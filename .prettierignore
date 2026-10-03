@@ -1,0 +1,9 @@
+node_modules/
+dist/
+dist-portable/
+public/portable.html
+plugins/showai/assets/
+plugins/showai/scripts/
+artifacts/
+output/
+package-lock.json

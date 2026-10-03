@@ -1,0 +1,12 @@
+{
+  "name": "showai-local",
+  "interface": { "displayName": "ShowAI Local" },
+  "plugins": [
+    {
+      "name": "showai",
+      "source": { "source": "local", "path": "./plugins/showai" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}

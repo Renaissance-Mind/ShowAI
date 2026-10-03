@@ -1,0 +1,270 @@
+{
+  "format": "showai",
+  "version": 1,
+  "document": {
+    "id": "showai-welcome",
+    "title": "一份可以探索的文档",
+    "icon": "✳",
+    "cover": "sage",
+    "parentId": null,
+    "favorite": false,
+    "archived": false,
+    "createdAt": "2026-10-03T00:00:00.000Z",
+    "updatedAt": "2026-10-03T00:00:00.000Z",
+    "comments": [],
+    "content": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "让文字、数据与灵感，住在同一个地方。ShowAI 把可编辑的文档和可探索的网页装进一个轻量文件。"
+            }
+          ]
+        },
+        {
+          "type": "callout",
+          "attrs": {
+            "tone": "sage",
+            "icon": "✦"
+          },
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "这份文档可以断网打开。图表、表格、折叠内容和计算控件都运行在当前浏览器中。点击顶部「下载源文件」获取 JSON 后，可导入 ShowAI 继续编辑。"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "attrs": {
+            "level": 2
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "让数据自己说话"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "下面是两个数学函数的确定值。切换曲线、悬停查看各点；没有使用实验或业务数据。"
+            }
+          ]
+        },
+        {
+          "type": "widget",
+          "attrs": {
+            "kind": "chart",
+            "data": {
+              "title": "两种增长的形状",
+              "description": "数学函数 · x 从 0 到 5",
+              "type": "line",
+              "labels": [
+                "0",
+                "1",
+                "2",
+                "3",
+                "4",
+                "5"
+              ],
+              "series": [
+                {
+                  "name": "y = x²",
+                  "values": [
+                    0,
+                    1,
+                    4,
+                    9,
+                    16,
+                    25
+                  ],
+                  "color": "#547c63"
+                },
+                {
+                  "name": "y = x",
+                  "values": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "color": "#c6925c"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "heading",
+          "attrs": {
+            "level": 2
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "信息也可以被整理"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "资料表可搜索、排序和筛选。这里收录的链接指向本文相关工具的官方文档。"
+            }
+          ]
+        },
+        {
+          "type": "widget",
+          "attrs": {
+            "kind": "database",
+            "data": {
+              "title": "参考资料",
+              "columns": [
+                {
+                  "id": "name",
+                  "name": "资料",
+                  "type": "text"
+                },
+                {
+                  "id": "status",
+                  "name": "用途",
+                  "type": "select",
+                  "options": [
+                    "开发",
+                    "接入"
+                  ]
+                },
+                {
+                  "id": "url",
+                  "name": "官方来源",
+                  "type": "url"
+                }
+              ],
+              "rows": [
+                {
+                  "id": "react",
+                  "name": "React 文档",
+                  "status": "开发",
+                  "url": "https://react.dev/"
+                },
+                {
+                  "id": "tiptap",
+                  "name": "Tiptap 文档",
+                  "status": "开发",
+                  "url": "https://tiptap.dev/docs"
+                },
+                {
+                  "id": "plugins",
+                  "name": "OpenAI 插件打包",
+                  "status": "接入",
+                  "url": "https://developers.openai.com/plugins/build/plugins"
+                }
+              ],
+              "groupBy": "status"
+            }
+          }
+        },
+        {
+          "type": "heading",
+          "attrs": {
+            "level": 2
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "调整参数，观察变化"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "以下是可以自行调整的阅读计划假设。结果按每日分钟数 × 阅读天数计算。"
+            }
+          ]
+        },
+        {
+          "type": "widget",
+          "attrs": {
+            "kind": "playground",
+            "data": {
+              "title": "阅读时间估算",
+              "description": "可调整的计划假设",
+              "inputs": [
+                {
+                  "id": "minutes",
+                  "label": "每天阅读",
+                  "min": 5,
+                  "max": 120,
+                  "step": 5,
+                  "value": 30,
+                  "unit": "分钟"
+                },
+                {
+                  "id": "days",
+                  "label": "阅读天数",
+                  "min": 1,
+                  "max": 30,
+                  "step": 1,
+                  "value": 7,
+                  "unit": "天"
+                }
+              ],
+              "operation": "product",
+              "resultLabel": "累计阅读时间",
+              "unit": "分钟"
+            }
+          }
+        },
+        {
+          "type": "toggle",
+          "attrs": {
+            "title": "如何继续编辑这份文档",
+            "open": false
+          },
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "下载 JSON 源文件，打开 ShowAI 应用并选择「导入」。所有正文、区块设置和数据都可以继续修改，再导出为新的离线 HTML。阅读器中的临时筛选和滑块操作不会覆盖源文件。"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "horizontalRule"
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "ShowAI · 留一点空白，让想法继续生长。"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

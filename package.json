@@ -1,0 +1,49 @@
+{
+  "name": "showai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A local-first interactive document canvas for Codex research.",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build:portable": "vite build --config vite.portable.config.ts && node scripts/copy-viewer.mjs",
+    "build": "tsc -b && npm run build:portable && vite build && node scripts/package-plugin.mjs",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "vitest run",
+    "artifact": "node scripts/render-artifact.mjs",
+    "check": "tsc --noEmit",
+    "format": "prettier --write src scripts docs README.md *.ts *.json *.html"
+  },
+  "dependencies": {
+    "@tiptap/core": "^3.31.4",
+    "@tiptap/extension-highlight": "^3.31.4",
+    "@tiptap/extension-image": "^3.31.4",
+    "@tiptap/extension-placeholder": "^3.31.4",
+    "@tiptap/extension-table": "^3.31.4",
+    "@tiptap/extension-task-item": "^3.31.4",
+    "@tiptap/extension-task-list": "^3.31.4",
+    "@tiptap/extension-text-align": "^3.31.4",
+    "@tiptap/pm": "^3.31.4",
+    "@tiptap/react": "^3.31.4",
+    "@tiptap/starter-kit": "^3.31.4",
+    "lucide-react": "^1.50.0",
+    "marked": "^18.0.14",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@playwright/cli": "^0.1.22",
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "esbuild": "^0.28.2",
+    "prettier": "^3.9.9",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

@@ -1,0 +1,61 @@
+#!/usr/bin/env node
+import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
+import { dirname, resolve, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  MAX_ARTIFACT_BYTES,
+  injectArtifactIntoHtml,
+  parseArtifact,
+} from "../src/portable/validation.mjs";
+
+import { assertOfflineImages } from "../src/portable/assets.mjs";
+
+const args = process.argv.slice(2);
+if (args.includes("--help") || args.length < 2 || args.length > 3) {
+  console.log(
+    "Usage: node render-artifact.mjs input.showai.json output.html [viewer-template.html]\nCreates one interactive offline HTML file. Images must use embedded raster data URIs.\nBuild the viewer first with npm run build:portable, or use the packaged plugin command.",
+  );
+  process.exit(args.includes("--help") ? 0 : 1);
+}
+const [inputPath, outputPath, explicitTemplate] = args;
+if (resolve(inputPath) === resolve(outputPath))
+  throw new Error("Input and output must be different files.");
+const scriptDirectory = dirname(fileURLToPath(import.meta.url));
+const packageRoot = resolve(scriptDirectory, "..");
+const candidates = explicitTemplate
+  ? [resolve(explicitTemplate)]
+  : [
+      join(packageRoot, "assets/viewer.html"),
+      join(packageRoot, "dist-portable/portable.html"),
+    ];
+let templatePath;
+for (const candidate of candidates) {
+  const exists = await stat(candidate).then(
+    () => true,
+    (error) => {
+      if (error.code === "ENOENT") return false;
+      throw error;
+    },
+  );
+  if (exists) {
+    templatePath = candidate;
+    break;
+  }
+}
+if (!templatePath)
+  throw new Error(
+    "No bundled viewer found. Run npm run build:portable or npm run build before exporting.",
+  );
+if ((await stat(inputPath)).size > MAX_ARTIFACT_BYTES)
+  throw new Error("Artifact exceeds the 10 MB limit.");
+const artifact = parseArtifact(await readFile(inputPath, "utf8"));
+assertOfflineImages(artifact.document);
+const html = injectArtifactIntoHtml(
+  await readFile(templatePath, "utf8"),
+  artifact.document,
+);
+await mkdir(dirname(resolve(outputPath)), { recursive: true });
+await writeFile(outputPath, html, "utf8");
+console.log(
+  `Saved ${resolve(outputPath)} (${(Buffer.byteLength(html) / 1024).toFixed(0)} KB)`,
+);

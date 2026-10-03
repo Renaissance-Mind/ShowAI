@@ -1,0 +1,16 @@
+node_modules/
+dist/
+dist-portable/
+public/portable.html
+artifacts/
+test-results/
+playwright-report/
+*.tsbuildinfo
+.DS_Store
+.playwright-cli/
+output/
+plugins/showai/assets/viewer.html
+plugins/showai/assets/build.json
+plugins/showai/scripts/render-artifact.mjs
+plugins/showai/skills/show-document/references/
+plugins/showai/skills/show-document/examples/

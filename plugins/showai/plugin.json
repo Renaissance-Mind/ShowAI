@@ -1,0 +1,21 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "showai",
+  "version": "0.1.0",
+  "description": "Present research as portable interactive documents with editable blocks, charts, tables, and controls.",
+  "keywords": ["documents", "research", "visualization", "local-first"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "ShowAI",
+        "shortDescription": "Turn research into interactive documents",
+        "longDescription": "Create portable HTML documents from structured JSON. Present source-grounded research with text, images, charts, filterable tables, and interactive controls. Runs locally without API keys or a server.",
+        "category": "Productivity",
+        "defaultPrompt": [
+          "Use ShowAI to present this research as an interactive document."
+        ],
+        "brandColor": "#34644E"
+      }
+    }
+  }
+}
