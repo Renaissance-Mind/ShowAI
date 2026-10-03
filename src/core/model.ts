@@ -19,6 +19,19 @@ export interface ProjectMetadata {
   updatedAt: string;
   binding?: ProjectBinding;
   bindings?: ProjectBinding[];
+  pinned?: boolean;
+  archived?: boolean;
+  folders?: FolderMetadata[];
+}
+
+export interface FolderMetadata {
+  id: string;
+  name: string;
+  parentId: string | null;
+  pinned: boolean;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ProjectSummary extends ProjectMetadata {
@@ -38,6 +51,9 @@ export interface PageSummary {
   icon: string;
   hash: string;
   blockCount: number;
+  parentId: string | null;
+  favorite: boolean;
+  archived: boolean;
 }
 
 export type PageFields = Partial<

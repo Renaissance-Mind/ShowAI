@@ -22,6 +22,7 @@ import {
 import { CoreError } from "./model";
 import type {
   ApplyPageInput,
+  FolderMetadata,
   PageDiff,
   PageRecord,
   PageSummary,
@@ -34,6 +35,7 @@ import type {
 export { CoreError } from "./model";
 export type {
   ApplyPageInput,
+  FolderMetadata,
   PageDiff,
   PageRecord,
   PageSummary,
@@ -125,7 +127,84 @@ function validateProject(value: unknown, expectedId: string): ProjectMetadata {
       throw new CoreError("INVALID_DATA", "Project bindings must be an array.");
     project.bindings.forEach(validateBinding);
   }
-  return project;
+  for (const key of ["pinned", "archived"] as const) {
+    if (project[key] !== undefined && typeof project[key] !== "boolean")
+      throw new CoreError("INVALID_DATA", `Project ${key} must be boolean.`);
+  }
+  const folders = project.folders ?? [];
+  if (!Array.isArray(folders) || folders.length > 10000)
+    throw new CoreError(
+      "INVALID_DATA",
+      "Project folders must be an array of at most 10000 entries.",
+    );
+  const ids = new Set<string>();
+  for (const folder of folders) {
+    if (!folder || typeof folder !== "object")
+      throw new CoreError("INVALID_DATA", "Invalid folder metadata.");
+    assertId(folder.id);
+    validateName(folder.name);
+    if (ids.has(folder.id))
+      throw new CoreError("INVALID_DATA", `Duplicate folder id: ${folder.id}`);
+    ids.add(folder.id);
+    if (folder.parentId !== null) assertId(folder.parentId);
+    if (
+      typeof folder.pinned !== "boolean" ||
+      typeof folder.archived !== "boolean" ||
+      !Number.isFinite(Date.parse(folder.createdAt)) ||
+      !Number.isFinite(Date.parse(folder.updatedAt))
+    )
+      throw new CoreError(
+        "INVALID_DATA",
+        `Invalid folder metadata: ${folder.id}`,
+      );
+  }
+  const map = new Map(folders.map((folder) => [folder.id, folder]));
+  for (const folder of folders) {
+    const visited = new Set([folder.id]);
+    let parentId = folder.parentId;
+    while (parentId !== null) {
+      const parent = map.get(parentId);
+      if (!parent || visited.has(parentId) || visited.size >= 64)
+        throw new CoreError(
+          "INVALID_DATA",
+          "Folder hierarchy has a missing parent, cycle, or more than 64 levels.",
+        );
+      visited.add(parentId);
+      parentId = parent.parentId;
+    }
+  }
+  return {
+    ...project,
+    pinned: project.pinned ?? false,
+    archived: project.archived ?? false,
+    folders,
+  };
+}
+
+function folderVisible(folders: FolderMetadata[], id: string): boolean {
+  const byId = new Map(folders.map((folder) => [folder.id, folder]));
+  let folder = byId.get(id);
+  if (!folder) return false;
+  while (folder) {
+    if (folder.archived) return false;
+    folder = folder.parentId === null ? undefined : byId.get(folder.parentId);
+  }
+  return true;
+}
+
+function requireActiveFolder(
+  project: ProjectMetadata,
+  parentId: string | null,
+): void {
+  if (project.archived)
+    throw new CoreError("INVALID_DATA", "This project is archived.");
+  if (parentId === null) return;
+  assertId(parentId);
+  if (!folderVisible(project.folders ?? [], parentId))
+    throw new CoreError(
+      "NOT_FOUND",
+      "The destination folder is missing or archived.",
+    );
 }
 
 /** Canonical files, immutable checkpoints, and cooperating writers; no background service. */
@@ -337,7 +416,9 @@ export class FileStore {
     );
   }
 
-  async listProjects(): Promise<ProjectSummary[]> {
+  async listProjects(
+    options: { includeArchived?: boolean } = {},
+  ): Promise<ProjectSummary[]> {
     const path = join(this.root, "projects");
     await this.ensureDirectory(path);
     const projects: ProjectSummary[] = [];
@@ -349,9 +430,17 @@ export class FileStore {
         );
       if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
       const project = await this.readProject(entry.name);
-      const pages = await this.listPages(project.id);
+      if (project.archived && !options.includeArchived) continue;
+      const pages = await this.listPages(project.id, {
+        includeArchived: !!options.includeArchived,
+      });
       projects.push({
         ...project,
+        folders: options.includeArchived
+          ? (project.folders ?? [])
+          : (project.folders ?? []).filter((folder) =>
+              folderVisible(project.folders ?? [], folder.id),
+            ),
         updatedAt: pages.reduce(
           (latest, page) => (page.updatedAt > latest ? page.updatedAt : latest),
           project.updatedAt,
@@ -359,8 +448,10 @@ export class FileStore {
         pageCount: pages.length,
       });
     }
-    return projects.sort((left, right) =>
-      right.updatedAt.localeCompare(left.updatedAt),
+    return projects.sort(
+      (left, right) =>
+        Number(!!right.pinned) - Number(!!left.pinned) ||
+        right.updatedAt.localeCompare(left.updatedAt),
     );
   }
 
@@ -372,7 +463,9 @@ export class FileStore {
     const binding = input.binding ? validateBinding(input.binding) : undefined;
     return this.withLock("projects", async () => {
       if (binding) {
-        const existing = (await this.listProjects()).find((project) =>
+        const existing = (
+          await this.listProjects({ includeArchived: true })
+        ).find((project) =>
           (project.bindings ?? (project.binding ? [project.binding] : [])).some(
             (item) =>
               item.harness === binding.harness &&
@@ -389,27 +482,56 @@ export class FileStore {
         name,
         createdAt: now,
         updatedAt: now,
+        pinned: false,
+        archived: false,
+        folders: [],
         ...(binding ? { binding, bindings: [binding] } : {}),
       };
-      await this.atomicWrite(
-        join(this.projectPath(project.id), "project.json"),
-        JSON.stringify(project, null, 2),
-      );
-      await this.ensureDirectory(join(this.projectPath(project.id), "pages"));
-      return { ...project, pageCount: 0 };
+      const destination = this.projectPath(project.id);
+      const staging = join(dirname(destination), `.create-${project.id}`);
+      const syncDirectory = async (path: string) => {
+        if (process.platform === "win32") return;
+        const directory = await open(path, "r");
+        try {
+          await directory.sync();
+        } finally {
+          await directory.close();
+        }
+      };
+      try {
+        // Readers ignore the hidden staging directory. Publish a complete project
+        // in one rename so filesystem watchers never observe a missing manifest.
+        await this.atomicWrite(
+          join(staging, "project.json"),
+          JSON.stringify(project, null, 2),
+        );
+        await this.ensureDirectory(join(staging, "pages"));
+        await syncDirectory(staging);
+        await this.safePath(destination);
+        await rename(staging, destination);
+        await syncDirectory(dirname(destination));
+        return { ...project, pageCount: 0 };
+      } finally {
+        await rm(staging, { recursive: true, force: true });
+      }
     });
   }
 
   async updateProject(
     projectId: string,
-    input: { name: string },
+    input: { name?: string; pinned?: boolean; archived?: boolean },
   ): Promise<ProjectSummary> {
     assertId(projectId);
     return this.withLock(`project-${projectId}`, async () => {
       const current = await this.readProject(projectId);
+      for (const key of ["pinned", "archived"] as const)
+        if (input[key] !== undefined && typeof input[key] !== "boolean")
+          throw new CoreError("INVALID_DATA", `${key} must be boolean.`);
       const project = {
         ...current,
-        name: validateName(input.name),
+        ...(input.name !== undefined ? { name: validateName(input.name) } : {}),
+        ...(input.pinned !== undefined ? { pinned: input.pinned } : {}),
+        ...(input.archived !== undefined ? { archived: input.archived } : {}),
         updatedAt: new Date().toISOString(),
       };
       await this.atomicWrite(
@@ -418,7 +540,8 @@ export class FileStore {
       );
       return {
         ...project,
-        pageCount: (await this.listPages(projectId)).length,
+        pageCount: (await this.listPages(projectId, { includeArchived: false }))
+          .length,
       };
     });
   }
@@ -430,7 +553,7 @@ export class FileStore {
     const binding = validateBinding(input);
     assertId(projectId);
     return this.withLock("projects", async () => {
-      const projects = await this.listProjects();
+      const projects = await this.listProjects({ includeArchived: true });
       const other = projects.find(
         (project) =>
           project.id !== projectId &&
@@ -474,6 +597,130 @@ export class FileStore {
     });
   }
 
+  async listFolders(
+    projectId: string,
+    options: { includeArchived?: boolean } = {},
+  ): Promise<FolderMetadata[]> {
+    const project = await this.readProject(projectId);
+    const folders = project.folders ?? [];
+    if (project.archived && !options.includeArchived) return [];
+    return folders
+      .filter(
+        (folder) =>
+          options.includeArchived || folderVisible(folders, folder.id),
+      )
+      .sort(
+        (left, right) =>
+          Number(right.pinned) - Number(left.pinned) ||
+          right.updatedAt.localeCompare(left.updatedAt),
+      );
+  }
+
+  async createFolder(
+    projectId: string,
+    input: { name: string; parentId?: string | null },
+  ): Promise<FolderMetadata> {
+    assertId(projectId);
+    const name = validateName(input.name);
+    return this.withLock(`project-${projectId}`, async () => {
+      const project = await this.readProject(projectId);
+      requireActiveFolder(project, input.parentId ?? null);
+      const now = new Date().toISOString();
+      const folder: FolderMetadata = {
+        id: randomUUID(),
+        name,
+        parentId: input.parentId ?? null,
+        pinned: false,
+        archived: false,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const updated = validateProject(
+        {
+          ...project,
+          folders: [...(project.folders ?? []), folder],
+          updatedAt: now,
+        },
+        projectId,
+      );
+      await this.atomicWrite(
+        join(this.projectPath(projectId), "project.json"),
+        JSON.stringify(updated, null, 2),
+      );
+      return folder;
+    });
+  }
+
+  async updateFolder(
+    projectId: string,
+    folderId: string,
+    input: { name?: string; pinned?: boolean; archived?: boolean },
+  ): Promise<FolderMetadata> {
+    assertId(projectId);
+    assertId(folderId);
+    for (const key of ["pinned", "archived"] as const)
+      if (input[key] !== undefined && typeof input[key] !== "boolean")
+        throw new CoreError("INVALID_DATA", `${key} must be boolean.`);
+    return this.withLock(`project-${projectId}`, async () => {
+      const project = await this.readProject(projectId);
+      const folder = project.folders?.find((item) => item.id === folderId);
+      if (!folder) throw new CoreError("NOT_FOUND", "Folder not found.");
+      const now = new Date().toISOString();
+      const updated: FolderMetadata = {
+        ...folder,
+        ...(input.name !== undefined ? { name: validateName(input.name) } : {}),
+        ...(input.pinned !== undefined ? { pinned: input.pinned } : {}),
+        ...(input.archived !== undefined ? { archived: input.archived } : {}),
+        updatedAt: now,
+      };
+      await this.atomicWrite(
+        join(this.projectPath(projectId), "project.json"),
+        JSON.stringify(
+          {
+            ...project,
+            folders: project.folders!.map((item) =>
+              item.id === folderId ? updated : item,
+            ),
+            updatedAt: now,
+          },
+          null,
+          2,
+        ),
+      );
+      return updated;
+    });
+  }
+
+  async updatePageMetadata(
+    projectId: string,
+    pageId: string,
+    fields: {
+      title?: string;
+      favorite?: boolean;
+      parentId?: string | null;
+      archived?: boolean;
+    },
+    baseHash: string,
+  ): Promise<PageRecord> {
+    this.pagePath(projectId, pageId);
+    if (
+      !fields ||
+      Object.keys(fields).some(
+        (key) => !["title", "favorite", "parentId", "archived"].includes(key),
+      )
+    )
+      throw new CoreError("INVALID_DATA", "Unsupported page metadata field.");
+    return this.withLock(`project-${projectId}`, async () => {
+      const project = await this.readProject(projectId);
+      if (fields.parentId !== undefined)
+        requireActiveFolder(project, fields.parentId);
+      return this.applyPage(projectId, pageId, {
+        baseHash,
+        operations: [{ type: "page.set", fields }],
+      });
+    });
+  }
+
   private async readRecord(
     projectId: string,
     pageId: string,
@@ -498,8 +745,13 @@ export class FileStore {
     return { document, hash: documentHash(document), path };
   }
 
-  async listPages(projectId: string): Promise<PageSummary[]> {
-    await this.readProject(projectId);
+  async listPages(
+    projectId: string,
+    options: { includeArchived?: boolean } = {},
+  ): Promise<PageSummary[]> {
+    const project = await this.readProject(projectId);
+    if (project.archived && options.includeArchived === false) return [];
+    const folders = project.folders ?? [];
     const path = join(this.projectPath(projectId), "pages");
     await this.ensureDirectory(path);
     const pages: PageSummary[] = [];
@@ -516,6 +768,15 @@ export class FileStore {
       )
         continue;
       const record = await this.readRecord(projectId, entry.name.slice(0, -5));
+      const parentId = record.document.parentId;
+      const hasFolder =
+        parentId !== null && folders.some((folder) => folder.id === parentId);
+      if (
+        options.includeArchived === false &&
+        (record.document.archived ||
+          (hasFolder && !folderVisible(folders, parentId!)))
+      )
+        continue;
       pages.push({
         id: record.document.id,
         title: record.document.title,
@@ -523,10 +784,16 @@ export class FileStore {
         icon: record.document.icon,
         hash: record.hash,
         blockCount: indexBlocks(record.document).size,
+        parentId:
+          options.includeArchived === false && !hasFolder ? null : parentId,
+        favorite: record.document.favorite,
+        archived: record.document.archived,
       });
     }
-    return pages.sort((left, right) =>
-      right.updatedAt.localeCompare(left.updatedAt),
+    return pages.sort(
+      (left, right) =>
+        Number(right.favorite) - Number(left.favorite) ||
+        right.updatedAt.localeCompare(left.updatedAt),
     );
   }
 
@@ -571,43 +838,62 @@ export class FileStore {
 
   async createPage(
     projectId: string,
-    input: { title?: string; document?: ShowDocument } = {},
+    input: {
+      title?: string;
+      document?: ShowDocument;
+      parentId?: string | null;
+    } = {},
   ): Promise<PageRecord> {
-    await this.readProject(projectId);
-    const now = new Date().toISOString();
-    const id = randomUUID();
-    const document = normalizeDocument(
-      input.document
-        ? {
-            ...input.document,
-            id,
-            ...(input.title !== undefined ? { title: input.title } : {}),
-            createdAt: now,
-            updatedAt: now,
-          }
-        : {
-            id,
-            title: input.title ?? "未命名页面",
-            icon: "",
-            cover: "none",
-            parentId: null,
-            favorite: false,
-            archived: false,
-            createdAt: now,
-            updatedAt: now,
-            content: { type: "doc", content: [{ type: "paragraph" }] },
-            comments: [],
-          },
-    );
-    return this.withLock(`page-${projectId}-${id}`, async () => {
-      const record = {
-        document,
-        hash: documentHash(document),
-        path: this.pagePath(projectId, id),
-      };
-      await this.checkpoint(projectId, record);
-      await this.atomicWrite(record.path, serializeArtifact(document));
-      return record;
+    assertId(projectId);
+    return this.withLock(`project-${projectId}`, async () => {
+      const project = await this.readProject(projectId);
+      requireActiveFolder(project, input.parentId ?? null);
+      if (
+        input.parentId === undefined &&
+        input.document?.parentId &&
+        project.folders?.some(
+          (folder) => folder.id === input.document!.parentId,
+        )
+      )
+        requireActiveFolder(project, input.document.parentId);
+      const now = new Date().toISOString();
+      const id = randomUUID();
+      const document = normalizeDocument(
+        input.document
+          ? {
+              ...input.document,
+              id,
+              ...(input.title !== undefined ? { title: input.title } : {}),
+              ...(input.parentId !== undefined
+                ? { parentId: input.parentId }
+                : {}),
+              createdAt: now,
+              updatedAt: now,
+            }
+          : {
+              id,
+              title: input.title ?? "未命名页面",
+              icon: "",
+              cover: "none",
+              parentId: input.parentId ?? null,
+              favorite: false,
+              archived: false,
+              createdAt: now,
+              updatedAt: now,
+              content: { type: "doc", content: [{ type: "paragraph" }] },
+              comments: [],
+            },
+      );
+      return this.withLock(`page-${projectId}-${id}`, async () => {
+        const record = {
+          document,
+          hash: documentHash(document),
+          path: this.pagePath(projectId, id),
+        };
+        await this.checkpoint(projectId, record);
+        await this.atomicWrite(record.path, serializeArtifact(document));
+        return record;
+      });
     });
   }
 

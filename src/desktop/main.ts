@@ -26,6 +26,7 @@ import { assertId, CoreError, FileStore } from "../core/store";
 import type { PageRecord, ProjectBinding } from "../core/model";
 import {
   getComponent,
+  blankDocument,
   getTemplate,
   importComponent,
   instantiateTemplate,
@@ -54,12 +55,22 @@ const actions = new Set([
   "projects:list",
   "projects:create",
   "projects:rename",
+  "projects:pin",
+  "projects:remove",
+  "folders:list",
+  "folders:create",
+  "folders:rename",
+  "folders:pin",
+  "folders:remove",
   "pages:list",
   "pages:get",
   "pages:create",
   "pages:save",
   "pages:duplicate",
   "pages:remove",
+  "pages:rename",
+  "pages:pin",
+  "pages:move",
   "pages:import",
   "templates:list",
   "templates:get",
@@ -118,6 +129,34 @@ const projectId = (args: Record<string, unknown>) =>
   assertId(required(args, "projectId"));
 const pageId = (args: Record<string, unknown>) =>
   assertId(required(args, "pageId"));
+
+function boolean(args: Record<string, unknown>, key: string): boolean {
+  if (typeof args[key] !== "boolean")
+    throw new CoreError("INVALID_DATA", `${key} must be boolean.`);
+  return args[key];
+}
+
+function parentFolder(args: Record<string, unknown>): string | null {
+  return args.parentId === null || args.parentId === undefined
+    ? null
+    : assertId(required(args, "parentId"));
+}
+
+async function validateDestination(
+  projectId: string,
+  parentId: string | null,
+): Promise<void> {
+  if (
+    parentId !== null &&
+    !(await store.listFolders(projectId)).some(
+      (folder) => folder.id === parentId,
+    )
+  )
+    throw new CoreError(
+      "NOT_FOUND",
+      "The destination folder is missing or archived.",
+    );
+}
 
 async function optionalProject(
   args: Record<string, unknown>,
@@ -209,11 +248,7 @@ async function saveSettings(home: string): Promise<void> {
 }
 
 async function activePages(id: string) {
-  const pages = await store.listPages(id);
-  const states = await Promise.all(
-    pages.map((page) => store.readPage(id, page.id, { checkpoint: false })),
-  );
-  return pages.filter((_page, index) => !states[index].document.archived);
+  return store.listPages(id, { includeArchived: false });
 }
 
 async function pageRecord(id: string, page: string) {
@@ -262,12 +297,7 @@ async function handle(
     case "app:info":
       return info();
     case "projects:list":
-      return Promise.all(
-        (await store.listProjects()).map(async (project) => ({
-          ...project,
-          pageCount: (await activePages(project.id)).length,
-        })),
-      );
+      return store.listProjects();
     case "projects:create":
       return service.createProject(
         required(args, "name"),
@@ -277,6 +307,37 @@ async function handle(
       return store.updateProject(projectId(args), {
         name: required(args, "name"),
       });
+    case "projects:pin":
+      return store.updateProject(projectId(args), {
+        pinned: boolean(args, "pinned"),
+      });
+    case "projects:remove":
+      return store.updateProject(projectId(args), { archived: true });
+    case "folders:list":
+      return store.listFolders(projectId(args));
+    case "folders:create":
+      return store.createFolder(projectId(args), {
+        name: required(args, "name"),
+        parentId: parentFolder(args),
+      });
+    case "folders:rename":
+      return store.updateFolder(
+        projectId(args),
+        assertId(required(args, "folderId")),
+        { name: required(args, "name") },
+      );
+    case "folders:pin":
+      return store.updateFolder(
+        projectId(args),
+        assertId(required(args, "folderId")),
+        { pinned: boolean(args, "pinned") },
+      );
+    case "folders:remove":
+      return store.updateFolder(
+        projectId(args),
+        assertId(required(args, "folderId")),
+        { archived: true },
+      );
     case "pages:list":
       return activePages(projectId(args));
     case "pages:get":
@@ -284,25 +345,52 @@ async function handle(
     case "pages:create": {
       const id = projectId(args);
       const templateId = text(args, "templateId", true);
-      if (templateId)
-        return enrichPage(
-          id,
-          await service.applyTemplate(
-            id,
-            templateId,
-            text(args, "title", true),
-          ),
-        );
+      const document = templateId
+        ? instantiateTemplate(
+            (await getTemplate(store.root, templateId, id)).document,
+          )
+        : args.document !== undefined
+          ? validateDocument(args.document)
+          : blankDocument();
+      const parentId =
+        args.parentId !== undefined
+          ? parentFolder(args)
+          : args.document !== undefined &&
+              document.parentId &&
+              (await store.listFolders(id)).some(
+                (folder) => folder.id === document.parentId,
+              )
+            ? document.parentId
+            : null;
+      await validateDestination(id, parentId);
       return enrichPage(
         id,
         await service.createPage(id, {
           ...(args.title !== undefined
             ? { title: required(args, "title") }
             : {}),
-          ...(args.document !== undefined
-            ? { document: validateDocument(args.document) }
-            : {}),
+          document: { ...document, parentId },
         }),
+      );
+    }
+    case "pages:rename":
+    case "pages:pin":
+    case "pages:move": {
+      const id = projectId(args);
+      const fields =
+        action === "pages:rename"
+          ? { title: required(args, "title") }
+          : action === "pages:pin"
+            ? { favorite: boolean(args, "pinned") }
+            : { parentId: parentFolder(args) };
+      return enrichPage(
+        id,
+        await store.updatePageMetadata(
+          id,
+          pageId(args),
+          fields,
+          required(args, "baseHash"),
+        ),
       );
     }
     case "pages:save": {
@@ -320,14 +408,22 @@ async function handle(
     case "pages:duplicate": {
       const id = projectId(args),
         original = await store.readPage(id, pageId(args));
+      const parentId = (await store.listFolders(id)).some(
+        (folder) => folder.id === original.document.parentId,
+      )
+        ? original.document.parentId
+        : null;
       return enrichPage(
         id,
         await service.createPage(id, {
-          document: instantiateTemplate({
-            ...original.document,
-            title: `${original.document.title || "未命名页面"} 副本`,
-            archived: false,
-          }),
+          document: {
+            ...instantiateTemplate({
+              ...original.document,
+              title: `${original.document.title || "未命名页面"} 副本`,
+              archived: false,
+            }),
+            parentId,
+          },
         }),
       );
     }
@@ -347,10 +443,19 @@ async function handle(
     case "pages:import": {
       const artifact = artifactInput(args.artifact);
       const id = projectId(args);
+      const parentId =
+        args.parentId !== undefined
+          ? parentFolder(args)
+          : (await store.listFolders(id)).some(
+                (folder) => folder.id === artifact.document.parentId,
+              )
+            ? artifact.document.parentId
+            : null;
+      await validateDestination(id, parentId);
       return enrichPage(
         id,
         await service.createPage(id, {
-          document: artifact.document,
+          document: { ...artifact.document, parentId },
           components: artifact.components,
         }),
       );

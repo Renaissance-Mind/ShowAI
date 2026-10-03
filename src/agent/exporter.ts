@@ -223,7 +223,9 @@ export async function exportPage(
     };
   }
 
-  const pages = await store.listPages(options.projectId);
+  const pages = await store.listPages(options.projectId, {
+    includeArchived: false,
+  });
   if (!pages.length) throw new Error("This project has no pages to export.");
   const selected = options.pageId
     ? pages.filter((page) => page.id === options.pageId)

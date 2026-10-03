@@ -17,6 +17,11 @@ import {
   FileText,
   Folder,
   FolderOpen,
+  FolderPlus,
+  Pencil,
+  Pin,
+  PinOff,
+  Trash2,
   HardDrive,
   LayoutTemplate,
   Loader2,
@@ -27,7 +32,11 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import type { ProjectSummary, PageSummary } from "../core/model";
+import type {
+  ProjectSummary,
+  PageSummary,
+  FolderMetadata,
+} from "../core/model";
 import type { DesktopInfo } from "../desktop/bridge";
 import type { ShowArtifact, ShowDocument } from "../types";
 import type {
@@ -48,6 +57,11 @@ import { parseMarkdown } from "../lib/markdown";
 import { newDocument } from "../lib/document";
 import { desktop, errorMessage } from "./bridge";
 import { usePage, type LoadedPage } from "./usePage";
+import {
+  LibraryRow,
+  LibraryContextMenu,
+  type LibraryTarget,
+} from "./LibraryNavigation";
 import "./studio.css";
 
 type View =
@@ -59,7 +73,15 @@ type Catalog = {
 type LoadedTemplate = TemplateRecord & { components?: CompiledComponent[] };
 type DialogState =
   | { type: "project"; project?: ProjectSummary }
-  | { type: "newPage" }
+  | {
+      type: "newPage";
+      projectId: string;
+      parentId: string | null;
+      templates: TemplateMetadata[];
+    }
+  | { type: "folder"; projectId: string; parentId: string | null }
+  | { type: "rename"; target: LibraryTarget }
+  | { type: "delete"; target: LibraryTarget }
   | { type: "template"; record: LoadedTemplate; copy?: boolean }
   | { type: "saveTemplate" }
   | {
@@ -98,9 +120,10 @@ function Dialog({
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement;
-    panel.current
-      ?.querySelector<HTMLElement>("input,textarea,select,button")
-      ?.focus();
+    (
+      panel.current?.querySelector<HTMLElement>("input,textarea,select") ??
+      panel.current?.querySelector<HTMLElement>("button")
+    )?.focus();
     const handle = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
       if (event.key === "Tab") {
@@ -161,7 +184,22 @@ export default function Studio() {
   const [info, setInfo] = useState<DesktopInfo | null>(null);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
-  const [pages, setPages] = useState<PageSummary[]>([]);
+  const [contents, setContents] = useState<
+    Record<string, { pages: PageSummary[]; folders: FolderMetadata[] }>
+  >({});
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [expandedProjects, setExpandedProjects] = useState<
+    Record<string, boolean>
+  >({});
+  const [expandedFolders, setExpandedFolders] = useState<
+    Record<string, boolean>
+  >({});
+  const expandedRef = useRef(expandedProjects);
+  expandedRef.current = expandedProjects;
+  const pages = selectedProject ? (contents[selectedProject]?.pages ?? []) : [];
+  const folders = selectedProject
+    ? (contents[selectedProject]?.folders ?? [])
+    : [];
   const [view, setView] = useState<View>("projects");
   const [templates, setTemplates] = useState<TemplateMetadata[]>([]);
   const [catalog, setCatalog] = useState<Catalog>({ builtin: [], custom: [] });
@@ -170,7 +208,12 @@ export default function Studio() {
   const [notice, setNotice] = useState("");
   const [problem, setProblem] = useState("");
   const [busy, setBusy] = useState(false);
-  const [menu, setMenu] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    target: LibraryTarget;
+    anchor: HTMLElement;
+    pageTools?: boolean;
+  } | null>(null);
+  const [projectsMenu, setProjectsMenu] = useState<HTMLElement | null>(null);
   const [dark, setDark] = useState(() => {
     const saved = localStorage.getItem("showai:appearance");
     return saved
@@ -188,6 +231,8 @@ export default function Studio() {
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const selectedRef = useRef(selectedProject);
   selectedRef.current = selectedProject;
+  const selectedFolderRef = useRef(selectedFolder);
+  selectedFolderRef.current = selectedFolder;
   const initialized = useRef(false);
   const closeDialog = useCallback(() => setDialog(null), []);
 
@@ -195,17 +240,26 @@ export default function Studio() {
     (error: unknown) => setProblem(errorMessage(error)),
     [],
   );
+  const loadProjectContents = useCallback(async (id: string) => {
+    const [nextPages, nextFolders] = await Promise.all([
+      desktop.invoke<PageSummary[]>("pages:list", { projectId: id }),
+      desktop.invoke<FolderMetadata[]>("folders:list", { projectId: id }),
+    ]);
+    const next = { pages: nextPages, folders: nextFolders };
+    setContents((current) => ({ ...current, [id]: next }));
+    return next;
+  }, []);
   const refresh = useCallback(async () => {
     const next = await desktop.invoke<ProjectSummary[]>("projects:list");
     setProjects(next);
-    const id = selectedRef.current;
-    if (id && next.some((item) => item.id === id)) {
-      const nextPages = await desktop.invoke<PageSummary[]>("pages:list", {
-        projectId: id,
-      });
-      if (selectedRef.current === id) setPages(nextPages);
-    }
-  }, []);
+    const visibleIds = next
+      .filter(
+        (item) =>
+          expandedRef.current[item.id] || item.id === selectedRef.current,
+      )
+      .map((item) => item.id);
+    await Promise.all(visibleIds.map(loadProjectContents));
+  }, [loadProjectContents]);
   const loadCatalog = useCallback(async () => {
     const id = selectedRef.current;
     const scope = id ? { projectId: id } : {};
@@ -241,9 +295,11 @@ export default function Studio() {
       if (projectId && pageId) {
         selectedRef.current = projectId;
         setSelectedProject(projectId);
-        setPages(
-          await desktop.invoke<PageSummary[]>("pages:list", { projectId }),
+        const loaded = await loadProjectContents(projectId);
+        setSelectedFolder(
+          loaded.pages.find((item) => item.id === pageId)?.parentId ?? null,
         );
+        setExpandedProjects((current) => ({ ...current, [projectId]: true }));
         await page.open(projectId, pageId);
         setView("page");
       }
@@ -287,10 +343,14 @@ export default function Studio() {
   }, [view, page.draft?.title]);
   useEffect(() => {
     const handle = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMenu(false);
+      if (event.key === "Escape") setContextMenu(null);
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "n") {
         event.preventDefault();
-        if (selectedRef.current) setDialog({ type: "newPage" });
+        if (selectedRef.current)
+          void beginNewPage(
+            selectedRef.current,
+            selectedFolderRef.current,
+          ).catch(report);
         else setDialog({ type: "project" });
       }
     };
@@ -303,40 +363,68 @@ export default function Studio() {
       setView("page");
       return;
     }
-    setMenu(false);
+    setContextMenu(null);
     setQuery("");
     setView(next);
     if (next === "projects") {
       setSelectedProject(null);
       selectedRef.current = null;
-      setPages([]);
+      setSelectedFolder(null);
     }
     if (next === "templates" || next === "components") await loadCatalog();
   }
-  async function openProject(id: string) {
+  async function openProject(id: string, folderId: string | null = null) {
     if (!(await page.flush())) {
       setView("page");
       return;
     }
     selectedRef.current = id;
     setSelectedProject(id);
+    setSelectedFolder(folderId);
+    setExpandedProjects((current) => ({ ...current, [id]: true }));
     setQuery("");
     setView("project");
-    setMenu(false);
-    setPages(
-      await desktop.invoke<PageSummary[]>("pages:list", { projectId: id }),
-    );
+    setContextMenu(null);
+    const loaded = await loadProjectContents(id);
+    expandFolderPath(loaded.folders, folderId);
     await loadCatalog();
   }
   async function openPage(id: string, projectId = selectedProject) {
     if (!projectId) return;
     if (await page.open(projectId, id)) {
+      selectedRef.current = projectId;
+      setSelectedProject(projectId);
+      setExpandedProjects((current) => ({ ...current, [projectId]: true }));
+      const loaded = await loadProjectContents(projectId);
+      const parentId =
+        loaded.pages.find((item) => item.id === id)?.parentId ?? null;
+      setSelectedFolder(parentId);
+      expandFolderPath(loaded.folders, parentId);
       setView("page");
-      setMenu(false);
+      setContextMenu(null);
     }
   }
+  async function beginNewPage(projectId: string, parentId: string | null) {
+    const choices = await desktop.invoke<TemplateMetadata[]>("templates:list", {
+      projectId,
+    });
+    setContextMenu(null);
+    setDialog({ type: "newPage", projectId, parentId, templates: choices });
+  }
+  function expandFolderPath(items: FolderMetadata[], parentId: string | null) {
+    const expanded: Record<string, boolean> = {};
+    while (parentId && !expanded[parentId]) {
+      expanded[parentId] = true;
+      parentId = items.find((item) => item.id === parentId)?.parentId ?? null;
+    }
+    setExpandedFolders((current) => ({ ...current, ...expanded }));
+  }
   async function createPage(templateId = "blank") {
-    if (!selectedProject) return;
+    const projectId =
+      dialog?.type === "newPage" ? dialog.projectId : selectedProject;
+    const parentId =
+      dialog?.type === "newPage" ? dialog.parentId : selectedFolder;
+    if (!projectId) return;
     if (!(await page.flush())) {
       setDialog(null);
       setView("page");
@@ -345,10 +433,12 @@ export default function Studio() {
     setBusy(true);
     try {
       const created = await desktop.invoke<LoadedPage>("pages:create", {
-        projectId: selectedProject,
+        projectId,
+        parentId,
         templateId,
       });
-      await page.open(selectedProject, created.document.id);
+      await openProject(projectId, parentId);
+      await page.open(projectId, created.document.id);
       setDialog(null);
       setView("page");
       await refresh();
@@ -378,9 +468,10 @@ export default function Studio() {
     } else artifact = parseArtifact(file.content);
     const imported = await desktop.invoke<LoadedPage>("pages:import", {
       projectId: selectedProject,
+      parentId: selectedFolder,
       artifact,
     });
-    await page.open(selectedProject, imported.document.id);
+    await openPage(imported.document.id, selectedProject);
     setView("page");
     await refresh();
     setNotice("页面已导入");
@@ -388,7 +479,7 @@ export default function Studio() {
   async function exportPage(format: "html" | "json" | "inline") {
     if (!selectedProject || !page.draft || !(await page.flush())) return;
     setBusy(true);
-    setMenu(false);
+    setContextMenu(null);
     try {
       const result = await desktop.invoke<{ path: string } | null>(
         "export:page",
@@ -416,21 +507,235 @@ export default function Studio() {
       setBusy(false);
     }
   }
-  async function removePage() {
-    if (!selectedProject || !page.draft || !(await page.flush())) return;
-    await desktop.invoke("pages:remove", {
-      projectId: selectedProject,
-      pageId: page.draft.id,
-      baseHash: page.record?.hash,
-    });
-    await page.clear();
-    setMenu(false);
-    setView("project");
+  const projectTarget = (item: ProjectSummary): LibraryTarget => ({
+    kind: "project",
+    projectId: item.id,
+    id: item.id,
+    title: item.name,
+    pinned: !!item.pinned,
+    parentId: null,
+  });
+  const folderTarget = (
+    item: FolderMetadata,
+    projectId: string,
+  ): LibraryTarget => ({
+    kind: "folder",
+    projectId,
+    id: item.id,
+    title: item.name,
+    pinned: !!item.pinned,
+    parentId: item.parentId ?? null,
+  });
+  const pageTarget = (item: PageSummary, projectId: string): LibraryTarget => ({
+    kind: "page",
+    projectId,
+    id: item.id,
+    title: item.title || "无标题",
+    pinned: !!item.favorite,
+    parentId: item.parentId ?? null,
+  });
+  const activePageTarget = (): LibraryTarget | null =>
+    page.draft && page.projectId
+      ? {
+          kind: "page",
+          projectId: page.projectId,
+          id: page.draft.id,
+          title: page.draft.title || "无标题",
+          pinned: page.draft.favorite,
+          parentId: page.draft.parentId,
+        }
+      : null;
+  const showMenu = (
+    target: LibraryTarget,
+    anchor: HTMLElement,
+    pageTools = false,
+  ) =>
+    setContextMenu((current) =>
+      current?.anchor === anchor && current.target.id === target.id
+        ? null
+        : { target, anchor, pageTools },
+    );
+  async function toggleProject(id: string) {
+    if (!expandedProjects[id]) await loadProjectContents(id);
+    setExpandedProjects((current) => ({ ...current, [id]: !current[id] }));
+  }
+  async function updateTarget(
+    target: LibraryTarget,
+    change: { name?: string; pinned?: boolean },
+  ) {
+    if (!(await page.flush())) {
+      setView("page");
+      return false;
+    }
+    if (
+      target.kind === "page" &&
+      page.draft?.id === target.id &&
+      page.projectId === target.projectId
+    ) {
+      page.edit({
+        ...(change.name !== undefined ? { title: change.name } : {}),
+        ...(change.pinned !== undefined ? { favorite: change.pinned } : {}),
+      });
+      if (!(await page.flush())) return false;
+    } else if (target.kind === "page") {
+      const record = await desktop.invoke<LoadedPage>("pages:get", {
+        projectId: target.projectId,
+        pageId: target.id,
+      });
+      await desktop.invoke(
+        change.name !== undefined ? "pages:rename" : "pages:pin",
+        {
+          projectId: target.projectId,
+          pageId: target.id,
+          baseHash: record.hash,
+          ...(change.name !== undefined
+            ? { title: change.name }
+            : { pinned: change.pinned }),
+        },
+      );
+    } else {
+      await desktop.invoke(
+        `${target.kind === "project" ? "projects" : "folders"}:${change.name !== undefined ? "rename" : "pin"}`,
+        {
+          projectId: target.projectId,
+          ...(target.kind === "folder" ? { folderId: target.id } : {}),
+          ...change,
+        },
+      );
+    }
     await refresh();
-    setNotice("页面已移出列表，源文件仍保留");
+    return true;
+  }
+  async function deleteTarget(target: LibraryTarget) {
+    if (!(await page.flush())) {
+      setDialog(null);
+      setView("page");
+      return;
+    }
+    const owning = contents[target.projectId];
+    const insideFolder = (parentId: string | null): boolean => {
+      const visited = new Set<string>();
+      while (parentId && !visited.has(parentId)) {
+        if (parentId === target.id) return true;
+        visited.add(parentId);
+        parentId =
+          owning?.folders.find((item) => item.id === parentId)?.parentId ??
+          null;
+      }
+      return false;
+    };
+    const closePage =
+      page.projectId === target.projectId &&
+      (target.kind === "project" ||
+        (target.kind === "page" && page.draft?.id === target.id) ||
+        (target.kind === "folder" &&
+          insideFolder(page.draft?.parentId ?? null)));
+    const currentRecord =
+      target.kind === "page"
+        ? await desktop.invoke<LoadedPage>("pages:get", {
+            projectId: target.projectId,
+            pageId: target.id,
+          })
+        : null;
+    if (closePage && !(await page.clear())) return;
+    await desktop.invoke(
+      `${target.kind === "project" ? "projects" : target.kind === "folder" ? "folders" : "pages"}:remove`,
+      {
+        projectId: target.projectId,
+        ...(target.kind === "folder" ? { folderId: target.id } : {}),
+        ...(currentRecord
+          ? { pageId: target.id, baseHash: currentRecord.hash }
+          : {}),
+      },
+    );
+    setDialog(null);
+    setContextMenu(null);
+    if (target.kind === "project" && selectedRef.current === target.projectId) {
+      setSelectedProject(null);
+      selectedRef.current = null;
+      setSelectedFolder(null);
+      setView("projects");
+    } else if (
+      selectedRef.current === target.projectId &&
+      (closePage || (target.kind === "folder" && insideFolder(selectedFolder)))
+    ) {
+      setSelectedFolder(
+        target.kind === "folder" ? target.parentId : selectedFolder,
+      );
+      setView("project");
+    }
+    await refresh();
+    setNotice("已删除");
+  }
+  function renderChildren(
+    projectId: string,
+    parentId: string | null = null,
+    depth = 0,
+  ): ReactNode {
+    if (depth > 30) return null;
+    const current = contents[projectId];
+    if (!current) return null;
+    const folderIds = new Set(current.folders.map((item) => item.id));
+    const targets: LibraryTarget[] = [
+      ...current.folders
+        .filter((item) => (item.parentId ?? null) === parentId)
+        .map((item) => folderTarget(item, projectId)),
+      ...current.pages
+        .filter(
+          (item) =>
+            (item.parentId && folderIds.has(item.parentId)
+              ? item.parentId
+              : null) === parentId,
+        )
+        .map((item) => pageTarget(item, projectId)),
+    ].sort((a, b) => Number(b.pinned) - Number(a.pinned));
+    return targets.map((target) => (
+      <div key={target.id}>
+        <LibraryRow
+          target={target}
+          active={
+            selectedProject === projectId &&
+            (target.kind === "page"
+              ? view === "page" && page.draft?.id === target.id
+              : view === "project" && selectedFolder === target.id)
+          }
+          expanded={
+            target.kind === "folder" ? !!expandedFolders[target.id] : undefined
+          }
+          onToggle={
+            target.kind === "folder"
+              ? () =>
+                  setExpandedFolders((current) => ({
+                    ...current,
+                    [target.id]: !current[target.id],
+                  }))
+              : undefined
+          }
+          onOpen={() => {
+            if (target.kind === "folder") {
+              setExpandedFolders((current) => ({
+                ...current,
+                [target.id]: true,
+              }));
+              void openProject(projectId, target.id).catch(report);
+            } else void openPage(target.id, projectId).catch(report);
+          }}
+          onMenu={showMenu}
+        />
+        {target.kind === "folder" && expandedFolders[target.id] && (
+          <div className="studio-tree-children">
+            {renderChildren(projectId, target.id, depth + 1)}
+          </div>
+        )}
+      </div>
+    ));
   }
   async function addBlock(kind: string, data: Record<string, unknown>) {
-    if (!page.draft || !page.projectId) {
+    if (
+      !page.draft ||
+      !page.projectId ||
+      page.projectId !== selectedRef.current
+    ) {
       setNotice("先打开一个页面，再插入组件");
       return;
     }
@@ -482,14 +787,47 @@ export default function Studio() {
       .toLowerCase()
       .includes(query.toLowerCase()),
   );
-  const filteredPages = pages.filter((item) =>
-    item.title.toLowerCase().includes(query.toLowerCase()),
+  const folderIds = new Set(folders.map((item) => item.id));
+  const currentFolder = folders.find((item) => item.id === selectedFolder);
+  const filteredPages = pages.filter(
+    (item) =>
+      item.title.toLowerCase().includes(query.toLowerCase()) &&
+      (query ||
+        (item.parentId && folderIds.has(item.parentId)
+          ? item.parentId
+          : null) === selectedFolder),
   );
+  const filteredFolders = folders.filter(
+    (item) =>
+      item.name.toLowerCase().includes(query.toLowerCase()) &&
+      (query || (item.parentId ?? null) === selectedFolder),
+  );
+  const visibleEntries = [
+    ...filteredFolders.map((item) => ({
+      target: folderTarget(item, selectedProject!),
+      updatedAt: item.updatedAt,
+    })),
+    ...filteredPages.map((item) => ({
+      target: pageTarget(item, selectedProject!),
+      updatedAt: item.updatedAt,
+    })),
+  ].sort((a, b) => Number(b.target.pinned) - Number(a.target.pinned));
+  const breadcrumbFolders: FolderMetadata[] = [];
+  let breadcrumbFolder = currentFolder;
+  while (
+    breadcrumbFolder &&
+    !breadcrumbFolders.some((item) => item.id === breadcrumbFolder!.id)
+  ) {
+    breadcrumbFolders.unshift(breadcrumbFolder);
+    breadcrumbFolder = folders.find(
+      (item) => item.id === breadcrumbFolder!.parentId,
+    );
+  }
   const heading =
     view === "projects"
       ? "项目"
       : view === "project"
-        ? (project?.name ?? "项目")
+        ? (currentFolder?.name ?? project?.name ?? "项目")
         : view === "templates"
           ? "模板"
           : view === "components"
@@ -517,7 +855,7 @@ export default function Studio() {
               onClick={action(() => navigate("projects"))}
             >
               <FolderOpen size={17} />
-              项目<span>{projects.length}</span>
+              项目
             </button>
             <button
               className={view === "templates" ? "active" : ""}
@@ -536,45 +874,38 @@ export default function Studio() {
           </nav>
           <div className="studio-sidebar-projects">
             <div className="studio-sidebar-label">
-              本机项目
+              项目
               <button
-                className="studio-icon"
-                aria-label="新建项目"
-                onClick={() => setDialog({ type: "project" })}
+                className="studio-icon studio-row-menu"
+                aria-label="项目列表操作"
+                aria-haspopup="menu"
+                onClick={(event) => {
+                  const anchor = event.currentTarget;
+                  setProjectsMenu((current) =>
+                    current === anchor ? null : anchor,
+                  );
+                }}
               >
-                <Plus size={14} />
+                <MoreHorizontal size={17} />
               </button>
             </div>
             {projects.map((item) => (
               <div key={item.id}>
-                <button
-                  className={`studio-project-link ${selectedProject === item.id ? "active" : ""}`}
-                  onClick={action(() => openProject(item.id))}
-                >
-                  <Folder size={14} />
-                  <span>{item.name}</span>
-                  <small>{item.pageCount}</small>
-                </button>
-                {selectedProject === item.id && (
-                  <div className="studio-page-links">
-                    {pages.map((item) => (
-                      <button
-                        key={item.id}
-                        className={
-                          view === "page" && page.draft?.id === item.id
-                            ? "active"
-                            : ""
-                        }
-                        onClick={action(() => openPage(item.id))}
-                      >
-                        <FileText size={13} />
-                        <span>{item.title || "无标题"}</span>
-                      </button>
-                    ))}
-                    <button onClick={() => setDialog({ type: "newPage" })}>
-                      <Plus size={13} />
-                      <span>新页面</span>
-                    </button>
+                <LibraryRow
+                  target={projectTarget(item)}
+                  active={
+                    selectedProject === item.id &&
+                    view === "project" &&
+                    !selectedFolder
+                  }
+                  expanded={!!expandedProjects[item.id]}
+                  onToggle={action(() => toggleProject(item.id))}
+                  onOpen={action(() => openProject(item.id))}
+                  onMenu={showMenu}
+                />
+                {expandedProjects[item.id] && (
+                  <div className="studio-tree-children">
+                    {renderChildren(item.id)}
                   </div>
                 )}
               </div>
@@ -588,10 +919,6 @@ export default function Studio() {
               <Settings2 size={15} />
               设置
             </button>
-            <div>
-              <span className="studio-local-dot" />
-              本地内容库<span className="studio-version">{info?.version}</span>
-            </div>
           </div>
         </aside>
       )}
@@ -611,6 +938,16 @@ export default function Studio() {
                 </button>
               </>
             )}
+            {breadcrumbFolders.map((item) => (
+              <span className="studio-breadcrumb-folder" key={item.id}>
+                <ChevronRight size={13} />
+                <button
+                  onClick={action(() => openProject(selectedProject!, item.id))}
+                >
+                  {item.name}
+                </button>
+              </span>
+            ))}
             {view === "page" && (
               <>
                 <ChevronRight size={13} />
@@ -658,75 +995,17 @@ export default function Studio() {
                   <ArrowUpRight size={14} />
                   导出
                 </button>
-                <div className="studio-popover-anchor">
-                  <button
-                    className="studio-icon"
-                    aria-label="页面操作"
-                    onClick={() => setMenu(!menu)}
-                  >
-                    <MoreHorizontal size={18} />
-                  </button>
-                  {menu && (
-                    <>
-                      <div
-                        className="studio-menu-shade"
-                        onClick={() => setMenu(false)}
-                      />
-                      <div className="studio-popover">
-                        <button
-                          onClick={action(async () => {
-                            if (!(await page.flush())) return;
-                            setMenu(false);
-                            setDialog({ type: "saveTemplate" });
-                          })}
-                        >
-                          保存为模板
-                        </button>
-                        <button
-                          onClick={action(async () => {
-                            if (!(await page.flush())) return;
-                            const result = await desktop.invoke<LoadedPage>(
-                              "pages:duplicate",
-                              {
-                                projectId: selectedProject,
-                                pageId: page.draft!.id,
-                              },
-                            );
-                            await page.open(
-                              selectedProject!,
-                              result.document.id,
-                            );
-                            setMenu(false);
-                            await refresh();
-                          })}
-                        >
-                          <Copy size={14} />
-                          复制页面
-                        </button>
-                        <button onClick={() => void exportPage("json")}>
-                          下载源文件
-                        </button>
-                        <button onClick={() => void exportPage("inline")}>
-                          导出会话片段
-                        </button>
-                        <button
-                          onClick={action(() =>
-                            desktop.invoke("app:openPageWindow", {
-                              projectId: selectedProject,
-                              pageId: page.draft!.id,
-                            }),
-                          )}
-                        >
-                          在独立窗口打开
-                        </button>
-                        <hr />
-                        <button className="danger" onClick={action(removePage)}>
-                          移出页面列表
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
+                <button
+                  className="studio-icon"
+                  aria-label="页面操作"
+                  aria-haspopup="menu"
+                  onClick={(event) => {
+                    const target = activePageTarget();
+                    if (target) showMenu(target, event.currentTarget, true);
+                  }}
+                >
+                  <MoreHorizontal size={18} />
+                </button>
               </>
             )}
           </div>
@@ -809,24 +1088,7 @@ export default function Studio() {
             <div className="studio-library">
               <div className="studio-section-heading">
                 <div>
-                  <p className="studio-overline">
-                    {view === "projects"
-                      ? "YOUR SPACE"
-                      : view === "project"
-                        ? "PROJECT"
-                        : view === "templates"
-                          ? "START WITH A STRUCTURE"
-                          : view === "components"
-                            ? "BUILDING BLOCKS"
-                            : "PREFERENCES"}
-                  </p>
                   <h1>{heading}</h1>
-                  {view === "project" && (
-                    <p>
-                      {pages.length} 个页面
-                      {project?.binding ? ` · ${project.binding.harness}` : ""}
-                    </p>
-                  )}
                 </div>
                 <div className="studio-section-actions">
                   {view === "projects" && (
@@ -838,15 +1100,8 @@ export default function Studio() {
                       新建项目
                     </button>
                   )}
-                  {view === "project" && (
+                  {view === "project" && project && (
                     <>
-                      <button
-                        className="studio-icon"
-                        aria-label="修改项目名称"
-                        onClick={() => setDialog({ type: "project", project })}
-                      >
-                        <Settings2 size={17} />
-                      </button>
                       <button
                         className="studio-button"
                         onClick={action(importPage)}
@@ -863,11 +1118,19 @@ export default function Studio() {
                         导出网站
                       </button>
                       <button
-                        className="studio-button primary"
-                        onClick={() => setDialog({ type: "newPage" })}
+                        className="studio-icon"
+                        aria-label="当前目录操作"
+                        aria-haspopup="menu"
+                        onClick={(event) =>
+                          showMenu(
+                            currentFolder
+                              ? folderTarget(currentFolder, project.id)
+                              : projectTarget(project),
+                            event.currentTarget,
+                          )
+                        }
                       >
-                        <Plus size={15} />
-                        新页面
+                        <MoreHorizontal size={18} />
                       </button>
                     </>
                   )}
@@ -938,7 +1201,7 @@ export default function Studio() {
               {view === "projects" && (
                 <>
                   <div className="studio-library-toolbar">
-                    <span>{projects.length} 个项目</span>
+                    <span />
                     <label className="studio-search">
                       <Search size={15} />
                       <input
@@ -952,24 +1215,34 @@ export default function Studio() {
                   {filteredProjects.length ? (
                     <div className="studio-project-grid">
                       {filteredProjects.map((item) => (
-                        <button
-                          className="studio-project-card"
-                          key={item.id}
-                          onClick={action(() => openProject(item.id))}
-                        >
-                          <div className="studio-project-card-top">
+                        <div className="studio-project-card" key={item.id}>
+                          <button
+                            className="studio-card-open"
+                            onClick={action(() => openProject(item.id))}
+                          >
                             <span className="studio-folder-symbol">
-                              <Folder size={25} strokeWidth={1.4} />
+                              <Folder size={21} strokeWidth={1.6} />
                             </span>
-                            <ArrowUpRight size={17} />
-                          </div>
-                          <h2>{item.name}</h2>
-                          <p>
-                            {item.pageCount} 个页面
-                            <span>{item.binding?.harness ?? "本地项目"}</span>
-                          </p>
-                          <footer>更新于 {shortDate(item.updatedAt)}</footer>
-                        </button>
+                            <h2>
+                              {item.name}
+                              {item.pinned && (
+                                <Pin size={12} aria-label="已置顶" />
+                              )}
+                            </h2>
+                            <p>{item.binding?.harness ?? "本地项目"}</p>
+                            <footer>{shortDate(item.updatedAt)}</footer>
+                          </button>
+                          <button
+                            className="studio-icon studio-row-menu"
+                            aria-label={`${item.name}的操作`}
+                            aria-haspopup="menu"
+                            onClick={(event) =>
+                              showMenu(projectTarget(item), event.currentTarget)
+                            }
+                          >
+                            <MoreHorizontal size={17} />
+                          </button>
+                        </div>
                       ))}
                     </div>
                   ) : (
@@ -1018,39 +1291,64 @@ export default function Studio() {
                       />
                     </label>
                   </div>
-                  {filteredPages.length ? (
+                  {visibleEntries.length ? (
                     <div className="studio-page-list">
-                      {filteredPages.map((item) => (
-                        <button
-                          key={item.id}
-                          onClick={action(() => openPage(item.id))}
-                        >
-                          <span className="studio-page-list-icon">
-                            {item.icon || (
-                              <FileText size={23} strokeWidth={1.3} />
+                      {visibleEntries.map(({ target, updatedAt }) => (
+                        <div key={target.id} className="studio-page-list-row">
+                          <button
+                            className="studio-page-list-open"
+                            onClick={action(() =>
+                              target.kind === "folder"
+                                ? openProject(target.projectId, target.id)
+                                : openPage(target.id, target.projectId),
                             )}
-                          </span>
-                          <span>
-                            <strong>{item.title || "无标题"}</strong>
-                            <small>{item.blockCount} 个区块</small>
-                          </span>
-                          <time>{shortDate(item.updatedAt)}</time>
-                          <ChevronRight size={16} />
-                        </button>
+                          >
+                            <span className="studio-page-list-icon">
+                              {target.kind === "folder" ? (
+                                <Folder size={19} />
+                              ) : (
+                                <FileText size={19} />
+                              )}
+                            </span>
+                            <strong>{target.title}</strong>
+                            {target.pinned && (
+                              <Pin size={12} aria-label="已置顶" />
+                            )}
+                            <time>{shortDate(updatedAt)}</time>
+                          </button>
+                          <button
+                            className="studio-icon studio-row-menu"
+                            aria-label={`${target.title}的操作`}
+                            aria-haspopup="menu"
+                            onClick={(event) =>
+                              showMenu(target, event.currentTarget)
+                            }
+                          >
+                            <MoreHorizontal size={17} />
+                          </button>
+                        </div>
                       ))}
                     </div>
                   ) : (
                     <div className="studio-empty">
-                      <FilePlus2 size={34} strokeWidth={1.2} />
-                      <h2>{query ? "没有匹配的页面" : "第一张空白画布"}</h2>
-                      <p>从空白页面或模板开始。</p>
-                      <button
-                        className="studio-button primary"
-                        onClick={() => setDialog({ type: "newPage" })}
-                      >
-                        <Plus size={15} />
-                        创建页面
-                      </button>
+                      <FilePlus2 size={30} strokeWidth={1.2} />
+                      <h2>
+                        {query
+                          ? "没有匹配的内容"
+                          : currentFolder
+                            ? "文件夹为空"
+                            : "从空白画布开始"}
+                      </h2>
+                      {!query && (
+                        <button
+                          className="studio-text-button"
+                          onClick={action(() =>
+                            beginNewPage(selectedProject!, selectedFolder),
+                          )}
+                        >
+                          创建页面
+                        </button>
+                      )}
                     </div>
                   )}
                 </>
@@ -1136,10 +1434,10 @@ export default function Studio() {
                         className={componentFilter === "custom" ? "active" : ""}
                         onClick={() => setComponentFilter("custom")}
                       >
-                        自定义 · {catalog.custom.length}
+                        自定义
                       </button>
                     </div>
-                    <span>{catalog.builtin.length} 个内置组件</span>
+                    <span />
                   </div>
                   <div className="studio-component-grid">
                     {componentFilter === "all" &&
@@ -1220,6 +1518,10 @@ export default function Studio() {
                           setInfo(next);
                           setSelectedProject(null);
                           selectedRef.current = null;
+                          setSelectedFolder(null);
+                          setContents({});
+                          setExpandedProjects({});
+                          setExpandedFolders({});
                           await refresh();
                           await loadCatalog();
                           setNotice("内容库已切换");
@@ -1300,6 +1602,169 @@ export default function Studio() {
           {notice}
         </div>
       )}
+      {projectsMenu && (
+        <LibraryContextMenu
+          anchor={projectsMenu}
+          label="项目列表操作"
+          onClose={() => setProjectsMenu(null)}
+          items={[
+            {
+              label: "新建项目",
+              icon: <FolderPlus size={15} />,
+              onSelect: () => setDialog({ type: "project" }),
+            },
+          ]}
+        />
+      )}
+      {contextMenu && (
+        <LibraryContextMenu
+          anchor={contextMenu.anchor}
+          label={`${contextMenu.target.title}的操作`}
+          onClose={() => setContextMenu(null)}
+          items={[
+            {
+              label: "添加新页面",
+              icon: <FilePlus2 size={15} />,
+              onSelect: action(() =>
+                beginNewPage(
+                  contextMenu.target.projectId,
+                  contextMenu.target.kind === "folder"
+                    ? contextMenu.target.id
+                    : contextMenu.target.parentId,
+                ),
+              ),
+            },
+            {
+              label: "新文件夹",
+              icon: <FolderPlus size={15} />,
+              onSelect: () =>
+                setDialog({
+                  type: "folder",
+                  projectId: contextMenu.target.projectId,
+                  parentId:
+                    contextMenu.target.kind === "folder"
+                      ? contextMenu.target.id
+                      : contextMenu.target.parentId,
+                }),
+            },
+            {
+              label: "重命名",
+              icon: <Pencil size={15} />,
+              onSelect: () =>
+                setDialog({ type: "rename", target: contextMenu.target }),
+            },
+            {
+              label: contextMenu.target.pinned ? "取消置顶" : "置顶",
+              icon: contextMenu.target.pinned ? (
+                <PinOff size={15} />
+              ) : (
+                <Pin size={15} />
+              ),
+              onSelect: action(() =>
+                updateTarget(contextMenu.target, {
+                  pinned: !contextMenu.target.pinned,
+                }),
+              ),
+            },
+            ...(contextMenu.pageTools
+              ? [
+                  {
+                    label: "保存为模板",
+                    separatorBefore: true,
+                    icon: <LayoutTemplate size={15} />,
+                    onSelect: action(async () => {
+                      if (await page.flush())
+                        setDialog({ type: "saveTemplate" });
+                    }),
+                  },
+                  {
+                    label: "复制页面",
+                    icon: <Copy size={15} />,
+                    onSelect: action(async () => {
+                      if (!(await page.flush())) return;
+                      const result = await desktop.invoke<LoadedPage>(
+                        "pages:duplicate",
+                        {
+                          projectId: contextMenu.target.projectId,
+                          pageId: contextMenu.target.id,
+                        },
+                      );
+                      await openPage(
+                        result.document.id,
+                        contextMenu.target.projectId,
+                      );
+                      await refresh();
+                    }),
+                  },
+                  {
+                    label: "下载源文件",
+                    onSelect: () => void exportPage("json"),
+                  },
+                  {
+                    label: "导出会话片段",
+                    onSelect: () => void exportPage("inline"),
+                  },
+                  {
+                    label: "在独立窗口打开",
+                    onSelect: action(() =>
+                      desktop.invoke("app:openPageWindow", {
+                        projectId: contextMenu.target.projectId,
+                        pageId: contextMenu.target.id,
+                      }),
+                    ),
+                  },
+                ]
+              : []),
+            {
+              label: "删除",
+              icon: <Trash2 size={15} />,
+              danger: true,
+              separatorBefore: true,
+              onSelect: () =>
+                setDialog({ type: "delete", target: contextMenu.target }),
+            },
+          ]}
+        />
+      )}
+      {dialog?.type === "folder" && (
+        <NameDialog
+          title="新文件夹"
+          inputLabel="文件夹名称"
+          onClose={closeDialog}
+          onSave={async (name) => {
+            if (!(await page.flush())) return;
+            const folder = await desktop.invoke<FolderMetadata>(
+              "folders:create",
+              { projectId: dialog.projectId, parentId: dialog.parentId, name },
+            );
+            setExpandedFolders((current) => ({
+              ...current,
+              ...(dialog.parentId ? { [dialog.parentId]: true } : {}),
+            }));
+            await openProject(dialog.projectId, folder.id);
+            await refresh();
+            setDialog(null);
+          }}
+        />
+      )}
+      {dialog?.type === "rename" && (
+        <NameDialog
+          title="重命名"
+          inputLabel="名称"
+          initialValue={dialog.target.title}
+          onClose={closeDialog}
+          onSave={async (name) => {
+            if (await updateTarget(dialog.target, { name })) setDialog(null);
+          }}
+        />
+      )}
+      {dialog?.type === "delete" && (
+        <DeleteDialog
+          target={dialog.target}
+          onClose={closeDialog}
+          onDelete={() => deleteTarget(dialog.target)}
+        />
+      )}
       {dialog?.type === "project" && (
         <ProjectDialog
           project={dialog.project}
@@ -1322,7 +1787,7 @@ export default function Studio() {
       {dialog?.type === "newPage" && (
         <Dialog title="新页面" onClose={closeDialog}>
           <div className="studio-template-picker">
-            {templates.map((item) => (
+            {dialog.templates.map((item) => (
               <button
                 key={`${item.scope}:${item.id}`}
                 disabled={busy}
@@ -1382,7 +1847,7 @@ export default function Studio() {
           builtin={dialog.builtin}
           custom={dialog.custom}
           source={dialog.source}
-          canInsert={!!page.draft}
+          canInsert={!!page.draft && page.projectId === selectedProject}
           projectId={selectedProject ?? undefined}
           onInsert={addBlock}
           onClose={closeDialog}
@@ -1394,6 +1859,116 @@ export default function Studio() {
         />
       )}
     </div>
+  );
+}
+
+function NameDialog({
+  title,
+  inputLabel,
+  initialValue = "",
+  onClose,
+  onSave,
+}: {
+  title: string;
+  inputLabel: string;
+  initialValue?: string;
+  onClose: () => void;
+  onSave: (name: string) => Promise<void>;
+}) {
+  const [name, setName] = useState(initialValue);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  return (
+    <Dialog title={title} onClose={onClose}>
+      <form
+        className="studio-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!name.trim() || busy) return;
+          setBusy(true);
+          setError("");
+          void onSave(name.trim())
+            .catch((reason) => setError(errorMessage(reason)))
+            .finally(() => setBusy(false));
+        }}
+      >
+        <label>
+          {inputLabel}
+          <input
+            aria-label={inputLabel}
+            value={name}
+            maxLength={1000}
+            onFocus={(event) => event.target.select()}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
+        {error && (
+          <p className="studio-form-error" role="alert">
+            {error}
+          </p>
+        )}
+        <footer>
+          <button className="studio-button" type="button" onClick={onClose}>
+            取消
+          </button>
+          <button
+            className="studio-button primary"
+            disabled={!name.trim() || busy}
+          >
+            {busy && <Loader2 size={14} className="studio-spin" />}
+            {initialValue ? "保存" : "创建"}
+          </button>
+        </footer>
+      </form>
+    </Dialog>
+  );
+}
+
+function DeleteDialog({
+  target,
+  onClose,
+  onDelete,
+}: {
+  target: LibraryTarget;
+  onClose: () => void;
+  onDelete: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
+  return (
+    <Dialog
+      title={`删除${target.kind === "project" ? "项目" : target.kind === "folder" ? "文件夹" : "页面"}`}
+      onClose={onClose}
+    >
+      <div className="studio-form">
+        <p className="studio-delete-description">
+          删除「{target.title}」？
+          {target.kind !== "page" && "其中的页面和子文件夹也会从列表中移除。"}
+        </p>
+        {error && (
+          <p className="studio-form-error" role="alert">
+            {error}
+          </p>
+        )}
+        <footer>
+          <button className="studio-button" onClick={onClose}>
+            取消
+          </button>
+          <button
+            className="studio-button danger"
+            disabled={busy}
+            onClick={() => {
+              setBusy(true);
+              void onDelete()
+                .catch((reason) => setError(errorMessage(reason)))
+                .finally(() => setBusy(false));
+            }}
+          >
+            {busy && <Loader2 size={14} className="studio-spin" />}删除
+          </button>
+        </footer>
+      </div>
+    </Dialog>
   );
 }
 

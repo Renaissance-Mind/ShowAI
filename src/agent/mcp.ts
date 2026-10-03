@@ -13,7 +13,7 @@ export function createMcpServer(options: {
   const service = new AgentService(options);
   const projectId = service.requireProject(options.projectId);
   const server = new McpServer(
-    { name: "showai", version: "0.3.0" },
+    { name: "showai", version: "0.3.1" },
     {
       instructions: `Create and revise interactive ShowAI pages in project ${projectId}. This connection cannot switch projects. Read pages before writing; keep their hash and use page_diff before a follow-up. Supply baseHash for saves and patches. A conflict means another edit occurred: reread, inspect the diff and merge deliberately. Export HTML for sharing, inline for a host-supported visualization surface, or site for static hosting. Export does not itself install UI in the host or publish to the internet.`,
     },
