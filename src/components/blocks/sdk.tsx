@@ -1,4 +1,5 @@
 import "./block.css";
+import "./theme.css";
 export {
   TextBlock as Text,
   ImageBlock as Image,

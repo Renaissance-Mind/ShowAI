@@ -289,8 +289,8 @@ export function CalloutBlock({ data, onChange, readOnly }: BlockProps) {
     <aside
       className="sb-primitive sb-callout"
       style={{
-        borderLeft: "3px solid #62836b",
-        background: "#edf3ee",
+        borderLeft: "2px solid var(--text, #222222)",
+        background: "var(--surface, #f7f7f7)",
         padding: "14px 18px",
         ...appearance(data),
       }}
@@ -335,7 +335,7 @@ export function DividerBlock({ data }: BlockProps) {
       className="sb-primitive sb-divider"
       style={{
         border: 0,
-        borderTop: `1px solid ${text(data.color) || "#dce1d7"}`,
+        borderTop: `1px solid ${text(data.color) || "var(--line, #dddddd)"}`,
         margin: "22px 0",
       }}
     />

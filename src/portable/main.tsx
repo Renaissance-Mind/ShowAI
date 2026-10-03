@@ -8,6 +8,8 @@ import type { CompiledComponent } from "../components/custom/types";
 import { PageContent } from "./PageContent";
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import "./portable.css";
+import "../design/tokens.css";
+import "../design/content.css";
 
 // Set only by the trusted inline exporter. Ordinary readers and the desktop app
 // keep individual sandboxed iframes for custom code.

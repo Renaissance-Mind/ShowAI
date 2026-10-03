@@ -61,7 +61,7 @@
         "data": {
           "content": "## 让内容更容易理解\n\n用 **清晰的层次** 组织观点，把证据放在结论旁边。\n\n> 好的表达，让读者看见内容之间的关系。\n\n- 先说明核心观点\n- 再展开依据与细节",
           "format": "markdown",
-          "color": "#30382e",
+          "color": "#222222",
           "padding": 20
         }
       },
@@ -70,7 +70,7 @@
         "data": {
           "content": "记录一个想法。\n下一行继续补充。",
           "format": "plain",
-          "backgroundColor": "#f0f4ed",
+          "backgroundColor": "#f7f7f7",
           "padding": 20,
           "radius": 8
         }
@@ -435,7 +435,7 @@
       {
         "name": "分隔线示例",
         "data": {
-          "color": "#62836b"
+          "color": "#dddddd"
         }
       }
     ]

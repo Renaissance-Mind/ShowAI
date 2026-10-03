@@ -1,3 +1,5 @@
+import themeTokens from "../design/tokens.css?raw";
+import themeContent from "../design/content.css?raw";
 import contract from "../components/blocks/primitive-contract.mjs?raw";
 import sdk from "../components/blocks/sdk.tsx?raw";
 import primitives from "../components/blocks/Primitives.tsx?raw";
@@ -24,6 +26,7 @@ export const builtinSources: Record<string, string> = {
   "shared.tsx": shared,
   "helpers.ts": helpers,
   "block.css": css,
+  "theme.css": `${themeTokens}\n${themeContent}`,
 };
 export const builtinExports: Record<string, string> = {
   text: "Text",

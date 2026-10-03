@@ -6,12 +6,12 @@ import type {
 } from "./types";
 
 export const COLORS = [
-  "#44745a",
-  "#7990b2",
-  "#c39659",
-  "#a17ea1",
-  "#b76e66",
-  "#5c9999",
+  "#120a8f",
+  "#5147b8",
+  "#8179c2",
+  "#4674af",
+  "#6b78a8",
+  "#898892",
 ];
 export const text = (value: unknown, fallback = "") =>
   typeof value === "string" || typeof value === "number"
