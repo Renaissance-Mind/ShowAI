@@ -3,7 +3,39 @@
     "id": "blank",
     "name": "空白画布",
     "description": "从一个空白页面开始。",
-    "content": [{ "type": "paragraph" }]
+    "content": [
+      {
+        "type": "paragraph"
+      }
+    ],
+    "version": "1.0.0",
+    "scenarios": [
+      "已有明确布局构想，需要从空白页面组织说明、图片或交互内容。"
+    ],
+    "contentGuide": [
+      {
+        "title": "组织原则",
+        "instructions": [
+          "先明确读者要理解的问题或要作出的判断。",
+          "按论点与证据组织内容；只选择对当前需求有用的呈现方式。"
+        ]
+      }
+    ],
+    "related": [],
+    "examples": [
+      {
+        "name": "解释一个概念",
+        "request": "用一页解释一个概念，并保留必要的交互。",
+        "steps": [
+          {
+            "kind": "template",
+            "id": "blank",
+            "version": "1.0.0",
+            "purpose": "按概念的解释顺序组织页面，再选择适用的呈现方式。"
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "research",
@@ -12,19 +44,36 @@
     "content": [
       {
         "type": "heading",
-        "attrs": { "level": 2 },
-        "content": [{ "type": "text", "text": "问题" }]
+        "attrs": {
+          "level": 2
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "问题"
+          }
+        ]
       },
       {
         "type": "paragraph",
         "content": [
-          { "type": "text", "text": "写下要研究的问题、范围与判断标准。" }
+          {
+            "type": "text",
+            "text": "写下要研究的问题、范围与判断标准。"
+          }
         ]
       },
       {
         "type": "heading",
-        "attrs": { "level": 2 },
-        "content": [{ "type": "text", "text": "发现与证据" }]
+        "attrs": {
+          "level": 2
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "发现与证据"
+          }
+        ]
       },
       {
         "type": "paragraph",
@@ -42,9 +91,21 @@
           "data": {
             "title": "来源记录",
             "columns": [
-              { "id": "name", "name": "来源", "type": "text" },
-              { "id": "url", "name": "链接", "type": "url" },
-              { "id": "finding", "name": "支持的发现", "type": "text" }
+              {
+                "id": "name",
+                "name": "来源",
+                "type": "text"
+              },
+              {
+                "id": "url",
+                "name": "链接",
+                "type": "url"
+              },
+              {
+                "id": "finding",
+                "name": "支持的发现",
+                "type": "text"
+              }
             ],
             "rows": []
           }
@@ -52,10 +113,113 @@
       },
       {
         "type": "heading",
-        "attrs": { "level": 2 },
-        "content": [{ "type": "text", "text": "待确认" }]
+        "attrs": {
+          "level": 2
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "待确认"
+          }
+        ]
       },
-      { "type": "paragraph" }
+      {
+        "type": "paragraph"
+      }
+    ],
+    "version": "1.0.0",
+    "scenarios": [
+      "整理一个有明确范围的调研问题，例如比较日志系统的查询能力与部署限制。",
+      "解释论文的任务、方法和实验，让读者理解贡献、证据与适用范围。"
+    ],
+    "contentGuide": [
+      {
+        "title": "界定问题",
+        "instructions": [
+          "说明要回答的问题、目标读者、范围和评价标准。",
+          "区分已知事实、作者主张、自己的推断和仍待验证的假设。"
+        ]
+      },
+      {
+        "title": "整理方法与证据",
+        "instructions": [
+          "论文讲解先交代任务与已有方法的限制，再说明输入、输出、关键机制和假设。",
+          "用结构化对比呈现可比的证据，用流程或图示解释机制，用文字连接推理步骤。",
+          "定量结果注明数据集、条件、基线和单位；视觉结果保留出处与图注。"
+        ]
+      },
+      {
+        "title": "形成判断",
+        "instructions": [
+          "把每个核心发现链接到支持它的来源。",
+          "说明局限和待确认事项；证据不足时明确保留不确定性。",
+          "避免把组件占位内容当成实际调研结果。"
+        ]
+      }
+    ],
+    "related": [
+      {
+        "kind": "component",
+        "id": "database",
+        "version": "1.0.0",
+        "purpose": "按统一字段整理来源、方法和支持的发现。"
+      },
+      {
+        "kind": "component",
+        "id": "chart",
+        "version": "1.0.0",
+        "purpose": "呈现口径一致的定量证据及变化。"
+      },
+      {
+        "kind": "component",
+        "id": "gallery",
+        "version": "1.0.0",
+        "purpose": "呈现方法图或视觉结果与图注。"
+      },
+      {
+        "kind": "component",
+        "id": "bookmark",
+        "version": "1.0.0",
+        "purpose": "提供可追溯的原始来源入口。"
+      }
+    ],
+    "examples": [
+      {
+        "name": "论文讲解",
+        "request": "解释一篇论文的任务、核心方法、实验与局限。",
+        "steps": [
+          {
+            "kind": "template",
+            "id": "research",
+            "version": "1.0.0",
+            "purpose": "按问题→方法机制→实验依据→局限组织叙述。"
+          },
+          {
+            "kind": "component",
+            "id": "gallery",
+            "version": "1.0.0",
+            "purpose": "在方法说明后插入有出处的方法图和图注。"
+          },
+          {
+            "kind": "component",
+            "id": "database",
+            "version": "1.0.0",
+            "purpose": "在实验部分按统一口径列出设置与比较条件。"
+          },
+          {
+            "kind": "component",
+            "id": "chart",
+            "version": "1.0.0",
+            "purpose": "有可比数值时，再按数据维度选择图形展示。"
+          },
+          {
+            "kind": "component",
+            "id": "bookmark",
+            "version": "1.0.0",
+            "purpose": "在结尾保留论文与代码的来源入口。"
+          }
+        ]
+      }
     ]
   },
   {
@@ -79,10 +243,26 @@
           "data": {
             "title": "选项对比",
             "columns": [
-              { "id": "option", "name": "选项", "type": "text" },
-              { "id": "strength", "name": "优势", "type": "text" },
-              { "id": "limit", "name": "限制", "type": "text" },
-              { "id": "source", "name": "来源", "type": "url" }
+              {
+                "id": "option",
+                "name": "选项",
+                "type": "text"
+              },
+              {
+                "id": "strength",
+                "name": "优势",
+                "type": "text"
+              },
+              {
+                "id": "limit",
+                "name": "限制",
+                "type": "text"
+              },
+              {
+                "id": "source",
+                "name": "来源",
+                "type": "url"
+              }
             ],
             "rows": []
           }
@@ -90,10 +270,87 @@
       },
       {
         "type": "heading",
-        "attrs": { "level": 2 },
-        "content": [{ "type": "text", "text": "判断" }]
+        "attrs": {
+          "level": 2
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "判断"
+          }
+        ]
       },
-      { "type": "paragraph" }
+      {
+        "type": "paragraph"
+      }
+    ],
+    "version": "1.0.0",
+    "scenarios": [
+      "按共同标准选择方案，例如比较三种数据库或几种研究方法。",
+      "说明备选项在不同约束下的取舍，帮助读者按自己的需求判断。"
+    ],
+    "contentGuide": [
+      {
+        "title": "定义比较口径",
+        "instructions": [
+          "先说明使用场景、约束和评价维度，再选取可比较的方案。",
+          "每个维度采用一致定义，缺失项明确标记，避免把缺失当成零。"
+        ]
+      },
+      {
+        "title": "整理证据与取舍",
+        "instructions": [
+          "先以统一结构展示事实，再分别说明优点、限制与适用条件。",
+          "只有在测量条件一致时才作数值比较。",
+          "结论要指出适用条件和来源，不用主观分数替代证据。"
+        ]
+      }
+    ],
+    "related": [
+      {
+        "kind": "component",
+        "id": "database",
+        "version": "1.0.0",
+        "purpose": "让多个选项按同一组字段对齐比较。"
+      },
+      {
+        "kind": "component",
+        "id": "chart",
+        "version": "1.0.0",
+        "purpose": "在数据口径一致时对比数值。"
+      },
+      {
+        "kind": "component",
+        "id": "bookmark",
+        "version": "1.0.0",
+        "purpose": "为各项能力与限制提供来源。"
+      }
+    ],
+    "examples": [
+      {
+        "name": "技术方案取舍",
+        "request": "比较几个候选方案在指定场景下的适用性。",
+        "steps": [
+          {
+            "kind": "template",
+            "id": "comparison",
+            "version": "1.0.0",
+            "purpose": "先定义场景与标准，再呈现选项和判断。"
+          },
+          {
+            "kind": "component",
+            "id": "database",
+            "version": "1.0.0",
+            "purpose": "按选项→能力→限制→来源排布证据。"
+          },
+          {
+            "kind": "component",
+            "id": "bookmark",
+            "version": "1.0.0",
+            "purpose": "在判断后给出进一步核验的入口。"
+          }
+        ]
+      }
     ]
   },
   {
@@ -103,33 +360,127 @@
     "content": [
       {
         "type": "heading",
-        "attrs": { "level": 2 },
-        "content": [{ "type": "text", "text": "核心结论" }]
+        "attrs": {
+          "level": 2
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "核心结论"
+          }
+        ]
       },
       {
         "type": "paragraph",
         "content": [
-          { "type": "text", "text": "用一段话说明结论及其适用范围。" }
+          {
+            "type": "text",
+            "text": "用一段话说明结论及其适用范围。"
+          }
         ]
       },
       {
         "type": "heading",
-        "attrs": { "level": 2 },
-        "content": [{ "type": "text", "text": "关键事实" }]
+        "attrs": {
+          "level": 2
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "关键事实"
+          }
+        ]
       },
-      { "type": "paragraph" },
+      {
+        "type": "paragraph"
+      },
       {
         "type": "heading",
-        "attrs": { "level": 2 },
-        "content": [{ "type": "text", "text": "下一步" }]
+        "attrs": {
+          "level": 2
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "下一步"
+          }
+        ]
       },
       {
         "type": "taskList",
         "content": [
           {
             "type": "taskItem",
-            "attrs": { "checked": false },
-            "content": [{ "type": "paragraph" }]
+            "attrs": {
+              "checked": false
+            },
+            "content": [
+              {
+                "type": "paragraph"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "version": "1.0.0",
+    "scenarios": [
+      "汇报已有调研或实验的关键结论，让读者迅速理解事实与下一步。",
+      "把较长的材料整理为一份可行动的简报，保留必要的证据链接。"
+    ],
+    "contentGuide": [
+      {
+        "title": "提炼主线",
+        "instructions": [
+          "开头说明一个核心结论及其适用范围。",
+          "每条关键事实直接支持该结论，删除无关背景。"
+        ]
+      },
+      {
+        "title": "支持行动",
+        "instructions": [
+          "用可追溯的数字或证据说明重要程度。",
+          "列出下一步行动及尚待确认的条件。",
+          "缺少证据时明确说明，避免把建议写成已经完成的结果。"
+        ]
+      }
+    ],
+    "related": [
+      {
+        "kind": "component",
+        "id": "metrics",
+        "version": "1.0.0",
+        "purpose": "突出少量重要且已核实的数字。"
+      },
+      {
+        "kind": "component",
+        "id": "bookmark",
+        "version": "1.0.0",
+        "purpose": "提供关键事实的出处。"
+      }
+    ],
+    "examples": [
+      {
+        "name": "实验结果简报",
+        "request": "将已有实验记录整理为结论、依据和后续行动。",
+        "steps": [
+          {
+            "kind": "template",
+            "id": "brief",
+            "version": "1.0.0",
+            "purpose": "按照结论→关键事实→下一步的顺序展开。"
+          },
+          {
+            "kind": "component",
+            "id": "metrics",
+            "version": "1.0.0",
+            "purpose": "在关键事实部分突出已知样本量、结果和单位。"
+          },
+          {
+            "kind": "component",
+            "id": "bookmark",
+            "version": "1.0.0",
+            "purpose": "链接可核验的实验记录或报告。"
           }
         ]
       }

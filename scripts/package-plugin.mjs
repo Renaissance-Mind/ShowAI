@@ -27,9 +27,17 @@ await copyFile(
   join(root, "dist-agent/cli.mjs"),
   join(plugin, "scripts/cli.mjs"),
 );
-for (const document of ["artifact-format.md", "agent-usage.md"]) {
+for (const document of [
+  "artifact-format.md",
+  "agent-usage.md",
+  "catalog-lifecycle.md",
+]) {
   const text = (await readFile(join(root, "docs", document), "utf8"))
     .replaceAll("../plugins/showai/README.md", "../../../README.md")
+    .replaceAll(
+      "](../src/",
+      "](https://github.com/Renaissance-Mind/ShowAI/blob/main/src/",
+    )
     .replaceAll(
       "../resources/catalog/value-slider",
       "../examples/value-slider",

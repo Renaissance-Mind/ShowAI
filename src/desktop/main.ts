@@ -30,6 +30,11 @@ import {
   getTemplate,
   importComponent,
   instantiateTemplate,
+  instantiateTemplateRecord,
+  promotePackage,
+  forkPackage,
+  previewPackageMerge,
+  savePackageMerge,
   listBuiltinComponents,
   describeBuiltinComponent,
   listComponents,
@@ -44,6 +49,18 @@ import {
   serializeArtifact,
   validateDocument,
 } from "../portable/validation.mjs";
+import {
+  preparePublication,
+  verifyPublication,
+  loadRemoteComponents,
+} from "../core/publication";
+import type {
+  CatalogReadOptions,
+  PackageRevisionRef,
+  PackageMergeInput,
+  EditablePackage,
+  SaveTemplateInput,
+} from "../components/custom/types";
 import type { ComponentManifest, JsonSchema } from "../components/custom/types";
 import type { DesktopChange, DesktopInfo, DesktopResponse } from "./bridge";
 
@@ -81,6 +98,12 @@ const actions = new Set([
   "components:source",
   "components:save",
   "components:createExample",
+  "catalog:promote",
+  "catalog:fork",
+  "catalog:mergePreview",
+  "catalog:mergeSave",
+  "catalog:preparePublish",
+  "catalog:verifyPublish",
   "dialog:openPage",
   "export:page",
   "export:site",
@@ -140,6 +163,51 @@ function parentFolder(args: Record<string, unknown>): string | null {
   return args.parentId === null || args.parentId === undefined
     ? null
     : assertId(required(args, "parentId"));
+}
+
+function catalogOptions(args: Record<string, unknown>): CatalogReadOptions {
+  const scope = text(args, "scope", true);
+  if (
+    scope &&
+    !["all", "project", "global", "published", "builtin"].includes(scope)
+  )
+    throw new CoreError("INVALID_DATA", "Unknown catalog scope.");
+  return {
+    scope: scope as CatalogReadOptions["scope"],
+    version: text(args, "version", true),
+    integrity: text(args, "integrity", true),
+  };
+}
+function revisionArg(
+  args: Record<string, unknown>,
+  key = "ref",
+): PackageRevisionRef {
+  const value = args[key];
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new CoreError(
+      "INVALID_DATA",
+      "An exact package revision is required.",
+    );
+  const ref = value as Record<string, unknown>;
+  if (
+    !["template", "component"].includes(String(ref.kind)) ||
+    ["id", "version", "integrity"].some(
+      (key) => typeof ref[key] !== "string" || !ref[key],
+    )
+  )
+    throw new CoreError(
+      "INVALID_DATA",
+      "A revision needs kind, id, version and integrity.",
+    );
+  return value as PackageRevisionRef;
+}
+function componentDelivery(
+  args: Record<string, unknown>,
+): "bundled" | "remote" {
+  if (args.components === undefined) return "bundled";
+  if (args.components !== "bundled" && args.components !== "remote")
+    throw new CoreError("INVALID_DATA", "Choose bundled or remote components.");
+  return args.components;
 }
 
 async function validateDestination(
@@ -346,8 +414,18 @@ async function handle(
       const id = projectId(args);
       const templateId = text(args, "templateId", true);
       const document = templateId
-        ? instantiateTemplate(
-            (await getTemplate(store.root, templateId, id)).document,
+        ? await instantiateTemplateRecord(
+            store.root,
+            await getTemplate(store.root, templateId, id, {
+              version: text(args, "templateVersion", true),
+              scope: text(
+                args,
+                "templateScope",
+                true,
+              ) as CatalogReadOptions["scope"],
+              integrity: text(args, "templateIntegrity", true),
+            }),
+            id,
           )
         : args.document !== undefined
           ? validateDocument(args.document)
@@ -456,65 +534,102 @@ async function handle(
         id,
         await service.createPage(id, {
           document: { ...artifact.document, parentId },
-          components: artifact.components,
+          components: [
+            ...(artifact.components ?? []),
+            ...(artifact.remoteComponents?.length
+              ? await loadRemoteComponents(artifact.remoteComponents)
+              : []),
+          ],
         }),
       );
     }
     case "templates:list":
-      return listTemplates(store.root, await optionalProject(args));
+      return listTemplates(
+        store.root,
+        await optionalProject(args),
+        catalogOptions(args),
+      );
     case "templates:get": {
       const project = await optionalProject(args);
       const template = await getTemplate(
         store.root,
         required(args, "id"),
         project,
+        catalogOptions(args),
+      );
+      const previewDocument = await instantiateTemplateRecord(
+        store.root,
+        template,
+        project,
       );
       return {
         ...template,
+        previewDocument,
         components: await resolveDocumentComponents(
           store.root,
-          template.document,
+          previewDocument,
           project,
         ),
       };
     }
     case "templates:save": {
-      const project = await optionalProject(args);
+      const project = projectId(args);
+      await store.listPages(project);
       const document =
         args.document !== undefined
           ? validateDocument(args.document)
-          : (await store.readPage(projectId(args), pageId(args))).document;
-      await resolveDocumentComponents(store.root, document, project);
+          : args.pageId
+            ? (await store.readPage(project, pageId(args))).document
+            : undefined;
       return saveTemplate(
         store.root,
         {
           id: text(args, "id", true),
+          version: text(args, "version", true),
           name: required(args, "name"),
           description:
             typeof args.description === "string" ? args.description : "",
           document,
+          scenarios: args.scenarios as SaveTemplateInput["scenarios"],
+          contentGuide: args.contentGuide as SaveTemplateInput["contentGuide"],
+          related: args.related as SaveTemplateInput["related"],
+          examples: args.examples as SaveTemplateInput["examples"],
+          composition: args.composition as SaveTemplateInput["composition"],
+          parents: args.parents as SaveTemplateInput["parents"],
+          mergeBase: args.mergeBase as SaveTemplateInput["mergeBase"],
         },
         project,
       );
     }
     case "components:list":
       return [
-        ...listBuiltinComponents().map((item) => ({
+        ...(!args.scope || args.scope === "all" || args.scope === "builtin"
+          ? listBuiltinComponents()
+          : []
+        ).map((item) => ({
           ...item,
           id: item.kind,
           scope: "builtin",
         })),
-        ...(await listComponents(store.root, await optionalProject(args))),
+        ...(await listComponents(
+          store.root,
+          await optionalProject(args),
+          catalogOptions(args),
+        )),
       ];
     case "components:get": {
       const id = required(args, "id");
-      if (listBuiltinComponents().some((item) => item.kind === id))
+      if (
+        (!args.scope || args.scope === "builtin") &&
+        listBuiltinComponents().some((item) => item.kind === id)
+      )
         return { ...describeBuiltinComponent(id), id, scope: "builtin" };
       return getComponent(
         store.root,
         id,
         text(args, "version", true),
         await optionalProject(args),
+        catalogOptions(args),
       );
     }
     case "components:source":
@@ -523,9 +638,11 @@ async function handle(
         required(args, "id"),
         text(args, "version", true),
         await optionalProject(args),
+        catalogOptions(args),
       );
     case "components:import": {
-      const project = await optionalProject(args);
+      const project = projectId(args);
+      await store.listPages(project);
       const result = await dialog.showOpenDialog(window, {
         title: "选择组件源码目录",
         properties: ["openDirectory"],
@@ -534,11 +651,13 @@ async function handle(
       return importComponent(store.root, result.filePaths[0], project);
     }
     case "components:save": {
-      const project = await optionalProject(args);
+      const project = projectId(args);
+      await store.listPages(project);
       if (
         !args.manifest ||
         typeof args.manifest !== "object" ||
-        !args.schema ||
+        (typeof args.schema !== "boolean" &&
+          (!args.schema || typeof args.schema !== "object")) ||
         typeof args.source !== "string"
       )
         throw new CoreError(
@@ -562,7 +681,8 @@ async function handle(
       );
     }
     case "components:createExample": {
-      const project = await optionalProject(args);
+      const project = projectId(args);
+      await store.listPages(project);
       const id = `counter-${randomUUID().slice(0, 8)}`;
       return saveComponent(
         store.root,
@@ -572,10 +692,22 @@ async function handle(
             name: "计数器",
             version: "1.0.0",
             description: "可编辑的 React 控件示例，点击按钮调整计数。",
-            scenarios: ["理解组件输入、交互和页面数据保存"],
+            scenarios: [
+              "理解组件输入、交互和页面数据保存，例如用按钮记录一个本地计数。",
+            ],
+            effects: [
+              "点击按钮即可观察数值变化。",
+              "编辑状态下将计数保存到页面，阅读时可临时操作。",
+            ],
             entry: "Component.tsx",
             defaultData: { label: "计数", value: 0 },
-            examples: [{ name: "从零开始", data: { label: "计数", value: 0 } }],
+            examples: [
+              {
+                name: "从零开始",
+                request: "从0开始，用增加和减少按钮探索整数变化。",
+                data: { label: "计数", value: 0 },
+              },
+            ],
           },
           schema: {
             type: "object",
@@ -590,6 +722,79 @@ async function handle(
         },
         project,
       );
+    }
+    case "catalog:promote": {
+      const project = projectId(args);
+      await store.listPages(project);
+      const bundle = await promotePackage(store.root, revisionArg(args), {
+        projectId: project,
+        target: "global",
+      });
+      const ref = bundle.root;
+      return ref.kind === "component"
+        ? getComponent(store.root, ref.id, ref.version, project, {
+            scope: "global",
+            integrity: ref.integrity,
+          })
+        : getTemplate(store.root, ref.id, project, {
+            scope: "global",
+            version: ref.version,
+            integrity: ref.integrity,
+          });
+    }
+    case "catalog:fork": {
+      const project = projectId(args);
+      await store.listPages(project);
+      return forkPackage(store.root, revisionArg(args), {
+        projectId: project,
+        id: text(args, "id", true),
+        version: required(args, "version"),
+        name: text(args, "name", true),
+      });
+    }
+    case "catalog:mergePreview":
+    case "catalog:mergeSave": {
+      const project = projectId(args);
+      await store.listPages(project);
+      const input: PackageMergeInput = {
+        projectId: project,
+        base: revisionArg(args, "base"),
+        ours: revisionArg(args, "ours"),
+        theirs: revisionArg(args, "theirs"),
+      };
+      return action === "catalog:mergePreview"
+        ? previewPackageMerge(store.root, input)
+        : savePackageMerge(store.root, {
+            ...input,
+            id: text(args, "id", true),
+            version: required(args, "version"),
+            resolved: args.resolved as EditablePackage,
+          });
+    }
+    case "catalog:preparePublish": {
+      const project = await optionalProject(args),
+        ref = revisionArg(args);
+      const selection = await dialog.showOpenDialog(window, {
+        title: "选择发布包保存位置",
+        properties: ["openDirectory", "createDirectory"],
+      });
+      if (selection.canceled || !selection.filePaths[0]) return null;
+      const out = join(
+        selection.filePaths[0],
+        `${filename(ref.id)}-${filename(ref.version)}-${Date.now()}`,
+      );
+      return preparePublication(store.root, {
+        refs: [ref],
+        projectId: project,
+        out,
+      });
+    }
+    case "catalog:verifyPublish": {
+      const project = await optionalProject(args);
+      return verifyPublication(store.root, {
+        manifestUrl: required(args, "manifestUrl"),
+        projectId: project,
+      });
     }
     case "dialog:openPage": {
       const result = await dialog.showOpenDialog(window, {
@@ -639,6 +844,7 @@ async function handle(
         projectId: id,
         pageId: page,
         format,
+        components: componentDelivery(args),
         out: selection.filePath,
         overwrite: true,
       });
@@ -655,6 +861,7 @@ async function handle(
         root: store.root,
         projectId: id,
         format: "site",
+        components: componentDelivery(args),
         out: selection.filePaths[0],
         overwrite: true,
       });

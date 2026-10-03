@@ -1,0 +1,166 @@
+import { canonicalJson } from "./diff";
+import type { MergeConflict } from "../components/custom/types";
+
+const equal = (left: unknown, right: unknown) =>
+  left === undefined || right === undefined
+    ? left === right
+    : canonicalJson(left) === canonicalJson(right);
+const object = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === "object" && !Array.isArray(value);
+interface Hunk {
+  start: number;
+  end: number;
+  lines: string[];
+}
+
+function hunks(base: string[], next: string[]): Hunk[] {
+  // Bound memory for large source files; conservative conflicts are preferable
+  // to an approximate merge that silently overwrites a change.
+  if ((base.length + 1) * (next.length + 1) > 2_000_000) {
+    let start = 0,
+      suffix = 0;
+    while (
+      start < base.length &&
+      start < next.length &&
+      base[start] === next[start]
+    )
+      start++;
+    while (
+      suffix < base.length - start &&
+      suffix < next.length - start &&
+      base[base.length - suffix - 1] === next[next.length - suffix - 1]
+    )
+      suffix++;
+    return [
+      {
+        start,
+        end: base.length - suffix,
+        lines: next.slice(start, next.length - suffix),
+      },
+    ];
+  }
+  const width = next.length + 1,
+    table = new Uint32Array((base.length + 1) * width);
+  for (let a = base.length - 1; a >= 0; a--)
+    for (let b = next.length - 1; b >= 0; b--)
+      table[a * width + b] =
+        base[a] === next[b]
+          ? table[(a + 1) * width + b + 1] + 1
+          : Math.max(table[(a + 1) * width + b], table[a * width + b + 1]);
+  const result: Hunk[] = [];
+  let a = 0,
+    b = 0,
+    active: Hunk | undefined;
+  const flush = () => {
+    if (active) result.push(active);
+    active = undefined;
+  };
+  while (a < base.length || b < next.length) {
+    if (a < base.length && b < next.length && base[a] === next[b]) {
+      flush();
+      a++;
+      b++;
+      continue;
+    }
+    active ??= { start: a, end: a, lines: [] };
+    if (
+      b < next.length &&
+      (a === base.length ||
+        table[a * width + b + 1] >= table[(a + 1) * width + b])
+    )
+      active.lines.push(next[b++]);
+    else active.end = ++a;
+  }
+  flush();
+  return result;
+}
+
+export function mergeText(
+  base: string,
+  ours: string,
+  theirs: string,
+): string | undefined {
+  const lines = base.split(/(?<=\n)/);
+  const left = hunks(lines, ours.split(/(?<=\n)/)),
+    right = hunks(lines, theirs.split(/(?<=\n)/));
+  const changes = [...left];
+  for (const candidate of right) {
+    let duplicate = false;
+    for (const current of left) {
+      if (equal(current, candidate)) {
+        duplicate = true;
+        continue;
+      }
+      const overlaps =
+        current.start === current.end
+          ? current.start >= candidate.start && current.start <= candidate.end
+          : candidate.start === candidate.end
+            ? candidate.start >= current.start && candidate.start <= current.end
+            : current.start < candidate.end && candidate.start < current.end;
+      if (overlaps) return undefined;
+    }
+    if (!duplicate) changes.push(candidate);
+  }
+  const result = [...lines];
+  for (const change of changes.sort(
+    (a, b) => b.start - a.start || b.end - a.end,
+  ))
+    result.splice(change.start, change.end - change.start, ...change.lines);
+  return result.join("");
+}
+
+/** Missing keys, deletions, and array changes remain distinct from null. */
+export function mergeValues(
+  base: unknown,
+  ours: unknown,
+  theirs: unknown,
+  path = "",
+): { value: unknown; conflicts: MergeConflict[] } {
+  if (equal(ours, theirs) || equal(theirs, base))
+    return { value: structuredClone(ours), conflicts: [] };
+  if (equal(ours, base))
+    return { value: structuredClone(theirs), conflicts: [] };
+  if (object(ours) && object(theirs) && (base === undefined || object(base))) {
+    const before = object(base) ? base : {},
+      value: Record<string, unknown> = {},
+      conflicts: MergeConflict[] = [];
+    for (const key of new Set([
+      ...Object.keys(before),
+      ...Object.keys(ours),
+      ...Object.keys(theirs),
+    ])) {
+      const merged = mergeValues(
+        before[key],
+        ours[key],
+        theirs[key],
+        `${path}/${key.replaceAll("~", "~0").replaceAll("/", "~1")}`,
+      );
+      if (merged.value !== undefined) value[key] = merged.value;
+      conflicts.push(...merged.conflicts);
+    }
+    return { value, conflicts };
+  }
+  const text =
+    typeof base === "string" &&
+    typeof ours === "string" &&
+    typeof theirs === "string" &&
+    (path.endsWith("/source") ||
+      path.startsWith("/files/") ||
+      base.includes("\n"));
+  if (text) {
+    const merged = mergeText(base, ours, theirs);
+    if (merged !== undefined) return { value: merged, conflicts: [] };
+  }
+  return {
+    value: structuredClone(ours),
+    conflicts: [
+      {
+        path: path || "/",
+        kind: text ? "text" : "value",
+        ...(base !== undefined ? { base } : {}),
+        ...(ours !== undefined ? { ours } : {}),
+        ...(theirs !== undefined ? { theirs } : {}),
+      },
+    ],
+  };
+}

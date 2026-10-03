@@ -349,6 +349,24 @@ html {
   line-height: 1.8;
   color: var(--text-secondary);
 }
+.portable-network-note {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: -12px 0 20px;
+}
+.portable-network-error {
+  padding: 12px 14px;
+  color: #b8463c;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+:root[data-theme="dark"] .portable-network-error {
+  color: #f18c80;
+}
 @keyframes menu-appear {
   from {
     opacity: 0;

@@ -1,0 +1,222 @@
+.catalog-detail .studio-detail-tabs {
+  margin-top: 12px;
+}
+.catalog-lineage {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+.catalog-lineage code,
+.catalog-related code {
+  font-family: ui-monospace, monospace;
+  overflow-wrap: anywhere;
+}
+.catalog-lineage details {
+  margin-left: auto;
+}
+.catalog-lineage ul {
+  padding-left: 18px;
+}
+.catalog-lineage li span {
+  margin-left: 8px;
+}
+.catalog-documentation {
+  font-size: 14px;
+  line-height: 1.7;
+}
+.catalog-documentation h3,
+.catalog-edit-form h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 22px 0 8px;
+}
+.catalog-documentation h4 {
+  font-size: 14px;
+  font-weight: 500;
+  margin: 12px 0 4px;
+}
+.catalog-documentation p {
+  margin: 6px 0 12px;
+}
+.catalog-documentation ul {
+  margin: 6px 0 14px;
+  padding-left: 21px;
+}
+.catalog-documentation li {
+  margin: 5px 0;
+}
+.catalog-related {
+  list-style: none;
+  padding: 0 !important;
+}
+.catalog-related li {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+.catalog-related li > div {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.catalog-related li > div > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.catalog-related li p {
+  margin: 5px 0 0;
+}
+.catalog-example {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.catalog-example summary {
+  font-size: 14px;
+  cursor: pointer;
+}
+.catalog-example > p {
+  margin: 9px 0;
+}
+.catalog-example ol {
+  padding-left: 24px;
+}
+.catalog-example label {
+  margin-top: 12px;
+}
+.catalog-example-link {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 11px 0;
+  text-align: left;
+  width: 100%;
+  border-bottom: 1px solid var(--line);
+}
+.catalog-example-link strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+.catalog-example-link span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.catalog-edit-form,
+.catalog-edit-form.compact {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 17px;
+}
+.catalog-edit-form input,
+.catalog-edit-form textarea,
+.catalog-edit-form select,
+.catalog-composition input,
+.catalog-composition select {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--text);
+  border-radius: 5px;
+  padding: 8px;
+  font-size: 13px;
+}
+.catalog-related-fields {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin-bottom: 7px;
+}
+.catalog-related-fields select {
+  width: 90px;
+  flex-shrink: 0;
+}
+.catalog-related-fields input {
+  min-width: 0;
+}
+.catalog-related-fields input:nth-last-of-type(1) {
+  max-width: 145px;
+}
+.catalog-related-fields input:only-of-type {
+  max-width: none;
+}
+.catalog-related-row,
+.catalog-guide-editor {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.catalog-guide-editor textarea {
+  min-height: 90px;
+}
+.catalog-part {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+.catalog-part > div {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+.catalog-part strong {
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.catalog-compose-add {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 18px 0 12px;
+}
+.catalog-compose-add select {
+  min-width: 0;
+  flex: 1;
+}
+.catalog-detail > footer {
+  flex-wrap: wrap;
+  row-gap: 12px;
+}
+.catalog-detail > footer > span {
+  flex: 1 0 100%;
+  font-size: 12px;
+}
+.catalog-publish-intro {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.catalog-edit-form .studio-path {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+.catalog-scope-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.catalog-scope-controls label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.catalog-scope-controls select {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--paper);
+  color: var(--text);
+  padding: 6px 10px;
+  font-size: 13px;
+  max-width: 230px;
+}
+
+.catalog-composition > .studio-text-button + .studio-text-button {
+  margin-left: 18px;
+  color: var(--muted);
+}

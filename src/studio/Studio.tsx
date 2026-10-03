@@ -46,11 +46,10 @@ import type {
   ComponentSource,
   TemplateMetadata,
   TemplateRecord,
+  PackageRevisionRef,
+  CatalogReadOptions,
 } from "../components/custom/types";
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
-import { componentWidgetData } from "../components/custom/contract";
-import { Widget } from "../components/blocks/Widget";
-import { createBlockData } from "../components/blocks/registry";
 import DocumentEditor from "../editor/DocumentEditor";
 import { parseArtifact } from "../lib/artifact";
 import { parseMarkdown } from "../lib/markdown";
@@ -62,6 +61,13 @@ import {
   LibraryContextMenu,
   type LibraryTarget,
 } from "./LibraryNavigation";
+import Dialog from "./Dialog";
+import {
+  TemplateDialog,
+  ComponentDialog,
+  PublishDialog,
+  blankTemplate,
+} from "./CatalogDialogs";
 import "./studio.css";
 
 type View =
@@ -70,7 +76,10 @@ type Catalog = {
   builtin: BuiltinComponentMetadata[];
   custom: ComponentMetadata[];
 };
-type LoadedTemplate = TemplateRecord & { components?: CompiledComponent[] };
+type LoadedTemplate = TemplateRecord & {
+  components?: CompiledComponent[];
+  previewDocument?: ShowDocument;
+};
 type DialogState =
   | { type: "project"; project?: ProjectSummary }
   | {
@@ -84,6 +93,7 @@ type DialogState =
   | { type: "delete"; target: LibraryTarget }
   | { type: "template"; record: LoadedTemplate; copy?: boolean }
   | { type: "saveTemplate" }
+  | { type: "publish"; ref: PackageRevisionRef }
   | {
       type: "component";
       builtin?: BuiltinComponentMetadata;
@@ -101,82 +111,14 @@ function shortDate(value: string) {
 function Scope({ value }: { value: string }) {
   return (
     <span className="studio-tag">
-      {{ builtin: "内置", user: "本机", project: "项目" }[value] ?? value}
+      {{
+        builtin: "内置",
+        global: "全局",
+        published: "已发布",
+        user: "全局",
+        project: "项目",
+      }[value] ?? value}
     </span>
-  );
-}
-
-function Dialog({
-  title,
-  children,
-  onClose,
-  wide = false,
-}: {
-  title: string;
-  children: ReactNode;
-  onClose: () => void;
-  wide?: boolean;
-}) {
-  const panel = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement;
-    (
-      panel.current?.querySelector<HTMLElement>("input,textarea,select") ??
-      panel.current?.querySelector<HTMLElement>("button")
-    )?.focus();
-    const handle = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-      if (event.key === "Tab") {
-        const items = [
-          ...(panel.current?.querySelectorAll<HTMLElement>(
-            "button:not([disabled]),input,textarea,select,a[href]",
-          ) ?? []),
-        ].filter((item) => item.offsetParent !== null);
-        const first = items[0],
-          last = items.at(-1);
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last?.focus();
-        }
-        if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first?.focus();
-        }
-      }
-    };
-    document.addEventListener("keydown", handle);
-    return () => {
-      document.removeEventListener("keydown", handle);
-      previous?.focus();
-    };
-  }, [onClose]);
-  return (
-    <div
-      className="studio-modal-shade"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div
-        ref={panel}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className={`studio-modal ${wide ? "wide" : ""}`}
-      >
-        <header>
-          <h2>{title}</h2>
-          <button
-            className="studio-icon"
-            aria-label="关闭弹窗"
-            onClick={onClose}
-          >
-            <X size={18} />
-          </button>
-        </header>
-        {children}
-      </div>
-    </div>
   );
 }
 
@@ -203,6 +145,10 @@ export default function Studio() {
   const [view, setView] = useState<View>("projects");
   const [templates, setTemplates] = useState<TemplateMetadata[]>([]);
   const [catalog, setCatalog] = useState<Catalog>({ builtin: [], custom: [] });
+  const [catalogScope, setCatalogScope] =
+    useState<CatalogReadOptions["scope"]>("all");
+  const catalogScopeRef = useRef(catalogScope);
+  catalogScopeRef.current = catalogScope;
   const [query, setQuery] = useState("");
   const [dialog, setDialog] = useState<DialogState>(null);
   const [notice, setNotice] = useState("");
@@ -214,6 +160,7 @@ export default function Studio() {
     pageTools?: boolean;
   } | null>(null);
   const [projectsMenu, setProjectsMenu] = useState<HTMLElement | null>(null);
+  const [exportMenu, setExportMenu] = useState<HTMLElement | null>(null);
   const [dark, setDark] = useState(() => {
     const saved = localStorage.getItem("showai:appearance");
     return saved
@@ -262,7 +209,8 @@ export default function Studio() {
   }, [loadProjectContents]);
   const loadCatalog = useCallback(async () => {
     const id = selectedRef.current;
-    const scope = id ? { projectId: id } : {};
+    const requestedScope = catalogScopeRef.current;
+    const scope = { ...(id ? { projectId: id } : {}), scope: requestedScope };
     const [nextTemplates, nextCatalog] = await Promise.all([
       desktop.invoke<TemplateMetadata[]>("templates:list", scope),
       desktop.invoke<(BuiltinComponentMetadata | ComponentMetadata)[]>(
@@ -270,7 +218,11 @@ export default function Studio() {
         scope,
       ),
     ]);
-    if (selectedRef.current !== id) return;
+    if (
+      selectedRef.current !== id ||
+      catalogScopeRef.current !== requestedScope
+    )
+      return;
     setTemplates(nextTemplates);
     setCatalog({
       builtin: nextCatalog.filter(
@@ -320,6 +272,10 @@ export default function Studio() {
       unsubscribe();
     };
   }, [refresh, loadCatalog, report]);
+  useEffect(() => {
+    if (initialized.current) void loadCatalog().catch(report);
+  }, [catalogScope, loadCatalog, report]);
+
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     localStorage.setItem("showai:appearance", dark ? "dark" : "light");
@@ -419,7 +375,7 @@ export default function Studio() {
     }
     setExpandedFolders((current) => ({ ...current, ...expanded }));
   }
-  async function createPage(templateId = "blank") {
+  async function createPage(templateId = "blank", template?: TemplateMetadata) {
     const projectId =
       dialog?.type === "newPage" ? dialog.projectId : selectedProject;
     const parentId =
@@ -436,6 +392,9 @@ export default function Studio() {
         projectId,
         parentId,
         templateId,
+        templateVersion: template?.version,
+        templateScope: template?.scope,
+        templateIntegrity: template?.integrity,
       });
       await openProject(projectId, parentId);
       await page.open(projectId, created.document.id);
@@ -476,14 +435,22 @@ export default function Studio() {
     await refresh();
     setNotice("页面已导入");
   }
-  async function exportPage(format: "html" | "json" | "inline") {
+  async function exportPage(
+    format: "html" | "json" | "inline",
+    components: "bundled" | "remote" = "bundled",
+  ) {
     if (!selectedProject || !page.draft || !(await page.flush())) return;
     setBusy(true);
     setContextMenu(null);
     try {
       const result = await desktop.invoke<{ path: string } | null>(
         "export:page",
-        { projectId: selectedProject, pageId: page.draft.id, format },
+        {
+          projectId: selectedProject,
+          pageId: page.draft.id,
+          format,
+          components,
+        },
       );
       if (result) setNotice("页面已导出");
     } catch (reason) {
@@ -492,15 +459,20 @@ export default function Studio() {
       setBusy(false);
     }
   }
-  async function exportSite() {
+  async function exportSite(components: "bundled" | "remote" = "bundled") {
     if (!selectedProject || !(await page.flush())) return;
     setBusy(true);
     try {
       const result = await desktop.invoke<{ path: string } | null>(
         "export:site",
-        { projectId: selectedProject },
+        { projectId: selectedProject, components },
       );
-      if (result) setNotice("网站已导出，可部署到静态托管");
+      if (result)
+        setNotice(
+          components === "remote"
+            ? "网站已导出，组件按固定发布版本联网加载"
+            : "网站已导出，可部署到静态托管",
+        );
     } catch (reason) {
       report(reason);
     } finally {
@@ -764,6 +736,8 @@ export default function Studio() {
     const custom = await desktop.invoke<CompiledComponent>("components:get", {
       id: item.id,
       version: item.version,
+      scope: item.scope,
+      integrity: item.integrity,
       ...(selectedProject ? { projectId: selectedProject } : {}),
     });
     let source: ComponentSource | undefined;
@@ -772,6 +746,8 @@ export default function Studio() {
         source = await desktop.invoke<ComponentSource>("components:source", {
           id: item.id,
           version: item.version,
+          scope: item.scope,
+          integrity: item.integrity,
           ...(selectedProject ? { projectId: selectedProject } : {}),
         });
       } catch (reason) {
@@ -1112,7 +1088,13 @@ export default function Studio() {
                       <button
                         className="studio-button"
                         disabled={!pages.length || busy}
-                        onClick={() => void exportSite()}
+                        aria-haspopup="menu"
+                        onClick={(event) => {
+                          const anchor = event.currentTarget;
+                          setExportMenu((current) =>
+                            current === anchor ? null : anchor,
+                          );
+                        }}
                       >
                         <ArrowUpRight size={15} />
                         导出网站
@@ -1136,18 +1118,12 @@ export default function Studio() {
                   )}
                   {view === "templates" && (
                     <button
+                      disabled={!selectedProject}
                       className="studio-button primary"
                       onClick={() =>
                         setDialog({
                           type: "template",
-                          record: {
-                            id: "",
-                            name: "",
-                            description: "",
-                            scope: "user",
-                            updatedAt: new Date().toISOString(),
-                            document: newDocument(),
-                          },
+                          record: blankTemplate(),
                           copy: true,
                         })
                       }
@@ -1160,6 +1136,7 @@ export default function Studio() {
                     <>
                       <button
                         className="studio-button"
+                        disabled={!selectedProject}
                         onClick={action(async () => {
                           const result =
                             await desktop.invoke<CompiledComponent | null>(
@@ -1179,6 +1156,7 @@ export default function Studio() {
                       </button>
                       <button
                         className="studio-button primary"
+                        disabled={!selectedProject}
                         onClick={action(async () => {
                           const result =
                             await desktop.invoke<CompiledComponent>(
@@ -1198,6 +1176,55 @@ export default function Studio() {
                   )}
                 </div>
               </div>
+              {(view === "templates" || view === "components") && (
+                <div className="studio-library-toolbar catalog-scope-controls">
+                  <label>
+                    定制项目
+                    <select
+                      aria-label="目录项目"
+                      value={selectedProject ?? ""}
+                      onChange={(event) => {
+                        const id = event.target.value;
+                        void (async () => {
+                          if (!(await page.flush())) return;
+                          selectedRef.current = id || null;
+                          setSelectedProject(id || null);
+                          setSelectedFolder(null);
+                          if (id) await loadProjectContents(id);
+                          await loadCatalog();
+                        })().catch(report);
+                      }}
+                    >
+                      <option value="">选择项目</option>
+                      {projects.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    查看范围
+                    <select
+                      aria-label="目录范围"
+                      value={catalogScope ?? "all"}
+                      onChange={(event) =>
+                        setCatalogScope(
+                          event.target.value as CatalogReadOptions["scope"],
+                        )
+                      }
+                    >
+                      <option value="all">全部</option>
+                      <option value="project">项目</option>
+                      <option value="global">全局</option>
+                      <option value="published">已发布</option>
+                      <option value="builtin">内置</option>
+                    </select>
+                  </label>
+                  {!selectedProject && <span>先选择项目，再创建或定制。</span>}
+                </div>
+              )}
+
               {view === "projects" && (
                 <>
                   <div className="studio-library-toolbar">
@@ -1355,20 +1382,15 @@ export default function Studio() {
               )}
               {view === "templates" && (
                 <>
-                  <div className="studio-library-toolbar">
-                    <span>
-                      {selectedProject ? "本机与当前项目的模板" : "本机模板库"}
-                    </span>
-                  </div>
                   <div className="studio-template-grid">
                     {templates.map((item, index) => (
                       <div
                         className="studio-template-card"
-                        key={`${item.scope}:${item.id}`}
+                        key={`${item.scope}:${item.id}:${item.version}`}
                       >
                         <button
                           className={`studio-template-art art-${index % 4}`}
-                          aria-label={`查看模板 ${item.name}`}
+                          aria-label={`查看模板 ${item.name} ${item.version} ${item.scope}`}
                           onClick={action(async () => {
                             const record = await desktop.invoke<LoadedTemplate>(
                               "templates:get",
@@ -1404,7 +1426,7 @@ export default function Studio() {
                           <button
                             className="studio-text-button"
                             disabled={!selectedProject}
-                            onClick={() => void createPage(item.id)}
+                            onClick={() => void createPage(item.id, item)}
                           >
                             使用模板
                             <ArrowUpRight size={14} />
@@ -1460,7 +1482,7 @@ export default function Studio() {
                               <Scope value="builtin" />
                             </h2>
                             <p>{item.description}</p>
-                            <footer>{item.scenarios.join(" · ")}</footer>
+                            <footer>v{item.version ?? "1.0.0"}</footer>
                           </div>
                         </button>
                       ))}
@@ -1479,10 +1501,7 @@ export default function Studio() {
                             <Scope value={item.scope} />
                           </h2>
                           <p>{item.description}</p>
-                          <footer>
-                            v{item.version} ·{" "}
-                            {item.scenarios.join(" · ") || "自定义 React 组件"}
-                          </footer>
+                          <footer>v{item.version}</footer>
                         </div>
                       </button>
                     ))}
@@ -1602,6 +1621,23 @@ export default function Studio() {
           {notice}
         </div>
       )}
+      {exportMenu && (
+        <LibraryContextMenu
+          anchor={exportMenu}
+          label="网站导出方式"
+          onClose={() => setExportMenu(null)}
+          items={[
+            {
+              label: "离线网站 · 打包组件",
+              onSelect: () => void exportSite("bundled"),
+            },
+            {
+              label: "联网网站 · 引用发布组件",
+              onSelect: () => void exportSite("remote"),
+            },
+          ]}
+        />
+      )}
       {projectsMenu && (
         <LibraryContextMenu
           anchor={projectsMenu}
@@ -1701,6 +1737,10 @@ export default function Studio() {
                     onSelect: () => void exportPage("json"),
                   },
                   {
+                    label: "引用已发布组件导出",
+                    onSelect: () => void exportPage("html", "remote"),
+                  },
+                  {
                     label: "导出会话片段",
                     onSelect: () => void exportPage("inline"),
                   },
@@ -1789,9 +1829,9 @@ export default function Studio() {
           <div className="studio-template-picker">
             {dialog.templates.map((item) => (
               <button
-                key={`${item.scope}:${item.id}`}
+                key={`${item.scope}:${item.id}:${item.version}`}
                 disabled={busy}
-                onClick={() => void createPage(item.id)}
+                onClick={() => void createPage(item.id, item)}
               >
                 <span>
                   {item.id === "blank" ? (
@@ -1810,24 +1850,45 @@ export default function Studio() {
           </div>
         </Dialog>
       )}
+      {dialog?.type === "publish" && (
+        <PublishDialog
+          refValue={dialog.ref}
+          projectId={selectedProject ?? undefined}
+          onClose={closeDialog}
+          onPublished={async () => {
+            await loadCatalog();
+            setDialog(null);
+            setNotice("发布版本已验证并登记");
+          }}
+        />
+      )}
       {dialog?.type === "template" && (
         <TemplateDialog
-          key={dialog.record.id}
+          key={`${dialog.record.id}:${dialog.record.version}:${dialog.record.scope}`}
           record={dialog.record}
           copy={dialog.copy}
           components={dialog.record.components ?? []}
+          templates={templates}
+          onPublish={(ref) => setDialog({ type: "publish", ref })}
           projectId={selectedProject ?? undefined}
           onClose={closeDialog}
           onSaved={async () => {
             await loadCatalog();
             setDialog(null);
-            setNotice("模板已保存");
+            setNotice("模板目录已更新");
           }}
         />
       )}
       {dialog?.type === "saveTemplate" && page.draft && (
-        <SaveTemplateDialog
-          document={page.draft}
+        <TemplateDialog
+          record={{
+            ...blankTemplate(),
+            name: page.draft.title || "新模板",
+            document: page.draft,
+          }}
+          components={page.record?.components ?? []}
+          templates={templates}
+          onPublish={(ref) => setDialog({ type: "publish", ref })}
           projectId={selectedProject ?? undefined}
           onClose={closeDialog}
           onSaved={async () => {
@@ -1841,20 +1902,21 @@ export default function Studio() {
         <ComponentDialog
           key={
             dialog.custom
-              ? `${dialog.custom.id}@${dialog.custom.version}`
+              ? `${dialog.custom.id}@${dialog.custom.version}:${dialog.custom.scope}:${dialog.custom.integrity}`
               : dialog.builtin?.kind
           }
           builtin={dialog.builtin}
           custom={dialog.custom}
           source={dialog.source}
           canInsert={!!page.draft && page.projectId === selectedProject}
+          onPublish={(ref) => setDialog({ type: "publish", ref })}
           projectId={selectedProject ?? undefined}
           onInsert={addBlock}
           onClose={closeDialog}
           onSaved={async (component) => {
             await loadCatalog();
             await viewComponent(component);
-            setNotice("新版本已保存");
+            setNotice("组件目录已更新");
           }}
         />
       )}
@@ -2024,411 +2086,6 @@ function ProjectDialog({
           </button>
         </footer>
       </form>
-    </Dialog>
-  );
-}
-
-function SaveTemplateDialog({
-  document,
-  projectId,
-  onClose,
-  onSaved,
-}: {
-  document: ShowDocument;
-  projectId?: string;
-  onClose: () => void;
-  onSaved: () => Promise<void>;
-}) {
-  const [name, setName] = useState(document.title || "新模板"),
-    [description, setDescription] = useState(""),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  return (
-    <Dialog title="保存为模板" onClose={onClose}>
-      <form
-        className="studio-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          setBusy(true);
-          void desktop
-            .invoke("templates:save", {
-              name,
-              description,
-              document,
-              ...(projectId ? { projectId } : {}),
-            })
-            .then(onSaved)
-            .catch((reason) => setError(errorMessage(reason)))
-            .finally(() => setBusy(false));
-        }}
-      >
-        <label>
-          模板名称
-          <input
-            aria-label="模板名称"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-        </label>
-        <label>
-          适用场景
-          <textarea
-            aria-label="模板说明"
-            placeholder="这个模板适合呈现什么内容？"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-        </label>
-        {error && (
-          <p className="studio-form-error" role="alert">
-            {error}
-          </p>
-        )}
-        <footer>
-          <button type="button" className="studio-button" onClick={onClose}>
-            取消
-          </button>
-          <button
-            className="studio-button primary"
-            disabled={!name.trim() || busy}
-          >
-            保存模板
-          </button>
-        </footer>
-      </form>
-    </Dialog>
-  );
-}
-
-function TemplateDialog({
-  record,
-  copy,
-  components,
-  projectId,
-  onClose,
-  onSaved,
-}: {
-  record: TemplateRecord;
-  copy?: boolean;
-  components: CompiledComponent[];
-  projectId?: string;
-  onClose: () => void;
-  onSaved: () => Promise<void>;
-}) {
-  const [name, setName] = useState(record.name),
-    [description, setDescription] = useState(record.description),
-    [document, setDocument] = useState(record.document),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  return (
-    <Dialog
-      title={record.scope === "builtin" ? "模板预览" : "编辑模板"}
-      onClose={onClose}
-      wide
-    >
-      <div className="studio-template-edit">
-        <div className="studio-form compact">
-          <label>
-            模板名称
-            <input
-              aria-label="模板名称"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-            />
-          </label>
-          <label>
-            适用场景
-            <input
-              aria-label="模板说明"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-            />
-          </label>
-        </div>
-        <div className="studio-template-document">
-          <CustomComponentsProvider components={components}>
-            <DocumentEditor
-              content={document.content}
-              onChange={(content) => setDocument({ ...document, content })}
-              minimal
-            />
-          </CustomComponentsProvider>
-        </div>
-        {error && (
-          <p className="studio-form-error" role="alert">
-            {error}
-          </p>
-        )}
-        <footer>
-          <span>
-            {record.scope === "builtin"
-              ? "修改后保存为自己的模板"
-              : "布局和内容将作为新页面的起点"}
-          </span>
-          <button
-            className="studio-button primary"
-            disabled={!name.trim() || busy}
-            onClick={() => {
-              setBusy(true);
-              void desktop
-                .invoke("templates:save", {
-                  ...(!copy ? { id: record.id } : {}),
-                  name,
-                  description,
-                  document,
-                  ...(projectId ? { projectId } : {}),
-                })
-                .then(onSaved)
-                .catch((reason) => setError(errorMessage(reason)))
-                .finally(() => setBusy(false));
-            }}
-          >
-            {busy ? <Loader2 size={15} className="studio-spin" /> : null}
-            保存模板
-          </button>
-        </footer>
-      </div>
-    </Dialog>
-  );
-}
-
-function ComponentDialog({
-  builtin,
-  custom,
-  source,
-  canInsert,
-  projectId,
-  onInsert,
-  onClose,
-  onSaved,
-}: {
-  builtin?: BuiltinComponentMetadata;
-  custom?: CompiledComponent;
-  source?: ComponentSource;
-  canInsert: boolean;
-  projectId?: string;
-  onInsert: (kind: string, data: Record<string, unknown>) => Promise<void>;
-  onClose: () => void;
-  onSaved: (component: CompiledComponent) => Promise<void>;
-}) {
-  const item = builtin ?? custom!;
-  const [tab, setTab] = useState<"preview" | "code" | "schema">("preview");
-  const [code, setCode] = useState(source?.source ?? "");
-  const [schema, setSchema] = useState(
-    JSON.stringify(
-      source?.schema ?? builtin?.propsSchema ?? custom?.schema ?? {},
-      null,
-      2,
-    ),
-  );
-  const [defaults, setDefaults] = useState(
-    JSON.stringify(item.defaultData, null, 2),
-  );
-  const [name, setName] = useState(item.name),
-    [description, setDescription] = useState(item.description);
-  const nextVersion =
-    custom?.version.replace(/(\d+)$/, (value) => String(Number(value) + 1)) ??
-    "1.0.0";
-  const [version, setVersion] = useState(nextVersion);
-  const [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  const [example, setExample] = useState(0);
-  const examples = item.examples ?? [];
-  const data = examples[example]?.data ?? item.defaultData;
-  return (
-    <Dialog title={item.name} onClose={onClose} wide>
-      <div className="studio-component-detail">
-        <p className="studio-modal-description">{item.description}</p>
-        <div className="studio-detail-scenarios">
-          {item.scenarios.map((value) => (
-            <span key={value}>{value}</span>
-          ))}
-        </div>
-        <div className="studio-detail-tabs">
-          <button
-            className={tab === "preview" ? "active" : ""}
-            onClick={() => setTab("preview")}
-          >
-            预览
-          </button>
-          {source && (
-            <button
-              className={tab === "code" ? "active" : ""}
-              onClick={() => setTab("code")}
-            >
-              组件代码
-            </button>
-          )}
-          <button
-            className={tab === "schema" ? "active" : ""}
-            onClick={() => setTab("schema")}
-          >
-            数据结构
-          </button>
-          {custom && <span>v{custom.version}</span>}
-        </div>
-        {tab === "preview" && (
-          <>
-            {examples.length > 0 && (
-              <label className="studio-example-picker">
-                示例
-                <select
-                  aria-label="组件示例"
-                  value={example}
-                  onChange={(event) => setExample(Number(event.target.value))}
-                >
-                  {examples.map((value, index) => (
-                    <option key={index} value={index}>
-                      {value.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <div className="studio-component-preview">
-              {builtin ? (
-                <Widget kind={builtin.kind} data={data} readOnly />
-              ) : (
-                <CustomComponentsProvider components={[custom!]}>
-                  <Widget
-                    kind="custom"
-                    data={componentWidgetData(custom!, data)}
-                    readOnly
-                  />
-                </CustomComponentsProvider>
-              )}
-            </div>
-          </>
-        )}
-        {tab === "code" && source && (
-          <div className="studio-form">
-            <div className="studio-form-row">
-              <label>
-                名称
-                <input
-                  aria-label="组件名称"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                />
-              </label>
-              <label>
-                新版本
-                <input
-                  aria-label="组件新版本"
-                  value={version}
-                  onChange={(event) => setVersion(event.target.value)}
-                />
-              </label>
-            </div>
-            <label>
-              说明
-              <input
-                aria-label="组件说明"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-              />
-            </label>
-            <label>
-              React / TSX
-              <textarea
-                className="studio-code-editor"
-                aria-label="组件源码"
-                spellCheck={false}
-                value={code}
-                onChange={(event) => setCode(event.target.value)}
-              />
-            </label>
-          </div>
-        )}
-        {tab === "schema" && (
-          <div className="studio-form">
-            <label>
-              参数规则
-              <textarea
-                className="studio-code-editor"
-                aria-label="组件参数规则"
-                spellCheck={false}
-                readOnly={!source}
-                value={schema}
-                onChange={(event) => setSchema(event.target.value)}
-              />
-            </label>
-            <label>
-              默认数据
-              <textarea
-                className="studio-code-editor short"
-                aria-label="组件默认数据"
-                spellCheck={false}
-                readOnly={!source}
-                value={defaults}
-                onChange={(event) => setDefaults(event.target.value)}
-              />
-            </label>
-          </div>
-        )}
-        {error && (
-          <p className="studio-form-error" role="alert">
-            {error}
-          </p>
-        )}
-        <footer>
-          <span>
-            {custom ? `自定义组件 · ${custom.id}` : "内置组件"}
-            {!canInsert ? " · 打开页面后可插入" : ""}
-          </span>
-          {source && tab !== "preview" && (
-            <button
-              className="studio-button"
-              disabled={busy}
-              onClick={() => {
-                setBusy(true);
-                void (async () => {
-                  const defaultData = JSON.parse(defaults);
-                  const parsedSchema = JSON.parse(schema);
-                  const saved = await desktop.invoke<CompiledComponent>(
-                    "components:save",
-                    {
-                      ...(projectId ? { projectId } : {}),
-                      manifest: {
-                        ...source.manifest,
-                        name,
-                        description,
-                        version,
-                        defaultData,
-                      },
-                      schema: parsedSchema,
-                      source: code,
-                      files: source.files,
-                      assets: source.assets,
-                    },
-                  );
-                  await onSaved(saved);
-                })()
-                  .catch((reason) => setError(errorMessage(reason)))
-                  .finally(() => setBusy(false));
-              }}
-            >
-              {busy ? <Loader2 size={15} className="studio-spin" /> : null}
-              保存新版本
-            </button>
-          )}
-          <button
-            className="studio-button primary"
-            disabled={!canInsert}
-            onClick={() =>
-              void onInsert(
-                builtin?.kind ?? "custom",
-                builtin
-                  ? createBlockData(builtin.kind)
-                  : componentWidgetData(custom!, custom!.defaultData),
-              )
-            }
-          >
-            <Plus size={15} />
-            插入页面
-          </button>
-        </footer>
-      </div>
     </Dialog>
   );
 }

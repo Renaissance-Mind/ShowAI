@@ -20,6 +20,7 @@ import { CANVAS_KEY } from "./lib/canvas";
 import {
   buildCanvasArtifactHtml,
   loadCanvasArtifact,
+  materializeCanvasArtifact,
   retainCanvasArtifact,
   saveCanvasArtifact,
 } from "./portable/canvas";
@@ -27,7 +28,7 @@ import { CustomComponentsProvider } from "./components/custom/CustomBlock";
 import type { CompiledComponent } from "./components/custom/types";
 import { downloadFile, newDocument, toMarkdown } from "./lib/document";
 import { parseMarkdown } from "./lib/markdown";
-import type { ShowDocument } from "./types";
+import type { ShowArtifact, ShowDocument } from "./types";
 
 function initialPage() {
   try {
@@ -64,6 +65,7 @@ export default function App() {
   const current = useRef(page);
   const currentComponents = useRef(components);
   const blocked = useRef(!!initial.error);
+  const importGeneration = useRef(0);
   current.current = page;
   currentComponents.current = components;
 
@@ -209,6 +211,7 @@ export default function App() {
   }
 
   async function openFile(file: File) {
+    const request = ++importGeneration.current;
     setMenuOpen(false);
     if (file.size > 10 * 1024 * 1024) {
       setError("页面文件不能超过 10 MB。");
@@ -218,6 +221,7 @@ export default function App() {
       const raw = await file.text();
       let incoming: ShowDocument;
       let incomingComponents: CompiledComponent[] = [];
+      let remoteComponents: ShowArtifact["remoteComponents"];
       if (/\.(md|markdown|txt)$/i.test(file.name)) {
         incoming = newDocument(file.name.replace(/\.[^.]+$/, ""));
         incoming.content = parseMarkdown(raw);
@@ -232,11 +236,22 @@ export default function App() {
         const artifact = parseArtifact(source?.textContent ?? "");
         incoming = artifact.document;
         incomingComponents = artifact.components ?? [];
+        remoteComponents = artifact.remoteComponents;
       } else {
         const artifact = parseArtifact(raw);
         incoming = artifact.document;
         incomingComponents = artifact.components ?? [];
+        remoteComponents = artifact.remoteComponents;
       }
+      const materialized = await materializeCanvasArtifact({
+        format: "showai",
+        version: 1,
+        document: incoming,
+        components: incomingComponents,
+        remoteComponents,
+      });
+      if (request !== importGeneration.current) return;
+      incomingComponents = materialized.components ?? [];
       retainCanvasArtifact(localStorage, {
         format: "showai",
         version: 1,
@@ -260,6 +275,7 @@ export default function App() {
       setError("");
       window.scrollTo(0, 0);
     } catch (reason) {
+      if (request !== importGeneration.current) return;
       setError(
         `打开失败：${reason instanceof Error ? reason.message : "请检查页面格式"}`,
       );

@@ -26,6 +26,8 @@ import templates from "../../resources/catalog/templates.json";
 import builtinComponents from "../../resources/catalog/components.json";
 import { validateDocument } from "../portable/validation.mjs";
 import type { ShowDocument } from "../types";
+import { canonicalJson } from "./diff";
+import { mergeValues } from "./catalog-merge";
 import { assertJsonValue, assertProps } from "../components/custom/schema";
 import {
   COMPONENT_DATA_MARKER,
@@ -44,6 +46,14 @@ import type {
   JsonSchema,
   TemplateMetadata,
   TemplateRecord,
+  CatalogReadOptions,
+  PackageRevisionRef,
+  PackageBundle,
+  SaveTemplateInput,
+  TemplatePart,
+  EditablePackage,
+  PackageMergeInput,
+  PackageMergePreview,
 } from "../components/custom/types";
 
 export type {
@@ -53,6 +63,13 @@ export type {
   ComponentSource,
   TemplateMetadata,
   TemplateRecord,
+  CatalogReadOptions,
+  PackageRevisionRef,
+  PackageBundle,
+  SaveTemplateInput,
+  EditablePackage,
+  PackageMergeInput,
+  PackageMergePreview,
 } from "../components/custom/types";
 
 export function listBuiltinComponents(): BuiltinComponentMetadata[] {
@@ -150,7 +167,7 @@ async function safePath(
     if (index < parts.length - 1) {
       if (stat && !stat.isDirectory())
         throw new Error("Catalog parent is not a directory.");
-      if (!stat && createParent) await mkdir(current);
+      if (!stat && createParent) await mkdir(current, { recursive: true });
     }
   }
   return target;
@@ -162,31 +179,24 @@ async function readJson(home: string, path: string): Promise<unknown> {
     throw new Error("Invalid catalog file.");
   return JSON.parse(await readFile(path, "utf8"));
 }
-async function writeJson(
-  home: string,
-  path: string,
-  value: unknown,
-): Promise<void> {
-  await safePath(home, path, true);
-  const temporary = join(dirname(path), `.${randomUUID()}.tmp`);
-  await writeFile(temporary, JSON.stringify(value, null, 2) + "\n", {
-    flag: "wx",
-    mode: 0o600,
-  });
-  await rename(temporary, path);
-}
 function packageBase(
   home: string,
   kind: "templates" | "components",
   projectId?: string,
+  scope?: CatalogScope,
 ): string {
+  if (scope === "published")
+    return join(resolve(home), "packages", "published", kind);
   return join(projectRoot(home, projectId), "packages", kind);
 }
 function locations(
   home: string,
   kind: "templates" | "components",
   projectId?: string,
+  options: CatalogReadOptions = {},
 ): { path: string; scope: CatalogScope }[] {
+  if (options.scope === "project" && !projectId)
+    throw new Error("A project scope requires projectId.");
   return [
     ...(projectId
       ? [
@@ -196,8 +206,117 @@ function locations(
           },
         ]
       : []),
-    { path: packageBase(home, kind), scope: "user" as const },
-  ];
+    { path: packageBase(home, kind), scope: "global" as const },
+    {
+      path: packageBase(home, kind, undefined, "published"),
+      scope: "published" as const,
+    },
+  ].filter(
+    (location) =>
+      !options.scope ||
+      options.scope === "all" ||
+      location.scope === options.scope,
+  );
+}
+
+async function requireProjectWrite(
+  home: string,
+  projectId?: string,
+): Promise<string> {
+  if (!projectId)
+    throw new Error(
+      "A projectId is required for catalog writes. Promote a project revision explicitly to add it to the global catalog.",
+    );
+  const project = (await readJson(
+    home,
+    join(projectRoot(home, projectId), "project.json"),
+  )) as Record<string, unknown>;
+  if (
+    project.id !== projectId ||
+    project.format !== "showai-project" ||
+    project.archived
+  )
+    throw new Error(
+      "The catalog destination must be an existing active project.",
+    );
+  return projectId;
+}
+
+function revisionIdentity(ref: PackageRevisionRef): string {
+  return `${ref.kind}:${ref.id}@${ref.version}:${ref.integrity}`;
+}
+export function packageRevisionRef(
+  kind: "component" | "template",
+  item: {
+    id: string;
+    version: string;
+    integrity: string;
+    scope?: CatalogScope;
+  },
+): PackageRevisionRef {
+  return {
+    kind,
+    id: item.id,
+    version: item.version,
+    integrity: item.integrity,
+    ...(item.scope ? { scope: item.scope } : {}),
+  };
+}
+function checkedRef(
+  value: unknown,
+  expectedKind?: "component" | "template",
+): PackageRevisionRef {
+  const ref = record(value, "Package reference");
+  if (
+    (ref.kind !== "component" && ref.kind !== "template") ||
+    (expectedKind && ref.kind !== expectedKind)
+  )
+    throw new Error("Invalid package reference kind.");
+  if (typeof ref.id !== "string" || typeof ref.version !== "string")
+    throw new Error("Package references need textual id and exact version.");
+  assertId(String(ref.id));
+  assertVersion(String(ref.version));
+  if (
+    typeof ref.integrity !== "string" ||
+    !/^sha256-[a-f0-9]{64}$/.test(ref.integrity)
+  )
+    throw new Error(
+      "An exact package reference requires its integrity fingerprint.",
+    );
+  if (
+    ref.scope !== undefined &&
+    !["project", "global", "published", "builtin"].includes(String(ref.scope))
+  )
+    throw new Error("Invalid package scope.");
+  if (ref.projectId !== undefined) projectRoot(".", String(ref.projectId));
+  return {
+    kind: ref.kind,
+    id: String(ref.id),
+    version: String(ref.version),
+    integrity: ref.integrity,
+    ...(ref.scope ? { scope: ref.scope as CatalogScope } : {}),
+    ...(ref.projectId ? { projectId: String(ref.projectId) } : {}),
+  };
+}
+function portableRef(ref: PackageRevisionRef): PackageRevisionRef {
+  const { kind, id, version, integrity } = checkedRef(ref);
+  return { kind, id, version, integrity };
+}
+function textList(value: unknown, name: string): string[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string"))
+    throw new Error(`${name} must be an array of text.`);
+  return value;
+}
+function compareVersion(left: string, right: string): number {
+  const [a, apre] = left.split("-"),
+    [b, bpre] = right.split("-");
+  const an = a.split(".").map(Number),
+    bn = b.split(".").map(Number);
+  for (let i = 0; i < 3; i++) if (an[i] !== bn[i]) return an[i] - bn[i];
+  if (!apre && bpre) return 1;
+  if (apre && !bpre) return -1;
+  return (apre ?? "").localeCompare(bpre ?? "", undefined, { numeric: true });
 }
 async function children(home: string, path: string): Promise<string[]> {
   await safePath(home, path);
@@ -207,132 +326,473 @@ async function children(home: string, path: string): Promise<string[]> {
 function documentCopy(document: ShowDocument): ShowDocument {
   return validateDocument(JSON.parse(JSON.stringify(document))) as ShowDocument;
 }
-function builtinTemplate(id: string): TemplateRecord | undefined {
-  const item = templates.find((template) => template.id === id);
-  if (!item) return undefined;
-  const date = "2026-10-03T00:00:00.000Z";
-  return {
-    id: item.id,
-    name: item.name,
-    description: item.description,
-    scope: "builtin",
-    updatedAt: date,
-    document: documentCopy({
-      id: `template-${item.id}`,
-      title: item.id === "blank" ? "" : item.name,
-      icon: "",
-      cover: "none",
-      parentId: null,
-      favorite: false,
-      archived: false,
-      createdAt: date,
-      updatedAt: date,
-      comments: [],
-      content: { type: "doc", content: item.content },
-    }),
-  };
+function templateIntegrity(item: TemplateRecord): string {
+  const {
+    scope: _scope,
+    updatedAt: _date,
+    integrity: _integrity,
+    legacy: _legacy,
+    document,
+    ...fields
+  } = item;
+  const {
+    id: _id,
+    createdAt: _created,
+    updatedAt: _updated,
+    parentId: _parent,
+    favorite: _favorite,
+    archived: _archived,
+    ...content
+  } = document;
+  return digest(canonicalJson({ ...fields, document: content }));
 }
-function templateRecord(value: unknown, scope: CatalogScope): TemplateRecord {
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    throw new Error("Invalid template file.");
-  const item = value as Record<string, unknown>;
+function relatedItems(value: unknown): TemplateMetadata["related"] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value))
+    throw new Error("Related packages must be an array.");
+  return value.map((value) => {
+    const item = record(value, "Related package");
+    if (
+      !["component", "template"].includes(String(item.kind)) ||
+      typeof item.purpose !== "string"
+    )
+      throw new Error("Related packages need kind and purpose.");
+    assertId(String(item.id));
+    if (item.version !== undefined) assertVersion(String(item.version));
+    return {
+      kind: item.kind as "component" | "template",
+      id: String(item.id),
+      purpose: item.purpose,
+      ...(item.version ? { version: String(item.version) } : {}),
+    };
+  });
+}
+function templateRecord(
+  value: unknown,
+  scope: CatalogScope,
+  verify = true,
+): TemplateRecord {
+  const item = record(value, "Template");
   if (
     typeof item.id !== "string" ||
     typeof item.name !== "string" ||
+    !item.name.trim() ||
     typeof item.description !== "string" ||
     typeof item.updatedAt !== "string"
   )
     throw new Error("Invalid template metadata.");
   assertId(item.id);
-  return {
+  const legacy = item.version === undefined || item.legacy === true;
+  const version = legacy ? "0.0.0-legacy" : String(item.version);
+  assertVersion(version);
+  const guide = item.contentGuide ?? [];
+  if (!Array.isArray(guide))
+    throw new Error("Template contentGuide must be an array.");
+  const examples = item.examples ?? [];
+  if (!Array.isArray(examples))
+    throw new Error("Template examples must be an array.");
+  const composition =
+    item.composition === undefined
+      ? undefined
+      : (() => {
+          if (!Array.isArray(item.composition) || item.composition.length > 100)
+            throw new Error(
+              "Template composition must contain at most 100 ordered parts.",
+            );
+          return item.composition.map((value): TemplatePart => {
+            const part = record(value, "Template part");
+            if (part.type === "content") {
+              const node = record(
+                part.content,
+                "Template content",
+              ) as ShowDocument["content"];
+              documentCopy({
+                ...blankDocument(),
+                content:
+                  node.type === "doc" ? node : { type: "doc", content: [node] },
+              });
+              return { type: "content", content: structuredClone(node) };
+            }
+            if (
+              part.type !== "template" ||
+              (part.title !== undefined && typeof part.title !== "string")
+            )
+              throw new Error("Unknown template composition part.");
+            return {
+              type: "template",
+              ref: portableRef(checkedRef(part.ref, "template")),
+              ...(part.title !== undefined
+                ? { title: part.title as string }
+                : {}),
+            };
+          });
+        })();
+  const dependencies = item.dependencies ?? [];
+  if (!Array.isArray(dependencies))
+    throw new Error("Template dependencies must be an array.");
+  if (item.parents !== undefined && !Array.isArray(item.parents))
+    throw new Error("Template parents must be an array.");
+  const result: TemplateRecord = {
     id: item.id,
-    name: item.name,
+    name: item.name.trim(),
     description: item.description,
-    updatedAt: item.updatedAt,
+    version,
+    integrity: "",
     scope,
+    updatedAt: item.updatedAt,
     document: documentCopy(item.document as ShowDocument),
+    scenarios: textList(item.scenarios, "Template scenarios"),
+    contentGuide: guide.map((value) => {
+      const row = record(value, "Content guide");
+      if (typeof row.title !== "string")
+        throw new Error("Content guide needs a title.");
+      return {
+        title: row.title,
+        instructions: textList(row.instructions, "Content instructions"),
+      };
+    }),
+    related: relatedItems(item.related),
+    examples: examples.map((value) => {
+      const example = record(value, "Template example");
+      if (
+        typeof example.name !== "string" ||
+        typeof example.request !== "string"
+      )
+        throw new Error("Template examples need name and request.");
+      return {
+        name: example.name,
+        request: example.request,
+        steps: relatedItems(example.steps),
+      };
+    }),
+    dependencies: dependencies.map((ref) => portableRef(checkedRef(ref))),
+    ...(composition ? { composition } : {}),
+    ...(item.parents
+      ? { parents: (item.parents as unknown[]).map((ref) => checkedRef(ref)) }
+      : {}),
+    ...(item.mergeBase ? { mergeBase: checkedRef(item.mergeBase) } : {}),
+    ...(legacy ? { legacy: true } : {}),
   };
+  result.integrity = templateIntegrity(result);
+  if (verify && !legacy && item.integrity !== result.integrity)
+    throw new Error(
+      `Template integrity verification failed: ${result.id}@${result.version}.`,
+    );
+  return result;
+}
+function builtinTemplate(id: string): TemplateRecord | undefined {
+  const item = templates.find((template) => template.id === id);
+  if (!item) return undefined;
+  const date = "2026-10-03T00:00:00.000Z";
+  return templateRecord(
+    {
+      ...item,
+      version: "1.0.0",
+      updatedAt: date,
+      dependencies: [],
+      document: {
+        ...blankDocument(),
+        id: `template-${id}`,
+        title: id === "blank" ? "" : item.name,
+        createdAt: date,
+        updatedAt: date,
+        content: { type: "doc", content: item.content },
+      },
+    },
+    "builtin",
+    false,
+  );
+}
+async function templatesAt(
+  home: string,
+  path: string,
+  scope: CatalogScope,
+): Promise<TemplateRecord[]> {
+  const result: TemplateRecord[] = [];
+  for (const name of (await children(home, path)).sort()) {
+    if (name.endsWith(".json") && COMPONENT_ID.test(name.slice(0, -5)))
+      result.push(
+        templateRecord(await readJson(home, join(path, name)), scope),
+      );
+    else if (COMPONENT_ID.test(name)) {
+      for (const version of (await children(home, join(path, name)))
+        .filter((version) => COMPONENT_VERSION.test(version))
+        .sort((a, b) => compareVersion(b, a))) {
+        const entry = join(path, name, version, "template.json");
+        const template = templateRecord(await readJson(home, entry), scope);
+        if (template.id !== name || template.version !== version)
+          throw new Error("Template path and identity differ.");
+        result.push(template);
+      }
+    }
+  }
+  return result;
 }
 export async function listTemplates(
   home: string,
   projectId?: string,
+  options: CatalogReadOptions = {},
 ): Promise<TemplateMetadata[]> {
-  const found = new Map<string, TemplateMetadata>();
-  for (const location of locations(home, "templates", projectId)) {
-    for (const file of (await children(home, location.path))
-      .filter((name) => name.endsWith(".json"))
-      .sort()) {
-      const item = templateRecord(
-        await readJson(home, join(location.path, file)),
-        location.scope,
-      );
-      if (!found.has(item.id)) {
-        const { document: _document, ...metadata } = item;
-        found.set(item.id, metadata);
-      }
+  const result: TemplateMetadata[] = [];
+  for (const location of locations(home, "templates", projectId, options)) {
+    for (const item of await templatesAt(home, location.path, location.scope)) {
+      const {
+        document: _document,
+        composition: _composition,
+        ...metadata
+      } = item;
+      result.push(metadata);
     }
   }
-  for (const spec of templates)
-    if (!found.has(spec.id)) {
-      const { document: _document, ...metadata } = builtinTemplate(spec.id)!;
-      found.set(spec.id, metadata);
+  if (!options.scope || options.scope === "all" || options.scope === "builtin")
+    for (const spec of templates) {
+      const {
+        document: _document,
+        composition: _composition,
+        ...metadata
+      } = builtinTemplate(spec.id)!;
+      result.push(metadata);
     }
-  return [...found.values()];
+  return result;
 }
 export async function getTemplate(
   home: string,
   id: string,
   projectId?: string,
+  options: CatalogReadOptions = {},
 ): Promise<TemplateRecord> {
   assertId(id);
-  for (const location of locations(home, "templates", projectId)) {
-    const path = await safePath(home, join(location.path, `${id}.json`));
-    if (await optionalStat(path))
-      return templateRecord(await readJson(home, path), location.scope);
+  if (options.version) assertVersion(options.version);
+  for (const location of locations(home, "templates", projectId, options)) {
+    const candidates: TemplateRecord[] = [];
+    const versionRoot = join(location.path, id);
+    if (await optionalStat(await safePath(home, versionRoot))) {
+      const versions = options.version
+        ? [options.version]
+        : (await children(home, versionRoot))
+            .filter((version) => COMPONENT_VERSION.test(version))
+            .sort((a, b) => compareVersion(b, a));
+      for (const version of versions) {
+        const path = await safePath(
+          home,
+          join(versionRoot, version, "template.json"),
+        );
+        if (await optionalStat(path))
+          candidates.push(
+            templateRecord(await readJson(home, path), location.scope),
+          );
+      }
+    }
+    const flat = await safePath(home, join(location.path, `${id}.json`));
+    if (
+      (!options.version || options.version === "0.0.0-legacy") &&
+      (await optionalStat(flat))
+    )
+      candidates.push(
+        templateRecord(await readJson(home, flat), location.scope),
+      );
+    const match = candidates.find(
+      (item) =>
+        (!options.version || item.version === options.version) &&
+        (!options.integrity || item.integrity === options.integrity),
+    );
+    if (match) return match;
   }
-  const builtin = builtinTemplate(id);
-  if (builtin) return builtin;
-  throw new Error(`Template not found: ${id}.`);
+  if (
+    !options.scope ||
+    options.scope === "all" ||
+    options.scope === "builtin"
+  ) {
+    const item = builtinTemplate(id);
+    if (
+      item &&
+      (!options.version || item.version === options.version) &&
+      (!options.integrity || item.integrity === options.integrity)
+    )
+      return item;
+  }
+  throw new Error(
+    `Exact template not found: ${id}${options.version ? `@${options.version}` : ""}${options.integrity ? ` (integrity ${options.integrity})` : ""}.`,
+  );
+}
+export async function getTemplateByRef(
+  home: string,
+  input: PackageRevisionRef,
+  projectId?: string,
+): Promise<TemplateRecord> {
+  const ref = checkedRef(input, "template");
+  return getTemplate(home, ref.id, ref.projectId ?? projectId, {
+    version: ref.version,
+    integrity: ref.integrity,
+    scope: ref.scope,
+  });
+}
+async function writeTemplateRevision(
+  home: string,
+  template: TemplateRecord,
+  scope: "project" | "global" | "published",
+  projectId?: string,
+): Promise<TemplateRecord> {
+  if (Buffer.byteLength(JSON.stringify(template)) > 12 * 1024 * 1024)
+    throw new Error("Template source exceeds the 12 MB catalog record limit.");
+  const destination = await safePath(
+    home,
+    join(
+      packageBase(
+        home,
+        "templates",
+        scope === "project" ? projectId : undefined,
+        scope,
+      ),
+      template.id,
+      template.version,
+    ),
+    true,
+  );
+  if (await optionalStat(destination)) {
+    const current = templateRecord(
+      await readJson(home, join(destination, "template.json")),
+      scope,
+    );
+    if (current.integrity !== template.integrity)
+      throw new Error(
+        `Template ${template.id}@${template.version} is immutable. Save a new version.`,
+      );
+    return current;
+  }
+  const staging = join(dirname(destination), `.template-${randomUUID()}`);
+  await mkdir(staging);
+  try {
+    await writeFile(
+      join(staging, "template.json"),
+      JSON.stringify({ ...template, scope }, null, 2) + "\n",
+      { flag: "wx", mode: 0o600 },
+    );
+    await rename(staging, destination);
+  } finally {
+    await rm(staging, { recursive: true, force: true });
+  }
+  return { ...template, scope };
 }
 export async function saveTemplate(
   home: string,
-  input: {
-    id?: string;
-    name: string;
-    description: string;
-    document: ShowDocument;
-  },
+  input: SaveTemplateInput,
   projectId?: string,
 ): Promise<TemplateRecord> {
-  const id = input.id || `template-${randomUUID()}`;
+  const project = await requireProjectWrite(home, projectId);
+  const id = input.id ?? `template-${randomUUID()}`,
+    version = input.version ?? "1.0.0";
   assertId(id);
-  if (
-    !input.name?.trim() ||
-    input.name.length > 200 ||
-    typeof input.description !== "string" ||
-    input.description.length > 4000
-  )
-    throw new Error("A template needs a name and a short description.");
-  const record: TemplateRecord = {
-    id,
-    name: input.name.trim(),
-    description: input.description.trim(),
-    document: documentCopy(input.document),
-    scope: projectId ? "project" : "user",
-    updatedAt: new Date().toISOString(),
-  };
-  await writeJson(
+  assertVersion(version);
+  if (version === "0.0.0-legacy")
+    throw new Error("Legacy flat templates are read-only. Save a new version.");
+  const document = await lockDocumentComponents(
     home,
-    join(packageBase(home, "templates", projectId), `${id}.json`),
-    record,
+    documentCopy(input.document ?? blankDocument()),
+    project,
   );
-  return record;
+  const dependencies = new Map<string, PackageRevisionRef>();
+  const addComponents = async (doc: ShowDocument) => {
+    for (const component of await resolveDocumentComponents(
+      home,
+      doc,
+      project,
+    )) {
+      const ref = portableRef(packageRevisionRef("component", component));
+      dependencies.set(revisionIdentity(ref), ref);
+    }
+  };
+  const composition: TemplatePart[] | undefined = input.composition
+    ? []
+    : undefined;
+  if (input.composition)
+    for (const part of input.composition) {
+      if (part.type === "content") {
+        const value = await lockDocumentComponents(
+          home,
+          {
+            ...blankDocument(),
+            content:
+              part.content.type === "doc"
+                ? part.content
+                : { type: "doc", content: [part.content] },
+          },
+          project,
+        );
+        composition!.push({ type: "content", content: value.content });
+        await addComponents(value);
+      } else {
+        if (part.type !== "template" || part.ref.kind !== "template")
+          throw new Error("Invalid template composition part.");
+        const nested = await getTemplate(
+          home,
+          part.ref.id,
+          part.ref.projectId ?? project,
+          {
+            version: part.ref.version,
+            integrity: part.ref.integrity,
+            scope: part.ref.scope,
+          },
+        );
+        if (nested.id === id && nested.version === version)
+          throw new Error("Template composition contains a cycle.");
+        const ref = portableRef(packageRevisionRef("template", nested));
+        composition!.push({
+          type: "template",
+          ref,
+          ...(part.title ? { title: part.title } : {}),
+        });
+        dependencies.set(revisionIdentity(ref), ref);
+        await instantiateTemplateRecord(home, nested, project);
+        const nestedBundle = await resolvePackageBundle(
+          home,
+          packageRevisionRef("template", nested),
+          project,
+        );
+        for (const item of nestedBundle.templates) {
+          const dependency = portableRef(packageRevisionRef("template", item));
+          dependencies.set(revisionIdentity(dependency), dependency);
+        }
+        for (const { component } of nestedBundle.components) {
+          const dependency = portableRef(
+            packageRevisionRef("component", component),
+          );
+          dependencies.set(revisionIdentity(dependency), dependency);
+        }
+      }
+    }
+  else await addComponents(document);
+  const item = templateRecord(
+    Object.fromEntries(
+      Object.entries({
+        name: input.name,
+        description: input.description,
+        scenarios: input.scenarios,
+        contentGuide: input.contentGuide,
+        related: input.related,
+        examples: input.examples,
+        parents: input.parents,
+        mergeBase: input.mergeBase,
+        id,
+        version,
+        document,
+        composition,
+        dependencies: [...dependencies.values()],
+        updatedAt: new Date().toISOString(),
+      }).filter(([, value]) => value !== undefined),
+    ),
+    "project",
+    false,
+  );
+  await instantiateTemplateRecord(home, item, project);
+  return writeTemplateRevision(home, item, "project", project);
 }
 export function instantiateTemplate(document: ShowDocument): ShowDocument {
   const copy = documentCopy(document),
     date = new Date().toISOString();
   const visit = (node: typeof copy.content) => {
-    if (node.attrs?.id) node.attrs.id = randomUUID();
+    if (node.type !== "doc" && node.type !== "text")
+      node.attrs = { ...node.attrs, id: randomUUID() };
     node.content?.forEach(visit);
   };
   visit(copy.content);
@@ -387,7 +847,19 @@ function manifestFrom(value: unknown): ComponentManifest {
     const example = record(value, "Component example");
     if (typeof example.name !== "string")
       throw new Error("Each component example needs a name.");
-    return { name: example.name, data: record(example.data, "Example data") };
+    for (const key of ["request", "description"])
+      if (example[key] !== undefined && typeof example[key] !== "string")
+        throw new Error(`Component example ${key} must be text.`);
+    return {
+      name: example.name,
+      data: record(example.data, "Example data"),
+      ...(example.request !== undefined
+        ? { request: example.request as string }
+        : {}),
+      ...(example.description !== undefined
+        ? { description: example.description as string }
+        : {}),
+    };
   });
   return {
     id,
@@ -398,6 +870,19 @@ function manifestFrom(value: unknown): ComponentManifest {
     scenarios: item.scenarios as string[],
     defaultData,
     examples,
+    ...(item.effects !== undefined
+      ? { effects: textList(item.effects, "Component effects") }
+      : {}),
+    ...(item.parents !== undefined
+      ? {
+          parents: Array.isArray(item.parents)
+            ? item.parents.map((ref) => checkedRef(ref))
+            : (() => {
+                throw new Error("Component parents must be an array.");
+              })(),
+        }
+      : {}),
+    ...(item.mergeBase ? { mergeBase: checkedRef(item.mergeBase) } : {}),
   };
 }
 async function packageFiles(directory: string): Promise<Map<string, Buffer>> {
@@ -758,17 +1243,16 @@ function compiledRecord(value: unknown, scope: CatalogScope): StoredComponent {
 export async function listComponents(
   home: string,
   projectId?: string,
+  options: CatalogReadOptions = {},
 ): Promise<ComponentMetadata[]> {
-  const found = new Map<string, ComponentMetadata>();
-  for (const location of locations(home, "components", projectId)) {
+  const result: ComponentMetadata[] = [];
+  for (const location of locations(home, "components", projectId, options)) {
     for (const id of (await children(home, location.path))
       .filter((id) => COMPONENT_ID.test(id))
       .sort()) {
       for (const version of (await children(home, join(location.path, id)))
         .filter((version) => COMPONENT_VERSION.test(version))
-        .sort()) {
-        const key = `${id}@${version}`;
-        if (found.has(key)) continue;
+        .sort((a, b) => compareVersion(b, a))) {
         const {
           html: _html,
           inline: _inline,
@@ -782,54 +1266,85 @@ export async function listComponents(
           ),
           location.scope,
         );
-        found.set(key, metadata);
+        if (metadata.id !== id || metadata.version !== version)
+          throw new Error("Component path and identity differ.");
+        result.push(metadata);
       }
     }
   }
-  return [...found.values()].sort(
-    (left, right) =>
-      left.id.localeCompare(right.id) ||
-      right.version.localeCompare(left.version, undefined, { numeric: true }),
-  );
+  return result;
 }
 async function componentLocation(
   home: string,
   id: string,
   version?: string,
   projectId?: string,
+  options: CatalogReadOptions = {},
 ): Promise<{ path: string; scope: CatalogScope }> {
   assertId(id);
-  const selected =
-    version ??
-    (await listComponents(home, projectId)).find(
-      (component) => component.id === id,
-    )?.version;
-  if (!selected) throw new Error(`Component not found: ${id}.`);
-  assertVersion(selected);
-  for (const location of locations(home, "components", projectId)) {
-    const path = await safePath(home, join(location.path, id, selected));
-    if (await optionalStat(path)) return { path, scope: location.scope };
+  if (version) assertVersion(version);
+  for (const location of locations(home, "components", projectId, options)) {
+    const base = await safePath(home, join(location.path, id));
+    if (!(await optionalStat(base))) continue;
+    const versions = version
+      ? [version]
+      : (await children(home, base))
+          .filter((value) => COMPONENT_VERSION.test(value))
+          .sort((a, b) => compareVersion(b, a));
+    for (const selected of versions) {
+      const path = await safePath(home, join(base, selected));
+      if (!(await optionalStat(path))) continue;
+      const item = compiledRecord(
+        await readJson(home, join(path, "compiled.json")),
+        location.scope,
+      );
+      if (item.id !== id || item.version !== selected)
+        throw new Error("Component path and identity differ.");
+      if (!options.integrity || options.integrity === item.integrity)
+        return { path, scope: location.scope };
+    }
   }
-  throw new Error(`Component not found: ${id}@${selected}.`);
+  throw new Error(
+    `Exact component not found: ${id}${version ? `@${version}` : ""}${options.integrity ? ` (integrity ${options.integrity})` : ""}.`,
+  );
 }
 export async function getComponent(
   home: string,
   id: string,
   version?: string,
   projectId?: string,
+  options: CatalogReadOptions = {},
 ): Promise<CompiledComponent> {
-  const location = await componentLocation(home, id, version, projectId);
+  const location = await componentLocation(
+    home,
+    id,
+    version,
+    projectId,
+    options,
+  );
   const { sourceIntegrity: _source, ...component } = compiledRecord(
     await readJson(home, join(location.path, "compiled.json")),
     location.scope,
   );
   return component;
 }
+export async function getComponentByRef(
+  home: string,
+  input: PackageRevisionRef,
+  projectId?: string,
+): Promise<CompiledComponent> {
+  const ref = checkedRef(input, "component");
+  return getComponent(home, ref.id, ref.version, ref.projectId ?? projectId, {
+    scope: ref.scope,
+    integrity: ref.integrity,
+  });
+}
 export async function importComponent(
   home: string,
   packageDirectory: string,
   projectId?: string,
 ): Promise<CompiledComponent> {
+  projectId = await requireProjectWrite(home, projectId);
   const directory = await realpath(packageDirectory);
   const files = await packageFiles(directory);
   if (!files.has("manifest.json") || !files.has("props.schema.json"))
@@ -852,7 +1367,7 @@ export async function importComponent(
     ),
     true,
   );
-  const scope = projectId ? "project" : "user";
+  const scope: CatalogScope = "project";
   if (await optionalStat(destination)) {
     const existing = compiledRecord(
       await readJson(home, join(destination, "compiled.json")),
@@ -875,14 +1390,37 @@ export async function importComponent(
       throw new Error(
         `Component ${manifest.id}@${manifest.version} is immutable. Increase its version before changing the package.`,
       );
-    for (const [path, contents] of files) {
-      const target = await safePath(home, join(destination, path), true);
-      await writeFile(target, contents, { flag: "wx", mode: 0o600 });
+    // Restoring source does not rewrite an immutable portable revision. Keep
+    // verified source in a separate content-addressed cache beside versions.
+    const cache = await safePath(
+      home,
+      join(dirname(destination), ".sources", existing.integrity),
+      true,
+    );
+    if (await optionalStat(cache)) {
+      if (sourceDigest(await packageFiles(cache)) !== sourceIntegrity)
+        throw new Error(
+          "Verified component source is immutable. Save a new version.",
+        );
+      return compiled;
     }
-    await writeJson(home, join(destination, "compiled.json"), {
-      ...compiled,
-      sourceIntegrity,
-    });
+    const stagedSource = join(dirname(cache), `.source-${randomUUID()}`);
+    await mkdir(stagedSource);
+    try {
+      for (const [path, contents] of files) {
+        const target = join(stagedSource, path);
+        await mkdir(dirname(target), { recursive: true });
+        await writeFile(target, contents, { flag: "wx", mode: 0o600 });
+      }
+      await writeFile(
+        join(stagedSource, ".source-integrity.json"),
+        JSON.stringify({ sourceIntegrity }),
+        { flag: "wx", mode: 0o600 },
+      );
+      await rename(stagedSource, cache);
+    } finally {
+      await rm(stagedSource, { recursive: true, force: true });
+    }
     return compiled;
   }
   const component = await compilePackage(
@@ -911,24 +1449,73 @@ export async function importComponent(
   }
   return component;
 }
+async function componentSourcePath(
+  home: string,
+  location: { path: string; scope: CatalogScope },
+): Promise<string | undefined> {
+  if (
+    await optionalStat(
+      await safePath(home, join(location.path, "manifest.json")),
+    )
+  )
+    return location.path;
+  const component = compiledRecord(
+    await readJson(home, join(location.path, "compiled.json")),
+    location.scope,
+  );
+  const cache = await safePath(
+    home,
+    join(dirname(location.path), ".sources", component.integrity),
+  );
+  return (await optionalStat(cache)) ? cache : undefined;
+}
 export async function readComponentSource(
   home: string,
   id: string,
   version?: string,
   projectId?: string,
+  options: CatalogReadOptions = {},
 ): Promise<ComponentSource> {
-  const location = await componentLocation(home, id, version, projectId);
+  const location = await componentLocation(
+    home,
+    id,
+    version,
+    projectId,
+    options,
+  );
   await safePath(home, location.path);
-  const files = await packageFiles(location.path);
+  const sourcePath = await componentSourcePath(home, location);
+  const files = sourcePath
+    ? await packageFiles(sourcePath)
+    : new Map<string, Buffer>();
   if (!files.has("manifest.json") || !files.has("props.schema.json"))
     throw new Error(
       "This component was imported from a portable page and has no editable source. Import the original source package to edit it.",
+    );
+  const compiled = compiledRecord(
+    await readJson(home, join(location.path, "compiled.json")),
+    location.scope,
+  );
+  const expectedSource =
+    sourcePath === location.path
+      ? compiled.sourceIntegrity
+      : (
+          (await readJson(
+            home,
+            join(sourcePath!, ".source-integrity.json"),
+          )) as { sourceIntegrity: string }
+        ).sourceIntegrity;
+  if (expectedSource !== "portable" && sourceDigest(files) !== expectedSource)
+    throw new Error(
+      "Component source integrity verification failed. Restore the original source or save a new version.",
     );
   const manifest = manifestFrom(
     JSON.parse(files.get("manifest.json")!.toString("utf8")),
   );
   return {
     manifest,
+    ...(manifest.parents ? { parents: manifest.parents } : {}),
+    ...(manifest.mergeBase ? { mergeBase: manifest.mergeBase } : {}),
     schema: JSON.parse(files.get("props.schema.json")!.toString("utf8")),
     source: files.get(manifest.entry.replace(/^\.\//, ""))!.toString("utf8"),
     files: Object.fromEntries(
@@ -951,10 +1538,17 @@ export async function saveComponent(
     source: string;
     files?: Record<string, string>;
     assets?: Record<string, string>;
+    parents?: PackageRevisionRef[];
+    mergeBase?: PackageRevisionRef;
   },
   projectId?: string,
 ): Promise<CompiledComponent> {
-  const manifest = manifestFrom(input.manifest);
+  projectId = await requireProjectWrite(home, projectId);
+  const manifest = manifestFrom({
+    ...input.manifest,
+    ...(input.parents ? { parents: input.parents } : {}),
+    ...(input.mergeBase ? { mergeBase: input.mergeBase } : {}),
+  });
   if (typeof input.source !== "string")
     throw new Error("Component source must be text.");
   const directory = await safePath(
@@ -1025,6 +1619,7 @@ export async function resolveDocumentComponents(
         ref.componentId,
         ref.version,
         projectId,
+        { integrity: ref.integrity, scope: ref.scope },
       );
       if (ref.integrity && component.integrity !== ref.integrity)
         throw new Error(
@@ -1035,7 +1630,10 @@ export async function resolveDocumentComponents(
           node.type === "widget" &&
           node.attrs?.kind === "custom" &&
           node.attrs.data?.componentId === component.id &&
-          node.attrs.data?.version === component.version
+          node.attrs.data?.version === component.version &&
+          (node.attrs.data?.integrity
+            ? node.attrs.data.integrity === component.integrity
+            : !ref.integrity && node.attrs.data?.scope === ref.scope)
         )
           assertProps(component.schema, node.attrs.data.props);
         node.content?.forEach(visit);
@@ -1052,9 +1650,10 @@ export async function importCompiledComponents(
   components: CompiledComponent[],
   projectId?: string,
 ): Promise<ComponentMetadata[]> {
+  projectId = await requireProjectWrite(home, projectId);
   if (!Array.isArray(components) || components.length > 100)
     throw new Error("Invalid portable component collection.");
-  const scope = projectId ? "project" : "user";
+  const scope: CatalogScope = "project";
   const checked = components.map((component) => {
     const validated = compiledRecord(
       { ...component, sourceIntegrity: "portable" },
@@ -1149,4 +1748,699 @@ export function blankDocument(): ShowDocument {
     comments: [],
     content: structuredClone(emptyContent),
   };
+}
+
+/** Freeze authoring references without mutating a caller's live editor draft. */
+export async function lockDocumentComponents(
+  home: string,
+  document: ShowDocument,
+  projectId?: string,
+): Promise<ShowDocument> {
+  const copy = documentCopy(document);
+  const selected = new Map<string, Promise<CompiledComponent>>();
+  const visit = async (node: ShowDocument["content"]): Promise<void> => {
+    if (node.type === "widget" && node.attrs?.kind === "custom") {
+      const data = node.attrs.data as Record<string, unknown>;
+      const ref = collectCustomComponentRefs({
+        ...copy,
+        content: { type: "doc", content: [node] },
+      })[0];
+      const key = `${ref.componentId}@${ref.version}:${ref.integrity ?? ""}:${ref.scope ?? ""}`;
+      let pending = selected.get(key);
+      if (!pending) {
+        pending = getComponent(home, ref.componentId, ref.version, projectId, {
+          integrity: ref.integrity,
+          scope: ref.scope,
+        });
+        selected.set(key, pending);
+      }
+      const component = await pending;
+      assertProps(component.schema, data.props);
+      const { scope: _scope, ...properties } = data;
+      node.attrs.data = {
+        ...properties,
+        componentId: component.id,
+        version: component.version,
+        integrity: component.integrity,
+      };
+    }
+    await Promise.all((node.content ?? []).map(visit));
+  };
+  await visit(copy.content);
+  return copy;
+}
+
+export async function instantiateTemplateRecord(
+  home: string,
+  input: PackageRevisionRef | TemplateRecord,
+  projectId?: string,
+): Promise<ShowDocument> {
+  const initial =
+    "document" in input
+      ? templateRecord(input, input.scope)
+      : await getTemplateByRef(home, input, projectId);
+  let expandedNodes = 0;
+  const expand = async (
+    template: TemplateRecord,
+    ancestors: Set<string>,
+    depth: number,
+  ): Promise<ShowDocument> => {
+    const identity = revisionIdentity(packageRevisionRef("template", template));
+    if (ancestors.has(identity))
+      throw new Error(
+        `Template composition cycle: ${template.id}@${template.version}.`,
+      );
+    if (depth > 16) throw new Error("Template composition exceeds 16 levels.");
+    const active = new Set(ancestors).add(identity);
+    const content: ShowDocument["content"][] = [];
+    const append = (nodes: ShowDocument["content"][]) => {
+      const count = (node: ShowDocument["content"]) => {
+        expandedNodes++;
+        node.content?.forEach(count);
+      };
+      nodes.forEach(count);
+      if (expandedNodes > 12000)
+        throw new Error("Expanded template exceeds 12000 nodes.");
+      content.push(...nodes);
+    };
+    if (template.composition) {
+      for (const part of template.composition) {
+        if (part.type === "content")
+          append(
+            structuredClone(
+              part.content.type === "doc"
+                ? (part.content.content ?? [])
+                : [part.content],
+            ),
+          );
+        else {
+          if (part.title)
+            append([
+              {
+                type: "heading",
+                attrs: { level: 2 },
+                content: [{ type: "text", text: part.title }],
+              },
+            ]);
+          const nested = await getTemplateByRef(home, part.ref, projectId);
+          const result = await expand(nested, active, depth + 1);
+          // Nested nodes have already contributed to the expansion limit.
+          content.push(...(result.content.content ?? []));
+        }
+      }
+    } else append(structuredClone(template.document.content.content ?? []));
+    return { ...template.document, content: { type: "doc", content } };
+  };
+  return instantiateTemplate(
+    await lockDocumentComponents(
+      home,
+      await expand(initial, new Set(), 0),
+      projectId,
+    ),
+  );
+}
+
+function templateDependencies(template: TemplateRecord): PackageRevisionRef[] {
+  const refs = new Map<string, PackageRevisionRef>();
+  const put = (ref: PackageRevisionRef) => {
+    const identity = portableRef(ref);
+    refs.set(revisionIdentity(identity), identity);
+  };
+  for (const dependency of template.dependencies) put(dependency);
+  const collect = (content: ShowDocument["content"]) => {
+    const doc = {
+      ...template.document,
+      content:
+        content.type === "doc" ? content : { type: "doc", content: [content] },
+    };
+    for (const ref of collectCustomComponentRefs(doc)) {
+      if (!ref.integrity)
+        throw new Error(
+          `Template ${template.id} has an unlocked component. Fork it to a versioned project template first.`,
+        );
+      put({
+        kind: "component",
+        id: ref.componentId,
+        version: ref.version,
+        integrity: ref.integrity,
+      });
+    }
+  };
+  if (template.composition)
+    for (const part of template.composition) {
+      if (part.type === "template") put(part.ref);
+      else collect(part.content);
+    }
+  else collect(template.document.content);
+  return [...refs.values()];
+}
+
+export async function resolvePackageBundle(
+  home: string,
+  input: PackageRevisionRef,
+  projectId?: string,
+): Promise<PackageBundle> {
+  const root = checkedRef(input),
+    components: PackageBundle["components"] = [],
+    records: TemplateRecord[] = [];
+  const visited = new Set<string>();
+  const walk = async (
+    ref: PackageRevisionRef,
+    ancestors: Set<string>,
+    depth: number,
+  ): Promise<void> => {
+    const key = revisionIdentity(ref);
+    if (ancestors.has(key))
+      throw new Error(`Package dependency cycle at ${ref.id}@${ref.version}.`);
+    if (depth > 16 || visited.size > 1000)
+      throw new Error("Package dependency closure is too large.");
+    if (visited.has(key)) return;
+    const active = new Set(ancestors).add(key);
+    if (ref.kind === "component") {
+      const component = await getComponentByRef(home, ref, projectId);
+      const location = await componentLocation(
+        home,
+        component.id,
+        component.version,
+        ref.projectId ?? projectId,
+        { scope: ref.scope, integrity: component.integrity },
+      );
+      const hasSource = await componentSourcePath(home, location);
+      const source = hasSource
+        ? await readComponentSource(
+            home,
+            component.id,
+            component.version,
+            ref.projectId ?? projectId,
+            { scope: ref.scope, integrity: component.integrity },
+          )
+        : undefined;
+      components.push({ component, ...(source ? { source } : {}) });
+    } else {
+      const template = await getTemplateByRef(home, ref, projectId);
+      for (const dependency of templateDependencies(template))
+        await walk(dependency, active, depth + 1);
+      records.push(template);
+    }
+    visited.add(key);
+  };
+  await walk(root, new Set(), 0);
+  return {
+    format: "showai-catalog-bundle",
+    version: 1,
+    root: portableRef(root),
+    components,
+    templates: records,
+  };
+}
+
+function componentSourceFiles(source: ComponentSource): Map<string, Buffer> {
+  const manifest = manifestFrom(source.manifest);
+  const files = new Map<string, Buffer>();
+  const add = (path: string, data: Buffer) => {
+    if (
+      isAbsolute(path) ||
+      path.includes("\\") ||
+      path.split("/").includes("..") ||
+      !SOURCE_EXTENSIONS.has(extname(path)) ||
+      path === "compiled.json" ||
+      path.split("/").some((part) => part.startsWith("."))
+    )
+      throw new Error(
+        "Component source must use supported package-local paths.",
+      );
+    files.set(path, data);
+  };
+  for (const [path, text] of Object.entries(source.files ?? {})) {
+    if (typeof text !== "string" || !TEXT_EXTENSIONS.has(extname(path)))
+      throw new Error("Invalid component text file.");
+    add(path, Buffer.from(text));
+  }
+  for (const [path, encoded] of Object.entries(source.assets ?? {})) {
+    if (
+      typeof encoded !== "string" ||
+      !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded) ||
+      TEXT_EXTENSIONS.has(extname(path))
+    )
+      throw new Error("Invalid component binary asset.");
+    add(path, Buffer.from(encoded, "base64"));
+  }
+  if (typeof source.source !== "string")
+    throw new Error("Component source must contain its entry text.");
+  add("manifest.json", Buffer.from(JSON.stringify(manifest, null, 2)));
+  add("props.schema.json", Buffer.from(JSON.stringify(source.schema, null, 2)));
+  add(manifest.entry.replace(/^\.\//, ""), Buffer.from(source.source));
+  if (
+    files.size > MAX_FILES ||
+    [...files.values()].reduce((total, value) => total + value.length, 0) >
+      MAX_PACKAGE_BYTES
+  )
+    throw new Error("Component source package exceeds its size limit.");
+  return files;
+}
+
+/** Semantic validation is separate from a publication transport's byte checksum. */
+export function validatePackageBundle(value: unknown): PackageBundle {
+  const bundle = record(value, "Catalog bundle");
+  if (
+    bundle.format !== "showai-catalog-bundle" ||
+    bundle.version !== 1 ||
+    !Array.isArray(bundle.components) ||
+    !Array.isArray(bundle.templates) ||
+    bundle.components.length + bundle.templates.length > 1000
+  )
+    throw new Error("Invalid catalog bundle envelope.");
+  const root = checkedRef(bundle.root);
+  const components: PackageBundle["components"] = bundle.components.map(
+    (value) => {
+      const entry = record(value, "Bundle component");
+      const { sourceIntegrity: _source, ...component } = compiledRecord(
+        {
+          ...record(entry.component, "Compiled component"),
+          sourceIntegrity: "portable",
+        },
+        "published",
+      );
+      assertProps(component.schema, component.defaultData);
+      component.examples.forEach((example) =>
+        assertProps(component.schema, example.data),
+      );
+      if (entry.source !== undefined) {
+        const source = entry.source as ComponentSource;
+        componentSourceFiles(source);
+        if (
+          canonicalJson(manifestFrom(source.manifest)) !==
+            canonicalJson(manifestFrom(component)) ||
+          canonicalJson(source.schema) !== canonicalJson(component.schema)
+        )
+          throw new Error(
+            "Bundle source metadata differs from its compiled component.",
+          );
+        return { component, source: structuredClone(source) };
+      }
+      return { component };
+    },
+  );
+  const records = bundle.templates.map((item) =>
+    templateRecord(item, "published"),
+  );
+  const available = new Map<string, PackageRevisionRef>();
+  const slots = new Map<string, string>();
+  for (const ref of [
+    ...components.map((entry) =>
+      packageRevisionRef("component", entry.component),
+    ),
+    ...records.map((item) => packageRevisionRef("template", item)),
+  ]) {
+    const slot = `${ref.kind}:${ref.id}@${ref.version}`;
+    if (slots.has(slot) && slots.get(slot) !== ref.integrity)
+      throw new Error(`Conflicting package identities in bundle: ${slot}.`);
+    slots.set(slot, ref.integrity);
+    available.set(revisionIdentity(ref), ref);
+  }
+  if (!available.has(revisionIdentity(root)))
+    throw new Error("Bundle root is missing or its integrity differs.");
+  const byTemplate = new Map(
+    records.map((item) => [
+      revisionIdentity(packageRevisionRef("template", item)),
+      item,
+    ]),
+  );
+  const check = (
+    template: TemplateRecord,
+    active: Set<string>,
+    depth: number,
+  ) => {
+    const key = revisionIdentity(packageRevisionRef("template", template));
+    if (active.has(key) || depth > 16)
+      throw new Error("Bundle template dependency cycle or excessive depth.");
+    const path = new Set(active).add(key);
+    for (const ref of templateDependencies(template)) {
+      if (!available.has(revisionIdentity(ref)))
+        throw new Error(
+          `Missing exact bundle dependency: ${ref.id}@${ref.version}.`,
+        );
+      if (ref.kind === "template")
+        check(byTemplate.get(revisionIdentity(ref))!, path, depth + 1);
+    }
+  };
+  records.forEach((item) => check(item, new Set(), 0));
+  return {
+    format: "showai-catalog-bundle",
+    version: 1,
+    root: portableRef(root),
+    components,
+    templates: records,
+  };
+}
+
+async function installBundle(
+  home: string,
+  value: PackageBundle,
+  scope: "global" | "published",
+): Promise<PackageBundle> {
+  const bundle = validatePackageBundle(value);
+  const targets = [
+    ...bundle.components.map((entry) => ({
+      kind: "components" as const,
+      id: entry.component.id,
+      version: entry.component.version,
+      integrity: entry.component.integrity,
+    })),
+    ...bundle.templates.map((entry) => ({
+      kind: "templates" as const,
+      id: entry.id,
+      version: entry.version,
+      integrity: entry.integrity,
+    })),
+  ];
+  // Preflight every dependency before making any visible revision available.
+  for (const target of targets) {
+    const path = await safePath(
+      home,
+      join(
+        packageBase(home, target.kind, undefined, scope),
+        target.id,
+        target.version,
+      ),
+    );
+    if (!(await optionalStat(path))) continue;
+    const current =
+      target.kind === "components"
+        ? compiledRecord(
+            await readJson(home, join(path, "compiled.json")),
+            scope,
+          )
+        : templateRecord(
+            await readJson(home, join(path, "template.json")),
+            scope,
+          );
+    if (current.integrity !== target.integrity)
+      throw new Error(
+        `Cannot install immutable ${target.id}@${target.version}: ${scope} contains different content.`,
+      );
+  }
+  for (const entry of bundle.components) {
+    const component = { ...entry.component, scope };
+    const destination = await safePath(
+      home,
+      join(
+        packageBase(home, "components", undefined, scope),
+        component.id,
+        component.version,
+      ),
+      true,
+    );
+    if (await optionalStat(destination)) continue;
+    const staging = join(dirname(destination), `.install-${randomUUID()}`);
+    await mkdir(staging);
+    try {
+      const files = entry.source
+        ? componentSourceFiles(entry.source)
+        : new Map<string, Buffer>();
+      for (const [path, contents] of files) {
+        const target = join(staging, path);
+        await mkdir(dirname(target), { recursive: true });
+        await writeFile(target, contents, { flag: "wx", mode: 0o600 });
+      }
+      await writeFile(
+        join(staging, "compiled.json"),
+        JSON.stringify(
+          {
+            ...component,
+            sourceIntegrity: entry.source ? sourceDigest(files) : "portable",
+          },
+          null,
+          2,
+        ),
+        { flag: "wx", mode: 0o600 },
+      );
+      await rename(staging, destination);
+    } finally {
+      await rm(staging, { recursive: true, force: true });
+    }
+  }
+  // resolvePackageBundle orders children before parents. The root becomes visible last.
+  const pending = new Map(
+    bundle.templates.map((item) => [
+      revisionIdentity(packageRevisionRef("template", item)),
+      item,
+    ]),
+  );
+  const installed = new Set<string>();
+  const installTemplate = async (item: TemplateRecord): Promise<void> => {
+    const key = revisionIdentity(packageRevisionRef("template", item));
+    if (installed.has(key)) return;
+    for (const ref of templateDependencies(item))
+      if (ref.kind === "template" && pending.has(revisionIdentity(ref)))
+        await installTemplate(pending.get(revisionIdentity(ref))!);
+    await writeTemplateRevision(home, item, scope);
+    installed.add(key);
+  };
+  for (const item of bundle.templates) await installTemplate(item);
+  return {
+    ...bundle,
+    root: { ...bundle.root, scope },
+    components: bundle.components.map((entry) => ({
+      ...entry,
+      component: { ...entry.component, scope },
+    })),
+    templates: bundle.templates.map((item) => ({ ...item, scope })),
+  };
+}
+
+export async function importPublishedBundle(
+  home: string,
+  bundle: PackageBundle,
+): Promise<PackageBundle> {
+  return installBundle(home, bundle, "published");
+}
+export async function promotePackage(
+  home: string,
+  ref: PackageRevisionRef,
+  input: { projectId: string; target: "global" },
+): Promise<PackageBundle> {
+  await requireProjectWrite(home, input.projectId);
+  if (input.target !== "global")
+    throw new Error("Promotion must explicitly target global.");
+  return installBundle(
+    home,
+    await resolvePackageBundle(home, ref, input.projectId),
+    "global",
+  );
+}
+
+export async function forkPackage(
+  home: string,
+  input: PackageRevisionRef,
+  target: { projectId: string; id?: string; version: string; name?: string },
+): Promise<CompiledComponent | TemplateRecord> {
+  await requireProjectWrite(home, target.projectId);
+  assertVersion(target.version);
+  const ref = checkedRef(input);
+  if ((target.id ?? ref.id) === ref.id && target.version === ref.version)
+    throw new Error(
+      "A fork must have a new exact version or a new logical id.",
+    );
+  if (ref.kind === "component") {
+    const source = await readComponentSource(
+      home,
+      ref.id,
+      ref.version,
+      ref.projectId ?? target.projectId,
+      { integrity: ref.integrity, scope: ref.scope },
+    );
+    const {
+      mergeBase: _sourceMergeBase,
+      parents: _sourceParents,
+      manifest: sourceManifest,
+      ...sourceFiles
+    } = source;
+    const {
+      mergeBase: _manifestMergeBase,
+      parents: _manifestParents,
+      ...manifest
+    } = sourceManifest;
+    return saveComponent(
+      home,
+      {
+        ...sourceFiles,
+        manifest: {
+          ...manifest,
+          id: target.id ?? ref.id,
+          version: target.version,
+          ...(target.name ? { name: target.name } : {}),
+        },
+        parents: [ref],
+      },
+      target.projectId,
+    );
+  }
+  const template = await getTemplateByRef(home, ref, target.projectId);
+  const { mergeBase: _mergeBase, parents: _parents, ...content } = template;
+  return saveTemplate(
+    home,
+    {
+      ...content,
+      id: target.id ?? ref.id,
+      version: target.version,
+      ...(target.name ? { name: target.name } : {}),
+      parents: [ref],
+      composition: template.composition,
+    },
+    target.projectId,
+  );
+}
+
+async function editablePackage(
+  home: string,
+  ref: PackageRevisionRef,
+  projectId: string,
+): Promise<EditablePackage> {
+  if (ref.kind === "component") {
+    // Verify the locked runtime as well as loading the source. Never invent a base.
+    await getComponentByRef(home, ref, projectId);
+    const source = await readComponentSource(
+      home,
+      ref.id,
+      ref.version,
+      ref.projectId ?? projectId,
+      { scope: ref.scope, integrity: ref.integrity },
+    );
+    const {
+      parents: _parents,
+      mergeBase: _mergeBase,
+      ...manifest
+    } = source.manifest;
+    const files = { ...source.files };
+    delete files[manifest.entry];
+    delete files[manifest.entry.replace(/^\.\//, "")];
+    delete files["manifest.json"];
+    delete files["props.schema.json"];
+    return {
+      kind: "component",
+      manifest,
+      schema: source.schema,
+      source: source.source,
+      files,
+      assets: source.assets ?? {},
+    };
+  }
+  const {
+    scope: _scope,
+    integrity: _integrity,
+    dependencies: _deps,
+    updatedAt: _date,
+    parents: _parents,
+    mergeBase: _mergeBase,
+    legacy: _legacy,
+    ...template
+  } = await getTemplateByRef(home, ref, projectId);
+  const {
+    id: _id,
+    createdAt: _created,
+    updatedAt: _updated,
+    ...document
+  } = template.document;
+  return {
+    kind: "template",
+    template: {
+      ...template,
+      document: {
+        ...document,
+        id: "merge-document",
+        createdAt: "2000-01-01T00:00:00.000Z",
+        updatedAt: "2000-01-01T00:00:00.000Z",
+      },
+    },
+  };
+}
+export async function previewPackageMerge(
+  home: string,
+  input: PackageMergeInput,
+): Promise<PackageMergePreview> {
+  await requireProjectWrite(home, input.projectId);
+  const base = checkedRef(input.base),
+    ours = checkedRef(input.ours),
+    theirs = checkedRef(input.theirs);
+  if (base.kind !== ours.kind || base.kind !== theirs.kind)
+    throw new Error("Merge inputs must have the same package kind.");
+  const values = await Promise.all(
+    [base, ours, theirs].map((ref) =>
+      editablePackage(home, ref, input.projectId),
+    ),
+  );
+  const normalizeIdentity = (item: EditablePackage) => {
+    const copy = structuredClone(item),
+      fields = copy.kind === "component" ? copy.manifest : copy.template;
+    fields.id = base.id;
+    fields.version = base.version;
+    return copy;
+  };
+  const result = mergeValues(
+    ...(values.map(normalizeIdentity) as [
+      EditablePackage,
+      EditablePackage,
+      EditablePackage,
+    ]),
+  );
+  const merged = result.value as EditablePackage;
+  const identity =
+    merged.kind === "component" ? merged.manifest : merged.template;
+  identity.id = ours.id;
+  identity.version = ours.version;
+  return {
+    ...input,
+    base,
+    ours,
+    theirs,
+    kind: ours.kind,
+    merged,
+    conflicts: result.conflicts,
+  };
+}
+export async function savePackageMerge(
+  home: string,
+  input: PackageMergeInput & {
+    id?: string;
+    version: string;
+    resolved: EditablePackage;
+  },
+): Promise<CompiledComponent | TemplateRecord> {
+  const preview = await previewPackageMerge(home, input);
+  assertVersion(input.version);
+  if (!input.resolved || input.resolved.kind !== preview.kind)
+    throw new Error(
+      "Provide the resolved editable package after reviewing merge conflicts.",
+    );
+  const id = input.id ?? input.ours.id;
+  if (
+    [input.base, input.ours, input.theirs].some(
+      (ref) => ref.id === id && ref.version === input.version,
+    )
+  )
+    throw new Error("Save the merge as a new immutable version.");
+  const parents = [checkedRef(input.ours), checkedRef(input.theirs)];
+  if (input.resolved.kind === "component")
+    return saveComponent(
+      home,
+      {
+        ...input.resolved,
+        manifest: { ...input.resolved.manifest, id, version: input.version },
+        parents,
+        mergeBase: input.base,
+      },
+      input.projectId,
+    );
+  return saveTemplate(
+    home,
+    {
+      ...input.resolved.template,
+      id,
+      version: input.version,
+      parents,
+      mergeBase: input.base,
+    },
+    input.projectId,
+  );
 }

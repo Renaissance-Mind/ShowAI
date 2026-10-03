@@ -9,13 +9,10 @@ import {
 } from "react";
 import { Settings2 } from "lucide-react";
 import type { BlockProps } from "../blocks/types";
-import {
-  COMPONENT_DATA_MARKER,
-  componentKey,
-  readCustomBlockData,
-} from "./contract";
+import { COMPONENT_DATA_MARKER, readCustomBlockData } from "./contract";
 import type { CompiledComponent } from "./types";
 import { InlineComponent } from "./InlineComponent";
+import { findComponent, indexComponents } from "./component-index";
 import "./custom.css";
 
 const ComponentsContext = createContext<ReadonlyMap<string, CompiledComponent>>(
@@ -32,16 +29,7 @@ export function CustomComponentsProvider({
   children: ReactNode;
   inlineHost?: HTMLElement | null;
 }) {
-  const value = useMemo(() => {
-    const map = new Map<string, CompiledComponent>();
-    for (const component of components) {
-      const key = componentKey(component.id, component.version);
-      if (map.has(key) && map.get(key)?.integrity !== component.integrity)
-        throw new Error(`Conflicting component packages: ${key}.`);
-      map.set(key, component);
-    }
-    return map;
-  }, [components]);
+  const value = useMemo(() => indexComponents(components), [components]);
   return (
     <ComponentsContext.Provider value={value}>
       <InlineHostContext.Provider value={inlineHost}>
@@ -88,11 +76,7 @@ export function CustomBlock({ data, onChange, readOnly }: BlockProps) {
   const parsed = readCustomBlockData(data);
   const components = useContext(ComponentsContext);
   const inlineHost = useContext(InlineHostContext);
-  const component = components.get(
-    componentKey(parsed.componentId, parsed.version),
-  );
-  if (component && parsed.integrity && component.integrity !== parsed.integrity)
-    throw new Error("组件内容与此页面记录的版本不一致。");
+  const component = findComponent(components, parsed);
   return component && inlineHost ? (
     <InlineComponent
       key={component.integrity}
@@ -113,7 +97,9 @@ export function CustomBlock({ data, onChange, readOnly }: BlockProps) {
       <div style={{ padding: 18 }}>
         <strong>{parsed.componentId}</strong>
         <p>
-          需要安装组件 {parsed.componentId}@{parsed.version}。页面数据已保留。
+          需要安装组件 {parsed.componentId}@{parsed.version}
+          {parsed.integrity ? `（${parsed.integrity.slice(7, 19)}）` : ""}
+          。页面数据已保留。
         </p>
       </div>
     </section>
@@ -143,6 +129,10 @@ function SandboxComponent({
     timeout: number;
   } | null>(null);
   const latest = useRef({ data, parsed, onChange, readOnly });
+  const initial = useRef({
+    props: parsed.props,
+    readOnly: !!readOnly || !onChange,
+  });
   latest.current = { data, parsed, onChange, readOnly };
   const editable = !!onChange && !readOnly;
   const cancelValidation = () => {
@@ -206,10 +196,10 @@ function SandboxComponent({
       policy +
       component.html.replace(
         COMPONENT_DATA_MARKER,
-        `<script id="showai-component-data" type="application/json">${safeJson({ channel, props: component.defaultData, readOnly: true })}</script>`,
+        `<script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current })}</script>`,
       )
     );
-  }, [component.html, component.defaultData, channel]);
+  }, [component.html, channel]);
 
   const sendProps = () => {
     const current = latest.current;

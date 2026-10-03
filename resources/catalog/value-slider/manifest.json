@@ -1,15 +1,33 @@
 {
   "id": "value-slider",
   "name": "数值滑块",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "通过滑块调整一个数值。编辑时同步页面数据，阅读时可临时探索。",
-  "scenarios": ["参数探索", "交互讲解"],
+  "scenarios": [
+    "让读者探索单个有界数值，例如调整阈值或观察一个连续参数。",
+    "在组件开发时验证props输入、阅读交互与编辑保存。"
+  ],
   "entry": "index.tsx",
-  "defaultData": { "label": "数值", "value": 0, "min": 0, "max": 100 },
+  "defaultData": {
+    "label": "数值",
+    "value": 0,
+    "min": 0,
+    "max": 100
+  },
   "examples": [
     {
       "name": "0 至 100 的数值",
-      "data": { "label": "数值", "value": 0, "min": 0, "max": 100 }
+      "data": {
+        "label": "数值",
+        "value": 0,
+        "min": 0,
+        "max": 100
+      },
+      "request": "创建一个可以在0到100之间调整的数值。"
     }
+  ],
+  "effects": [
+    "通过滑动显示当前值及取值范围。",
+    "编辑模式下将新值写回页面，阅读模式下保留临时探索状态。"
   ]
 }

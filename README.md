@@ -8,7 +8,7 @@ ShowAI 提供桌面工作台、React 组件与模板，以及供 Codex、Claude 
 
 ## 桌面使用
 
-构建后的安装包位于 `release/`。macOS arm64 使用 `ShowAI-0.3.1-arm64.dmg`：打开后将 ShowAI 拖入「应用程序」，再启动应用。当前构建采用临时签名，尚未进行 Apple 公证；请通过系统提供的「仍要打开」流程打开你信任的本地构建。
+构建后的安装包位于 `release/`。macOS arm64 使用 `ShowAI-0.4.0-arm64.dmg`：打开后将 ShowAI 拖入「应用程序」，再启动应用。当前构建采用临时签名，尚未进行 Apple 公证；请通过系统提供的「仍要打开」流程打开你信任的本地构建。
 
 Windows x64 的 NSIS 安装配置已包含在仓库中，应在 Windows 构建并验收后分发。当前仓库没有公开发布的安装包或 npm/PyPI 安装入口。
 
@@ -111,18 +111,40 @@ MCP 是可选的工具入口，通过 `mcp --project PROJECT_ID` 启动并固定
 
 ## 组件与模板
 
-内置组件包括图表、数据库/看板、指标、参数计算、图片集和来源卡片，另有文字、列表、表格、图片、提示块和折叠块。组件目录提供用途、输入规则、场景和预设，便于 Agent 选择。
+组件和模板按「项目 → 全局 → 已发布」查找，内置预设作为兜底。定制默认属于选定项目；注册全局、登记发布都需要显式操作。版本使用 `id + version + integrity` 标识，已有页面锁定实际引用，不会随其他项目的修改或新版本发布而变化。
 
-自定义组件包包含 `manifest.json`、`props.schema.json` 和 React 入口代码，可通过组件库或 CLI 导入：
+组件说明包含分点的使用场景、可视化效果和示例。模板说明包含使用场景、内容处理方式、相关模板/组件 ID，以及描述需求、使用顺序与结构的示例。Agent 先查询摘要，再按需请求说明、参数或源码：
+
+```sh
+node dist-agent/cli.mjs guide catalog --json
+node dist-agent/cli.mjs catalog list --kind component --query 面积 --project PROJECT_ID --limit 5 --json
+node dist-agent/cli.mjs catalog describe playground --view examples --project PROJECT_ID --json
+```
+
+项目里的组件可以注册为不可变的全局版本，其他项目再从它派生自己的版本。`parents` 保留来源关系，三方合并会显示冲突，并把解决结果保存为新的项目版本；全局、已发布和父版本均不会被覆盖。
+
+模板支持有序组合与递归引用其他模板，并锁定子模板和实际组件依赖。应用模板时展开成独立页面，生成新的页面与区块 ID。分享成品只需要展开后的页面及用到的组件；无需携带模板定义。注册组合模板时会收集完整依赖，即使来源项目被移除，其他项目仍可使用注册版本。产品未额外预置组合模板。
+
+自定义组件包包含 `manifest.json`、`props.schema.json` 和 React 入口代码。参考 [数值滑块组件](resources/catalog/value-slider)：
 
 ```sh
 node dist-agent/cli.mjs catalog import --input ./resources/catalog/value-slider --project PROJECT_ID --json
-node dist-agent/cli.mjs catalog describe value-slider --project PROJECT_ID --json
 ```
 
-参考 [数值滑块组件](resources/catalog/value-slider)。桌面与独立 HTML 中，组件在隔离 iframe 中运行，支持 React 与包内本地资源，不能访问应用文件系统或连接外部网络。会话 inline 模式使用宿主提供的整页沙箱与 Shadow DOM 样式隔离，组件之间共享该页面的 JavaScript 环境。已经安装的版本保持不变，代码修改需要提升版本号。
+桌面与独立 HTML 中，组件在隔离 iframe 中运行，不能访问应用文件系统或直接连接外部网络。会话 inline 模式使用宿主提供的整页沙箱与 Shadow DOM 样式隔离，组件之间共享该页面的 JavaScript 环境。
 
-模板保存页面结构、组件配置和内容。应用模板会生成一份具有独立页面与区块 id 的新页面，后续修改互不影响。也可以把已有页面保存为项目模板。
+## 发布与远程引用
+
+导出默认 `--components bundled`，把所需组件一起打包，保持离线能力。选择 `--components remote` 时，每个自定义组件都必须已有经过验证的固定发布地址；缺失依赖会明确列出并拒绝导出。阅读器下载时再次校验字节摘要与版本指纹，无法联网或校验失败时显示错误。会话 inline 交付始终打包组件。
+
+发布流程是准备一个可自部署的静态目录，再验证已部署的清单网址并登记。准备文件不会自动上传，也不会直接变成「已发布」。同一套目录可放到用户自己的静态服务器；远程请求使用精确的内容地址，不会悄悄切换到最新版。
+
+```sh
+node dist-agent/cli.mjs guide publish --json
+node dist-agent/cli.mjs guide versions --json
+```
+
+数据目录、解析规则、版本派生、依赖闭包和合并边界见 [目录生命周期](docs/catalog-lifecycle.md)，具体命令见 [Agent 使用说明](docs/agent-usage.md)。
 
 ## 开发与验证
 
@@ -133,7 +155,7 @@ npm run build
 npm audit
 ```
 
-`npm test` 会先构建独立阅读器，再验证真实导出。`npm run test:desktop` 在本机启动独立数据目录的 Electron，检查文件接口、编辑冲突和退出保存。CI 执行类型检查、测试、构建和依赖审计；安装包仍需在目标系统运行验收。
+`npm test` 会先构建独立阅读器，再验证真实导出。`npm run test:desktop` 在本机启动独立数据目录的 Electron，检查文件接口、编辑冲突、退出保存、目录版本和组合模板。CI 执行类型检查、测试、构建和依赖审计；安装包仍需在目标系统运行验收。
 
 | 目录                           | 职责                                           |
 | ------------------------------ | ---------------------------------------------- |

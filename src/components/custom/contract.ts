@@ -75,6 +75,11 @@ export function readCustomBlockData(value: unknown): CustomBlockData {
   )
     throw new Error("Invalid component integrity hash.");
   if (
+    data.scope !== undefined &&
+    !["project", "global", "published", "builtin"].includes(String(data.scope))
+  )
+    throw new Error("Invalid component scope.");
+  if (
     !data.props ||
     typeof data.props !== "object" ||
     Array.isArray(data.props)
@@ -85,6 +90,7 @@ export function readCustomBlockData(value: unknown): CustomBlockData {
     version: data.version,
     props: data.props as Record<string, unknown>,
     ...(data.integrity ? { integrity: data.integrity as string } : {}),
+    ...(data.scope ? { scope: data.scope as CustomComponentRef["scope"] } : {}),
   };
 }
 
@@ -94,17 +100,16 @@ export function collectCustomComponentRefs(
   const refs = new Map<string, CustomComponentRef>();
   const visit = (node: typeof document.content) => {
     if (node.type === "widget" && node.attrs?.kind === "custom") {
-      const { componentId, version, integrity } = readCustomBlockData(
+      const { componentId, version, integrity, scope } = readCustomBlockData(
         node.attrs.data,
       );
-      const key = componentKey(componentId, version);
+      const key = `${componentKey(componentId, version)}:${integrity ?? scope ?? "unpinned"}`;
       const previous = refs.get(key);
-      if (previous?.integrity && integrity && previous.integrity !== integrity)
-        throw new Error(`Conflicting integrity hashes for ${key}.`);
       refs.set(key, {
         componentId,
         version,
         integrity: integrity ?? previous?.integrity,
+        ...(scope ? { scope } : {}),
       });
     }
     node.content?.forEach(visit);

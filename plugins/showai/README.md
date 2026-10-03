@@ -4,6 +4,12 @@ This plugin gives Codex and Claude Code a shared workflow for creating, revising
 
 Build it from the repository with `npm run build`. The generated `assets/build.json` records its version and compiler platform. Node.js 22.12 or later is required. A plugin archive built on one OS/architecture carries that compiler; build on the target platform for component imports there.
 
+## Discover workflows as needed
+
+The skill starts with ShowAI's project model and session binding. Use `guide` for the current operation, then query a small catalog result set and request a particular `describe --view` only when needed. Summaries omit schemas, defaults, source code and full template documents; `source` is an explicit view. The `full` view gathers descriptive metadata without including executable runtimes or original source.
+
+Authoring writes require a selected project. Lookup prefers project, global and published libraries before built-ins, and page/composition references are pinned by version and integrity. Shared revisions remain immutable; create a project fork or merged revision to make changes. Global promotion and published-release registration are explicit actions. Preparing publication files or exporting a site does not upload them.
+
 ## Install and update in Codex
 
 From the source repository, run:

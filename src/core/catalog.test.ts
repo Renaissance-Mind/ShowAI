@@ -24,13 +24,22 @@ import {
   resolveDocumentComponents,
   saveComponent,
   saveTemplate,
+  promotePackage,
+  packageRevisionRef,
 } from "./catalog";
+import { FileStore } from "./store";
 import type { ComponentManifest } from "../components/custom/types";
 
 const directories: string[] = [];
+const projectIds = new Map<string, string>();
+const project = (home: string) => projectIds.get(home)!;
 async function temporary() {
   const path = await mkdtemp(join(tmpdir(), "showai-catalog-"));
   directories.push(path);
+  projectIds.set(
+    path,
+    (await new FileStore(path).createProject({ name: "Catalog test" })).id,
+  );
   return path;
 }
 afterEach(async () => {
@@ -63,13 +72,10 @@ const source =
 describe("filesystem template catalog", () => {
   it("provides blank, research, comparison and brief without invented findings", async () => {
     const home = await temporary();
-    expect((await listTemplates(home)).map((item) => item.id)).toEqual([
-      "blank",
-      "research",
-      "comparison",
-      "brief",
-    ]);
-    const research = await getTemplate(home, "research");
+    expect(
+      (await listTemplates(home, project(home))).map((item) => item.id),
+    ).toEqual(["blank", "research", "comparison", "brief"]);
+    const research = await getTemplate(home, "research", project(home));
     expect(research.scope).toBe("builtin");
     expect(
       research.document.content.content?.find((node) => node.type === "widget")
@@ -87,26 +93,41 @@ describe("filesystem template catalog", () => {
         content: [{ type: "text", text: "A user-authored template." }],
       },
     ];
-    const personal = await saveTemplate(home, {
-      id: "research",
-      name: "Personal",
-      description: "Reusable",
-      document,
+    const personal = await saveTemplate(
+      home,
+      {
+        id: "research",
+        name: "Personal",
+        description: "Reusable",
+        document,
+      },
+      project(home),
+    );
+    await promotePackage(home, packageRevisionRef("template", personal), {
+      projectId: project(home),
+      target: "global",
     });
+    const projectOne = (
+      await new FileStore(home).createProject({
+        name: "Second catalog project",
+      })
+    ).id;
     await saveTemplate(
       home,
       { id: "research", name: "Project", description: "Local", document },
-      "project-one",
+      projectOne,
     );
-    expect((await getTemplate(home, "research")).name).toBe("Personal");
-    expect((await getTemplate(home, "research", "project-one")).name).toBe(
+    expect((await getTemplate(home, "research", project(home))).name).toBe(
+      "Personal",
+    );
+    expect((await getTemplate(home, "research", projectOne)).name).toBe(
       "Project",
     );
     expect(
-      (await listTemplates(home, "project-one")).filter(
+      (await listTemplates(home, projectOne)).filter(
         (item) => item.id === "research",
       ),
-    ).toHaveLength(1);
+    ).toHaveLength(3);
     const page = instantiateTemplate(personal.document);
     expect(page.id).not.toBe(document.id);
     expect(page.content.content?.[0].attrs?.id).not.toBe("original-block");
@@ -118,16 +139,25 @@ describe("filesystem template catalog", () => {
   it("rejects path traversal and symlink catalog writes", async () => {
     const home = await temporary(),
       outside = await temporary();
-    await mkdir(join(home, "packages"));
-    await symlink(outside, join(home, "packages/templates"));
+    await mkdir(join(home, "projects", project(home), "packages"));
+    await symlink(
+      outside,
+      join(home, "projects", project(home), "packages/templates"),
+    );
     await expect(
-      saveTemplate(home, {
-        name: "Unsafe",
-        description: "",
-        document: blankDocument(),
-      }),
+      saveTemplate(
+        home,
+        {
+          name: "Unsafe",
+          description: "",
+          document: blankDocument(),
+        },
+        project(home),
+      ),
     ).rejects.toThrow("Symbolic");
-    await expect(getTemplate(home, "../outside")).rejects.toThrow("ids");
+    await expect(
+      getTemplate(home, "../outside", project(home)),
+    ).rejects.toThrow("ids");
     await expect(listTemplates(home, "../../outside")).rejects.toThrow(
       "project",
     );
@@ -154,6 +184,7 @@ describe("compiled React packages", () => {
     const component = await importComponent(
       home,
       resolve("resources/catalog/value-slider"),
+      project(home),
     );
     expect(component.html).toContain("Content-Security-Policy");
     expect(component.html).toContain("<!--SHOWAI_COMPONENT_DATA-->");
@@ -162,71 +193,113 @@ describe("compiled React packages", () => {
     expect(component.inline!.script.length).toBeLessThan(15000);
     expect(component.integrity).toMatch(/^sha256-[a-f0-9]{64}$/);
     expect(
-      (await readComponentSource(home, "value-slider", "1.0.0")).source,
+      (
+        await readComponentSource(
+          home,
+          "value-slider",
+          component.version,
+          project(home),
+        )
+      ).source,
     ).toContain("ValueSlider");
     const document = blankDocument();
     document.content.content = Array.from({ length: 2 }, () => ({
       type: "widget",
       attrs: { kind: "custom", data: componentWidgetData(component) },
     }));
-    const resolved = await resolveDocumentComponents(home, document);
+    const resolved = await resolveDocumentComponents(
+      home,
+      document,
+      project(home),
+    );
     expect(resolved).toHaveLength(1);
     expect(resolved[0].html).toBe(component.html);
     expect(JSON.stringify(document)).not.toContain("<!doctype");
-    expect((await listComponents(home))[0].id).toBe("value-slider");
-    expect((await listComponents(home))[0]).not.toHaveProperty("inline");
+    expect((await listComponents(home, project(home)))[0].id).toBe(
+      "value-slider",
+    );
+    expect((await listComponents(home, project(home)))[0]).not.toHaveProperty(
+      "inline",
+    );
   });
   it("uses immutable versions, validates defaults and examples, and allows a new version", async () => {
     const home = await temporary();
-    const first = await saveComponent(home, { manifest, schema, source });
+    const first = await saveComponent(
+      home,
+      { manifest, schema, source },
+      project(home),
+    );
     expect(
-      (await saveComponent(home, { manifest, schema, source })).integrity,
+      (await saveComponent(home, { manifest, schema, source }, project(home)))
+        .integrity,
     ).toBe(first.integrity);
     await expect(
-      saveComponent(home, { manifest, schema, source: source + "\n// edited" }),
+      saveComponent(
+        home,
+        { manifest, schema, source: source + "\n// edited" },
+        project(home),
+      ),
     ).rejects.toThrow("immutable");
     await expect(
-      saveComponent(home, {
-        manifest: {
-          ...manifest,
-          id: "bad-default",
-          defaultData: { value: "invalid" },
+      saveComponent(
+        home,
+        {
+          manifest: {
+            ...manifest,
+            id: "bad-default",
+            defaultData: { value: "invalid" },
+          },
+          schema,
+          source,
         },
-        schema,
-        source,
-      }),
+        project(home),
+      ),
     ).rejects.toThrow("props");
     await expect(
-      saveComponent(home, {
-        manifest: {
-          ...manifest,
-          id: "bad-example",
-          examples: [{ name: "bad", data: {} }],
+      saveComponent(
+        home,
+        {
+          manifest: {
+            ...manifest,
+            id: "bad-example",
+            examples: [{ name: "bad", data: {} }],
+          },
+          schema,
+          source,
         },
+        project(home),
+      ),
+    ).rejects.toThrow("props");
+    await saveComponent(
+      home,
+      {
+        manifest: { ...manifest, version: "1.0.1" },
         schema,
         source,
-      }),
-    ).rejects.toThrow("props");
-    await saveComponent(home, {
-      manifest: { ...manifest, version: "1.0.1" },
-      schema,
-      source,
-    });
-    expect((await getComponent(home, manifest.id)).version).toBe("1.0.1");
+      },
+      project(home),
+    );
+    expect(
+      (await getComponent(home, manifest.id, undefined, project(home))).version,
+    ).toBe("1.0.1");
   });
   it("compiles package-local modules and CSS but rejects Node, remote and escaping imports", async () => {
     const home = await temporary();
-    const component = await saveComponent(home, {
-      manifest,
-      schema,
-      source:
-        'import "./styles.css";import Label from "./Label";export default function C(){return <Label/>}',
-      files: {
-        "styles.css": ".actual-label{color:green}",
-        "Label.tsx":
-          'export default function Label(){return <strong className="actual-label">Label</strong>}',
+    const component = await saveComponent(
+      home,
+      {
+        manifest,
+        schema,
+        source:
+          'import "./styles.css";import Label from "./Label";export default function C(){return <Label/>}',
+        files: {
+          "styles.css": ".actual-label{color:green}",
+          "Label.tsx":
+            'export default function Label(){return <strong className="actual-label">Label</strong>}',
+        },
       },
-    });
+      project(home),
+    );
     expect(component.html).toContain("actual-label");
     for (const [index, importPath] of [
       "node:fs",
@@ -235,11 +308,15 @@ describe("compiled React packages", () => {
       "react-dom/server",
     ].entries()) {
       await expect(
-        saveComponent(home, {
-          manifest: { ...manifest, id: `blocked-${index}` },
-          schema,
-          source: `import value from ${JSON.stringify(importPath)};export default function C(){return <pre>{String(value)}</pre>}`,
-        }),
+        saveComponent(
+          home,
+          {
+            manifest: { ...manifest, id: `blocked-${index}` },
+            schema,
+            source: `import value from ${JSON.stringify(importPath)};export default function C(){return <pre>{String(value)}</pre>}`,
+          },
+          project(home),
+        ),
       ).rejects.toThrow(/allowed|leave/);
     }
   });
@@ -258,17 +335,21 @@ describe("compiled React packages", () => {
       resolve("resources/catalog/value-slider/index.tsx"),
       join(packageDir, "index.tsx"),
     );
-    await expect(importComponent(home, packageDir)).rejects.toThrow("symbolic");
-    await saveComponent(home, { manifest, schema, source });
+    await expect(
+      importComponent(home, packageDir, project(home)),
+    ).rejects.toThrow("symbolic");
+    await saveComponent(home, { manifest, schema, source }, project(home));
     const path = join(
       home,
+      "projects",
+      project(home),
       "packages/components/local-counter/1.0.0/compiled.json",
     );
     const stored = JSON.parse(await readFile(path, "utf8"));
     stored.html += "<!-- modified -->";
     await writeFile(path, JSON.stringify(stored));
     await expect(
-      getComponent(home, manifest.id, manifest.version),
+      getComponent(home, manifest.id, manifest.version, project(home)),
     ).rejects.toThrow("integrity");
   });
   it("resolves project packages without leaking into other projects and rejects mismatched props or integrity", async () => {
@@ -276,10 +357,12 @@ describe("compiled React packages", () => {
     const component = await saveComponent(
       home,
       { manifest, schema, source },
-      "private-project",
+      project(home),
     );
-    expect(await listComponents(home)).toEqual([]);
-    expect((await listComponents(home, "private-project"))[0].scope).toBe(
+    expect(await listComponents(home, undefined, { scope: "global" })).toEqual(
+      [],
+    );
+    expect((await listComponents(home, project(home)))[0].scope).toBe(
       "project",
     );
     const document = blankDocument();
@@ -296,32 +379,40 @@ describe("compiled React packages", () => {
       },
     ];
     await expect(
-      resolveDocumentComponents(home, document, "private-project"),
+      resolveDocumentComponents(home, document, project(home)),
     ).rejects.toThrow("props");
     document.content.content[0].attrs!.data = {
       ...componentWidgetData(component),
       integrity: "sha256-" + "0".repeat(64),
     };
     await expect(
-      resolveDocumentComponents(home, document, "private-project"),
+      resolveDocumentComponents(home, document, project(home)),
     ).rejects.toThrow("integrity");
   });
   it("imports portable components without execution and can restore the original editable source", async () => {
     const firstHome = await temporary(),
       secondHome = await temporary();
-    const component = await saveComponent(firstHome, {
-      manifest,
-      schema,
-      source,
-    });
-    await importCompiledComponents(secondHome, [component], "imported-page");
+    const component = await saveComponent(
+      firstHome,
+      {
+        manifest,
+        schema,
+        source,
+      },
+      project(firstHome),
+    );
+    await importCompiledComponents(
+      secondHome,
+      [component],
+      project(secondHome),
+    );
     expect(
       (
         await getComponent(
           secondHome,
           manifest.id,
           manifest.version,
-          "imported-page",
+          project(secondHome),
         )
       ).html,
     ).toBe(component.html);
@@ -330,20 +421,20 @@ describe("compiled React packages", () => {
         secondHome,
         manifest.id,
         manifest.version,
-        "imported-page",
+        project(secondHome),
       ),
     ).rejects.toThrow("no editable source");
     await expect(
       importCompiledComponents(
         secondHome,
         [{ ...component, html: component.html + "x" }],
-        "imported-page",
+        project(secondHome),
       ),
     ).rejects.toThrow("integrity");
     await saveComponent(
       secondHome,
       { manifest, schema, source },
-      "imported-page",
+      project(secondHome),
     );
     expect(
       (
@@ -351,7 +442,7 @@ describe("compiled React packages", () => {
           secondHome,
           manifest.id,
           manifest.version,
-          "imported-page",
+          project(secondHome),
         )
       ).source,
     ).toBe(source);
@@ -362,23 +453,32 @@ describe("compiled React packages", () => {
       "image.png":
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
     };
-    await saveComponent(home, {
-      manifest,
-      schema,
-      source:
-        'import image from "./image.png";export default function Image(){return <img src={image} alt="Asset"/>}',
-      assets,
-    });
+    await saveComponent(
+      home,
+      {
+        manifest,
+        schema,
+        source:
+          'import image from "./image.png";export default function Image(){return <img src={image} alt="Asset"/>}',
+        assets,
+      },
+      project(home),
+    );
     const stored = await readComponentSource(
       home,
       manifest.id,
       manifest.version,
+      project(home),
     );
     expect(stored.assets).toEqual(assets);
-    const next = await saveComponent(home, {
-      ...stored,
-      manifest: { ...stored.manifest, version: "1.0.1" },
-    });
+    const next = await saveComponent(
+      home,
+      {
+        ...stored,
+        manifest: { ...stored.manifest, version: "1.0.1" },
+      },
+      project(home),
+    );
     expect(next.html).toContain("data:image/png;base64,");
   });
 });

@@ -1,10 +1,36 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import packageMetadata from "../../package.json";
 import { AgentService, errorResult } from "./service";
 import { validateDocument } from "../portable/validation.mjs";
-import type { CompiledComponent } from "../components/custom/types";
+import type {
+  CompiledComponent,
+  ComponentSource,
+  EditablePackage,
+  SaveTemplateInput,
+} from "../components/custom/types";
 import type { PageOperation } from "../core/model";
+import type { PublishedComponentLocator } from "../core/publication";
+import { CATALOG_VIEWS } from "./disclosure";
+import { GUIDE_TOPICS } from "./guides";
+
+const scopeSchema = z.enum([
+  "builtin",
+  "global",
+  "published",
+  "project",
+  "all",
+]);
+const refSchema = z.object({
+  kind: z.enum(["component", "template"]),
+  id: z.string(),
+  version: z.string(),
+  integrity: z.string(),
+  scope: z.enum(["builtin", "global", "published", "project"]).optional(),
+  projectId: z.string().optional(),
+});
+const jsonObject = z.record(z.string(), z.unknown());
 
 export function createMcpServer(options: {
   root?: string;
@@ -13,9 +39,9 @@ export function createMcpServer(options: {
   const service = new AgentService(options);
   const projectId = service.requireProject(options.projectId);
   const server = new McpServer(
-    { name: "showai", version: "0.3.1" },
+    { name: "showai", version: packageMetadata.version },
     {
-      instructions: `Create and revise interactive ShowAI pages in project ${projectId}. This connection cannot switch projects. Read pages before writing; keep their hash and use page_diff before a follow-up. Supply baseHash for saves and patches. A conflict means another edit occurred: reread, inspect the diff and merge deliberately. Export HTML for sharing, inline for a host-supported visualization surface, or site for static hosting. Export does not itself install UI in the host or publish to the internet.`,
+      instructions: `ShowAI creates interactive pages in project ${projectId}. This connection is bound to that project. Use guide for the current task, catalog summaries to choose resources and explicit views for details or source. Read a page and retain its hash before writing. Shared revisions are immutable; fork/merge into this project. Shared promotion or published registration needs an explicit CLI/desktop action.`,
     },
   );
   const call = (handler: () => Promise<unknown>) =>
@@ -49,11 +75,22 @@ export function createMcpServer(options: {
     destructiveHint: false,
     openWorldHint: false,
   };
+
+  server.registerTool(
+    "guide",
+    {
+      description:
+        "Read one focused ShowAI guide only when that operation is needed. Omitting topic lists the available guides.",
+      inputSchema: { topic: z.enum(GUIDE_TOPICS).optional() },
+      annotations: readOnly,
+    },
+    ({ topic }) => call(async () => service.guide(topic)),
+  );
   server.registerTool(
     "project_context",
     {
       description:
-        "Inspect the single project bound to this connection and the ShowAI storage directory.",
+        "Inspect this connection's project identity and storage root. It cannot select another project.",
       inputSchema: {},
       annotations: readOnly,
     },
@@ -61,13 +98,14 @@ export function createMcpServer(options: {
       call(async () => ({
         project: (await service.listProjects())[0],
         root: service.store.root,
+        next: "guide workspace",
       })),
   );
   server.registerTool(
     "pages_list",
     {
       description:
-        "List pages in this connection's project, including titles and current hashes.",
+        "List page titles, identities and current hashes in the bound project.",
       inputSchema: {},
       annotations: readOnly,
     },
@@ -77,7 +115,7 @@ export function createMcpServer(options: {
     "page_read",
     {
       description:
-        "Read a page and checkpoint its content for later diff. Save the returned hash for the next revision.",
+        "Read a page and retain its checkpoint hash for the next edit or diff.",
       inputSchema: { pageId: z.string().min(1) },
       annotations: readOnly,
     },
@@ -87,23 +125,23 @@ export function createMcpServer(options: {
     "page_create",
     {
       description:
-        "Create a page in this connection's project. A document, when supplied, is a ShowAI document JSON object.",
+        "Create a page in the bound project. Optional artifact components are imported into this project; remote components are fetched and verified.",
       inputSchema: {
         title: z.string().optional(),
-        document: z.record(z.string(), z.unknown()).optional(),
-        components: z
-          .array(z.record(z.string(), z.unknown()))
-          .max(100)
-          .optional(),
+        document: jsonObject.optional(),
+        components: z.array(jsonObject).max(100).optional(),
+        remoteComponents: z.array(jsonObject).max(100).optional(),
       },
-      annotations: write,
+      annotations: { ...write, openWorldHint: true },
     },
-    ({ title, document, components }) =>
+    ({ title, document, components, remoteComponents }) =>
       call(() =>
         service.createPage(projectId, {
           title,
-          components: components as unknown as CompiledComponent[] | undefined,
           ...(document ? { document: validateDocument(document) } : {}),
+          components: components as unknown as CompiledComponent[] | undefined,
+          remoteComponents: remoteComponents as unknown as
+            PublishedComponentLocator[] | undefined,
         }),
       ),
   );
@@ -111,19 +149,17 @@ export function createMcpServer(options: {
     "page_save",
     {
       description:
-        "Replace a page using a hash from page_read. Rejects stale writes with CONFLICT and currentHash.",
+        "Save a page with its current baseHash; rejects stale content with CONFLICT. Use guide authoring for the editing workflow.",
       inputSchema: {
         pageId: z.string(),
-        document: z.record(z.string(), z.unknown()),
-        components: z
-          .array(z.record(z.string(), z.unknown()))
-          .max(100)
-          .optional(),
+        document: jsonObject,
         baseHash: z.string().min(1),
+        components: z.array(jsonObject).max(100).optional(),
+        remoteComponents: z.array(jsonObject).max(100).optional(),
       },
-      annotations: write,
+      annotations: { ...write, openWorldHint: true },
     },
-    ({ pageId, document, baseHash, components }) =>
+    ({ pageId, document, baseHash, components, remoteComponents }) =>
       call(() =>
         service.savePage(
           projectId,
@@ -131,6 +167,8 @@ export function createMcpServer(options: {
           validateDocument(document),
           baseHash,
           components as unknown as CompiledComponent[] | undefined,
+          remoteComponents as unknown as
+            PublishedComponentLocator[] | undefined,
         ),
       ),
   );
@@ -138,11 +176,11 @@ export function createMcpServer(options: {
     "page_apply",
     {
       description:
-        "Apply stable-block-id operations: page.set(fields), block.insert(node,parentId?,afterId?), block.remove(blockId), block.replace(blockId,node), block.move(blockId,parentId?,afterId?), block.attrs.set(blockId,attrs), block.text.set(blockId,text). Requires the last read hash.",
+        "Apply stable-block-id operations with a current baseHash. Query guide authoring for the operation shapes.",
       inputSchema: {
         pageId: z.string(),
         baseHash: z.string().min(1),
-        operations: z.array(z.record(z.string(), z.unknown())).max(1000),
+        operations: z.array(jsonObject).max(1000),
       },
       annotations: write,
     },
@@ -158,7 +196,7 @@ export function createMcpServer(options: {
     "page_diff",
     {
       description:
-        "Compare current content to a hash previously returned by page_read. Reports changed fields, added/removed/changed/moved blocks. Never marks changes as accepted.",
+        "Compare a page with a previous read hash, including user edits, without accepting or overwriting changes.",
       inputSchema: { pageId: z.string(), sinceHash: z.string().min(1) },
       annotations: readOnly,
     },
@@ -169,52 +207,69 @@ export function createMcpServer(options: {
     "page_export",
     {
       description:
-        "Export a page as offline HTML, a conversation HTML fragment, or the project's pages as a static site. Returns local output/source paths. Does not publish or promise host UI rendering. Images must be embedded.",
+        "Build HTML, a conversation fragment or a static site. Bundled is offline; remote needs verified locators. Inline requires bundled. This does not upload a site.",
       inputSchema: {
         pageId: z.string().optional(),
         format: z.enum(["html", "inline", "site"]),
+        components: z.enum(["bundled", "remote"]).optional(),
         out: z.string().min(1),
         overwrite: z.boolean().optional(),
       },
       annotations: write,
     },
-    ({ pageId, format, out, overwrite }) =>
-      call(() => service.export({ projectId, pageId, format, out, overwrite })),
+    ({ pageId, format, components, out, overwrite }) =>
+      call(() =>
+        service.export({
+          projectId,
+          pageId,
+          format,
+          components,
+          out,
+          overwrite,
+        }),
+      ),
   );
+
   server.registerTool(
     "catalog_list",
     {
       description:
-        "Find available built-in and installed components and templates by kind or search text. Results contain usage descriptions and versions.",
+        "Find paginated component/template summaries. Does not return schemas, default data, source or complete template documents.",
       inputSchema: {
         kind: z.enum(["component", "template"]).optional(),
+        scope: scopeSchema.optional(),
         query: z.string().optional(),
+        limit: z.number().int().min(1).max(50).optional(),
+        cursor: z.string().optional(),
       },
       annotations: readOnly,
     },
-    ({ kind, query }) =>
-      call(() => service.catalogList({ projectId, kind, query })),
+    (input) => call(() => service.catalogList({ projectId, ...input })),
   );
   server.registerTool(
     "catalog_describe",
     {
       description:
-        "Read a component's input schema, usage metadata and presets, or a template's full page structure. Component implementation code is omitted from the tool response.",
+        "Read a resource summary by default. Request guide/schema/examples/dependencies/full only as needed; source code or template bodies require view=source.",
       inputSchema: {
         id: z.string(),
         kind: z.enum(["component", "template"]).optional(),
+        scope: scopeSchema.optional(),
         version: z.string().optional(),
+        integrity: z.string().optional(),
+        view: z.enum(CATALOG_VIEWS).optional(),
+        file: z.string().optional(),
       },
       annotations: readOnly,
     },
-    ({ id, kind, version }) =>
-      call(() => service.catalogDescribe(id, { projectId, kind, version })),
+    ({ id, ...input }) =>
+      call(() => service.catalogDescribe(id, { projectId, ...input })),
   );
   server.registerTool(
     "component_import",
     {
       description:
-        "Compile and install a local React component package into this project's catalog. Package versions are immutable; a changed implementation requires a new version.",
+        "Import and compile a local component package into this project. Existing revisions cannot be overwritten.",
       inputSchema: { directory: z.string().min(1) },
       annotations: write,
     },
@@ -222,32 +277,147 @@ export function createMcpServer(options: {
       call(() => service.importComponent(directory, projectId)),
   );
   server.registerTool(
+    "component_save",
+    {
+      description:
+        "Save explicitly supplied component source as a new immutable revision in this project. Read guide catalog and source view first.",
+      inputSchema: { source: jsonObject },
+      annotations: write,
+    },
+    ({ source }) =>
+      call(() =>
+        service.saveComponent(projectId, source as unknown as ComponentSource),
+      ),
+  );
+  server.registerTool(
     "template_apply",
     {
       description:
-        "Create a new editable page from a template in this project. Does not replace an existing page.",
-      inputSchema: { templateId: z.string(), title: z.string().optional() },
+        "Create an independent page from a template, expanding its pinned composition. Returns the new page and hash.",
+      inputSchema: {
+        templateId: z.string(),
+        title: z.string().optional(),
+        scope: z.enum(["builtin", "global", "published", "project"]).optional(),
+        version: z.string().optional(),
+        integrity: z.string().optional(),
+      },
       annotations: write,
     },
-    ({ templateId, title }) =>
-      call(() => service.applyTemplate(projectId, templateId, title)),
+    ({ templateId, title, ...selection }) =>
+      call(() =>
+        service.applyTemplate(projectId, templateId, title, selection),
+      ),
   );
   server.registerTool(
     "template_save",
     {
       description:
-        "Save an existing page as a project template with its layout, content and component settings.",
+        "Create an immutable project template from a page or explicit metadata/composition. Use guide templates for input shape.",
+      inputSchema: { pageId: z.string().optional(), input: jsonObject },
+      annotations: write,
+    },
+    ({ pageId, input }) =>
+      call(() =>
+        service.saveTemplate(
+          projectId,
+          pageId,
+          input as unknown as SaveTemplateInput,
+        ),
+      ),
+  );
+  server.registerTool(
+    "catalog_fork",
+    {
+      description:
+        "Fork an exact shared or current-project revision into a new revision owned by this project.",
       inputSchema: {
-        pageId: z.string(),
-        name: z.string(),
-        description: z.string().default(""),
+        ref: refSchema,
+        id: z.string().optional(),
+        version: z.string(),
+        name: z.string().optional(),
       },
       annotations: write,
     },
-    ({ pageId, name, description }) =>
+    ({ ref, ...target }) => call(() => service.fork(projectId, ref, target)),
+  );
+  server.registerTool(
+    "catalog_merge_preview",
+    {
+      description:
+        "Preview a three-way merge without writing. Defaults to conflict paths; view=source explicitly returns the editable candidate and conflict values.",
+      inputSchema: {
+        base: refSchema,
+        ours: refSchema,
+        theirs: refSchema,
+        view: z.enum(["summary", "source"]).optional(),
+      },
+      annotations: readOnly,
+    },
+    ({ view, ...input }) =>
+      call(async () => {
+        const preview = await service.previewMerge(projectId, input);
+        return view === "source"
+          ? preview
+          : {
+              projectId,
+              kind: preview.kind,
+              base: preview.base,
+              ours: preview.ours,
+              theirs: preview.theirs,
+              conflictCount: preview.conflicts.length,
+              conflicts: preview.conflicts.map(({ path, kind }) => ({
+                path,
+                kind,
+              })),
+              next: "Read catalog_merge_preview with view=source, resolve conflicts, then catalog_merge_resolve with a new version.",
+            };
+      }),
+  );
+  server.registerTool(
+    "catalog_merge_resolve",
+    {
+      description:
+        "Save a reviewed merge resolution as a new project revision. Shared scopes cannot be overwritten from this connection.",
+      inputSchema: {
+        base: refSchema,
+        ours: refSchema,
+        theirs: refSchema,
+        id: z.string().optional(),
+        version: z.string(),
+        resolved: jsonObject,
+      },
+      annotations: write,
+    },
+    ({ resolved, ...input }) =>
       call(() =>
-        service.saveTemplate(projectId, pageId, { name, description }),
+        service.resolveMerge(projectId, {
+          ...input,
+          resolved: resolved as unknown as EditablePackage,
+        }),
       ),
+  );
+  server.registerTool(
+    "publication_prepare",
+    {
+      description:
+        "Prepare local static publication files from exact refs. Does not upload or register a shared published release. Query guide publish for the explicit next step.",
+      inputSchema: { refs: z.array(refSchema).min(1), out: z.string() },
+      annotations: write,
+    },
+    (input) => call(() => service.preparePublication(projectId, input)),
+  );
+  server.registerTool(
+    "publication_list",
+    {
+      description:
+        "List small verified publication references already registered in the local shared library; no network or registration writes.",
+      inputSchema: {
+        limit: z.number().int().min(1).max(50).optional(),
+        cursor: z.string().optional(),
+      },
+      annotations: readOnly,
+    },
+    (input) => call(() => service.publications(input)),
   );
   return server;
 }
@@ -257,10 +427,8 @@ export async function startMcp(options: {
   projectId: string;
 }): Promise<void> {
   const service = new AgentService(options);
-  // Fail before advertising tools when a project id was mistyped or is unavailable.
   await service.listPages(service.requireProject(options.projectId));
-  const server = createMcpServer(options);
-  await server.connect(new StdioServerTransport());
+  await createMcpServer(options).connect(new StdioServerTransport());
   process.stderr.write(
     `ShowAI MCP connected to project ${options.projectId}.\n`,
   );

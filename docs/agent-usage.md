@@ -1,14 +1,182 @@
 # Use ShowAI from an Agent
 
-ShowAI stores projects and pages on disk and uses one Node.js implementation for the desktop application, command line, and optional MCP server. The CLI is built at `dist-agent/cli.mjs`. The plugin carries the same CLI at `scripts/cli.mjs` plus the offline reader. A Python Agent can invoke this executable with `subprocess`, or use an MCP client; it does not need a separate rendering engine.
+ShowAI's Node.js CLI and optional MCP server operate on the same project files as the desktop workbench. The CLI runs one command and exits; the desktop window can be closed and no Core daemon is required. It is built at `dist-agent/cli.mjs`, or installed inside a plugin as `scripts/cli.mjs`. A Python Agent can invoke it with `subprocess` or an MCP client.
 
-Run `npm run build` once from the source repository. Node.js 22.12 or later is required for standalone CLI/plugin use. The examples below use the repository entry point; replace it with the installed plugin's absolute `scripts/cli.mjs` path when using a plugin. They do not rely on an unpublished npm package.
+In the examples below, `showai` means `node /absolute/path/to/scripts/cli.mjs`. Do not assume a global npm command exists. Standalone use requires Node.js 22.12+. The desktop application's **Settings → Connect Agent** panel provides its bundled executable, CLI path and environment for use without a separate Node installation.
 
-## Use the installed desktop runtime
+## Start small
 
-The desktop application's Settings → Connect Agent panel provides a JSON launch configuration with `command`, `args`, and `env`. It points at the installed ShowAI executable, its bundled CLI and the currently selected data directory. Use that configuration when Node.js is not separately installed. The application window can be closed while these CLI commands run; no background Core service is required.
+The installed skill supplies the project model and basic commands. Detailed instructions are available from the executable instead of loading every reference at startup:
 
-For the default macOS installation, the equivalent command is:
+```sh
+showai guide --json
+showai guide workspace --json
+showai guide catalog --json
+```
+
+Choose one topic for the current operation: `workspace`, `authoring`, `document`, `catalog`, `templates`, `versions`, `export` or `publish`. `document` explains the JSON block format; it is only needed when authoring blocks directly. Catalog summaries and command receipts include a useful next step.
+
+Every successful `--json` command returns `{ "ok": true, "data": ... }`. Failures return `{ "ok": false, "error": { "code", "message", "currentHash"? } }` and a nonzero exit code (`3` for page conflicts).
+
+## Select the current project
+
+Storage defaults to `~/.showai`. Use `SHOWAI_HOME` or `--home /absolute/path` to match the desktop content library.
+
+```sh
+showai projects current --harness codex --session ACTUAL_SESSION_ID --json
+showai projects list --json
+showai projects create --name "A research topic" --harness codex --session ACTUAL_SESSION_ID --json
+showai projects bind PROJECT --harness claude-code --session ACTUAL_SESSION_ID --json
+showai pages list --project PROJECT --json
+```
+
+`projects current` only reports an existing binding. It never chooses the latest project or creates one implicitly. Use the real session identifier supplied by the harness. If none is available, create without a binding and retain the returned id in the conversation. Reusing another project requires an explicit selection. Every page or project-catalog write requires `--project`.
+
+## Discover resources, then request one view
+
+Search with a query and a small limit before inspecting individual resources:
+
+```sh
+showai catalog list --kind component --query chart --project PROJECT --limit 5 --json
+showai catalog list --kind template --query research --project PROJECT --limit 5 --json
+showai catalog describe chart --kind component --view guide --project PROJECT --json
+showai catalog describe chart --kind component --view schema --project PROJECT --json
+showai catalog describe chart --kind component --view examples --project PROJECT --json
+```
+
+A list returns `{ items, total, limit, nextCursor, next }`; the default limit is 20 and the maximum is 50. Pass the returned cursor with the same query and scope to continue. If the catalog changes, restart without a cursor.
+
+Lookup uses the selected project, then global and published libraries, with built-ins as fallback. Use `--scope project|global|published|builtin` and an exact `--version`/`--integrity` when selecting a particular revision. Discovery does not include default data, schemas, code, runtime HTML, or full template documents.
+
+| View                | What is returned                                                                                   |
+| ------------------- | -------------------------------------------------------------------------------------------------- |
+| `summary` (default) | Identity and scope; component purpose/scenarios/effects, or template scenarios                     |
+| `guide`             | Usage guidance, component node shape, or template content guide and related resources              |
+| `schema`            | Component props schema, or the template-definition input shape                                     |
+| `examples`          | Relevant examples and, for components, default data                                                |
+| `dependencies`      | Exact dependencies and revision ancestry                                                           |
+| `source`            | Explicit original component code or template definition                                            |
+| `full`              | Descriptive metadata, schema/examples/dependencies; source and executable runtimes remain excluded |
+
+For a custom component, source view returns its entry code and an index of files. Read one additional file or request the complete original package explicitly:
+
+```sh
+showai catalog describe value-slider --scope project --project PROJECT --view source --json
+showai catalog describe value-slider --scope project --project PROJECT --view source --file index.tsx --json
+showai catalog describe value-slider --scope project --project PROJECT --view source --file '*' --out component-source.json --json
+```
+
+Built-in renderer source is maintained in the ShowAI repository. Compiled-only imported components can render, but require their original source package before source editing or merging.
+
+## Edit pages safely
+
+```sh
+showai pages create --project PROJECT --input page.showai.json --json
+showai pages read PAGE --project PROJECT --json
+showai pages diff PAGE --project PROJECT --since PREVIOUS_HASH --json
+showai pages apply PAGE --project PROJECT --input operations.json --base-hash CURRENT_HASH --json
+showai pages save PAGE --project PROJECT --input revised.showai.json --base-hash CURRENT_HASH --json
+```
+
+Read before writing, retain stable block ids and inspect user changes against the previous checkpoint. On `CONFLICT`, read again and merge deliberately; do not reuse an old full-document replacement with a newer hash. The authoring guide gives operation shapes, while the document guide covers the JSON tree. An input path of `-` reads JSON from stdin.
+
+Custom references are locked to exact version and integrity when pages are written. Importing an artifact's bundled or remotely verified runtimes installs them into the selected project and rebinds matching references there; it does not change shared libraries.
+
+## Project versions, forks and merges
+
+New authoring work belongs to a project. Global, published and built-in revisions are shared and immutable. Import or save a new project revision first:
+
+```sh
+showai catalog import --project PROJECT --input ./component-package --json
+showai catalog save --project PROJECT --input component-source.json --json
+```
+
+A source input contains the original `manifest`, `schema`, `source`, optional `files` and `assets`; a response from `--view source --file '*' --out ...` can be used after editing its `source` object. Existing id/version content cannot be replaced. Increase the version for subsequent changes.
+
+Catalog results provide exact refs with `kind`, `id`, `version`, `integrity`, `scope` and, for project revisions, `projectId`. Save a selected ref to a JSON file for these commands:
+
+```sh
+showai catalog fork --project PROJECT --input ref.json --id my-variant --version 1.0.0 --json
+showai catalog promote --project PROJECT --input ref.json --to global --json
+```
+
+Promotion requires explicit `--to global`. It registers an immutable revision and its dependencies in the local shared library; it does not upload anything.
+
+Three-way merge input contains exact `base`, `ours` and `theirs` refs. Preview is read-only and returns conflict paths by default. Save the full candidate to a file for review:
+
+```sh
+showai catalog merge preview --project PROJECT --input merge-input.json --out merge-preview.json --json
+showai catalog merge resolve --project PROJECT --input resolved-merge.json --json
+```
+
+The resolution file contains the same refs, a new `version`, optional `id`, and `resolved` copied from the reviewed preview's editable package with conflicts resolved. `--view source` explicitly returns the complete preview to the caller. The result is a new project revision; no parent revision is overwritten.
+
+## Templates and composition
+
+A template can be saved from an existing page or from explicit metadata and composition:
+
+```sh
+showai template save --project PROJECT --page PAGE --name "Report structure" --version 1.0.0 --json
+showai template save --project PROJECT --input template-definition.json --json
+showai template apply TEMPLATE_ID --project PROJECT --version VERSION --title "My report" --json
+```
+
+A template definition includes `name`, `description`, optional `id`/`version`, `scenarios`, `contentGuide`, `related`, `examples`, and either `document` or `composition`. Query the template guide for usage and source view only when editing its definition.
+
+Composition parts are `{ "type": "content", "content": DOC_NODE }` or `{ "type": "template", "ref": EXACT_REF, "title": OPTIONAL_TITLE }`. The core locks references, checks the dependency graph, and expands composed templates when creating a page. `--view dependencies` exposes the pinned graph. Applying a template creates independent page and block identities.
+
+## Deliver locally or prepare a publication
+
+```sh
+showai export --project PROJECT --page PAGE --format html --components bundled --out ./report.html --json
+showai export --project PROJECT --page PAGE --format inline --components bundled --out ./report-inline.html --json
+showai export --project PROJECT --format site --components remote --out ./site --json
+```
+
+Bundled is the default. The reader, content and exact custom runtimes travel together; raster images must be embedded for offline delivery. HTML and inline exports also save editable source JSON. A static site includes relative navigation, source files and shared reader assets, and is intended for HTTP/static hosting. Whole-project export omits archived pages.
+
+Inline is a UTF-8 fragment for a host-supported visualization surface and must remain under 1 MB. It requires bundled components. A terminal or generic MCP client does not acquire HTML display simply by connecting ShowAI. Desktop/ordinary HTML use component iframes; conversation inline mode uses the host's whole-page sandbox with per-component Shadow DOM styles.
+
+Remote delivery uses previously verified exact component locators and requires network access when reading. The HTML does not silently choose a newer version. Prepare and register published files explicitly:
+
+```sh
+showai publish prepare --project PROJECT --input publication-refs.json --out ./publication --json
+showai publish verify --project PROJECT --url MANIFEST_URL --json
+showai publish list --limit 20 --json
+```
+
+The input is an exact-ref array or `{ "refs": [...] }`. `prepare` only writes local static files. Uploading them to a chosen host is a separate, explicitly requested operation. `verify` fetches the manifest and runtime bytes, validates them and registers the release in the local shared published library; `register` is an alias that performs the same verification. Pure-template releases are included in the publication list even when they have no component runtimes. These commands do not themselves upload a public website.
+
+Existing exports require `--overwrite`. Project sources and shared catalog/publication metadata are protected against output-path aliases and symbolic links. The selected project's `exports/` subtree is an allowed destination.
+
+## Install, update and connect
+
+From the source repository:
+
+```sh
+npm run plugin:install
+npm run plugin:update
+```
+
+These build the reader, CLI and plugin, install or refresh through the official Codex commands, compare the installed copy byte-for-byte and confirm it is enabled. The receipt is `artifacts/codex-plugin-install.json`. Start a new Codex conversation after success. No desktop rebuild, Git pull, automatic uninstall or application restart is performed. See [the plugin README](../plugins/showai/README.md) for release bundles.
+
+Claude Code uses the repository's marketplace after `npm run build`:
+
+```sh
+claude plugin marketplace add ./
+claude plugin install showai@renaissance-mind
+```
+
+The optional MCP server is a subprocess fixed to one existing project:
+
+```sh
+codex mcp add showai-PROJECT -- node /absolute/path/ShowAI/dist-agent/cli.mjs mcp --project PROJECT
+claude mcp add --transport stdio --scope local showai-PROJECT -- node /absolute/path/ShowAI/dist-agent/cli.mjs mcp --project PROJECT
+```
+
+Use `guide`, `project_context`, `catalog_list` and view-aware `catalog_describe` for discovery. Page editing, project component/template creation, fork/merge and local publication preparation use the same operations as CLI. Project-bound MCP cannot promote to global, register a published release or write another project's catalog; use an explicit CLI or desktop action for shared-library changes. Protocol JSON uses stdout and diagnostics use stderr.
+
+For a desktop installation without Node.js, use the launch configuration copied from Settings. On a standard macOS installation the executable can run the bundled CLI as follows:
 
 ```sh
 ELECTRON_RUN_AS_NODE=1 "/Applications/ShowAI.app/Contents/MacOS/ShowAI" \
@@ -16,136 +184,17 @@ ELECTRON_RUN_AS_NODE=1 "/Applications/ShowAI.app/Contents/MacOS/ShowAI" \
   projects list --json
 ```
 
-When the desktop application uses a non-default content directory, also pass `--home` or the `SHOWAI_HOME` value from its copied configuration. On Windows, use the executable and resource paths copied from Settings; the installation directory is user-selectable.
+Copy the configured `SHOWAI_HOME` too when the desktop application uses a non-default library. Other operating systems use the actual paths returned by Settings.
 
-## Plugin installation
-
-The source repository includes Codex and Claude Code marketplace manifests. For Codex, run `npm run plugin:install` once and `npm run plugin:update` after changes. Both build only the reader, CLI and plugin, use the official Codex installation commands, compare the installed bundle byte-for-byte and confirm it is enabled. The receipt is saved to `artifacts/codex-plugin-install.json`; start a new conversation after success. See [the plugin README](../plugins/showai/README.md) for details and extracted release bundles. For Claude Code, build first with `npm run build`.
-
-From the repository root, Claude Code supports:
-
-```sh
-claude plugin marketplace add ./
-claude plugin install showai@renaissance-mind
-```
-
-The plugin is a skill plus the compiled CLI and reader. It does not publish a site, register a global active project or silently connect an MCP server. Its standalone `node` commands require Node.js 22.12+; the desktop launch configuration above uses ShowAI's bundled runtime instead.
-
-## Storage and session binding
-
-By default, authoring files live in `~/.showai`. Set `SHOWAI_HOME` or add `--home /absolute/path` to use a different root. The desktop application and every Agent must use the same root to share edits. There is no global active project. A page operation must name its project.
-
-```sh
-node dist-agent/cli.mjs projects list --json
-node dist-agent/cli.mjs projects create --name "A research topic" --harness codex --session ACTUAL_SESSION_ID --json
-node dist-agent/cli.mjs projects bind PROJECT_ID --harness claude-code --session ACTUAL_SESSION_ID --json
-node dist-agent/cli.mjs pages list --project PROJECT_ID --json
-```
-
-Use the real conversation/session identifier provided by the harness. If unavailable, omit binding and preserve the returned project id in the conversation. A new unrelated conversation gets its own project. Reusing an existing project requires an explicit selection. Repeating project creation for an already bound harness/session returns its existing project.
-
-`--json` returns `{ "ok": true, "data": ... }`; failures return `{ "ok": false, "error": { "code", "message", "currentHash"? } }`. The process exits nonzero on failure (`3` for conflicts). Without `--json`, listings print ids and titles, while record commands print readable JSON.
-
-## Templates and components
-
-```sh
-node dist-agent/cli.mjs catalog list --project PROJECT_ID --json
-node dist-agent/cli.mjs catalog list --kind template --query report --json
-node dist-agent/cli.mjs catalog describe COMPONENT_ID --kind component --project PROJECT_ID --json
-node dist-agent/cli.mjs catalog describe TEMPLATE_ID --kind template --project PROJECT_ID --json
-node dist-agent/cli.mjs template apply TEMPLATE_ID --project PROJECT_ID --title "My report" --json
-node dist-agent/cli.mjs template save --project PROJECT_ID --page PAGE_ID --name "My report layout" --description "Evidence followed by comparison" --json
-node dist-agent/cli.mjs catalog import --input /absolute/path/component-package --project PROJECT_ID --json
-```
-
-Applying a template creates a new page. Importing without `--project` makes a component available from the global catalog; a project-specific import remains in that project. Component versions are immutable. The Agent can inspect component purpose, schema, presets, and version without receiving the entire compiled browser bundle.
-
-## Safe revisions and user edits
-
-```sh
-node dist-agent/cli.mjs pages create --project PROJECT_ID --input report.showai.json --json
-node dist-agent/cli.mjs pages read PAGE_ID --project PROJECT_ID --json
-node dist-agent/cli.mjs pages diff PAGE_ID --project PROJECT_ID --since PREVIOUS_HASH --json
-node dist-agent/cli.mjs pages apply PAGE_ID --project PROJECT_ID --input operations.json --base-hash CURRENT_HASH --json
-node dist-agent/cli.mjs pages save PAGE_ID --project PROJECT_ID --input revised.showai.json --base-hash CURRENT_HASH --json
-```
-
-Read checkpoints preserve a baseline for later comparison. `diff` describes changes since a previous read; it does not change the page or accept user edits. Saving or applying operations requires the current content hash. If the page changed in the desktop application or another Agent, ShowAI returns `CONFLICT` with the current hash and leaves the file intact. Read again, inspect the difference and merge the content before retrying.
-
-`pages create/save --input` accepts a version 1 ShowAI artifact or its document object. `pages apply --input` accepts an operation array or `{ "operations": [...] }`. An input path of `-` reads JSON from stdin. For example:
-
-```json
-[
-  { "type": "page.set", "fields": { "title": "Revised findings" } },
-  {
-    "type": "block.text.set",
-    "blockId": "STABLE_BLOCK_ID",
-    "text": "An updated finding."
-  }
-]
-```
-
-Other operations are `block.insert`, `block.remove`, `block.replace`, `block.move`, and `block.attrs.set`. Use the stable ids returned by `pages read`, and preserve them when saving. In insert/move operations, omitted `afterId` appends; `afterId: null` places the block first. Root-level placement uses omitted/null `parentId`.
-
-## Delivery
-
-```sh
-node dist-agent/cli.mjs export --project PROJECT_ID --page PAGE_ID --format html --out /absolute/path/report.html --json
-node dist-agent/cli.mjs export --project PROJECT_ID --page PAGE_ID --format inline --out /absolute/path/report-inline.html --json
-node dist-agent/cli.mjs export --project PROJECT_ID --format site --out /absolute/path/site --json
-```
-
-HTML and inline exports also save a `.showai.json` source next to the output. Site export creates an `index.html`, page files, shared reader assets, a `sources/` directory and `showai-site.json`. Multiple pages have relative navigation, so the directory can be hosted under a subpath. No hosting account is required to build these outputs; sharing through a public URL requires uploading the site directory to a static host.
-
-Offline exports require embedded raster images and contain the exact installed custom-component versions used by the pages. They do not fetch a component CDN at runtime. By default existing output files are not replaced; use `--overwrite` deliberately. Site overwrite accepts only an empty directory or an existing ShowAI site for the same project. A whole-project export skips archived pages and removes page/source files recorded by the previous site manifest when they are no longer included. An explicit `--page` export may still select an archived page.
-
-Exports may be saved outside authoring data or inside `projects/PROJECT_ID/exports/` in the selected content directory. Project source files, snapshots and another project's export subtree are protected, including when a symbolic link points to them. The output source JSON carries the custom component runtimes; importing that JSON into another project installs those exact versions without executing their code.
-
-Inline is a UTF-8 fragment for a host-supported visualization surface, with a 1 MB payload limit. Large media or many custom runtimes may require standalone HTML. A browser test wrapper must declare UTF-8; the fragment intentionally has no document-level head or charset. In this Codex desktop conversation, the visualize capability can render it; a terminal or generic MCP client does not acquire HTML rendering merely by connecting a tool. Preview the actual delivered artifact in its target surface and exercise a relevant interaction.
-
-## Optional MCP
-
-The plugin normally uses the bundled CLI through its skill. MCP is optional and is a subprocess started by the Agent host, not a system daemon. Bind the connection to one existing project when configuring it:
-
-```sh
-codex mcp add showai-PROJECT_ID -- node /absolute/path/ShowAI/dist-agent/cli.mjs mcp --project PROJECT_ID
-claude mcp add --transport stdio --scope local showai-PROJECT_ID -- node /absolute/path/ShowAI/dist-agent/cli.mjs mcp --project PROJECT_ID
-```
-
-For an isolated home, append `--home /absolute/path/store`. Use a different server name or update configuration deliberately when switching projects. The plugin does not auto-register a global server because an installed plugin is shared across conversations.
-
-The server exposes project context, page list/create/read/save/apply/diff/export, component/template lookup, component import and template operations. Project selection is fixed at startup; tool arguments cannot silently switch to another project. All standard I/O output is MCP JSON-RPC, and diagnostic logs go to stderr. This server provides tools, not a claim of universal MCP Apps UI support.
-
-A general MCP client uses:
-
-```json
-{
-  "mcpServers": {
-    "showai-research": {
-      "command": "node",
-      "args": [
-        "/absolute/path/ShowAI/dist-agent/cli.mjs",
-        "mcp",
-        "--project",
-        "PROJECT_ID"
-      ]
-    }
-  }
-}
-```
-
-A Python Agent can also call the CLI directly:
+A Python Agent can invoke the same CLI directly:
 
 ```python
 import json
 import subprocess
 
 result = subprocess.run(
-    ["node", "/absolute/path/ShowAI/dist-agent/cli.mjs", "pages", "read",
-     "PAGE_ID", "--project", "PROJECT_ID", "--json"],
+    ["node", "/absolute/path/ShowAI/dist-agent/cli.mjs", "guide", "catalog", "--json"],
     check=True, capture_output=True, text=True,
 )
-page = json.loads(result.stdout)["data"]
+guide = json.loads(result.stdout)["data"]
 ```
-
-The Agent owns planning and data gathering; ShowAI owns page validation, rendering and delivery. Static exported pages do not make model calls. Agent-triggering buttons would require an explicitly implemented host bridge or backend.

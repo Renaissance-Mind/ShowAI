@@ -56,6 +56,7 @@ const html = injectArtifactIntoHtml(
   await readFile(templatePath, "utf8"),
   artifact.document,
   artifact.components,
+  artifact.remoteComponents,
 );
 await mkdir(dirname(resolve(outputPath)), { recursive: true });
 const output = inline ? toInlineFragment(html) : html;

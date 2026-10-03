@@ -3,7 +3,10 @@
     "kind": "chart",
     "name": "数据图表",
     "description": "交互式折线图、柱状图和可展开的原始数据。",
-    "scenarios": ["趋势分析", "数值比较"],
+    "scenarios": [
+      "展示有明确横轴顺序的数值变化，例如某实验在各个训练步的损失或一段时间的请求量。",
+      "比较同一指标下的多个选项，例如使用相同测评集得到的模型成绩；只有可比口径的数据才放在同一图中。"
+    ],
     "defaultData": {
       "title": "数据图表",
       "type": "line",
@@ -21,7 +24,10 @@
           "type": "string"
         },
         "type": {
-          "enum": ["line", "bar"]
+          "enum": [
+            "line",
+            "bar"
+          ]
         },
         "labels": {
           "type": "array",
@@ -48,14 +54,20 @@
                 "type": "string"
               }
             },
-            "required": ["name", "values"]
+            "required": [
+              "name",
+              "values"
+            ]
           }
         },
         "unit": {
           "type": "string"
         }
       },
-      "required": ["labels", "series"]
+      "required": [
+        "labels",
+        "series"
+      ]
     },
     "examples": [
       {
@@ -63,22 +75,39 @@
         "data": {
           "title": "y = x",
           "type": "line",
-          "labels": ["0", "1", "2"],
+          "labels": [
+            "0",
+            "1",
+            "2"
+          ],
           "series": [
             {
               "name": "y = x",
-              "values": [0, 1, 2]
+              "values": [
+                0,
+                1,
+                2
+              ]
             }
           ]
-        }
+        },
+        "request": "用折线展示线性函数y=x在0、1、2处的值，并允许切换图表类型。"
       }
+    ],
+    "version": "1.0.0",
+    "effects": [
+      "把趋势、峰值和序列间差异变成可直接观察的图形。",
+      "通过切换折线或柱状图、显示或隐藏序列、查看原始数据，帮助读者核对结论。"
     ]
   },
   {
     "kind": "database",
     "name": "数据库",
     "description": "带筛选、排序和看板视图的表格。单元格支持文字、数字、选择、复选框和链接。",
-    "scenarios": ["来源记录", "方案比较", "任务整理"],
+    "scenarios": [
+      "整理可按字段比较的记录，例如论文的任务、方法、数据集与来源链接。",
+      "跟踪有阶段状态的事项，例如待阅读、已阅读、已复现的论文清单。"
+    ],
     "defaultData": {
       "title": "数据库",
       "columns": [
@@ -108,7 +137,13 @@
                 "type": "string"
               },
               "type": {
-                "enum": ["text", "number", "select", "checkbox", "url"]
+                "enum": [
+                  "text",
+                  "number",
+                  "select",
+                  "checkbox",
+                  "url"
+                ]
               },
               "options": {
                 "type": "array",
@@ -117,7 +152,11 @@
                 }
               }
             },
-            "required": ["id", "name", "type"]
+            "required": [
+              "id",
+              "name",
+              "type"
+            ]
           }
         },
         "rows": {
@@ -129,9 +168,15 @@
                 "type": "string"
               }
             },
-            "required": ["id"],
+            "required": [
+              "id"
+            ],
             "additionalProperties": {
-              "type": ["string", "number", "boolean"]
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ]
             }
           }
         },
@@ -139,15 +184,63 @@
           "type": "string"
         }
       },
-      "required": ["columns", "rows"]
+      "required": [
+        "columns",
+        "rows"
+      ]
     },
-    "examples": []
+    "examples": [
+      {
+        "name": "平方值记录",
+        "request": "把0、1、2的平方列成可排序的表格。",
+        "data": {
+          "title": "平方值",
+          "columns": [
+            {
+              "id": "x",
+              "name": "x",
+              "type": "number"
+            },
+            {
+              "id": "square",
+              "name": "x²",
+              "type": "number"
+            }
+          ],
+          "rows": [
+            {
+              "id": "n0",
+              "x": 0,
+              "square": 0
+            },
+            {
+              "id": "n1",
+              "x": 1,
+              "square": 1
+            },
+            {
+              "id": "n2",
+              "x": 2,
+              "square": 4
+            }
+          ]
+        }
+      }
+    ],
+    "version": "1.0.0",
+    "effects": [
+      "让读者筛选、排序和搜索一组记录，检查具体证据。",
+      "同一份数据可切换表格或看板，分别呈现属性对比和状态分组。"
+    ]
   },
   {
     "kind": "metrics",
     "name": "关键指标",
     "description": "显示有来源的数值、单位、变化和说明。",
-    "scenarios": ["关键发现", "指标摘要"],
+    "scenarios": [
+      "突出少量已核实的关键数字，例如实验样本数、运行时长或比较结果。",
+      "在长报告开头帮助读者识别最重要的量及单位；数据缺失时保留说明，不补造数字。"
+    ],
     "defaultData": {
       "title": "关键指标",
       "items": []
@@ -167,7 +260,10 @@
                 "type": "string"
               },
               "value": {
-                "type": ["string", "number"]
+                "type": [
+                  "string",
+                  "number"
+                ]
               },
               "unit": {
                 "type": "string"
@@ -179,19 +275,59 @@
                 "type": "number"
               }
             },
-            "required": ["label", "value"]
+            "required": [
+              "label",
+              "value"
+            ]
           }
         }
       },
-      "required": ["items"]
+      "required": [
+        "items"
+      ]
     },
-    "examples": []
+    "examples": [
+      {
+        "name": "边长为3米的正方形",
+        "request": "突出这个正方形的边长、面积和周长。",
+        "data": {
+          "title": "正方形",
+          "items": [
+            {
+              "label": "边长",
+              "value": 3,
+              "unit": "m"
+            },
+            {
+              "label": "面积",
+              "value": 9,
+              "unit": "m²",
+              "detail": "3 × 3"
+            },
+            {
+              "label": "周长",
+              "value": 12,
+              "unit": "m",
+              "detail": "4 × 3"
+            }
+          ]
+        }
+      }
+    ],
+    "version": "1.0.0",
+    "effects": [
+      "用简短标签、数值和说明提高关键数字的可读性。",
+      "可呈现有依据的变化比例，同时保留口径说明。"
+    ]
   },
   {
     "kind": "playground",
     "name": "交互计算",
     "description": "用滑块探索求和、乘积或平均值。",
-    "scenarios": ["参数探索", "数学讲解"],
+    "scenarios": [
+      "解释几个输入怎样影响结果，例如矩形的长宽与面积、不同开销项与总成本。",
+      "让读者在限定范围内探索求和、乘积或平均值，检查参数敏感性。"
+    ],
     "defaultData": {
       "title": "交互计算",
       "inputs": [],
@@ -228,30 +364,89 @@
               },
               "value": {
                 "type": "number"
+              },
+              "unit": {
+                "type": "string"
               }
             },
-            "required": ["id", "label", "min", "max", "step", "value"]
+            "required": [
+              "id",
+              "label",
+              "min",
+              "max",
+              "step",
+              "value"
+            ]
           }
         },
         "operation": {
-          "enum": ["sum", "product", "average"]
+          "enum": [
+            "sum",
+            "product",
+            "average"
+          ]
         },
         "resultLabel": {
           "type": "string"
         },
         "unit": {
           "type": "string"
+        },
+        "description": {
+          "type": "string"
         }
       },
-      "required": ["inputs", "operation"]
+      "required": [
+        "inputs",
+        "operation"
+      ]
     },
-    "examples": []
+    "examples": [
+      {
+        "name": "矩形面积",
+        "request": "让读者调整矩形长宽并观察面积。",
+        "data": {
+          "title": "矩形面积",
+          "inputs": [
+            {
+              "id": "length",
+              "label": "长",
+              "min": 1,
+              "max": 10,
+              "step": 1,
+              "value": 3,
+              "unit": "m"
+            },
+            {
+              "id": "width",
+              "label": "宽",
+              "min": 1,
+              "max": 10,
+              "step": 1,
+              "value": 4,
+              "unit": "m"
+            }
+          ],
+          "operation": "product",
+          "resultLabel": "面积",
+          "unit": "m²"
+        }
+      }
+    ],
+    "version": "1.0.0",
+    "effects": [
+      "输入变化会立即更新结果，帮助读者理解变量之间的关系。",
+      "默认参数、单位和范围明确，读者可以重置探索过程；阅读时的试算不更改页面原始数据。"
+    ]
   },
   {
     "kind": "gallery",
     "name": "图片画廊",
     "description": "包含图注的图片集合。导出离线页面时使用内嵌 PNG、JPEG、GIF、WebP 或 AVIF。",
-    "scenarios": ["视觉证据", "设计参考"],
+    "scenarios": [
+      "对照多张图片及图注，例如方法示意图、设计方案或视觉实验结果。",
+      "需要保留局部细节、允许读者放大查看的视觉材料；离线交付使用内嵌图片。"
+    ],
     "defaultData": {
       "title": "图片画廊",
       "columns": 2,
@@ -286,19 +481,54 @@
                 "type": "string"
               }
             },
-            "required": ["src"]
+            "required": [
+              "src"
+            ]
           }
         }
       },
-      "required": ["images"]
+      "required": [
+        "images"
+      ]
     },
-    "examples": []
+    "examples": [
+      {
+        "name": "棋盘格示意图",
+        "request": "并排展示两张合成棋盘格，体验排布、图注和放大。",
+        "data": {
+          "title": "棋盘格示意",
+          "columns": 2,
+          "images": [
+            {
+              "id": "sage",
+              "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAAAR0lEQVR4nO3PMQ0AMAwDwYAsg9Io4KpTIYSEt5z0s3WudXak92+kAgICAgICAgICAgICGgZKDaWOAQEBAQEBAQEBAQEBDQM1LGPPgJHxHtwAAAAASUVORK5CYII=",
+              "alt": "绿色与浅绿色的2×2棋盘格",
+              "caption": "绿色棋盘格示意"
+            },
+            {
+              "id": "gray",
+              "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAAAR0lEQVR4nO3PsQkAMAwDQU8ZSJP9ixDIBl5CnQ++Fqda+0S670cqICAgICAgICAgICCgYaDUUOoYEBAQEBAQEBAQEBDQMFADyGJNALAVvsUAAAAASUVORK5CYII=",
+              "alt": "深灰与浅灰的2×2棋盘格",
+              "caption": "灰色棋盘格示意"
+            }
+          ]
+        }
+      }
+    ],
+    "version": "1.0.0",
+    "effects": [
+      "用统一排布把视觉证据放在一起比较。",
+      "保留每张图的图注，并支持打开大图查看细节。"
+    ]
   },
   {
     "kind": "bookmark",
     "name": "来源书签",
     "description": "带标题、描述和可选缩略图的外部来源链接。",
-    "scenarios": ["论文引用", "网页来源"],
+    "scenarios": [
+      "为结论附上论文、项目主页、官方文档等可继续阅读的来源。",
+      "读者需要在页面内快速判断某个链接的用途，而不是看到一串裸网址。"
+    ],
     "defaultData": {
       "title": "",
       "description": "",
@@ -321,8 +551,26 @@
           "type": "string"
         }
       },
-      "required": ["url"]
+      "required": [
+        "url"
+      ]
     },
-    "examples": []
+    "examples": [
+      {
+        "name": "示例来源卡片",
+        "request": "用标题和简述呈现一个示例网址。",
+        "data": {
+          "title": "示例网址",
+          "description": "使用example.com演示来源卡片的结构。",
+          "url": "https://example.com",
+          "image": ""
+        }
+      }
+    ],
+    "version": "1.0.0",
+    "effects": [
+      "把来源链接整理成有标题和简述的入口。",
+      "可选缩略图辅助识别来源，点击后打开对应网页。"
+    ]
   }
 ]

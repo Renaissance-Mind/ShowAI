@@ -18,19 +18,32 @@ export function toInlineFragment(html, id = `showai-${randomUUID()}`) {
   );
   if (artifactSource) {
     const artifact = JSON.parse(artifactSource[2]);
-    const references = new Set();
+    if (artifact?.remoteComponents?.length)
+      throw new Error(
+        "Inline conversation pages must bundle all components; the host blocks remote component requests.",
+      );
+    const references = new Map();
     const visit = (node) => {
-      if (node?.type === "widget" && node.attrs?.kind === "custom")
-        references.add(
-          `${node.attrs.data?.componentId}@${node.attrs.data?.version}`,
+      if (node?.type === "widget" && node.attrs?.kind === "custom") {
+        const data = node.attrs.data;
+        references.set(
+          `${data?.componentId}@${data?.version}#${data?.integrity ?? data?.scope ?? "legacy"}`,
+          data,
         );
+      }
       node?.content?.forEach(visit);
     };
     visit(artifact?.document?.content);
-    for (const reference of references) {
-      const component = artifact.components?.find(
-        (item) => `${item.id}@${item.version}` === reference,
+    for (const [reference, ref] of references) {
+      const candidates = artifact.components?.filter(
+        (item) =>
+          item.id === ref.componentId &&
+          item.version === ref.version &&
+          (ref.integrity
+            ? item.integrity === ref.integrity
+            : !ref.scope || item.scope === ref.scope),
       );
+      const component = candidates?.length === 1 ? candidates[0] : undefined;
       if (!component?.inline?.script)
         throw new Error(
           `Custom component ${reference} needs an inline runtime. Import its rebuilt source as a new version, or export standalone HTML.`,

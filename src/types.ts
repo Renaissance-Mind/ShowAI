@@ -1,5 +1,6 @@
 import type { JSONContent } from "@tiptap/core";
 import type { CompiledComponent } from "./components/custom/types";
+import type { PublishedComponentLocator } from "./portable/publication-types";
 
 export interface ShowDocument {
   id: string;
@@ -25,6 +26,8 @@ export interface ShowArtifact {
   version: 1;
   document: ShowDocument;
   components?: CompiledComponent[];
+  /** Exact published packages required by an intentionally network-dependent export. */
+  remoteComponents?: PublishedComponentLocator[];
 }
 
 export type WidgetData = Record<string, unknown>;

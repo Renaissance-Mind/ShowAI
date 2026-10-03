@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import { Download, Moon, MoreHorizontal, Printer, Sun } from "lucide-react";
 import { parseArtifact, serializeArtifact } from "./validation.mjs";
 import type { ShowArtifact, ShowDocument } from "../types";
+import { loadRemoteComponents } from "./remote.mjs";
+import type { CompiledComponent } from "../components/custom/types";
 import { PageContent } from "./PageContent";
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import "./portable.css";
@@ -17,9 +19,10 @@ const inlineHost =
 function downloadSource(
   document: ShowDocument,
   components: ShowArtifact["components"],
+  remoteComponents: ShowArtifact["remoteComponents"],
 ) {
   const url = URL.createObjectURL(
-    new Blob([serializeArtifact(document, components)], {
+    new Blob([serializeArtifact(document, components, remoteComponents)], {
       type: "application/json",
     }),
   );
@@ -38,6 +41,46 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const [remote, setRemote] = useState<CompiledComponent[]>([]);
+  const [remoteError, setRemoteError] = useState("");
+  const [remoteLoading, setRemoteLoading] = useState(
+    !!artifact.remoteComponents?.length,
+  );
+  useEffect(() => {
+    if (!artifact.remoteComponents?.length) return;
+    if (inlineHost) {
+      setRemoteError("对话内页面必须完整打包组件，不能使用远程依赖。");
+      setRemoteLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    let active = true;
+    setRemoteLoading(true);
+    void loadRemoteComponents(artifact.remoteComponents, {
+      signal: controller.signal,
+    })
+      .then((components) => {
+        if (active) {
+          setRemote(components);
+          setRemoteError("");
+        }
+      })
+      .catch((error) => {
+        if (active)
+          setRemoteError(
+            error instanceof Error
+              ? error.message
+              : "远程组件无法加载，请检查网络。",
+          );
+      })
+      .finally(() => {
+        if (active) setRemoteLoading(false);
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [artifact.remoteComponents]);
   useEffect(() => {
     window.document.documentElement.dataset.theme = dark ? "dark" : "light";
   }, [dark]);
@@ -78,7 +121,11 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
           <div className="portable-options-menu" id="page-options">
             <button
               onClick={() => {
-                downloadSource(document, artifact.components);
+                downloadSource(
+                  document,
+                  artifact.components,
+                  artifact.remoteComponents,
+                );
                 setMenuOpen(false);
               }}
             >
@@ -106,8 +153,20 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
       </div>
       <main className="portable-document">
         {document.title && <h1 className="portable-title">{document.title}</h1>}
+        {!!artifact.remoteComponents?.length && (
+          <p className="portable-network-note">
+            {remoteLoading
+              ? "正在校验并加载已发布的固定版本组件…"
+              : "此页面使用已发布的固定版本组件，需要联网加载。"}
+          </p>
+        )}
+        {remoteError && (
+          <p role="alert" className="portable-network-error">
+            {remoteError}
+          </p>
+        )}
         <CustomComponentsProvider
-          components={artifact.components ?? []}
+          components={[...(artifact.components ?? []), ...remote]}
           inlineHost={inlineHost}
         >
           <PageContent content={document.content} />

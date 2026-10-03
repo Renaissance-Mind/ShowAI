@@ -1,4 +1,5 @@
 // Shared by the browser importer and the dependency-free artifact command.
+import { validateRemoteComponents } from "./remote.mjs";
 export const MAX_ARTIFACT_BYTES = 10 * 1024 * 1024;
 export const ARTIFACT_DATA_ID = "showai-data";
 const MAX_NODES = 12000;
@@ -559,25 +560,31 @@ export function validateDocument(value) {
 
 function validateComponents(input) {
   if (input === undefined) return undefined;
-  if (!Array.isArray(input) || input.length > 100) throw new Error('components must be an array of at most 100 packages.');
-  validateJson(input, 'components');
+  if (!Array.isArray(input) || input.length > 100)
+    throw new Error("components must be an array of at most 100 packages.");
+  validateJson(input, "components");
   const seen = new Set();
   return input.map((item, i) => {
     object(item, `components[${i}]`);
-    string(item.id, 'component.id', 80);
-    string(item.name, 'component.name', 200);
-    string(item.version, 'component.version', 80);
-    string(item.html, 'component.html', MAX_ARTIFACT_BYTES);
-    string(item.integrity, 'component.integrity', 200);
-    if (!/^[a-z][a-z0-9-]*$/.test(item.id) || !/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(item.version)) throw new Error('Invalid component identity.');
-    const key = `${item.id}@${item.version}`;
+    string(item.id, "component.id", 80);
+    string(item.name, "component.name", 200);
+    string(item.version, "component.version", 80);
+    string(item.html, "component.html", MAX_ARTIFACT_BYTES);
+    string(item.integrity, "component.integrity", 200);
+    if (
+      !/^[a-z][a-z0-9-]*$/.test(item.id) ||
+      !/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(item.version)
+    )
+      throw new Error("Invalid component identity.");
+    const key = `${item.id}@${item.version}#${item.integrity}`;
     if (seen.has(key)) throw new Error(`Duplicate embedded component: ${key}`);
     seen.add(key);
-    if (typeof item.schema !== 'boolean') object(item.schema, 'component.schema');
+    if (typeof item.schema !== "boolean")
+      object(item.schema, "component.schema");
     if (item.inline !== undefined) {
-      object(item.inline, 'component.inline');
-      string(item.inline.script, 'component.inline.script', MAX_ARTIFACT_BYTES);
-      string(item.inline.styles, 'component.inline.styles', MAX_ARTIFACT_BYTES);
+      object(item.inline, "component.inline");
+      string(item.inline.script, "component.inline.script", MAX_ARTIFACT_BYTES);
+      string(item.inline.styles, "component.inline.styles", MAX_ARTIFACT_BYTES);
     }
     return structuredClone(item);
   });
@@ -601,13 +608,30 @@ export function parseArtifact(input) {
     format: "showai",
     version: 1,
     document: validateDocument(artifact.document),
-    ...(artifact.components === undefined ? {} : { components: validateComponents(artifact.components) }),
+    ...(artifact.components === undefined
+      ? {}
+      : { components: validateComponents(artifact.components) }),
+    ...(artifact.remoteComponents === undefined
+      ? {}
+      : {
+          remoteComponents: validateRemoteComponents(artifact.remoteComponents),
+        }),
   };
 }
 
-export function serializeArtifact(document, components) {
+export function serializeArtifact(document, components, remoteComponents) {
   const result = JSON.stringify(
-    { format: "showai", version: 1, document: validateDocument(document), ...(components?.length ? { components: validateComponents(components) } : {}) },
+    {
+      format: "showai",
+      version: 1,
+      document: validateDocument(document),
+      ...(components?.length
+        ? { components: validateComponents(components) }
+        : {}),
+      ...(remoteComponents?.length
+        ? { remoteComponents: validateRemoteComponents(remoteComponents) }
+        : {}),
+    },
     null,
     2,
   );
@@ -625,12 +649,22 @@ export function escapeJsonForHtml(value) {
     .replace(/\u2029/g, "\\u2029");
 }
 
-export function injectArtifactIntoHtml(template, document, components) {
+export function injectArtifactIntoHtml(
+  template,
+  document,
+  components,
+  remoteComponents,
+) {
   const artifact = {
     format: "showai",
     version: 1,
     document: validateDocument(document),
-    ...(components?.length ? { components: validateComponents(components) } : {}),
+    ...(components?.length
+      ? { components: validateComponents(components) }
+      : {}),
+    ...(remoteComponents?.length
+      ? { remoteComponents: validateRemoteComponents(remoteComponents) }
+      : {}),
   };
   const serialized = escapeJsonForHtml(artifact);
   if (new TextEncoder().encode(serialized).length > MAX_ARTIFACT_BYTES)

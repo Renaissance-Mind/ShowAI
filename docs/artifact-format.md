@@ -28,7 +28,7 @@ A `.showai.json` file describes one interactive page. The rendered `.html` conta
 
 Every stored non-text block has a stable `attrs.id`, assigned when the page enters the file store. Keep these ids when revising a page so diffs can distinguish moved and changed blocks. The page's content hash is returned by the CLI/store, not stored in this artifact envelope. Agent updates require that hash separately through `--base-hash`; see [Agent usage](agent-usage.md).
 
-An optional top-level `components` array contains the exact compiled custom runtimes used by this artifact. Authoring page JSON stores component references; exported sources include the compiled dependencies so another installation can display the page.
+An optional top-level `components` array contains the exact compiled custom runtimes used by a bundled artifact. A remote artifact can instead include `remoteComponents` containing verified exact publication locators. Authoring page JSON stores component references; exported sources include the compiled dependencies so another installation can display the page.
 
 See [the complete example](../examples/welcome.showai.json), which pairs a mathematical chart with a two-input calculator. In the installed plugin the example is under `../examples/` relative to this reference.
 
@@ -219,3 +219,19 @@ The standalone renderer also accepts `--inline`. Its output is an HTML fragment 
 Source JSON is limited to 10 MB, 12,000 document nodes, and 48 levels of JSON nesting. Built-in widgets also have the limits described above. Invalid trees, unsupported node types, malformed marks, unsafe URLs, nonfinite numbers, and prototype-pollution keys are rejected before creating the editor. Unknown widget kinds preserve plain JSON data.
 
 The generated file escapes embedded JSON and the HTML title. Paragraph text and data remain escaped. Custom components are executable code supplied through the explicit component-package mechanism and run in the rendering boundary described above. The reader has no telemetry, background API, or account connection. Image embedding makes network requests only during browser export; ordinary source links navigate when activated.
+
+## Catalog revision identity and remote delivery
+
+Custom widget references use `componentId`, exact `version`, `integrity` and `props`, with an optional scope hint. Writes through the Agent and desktop services lock these references. Components with the same id/version but different fingerprints are distinct; a pinned reference must resolve its own fingerprint. Old sources without a fingerprint are normalized on their next authoring write. Existing immutable package content is never replaced by this normalization.
+
+A remote artifact adds `remoteComponents` at the envelope level. Each locator has:
+
+```text
+{ ref: { kind: "component", id, version, integrity, scope? },
+  bundleRef: { kind: "component" | "template", id, version, integrity, scope? },
+  url, sha256, bytes, manifestUrl, manifestIntegrity, verifiedAt }
+```
+
+Use locators returned by publication verification, rather than inventing them. `sha256` protects the exact downloaded bundle bytes; `ref.integrity` selects and validates the component revision inside it. The reader checks both before mounting any custom code. HTTPS is required except for localhost/loopback HTTP used for self-hosting and tests. Cross-origin static hosting must permit CORS. Remote files require network access; inline exports require bundled components because the host blocks these network requests.
+
+Importing a remote source verifies its locators and materializes the components into the selected project, preserving the version identity. A failed download or integrity check must leave the existing page untouched. Source templates are expanded before a page is saved; they are not required in the delivered page. See [catalog lifecycle](catalog-lifecycle.md) for versioned template definitions and immutable library registration.

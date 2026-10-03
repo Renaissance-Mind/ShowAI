@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { AgentService, errorResult } from "./service";
 import type {
   PageOperation,
@@ -8,40 +8,37 @@ import type {
   ShowDocument,
 } from "../core/model";
 import { parseArtifact, validateDocument } from "../portable/validation.mjs";
-import type { CompiledComponent } from "../components/custom/types";
+import type {
+  CatalogScope,
+  CompiledComponent,
+  ComponentSource,
+  EditablePackage,
+  PackageMergeInput,
+  PackageRevisionRef,
+  SaveTemplateInput,
+} from "../components/custom/types";
+import type { PublishedComponentLocator } from "../core/publication";
+import { CATALOG_VIEWS, type CatalogView } from "./disclosure";
+import { assertExportDestination } from "./exporter";
 import type { ExportFormat } from "./exporter";
 
-export const CLI_HELP = `ShowAI — create, revise and deliver interactive pages.
+export const CLI_HELP = `ShowAI — interactive pages shared by people and Agents.
 
-Usage: showai <command> [options]
-
+Start with one project:
+  projects current --harness HOST --session SESSION_ID
   projects list
-  projects create --name NAME [--harness codex --session SESSION_ID]
-  projects bind PROJECT --harness HARNESS --session SESSION_ID
+  projects create --name NAME [--harness HOST --session SESSION_ID]
+  projects bind PROJECT --harness HOST --session SESSION_ID
   pages list --project PROJECT
-  pages create --project PROJECT [--title TITLE] [--input page.showai.json]
-  pages read PAGE --project PROJECT
-  pages save PAGE --project PROJECT --input page.showai.json --base-hash HASH
-  pages apply PAGE --project PROJECT --input operations.json --base-hash HASH
-  pages diff PAGE --project PROJECT --since HASH
-  export --project PROJECT [--page PAGE] --format html|inline|site --out PATH
-  catalog list [--kind component|template] [--query TEXT]
-  catalog describe ID [--kind component|template] [--version VERSION]
-  catalog import --input COMPONENT_DIRECTORY [--project PROJECT]
-  template apply ID --project PROJECT [--title TITLE]
-  template save --project PROJECT --page PAGE --name NAME [--description TEXT]
-  mcp --project PROJECT
 
-Shared options:
-  --home PATH        Data directory (default SHOWAI_HOME or ~/.showai)
-  --project ID       Explicit project; never inferred from another session
-  --json             Return machine-readable { ok, data } or { ok, error }
-  --overwrite        Replace an existing exported deliverable
-  --help             Show this help
+Discover only what you need:
+  guide [workspace|authoring|document|catalog|templates|versions|export|publish]
+  catalog list [--kind component|template] [--scope SCOPE] [--limit 20]
+  catalog describe ID [--kind component|template] [--view VIEW]
 
-Read a page before changing it. Keep its hash, compare with pages diff, and
-pass --base-hash when saving/applying; stale writes return CONFLICT.
-MCP runs over stdin/stdout and is bound to one explicitly selected project.
+Shared: --home PATH, --project ID, --json, --help.
+Project writes require --project; shared promotion/registration is explicit.
+Use showai guide TOPIC for exact authoring, versioning and delivery commands.
 `;
 
 interface Arguments {
@@ -70,6 +67,16 @@ function parseArguments(args: string[]): Arguments {
     "query",
     "version",
     "description",
+    "scope",
+    "view",
+    "file",
+    "limit",
+    "cursor",
+    "to",
+    "id",
+    "url",
+    "components",
+    "integrity",
   ]);
   for (let index = 0; index < args.length; index++) {
     const argument = args[index];
@@ -127,9 +134,11 @@ async function readJson(path: string): Promise<unknown> {
   return JSON.parse(data);
 }
 
-async function readDocument(
-  path: string,
-): Promise<{ document: ShowDocument; components?: CompiledComponent[] }> {
+async function readDocument(path: string): Promise<{
+  document: ShowDocument;
+  components?: CompiledComponent[];
+  remoteComponents?: PublishedComponentLocator[];
+}> {
   const input = await readJson(path);
   return input && typeof input === "object" && "format" in input
     ? parseArtifact(input)
@@ -162,17 +171,106 @@ function requireCount(args: Arguments, min: number, max = min) {
     );
 }
 
+function objectInput(value: unknown, label = "input"): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new Error(`${label} must be a JSON object.`);
+  return value as Record<string, unknown>;
+}
+function catalogScope(
+  args: Arguments,
+  allowAll = true,
+): CatalogScope | "all" | undefined {
+  const value = option(args, "scope");
+  if (!value) return;
+  const scope = value === "user" ? "global" : value;
+  if (
+    ![
+      "builtin",
+      "global",
+      "published",
+      "project",
+      ...(allowAll ? ["all"] : []),
+    ].includes(scope)
+  )
+    throw new Error("--scope must be builtin, global, published or project.");
+  return scope as CatalogScope | "all";
+}
+function catalogView(args: Arguments): CatalogView {
+  const view = option(args, "view") ?? "summary";
+  if (!CATALOG_VIEWS.includes(view as CatalogView))
+    throw new Error(`--view must be one of ${CATALOG_VIEWS.join(", ")}.`);
+  return view as CatalogView;
+}
+function componentMode(args: Arguments): "bundled" | "remote" {
+  const mode = option(args, "components") ?? "bundled";
+  if (mode !== "bundled" && mode !== "remote")
+    throw new Error("--components must be bundled or remote.");
+  return mode;
+}
+function resultLimit(args: Arguments): number | undefined {
+  const text = option(args, "limit");
+  if (text === undefined) return;
+  if (!/^[0-9]+$/.test(text))
+    throw new Error("--limit must be an integer from 1 to 50.");
+  return Number(text);
+}
+async function saveOutput(
+  service: AgentService,
+  args: Arguments,
+  value: unknown,
+) {
+  const output = option(args, "out");
+  if (!output) return;
+  const path = resolve(output);
+  const projectId = option(args, "project");
+  if (!projectId)
+    throw new Error(
+      "Writing a catalog/merge output requires --project; choose a project export location or an external path.",
+    );
+  await assertExportDestination(
+    service.store.root,
+    service.requireProject(projectId),
+    path,
+  );
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, JSON.stringify(value, null, 2) + "\n", {
+    flag: args.options.overwrite ? "w" : "wx",
+  });
+  return path;
+}
+
 export async function runCli(argv: string[]): Promise<unknown> {
   const args = parseArguments(argv);
   const [command, action, id] = args.positional;
-  if (!command || args.options.help) {
+  if (!command || (args.options.help && !command)) {
     process.stdout.write(CLI_HELP);
     return undefined;
   }
   const service = new AgentService({ root: option(args, "home") });
   const project = () => service.requireProject(option(args, "project"));
+  if (args.options.help)
+    return service.guide(
+      (
+        {
+          projects: "workspace",
+          pages: "authoring",
+          catalog: "catalog",
+          template: "templates",
+          export: "export",
+          publish: "publish",
+          mcp: "workspace",
+        } as Record<string, string>
+      )[command],
+    );
   switch (command) {
+    case "guide":
+      requireCount(args, 1, 2);
+      return service.guide(action);
     case "projects":
+      if (action === "current") {
+        requireCount(args, 2);
+        return service.currentProject(binding(args, true)!);
+      }
       if (action === "list") {
         requireCount(args, 2);
         return service.listProjects();
@@ -216,6 +314,7 @@ export async function runCli(argv: string[]): Promise<unknown> {
           input.document,
           option(args, "base-hash", true)!,
           input.components,
+          input.remoteComponents,
         );
       }
       if (action === "apply") {
@@ -251,48 +350,178 @@ export async function runCli(argv: string[]): Promise<unknown> {
         format: format as ExportFormat,
         out: option(args, "out", true)!,
         overwrite: !!args.options.overwrite,
+        components: componentMode(args),
       });
     }
     case "catalog": {
       const kind = option(args, "kind") as "component" | "template" | undefined;
-      if (kind && kind !== "component" && kind !== "template")
+      if (kind && !["component", "template"].includes(kind))
         throw new Error("--kind must be component or template.");
       if (action === "list") {
         requireCount(args, 2);
         return service.catalogList({
           projectId: option(args, "project"),
           kind,
+          scope: catalogScope(args),
           query: option(args, "query"),
+          limit: resultLimit(args),
+          cursor: option(args, "cursor"),
         });
       }
       if (action === "describe") {
         requireCount(args, 3);
-        return service.catalogDescribe(id, {
+        const result = await service.catalogDescribe(id, {
           projectId: option(args, "project"),
           kind,
+          scope: catalogScope(args),
           version: option(args, "version"),
+          integrity: option(args, "integrity"),
+          view: catalogView(args),
+          file: option(args, "file"),
         });
+        const path = await saveOutput(service, args, result);
+        return path
+          ? {
+              id,
+              kind: kind ?? "component",
+              view: catalogView(args),
+              path,
+              next: "Read the saved detail only when needed.",
+            }
+          : result;
       }
       if (action === "import") {
         requireCount(args, 2);
         return service.importComponent(
           resolve(option(args, "input", true)!),
-          option(args, "project"),
+          project(),
         );
+      }
+      if (action === "save") {
+        requireCount(args, 2);
+        const input = objectInput(await readJson(option(args, "input", true)!));
+        return service.saveComponent(
+          project(),
+          objectInput(
+            typeof input.source === "object" ? input.source : input,
+          ) as unknown as ComponentSource,
+        );
+      }
+      if (action === "promote" || action === "fork") {
+        requireCount(args, 2);
+        const input = objectInput(await readJson(option(args, "input", true)!));
+        const ref = objectInput(
+          input.ref ?? input,
+          "package ref",
+        ) as unknown as PackageRevisionRef;
+        if (action === "promote") {
+          if (option(args, "to") !== "global")
+            throw new Error(
+              "Promotion requires explicit --to global. It registers a local shared revision, not a public upload.",
+            );
+          return service.promote(project(), ref, "global");
+        }
+        return service.fork(project(), ref, {
+          id: option(args, "id"),
+          version: option(args, "version", true)!,
+          name: option(args, "name"),
+        });
+      }
+      if (action === "merge") {
+        requireCount(args, 3);
+        const input = objectInput(await readJson(option(args, "input", true)!));
+        if (input.projectId !== undefined && input.projectId !== project())
+          throw new Error("The input projectId must match --project.");
+        if (id === "preview") {
+          const preview = await service.previewMerge(
+            project(),
+            input as unknown as Omit<PackageMergeInput, "projectId">,
+          );
+          const path = await saveOutput(service, args, preview);
+          if (catalogView(args) === "source" && !path) return preview;
+          return {
+            projectId: preview.projectId,
+            kind: preview.kind,
+            base: preview.base,
+            ours: preview.ours,
+            theirs: preview.theirs,
+            conflictCount: preview.conflicts.length,
+            conflicts: preview.conflicts.map(({ path, kind }) => ({
+              path,
+              kind,
+            })),
+            ...(path ? { path } : {}),
+            next: "Review --view source or the saved preview, then provide resolved plus a new version to catalog merge resolve.",
+          };
+        }
+        if (id === "resolve") {
+          if (!input.resolved || typeof input.version !== "string")
+            throw new Error(
+              "Resolve requires a reviewed resolved package and a new version in the input file.",
+            );
+          return service.resolveMerge(
+            project(),
+            input as unknown as Omit<PackageMergeInput, "projectId"> & {
+              id?: string;
+              version: string;
+              resolved: EditablePackage;
+            },
+          );
+        }
       }
       break;
     }
     case "template": {
       if (action === "apply" || action === "instantiate") {
         requireCount(args, 3);
-        return service.applyTemplate(project(), id, option(args, "title"));
+        return service.applyTemplate(project(), id, option(args, "title"), {
+          scope: catalogScope(args, false) as CatalogScope | undefined,
+          version: option(args, "version"),
+          integrity: option(args, "integrity"),
+        });
       }
       if (action === "save") {
         requireCount(args, 2);
-        return service.saveTemplate(project(), option(args, "page", true)!, {
-          name: option(args, "name", true)!,
-          description: option(args, "description") ?? "",
+        const raw = option(args, "input")
+          ? objectInput(await readJson(option(args, "input")!))
+          : {};
+        const input = objectInput(
+          raw.source ?? raw.template ?? raw,
+        ) as unknown as SaveTemplateInput;
+        return service.saveTemplate(project(), option(args, "page"), {
+          ...input,
+          ...(option(args, "id") ? { id: option(args, "id") } : {}),
+          ...(option(args, "version")
+            ? { version: option(args, "version") }
+            : {}),
+          name: option(args, "name") ?? input.name,
+          description: option(args, "description") ?? input.description ?? "",
         });
+      }
+      break;
+    }
+    case "publish": {
+      if (action === "list") {
+        requireCount(args, 2);
+        return service.publications({
+          limit: resultLimit(args),
+          cursor: option(args, "cursor"),
+        });
+      }
+      if (action === "prepare") {
+        requireCount(args, 2);
+        const raw = await readJson(option(args, "input", true)!);
+        const refs = Array.isArray(raw) ? raw : objectInput(raw).refs;
+        if (!Array.isArray(refs))
+          throw new Error("Publication input requires a refs array.");
+        return service.preparePublication(project(), {
+          refs: refs as PackageRevisionRef[],
+          out: resolve(option(args, "out", true)!),
+        });
+      }
+      if (action === "verify" || action === "register") {
+        requireCount(args, 2);
+        return service.verifyPublication(project(), option(args, "url", true)!);
       }
       break;
     }

@@ -21,6 +21,9 @@ import {
 import { fileURLToPath } from "node:url";
 import { FileStore } from "../core/store";
 import { resolveDocumentComponents } from "../core/catalog";
+import { resolvePublishedComponents } from "../core/publication";
+import { publicationRefKey } from "../portable/remote.mjs";
+import type { PublishedComponentLocator } from "../portable/publication-types";
 import type { CompiledComponent } from "../components/custom/types";
 import { assertOfflineImages } from "../portable/assets.mjs";
 import { toInlineFragment } from "../portable/inline.mjs";
@@ -39,6 +42,7 @@ export interface ExportOptions {
   out: string;
   templatePath?: string;
   overwrite?: boolean;
+  components?: "bundled" | "remote";
 }
 export interface ExportResult {
   format: ExportFormat;
@@ -47,6 +51,8 @@ export interface ExportResult {
   path: string;
   sourcePaths: string[];
   bytes: number;
+  components: "bundled" | "remote";
+  requiresNetwork: boolean;
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -91,13 +97,45 @@ export async function buildPageHtml(
   document: ShowDocument,
   templatePath?: string,
   components: CompiledComponent[] = [],
+  remoteComponents: PublishedComponentLocator[] = [],
 ): Promise<string> {
   assertOfflineImages(document);
   return injectArtifactIntoHtml(
     await readFile(await findViewerTemplate(templatePath), "utf8"),
     document,
     components,
+    remoteComponents,
   );
+}
+
+/** Exported documents pin what was actually resolved, without mutating authoring files. */
+function lockedDocument(
+  document: ShowDocument,
+  components: CompiledComponent[],
+): ShowDocument {
+  const copy = structuredClone(document);
+  const visit = (node: ShowDocument["content"]) => {
+    if (node.type === "widget" && node.attrs?.kind === "custom") {
+      const data = node.attrs.data;
+      const candidates = components.filter(
+        (component) =>
+          component.id === data?.componentId &&
+          component.version === data?.version &&
+          (!data.integrity || component.integrity === data.integrity),
+      );
+      if (candidates.length !== 1)
+        throw new Error(
+          `Cannot lock custom component ${data?.componentId}@${data?.version}; specify its exact integrity.`,
+        );
+      node.attrs = {
+        ...node.attrs,
+        data: { ...data, integrity: candidates[0].integrity },
+      };
+    }
+    node.content?.forEach(visit);
+  };
+  visit(copy.content);
+  return copy;
 }
 
 async function assertDestination(
@@ -148,12 +186,25 @@ export async function assertExportDestination(
   const projects = join(store.root, "projects");
   const allowed = join(store.projectPath(projectId), "exports");
   const target = resolve(path);
+  const catalogs = [
+    join(store.root, "packages"),
+    join(store.root, "publications"),
+  ];
+  if (catalogs.some((catalog) => isInside(catalog, target)))
+    throw new Error(
+      "Export cannot overwrite immutable package catalogs or publication records.",
+    );
   if (isInside(projects, target) && !isInside(allowed, target))
     throw new Error(
       "Export outside project sources or into this project's exports directory.",
     );
   const actualProjects = await effectivePath(projects);
   const actualTarget = await effectivePath(target);
+  const actualCatalogs = await Promise.all(catalogs.map(effectivePath));
+  if (actualCatalogs.some((catalog) => isInside(catalog, actualTarget)))
+    throw new Error(
+      "Export destination resolves to protected package catalogs or publication records.",
+    );
   // Keep the permitted location lexical relative to the real projects root: an
   // exports symlink must not redefine what belongs to the export subtree.
   const actualAllowed = join(actualProjects, projectId, "exports");
@@ -178,25 +229,43 @@ export async function exportPage(
   options: ExportOptions,
 ): Promise<ExportResult> {
   const store = new FileStore(options.root);
+  const componentMode = options.components ?? "bundled";
+  if (!["bundled", "remote"].includes(componentMode))
+    throw new Error("Choose bundled or remote components.");
+  if (options.format === "inline" && componentMode === "remote")
+    throw new Error(
+      "Inline exports must bundle components because the conversation host blocks remote requests.",
+    );
   const out = resolve(options.out);
   await assertExportDestination(store.root, options.projectId, out);
   if (options.format !== "site") {
     if (!options.pageId)
       throw new Error("A page id is required for html or inline export.");
-    const { document } = await store.readPage(
+    const { document: sourceDocument } = await store.readPage(
       options.projectId,
       options.pageId,
       { checkpoint: false },
     );
     const components = await resolveDocumentComponents(
       store.root,
-      document,
+      sourceDocument,
       options.projectId,
     );
+    const document = lockedDocument(sourceDocument, components);
+    const remoteComponents =
+      componentMode === "remote"
+        ? await resolvePublishedComponents(
+            store.root,
+            document,
+            options.projectId,
+          )
+        : [];
+    const bundledComponents = componentMode === "bundled" ? components : [];
     const html = await buildPageHtml(
       document,
       options.templatePath,
-      components,
+      bundledComponents,
+      remoteComponents,
     );
     const result = options.format === "inline" ? toInlineFragment(html) : html;
     const sourcePath =
@@ -209,9 +278,13 @@ export async function exportPage(
     await assertExportDestination(store.root, options.projectId, sourcePath);
     await assertDestination(sourcePath, !!options.overwrite);
     await mkdir(dirname(out), { recursive: true });
-    await writeFile(sourcePath, serializeArtifact(document, components), {
-      flag: options.overwrite ? "w" : "wx",
-    });
+    await writeFile(
+      sourcePath,
+      serializeArtifact(document, bundledComponents, remoteComponents),
+      {
+        flag: options.overwrite ? "w" : "wx",
+      },
+    );
     await writeFile(out, result, { flag: options.overwrite ? "w" : "wx" });
     return {
       format: options.format,
@@ -220,6 +293,8 @@ export async function exportPage(
       path: out,
       sourcePaths: [sourcePath],
       bytes: Buffer.byteLength(result),
+      components: componentMode,
+      requiresNetwork: remoteComponents.length > 0,
     };
   }
 
@@ -241,7 +316,7 @@ export async function exportPage(
     await findViewerTemplate(options.templatePath),
     "utf8",
   );
-  const documents = records
+  let documents = records
     .map((record) => record.document)
     .filter((document) => options.pageId || !document.archived);
   if (!documents.length)
@@ -251,6 +326,28 @@ export async function exportPage(
     documents.map((document) =>
       resolveDocumentComponents(store.root, document, options.projectId),
     ),
+  );
+  documents = documents.map((document, index) =>
+    lockedDocument(document, pageComponents[index]),
+  );
+  const allRemote =
+    componentMode === "remote"
+      ? await resolvePublishedComponents(
+          store.root,
+          {
+            ...documents[0],
+            content: {
+              type: "doc",
+              content: documents.flatMap(
+                (document) => document.content.content ?? [],
+              ),
+            },
+          },
+          options.projectId,
+        )
+      : [];
+  const remoteByRef = new Map(
+    allRemote.map((locator) => [publicationRefKey(locator.ref), locator]),
   );
   let previousRoutes: { id: string; file: string }[] = [];
   if (await exists(out)) {
@@ -316,8 +413,26 @@ export async function exportPage(
   const sourcePaths: string[] = [];
   let bytes = 0;
   for (const [index, document] of documents.entries()) {
-    const components = pageComponents[index];
-    let html = injectArtifactIntoHtml(template, document, components);
+    const components = componentMode === "bundled" ? pageComponents[index] : [];
+    const remoteComponents =
+      componentMode === "remote"
+        ? pageComponents[index].map((component) =>
+            remoteByRef.get(
+              publicationRefKey({
+                kind: "component",
+                id: component.id,
+                version: component.version,
+                integrity: component.integrity,
+              }),
+            )!,
+          )
+        : [];
+    let html = injectArtifactIntoHtml(
+      template,
+      document,
+      components,
+      remoteComponents,
+    );
     // Each page shares one reader bundle and stylesheet; page data remains embedded.
     const scripts: string[] = [];
     html = html.replace(
@@ -363,7 +478,10 @@ export async function exportPage(
       "sources",
       `${encodeURIComponent(document.id)}.showai.json`,
     );
-    await writeFile(sourcePath, serializeArtifact(document, components));
+    await writeFile(
+      sourcePath,
+      serializeArtifact(document, components, remoteComponents),
+    );
     sourcePaths.push(sourcePath);
     bytes += Buffer.byteLength(html);
   }
@@ -384,6 +502,8 @@ export async function exportPage(
         version: 1,
         projectId: options.projectId,
         pages: routes,
+        components: componentMode,
+        requiresNetwork: allRemote.length > 0,
       },
       null,
       2,
@@ -396,5 +516,7 @@ export async function exportPage(
     path: join(out, "index.html"),
     sourcePaths,
     bytes,
+    components: componentMode,
+    requiresNetwork: allRemote.length > 0,
   };
 }

@@ -1,48 +1,37 @@
 ---
 name: show-document
-description: Create, inspect, revise, and share interactive ShowAI pages using reusable components and templates. Use when the user asks for ShowAI, an interactive report, a visual explanation, or a small content site.
+description: Use ShowAI to create or revise interactive pages, reports and small sites with reusable components and templates, shared with the desktop workspace.
 ---
 
-Use ShowAI's bundled command to work with real project files shared with the desktop application. Read [Agent usage](references/agent-usage.md) for exact commands and [Artifact format](references/artifact-format.md) for document structure. The plugin root is two levels above this skill directory. Invoke:
+ShowAI 将内容组织成可阅读、可探索的页面。工作台与 Agent 使用同一份项目文件；组件负责表达，模板负责内容组织。先明确读者需要理解什么，再选择布局与交互，使用用户材料或可核实的数据。
+
+以下 `showai` 指 `node <本插件根目录>/scripts/cli.mjs`，不要假设全局命令已安装。插件根目录位于当前 skill 目录上两级；独立运行需要 Node.js 22.12+。
+
+先检查本会话已有的项目绑定：
 
 ```sh
-node /absolute/path/to/showai/scripts/cli.mjs --help
+showai projects current --harness HOST --session ACTUAL_SESSION_ID --json
 ```
 
-The command requires Node.js 22.12 or later. This package includes a compiled viewer and CLI; it does not require an API key. Component compilation uses the bundled platform-specific compiler. Check `assets/build.json` for its operating system and architecture.
-
-## Bind the current conversation
-
-Every page command needs an explicit project id. When this conversation already has a ShowAI project, reuse its id. When the user asks to continue another project, list projects and bind only the selected project. Otherwise create a project with a descriptive name and the host's actual conversation/session id:
+有绑定就使用返回的项目；用户指定其他项目时先 `projects list --json`，明确选择后绑定。没有绑定时，新建项目：
 
 ```sh
-node /absolute/path/to/showai/scripts/cli.mjs projects create --name "Research topic" --harness codex --session "ACTUAL_SESSION_ID" --json
+showai projects create --name "主题" --harness HOST --session ACTUAL_SESSION_ID --json
+showai pages list --project PROJECT --json
 ```
 
-Use `--harness claude-code` or the actual host name on other Agents. If no session id is available, create a project without binding and keep the returned project id in the conversation; do not invent or borrow a session id. Never guess the current project from the most recently edited project, working directory, or global active state. To explicitly reuse a selected project, use `projects bind PROJECT --harness HOST --session ACTUAL_SESSION_ID`.
+使用宿主提供的真实会话 id；无法获得时省略绑定，保留新项目 id。每次写入明确指定项目。默认内容库为 `~/.showai`，用 `--home` 与桌面设置保持一致。
 
-Default storage is `~/.showai`; `--home` or `SHOWAI_HOME` changes it. Use the same home as the desktop application so user and Agent edits reach the same files. Save documents in this store, then export the deliverable separately. Do not keep the only editable source in a temporary visualization directory.
+按当前步骤查询一个主题，无须先读完整参考文档：
 
-## Create and revise
+- `guide workspace`：项目与绑定。
+- `guide authoring`：读取、差异、编辑和冲突处理。
+- `guide catalog`：摘要搜索，再按需查看用途、输入、示例或源码。
+- `guide templates`：模板内容组织与组合。
+- `guide versions`：项目内派生、合并与显式提升到全局。
+- `guide export`：单 HTML、会话展示和网站。
+- `guide publish`：准备发布文件，以及验证、登记远端版本。
 
-1. Search `catalog list --project PROJECT --json`, then describe relevant components or templates. Built-in data and component descriptions specify supported inputs and intended use.
-2. Apply a template with `template apply ID --project PROJECT --json`, or create a page with `pages create --project PROJECT --input FILE --json`.
-3. Before any follow-up edit, `pages read PAGE --project PROJECT --json`. Keep the returned `hash` and stable block ids. Compare to the hash from the previous turn using `pages diff PAGE --project PROJECT --since HASH --json` so manual user edits are visible.
-4. Preserve the user's changes. Use targeted operations when possible: `pages apply PAGE --project PROJECT --input OPERATIONS.json --base-hash HASH --json`. A full `pages save` also requires `--base-hash`.
-5. On `CONFLICT`, read again, inspect what changed, and merge deliberately. Never retry with a newer hash while blindly keeping an old full-document replacement.
+先用 query 与较小 limit 搜索，再 describe 选中的组件或模板。按项目→全局→已发布查找，内置内容兜底；只取下一步需要的 view，源码显式请求。页面和组合引用锁定 version+integrity；已有版本固定，后续编辑形成当前项目的派生版本。全局提升、发布登记均为独立操作；导出不代表已上传。页面修改前检查用户的新编辑并使用当前 hash，遇冲突先合并。
 
-Keep page content and data factual. Use the user's data or verified sources, label assumptions and scenarios, and omit unknown measurements. Include only sections and controls useful to the subject. A page delivers content; project management remains in the authoring application.
-
-## Deliver
-
-```sh
-node /absolute/path/to/showai/scripts/cli.mjs export --project PROJECT --page PAGE --format html --out /absolute/path/report.html --json
-node /absolute/path/to/showai/scripts/cli.mjs export --project PROJECT --page PAGE --format inline --out /absolute/path/report-inline.html --json
-node /absolute/path/to/showai/scripts/cli.mjs export --project PROJECT --format site --out /absolute/path/site --json
-```
-
-Images must be embedded for offline export. Exported HTML contains the reader, page data, and the exact installed component versions used by the page. Site export includes relative navigation and shared reader assets. Output is not automatically published.
-
-For a host with an inline visualization surface, read that host's visualization instructions, export `inline` into a permitted durable path, preview it, and send the host-supported reference. The Codex visualization reference is host-specific and is not a general MCP protocol. For other hosts, return the HTML artifact or use the available browser preview. Never claim a terminal can render HTML inline or that generating a file installed a plugin.
-
-The MCP server is optional. It starts through the same CLI with `mcp --project PROJECT` and is deliberately bound to that one project. See [Agent usage](references/agent-usage.md) for explicit per-project setup. The plugin does not silently register a global active project or change user configuration.
+交付时使用宿主支持的页面展示通道；文件与网址也是有效交付。完整工作台管理界面不进入读者收到的页面。
