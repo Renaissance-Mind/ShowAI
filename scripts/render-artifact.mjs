@@ -9,11 +9,13 @@ import {
 } from "../src/portable/validation.mjs";
 
 import { assertOfflineImages } from "../src/portable/assets.mjs";
+import { toInlineFragment } from "../src/portable/inline.mjs";
 
-const args = process.argv.slice(2);
+const inline = process.argv.includes("--inline");
+const args = process.argv.slice(2).filter((arg) => arg !== "--inline");
 if (args.includes("--help") || args.length < 2 || args.length > 3) {
   console.log(
-    "Usage: node render-artifact.mjs input.showai.json output.html [viewer-template.html]\nCreates one interactive offline HTML file. Images must use embedded raster data URIs.\nBuild the viewer first with npm run build:portable, or use the packaged plugin command.",
+    "Usage: node render-artifact.mjs input.showai.json output.html [viewer-template.html] [--inline]\nCreates a standalone page, or an inline conversation fragment with --inline. Images must be embedded.\nBuild the viewer first with npm run build:portable, or use the packaged plugin command.",
   );
   process.exit(args.includes("--help") ? 0 : 1);
 }
@@ -55,7 +57,8 @@ const html = injectArtifactIntoHtml(
   artifact.document,
 );
 await mkdir(dirname(resolve(outputPath)), { recursive: true });
-await writeFile(outputPath, html, "utf8");
+const output = inline ? toInlineFragment(html) : html;
+await writeFile(outputPath, output, "utf8");
 console.log(
-  `Saved ${resolve(outputPath)} (${(Buffer.byteLength(html) / 1024).toFixed(0)} KB)`,
+  `Saved ${resolve(outputPath)} (${(Buffer.byteLength(output) / 1024).toFixed(0)} KB${inline ? ", inline" : ""})`,
 );

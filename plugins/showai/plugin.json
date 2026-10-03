@@ -1,9 +1,14 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "showai",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Deliver one lightweight interactive page with text, images, charts, tables, and controls.",
-  "keywords": ["canvas", "research", "visualization", "single-page"],
+  "keywords": [
+    "canvas",
+    "research",
+    "visualization",
+    "single-page"
+  ],
   "extensions": {
     "com.openai": {
       "interface": {

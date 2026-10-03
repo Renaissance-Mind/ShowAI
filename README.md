@@ -32,7 +32,7 @@ node scripts/render-artifact.mjs examples/welcome.showai.json artifacts/ShowAI.h
 
 `npm run build` 会把阅读器、生成命令、格式说明和 skill 一起打包到 `plugins/showai`。仓库级插件目录配置在 `.agents/plugins/marketplace.json`，安装方式见[插件说明](plugins/showai/README.md)。
 
-插件接受结构化的单页内容，生成 HTML 后直接返回该页面。JSON 源文件供后续修改使用，默认内嵌在 HTML 里。
+插件接受结构化的单页内容。支持对话内展示的宿主可使用 `--inline` 生成可直接嵌入回复的页面；普通 HTML 导出继续用于下载和离线打开。JSON 源文件内嵌在输出中，供后续修改使用。
 
 ## 区块扩展
 
