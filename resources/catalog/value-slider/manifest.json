@@ -1,0 +1,15 @@
+{
+  "id": "value-slider",
+  "name": "数值滑块",
+  "version": "1.0.0",
+  "description": "通过滑块调整一个数值。编辑时同步页面数据，阅读时可临时探索。",
+  "scenarios": ["参数探索", "交互讲解"],
+  "entry": "index.tsx",
+  "defaultData": { "label": "数值", "value": 0, "min": 0, "max": 100 },
+  "examples": [
+    {
+      "name": "0 至 100 的数值",
+      "data": { "label": "数值", "value": 0, "min": 0, "max": 100 }
+    }
+  ]
+}

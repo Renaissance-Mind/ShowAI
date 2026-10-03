@@ -5,6 +5,8 @@ import { GalleryBlock } from "./Gallery";
 import { MetricsBlock } from "./Metrics";
 import { PlaygroundBlock } from "./Playground";
 import { parseChartData } from "./helpers";
+import { CustomBlock } from "../custom/CustomBlock";
+import { readCustomBlockData } from "../custom/contract";
 import type { BlockData, BlockDefinition, BlockRegistration } from "./types";
 
 export type {
@@ -248,4 +250,20 @@ registerBlock({
   icon: "↗",
   defaultData: { title: "", description: "", url: "", image: "" },
   renderer: BookmarkBlock,
+});
+
+registerBlock({
+  kind: "custom",
+  title: "自定义组件",
+  description: "使用项目中安装的 React 组件",
+  icon: "◇",
+  defaultData: {
+    componentId: "value-slider",
+    version: "1.0.0",
+    props: { label: "数值", value: 0, min: 0, max: 100 },
+  },
+  renderer: CustomBlock,
+  validate: (data) => {
+    readCustomBlockData(data);
+  },
 });

@@ -1,4 +1,5 @@
 import type { JSONContent } from "@tiptap/core";
+import type { CompiledComponent } from "./components/custom/types";
 
 export interface ShowDocument {
   id: string;
@@ -23,6 +24,7 @@ export interface ShowArtifact {
   format: "showai";
   version: 1;
   document: ShowDocument;
+  components?: CompiledComponent[];
 }
 
 export type WidgetData = Record<string, unknown>;

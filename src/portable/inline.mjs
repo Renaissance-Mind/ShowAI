@@ -11,6 +11,32 @@ export function toInlineFragment(html, id = `showai-${randomUUID()}`) {
     (match) => match[1],
   );
   const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
+  const artifactSource = scripts.find(
+    (match) =>
+      match[1].includes("application/json") &&
+      /\bid=["']showai-data["']/.test(match[1]),
+  );
+  if (artifactSource) {
+    const artifact = JSON.parse(artifactSource[2]);
+    const references = new Set();
+    const visit = (node) => {
+      if (node?.type === "widget" && node.attrs?.kind === "custom")
+        references.add(
+          `${node.attrs.data?.componentId}@${node.attrs.data?.version}`,
+        );
+      node?.content?.forEach(visit);
+    };
+    visit(artifact?.document?.content);
+    for (const reference of references) {
+      const component = artifact.components?.find(
+        (item) => `${item.id}@${item.version}` === reference,
+      );
+      if (!component?.inline?.script)
+        throw new Error(
+          `Custom component ${reference} needs an inline runtime. Import its rebuilt source as a new version, or export standalone HTML.`,
+        );
+    }
+  }
   if (
     !body ||
     !styles.length ||
@@ -47,11 +73,11 @@ export function toInlineFragment(html, id = `showai-${randomUUID()}`) {
           `window.document.getElementById("${id}").dataset.theme`,
         )
         // Preserve DOMParser's runtime string while keeping the serialized file fragment-only.
-        .replace(/<(?=(?:html|head|body)(?:\s|>))/gi, "\\x3c");
+        .replace(/<(?=!doctype\b|(?:html|head|body)(?:\s|>))/gi, "\\x3c");
       return `<script type="module">${script}</script>`;
     })
     .join("\n");
-  const fragment = `<section id="${id}">${markup}</section>\n<style>\n@scope (#${id}) {\n${css}\n.portable-document { max-width: none; padding: 24px 0 12px; }\n.portable-title { padding-right: 96px; font-size: 28px; margin-bottom: 24px; }\n.portable-options { display: none; }\n.portable-app { min-height: 0; }\n}\n</style>\n${code}\n`;
+  const fragment = `<section id="${id}" data-showai-inline-root>${markup}</section>\n<style>\n@scope (#${id}) {\n${css}\n.portable-document { max-width: none; padding: 24px 0 12px; }\n.portable-title { padding-right: 96px; font-size: 28px; margin-bottom: 24px; }\n.portable-options { display: none; }\n.portable-app { min-height: 0; }\n}\n</style>\n${code}\n`;
   if (Buffer.byteLength(fragment) > 1_000_000)
     throw new Error(
       "The inline page exceeds the 1 MB conversation limit. Use a standalone HTML page instead.",

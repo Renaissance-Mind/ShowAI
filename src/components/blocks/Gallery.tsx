@@ -58,23 +58,25 @@ function Lightbox({
   index,
   onIndex,
   close,
+  portalHost,
 }: {
   images: GalleryImage[];
   index: number;
   onIndex: (index: number) => void;
   close: () => void;
+  portalHost: HTMLElement;
 }) {
   const closeButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const overflow = portalHost.style.overflow;
+    portalHost.style.overflow = "hidden";
     closeButton.current?.focus();
     return () => {
-      document.body.style.overflow = overflow;
-      previous?.focus();
+      portalHost.style.overflow = overflow;
+      previous?.focus({ preventScroll: true });
     };
-  }, []);
+  }, [portalHost]);
   const item = images[index];
   if (!item) return null;
   return createPortal(
@@ -159,11 +161,12 @@ function Lightbox({
         </button>
       )}
     </div>,
-    document.body,
+    portalHost,
   );
 }
 
 export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
+  const galleryRoot = useRef<HTMLElement>(null);
   const images: GalleryImage[] = Array.isArray(data.images)
     ? data.images
         .filter((item) => item && typeof item === "object")
@@ -245,6 +248,7 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
   };
   return (
     <section
+      ref={galleryRoot}
       className="sb-block sb-gallery"
       aria-label={text(data.title, "图片画廊")}
     >
@@ -457,6 +461,11 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
           index={preview}
           onIndex={setPreview}
           close={() => setPreview(null)}
+          portalHost={
+            galleryRoot.current?.closest<HTMLElement>(
+              "[data-showai-inline-root]",
+            ) ?? document.body
+          }
         />
       )}
     </section>

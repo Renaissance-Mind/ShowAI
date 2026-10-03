@@ -1,0 +1,285 @@
+// Runs the actual Electron binary against an isolated data directory and built UI.
+import assert from "node:assert/strict";
+import { execFile, spawn } from "node:child_process";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+import electron from "electron";
+
+const repository = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const temporary = await mkdtemp(join(tmpdir(), "showai-desktop-smoke-"));
+const packagedExecutable = process.argv[2]
+  ? resolve(process.argv[2])
+  : undefined;
+async function availablePort() {
+  const server = createServer();
+  await new Promise((done) => server.listen(0, "127.0.0.1", done));
+  const port = server.address().port;
+  await new Promise((done) => server.close(done));
+  return port;
+}
+const rendererPort = await availablePort(),
+  mainPort = await availablePort();
+const environment = {
+  ...process.env,
+  SHOWAI_HOME: join(temporary, "home"),
+  SHOWAI_USER_DATA: join(temporary, "profile"),
+};
+delete environment.ELECTRON_RUN_AS_NODE;
+delete environment.SHOWAI_VIEWER;
+delete environment.ESBUILD_BINARY_PATH;
+delete environment.NODE_PATH;
+delete environment.SHOWAI_RUNTIME_ENTRY;
+const child = spawn(
+  packagedExecutable ?? electron,
+  [
+    `--inspect=${mainPort}`,
+    ...(packagedExecutable ? [] : [join(repository, "dist-desktop/main.mjs")]),
+    `--remote-debugging-port=${rendererPort}`,
+  ],
+  {
+    cwd: packagedExecutable ? temporary : repository,
+    env: environment,
+    stdio: ["ignore", "pipe", "pipe"],
+  },
+);
+let output = "";
+child.stderr.on("data", (chunk) => {
+  output += chunk;
+});
+child.stdout.on("data", (chunk) => {
+  output += chunk;
+});
+const sockets = [];
+let inspectMain;
+
+async function connect(port) {
+  let target;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    if (child.exitCode !== null) throw new Error(`Electron exited: ${output}`);
+    const response = await fetch(`http://127.0.0.1:${port}/json/list`).catch(
+      () => null,
+    );
+    if (response?.ok) target = (await response.json())[0];
+    if (target) break;
+    await new Promise((done) => setTimeout(done, 100));
+  }
+  if (!target) throw new Error(`Electron did not start: ${output}`);
+  const socket = new WebSocket(target.webSocketDebuggerUrl);
+  await new Promise((done, reject) => {
+    socket.onopen = done;
+    socket.onerror = reject;
+  });
+  sockets.push(socket);
+  let sequence = 0;
+  const pending = new Map();
+  socket.onmessage = (event) => {
+    const message = JSON.parse(event.data),
+      request = pending.get(message.id);
+    if (
+      message.method === "Log.entryAdded" ||
+      message.method === "Runtime.exceptionThrown"
+    )
+      output += JSON.stringify(message) + "\n";
+    if (!request) return;
+    pending.delete(message.id);
+    clearTimeout(request.timeout);
+    if (message.error) request.reject(new Error(JSON.stringify(message.error)));
+    else request.resolve(message.result);
+  };
+  socket.onclose = () => {
+    for (const request of pending.values()) {
+      clearTimeout(request.timeout);
+      request.reject(new Error("Electron debugger disconnected."));
+    }
+    pending.clear();
+  };
+  function call(method, params) {
+    const id = ++sequence;
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        pending.delete(id);
+        reject(new Error(`Electron timed out: ${method}`));
+      }, 15000);
+      pending.set(id, { resolve, reject, timeout });
+      socket.send(JSON.stringify({ id, method, params }));
+    });
+  }
+  if (port === rendererPort) {
+    await call("Log.enable", {});
+    await call("Runtime.enable", {});
+  }
+  return async (expression) => {
+    const result = await call("Runtime.evaluate", {
+      expression,
+      awaitPromise: true,
+      returnByValue: true,
+    });
+    if (result.exceptionDetails)
+      throw new Error(JSON.stringify(result.exceptionDetails));
+    return result.result.value;
+  };
+}
+
+try {
+  const main = await connect(mainPort),
+    renderer = await connect(rendererPort);
+  inspectMain = main;
+  const native =
+    "process.getBuiltinModule('module').createRequire(process.cwd()+'/package.json')('electron')";
+  const result = await renderer(`(async()=>{
+    for(let i=0;i<100&&!window.showai;i++) await new Promise(resolve=>setTimeout(resolve,20));
+    const api=window.showai;
+    if(!api) throw new Error('Desktop preload is missing.');
+    const info=await api.invoke('app:info');
+    const project=await api.invoke('projects:create',{name:'Desktop smoke'});
+    const page=await api.invoke('pages:create',{projectId:project.id,title:'Page'});
+    const saved=await api.invoke('pages:save',{projectId:project.id,pageId:page.document.id,baseHash:page.hash,document:{...page.document,title:'Saved'}});
+    let conflict;
+    try {await api.invoke('pages:save',{projectId:project.id,pageId:page.document.id,baseHash:page.hash,document:page.document});}catch(error){conflict=error;}
+    const duplicate=await api.invoke('pages:duplicate',{projectId:project.id,pageId:page.document.id});
+    await api.invoke('pages:remove',{projectId:project.id,pageId:duplicate.document.id});
+    const pages=await api.invoke('pages:list',{projectId:project.id});
+    const templates=await api.invoke('templates:list',{projectId:project.id});
+    const component=await api.invoke('components:createExample',{projectId:project.id});
+    const source=await api.invoke('components:source',{projectId:project.id,id:component.id,version:component.version});
+    const asset='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==';
+    const nextComponent=await api.invoke('components:save',{projectId:project.id,manifest:{...source.manifest,version:'1.0.1'},schema:source.schema,source:source.source,files:source.files,assets:{'pixel.png':asset}});
+    const nextSource=await api.invoke('components:source',{projectId:project.id,id:nextComponent.id,version:nextComponent.version});
+    const savedCustom=await api.invoke('pages:save',{projectId:project.id,pageId:saved.document.id,baseHash:saved.hash,document:{...saved.document,content:{type:'doc',content:[...saved.document.content.content,{type:'widget',attrs:{kind:'custom',data:{componentId:nextComponent.id,version:nextComponent.version,integrity:nextComponent.integrity,props:nextComponent.defaultData}}}]}}});
+    const frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts');frame.style.width='500px';
+    const frameReady=new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(new Error('Component did not run under the desktop CSP.')),10000);window.addEventListener('message',function receive(event){if(event.source!==frame.contentWindow||event.data?.channel!=='desktop-smoke')return;if(event.data.type==='showai:error'){clearTimeout(timeout);window.removeEventListener('message',receive);reject(new Error(event.data.message));}else if(event.data.type==='showai:ready'){frame.contentWindow.postMessage({channel:'desktop-smoke',type:'showai:validate',requestId:'check',props:component.defaultData},'*');}else if(event.data.type==='showai:validation'&&event.data.requestId==='check'&&event.data.valid){clearTimeout(timeout);window.removeEventListener('message',receive);resolve(true);}})});
+    frame.srcdoc=component.html.replace('<!--SHOWAI_COMPONENT_DATA-->','<script id="showai-component-data" type="application/json">'+JSON.stringify({channel:'desktop-smoke',props:component.defaultData,readOnly:false})+'</script>');document.body.append(frame);
+    const componentReady=await frameReady;frame.remove();
+    const csp=document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.content;
+    const unknown=await api.invoke('arbitrary:read',{}).catch(error=>error.code);
+    return {home:info.home,packaged:info.packaged,projectId:project.id,pageId:savedCustom.document.id,cli:info.cli,pageCount:pages.length,title:pages[0].title,conflict,templateCount:templates.length,componentBytes:component.html.length,componentSource:source.source.length,componentsOnSave:Array.isArray(saved.components),assetsPreserved:nextSource.assets?.['pixel.png']===asset,componentReady,csp,unknown};
+  })()`);
+  assert.equal(result.home, join(temporary, "home"));
+  assert.equal(result.packaged, Boolean(packagedExecutable));
+  assert.equal(result.pageCount, 1);
+  assert.equal(result.title, "Saved");
+  assert.equal(result.conflict.code, "CONFLICT");
+  assert.match(result.conflict.currentHash, /^[a-f0-9]{64}$/);
+  assert.equal(result.unknown, "INVALID_DATA");
+  assert.equal(result.componentsOnSave, true);
+  assert.equal(result.assetsPreserved, true);
+  assert.equal(result.componentReady, true);
+  assert.ok(result.csp?.includes("connect-src 'none'"));
+  assert.ok(!result.csp.includes("unsafe-eval"));
+  assert.ok(
+    result.templateCount > 0 &&
+      result.componentBytes > 0 &&
+      result.componentSource > 0,
+  );
+  const cli = await promisify(execFile)(
+    result.cli.command,
+    [...result.cli.args, "projects", "list", "--json"],
+    {
+      env: { ...environment, ...result.cli.env },
+      timeout: 15000,
+    },
+  );
+  assert.equal(JSON.parse(cli.stdout).ok, true);
+  await renderer(
+    "window.__closeCount=0;window.__release=window.showai.onBeforeClose(async()=>{window.__closeCount++;return false});'registered'",
+  );
+  await main(`${native}.BrowserWindow.getAllWindows()[0].close(); 'requested'`);
+  await new Promise((done) => setTimeout(done, 300));
+  const refusal = await renderer(
+    "({count:window.__closeCount,bridge:!!window.showai})",
+  );
+  assert.deepEqual(refusal, { count: 1, bridge: true });
+  await main(`${native}.app.quit(); 'quit requested'`);
+  await new Promise((done) => setTimeout(done, 300));
+  assert.deepEqual(
+    await renderer("({count:window.__closeCount,bridge:!!window.showai})"),
+    { count: 2, bridge: true },
+  );
+  await renderer("window.__release();'released'");
+  await main(`${native}.BrowserWindow.getAllWindows()[0].close(); 'requested'`);
+  await new Promise((done) => setTimeout(done, 300));
+  assert.equal(await main(`${native}.BrowserWindow.getAllWindows().length`), 0);
+  for (const socket of sockets) socket.close();
+  const exited = new Promise((done) => child.once("exit", done));
+  child.kill("SIGTERM");
+  await Promise.race([exited, new Promise((done) => setTimeout(done, 3000))]);
+  assert.ok(
+    child.exitCode !== null || child.signalCode !== null,
+    "Desktop application must exit before testing the independent CLI.",
+  );
+  const exported = await promisify(execFile)(
+    result.cli.command,
+    [
+      ...result.cli.args,
+      "export",
+      "--project",
+      result.projectId,
+      "--page",
+      result.pageId,
+      "--format",
+      "html",
+      "--out",
+      join(temporary, "portable.html"),
+      "--json",
+    ],
+    {
+      cwd: temporary,
+      env: { ...environment, ...result.cli.env },
+      timeout: 20000,
+    },
+  );
+  const artifact = JSON.parse(exported.stdout);
+  assert.equal(artifact.ok, true);
+  const html = await readFile(artifact.data.path, "utf8");
+  assert.ok(html.includes("showai-data") && html.includes("componentId"));
+  console.log(
+    JSON.stringify(
+      {
+        passed: true,
+        packaged: result.packaged,
+        checks: [
+          "desktop bridge",
+          "file persistence",
+          "conflict details",
+          "soft removal",
+          "catalog",
+          "React compiler",
+          "component binary assets survive source saves",
+          "sandboxed React under desktop CSP",
+          "action allowlist",
+          "native close cancellation",
+          "app quit cancellation",
+          "CLI using bundled Electron runtime",
+          "native close after flush",
+          "standalone custom HTML export with desktop process stopped",
+        ],
+        componentBytes: result.componentBytes,
+      },
+      null,
+      2,
+    ),
+  );
+} catch (error) {
+  console.error(error);
+  if (inspectMain)
+    console.error(
+      await inspectMain(
+        "Promise.all(process.getBuiltinModule('module').createRequire(process.cwd()+'/package.json')('electron').BrowserWindow.getAllWindows().flatMap(window=>window.webContents.mainFrame.frames).map(async frame=>({url:frame.url,content:await frame.executeJavaScript('({text:document.body?.innerText, scripts:document.scripts.length,config:document.getElementById(\"showai-component-data\")?.textContent})')})))",
+      ).catch((reason) => String(reason)),
+    );
+  console.error(output);
+  process.exitCode = 1;
+} finally {
+  for (const socket of sockets) socket.close();
+  if (child.exitCode === null) {
+    const exited = new Promise((done) => child.once("exit", done));
+    child.kill("SIGTERM");
+    await Promise.race([exited, new Promise((done) => setTimeout(done, 3000))]);
+    if (child.exitCode === null) child.kill("SIGKILL");
+  }
+  await rm(temporary, { recursive: true, force: true });
+}

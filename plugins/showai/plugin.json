@@ -1,23 +1,24 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "showai",
-  "version": "0.2.1",
-  "description": "Deliver one lightweight interactive page with text, images, charts, tables, and controls.",
+  "version": "0.3.0",
+  "description": "Create interactive pages and small sites from reusable React components and templates, with explicit project binding and safe revisions.",
   "keywords": [
-    "canvas",
     "research",
-    "visualization",
-    "single-page"
+    "interactive-pages",
+    "templates",
+    "components",
+    "html"
   ],
   "extensions": {
     "com.openai": {
       "interface": {
         "displayName": "ShowAI",
-        "shortDescription": "Present research as one interactive page",
-        "longDescription": "Create a single, content-focused HTML canvas from structured JSON. Text, images, charts, filterable tables, and interactive controls run offline in the page, with no workspace or server.",
+        "shortDescription": "Create and share interactive pages",
+        "longDescription": "Use a shared project store to create, inspect, revise, and export interactive pages. Reuse components and templates, compare user edits before writing, and deliver one offline HTML page or a multi-page site.",
         "category": "Productivity",
         "defaultPrompt": [
-          "Use ShowAI to present this result as one interactive page."
+          "Use ShowAI to present this research as an interactive page."
         ],
         "brandColor": "#34644E"
       }

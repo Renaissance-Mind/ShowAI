@@ -1,0 +1,56 @@
+appId: ai.renaissancemind.showai
+productName: ShowAI
+asar: true
+beforePack: src/desktop/before-pack.cjs
+afterPack: src/desktop/after-pack.cjs
+directories:
+  output: release
+files:
+  - dist/**
+  - dist-desktop/**
+  - package.json
+  - "!**/*.map"
+  - "!**/node_modules/**"
+extraResources:
+  - from: plugins/showai
+    to: plugin
+    filter:
+      - "**/*"
+      - "!**/*.map"
+      - "!**/.DS_Store"
+  - from: plugins/showai/node_modules
+    to: plugin/node_modules
+    filter:
+      - "**/*"
+      - "!**/*.map"
+      - "!**/.DS_Store"
+protocols:
+  - name: ShowAI Page
+    schemes:
+      - showai
+mac:
+  icon: src/desktop/assets/icon.icns
+  category: public.app-category.productivity
+  identity: "-"
+  hardenedRuntime: false
+  notarize: false
+  entitlements: src/desktop/assets/entitlements.mac.plist
+  entitlementsInherit: src/desktop/assets/entitlements.mac.plist
+  target:
+    - target: dmg
+      arch:
+        - arm64
+    - target: zip
+      arch:
+        - arm64
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+win:
+  icon: src/desktop/assets/icon.png
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: "${productName}-${version}-${arch}-setup.${ext}"
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

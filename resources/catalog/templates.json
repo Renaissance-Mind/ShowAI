@@ -1,0 +1,138 @@
+[
+  {
+    "id": "blank",
+    "name": "空白画布",
+    "description": "从一个空白页面开始。",
+    "content": [{ "type": "paragraph" }]
+  },
+  {
+    "id": "research",
+    "name": "调研",
+    "description": "整理问题、证据、发现与来源。",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": { "level": 2 },
+        "content": [{ "type": "text", "text": "问题" }]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "text", "text": "写下要研究的问题、范围与判断标准。" }
+        ]
+      },
+      {
+        "type": "heading",
+        "attrs": { "level": 2 },
+        "content": [{ "type": "text", "text": "发现与证据" }]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "在这里记录经过核实的发现，并链接对应来源。"
+          }
+        ]
+      },
+      {
+        "type": "widget",
+        "attrs": {
+          "kind": "database",
+          "data": {
+            "title": "来源记录",
+            "columns": [
+              { "id": "name", "name": "来源", "type": "text" },
+              { "id": "url", "name": "链接", "type": "url" },
+              { "id": "finding", "name": "支持的发现", "type": "text" }
+            ],
+            "rows": []
+          }
+        }
+      },
+      {
+        "type": "heading",
+        "attrs": { "level": 2 },
+        "content": [{ "type": "text", "text": "待确认" }]
+      },
+      { "type": "paragraph" }
+    ]
+  },
+  {
+    "id": "comparison",
+    "name": "对比",
+    "description": "按共同标准比较选项，保留证据。",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "补充比较目标与评价标准，再加入实际选项和证据。"
+          }
+        ]
+      },
+      {
+        "type": "widget",
+        "attrs": {
+          "kind": "database",
+          "data": {
+            "title": "选项对比",
+            "columns": [
+              { "id": "option", "name": "选项", "type": "text" },
+              { "id": "strength", "name": "优势", "type": "text" },
+              { "id": "limit", "name": "限制", "type": "text" },
+              { "id": "source", "name": "来源", "type": "url" }
+            ],
+            "rows": []
+          }
+        }
+      },
+      {
+        "type": "heading",
+        "attrs": { "level": 2 },
+        "content": [{ "type": "text", "text": "判断" }]
+      },
+      { "type": "paragraph" }
+    ]
+  },
+  {
+    "id": "brief",
+    "name": "简报",
+    "description": "围绕一个结论组织关键事实和下一步。",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": { "level": 2 },
+        "content": [{ "type": "text", "text": "核心结论" }]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          { "type": "text", "text": "用一段话说明结论及其适用范围。" }
+        ]
+      },
+      {
+        "type": "heading",
+        "attrs": { "level": 2 },
+        "content": [{ "type": "text", "text": "关键事实" }]
+      },
+      { "type": "paragraph" },
+      {
+        "type": "heading",
+        "attrs": { "level": 2 },
+        "content": [{ "type": "text", "text": "下一步" }]
+      },
+      {
+        "type": "taskList",
+        "content": [
+          {
+            "type": "taskItem",
+            "attrs": { "checked": false },
+            "content": [{ "type": "paragraph" }]
+          }
+        ]
+      }
+    ]
+  }
+]

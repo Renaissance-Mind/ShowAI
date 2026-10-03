@@ -1,16 +1,27 @@
 import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { EditorContent, useEditor } from "@tiptap/react";
 import { Download, Moon, MoreHorizontal, Printer, Sun } from "lucide-react";
-import { createExtensions } from "../editor/extensions";
 import { parseArtifact, serializeArtifact } from "./validation.mjs";
 import type { ShowArtifact, ShowDocument } from "../types";
-import "../editor/editor.css";
+import { PageContent } from "./PageContent";
+import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import "./portable.css";
 
-function downloadSource(document: ShowDocument) {
+// Set only by the trusted inline exporter. Ordinary readers and the desktop app
+// keep individual sandboxed iframes for custom code.
+const inlineHost =
+  window.document
+    .getElementById("root")
+    ?.closest<HTMLElement>("[data-showai-inline-root]") ?? null;
+
+function downloadSource(
+  document: ShowDocument,
+  components: ShowArtifact["components"],
+) {
   const url = URL.createObjectURL(
-    new Blob([serializeArtifact(document)], { type: "application/json" }),
+    new Blob([serializeArtifact(document, components)], {
+      type: "application/json",
+    }),
   );
   const link = window.document.createElement("a");
   link.href = url;
@@ -27,13 +38,6 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const editor = useEditor({
-    extensions: createExtensions({ readOnly: true }),
-    content: document.content,
-    editable: false,
-    immediatelyRender: true,
-  });
-
   useEffect(() => {
     window.document.documentElement.dataset.theme = dark ? "dark" : "light";
   }, [dark]);
@@ -74,7 +78,7 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
           <div className="portable-options-menu" id="page-options">
             <button
               onClick={() => {
-                downloadSource(document);
+                downloadSource(document, artifact.components);
                 setMenuOpen(false);
               }}
             >
@@ -102,7 +106,12 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
       </div>
       <main className="portable-document">
         {document.title && <h1 className="portable-title">{document.title}</h1>}
-        <EditorContent editor={editor} className="portable-editor" />
+        <CustomComponentsProvider
+          components={artifact.components ?? []}
+          inlineHost={inlineHost}
+        >
+          <PageContent content={document.content} />
+        </CustomComponentsProvider>
       </main>
     </div>
   );

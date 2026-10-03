@@ -122,25 +122,218 @@ html {
   margin: 0 0 32px;
   overflow-wrap: anywhere;
 }
-.portable-editor .tiptap {
-  outline: none;
-  line-height: 1.8;
-  min-height: 0;
-  padding: 0 !important;
+/* Reader typography is independent of the editing application. */
+.portable-content {
+  font-size: 14px;
+  line-height: 1.9;
+  letter-spacing: 0.005em;
+  overflow-wrap: anywhere;
 }
-.portable-editor .tiptap ul[data-type="taskList"] {
+.portable-content > :first-child {
+  margin-top: 0;
+}
+.portable-content p {
+  margin: 9px 0;
+  white-space: pre-wrap;
+}
+.portable-content h1,
+.portable-content h2,
+.portable-content h3 {
+  font-weight: 650;
+  line-height: 1.45;
+  letter-spacing: -0.035em;
+  scroll-margin-top: 32px;
+}
+.portable-content h1 {
+  font-size: 28px;
+  margin: 35px 0 13px;
+}
+.portable-content h2 {
+  font-size: 21px;
+  margin: 32px 0 12px;
+}
+.portable-content h3 {
+  font-size: 17px;
+  margin: 24px 0 9px;
+}
+.portable-content strong {
+  font-weight: 650;
+}
+.portable-content a {
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.portable-content mark {
+  border-radius: 2px;
+  padding: 1px 2px;
+  color: #343a35;
+  box-decoration-break: clone;
+}
+.portable-content code {
+  border-radius: 4px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.88em;
+  padding: 2px 5px;
+  color: #9a634d;
+  background: var(--hover);
+}
+.portable-content pre {
+  overflow: auto;
+  margin: 20px 0;
+  padding: 19px 22px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--hover);
+  white-space: pre;
+  tab-size: 2;
+  line-height: 1.7;
+}
+.portable-content pre code {
+  padding: 0;
+  color: var(--text);
+  font-size: 12px;
+  background: transparent;
+}
+.portable-content blockquote {
+  margin: 20px 0;
+  border-left: 3px solid var(--accent);
+  padding: 1px 0 1px 20px;
+}
+.portable-content blockquote p {
+  margin: 4px 0;
+}
+.portable-content hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 28px 0;
+}
+.portable-content ul,
+.portable-content ol {
+  padding-left: 24px;
+  margin: 10px 0;
+}
+.portable-content li {
+  padding-left: 3px;
+}
+.portable-content li::marker {
+  color: var(--accent);
+}
+.portable-content li p {
+  margin: 2px 0;
+}
+.portable-content li > ul,
+.portable-content li > ol {
+  margin: 2px 0 5px;
+}
+.portable-content .portable-task-list {
   list-style: none;
   padding-left: 0;
 }
-.portable-editor .tiptap ul[data-type="taskList"] > li {
+.portable-task {
   display: flex;
-  gap: 9px;
+  gap: 10px;
+  align-items: flex-start;
 }
-.portable-editor .tiptap ul[data-type="taskList"] > li > div {
+.portable-task > input {
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+  margin-top: 8px;
+}
+.portable-task > div {
+  flex: 1;
+  min-width: 0;
+}
+.portable-task[data-checked="true"] > div > p {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.portable-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 22px auto;
+  border-radius: 5px;
+  object-fit: contain;
+}
+.portable-table-scroll {
+  overflow-x: auto;
+  margin: 21px 0;
+}
+.portable-table-scroll > table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+  font-size: 12px;
+}
+.portable-table-scroll > table > tbody > tr > th,
+.portable-table-scroll > table > tbody > tr > td {
+  border: 1px solid var(--border);
+  padding: 7px 11px;
+  min-width: 70px;
+  vertical-align: top;
+  text-align: left;
+}
+.portable-table-scroll > table > tbody > tr > th {
+  font-weight: 600;
+  background: var(--hover);
+}
+.portable-table-scroll > table > tbody > tr > td > p,
+.portable-table-scroll > table > tbody > tr > th > p {
+  margin: 0;
+}
+.portable-callout {
+  display: flex;
+  gap: 11px;
+  margin: 22px 0;
+  border-radius: 6px;
+  padding: 14px 17px;
+  background: var(--accent-soft);
+}
+.portable-callout.tone-sage {
+  background: color-mix(in srgb, #a9c495 18%, var(--surface));
+}
+.portable-callout.tone-sand {
+  background: color-mix(in srgb, #d5b677 19%, var(--surface));
+}
+.portable-callout.tone-blue {
+  background: color-mix(in srgb, #93b9cd 18%, var(--surface));
+}
+.portable-callout.tone-rose {
+  background: color-mix(in srgb, #cb9493 16%, var(--surface));
+}
+.portable-callout-icon {
+  flex: 0 0 24px;
+  font-size: 18px;
+}
+.portable-callout > div {
+  min-width: 0;
   flex: 1;
 }
-.portable-editor .tiptap ul[data-type="taskList"] > li p {
-  margin: 0;
+.portable-callout > div > :first-child {
+  margin-top: 0;
+}
+.portable-callout > div > :last-child {
+  margin-bottom: 0;
+}
+.portable-toggle {
+  margin: 17px 0;
+}
+.portable-toggle summary {
+  cursor: pointer;
+  font-weight: 550;
+}
+.portable-toggle summary::marker {
+  color: var(--accent);
+}
+.portable-toggle-body {
+  border-left: 1px solid var(--border);
+  margin: 8px 0 0 7px;
+  padding-left: 21px;
+}
+.portable-widget {
+  margin: 25px 0;
 }
 .portable-error {
   max-width: 600px;
@@ -178,7 +371,7 @@ html {
     font-size: 32px;
     margin-bottom: 24px;
   }
-  .portable-editor .tiptap table:not(.sb-block table) {
+  .portable-table-scroll > table {
     display: block;
     overflow-x: auto;
   }
@@ -202,7 +395,7 @@ html {
   .portable-title {
     font-size: 30px;
   }
-  .portable-editor .tiptap {
+  .portable-content {
     font-size: 11pt;
   }
   body,

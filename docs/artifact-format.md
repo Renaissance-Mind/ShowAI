@@ -1,6 +1,6 @@
 # ShowAI artifact format, version 1
 
-A `.showai.json` file describes one interactive page. The rendered `.html` contains that source, the React reader, styles, and interactive block components. It opens directly in a browser without a server. The visible surface is the page title and content; a small corner menu provides source download, appearance, and print. Reader interactions are temporary; edit the source or open it in the ShowAI canvas to save content changes.
+A `.showai.json` file describes one interactive page. The rendered `.html` contains that source, the React reader, styles, and interactive block components. It opens directly in a browser without a server. The visible surface is the page title and content; a small corner menu provides source download, appearance, and print. Reader interactions are temporary; edit the source or import it into the ShowAI desktop project to save content changes.
 
 ## Envelope
 
@@ -24,7 +24,11 @@ A `.showai.json` file describes one interactive page. The rendered `.html` conta
 }
 ```
 
-`id`, `title`, and a `doc` content node are required. `createdAt` and `updatedAt` use ISO date strings; missing dates use import time. Older sources may retain `icon`, `cover`, `parentId`, `favorite`, `archived`, and `comments` for compatibility. These fields do not add navigation, decorations, or comments to the rendered page. Import opens the source as the current canvas.
+`id`, `title`, and a `doc` content node are required. `createdAt` and `updatedAt` use ISO date strings; missing dates use import time. Sources may also contain `icon`, `cover`, `parentId`, `favorite`, `archived`, and `comments`. These fields do not add navigation, decorations, or comments to a single rendered page. The authoring store uses `archived` to exclude removed pages from normal listings and whole-project site exports. Import creates an editable page in the selected project.
+
+Every stored non-text block has a stable `attrs.id`, assigned when the page enters the file store. Keep these ids when revising a page so diffs can distinguish moved and changed blocks. The page's content hash is returned by the CLI/store, not stored in this artifact envelope. Agent updates require that hash separately through `--base-hash`; see [Agent usage](agent-usage.md).
+
+An optional top-level `components` array contains the exact compiled custom runtimes used by this artifact. Authoring page JSON stores component references; exported sources include the compiled dependencies so another installation can display the page.
 
 See [the complete example](../examples/welcome.showai.json), which pairs a mathematical chart with a two-input calculator. In the installed plugin the example is under `../examples/` relative to this reference.
 
@@ -136,11 +140,51 @@ Up to 100 images with unique IDs. Use raster data URIs for portable images. Read
 
 Use an HTTP(S) destination URL. Optional `image` follows the same rules as gallery images. Links open their destinations when clicked; link destinations are not copied into the offline file.
 
-### Custom blocks
+### Installed custom React components
 
-Register a React component in `src/components/blocks/registry.ts` and include it in both application and reader builds. Follow the registry's `BlockDefinition` and `BlockProps` contracts, with stable `kind`, `defaultData`, and a renderer. The serialized widget contains only data. Unknown kinds keep their data and display a readable fallback; importing JSON cannot install or execute a component.
+A custom component is imported from a local package containing `manifest.json`, `props.schema.json`, its React entry and any local resources. The manifest describes `id`, `name`, `version`, `description`, `scenarios`, `entry`, `defaultData`, and named `examples`. See [the value slider](../resources/catalog/value-slider).
 
-A custom renderer must respect `readOnly` for persistent edits while allowing temporary exploration. Bundle its runtime assets, and declare any external images in `src/portable/assets.mjs` so offline export can embed them. Rebuild the viewer and plugin after registration.
+The page node stores a reference and props:
+
+```json
+{
+  "type": "widget",
+  "attrs": {
+    "kind": "custom",
+    "data": {
+      "componentId": "value-slider",
+      "version": "1.0.0",
+      "props": { "label": "Value", "value": 30, "min": 0, "max": 100 }
+    }
+  }
+}
+```
+
+`componentId` uses lowercase letters, numbers and hyphens. `version` is an exact semantic version. An optional `integrity` records the expected compiled package hash. `props` must satisfy that version's JSON Schema. Component ids and props are data; putting arbitrary JavaScript in a node does not define a renderer.
+
+The React entry exports a default component receiving `{ data, onChange?, readOnly }`. Use `onChange(nextData)` for authoring updates. In reading mode, persistent updates are disabled; local React state can still support temporary exploration. Installed package versions are immutable, so a source edit requires a new version.
+
+The compiler supports React and package-local imports. Desktop and ordinary HTML render each component in an iframe with `sandbox="allow-scripts"`; the component cannot use the desktop bridge, filesystem or external network. The catalog keeps original package files for editing, while each exported artifact includes a deduplicated `components` array:
+
+```text
+components: [{
+  id, name, version, description, scenarios, entry, defaultData, examples,
+  scope, updatedAt, schema, html, integrity,
+  inline?: { script, styles }
+}]
+```
+
+`html` is the self-contained sandbox runtime generated by the component compiler. `inline` is a separately compiled mount bundle that reuses the reader's React runtime; both are covered by `integrity`. These fields are generated outputs, not values an Agent should hand-author. Importing the exported JSON validates and installs compiled packages into the selected project without executing them. A compiled-only import can render and export; editing its TSX source requires the original component package.
+
+### Conversation inline mode
+
+Some conversation surfaces disallow nested iframes. For those surfaces, `--format inline` explicitly marks the root as `data-showai-inline-root`. The reader uses each component's generated `inline.script` and `inline.styles`, mounted in Shadow DOM inside the host's existing whole-page sandbox. Styles are isolated per component; component JavaScript shares that host page's execution context. This mode is disabled when the desktop bridge (`window.showai`) is present.
+
+The reader does not extract or evaluate scripts from arbitrary component HTML. Packages created before the inline mount bundle was available still work in the ordinary HTML reader; conversation mode reports that their original source must be imported under a new version. The complete UTF-8 fragment must remain under 1 MB. Larger pages should use standalone HTML.
+
+### Application-level block registration
+
+Developers changing ShowAI itself can still use `registerBlock` in `src/components/blocks/registry.ts`, load that registration in both app and reader builds, and rebuild. This is distinct from installing a component package through the catalog. Unknown widget kinds preserve their JSON and show a fallback instead of discarding content.
 
 ## Export and offline behavior
 
@@ -156,12 +200,22 @@ The packaged plugin can run without this repository or its dependencies:
 node /absolute/path/to/showai/scripts/render-artifact.mjs input.showai.json output.html
 ```
 
-The command accepts an optional third argument for a custom built viewer template. It requires Node.js 20 or later. It validates the source before writing output and rejects externally linked images, so a successful built-in document render is self-contained.
+The command accepts an optional third argument for a custom built viewer template. It requires Node.js 22.12 or later. It validates the source before writing output and rejects externally linked images, so a successful render is self-contained. A custom page must include its compiled `components` payload; the project-aware CLI resolves that payload from the component catalog automatically.
 
 From the ShowAI browser application, HTML export downloads external images and embeds them. A remote server must permit this browser request. If an image cannot be read, is unsupported, or would exceed the document limit, export stops with an error; upload the local raster image and retry. Supported embedded formats are PNG, JPEG, GIF, WebP, and AVIF. SVG, executable URLs, and relative/file image paths are rejected. Image nodes, gallery images, and bookmark thumbnails are covered. Followed source links still require network access.
+
+For project pages, use the shared CLI rather than reading authoring files by hand:
+
+```sh
+node dist-agent/cli.mjs export --project PROJECT_ID --page PAGE_ID --format html --out ./report.html
+node dist-agent/cli.mjs export --project PROJECT_ID --page PAGE_ID --format inline --out ./report-inline.html
+node dist-agent/cli.mjs export --project PROJECT_ID --format site --out ./site
+```
+
+The standalone renderer also accepts `--inline`. Its output is an HTML fragment for a host-supported display surface; direct browser test wrappers must declare UTF-8. A static site uses external shared reader assets and should be served over HTTP or deployed to a static host. Only the single-file HTML is intended for direct offline opening.
 
 ## Validation and limits
 
 Source JSON is limited to 10 MB, 12,000 document nodes, and 48 levels of JSON nesting. Built-in widgets also have the limits described above. Invalid trees, unsupported node types, malformed marks, unsafe URLs, nonfinite numbers, and prototype-pollution keys are rejected before creating the editor. Unknown widget kinds preserve plain JSON data.
 
-The generated file escapes embedded JSON and the HTML title. No document text is executed as code. The reader has no telemetry, background API, or account connection. Image embedding makes network requests only during browser export; ordinary source links navigate when activated.
+The generated file escapes embedded JSON and the HTML title. Paragraph text and data remain escaped. Custom components are executable code supplied through the explicit component-package mechanism and run in the rendering boundary described above. The reader has no telemetry, background API, or account connection. Image embedding makes network requests only during browser export; ordinary source links navigate when activated.

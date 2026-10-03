@@ -1,0 +1,398 @@
+import { createHash } from "node:crypto";
+import { validateDocument } from "../portable/validation.mjs";
+import { CoreError } from "./model";
+import type {
+  FieldChange,
+  JSONContent,
+  PageChange,
+  PageOperation,
+  ShowDocument,
+} from "./model";
+
+export function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{${Object.entries(value)
+      .filter(([, item]) => item !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+/** Only document bookkeeping dates are excluded; dates in user data remain meaningful. */
+export function documentHash(document: ShowDocument): string {
+  const { createdAt: _createdAt, updatedAt: _updatedAt, ...content } = document;
+  return createHash("sha256").update(canonicalJson(content)).digest("hex");
+}
+
+export function normalizeDocument(
+  input: unknown,
+  previous?: ShowDocument,
+): ShowDocument {
+  let document: ShowDocument;
+  try {
+    document = validateDocument(input);
+  } catch (error) {
+    throw new CoreError(
+      "INVALID_DATA",
+      error instanceof Error ? error.message : "Invalid page document.",
+    );
+  }
+  const used = new Set<string>();
+  const oldIds = new Map<string, string[]>();
+  const signature = (node: JSONContent) => {
+    const strip = (item: JSONContent): JSONContent => {
+      const { id: _id, ...attrs } = item.attrs ?? {};
+      return {
+        ...item,
+        ...(item.attrs ? { attrs } : {}),
+        ...(item.content ? { content: item.content.map(strip) } : {}),
+      };
+    };
+    return canonicalJson(strip(node));
+  };
+  const collectOld = (node: JSONContent) => {
+    if (
+      node.type !== "doc" &&
+      node.type !== "text" &&
+      typeof node.attrs?.id === "string"
+    ) {
+      const key = signature(node);
+      oldIds.set(key, [...(oldIds.get(key) ?? []), node.attrs.id]);
+    }
+    node.content?.forEach(collectOld);
+  };
+  if (previous) collectOld(previous.content);
+  const visit = (node: JSONContent, path: string) => {
+    if (node.type !== "doc" && node.type !== "text") {
+      let id =
+        typeof node.attrs?.id === "string" && node.attrs.id.trim()
+          ? node.attrs.id
+          : undefined;
+      if (!id)
+        id = oldIds
+          .get(signature(node))
+          ?.find((candidate) => !used.has(candidate));
+      if (!id || used.has(id))
+        id = `block-${createHash("sha256")
+          .update(`${document.id}:${path}:${signature(node)}`)
+          .digest("hex")
+          .slice(0, 24)}`;
+      while (used.has(id)) id = `${id}-copy`;
+      used.add(id);
+      node.attrs = { ...node.attrs, id };
+    }
+    node.content?.forEach((child, index) => visit(child, `${path}/${index}`));
+  };
+  visit(document.content, "");
+  return document;
+}
+
+interface NodeEntry {
+  node: JSONContent;
+  parentId: string | null;
+  afterId: string | null;
+}
+
+export function indexBlocks(document: ShowDocument): Map<string, NodeEntry> {
+  const blocks = new Map<string, NodeEntry>();
+  const walk = (parent: JSONContent, parentId: string | null) => {
+    let afterId: string | null = null;
+    for (const node of parent.content ?? []) {
+      if (node.type === "text") continue;
+      const id = node.attrs?.id;
+      if (typeof id !== "string" || !id)
+        throw new CoreError(
+          "INVALID_DATA",
+          "A block is missing its stable id. Save the page before comparing changes.",
+        );
+      if (blocks.has(id))
+        throw new CoreError("INVALID_DATA", `Duplicate block id: ${id}`);
+      blocks.set(id, { node, parentId, afterId });
+      walk(node, id);
+      afterId = id;
+    }
+  };
+  walk(document.content, null);
+  return blocks;
+}
+
+function changesForFields(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+  prefix = "",
+): FieldChange[] {
+  const result: FieldChange[] = [];
+  for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+    if (
+      Object.hasOwn(before, key) === Object.hasOwn(after, key) &&
+      canonicalJson(before[key]) === canonicalJson(after[key])
+    )
+      continue;
+    const field = prefix ? `${prefix}.${key}` : key;
+    const left = before[key];
+    const right = after[key];
+    if (
+      left &&
+      right &&
+      typeof left === "object" &&
+      typeof right === "object" &&
+      !Array.isArray(left) &&
+      !Array.isArray(right)
+    ) {
+      result.push(
+        ...changesForFields(
+          left as Record<string, unknown>,
+          right as Record<string, unknown>,
+          field,
+        ),
+      );
+    } else {
+      result.push({
+        field,
+        ...(left !== undefined ? { before: left } : {}),
+        ...(right !== undefined ? { after: right } : {}),
+      });
+    }
+  }
+  return result;
+}
+
+export function diffDocuments(
+  before: ShowDocument,
+  after: ShowDocument,
+): PageChange[] {
+  const changes: PageChange[] = [];
+  const metadata = (document: ShowDocument): Record<string, unknown> => {
+    const {
+      content: _content,
+      createdAt: _createdAt,
+      updatedAt: _updatedAt,
+      ...rest
+    } = document;
+    return rest;
+  };
+  const pageFields = changesForFields(metadata(before), metadata(after));
+  if (pageFields.length)
+    changes.push({ type: "page.changed", fields: pageFields });
+  const oldBlocks = indexBlocks(before);
+  const newBlocks = indexBlocks(after);
+  for (const [id, entry] of oldBlocks) {
+    if (
+      !newBlocks.has(id) &&
+      (!entry.parentId || newBlocks.has(entry.parentId))
+    ) {
+      changes.push({
+        type: "block.removed",
+        blockId: id,
+        parentId: entry.parentId,
+        node: entry.node,
+      });
+    }
+  }
+  for (const [id, entry] of newBlocks) {
+    const old = oldBlocks.get(id);
+    if (!old) {
+      if (!entry.parentId || oldBlocks.has(entry.parentId))
+        changes.push({ type: "block.added", blockId: id, ...entry });
+      continue;
+    }
+    // Direct text and marks belong to this block. Nested blocks have their own records.
+    const own = (node: JSONContent): Record<string, unknown> => {
+      const { content, ...rest } = node;
+      return {
+        ...rest,
+        content: (content ?? []).filter((child) => child.type === "text"),
+      };
+    };
+    const fields = changesForFields(own(old.node), own(entry.node));
+    if (fields.length)
+      changes.push({ type: "block.changed", blockId: id, fields });
+    if (old.parentId !== entry.parentId || old.afterId !== entry.afterId) {
+      // Removing/inserting a preceding sibling is not a move of every later sibling.
+      const survivingPredecessor = (
+        map: Map<string, NodeEntry>,
+        target: NodeEntry,
+        other: Map<string, NodeEntry>,
+      ): string | null => {
+        let previous = target.afterId;
+        while (previous && !other.has(previous))
+          previous = map.get(previous)?.afterId ?? null;
+        return previous;
+      };
+      if (
+        old.parentId !== entry.parentId ||
+        survivingPredecessor(oldBlocks, old, newBlocks) !==
+          survivingPredecessor(newBlocks, entry, oldBlocks)
+      ) {
+        changes.push({
+          type: "block.moved",
+          blockId: id,
+          parentId: entry.parentId,
+          afterId: entry.afterId,
+        });
+      }
+    }
+  }
+  return changes;
+}
+
+export function applyOperations(
+  document: ShowDocument,
+  operations: PageOperation[],
+): ShowDocument {
+  if (!Array.isArray(operations) || operations.length > 1000)
+    throw new CoreError(
+      "INVALID_DATA",
+      "Expected at most 1000 page operations.",
+    );
+  const draft = structuredClone(document);
+  const locate = (
+    id: string,
+  ): { parent: JSONContent; index: number; node: JSONContent } => {
+    const visit = (
+      parent: JSONContent,
+    ): ReturnType<typeof locate> | undefined => {
+      for (const [index, node] of (parent.content ?? []).entries()) {
+        if (node.type !== "text" && node.attrs?.id === id)
+          return { parent, index, node };
+        const found = visit(node);
+        if (found) return found;
+      }
+    };
+    const found = visit(draft.content);
+    if (!found) throw new CoreError("NOT_FOUND", `Block ${id} does not exist.`);
+    return found;
+  };
+  const insert = (
+    node: JSONContent,
+    parentId?: string | null,
+    afterId?: string | null,
+  ) => {
+    if (node.type === "text" || node.type === "doc")
+      throw new CoreError(
+        "INVALID_DATA",
+        "Insert a block node, not a text or document node.",
+      );
+    const parent = parentId ? locate(parentId).node : draft.content;
+    const children = parent.content ?? [];
+    let index = children.length;
+    if (afterId === null) index = 0;
+    else if (afterId !== undefined) {
+      const sibling = children.findIndex(
+        (child) => child.attrs?.id === afterId,
+      );
+      if (sibling < 0)
+        throw new CoreError(
+          "NOT_FOUND",
+          `Insertion anchor ${afterId} does not belong to this parent.`,
+        );
+      index = sibling + 1;
+    }
+    children.splice(index, 0, node);
+    parent.content = children;
+  };
+  for (const operation of operations) {
+    if (!operation || typeof operation !== "object")
+      throw new CoreError("INVALID_DATA", "Invalid page operation.");
+    switch (operation.type) {
+      case "page.set": {
+        const allowed = new Set([
+          "title",
+          "icon",
+          "cover",
+          "parentId",
+          "favorite",
+          "archived",
+          "comments",
+        ]);
+        if (
+          !operation.fields ||
+          Object.keys(operation.fields).some((key) => !allowed.has(key))
+        )
+          throw new CoreError("INVALID_DATA", "Unsupported page field.");
+        Object.assign(draft, operation.fields);
+        break;
+      }
+      case "block.insert":
+        insert(
+          structuredClone(operation.node),
+          operation.parentId,
+          operation.afterId,
+        );
+        break;
+      case "block.remove": {
+        const target = locate(operation.blockId);
+        target.parent.content!.splice(target.index, 1);
+        break;
+      }
+      case "block.replace": {
+        const target = locate(operation.blockId);
+        if (["text", "doc"].includes(operation.node.type ?? ""))
+          throw new CoreError(
+            "INVALID_DATA",
+            "Replacement must be a block node.",
+          );
+        const node = structuredClone(operation.node);
+        node.attrs = { ...node.attrs, id: operation.blockId };
+        target.parent.content![target.index] = node;
+        break;
+      }
+      case "block.move": {
+        const target = locate(operation.blockId);
+        const contains = (node: JSONContent, id: string): boolean =>
+          node.attrs?.id === id ||
+          (node.content ?? []).some((child) => contains(child, id));
+        if (
+          (operation.parentId && contains(target.node, operation.parentId)) ||
+          operation.afterId === operation.blockId
+        )
+          throw new CoreError(
+            "INVALID_DATA",
+            "A block cannot be moved inside itself or after itself.",
+          );
+        target.parent.content!.splice(target.index, 1);
+        insert(target.node, operation.parentId, operation.afterId);
+        break;
+      }
+      case "block.attrs.set": {
+        if (
+          !operation.attrs ||
+          typeof operation.attrs !== "object" ||
+          Array.isArray(operation.attrs) ||
+          Object.hasOwn(operation.attrs, "id")
+        )
+          throw new CoreError(
+            "INVALID_DATA",
+            "Block attributes cannot change a stable id.",
+          );
+        const node = locate(operation.blockId).node;
+        node.attrs = { ...node.attrs, ...operation.attrs };
+        break;
+      }
+      case "block.text.set": {
+        const node = locate(operation.blockId).node;
+        if (
+          !["paragraph", "heading", "codeBlock"].includes(node.type ?? "") ||
+          typeof operation.text !== "string"
+        )
+          throw new CoreError(
+            "INVALID_DATA",
+            "Text replacement requires a paragraph, heading, or code block.",
+          );
+        node.content = operation.text
+          ? [{ type: "text", text: operation.text }]
+          : [];
+        break;
+      }
+      default:
+        throw new CoreError(
+          "INVALID_DATA",
+          `Unsupported operation: ${String((operation as { type?: unknown }).type)}`,
+        );
+    }
+  }
+  return normalizeDocument(draft, document);
+}

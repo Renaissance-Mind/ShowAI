@@ -1,6 +1,6 @@
 {
-  "name": "showai-local",
-  "interface": { "displayName": "ShowAI Local" },
+  "name": "renaissance-mind",
+  "interface": { "displayName": "Renaissance Mind" },
   "plugins": [
     {
       "name": "showai",

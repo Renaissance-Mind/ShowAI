@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "label": { "type": "string", "maxLength": 100 },
+    "value": { "type": "number" },
+    "min": { "type": "number" },
+    "max": { "type": "number" }
+  },
+  "required": ["label", "value", "min", "max"],
+  "additionalProperties": false
+}

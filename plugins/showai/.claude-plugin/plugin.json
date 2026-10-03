@@ -1,0 +1,6 @@
+{
+  "name": "showai",
+  "version": "0.3.0",
+  "description": "Create interactive ShowAI pages and sites using shared projects, reusable components, templates, and guarded revisions.",
+  "skills": "./skills/"
+}

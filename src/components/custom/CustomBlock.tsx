@@ -1,0 +1,363 @@
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { Settings2 } from "lucide-react";
+import type { BlockProps } from "../blocks/types";
+import {
+  COMPONENT_DATA_MARKER,
+  componentKey,
+  readCustomBlockData,
+} from "./contract";
+import type { CompiledComponent } from "./types";
+import { InlineComponent } from "./InlineComponent";
+import "./custom.css";
+
+const ComponentsContext = createContext<ReadonlyMap<string, CompiledComponent>>(
+  new Map(),
+);
+const InlineHostContext = createContext<HTMLElement | null>(null);
+
+export function CustomComponentsProvider({
+  components,
+  children,
+  inlineHost = null,
+}: {
+  components: CompiledComponent[];
+  children: ReactNode;
+  inlineHost?: HTMLElement | null;
+}) {
+  const value = useMemo(() => {
+    const map = new Map<string, CompiledComponent>();
+    for (const component of components) {
+      const key = componentKey(component.id, component.version);
+      if (map.has(key) && map.get(key)?.integrity !== component.integrity)
+        throw new Error(`Conflicting component packages: ${key}.`);
+      map.set(key, component);
+    }
+    return map;
+  }, [components]);
+  return (
+    <ComponentsContext.Provider value={value}>
+      <InlineHostContext.Provider value={inlineHost}>
+        {children}
+      </InlineHostContext.Provider>
+    </ComponentsContext.Provider>
+  );
+}
+
+function safeJson(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
+function jsonObject(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const visit = (entry: unknown, depth = 0): boolean => {
+    if (depth > 40) return false;
+    if (
+      entry === null ||
+      typeof entry === "boolean" ||
+      typeof entry === "string"
+    )
+      return true;
+    if (typeof entry === "number") return Number.isFinite(entry);
+    if (Array.isArray(entry))
+      return entry.every((item) => visit(item, depth + 1));
+    return (
+      !!entry &&
+      typeof entry === "object" &&
+      Object.entries(entry).every(
+        ([key, item]) =>
+          !["__proto__", "constructor", "prototype"].includes(key) &&
+          visit(item, depth + 1),
+      )
+    );
+  };
+  return visit(value) && JSON.stringify(value).length <= 1_000_000;
+}
+
+export function CustomBlock({ data, onChange, readOnly }: BlockProps) {
+  const parsed = readCustomBlockData(data);
+  const components = useContext(ComponentsContext);
+  const inlineHost = useContext(InlineHostContext);
+  const component = components.get(
+    componentKey(parsed.componentId, parsed.version),
+  );
+  if (component && parsed.integrity && component.integrity !== parsed.integrity)
+    throw new Error("组件内容与此页面记录的版本不一致。");
+  return component && inlineHost ? (
+    <InlineComponent
+      key={component.integrity}
+      component={component}
+      data={parsed.props}
+      host={inlineHost}
+    />
+  ) : component ? (
+    <SandboxComponent
+      key={component.integrity}
+      component={component}
+      data={data}
+      onChange={onChange}
+      readOnly={readOnly}
+    />
+  ) : (
+    <section className="sb-block sb-unavailable" aria-label="组件尚未安装">
+      <div style={{ padding: 18 }}>
+        <strong>{parsed.componentId}</strong>
+        <p>
+          需要安装组件 {parsed.componentId}@{parsed.version}。页面数据已保留。
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function SandboxComponent({
+  component,
+  data,
+  onChange,
+  readOnly,
+}: BlockProps & { component: CompiledComponent }) {
+  const parsed = readCustomBlockData(data);
+  const iframe = useRef<HTMLIFrameElement>(null);
+  const [channel] = useState(() => crypto.randomUUID());
+  const [height, setHeight] = useState(180);
+  const [error, setError] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [draftError, setDraftError] = useState("");
+  const [validating, setValidating] = useState(false);
+  const draftBase = useRef("");
+  const settingsButton = useRef<HTMLButtonElement>(null);
+  const pendingValidation = useRef<{
+    id: string;
+    props: Record<string, unknown>;
+    timeout: number;
+  } | null>(null);
+  const latest = useRef({ data, parsed, onChange, readOnly });
+  latest.current = { data, parsed, onChange, readOnly };
+  const editable = !!onChange && !readOnly;
+  const cancelValidation = () => {
+    if (pendingValidation.current)
+      window.clearTimeout(pendingValidation.current.timeout);
+    pendingValidation.current = null;
+    setValidating(false);
+  };
+  const closeEditor = () => {
+    cancelValidation();
+    setEditing(false);
+    requestAnimationFrame(() => settingsButton.current?.focus());
+  };
+  const openEditor = () => {
+    draftBase.current = JSON.stringify(latest.current.parsed.props);
+    setDraft(JSON.stringify(latest.current.parsed.props, null, 2));
+    setDraftError("");
+    setEditing(true);
+  };
+  const saveDraft = () => {
+    let next: unknown;
+    try {
+      next = JSON.parse(draft);
+    } catch (error) {
+      setDraftError(
+        error instanceof Error ? error.message : "JSON 格式不正确。",
+      );
+      return;
+    }
+    if (!jsonObject(next)) {
+      setDraftError("组件数据必须是 JSON 对象，且不超过 1 MB。");
+      return;
+    }
+    if (JSON.stringify(latest.current.parsed.props) !== draftBase.current) {
+      setDraftError("组件数据已更新，请重新打开编辑后再修改。");
+      return;
+    }
+    cancelValidation();
+    setDraftError("");
+    const id = crypto.randomUUID();
+    const timeout = window.setTimeout(() => {
+      pendingValidation.current = null;
+      setValidating(false);
+      setDraftError("组件未响应数据校验，请重新加载组件后再试。");
+    }, 5000);
+    pendingValidation.current = { id, props: next, timeout };
+    setValidating(true);
+    iframe.current?.contentWindow?.postMessage(
+      { channel, type: "showai:validate", requestId: id, props: next },
+      "*",
+    );
+  };
+  const html = useMemo(() => {
+    if (!component.html.includes(COMPONENT_DATA_MARKER))
+      throw new Error("组件缺少运行入口。");
+    // A portable package is executable user content. Enforce the policy before
+    // parsing any of its markup, even if its own document omits or changes CSP.
+    const policy =
+      "<!doctype html><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'\">";
+    return (
+      policy +
+      component.html.replace(
+        COMPONENT_DATA_MARKER,
+        `<script id="showai-component-data" type="application/json">${safeJson({ channel, props: component.defaultData, readOnly: true })}</script>`,
+      )
+    );
+  }, [component.html, component.defaultData, channel]);
+
+  const sendProps = () => {
+    const current = latest.current;
+    iframe.current?.contentWindow?.postMessage(
+      {
+        channel,
+        type: "showai:props",
+        props: current.parsed.props,
+        readOnly: !!current.readOnly || !current.onChange,
+      },
+      "*",
+    );
+  };
+  useEffect(() => {
+    const receive = (event: MessageEvent) => {
+      if (
+        event.source !== iframe.current?.contentWindow ||
+        !event.data ||
+        event.data.channel !== channel
+      )
+        return;
+      if (event.data.type === "showai:ready") sendProps();
+      if (
+        event.data.type === "showai:height" &&
+        typeof event.data.height === "number" &&
+        Number.isFinite(event.data.height)
+      )
+        setHeight(Math.min(4000, Math.max(48, Math.ceil(event.data.height))));
+      if (event.data.type === "showai:error")
+        setError(String(event.data.message || "组件无法显示。").slice(0, 500));
+      if (event.data.type === "showai:valid") setError("");
+      const current = latest.current;
+      const pending = pendingValidation.current;
+      if (
+        event.data.type === "showai:validation" &&
+        pending &&
+        pending.id === event.data.requestId
+      ) {
+        cancelValidation();
+        if (event.data.valid !== true) {
+          setDraftError(
+            String(event.data.message || "数据不符合组件的属性要求。").slice(
+              0,
+              1000,
+            ),
+          );
+        } else if (JSON.stringify(current.parsed.props) !== draftBase.current) {
+          setDraftError("组件数据已更新，请重新打开编辑后再修改。");
+        } else if (!current.readOnly && current.onChange) {
+          current.onChange({ ...current.data, props: pending.props });
+          closeEditor();
+        }
+      }
+      if (
+        event.data.type === "showai:change" &&
+        !current.readOnly &&
+        current.onChange &&
+        jsonObject(event.data.props)
+      )
+        current.onChange({ ...current.data, props: event.data.props });
+    };
+    window.addEventListener("message", receive);
+    return () => {
+      window.removeEventListener("message", receive);
+      if (pendingValidation.current)
+        window.clearTimeout(pendingValidation.current.timeout);
+    };
+  }, [channel]);
+  useEffect(sendProps, [parsed.props, readOnly, onChange, channel]);
+
+  return (
+    <section
+      className="showai-custom-block"
+      aria-label={component.name}
+      style={{ margin: "18px 0" }}
+    >
+      {editable && !editing && (
+        <button
+          ref={settingsButton}
+          type="button"
+          className="custom-props-trigger"
+          aria-label="编辑组件数据"
+          title="编辑组件数据"
+          onClick={openEditor}
+        >
+          <Settings2 size={15} />
+        </button>
+      )}
+      {editable && editing && (
+        <div
+          className="custom-props-editor"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.stopPropagation();
+              closeEditor();
+            }
+          }}
+        >
+          <label htmlFor={`${channel}-props`}>组件数据</label>
+          <textarea
+            id={`${channel}-props`}
+            aria-label="组件属性 JSON"
+            value={draft}
+            spellCheck={false}
+            rows={Math.max(5, Math.min(14, draft.split("\n").length))}
+            autoFocus
+            onChange={(event) => {
+              setDraft(event.target.value);
+              setDraftError("");
+            }}
+            disabled={validating}
+          />
+          {draftError && (
+            <p role="alert" className="custom-props-error">
+              {draftError}
+            </p>
+          )}
+          <div className="custom-props-actions">
+            <button type="button" onClick={closeEditor}>
+              取消
+            </button>
+            <button type="button" disabled={validating} onClick={saveDraft}>
+              {validating ? "校验中…" : "应用"}
+            </button>
+          </div>
+        </div>
+      )}
+      <iframe
+        ref={iframe}
+        title={component.name}
+        srcDoc={html}
+        sandbox="allow-scripts"
+        referrerPolicy="no-referrer"
+        onLoad={sendProps}
+        allow="camera 'none'; microphone 'none'; geolocation 'none'; clipboard-read 'none'; clipboard-write 'none'"
+        style={{
+          width: "100%",
+          height,
+          border: 0,
+          display: "block",
+          background: "transparent",
+        }}
+      />
+      {error && (
+        <p role="alert" style={{ color: "#ae3c3c", fontSize: 12 }}>
+          {error}
+        </p>
+      )}
+    </section>
+  );
+}

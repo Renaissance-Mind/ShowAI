@@ -66,6 +66,7 @@ export interface DocumentEditorProps {
   readOnly?: boolean;
   minimal?: boolean;
   onEditorReady?: (editor: Editor) => void;
+  onBrowseComponents?: () => void;
 }
 
 interface MenuItem {
@@ -150,6 +151,7 @@ export default function DocumentEditor({
   readOnly = false,
   minimal = true,
   onEditorReady,
+  onBrowseComponents,
 }: DocumentEditorProps) {
   const latestOnChange = useRef(onChange);
   latestOnChange.current = onChange;
@@ -650,32 +652,47 @@ export default function DocumentEditor({
             .run();
         },
       },
-      ...blockDefinitions.map((block) => ({
-        id: block.kind,
-        title: block.title,
-        description: block.description,
-        keywords: `${block.kind} ${block.title} ${block.description}`,
-        icon:
-          block.kind === "chart" ? (
-            <BarChart3 size={20} />
-          ) : block.kind === "database" ? (
-            <Table2 size={20} />
-          ) : (
-            <PanelTop size={20} />
-          ),
-        group: "交互组件",
-        run: (e: Editor) => {
-          e.chain()
-            .focus()
-            .insertContent({
-              type: "widget",
-              attrs: { kind: block.kind, data: createBlockData(block.kind) },
-            })
-            .run();
-        },
-      })),
+      ...blockDefinitions
+        .filter((block) => block.kind !== "custom")
+        .map((block) => ({
+          id: block.kind,
+          title: block.title,
+          description: block.description,
+          keywords: `${block.kind} ${block.title} ${block.description}`,
+          icon:
+            block.kind === "chart" ? (
+              <BarChart3 size={20} />
+            ) : block.kind === "database" ? (
+              <Table2 size={20} />
+            ) : (
+              <PanelTop size={20} />
+            ),
+          group: "交互组件",
+          run: (e: Editor) => {
+            e.chain()
+              .focus()
+              .insertContent({
+                type: "widget",
+                attrs: { kind: block.kind, data: createBlockData(block.kind) },
+              })
+              .run();
+          },
+        })),
+      ...(onBrowseComponents
+        ? [
+            {
+              id: "custom-library",
+              title: "自定义组件",
+              description: "从组件库选择已安装的组件",
+              keywords: "custom component 自定义 组件",
+              icon: <PanelTop size={20} />,
+              group: "交互组件",
+              run: onBrowseComponents,
+            },
+          ]
+        : []),
     ],
-    [openDialog],
+    [openDialog, onBrowseComponents],
   );
   const filteredItems = items.filter((item) =>
     `${item.title} ${item.keywords}`

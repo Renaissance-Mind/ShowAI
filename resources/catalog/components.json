@@ -1,0 +1,328 @@
+[
+  {
+    "kind": "chart",
+    "name": "数据图表",
+    "description": "交互式折线图、柱状图和可展开的原始数据。",
+    "scenarios": ["趋势分析", "数值比较"],
+    "defaultData": {
+      "title": "数据图表",
+      "type": "line",
+      "labels": [],
+      "series": [],
+      "unit": ""
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "type": {
+          "enum": ["line", "bar"]
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 500
+        },
+        "series": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "color": {
+                "type": "string"
+              }
+            },
+            "required": ["name", "values"]
+          }
+        },
+        "unit": {
+          "type": "string"
+        }
+      },
+      "required": ["labels", "series"]
+    },
+    "examples": [
+      {
+        "name": "线性函数 y=x",
+        "data": {
+          "title": "y = x",
+          "type": "line",
+          "labels": ["0", "1", "2"],
+          "series": [
+            {
+              "name": "y = x",
+              "values": [0, 1, 2]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "kind": "database",
+    "name": "数据库",
+    "description": "带筛选、排序和看板视图的表格。单元格支持文字、数字、选择、复选框和链接。",
+    "scenarios": ["来源记录", "方案比较", "任务整理"],
+    "defaultData": {
+      "title": "数据库",
+      "columns": [
+        {
+          "id": "name",
+          "name": "名称",
+          "type": "text"
+        }
+      ],
+      "rows": []
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "enum": ["text", "number", "select", "checkbox", "url"]
+              },
+              "options": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["id", "name", "type"]
+          }
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": ["id"],
+            "additionalProperties": {
+              "type": ["string", "number", "boolean"]
+            }
+          }
+        },
+        "groupBy": {
+          "type": "string"
+        }
+      },
+      "required": ["columns", "rows"]
+    },
+    "examples": []
+  },
+  {
+    "kind": "metrics",
+    "name": "关键指标",
+    "description": "显示有来源的数值、单位、变化和说明。",
+    "scenarios": ["关键发现", "指标摘要"],
+    "defaultData": {
+      "title": "关键指标",
+      "items": []
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "value": {
+                "type": ["string", "number"]
+              },
+              "unit": {
+                "type": "string"
+              },
+              "detail": {
+                "type": "string"
+              },
+              "trend": {
+                "type": "number"
+              }
+            },
+            "required": ["label", "value"]
+          }
+        }
+      },
+      "required": ["items"]
+    },
+    "examples": []
+  },
+  {
+    "kind": "playground",
+    "name": "交互计算",
+    "description": "用滑块探索求和、乘积或平均值。",
+    "scenarios": ["参数探索", "数学讲解"],
+    "defaultData": {
+      "title": "交互计算",
+      "inputs": [],
+      "operation": "sum",
+      "resultLabel": "计算结果",
+      "unit": ""
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "min": {
+                "type": "number"
+              },
+              "max": {
+                "type": "number"
+              },
+              "step": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "value": {
+                "type": "number"
+              }
+            },
+            "required": ["id", "label", "min", "max", "step", "value"]
+          }
+        },
+        "operation": {
+          "enum": ["sum", "product", "average"]
+        },
+        "resultLabel": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        }
+      },
+      "required": ["inputs", "operation"]
+    },
+    "examples": []
+  },
+  {
+    "kind": "gallery",
+    "name": "图片画廊",
+    "description": "包含图注的图片集合。导出离线页面时使用内嵌 PNG、JPEG、GIF、WebP 或 AVIF。",
+    "scenarios": ["视觉证据", "设计参考"],
+    "defaultData": {
+      "title": "图片画廊",
+      "columns": 2,
+      "images": []
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "images": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "src": {
+                "type": "string"
+              },
+              "alt": {
+                "type": "string"
+              },
+              "caption": {
+                "type": "string"
+              }
+            },
+            "required": ["src"]
+          }
+        }
+      },
+      "required": ["images"]
+    },
+    "examples": []
+  },
+  {
+    "kind": "bookmark",
+    "name": "来源书签",
+    "description": "带标题、描述和可选缩略图的外部来源链接。",
+    "scenarios": ["论文引用", "网页来源"],
+    "defaultData": {
+      "title": "",
+      "description": "",
+      "url": "",
+      "image": ""
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        }
+      },
+      "required": ["url"]
+    },
+    "examples": []
+  }
+]

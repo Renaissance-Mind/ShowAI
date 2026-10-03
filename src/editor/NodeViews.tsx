@@ -22,6 +22,7 @@ export function WidgetView({
     <NodeViewWrapper
       className={`document-widget${selected && editable ? " is-selected" : ""}`}
       data-widget-kind={node.attrs.kind}
+      data-block-id={node.attrs.id ?? undefined}
     >
       <Widget
         kind={node.attrs.kind}
@@ -44,7 +45,10 @@ export function CalloutView({ node, updateAttributes, editor }: NodeViewProps) {
     selector: ({ editor: current }) => current.isEditable,
   });
   return (
-    <NodeViewWrapper className={`document-callout tone-${node.attrs.tone}`}>
+    <NodeViewWrapper
+      className={`document-callout tone-${node.attrs.tone}`}
+      data-block-id={node.attrs.id ?? undefined}
+    >
       <div className="callout-decoration" contentEditable={false}>
         <button
           className="callout-icon"
@@ -87,7 +91,10 @@ export function ToggleView({ node, updateAttributes, editor }: NodeViewProps) {
   const [open, setOpen] = useState(Boolean(node.attrs.open));
   useEffect(() => setOpen(Boolean(node.attrs.open)), [node.attrs.open]);
   return (
-    <NodeViewWrapper className={`document-toggle${open ? " is-open" : ""}`}>
+    <NodeViewWrapper
+      className={`document-toggle${open ? " is-open" : ""}`}
+      data-block-id={node.attrs.id ?? undefined}
+    >
       <div className="toggle-heading" contentEditable={false}>
         <button
           aria-label={open ? "收起内容" : "展开内容"}

@@ -1,28 +1,48 @@
 ---
 name: show-document
-description: Present research, explanations, or comparisons as one standalone interactive ShowAI HTML page when the user asks for a ShowAI page or an interactive visual result.
+description: Create, inspect, revise, and share interactive ShowAI pages using reusable components and templates. Use when the user asks for ShowAI, an interactive report, a visual explanation, or a small content site.
 ---
 
-Deliver one content-focused interactive page directly in the conversation when the host supports inline visualization. Keep it as a simple canvas: a title, useful content, and interactions that help explain it. Use the user's language. Include only sections and controls needed by the subject. The bundled reader provides one small options menu.
-
-Read [the artifact format](references/artifact-format.md) and adapt [the complete example](examples/welcome.showai.json). Author a `format: "showai", version: 1` JSON source containing one `document`. Put text, images, chart, database, gallery, metrics, and playground blocks in its ordered content. Registering new React blocks requires rebuilding the viewer; JSON contains data only.
-
-Ground claims and charts in the user's data or verified sources. Link evidence next to the relevant claim. Label mathematical values, assumptions, and user-controlled scenarios where used. Omit unknown measurements. Keep sources concise and specific.
-
-Render with the bundled command. The plugin root is two levels above this skill directory:
+Use ShowAI's bundled command to work with real project files shared with the desktop application. Read [Agent usage](references/agent-usage.md) for exact commands and [Artifact format](references/artifact-format.md) for document structure. The plugin root is two levels above this skill directory. Invoke:
 
 ```sh
-node /absolute/path/to/showai/scripts/render-artifact.mjs /absolute/path/to/result.showai.json /absolute/path/to/showai-page.html --inline
+node /absolute/path/to/showai/scripts/cli.mjs --help
 ```
 
-The command needs Node.js 20 or later; no install step, API key, server, or workspace is required. Embed raster image data URIs before rendering; the command rejects external image URLs to keep the page self-contained. Supporting source links may use web URLs.
+The command requires Node.js 22.12 or later. This package includes a compiled viewer and CLI; it does not require an API key. Component compilation uses the bundled platform-specific compiler. Check `assets/build.json` for its operating system and architecture.
 
-The `--inline` output is a fragment under 1 MB with bundled React and scoped product styles. Put it in the current thread's explicitly writable visualization directory when provided; otherwise use a durable task-owned output directory. Read the host's visualize skill if available, then emit the host-supported inline content reference in the final reply:
+## Bind the current conversation
 
-```text
-visualize{"path":"/absolute/path/to/showai-page.html"}
+Every page command needs an explicit project id. When this conversation already has a ShowAI project, reuse its id. When the user asks to continue another project, list projects and bind only the selected project. Otherwise create a project with a descriptive name and the host's actual conversation/session id:
+
+```sh
+node /absolute/path/to/showai/scripts/cli.mjs projects create --name "Research topic" --harness codex --session "ACTUAL_SESSION_ID" --json
 ```
 
-This uses the host's conversational display capability, not an installed MCP tool call. Return the live page itself. Keep explanatory prose brief. Preview the actual fragment in the host sandbox and exercise a relevant interaction before delivery when tools permit.
+Use `--harness claude-code` or the actual host name on other Agents. If no session id is available, create a project without binding and keep the returned project id in the conversation; do not invent or borrow a session id. Never guess the current project from the most recently edited project, working directory, or global active state. To explicitly reuse a selected project, use `projects bind PROJECT --harness HOST --session ACTUAL_SESSION_ID`.
 
-For hosts without that capability, or when the user requests a downloadable file, omit `--inline` to produce standalone HTML and open it through the available file/browser panel. Keep the JSON alongside the output for revisions. Never claim native MCP UI integration or installation merely because the skill generated a page.
+Default storage is `~/.showai`; `--home` or `SHOWAI_HOME` changes it. Use the same home as the desktop application so user and Agent edits reach the same files. Save documents in this store, then export the deliverable separately. Do not keep the only editable source in a temporary visualization directory.
+
+## Create and revise
+
+1. Search `catalog list --project PROJECT --json`, then describe relevant components or templates. Built-in data and component descriptions specify supported inputs and intended use.
+2. Apply a template with `template apply ID --project PROJECT --json`, or create a page with `pages create --project PROJECT --input FILE --json`.
+3. Before any follow-up edit, `pages read PAGE --project PROJECT --json`. Keep the returned `hash` and stable block ids. Compare to the hash from the previous turn using `pages diff PAGE --project PROJECT --since HASH --json` so manual user edits are visible.
+4. Preserve the user's changes. Use targeted operations when possible: `pages apply PAGE --project PROJECT --input OPERATIONS.json --base-hash HASH --json`. A full `pages save` also requires `--base-hash`.
+5. On `CONFLICT`, read again, inspect what changed, and merge deliberately. Never retry with a newer hash while blindly keeping an old full-document replacement.
+
+Keep page content and data factual. Use the user's data or verified sources, label assumptions and scenarios, and omit unknown measurements. Include only sections and controls useful to the subject. A page delivers content; project management remains in the authoring application.
+
+## Deliver
+
+```sh
+node /absolute/path/to/showai/scripts/cli.mjs export --project PROJECT --page PAGE --format html --out /absolute/path/report.html --json
+node /absolute/path/to/showai/scripts/cli.mjs export --project PROJECT --page PAGE --format inline --out /absolute/path/report-inline.html --json
+node /absolute/path/to/showai/scripts/cli.mjs export --project PROJECT --format site --out /absolute/path/site --json
+```
+
+Images must be embedded for offline export. Exported HTML contains the reader, page data, and the exact installed component versions used by the page. Site export includes relative navigation and shared reader assets. Output is not automatically published.
+
+For a host with an inline visualization surface, read that host's visualization instructions, export `inline` into a permitted durable path, preview it, and send the host-supported reference. The Codex visualization reference is host-specific and is not a general MCP protocol. For other hosts, return the HTML artifact or use the available browser preview. Never claim a terminal can render HTML inline or that generating a file installed a plugin.
+
+The MCP server is optional. It starts through the same CLI with `mcp --project PROJECT` and is deliberately bound to that one project. See [Agent usage](references/agent-usage.md) for explicit per-project setup. The plugin does not silently register a global active project or change user configuration.

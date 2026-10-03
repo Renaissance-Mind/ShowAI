@@ -1,0 +1,110 @@
+.showai-custom-block {
+  position: relative;
+}
+.custom-props-trigger {
+  position: absolute;
+  right: 8px;
+  top: -13px;
+  z-index: 2;
+  width: 28px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border, #dfe6df);
+  border-radius: 6px;
+  color: var(--text-secondary, #657465);
+  background: var(--surface, #fff);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.showai-custom-block:hover > .custom-props-trigger,
+.showai-custom-block:focus-within > .custom-props-trigger {
+  opacity: 1;
+}
+.custom-props-trigger:focus-visible {
+  outline: 2px solid var(--accent, #547c63);
+  outline-offset: 3px;
+}
+.custom-props-editor {
+  padding: 14px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border, #dfe6df);
+  border-radius: 9px;
+  background: var(--surface, #fff);
+  color: var(--text, #292d29);
+  font:
+    13px/1.5 system-ui,
+    sans-serif;
+}
+.custom-props-editor > label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.custom-props-editor textarea {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  min-height: 110px;
+  max-height: 400px;
+  padding: 10px;
+  border: 1px solid var(--border, #dfe6df);
+  border-radius: 6px;
+  background: var(--bg, #fff);
+  color: inherit;
+  font:
+    12px/1.65 ui-monospace,
+    monospace;
+}
+.custom-props-editor textarea:focus {
+  outline: 2px solid var(--accent, #547c63);
+  outline-offset: 2px;
+}
+.custom-props-error {
+  color: #ae3c3c;
+  margin: 9px 0 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.custom-props-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+.custom-props-actions button {
+  padding: 5px 12px;
+  border: 1px solid var(--border, #dfe6df);
+  border-radius: 6px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.custom-props-actions button:last-child {
+  color: #fff;
+  background: var(--accent, #547c63);
+  border-color: transparent;
+}
+.custom-props-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+@media (hover: none) {
+  .custom-props-trigger {
+    opacity: 1;
+  }
+}
+@media print {
+  .custom-props-trigger,
+  .custom-props-editor {
+    display: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .custom-props-trigger {
+    transition: none;
+  }
+}

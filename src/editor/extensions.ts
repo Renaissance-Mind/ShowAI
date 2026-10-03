@@ -1,5 +1,6 @@
-import { mergeAttributes, Node } from "@tiptap/core";
+import { Extension, mergeAttributes, Node } from "@tiptap/core";
 import { ReactNodeViewRenderer } from "@tiptap/react";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Image from "@tiptap/extension-image";
@@ -9,6 +10,112 @@ import TaskItem from "@tiptap/extension-task-item";
 import Highlight from "@tiptap/extension-highlight";
 import TextAlign from "@tiptap/extension-text-align";
 import { CalloutView, ToggleView, WidgetView } from "./NodeViews";
+
+export const blockIdNodeTypes = [
+  "paragraph",
+  "heading",
+  "blockquote",
+  "bulletList",
+  "orderedList",
+  "listItem",
+  "taskList",
+  "taskItem",
+  "codeBlock",
+  "hardBreak",
+  "horizontalRule",
+  "image",
+  "table",
+  "tableRow",
+  "tableCell",
+  "tableHeader",
+  "callout",
+  "toggle",
+  "widget",
+];
+
+export const blockIdPluginKey = new PluginKey("showaiBlockIds");
+
+/** Attribute-only steps leave document positions, selection, and text untouched. */
+export function createBlockIdPlugin(isEditable: () => boolean): Plugin {
+  const types = new Set(blockIdNodeTypes);
+  return new Plugin({
+    key: blockIdPluginKey,
+    appendTransaction(transactions, _previous, current) {
+      if (
+        !isEditable() ||
+        !transactions.some(
+          (transaction) =>
+            transaction.docChanged ||
+            transaction.getMeta(blockIdPluginKey) ||
+            transaction.getMeta("editableChanged"),
+        )
+      )
+        return null;
+      const used = new Set<string>();
+      const transaction = current.tr;
+      current.doc.descendants((node, position) => {
+        if (!types.has(node.type.name)) return;
+        const existing = node.attrs.id;
+        if (
+          typeof existing === "string" &&
+          existing.trim() &&
+          !used.has(existing)
+        ) {
+          used.add(existing);
+          return;
+        }
+        let id: string;
+        do {
+          id = globalThis.crypto.randomUUID();
+        } while (used.has(id));
+        used.add(id);
+        transaction.setNodeAttribute(position, "id", id);
+      });
+      if (!transaction.docChanged) return null;
+      return transaction
+        .setMeta(blockIdPluginKey, true)
+        .setMeta("addToHistory", false);
+    },
+  });
+}
+
+export const StableBlockIds = Extension.create<{ readOnly: boolean }>({
+  name: "showaiStableBlockIds",
+  addOptions: () => ({ readOnly: false }),
+  addGlobalAttributes() {
+    return [
+      {
+        types: blockIdNodeTypes,
+        attributes: {
+          id: {
+            default: null,
+            parseHTML: (element) => element.getAttribute("data-block-id"),
+            renderHTML: (attributes) =>
+              typeof attributes.id === "string" && attributes.id.trim()
+                ? { "data-block-id": attributes.id }
+                : {},
+          },
+        },
+      },
+    ];
+  },
+  addProseMirrorPlugins() {
+    return [
+      createBlockIdPlugin(
+        () => !this.options.readOnly && this.editor.isEditable,
+      ),
+    ];
+  },
+  onCreate() {
+    if (!this.options.readOnly && this.editor.isEditable) {
+      this.editor.view.dispatch(
+        this.editor.state.tr
+          .setMeta(blockIdPluginKey, true)
+          .setMeta("addToHistory", false),
+      );
+    }
+  },
+});
 
 export const WidgetNode = Node.create({
   name: "widget",
@@ -82,6 +189,7 @@ export function createExtensions(
   options: { readOnly?: boolean; placeholder?: string } = {},
 ) {
   return [
+    StableBlockIds.configure({ readOnly: options.readOnly ?? false }),
     StarterKit.configure({
       heading: { levels: [1, 2, 3] },
       link: {
