@@ -83,7 +83,16 @@ HTML 与 inline 导出同时保存 `.showai.json` 源文件；独立页面的菜
 
 `npm run build` 生成 `plugins/showai/`，其中包含技能、CLI、阅读器、组件编译器和使用说明。插件使用与桌面工作台相同的项目文件。
 
-Codex：本仓库的 `.agents/plugins/marketplace.json` 提供本地插件目录。在此仓库对应的 Codex 项目中打开 Plugins 面板，安装 ShowAI，再开始新会话。若使用复制出来的插件目录，按 [插件说明](plugins/showai/README.md) 注册到个人 marketplace。
+Codex：在仓库中运行安装命令，之后每次修改代码再运行更新命令：
+
+```sh
+npm run plugin:install
+npm run plugin:update
+```
+
+两条命令都会构建阅读器、CLI 和插件包，通过官方 `codex plugin marketplace add` / `codex plugin add` 安装或刷新当前本地来源，并逐文件比对安装副本与构建结果，确认插件已启用。无需重建桌面安装包，也不会自动拉取 Git、修改其他插件来源或重启 Codex。需要 Node.js 22.12+ 和支持 `codex plugin add` 的 Codex CLI。
+
+更新结果保存在 `artifacts/codex-plugin-install.json`，包含实际安装路径和文件哈希。完成后新开 Codex 会话加载技能；本地更新可以保持同一开发版本号，是否成功以安装副本校验为准。如果同名 marketplace 指向其他目录，或缓存校验失败，命令会明确报错，保留现有插件供检查。详见 [插件说明](plugins/showai/README.md)。
 
 Claude Code：在 ShowAI 仓库中执行：
 

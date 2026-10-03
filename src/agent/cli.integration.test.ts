@@ -425,6 +425,29 @@ test("CLI discovers built-ins and roundtrips custom component artifacts to anoth
     "--input",
     join(repository, "resources/catalog/value-slider"),
   ]);
+  expect(component).not.toHaveProperty("html");
+  expect(component).not.toHaveProperty("inline");
+  const description = await run([
+    "catalog",
+    "describe",
+    component.id,
+    "--project",
+    project.id,
+  ]);
+  expect(description).not.toHaveProperty("html");
+  expect(description).not.toHaveProperty("inline");
+  const listed = await run([
+    "catalog",
+    "list",
+    "--kind",
+    "component",
+    "--project",
+    project.id,
+  ]);
+  for (const metadata of listed) {
+    expect(metadata).not.toHaveProperty("html");
+    expect(metadata).not.toHaveProperty("inline");
+  }
   const page = await run([
     "pages",
     "create",

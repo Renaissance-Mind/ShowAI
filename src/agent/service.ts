@@ -22,6 +22,17 @@ import {
   saveTemplate,
 } from "../core/catalog";
 
+function withoutComponentRuntime<T extends object>(
+  component: T,
+): Omit<T, "html" | "inline"> {
+  const {
+    html: _html,
+    inline: _inline,
+    ...metadata
+  } = component as T & { html?: unknown; inline?: unknown };
+  return metadata;
+}
+
 /** CLI, MCP and the desktop bridge use the same filesystem operations. */
 export class AgentService {
   readonly store: FileStore;
@@ -92,7 +103,7 @@ export class AgentService {
       input.kind === "template"
         ? []
         : (await listComponents(this.store.root, projectId)).map((item) => ({
-            ...item,
+            ...withoutComponentRuntime(item),
             catalogKind: "component",
           }));
     const templates =
@@ -122,22 +133,22 @@ export class AgentService {
       return getTemplate(this.store.root, id, projectId);
     if (listBuiltinComponents().some((item) => item.kind === id))
       return { ...describeBuiltinComponent(id), id, scope: "builtin" };
-    const { html: _html, ...component } = await getComponent(
+    const component = await getComponent(
       this.store.root,
       id,
       input.version,
       projectId,
     );
-    return component;
+    return withoutComponentRuntime(component);
   }
 
   async importComponent(directory: string, projectId?: string) {
-    const { html: _html, ...component } = await importComponent(
+    const component = await importComponent(
       this.store.root,
       directory,
       this.catalogProject(projectId),
     );
-    return component;
+    return withoutComponentRuntime(component);
   }
 
   async applyTemplate(projectId: string, templateId: string, title?: string) {

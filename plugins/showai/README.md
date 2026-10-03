@@ -4,34 +4,31 @@ This plugin gives Codex and Claude Code a shared workflow for creating, revising
 
 Build it from the repository with `npm run build`. The generated `assets/build.json` records its version and compiler platform. Node.js 22.12 or later is required. A plugin archive built on one OS/architecture carries that compiler; build on the target platform for component imports there.
 
-For Codex, this repository exposes `.agents/plugins/marketplace.json`. Open the local marketplace in the Plugins panel and install ShowAI, then start a new conversation. A portable plugin root is `plugins/showai`.
+## Install and update in Codex
 
-For a copied build outside this repository, first place the plugin in a stable directory such as `~/.codex/plugins/showai`. For example, from a built source repository:
+From the source repository, run:
 
 ```sh
-mkdir -p "$HOME/.codex/plugins/showai"
-cp -R plugins/showai/. "$HOME/.codex/plugins/showai/"
+npm run plugin:install
 ```
 
-A macOS desktop installation carries the same plugin at `/Applications/ShowAI.app/Contents/Resources/plugin`; copy that directory's contents instead when using the installed application.
+After changing the source or skill, refresh the installed plugin with:
 
-If `~/.agents/plugins/marketplace.json` does not exist, create it with this content. If it already exists, add only the ShowAI entry to its existing `plugins` array and keep the existing marketplace name and other entries:
-
-```json
-{
-  "name": "showai-local",
-  "plugins": [
-    {
-      "name": "showai",
-      "source": { "source": "local", "path": "./.codex/plugins/showai" },
-      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
-      "category": "Productivity"
-    }
-  ]
-}
+```sh
+npm run plugin:update
 ```
 
-Restart the Codex desktop application, find ShowAI in that local marketplace, install it, and start a new conversation. The source path is relative to the personal marketplace root (your home directory), not to `.agents/plugins/`.
+Both commands build the portable reader, Agent CLI and plugin package, then use the official Codex CLI to add this repository as a local marketplace and install or refresh `showai@renaissance-mind`. They do not build the desktop installer, pull Git changes, restart Codex, edit configuration text or automatically uninstall anything.
+
+The helper reads `installedPath` from Codex's installation response, recursively compares source and installed file hashes (including executable status), and checks that Codex reports the plugin as enabled. The receipt is written to `artifacts/codex-plugin-install.json` in the repository. Start a new conversation after a successful update so the latest skill is loaded. Local development updates can keep the same plugin version because the installed bytes are verified.
+
+A current Codex CLI with `codex plugin marketplace add` and `codex plugin add` is required. If the marketplace name is already assigned to a different source, the helper refuses to replace it. If installed bytes differ, it reports the mismatch and suggests the official remove/add commands for an explicit reinstall; it never deletes the installed plugin on its own.
+
+The stable development source is this repository's `plugins/showai/` directory. Codex uses an installed cache copy, so editing the source without running the update command is not proof that a new conversation will use those files. Keep the repository at its registered location or deliberately register its new location.
+
+For an extracted release bundle, place this plugin directory under `plugins/showai` inside a local marketplace root with a `.agents/plugins/marketplace.json` entry pointing to `./plugins/showai`. Register that root with `codex plugin marketplace add /absolute/path/to/marketplace`, then install with `codex plugin add showai@MARKETPLACE_NAME`. Replace the bundle and repeat the official add command to refresh it. Source-repository users should prefer the verified npm commands above.
+
+## Claude Code
 
 For Claude Code, the repository also exposes `.claude-plugin/marketplace.json`. From the repository's parent directory:
 

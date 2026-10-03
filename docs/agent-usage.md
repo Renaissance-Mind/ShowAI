@@ -20,7 +20,7 @@ When the desktop application uses a non-default content directory, also pass `--
 
 ## Plugin installation
 
-The source repository includes Codex and Claude Code marketplace manifests. Build first with `npm run build`. Install ShowAI from the Codex Plugins panel while working in this repository, or register the copied plugin in a personal marketplace as described in [the plugin README](../plugins/showai/README.md).
+The source repository includes Codex and Claude Code marketplace manifests. For Codex, run `npm run plugin:install` once and `npm run plugin:update` after changes. Both build only the reader, CLI and plugin, use the official Codex installation commands, compare the installed bundle byte-for-byte and confirm it is enabled. The receipt is saved to `artifacts/codex-plugin-install.json`; start a new conversation after success. See [the plugin README](../plugins/showai/README.md) for details and extracted release bundles. For Claude Code, build first with `npm run build`.
 
 From the repository root, Claude Code supports:
 
