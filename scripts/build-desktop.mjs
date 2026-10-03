@@ -1,3 +1,4 @@
+import { rawSourcePlugin } from "./raw-source-plugin.mjs";
 import { build } from "esbuild";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve, join } from "node:path";
@@ -23,6 +24,7 @@ await build({
   bundle: true,
   external: ["electron"],
   plugins: [
+    rawSourcePlugin,
     {
       name: "desktop-compiler-runtime",
       setup(builder) {

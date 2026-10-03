@@ -48,7 +48,7 @@ describe("interactive block data", () => {
             readOnly: true,
           }),
         ),
-      ).toContain("sb-block");
+      ).toMatch(/sb-block|sb-primitive/);
       first.title = "Changed title";
       expect(createBlockData(block.kind)).toEqual(second);
     }

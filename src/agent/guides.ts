@@ -118,6 +118,9 @@ const guides: Record<
       "Scopes are builtin, global, published and project. Shared scopes are immutable; author changes in an explicitly selected project.",
       "describe defaults to summary. Component summaries contain purpose, scenarios and effects; template summaries contain scenarios. No schema, default data, page body or code is included.",
       "Views: guide for usage, schema for props, examples for presets, dependencies for exact references, source for original code/template definition, full for all descriptive metadata. full still excludes source and executable runtimes.",
+      "All canvas content is available as components: text, image, table, callout, toggle, divider, code and the interactive components. Insert builtin widgets with kind and data; request schema/examples before authoring. Text supports Markdown or plain content and appearance props.",
+      "Builtins expose an editable starting source. Read --view source, choose a new manifest id/version, then save it in the selected project.",
+      "Compose in code with named imports from showai:components (Text, Image, Table, Callout, Toggle, Divider, Code, Chart, Database, Metrics, Playground, Gallery, Bookmark). Import custom children from showai:component/ID after declaring their exact refs in manifest.dependencies. Pass data, readOnly and onChange to each child. Compiled parents contain their children; promotion/publication copies the source dependency closure.",
       "Component source shows the entry file and a file index. Add --file PATH for a particular file or --file '*' for the complete original package.",
     ],
     commands: [

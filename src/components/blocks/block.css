@@ -1588,3 +1588,30 @@
     opacity: 1;
   }
 }
+
+.sb-primitive { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.sb-rich-text { line-height: 1.75; }
+.sb-rich-text > :first-child { margin-top: 0; }
+.sb-rich-text > :last-child { margin-bottom: 0; }
+.sb-rich-text h1, .sb-rich-text h2, .sb-rich-text h3 { line-height: 1.35; letter-spacing: -.02em; }
+.sb-rich-text blockquote { margin: 20px 0; padding: 8px 18px; border-left: 3px solid #62836b; background: #edf3ee; }
+.sb-rich-text pre { padding: 14px; overflow: auto; background: #f1f3ef; border-radius: 5px; }
+.sb-rich-text img, .sb-image img { display: block; max-width: 100%; }
+.sb-image figcaption { font-size: 12px; color: #73796f; text-align: center; padding-top: 9px; }
+.sb-image-empty { padding: 55px 15px; background: #f1f3ef; text-align: center; color: #73796f; }
+.sb-primitive-editor { margin-top: 14px; font-size: 12px; color: #73796f; }
+.sb-primitive-editor summary { cursor: pointer; }
+.sb-primitive-editor textarea, .sb-primitive-editor input { display: block; width: 100%; padding: 8px; border: 1px solid #dce1d7; border-radius: 5px; background: white; font: inherit; color: #292d29; }
+.sb-primitive-editor textarea { min-height: 130px; margin-top: 8px; }
+.sb-primitive-editor label { display: block; margin-top: 8px; }
+.sb-table-scroll { overflow-x: auto; }
+.sb-table table, .sb-rich-text table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.sb-table th, .sb-table td, .sb-rich-text th, .sb-rich-text td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #dce1d7; }
+.sb-table th, .sb-rich-text th { background: #f1f3ef; font-weight: 600; }
+.sb-table input { width: 100%; min-width: 70px; color: inherit; background: transparent; border: 0; font: inherit; }
+.sb-table-actions { display: flex; gap: 12px; margin-top: 10px; font-size: 12px; }
+.sb-toggle > summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
+.sb-toggle > .sb-text { padding: 8px 0 8px 20px; }
+.sb-callout > strong { display: block; margin-bottom: 7px; }
+.sb-code pre { margin: 0; padding: 16px; overflow-x: auto; background: #f1f3ef; border-radius: 5px; font: 13px/1.65 ui-monospace, monospace; }
+.sb-code textarea { width: 100%; margin-top: 10px; min-height: 130px; font: 13px/1.65 ui-monospace, monospace; }

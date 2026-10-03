@@ -21,6 +21,9 @@ import {
   listBuiltinComponents,
   listTemplates,
   readComponentSource,
+  readBuiltinComponentSource,
+  resolvePackageBundle,
+  validatePackageBundle,
   resolveDocumentComponents,
   saveComponent,
   saveTemplate,
@@ -168,6 +171,13 @@ describe("compiled React packages", () => {
   it("describes all built-in blocks for agents without importing browser renderers", () => {
     const builtins = listBuiltinComponents();
     expect(builtins.map((item) => item.kind)).toEqual([
+      "text",
+      "image",
+      "table",
+      "callout",
+      "toggle",
+      "divider",
+      "code",
       "chart",
       "database",
       "metrics",
@@ -481,4 +491,135 @@ describe("compiled React packages", () => {
     );
     expect(next.html).toContain("data:image/png;base64,");
   });
+});
+
+describe("component composition and editable primitives", () => {
+  it("compiles every builtin starting source through the shared SDK", async () => {
+    const home = await temporary();
+    for (const item of listBuiltinComponents()) {
+      const original = readBuiltinComponentSource(item.kind);
+      const compiled = await saveComponent(
+        home,
+        {
+          ...original,
+          manifest: { ...original.manifest, id: `my-${item.kind}` },
+        },
+        project(home),
+      );
+      expect(compiled.html).toContain("Content-Security-Policy");
+      expect(compiled.inline?.script).toBeTruthy();
+      if (item.kind === "text")
+        expect(compiled.inline!.script.length).toBeLessThan(80000);
+      expect(compiled.defaultData).toEqual(item.defaultData);
+    }
+  }, 30000);
+
+  it("bundles nested exact revisions, preserves closure and validates every dependency", async () => {
+    const home = await temporary();
+    const child = await saveComponent(
+      home,
+      { manifest, schema, source },
+      project(home),
+    );
+    const wrapper = {
+      ...manifest,
+      id: "counter-panel",
+      dependencies: [packageRevisionRef("component", child)],
+    };
+    const parent = await saveComponent(
+      home,
+      {
+        manifest: wrapper,
+        schema,
+        source:
+          'import Counter from "showai:component/local-counter";import {Text} from "showai:components";export default function Panel(props){return <section><Text data={{content:"## Nested counter"}} readOnly/><Counter {...props}/></section>}',
+      },
+      project(home),
+    );
+    const grandparent = await saveComponent(
+      home,
+      {
+        manifest: {
+          ...manifest,
+          id: "counter-report",
+          dependencies: [packageRevisionRef("component", parent)],
+        },
+        schema,
+        source:
+          'import Panel from "showai:component/counter-panel";export default function Report(props){return <Panel {...props}/>}',
+      },
+      project(home),
+    );
+    const bundle = await resolvePackageBundle(
+      home,
+      packageRevisionRef("component", grandparent),
+      project(home),
+    );
+    expect(bundle.components.map((entry) => entry.component.id)).toEqual([
+      child.id,
+      parent.id,
+      grandparent.id,
+    ]);
+    expect(() =>
+      validatePackageBundle({
+        ...bundle,
+        components: bundle.components.slice(1),
+      }),
+    ).toThrow("Missing exact");
+    await promotePackage(home, packageRevisionRef("component", grandparent), {
+      projectId: project(home),
+      target: "global",
+    });
+    await rm(join(home, "projects", project(home)), { recursive: true });
+    const other = (
+      await new FileStore(home).createProject({ name: "Consumer" })
+    ).id;
+    const editable = await readComponentSource(
+      home,
+      grandparent.id,
+      grandparent.version,
+      other,
+      { scope: "global" },
+    );
+    const fork = await saveComponent(
+      home,
+      { ...editable, manifest: { ...editable.manifest, version: "1.0.1" } },
+      other,
+    );
+    expect(fork.dependencies?.[0].integrity).toBe(parent.integrity);
+    expect(fork.html).toContain("Nested counter");
+    await expect(
+      saveComponent(
+        home,
+        {
+          manifest: { ...manifest, id: "missing-declaration" },
+          schema,
+          source:
+            'import Child from "showai:component/local-counter";export default Child',
+        },
+        other,
+      ),
+    ).rejects.toThrow("Declare an exact");
+    await expect(
+      saveComponent(
+        home,
+        {
+          manifest: {
+            ...wrapper,
+            id: "wrong-fingerprint",
+            dependencies: [
+              {
+                ...packageRevisionRef("component", child),
+                integrity: "sha256-" + "0".repeat(64),
+              },
+            ],
+          },
+          schema,
+          source:
+            'import Child from "showai:component/local-counter";export default Child',
+        },
+        other,
+      ),
+    ).rejects.toThrow(/integrity|not found/);
+  }, 30000);
 });

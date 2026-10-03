@@ -29,6 +29,7 @@ import {
   listComponents,
   listTemplates,
   readComponentSource,
+  readBuiltinComponentSource,
   saveComponent,
   saveTemplate,
   promotePackage,
@@ -388,13 +389,7 @@ export class AgentService {
         });
     const summary = summarizeCatalog("component", component, projectId);
     const next = Object.fromEntries(
-      [
-        "guide",
-        "schema",
-        "examples",
-        "dependencies",
-        ...(builtin ? [] : ["source"]),
-      ].map((view) => [
+      ["guide", "schema", "examples", "dependencies", "source"].map((view) => [
         view,
         describeCommand(summary, projectId, view as CatalogView),
       ]),
@@ -447,28 +442,22 @@ export class AgentService {
       return {
         ...summary,
         view,
-        dependencies: [],
+        dependencies:
+          "dependencies" in component ? (component.dependencies ?? []) : [],
         parents,
         mergeBase: "mergeBase" in component ? component.mergeBase : undefined,
         next,
       };
     if (view === "source") {
-      if (builtin)
-        return {
-          ...summary,
-          view,
-          available: false,
-          reason:
-            "Built-in renderer source is maintained in the ShowAI application repository. Installed custom packages expose their original files here.",
-          next,
-        };
-      const source = await readComponentSource(
-        this.store.root,
-        id,
-        input.version,
-        projectId,
-        { scope: input.scope, integrity: input.integrity },
-      );
+      const source = builtin
+        ? readBuiltinComponentSource(id)
+        : await readComponentSource(
+            this.store.root,
+            id,
+            input.version,
+            projectId,
+            { scope: input.scope, integrity: input.integrity },
+          );
       if (input.file === "*") return { ...summary, view, source, next };
       if (input.file) {
         if (Object.hasOwn(source.files, input.file))
@@ -517,7 +506,8 @@ export class AgentService {
       schema,
       defaultData: component.defaultData,
       examples: component.examples,
-      dependencies: [],
+      dependencies:
+        "dependencies" in component ? (component.dependencies ?? []) : [],
       parents,
       mergeBase: "mergeBase" in component ? component.mergeBase : undefined,
       next,

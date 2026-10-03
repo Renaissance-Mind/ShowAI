@@ -65,7 +65,7 @@ Text marks are `bold`, `italic`, `underline`, `strike`, `code`, `highlight`, and
 }
 ```
 
-## Interactive blocks
+## Components
 
 Every interactive block uses the same wrapper:
 
@@ -85,6 +85,24 @@ Every interactive block uses the same wrapper:
 ```
 
 The built-in data shapes below are plain JSON. Optional fields are marked with `?`; the notation describes a schema and is not literal JSON.
+
+### Basic content
+
+Basic components use the same widget envelope, with these kinds and data fields:
+
+| Kind      | Data                                                                     |
+| --------- | ------------------------------------------------------------------------ |
+| `text`    | `content: string`, `format?: "markdown"                                  | "plain"` |
+| `image`   | `src: string`, `alt?`, `caption?`, `width?`, `height?`, `fit?: "contain" | "cover"` |
+| `table`   | `title?`, `columns: string[]`, `rows: (string                            | number   | boolean)[][]` |
+| `callout` | `title?`, `content: string` (Markdown)                                   |
+| `toggle`  | `summary: string`, `content: string` (Markdown), `open?: boolean`        |
+| `divider` | `color?: string`                                                         |
+| `code`    | `content: string`, `language?: string`                                   |
+
+Appearance fields include `color`, `backgroundColor`, `fontSize`, `align`, `padding`, and `radius`. Tables have 1–100 columns and up to 1,000 rectangular rows. Image URLs and Markdown images must be embedded for offline delivery. Browser export embeds image component URLs and inline/reference Markdown images. Builtins are discoverable by Agent and expose a source wrapper for creating a project variant. Existing editor-native nodes remain readable in the same artifact format.
+
+Custom components can import named builtins from `showai:components`, and exact custom children from `showai:component/ID` after declaring `manifest.dependencies`. The parent runtime bundles child implementations for offline and inline delivery. Catalog registration/publication additionally preserves the dependency source closure; see [component lifecycle](catalog-lifecycle.md).
 
 ### Chart
 

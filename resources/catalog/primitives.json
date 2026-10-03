@@ -1,0 +1,507 @@
+[
+  {
+    "kind": "text",
+    "name": "文本框",
+    "description": "支持 Markdown 与纯文本的基础文本组件，可定制颜色、字号、对齐和背景。",
+    "scenarios": [
+      "撰写标题、段落、列表、引用和代码，建立页面的文字层次。",
+      "在自定义组件中组合文本和图像，或派生自己的语法与排版。"
+    ],
+    "effects": [
+      "统一呈现 Markdown 标题、强调、引用、表格和代码。",
+      "通过组件数据调整颜色与外观；派生源码可扩展解析规则。"
+    ],
+    "version": "1.0.0",
+    "defaultData": {
+      "content": "在这里写下内容。",
+      "format": "markdown"
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "string",
+          "maxLength": 1000000
+        },
+        "format": {
+          "enum": ["markdown", "plain"]
+        },
+        "color": {
+          "type": "string"
+        },
+        "backgroundColor": {
+          "type": "string"
+        },
+        "fontSize": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 200
+        },
+        "align": {
+          "enum": ["left", "center", "right", "justify"]
+        },
+        "padding": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "radius": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        }
+      },
+      "required": ["content"],
+      "additionalProperties": false
+    },
+    "examples": [
+      {
+        "name": "研究摘要",
+        "request": "用标题、强调和引用展示一段研究说明。",
+        "data": {
+          "content": "## 让内容更容易理解\n\n用 **清晰的层次** 组织观点，把证据放在结论旁边。\n\n> 好的表达，让读者看见内容之间的关系。\n\n- 先说明核心观点\n- 再展开依据与细节",
+          "format": "markdown",
+          "color": "#30382e",
+          "padding": 20
+        }
+      },
+      {
+        "name": "纯文本便笺",
+        "data": {
+          "content": "记录一个想法。\n下一行继续补充。",
+          "format": "plain",
+          "backgroundColor": "#f0f4ed",
+          "padding": 20,
+          "radius": 8
+        }
+      }
+    ]
+  },
+  {
+    "kind": "image",
+    "name": "图像框",
+    "description": "单张图像与图注，可调整尺寸、裁切和圆角。离线页面使用内嵌图像。",
+    "scenarios": [
+      "展示示意图、设计稿或照片，并提供替代文字和图注。",
+      "在自定义组件中搭配文本，建立图文布局。"
+    ],
+    "effects": [
+      "保留图像比例或按给定尺寸裁切。",
+      "同一份数据可复用于页面、模块和组合组件。"
+    ],
+    "version": "1.0.0",
+    "defaultData": {
+      "src": "",
+      "alt": "",
+      "caption": ""
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "src": {
+          "type": "string"
+        },
+        "alt": {
+          "type": "string"
+        },
+        "caption": {
+          "type": "string"
+        },
+        "width": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "height": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "fit": {
+          "enum": ["contain", "cover"]
+        },
+        "color": {
+          "type": "string"
+        },
+        "backgroundColor": {
+          "type": "string"
+        },
+        "fontSize": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 200
+        },
+        "align": {
+          "enum": ["left", "center", "right", "justify"]
+        },
+        "padding": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "radius": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        }
+      },
+      "required": ["src"],
+      "additionalProperties": false
+    },
+    "examples": [
+      {
+        "name": "带图注的图像",
+        "request": "展示绿色棋盘格及图注。",
+        "data": {
+          "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAAAR0lEQVR4nO3PMQ0AMAwDwYAsg9Io4KpTIYSEt5z0s3WudXak92+kAgICAgICAgICAgICGgZKDaWOAQEBAQEBAQEBAQEBDQM1LGPPgJHxHtwAAAAASUVORK5CYII=",
+          "alt": "绿色棋盘格",
+          "caption": "图像、替代文字与图注保存在同一个组件中。",
+          "width": 220,
+          "height": 160,
+          "fit": "cover",
+          "radius": 8
+        }
+      }
+    ]
+  },
+  {
+    "kind": "table",
+    "name": "基础表格",
+    "description": "轻量的二维表格，支持文字、数字和布尔值，可直接编辑表头和单元格。",
+    "scenarios": [
+      "展示小规模对照、术语解释或计算结果。",
+      "在组合组件中嵌入简单结构化内容。"
+    ],
+    "effects": [
+      "以统一表头和行间距呈现二维数据。",
+      "编辑页面时可修改单元格与增减行；阅读时保持完整表格。"
+    ],
+    "version": "1.0.0",
+    "defaultData": {
+      "title": "",
+      "columns": ["名称", "说明"],
+      "rows": [["", ""]]
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+            "type": "string"
+          }
+        },
+        "rows": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": ["string", "number", "boolean"]
+            }
+          }
+        },
+        "color": {
+          "type": "string"
+        },
+        "backgroundColor": {
+          "type": "string"
+        },
+        "fontSize": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 200
+        },
+        "align": {
+          "enum": ["left", "center", "right", "justify"]
+        },
+        "padding": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "radius": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        }
+      },
+      "required": ["columns", "rows"],
+      "additionalProperties": false
+    },
+    "examples": [
+      {
+        "name": "基础内容对照",
+        "request": "对照文本、图像和表格各自表达的内容。",
+        "data": {
+          "title": "选择合适的表达方式",
+          "columns": ["组件", "内容"],
+          "rows": [
+            ["文本框", "观点与解释"],
+            ["图像框", "视觉材料"],
+            ["基础表格", "二维对照"]
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "kind": "callout",
+    "name": "提示框",
+    "description": "带标题和 Markdown 正文的提示、引用或说明。",
+    "scenarios": [
+      "组织页面中的说明、补充内容和结构。",
+      "在自定义组件中组合内容，并保存可复用的外观。"
+    ],
+    "effects": [
+      "带标题和 Markdown 正文的提示、引用或说明。",
+      "使用组件数据和源码扩展自己的呈现方式。"
+    ],
+    "version": "1.0.0",
+    "defaultData": {
+      "title": "提示",
+      "content": "补充一条说明。"
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "color": {
+          "type": "string"
+        },
+        "backgroundColor": {
+          "type": "string"
+        },
+        "fontSize": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 200
+        },
+        "align": {
+          "enum": ["left", "center", "right", "justify"]
+        },
+        "padding": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "radius": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        }
+      },
+      "required": ["content"],
+      "additionalProperties": false
+    },
+    "examples": [
+      {
+        "name": "提示框示例",
+        "data": {
+          "title": "阅读提示",
+          "content": "先看 **主要结论**，再检查每项证据。"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "toggle",
+    "name": "折叠内容",
+    "description": "按需展开补充信息，正文支持 Markdown。",
+    "scenarios": [
+      "组织页面中的说明、补充内容和结构。",
+      "在自定义组件中组合内容，并保存可复用的外观。"
+    ],
+    "effects": [
+      "按需展开补充信息，正文支持 Markdown。",
+      "使用组件数据和源码扩展自己的呈现方式。"
+    ],
+    "version": "1.0.0",
+    "defaultData": {
+      "summary": "展开内容",
+      "content": "这里是补充说明。",
+      "open": false
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "open": {
+          "type": "boolean"
+        },
+        "color": {
+          "type": "string"
+        },
+        "backgroundColor": {
+          "type": "string"
+        },
+        "fontSize": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 200
+        },
+        "align": {
+          "enum": ["left", "center", "right", "justify"]
+        },
+        "padding": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "radius": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        }
+      },
+      "required": ["summary", "content"],
+      "additionalProperties": false
+    },
+    "examples": [
+      {
+        "name": "折叠内容示例",
+        "data": {
+          "summary": "查看计算过程",
+          "content": "面积 = 长 × 宽\n\n3 × 4 = **12 m²**",
+          "open": true
+        }
+      }
+    ]
+  },
+  {
+    "kind": "divider",
+    "name": "分隔线",
+    "description": "在页面内容之间建立轻量的视觉分隔。",
+    "scenarios": [
+      "组织页面中的说明、补充内容和结构。",
+      "在自定义组件中组合内容，并保存可复用的外观。"
+    ],
+    "effects": [
+      "在页面内容之间建立轻量的视觉分隔。",
+      "使用组件数据和源码扩展自己的呈现方式。"
+    ],
+    "version": "1.0.0",
+    "defaultData": {
+      "color": "#dce1d7"
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "color": {
+          "type": "string"
+        },
+        "backgroundColor": {
+          "type": "string"
+        },
+        "fontSize": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 200
+        },
+        "align": {
+          "enum": ["left", "center", "right", "justify"]
+        },
+        "padding": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "radius": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "examples": [
+      {
+        "name": "分隔线示例",
+        "data": {
+          "color": "#62836b"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "code",
+    "name": "代码块",
+    "description": "保留缩进与换行的代码片段，可声明语言并自定义外观。",
+    "scenarios": [
+      "组织页面中的说明、补充内容和结构。",
+      "在自定义组件中组合内容，并保存可复用的外观。"
+    ],
+    "effects": [
+      "保留缩进与换行的代码片段，可声明语言并自定义外观。",
+      "使用组件数据和源码扩展自己的呈现方式。"
+    ],
+    "version": "1.0.0",
+    "defaultData": {
+      "content": "",
+      "language": ""
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        },
+        "color": {
+          "type": "string"
+        },
+        "backgroundColor": {
+          "type": "string"
+        },
+        "fontSize": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 200
+        },
+        "align": {
+          "enum": ["left", "center", "right", "justify"]
+        },
+        "padding": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "radius": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        }
+      },
+      "required": ["content"],
+      "additionalProperties": false
+    },
+    "examples": [
+      {
+        "name": "代码块示例",
+        "data": {
+          "content": "const area = width * height;",
+          "language": "javascript"
+        }
+      }
+    ]
+  }
+]

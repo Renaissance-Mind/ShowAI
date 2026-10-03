@@ -75,7 +75,7 @@ async function copyRuntimePackage(name) {
   for (const dependency of Object.keys(metadata.dependencies ?? {}))
     await copyRuntimePackage(dependency);
 }
-for (const name of ["esbuild", "react", "react-dom", "scheduler", "ajv"])
+for (const name of ["esbuild", "react", "react-dom", "scheduler", "ajv", "marked", "lucide-react"])
   await copyRuntimePackage(name);
 const binaryPackages = await readdir(join(root, "node_modules/@esbuild"));
 for (const name of binaryPackages)

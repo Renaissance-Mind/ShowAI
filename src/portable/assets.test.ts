@@ -35,7 +35,7 @@ afterAll(
 );
 
 describe("self-contained image export", () => {
-  it("embeds images in text, gallery, and bookmark and reuses one download", async () => {
+  it("embeds images in native text, image components, gallery, and bookmark and reuses one download", async () => {
     const src = `${origin}/image.png`;
     const document = validateDocument({
       id: "images",
@@ -44,6 +44,19 @@ describe("self-contained image export", () => {
         type: "doc",
         content: [
           { type: "image", attrs: { src } },
+          {
+            type: "widget",
+            attrs: { kind: "image", data: { src, alt: "Primitive image" } },
+          },
+          {
+            type: "widget",
+            attrs: {
+              kind: "text",
+              data: {
+                content: `![Inline](${src})\n\n![Reference][figure]\n\n[figure]: ${src}\n\n[Keep this link](${src})`,
+              },
+            },
+          },
           {
             type: "widget",
             attrs: {
@@ -72,6 +85,16 @@ describe("self-contained image export", () => {
     expect(result.content.content?.[0].attrs?.src).toBe(
       `data:image/png;base64,${png.toString("base64")}`,
     );
+    const text = result.content.content?.find(
+      (node) => node.attrs?.kind === "text",
+    );
+    expect(text?.attrs?.data.content).toContain(
+      "![Inline](<data:image/png;base64,",
+    );
+    expect(text?.attrs?.data.content).toContain(
+      "![Reference](<data:image/png;base64,",
+    );
+    expect(text?.attrs?.data.content).toContain(`[Keep this link](${src})`);
     expect(document.content.content?.[0].attrs?.src).toBe(src);
   });
 

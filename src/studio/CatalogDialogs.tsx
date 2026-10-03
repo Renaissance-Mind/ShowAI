@@ -3,6 +3,10 @@ import {
   ArrowDown,
   ArrowUp,
   Globe2,
+  BookOpen,
+  Monitor,
+  Sparkles,
+  Layers,
   Loader2,
   Plus,
   Trash2,
@@ -23,12 +27,33 @@ import type {
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import { componentWidgetData } from "../components/custom/contract";
 import { Widget } from "../components/blocks/Widget";
-import { createBlockData } from "../components/blocks/registry";
 import DocumentEditor from "../editor/DocumentEditor";
 import { newDocument } from "../lib/document";
 import { desktop, errorMessage } from "./bridge";
 import Dialog from "./Dialog";
 import "./catalog.css";
+
+function ReferenceSection({
+  title,
+  icon,
+  children,
+}: {
+  title: string;
+  icon: "usage" | "effect" | "content";
+  children: React.ReactNode;
+}) {
+  const Icon =
+    icon === "usage" ? BookOpen : icon === "effect" ? Sparkles : Layers;
+  return (
+    <section className="catalog-reference-section">
+      <h3>
+        <Icon size={17} />
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
 
 export type LoadedTemplate = TemplateRecord & {
   components?: CompiledComponent[];
@@ -259,6 +284,7 @@ export function TemplateDialog({
   const [selectedPart, setSelectedPart] = useState("");
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const [templateExample, setTemplateExample] = useState(0);
   const [editingPart, setEditingPart] = useState(0);
   const localParts = parts
     .map((part, index) => ({ part, index }))
@@ -316,13 +342,13 @@ export function TemplateDialog({
             className={tab === "about" ? "active" : ""}
             onClick={() => setTab("about")}
           >
-            使用说明
+            概览
           </button>
           <button
             className={tab === "layout" ? "active" : ""}
             onClick={() => setTab("layout")}
           >
-            页面布局
+            编辑布局
           </button>
           <button
             className={tab === "edit" ? "active" : ""}
@@ -338,41 +364,98 @@ export function TemplateDialog({
           </button>
         </div>
         {tab === "about" && (
-          <div className="catalog-documentation">
-            <p>{record.description}</p>
-            <h3>使用场景</h3>
-            <Bullets items={record.scenarios ?? []} />
-            <h3>内容处理方式</h3>
-            {(record.contentGuide ?? []).map((section, index) => (
-              <section key={index}>
-                <h4>{section.title}</h4>
-                <Bullets items={section.instructions} />
-              </section>
-            ))}
-            <h3>相关模板与组件</h3>
-            <RelatedList items={record.related ?? []} />
-            <h3>示例</h3>
-            {record.examples?.map((example, index) => (
-              <details className="catalog-example" key={index}>
-                <summary>{example.name}</summary>
-                <p>{example.request}</p>
-                <ol>
-                  {example.steps.map((step, i) => (
-                    <li key={i}>
-                      <code>
-                        {step.id}
-                        {step.version ? `@${step.version}` : ""}
-                      </code>{" "}
-                      — {step.purpose}
-                    </li>
+          <>
+            <div className="catalog-reference-intro">
+              <span>页面模板 · {record.version}</span>
+              <p>{record.description}</p>
+            </div>
+            <div className="catalog-overview">
+              <aside className="catalog-documentation">
+                <ReferenceSection title="使用场景" icon="usage">
+                  <Bullets items={record.scenarios ?? []} />
+                </ReferenceSection>
+                <ReferenceSection title="内容处理方式" icon="content">
+                  {(record.contentGuide ?? []).map((section, index) => (
+                    <div key={index}>
+                      <h4>{section.title}</h4>
+                      <Bullets items={section.instructions} />
+                    </div>
                   ))}
-                </ol>
-              </details>
-            ))}
-            {!record.examples?.length && (
-              <p className="studio-caption">尚未添加示例。</p>
-            )}
-          </div>
+                </ReferenceSection>
+                {!!record.related?.length && (
+                  <ReferenceSection title="相关模板与组件" icon="content">
+                    <RelatedList items={record.related} />
+                  </ReferenceSection>
+                )}
+              </aside>
+              <section
+                className="catalog-live-example"
+                aria-label="模板示例预览"
+              >
+                <header>
+                  <h3>
+                    <Monitor size={17} />
+                    页面预览
+                  </h3>
+                  <button
+                    className="studio-text-button"
+                    onClick={() => setTab("layout")}
+                  >
+                    编辑布局 ↗
+                  </button>
+                </header>
+                {!!record.examples?.length && (
+                  <label className="studio-example-picker">
+                    示例
+                    <select
+                      aria-label="模板示例"
+                      value={templateExample}
+                      onChange={(event) =>
+                        setTemplateExample(Number(event.target.value))
+                      }
+                    >
+                      {record.examples.map((example, index) => (
+                        <option key={index} value={index}>
+                          {example.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {record.examples?.[templateExample] && (
+                  <p className="catalog-example-request">
+                    {record.examples[templateExample].request}
+                  </p>
+                )}
+                <div className="catalog-preview-stage catalog-template-preview">
+                  <div className="catalog-template-paper">
+                    <CustomComponentsProvider components={components}>
+                      <DocumentEditor
+                        content={
+                          (record.previewDocument ?? record.document).content
+                        }
+                        onChange={() => {}}
+                        readOnly
+                        minimal
+                      />
+                    </CustomComponentsProvider>
+                  </div>
+                </div>
+                {!!record.examples?.[templateExample]?.steps.length && (
+                  <details className="catalog-example-data">
+                    <summary>示例用法</summary>
+                    <ol>
+                      {record.examples[templateExample].steps.map((step, i) => (
+                        <li key={i}>
+                          <strong>{step.id}</strong> · {step.purpose}
+                        </li>
+                      ))}
+                    </ol>
+                  </details>
+                )}
+              </section>
+            </div>
+          </>
         )}
         {tab === "layout" && (
           <>
@@ -839,9 +922,7 @@ export function ComponentDialog({
   onPublish: (ref: PackageRevisionRef) => void;
 }) {
   const item = builtin ?? custom!;
-  const [tab, setTab] = useState<"about" | "preview" | "code" | "schema">(
-    "about",
-  );
+  const [tab, setTab] = useState<"about" | "code" | "schema">("about");
   const [code, setCode] = useState(source?.source ?? ""),
     [schema, setSchema] = useState(
       JSON.stringify(
@@ -861,7 +942,10 @@ export function ComponentDialog({
     [scenarios, setScenarios] = useState(item.scenarios.join("\n")),
     [effects, setEffects] = useState((item.effects ?? []).join("\n"));
   const [version, setVersion] = useState(
-    nextVersion(custom?.version ?? "0.0.0"),
+    custom ? nextVersion(custom.version) : "1.0.0",
+  );
+  const [componentId, setComponentId] = useState(
+    custom?.id ?? `my-${builtin?.kind}`,
   );
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -876,13 +960,14 @@ export function ComponentDialog({
       .finally(() => setBusy(false));
   };
   async function save() {
-    if (!projectId || !source || !custom)
+    if (!projectId || !source)
       throw new Error("选择项目并提供组件源码后才能保存定制版本。");
     const { mergeBase: _previousMerge, ...baseManifest } = source.manifest;
     const saved = await desktop.invoke<CompiledComponent>("components:save", {
       projectId,
       manifest: {
         ...baseManifest,
+        id: componentId,
         name,
         description,
         version,
@@ -890,7 +975,9 @@ export function ComponentDialog({
         effects: lines(effects),
         defaultData: JSON.parse(defaults),
         examples: JSON.parse(examplesJson),
-        parents: [revision("component", custom, projectId)],
+        ...(custom
+          ? { parents: [revision("component", custom, projectId)] }
+          : {}),
       },
       schema: JSON.parse(schema),
       source: code,
@@ -908,13 +995,7 @@ export function ComponentDialog({
             className={tab === "about" ? "active" : ""}
             onClick={() => setTab("about")}
           >
-            使用说明
-          </button>
-          <button
-            className={tab === "preview" ? "active" : ""}
-            onClick={() => setTab("preview")}
-          >
-            示例预览
+            概览
           </button>
           {source && (
             <button
@@ -932,70 +1013,102 @@ export function ComponentDialog({
           </button>
         </div>
         {tab === "about" && (
-          <div className="catalog-documentation">
-            <p>{item.description}</p>
-            <h3>使用场景</h3>
-            <Bullets items={item.scenarios} />
-            <h3>可视化效果</h3>
-            <Bullets items={item.effects ?? []} />
-            <h3>示例</h3>
-            {examples.map((value, index) => (
-              <button
-                className="catalog-example-link"
-                key={index}
-                onClick={() => {
-                  setExample(index);
-                  setTab("preview");
-                }}
-              >
-                <strong>{value.name}</strong>
-                <span>
-                  {value.request ??
-                    value.description ??
-                    "查看输入数据与交互效果"}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-        {tab === "preview" && (
           <>
-            {examples.length > 0 && (
-              <label className="studio-example-picker">
-                示例
-                <select
-                  aria-label="组件示例"
-                  value={example}
-                  onChange={(event) => setExample(Number(event.target.value))}
-                >
-                  {examples.map((value, index) => (
-                    <option key={index} value={index}>
-                      {value.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {examples[example]?.request && (
-              <p className="studio-caption">{examples[example].request}</p>
-            )}
-            <div className="studio-component-preview">
-              {builtin ? (
-                <Widget kind={builtin.kind} data={data} readOnly />
-              ) : (
-                <CustomComponentsProvider components={[custom!]}>
-                  <Widget
-                    kind="custom"
-                    data={componentWidgetData(custom!, data)}
-                    readOnly
-                  />
-                </CustomComponentsProvider>
-              )}
+            <div className="catalog-reference-intro">
+              <span>
+                {builtin ? "内置组件" : "自定义组件"} ·{" "}
+                {item.version ?? "1.0.0"}
+              </span>
+              <p>{item.description}</p>
+            </div>
+            <div className="catalog-overview">
+              <aside className="catalog-documentation">
+                <ReferenceSection title="使用场景" icon="usage">
+                  <Bullets items={item.scenarios} />
+                </ReferenceSection>
+                <ReferenceSection title="可视化效果" icon="effect">
+                  <Bullets items={item.effects ?? []} />
+                </ReferenceSection>
+                {source && (
+                  <ReferenceSection title="定制起点" icon="content">
+                    <p>从这份组件源码保存自己的版本，调整内容、外观与交互。</p>
+                    <button
+                      className="studio-text-button"
+                      onClick={() => setTab("code")}
+                    >
+                      打开源码 <span aria-hidden="true">↗</span>
+                    </button>
+                  </ReferenceSection>
+                )}
+              </aside>
+              <section
+                className="catalog-live-example"
+                aria-label="组件示例预览"
+              >
+                <header>
+                  <h3>
+                    <Monitor size={17} />
+                    实时示例
+                  </h3>
+                  <span>可直接体验</span>
+                </header>
+                {examples.length > 0 && (
+                  <label className="studio-example-picker">
+                    示例
+                    <select
+                      aria-label="组件示例"
+                      value={example}
+                      onChange={(event) =>
+                        setExample(Number(event.target.value))
+                      }
+                    >
+                      {examples.map((value, index) => (
+                        <option key={index} value={index}>
+                          {value.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {(examples[example]?.request ||
+                  examples[example]?.description) && (
+                  <p className="catalog-example-request">
+                    {examples[example].request ?? examples[example].description}
+                  </p>
+                )}
+                <div className="studio-component-preview catalog-preview-stage">
+                  {builtin ? (
+                    <Widget kind={builtin.kind} data={data} readOnly />
+                  ) : (
+                    <CustomComponentsProvider components={[custom!]}>
+                      <Widget
+                        kind="custom"
+                        data={componentWidgetData(custom!, data)}
+                        readOnly
+                      />
+                    </CustomComponentsProvider>
+                  )}
+                </div>
+                <details className="catalog-example-data">
+                  <summary>示例数据</summary>
+                  <pre>{JSON.stringify(data, null, 2)}</pre>
+                </details>
+              </section>
             </div>
           </>
         )}
         {tab === "code" && source && (
           <div className="studio-form catalog-edit-form">
+            {builtin && (
+              <label>
+                组件 ID
+                <input
+                  aria-label="组件 ID"
+                  value={componentId}
+                  onChange={(event) => setComponentId(event.target.value)}
+                />
+              </label>
+            )}
             <div className="studio-form-row">
               <label>
                 名称
@@ -1096,7 +1209,7 @@ export function ComponentDialog({
           <span>
             {source
               ? projectId
-                ? "修改将保存为当前项目的新版本。"
+                ? "修改将保存到当前项目。"
                 : "选择项目后可定制。"
               : custom
                 ? "此副本只有运行代码；编辑需要原始源码。"
@@ -1152,8 +1265,8 @@ export function ComponentDialog({
                 onInsert(
                   builtin?.kind ?? "custom",
                   builtin
-                    ? createBlockData(builtin.kind)
-                    : componentWidgetData(custom!, custom!.defaultData),
+                    ? structuredClone(data)
+                    : componentWidgetData(custom!, data),
                 ),
               )
             }

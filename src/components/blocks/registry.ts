@@ -1,3 +1,14 @@
+import {
+  TextBlock,
+  ImageBlock,
+  TableBlock,
+  CalloutBlock,
+  ToggleBlock,
+  DividerBlock,
+  CodeBlock,
+  validatePrimitiveData,
+} from "./Primitives";
+import primitiveMetadata from "../../../resources/catalog/primitives.json";
 import { BookmarkBlock } from "./Bookmark";
 import { ChartBlock } from "./Chart";
 import { DatabaseBlock } from "./Database";
@@ -120,6 +131,39 @@ function objectArray(data: BlockData, key: string): Record<string, unknown>[] {
   )
     throw new Error(`${key} 必须是对象数组。`);
   return data[key];
+}
+
+for (const item of primitiveMetadata) {
+  registerBlock({
+    kind: item.kind,
+    title: item.name,
+    description: item.description,
+    icon: (
+      {
+        text: "T",
+        image: "▧",
+        table: "▦",
+        callout: "!",
+        toggle: "⌄",
+        divider: "—",
+        code: "{}",
+      } as Record<string, string>
+    )[item.kind],
+    defaultData: item.defaultData as BlockData,
+    renderer: {
+      text: TextBlock,
+      image: ImageBlock,
+      table: TableBlock,
+      callout: CalloutBlock,
+      toggle: ToggleBlock,
+      divider: DividerBlock,
+      code: CodeBlock,
+    }[
+      item.kind as
+        "text" | "image" | "table" | "callout" | "toggle" | "divider" | "code"
+    ],
+    validate: (data) => validatePrimitiveData(item.kind, data),
+  });
 }
 
 registerBlock({

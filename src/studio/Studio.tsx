@@ -730,7 +730,11 @@ export default function Studio() {
     item: BuiltinComponentMetadata | ComponentMetadata,
   ) {
     if ("kind" in item) {
-      setDialog({ type: "component", builtin: item });
+      const source = await desktop.invoke<ComponentSource>(
+        "components:source",
+        { id: item.kind, scope: "builtin" },
+      );
+      setDialog({ type: "component", builtin: item, source });
       return;
     }
     const custom = await desktop.invoke<CompiledComponent>("components:get", {
@@ -1473,7 +1477,25 @@ export default function Studio() {
                             className={`studio-component-symbol symbol-${index % 4}`}
                           >
                             <span>
-                              {["↗", "▦", "◴", "⌁", "▧", "↗"][index % 6]}
+                              {
+                                (
+                                  {
+                                    text: "T",
+                                    image: "▧",
+                                    table: "▦",
+                                    callout: "!",
+                                    toggle: "⌄",
+                                    divider: "—",
+                                    code: "{}",
+                                    chart: "↗",
+                                    database: "▦",
+                                    metrics: "◴",
+                                    playground: "⌁",
+                                    gallery: "▧",
+                                    bookmark: "↗",
+                                  } as Record<string, string>
+                                )[item.kind]
+                              }
                             </span>
                           </div>
                           <div>

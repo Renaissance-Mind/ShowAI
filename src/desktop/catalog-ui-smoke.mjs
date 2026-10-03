@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 // Exercises the real desktop catalog across two real project directories.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rename, writeFile } from "node:fs/promises";
@@ -98,9 +99,77 @@ try {
     .getByRole("heading", { name: "可视化效果", exact: true })
     .waitFor();
   assert.ok((await dialog.locator(".catalog-documentation li").count()) >= 4);
-  await dialog.getByRole("button", { name: "示例预览", exact: true }).click();
+  assert.equal(
+    await dialog.getByRole("button", { name: "示例预览", exact: true }).count(),
+    0,
+  );
+  assert.equal(await dialog.locator(".catalog-overview").count(), 1);
   await dialog.getByRole("region", { name: "y = x", exact: true }).waitFor();
+  await page.screenshot({
+    path: join(output, "chart-overview.png"),
+    fullPage: true,
+    animations: "disabled",
+  });
   await dialog.getByRole("button", { name: "关闭弹窗", exact: true }).click();
+  await page
+    .locator(".studio-component-card")
+    .filter({
+      has: page.getByRole("heading", { name: "文本框 内置", exact: true }),
+    })
+    .click();
+  dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("heading", { name: "让内容更容易理解", exact: true })
+    .waitFor();
+  await page.screenshot({
+    path: join(output, "text-overview.png"),
+    fullPage: true,
+    animations: "disabled",
+  });
+  await dialog.getByLabel("组件示例", { exact: true }).selectOption("1");
+  await dialog
+    .locator(".sb-text p")
+    .filter({ hasText: "记录一个想法。" })
+    .waitFor();
+  await page.setViewportSize({ width: 700, height: 850 });
+  const docBox = await dialog.locator(".catalog-documentation").boundingBox(),
+    previewBox = await dialog.locator(".catalog-live-example").boundingBox();
+  assert.ok(
+    previewBox.y >= docBox.y + docBox.height,
+    "narrow overview stacks explanation above the preview",
+  );
+  await page.screenshot({
+    path: join(output, "text-overview-narrow.png"),
+    fullPage: true,
+    animations: "disabled",
+  });
+  await page.setViewportSize({ width: 1280, height: 960 });
+  await dialog.getByRole("button", { name: "定制组件", exact: true }).click();
+  await dialog.getByLabel("组件名称", { exact: true }).fill("定制文本框");
+  await dialog
+    .getByLabel("组件源码", { exact: true })
+    .fill(
+      'import {Text} from "showai:components";export default function MyText({data,onChange,readOnly}){return <Text data={{...data,color:"#194a2a"}} onChange={onChange} readOnly={readOnly}/>}',
+    );
+  await dialog
+    .getByRole("button", { name: "保存项目新版本", exact: true })
+    .click();
+  await page.getByRole("dialog", { name: "定制文本框", exact: true }).waitFor();
+  const customText = await api("components:get", {
+    projectId: a.id,
+    id: "my-text",
+    version: "1.0.0",
+  });
+  assert.equal(customText.scope, "project");
+  await page
+    .frameLocator('iframe[title="定制文本框"]')
+    .getByRole("heading", { name: "让内容更容易理解", exact: true })
+    .waitFor();
+  await page.getByRole("button", { name: "关闭弹窗", exact: true }).click();
+  result.checks.push(
+    "builtin text documentation and live examples share one responsive view; the UI saves an editable native text variant through the real compiler",
+  );
+
   await page
     .locator(".studio-component-card")
     .filter({
@@ -281,19 +350,27 @@ try {
     version: parent.version,
     integrity: parent.integrity,
   };
-  const card = page
-    .locator(".studio-template-card")
-    .filter({
-      has: page.getByRole("heading", { name: "Combined report", exact: true }),
-    });
+  const card = page.locator(".studio-template-card").filter({
+    has: page.getByRole("heading", { name: "Combined report", exact: true }),
+  });
   await card.getByRole("button", { name: /查看模板/ }).click();
   dialog = page.getByRole("dialog");
   await dialog
     .getByRole("heading", { name: "内容处理方式", exact: true })
     .waitFor();
   await dialog
-    .getByRole("heading", { name: "相关模板与组件", exact: true })
+    .getByRole("region", { name: "模板示例预览", exact: true })
     .waitFor();
+  await dialog
+    .frameLocator('iframe[title="Project B counter"]')
+    .getByRole("status")
+    .filter({ hasText: "7" })
+    .waitFor();
+  await page.screenshot({
+    path: join(output, "template-overview.png"),
+    fullPage: true,
+    animations: "disabled",
+  });
   await dialog.getByRole("button", { name: "注册到全局", exact: true }).click();
   await page.getByRole("dialog").waitFor({ state: "detached" });
   await page.getByLabel("目录项目", { exact: true }).selectOption(a.id);
@@ -375,6 +452,196 @@ try {
   assert.equal(new Set(ids).size, ids.length);
   result.checks.push(
     "UI composes a nested template; global promotion preserves its custom dependency closure; A applies it after B's source directory is removed, with locked identity and working props",
+  );
+
+  const childRef = {
+    kind: "component",
+    id: original.id,
+    version: original.version,
+    integrity: original.integrity,
+  };
+  const nestedSchema = {
+    type: "object",
+    properties: { counter: original.schema },
+    required: ["counter"],
+    additionalProperties: false,
+  };
+  const panel = await api("components:save", {
+    projectId: a.id,
+    manifest: {
+      id: "nested-panel",
+      name: "嵌套面板",
+      version: "1.0.0",
+      description: "Text and a nested counter",
+      entry: "index.tsx",
+      scenarios: ["Composition"],
+      dependencies: [childRef],
+      defaultData: { counter: original.defaultData },
+      examples: [],
+    },
+    schema: nestedSchema,
+    source: `import Counter from "showai:component/${original.id}";import {Text} from "showai:components";export default function Panel({data,onChange,readOnly}){return <section><Text data={{content:"## 组合中的文本"}} readOnly/><Counter data={data.counter} readOnly={readOnly} onChange={counter=>onChange?.({...data,counter})}/></section>}`,
+  });
+  const latest = await api("pages:get", {
+    projectId: a.id,
+    pageId: created.id,
+  });
+  await api("pages:save", {
+    projectId: a.id,
+    pageId: created.id,
+    baseHash: latest.hash,
+    document: {
+      ...latest.document,
+      content: {
+        ...latest.document.content,
+        content: [
+          ...latest.document.content.content,
+          {
+            type: "widget",
+            attrs: {
+              kind: "custom",
+              data: {
+                componentId: panel.id,
+                version: panel.version,
+                integrity: panel.integrity,
+                props: panel.defaultData,
+              },
+            },
+          },
+        ],
+      },
+    },
+  });
+  const panelFrame = page.frameLocator('iframe[title="嵌套面板"]');
+  await panelFrame
+    .getByRole("heading", { name: "组合中的文本", exact: true })
+    .waitFor();
+  assert.equal(await panelFrame.locator("iframe").count(), 0);
+  await panelFrame.getByRole("button", { name: "增加", exact: true }).click();
+  await poll(
+    () => panelFrame.getByRole("status").innerText(),
+    (value) => value === "1",
+    "composed child update",
+  );
+  await page.locator(".studio-save-state.saved").waitFor();
+  await poll(
+    async () => {
+      const edited = await api("pages:get", {
+        projectId: a.id,
+        pageId: created.id,
+      });
+      return edited.document.content.content.find(
+        (node) => node.attrs?.data?.componentId === panel.id,
+      )?.attrs.data.props.counter.value;
+    },
+    (value) => value === 1,
+    "composed data persisted to disk",
+  );
+  const exported = JSON.parse(
+    execFileSync(
+      process.execPath,
+      [
+        join(root, "dist-agent/cli.mjs"),
+        "export",
+        "--project",
+        a.id,
+        "--page",
+        created.id,
+        "--format",
+        "html",
+        "--out",
+        join(output, "nested.html"),
+        "--json",
+      ],
+      { env, encoding: "utf8" },
+    ),
+  ).data;
+  result.nestedExport = exported;
+  const offlineOpened = application.waitForEvent("window");
+  await application.evaluate(async ({ BrowserWindow }, path) => {
+    const window = new BrowserWindow({
+      show: false,
+      webPreferences: { contextIsolation: true, sandbox: true },
+    });
+    await window.loadFile(path);
+  }, exported.path);
+  const offlinePage = await offlineOpened;
+  await offlinePage
+    .frameLocator('iframe[title="嵌套面板"]')
+    .getByRole("heading", { name: "组合中的文本", exact: true })
+    .waitFor();
+  assert.equal(
+    await offlinePage
+      .frameLocator('iframe[title="嵌套面板"]')
+      .getByRole("status")
+      .innerText(),
+    "1",
+  );
+  const compact = await api("pages:create", {
+    projectId: a.id,
+    document: {
+      id: "nested-inline",
+      title: "组件嵌套示例",
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "widget",
+            attrs: {
+              kind: "custom",
+              data: {
+                componentId: panel.id,
+                version: panel.version,
+                integrity: panel.integrity,
+                props: { counter: { ...original.defaultData, value: 1 } },
+              },
+            },
+          },
+        ],
+      },
+    },
+  });
+  const inlineExport = JSON.parse(
+    execFileSync(
+      process.execPath,
+      [
+        join(root, "dist-agent/cli.mjs"),
+        "export",
+        "--project",
+        a.id,
+        "--page",
+        compact.document.id,
+        "--format",
+        "inline",
+        "--out",
+        join(output, "nested-inline.html"),
+        "--json",
+      ],
+      { env, encoding: "utf8" },
+    ),
+  ).data;
+  const inlineOpened = application.waitForEvent("window");
+  await application.evaluate(async ({ BrowserWindow }, path) => {
+    const window = new BrowserWindow({
+      show: false,
+      webPreferences: { contextIsolation: true, sandbox: true },
+    });
+    await window.loadFile(path);
+  }, inlineExport.path);
+  const inlinePage = await inlineOpened;
+  await inlinePage
+    .getByRole("heading", { name: "组合中的文本", exact: true })
+    .waitFor();
+  assert.equal(await inlinePage.locator("iframe").count(), 0);
+  result.inlineExportBytes = inlineExport.bytes;
+
+  await page.screenshot({
+    path: join(output, "nested-component.png"),
+    fullPage: true,
+    animations: "disabled",
+  });
+  result.checks.push(
+    "code composition renders builtin text and an exact custom child in one sandbox; child edits save to parent props and offline HTML export succeeds",
   );
   assert.deepEqual(result.rendererErrors, []);
   assert.equal(await digest(), result.runtimeHash);

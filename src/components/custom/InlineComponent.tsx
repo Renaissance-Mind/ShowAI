@@ -1,4 +1,5 @@
 import * as ReactRuntime from "react";
+import * as DomRuntime from "react-dom";
 import * as ClientRuntime from "react-dom/client";
 import * as JsxRuntime from "react/jsx-runtime";
 import * as JsxDevRuntime from "react/jsx-dev-runtime";
@@ -71,6 +72,7 @@ export function InlineComponent({
     globals.__SHOWAI_COMPONENT_HOST__ = {
       react: ReactRuntime,
       client: ClientRuntime,
+      dom: DomRuntime,
       jsx: JsxRuntime,
       jsxDev: JsxDevRuntime,
     };

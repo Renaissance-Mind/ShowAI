@@ -7,6 +7,7 @@ export { assertJsonValue } from "./contract";
 const ajv = new Ajv({
   allErrors: true,
   strict: true,
+  allowUnionTypes: true,
   validateFormats: false,
   addUsedSchema: false,
 });

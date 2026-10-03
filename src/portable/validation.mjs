@@ -1,3 +1,4 @@
+import { validatePrimitiveData } from "../components/blocks/primitive-contract.mjs";
 // Shared by the browser importer and the dependency-free artifact command.
 import { validateRemoteComponents } from "./remote.mjs";
 export const MAX_ARTIFACT_BYTES = 10 * 1024 * 1024;
@@ -214,6 +215,11 @@ function validateAttrs(attrs, path, permitted) {
 }
 
 function validateWidgetData(kind, data, path) {
+  if (["text", "image", "table", "callout", "toggle", "divider", "code"].includes(kind)) {
+    validatePrimitiveData(kind, data);
+    if (kind === "image" && data.src && !isSafeUrl(data.src, true)) throw new Error(`${path}.src must be a safe raster image URL.`);
+    return;
+  }
   if (
     ![
       "chart",

@@ -34,4 +34,6 @@ showai pages list --project PROJECT --json
 
 先用 query 与较小 limit 搜索，再 describe 选中的组件或模板。按项目→全局→已发布查找，内置内容兜底；只取下一步需要的 view，源码显式请求。页面和组合引用锁定 version+integrity；已有版本固定，后续编辑形成当前项目的派生版本。全局提升、发布登记均为独立操作；导出不代表已上传。页面修改前检查用户的新编辑并使用当前 hash，遇冲突先合并。
 
+基础内容也通过组件目录使用：`text`、`image`、`table`、`callout`、`toggle`、`divider`、`code`。内置组件的 source view 提供可编辑起点，修改 ID/版本后保存到项目。组合 React 组件时，从 `showai:components` 导入内置实现；已有自定义子组件先在 `manifest.dependencies` 声明精确引用，再从 `showai:component/ID` 导入。将子组件的 `onChange` 连接到父数据，并传递 `readOnly`。详见 Agent usage 的 Basic components and code composition。
+
 交付时使用宿主支持的页面展示通道；文件与网址也是有效交付。完整工作台管理界面不进入读者收到的页面。

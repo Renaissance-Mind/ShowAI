@@ -125,6 +125,10 @@ node dist-agent/cli.mjs catalog describe playground --view examples --project PR
 
 模板支持有序组合与递归引用其他模板，并锁定子模板和实际组件依赖。应用模板时展开成独立页面，生成新的页面与区块 ID。分享成品只需要展开后的页面及用到的组件；无需携带模板定义。注册组合模板时会收集完整依赖，即使来源项目被移除，其他项目仍可使用注册版本。产品未额外预置组合模板。
 
+画布中的基础内容也进入组件目录：文本、图像、基础表格、提示框、折叠内容、分隔线与代码块，均可由 Agent 查询说明、数据结构与示例，并从起始源码定制项目版本。组件与模板的概览把说明和实时示例放在同一页，按窗口宽度采用左右或上下布局。
+
+组件可在代码中嵌套：从 `showai:components` 导入内置 React 实现；在 `manifest.dependencies` 中声明子组件的固定版本与指纹，再从 `showai:component/<id>` 导入。编译后的父组件包含子组件运行代码，注册与发布同时保存完整依赖源码。用法见 [Agent 组件组合](docs/agent-usage.md#basic-components-and-code-composition)。
+
 自定义组件包包含 `manifest.json`、`props.schema.json` 和 React 入口代码。参考 [数值滑块组件](resources/catalog/value-slider)：
 
 ```sh

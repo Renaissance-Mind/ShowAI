@@ -111,6 +111,58 @@ showai catalog merge resolve --project PROJECT --input resolved-merge.json --jso
 
 The resolution file contains the same refs, a new `version`, optional `id`, and `resolved` copied from the reviewed preview's editable package with conflicts resolved. `--view source` explicitly returns the complete preview to the caller. The result is a new project revision; no parent revision is overwritten.
 
+## Basic components and code composition
+
+All canvas content is discoverable through the component catalog. Basic kinds are `text`, `image`, `table`, `callout`, `toggle`, `divider`, and `code`. Headings, paragraphs, lists, quotations and Markdown tables are part of the text component. Each kind uses the same page node envelope as interactive components:
+
+```json
+{
+  "type": "widget",
+  "attrs": {
+    "kind": "text",
+    "data": {
+      "content": "## Main finding\n\nDescribe the evidence.",
+      "format": "markdown",
+      "color": "#30382e"
+    }
+  }
+}
+```
+
+Request `--view schema` and `--view examples` for the selected kind. `--view source` returns an editable starting package for builtins as well as custom components. Choose your own manifest ID and version, edit the source or default data, then save to an explicit project. Appearance fields include color, background, alignment, padding, radius and, for text, font size. Image components support dimensions, fit, alt text and captions; simple tables use a string column array and rectangular rows of scalar cells.
+
+Custom React components can compose builtins directly:
+
+```tsx
+import { Text, Image, Table } from "showai:components";
+
+export default function Figure({ data, onChange, readOnly }) {
+  return (
+    <section>
+      <Text
+        data={data.text}
+        readOnly={readOnly}
+        onChange={(text) => onChange?.({ ...data, text })}
+      />
+      <Image
+        data={data.image}
+        readOnly={readOnly}
+        onChange={(image) => onChange?.({ ...data, image })}
+      />
+      <Table
+        data={data.table}
+        readOnly={readOnly}
+        onChange={(table) => onChange?.({ ...data, table })}
+      />
+    </section>
+  );
+}
+```
+
+The SDK also exports `Callout`, `Toggle`, `Divider`, `Code`, `Chart`, `Database`, `Metrics`, `Playground`, `Gallery`, and `Bookmark`. Package-local React modules can nest normally. To reuse an existing custom component, declare its exact component ref in `manifest.dependencies`, then import its default export from `showai:component/ID`. The child must have verified editable source available in the selected project or shared catalog. Pass `readOnly` and connect child `onChange` callbacks to the parent's data; each child validates its own schema. The parent schema should define the complete data it stores, including nested child data.
+
+Composition is compiled into the parent's runtime and works in desktop, offline HTML and inline conversation exports. Global registration and publication preserve all exact dependency sources. Cycles, missing fingerprints, imports outside a package, and compositions deeper than 16 levels are rejected. Nesting is authored in code.
+
 ## Templates and composition
 
 A template can be saved from an existing page or from explicit metadata and composition:

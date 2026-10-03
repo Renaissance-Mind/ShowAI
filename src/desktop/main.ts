@@ -40,6 +40,7 @@ import {
   listComponents,
   listTemplates,
   readComponentSource,
+  readBuiltinComponentSource,
   resolveDocumentComponents,
   saveComponent,
   saveTemplate,
@@ -633,6 +634,8 @@ async function handle(
       );
     }
     case "components:source":
+      if (args.scope === "builtin")
+        return readBuiltinComponentSource(required(args, "id"));
       return readComponentSource(
         store.root,
         required(args, "id"),

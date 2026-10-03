@@ -24,6 +24,8 @@ import Ajv from "ajv";
 import standaloneCode from "ajv/dist/standalone/index.js";
 import templates from "../../resources/catalog/templates.json";
 import builtinComponents from "../../resources/catalog/components.json";
+import primitiveComponents from "../../resources/catalog/primitives.json";
+import { builtinSources, builtinExports } from "./builtin-sources";
 import { validateDocument } from "../portable/validation.mjs";
 import type { ShowDocument } from "../types";
 import { canonicalJson } from "./diff";
@@ -73,7 +75,10 @@ export type {
 } from "../components/custom/types";
 
 export function listBuiltinComponents(): BuiltinComponentMetadata[] {
-  return structuredClone(builtinComponents) as BuiltinComponentMetadata[];
+  return structuredClone([
+    ...primitiveComponents,
+    ...builtinComponents,
+  ]) as BuiltinComponentMetadata[];
 }
 export function describeBuiltinComponent(
   kind: string,
@@ -81,6 +86,34 @@ export function describeBuiltinComponent(
   const component = listBuiltinComponents().find((item) => item.kind === kind);
   if (!component) throw new Error(`Built-in component not found: ${kind}.`);
   return component;
+}
+
+export function readBuiltinComponentSource(kind: string): ComponentSource {
+  const item = describeBuiltinComponent(kind);
+  const exported = builtinExports[kind];
+  if (!exported) throw new Error(`No editable source for ${kind}.`);
+  const source = `import { ${exported} } from "showai:components";
+
+export default function Component({ data, onChange, readOnly }) {
+  return <${exported} data={data} onChange={onChange} readOnly={readOnly} />;
+}
+`;
+  return {
+    manifest: {
+      id: kind,
+      name: item.name,
+      version: item.version ?? "1.0.0",
+      description: item.description,
+      scenarios: item.scenarios,
+      effects: item.effects,
+      entry: "index.tsx",
+      defaultData: item.defaultData,
+      examples: item.examples,
+    },
+    schema: item.propsSchema,
+    source,
+    files: { "index.tsx": source },
+  };
 }
 
 const MAX_PACKAGE_BYTES = 8 * 1024 * 1024;
@@ -873,6 +906,9 @@ function manifestFrom(value: unknown): ComponentManifest {
     ...(item.effects !== undefined
       ? { effects: textList(item.effects, "Component effects") }
       : {}),
+    ...(item.dependencies !== undefined
+      ? { dependencies: componentDependencies(item.dependencies) }
+      : {}),
     ...(item.parents !== undefined
       ? {
           parents: Array.isArray(item.parents)
@@ -885,6 +921,19 @@ function manifestFrom(value: unknown): ComponentManifest {
     ...(item.mergeBase ? { mergeBase: checkedRef(item.mergeBase) } : {}),
   };
 }
+function componentDependencies(value: unknown): PackageRevisionRef[] {
+  if (!Array.isArray(value) || value.length > 100)
+    throw new Error(
+      "Component dependencies must be an array of at most 100 exact references.",
+    );
+  const refs = value.map((ref) => portableRef(checkedRef(ref, "component")));
+  if (new Set(refs.map((ref) => ref.id)).size !== refs.length)
+    throw new Error(
+      "Component dependency ids must be unique within a package.",
+    );
+  return refs;
+}
+
 async function packageFiles(directory: string): Promise<Map<string, Buffer>> {
   const root = await realpath(directory);
   const files = new Map<string, Buffer>();
@@ -974,6 +1023,8 @@ async function compilePackage(
   schema: JsonSchema,
   files: Map<string, Buffer>,
   scope: CatalogScope,
+  home: string,
+  projectId?: string,
 ): Promise<CompiledComponent> {
   const require = createRequire(
     process.env.SHOWAI_RUNTIME_ENTRY ?? import.meta.url,
@@ -985,47 +1036,206 @@ async function compilePackage(
     throw new Error("The component entry does not exist inside the package.");
   const ajv = new Ajv({
     strict: true,
+    allowUnionTypes: true,
+    addUsedSchema: false,
     validateFormats: false,
     code: { source: true, esm: true },
     allErrors: true,
   });
   const validator = standaloneCode(ajv, ajv.compile(schema));
-  const trusted = ["react", "react-dom", "scheduler", "ajv"].map((name) =>
-    dirname(require.resolve(`${name}/package.json`)),
+  const trusted = [
+    "react",
+    "react-dom",
+    "scheduler",
+    "ajv",
+    "marked",
+    "lucide-react",
+  ].map((name) => dirname(require.resolve(`${name}/package.json`)));
+  const lucideRoot = dirname(require.resolve("lucide-react/package.json"));
+  type RuntimePackage = {
+    manifest: ComponentManifest;
+    files: Map<string, Buffer>;
+    validator: string;
+    children: Map<string, string>;
+  };
+  const packages = new Map<string, RuntimePackage>();
+  const rootPackage: RuntimePackage = {
+    manifest,
+    files,
+    validator,
+    children: new Map(),
+  };
+  packages.set("root", rootPackage);
+  const loadDependencies = async (
+    owner: RuntimePackage,
+    active: Set<string>,
+    depth: number,
+  ): Promise<void> => {
+    if (depth > 16) throw new Error("Component composition exceeds 16 levels.");
+    for (const ref of owner.manifest.dependencies ?? []) {
+      const slot = `${ref.id}@${ref.version}`;
+      if (active.has(slot))
+        throw new Error(`Component composition cycle: ${slot}.`);
+      const key = revisionIdentity(ref);
+      owner.children.set(ref.id, key);
+      if (packages.has(key)) {
+        await loadDependencies(
+          packages.get(key)!,
+          new Set(active).add(slot),
+          depth + 1,
+        );
+        continue;
+      }
+      if (packages.size >= 100)
+        throw new Error("Component composition exceeds 100 packages.");
+      const source = await readComponentSource(
+        home,
+        ref.id,
+        ref.version,
+        projectId,
+        { integrity: ref.integrity },
+      );
+      const child: RuntimePackage = {
+        manifest: source.manifest,
+        files: componentSourceFiles(source),
+        validator: standaloneCode(ajv, ajv.compile(source.schema)),
+        children: new Map(),
+      };
+      packages.set(key, child);
+      await loadDependencies(child, new Set(active).add(slot), depth + 1);
+    }
+  };
+  await loadDependencies(
+    rootPackage,
+    new Set([`${manifest.id}@${manifest.version}`]),
+    0,
   );
+  // Every local import stays within its own verified package, including nested packages.
+  const locate = (
+    map: Map<string, Buffer> | Record<string, string>,
+    candidate: string,
+  ) => {
+    const has = (path: string) =>
+      map instanceof Map ? map.has(path) : Object.hasOwn(map, path);
+    return [
+      candidate,
+      ...[
+        ".tsx",
+        ".ts",
+        ".jsx",
+        ".js",
+        ".json",
+        "/index.tsx",
+        "/index.ts",
+        "/index.jsx",
+        "/index.js",
+      ].map((ext) => candidate + ext),
+    ].find(has);
+  };
+  const modulePath = (key: string, file: string) => `${key}/${file}`;
+  const splitModule = (path: string) => {
+    const slash = path.indexOf("/");
+    return { key: path.slice(0, slash), file: path.slice(slash + 1) };
+  };
   const boundary: Plugin = {
     name: "showai-component-boundary",
     setup(plugin) {
-      plugin.onResolve({ filter: /^showai:/ }, (args) =>
-        args.path === "showai:validator"
-          ? { path: args.path, namespace: "showai-validator" }
-          : { errors: [{ text: "Unknown ShowAI component module." }] },
+      plugin.onResolve({ filter: /^showai:/ }, (args) => {
+        const owner =
+          args.namespace === "showai-package"
+            ? splitModule(args.importer).key
+            : args.namespace === "showai-nested"
+              ? args.importer
+              : "root";
+        if (args.path === "showai:validator")
+          return { path: owner, namespace: "showai-validator" };
+        if (args.path === "showai:components")
+          return { path: "sdk.tsx", namespace: "showai-builtin" };
+        if (args.path.startsWith("showai:component/")) {
+          const id = args.path.slice("showai:component/".length);
+          const child = packages.get(owner)?.children.get(id);
+          return child
+            ? {
+                path: child,
+                namespace: "showai-nested",
+              }
+            : {
+                errors: [
+                  {
+                    text: `Declare an exact manifest.dependencies reference before importing ${id}.`,
+                  },
+                ],
+              };
+        }
+        return { errors: [{ text: "Unknown ShowAI component module." }] };
+      });
+      plugin.onLoad(
+        { filter: /.*/, namespace: "showai-validator" },
+        (args) => ({
+          contents: packages.get(args.path)!.validator,
+          loader: "js",
+        }),
       );
-      plugin.onLoad({ filter: /.*/, namespace: "showai-validator" }, () => ({
-        contents: validator,
-        loader: "js",
-        resolveDir: root,
+      plugin.onLoad({ filter: /.*/, namespace: "showai-builtin" }, (args) => ({
+        contents: builtinSources[args.path],
+        loader: args.path.endsWith(".mjs")
+          ? "js"
+          : (extname(args.path).slice(1) as "tsx" | "ts" | "css"),
       }));
-      plugin.onResolve({ filter: /.*/ }, async (args) => {
+      plugin.onLoad({ filter: /.*/, namespace: "showai-nested" }, (args) => {
+        const owner = packages.get(args.path)!;
+        return {
+          contents: `import React from 'react';import Child from './${owner.manifest.entry.replace(/^\.\//, "")}';import validate from 'showai:validator';
+const defaults=${JSON.stringify(owner.manifest.defaultData)};
+function check(data){if(!validate(data))throw new Error(${JSON.stringify(owner.manifest.id)}+' props: '+JSON.stringify(validate.errors));return data;}
+export default function Nested({data=defaults,onChange,readOnly=true}){check(data);return <Child data={data} readOnly={readOnly} onChange={readOnly||!onChange?undefined:next=>onChange(check(next))}/>;}`,
+          loader: "tsx",
+        };
+      });
+      plugin.onLoad({ filter: /.*/, namespace: "showai-package" }, (args) => {
+        const { key, file } = splitModule(args.path),
+          owner = packages.get(key)!;
+        const contents = owner.files.get(file);
+        if (!contents)
+          return { errors: [{ text: `Missing package file: ${file}` }] };
+        const extension = extname(file).slice(1);
+        return {
+          contents,
+          loader: ["tsx", "ts", "jsx", "js", "json", "css"].includes(extension)
+            ? (extension as "tsx" | "ts" | "jsx" | "js" | "json" | "css")
+            : "dataurl",
+        };
+      });
+      plugin.onResolve({ filter: /.*/ }, (args) => {
         if (args.path.startsWith("showai:")) return;
         if (
           args.namespace === "showai-validator" &&
           args.path.startsWith("ajv/")
         )
           return { path: require.resolve(args.path) };
-        const importerTrusted = trusted.some((base) =>
-          inside(base, args.importer),
-        );
+        const sdkImport = args.namespace === "showai-builtin";
         if (
           [
             "react",
             "react/jsx-runtime",
             "react/jsx-dev-runtime",
             "react-dom/client",
-          ].includes(args.path)
-        )
-          return { path: require.resolve(args.path) };
-        if (importerTrusted) {
+          ].includes(args.path) ||
+          (sdkImport &&
+            ["react-dom", "marked", "lucide-react"].includes(args.path))
+        ) {
+          return {
+            path:
+              args.path === "lucide-react"
+                ? join(
+                    dirname(require.resolve("lucide-react/package.json")),
+                    require("lucide-react/package.json").module,
+                  )
+                : require.resolve(args.path),
+            ...(args.path === "lucide-react" ? { sideEffects: false } : {}),
+          };
+        }
+        if (trusted.some((base) => inside(base, args.importer))) {
           if (["scheduler", "react", "react-dom"].includes(args.path))
             return { path: require.resolve(args.path) };
           if (args.path.startsWith(".")) {
@@ -1033,7 +1243,10 @@ async function compilePackage(
               resolve(args.resolveDir, args.path),
             );
             if (trusted.some((base) => inside(base, resolved)))
-              return { path: resolved };
+              return {
+                path: resolved,
+                ...(inside(lucideRoot, resolved) ? { sideEffects: false } : {}),
+              };
           }
           return {
             errors: [{ text: `Unexpected runtime dependency: ${args.path}` }],
@@ -1043,53 +1256,40 @@ async function compilePackage(
           return {
             errors: [
               {
-                text: `Only React and package-local imports are allowed: ${args.path}`,
+                text: `Only React, ShowAI SDK and package-local imports are allowed: ${args.path}`,
               },
             ],
           };
-        const candidate = resolve(args.resolveDir, args.path);
-        if (!inside(root, candidate))
+        const { key, file } =
+          args.namespace === "showai-package"
+            ? splitModule(args.importer)
+            : args.namespace === "showai-nested"
+              ? { key: args.importer, file: "" }
+              : { key: "root", file: "" };
+        const base = sdkImport ? "/builtin" : "/package";
+        const candidate = relative(
+          base,
+          resolve(base, dirname(sdkImport ? args.importer : file), args.path),
+        )
+          .split(sep)
+          .join("/");
+        if (candidate.startsWith("../") || candidate === "..")
           return {
             errors: [{ text: "Component imports cannot leave the package." }],
           };
-        const candidates = [
+        const selected = locate(
+          sdkImport ? builtinSources : packages.get(key)!.files,
           candidate,
-          ...[
-            ".tsx",
-            ".ts",
-            ".jsx",
-            ".js",
-            ".json",
-            "/index.tsx",
-            "/index.ts",
-            "/index.jsx",
-            "/index.js",
-          ].map((suffix) => candidate + suffix),
-        ];
-        for (const path of candidates) {
-          const key = relative(root, path).split(sep).join("/");
-          if (files.has(key)) return { path };
-        }
-        return { errors: [{ text: `Missing package file: ${args.path}` }] };
-      });
-      plugin.onLoad({ filter: /.*/, namespace: "file" }, (args) => {
-        if (!inside(root, args.path)) return;
-        const contents = files.get(
-          relative(root, args.path).split(sep).join("/"),
         );
-        if (!contents)
-          return {
-            errors: [
-              { text: "Component file is outside the imported package." },
-            ],
-          };
-        const extension = extname(args.path).slice(1);
-        const loader = ["tsx", "ts", "jsx", "js", "json", "css"].includes(
-          extension,
-        )
-          ? (extension as "tsx" | "ts" | "jsx" | "js" | "json" | "css")
-          : "dataurl";
-        return { contents, loader };
+        return selected
+          ? {
+              path: sdkImport ? selected : modulePath(key, selected),
+              namespace: sdkImport ? "showai-builtin" : "showai-package",
+              ...(sdkImport && !selected.endsWith(".css")
+                ? { sideEffects: false }
+                : {}),
+            }
+          : { errors: [{ text: `Missing package file: ${args.path}` }] };
       });
     },
   };
@@ -1128,7 +1328,10 @@ async function compilePackage(
     name: "showai-inline-react",
     setup(plugin) {
       plugin.onResolve(
-        { filter: /^(?:react(?:\/jsx(?:-dev)?-runtime)?|react-dom\/client)$/ },
+        {
+          filter:
+            /^(?:react(?:\/jsx(?:-dev)?-runtime)?|react-dom(?:\/client)?)$/,
+        },
         (args) => ({ path: args.path, namespace: "showai-inline-react" }),
       );
       plugin.onLoad(
@@ -1137,6 +1340,7 @@ async function compilePackage(
           const namespace = {
             react: "react",
             "react-dom/client": "client",
+            "react-dom": "dom",
             "react/jsx-runtime": "jsx",
             "react/jsx-dev-runtime": "jsxDev",
           }[args.path];
@@ -1385,6 +1589,8 @@ export async function importComponent(
       schema,
       files,
       scope,
+      home,
+      projectId,
     );
     if (compiled.integrity !== existing.integrity)
       throw new Error(
@@ -1429,6 +1635,8 @@ export async function importComponent(
     schema,
     files,
     scope,
+    home,
+    projectId,
   );
   const staging = join(dirname(destination), `.import-${randomUUID()}`);
   await mkdir(staging);
@@ -1935,6 +2143,8 @@ export async function resolvePackageBundle(
             { scope: ref.scope, integrity: component.integrity },
           )
         : undefined;
+      for (const dependency of component.dependencies ?? [])
+        await walk(dependency, active, depth + 1);
       components.push({ component, ...(source ? { source } : {}) });
     } else {
       const template = await getTemplateByRef(home, ref, projectId);
@@ -2084,6 +2294,31 @@ export function validatePackageBundle(value: unknown): PackageBundle {
         check(byTemplate.get(revisionIdentity(ref))!, path, depth + 1);
     }
   };
+  const byComponent = new Map(
+    components.map((entry) => [
+      revisionIdentity(packageRevisionRef("component", entry.component)),
+      entry.component,
+    ]),
+  );
+  const checkComponent = (
+    component: CompiledComponent,
+    active: Set<string>,
+    depth: number,
+  ) => {
+    const key = revisionIdentity(packageRevisionRef("component", component));
+    if (active.has(key) || depth > 16)
+      throw new Error("Bundle component dependency cycle or excessive depth.");
+    const path = new Set(active).add(key);
+    for (const ref of component.dependencies ?? []) {
+      const child = byComponent.get(revisionIdentity(ref));
+      if (!child)
+        throw new Error(
+          `Missing exact bundle dependency: ${ref.id}@${ref.version}.`,
+        );
+      checkComponent(child, path, depth + 1);
+    }
+  };
+  components.forEach((entry) => checkComponent(entry.component, new Set(), 0));
   records.forEach((item) => check(item, new Set(), 0));
   return {
     format: "showai-catalog-bundle",

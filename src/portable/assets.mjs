@@ -1,3 +1,4 @@
+import { marked } from "marked";
 import {
   isSafeUrl,
   MAX_ARTIFACT_BYTES,
@@ -10,6 +11,35 @@ function imageSlots(document) {
   const visit = (node) => {
     if (node.type === "image" && node.attrs?.src)
       slots.push([node.attrs, "src"]);
+    if (
+      node.type === "widget" &&
+      node.attrs?.kind === "image" &&
+      node.attrs.data?.src
+    )
+      slots.push([node.attrs.data, "src"]);
+    if (
+      node.type === "widget" &&
+      ["text", "callout", "toggle"].includes(node.attrs?.kind) &&
+      node.attrs.data?.format !== "plain"
+    ) {
+      const data = node.attrs.data;
+      marked.walkTokens(marked.lexer(data.content ?? ""), (token) => {
+        if (token.type !== "image") return;
+        let src = token.href;
+        const slot = {
+          get src() {
+            return src;
+          },
+          set src(value) {
+            const alt = token.text.replace(/([\\[\]])/g, "\\$1");
+            const image = `![${alt}](<${value}>${token.title ? " " + JSON.stringify(token.title) : ""})`;
+            data.content = data.content.split(token.raw).join(image);
+            src = value;
+          },
+        };
+        slots.push([slot, "src"]);
+      });
+    }
     if (node.type === "widget" && node.attrs?.kind === "gallery") {
       for (const item of node.attrs.data?.images ?? [])
         if (item?.src) slots.push([item, "src"]);

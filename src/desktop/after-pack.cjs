@@ -20,6 +20,8 @@ module.exports = async function afterPack(context) {
     "node_modules/react/package.json",
     "node_modules/react-dom/package.json",
     "node_modules/ajv/package.json",
+    "node_modules/marked/package.json",
+    "node_modules/lucide-react/package.json",
   ]) {
     await access(join(plugin, file));
   }

@@ -1,3 +1,4 @@
+import { rawSourcePlugin } from "../../scripts/raw-source-plugin.mjs";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import { build } from "esbuild";
 import { execFile } from "node:child_process";
@@ -54,6 +55,7 @@ beforeAll(async () => {
     format: "esm",
     target: "node22",
     external: ["esbuild"],
+    plugins: [rawSourcePlugin],
     banner: {
       js: 'import { createRequire as __showaiCreateRequire } from "node:module"; const require = __showaiCreateRequire(import.meta.url);',
     },
@@ -1493,7 +1495,7 @@ test("catalog search indexes descriptive examples while returning only summaries
   expect(runtimeOnly.items).toHaveLength(0);
   const builtin = await run(["catalog", "describe", "playground"]);
   expect(Object.keys(builtin.next).sort()).toEqual(
-    ["guide", "schema", "examples", "dependencies"].sort(),
+    ["guide", "schema", "examples", "dependencies", "source"].sort(),
   );
   const unavailable = await run([
     "catalog",
@@ -1502,6 +1504,6 @@ test("catalog search indexes descriptive examples while returning only summaries
     "--view",
     "source",
   ]);
-  expect(unavailable.available).toBe(false);
-  expect(unavailable.next).not.toHaveProperty("source");
+  expect(unavailable.source).toContain("showai:components");
+  expect(unavailable.next).toHaveProperty("source");
 });

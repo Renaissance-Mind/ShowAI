@@ -93,6 +93,8 @@ export interface ComponentManifest {
   description: string;
   scenarios: string[];
   effects?: string[];
+  /** Exact component revisions imported through showai:component/<id>. */
+  dependencies?: PackageRevisionRef[];
   entry: string;
   defaultData: Record<string, unknown>;
   examples: ComponentExample[];
