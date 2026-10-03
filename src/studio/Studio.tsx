@@ -22,7 +22,6 @@ import {
   Pin,
   PinOff,
   Trash2,
-  HardDrive,
   LayoutTemplate,
   Loader2,
   MoreHorizontal,
@@ -69,6 +68,11 @@ import {
   blankTemplate,
 } from "./CatalogDialogs";
 import "./studio.css";
+import {
+  SettingsNavigation,
+  SettingsPanel,
+  type SettingsSection,
+} from "./Settings";
 
 type View =
   "projects" | "project" | "page" | "templates" | "components" | "settings";
@@ -143,6 +147,9 @@ export default function Studio() {
     ? (contents[selectedProject]?.folders ?? [])
     : [];
   const [view, setView] = useState<View>("projects");
+  const [settingsSection, setSettingsSection] =
+    useState<SettingsSection>("general");
+  const settingsReturnView = useRef<View>("projects");
   const [templates, setTemplates] = useState<TemplateMetadata[]>([]);
   const [catalog, setCatalog] = useState<Catalog>({ builtin: [], custom: [] });
   const [catalogScope, setCatalogScope] =
@@ -319,6 +326,8 @@ export default function Studio() {
       setView("page");
       return;
     }
+    if (next === "settings" && view !== "settings")
+      settingsReturnView.current = view;
     setContextMenu(null);
     setQuery("");
     setView(next);
@@ -820,121 +829,149 @@ export default function Studio() {
   };
 
   return (
-    <div className={`studio ${focusWindow ? "focus-window" : ""}`}>
-      {!focusWindow && (
-        <aside className="studio-sidebar">
-          <div className="studio-brand">
-            <span>✳</span>
-            <strong>ShowAI</strong>
-          </div>
-          <nav className="studio-main-nav" aria-label="主要导航">
-            <button
-              className={
-                ["projects", "project", "page"].includes(view) ? "active" : ""
-              }
-              onClick={action(() => navigate("projects"))}
-            >
-              <FolderOpen size={17} />
-              项目
-            </button>
-            <button
-              className={view === "templates" ? "active" : ""}
-              onClick={action(() => navigate("templates"))}
-            >
-              <LayoutTemplate size={17} />
-              模板
-            </button>
-            <button
-              className={view === "components" ? "active" : ""}
-              onClick={action(() => navigate("components"))}
-            >
-              <Blocks size={17} />
-              组件
-            </button>
-          </nav>
-          <div className="studio-sidebar-projects">
-            <div className="studio-sidebar-label">
-              项目
+    <div
+      className={`studio ${focusWindow ? "focus-window" : ""} ${view === "settings" ? "settings-view" : ""}`}
+    >
+      {!focusWindow &&
+        (view === "settings" ? (
+          <SettingsNavigation
+            section={settingsSection}
+            info={info}
+            onSelect={setSettingsSection}
+            onBack={action(() => navigate(settingsReturnView.current))}
+          />
+        ) : (
+          <aside className="studio-sidebar">
+            <div className="studio-brand">
+              <span>✳</span>
+              <strong>ShowAI</strong>
+            </div>
+            <nav className="studio-main-nav" aria-label="主要导航">
               <button
-                className="studio-icon studio-row-menu"
-                aria-label="项目列表操作"
-                aria-haspopup="menu"
-                onClick={(event) => {
-                  const anchor = event.currentTarget;
-                  setProjectsMenu((current) =>
-                    current === anchor ? null : anchor,
-                  );
-                }}
+                className={
+                  ["projects", "project", "page"].includes(view) ? "active" : ""
+                }
+                onClick={action(() => navigate("projects"))}
               >
-                <MoreHorizontal size={17} />
+                <FolderOpen size={17} />
+                项目
+              </button>
+              <button
+                className={view === "templates" ? "active" : ""}
+                onClick={action(() => navigate("templates"))}
+              >
+                <LayoutTemplate size={17} />
+                模板
+              </button>
+              <button
+                className={view === "components" ? "active" : ""}
+                onClick={action(() => navigate("components"))}
+              >
+                <Blocks size={17} />
+                组件
+              </button>
+            </nav>
+            <div className="studio-sidebar-projects">
+              <div className="studio-sidebar-label">
+                项目
+                <button
+                  className="studio-icon studio-row-menu"
+                  aria-label="项目列表操作"
+                  aria-haspopup="menu"
+                  onClick={(event) => {
+                    const anchor = event.currentTarget;
+                    setProjectsMenu((current) =>
+                      current === anchor ? null : anchor,
+                    );
+                  }}
+                >
+                  <MoreHorizontal size={17} />
+                </button>
+              </div>
+              {projects.map((item) => (
+                <div key={item.id}>
+                  <LibraryRow
+                    target={projectTarget(item)}
+                    active={
+                      selectedProject === item.id &&
+                      view === "project" &&
+                      !selectedFolder
+                    }
+                    expanded={!!expandedProjects[item.id]}
+                    onToggle={action(() => toggleProject(item.id))}
+                    onOpen={action(() => openProject(item.id))}
+                    onMenu={showMenu}
+                  />
+                  {expandedProjects[item.id] && (
+                    <div className="studio-tree-children">
+                      {renderChildren(item.id)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="studio-sidebar-bottom">
+              <button onClick={action(() => navigate("settings"))}>
+                <Settings2 size={15} />
+                设置
               </button>
             </div>
-            {projects.map((item) => (
-              <div key={item.id}>
-                <LibraryRow
-                  target={projectTarget(item)}
-                  active={
-                    selectedProject === item.id &&
-                    view === "project" &&
-                    !selectedFolder
-                  }
-                  expanded={!!expandedProjects[item.id]}
-                  onToggle={action(() => toggleProject(item.id))}
-                  onOpen={action(() => openProject(item.id))}
-                  onMenu={showMenu}
-                />
-                {expandedProjects[item.id] && (
-                  <div className="studio-tree-children">
-                    {renderChildren(item.id)}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="studio-sidebar-bottom">
-            <button
-              className={view === "settings" ? "active" : ""}
-              onClick={action(() => navigate("settings"))}
-            >
-              <Settings2 size={15} />
-              设置
-            </button>
-          </div>
-        </aside>
-      )}
+          </aside>
+        ))}
       <main className="studio-main">
         <header className="studio-topbar">
-          <div className="studio-breadcrumb">
-            {focusWindow ? (
-              <span>ShowAI</span>
-            ) : (
-              <button onClick={action(() => navigate("projects"))}>项目</button>
-            )}
-            {selectedProject && (
-              <>
-                <ChevronRight size={13} />
-                <button onClick={action(() => openProject(selectedProject))}>
-                  {project?.name ?? "项目"}
-                </button>
-              </>
-            )}
-            {breadcrumbFolders.map((item) => (
-              <span className="studio-breadcrumb-folder" key={item.id}>
-                <ChevronRight size={13} />
-                <button
-                  onClick={action(() => openProject(selectedProject!, item.id))}
-                >
-                  {item.name}
-                </button>
+          {view === "settings" ? (
+            <div className="settings-breadcrumb">
+              <span>设置</span>
+              <ChevronRight size={12} aria-hidden="true" />
+              <span>
+                {
+                  {
+                    general: "通用",
+                    appearance: "外观",
+                    agent: "Agent",
+                    about: "关于",
+                  }[settingsSection]
+                }
               </span>
-            ))}
-            {view === "page" && (
-              <>
-                <ChevronRight size={13} />
-                <span>{page.draft?.title || "无标题"}</span>
-              </>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="studio-breadcrumb">
+              {focusWindow ? (
+                <span>ShowAI</span>
+              ) : (
+                <button onClick={action(() => navigate("projects"))}>
+                  项目
+                </button>
+              )}
+              {selectedProject && (
+                <>
+                  <ChevronRight size={13} />
+                  <button onClick={action(() => openProject(selectedProject))}>
+                    {project?.name ?? "项目"}
+                  </button>
+                </>
+              )}
+              {breadcrumbFolders.map((item) => (
+                <span className="studio-breadcrumb-folder" key={item.id}>
+                  <ChevronRight size={13} />
+                  <button
+                    onClick={action(() =>
+                      openProject(selectedProject!, item.id),
+                    )}
+                  >
+                    {item.name}
+                  </button>
+                </span>
+              ))}
+              {view === "page" && (
+                <>
+                  <ChevronRight size={13} />
+                  <span>{page.draft?.title || "无标题"}</span>
+                </>
+              )}
+            </div>
+          )}
           <div className="studio-header-actions">
             {view === "page" && page.draft && (
               <>
@@ -1036,7 +1073,46 @@ export default function Studio() {
               <Loader2 size={24} className="studio-spin" />
             </div>
           )}
-          {view === "page" && page.draft ? (
+          {view === "settings" ? (
+            <SettingsPanel
+              section={settingsSection}
+              info={info}
+              dark={dark}
+              onDarkChange={setDark}
+              onChooseHome={action(async () => {
+                if (!(await page.flush())) return;
+                const next = await desktop.invoke<DesktopInfo | null>(
+                  "settings:chooseHome",
+                );
+                if (next) {
+                  await page.clear();
+                  setInfo(next);
+                  settingsReturnView.current = "projects";
+                  setSelectedProject(null);
+                  selectedRef.current = null;
+                  setSelectedFolder(null);
+                  setContents({});
+                  setExpandedProjects({});
+                  setExpandedFolders({});
+                  await refresh();
+                  await loadCatalog();
+                  setNotice("内容库已切换");
+                }
+              })}
+              onCopyHome={action(async () => {
+                if (!info) return;
+                await desktop.invoke("clipboard:write", { text: info.home });
+                setNotice("内容库路径已复制");
+              })}
+              onCopyConfig={action(async () => {
+                if (!info) return;
+                await desktop.invoke("clipboard:write", {
+                  text: JSON.stringify(info.cli, null, 2),
+                });
+                setNotice("本地启动配置已复制");
+              })}
+            />
+          ) : view === "page" && page.draft ? (
             <article className="studio-editor-page">
               <textarea
                 ref={titleRef}
@@ -1536,102 +1612,6 @@ export default function Studio() {
                     </div>
                   )}
                 </>
-              )}
-              {view === "settings" && (
-                <div className="studio-settings">
-                  <section>
-                    <h2>
-                      <HardDrive size={18} />
-                      内容位置
-                    </h2>
-                    <p className="studio-path">{info?.home}</p>
-                    <p>
-                      项目、页面和快照保存在这个文件夹。可以选择已有内容库，也可以使用新目录。
-                    </p>
-                    <button
-                      className="studio-button"
-                      onClick={action(async () => {
-                        if (!(await page.clear())) return;
-                        const next = await desktop.invoke<DesktopInfo | null>(
-                          "settings:chooseHome",
-                        );
-                        if (next) {
-                          setInfo(next);
-                          setSelectedProject(null);
-                          selectedRef.current = null;
-                          setSelectedFolder(null);
-                          setContents({});
-                          setExpandedProjects({});
-                          setExpandedFolders({});
-                          await refresh();
-                          await loadCatalog();
-                          setNotice("内容库已切换");
-                        }
-                      })}
-                    >
-                      选择内容库
-                    </button>
-                  </section>
-                  <section>
-                    <h2>
-                      <Settings2 size={18} />
-                      外观
-                    </h2>
-                    <div className="studio-choice-row">
-                      <button
-                        className={!dark ? "selected" : ""}
-                        onClick={() => setDark(false)}
-                      >
-                        浅色
-                      </button>
-                      <button
-                        className={dark ? "selected" : ""}
-                        onClick={() => setDark(true)}
-                      >
-                        深色
-                      </button>
-                    </div>
-                  </section>
-                  <section>
-                    <h2>
-                      <Code2 size={18} />
-                      连接 Agent
-                    </h2>
-                    <p>
-                      默认通过文件和 CLI 操作各自项目。MCP
-                      可作为按项目配置的可选入口。
-                    </p>
-                    <div className="studio-code-preview">
-                      <code>
-                        {info ? JSON.stringify(info.cli, null, 2) : ""}
-                      </code>
-                    </div>
-                    <button
-                      className="studio-button"
-                      onClick={action(async () => {
-                        await desktop.invoke("clipboard:write", {
-                          text: JSON.stringify(info?.cli, null, 2),
-                        });
-                        setNotice("本地启动配置已复制");
-                      })}
-                    >
-                      <Copy size={14} />
-                      复制启动配置
-                    </button>
-                    <p className="studio-caption">
-                      先创建或绑定项目，再把 projectId 传给命令。无需提前运行
-                      Core 服务。
-                    </p>
-                  </section>
-                  <section>
-                    <h2>ShowAI</h2>
-                    <p>
-                      版本 {info?.version} ·{" "}
-                      {info?.platform === "darwin" ? "macOS" : info?.platform} ·{" "}
-                      {info?.packaged ? "桌面安装包" : "开发环境"}
-                    </p>
-                  </section>
-                </div>
               )}
             </div>
           )}

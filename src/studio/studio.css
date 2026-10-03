@@ -761,67 +761,6 @@ button.studio-tree-chevron:hover {
   font-size: 12px;
   line-height: 1.5;
 }
-.studio-settings {
-  max-width: 740px;
-}
-.studio-settings section {
-  padding: 18px 0;
-  border-top: 1px solid var(--line);
-}
-.studio-settings h2 {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  font-weight: 500;
-  margin: 0 0 10px;
-}
-.studio-settings section > p {
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.65;
-  margin: 8px 0 12px;
-}
-.studio-settings .studio-path {
-  font-family: ui-monospace, monospace;
-  font-size: 12px;
-  background: var(--surface);
-  padding: 9px 11px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  overflow-wrap: anywhere;
-  color: var(--text);
-}
-.studio-choice-row {
-  display: flex;
-  gap: 7px;
-}
-.studio-choice-row button {
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  padding: 6px 20px;
-  font-size: 14px;
-  min-height: 34px;
-}
-.studio-choice-row button.selected {
-  color: var(--accent);
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-.studio-code-preview {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  padding: 12px;
-  overflow: auto;
-  margin: 0 0 12px;
-}
-.studio-code-preview code {
-  white-space: pre;
-  font-size: 12px;
-  line-height: 1.65;
-  font-family: ui-monospace, monospace;
-}
 .studio-modal-shade {
   position: fixed;
   inset: 0;
