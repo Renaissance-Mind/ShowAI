@@ -19,15 +19,6 @@ export interface ShowDocument {
   }[];
 }
 
-export interface Workspace {
-  version: 1;
-  documents: ShowDocument[];
-  activeId: string;
-  theme: "light" | "dark" | "system";
-  font: "sans" | "serif" | "mono";
-  wide: boolean;
-}
-
 export interface ShowArtifact {
   format: "showai";
   version: 1;

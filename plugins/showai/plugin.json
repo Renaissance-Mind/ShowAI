@@ -1,18 +1,18 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "showai",
-  "version": "0.1.0",
-  "description": "Present research as portable interactive documents with editable blocks, charts, tables, and controls.",
-  "keywords": ["documents", "research", "visualization", "local-first"],
+  "version": "0.2.0",
+  "description": "Deliver one lightweight interactive page with text, images, charts, tables, and controls.",
+  "keywords": ["canvas", "research", "visualization", "single-page"],
   "extensions": {
     "com.openai": {
       "interface": {
         "displayName": "ShowAI",
-        "shortDescription": "Turn research into interactive documents",
-        "longDescription": "Create portable HTML documents from structured JSON. Present source-grounded research with text, images, charts, filterable tables, and interactive controls. Runs locally without API keys or a server.",
+        "shortDescription": "Present research as one interactive page",
+        "longDescription": "Create a single, content-focused HTML canvas from structured JSON. Text, images, charts, filterable tables, and interactive controls run offline in the page, with no workspace or server.",
         "category": "Productivity",
         "defaultPrompt": [
-          "Use ShowAI to present this research as an interactive document."
+          "Use ShowAI to present this result as one interactive page."
         ],
         "brandColor": "#34644E"
       }

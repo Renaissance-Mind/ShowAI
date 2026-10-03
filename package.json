@@ -1,9 +1,9 @@
 {
   "name": "showai",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "A local-first interactive document canvas for Codex research.",
+  "description": "A lightweight single-page interactive canvas for Codex.",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build:portable": "vite build --config vite.portable.config.ts && node scripts/copy-viewer.mjs",

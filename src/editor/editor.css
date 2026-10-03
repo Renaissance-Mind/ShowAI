@@ -353,7 +353,14 @@
   padding: 5px;
   margin: -10px 0 16px;
 }
-.table-toolbar > span {
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.table-actions > span {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -369,6 +376,35 @@
 .table-toolbar .danger {
   color: #af6655;
   margin-left: auto;
+}
+.table-toolbar.is-compact {
+  position: relative;
+  width: max-content;
+  margin: 0 0 8px auto;
+  padding: 0;
+  border: none;
+}
+.table-toolbar.is-compact > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  padding: 6px;
+}
+.table-menu {
+  top: 31px;
+  right: 0;
+}
+.block-style-select {
+  width: calc(100% - 12px);
+  margin: 3px 6px 6px;
+  padding: 6px 7px;
+  color: var(--text);
+  background: var(--editor-paper);
+  border: 1px solid var(--editor-line);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 12px;
 }
 .document-callout {
   position: relative;
@@ -678,6 +714,17 @@
   box-shadow: 0 14px 50px #24342922;
   overflow: hidden;
   animation: editor-menu-appear 0.15s ease;
+}
+.slash-menu.is-minimal {
+  width: 272px;
+}
+.slash-menu.is-minimal .slash-item {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.slash-menu.is-minimal .slash-item-icon {
+  width: 29px;
+  height: 29px;
 }
 .slash-search {
   display: flex;

@@ -64,6 +64,7 @@ export interface DocumentEditorProps {
   content: JSONContent;
   onChange: (content: JSONContent) => void;
   readOnly?: boolean;
+  minimal?: boolean;
   onEditorReady?: (editor: Editor) => void;
 }
 
@@ -147,6 +148,7 @@ export default function DocumentEditor({
   content,
   onChange,
   readOnly = false,
+  minimal = true,
   onEditorReady,
 }: DocumentEditorProps) {
   const latestOnChange = useRef(onChange);
@@ -166,6 +168,7 @@ export default function DocumentEditor({
   const [blockMenu, setBlockMenu] = useState(false);
   const [styleMenu, setStyleMenu] = useState(false);
   const [insertMenu, setInsertMenu] = useState(false);
+  const [tableMenu, setTableMenu] = useState(false);
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [dialogError, setDialogError] = useState("");
   const [notice, setNotice] = useState("");
@@ -179,7 +182,10 @@ export default function DocumentEditor({
   menuRef.current = slash;
   selectedRef.current = selectedIndex;
 
-  const extensions = useMemo(() => createExtensions(), []);
+  const extensions = useMemo(
+    () => createExtensions({ placeholder: "输入 / 添加内容" }),
+    [],
+  );
   const editor = useEditor({
     extensions,
     content,
@@ -257,6 +263,7 @@ export default function DocumentEditor({
       setBlockMenu(false);
       setStyleMenu(false);
       setInsertMenu(false);
+      setTableMenu(false);
       setDialog(null);
       setBubble(null);
     }
@@ -315,18 +322,19 @@ export default function DocumentEditor({
   }, [slash?.manual]);
 
   useEffect(() => {
-    if (!styleMenu && !insertMenu && !blockMenu) return;
+    if (!styleMenu && !insertMenu && !blockMenu && !tableMenu) return;
     const closeMenus = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
       setStyleMenu(false);
       setInsertMenu(false);
       setBlockMenu(false);
+      setTableMenu(false);
       editor?.commands.focus();
     };
     document.addEventListener("keydown", closeMenus);
     return () => document.removeEventListener("keydown", closeMenus);
-  }, [styleMenu, insertMenu, blockMenu, editor]);
+  }, [styleMenu, insertMenu, blockMenu, tableMenu, editor]);
 
   useEffect(() => {
     if (!notice) return;
@@ -872,8 +880,10 @@ export default function DocumentEditor({
   );
 
   return (
-    <div className={`document-editor${readOnly ? " is-readonly" : ""}`}>
-      {!readOnly && (
+    <div
+      className={`document-editor${readOnly ? " is-readonly" : ""}${minimal ? " is-minimal" : ""}`}
+    >
+      {!readOnly && !minimal && (
         <div className="editor-toolbar" role="toolbar" aria-label="文档格式">
           <div className="toolbar-style">
             <button
@@ -1039,47 +1049,89 @@ export default function DocumentEditor({
       )}
 
       {!readOnly && editor.isActive("table") && (
-        <div className="table-toolbar" aria-label="表格操作">
-          <span>
-            <Table2 size={14} />
-            表格
-          </span>
-          <button onClick={() => editor.chain().focus().addRowAfter().run()}>
-            添加行
-          </button>
-          <button onClick={() => editor.chain().focus().addColumnAfter().run()}>
-            添加列
-          </button>
-          <button
-            onClick={() => editor.chain().focus().toggleHeaderRow().run()}
-          >
-            表头
-          </button>
-          <button
-            disabled={!editor.can().mergeCells()}
-            onClick={() => editor.chain().focus().mergeCells().run()}
-          >
-            合并
-          </button>
-          <button
-            disabled={!editor.can().splitCell()}
-            onClick={() => editor.chain().focus().splitCell().run()}
-          >
-            拆分
-          </button>
-          <button onClick={() => editor.chain().focus().deleteRow().run()}>
-            删除行
-          </button>
-          <button onClick={() => editor.chain().focus().deleteColumn().run()}>
-            删除列
-          </button>
-          <button
-            className="danger"
-            onClick={() => editor.chain().focus().deleteTable().run()}
-            aria-label="删除表格"
-          >
-            <Trash2 size={14} />
-          </button>
+        <div
+          className={`table-toolbar${minimal ? " is-compact" : ""}`}
+          aria-label="表格操作"
+        >
+          {minimal && (
+            <button
+              aria-label="表格操作"
+              aria-expanded={tableMenu}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => setTableMenu(!tableMenu)}
+            >
+              <Table2 size={14} />
+              <ChevronDown size={12} />
+            </button>
+          )}
+          {(!minimal || tableMenu) && (
+            <>
+              {minimal && (
+                <div
+                  className="editor-menu-dismiss"
+                  onClick={() => setTableMenu(false)}
+                />
+              )}
+              <div
+                className={
+                  minimal ? "editor-small-menu table-menu" : "table-actions"
+                }
+                onClick={() => setTableMenu(false)}
+              >
+                {!minimal && (
+                  <span>
+                    <Table2 size={14} />
+                    表格
+                  </span>
+                )}
+                <button
+                  onClick={() => editor.chain().focus().addRowAfter().run()}
+                >
+                  添加行
+                </button>
+                <button
+                  onClick={() => editor.chain().focus().addColumnAfter().run()}
+                >
+                  添加列
+                </button>
+                <button
+                  onClick={() => editor.chain().focus().toggleHeaderRow().run()}
+                >
+                  表头
+                </button>
+                <button
+                  disabled={!editor.can().mergeCells()}
+                  onClick={() => editor.chain().focus().mergeCells().run()}
+                >
+                  合并
+                </button>
+                <button
+                  disabled={!editor.can().splitCell()}
+                  onClick={() => editor.chain().focus().splitCell().run()}
+                >
+                  拆分
+                </button>
+                <button
+                  onClick={() => editor.chain().focus().deleteRow().run()}
+                >
+                  删除行
+                </button>
+                <button
+                  onClick={() => editor.chain().focus().deleteColumn().run()}
+                >
+                  删除列
+                </button>
+                <button
+                  className="danger"
+                  onClick={() => editor.chain().focus().deleteTable().run()}
+                  aria-label="删除表格"
+                >
+                  <Trash2 size={14} />
+                  {minimal && "删除表格"}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -1173,7 +1225,84 @@ export default function DocumentEditor({
                   onClick={() => setBlockMenu(false)}
                 />
                 <div className="editor-small-menu block-menu">
-                  <div className="menu-caption">内容块</div>
+                  {minimal &&
+                    ["paragraph", "heading"].includes(
+                      editor.state.doc.nodeAt(hover.pos)?.type.name ?? "",
+                    ) && (
+                      <>
+                        <select
+                          className="block-style-select"
+                          aria-label="内容块样式"
+                          value={
+                            editor.state.doc.nodeAt(hover.pos)?.attrs.level ??
+                            "text"
+                          }
+                          onChange={(event) => {
+                            const chain = editor
+                              .chain()
+                              .focus()
+                              .setTextSelection(hover.pos + 1);
+                            if (event.target.value === "text")
+                              chain.setParagraph().run();
+                            else
+                              chain
+                                .setHeading({
+                                  level: Number(event.target.value) as
+                                    1 | 2 | 3,
+                                })
+                                .run();
+                            setBlockMenu(false);
+                          }}
+                        >
+                          <option value="text">正文</option>
+                          <option value="1">标题 1</option>
+                          <option value="2">标题 2</option>
+                          <option value="3">标题 3</option>
+                        </select>
+                        <div className="align-tools">
+                          {(
+                            [
+                              [
+                                "left",
+                                "左对齐",
+                                <AlignLeft key="left" size={16} />,
+                              ],
+                              [
+                                "center",
+                                "居中",
+                                <AlignCenter key="center" size={16} />,
+                              ],
+                              [
+                                "right",
+                                "右对齐",
+                                <AlignRight key="right" size={16} />,
+                              ],
+                            ] as const
+                          ).map(([align, label, icon]) => (
+                            <ToolButton
+                              key={align}
+                              label={label}
+                              active={
+                                editor.state.doc.nodeAt(hover.pos)?.attrs
+                                  .textAlign === align
+                              }
+                              onClick={() => {
+                                editor
+                                  .chain()
+                                  .focus()
+                                  .setTextSelection(hover.pos + 1)
+                                  .setTextAlign(align)
+                                  .run();
+                                setBlockMenu(false);
+                              }}
+                            >
+                              {icon}
+                            </ToolButton>
+                          ))}
+                        </div>
+                        <div className="menu-rule" />
+                      </>
+                    )}
                   <button
                     disabled={hover.index === 0}
                     onClick={() => moveBlock(hover.pos, -1)}
@@ -1232,7 +1361,7 @@ export default function DocumentEditor({
         )}
       </div>
 
-      {!readOnly && (
+      {!readOnly && !minimal && (
         <button
           className="document-add-block"
           onClick={() => {
@@ -1304,7 +1433,7 @@ export default function DocumentEditor({
               }}
             />
             <div
-              className="slash-menu"
+              className={`slash-menu${minimal ? " is-minimal" : ""}`}
               role="dialog"
               aria-label="插入内容"
               style={{ left: slash.left, top: slash.top }}
@@ -1376,7 +1505,7 @@ export default function DocumentEditor({
                       <span className="slash-item-icon">{item.icon}</span>
                       <span>
                         <strong>{item.title}</strong>
-                        <small>{item.description}</small>
+                        {!minimal && <small>{item.description}</small>}
                       </span>
                       {index === selectedIndex && (
                         <span className="slash-enter">↵</span>
@@ -1384,11 +1513,6 @@ export default function DocumentEditor({
                     </button>
                   </div>
                 ))}
-              </div>
-              <div className="slash-footer">
-                <span>↑ ↓ 选择</span>
-                <span>↵ 插入</span>
-                <span>为你的想法，多一点可能</span>
               </div>
             </div>
           </>,
@@ -1473,7 +1597,7 @@ export default function DocumentEditor({
                   )}
                 </div>
                 <h3 id="editor-dialog-title">
-                  {dialog.type === "image" ? "让想法被看见" : "添加链接"}
+                  {dialog.type === "image" ? "插入图片" : "添加链接"}
                 </h3>
                 <button
                   type="button"
@@ -1492,7 +1616,6 @@ export default function DocumentEditor({
                   <Upload size={23} />
                   <strong>选择本地图片</strong>
                   <span>PNG、JPEG、GIF、WebP、AVIF · 最大 8 MB</span>
-                  <small>图片随文档保存在本地，也可以直接拖入正文</small>
                 </button>
               )}
               <label className="editor-field">

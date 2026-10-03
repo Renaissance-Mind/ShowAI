@@ -1576,3 +1576,15 @@
     print-color-adjust: exact;
   }
 }
+
+/* Block editing tools appear when the block is being used. */
+@media (hover: hover) and (pointer: fine) {
+  .sb-block > .sb-header > .sb-actions {
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .sb-block:hover > .sb-header > .sb-actions,
+  .sb-block:focus-within > .sb-header > .sb-actions {
+    opacity: 1;
+  }
+}

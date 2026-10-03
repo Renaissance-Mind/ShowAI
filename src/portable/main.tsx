@@ -1,6 +1,7 @@
-import { StrictMode, useEffect, useMemo, useState } from "react";
+import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { EditorContent, useEditor } from "@tiptap/react";
+import { Download, Moon, MoreHorizontal, Printer, Sun } from "lucide-react";
 import { createExtensions } from "../editor/extensions";
 import { parseArtifact, serializeArtifact } from "./validation.mjs";
 import type { ShowArtifact, ShowDocument } from "../types";
@@ -13,7 +14,7 @@ function downloadSource(document: ShowDocument) {
   );
   const link = window.document.createElement("a");
   link.href = url;
-  link.download = `${document.title.replace(/[^\p{L}\p{N} _-]/gu, "").trim() || "document"}.showai.json`;
+  link.download = `${document.title.replace(/[^\p{L}\p{N} _-]/gu, "").trim() || "page"}.showai.json`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -23,153 +24,85 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
   const [dark, setDark] = useState(
     () => window.matchMedia("(prefers-color-scheme: dark)").matches,
   );
-  const [wide, setWide] = useState(false);
-  const [tocOpen, setTocOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const editor = useEditor({
     extensions: createExtensions({ readOnly: true }),
     content: document.content,
     editable: false,
     immediatelyRender: true,
   });
-  const headings = useMemo(() => {
-    const result: { text: string; level: number; id: string }[] = [];
-    const visit = (node: ShowDocument["content"]) => {
-      if (node.type === "heading")
-        result.push({
-          text: node.content?.map((child) => child.text ?? "").join("") ?? "",
-          level: Number(node.attrs?.level ?? 2),
-          id: `section-${result.length + 1}`,
-        });
-      node.content?.forEach(visit);
-    };
-    visit(document.content);
-    return result;
-  }, [document.content]);
 
   useEffect(() => {
     window.document.documentElement.dataset.theme = dark ? "dark" : "light";
   }, [dark]);
+
   useEffect(() => {
-    if (!editor) return;
-    editor.view.dom
-      .querySelectorAll("h1,h2,h3,h4,h5,h6")
-      .forEach((heading, index) => {
-        heading.id = `section-${index + 1}`;
-      });
-  }, [editor, headings]);
+    if (!menuOpen) return;
+    const closeOnPointer = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    };
+    window.document.addEventListener("pointerdown", closeOnPointer);
+    window.document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.document.removeEventListener("pointerdown", closeOnPointer);
+      window.document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [menuOpen]);
 
   return (
-    <div className={`portable-app ${wide ? "is-wide" : ""}`}>
-      <header className="portable-toolbar">
-        <a
-          href="#document-top"
-          className="portable-brand"
-          aria-label="ShowAI 文档"
+    <div className="portable-app">
+      <div className="portable-options" ref={menuRef}>
+        <button
+          ref={menuButtonRef}
+          className="portable-options-trigger"
+          aria-label="页面选项"
+          aria-expanded={menuOpen}
+          aria-controls="page-options"
+          onClick={() => setMenuOpen(!menuOpen)}
         >
-          <span>✦</span> ShowAI <i>/</i>
-          <span className="portable-toolbar-title">
-            {document.title || "无标题"}
-          </span>
-        </a>
-        <nav aria-label="文档操作">
-          {headings.length > 0 && (
+          <MoreHorizontal size={19} />
+        </button>
+        {menuOpen && (
+          <div className="portable-options-menu" id="page-options">
             <button
-              onClick={() => setTocOpen(!tocOpen)}
-              aria-expanded={tocOpen}
+              onClick={() => {
+                downloadSource(document);
+                setMenuOpen(false);
+              }}
             >
-              目录
+              <Download size={15} /> 下载源文件
             </button>
-          )}
-          <button onClick={() => setWide(!wide)} aria-pressed={wide}>
-            {wide ? "标准宽度" : "宽页模式"}
-          </button>
-          <button
-            onClick={() => setDark(!dark)}
-            aria-label={dark ? "切换浅色外观" : "切换深色外观"}
-          >
-            {dark ? "☀" : "◐"}
-          </button>
-          <button onClick={() => window.print()}>打印</button>
-          <button
-            className="portable-source-button"
-            onClick={() => downloadSource(document)}
-          >
-            下载源文件 ↗
-          </button>
-        </nav>
-      </header>
-      {tocOpen && (
-        <aside className="portable-toc" aria-label="文档目录">
-          <div className="portable-toc-title">
-            本文目录
-            <button onClick={() => setTocOpen(false)} aria-label="关闭目录">
-              ×
-            </button>
-          </div>
-          {headings.map((heading) => (
-            <a
-              key={heading.id}
-              href={`#${heading.id}`}
-              style={{ paddingLeft: Math.max(0, heading.level - 1) * 10 + 12 }}
-              onClick={() => setTocOpen(false)}
+            <button
+              onClick={() => {
+                setDark(!dark);
+                setMenuOpen(false);
+              }}
             >
-              {heading.text || "未命名标题"}
-            </a>
-          ))}
-        </aside>
-      )}
-      <main id="document-top" className="portable-document">
-        {document.cover && document.cover !== "none" && (
-          <div
-            className={`portable-cover cover-${document.cover}`}
-            aria-hidden="true"
-          >
-            <div />
-            <span>让想法继续生长。</span>
+              {dark ? <Sun size={15} /> : <Moon size={15} />}
+              {dark ? "浅色外观" : "深色外观"}
+            </button>
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                window.print();
+              }}
+            >
+              <Printer size={15} /> 打印
+            </button>
           </div>
         )}
-        <div className="portable-document-body">
-          <div className="portable-document-icon" aria-hidden="true">
-            {document.icon || "✦"}
-          </div>
-          <p className="portable-eyebrow">一份可以探索的文档</p>
-          <h1 className="portable-title">{document.title || "无标题"}</h1>
-          <div className="portable-meta">
-            <span>ShowAI 文档</span>
-            <span>·</span>
-            <time dateTime={document.updatedAt}>
-              {new Date(document.updatedAt).toLocaleDateString(undefined, {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              })}
-            </time>
-            <span>·</span>
-            <span>探索下方的内容</span>
-          </div>
-          <EditorContent editor={editor} className="portable-editor" />
-          {document.comments.length > 0 && (
-            <details className="portable-comments">
-              <summary>文档批注 · {document.comments.length}</summary>
-              {document.comments.map((comment) => (
-                <div key={comment.id} className="portable-comment">
-                  <p>{comment.text}</p>
-                  <small>
-                    {comment.resolved ? "已解决 · " : ""}
-                    {new Date(comment.createdAt).toLocaleDateString()}
-                  </small>
-                </div>
-              ))}
-            </details>
-          )}
-          <footer className="portable-footer">
-            <span>✦ ShowAI</span>
-            <p>保存源文件，让思考继续。</p>
-            <button onClick={() => downloadSource(document)}>
-              下载可编辑源文件 ↗
-            </button>
-          </footer>
-        </div>
+      </div>
+      <main className="portable-document">
+        {document.title && <h1 className="portable-title">{document.title}</h1>}
+        <EditorContent editor={editor} className="portable-editor" />
       </main>
     </div>
   );
@@ -178,24 +111,19 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
 function App() {
   const result = useMemo(() => {
     const raw = window.document.getElementById("showai-data")?.textContent;
-    if (!raw || raw.trim() === "null")
-      return {
-        error:
-          "这是 ShowAI 阅读器模板。请从 ShowAI 导出文档，或使用插件附带的命令生成完整的交互文档。",
-      };
+    if (!raw || raw.trim() === "null") return { error: "页面内容为空。" };
     try {
       return { artifact: parseArtifact(raw) };
     } catch (error) {
       return {
-        error: error instanceof Error ? error.message : "无法读取这份文档。",
+        error: error instanceof Error ? error.message : "无法读取这份页面。",
       };
     }
   }, []);
   if (!result.artifact)
     return (
       <main className="portable-error">
-        <span>✦</span>
-        <h1>ShowAI 文档</h1>
+        <h1>无法打开页面</h1>
         <p>{result.error}</p>
       </main>
     );

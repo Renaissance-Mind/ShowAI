@@ -1,6 +1,6 @@
 # ShowAI artifact format, version 1
 
-A `.showai.json` file is the editable source. A rendered `.html` file contains the same source, the React reader, styles, and interactive block components. The HTML opens directly in a browser without a server. Reader interactions are temporary; use the source file in the ShowAI application to make persistent edits.
+A `.showai.json` file describes one interactive page. The rendered `.html` contains that source, the React reader, styles, and interactive block components. It opens directly in a browser without a server. The visible surface is the page title and content; a small corner menu provides source download, appearance, and print. Reader interactions are temporary; edit the source or open it in the ShowAI canvas to save content changes.
 
 ## Envelope
 
@@ -9,10 +9,8 @@ A `.showai.json` file is the editable source. A rendered `.html` file contains t
   "format": "showai",
   "version": 1,
   "document": {
-    "id": "research-notes",
-    "title": "Research notes",
-    "icon": "🔎",
-    "cover": "sage",
+    "id": "research-result",
+    "title": "Research result",
     "content": {
       "type": "doc",
       "content": [
@@ -26,9 +24,9 @@ A `.showai.json` file is the editable source. A rendered `.html` file contains t
 }
 ```
 
-`id`, `title`, and a `doc` content node are required. Optional document fields are `icon`, `cover`, `parentId`, `favorite`, `archived`, `createdAt`, `updatedAt`, and `comments`. Dates are ISO date strings. Missing dates use import time. Cover values used by the application are `none`, `sage`, `sand`, `blue`, `rose`, and `ink`. A comment has `{id, text, createdAt, resolved}`. Source files retain page identity and metadata; importing into a workspace creates a new page identity to avoid overwriting an existing page.
+`id`, `title`, and a `doc` content node are required. `createdAt` and `updatedAt` use ISO date strings; missing dates use import time. Older sources may retain `icon`, `cover`, `parentId`, `favorite`, `archived`, and `comments` for compatibility. These fields do not add navigation, decorations, or comments to the rendered page. Import opens the source as the current canvas.
 
-See [the complete example](../examples/welcome.showai.json), which includes a mathematical chart, source database, calculator, callout, and expandable explanation. In the installed plugin the example is under `../examples/` relative to this reference.
+See [the complete example](../examples/welcome.showai.json), which pairs a mathematical chart with a two-input calculator. In the installed plugin the example is under `../examples/` relative to this reference.
 
 ## Text and document blocks
 

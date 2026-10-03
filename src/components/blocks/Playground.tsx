@@ -365,7 +365,6 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
                 (data.operation === "average" ? `，÷ ${inputs.length}` : "")
               : "等待设置参数"}
           </span>
-          <span className="sb-local-state-note">拖动参数，即时计算</span>
         </div>
       </div>
     </section>
