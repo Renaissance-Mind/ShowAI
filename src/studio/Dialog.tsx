@@ -6,11 +6,17 @@ export default function Dialog({
   children,
   onClose,
   wide = false,
+  className = "",
+  titleAccessory,
+  headerContent,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
+  className?: string;
+  titleAccessory?: ReactNode;
+  headerContent?: ReactNode;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -57,10 +63,18 @@ export default function Dialog({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`studio-modal ${wide ? "wide" : ""}`}
+        className={`studio-modal ${wide ? "wide" : ""} ${className}`}
       >
         <header>
-          <h2>{title}</h2>
+          {titleAccessory ? (
+            <div className="studio-modal-title">
+              <h2>{title}</h2>
+              {titleAccessory}
+            </div>
+          ) : (
+            <h2>{title}</h2>
+          )}
+          {headerContent}
           <button
             className="studio-icon"
             aria-label="关闭弹窗"

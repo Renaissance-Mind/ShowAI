@@ -1007,12 +1007,21 @@ export function ComponentDialog({
     await onSaved(saved);
   }
   return (
-    <Dialog title={item.name} onClose={onClose} wide>
-      <div className="studio-component-detail catalog-detail">
-        {custom && <Lineage item={custom} />}
-        <div className="studio-detail-tabs">
+    <Dialog
+      title={item.name}
+      onClose={onClose}
+      wide
+      className="catalog-component-dialog"
+      titleAccessory={
+        <span className="catalog-component-version">
+          {item.version ?? "1.0.0"}
+        </span>
+      }
+      headerContent={
+        <nav className="studio-detail-tabs" aria-label="组件详情菜单">
           <button
             className={tab === "about" ? "active" : ""}
+            aria-pressed={tab === "about"}
             onClick={() => setTab("about")}
           >
             概览
@@ -1020,6 +1029,7 @@ export function ComponentDialog({
           {source && (
             <button
               className={tab === "code" ? "active" : ""}
+              aria-pressed={tab === "code"}
               onClick={() => setTab("code")}
             >
               定制组件
@@ -1027,18 +1037,20 @@ export function ComponentDialog({
           )}
           <button
             className={tab === "schema" ? "active" : ""}
+            aria-pressed={tab === "schema"}
             onClick={() => setTab("schema")}
           >
             数据结构
           </button>
-        </div>
+        </nav>
+      }
+    >
+      <div className="studio-component-detail catalog-detail">
+        {custom && <Lineage item={custom} />}
         {tab === "about" && (
           <>
             <div className="catalog-reference-intro">
-              <span>
-                {builtin ? "内置组件" : "自定义组件"} ·{" "}
-                {item.version ?? "1.0.0"}
-              </span>
+              <span>{builtin ? "内置组件" : "自定义组件"}</span>
               <p>{item.description}</p>
             </div>
             <div className="catalog-overview">
@@ -1226,15 +1238,10 @@ export function ComponentDialog({
           </p>
         )}
         <footer>
-          <span>
-            {source
-              ? projectId
-                ? "修改将保存到当前项目。"
-                : "选择项目后可定制。"
-              : custom
-                ? "此副本只有运行代码；编辑需要原始源码。"
-                : "内置组件"}
-          </span>
+          {source && !projectId && <span>选择项目后可定制。</span>}
+          {!source && custom && (
+            <span>此副本只有运行代码；编辑需要原始源码。</span>
+          )}
           {custom?.scope === "project" && (
             <button
               className="studio-button"
