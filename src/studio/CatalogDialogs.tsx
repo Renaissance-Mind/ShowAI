@@ -18,6 +18,7 @@ import type {
   CompiledComponent,
   ComponentMetadata,
   ComponentSource,
+  ComponentCategory,
   PackageRevisionRef,
   RelatedPackage,
   TemplateMetadata,
@@ -35,6 +36,10 @@ import { splitContent } from "../surface/model";
 import { newDocument } from "../lib/document";
 import { desktop, errorMessage } from "./bridge";
 import Dialog from "./Dialog";
+import {
+  componentCategories,
+  componentCategory,
+} from "../core/component-categories";
 import "./catalog.css";
 
 function TemplateContent(props: DocumentEditorProps) {
@@ -942,6 +947,9 @@ export function ComponentDialog({
   onPublish: (ref: PackageRevisionRef) => void;
 }) {
   const item = builtin ?? custom!;
+  const [category, setCategory] = useState<ComponentCategory>(() =>
+    componentCategory(item),
+  );
   const [tab, setTab] = useState<"about" | "code" | "schema">("about");
   const [code, setCode] = useState(source?.source ?? ""),
     [schema, setSchema] = useState(
@@ -988,6 +996,7 @@ export function ComponentDialog({
       manifest: {
         ...baseManifest,
         id: componentId,
+        category,
         name,
         description,
         version,
@@ -1131,6 +1140,22 @@ export function ComponentDialog({
         )}
         {tab === "code" && source && (
           <div className="studio-form catalog-edit-form">
+            <label>
+              类型
+              <select
+                aria-label="组件类型"
+                value={category}
+                onChange={(event) =>
+                  setCategory(event.target.value as ComponentCategory)
+                }
+              >
+                {componentCategories.map(({ id, label }) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
             {builtin && (
               <label>
                 组件 ID

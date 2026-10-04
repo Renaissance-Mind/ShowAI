@@ -72,6 +72,35 @@ const schema = {
 const source =
   'import {useState} from "react";export default function Counter({data,onChange}){const[value,setValue]=useState(data.value);return <button onClick={()=>{setValue(value+1);onChange?.({value:value+1})}}>{value}</button>}';
 
+it("preserves a custom component category through saving and listing", async () => {
+  const home = await temporary();
+  const saved = await saveComponent(
+    home,
+    {
+      manifest: { ...manifest, category: "data" },
+      schema,
+      source,
+    },
+    project(home),
+  );
+  expect(saved.category).toBe("data");
+  expect((await listComponents(home, project(home)))[0].category).toBe("data");
+  await expect(
+    saveComponent(
+      home,
+      {
+        manifest: {
+          ...manifest,
+          category: "invalid",
+        } as unknown as ComponentManifest,
+        schema,
+        source,
+      },
+      project(home),
+    ),
+  ).rejects.toThrow("Component category");
+});
+
 it("React Flow can be composed through the SDK and exported without external scripts", async () => {
   const home = await temporary();
   const original = readBuiltinComponentSource("flowchart");

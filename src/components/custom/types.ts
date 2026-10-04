@@ -86,11 +86,15 @@ export interface ComponentExample {
 }
 
 /** User packages contain manifest.json, props.schema.json and a local React entry. */
+export type ComponentCategory =
+  "text" | "image" | "table" | "data" | "flow" | "other";
+
 export interface ComponentManifest {
   id: string;
   name: string;
   version: string;
   description: string;
+  category?: ComponentCategory;
   scenarios: string[];
   effects?: string[];
   /** Exact component revisions imported through showai:component/<id>. */

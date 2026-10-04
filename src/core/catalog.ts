@@ -58,6 +58,7 @@ import type {
   PackageMergeInput,
   PackageMergePreview,
 } from "../components/custom/types";
+import { componentCategories, componentCategory } from "./component-categories";
 
 export type {
   CompiledComponent,
@@ -105,6 +106,7 @@ export default function Component({ data, onChange, readOnly }) {
       name: item.name,
       version: item.version ?? "1.0.0",
       description: item.description,
+      category: componentCategory(item),
       scenarios: item.scenarios,
       effects: item.effects,
       entry: "index.tsx",
@@ -850,6 +852,13 @@ function record(value: unknown, label: string): Record<string, unknown> {
 }
 function manifestFrom(value: unknown): ComponentManifest {
   const item = record(value, "Component manifest");
+  if (
+    item.category !== undefined &&
+    !componentCategories.some(({ id }) => id === item.category)
+  )
+    throw new Error(
+      "Component category must be text, image, table, data, flow or other.",
+    );
   for (const key of ["id", "name", "version", "description", "entry"])
     if (typeof item[key] !== "string" || (item[key] as string).length > 4000)
       throw new Error(`Component manifest needs ${key}.`);
@@ -900,6 +909,9 @@ function manifestFrom(value: unknown): ComponentManifest {
     version,
     name: (item.name as string).trim(),
     description: item.description as string,
+    ...(item.category !== undefined
+      ? { category: item.category as ComponentManifest["category"] }
+      : {}),
     entry,
     scenarios: item.scenarios as string[],
     defaultData,

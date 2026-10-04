@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -11,7 +12,6 @@ import {
   Blocks,
   Check,
   ChevronRight,
-  Code2,
   Copy,
   FilePlus2,
   FileText,
@@ -43,6 +43,7 @@ import type {
   CompiledComponent,
   ComponentMetadata,
   ComponentSource,
+  ComponentCategory,
   TemplateMetadata,
   TemplateRecord,
   PackageRevisionRef,
@@ -61,6 +62,11 @@ import {
   type LibraryTarget,
 } from "./LibraryNavigation";
 import Dialog from "./Dialog";
+import { ComponentCatalog, ComponentNavigation } from "./ComponentCatalog";
+import {
+  groupComponents,
+  type ComponentFilter,
+} from "../core/component-categories";
 import {
   TemplateDialog,
   ComponentDialog,
@@ -174,9 +180,19 @@ export default function Studio() {
       ? saved === "dark"
       : matchMedia("(prefers-color-scheme: dark)").matches;
   });
-  const [componentFilter, setComponentFilter] = useState<"all" | "custom">(
-    "all",
+  const [componentFilter, setComponentFilter] =
+    useState<ComponentFilter>("all");
+  const [componentCategory, setComponentCategory] =
+    useState<ComponentCategory | null>("text");
+  const [categoryRequest, setCategoryRequest] = useState<{
+    category: ComponentCategory;
+    sequence: number;
+  } | null>(null);
+  const componentGroups = useMemo(
+    () => groupComponents(catalog, componentFilter),
+    [catalog, componentFilter],
   );
+  const catalogScrollRef = useRef<HTMLDivElement>(null);
   const [focusWindow] = useState(
     () => new URLSearchParams(location.search).get("focus") === "1",
   );
@@ -222,7 +238,7 @@ export default function Studio() {
       desktop.invoke<TemplateMetadata[]>("templates:list", scope),
       desktop.invoke<(BuiltinComponentMetadata | ComponentMetadata)[]>(
         "components:list",
-        scope,
+        { ...scope, scope: "all" },
       ),
     ]);
     if (
@@ -830,7 +846,7 @@ export default function Studio() {
 
   return (
     <div
-      className={`studio ${focusWindow ? "focus-window" : ""} ${view === "settings" ? "settings-view" : ""}`}
+      className={`studio ${focusWindow ? "focus-window" : ""} ${view === "settings" ? "settings-view" : ""} ${view === "components" ? "components-view" : ""}`}
     >
       {!focusWindow &&
         (view === "settings" ? (
@@ -871,45 +887,59 @@ export default function Studio() {
                 组件
               </button>
             </nav>
-            <div className="studio-sidebar-projects">
-              <div className="studio-sidebar-label">
-                项目
-                <button
-                  className="studio-icon studio-row-menu"
-                  aria-label="项目列表操作"
-                  aria-haspopup="menu"
-                  onClick={(event) => {
-                    const anchor = event.currentTarget;
-                    setProjectsMenu((current) =>
-                      current === anchor ? null : anchor,
-                    );
-                  }}
-                >
-                  <MoreHorizontal size={17} />
-                </button>
-              </div>
-              {projects.map((item) => (
-                <div key={item.id}>
-                  <LibraryRow
-                    target={projectTarget(item)}
-                    active={
-                      selectedProject === item.id &&
-                      view === "project" &&
-                      !selectedFolder
-                    }
-                    expanded={!!expandedProjects[item.id]}
-                    onToggle={action(() => toggleProject(item.id))}
-                    onOpen={action(() => openProject(item.id))}
-                    onMenu={showMenu}
-                  />
-                  {expandedProjects[item.id] && (
-                    <div className="studio-tree-children">
-                      {renderChildren(item.id)}
-                    </div>
-                  )}
+            {view === "components" ? (
+              <ComponentNavigation
+                groups={componentGroups}
+                active={componentCategory}
+                onSelect={(category) => {
+                  setComponentCategory(category);
+                  setCategoryRequest((current) => ({
+                    category,
+                    sequence: (current?.sequence ?? 0) + 1,
+                  }));
+                }}
+              />
+            ) : (
+              <div className="studio-sidebar-projects">
+                <div className="studio-sidebar-label">
+                  项目
+                  <button
+                    className="studio-icon studio-row-menu"
+                    aria-label="项目列表操作"
+                    aria-haspopup="menu"
+                    onClick={(event) => {
+                      const anchor = event.currentTarget;
+                      setProjectsMenu((current) =>
+                        current === anchor ? null : anchor,
+                      );
+                    }}
+                  >
+                    <MoreHorizontal size={17} />
+                  </button>
                 </div>
-              ))}
-            </div>
+                {projects.map((item) => (
+                  <div key={item.id}>
+                    <LibraryRow
+                      target={projectTarget(item)}
+                      active={
+                        selectedProject === item.id &&
+                        view === "project" &&
+                        !selectedFolder
+                      }
+                      expanded={!!expandedProjects[item.id]}
+                      onToggle={action(() => toggleProject(item.id))}
+                      onOpen={action(() => openProject(item.id))}
+                      onMenu={showMenu}
+                    />
+                    {expandedProjects[item.id] && (
+                      <div className="studio-tree-children">
+                        {renderChildren(item.id)}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="studio-sidebar-bottom">
               <button onClick={action(() => navigate("settings"))}>
                 <Settings2 size={15} />
@@ -1068,6 +1098,7 @@ export default function Studio() {
           </div>
         )}
         <div
+          ref={catalogScrollRef}
           className={`studio-scroll${view === "page" && page.draft ? " has-page-surface" : ""}`}
         >
           {loading && (
@@ -1145,7 +1176,9 @@ export default function Studio() {
               />
             </CustomComponentsProvider>
           ) : (
-            <div className="studio-library">
+            <div
+              className={`studio-library${view === "components" ? " studio-component-library" : ""}`}
+            >
               <div className="studio-section-heading">
                 <div>
                   <h1>{heading}</h1>
@@ -1260,6 +1293,36 @@ export default function Studio() {
                   )}
                 </div>
               </div>
+              {view === "components" && (
+                <nav
+                  className="studio-filter-tabs component-source-tabs"
+                  aria-label="组件来源"
+                >
+                  {(
+                    [
+                      ["all", "全部"],
+                      ["builtin", "默认"],
+                      ["custom", "自定义"],
+                    ] as const
+                  ).map(([filter, label]) => (
+                    <button
+                      key={filter}
+                      className={componentFilter === filter ? "active" : ""}
+                      aria-pressed={componentFilter === filter}
+                      onClick={() => {
+                        setComponentFilter(filter);
+                        setCategoryRequest(null);
+                        catalogScrollRef.current?.scrollTo({
+                          top: 0,
+                          behavior: "instant",
+                        });
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </nav>
+              )}
               {(view === "templates" || view === "components") && (
                 <div className="studio-library-toolbar catalog-scope-controls">
                   <label>
@@ -1287,24 +1350,26 @@ export default function Studio() {
                       ))}
                     </select>
                   </label>
-                  <label>
-                    查看范围
-                    <select
-                      aria-label="目录范围"
-                      value={catalogScope ?? "all"}
-                      onChange={(event) =>
-                        setCatalogScope(
-                          event.target.value as CatalogReadOptions["scope"],
-                        )
-                      }
-                    >
-                      <option value="all">全部</option>
-                      <option value="project">项目</option>
-                      <option value="global">全局</option>
-                      <option value="published">已发布</option>
-                      <option value="builtin">内置</option>
-                    </select>
-                  </label>
+                  {view === "templates" && (
+                    <label>
+                      查看范围
+                      <select
+                        aria-label="目录范围"
+                        value={catalogScope ?? "all"}
+                        onChange={(event) =>
+                          setCatalogScope(
+                            event.target.value as CatalogReadOptions["scope"],
+                          )
+                        }
+                      >
+                        <option value="all">全部</option>
+                        <option value="project">项目</option>
+                        <option value="global">全局</option>
+                        <option value="published">已发布</option>
+                        <option value="builtin">内置</option>
+                      </select>
+                    </label>
+                  )}
                   {!selectedProject && <span>先选择项目，再创建或定制。</span>}
                 </div>
               )}
@@ -1527,95 +1592,13 @@ export default function Studio() {
                 </>
               )}
               {view === "components" && (
-                <>
-                  <div className="studio-library-toolbar">
-                    <div className="studio-filter-tabs">
-                      <button
-                        className={componentFilter === "all" ? "active" : ""}
-                        onClick={() => setComponentFilter("all")}
-                      >
-                        全部
-                      </button>
-                      <button
-                        className={componentFilter === "custom" ? "active" : ""}
-                        onClick={() => setComponentFilter("custom")}
-                      >
-                        自定义
-                      </button>
-                    </div>
-                    <span />
-                  </div>
-                  <div className="studio-component-grid">
-                    {componentFilter === "all" &&
-                      catalog.builtin.map((item, index) => (
-                        <button
-                          className="studio-component-card"
-                          key={item.kind}
-                          onClick={action(() => viewComponent(item))}
-                        >
-                          <div
-                            className={`studio-component-symbol symbol-${index % 4}`}
-                          >
-                            <span>
-                              {
-                                (
-                                  {
-                                    text: "T",
-                                    image: "▧",
-                                    table: "▦",
-                                    callout: "!",
-                                    toggle: "⌄",
-                                    divider: "—",
-                                    code: "{}",
-                                    chart: "↗",
-                                    database: "▦",
-                                    metrics: "◴",
-                                    playground: "⌁",
-                                    gallery: "▧",
-                                    bookmark: "↗",
-                                  } as Record<string, string>
-                                )[item.kind]
-                              }
-                            </span>
-                          </div>
-                          <div>
-                            <h2>
-                              {item.name}
-                              <Scope value="builtin" />
-                            </h2>
-                            <p>{item.description}</p>
-                            <footer>v{item.version ?? "1.0.0"}</footer>
-                          </div>
-                        </button>
-                      ))}
-                    {catalog.custom.map((item) => (
-                      <button
-                        className="studio-component-card"
-                        key={`${item.id}@${item.version}:${item.scope}`}
-                        onClick={action(() => viewComponent(item))}
-                      >
-                        <div className="studio-component-symbol symbol-3">
-                          <Code2 size={26} />
-                        </div>
-                        <div>
-                          <h2>
-                            {item.name}
-                            <Scope value={item.scope} />
-                          </h2>
-                          <p>{item.description}</p>
-                          <footer>v{item.version}</footer>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                  {componentFilter === "custom" && !catalog.custom.length && (
-                    <div className="studio-empty">
-                      <Blocks size={33} strokeWidth={1.3} />
-                      <h2>添加自己的组件</h2>
-                      <p>导入本地组件包，或从一个可编辑的示例开始。</p>
-                    </div>
-                  )}
-                </>
+                <ComponentCatalog
+                  groups={componentGroups}
+                  scrollRef={catalogScrollRef}
+                  request={categoryRequest}
+                  onActiveChange={setComponentCategory}
+                  onOpen={(item) => void viewComponent(item).catch(report)}
+                />
               )}
             </div>
           )}
