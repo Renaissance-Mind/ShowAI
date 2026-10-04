@@ -16,8 +16,8 @@ const env = {
 };
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await _electron.launch({
-  executablePath: electron,
-  args: [root],
+  executablePath: process.env.SHOWAI_SMOKE_BINARY || electron,
+  args: process.env.SHOWAI_SMOKE_BINARY ? [] : [root],
   cwd: root,
   env,
 });
