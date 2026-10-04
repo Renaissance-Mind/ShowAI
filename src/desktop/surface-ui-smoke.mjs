@@ -26,7 +26,9 @@ async function poll(read, accept, label) {
     if (accept(value)) return value;
     await delay(60);
   }
-  throw new Error(`Timed out: ${label}: ${JSON.stringify(value)}`);
+  throw new Error(
+    `Timed out: ${label}: ${JSON.stringify(value).slice(0, 1200)}`,
+  );
 }
 const text = (value) => ({ type: "text", text: value });
 const paragraph = (value) => ({ type: "paragraph", content: [text(value)] });
@@ -36,8 +38,9 @@ try {
     args: [repository],
     cwd: repository,
     env,
+    timeout: 15000,
   });
-  page = await app.firstWindow();
+  page = await app.firstWindow({ timeout: 15000 });
   page.on("pageerror", (error) => result.errors.push(error.message));
   page.setDefaultTimeout(10000);
   await page.setViewportSize({ width: 1440, height: 940 });
@@ -103,73 +106,122 @@ try {
     .first()
     .click();
   const surface = page.locator(".page-surface");
-  const mode = () => surface.getAttribute("data-mode");
   await surface.waitFor();
-  assert.equal(await mode(), "document");
   const initialEditor = await page
     .locator(".surface-document .tiptap")
     .elementHandle();
-  const scrollTop = () =>
-    page.locator(".surface-scroll").evaluate((element) => element.scrollTop);
   const camera = () =>
     page.locator(".surface-world").evaluate((element) => {
       const matrix = new DOMMatrix(getComputedStyle(element).transform);
       return { x: matrix.e, y: matrix.f, scale: matrix.a };
     });
-  await page.mouse.move(980, 500);
-  await page.mouse.wheel(3, 500);
-  await poll(scrollTop, (n) => n > 300, "native document scroll");
-  await delay(260);
-  const readingPosition = await scrollTop();
-  await page.mouse.wheel(900, 0);
-  await delay(400);
-  assert.equal(
-    await mode(),
-    "document",
-    "one large horizontal wheel must not escape",
+  const settled = () =>
+    poll(
+      () => surface.getAttribute("data-settling"),
+      (value) => value === null,
+      "spring settled",
+    );
+  await poll(
+    () => surface.getAttribute("data-anchor"),
+    (value) => value === "document",
+    "initial body anchor",
   );
-  assert.ok(Math.abs((await camera()).x) < 1, "resistance springs back");
-  assert.ok(Math.abs((await scrollTop()) - readingPosition) < 2);
+  assert.equal(await surface.getAttribute("data-mode"), null);
+  assert.equal(
+    await page.getByRole("button", { name: "展开画布", exact: true }).count(),
+    0,
+  );
+  assert.equal(await page.locator(".surface-grid").count(), 0);
+  const colors = await surface.evaluate((element) => ({
+    background: getComputedStyle(element).backgroundColor,
+    image: getComputedStyle(element).backgroundImage,
+    paper: getComputedStyle(element.querySelector(".surface-document"))
+      .backgroundColor,
+    shadow: getComputedStyle(element.querySelector(".surface-document"))
+      .boxShadow,
+  }));
+  assert.deepEqual(colors, {
+    background: "rgb(255, 255, 255)",
+    image: "none",
+    paper: "rgba(0, 0, 0, 0)",
+    shadow: "none",
+  });
+  await page.mouse.move(980, 500);
+  await page.mouse.wheel(0, 200);
+  await poll(camera, (value) => value.y < -300, "vertical reading");
+  await delay(300);
+  await settled();
+  const readingPosition = (await camera()).y;
+  await page.mouse.wheel(20, 0);
+  const pulled = await poll(
+    camera,
+    (value) => value.x < -5,
+    "visible elastic displacement",
+  );
+  assert.ok(Math.abs(pulled.x) < 40);
+  await poll(
+    () => surface.getAttribute("data-settling"),
+    (value) => value === "true",
+    "animated return begins",
+  );
+  const returning = await camera();
+  assert.ok(
+    Math.abs(returning.x) > 0.05,
+    "return is animated rather than an instantaneous reset",
+  );
+  await settled();
+  assert.ok(Math.abs((await camera()).x) < 0.2);
+  assert.ok(Math.abs((await camera()).y - readingPosition) < 1);
+  await page.mouse.wheel(20, 0);
+  await poll(
+    () => surface.getAttribute("data-settling"),
+    (value) => value === "true",
+    "interruptible return",
+  );
+  const interrupted = await camera();
+  await page.mouse.wheel(-10, 0);
+  await delay(50);
+  assert.ok(
+    Math.abs((await camera()).x - interrupted.x) < 40,
+    "new input continues from the visible position",
+  );
+  await delay(250);
+  await settled();
+  assert.ok(Math.abs((await camera()).x) < 0.2);
   for (let i = 0; i < 5; i++) {
     await page.mouse.wheel(80, 0);
     await delay(40);
   }
-  await poll(
-    mode,
-    (value) => value === "canvas",
-    "deliberate horizontal escape",
-  );
-  assert.equal(
-    await initialEditor.evaluate((node) => node.isConnected),
-    true,
-    "mode changes keep editor mounted",
-  );
+  await delay(300);
+  await settled();
   assert.ok(
-    Math.abs((await camera()).y + readingPosition) < 2,
-    "escape preserves reading position",
+    (await camera()).x < -200,
+    "continued pulling can leave the anchor",
   );
-  await delay(260);
+  assert.equal(await surface.getAttribute("data-anchor"), "");
+  assert.equal(await initialEditor.evaluate((node) => node.isConnected), true);
   const offset = (await camera()).x;
-  // Electron's native wheel injection can scale horizontal deltas on Retina.
-  // Return with a captured middle-button drag measured in screen pixels.
-  await page.mouse.move(950, 500);
+  await page.mouse.move(300, 500);
   await page.mouse.down({ button: "middle" });
-  await page.mouse.move(950 - offset, 500, { steps: 12 });
+  await page.mouse.move(300 - offset / 0.72, 500, { steps: 12 });
   await page.mouse.up({ button: "middle" });
   await poll(
-    mode,
+    () => surface.getAttribute("data-anchor"),
     (value) => value === "document",
-    "automatic return without peripheral content",
+    "body gently reattaches",
   );
-  assert.ok(Math.abs((await scrollTop()) - readingPosition) < 2);
+  await settled();
+  assert.ok(Math.abs((await camera()).x) < 1);
+  assert.ok(Math.abs((await camera()).y - readingPosition) < 1);
+  assert.equal(await surface.getAttribute("data-mode"), null);
   result.checks.push(
-    "native vertical scrolling, elastic resistance, deliberate escape, stable editor DOM and automatic return at the original reading position",
+    "one white surface, visible horizontal resistance, multi-frame spring return, deliberate departure, gentle reattachment and stable editor DOM",
   );
 
   // Horizontal table scrolling must own even the boundary tail of its gesture.
-  await page.locator(".surface-scroll").evaluate((element) => {
-    element.scrollTop = 0;
-  });
+  await surface.focus();
+  await surface.press("PageUp");
+  await settled();
   const code = page.locator(".surface-document .tableWrapper");
   await code.hover();
   for (let i = 0; i < 6; i++) {
@@ -177,13 +229,11 @@ try {
     await delay(40);
   }
   assert.ok(await code.evaluate((element) => element.scrollLeft > 100));
-  assert.equal(await mode(), "document");
-  result.checks.push(
-    "wide table retains horizontal scrolling without escaping the document",
-  );
+  assert.equal(await surface.getAttribute("data-mode"), null);
+  result.checks.push("wide table retains its own horizontal scrolling");
 
-  await page.getByRole("button", { name: "展开画布", exact: true }).click();
   await page.getByRole("button", { name: "添加内容", exact: true }).click();
+  await settled();
   const side = page.locator(".surface-card .tiptap");
   await side.fill("旁注保存在真实页面中");
   await side.press("End");
@@ -199,8 +249,10 @@ try {
     canvasItems(value).find((node) => node.attrs.id === id);
   const beforeMove = item(saved).attrs.canvas;
   await page.getByRole("button", { name: "缩小画布", exact: true }).click();
-  const zoom = (await poll(camera, (value) => value.scale < 1, "zoom frame"))
-    .scale;
+  await poll(camera, (value) => value.scale < 1, "zoom frame");
+  await delay(300);
+  await settled();
+  const zoom = (await camera()).scale;
   const handle = page.getByRole("button", {
     name: "移动画布内容",
     exact: true,
@@ -255,16 +307,54 @@ try {
   await page.mouse.down();
   await page.mouse.move(cancelHandle.x + 75, cancelHandle.y + 40, { steps: 6 });
   await page.keyboard.press("Escape");
+  await page.mouse.move(100, 160);
   await page.mouse.up();
   await delay(550);
   assert.deepEqual(item(await read()).attrs.canvas, originalPosition);
-  await page.getByRole("button", { name: "回到正文", exact: true }).click();
-  assert.equal(
-    await mode(),
-    "canvas",
-    "existing content prevents automatic mode collapse",
+  const beforeWheel = await camera();
+  await page.mouse.move(270, 500);
+  await page.mouse.wheel(16, 0);
+  await poll(
+    camera,
+    (value) => Math.abs(value.x - beforeWheel.x) > 3,
+    "cancel outside the workspace does not leave navigation locked",
   );
+  await delay(300);
+  await settled();
+  await settled();
+  await poll(
+    () => surface.getAttribute("data-anchor"),
+    (value) => value === id,
+    "peripheral region anchor",
+  );
+  const anchoredCard = await camera();
+  await page.mouse.move(270, 500);
+  for (const direction of [1, -1]) {
+    await page.mouse.wheel(18 * direction, 0);
+    const displaced = await poll(
+      camera,
+      (value) => Math.abs(value.x - anchoredCard.x) > 4,
+      "side content also resists",
+    );
+    assert.ok(Math.abs(displaced.x - anchoredCard.x) < 36);
+    await poll(
+      () => surface.getAttribute("data-settling"),
+      (value) => value === "true",
+      "side content spring begins",
+    );
+    await settled();
+    assert.ok(Math.abs((await camera()).x - anchoredCard.x) < 0.2);
+    assert.equal(await surface.getAttribute("data-anchor"), id);
+  }
+  result.checks.push(
+    "peripheral content reattaches and retains animated resistance in both horizontal directions",
+  );
+  await page.getByRole("button", { name: "回到正文", exact: true }).click();
+  await settled();
+  await settled();
+  assert.equal(await surface.getAttribute("data-mode"), null);
   await page.getByRole("button", { name: "总览画布内容", exact: true }).click();
+  await settled();
   await page.screenshot({ path: join(output, "canvas-overview.png") });
   await page.getByRole("button", { name: "定位内容", exact: true }).click();
   await page.getByRole("button", { name: "删除画布内容", exact: true }).click();
@@ -287,7 +377,7 @@ try {
   assert.match(await side.innerText(), /with spaces/);
   assert.deepEqual(item(await read()).attrs.canvas, originalPosition);
   result.checks.push(
-    "Escape cancellation, canvas retained with side content, deletion undo and complete reload recovery",
+    "Escape cancellation, deletion undo and complete reload recovery",
   );
 
   // Export through the real CLI and open its standalone, offline reader.
@@ -343,6 +433,11 @@ try {
   await reader.emulateMedia({ media: "screen", reducedMotion: "reduce" });
   await reader.setViewportSize({ width: 390, height: 844 });
   await reader.getByRole("button", { name: "回到正文", exact: true }).click();
+  await poll(
+    () => reader.locator(".page-surface").getAttribute("data-settling"),
+    (value) => value === null,
+    "reader home settles",
+  );
   const toolbar = await reader.locator(".surface-toolbar").boundingBox();
   assert.ok(toolbar.x >= 0 && toolbar.x + toolbar.width <= 391);
   await reader.screenshot({ path: join(output, "reader-mobile.png") });
@@ -360,7 +455,8 @@ try {
     "dock note into body",
   );
   await page.getByRole("button", { name: "回到正文", exact: true }).click();
-  assert.equal(await mode(), "document");
+  await settled();
+  assert.equal(await surface.getAttribute("data-mode"), null);
   assert.equal(await page.locator(".surface-card").count(), 0);
   assert.match(
     await page.locator(".surface-document .tiptap").innerText(),
@@ -376,15 +472,16 @@ try {
   result.checks.push(
     "docking side content back into the document retains all text and saves the canonical file",
   );
-  await page.locator(".surface-scroll").evaluate((element) => {
-    element.scrollTop = 0;
-  });
+  await surface.focus();
+  await surface.press("PageUp");
+  await settled();
   const originalBlockId = saved.document.content.content[0].attrs.id;
   await page.locator(".surface-document .tiptap > p").first().hover();
   await page
     .getByRole("button", { name: "移动或管理内容块", exact: true })
     .click();
   await page.getByRole("button", { name: "移至画布", exact: true }).click();
+  await settled();
   const detached = await poll(
     read,
     (value) => canvasItems(value).length === 1,
@@ -404,12 +501,26 @@ try {
 } catch (error) {
   result.error = error.stack ?? String(error);
   if (page && !page.isClosed())
+    result.viewport = await page.evaluate(() => ({
+      reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+      anchor: document
+        .querySelector(".page-surface")
+        ?.getAttribute("data-anchor"),
+      transform: document
+        .querySelector(".surface-world")
+        ?.getAttribute("style"),
+      scroll: document.querySelector(".surface-scroll")?.scrollTop,
+    }));
+  if (page && !page.isClosed())
     await page
       .screenshot({ path: join(output, "failure.png") })
       .catch(() => {});
   process.exitCode = 1;
 } finally {
-  if (app) await app.close();
+  if (app) {
+    if (result.passed) await app.close();
+    else app.process().kill("SIGTERM");
+  }
   await writeFile(join(output, "result.json"), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));
 }

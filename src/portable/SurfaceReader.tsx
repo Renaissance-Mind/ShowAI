@@ -12,13 +12,6 @@ export function SurfaceReader({
   heading: ReactNode;
 }) {
   const { body, items } = splitContent(content);
-  if (!items.length)
-    return (
-      <main className="portable-document">
-        {heading}
-        <PageContent content={content} />
-      </main>
-    );
   return (
     <PageSurface
       items={items.map((node) => ({

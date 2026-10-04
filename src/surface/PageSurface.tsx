@@ -9,7 +9,6 @@ import {
 } from "react";
 import {
   ArrowDownToLine,
-  Expand,
   FileText,
   GripHorizontal,
   Minus,
@@ -271,7 +270,7 @@ function SurfaceCard({
   );
 }
 
-/** The editor DOM stays mounted when its viewport changes between scroll and pan. */
+/** All content shares one camera and one elastic navigation model. */
 export default function PageSurface({
   children,
   items,
@@ -282,23 +281,21 @@ export default function PageSurface({
   onDelete,
   extraActions,
 }: Props) {
-  const viewport = useSurfaceViewport(items.length > 0);
-  const {
-    rootRef,
-    scrollRef,
-    worldRef,
-    documentRef,
-    mode,
-    scale,
-    camera,
-    controls,
-  } = viewport;
+  const viewport = useSurfaceViewport(
+    items
+      .map(
+        (item) =>
+          `${item.id}:${item.position.x}:${item.position.y}:${item.position.width}`,
+      )
+      .join("|"),
+  );
+  const { rootRef, scrollRef, worldRef, documentRef, scale, camera, controls } =
+    viewport;
   const reveal = (position: CanvasPlacement) => {
-    controls.current.enter();
     const root = rootRef.current!,
       world = worldRef.current!;
     const left = (scrollRef.current!.clientWidth - world.offsetWidth) / 2;
-    camera.current = {
+    const target = {
       x:
         root.clientWidth / 2 -
         left -
@@ -306,10 +303,9 @@ export default function PageSurface({
       y: root.clientHeight * 0.25 - position.y * camera.current.scale,
       scale: camera.current.scale,
     };
-    controls.current.paint();
+    controls.current.moveTo(target);
   };
   const fit = () => {
-    controls.current.enter();
     const root = rootRef.current!,
       world = worldRef.current!,
       body = documentRef.current!;
@@ -335,12 +331,12 @@ export default function PageSurface({
       ),
     );
     const left = (scrollRef.current!.clientWidth - world.offsetWidth) / 2;
-    camera.current = {
+    const target = {
       x: root.clientWidth / 2 - left - ((minX + maxX) / 2) * scale,
       y: 48 - minY * scale,
       scale,
     };
-    controls.current.paint();
+    controls.current.moveTo(target);
   };
   useImperativeHandle(ref, () => ({
     insertPosition: () => {
@@ -353,10 +349,7 @@ export default function PageSurface({
         x = world.offsetWidth + 64 + (items.length % 4) * 32;
       return {
         x,
-        y:
-          mode === "document"
-            ? scrollRef.current!.scrollTop + 64
-            : (root.clientHeight * 0.25 - c.y) / c.scale,
+        y: (root.clientHeight * 0.25 - c.y) / c.scale,
         width: 360,
       };
     },
@@ -366,13 +359,11 @@ export default function PageSurface({
     <div
       ref={rootRef}
       className="page-surface"
-      data-mode={mode}
       tabIndex={0}
       role="region"
       aria-label="页面工作区"
-      aria-description="正文可上下滚动。持续横向滑动可展开画布，也可使用下方按钮。画布空白处可拖动，方向键可平移，Escape 回到正文。"
+      aria-description="在白板上滚动或拖动空白处浏览。横向滑动带有弹性阻力，完整可见的内容会轻微吸附；持续滑动可以离开。Escape 回到正文。"
     >
-      <div className="surface-grid" aria-hidden="true" />
       <div ref={scrollRef} className="surface-scroll">
         <div ref={worldRef} className="surface-world">
           <div
@@ -394,78 +385,59 @@ export default function PageSurface({
           ))}
         </div>
       </div>
-      <div className="surface-resistance" aria-hidden="true">
-        <Expand size={15} />
-        <span>继续横向滑动，展开画布</span>
-      </div>
       <div
         className="surface-toolbar"
         data-surface-ui
         role="group"
         aria-label="页面视图"
       >
-        {mode === "document" ? (
-          <button onClick={() => controls.current.enter()} title="展开自由画布">
-            <Expand size={15} />
-            <span>展开画布</span>
-          </button>
-        ) : (
+        <button
+          onClick={() => controls.current.home()}
+          title="回到正文位置（Escape）"
+        >
+          <FileText size={15} />
+          <span>回到正文</span>
+        </button>
+        <span className="surface-toolbar-divider" />
+        <button
+          aria-label="缩小画布"
+          disabled={scale <= MIN_ZOOM}
+          onClick={() => controls.current.zoom(scale / 1.2)}
+        >
+          <Minus size={15} />
+        </button>
+        <button
+          className="surface-zoom"
+          aria-label="重置画布缩放"
+          title="重置为 100%"
+          onClick={() => controls.current.zoom(1)}
+        >
+          {Math.round(scale * 100)}%
+        </button>
+        <button
+          aria-label="放大画布"
+          disabled={scale >= MAX_ZOOM}
+          onClick={() => controls.current.zoom(scale * 1.2)}
+        >
+          <Plus size={15} />
+        </button>
+        <button aria-label="总览画布内容" title="总览画布内容" onClick={fit}>
+          <Maximize2 size={15} />
+        </button>
+        {onAdd && (
           <>
-            <button
-              onClick={() => controls.current.home()}
-              title="回到正文位置（Escape）"
-            >
-              <FileText size={15} />
-              <span>回到正文</span>
-            </button>
             <span className="surface-toolbar-divider" />
-            <button
-              aria-label="缩小画布"
-              disabled={scale <= MIN_ZOOM}
-              onClick={() => controls.current.zoom(scale / 1.2)}
-            >
-              <Minus size={15} />
-            </button>
-            <button
-              className="surface-zoom"
-              aria-label="重置画布缩放"
-              title="重置为 100%"
-              onClick={() => controls.current.zoom(1)}
-            >
-              {Math.round(scale * 100)}%
-            </button>
-            <button
-              aria-label="放大画布"
-              disabled={scale >= MAX_ZOOM}
-              onClick={() => controls.current.zoom(scale * 1.2)}
-            >
+            <button onClick={onAdd}>
               <Plus size={15} />
+              <span>添加内容</span>
             </button>
-            <button
-              aria-label="总览画布内容"
-              title="总览画布内容"
-              onClick={fit}
-            >
-              <Maximize2 size={15} />
-            </button>
-            {onAdd && (
-              <>
-                <span className="surface-toolbar-divider" />
-                <button onClick={onAdd}>
-                  <Plus size={15} />
-                  <span>添加内容</span>
-                </button>
-              </>
-            )}
           </>
         )}
         {extraActions}
       </div>
-      {mode === "canvas" && (
+      {items.length > 0 && (
         <div className="surface-orientation" data-surface-ui>
-          <span>
-            {items.length ? `${items.length} 个画布内容` : "自由画布"}
-          </span>
+          <span>{`${items.length} 个内容区域`}</span>
           {items.length > 0 && (
             <button onClick={() => reveal(items[0].position)}>定位内容</button>
           )}
@@ -474,9 +446,6 @@ export default function PageSurface({
           </span>
         </div>
       )}
-      <span className="surface-sr-only" role="status" aria-live="polite">
-        {mode === "canvas" ? "已展开自由画布" : "文档模式"}
-      </span>
     </div>
   );
 }

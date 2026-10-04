@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
+import { GESTURE_IDLE, normalizedWheel, zoomAt, type Camera } from "./model";
 import {
-  advanceEscape,
-  canDock,
-  GESTURE_IDLE,
-  normalizedWheel,
-  resistance,
-  zoomAt,
-  type Camera,
-  type EscapeGesture,
-} from "./model";
+  clamp,
+  nearestSnap,
+  panFrom,
+  snapRegion,
+  springStep,
+  type SurfaceAnchor,
+  type SurfaceRegion,
+} from "./physics";
 
 const editable = (target: EventTarget | null) =>
   target instanceof Element &&
@@ -57,23 +57,25 @@ function ownsWheel(
   return false;
 }
 
-export function useSurfaceViewport(hasItems: boolean) {
+interface PanGesture {
+  origin: Camera;
+  anchor: SurfaceAnchor | null;
+  delta: { x: number; y: number };
+  released: boolean;
+}
+
+export function useSurfaceViewport(layoutKey: string) {
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const worldRef = useRef<HTMLDivElement>(null);
   const documentRef = useRef<HTMLDivElement>(null);
   const camera = useRef<Camera>({ x: 0, y: 0, scale: 1 });
-  const modeRef = useRef(hasItems ? "canvas" : "document");
-  const itemsRef = useRef(hasItems);
-  itemsRef.current = hasItems;
-  const [mode, setMode] = useState(modeRef.current);
   const [scale, setScale] = useState(1);
   const controls = useRef({
-    enter: () => {},
     home: () => {},
     zoom: (_scale: number) => {},
-    settle: () => {},
-    paint: () => {},
+    moveTo: (_camera: Camera) => {},
+    refresh: () => {},
   });
 
   useEffect(() => {
@@ -81,132 +83,219 @@ export function useSurfaceViewport(hasItems: boolean) {
       scroll = scrollRef.current!,
       world = worldRef.current!,
       body = documentRef.current!;
+    const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0,
-      idle = 0,
-      transition = 0;
-    let gesture: EscapeGesture | null = null;
-    let nestedGesture = false;
-    let lastWheel = -Infinity;
-    let rubber = 0;
-    let space = false;
+      springFrame = 0,
+      idle = 0;
+    let anchor: SurfaceAnchor | null = null;
+    let objectGesture = false;
+    let gesture: PanGesture | null = null;
+    let lastWheel = -Infinity,
+      nestedGesture = false,
+      space = false;
     let drag: {
       id: number;
       x: number;
       y: number;
-      camera: Camera;
-      scroll: number;
-      mode: string;
+      started: boolean;
+      touch: boolean;
+      gesture: PanGesture;
     } | null = null;
     const touches = new Map<number, { x: number; y: number }>();
     let pinch: {
       distance: number;
       center: { x: number; y: number };
       camera: Camera;
+      anchor: SurfaceAnchor | null;
     } | null = null;
-    const offset = () => (scroll.clientWidth - world.offsetWidth) / 2;
-    const maxScroll = () =>
-      Math.max(0, body.offsetHeight - scroll.clientHeight);
+    const bounds = () => ({
+      width: scroll.clientWidth,
+      height: root.clientHeight,
+      offsetX: (scroll.clientWidth - world.offsetWidth) / 2,
+    });
+    const regions = (): SurfaceRegion[] => {
+      return [
+        {
+          id: "document",
+          label: "正文",
+          x: 0,
+          y: 0,
+          width: world.offsetWidth,
+          height: body.offsetHeight,
+        },
+        ...[...world.querySelectorAll<HTMLElement>(".surface-card")].map(
+          (element) => ({
+            id: element.dataset.surfaceItem!,
+            label: "内容区域",
+            x: element.offsetLeft,
+            y: element.offsetTop,
+            width: element.offsetWidth,
+            height: element.offsetHeight,
+          }),
+        ),
+      ];
+    };
+    const setAnchor = (next: SurfaceAnchor | null) => {
+      anchor = next;
+      root.dataset.anchor = next?.id ?? "";
+    };
+    const paintNow = () => {
+      const c = camera.current;
+      const transform = `translate3d(${c.x}px, ${c.y}px, 0) scale(${c.scale})`;
+      if (world.style.transform && world.style.transform !== transform)
+        root.dispatchEvent(
+          new Event("showai:viewport-change", { bubbles: true }),
+        );
+      world.style.transform = transform;
+      setScale(c.scale);
+    };
     const paint = () => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        const c = camera.current;
-        const transform =
-          modeRef.current === "canvas"
-            ? `translate3d(${c.x}px, ${c.y}px, 0) scale(${c.scale})`
-            : `translate3d(${-rubber}px, 0, 0)`;
-        if (world.style.transform && world.style.transform !== transform)
-          root.dispatchEvent(
-            new Event("showai:viewport-change", { bubbles: true }),
+      frame = requestAnimationFrame(paintNow);
+    };
+    const stopSpring = () => {
+      cancelAnimationFrame(springFrame);
+      springFrame = 0;
+      delete root.dataset.settling;
+    };
+    const springTo = (target: Camera, complete?: () => void) => {
+      stopSpring();
+      cancelAnimationFrame(frame);
+      if (reducedMotion.matches) {
+        camera.current = target;
+        paintNow();
+        complete?.();
+        return;
+      }
+      root.dataset.settling = "true";
+      let previous = performance.now();
+      const velocity = { x: 0, y: 0, scale: 0 };
+      const step = (time: number) => {
+        const elapsed = (time - previous) / 1000;
+        previous = time;
+        const next = { ...camera.current };
+        let settled = true;
+        for (const key of ["x", "y", "scale"] as const) {
+          const updated = springStep(
+            next[key],
+            velocity[key],
+            target[key],
+            elapsed,
           );
-        world.style.transform = transform;
-        root.style.setProperty("--surface-grid-x", `${offset() + c.x}px`);
-        root.style.setProperty("--surface-grid-y", `${c.y}px`);
-        root.style.setProperty("--surface-grid-size", `${24 * c.scale}px`);
-        root.style.setProperty(
-          "--surface-pull",
-          String(Math.min(1, Math.abs(rubber) / 70)),
-        );
-        root.dataset.pull = rubber > 0 ? "right" : "left";
-        setScale(c.scale);
-      });
+          next[key] = updated.position;
+          velocity[key] = updated.velocity;
+          const tolerance = key === "scale" ? 0.0002 : 0.15;
+          if (
+            Math.abs(next[key] - target[key]) > tolerance ||
+            Math.abs(velocity[key]) > tolerance * 8
+          )
+            settled = false;
+        }
+        camera.current = settled ? target : next;
+        paintNow();
+        if (settled) {
+          stopSpring();
+          complete?.();
+        } else springFrame = requestAnimationFrame(step);
+      };
+      springFrame = requestAnimationFrame(step);
     };
-    const animate = () => {
-      root.classList.add("is-settling");
-      clearTimeout(transition);
-      transition = window.setTimeout(
-        () => root.classList.remove("is-settling"),
-        200,
-      );
-    };
-    const changeMode = (next: string) => {
-      modeRef.current = next;
-      root.dataset.mode = next;
-      setMode(next);
-    };
-    const enter = () => {
-      if (modeRef.current === "canvas") return;
-      camera.current = { x: -rubber, y: -scroll.scrollTop, scale: 1 };
-      changeMode("canvas");
-      scroll.scrollTop = 0;
-      rubber = 0;
-      gesture = null;
-      paint();
-    };
-    const dock = () => {
-      const y = Math.max(0, Math.min(maxScroll(), -camera.current.y));
-      rubber = 0;
-      camera.current = { x: 0, y: 0, scale: 1 };
-      changeMode("document");
-      // CSS mode changes synchronously, before restoring native scroll position.
-      world.style.transform = "none";
-      scroll.scrollTop = y;
+    const refresh = () => {
+      if (gesture) gesture.released = true;
+      const visible = nearestSnap(regions(), camera.current, bounds());
+      // Content edits/resize may change geometry. Refresh resistance without
+      // dragging the user's camera along with a moving or resizing card.
+      setAnchor(visible ? { ...visible.anchor, x: camera.current.x } : null);
       paint();
     };
     const settle = () => {
+      clearTimeout(idle);
+      const current = gesture;
       gesture = null;
-      if (modeRef.current === "document") {
-        animate();
-        rubber = 0;
-        paint();
-      } else if (canDock(camera.current, maxScroll(), itemsRef.current)) dock();
+      if (
+        current?.anchor &&
+        !current.released &&
+        regions().some((region) => region.id === current.anchor!.id)
+      ) {
+        setAnchor(current.anchor);
+        springTo({
+          ...camera.current,
+          x: current.anchor.x,
+          y: clamp(camera.current.y, current.anchor.minY, current.anchor.maxY),
+        });
+        return;
+      }
+      const snap = nearestSnap(regions(), camera.current, bounds());
+      setAnchor(snap?.anchor ?? null);
+      if (snap) springTo(snap.camera);
     };
     const later = () => {
       clearTimeout(idle);
       idle = window.setTimeout(settle, GESTURE_IDLE);
     };
-    const home = () => {
+    const interrupt = () => {
       clearTimeout(idle);
+      stopSpring();
       gesture = null;
-      rubber = 0;
-      if (modeRef.current === "document") {
-        paint();
-        return;
-      }
-      // Keep the reader's vertical location when returning from a side excursion.
-      camera.current = {
+    };
+    const beginPan = (): PanGesture => {
+      interrupt();
+      return {
+        origin: { ...camera.current },
+        anchor,
+        delta: { x: 0, y: 0 },
+        released: false,
+      };
+    };
+    const pan = (current: PanGesture) => {
+      const next = panFrom(current.origin, current.delta, current.anchor);
+      current.released ||= next.released;
+      camera.current = next.camera;
+      if (current.released) setAnchor(null);
+      paint();
+    };
+    const moveTo = (target: Camera) => {
+      interrupt();
+      setAnchor(null);
+      springTo(target, refresh);
+    };
+    const home = () => {
+      interrupt();
+      const viewport = bounds();
+      const target = {
         x: 0,
-        y: Math.max(
-          -maxScroll(),
-          Math.min(0, camera.current.y / camera.current.scale),
+        y: clamp(
+          camera.current.y / camera.current.scale,
+          Math.min(0, viewport.height - 76 - body.offsetHeight),
+          0,
         ),
         scale: 1,
       };
-      if (!itemsRef.current) dock();
-      else {
-        animate();
-        paint();
-      }
+      const bodyRegion = regions()[0];
+      const snap = snapRegion(bodyRegion, target, viewport);
+      setAnchor(snap?.anchor ?? null);
+      springTo(target);
     };
     const zoom = (
       value: number,
-      point = { x: root.clientWidth / 2 - offset(), y: root.clientHeight / 2 },
+      point = {
+        x: bounds().width / 2 - bounds().offsetX,
+        y: root.clientHeight / 2,
+      },
     ) => {
-      enter();
+      interrupt();
+      setAnchor(null);
       camera.current = zoomAt(camera.current, point, value);
       paint();
+      later();
     };
-    controls.current = { enter, home, zoom, settle, paint };
+    controls.current = { home, zoom, moveTo, refresh };
+
     const wheel = (event: WheelEvent) => {
+      if (objectGesture) {
+        event.preventDefault();
+        return;
+      }
       if (event.defaultPrevented || drag || pinch) return;
       const delta = normalizedWheel(
         event.deltaX,
@@ -220,45 +309,28 @@ export function useSurfaceViewport(hasItems: boolean) {
       lastWheel = now;
       nestedGesture ||= ownsWheel(event.target, scroll, delta.x, delta.y);
       if (nestedGesture) return;
-      root.classList.remove("is-settling");
+      event.preventDefault();
       if (event.ctrlKey || event.metaKey) {
-        event.preventDefault();
         const rect = root.getBoundingClientRect();
         zoom(
-          camera.current.scale *
-            Math.exp(-Math.max(-100, Math.min(100, delta.y)) * 0.008),
+          camera.current.scale * Math.exp(-clamp(delta.y, -100, 100) * 0.008),
           {
-            x: event.clientX - rect.left - offset(),
+            x: event.clientX - rect.left - bounds().offsetX,
             y: event.clientY - rect.top,
           },
         );
-        later();
         return;
       }
-      if (modeRef.current === "document") {
-        const next = advanceEscape(gesture, delta.x, delta.y, now);
-        gesture = next.gesture;
-        if (gesture.axis === "x") {
-          event.preventDefault();
-          rubber = resistance(gesture.distance);
-          if (next.escaped) enter();
-          paint();
-        }
-      } else {
-        event.preventDefault();
-        camera.current = {
-          ...camera.current,
-          x: camera.current.x - delta.x,
-          y: camera.current.y - delta.y,
-        };
-        paint();
-      }
+      if (!gesture) gesture = beginPan();
+      gesture.delta.x -= delta.x;
+      gesture.delta.y -= delta.y;
+      pan(gesture);
       later();
     };
     const localPoint = (event: PointerEvent) => {
       const rect = root.getBoundingClientRect();
       return {
-        x: event.clientX - rect.left - offset(),
+        x: event.clientX - rect.left - bounds().offsetX,
         y: event.clientY - rect.top,
       };
     };
@@ -270,47 +342,63 @@ export function useSurfaceViewport(hasItems: boolean) {
       };
     };
     const down = (event: PointerEvent) => {
+      if (springFrame) interrupt();
+      const target = event.target as Element;
+      if (target.closest("[data-surface-handle]")) {
+        if (event.button === 0) {
+          interrupt();
+          objectGesture = true;
+        }
+        return;
+      }
       if (
-        (event.target as Element).closest(
+        target.closest(
           '[data-surface-ui], [data-surface-handle], [data-surface-gesture="own"], .react-flow',
         )
       )
         return;
-      if (event.pointerType === "touch") {
+      const touch = event.pointerType === "touch";
+      if (touch) {
         touches.set(event.pointerId, localPoint(event));
-        if (touches.size === 2 && modeRef.current === "canvas") {
+        if (touches.size === 2) {
           event.preventDefault();
+          interrupt();
           drag = null;
-          pinch = { ...pinchMetrics(), camera: { ...camera.current } };
-          root.setPointerCapture(event.pointerId);
+          pinch = { ...pinchMetrics(), camera: { ...camera.current }, anchor };
+          setAnchor(null);
+          for (const id of touches.keys()) root.setPointerCapture(id);
           return;
         }
       }
+      const touchReading =
+        touch &&
+        !target.closest(
+          'button, a, input, textarea, select, summary, [role="slider"], iframe',
+        );
       if (
         drag ||
         event.button > 1 ||
-        (interactive(event.target) &&
-          !(event.button === 1 || (space && !editable(event.target))))
+        (interactive(target) &&
+          !touchReading &&
+          !(event.button === 1 || (space && !editable(target))))
       )
         return;
-      const background = !(event.target as Element).closest(
-        "[data-surface-content]",
-      );
-      if (!background && !space && event.button !== 1) return;
-      if (event.pointerType !== "touch") event.preventDefault();
-      clearTimeout(idle);
-      root.classList.remove("is-settling");
-      root.focus({ preventScroll: true });
+      const background = !target.closest("[data-surface-content]");
+      if (!background && !touchReading && !space && event.button !== 1) return;
+      if (!touch) {
+        event.preventDefault();
+        root.focus({ preventScroll: true });
+        root.setPointerCapture(event.pointerId);
+      }
       drag = {
         id: event.pointerId,
         x: event.clientX,
         y: event.clientY,
-        camera: { ...camera.current },
-        scroll: scroll.scrollTop,
-        mode: modeRef.current,
+        touch,
+        started: !touch,
+        gesture: beginPan(),
       };
-      root.setPointerCapture(event.pointerId);
-      root.classList.add("is-panning");
+      if (!touch) root.classList.add("is-panning");
     };
     const move = (event: PointerEvent) => {
       if (touches.has(event.pointerId))
@@ -333,59 +421,53 @@ export function useSurfaceViewport(hasItems: boolean) {
       if (!drag || drag.id !== event.pointerId) return;
       const dx = event.clientX - drag.x,
         dy = event.clientY - drag.y;
-      if (modeRef.current === "document") {
-        scroll.scrollTop = drag.scroll - dy;
-        if (Math.abs(dx) > Math.abs(dy) * 1.6) {
-          rubber = resistance(-dx);
-          if (Math.abs(dx) >= 280) {
-            enter();
-            drag = {
-              ...drag,
-              x: event.clientX,
-              y: event.clientY,
-              camera: { ...camera.current },
-            };
-          }
-        }
-      } else {
-        camera.current = {
-          ...camera.current,
-          x: drag.camera.x + dx,
-          y: drag.camera.y + dy,
-        };
+      if (!drag.started) {
+        if (Math.hypot(dx, dy) < 8 || !window.getSelection()?.isCollapsed)
+          return;
+        drag.started = true;
+        root.setPointerCapture(event.pointerId);
+        root.classList.add("is-panning");
       }
-      paint();
+      drag.gesture.delta = { x: dx, y: dy };
+      pan(drag.gesture);
     };
     const finish = (event?: PointerEvent, cancelled = false) => {
-      const active =
-        !!pinch || !!(drag && (!event || drag.id === event.pointerId));
+      objectGesture = false;
       if (event) touches.delete(event.pointerId);
       else touches.clear();
-      if (!active) return;
       if (pinch) {
-        if (cancelled) camera.current = pinch.camera;
-        if (touches.size < 2) pinch = null;
-        paint();
+        const initial = pinch;
+        pinch = null;
+        if (cancelled) {
+          setAnchor(initial.anchor);
+          springTo(initial.camera);
+        } else settle();
       }
       if (drag && (!event || drag.id === event.pointerId)) {
-        if (cancelled) {
-          camera.current = drag.camera;
-          changeMode(drag.mode);
-          if (drag.mode === "document") scroll.scrollTop = drag.scroll;
-        }
-        const id = drag.id;
+        const initial = drag;
         drag = null;
-        if (root.hasPointerCapture(id)) root.releasePointerCapture(id);
+        if (root.hasPointerCapture(initial.id))
+          root.releasePointerCapture(initial.id);
+        if (initial.started) {
+          if (cancelled) {
+            setAnchor(initial.gesture.anchor);
+            springTo(initial.gesture.origin);
+          } else {
+            gesture = initial.gesture;
+            settle();
+          }
+        }
       }
       root.classList.remove("is-panning");
-      if (cancelled) {
-        rubber = 0;
-        paint();
-      } else settle();
     };
     const up = (event: PointerEvent) => finish(event);
     const cancel = (event: PointerEvent) => finish(event, true);
+    const lostCapture = (event: PointerEvent) => {
+      objectGesture = false;
+      if (drag?.id === event.pointerId) finish(event, true);
+    };
     const keydown = (event: KeyboardEvent) => {
+      if (springFrame) stopSpring();
       if (event.defaultPrevented || event.isComposing || editable(event.target))
         return;
       if (event.code === "Space" && !interactive(event.target)) {
@@ -397,29 +479,33 @@ export function useSurfaceViewport(hasItems: boolean) {
         if (drag || pinch) finish(undefined, true);
         else home();
       }
-      if (event.target !== root || modeRef.current !== "canvas") return;
+      if (event.target !== root) return;
+      const step = event.shiftKey ? 320 : 120;
       const arrows: Record<string, [number, number]> = {
-        ArrowLeft: [80, 0],
-        ArrowRight: [-80, 0],
-        ArrowUp: [0, 80],
-        ArrowDown: [0, -80],
+        ArrowLeft: [step, 0],
+        ArrowRight: [-step, 0],
+        ArrowUp: [0, step],
+        ArrowDown: [0, -step],
+        PageUp: [0, root.clientHeight * 0.8],
+        PageDown: [0, -root.clientHeight * 0.8],
       };
       if (arrows[event.key]) {
         event.preventDefault();
         const [x, y] = arrows[event.key];
-        camera.current = {
+        moveTo({
           ...camera.current,
           x: camera.current.x + x,
-          y: camera.current.y + y,
-        };
-        paint();
-        later();
+          y:
+            anchor && !x
+              ? clamp(camera.current.y + y, anchor.minY, anchor.maxY)
+              : camera.current.y + y,
+        });
       }
       if (["+", "=", "-"].includes(event.key)) {
         event.preventDefault();
         zoom(camera.current.scale * (event.key === "-" ? 1 / 1.2 : 1.2));
       }
-      if (event.key === "0") {
+      if (event.key === "0" || event.key === "Home") {
         event.preventDefault();
         home();
       }
@@ -434,66 +520,86 @@ export function useSurfaceViewport(hasItems: boolean) {
       space = false;
       root.classList.remove("is-hand");
       finish(undefined, true);
-      clearTimeout(idle);
+      if (gesture) settle();
     };
     const nativeScroll = () => {
-      if (
-        modeRef.current !== "canvas" ||
-        (!scroll.scrollTop && !scroll.scrollLeft)
-      )
-        return;
-      // Focus and editor caret navigation can request native scroll even with
-      // overflow hidden. Incorporate it into the camera before clearing it.
-      camera.current = {
-        ...camera.current,
-        x: camera.current.x - scroll.scrollLeft,
-        y: camera.current.y - scroll.scrollTop,
-      };
+      if (!scroll.scrollTop && !scroll.scrollLeft) return;
+      const x = scroll.scrollLeft,
+        y = scroll.scrollTop;
       scroll.scrollTop = 0;
       scroll.scrollLeft = 0;
-      paint();
+      // Editor transactions may request scroll while a region is being revealed.
+      // The camera owns that transition; a real pointer/key event interrupts it.
+      if (springFrame) {
+        paint();
+        return;
+      }
+      // Browser find, caret navigation and focus still request native scroll.
+      // Keep those movements in the same camera coordinates as pointer gestures.
+      interrupt();
+      camera.current = {
+        ...camera.current,
+        x: camera.current.x - x,
+        y: camera.current.y - y,
+      };
+      refresh();
     };
-    const resize = new ResizeObserver(paint);
+    const resize = new ResizeObserver(() => {
+      if (!gesture && !drag && !pinch && !springFrame && !objectGesture)
+        refresh();
+    });
     resize.observe(root);
+    resize.observe(body);
+    const observedCards = new Set<HTMLElement>();
+    const refreshLayout = () => {
+      const cards = new Set(
+        world.querySelectorAll<HTMLElement>(".surface-card"),
+      );
+      for (const card of observedCards) {
+        if (!cards.has(card)) {
+          resize.unobserve(card);
+          observedCards.delete(card);
+        }
+      }
+      for (const card of cards) {
+        if (!observedCards.has(card)) {
+          resize.observe(card);
+          observedCards.add(card);
+        }
+      }
+      refresh();
+    };
+    controls.current.refresh = refreshLayout;
     root.addEventListener("wheel", wheel, { passive: false });
     root.addEventListener("pointerdown", down);
     root.addEventListener("pointermove", move);
     root.addEventListener("pointerup", up);
     root.addEventListener("pointercancel", cancel);
+    root.addEventListener("lostpointercapture", lostCapture);
     root.addEventListener("keydown", keydown);
     scroll.addEventListener("scroll", nativeScroll);
     window.addEventListener("keyup", keyup);
     window.addEventListener("blur", blur);
-    paint();
+    refreshLayout();
     return () => {
       resize.disconnect();
       cancelAnimationFrame(frame);
+      cancelAnimationFrame(springFrame);
       clearTimeout(idle);
-      clearTimeout(transition);
       root.removeEventListener("wheel", wheel);
       root.removeEventListener("pointerdown", down);
       root.removeEventListener("pointermove", move);
       root.removeEventListener("pointerup", up);
       root.removeEventListener("pointercancel", cancel);
+      root.removeEventListener("lostpointercapture", lostCapture);
       root.removeEventListener("keydown", keydown);
       scroll.removeEventListener("scroll", nativeScroll);
       window.removeEventListener("keyup", keyup);
       window.removeEventListener("blur", blur);
     };
   }, []);
-
   useEffect(() => {
-    if (hasItems) controls.current.enter();
-  }, [hasItems]);
-
-  return {
-    rootRef,
-    scrollRef,
-    worldRef,
-    documentRef,
-    mode,
-    scale,
-    camera,
-    controls,
-  };
+    controls.current.refresh();
+  }, [layoutKey]);
+  return { rootRef, scrollRef, worldRef, documentRef, scale, camera, controls };
 }

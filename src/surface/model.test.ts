@@ -12,16 +12,12 @@ import {
   validateDocument,
 } from "../portable/validation.mjs";
 import {
-  advanceEscape,
-  canDock,
   dockItem,
   makeCanvasItem,
   normalizedWheel,
   replaceBody,
-  resistance,
   splitContent,
   zoomAt,
-  type EscapeGesture,
 } from "./model";
 
 const paragraph = (text: string): JSONContent => ({
@@ -38,32 +34,7 @@ const sample = () => ({
   },
 });
 
-describe("document-first gestures", () => {
-  it("requires sustained horizontal intent, never a single spike or vertical inertia", () => {
-    expect(advanceEscape(null, 3000, 0, 0).escaped).toBe(false);
-    let gesture: EscapeGesture | null = null;
-    for (let i = 0; i < 8; i++) {
-      const next = advanceEscape(gesture, i ? 70 : 5, i ? 0 : 60, i * 30);
-      expect(next.escaped).toBe(false);
-      gesture = next.gesture;
-    }
-    gesture = null;
-    for (let i = 0; i < 4; i++) {
-      const next = advanceEscape(gesture, 75, 5, i * 30);
-      expect(next.escaped).toBe(i === 3);
-      gesture = next.gesture;
-    }
-  });
-  it("resets after inactivity and unwinds when the direction reverses", () => {
-    let gesture = advanceEscape(null, 80, 0, 0).gesture;
-    gesture = advanceEscape(gesture, -80, 0, 40).gesture;
-    expect(gesture.distance).toBe(0);
-    gesture = advanceEscape(gesture, 80, 0, 80).gesture;
-    const next = advanceEscape(gesture, 80, 0, 1000);
-    expect(next.gesture.distance).toBe(80);
-    expect(next.escaped).toBe(false);
-    expect(Math.abs(resistance(10000))).toBeLessThanOrEqual(88);
-  });
+describe("shared camera coordinates", () => {
   it("normalizes mouse line/page wheels and Shift-scroll", () => {
     expect(normalizedWheel(0, 3, 1, 800, true)).toEqual({ x: 48, y: 0 });
     expect(normalizedWheel(0, 1, 2, 800)).toEqual({ x: 0, y: 800 });
@@ -82,16 +53,6 @@ describe("document-first gestures", () => {
       expect(next.scale).toBeGreaterThanOrEqual(0.25);
       expect(next.scale).toBeLessThanOrEqual(2);
     }
-  });
-  it("only docks near the document at reading scale with no peripheral content", () => {
-    expect(canDock({ x: 25, y: -800, scale: 1 }, 1000, false)).toBe(true);
-    for (const camera of [
-      { x: 60, y: 0, scale: 1 },
-      { x: 0, y: -1300, scale: 1 },
-      { x: 0, y: 0, scale: 0.8 },
-    ])
-      expect(canDock(camera, 1000, false)).toBe(false);
-    expect(canDock({ x: 0, y: 0, scale: 1 }, 1000, true)).toBe(false);
   });
 });
 
