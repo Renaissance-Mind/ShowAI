@@ -265,7 +265,7 @@ html {
   border-collapse: collapse;
   width: 100%;
   table-layout: fixed;
-  font-size: 12px;
+  font-size: inherit;
 }
 .portable-table-scroll > table > tbody > tr > th,
 .portable-table-scroll > table > tbody > tr > td {

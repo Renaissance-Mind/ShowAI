@@ -121,10 +121,104 @@ try {
   await open();
   const native = page.locator(".document-content > .tableWrapper table");
   const basic = page.locator(".document-widget .sb-table");
+  const basicControls = page.locator(".table-hover-controls");
   const styles = (locator) =>
     locator.evaluateAll((cells) =>
       cells.map((cell) => getComputedStyle(cell).textAlign),
     );
+  const bodyFont = await page
+    .locator(".document-content > p")
+    .first()
+    .evaluate((element) => getComputedStyle(element).fontSize);
+  for (const cells of [
+    native.locator("th, td, p"),
+    basic.locator("th, td, input"),
+  ]) {
+    assert.ok(
+      (
+        await cells.evaluateAll((elements) =>
+          elements.map((element) => getComputedStyle(element).fontSize),
+        )
+      ).every((size) => size === bodyFont),
+      "Table text must match the document font size",
+    );
+  }
+  for (const headers of [native.locator("th"), basic.locator("th")]) {
+    assert.ok(
+      (
+        await headers.evaluateAll((elements) =>
+          elements.map((element) =>
+            parseFloat(getComputedStyle(element).paddingTop),
+          ),
+        )
+      ).every((padding) => padding <= 16),
+      "Headers must not reserve blank space for controls",
+    );
+  }
+  const stableHover = async (table, toolbar) => {
+    await table.locator("th").nth(1).hover();
+    await toolbar.waitFor();
+    assert.equal(
+      (await toolbar.innerText()).trim(),
+      "",
+      "Controls must contain icons without a visible table label",
+    );
+    const owner = await toolbar.getAttribute("data-table-controls-owner");
+    await page.evaluate((owner) => {
+      window.tableHoverRemovals = 0;
+      window.tableHoverObserver = new MutationObserver((records) => {
+        for (const record of records)
+          for (const node of record.removedNodes) {
+            if (
+              node instanceof Element &&
+              node.getAttribute("data-table-controls-owner") === owner &&
+              (node.classList.contains("table-global-alignment") ||
+                node.classList.contains("sb-table-global-alignment"))
+            )
+              window.tableHoverRemovals++;
+          }
+      });
+      window.tableHoverObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+    }, owner);
+    const tableRect = await table.boundingBox();
+    const controlRect = await toolbar.boundingBox();
+    await page.mouse.move(
+      controlRect.x + controlRect.width / 2,
+      tableRect.y + 5,
+    );
+    await page.mouse.move(
+      controlRect.x + controlRect.width / 2,
+      tableRect.y - 3,
+    );
+    await page.waitForTimeout(350); // Pause deliberately in the gap between table and controls.
+    await toolbar.waitFor();
+    await page.mouse.move(
+      controlRect.x + controlRect.width / 2,
+      controlRect.y + controlRect.height / 2,
+      { steps: 12 },
+    );
+    await page.waitForTimeout(350);
+    assert.equal(
+      await page.evaluate(() => window.tableHoverRemovals),
+      0,
+      "Crossing slowly into controls must never remove or recreate them",
+    );
+    await page.evaluate(() => window.tableHoverObserver.disconnect());
+  };
+  await stableHover(
+    native,
+    page.locator(".document-table-controls.table-global-alignment"),
+  );
+  await stableHover(
+    basic.locator("table"),
+    page.locator(".table-hover-controls.sb-table-global-alignment"),
+  );
+  result.checks.push(
+    "Stable slow hover into controls, compact headers, icon-only controls and body-sized table text",
+  );
   await native.locator("tr").first().locator("th").nth(1).hover();
   await page
     .locator(".document-table-controls.table-column-alignment")
@@ -144,7 +238,7 @@ try {
   await page.screenshot({ path: join(output, "native-column.png") });
   await page
     .locator(".document-table-controls.table-global-alignment")
-    .getByRole("button", { name: "整个表格右对齐", exact: true })
+    .getByRole("button", { name: "表格右对齐", exact: true })
     .click();
   assert.ok(
     (await styles(native.locator("th, td"))).every(
@@ -154,7 +248,7 @@ try {
   await native.locator("td").first().click({ button: "right" });
   await page
     .getByRole("dialog", { name: "表格对齐设置" })
-    .getByRole("button", { name: "整个表格居中", exact: true })
+    .getByRole("button", { name: "表格居中", exact: true })
     .click();
   assert.ok(
     (await styles(native.locator("th, td"))).every(
@@ -217,7 +311,7 @@ try {
   await native.locator("th").nth(1).hover();
   await page
     .locator(".table-global-alignment")
-    .getByRole("button", { name: "整个表格居中", exact: true })
+    .getByRole("button", { name: "表格居中", exact: true })
     .click();
   result.checks.push(
     "Native table header hover, column alignment, corner controls, context menu and inherited alignment in new rows",
@@ -225,15 +319,14 @@ try {
 
   await basic.locator("th").nth(1).hover();
   const headerInput = await basic.locator("th input").nth(1).boundingBox();
-  const columnControl = await basic
-    .locator(".sb-table-column-alignment")
-    .nth(1)
+  const columnControl = await page
+    .locator(".table-hover-controls.sb-table-column-alignment")
     .boundingBox();
   assert.ok(
     headerInput.y >= columnControl.y + columnControl.height,
     "Column controls must not cover header text",
   );
-  await basic
+  await basicControls
     .getByRole("button", { name: "第 2 列右对齐", exact: true })
     .click();
   assert.deepEqual(await styles(basic.locator("tr > :nth-child(2)")), [
@@ -250,9 +343,9 @@ try {
   );
   await basic.locator("th").nth(1).hover();
   await page.screenshot({ path: join(output, "basic-column.png") });
-  await basic
-    .locator(".sb-table-global-alignment")
-    .getByRole("button", { name: "整个表格居中", exact: true })
+  await page
+    .locator(".table-hover-controls.sb-table-global-alignment")
+    .getByRole("button", { name: "表格居中", exact: true })
     .click();
   assert.ok(
     (await styles(basic.locator("th, td"))).every(
@@ -260,15 +353,17 @@ try {
     ),
   );
   await basic.locator("td").first().click({ button: "right" });
-  await basic
+  await page
     .getByRole("dialog", { name: "表格对齐设置" })
-    .getByRole("button", { name: "整个表格左对齐", exact: true })
+    .getByRole("button", { name: "表格左对齐", exact: true })
     .click();
   assert.ok(
     (await styles(basic.locator("th, td"))).every((value) => value === "left"),
   );
   await basic.locator("th").nth(1).hover();
-  await basic.getByRole("button", { name: "第 2 列居中", exact: true }).click();
+  await basicControls
+    .getByRole("button", { name: "第 2 列居中", exact: true })
+    .click();
   await basic.getByRole("button", { name: "添加行", exact: true }).click();
   assert.deepEqual(await styles(basic.locator("tr > :nth-child(2)")), [
     "center",
@@ -336,6 +431,19 @@ try {
   assert.deepEqual(
     await styles(viewer.locator(".sb-table tr > :nth-child(2)")),
     ["center", "center", "center", "center"],
+  );
+  const viewerFont = await viewer
+    .locator(".portable-content > p")
+    .first()
+    .evaluate((element) => getComputedStyle(element).fontSize);
+  assert.ok(
+    (
+      await viewer
+        .locator(".portable-content th, .portable-content td")
+        .evaluateAll((elements) =>
+          elements.map((element) => getComputedStyle(element).fontSize),
+        )
+    ).every((size) => size === viewerFont),
   );
   assert.equal(await viewer.locator(".table-alignment-buttons").count(), 0);
   await viewer.screenshot({ path: join(output, "export.png") });

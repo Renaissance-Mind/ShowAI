@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
@@ -10,124 +10,27 @@ import {
 } from "../components/blocks/TableAlignment";
 import { alignDocumentTable, tableAlignmentValue } from "./table-alignment";
 
-interface Target {
-  table: HTMLTableElement;
-  cell: HTMLTableCellElement | null;
-  context: { left: number; top: number } | null;
-}
+import {
+  useTableHover,
+  tableControlPositions,
+} from "../components/blocks/table-hover";
+
+const acceptDocumentTable = (table: HTMLTableElement) =>
+  !table.closest(".document-widget");
 
 export function TableControls({ editor }: { editor: Editor }) {
-  const [target, setTarget] = useState<Target | null>(null);
   const [, refresh] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
-  const menuOpenRef = useRef(false);
-  menuOpenRef.current = menuOpen;
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const keep = () => {
-    if (hideTimer.current) clearTimeout(hideTimer.current);
-  };
-  const hide = () => {
-    keep();
-    hideTimer.current = setTimeout(
-      () =>
-        setTarget((value) =>
-          menuOpenRef.current ||
-          value?.context ||
-          document.activeElement?.closest(".document-table-controls")
-            ? value
-            : null,
-        ),
-      160,
-    );
-  };
-
+  const { target, setTarget, owner } = useTableHover(editor.view.dom, {
+    keepOpen: menuOpen,
+    accept: acceptDocumentTable,
+    onDismiss: () => setMenuOpen(false),
+  });
   useEffect(() => {
-    const root = editor.view.dom;
-    const find = (event: Event) => {
-      const element = event.target as Element;
-      const table = element.closest?.("table");
-      if (
-        !(table instanceof HTMLTableElement) ||
-        table.closest(".document-widget")
-      )
-        return null;
-      const cell = element.closest("td, th") as HTMLTableCellElement | null;
-      return {
-        table,
-        cell: cell?.parentElement === table.rows[0] ? cell : null,
-        context: null,
-      };
-    };
-    const hover = (event: Event) => {
-      keep();
-      const next = find(event);
-      setTarget((previous) =>
-        menuOpenRef.current ||
-        previous?.context ||
-        (previous?.table === next?.table && previous?.cell === next?.cell)
-          ? previous
-          : next,
-      );
-    };
-    const context = (event: MouseEvent) => {
-      const next = find(event);
-      if (!next) return;
-      event.preventDefault();
-      event.stopPropagation();
-      setMenuOpen(false);
-      setTarget({
-        ...next,
-        cell: null,
-        context: {
-          left: Math.min(event.clientX, window.innerWidth - 200),
-          top: Math.min(event.clientY, window.innerHeight - 50),
-        },
-      });
-    };
-    const dismiss = (event: Event) => {
-      if (event.type === "keydown" && (event as KeyboardEvent).key !== "Escape")
-        return;
-      if (
-        event.type === "pointerdown" &&
-        (event.target as Element).closest?.(".document-table-controls")
-      )
-        return;
-      setMenuOpen(false);
-      setTarget(null);
-    };
-    const viewportChanged = (event: Event) => {
-      if (event.target instanceof HTMLElement && event.target.contains(root))
-        dismiss(event);
-    };
     const update = () => refresh((value) => value + 1);
-    const transaction = () => {
-      if (editor.view.composing) return;
-      update();
-    };
-    root.addEventListener("mousemove", hover);
-    root.addEventListener("focusin", hover);
-    root.addEventListener("mouseleave", hide);
-    root.addEventListener("contextmenu", context);
-    document.addEventListener("pointerdown", dismiss);
-    document.addEventListener("keydown", dismiss);
-    window.addEventListener("scroll", update, true);
-    window.addEventListener("resize", update);
-    window.addEventListener("blur", dismiss);
-    window.addEventListener("showai:viewport-change", viewportChanged);
-    editor.on("transaction", transaction);
+    editor.on("transaction", update);
     return () => {
-      keep();
-      root.removeEventListener("mousemove", hover);
-      root.removeEventListener("focusin", hover);
-      root.removeEventListener("mouseleave", hide);
-      root.removeEventListener("contextmenu", context);
-      document.removeEventListener("pointerdown", dismiss);
-      document.removeEventListener("keydown", dismiss);
-      window.removeEventListener("scroll", update, true);
-      window.removeEventListener("resize", update);
-      window.removeEventListener("blur", dismiss);
-      window.removeEventListener("showai:viewport-change", viewportChanged);
-      editor.off("transaction", transaction);
+      editor.off("transaction", update);
     };
   }, [editor]);
 
@@ -158,8 +61,7 @@ export function TableControls({ editor }: { editor: Editor }) {
         cellResolved.before(cellDepth) - position - 1,
       ).left;
   }
-  const rect = target.table.getBoundingClientRect();
-  const cellRect = target.cell?.getBoundingClientRect();
+  const positions = tableControlPositions(target, 128);
   const prepareSelection = () => {
     const { $from } = editor.state.selection;
     const inTarget = Array.from(
@@ -197,20 +99,11 @@ export function TableControls({ editor }: { editor: Editor }) {
         className="document-table-controls table-global-alignment"
         role={target.context ? "dialog" : undefined}
         aria-label="表格对齐设置"
-        style={
-          target.context ?? {
-            left: Math.max(220, Math.min(rect.right, window.innerWidth - 8)),
-            top: Math.max(8, rect.top - 36),
-            transform: "translateX(-100%)",
-          }
-        }
-        onMouseEnter={keep}
-        onFocus={keep}
-        onMouseLeave={hide}
+        data-table-controls-owner={owner}
+        style={positions.global}
       >
-        <span>整个表格</span>
         <AlignmentButtons
-          scope="整个表格"
+          scope="表格"
           value={tableAlignmentValue(table, null)}
           onChange={(value) => align(null, value)}
         />
@@ -328,19 +221,11 @@ export function TableControls({ editor }: { editor: Editor }) {
           </div>
         )}
       </div>
-      {column !== null && cellRect && !target.context && (
+      {column !== null && !target.context && (
         <div
           className="document-table-controls table-column-alignment"
-          style={{
-            left: Math.max(
-              8,
-              Math.min(cellRect.right - 91, window.innerWidth - 99),
-            ),
-            top: cellRect.top + 3,
-          }}
-          onMouseEnter={keep}
-          onFocus={keep}
-          onMouseLeave={hide}
+          data-table-controls-owner={owner}
+          style={positions.column}
         >
           <AlignmentButtons
             scope={`第 ${column + 1} 列`}

@@ -1605,7 +1605,7 @@
 .sb-primitive-editor textarea { min-height: 130px; margin-top: 8px; }
 .sb-primitive-editor label { display: block; margin-top: 8px; }
 .sb-table-scroll { overflow-x: auto; }
-.sb-table table, .sb-rich-text table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.sb-table table, .sb-rich-text table { width: 100%; border-collapse: collapse; font-size: inherit; }
 .sb-table th, .sb-table td, .sb-rich-text th, .sb-rich-text td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #dce1d7; }
 .sb-table th, .sb-rich-text th { background: #f1f3ef; font-weight: 600; }
 .sb-table input { width: 100%; min-width: 70px; color: inherit; background: transparent; border: 0; font: inherit; }
@@ -1660,14 +1660,8 @@
 .sb-table-frame {
   position: relative;
 }
-.sb-table.is-editable .sb-table-frame {
-  padding-top: 34px;
-}
 .sb-table th {
   position: relative;
-}
-.sb-table.sb-primitive.is-editable .sb-table-scroll th {
-  padding-top: 34px;
 }
 .sb-table input {
   text-align: inherit;
@@ -1677,9 +1671,9 @@
 .table-global-alignment {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   width: max-content;
-  padding: 3px 5px 3px 9px;
+  padding: 3px 4px;
   border: 1px solid var(--border, #dedee5);
   border-radius: 7px;
   background: var(--surface, #fff);
@@ -1696,52 +1690,21 @@
   border: 0;
   box-shadow: none;
 }
-.sb-table-global-alignment {
-  position: absolute;
-  right: 0;
-  top: 0;
-  z-index: 4;
-}
-.sb-table-column-alignment {
-  position: absolute;
-  right: 3px;
-  top: 3px;
-  z-index: 3;
-}
 .sb-table-context-menu {
   position: absolute;
   z-index: 20;
 }
-.document-table-controls {
+.document-table-controls,
+.table-hover-controls {
   position: fixed;
   z-index: 1100;
-}
-@media (hover: hover) and (pointer: fine) {
-  .sb-table-global-alignment,
-  .sb-table-column-alignment {
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.12s;
-  }
-  .sb-table-frame:hover > .sb-table-global-alignment,
-  .sb-table-frame:focus-within > .sb-table-global-alignment,
-  .sb-table th:hover > .sb-table-column-alignment,
-  .sb-table th:focus-within > .sb-table-column-alignment {
-    opacity: 1;
-    pointer-events: auto;
-  }
 }
 @media print {
   .sb-table-global-alignment,
   .sb-table-column-alignment,
   .sb-table-context-menu,
-  .document-table-controls {
+  .document-table-controls,
+  .table-hover-controls {
     display: none !important;
-  }
-  .sb-table.is-editable .sb-table-frame {
-    padding-top: 0;
-  }
-  .sb-table.sb-primitive.is-editable .sb-table-scroll th {
-    padding-top: 10px;
   }
 }

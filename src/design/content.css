@@ -204,8 +204,8 @@
   table:not(.sb-block table),
 .sb-table table,
 .sb-rich-text table {
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: inherit;
+  line-height: inherit;
 }
 :is(.document-content, .portable-editor .tiptap)
   :is(th, td):not(.sb-block :is(th, td)),

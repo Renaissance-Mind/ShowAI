@@ -1,7 +1,5 @@
 import {
   createElement,
-  useEffect,
-  useRef,
   useState,
   type CSSProperties,
   type ReactNode,
@@ -15,7 +13,7 @@ import {
   tableColumnAlignment,
   alignTableData,
 } from "./primitive-contract.mjs";
-import { AlignmentButtons, type TableAlignment } from "./TableAlignment";
+import { BasicTableControls, type TableAlignment } from "./TableAlignment";
 export { validatePrimitiveData } from "./primitive-contract.mjs";
 
 const appearance = (data: Record<string, unknown>): CSSProperties => ({
@@ -215,36 +213,10 @@ export function TableBlock({ data, onChange, readOnly }: BlockProps) {
   const columns = (data.columns ?? []) as string[];
   const rows = (data.rows ?? []) as (string | number | boolean)[][];
   const editable = Boolean(onChange && !readOnly);
-  const tableRef = useRef<HTMLElement>(null);
-  const [contextMenu, setContextMenu] = useState<{
-    left: number;
-    top: number;
-  } | null>(null);
-  useEffect(() => {
-    if (!contextMenu) return;
-    const dismiss = (event: Event) => {
-      if (event.type === "keydown" && (event as KeyboardEvent).key !== "Escape")
-        return;
-      if (
-        event.type === "pointerdown" &&
-        (event.target as Element).closest?.(".sb-table-context-menu")
-      )
-        return;
-      setContextMenu(null);
-    };
-    document.addEventListener("pointerdown", dismiss);
-    document.addEventListener("keydown", dismiss);
-    window.addEventListener("blur", dismiss);
-    return () => {
-      document.removeEventListener("pointerdown", dismiss);
-      document.removeEventListener("keydown", dismiss);
-      window.removeEventListener("blur", dismiss);
-    };
-  }, [contextMenu]);
+  const [tableRoot, setTableRoot] = useState<HTMLElement | null>(null);
   const align = (column: number | null, alignment: TableAlignment) => {
     if (!editable) return;
     onChange?.(alignTableData(data, column, alignment));
-    setContextMenu(null);
   };
   const edit = (row: number, col: number, value: string) =>
     onChange?.({
@@ -255,54 +227,13 @@ export function TableBlock({ data, onChange, readOnly }: BlockProps) {
     });
   return (
     <section
-      ref={tableRef}
+      ref={setTableRoot}
       className={`sb-primitive sb-table${editable ? " is-editable" : ""}`}
-      onContextMenu={(event) => {
-        if (!editable) return;
-        event.preventDefault();
-        event.stopPropagation();
-        const rect = tableRef.current!.getBoundingClientRect();
-        const scale = rect.width / tableRef.current!.offsetWidth || 1;
-        setContextMenu({
-          left: Math.max(
-            0,
-            Math.min(
-              (event.clientX - rect.left) / scale,
-              tableRef.current!.offsetWidth - 194,
-            ),
-          ),
-          top: Math.max(
-            0,
-            Math.min(
-              (event.clientY - rect.top) / scale,
-              (window.innerHeight - rect.top) / scale - 42,
-            ),
-          ),
-        });
-      }}
       style={appearance(data)}
       aria-label={text(data.title) || "基础表格"}
     >
       {text(data.title) && <h3>{text(data.title)}</h3>}
       <div className="sb-table-frame">
-        {editable && (
-          <div className="sb-table-global-alignment">
-            <span>整个表格</span>
-            <AlignmentButtons
-              scope="整个表格"
-              value={
-                columns.every(
-                  (_, i) =>
-                    tableColumnAlignment(data, i) ===
-                    tableColumnAlignment(data, 0),
-                )
-                  ? tableColumnAlignment(data, 0)
-                  : null
-              }
-              onChange={(value) => align(null, value)}
-            />
-          </div>
-        )}
         <div className="sb-table-scroll">
           <table>
             <thead>
@@ -312,15 +243,6 @@ export function TableBlock({ data, onChange, readOnly }: BlockProps) {
                     key={i}
                     style={{ textAlign: tableColumnAlignment(data, i) }}
                   >
-                    {editable && (
-                      <div className="sb-table-column-alignment">
-                        <AlignmentButtons
-                          scope={`第 ${i + 1} 列`}
-                          value={tableColumnAlignment(data, i)}
-                          onChange={(value) => align(i, value)}
-                        />
-                      </div>
-                    )}
                     {readOnly || !onChange ? (
                       column
                     ) : (
@@ -366,28 +288,22 @@ export function TableBlock({ data, onChange, readOnly }: BlockProps) {
           </table>
         </div>
       </div>
-      {editable && contextMenu && (
-        <div
-          className="sb-table-context-menu"
-          role="dialog"
-          aria-label="表格对齐设置"
-          style={contextMenu}
-        >
-          <span>整个表格</span>
-          <AlignmentButtons
-            scope="整个表格"
-            value={
-              columns.every(
-                (_, i) =>
-                  tableColumnAlignment(data, i) ===
-                  tableColumnAlignment(data, 0),
-              )
+      {editable && (
+        <BasicTableControls
+          root={tableRoot}
+          getAlignment={(column) =>
+            column !== null
+              ? tableColumnAlignment(data, column)
+              : columns.every(
+                    (_, i) =>
+                      tableColumnAlignment(data, i) ===
+                      tableColumnAlignment(data, 0),
+                  )
                 ? tableColumnAlignment(data, 0)
                 : null
-            }
-            onChange={(value) => align(null, value)}
-          />
-        </div>
+          }
+          onChange={align}
+        />
       )}
       {!readOnly && onChange && (
         <div className="sb-table-actions">
