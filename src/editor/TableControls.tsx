@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/core";
+import { TextSelection } from "@tiptap/pm/state";
+import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { TableMap } from "@tiptap/pm/tables";
 import {
   AlignmentButtons,
@@ -17,6 +19,9 @@ interface Target {
 export function TableControls({ editor }: { editor: Editor }) {
   const [target, setTarget] = useState<Target | null>(null);
   const [, refresh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuOpenRef = useRef(false);
+  menuOpenRef.current = menuOpen;
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const keep = () => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -26,6 +31,7 @@ export function TableControls({ editor }: { editor: Editor }) {
     hideTimer.current = setTimeout(
       () =>
         setTarget((value) =>
+          menuOpenRef.current ||
           value?.context ||
           document.activeElement?.closest(".document-table-controls")
             ? value
@@ -56,6 +62,7 @@ export function TableControls({ editor }: { editor: Editor }) {
       keep();
       const next = find(event);
       setTarget((previous) =>
+        menuOpenRef.current ||
         previous?.context ||
         (previous?.table === next?.table && previous?.cell === next?.cell)
           ? previous
@@ -67,6 +74,7 @@ export function TableControls({ editor }: { editor: Editor }) {
       if (!next) return;
       event.preventDefault();
       event.stopPropagation();
+      setMenuOpen(false);
       setTarget({
         ...next,
         cell: null,
@@ -84,7 +92,12 @@ export function TableControls({ editor }: { editor: Editor }) {
         (event.target as Element).closest?.(".document-table-controls")
       )
         return;
+      setMenuOpen(false);
       setTarget(null);
+    };
+    const viewportChanged = (event: Event) => {
+      if (event.target instanceof HTMLElement && event.target.contains(root))
+        dismiss(event);
     };
     const update = () => refresh((value) => value + 1);
     const transaction = () => {
@@ -100,6 +113,7 @@ export function TableControls({ editor }: { editor: Editor }) {
     window.addEventListener("scroll", update, true);
     window.addEventListener("resize", update);
     window.addEventListener("blur", dismiss);
+    window.addEventListener("showai:viewport-change", viewportChanged);
     editor.on("transaction", transaction);
     return () => {
       keep();
@@ -112,6 +126,7 @@ export function TableControls({ editor }: { editor: Editor }) {
       window.removeEventListener("scroll", update, true);
       window.removeEventListener("resize", update);
       window.removeEventListener("blur", dismiss);
+      window.removeEventListener("showai:viewport-change", viewportChanged);
       editor.off("transaction", transaction);
     };
   }, [editor]);
@@ -145,6 +160,28 @@ export function TableControls({ editor }: { editor: Editor }) {
   }
   const rect = target.table.getBoundingClientRect();
   const cellRect = target.cell?.getBoundingClientRect();
+  const prepareSelection = () => {
+    const { $from } = editor.state.selection;
+    const inTarget = Array.from(
+      { length: $from.depth },
+      (_, index) => index + 1,
+    ).some(
+      (depth) =>
+        $from.node(depth).type.name === "table" &&
+        $from.before(depth) === position,
+    );
+    if (!inTarget)
+      editor.view.dispatch(
+        editor.state.tr.setSelection(
+          TextSelection.near(editor.state.doc.resolve(position + 3)),
+        ),
+      );
+  };
+  const runAction = (action: () => void) => {
+    prepareSelection();
+    action();
+    setMenuOpen(false);
+  };
   const align = (col: number | null, value: TableAlignment) => {
     editor.view.dispatch(
       alignDocumentTable(editor.state, position, col, value),
@@ -162,11 +199,9 @@ export function TableControls({ editor }: { editor: Editor }) {
         aria-label="表格对齐设置"
         style={
           target.context ?? {
-            left: Math.max(
-              8,
-              Math.min(rect.right - 190, window.innerWidth - 198),
-            ),
-            top: Math.max(8, rect.top - 32),
+            left: Math.max(220, Math.min(rect.right, window.innerWidth - 8)),
+            top: Math.max(8, rect.top - 36),
+            transform: "translateX(-100%)",
           }
         }
         onMouseEnter={keep}
@@ -179,6 +214,119 @@ export function TableControls({ editor }: { editor: Editor }) {
           value={tableAlignmentValue(table, null)}
           onChange={(value) => align(null, value)}
         />
+        {!target.context && (
+          <button
+            className="document-table-menu-trigger"
+            type="button"
+            aria-label="表格操作"
+            title="表格操作"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => {
+              prepareSelection();
+              setMenuOpen(!menuOpen);
+            }}
+          >
+            <MoreHorizontal size={16} />
+          </button>
+        )}
+        {menuOpen && !target.context && (
+          <div
+            className="document-table-menu"
+            role="menu"
+            aria-label="表格操作菜单"
+            onMouseDown={(event) => event.preventDefault()}
+          >
+            <button
+              role="menuitem"
+              onClick={() =>
+                runAction(() => {
+                  editor.chain().focus().addRowAfter().run();
+                })
+              }
+            >
+              <Plus size={14} />
+              添加行
+            </button>
+            <button
+              role="menuitem"
+              onClick={() =>
+                runAction(() => {
+                  editor.chain().focus().addColumnAfter().run();
+                })
+              }
+            >
+              <Plus size={14} />
+              添加列
+            </button>
+            <button
+              role="menuitem"
+              onClick={() =>
+                runAction(() => {
+                  editor.chain().focus().toggleHeaderRow().run();
+                })
+              }
+            >
+              切换表头
+            </button>
+            <button
+              role="menuitem"
+              disabled={!editor.can().mergeCells()}
+              onClick={() =>
+                runAction(() => {
+                  editor.chain().focus().mergeCells().run();
+                })
+              }
+            >
+              合并单元格
+            </button>
+            <button
+              role="menuitem"
+              disabled={!editor.can().splitCell()}
+              onClick={() =>
+                runAction(() => {
+                  editor.chain().focus().splitCell().run();
+                })
+              }
+            >
+              拆分单元格
+            </button>
+            <button
+              role="menuitem"
+              onClick={() =>
+                runAction(() => {
+                  editor.chain().focus().deleteRow().run();
+                })
+              }
+            >
+              删除行
+            </button>
+            <button
+              role="menuitem"
+              onClick={() =>
+                runAction(() => {
+                  editor.chain().focus().deleteColumn().run();
+                })
+              }
+            >
+              删除列
+            </button>
+            <button
+              role="menuitem"
+              className="danger"
+              onClick={() =>
+                runAction(() => {
+                  editor.chain().focus().deleteTable().run();
+                  setTarget(null);
+                })
+              }
+            >
+              <Trash2 size={14} />
+              删除表格
+            </button>
+          </div>
+        )}
       </div>
       {column !== null && cellRect && !target.context && (
         <div

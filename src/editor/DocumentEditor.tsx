@@ -174,7 +174,6 @@ export default function DocumentEditor({
   const [blockMenu, setBlockMenu] = useState(false);
   const [styleMenu, setStyleMenu] = useState(false);
   const [insertMenu, setInsertMenu] = useState(false);
-  const [tableMenu, setTableMenu] = useState(false);
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [dialogError, setDialogError] = useState("");
   const [notice, setNotice] = useState("");
@@ -269,7 +268,6 @@ export default function DocumentEditor({
       setBlockMenu(false);
       setStyleMenu(false);
       setInsertMenu(false);
-      setTableMenu(false);
       setDialog(null);
       setBubble(null);
     }
@@ -328,19 +326,18 @@ export default function DocumentEditor({
   }, [slash?.manual]);
 
   useEffect(() => {
-    if (!styleMenu && !insertMenu && !blockMenu && !tableMenu) return;
+    if (!styleMenu && !insertMenu && !blockMenu) return;
     const closeMenus = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
       setStyleMenu(false);
       setInsertMenu(false);
       setBlockMenu(false);
-      setTableMenu(false);
       editor?.commands.focus();
     };
     document.addEventListener("keydown", closeMenus);
     return () => document.removeEventListener("keydown", closeMenus);
-  }, [styleMenu, insertMenu, blockMenu, tableMenu, editor]);
+  }, [styleMenu, insertMenu, blockMenu, editor]);
 
   useEffect(() => {
     if (!notice) return;
@@ -1079,93 +1076,6 @@ export default function DocumentEditor({
           >
             <Redo2 size={16} />
           </ToolButton>
-        </div>
-      )}
-
-      {!readOnly && editor.isActive("table") && (
-        <div
-          className={`table-toolbar${minimal ? " is-compact" : ""}`}
-          aria-label="表格操作"
-        >
-          {minimal && (
-            <button
-              aria-label="表格操作"
-              aria-expanded={tableMenu}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => setTableMenu(!tableMenu)}
-            >
-              <Table2 size={14} />
-              <ChevronDown size={12} />
-            </button>
-          )}
-          {(!minimal || tableMenu) && (
-            <>
-              {minimal && (
-                <div
-                  className="editor-menu-dismiss"
-                  onClick={() => setTableMenu(false)}
-                />
-              )}
-              <div
-                className={
-                  minimal ? "editor-small-menu table-menu" : "table-actions"
-                }
-                onClick={() => setTableMenu(false)}
-              >
-                {!minimal && (
-                  <span>
-                    <Table2 size={14} />
-                    表格
-                  </span>
-                )}
-                <button
-                  onClick={() => editor.chain().focus().addRowAfter().run()}
-                >
-                  添加行
-                </button>
-                <button
-                  onClick={() => editor.chain().focus().addColumnAfter().run()}
-                >
-                  添加列
-                </button>
-                <button
-                  onClick={() => editor.chain().focus().toggleHeaderRow().run()}
-                >
-                  表头
-                </button>
-                <button
-                  disabled={!editor.can().mergeCells()}
-                  onClick={() => editor.chain().focus().mergeCells().run()}
-                >
-                  合并
-                </button>
-                <button
-                  disabled={!editor.can().splitCell()}
-                  onClick={() => editor.chain().focus().splitCell().run()}
-                >
-                  拆分
-                </button>
-                <button
-                  onClick={() => editor.chain().focus().deleteRow().run()}
-                >
-                  删除行
-                </button>
-                <button
-                  onClick={() => editor.chain().focus().deleteColumn().run()}
-                >
-                  删除列
-                </button>
-                <button
-                  className="danger"
-                  onClick={() => editor.chain().focus().deleteTable().run()}
-                  aria-label="删除表格"
-                >
-                  <Trash2 size={14} />
-                  {minimal && "删除表格"}
-                </button>
-              </div>
-            </>
-          )}
         </div>
       )}
 

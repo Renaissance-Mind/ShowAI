@@ -342,59 +342,6 @@
 .document-content.resize-cursor {
   cursor: col-resize;
 }
-.table-toolbar {
-  display: flex;
-  gap: 3px;
-  flex-wrap: wrap;
-  align-items: center;
-  border: 1px solid var(--editor-line);
-  border-radius: 5px;
-  background: var(--editor-paper);
-  padding: 5px;
-  margin: -10px 0 16px;
-}
-.table-actions {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  flex-wrap: wrap;
-  width: 100%;
-}
-.table-actions > span {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 8px;
-  color: var(--muted);
-  font-size: 10px;
-}
-.table-toolbar button {
-  padding: 5px 7px;
-  border-radius: 3px;
-  font-size: 10px;
-}
-.table-toolbar .danger {
-  color: #af6655;
-  margin-left: auto;
-}
-.table-toolbar.is-compact {
-  position: relative;
-  width: max-content;
-  margin: 0 0 8px auto;
-  padding: 0;
-  border: none;
-}
-.table-toolbar.is-compact > button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  padding: 6px;
-}
-.table-menu {
-  top: 31px;
-  right: 0;
-}
 .block-style-select {
   width: calc(100% - 12px);
   margin: 3px 6px 6px;
@@ -1105,7 +1052,6 @@
 }
 @media print {
   .editor-toolbar,
-  .table-toolbar,
   .block-handle,
   .document-add-block,
   .editor-notice,
@@ -1146,4 +1092,56 @@
   > tr:first-child
   > td {
   padding-top: 34px;
+}
+
+.document-table-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 4px;
+  color: var(--muted);
+  background: transparent;
+}
+.document-table-menu-trigger:hover,
+.document-table-menu-trigger[aria-expanded="true"] {
+  color: var(--text);
+  background: var(--hover);
+}
+.document-table-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 170px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  box-shadow: 0 8px 28px #00000018;
+  font-size: 12px;
+}
+.document-table-menu > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+}
+.document-table-menu > button:hover,
+.document-table-menu > button:focus-visible {
+  background: var(--hover);
+}
+.document-table-menu > button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.document-table-menu > button.danger {
+  color: #bf534d;
 }

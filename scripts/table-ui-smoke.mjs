@@ -166,11 +166,47 @@ try {
     .locator(".table-column-alignment")
     .getByRole("button", { name: "第 2 列右对齐", exact: true })
     .click();
+  const geometry = () =>
+    page
+      .locator(".document-content > p, .document-content > .tableWrapper")
+      .evaluateAll((elements) =>
+        elements.map((element) => {
+          const rect = element.getBoundingClientRect();
+          return { top: rect.top, height: rect.height };
+        }),
+      );
+  const beforeSelection = await geometry();
   await native.locator("td").last().click();
+  assert.deepEqual(
+    await geometry(),
+    beforeSelection,
+    "Selecting a table must not move document content",
+  );
+  await native.locator("td").last().hover();
   await page.getByRole("button", { name: "表格操作", exact: true }).click();
+  const triggerRect = await page
+    .getByRole("button", { name: "表格操作", exact: true })
+    .boundingBox();
+  const tableRect = await native.boundingBox();
+  assert.ok(
+    Math.abs(
+      triggerRect.x + triggerRect.width - tableRect.x - tableRect.width,
+    ) < 15,
+    "Table operations must be anchored to the table's right edge",
+  );
+  assert.ok(
+    Math.abs(triggerRect.y + triggerRect.height - tableRect.y) < 10,
+    "Table operations must float above the table",
+  );
+  assert.deepEqual(
+    await geometry(),
+    beforeSelection,
+    "Opening the operations menu must not change document layout",
+  );
+  await page.screenshot({ path: join(output, "table-menu.png") });
   await page
-    .locator(".table-menu")
-    .getByRole("button", { name: "添加行", exact: true })
+    .getByRole("menu", { name: "表格操作菜单" })
+    .getByRole("menuitem", { name: "添加行", exact: true })
     .click();
   assert.deepEqual(await styles(native.locator("tr > :nth-child(2)")), [
     "right",
