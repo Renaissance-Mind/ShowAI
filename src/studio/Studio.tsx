@@ -41,7 +41,6 @@ import type { ShowArtifact, ShowDocument } from "../types";
 import type {
   BuiltinComponentMetadata,
   CompiledComponent,
-  ComponentMetadata,
   ComponentSource,
   ComponentCategory,
   TemplateMetadata,
@@ -66,6 +65,8 @@ import { ComponentCatalog, ComponentNavigation } from "./ComponentCatalog";
 import {
   groupComponents,
   type ComponentFilter,
+  type CatalogComponent,
+  type CatalogCustomComponent,
 } from "../core/component-categories";
 import {
   TemplateDialog,
@@ -84,7 +85,7 @@ type View =
   "projects" | "project" | "page" | "templates" | "components" | "settings";
 type Catalog = {
   builtin: BuiltinComponentMetadata[];
-  custom: ComponentMetadata[];
+  custom: CatalogCustomComponent[];
 };
 type LoadedTemplate = TemplateRecord & {
   components?: CompiledComponent[];
@@ -103,9 +104,10 @@ type DialogState =
   | { type: "delete"; target: LibraryTarget }
   | { type: "template"; record: LoadedTemplate; copy?: boolean }
   | { type: "saveTemplate" }
-  | { type: "publish"; ref: PackageRevisionRef }
+  | { type: "publish"; ref: PackageRevisionRef; projectId?: string }
   | {
       type: "component";
+      projectId?: string;
       builtin?: BuiltinComponentMetadata;
       custom?: CompiledComponent;
       source?: ComponentSource;
@@ -180,6 +182,9 @@ export default function Studio() {
       ? saved === "dark"
       : matchMedia("(prefers-color-scheme: dark)").matches;
   });
+  const [componentProject, setComponentProject] = useState("all");
+  const componentProjectRef = useRef(componentProject);
+  componentProjectRef.current = componentProject;
   const [componentFilter, setComponentFilter] =
     useState<ComponentFilter>("all");
   const [componentCategory, setComponentCategory] =
@@ -234,16 +239,53 @@ export default function Studio() {
     const id = selectedRef.current;
     const requestedScope = catalogScopeRef.current;
     const scope = { ...(id ? { projectId: id } : {}), scope: requestedScope };
+    const requestedProject = componentProjectRef.current;
+    const loadComponents = async (): Promise<CatalogComponent[]> => {
+      if (requestedProject !== "all") {
+        const items = await desktop.invoke<CatalogComponent[]>(
+          "components:list",
+          { projectId: requestedProject, scope: "all" },
+        );
+        const project = (
+          await desktop.invoke<ProjectSummary[]>("projects:list")
+        ).find((item) => item.id === requestedProject);
+        return items.map((item) =>
+          !("kind" in item) && item.scope === "project"
+            ? {
+                ...item,
+                projectId: requestedProject,
+                projectName: project?.name,
+              }
+            : item,
+        );
+      }
+      const [shared, allProjects] = await Promise.all([
+        desktop.invoke<CatalogComponent[]>("components:list", { scope: "all" }),
+        desktop.invoke<ProjectSummary[]>("projects:list"),
+      ]);
+      const local = await Promise.all(
+        allProjects.map(async (project) => {
+          const items = await desktop.invoke<CatalogCustomComponent[]>(
+            "components:list",
+            { projectId: project.id, scope: "project" },
+          );
+          return items.map((item) => ({
+            ...item,
+            projectId: project.id,
+            projectName: project.name,
+          }));
+        }),
+      );
+      return [...shared, ...local.flat()];
+    };
     const [nextTemplates, nextCatalog] = await Promise.all([
       desktop.invoke<TemplateMetadata[]>("templates:list", scope),
-      desktop.invoke<(BuiltinComponentMetadata | ComponentMetadata)[]>(
-        "components:list",
-        { ...scope, scope: "all" },
-      ),
+      loadComponents(),
     ]);
     if (
       selectedRef.current !== id ||
-      catalogScopeRef.current !== requestedScope
+      catalogScopeRef.current !== requestedScope ||
+      componentProjectRef.current !== requestedProject
     )
       return;
     setTemplates(nextTemplates);
@@ -252,7 +294,7 @@ export default function Studio() {
         (item): item is BuiltinComponentMetadata => "kind" in item,
       ),
       custom: nextCatalog.filter(
-        (item): item is ComponentMetadata => !("kind" in item),
+        (item): item is CatalogCustomComponent => !("kind" in item),
       ),
     });
   }, []);
@@ -297,7 +339,7 @@ export default function Studio() {
   }, [refresh, loadCatalog, report]);
   useEffect(() => {
     if (initialized.current) void loadCatalog().catch(report);
-  }, [catalogScope, loadCatalog, report]);
+  }, [catalogScope, componentProject, loadCatalog, report]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
@@ -751,15 +793,19 @@ export default function Studio() {
     selectedRef.current = page.projectId;
     setView("page");
   }
-  async function viewComponent(
-    item: BuiltinComponentMetadata | ComponentMetadata,
-  ) {
+  async function viewComponent(item: CatalogComponent) {
+    const owner =
+      !("kind" in item) && item.projectId
+        ? item.projectId
+        : componentProjectRef.current !== "all"
+          ? componentProjectRef.current
+          : undefined;
     if ("kind" in item) {
       const source = await desktop.invoke<ComponentSource>(
         "components:source",
         { id: item.kind, scope: "builtin" },
       );
-      setDialog({ type: "component", builtin: item, source });
+      setDialog({ type: "component", builtin: item, source, projectId: owner });
       return;
     }
     const custom = await desktop.invoke<CompiledComponent>("components:get", {
@@ -767,7 +813,7 @@ export default function Studio() {
       version: item.version,
       scope: item.scope,
       integrity: item.integrity,
-      ...(selectedProject ? { projectId: selectedProject } : {}),
+      ...(owner ? { projectId: owner } : {}),
     });
     let source: ComponentSource | undefined;
     if (custom.entry) {
@@ -777,13 +823,13 @@ export default function Studio() {
           version: item.version,
           scope: item.scope,
           integrity: item.integrity,
-          ...(selectedProject ? { projectId: selectedProject } : {}),
+          ...(owner ? { projectId: owner } : {}),
         });
       } catch (reason) {
         if (!errorMessage(reason).includes("source")) throw reason;
       }
     }
-    setDialog({ type: "component", custom, source });
+    setDialog({ type: "component", custom, source, projectId: owner });
   }
 
   const loading = !info && !problem;
@@ -1251,15 +1297,42 @@ export default function Studio() {
                   )}
                   {view === "components" && (
                     <>
+                      <label className="component-project-picker">
+                        项目：
+                        <select
+                          aria-label="目录项目"
+                          value={componentProject}
+                          onChange={(event) => {
+                            const id = event.target.value;
+                            void (async () => {
+                              if (!(await page.flush())) return;
+                              componentProjectRef.current = id;
+                              setComponentProject(id);
+                              if (id !== "all") {
+                                selectedRef.current = id;
+                                setSelectedProject(id);
+                                setSelectedFolder(null);
+                              }
+                            })().catch(report);
+                          }}
+                        >
+                          <option value="all">全部</option>
+                          {projects.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                       <button
                         className="studio-button"
-                        disabled={!selectedProject}
+                        disabled={componentProject === "all"}
                         onClick={action(async () => {
                           const result =
                             await desktop.invoke<CompiledComponent | null>(
                               "components:import",
-                              selectedProject
-                                ? { projectId: selectedProject }
+                              componentProject !== "all"
+                                ? { projectId: componentProject }
                                 : {},
                             );
                           if (result) {
@@ -1273,17 +1346,20 @@ export default function Studio() {
                       </button>
                       <button
                         className="studio-button primary"
-                        disabled={!selectedProject}
+                        disabled={componentProject === "all"}
                         onClick={action(async () => {
                           const result =
                             await desktop.invoke<CompiledComponent>(
                               "components:createExample",
-                              selectedProject
-                                ? { projectId: selectedProject }
+                              componentProject !== "all"
+                                ? { projectId: componentProject }
                                 : {},
                             );
                           await loadCatalog();
-                          await viewComponent(result);
+                          await viewComponent({
+                            ...result,
+                            projectId: componentProject,
+                          });
                         })}
                       >
                         <Plus size={15} />
@@ -1323,7 +1399,7 @@ export default function Studio() {
                   ))}
                 </nav>
               )}
-              {(view === "templates" || view === "components") && (
+              {view === "templates" && (
                 <div className="studio-library-toolbar catalog-scope-controls">
                   <label>
                     定制项目
@@ -1594,6 +1670,8 @@ export default function Studio() {
               {view === "components" && (
                 <ComponentCatalog
                   groups={componentGroups}
+                  browser={!!info && "mode" in info && info.mode === "browser"}
+                  showProjectNames={componentProject === "all"}
                   scrollRef={catalogScrollRef}
                   request={categoryRequest}
                   onActiveChange={setComponentCategory}
@@ -1842,7 +1920,7 @@ export default function Studio() {
       {dialog?.type === "publish" && (
         <PublishDialog
           refValue={dialog.ref}
-          projectId={selectedProject ?? undefined}
+          projectId={dialog.projectId ?? selectedProject ?? undefined}
           onClose={closeDialog}
           onPublished={async () => {
             await loadCatalog();
@@ -1897,14 +1975,21 @@ export default function Studio() {
           builtin={dialog.builtin}
           custom={dialog.custom}
           source={dialog.source}
-          canInsert={!!page.draft && page.projectId === selectedProject}
-          onPublish={(ref) => setDialog({ type: "publish", ref })}
-          projectId={selectedProject ?? undefined}
+          canInsert={
+            !!page.draft &&
+            page.projectId === selectedProject &&
+            (dialog.custom?.scope !== "project" ||
+              page.projectId === dialog.projectId)
+          }
+          onPublish={(ref) =>
+            setDialog({ type: "publish", ref, projectId: dialog.projectId })
+          }
+          projectId={dialog.projectId}
           onInsert={addBlock}
           onClose={closeDialog}
           onSaved={async (component) => {
             await loadCatalog();
-            await viewComponent(component);
+            await viewComponent({ ...component, projectId: dialog.projectId });
             setNotice("组件目录已更新");
           }}
         />

@@ -1,0 +1,51 @@
+.component-capture-stage {
+  position: relative;
+  width: 720px;
+  height: 420px;
+  overflow: hidden;
+  background: #f3f4f7;
+  color: #252630;
+}
+.component-capture-native {
+  position: absolute;
+  width: 640px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  transform-origin: center;
+}
+.component-capture-native > .sb-primitive,
+.component-capture-native > .sb-block {
+  background: white;
+  border: 1px solid #e7e7ee;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px #2123410a;
+  margin: 0;
+}
+.component-capture-native > .sb-text,
+.component-capture-native > .sb-callout,
+.component-capture-native > .sb-toggle,
+.component-capture-native > .sb-code {
+  padding: 24px;
+}
+.component-capture-native > .sb-divider {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+.component-capture-native .sf-node-picker,
+.component-capture-native .sf-detail,
+.component-capture-native .sf-controls {
+  display: none;
+}
+.component-capture-stage *,
+.component-capture-stage *::before,
+.component-capture-stage *::after {
+  animation: none !important;
+  transition: none !important;
+}
+.component-capture-stage > [role="alert"] {
+  padding: 24px;
+  font-size: 14px;
+}

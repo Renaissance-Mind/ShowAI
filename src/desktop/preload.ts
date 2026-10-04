@@ -19,11 +19,16 @@ if (process.isMainFrame) {
       action: string,
       args: Record<string, unknown> = {},
     ): Promise<T> {
-      const result = (await ipcRenderer.invoke(
-        "showai:invoke",
-        action,
-        args,
-      )) as DesktopResponse<T>;
+      const result = (
+        action === "components:thumbnail" || action === "components:previewData"
+          ? await ipcRenderer.invoke(
+              action === "components:thumbnail"
+                ? "showai:thumbnail"
+                : "showai:previewData",
+              args,
+            )
+          : await ipcRenderer.invoke("showai:invoke", action, args)
+      ) as DesktopResponse<T>;
       if (!result.ok) throw result.error;
       return result.data;
     },

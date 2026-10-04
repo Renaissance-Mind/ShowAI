@@ -14,6 +14,7 @@ import type {
   ComponentGroup,
 } from "../core/component-categories";
 import "./component-catalog.css";
+import ComponentThumbnail from "./ComponentThumbnail";
 
 const categoryIcons = {
   text: Type,
@@ -66,12 +67,16 @@ export function ComponentCatalog({
   request,
   onActiveChange,
   onOpen,
+  browser = false,
+  showProjectNames = false,
 }: {
   groups: ComponentGroup[];
   scrollRef: RefObject<HTMLDivElement | null>;
   request: { category: ComponentCategory; sequence: number } | null;
   onActiveChange: (category: ComponentCategory | null) => void;
   onOpen: (item: CatalogComponent) => void;
+  browser?: boolean;
+  showProjectNames?: boolean;
 }) {
   const sections = useRef(new Map<ComponentCategory, HTMLElement>());
   const destination = useRef<{
@@ -221,24 +226,33 @@ export function ComponentCatalog({
                     key={
                       builtin
                         ? item.kind
-                        : `${item.id}@${item.version}:${item.scope}`
+                        : `${item.id}@${item.version}:${item.scope}:${item.projectId ?? ""}:${item.integrity}`
                     }
                     onClick={() => onOpen(item)}
                   >
-                    <div className="studio-component-symbol">
-                      {builtin ? (
-                        <Icon size={23} strokeWidth={1.6} />
-                      ) : (
-                        <Code2 size={23} strokeWidth={1.6} />
-                      )}
-                    </div>
-                    <div>
-                      <h3>
-                        {item.name}
-                        <span className="studio-tag">{scope}</span>
-                      </h3>
+                    <ComponentThumbnail item={item} browser={browser} />
+                    <div className="component-card-copy">
+                      <div className="component-card-identity">
+                        <span className="studio-component-symbol">
+                          {builtin ? (
+                            <Icon size={23} strokeWidth={1.6} />
+                          ) : (
+                            <Code2 size={23} strokeWidth={1.6} />
+                          )}
+                        </span>
+                        <h3>
+                          {item.name}
+                          <span
+                            className="studio-tag"
+                            title={!builtin ? item.projectName : undefined}
+                          >
+                            {showProjectNames && !builtin && item.projectName
+                              ? item.projectName
+                              : scope}
+                          </span>
+                        </h3>
+                      </div>
                       <p>{item.description}</p>
-                      <footer>v{item.version ?? "1.0.0"}</footer>
                     </div>
                   </button>
                 );

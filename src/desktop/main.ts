@@ -1,3 +1,4 @@
+import "./component-thumbnails";
 import {
   app,
   BrowserWindow,

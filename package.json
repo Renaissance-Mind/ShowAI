@@ -29,7 +29,8 @@
     "browser": "node dist-runtime/scripts/cli.mjs serve",
     "package:browser": "npm run build:browser && node scripts/package-browser.mjs",
     "test:browser": "npm run build:portable && vitest run src/browser/server.test.ts",
-    "test:browser:package": "node scripts/browser-package-smoke.mjs"
+    "test:browser:package": "node scripts/browser-package-smoke.mjs",
+    "test:component-gallery": "npm run build && node src/desktop/component-gallery-ui-smoke.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",

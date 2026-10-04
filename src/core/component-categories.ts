@@ -30,7 +30,12 @@ const builtinCategories: Record<string, ComponentCategory> = {
   flowchart: "flow",
 };
 
-export type CatalogComponent = BuiltinComponentMetadata | ComponentMetadata;
+export type CatalogCustomComponent = ComponentMetadata & {
+  projectId?: string;
+  projectName?: string;
+};
+export type CatalogComponent =
+  BuiltinComponentMetadata | CatalogCustomComponent;
 export type ComponentFilter = "all" | "builtin" | "custom";
 export type ComponentGroup = (typeof componentCategories)[number] & {
   items: CatalogComponent[];
@@ -43,7 +48,10 @@ export function componentCategory(item: CatalogComponent): ComponentCategory {
 }
 
 export function groupComponents(
-  catalog: { builtin: BuiltinComponentMetadata[]; custom: ComponentMetadata[] },
+  catalog: {
+    builtin: BuiltinComponentMetadata[];
+    custom: CatalogCustomComponent[];
+  },
   filter: ComponentFilter,
 ): ComponentGroup[] {
   const items = [
