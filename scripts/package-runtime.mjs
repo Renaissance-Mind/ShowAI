@@ -14,6 +14,8 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const runtime = join(root, "dist-runtime");
 await mkdir(join(runtime, "assets"), { recursive: true });
 await mkdir(join(runtime, "scripts"), { recursive: true });
+await rm(join(runtime, "web"), { recursive: true, force: true });
+await cp(join(root, "dist"), join(runtime, "web"), { recursive: true });
 await copyFile(
   join(root, "dist-portable/portable.html"),
   join(runtime, "assets/viewer.html"),

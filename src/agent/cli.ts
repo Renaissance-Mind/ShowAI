@@ -25,6 +25,9 @@ import { runtimeInfo, registerRuntime } from "./runtime";
 
 export const CLI_HELP = `ShowAI — interactive pages shared by people and Agents.
 
+Local browser workbench (same files as the desktop app and CLI):
+  serve [--home PATH] [--port PORT] [--no-open]
+
 Start with one project:
   runtime info | runtime register
   projects current --harness HOST --session SESSION_ID
@@ -50,9 +53,10 @@ interface Arguments {
 function parseArguments(args: string[]): Arguments {
   const positional: string[] = [];
   const options: Record<string, string | boolean> = {};
-  const booleans = new Set(["json", "help", "overwrite"]);
+  const booleans = new Set(["json", "help", "overwrite", "no-open"]);
   const strings = new Set([
     "home",
+    "port",
     "project",
     "name",
     "title",
@@ -248,6 +252,12 @@ export async function runCli(argv: string[]): Promise<unknown> {
     process.stdout.write(CLI_HELP);
     return undefined;
   }
+  if (command === "serve" && args.options.help) {
+    process.stdout.write(
+      "showai serve [--home PATH] [--port PORT] [--no-open] [--json]\nStart the local browser workbench. Default port: a free loopback port.\n",
+    );
+    return undefined;
+  }
   const service = new AgentService({ root: option(args, "home") });
   const project = () => service.requireProject(option(args, "project"));
   if (args.options.help)
@@ -265,6 +275,17 @@ export async function runCli(argv: string[]): Promise<unknown> {
       )[command],
     );
   switch (command) {
+    case "serve": {
+      requireCount(args, 1);
+      const { runBrowser } = await import("../browser/launch");
+      await runBrowser({
+        home: option(args, "home"),
+        port: option(args, "port"),
+        open: !args.options["no-open"],
+        json: !!args.options.json,
+      });
+      return undefined;
+    }
     case "runtime": {
       requireCount(args, 2);
       const info = await runtimeInfo(service.store.root);

@@ -9,6 +9,7 @@ export interface DesktopInfo {
   version: string;
   platform: string;
   packaged: boolean;
+  mode?: "desktop" | "browser";
   cli: { command: string; args: string[]; env: Record<string, string> };
 }
 

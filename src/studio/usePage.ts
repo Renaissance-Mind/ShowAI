@@ -272,6 +272,9 @@ export function usePage() {
   }, [flush]);
 
   useEffect(() => desktop.onBeforeClose(flush), [flush]);
+  useEffect(() => {
+    window.showai?.setDirty?.(!!draft && status !== "saved");
+  }, [draft, status]);
 
   useEffect(() => {
     const key = (event: KeyboardEvent) => {

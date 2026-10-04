@@ -5,6 +5,7 @@ export interface DesktopBridge {
   ): Promise<T>;
   onChange(listener: () => void): () => void;
   onBeforeClose(listener: () => Promise<boolean>): () => void;
+  setDirty?(dirty: boolean): void;
 }
 
 declare global {

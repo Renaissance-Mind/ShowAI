@@ -26,6 +26,12 @@ export default function Dialog({
       panel.current?.querySelector<HTMLElement>("button")
     )?.focus();
     const handle = (event: KeyboardEvent) => {
+      // A local file picker can sit above a component or publication dialog.
+      if (
+        panel.current !==
+        [...document.querySelectorAll('[role="dialog"]')].at(-1)
+      )
+        return;
       if (event.key === "Escape") onClose();
       if (event.key === "Tab") {
         const items = [

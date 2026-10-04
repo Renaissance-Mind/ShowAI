@@ -18,6 +18,41 @@ Windows x64 的 NSIS 安装配置已包含在仓库中，应在 Windows 构建�
 
 默认内容库为 `~/.showai`，可在「设置 → 内容位置」中更改。项目文件、页面与变更快照保存在磁盘中；CLI 和桌面应用使用同一目录时，可以互相看到修改。
 
+## 本地浏览器版
+
+macOS 可以选择桌面 App 或本地浏览器版；Linux 和 Windows 可以使用本地浏览器版。两种入口共用工作台、项目格式、组件编译器和 Agent CLI，指向同一内容库时直接读写同一份磁盘文件。
+
+浏览器发行包包含独立 Node 运行时，无需另装 Node 或 Electron。解压对应系统与架构的包后，macOS 双击 `start.command`，Linux 运行 `./start.sh`，Windows 双击 `start.cmd`。启动器打开本机工作台地址；使用期间保留终端窗口，按 Ctrl+C 停止服务。详见 [本地浏览器版使用说明](docs/local-browser.md)。
+
+本地浏览器工作台提供项目、文件夹、页面、模板、组件源码编辑、版本管理和导出。文件对话框直接浏览本机目录，导出结果写入所选磁盘位置。CLI 修改后工作台自动刷新，文件版本冲突沿用桌面版的检查与处理方式。
+
+从源码构建并运行：
+
+```sh
+npm ci
+npm run build:browser
+npm run browser
+```
+
+指定内容库与端口，或在没有图形桌面的环境下手动打开地址：
+
+```sh
+node dist-runtime/scripts/cli.mjs serve --home /absolute/path/to/library --port 5175 --no-open
+```
+
+默认内容库为 `~/.showai`。没有指定 `--home` 或 `SHOWAI_HOME` 时，可在设置中切换内容位置；浏览器版会独立记住这个位置。指定同一个目录即可与 Mac App 并行使用。
+
+发行包提供 `showai`（macOS/Linux）和 `showai.cmd`（Windows）。Agent CLI 无需启动工作台服务：
+
+```sh
+./showai projects list --json
+./showai runtime register --json
+```
+
+运行工作台或登记运行时后，在「设置 → Agent」复制启动配置；它包含发行包自带 Node、CLI 和当前内容库路径。已有 Codex/Claude Code 技能和可选 stdio MCP 继续使用同一套命令。
+
+在目标系统上执行 `npm run package:browser`，会生成 `release/ShowAI-browser-版本-系统-架构/` 与压缩包。打包程序下载官方独立 Node 并校验摘要；构建依赖仍需要开发环境 Node.js 22.12+。GitHub 的「Browser distributions」工作流可手动构建和验证 Linux、Windows、macOS 包。
+
 ## 从源码运行
 
 需要 Node.js 22.12+ 和 npm。仓库访问权限由 GitHub 管理。
@@ -30,7 +65,7 @@ npm run build
 npm run desktop
 ```
 
-桌面应用读取构建后的前端。修改代码后重新执行 `npm run build` 再启动。`npm run dev` 提供浏览器中的单页画布开发预览；完整项目管理和磁盘访问由桌面应用提供。
+桌面应用读取构建后的前端。修改代码后重新执行 `npm run build` 再启动。`npm run dev` 提供单页画布开发预览；完整本地工作台通过 `npm run desktop` 或 `npm run browser` 启动。
 
 构建安装包：
 

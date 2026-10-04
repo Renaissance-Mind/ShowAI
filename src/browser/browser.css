@@ -1,0 +1,92 @@
+.local-file-body {
+  padding: 18px 22px 20px;
+}
+.local-file-path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.local-file-path input,
+.local-file-name input {
+  min-width: 0;
+  flex: 1;
+  width: 100%;
+  padding: 9px 11px;
+  color: var(--text);
+  background: var(--paper);
+  border: 1px solid var(--line, #8886);
+  border-radius: 7px;
+  font: inherit;
+}
+.local-file-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.local-file-entries {
+  height: min(42vh, 340px);
+  overflow: auto;
+  border: 1px solid var(--line, #8884);
+  border-radius: 8px;
+  padding: 5px;
+}
+.local-file-entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  width: 100%;
+  border: 0;
+  border-radius: 5px;
+  padding: 9px 10px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.local-file-entry span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.local-file-entry:hover {
+  background: #8881;
+}
+.local-file-entry.selected {
+  background: #538a7826;
+  outline: 1px solid #538a7866;
+}
+.local-file-entry svg {
+  flex-shrink: 0;
+}
+.local-file-empty {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  padding: 35px 15px;
+  opacity: 0.7;
+}
+.local-file-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0;
+}
+.local-file-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+.local-file-footer > span {
+  flex: 1;
+  font-size: 12px;
+  opacity: 0.65;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -319,7 +319,13 @@ export function SettingsPanel({
               <div className="settings-row">
                 <dt>应用环境</dt>
                 <dd>
-                  {info ? (info.packaged ? "桌面安装包" : "开发环境") : "—"}
+                  {info
+                    ? info.mode === "browser"
+                      ? "本地浏览器版"
+                      : info.packaged
+                        ? "桌面安装包"
+                        : "开发环境"
+                    : "—"}
                 </dd>
               </div>
             </dl>
