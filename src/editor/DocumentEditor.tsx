@@ -58,6 +58,7 @@ import {
   createBlockData,
   blockDefinitions,
 } from "../components/blocks/registry";
+import { TableControls } from "./TableControls";
 import { createExtensions } from "./extensions";
 import "./editor.css";
 
@@ -1221,6 +1222,7 @@ export default function DocumentEditor({
         onDropCapture={handleDrop}
       >
         <EditorContent editor={editor} />
+        {!readOnly && <TableControls editor={editor} />}
         {!readOnly && hover && (
           <div className="block-handle" style={{ top: hover.top }}>
             <button

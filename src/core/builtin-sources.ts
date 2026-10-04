@@ -2,6 +2,7 @@ import themeTokens from "../design/tokens.css?raw";
 import themeContent from "../design/content.css?raw";
 import contract from "../components/blocks/primitive-contract.mjs?raw";
 import sdk from "../components/blocks/sdk.tsx?raw";
+import tableAlignment from "../components/blocks/TableAlignment.tsx?raw";
 import primitives from "../components/blocks/Primitives.tsx?raw";
 import chart from "../components/blocks/Chart.tsx?raw";
 import database from "../components/blocks/Database.tsx?raw";
@@ -20,6 +21,7 @@ export const builtinSources: Record<string, string> = {
   "primitive-contract.mjs": contract,
   "sdk.tsx": sdk,
   "Primitives.tsx": primitives,
+  "TableAlignment.tsx": tableAlignment,
   "Chart.tsx": chart,
   "Database.tsx": database,
   "Metrics.tsx": metrics,

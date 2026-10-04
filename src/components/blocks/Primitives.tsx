@@ -1,9 +1,21 @@
-import { createElement, type CSSProperties, type ReactNode } from "react";
+import {
+  createElement,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { marked, type Token, type Tokens } from "marked";
 import { safeImageUrl, safeUrl, text } from "./helpers";
 import type { BlockProps } from "./types";
 
-import { validatePrimitiveData } from "./primitive-contract.mjs";
+import {
+  validatePrimitiveData,
+  tableColumnAlignment,
+  alignTableData,
+} from "./primitive-contract.mjs";
+import { AlignmentButtons, type TableAlignment } from "./TableAlignment";
 export { validatePrimitiveData } from "./primitive-contract.mjs";
 
 const appearance = (data: Record<string, unknown>): CSSProperties => ({
@@ -202,6 +214,38 @@ export function TableBlock({ data, onChange, readOnly }: BlockProps) {
   validatePrimitiveData("table", data);
   const columns = (data.columns ?? []) as string[];
   const rows = (data.rows ?? []) as (string | number | boolean)[][];
+  const editable = Boolean(onChange && !readOnly);
+  const tableRef = useRef<HTMLElement>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    left: number;
+    top: number;
+  } | null>(null);
+  useEffect(() => {
+    if (!contextMenu) return;
+    const dismiss = (event: Event) => {
+      if (event.type === "keydown" && (event as KeyboardEvent).key !== "Escape")
+        return;
+      if (
+        event.type === "pointerdown" &&
+        (event.target as Element).closest?.(".sb-table-context-menu")
+      )
+        return;
+      setContextMenu(null);
+    };
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", dismiss);
+    window.addEventListener("blur", dismiss);
+    return () => {
+      document.removeEventListener("pointerdown", dismiss);
+      document.removeEventListener("keydown", dismiss);
+      window.removeEventListener("blur", dismiss);
+    };
+  }, [contextMenu]);
+  const align = (column: number | null, alignment: TableAlignment) => {
+    if (!editable) return;
+    onChange?.(alignTableData(data, column, alignment));
+    setContextMenu(null);
+  };
   const edit = (row: number, col: number, value: string) =>
     onChange?.({
       ...data,
@@ -211,58 +255,140 @@ export function TableBlock({ data, onChange, readOnly }: BlockProps) {
     });
   return (
     <section
-      className="sb-primitive sb-table"
+      ref={tableRef}
+      className={`sb-primitive sb-table${editable ? " is-editable" : ""}`}
+      onContextMenu={(event) => {
+        if (!editable) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const rect = tableRef.current!.getBoundingClientRect();
+        const scale = rect.width / tableRef.current!.offsetWidth || 1;
+        setContextMenu({
+          left: Math.max(
+            0,
+            Math.min(
+              (event.clientX - rect.left) / scale,
+              tableRef.current!.offsetWidth - 194,
+            ),
+          ),
+          top: Math.max(
+            0,
+            Math.min(
+              (event.clientY - rect.top) / scale,
+              (window.innerHeight - rect.top) / scale - 42,
+            ),
+          ),
+        });
+      }}
       style={appearance(data)}
       aria-label={text(data.title) || "基础表格"}
     >
       {text(data.title) && <h3>{text(data.title)}</h3>}
-      <div className="sb-table-scroll">
-        <table>
-          <thead>
-            <tr>
-              {columns.map((column, i) => (
-                <th key={i}>
-                  {readOnly || !onChange ? (
-                    column
-                  ) : (
-                    <input
-                      aria-label={`列 ${i + 1} 名称`}
-                      value={column}
-                      onChange={(event) =>
-                        onChange({
-                          ...data,
-                          columns: columns.map((c, j) =>
-                            i === j ? event.target.value : c,
-                          ),
-                        })
-                      }
-                    />
-                  )}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={i}>
-                {row.map((cell, j) => (
-                  <td key={j}>
+      <div className="sb-table-frame">
+        {editable && (
+          <div className="sb-table-global-alignment">
+            <span>整个表格</span>
+            <AlignmentButtons
+              scope="整个表格"
+              value={
+                columns.every(
+                  (_, i) =>
+                    tableColumnAlignment(data, i) ===
+                    tableColumnAlignment(data, 0),
+                )
+                  ? tableColumnAlignment(data, 0)
+                  : null
+              }
+              onChange={(value) => align(null, value)}
+            />
+          </div>
+        )}
+        <div className="sb-table-scroll">
+          <table>
+            <thead>
+              <tr>
+                {columns.map((column, i) => (
+                  <th
+                    key={i}
+                    style={{ textAlign: tableColumnAlignment(data, i) }}
+                  >
+                    {editable && (
+                      <div className="sb-table-column-alignment">
+                        <AlignmentButtons
+                          scope={`第 ${i + 1} 列`}
+                          value={tableColumnAlignment(data, i)}
+                          onChange={(value) => align(i, value)}
+                        />
+                      </div>
+                    )}
                     {readOnly || !onChange ? (
-                      String(cell)
+                      column
                     ) : (
                       <input
-                        aria-label={`第 ${i + 1} 行第 ${j + 1} 列`}
-                        value={String(cell)}
-                        onChange={(event) => edit(i, j, event.target.value)}
+                        aria-label={`列 ${i + 1} 名称`}
+                        value={column}
+                        onChange={(event) =>
+                          onChange({
+                            ...data,
+                            columns: columns.map((c, j) =>
+                              i === j ? event.target.value : c,
+                            ),
+                          })
+                        }
                       />
                     )}
-                  </td>
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr key={i}>
+                  {row.map((cell, j) => (
+                    <td
+                      key={j}
+                      style={{ textAlign: tableColumnAlignment(data, j) }}
+                    >
+                      {readOnly || !onChange ? (
+                        String(cell)
+                      ) : (
+                        <input
+                          aria-label={`第 ${i + 1} 行第 ${j + 1} 列`}
+                          value={String(cell)}
+                          onChange={(event) => edit(i, j, event.target.value)}
+                        />
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
+      {editable && contextMenu && (
+        <div
+          className="sb-table-context-menu"
+          role="dialog"
+          aria-label="表格对齐设置"
+          style={contextMenu}
+        >
+          <span>整个表格</span>
+          <AlignmentButtons
+            scope="整个表格"
+            value={
+              columns.every(
+                (_, i) =>
+                  tableColumnAlignment(data, i) ===
+                  tableColumnAlignment(data, 0),
+              )
+                ? tableColumnAlignment(data, 0)
+                : null
+            }
+            onChange={(value) => align(null, value)}
+          />
+        </div>
+      )}
       {!readOnly && onChange && (
         <div className="sb-table-actions">
           <button

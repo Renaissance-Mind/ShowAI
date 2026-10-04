@@ -9,6 +9,7 @@ import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Highlight from "@tiptap/extension-highlight";
 import TextAlign from "@tiptap/extension-text-align";
+import { TableAlignmentAttributes } from "./table-alignment";
 import { CalloutView, ToggleView, WidgetView } from "./NodeViews";
 
 export const blockIdNodeTypes = [
@@ -210,6 +211,7 @@ export function createExtensions(
       HTMLAttributes: { class: "document-image" },
     }),
     TableKit.configure({ table: { resizable: true } }),
+    TableAlignmentAttributes,
     TaskList,
     TaskItem.configure({ nested: true }),
     Highlight.configure({ multicolor: true }),

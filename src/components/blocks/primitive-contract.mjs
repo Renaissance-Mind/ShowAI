@@ -50,6 +50,18 @@ export function validatePrimitiveData(kind, data) {
     throw new Error("组件需要文字内容。");
   if (kind === "table") {
     if (
+      data.columnAlignments !== undefined &&
+      (!Array.isArray(data.columnAlignments) ||
+        data.columnAlignments.length !== data.columns?.length ||
+        data.columnAlignments.some(
+          (value) =>
+            value !== null && !["left", "center", "right"].includes(value),
+        ))
+    )
+      throw new Error(
+        "列对齐设置必须与列数一致，且只能使用 left、center、right 或 null。",
+      );
+    if (
       !Array.isArray(data.columns) ||
       !data.columns.length ||
       data.columns.length > 100 ||
@@ -74,4 +86,24 @@ export function validatePrimitiveData(kind, data) {
         "表格各行必须和表头列数一致，单元格只支持文字、数字和布尔值。",
       );
   }
+}
+
+/** A null column override inherits the table's alignment. */
+export function tableColumnAlignment(data, column) {
+  return data.columnAlignments?.[column] ?? data.align ?? "left";
+}
+
+export function alignTableData(data, column, alignment) {
+  if (!["left", "center", "right"].includes(alignment))
+    throw new Error("不支持此对齐方式。");
+  if (column === null) {
+    const { columnAlignments: _overrides, ...rest } = data;
+    return { ...rest, align: alignment };
+  }
+  if (!Number.isInteger(column) || column < 0 || column >= data.columns.length)
+    throw new Error("列索引超出范围。");
+  const columnAlignments = data.columns.map((_, index) =>
+    index === column ? alignment : (data.columnAlignments?.[index] ?? null),
+  );
+  return { ...data, columnAlignments };
 }
