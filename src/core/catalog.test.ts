@@ -72,6 +72,27 @@ const schema = {
 const source =
   'import {useState} from "react";export default function Counter({data,onChange}){const[value,setValue]=useState(data.value);return <button onClick={()=>{setValue(value+1);onChange?.({value:value+1})}}>{value}</button>}';
 
+it("React Flow can be composed through the SDK and exported without external scripts", async () => {
+  const home = await temporary();
+  const original = readBuiltinComponentSource("flowchart");
+  const source = {
+    ...original,
+    manifest: { ...original.manifest, id: "workflow-diagram" },
+  };
+  const result = await saveComponent(home, source, project(home));
+  expect(result.html).toContain("react-flow");
+  expect(result.html).not.toMatch(/<script[^>]+src=/);
+  expect(result.inline?.script).toBeTruthy();
+  expect(result.inline?.styles).toContain("sf-node");
+  const reloaded = await getComponent(
+    home,
+    result.id,
+    result.version,
+    project(home),
+  );
+  expect(reloaded.integrity).toBe(result.integrity);
+});
+
 describe("filesystem template catalog", () => {
   it("provides blank, research, comparison and brief without invented findings", async () => {
     const home = await temporary();
@@ -184,6 +205,7 @@ describe("compiled React packages", () => {
       "playground",
       "gallery",
       "bookmark",
+      "flowchart",
     ]);
     expect(
       builtins.every((item) => item.propsSchema && item.scenarios.length),

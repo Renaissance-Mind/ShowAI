@@ -28,7 +28,7 @@ const artifacts = process.env.SHOWAI_SMOKE_BINARY
   ? [
       binary,
       join(resources, "app.asar"),
-      join(resources, "plugin/scripts/cli.mjs"),
+      join(resources, "runtime/scripts/cli.mjs"),
     ]
   : [
       join(repository, "dist-desktop/main.mjs"),

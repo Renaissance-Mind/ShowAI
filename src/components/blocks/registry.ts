@@ -9,12 +9,15 @@ import {
   validatePrimitiveData,
 } from "./Primitives";
 import primitiveMetadata from "../../../resources/catalog/primitives.json";
+import componentMetadata from "../../../resources/catalog/components.json";
 import { BookmarkBlock } from "./Bookmark";
 import { ChartBlock } from "./Chart";
 import { DatabaseBlock } from "./Database";
 import { GalleryBlock } from "./Gallery";
 import { MetricsBlock } from "./Metrics";
 import { PlaygroundBlock } from "./Playground";
+import { FlowchartBlock } from "./Flowchart";
+import { validateFlowchartData } from "./flowchart-contract.mjs";
 import { parseChartData } from "./helpers";
 import { CustomBlock } from "../custom/CustomBlock";
 import { readCustomBlockData } from "../custom/contract";
@@ -166,6 +169,16 @@ for (const item of primitiveMetadata) {
   });
 }
 
+registerBlock({
+  kind: "flowchart",
+  title: "交互流程图",
+  description: "节点、分支与按需展开的说明",
+  icon: "⌘",
+  defaultData: componentMetadata.find((item) => item.kind === "flowchart")!
+    .defaultData as BlockData,
+  renderer: FlowchartBlock,
+  validate: validateFlowchartData,
+});
 registerBlock({
   kind: "chart",
   title: "数据图表",

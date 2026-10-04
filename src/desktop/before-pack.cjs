@@ -12,7 +12,7 @@ module.exports = async function beforePack(context) {
   }
   const root = context.packager.projectDir;
   const metadata = JSON.parse(
-    await readFile(join(root, "plugins/showai/assets/build.json"), "utf8"),
+    await readFile(join(root, "dist-runtime/assets/build.json"), "utf8"),
   );
   if (
     metadata.platform !== target ||
@@ -20,13 +20,13 @@ module.exports = async function beforePack(context) {
     metadata.version !== context.packager.appInfo.version
   ) {
     throw new Error(
-      "Plugin runtime does not match this application version/platform. Run npm run build on the target machine before packaging.",
+      "Runtime does not match this application version/platform. Run npm run build on the target machine before packaging.",
     );
   }
   await access(
     join(
       root,
-      "plugins/showai/node_modules/@esbuild",
+      "dist-runtime/node_modules/@esbuild",
       `${target}-${architecture}`,
       target === "win32" ? "esbuild.exe" : "bin/esbuild",
     ),

@@ -39,13 +39,13 @@ const fingerprintFiles = process.env.SHOWAI_SMOKE_BINARY
   ? [
       binary,
       join(resources, "app.asar"),
-      join(resources, "plugin/scripts/cli.mjs"),
+      join(resources, "runtime/scripts/cli.mjs"),
     ]
   : [
       join(repository, "dist-desktop/main.mjs"),
       join(repository, "dist-desktop/index.html"),
       join(repository, "dist-desktop/preload.cjs"),
-      join(repository, "plugins/showai/scripts/cli.mjs"),
+      join(repository, "dist-runtime/scripts/cli.mjs"),
     ];
 const fingerprints = async () =>
   Object.fromEntries(

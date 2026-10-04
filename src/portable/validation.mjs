@@ -1,4 +1,5 @@
 import { validatePrimitiveData } from "../components/blocks/primitive-contract.mjs";
+import { validateFlowchartData } from "../components/blocks/flowchart-contract.mjs";
 // Shared by the browser importer and the dependency-free artifact command.
 import { validateRemoteComponents } from "./remote.mjs";
 export const MAX_ARTIFACT_BYTES = 10 * 1024 * 1024;
@@ -62,6 +63,7 @@ const nodeAttributes = new Set([
   "tone",
   "kind",
   "data",
+  "canvas",
 ]);
 const markAttributes = new Set([
   "href",
@@ -215,9 +217,18 @@ function validateAttrs(attrs, path, permitted) {
 }
 
 function validateWidgetData(kind, data, path) {
-  if (["text", "image", "table", "callout", "toggle", "divider", "code"].includes(kind)) {
+  if (kind === "flowchart") {
+    validateFlowchartData(data);
+    return;
+  }
+  if (
+    ["text", "image", "table", "callout", "toggle", "divider", "code"].includes(
+      kind,
+    )
+  ) {
     validatePrimitiveData(kind, data);
-    if (kind === "image" && data.src && !isSafeUrl(data.src, true)) throw new Error(`${path}.src must be a safe raster image URL.`);
+    if (kind === "image" && data.src && !isSafeUrl(data.src, true))
+      throw new Error(`${path}.src must be a safe raster image URL.`);
     return;
   }
   if (
@@ -389,6 +400,36 @@ function validateNode(value, path, counter, depth = 0) {
     throw new Error(`Only text nodes can have a text field: ${path}.`);
   if (node.attrs !== undefined)
     validateAttrs(node.attrs, `${path}.attrs`, nodeAttributes);
+  if (node.attrs?.canvas != null) {
+    if (depth !== 1 || node.type !== "callout")
+      throw new Error(
+        `${path}.attrs.canvas is only supported on top-level callouts.`,
+      );
+    string(node.attrs.id, `${path}.attrs.id`, 200);
+    if (!node.attrs.id.trim())
+      throw new Error(`${path} needs a stable canvas id.`);
+    const position = object(node.attrs.canvas, `${path}.attrs.canvas`);
+    if (Object.keys(position).some((key) => !["x", "y", "width"].includes(key)))
+      throw new Error(`${path}.attrs.canvas contains an unsupported field.`);
+    for (const key of ["x", "y"])
+      if (
+        typeof position[key] !== "number" ||
+        !Number.isFinite(position[key]) ||
+        Math.abs(position[key]) > 1000000
+      )
+        throw new Error(
+          `${path}.attrs.canvas.${key} must be finite and within ±1000000.`,
+        );
+    if (
+      typeof position.width !== "number" ||
+      !Number.isFinite(position.width) ||
+      position.width < 240 ||
+      position.width > 1600
+    )
+      throw new Error(
+        `${path}.attrs.canvas.width must be between 240 and 1600.`,
+      );
+  }
   if (node.type === "image" && !isSafeUrl(node.attrs?.src, true))
     throw new Error(`${path} requires a safe image src.`);
   if (node.type === "widget") {

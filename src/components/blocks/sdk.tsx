@@ -6,6 +6,7 @@ export {
   TableBlock as Table,
 } from "./Primitives";
 export { ChartBlock as Chart } from "./Chart";
+export { FlowchartBlock as Flowchart } from "./Flowchart";
 export { DatabaseBlock as Database } from "./Database";
 export { MetricsBlock as Metrics } from "./Metrics";
 export { PlaygroundBlock as Playground } from "./Playground";

@@ -91,7 +91,7 @@ async function install() {
       throw new Error(`Unknown option ${flag}.`);
   if (flags.has("--help")) {
     log(
-      "Usage: node scripts/install-codex-plugin.mjs [--update] [--json]\nBuilds the reader, CLI and plugin bundle, then uses the official Codex CLI to register this local marketplace and install or refresh ShowAI. Verifies the installed copy byte-for-byte and confirms it is enabled. Does not pull Git, uninstall plugins, edit Codex config text, or restart Codex.",
+      "Usage: node scripts/install-codex-plugin.mjs [--update] [--json]\nValidates the skills-only plugin, then uses official Codex commands to install or refresh it. The ShowAI software runtime is installed separately. Verifies installed bytes and enabled status.",
     );
     return;
   }
@@ -146,9 +146,7 @@ async function install() {
       );
   }
 
-  log("Building the ShowAI reader and Agent tools…");
-  await npmScript("build:portable");
-  await npmScript("build:agent");
+  log("Preparing the ShowAI skills…");
   const packaged = await command(process.execPath, [
     join(root, "scripts/package-plugin.mjs"),
   ]);
@@ -200,9 +198,6 @@ async function install() {
     throw new Error(
       `Installed version ${installed.version} differs from the bundle version ${manifest.version}.`,
     );
-  const metadata = JSON.parse(
-    await readFile(join(installedPath, "assets/build.json"), "utf8"),
-  );
   const receiptPath = join(root, "artifacts/codex-plugin-install.json");
   const receipt = {
     ok: true,
@@ -219,12 +214,10 @@ async function install() {
       [
         "plugin.json",
         "skills/show-document/SKILL.md",
-        "scripts/cli.mjs",
-        "assets/viewer.html",
-        "assets/build.json",
+        "skills/create-component/SKILL.md",
+        "skills/extract-template/SKILL.md",
       ].map((path) => [path, actual.entries.get(path)?.sha256]),
     ),
-    builtAt: metadata.builtAt,
     verifiedAt: new Date().toISOString(),
     receiptPath,
   };

@@ -1,13 +1,13 @@
 {
   "name": "showai",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "description": "Offline desktop canvas with file-based projects and Agent tools.",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build:portable": "vite build --config vite.portable.config.ts && node scripts/copy-viewer.mjs",
-    "build": "tsc -b && npm run build:portable && vite build && npm run build:agent && node scripts/package-plugin.mjs && npm run desktop:build",
+    "build": "tsc -b && npm run build:portable && vite build && npm run build:agent && npm run package:runtime && npm run package:plugin && npm run desktop:build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "artifact": "node scripts/render-artifact.mjs",
@@ -21,9 +21,13 @@
     "pretest": "npm run build:portable",
     "test:desktop": "npm run build && node src/desktop/smoke.mjs && node src/desktop/ui-smoke.mjs && node src/desktop/library-ui-smoke.mjs && node src/desktop/catalog-ui-smoke.mjs",
     "plugin:install": "node scripts/install-codex-plugin.mjs",
-    "plugin:update": "node scripts/install-codex-plugin.mjs --update"
+    "plugin:update": "node scripts/install-codex-plugin.mjs --update",
+    "package:runtime": "node scripts/package-runtime.mjs",
+    "package:plugin": "node scripts/package-plugin.mjs",
+    "runtime:register": "node dist-runtime/scripts/cli.mjs runtime register --json"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^3.1.1",
     "@modelcontextprotocol/sdk": "^1.32.0",
     "@tiptap/core": "^3.31.4",
     "@tiptap/extension-highlight": "^3.31.4",
@@ -36,6 +40,7 @@
     "@tiptap/pm": "^3.31.4",
     "@tiptap/react": "^3.31.4",
     "@tiptap/starter-kit": "^3.31.4",
+    "@xyflow/react": "^12.12.0",
     "ajv": "^8.20.0",
     "chokidar": "^5.0.0",
     "esbuild": "^0.28.2",

@@ -8,7 +8,7 @@ export function build<T extends BuildOptions>(
   options: T & { [Key in Exclude<keyof T, keyof BuildOptions>]: never },
 ): Promise<BuildResult<T>> {
   const entry = app.isPackaged
-    ? join(process.resourcesPath, "plugin", "scripts", "cli.mjs")
+    ? join(process.resourcesPath, "runtime", "scripts", "cli.mjs")
     : import.meta.url;
   const compiler = createRequire(entry)("esbuild") as typeof import("esbuild");
   return compiler.build(options);

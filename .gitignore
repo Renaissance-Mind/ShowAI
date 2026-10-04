@@ -12,10 +12,10 @@ output/
 plugins/showai/assets/viewer.html
 plugins/showai/assets/build.json
 plugins/showai/scripts/render-artifact.mjs
-plugins/showai/skills/show-document/references/
 plugins/showai/skills/show-document/examples/
 
 dist-agent/
+dist-runtime/
 dist-desktop/
 release/
 plugins/showai/scripts/cli.mjs

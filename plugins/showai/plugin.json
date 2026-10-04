@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "showai",
-  "version": "0.4.0",
-  "description": "Create interactive pages and small sites from reusable React components and templates, with explicit project binding and safe revisions.",
+  "version": "0.5.0",
+  "description": "Skills for creating ShowAI pages, building reusable components and extracting templates through an independently installed ShowAI runtime.",
   "keywords": [
     "research",
     "interactive-pages",
@@ -15,7 +15,7 @@
       "interface": {
         "displayName": "ShowAI",
         "shortDescription": "Create and share interactive pages",
-        "longDescription": "Use a shared project store to create, inspect, revise, and export interactive pages. Reuse components and templates, compare user edits before writing, and deliver one offline HTML page or a multi-page site.",
+        "longDescription": "Create pages, build reusable components and extract templates with focused skills. Uses an independently installed ShowAI desktop application or CLI runtime.",
         "category": "Productivity",
         "defaultPrompt": [
           "Use ShowAI to present this research as an interactive page."

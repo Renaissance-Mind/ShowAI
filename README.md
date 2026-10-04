@@ -8,7 +8,7 @@ ShowAI 提供桌面工作台、React 组件与模板，以及供 Codex、Claude 
 
 ## 桌面使用
 
-构建后的安装包位于 `release/`。macOS arm64 使用 `ShowAI-0.4.0-arm64.dmg`：打开后将 ShowAI 拖入「应用程序」，再启动应用。当前构建采用临时签名，尚未进行 Apple 公证；请通过系统提供的「仍要打开」流程打开你信任的本地构建。
+构建后的安装包位于 `release/`。macOS arm64 使用 `ShowAI-0.5.0-arm64.dmg`：打开后将 ShowAI 拖入「应用程序」，再启动应用。当前构建采用临时签名，尚未进行 Apple 公证；请通过系统提供的「仍要打开」流程打开你信任的本地构建。
 
 Windows x64 的 NSIS 安装配置已包含在仓库中，应在 Windows 构建并验收后分发。当前仓库没有公开发布的安装包或 npm/PyPI 安装入口。
 
@@ -49,10 +49,10 @@ npm run package:win
 ShowAI CLI 直接读写项目文件，每次命令执行完成后退出。使用 CLI 时无需启动桌面应用，也无需先运行 Core 服务。
 
 ```sh
-node dist-agent/cli.mjs projects create --name "模型调研" --json
-node dist-agent/cli.mjs catalog list --kind template --json
-node dist-agent/cli.mjs template apply research --project PROJECT_ID --title "调研结果" --json
-node dist-agent/cli.mjs pages list --project PROJECT_ID --json
+node dist-runtime/scripts/cli.mjs projects create --name "模型调研" --json
+node dist-runtime/scripts/cli.mjs catalog list --kind template --json
+node dist-runtime/scripts/cli.mjs template apply research --project PROJECT_ID --title "调研结果" --json
+node dist-runtime/scripts/cli.mjs pages list --project PROJECT_ID --json
 ```
 
 把 `PROJECT_ID` 替换为新建项目返回的 id。每条页面命令显式指定项目。需要绑定会话时，创建项目时加上 `--harness codex --session ACTUAL_SESSION_ID`；只有用户选择复用已有项目时才绑定到该项目。
@@ -64,9 +64,9 @@ node dist-agent/cli.mjs pages list --project PROJECT_ID --json
 ## 单页与网站交付
 
 ```sh
-node dist-agent/cli.mjs export --project PROJECT_ID --page PAGE_ID --format html --out ./report.html --json
-node dist-agent/cli.mjs export --project PROJECT_ID --page PAGE_ID --format inline --out ./report-inline.html --json
-node dist-agent/cli.mjs export --project PROJECT_ID --format site --out ./site --json
+node dist-runtime/scripts/cli.mjs export --project PROJECT_ID --page PAGE_ID --format html --out ./report.html --json
+node dist-runtime/scripts/cli.mjs export --project PROJECT_ID --page PAGE_ID --format inline --out ./report-inline.html --json
+node dist-runtime/scripts/cli.mjs export --project PROJECT_ID --format site --out ./site --json
 ```
 
 | 产物         | 用途                                | 打开方式                                   |
@@ -83,7 +83,9 @@ HTML 与 inline 导出同时保存 `.showai.json` 源文件；独立页面的菜
 
 ## Codex 与 Claude Code 插件
 
-`npm run build` 生成 `plugins/showai/`，其中包含技能、CLI、阅读器、组件编译器和使用说明。插件使用与桌面工作台相同的项目文件。
+插件只分发三个技能：`show-document` 创建和修改页面，`create-component` 定义可复用组件，`extract-template` 将成熟页面抽象为模板。CLI、阅读器和组件编译器由独立安装的 ShowAI 软件提供；本地构建的运行包位于 `dist-runtime/`，桌面安装包把它放入 `Resources/runtime/`。
+
+桌面启动后会在所选内容目录登记 `agent-runtime.json`。使用独立运行包时执行 `npm run runtime:register`；技能读取启动配置并通过 `runtime info` 验证版本与内容目录。
 
 Codex：在仓库中运行安装命令，之后每次修改代码再运行更新命令：
 
@@ -92,7 +94,7 @@ npm run plugin:install
 npm run plugin:update
 ```
 
-两条命令都会构建阅读器、CLI 和插件包，通过官方 `codex plugin marketplace add` / `codex plugin add` 安装或刷新当前本地来源，并逐文件比对安装副本与构建结果，确认插件已启用。无需重建桌面安装包，也不会自动拉取 Git、修改其他插件来源或重启 Codex。需要 Node.js 22.12+ 和支持 `codex plugin add` 的 Codex CLI。
+两条命令只检查技能包，通过官方 `codex plugin marketplace add` / `codex plugin add` 安装或刷新当前本地来源，并逐文件比对安装副本与构建结果，确认插件已启用。无需重建桌面安装包，也不会自动拉取 Git、修改其他插件来源或重启 Codex。需要 Node.js 22.12+ 和支持 `codex plugin add` 的 Codex CLI。
 
 更新结果保存在 `artifacts/codex-plugin-install.json`，包含实际安装路径和文件哈希。完成后新开 Codex 会话加载技能；本地更新可以保持同一开发版本号，是否成功以安装副本校验为准。如果同名 marketplace 指向其他目录，或缓存校验失败，命令会明确报错，保留现有插件供检查。详见 [插件说明](plugins/showai/README.md)。
 
@@ -103,7 +105,7 @@ claude plugin marketplace add ./
 claude plugin install showai@renaissance-mind
 ```
 
-开发时也可以用 `claude --plugin-dir ./plugins/showai`，为当前会话加载插件。单独安装插件需要 Node.js 22.12+；使用桌面应用复制出的启动配置时，可以使用应用自带运行时。
+开发时也可以用 `claude --plugin-dir ./plugins/showai` 加载技能。插件自身不携带运行程序；先安装 ShowAI 或构建并登记外部运行包。外部 Node 方式需要 Node.js 22.12+；桌面配置使用应用自带运行时。
 
 MCP 是可选的工具入口，通过 `mcp --project PROJECT_ID` 启动并固定到一个项目。具体配置见 [Agent 使用说明](docs/agent-usage.md#optional-mcp)。插件不会设置跨会话共享的全局活动项目。
 
@@ -111,14 +113,16 @@ MCP 是可选的工具入口，通过 `mcp --project PROJECT_ID` 启动并固定
 
 ## 组件与模板
 
+流程图控件基于 [React Flow](https://reactflow.dev/) 与 Dagre，支持多条流程、节点详情、缩放和节点编辑。通过目录查询 `flowchart` 的 schema 与示例；自定义组件可从 `showai:components` 导入 `Flowchart`。技能的触发条件与披露顺序见 [技能组织](docs/skills.md)。
+
 组件和模板按「项目 → 全局 → 已发布」查找，内置预设作为兜底。定制默认属于选定项目；注册全局、登记发布都需要显式操作。版本使用 `id + version + integrity` 标识，已有页面锁定实际引用，不会随其他项目的修改或新版本发布而变化。
 
 组件说明包含分点的使用场景、可视化效果和示例。模板说明包含使用场景、内容处理方式、相关模板/组件 ID，以及描述需求、使用顺序与结构的示例。Agent 先查询摘要，再按需请求说明、参数或源码：
 
 ```sh
-node dist-agent/cli.mjs guide catalog --json
-node dist-agent/cli.mjs catalog list --kind component --query 面积 --project PROJECT_ID --limit 5 --json
-node dist-agent/cli.mjs catalog describe playground --view examples --project PROJECT_ID --json
+node dist-runtime/scripts/cli.mjs guide catalog --json
+node dist-runtime/scripts/cli.mjs catalog list --kind component --query 面积 --project PROJECT_ID --limit 5 --json
+node dist-runtime/scripts/cli.mjs catalog describe playground --view examples --project PROJECT_ID --json
 ```
 
 项目里的组件可以注册为不可变的全局版本，其他项目再从它派生自己的版本。`parents` 保留来源关系，三方合并会显示冲突，并把解决结果保存为新的项目版本；全局、已发布和父版本均不会被覆盖。
@@ -132,7 +136,7 @@ node dist-agent/cli.mjs catalog describe playground --view examples --project PR
 自定义组件包包含 `manifest.json`、`props.schema.json` 和 React 入口代码。参考 [数值滑块组件](resources/catalog/value-slider)：
 
 ```sh
-node dist-agent/cli.mjs catalog import --input ./resources/catalog/value-slider --project PROJECT_ID --json
+node dist-runtime/scripts/cli.mjs catalog import --input ./resources/catalog/value-slider --project PROJECT_ID --json
 ```
 
 桌面与独立 HTML 中，组件在隔离 iframe 中运行，不能访问应用文件系统或直接连接外部网络。会话 inline 模式使用宿主提供的整页沙箱与 Shadow DOM 样式隔离，组件之间共享该页面的 JavaScript 环境。
@@ -144,8 +148,8 @@ node dist-agent/cli.mjs catalog import --input ./resources/catalog/value-slider 
 发布流程是准备一个可自部署的静态目录，再验证已部署的清单网址并登记。准备文件不会自动上传，也不会直接变成「已发布」。同一套目录可放到用户自己的静态服务器；远程请求使用精确的内容地址，不会悄悄切换到最新版。
 
 ```sh
-node dist-agent/cli.mjs guide publish --json
-node dist-agent/cli.mjs guide versions --json
+node dist-runtime/scripts/cli.mjs guide publish --json
+node dist-runtime/scripts/cli.mjs guide versions --json
 ```
 
 数据目录、解析规则、版本派生、依赖闭包和合并边界见 [目录生命周期](docs/catalog-lifecycle.md)，具体命令见 [Agent 使用说明](docs/agent-usage.md)。
@@ -168,7 +172,8 @@ npm audit
 | `src/editor`、`src/components` | 内容编辑器、内置区块、自定义组件               |
 | `src/portable`                 | 轻量只读页面与离线交付格式                     |
 | `src/agent`                    | CLI、MCP 和导出                                |
-| `plugins/showai`               | Codex/Claude 技能与平台构建产物                |
+| `plugins/showai`               | Codex/Claude 技能与按需参考资料                |
+| `dist-runtime`                 | 外部 CLI、阅读器与编译依赖                     |
 
 开发工具链将 `app-builder-lib` 使用的 `@electron/get` 固定到 `5.1.0`，以移除旧 HTTP 缓存依赖；Node.js 最低版本与该下载器保持一致。
 

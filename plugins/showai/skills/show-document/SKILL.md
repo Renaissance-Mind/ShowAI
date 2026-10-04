@@ -1,11 +1,11 @@
 ---
 name: show-document
-description: Use ShowAI to create or revise interactive pages, reports and small sites with reusable components and templates, shared with the desktop workspace.
+description: 用 ShowAI 创建、修改或导出交互页面、报告和小型网站。复用已有组件与模板；组件开发和从成熟页面提取模板由专门技能处理。
 ---
 
 ShowAI 将内容组织成可阅读、可探索的页面。工作台与 Agent 使用同一份项目文件；组件负责表达，模板负责内容组织。先明确读者需要理解什么，再选择布局与交互，使用用户材料或可核实的数据。
 
-以下 `showai` 指 `node <本插件根目录>/scripts/cli.mjs`，不要假设全局命令已安装。插件根目录位于当前 skill 目录上两级；独立运行需要 Node.js 22.12+。
+插件只分发技能。沿用本会话已验证的 ShowAI CLI 命令前缀与内容目录；首次使用时读取 [运行入口](references/runtime.md)。下文 `showai` 代表该外部命令前缀。
 
 先检查本会话已有的项目绑定：
 
@@ -22,18 +22,17 @@ showai pages list --project PROJECT --json
 
 使用宿主提供的真实会话 id；无法获得时省略绑定，保留新项目 id。每次写入明确指定项目。默认内容库为 `~/.showai`，用 `--home` 与桌面设置保持一致。
 
-按当前步骤查询一个主题，无须先读完整参考文档：
+按本次操作读取 CLI 指南，普通创作先使用 `guide authoring`；只有需要直接构造文档树时再读 `guide document`。
 
 - `guide workspace`：项目与绑定。
 - `guide authoring`：读取、差异、编辑和冲突处理。
 - `guide catalog`：摘要搜索，再按需查看用途、输入、示例或源码。
-- `guide templates`：模板内容组织与组合。
-- `guide versions`：项目内派生、合并与显式提升到全局。
 - `guide export`：单 HTML、会话展示和网站。
-- `guide publish`：准备发布文件，以及验证、登记远端版本。
 
-先用 query 与较小 limit 搜索，再 describe 选中的组件或模板。按项目→全局→已发布查找，内置内容兜底；只取下一步需要的 view，源码显式请求。页面和组合引用锁定 version+integrity；已有版本固定，后续编辑形成当前项目的派生版本。全局提升、发布登记均为独立操作；导出不代表已上传。页面修改前检查用户的新编辑并使用当前 hash，遇冲突先合并。
+先按用途搜索组件或模板摘要，限制结果数；选中后取 `--view guide`，准备填入数据时取 `schema`，需要参考用法时取 `examples`。普通页面创作无需读取组件源码或整个目录。修改已有页面前读取当前版本、查看差异，并使用当前 hash 保存。
 
-基础内容也通过组件目录使用：`text`、`image`、`table`、`callout`、`toggle`、`divider`、`code`。内置组件的 source view 提供可编辑起点，修改 ID/版本后保存到项目。组合 React 组件时，从 `showai:components` 导入内置实现；已有自定义子组件先在 `manifest.dependencies` 声明精确引用，再从 `showai:component/ID` 导入。将子组件的 `onChange` 连接到父数据，并传递 `readOnly`。详见 Agent usage 的 Basic components and code composition。
+已有组件能够表达内容时直接复用。通过调整数据或组合已有组件能实现需求时采用组合；需要可复用的新交互、图形或布局时，进入 [create-component](../create-component/SKILL.md)，完成后回到页面创作。选库失败本身并不意味着必须写组件，先判断普通文本、表格和既有组件的组合是否足够。
+
+用户明确要求把迭代成熟的页面保存为可复用模板时，进入 [extract-template](../extract-template/SKILL.md)。应用已有模板仍属于本技能，使用 `guide templates` 与所选模板的 `guide`；页面完成不会自动触发模板提取。
 
 交付时使用宿主支持的页面展示通道；文件与网址也是有效交付。完整工作台管理界面不进入读者收到的页面。

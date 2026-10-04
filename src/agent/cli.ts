@@ -21,10 +21,12 @@ import type { PublishedComponentLocator } from "../core/publication";
 import { CATALOG_VIEWS, type CatalogView } from "./disclosure";
 import { assertExportDestination } from "./exporter";
 import type { ExportFormat } from "./exporter";
+import { runtimeInfo, registerRuntime } from "./runtime";
 
 export const CLI_HELP = `ShowAI — interactive pages shared by people and Agents.
 
 Start with one project:
+  runtime info | runtime register
   projects current --harness HOST --session SESSION_ID
   projects list
   projects create --name NAME [--harness HOST --session SESSION_ID]
@@ -263,6 +265,14 @@ export async function runCli(argv: string[]): Promise<unknown> {
       )[command],
     );
   switch (command) {
+    case "runtime": {
+      requireCount(args, 2);
+      const info = await runtimeInfo(service.store.root);
+      if (args.positional[1] === "info") return info;
+      if (args.positional[1] === "register")
+        return registerRuntime(service.store.root, info.launch);
+      throw new Error("Use runtime info or runtime register.");
+    }
     case "guide":
       requireCount(args, 1, 2);
       return service.guide(action);

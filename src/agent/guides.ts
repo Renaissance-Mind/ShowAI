@@ -3,7 +3,9 @@ export const GUIDE_TOPICS = [
   "authoring",
   "document",
   "catalog",
+  "component",
   "templates",
+  "template-extraction",
   "versions",
   "export",
   "publish",
@@ -133,6 +135,58 @@ const guides: Record<
       "showai catalog import --project PROJECT --input ./component-package --json",
       "showai catalog save --project PROJECT --input component-source.json --json",
     ],
+  },
+  component: {
+    purpose:
+      "Create a reusable React component only after reuse and composition leave a real expression or interaction gap.",
+    rules: [
+      "Describe input data, reader actions and resulting state before choosing an implementation. Search component summaries first; read source only for the chosen component being changed.",
+      "A local package contains manifest.json, props.schema.json and its React entry. The entry receives {data, onChange, readOnly}; onChange persists valid edits, while reading interactions keep source content unchanged.",
+      "manifest needs id, name, version, description, scenarios, entry, defaultData and examples. Default data and every example must pass the schema.",
+      "Use React, package-local imports or showai:components, including Flowchart. Custom children use showai:component/ID with exact manifest.dependencies refs. External npm libraries belong in the installed ShowAI runtime, not the skill package.",
+      "Import into the selected project, use it in a real page and check the main interaction in desktop and exported HTML. New versions are immutable; shared promotion is explicit.",
+    ],
+    commands: [
+      "showai catalog list --kind component --project PROJECT --query PURPOSE --limit 8 --json",
+      "showai catalog describe ID --kind component --project PROJECT --view source --file index.tsx --json",
+      "showai catalog import --project PROJECT --input ./component-package --json",
+      "showai catalog save --project PROJECT --input component-source.json --json",
+      "showai export --project PROJECT --page PAGE --format html --out ./component-preview.html --json",
+    ],
+  },
+  "template-extraction": {
+    purpose:
+      "Abstract a user-selected mature page into a reusable template while preserving the original example.",
+    rules: [
+      "Trigger when the user asks to save or extract a template. Finishing a page does not automatically create a template.",
+      "Read the current page and compare prior hash before extraction. Separate stable narrative/layout from instance facts, data and optional sections.",
+      "Replace instance content with filling guidance or honest empty states; describe input requirements in contentGuide, contexts in scenarios, component roles in related and realistic use in examples.",
+      "Current templates store document/composition and Agent-facing instructions. They are not an automatic variable-binding system. Saving --page alone is a snapshot; use --input for the abstracted definition.",
+      "Save in the project, apply to a new page and verify with different source material. Preserve the source page. Promote or publish only when requested.",
+    ],
+    commands: [
+      "showai pages read PAGE --project PROJECT --json",
+      "showai pages diff PAGE --project PROJECT --since PREVIOUS_HASH --json",
+      "showai catalog list --kind template --project PROJECT --query PURPOSE --limit 8 --json",
+      "showai template save --project PROJECT --input template-definition.json --json",
+      "showai template apply ID --project PROJECT --scope project --version VERSION --title 'Different content' --json",
+    ],
+    input: {
+      id: "reusable-report",
+      version: "1.0.0",
+      name: "Report",
+      description: "Reusable content structure",
+      scenarios: ["REPORT_CONTEXT"],
+      contentGuide: [
+        {
+          title: "Evidence",
+          instructions: ["Fill with source-backed observations"],
+        },
+      ],
+      related: [],
+      examples: [],
+      document: "ABSTRACTED_DOCUMENT_FROM_SELECTED_PAGE",
+    },
   },
   templates: {
     purpose:

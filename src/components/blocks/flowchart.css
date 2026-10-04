@@ -1,0 +1,209 @@
+.sf-block {
+  --sf-ink: var(--sb-text);
+  --sf-soft: var(--sb-soft);
+  --sf-line: var(--sb-line);
+}
+.sf-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 0 20px 14px;
+}
+.sf-tabs button {
+  padding: 7px 12px;
+  border-radius: 5px;
+  font-size: 13px;
+}
+.sf-tabs button[aria-selected="true"] {
+  background: var(--sb-accent-soft);
+  color: var(--sb-accent);
+}
+.sf-description {
+  margin: 0;
+  padding: 0 22px 16px;
+  color: var(--sb-text);
+  font-size: 13px;
+}
+.sf-canvas {
+  position: relative;
+  background: var(--sb-soft);
+  border-top: 1px solid var(--sb-line);
+  border-bottom: 1px solid var(--sb-line);
+}
+.sf-node {
+  width: 218px;
+  min-height: 106px;
+  padding: 13px 17px;
+  border: 1px solid var(--sb-line);
+  border-radius: 9px;
+  background: var(--sb-surface);
+  color: var(--sb-text);
+  box-shadow: 0 3px 10px #16332108;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+.sf-node strong {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.sf-node-kind {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--sb-muted);
+}
+.sf-node-subtitle {
+  font-size: 12px;
+  color: var(--sb-text);
+}
+.sf-node.sf-skill {
+  background: var(--sb-accent-soft);
+  border-color: color-mix(in srgb, var(--sb-accent) 25%, var(--sb-line));
+}
+.sf-node.sf-request,
+.sf-node.sf-result {
+  border-top: 3px solid var(--sb-accent);
+}
+.sf-node.sf-decision {
+  border-style: dashed;
+}
+.sf-node.is-selected {
+  outline: 2px solid var(--sb-accent);
+  outline-offset: 3px;
+}
+.sf-block .react-flow__handle {
+  width: 6px;
+  height: 6px;
+  border: 0;
+  background: var(--sb-accent);
+}
+.sf-block .react-flow__edge-path,
+.sf-block .react-flow__connection-path {
+  stroke: var(--sb-muted);
+}
+.sf-block .react-flow__edge-text {
+  fill: var(--sb-text);
+}
+.sf-block .react-flow__edge-textbg {
+  fill: var(--sb-surface);
+}
+.sf-block .react-flow__background-pattern {
+  fill: var(--sb-line);
+}
+.sf-block .react-flow__attribution {
+  background: var(--sb-surface);
+  color: var(--sb-muted);
+  font-size: 10px;
+}
+.sf-block .react-flow__attribution a {
+  color: inherit;
+}
+.sf-controls {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  gap: 1px;
+  padding: 3px;
+  border: 1px solid var(--sb-line);
+  border-radius: 6px;
+  background: var(--sb-surface);
+}
+.sf-controls button {
+  width: 33px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+}
+.sf-node-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 17px 20px 7px;
+}
+.sf-node-picker button {
+  padding: 5px 9px;
+  border: 1px solid var(--sb-line);
+  border-radius: 5px;
+  font-size: 12px;
+}
+.sf-node-picker button[aria-pressed="true"] {
+  color: var(--sb-accent);
+  border-color: var(--sb-accent);
+  background: var(--sb-accent-soft);
+}
+.sf-detail {
+  margin: 12px 20px 20px;
+  padding: 16px 18px;
+  border-left: 3px solid var(--sb-accent);
+  background: var(--sb-soft);
+}
+.sf-detail-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.sf-detail-heading span {
+  color: var(--sb-muted);
+  font-size: 12px;
+}
+.sf-detail-heading strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+.sf-detail p {
+  font-size: 13px;
+  margin: 9px 0 0;
+  line-height: 1.8;
+}
+.sf-detail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 13px;
+}
+.sf-detail-group > span {
+  color: var(--sb-muted);
+  font-size: 11px;
+}
+.sf-detail code {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--sb-text);
+  font-size: 12px;
+  font-family: "SFMono-Regular", Consolas, monospace;
+}
+.sf-editor {
+  margin-top: 14px;
+}
+.sf-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 12px 0;
+}
+.sf-editor input,
+.sf-editor textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--sb-line);
+  border-radius: 4px;
+  background: var(--sb-surface);
+}
+@media (max-width: 540px) {
+  .sf-tabs {
+    padding-inline: 12px;
+  }
+  .sf-detail {
+    margin-inline: 12px;
+  }
+  .sf-node-picker {
+    padding-inline: 12px;
+  }
+}

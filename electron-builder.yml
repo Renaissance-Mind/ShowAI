@@ -12,14 +12,14 @@ files:
   - "!**/*.map"
   - "!**/node_modules/**"
 extraResources:
-  - from: plugins/showai
-    to: plugin
+  - from: dist-runtime
+    to: runtime
     filter:
       - "**/*"
       - "!**/*.map"
       - "!**/.DS_Store"
-  - from: plugins/showai/node_modules
-    to: plugin/node_modules
+  - from: dist-runtime/node_modules
+    to: runtime/node_modules
     filter:
       - "**/*"
       - "!**/*.map"

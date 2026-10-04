@@ -572,5 +572,264 @@
       "把来源链接整理成有标题和简述的入口。",
       "可选缩略图辅助识别来源，点击后打开对应网页。"
     ]
+  },
+  {
+    "kind": "flowchart",
+    "name": "交互流程图",
+    "description": "基于 React Flow 的可缩放流程图，支持节点详情、分支关系、多条流程和编辑节点。",
+    "version": "1.0.0",
+    "scenarios": [
+      "解释技能、工作流或系统架构的触发条件与依赖。",
+      "让读者选择节点，按需查看说明、操作命令和参考文档。"
+    ],
+    "effects": [
+      "清晰表达流程和分支，节点详情按需显示。",
+      "可缩放和平移，编辑态保存节点位置与说明；支持离线 HTML 和对话内展示。"
+    ],
+    "defaultData": {
+      "title": "交互流程图",
+      "flows": [
+        {
+          "id": "process",
+          "label": "流程",
+          "direction": "TB",
+          "nodes": [
+            {
+              "id": "start",
+              "label": "明确问题",
+              "kind": "request",
+              "detail": "描述想理解的问题与读者需要。"
+            },
+            {
+              "id": "work",
+              "label": "整理内容",
+              "kind": "skill",
+              "detail": "组织有依据的内容。"
+            },
+            {
+              "id": "result",
+              "label": "阅读与探索",
+              "kind": "result",
+              "detail": "使用结果完成理解。"
+            }
+          ],
+          "edges": [
+            {
+              "id": "a",
+              "source": "start",
+              "target": "work"
+            },
+            {
+              "id": "b",
+              "source": "work",
+              "target": "result"
+            }
+          ]
+        }
+      ]
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "height": {
+          "type": "number",
+          "minimum": 360,
+          "maximum": 1200
+        },
+        "flows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "direction": {
+                "enum": [
+                  "TB",
+                  "LR"
+                ]
+              },
+              "nodes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "subtitle": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "enum": [
+                        "request",
+                        "skill",
+                        "decision",
+                        "reference",
+                        "query",
+                        "result"
+                      ]
+                    },
+                    "commands": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 30
+                    },
+                    "references": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 30
+                    },
+                    "position": {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y"
+                      ]
+                    },
+                    "sourceSide": {
+                      "enum": [
+                        "top",
+                        "bottom",
+                        "left",
+                        "right"
+                      ]
+                    },
+                    "targetSide": {
+                      "enum": [
+                        "top",
+                        "bottom",
+                        "left",
+                        "right"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "label"
+                  ]
+                },
+                "maxItems": 200
+              },
+              "edges": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "type": "string"
+                    },
+                    "target": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "source",
+                    "target"
+                  ]
+                },
+                "maxItems": 400
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "nodes",
+              "edges"
+            ]
+          },
+          "maxItems": 20
+        }
+      },
+      "required": [
+        "flows"
+      ]
+    },
+    "examples": [
+      {
+        "name": "三步内容流程",
+        "request": "展示从问题到阅读的过程",
+        "data": {
+          "title": "交互流程图",
+          "flows": [
+            {
+              "id": "process",
+              "label": "流程",
+              "direction": "TB",
+              "nodes": [
+                {
+                  "id": "start",
+                  "label": "明确问题",
+                  "kind": "request",
+                  "detail": "描述想理解的问题与读者需要。"
+                },
+                {
+                  "id": "work",
+                  "label": "整理内容",
+                  "kind": "skill",
+                  "detail": "组织有依据的内容。"
+                },
+                {
+                  "id": "result",
+                  "label": "阅读与探索",
+                  "kind": "result",
+                  "detail": "使用结果完成理解。"
+                }
+              ],
+              "edges": [
+                {
+                  "id": "a",
+                  "source": "start",
+                  "target": "work"
+                },
+                {
+                  "id": "b",
+                  "source": "work",
+                  "target": "result"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
   }
 ]

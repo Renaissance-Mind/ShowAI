@@ -12,7 +12,7 @@ module.exports = async function afterPack(context) {
           "Resources",
         )
       : join(context.appOutDir, "resources");
-  const plugin = join(resources, "plugin");
+  const plugin = join(resources, "runtime");
   for (const file of [
     "scripts/cli.mjs",
     "assets/viewer.html",

@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
+import { existsSync, readFileSync } from "node:fs";
 import {
   lstat,
   mkdir,
@@ -1043,14 +1044,39 @@ async function compilePackage(
     allErrors: true,
   });
   const validator = standaloneCode(ajv, ajv.compile(schema));
-  const trusted = [
+  const runtimeRoots = new Map<string, string>();
+  const includeRuntime = (name: string): void => {
+    if (runtimeRoots.has(name)) return;
+    let directory = dirname(require.resolve(name));
+    while (true) {
+      const metadataPath = join(directory, "package.json");
+      if (existsSync(metadataPath)) {
+        const metadata = JSON.parse(readFileSync(metadataPath, "utf8"));
+        if (metadata.name === name) {
+          runtimeRoots.set(name, directory);
+          Object.keys(metadata.dependencies ?? {})
+            .filter((name) => !name.startsWith("@types/"))
+            .forEach(includeRuntime);
+          return;
+        }
+      }
+      const parent = dirname(directory);
+      if (parent === directory)
+        throw new Error(`Missing installed runtime package: ${name}`);
+      directory = parent;
+    }
+  };
+  [
     "react",
     "react-dom",
     "scheduler",
     "ajv",
     "marked",
     "lucide-react",
-  ].map((name) => dirname(require.resolve(`${name}/package.json`)));
+    "@xyflow/react",
+    "@dagrejs/dagre",
+  ].forEach(includeRuntime);
+  const trusted = [...runtimeRoots.values()];
   const lucideRoot = dirname(require.resolve("lucide-react/package.json"));
   type RuntimePackage = {
     manifest: ComponentManifest;
@@ -1222,7 +1248,14 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
             "react-dom/client",
           ].includes(args.path) ||
           (sdkImport &&
-            ["react-dom", "marked", "lucide-react"].includes(args.path))
+            [
+              "react-dom",
+              "marked",
+              "lucide-react",
+              "@xyflow/react",
+              "@xyflow/react/dist/style.css",
+              "@dagrejs/dagre",
+            ].includes(args.path))
         ) {
           return {
             path:
@@ -1236,8 +1269,16 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
           };
         }
         if (trusted.some((base) => inside(base, args.importer))) {
-          if (["scheduler", "react", "react-dom"].includes(args.path))
-            return { path: require.resolve(args.path) };
+          if (
+            !args.path.startsWith(".") &&
+            [...runtimeRoots.keys()].some(
+              (name) => args.path === name || args.path.startsWith(name + "/"),
+            )
+          ) {
+            const target = require.resolve(args.path);
+            if (trusted.some((base) => inside(base, target)))
+              return { path: target };
+          }
           if (args.path.startsWith(".")) {
             const resolved = require.resolve(
               resolve(args.resolveDir, args.path),
@@ -1285,9 +1326,7 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
           ? {
               path: sdkImport ? selected : modulePath(key, selected),
               namespace: sdkImport ? "showai-builtin" : "showai-package",
-              ...(sdkImport && !selected.endsWith(".css")
-                ? { sideEffects: false }
-                : {}),
+              ...(sdkImport ? { sideEffects: selected.endsWith(".css") } : {}),
             }
           : { errors: [{ text: `Missing package file: ${args.path}` }] };
       });

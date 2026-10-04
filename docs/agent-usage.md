@@ -1,8 +1,10 @@
 # Use ShowAI from an Agent
 
-ShowAI's Node.js CLI and optional MCP server operate on the same project files as the desktop workbench. The CLI runs one command and exits; the desktop window can be closed and no Core daemon is required. It is built at `dist-agent/cli.mjs`, or installed inside a plugin as `scripts/cli.mjs`. A Python Agent can invoke it with `subprocess` or an MCP client.
+ShowAI's Node.js CLI and optional MCP server operate on the same project files as the desktop workbench. The CLI runs one command and exits; the desktop window can be closed and no Core daemon is required. It is built from `src/agent/cli.ts` and packaged at `dist-runtime/scripts/cli.mjs`, and included in the desktop application under `Resources/runtime/`. A Python Agent can invoke it with `subprocess` or an MCP client.
 
-In the examples below, `showai` means `node /absolute/path/to/scripts/cli.mjs`. Do not assume a global npm command exists. Standalone use requires Node.js 22.12+. The desktop application's **Settings → Connect Agent** panel provides its bundled executable, CLI path and environment for use without a separate Node installation.
+The skills-only plugin resolves the installed software from `agent-runtime.json` in the selected content directory, then verifies it with `runtime info --json`. Desktop startup records its bundled launch; standalone runtime users run `runtime register --json`.
+
+In the examples below, `showai` means the verified external command prefix, for example `node /absolute/path/to/dist-runtime/scripts/cli.mjs`. Do not assume a global npm command exists. Standalone use requires Node.js 22.12+. The desktop application's **Settings → Connect Agent** panel provides its bundled executable, CLI path and environment for use without a separate Node installation.
 
 ## Start small
 
@@ -210,7 +212,7 @@ npm run plugin:install
 npm run plugin:update
 ```
 
-These build the reader, CLI and plugin, install or refresh through the official Codex commands, compare the installed copy byte-for-byte and confirm it is enabled. The receipt is `artifacts/codex-plugin-install.json`. Start a new Codex conversation after success. No desktop rebuild, Git pull, automatic uninstall or application restart is performed. See [the plugin README](../plugins/showai/README.md) for release bundles.
+These validate and install the skills-only plugin through official Codex commands, compare installed skill bytes and confirm it is enabled. The runtime is built and installed separately. The receipt is `artifacts/codex-plugin-install.json`. Start a new Codex conversation after success. No desktop rebuild, Git pull, automatic uninstall or application restart is performed. See [the plugin README](../plugins/showai/README.md) for release bundles.
 
 Claude Code uses the repository's marketplace after `npm run build`:
 
@@ -222,8 +224,8 @@ claude plugin install showai@renaissance-mind
 The optional MCP server is a subprocess fixed to one existing project:
 
 ```sh
-codex mcp add showai-PROJECT -- node /absolute/path/ShowAI/dist-agent/cli.mjs mcp --project PROJECT
-claude mcp add --transport stdio --scope local showai-PROJECT -- node /absolute/path/ShowAI/dist-agent/cli.mjs mcp --project PROJECT
+codex mcp add showai-PROJECT -- node /absolute/path/ShowAI/dist-runtime/scripts/cli.mjs mcp --project PROJECT
+claude mcp add --transport stdio --scope local showai-PROJECT -- node /absolute/path/ShowAI/dist-runtime/scripts/cli.mjs mcp --project PROJECT
 ```
 
 Use `guide`, `project_context`, `catalog_list` and view-aware `catalog_describe` for discovery. Page editing, project component/template creation, fork/merge and local publication preparation use the same operations as CLI. Project-bound MCP cannot promote to global, register a published release or write another project's catalog; use an explicit CLI or desktop action for shared-library changes. Protocol JSON uses stdout and diagnostics use stderr.
@@ -232,7 +234,7 @@ For a desktop installation without Node.js, use the launch configuration copied 
 
 ```sh
 ELECTRON_RUN_AS_NODE=1 "/Applications/ShowAI.app/Contents/MacOS/ShowAI" \
-  "/Applications/ShowAI.app/Contents/Resources/plugin/scripts/cli.mjs" \
+  "/Applications/ShowAI.app/Contents/Resources/runtime/scripts/cli.mjs" \
   projects list --json
 ```
 
@@ -245,7 +247,7 @@ import json
 import subprocess
 
 result = subprocess.run(
-    ["node", "/absolute/path/ShowAI/dist-agent/cli.mjs", "guide", "catalog", "--json"],
+    ["node", "/absolute/path/ShowAI/dist-runtime/scripts/cli.mjs", "guide", "catalog", "--json"],
     check=True, capture_output=True, text=True,
 )
 guide = json.loads(result.stdout)["data"]

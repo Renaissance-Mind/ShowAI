@@ -21,6 +21,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { AgentService, errorResult } from "../agent/service";
+import { registerRuntime } from "../agent/runtime";
 import { assertExportDestination, exportPage } from "../agent/exporter";
 import { assertId, CoreError, FileStore } from "../core/store";
 import type { PageRecord, ProjectBinding } from "../core/model";
@@ -235,10 +236,10 @@ async function optionalProject(
   return id;
 }
 
-function pluginPath(): string {
+function runtimePath(): string {
   return app.isPackaged
-    ? join(process.resourcesPath, "plugin")
-    : join(repository, "plugins", "showai");
+    ? join(process.resourcesPath, "runtime")
+    : join(repository, "dist-runtime");
 }
 
 function info(): DesktopInfo {
@@ -249,7 +250,7 @@ function info(): DesktopInfo {
     packaged: app.isPackaged,
     cli: {
       command: process.execPath,
-      args: [join(pluginPath(), "scripts", "cli.mjs")],
+      args: [join(runtimePath(), "scripts", "cli.mjs")],
       env: { ELECTRON_RUN_AS_NODE: "1", SHOWAI_HOME: store.root },
     },
   };
@@ -269,6 +270,7 @@ async function useHome(home?: string): Promise<void> {
   store = new FileStore(home);
   service = new AgentService({ root: store.root });
   await store.listProjects();
+  await registerRuntime(store.root, info().cli);
   watcher = watch(store.root, {
     ignoreInitial: true,
     depth: 9,
@@ -1099,15 +1101,19 @@ else {
     .then(async () => {
       const settings = await readSettings();
       await useHome(process.env.SHOWAI_HOME ?? settings.home);
-      process.env.SHOWAI_VIEWER ??= join(pluginPath(), "assets", "viewer.html");
+      process.env.SHOWAI_VIEWER ??= join(
+        runtimePath(),
+        "assets",
+        "viewer.html",
+      );
       if (app.isPackaged) {
         process.env.SHOWAI_RUNTIME_ENTRY = join(
-          pluginPath(),
+          runtimePath(),
           "scripts",
           "cli.mjs",
         );
         process.env.ESBUILD_BINARY_PATH ??= join(
-          pluginPath(),
+          runtimePath(),
           "node_modules",
           "@esbuild",
           `${process.platform}-${process.arch}`,

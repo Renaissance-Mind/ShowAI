@@ -1,0 +1,863 @@
+{
+  "format": "showai",
+  "version": 1,
+  "document": {
+    "id": "showai-skills-routing",
+    "title": "ShowAI 技能与按需披露",
+    "content": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "三个 skills 分别负责页面创作、组件定制和模板提取。插件只提供技能与文档；外部 ShowAI 软件提供 CLI、阅读器和编译能力。选择流程或节点，查看触发条件、此时读取的资料和动态查询。"
+            }
+          ]
+        },
+        {
+          "type": "widget",
+          "attrs": {
+            "kind": "flowchart",
+            "data": {
+              "title": "ShowAI 技能与按需披露",
+              "description": "按意图进入流程，再按当前步骤加载所需信息。",
+              "height": 620,
+              "flows": [
+                {
+                  "id": "overview",
+                  "label": "总览",
+                  "description": "按用户目标选择技能，运行能力统一由外部 ShowAI 软件提供。",
+                  "direction": "TB",
+                  "nodes": [
+                    {
+                      "id": "intent",
+                      "label": "用户的当前目标",
+                      "kind": "request",
+                      "subtitle": "决定加载哪个 skill",
+                      "detail": "创建和编辑页面、开发新的表达组件、或把成熟页面抽象成模板，分别进入不同技能。完成页面不会自动触发模板提取。",
+                      "position": {
+                        "x": 264,
+                        "y": 0
+                      }
+                    },
+                    {
+                      "id": "page",
+                      "label": "页面创作",
+                      "kind": "skill",
+                      "subtitle": "show-document",
+                      "detail": "普通页面创作的默认入口。复用现有组件与模板，按任务读取 authoring、catalog 与 export 指南。",
+                      "references": ["skills/show-document/SKILL.md"],
+                      "position": {
+                        "x": 0,
+                        "y": 180
+                      }
+                    },
+                    {
+                      "id": "component",
+                      "label": "组件定制",
+                      "kind": "skill",
+                      "subtitle": "create-component",
+                      "detail": "用户明确要求新组件，或数据调整与已有组件组合仍无法表达需求时进入。完成组件后回到页面创作。",
+                      "references": ["skills/create-component/SKILL.md"],
+                      "position": {
+                        "x": 264,
+                        "y": 180
+                      }
+                    },
+                    {
+                      "id": "template",
+                      "label": "模板提取",
+                      "kind": "skill",
+                      "subtitle": "extract-template",
+                      "detail": "用户主动要求把已迭代好的页面提取为模板时进入。保留源页面，抽象填写约定，并应用不同材料验证。",
+                      "references": ["skills/extract-template/SKILL.md"],
+                      "position": {
+                        "x": 528,
+                        "y": 180
+                      }
+                    },
+                    {
+                      "id": "runtime",
+                      "label": "外部 ShowAI CLI",
+                      "kind": "query",
+                      "subtitle": "软件提供执行与阅读器",
+                      "detail": "先验证已安装软件入口与内容目录。CLI 读写项目 JSON，查询真实组件、模板与协议，并负责导出。",
+                      "commands": [
+                        "runtime info --json",
+                        "projects current --harness codex --session SESSION --json"
+                      ],
+                      "references": [
+                        "首次使用：skills/show-document/references/runtime.md"
+                      ],
+                      "position": {
+                        "x": 264,
+                        "y": 360
+                      }
+                    },
+                    {
+                      "id": "store",
+                      "label": "项目内容与资源库",
+                      "kind": "result",
+                      "subtitle": "页面 · 组件 · 模板",
+                      "detail": "所有写入明确指定项目。读取当前版本、检查用户修改；组件和模板以精确版本和指纹复用。",
+                      "position": {
+                        "x": 0,
+                        "y": 540
+                      },
+                      "sourceSide": "right"
+                    },
+                    {
+                      "id": "output",
+                      "label": "阅读与交付",
+                      "kind": "result",
+                      "subtitle": "桌面编辑 / HTML / 对话展示",
+                      "detail": "CLI 把阅读器和实际用到的组件装入交付物。技能包只含工作流程与文档。",
+                      "commands": ["guide export --json"],
+                      "position": {
+                        "x": 528,
+                        "y": 540
+                      },
+                      "targetSide": "left"
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "id": "overview-0",
+                      "source": "intent",
+                      "target": "page",
+                      "label": "创作 / 修改"
+                    },
+                    {
+                      "id": "overview-1",
+                      "source": "intent",
+                      "target": "component",
+                      "label": "组件缺口"
+                    },
+                    {
+                      "id": "overview-2",
+                      "source": "intent",
+                      "target": "template",
+                      "label": "提取模板"
+                    },
+                    {
+                      "id": "overview-3",
+                      "source": "page",
+                      "target": "runtime"
+                    },
+                    {
+                      "id": "overview-4",
+                      "source": "component",
+                      "target": "runtime"
+                    },
+                    {
+                      "id": "overview-5",
+                      "source": "template",
+                      "target": "runtime"
+                    },
+                    {
+                      "id": "overview-6",
+                      "source": "runtime",
+                      "target": "store"
+                    },
+                    {
+                      "id": "overview-7",
+                      "source": "store",
+                      "target": "output"
+                    }
+                  ]
+                },
+                {
+                  "id": "page-work",
+                  "label": "页面创作",
+                  "description": "先复用和组合；只有存在表达或交互缺口才进入组件定制。",
+                  "direction": "TB",
+                  "nodes": [
+                    {
+                      "id": "request",
+                      "label": "创建或修改页面",
+                      "kind": "request",
+                      "subtitle": "用户材料与读者目标",
+                      "detail": "明确读者要理解什么、输入材料和交付形式。",
+                      "position": {
+                        "x": 0,
+                        "y": 0
+                      },
+                      "sourceSide": "right",
+                      "targetSide": "top"
+                    },
+                    {
+                      "id": "skill",
+                      "label": "show-document",
+                      "kind": "skill",
+                      "subtitle": "加载当前工作流程",
+                      "detail": "首次使用验证外部 CLI；已验证入口和 home 在会话中复用。",
+                      "references": [
+                        "skills/show-document/SKILL.md",
+                        "首次使用：references/runtime.md"
+                      ],
+                      "position": {
+                        "x": 264,
+                        "y": 0
+                      },
+                      "sourceSide": "right",
+                      "targetSide": "left"
+                    },
+                    {
+                      "id": "context",
+                      "label": "项目与版本上下文",
+                      "kind": "query",
+                      "subtitle": "显式项目 + 当前 hash",
+                      "detail": "先查询真实会话绑定。修订前读页面与差异，保存时使用当前 hash。",
+                      "commands": [
+                        "projects current --harness codex --session SESSION --json",
+                        "guide authoring --json",
+                        "pages read PAGE --project PROJECT --json",
+                        "pages diff PAGE --project PROJECT --since HASH --json"
+                      ],
+                      "position": {
+                        "x": 528,
+                        "y": 0
+                      },
+                      "sourceSide": "bottom",
+                      "targetSide": "left"
+                    },
+                    {
+                      "id": "search",
+                      "label": "查找现有表达",
+                      "kind": "query",
+                      "subtitle": "摘要 → 选中对象",
+                      "detail": "按用途搜索组件或模板，只读少量摘要。选择后读取 guide；准备数据时读取 schema 或 examples。",
+                      "commands": [
+                        "catalog list --kind component --project PROJECT --query 用途 --limit 8 --json",
+                        "catalog describe ID --kind component --project PROJECT --view guide --json",
+                        "catalog describe ID --kind component --project PROJECT --view schema --json"
+                      ],
+                      "position": {
+                        "x": 528,
+                        "y": 145
+                      },
+                      "sourceSide": "left",
+                      "targetSide": "top"
+                    },
+                    {
+                      "id": "gap",
+                      "label": "现有表达能满足吗",
+                      "kind": "decision",
+                      "subtitle": "数据调整 / 组合评估",
+                      "detail": "能表达就直接用。已有组件组合可以实现就组合。只有新交互或新表达需要代码时才进入组件定制。",
+                      "position": {
+                        "x": 264,
+                        "y": 145
+                      },
+                      "sourceSide": "bottom",
+                      "targetSide": "right"
+                    },
+                    {
+                      "id": "reuse",
+                      "label": "复用组件与模板",
+                      "kind": "result",
+                      "subtitle": "保留精确版本引用",
+                      "detail": "应用模板创建新页面。只按所选组件的数据契约填写内容。",
+                      "commands": ["guide templates --json"],
+                      "position": {
+                        "x": 0,
+                        "y": 290
+                      },
+                      "sourceSide": "bottom",
+                      "targetSide": "top"
+                    },
+                    {
+                      "id": "custom",
+                      "label": "create-component",
+                      "kind": "skill",
+                      "subtitle": "完成后返回创作",
+                      "detail": "按组件定制流程设计、导入并验证，再把组件插入页面。",
+                      "references": ["skills/create-component/SKILL.md"],
+                      "position": {
+                        "x": 528,
+                        "y": 290
+                      },
+                      "sourceSide": "bottom",
+                      "targetSide": "top"
+                    },
+                    {
+                      "id": "write",
+                      "label": "写入与验证页面",
+                      "kind": "query",
+                      "subtitle": "文档树按需要才读",
+                      "detail": "直接构造页面数据时再读文档指南。校验保存后在实际页面中查看。",
+                      "commands": [
+                        "guide document --json",
+                        "pages apply PAGE --project PROJECT --input operations.json --base-hash HASH --json"
+                      ],
+                      "position": {
+                        "x": 264,
+                        "y": 435
+                      },
+                      "sourceSide": "right",
+                      "targetSide": "top"
+                    },
+                    {
+                      "id": "deliver",
+                      "label": "导出与展示",
+                      "kind": "result",
+                      "subtitle": "真实页面 + 主要交互",
+                      "detail": "导出不等于上传。保留可编辑源数据，按宿主支持的展示方式交付。",
+                      "commands": ["guide export --json"],
+                      "position": {
+                        "x": 528,
+                        "y": 435
+                      },
+                      "sourceSide": "bottom",
+                      "targetSide": "left"
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "id": "page-work-0",
+                      "source": "request",
+                      "target": "skill"
+                    },
+                    {
+                      "id": "page-work-1",
+                      "source": "skill",
+                      "target": "context"
+                    },
+                    {
+                      "id": "page-work-2",
+                      "source": "context",
+                      "target": "search"
+                    },
+                    {
+                      "id": "page-work-3",
+                      "source": "search",
+                      "target": "gap"
+                    },
+                    {
+                      "id": "page-work-4",
+                      "source": "gap",
+                      "target": "reuse",
+                      "label": "满足"
+                    },
+                    {
+                      "id": "page-work-5",
+                      "source": "gap",
+                      "target": "custom",
+                      "label": "需要定制"
+                    },
+                    {
+                      "id": "page-work-6",
+                      "source": "reuse",
+                      "target": "write"
+                    },
+                    {
+                      "id": "page-work-7",
+                      "source": "custom",
+                      "target": "write"
+                    },
+                    {
+                      "id": "page-work-8",
+                      "source": "write",
+                      "target": "deliver"
+                    }
+                  ]
+                },
+                {
+                  "id": "component-work",
+                  "label": "组件定制",
+                  "description": "从可复用的数据和交互契约开始，再导入和验证。",
+                  "direction": "TB",
+                  "nodes": [
+                    {
+                      "id": "need",
+                      "label": "新组件或真实表达缺口",
+                      "kind": "request",
+                      "subtitle": "已有组件与组合不足",
+                      "detail": "用户要求新的控件，或现有能力无法承载所需图形与交互。",
+                      "position": {
+                        "x": 0,
+                        "y": 0
+                      },
+                      "targetSide": "top",
+                      "sourceSide": "right"
+                    },
+                    {
+                      "id": "skill",
+                      "label": "create-component",
+                      "kind": "skill",
+                      "subtitle": "专项工作流程",
+                      "detail": "先明确输入、读者操作、变化结果与空数据状态。",
+                      "references": ["skills/create-component/SKILL.md"],
+                      "position": {
+                        "x": 264,
+                        "y": 0
+                      },
+                      "targetSide": "left",
+                      "sourceSide": "right"
+                    },
+                    {
+                      "id": "inspect",
+                      "label": "只读选中组件",
+                      "kind": "query",
+                      "subtitle": "guide / schema / source",
+                      "detail": "改造已有对象时按文件取源码。复用子组件时获取精确依赖引用。",
+                      "commands": [
+                        "guide component --json",
+                        "catalog describe ID --kind component --project PROJECT --view source --file index.tsx --json",
+                        "catalog describe ID --kind component --project PROJECT --view dependencies --json"
+                      ],
+                      "position": {
+                        "x": 528,
+                        "y": 0
+                      },
+                      "targetSide": "left",
+                      "sourceSide": "bottom"
+                    },
+                    {
+                      "id": "contract",
+                      "label": "组件设计与输入契约",
+                      "kind": "reference",
+                      "subtitle": "manifest + schema + React",
+                      "detail": "定义数据边界、默认值和真实用例。用 data 驱动，编辑变化通过 onChange 保存，readOnly 控制读取状态。",
+                      "references": [
+                        "skills/create-component/references/component-authoring.md"
+                      ],
+                      "position": {
+                        "x": 528,
+                        "y": 180
+                      },
+                      "targetSide": "top",
+                      "sourceSide": "left"
+                    },
+                    {
+                      "id": "build",
+                      "label": "复用或实现组件",
+                      "kind": "query",
+                      "subtitle": "ShowAI SDK / 精确子组件",
+                      "detail": "优先组合 SDK 控件。新外部库由 ShowAI 软件提供。当前 Flowchart 已可从 SDK 复用。",
+                      "commands": [
+                        "catalog describe flowchart --kind component --project PROJECT --view source --json"
+                      ],
+                      "position": {
+                        "x": 264,
+                        "y": 180
+                      },
+                      "targetSide": "right",
+                      "sourceSide": "left"
+                    },
+                    {
+                      "id": "import",
+                      "label": "导入与编译",
+                      "kind": "query",
+                      "subtitle": "保存当前项目版本",
+                      "detail": "默认数据和示例都必须通过 schema。编译错误直接暴露，已有版本不覆盖。",
+                      "commands": [
+                        "catalog import --project PROJECT --input ./component-package --json"
+                      ],
+                      "position": {
+                        "x": 0,
+                        "y": 180
+                      },
+                      "targetSide": "right",
+                      "sourceSide": "bottom"
+                    },
+                    {
+                      "id": "verify",
+                      "label": "真实页面验证",
+                      "kind": "result",
+                      "subtitle": "编辑保存 + 阅读交互 + 导出",
+                      "detail": "验证组件在桌面、离线 HTML、对话内显示均可用。编译成功不等于效果合格。",
+                      "position": {
+                        "x": 0,
+                        "y": 360
+                      },
+                      "targetSide": "top",
+                      "sourceSide": "right"
+                    },
+                    {
+                      "id": "return",
+                      "label": "回到页面创作",
+                      "kind": "result",
+                      "subtitle": "精确版本与指纹",
+                      "detail": "将组件插入实际页面。用户要求跨项目复用或发布时才进入 versions / publish。",
+                      "commands": [
+                        "按需：guide versions --json",
+                        "按需：guide publish --json"
+                      ],
+                      "position": {
+                        "x": 264,
+                        "y": 360
+                      },
+                      "targetSide": "left",
+                      "sourceSide": "right"
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "id": "component-work-0",
+                      "source": "need",
+                      "target": "skill"
+                    },
+                    {
+                      "id": "component-work-1",
+                      "source": "skill",
+                      "target": "inspect"
+                    },
+                    {
+                      "id": "component-work-2",
+                      "source": "inspect",
+                      "target": "contract"
+                    },
+                    {
+                      "id": "component-work-3",
+                      "source": "contract",
+                      "target": "build"
+                    },
+                    {
+                      "id": "component-work-4",
+                      "source": "build",
+                      "target": "import"
+                    },
+                    {
+                      "id": "component-work-5",
+                      "source": "import",
+                      "target": "verify"
+                    },
+                    {
+                      "id": "component-work-6",
+                      "source": "verify",
+                      "target": "return"
+                    }
+                  ]
+                },
+                {
+                  "id": "template-work",
+                  "label": "模板提取",
+                  "description": "由保存模板的用户意图触发，抽象成熟页面而非只复制实例。",
+                  "direction": "TB",
+                  "nodes": [
+                    {
+                      "id": "request",
+                      "label": "成熟页面 + 提取请求",
+                      "kind": "request",
+                      "subtitle": "用户主动提出目标",
+                      "detail": "“把这页整理成可复用模板”才进入该流程。普通页面完成时继续交付即可。",
+                      "position": {
+                        "x": 0,
+                        "y": 0
+                      },
+                      "targetSide": "top",
+                      "sourceSide": "right"
+                    },
+                    {
+                      "id": "skill",
+                      "label": "extract-template",
+                      "kind": "skill",
+                      "subtitle": "独立技能入口",
+                      "detail": "读取模板抽象说明与当前 CLI 指南。",
+                      "commands": ["guide template-extraction --json"],
+                      "references": [
+                        "skills/extract-template/SKILL.md",
+                        "skills/extract-template/references/template-abstraction.md"
+                      ],
+                      "position": {
+                        "x": 264,
+                        "y": 0
+                      },
+                      "targetSide": "left",
+                      "sourceSide": "right"
+                    },
+                    {
+                      "id": "read",
+                      "label": "读取最新页面与差异",
+                      "kind": "query",
+                      "subtitle": "纳入用户手动修改",
+                      "detail": "源页面继续保留。相似模板从摘要筛选，避免只换名称的重复模板。",
+                      "commands": [
+                        "pages read PAGE --project PROJECT --json",
+                        "pages diff PAGE --project PROJECT --since HASH --json",
+                        "catalog list --kind template --project PROJECT --query 用途 --limit 8 --json"
+                      ],
+                      "position": {
+                        "x": 528,
+                        "y": 0
+                      },
+                      "targetSide": "left",
+                      "sourceSide": "bottom"
+                    },
+                    {
+                      "id": "abstract",
+                      "label": "抽象稳定结构与填写内容",
+                      "kind": "decision",
+                      "subtitle": "结构 / 数据 / 可选部分",
+                      "detail": "保留叙事顺序、布局与组件关系；实例事实替换为填写提示或空状态。contentGuide 说明输入与证据要求，related/examples 描述组合与用法。",
+                      "position": {
+                        "x": 528,
+                        "y": 180
+                      },
+                      "targetSide": "top",
+                      "sourceSide": "left"
+                    },
+                    {
+                      "id": "save",
+                      "label": "保存模板定义",
+                      "kind": "query",
+                      "subtitle": "document / composition",
+                      "detail": "处理过的定义用 --input 保存。当前模型由 Agent 根据材料填充；未实现自动变量绑定。",
+                      "commands": [
+                        "template save --project PROJECT --input template-definition.json --json"
+                      ],
+                      "position": {
+                        "x": 264,
+                        "y": 180
+                      },
+                      "targetSide": "right",
+                      "sourceSide": "left"
+                    },
+                    {
+                      "id": "validate",
+                      "label": "用不同材料应用",
+                      "kind": "result",
+                      "subtitle": "原实例事实不泄漏",
+                      "detail": "创建新页面检查结构、组件依赖、可选内容和导出效果。",
+                      "commands": [
+                        "template apply ID --project PROJECT --scope project --version VERSION --title 新内容 --json"
+                      ],
+                      "position": {
+                        "x": 0,
+                        "y": 180
+                      },
+                      "targetSide": "right",
+                      "sourceSide": "bottom"
+                    },
+                    {
+                      "id": "library",
+                      "label": "项目模板与应用结果",
+                      "kind": "result",
+                      "subtitle": "共享与发布按请求进入",
+                      "detail": "模板和验证页面分别保存。全局提升、远端发布是另外的明确操作。",
+                      "commands": [
+                        "按需：guide versions --json",
+                        "按需：guide publish --json"
+                      ],
+                      "position": {
+                        "x": 0,
+                        "y": 360
+                      },
+                      "targetSide": "top",
+                      "sourceSide": "right"
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "id": "template-work-0",
+                      "source": "request",
+                      "target": "skill"
+                    },
+                    {
+                      "id": "template-work-1",
+                      "source": "skill",
+                      "target": "read"
+                    },
+                    {
+                      "id": "template-work-2",
+                      "source": "read",
+                      "target": "abstract"
+                    },
+                    {
+                      "id": "template-work-3",
+                      "source": "abstract",
+                      "target": "save"
+                    },
+                    {
+                      "id": "template-work-4",
+                      "source": "save",
+                      "target": "validate"
+                    },
+                    {
+                      "id": "template-work-5",
+                      "source": "validate",
+                      "target": "library"
+                    }
+                  ]
+                },
+                {
+                  "id": "disclosure",
+                  "label": "披露层级",
+                  "description": "静态说明决定做什么，CLI 返回当前对象和协议。",
+                  "direction": "TB",
+                  "nodes": [
+                    {
+                      "id": "metadata",
+                      "label": "名称与描述",
+                      "kind": "request",
+                      "subtitle": "选择适用的 skill",
+                      "detail": "所有技能入口描述便于发现；先按本次任务选择，避免同时加载全部流程。",
+                      "position": {
+                        "x": 0,
+                        "y": 0
+                      },
+                      "sourceSide": "right",
+                      "targetSide": "top"
+                    },
+                    {
+                      "id": "body",
+                      "label": "当前 SKILL.md",
+                      "kind": "skill",
+                      "subtitle": "目标、决策与关键约束",
+                      "detail": "只加载本次页面、组件或模板流程。进入另一流程时再读对应技能。",
+                      "position": {
+                        "x": 264,
+                        "y": 0
+                      },
+                      "sourceSide": "bottom",
+                      "targetSide": "left"
+                    },
+                    {
+                      "id": "reference",
+                      "label": "条件性的静态参考",
+                      "kind": "reference",
+                      "subtitle": "需要时才读",
+                      "detail": "运行入口首次读；组件契约在开发时读；模板抽象在提取时读。",
+                      "references": [
+                        "show-document/references/runtime.md",
+                        "create-component/references/component-authoring.md",
+                        "extract-template/references/template-abstraction.md"
+                      ],
+                      "position": {
+                        "x": 0,
+                        "y": 180
+                      },
+                      "sourceSide": "bottom",
+                      "targetSide": "top"
+                    },
+                    {
+                      "id": "guide",
+                      "label": "当前 CLI 操作指南",
+                      "kind": "query",
+                      "subtitle": "协议与命令",
+                      "detail": "按本次动作查询 component、template-extraction、authoring、export 等主题。",
+                      "commands": ["guide TOPIC --json"],
+                      "position": {
+                        "x": 528,
+                        "y": 180
+                      },
+                      "sourceSide": "bottom",
+                      "targetSide": "top"
+                    },
+                    {
+                      "id": "summary",
+                      "label": "真实目录的摘要",
+                      "kind": "query",
+                      "subtitle": "按用途少量检索",
+                      "detail": "组件和模板随软件及内容库变化，直接查动态目录。",
+                      "commands": [
+                        "catalog list --project PROJECT --kind component --query 用途 --limit 8 --json"
+                      ],
+                      "position": {
+                        "x": 528,
+                        "y": 360
+                      },
+                      "sourceSide": "left",
+                      "targetSide": "top"
+                    },
+                    {
+                      "id": "selected",
+                      "label": "选中对象的说明与输入",
+                      "kind": "query",
+                      "subtitle": "guide → schema / examples",
+                      "detail": "先确认对象用途，准备填入数据时再读取输入契约和示例。",
+                      "commands": [
+                        "catalog describe ID --project PROJECT --kind KIND --view guide --json",
+                        "按需：--view schema",
+                        "按需：--view examples"
+                      ],
+                      "position": {
+                        "x": 264,
+                        "y": 360
+                      },
+                      "sourceSide": "left",
+                      "targetSide": "right"
+                    },
+                    {
+                      "id": "source",
+                      "label": "开发时才取源码",
+                      "kind": "query",
+                      "subtitle": "文件级读取",
+                      "detail": "只在改造组件或合成模板时加载所选对象的源码。需要完整包时显式请求所有文件。",
+                      "commands": [
+                        "catalog describe ID --project PROJECT --kind component --view source --file index.tsx --json",
+                        "完整包按需：--file *"
+                      ],
+                      "position": {
+                        "x": 0,
+                        "y": 360
+                      },
+                      "sourceSide": "left",
+                      "targetSide": "right"
+                    }
+                  ],
+                  "edges": [
+                    {
+                      "id": "disclosure-0",
+                      "source": "metadata",
+                      "target": "body"
+                    },
+                    {
+                      "id": "disclosure-1",
+                      "source": "body",
+                      "target": "reference"
+                    },
+                    {
+                      "id": "disclosure-2",
+                      "source": "body",
+                      "target": "guide"
+                    },
+                    {
+                      "id": "disclosure-3",
+                      "source": "guide",
+                      "target": "summary"
+                    },
+                    {
+                      "id": "disclosure-4",
+                      "source": "summary",
+                      "target": "selected"
+                    },
+                    {
+                      "id": "disclosure-5",
+                      "source": "selected",
+                      "target": "source",
+                      "label": "仅开发时"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "图中的 showai 命令代表从已安装软件验证得到的 CLI 入口。组件与模板内容实时查询，源码仅在开发时读取。"
+            }
+          ]
+        },
+        {
+          "type": "widget",
+          "attrs": {
+            "kind": "bookmark",
+            "data": {
+              "title": "React Flow",
+              "description": "本控件使用的 React 节点图与交互库。",
+              "url": "https://reactflow.dev/learn"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

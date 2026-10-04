@@ -67,6 +67,25 @@ afterAll(async () => {
   await rm(bundleDirectory, { recursive: true, force: true });
 });
 
+test("external runtime records an executable launch and exposes only relevant guides", async () => {
+  const info = await run(["runtime", "info"]);
+  expect(info.protocol).toBe(1);
+  expect(info.launch.args).toEqual([cli]);
+  expect(info.guideTopics).toContain("template-extraction");
+  const registration = await run(["runtime", "register"]);
+  const config = JSON.parse(await readFile(registration.path, "utf8"));
+  const output = await execute(
+    config.launch.command,
+    [...config.launch.args, "guide", "component", "--json"],
+    { env: { ...environment(), ...config.launch.env } },
+  );
+  const guide = JSON.parse(output.stdout).data;
+  expect(guide.topic).toBe("component");
+  expect(guide.commands).toContain(
+    "showai catalog import --project PROJECT --input ./component-package --json",
+  );
+});
+
 test("real CLI binds sessions, detects user changes and rejects stale writes", async () => {
   const project = await run([
     "projects",

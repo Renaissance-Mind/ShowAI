@@ -12,6 +12,9 @@ import bookmark from "../components/blocks/Bookmark.tsx?raw";
 import shared from "../components/blocks/shared.tsx?raw";
 import helpers from "../components/blocks/helpers.ts?raw";
 import css from "../components/blocks/block.css?raw";
+import flowchart from "../components/blocks/Flowchart.tsx?raw";
+import flowchartCss from "../components/blocks/flowchart.css?raw";
+import flowchartContract from "../components/blocks/flowchart-contract.mjs?raw";
 
 export const builtinSources: Record<string, string> = {
   "primitive-contract.mjs": contract,
@@ -26,6 +29,9 @@ export const builtinSources: Record<string, string> = {
   "shared.tsx": shared,
   "helpers.ts": helpers,
   "block.css": css,
+  "Flowchart.tsx": flowchart,
+  "flowchart.css": flowchartCss,
+  "flowchart-contract.mjs": flowchartContract,
   "theme.css": `${themeTokens}\n${themeContent}`,
 };
 export const builtinExports: Record<string, string> = {
@@ -37,6 +43,7 @@ export const builtinExports: Record<string, string> = {
   divider: "Divider",
   code: "Code",
   chart: "Chart",
+  flowchart: "Flowchart",
   database: "Database",
   metrics: "Metrics",
   playground: "Playground",
