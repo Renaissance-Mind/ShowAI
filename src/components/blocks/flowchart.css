@@ -30,6 +30,18 @@
   border-top: 1px solid var(--sb-line);
   border-bottom: 1px solid var(--sb-line);
 }
+/* Host styles can make SVG width relative to this otherwise empty absolute layer. */
+.sf-canvas .react-flow__edges {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.sf-canvas .react-flow__edges > svg:not(.react-flow__marker) {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
 .sf-node {
   width: 218px;
   min-height: 106px;
@@ -103,6 +115,7 @@
 }
 .sf-controls {
   position: absolute;
+  z-index: 5;
   left: 16px;
   bottom: 16px;
   display: flex;
