@@ -27,11 +27,31 @@ import type {
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import { componentWidgetData } from "../components/custom/contract";
 import { Widget } from "../components/blocks/Widget";
-import DocumentEditor from "../editor/DocumentEditor";
+import DocumentEditor, {
+  type DocumentEditorProps,
+} from "../editor/DocumentEditor";
+import SurfaceEditor from "../surface/SurfaceEditor";
+import { splitContent } from "../surface/model";
 import { newDocument } from "../lib/document";
 import { desktop, errorMessage } from "./bridge";
 import Dialog from "./Dialog";
 import "./catalog.css";
+
+function TemplateContent(props: DocumentEditorProps) {
+  if (!splitContent(props.content).items.length)
+    return <DocumentEditor {...props} />;
+  return (
+    <div className="surface-template">
+      <SurfaceEditor
+        content={props.content}
+        onChange={props.onChange}
+        readOnly={props.readOnly}
+        title={null}
+        pageClassName="surface-template-body"
+      />
+    </div>
+  );
+}
 
 function ReferenceSection({
   title,
@@ -430,7 +450,7 @@ export function TemplateDialog({
                 <div className="catalog-preview-stage catalog-template-preview">
                   <div className="catalog-template-paper">
                     <CustomComponentsProvider components={components}>
-                      <DocumentEditor
+                      <TemplateContent
                         content={
                           (record.previewDocument ?? record.document).content
                         }
@@ -485,7 +505,7 @@ export function TemplateDialog({
             {(!parts.length || activePartIndex >= 0) && (
               <div className="studio-template-document">
                 <CustomComponentsProvider components={components}>
-                  <DocumentEditor
+                  <TemplateContent
                     key={parts.length ? activePartIndex : "document"}
                     content={layoutContent}
                     onChange={(content) => {
@@ -509,7 +529,7 @@ export function TemplateDialog({
               <details className="catalog-example">
                 <summary>查看组合后的完整布局</summary>
                 <CustomComponentsProvider components={components}>
-                  <DocumentEditor
+                  <TemplateContent
                     content={record.previewDocument.content}
                     onChange={() => {}}
                     readOnly

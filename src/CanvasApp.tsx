@@ -10,7 +10,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import DocumentEditor from "./editor/DocumentEditor";
+import SurfaceEditor from "./surface/SurfaceEditor";
 import {
   parseArtifact,
   serializeArtifact,
@@ -377,28 +377,28 @@ export default function App() {
           </button>
         </div>
       )}
-      <main className="canvas-page">
-        <textarea
-          ref={titleRef}
-          className="canvas-title"
-          aria-label="页面标题"
-          placeholder="无标题"
-          rows={1}
-          maxLength={1000}
-          value={page.title}
-          onChange={(event) =>
-            update({ title: event.target.value.replaceAll("\n", "") })
+      <CustomComponentsProvider components={components}>
+        <SurfaceEditor
+          key={page.id}
+          content={page.content}
+          onChange={changeContent}
+          pageClassName="canvas-page"
+          title={
+            <textarea
+              ref={titleRef}
+              className="canvas-title"
+              aria-label="页面标题"
+              placeholder="无标题"
+              rows={1}
+              maxLength={1000}
+              value={page.title}
+              onChange={(event) =>
+                update({ title: event.target.value.replaceAll("\n", "") })
+              }
+            />
           }
         />
-        <CustomComponentsProvider components={components}>
-          <DocumentEditor
-            key={page.id}
-            content={page.content}
-            onChange={changeContent}
-            minimal
-          />
-        </CustomComponentsProvider>
-      </main>
+      </CustomComponentsProvider>
       <input
         ref={fileRef}
         className="hidden"

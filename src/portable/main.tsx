@@ -5,7 +5,7 @@ import { parseArtifact, serializeArtifact } from "./validation.mjs";
 import type { ShowArtifact, ShowDocument } from "../types";
 import { loadRemoteComponents } from "./remote.mjs";
 import type { CompiledComponent } from "../components/custom/types";
-import { PageContent } from "./PageContent";
+import { SurfaceReader } from "./SurfaceReader";
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import "./portable.css";
 import "../design/tokens.css";
@@ -153,27 +153,33 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
           </div>
         )}
       </div>
-      <main className="portable-document">
-        {document.title && <h1 className="portable-title">{document.title}</h1>}
-        {!!artifact.remoteComponents?.length && (
-          <p className="portable-network-note">
-            {remoteLoading
-              ? "正在校验并加载已发布的固定版本组件…"
-              : "此页面使用已发布的固定版本组件，需要联网加载。"}
-          </p>
-        )}
-        {remoteError && (
-          <p role="alert" className="portable-network-error">
-            {remoteError}
-          </p>
-        )}
-        <CustomComponentsProvider
-          components={[...(artifact.components ?? []), ...remote]}
-          inlineHost={inlineHost}
-        >
-          <PageContent content={document.content} />
-        </CustomComponentsProvider>
-      </main>
+      <CustomComponentsProvider
+        components={[...(artifact.components ?? []), ...remote]}
+        inlineHost={inlineHost}
+      >
+        <SurfaceReader
+          content={document.content}
+          heading={
+            <>
+              {document.title && (
+                <h1 className="portable-title">{document.title}</h1>
+              )}
+              {!!artifact.remoteComponents?.length && (
+                <p className="portable-network-note">
+                  {remoteLoading
+                    ? "正在校验并加载已发布的固定版本组件…"
+                    : "此页面使用已发布的固定版本组件，需要联网加载。"}
+                </p>
+              )}
+              {remoteError && (
+                <p role="alert" className="portable-network-error">
+                  {remoteError}
+                </p>
+              )}
+            </>
+          }
+        />
+      </CustomComponentsProvider>
     </div>
   );
 }

@@ -49,7 +49,7 @@ import type {
   CatalogReadOptions,
 } from "../components/custom/types";
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
-import DocumentEditor from "../editor/DocumentEditor";
+import SurfaceEditor from "../surface/SurfaceEditor";
 import { parseArtifact } from "../lib/artifact";
 import { parseMarkdown } from "../lib/markdown";
 import { newDocument } from "../lib/document";
@@ -1067,7 +1067,9 @@ export default function Studio() {
             )}
           </div>
         )}
-        <div className="studio-scroll">
+        <div
+          className={`studio-scroll${view === "page" && page.draft ? " has-page-surface" : ""}`}
+        >
           {loading && (
             <div className="studio-loading">
               <Loader2 size={24} className="studio-spin" />
@@ -1113,33 +1115,35 @@ export default function Studio() {
               })}
             />
           ) : view === "page" && page.draft ? (
-            <article className="studio-editor-page">
-              <textarea
-                ref={titleRef}
-                className="studio-page-title"
-                aria-label="页面标题"
-                placeholder="无标题"
-                value={page.draft.title}
-                rows={1}
-                maxLength={1000}
-                onChange={(event) =>
-                  page.edit({ title: event.target.value.replaceAll("\n", "") })
+            <CustomComponentsProvider
+              components={page.record?.components ?? []}
+            >
+              <SurfaceEditor
+                key={page.draft.id}
+                content={page.draft.content}
+                onChange={page.editContent}
+                pageClassName="studio-editor-page"
+                onBrowseComponents={() =>
+                  void navigate("components").catch(report)
+                }
+                title={
+                  <textarea
+                    ref={titleRef}
+                    className="studio-page-title"
+                    aria-label="页面标题"
+                    placeholder="无标题"
+                    value={page.draft.title}
+                    rows={1}
+                    maxLength={1000}
+                    onChange={(event) =>
+                      page.edit({
+                        title: event.target.value.replaceAll("\n", ""),
+                      })
+                    }
+                  />
                 }
               />
-              <CustomComponentsProvider
-                components={page.record?.components ?? []}
-              >
-                <DocumentEditor
-                  key={page.draft.id}
-                  content={page.draft.content}
-                  onChange={page.editContent}
-                  onBrowseComponents={() =>
-                    void navigate("components").catch(report)
-                  }
-                  minimal
-                />
-              </CustomComponentsProvider>
-            </article>
+            </CustomComponentsProvider>
           ) : (
             <div className="studio-library">
               <div className="studio-section-heading">

@@ -27,6 +27,7 @@ import {
   CodeXml,
   Copy,
   ExternalLink,
+  Expand,
   GripVertical,
   Heading1,
   Heading2,
@@ -67,6 +68,7 @@ export interface DocumentEditorProps {
   minimal?: boolean;
   onEditorReady?: (editor: Editor) => void;
   onBrowseComponents?: () => void;
+  onMoveToCanvas?: (node: JSONContent) => void;
 }
 
 interface MenuItem {
@@ -152,6 +154,7 @@ export default function DocumentEditor({
   minimal = true,
   onEditorReady,
   onBrowseComponents,
+  onMoveToCanvas,
 }: DocumentEditorProps) {
   const latestOnChange = useRef(onChange);
   latestOnChange.current = onChange;
@@ -393,15 +396,28 @@ export default function DocumentEditor({
       } else setBubble(null);
     };
     const hideBubble = () => setBubble(null);
+    const viewportChanged = (event: Event) => {
+      if (
+        !(event.target instanceof Element) ||
+        !event.target.contains(editor.view.dom)
+      )
+        return;
+      setBubble(null);
+      setSlash(null);
+      setBlockMenu(false);
+      setHover(null);
+    };
     editor.on("transaction", refresh);
     editor.on("focus", refresh);
     editor.on("blur", hideBubble);
     window.addEventListener("scroll", hideBubble, true);
+    window.addEventListener("showai:viewport-change", viewportChanged);
     return () => {
       editor.off("transaction", refresh);
       editor.off("focus", refresh);
       editor.off("blur", hideBubble);
       window.removeEventListener("scroll", hideBubble, true);
+      window.removeEventListener("showai:viewport-change", viewportChanged);
     };
   }, [editor]);
 
@@ -1184,7 +1200,10 @@ export default function DocumentEditor({
                 pos,
                 size: node.nodeSize,
                 index,
-                top: rect.top - wrapper.getBoundingClientRect().top,
+                top:
+                  (rect.top - wrapper.getBoundingClientRect().top) /
+                  (wrapper.getBoundingClientRect().width /
+                    wrapper.offsetWidth || 1),
               };
           });
           setHover(next);
@@ -1320,6 +1339,19 @@ export default function DocumentEditor({
                         <div className="menu-rule" />
                       </>
                     )}
+                  {onMoveToCanvas && (
+                    <button
+                      onClick={() => {
+                        const node = editor.state.doc.nodeAt(hover.pos);
+                        if (node) onMoveToCanvas(node.toJSON());
+                        setBlockMenu(false);
+                        setHover(null);
+                      }}
+                    >
+                      <Expand size={15} />
+                      移至画布
+                    </button>
+                  )}
                   <button
                     disabled={hover.index === 0}
                     onClick={() => moveBlock(hover.pos, -1)}

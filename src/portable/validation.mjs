@@ -551,6 +551,23 @@ export function validateDocument(value) {
   if (document.content?.type !== "doc")
     throw new Error("Document content must be a doc node.");
   validateNode(document.content, "document.content", { count: 0 });
+  const canvasIds = new Set(
+    (document.content.content ?? [])
+      .filter((node) => node.attrs?.canvas != null)
+      .map((node) => node.attrs.id),
+  );
+  if (canvasIds.size) {
+    const seen = new Set();
+    const checkCanvasIds = (node) => {
+      const id = node.attrs?.id;
+      if (canvasIds.has(id)) {
+        if (seen.has(id)) throw new Error(`Duplicate canvas id: ${id}.`);
+        seen.add(id);
+      }
+      node.content?.forEach(checkCanvasIds);
+    };
+    checkCanvasIds(document.content);
+  }
   const now = new Date().toISOString();
   for (const key of ["createdAt", "updatedAt"])
     if (
