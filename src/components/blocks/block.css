@@ -1076,10 +1076,9 @@
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  padding: 19px;
-  background: var(--sb-soft);
-  border: 1px solid var(--sb-line);
-  border-radius: 6px;
+  padding: 0;
+  background: transparent;
+  border: 0;
   font-size: 10px;
   color: var(--sb-muted);
   min-width: 0;
