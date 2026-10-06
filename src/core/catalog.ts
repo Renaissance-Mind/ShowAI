@@ -910,6 +910,8 @@ function record(value: unknown, label: string): Record<string, unknown> {
 }
 function manifestFrom(value: unknown): ComponentManifest {
   const item = record(value, "Component manifest");
+  if (item.reader !== undefined && item.reader !== "readData")
+    throw new Error("Component reader must name the readData export.");
   if (
     item.category !== undefined &&
     !componentCategories.some(({ id }) => id === item.category)
@@ -971,6 +973,7 @@ function manifestFrom(value: unknown): ComponentManifest {
       ? { category: item.category as ComponentManifest["category"] }
       : {}),
     entry,
+    ...(item.reader ? { reader: "readData" as const } : {}),
     scenarios: item.scenarios as string[],
     defaultData,
     examples,
@@ -1069,13 +1072,14 @@ function compiledIntegrity(
   );
 }
 
-function runtimeSource(entry: string): string {
-  return `import React, {useState} from 'react';import{createRoot}from'react-dom/client';import UserComponent from ${JSON.stringify(entry)};import validate from 'showai:validator';
+function runtimeSource(entry: string, reader = false): string {
+  return `import React, {useState,useEffect} from 'react';import{createRoot}from'react-dom/client';import * as UserModule from ${JSON.stringify(entry)};import validate from 'showai:validator';const UserComponent=UserModule.default;
 const config=JSON.parse(document.getElementById('showai-component-data')?.textContent||'{}');const channel=config.channel;
 const send=(type,extra={})=>parent.postMessage({channel,type,...extra},'*');let update;
 const validationMessage=()=>(validate.errors||[]).map(error=>(error.instancePath||error.params?.missingProperty||'data')+' '+error.message).join('; ');
 function check(props){if(validate(props))return true;send('showai:error',{message:validationMessage()});return false;}
-function App(){const[state,setState]=useState({data:config.props||{},readOnly:config.readOnly!==false});update=(data,readOnly)=>{if(check(data)){setState({data,readOnly});send('showai:valid')}};return React.createElement(UserComponent,{...state,onChange:state.readOnly?undefined:(data)=>{if(check(data)){setState(s=>({...s,data}));send('showai:change',{props:data});}}});}
+function reading(props){try{const read=UserModule['read'+'Data'];if(${reader}&&typeof read!=='function')throw new Error('Declared readData export is missing');const computed=typeof read==='function'?read(props):undefined;if(computed&&typeof computed.then==='function')throw new Error('readData must be synchronous');const visit=(value,depth=0)=>{if(depth>40)throw new Error('readData is nested too deeply');if(value===null||typeof value==='string'||typeof value==='boolean'||typeof value==='number'&&Number.isFinite(value))return;if(Array.isArray(value)){value.forEach(child=>visit(child,depth+1));return;}if(value&&typeof value==='object'&&Object.getPrototypeOf(value)===Object.prototype){Object.values(value).forEach(child=>visit(child,depth+1));return;}throw new Error('readData must contain only finite JSON values');};if(typeof read==='function')visit(computed);const encoded=JSON.stringify(computed);if(encoded&&new TextEncoder().encode(encoded).byteLength>65536)throw new Error('readData exceeds 64 KiB');window.__SHOWAI_COMPONENT_READING__={ready:true,status:typeof read==='function'?'computed':'raw',props,data:encoded===undefined?undefined:JSON.parse(encoded)};}catch(error){window.__SHOWAI_COMPONENT_READING__={ready:true,status:'error',props,error:String(error.message||error)};}}
+function App(){const[state,setState]=useState({data:config.props||{},readOnly:config.readOnly!==false});useEffect(()=>reading(state.data),[state.data]);update=(data,readOnly)=>{if(check(data)){setState({data,readOnly});send('showai:valid')}};return React.createElement(UserComponent,{...state,onChange:state.readOnly?undefined:(data)=>{if(check(data)){setState(s=>({...s,data}));send('showai:change',{props:data});}}});}
 window.addEventListener('message',event=>{if(event.source!==parent||event.data?.channel!==channel)return;if(event.data?.type==='showai:validate'){const valid=validate(event.data.props);send('showai:validation',{requestId:event.data.requestId,valid,message:valid?'':validationMessage()});return;}if(event.data?.type==='showai:props')update?.(event.data.props,event.data.readOnly!==false);});
 window.addEventListener('error',event=>send('showai:error',{message:event.message}));window.addEventListener('unhandledrejection',event=>send('showai:error',{message:String(event.reason?.message||event.reason)}));
 createRoot(document.getElementById('component-root')).render(React.createElement(App));
@@ -1404,7 +1408,10 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
   };
   const output = await build({
     stdin: {
-      contents: runtimeSource(`./${manifest.entry.replace(/^\.\//, "")}`),
+      contents: runtimeSource(
+        `./${manifest.entry.replace(/^\.\//, "")}`,
+        manifest.reader === "readData",
+      ),
       resolveDir: root,
       sourcefile: "showai-entry.tsx",
       loader: "tsx",

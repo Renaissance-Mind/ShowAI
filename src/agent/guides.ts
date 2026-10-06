@@ -1,6 +1,7 @@
 export const GUIDE_TOPICS = [
   "workspace",
   "authoring",
+  "reading",
   "document",
   "whiteboard",
   "containers",
@@ -24,6 +25,41 @@ const guides: Record<
     next?: string;
   }
 > = {
+  reading: {
+    purpose:
+      "Read the same Page through structured data, rendered pixels or interactive HTML, preserving one source identity.",
+    rules: [
+      "Default to structured JSON for content/data edits, or format markdown for readable prose and component data. detail outline returns stable IDs before selecting blockIds. A partial document is a projection; reread the full Page before saving it.",
+      "Use image for styling, layout, clipping and selected/hover states. Use html for browser accessibility/DOM and actual interactions. Retain pageId, hash, componentRefs, viewport, theme and actions to compare the same source version. expectedHash rejects stale captures.",
+      "Image/html reads render the bundled reader in an isolated browser and return an artifact path plus .read.json metadata. MCP image reads also return PNG pixels. They require Chrome/Edge/Chromium or SHOWAI_BROWSER_EXECUTABLE; no browser is downloaded implicitly. Structured reads without computed readers work without a browser; rendered false explicitly requests raw source only.",
+      "Components declaring manifest.reader=readData export a synchronous readData(props) JSON model, evaluated only in their browser sandbox. computed distinguishes derived fields from source props. Components without this contract retain raw data; do not invent derived values. Outline reading does not load component runtimes.",
+      "actions target one selector or role/name, optionally within blockId. Supported types are hover, click, fill, select, check, uncheck and drag (dx/dy pixels). Missing or ambiguous targets fail visibly. Supply actions as a replayable sequence in --state; use the same viewport when comparing.",
+      "Reading interactions explore view state. draft true enables component editing only in the generated preview, including drag and forms; computed.props contains resulting temporary data. Apply intended source changes separately with page_apply/current baseHash. Reading never commits preview edits to the Page.",
+      "After visual changes inspect an image; after interaction changes exercise HTML actions. Rendered reading of an existing Page uses its stored pinned components. Rebuild and import changed component source as a new immutable version before replacing its reference.",
+    ],
+    commands: [
+      "showai pages read PAGE --project PROJECT --json",
+      "showai pages read PAGE --project PROJECT --detail outline --json",
+      "showai pages read PAGE --project PROJECT --blocks NODE_ID --format markdown",
+      "showai pages read PAGE --project PROJECT --view image --theme dark --width 1000 --height 900 --base-hash HASH --out ./preview.png --json",
+      "showai pages read PAGE --project PROJECT --view html --state reading-state.json --out ./preview.html --json",
+      "showai pages read PAGE --project PROJECT --rendered false --json",
+    ],
+    input: {
+      view: "html",
+      viewport: { width: 1000, height: 900 },
+      theme: "light",
+      draft: false,
+      actions: [
+        {
+          type: "hover",
+          blockId: "gantt",
+          role: "button",
+          name: "查看 交互与视觉设计，2026-10-08 至 2026-10-12，40%",
+        },
+      ],
+    },
+  },
   workspace: {
     purpose:
       "Bind one conversation to an explicit ShowAI project, shared with the desktop application.",
@@ -48,6 +84,7 @@ const guides: Record<
       "Create or revise page content without overwriting edits made by the user or another Agent.",
     rules: [
       "Read the page, retain its hash and stable block ids, and inspect pages diff against the preceding turn's hash.",
+      "Default to structured reading. Use guide reading for image checks and browser interaction checks; use the full source Page/current hash for writes.",
       "Save/apply requires --base-hash. On CONFLICT, read and merge deliberately; do not blindly retry an old document with a newer hash.",
       "New resources default to a Page surface. Page and Board containers nest recursively in artifact v3. Use guide containers for structure; query component schemas when adding components.",
       "Keep an ordinary report in one resource page, with sections, navigation and optional nested containers. Continue revisions in that same page; create multiple resource pages only for a user-requested website or separate documents.",
@@ -209,6 +246,7 @@ const guides: Record<
     purpose:
       "Create a reusable React component only after reuse and composition leave a real expression or interaction gap.",
     rules: [
+      "For derived values, declare manifest.reader=readData and export synchronous readData(props) JSON (up to 64 KiB) from the entry. Join computed fields back to source by stable IDs and mark derived fields. It executes in the component browser sandbox; do not read files or call services. Import a new version after adding or changing the contract.",
       "Describe input data, reader actions and resulting state before choosing an implementation. Search component summaries first; read source only for the chosen component being changed.",
       "A local package contains manifest.json, props.schema.json and its React entry. The entry receives {data, onChange, readOnly}; onChange persists valid edits, while reading interactions keep source content unchanged.",
       "Interactive components can import GestureBoundary from showai:components and set axes to x, y and/or zoom to own those gestures. Do not intercept unneeded axes. Native scroll regions and iframe contents already own their inputs.",

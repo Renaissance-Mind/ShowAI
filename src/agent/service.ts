@@ -56,6 +56,12 @@ import {
   type CatalogView,
 } from "./disclosure";
 import { getGuide } from "./guides";
+import {
+  readPageView,
+  type PageReadOptions,
+  type PageReadResult,
+  type StructuredRead,
+} from "./page-reading";
 
 export interface CatalogSelection {
   projectId?: string;
@@ -805,8 +811,23 @@ export class AgentService {
       : undefined;
     return this.store.createPage(project, { ...input, document });
   }
-  async readPage(projectId: string, pageId: string) {
-    return this.store.readPage(this.requireProject(projectId), pageId);
+  readPage(projectId: string, pageId: string): Promise<StructuredRead>;
+  readPage(
+    projectId: string,
+    pageId: string,
+    options: PageReadOptions,
+  ): Promise<PageReadResult>;
+  async readPage(
+    projectId: string,
+    pageId: string,
+    options: PageReadOptions = {},
+  ) {
+    return readPageView(
+      this.store,
+      this.requireProject(projectId),
+      pageId,
+      options,
+    );
   }
   async savePage(
     projectId: string,

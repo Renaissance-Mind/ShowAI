@@ -1354,9 +1354,10 @@ test("real catalog versions promote explicitly, fork and resolve an immutable so
     const revision = structuredClone(source);
     revision.manifest.version = version;
     revision.source = source.source.replace(
-      "padding: 20",
+      /padding:\s*(?:["'][^"']*["']|\d+)/,
       `padding: ${padding}`,
     );
+    expect(revision.source).not.toBe(source.source);
     await writeFile(path, JSON.stringify(revision));
     return run(["catalog", "save", "--project", project.id, "--input", path]);
   };
@@ -1386,7 +1387,10 @@ test("real catalog versions promote explicitly, fork and resolve an immutable so
   ).toBe(true);
   const preview = JSON.parse(await readFile(previewPath, "utf8"));
   const resolved = preview.merged;
-  resolved.source = source.source.replace("padding: 20", "padding: 32");
+  resolved.source = source.source.replace(
+    /padding:\s*(?:["'][^"']*["']|\d+)/,
+    "padding: 32",
+  );
   const resolutionPath = join(home, "merge-resolution.json");
   await writeFile(
     resolutionPath,

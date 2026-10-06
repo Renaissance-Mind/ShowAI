@@ -112,6 +112,8 @@ export interface ComponentManifest {
   /** Exact component revisions imported through showai:component/<id>. */
   dependencies?: PackageRevisionRef[];
   entry: string;
+  /** Named, synchronous JSON read model evaluated in the component browser sandbox. */
+  reader?: "readData";
   defaultData: Record<string, unknown>;
   examples: ComponentExample[];
   parents?: PackageRevisionRef[];

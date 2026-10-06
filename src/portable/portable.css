@@ -1,4 +1,11 @@
 @charset "UTF-8";
+.portable-draft-note {
+  padding: 10px 24px;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
 :root {
   font-family:
     Inter,

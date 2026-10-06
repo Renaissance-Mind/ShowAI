@@ -1,4 +1,10 @@
-import { createElement, type CSSProperties, type ReactNode } from "react";
+import {
+  createElement,
+  useEffect,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import type { JSONContent } from "@tiptap/core";
 import { Widget } from "../components/blocks/Widget";
 
@@ -230,7 +236,7 @@ export function PageNode({ node }: { node: JSONContent }): ReactNode {
           className="portable-widget"
           data-widget-kind={attrs.kind}
         >
-          <Widget kind={attrs.kind} data={attrs.data ?? {}} readOnly />
+          <ReadingWidget kind={attrs.kind} data={attrs.data ?? {}} />
         </div>
       );
     default:
@@ -243,5 +249,32 @@ export function PageContent({ content }: { content: JSONContent }) {
     <div className="portable-content">
       <PageNode node={content} />
     </div>
+  );
+}
+
+/** Editing is confined to the explicitly requested preview, never the stored Page. */
+function ReadingWidget({
+  kind,
+  data,
+}: {
+  kind: string;
+  data: Record<string, unknown>;
+}) {
+  const [local, setLocal] = useState(data);
+  useEffect(() => setLocal(data), [data]);
+  const options =
+    typeof window === "undefined"
+      ? undefined
+      : window.document.querySelector(
+          'script#showai-read-options[type="application/json"]',
+        )?.textContent;
+  const draft = options ? JSON.parse(options).draft === true : false;
+  return (
+    <Widget
+      kind={kind}
+      data={local}
+      readOnly={!draft}
+      onChange={draft ? setLocal : undefined}
+    />
   );
 }

@@ -28,6 +28,7 @@ showai pages list --project PROJECT --json
 按本次操作读取 CLI 指南，普通创作先使用 `guide authoring`；构造 Page 结构时读取 `guide containers`，区域内部的富文本区块再读 `guide document`。
 
 - `guide workspace`：项目与绑定。
+- `guide reading`：同一 Page 的结构化、图像与 HTML 读取。
 - `guide authoring`：读取、差异、编辑和冲突处理。
 - `guide containers`：Page/Board 嵌套、外框、视图与旧页迁移。
 - `guide catalog`：摘要搜索，再按需查看用途、输入、示例或源码。
@@ -38,6 +39,8 @@ showai pages list --project PROJECT --json
 Page 和 Board 本身也是组件目录条目，可查询 guide、schema 和 examples，用 component.insert 插入。原生容器通过内容、布局和模板定制；保持 surface 结构，不要把它们编码成普通 widget。
 
 先按用途搜索组件或模板摘要，限制结果数；选中后取 `--view guide`，准备填入数据时取 `schema`，需要参考用法时取 `examples`。普通页面创作无需读取组件源码或整个目录。修改已有页面前读取当前版本、查看差异，并使用当前 hash 保存。
+
+读取 Page 默认使用结构化 JSON；正文阅读可选择 Markdown。长页面先用 `--detail outline` 取得组件与区域 ID，再按 `--blocks` 读取局部。配色、布局、遮挡和选中状态等视觉问题使用 image，悬停、拖动、展开和表单行为使用 html。按需要读取 [Page 三种读取视图](references/page-reading.md) 与 `guide reading`。三种视图记录同一页面 hash、组件版本及渲染状态；修改视觉后查看图像，修改交互后实际操作 HTML。正式编辑使用完整页面的当前 hash。
 
 已有组件能够表达内容时直接复用。通过调整数据或组合已有组件能实现需求时采用组合；需要可复用的新交互、图形或布局时，进入 [create-component](../create-component/SKILL.md)，完成后回到页面创作。选库失败本身并不意味着必须写组件，先判断普通文本、表格和既有组件的组合是否足够。
 

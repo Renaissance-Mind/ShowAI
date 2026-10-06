@@ -28,6 +28,39 @@ import {
 } from "./model";
 import "./style.css";
 
+/** Derived fields retain task IDs so Agents can join them to the original props. */
+export function readData(data: GanttData) {
+  const issue = validate(data);
+  if (issue) throw new Error(issue);
+  const parents = new Set(
+    data.tasks.map((task) => task.parentId).filter(Boolean),
+  );
+  const tasks = summarize(data.tasks);
+  const leaves = tasks.filter((task) => !parents.has(task.id));
+  const current = today();
+  return {
+    asOf: current,
+    totals: {
+      tasks: leaves.length,
+      completed: leaves.filter((task) => task.progress === 100).length,
+      averageProgress: leaves.length
+        ? Math.round(
+            leaves.reduce((sum, task) => sum + task.progress, 0) /
+              leaves.length,
+          )
+        : 0,
+    },
+    tasks: tasks.map((task) => ({
+      id: task.id,
+      start: task.start,
+      end: task.end,
+      progress: task.progress,
+      status: status(task, current),
+      derived: parents.has(task.id) ? ["start", "end", "progress"] : [],
+    })),
+  };
+}
+
 export default function TaskGantt({
   data,
   onChange,

@@ -42,6 +42,7 @@ async function copyPackage(name) {
 }
 for (const name of [
   "esbuild",
+  "playwright-core",
   "react",
   "react-dom",
   "scheduler",

@@ -50,9 +50,20 @@ function downloadSource(
 
 function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
   const { document } = artifact;
-  const [dark, setDark] = useState(
-    () => window.matchMedia("(prefers-color-scheme: dark)").matches,
-  );
+  const draftPreview = useMemo(() => {
+    const options = window.document.getElementById(
+      "showai-read-options",
+    )?.textContent;
+    return options ? JSON.parse(options).draft === true : false;
+  }, []);
+  const [dark, setDark] = useState(() => {
+    const reading = window.document.getElementById(
+      "showai-read-options",
+    )?.textContent;
+    return reading
+      ? JSON.parse(reading).theme === "dark"
+      : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  });
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -123,6 +134,11 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
     <div
       className={`portable-app${artifact.selection ? " portable-partial" : ""}`}
     >
+      {draftPreview && (
+        <div className="portable-draft-note" role="status">
+          交互预览 · 更改仅保存在此预览中
+        </div>
+      )}
       <div className="portable-options" ref={menuRef}>
         <button
           ref={menuButtonRef}
@@ -148,7 +164,8 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
                 setMenuOpen(false);
               }}
             >
-              <Download size={15} /> 下载源文件
+              <Download size={15} />{" "}
+              {draftPreview ? "下载原始源文件" : "下载源文件"}
             </button>
             <button
               onClick={() => {

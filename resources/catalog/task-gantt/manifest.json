@@ -1,7 +1,8 @@
 {
   "id": "task-gantt",
   "name": "任务管理甘特图",
-  "version": "1.2.2",
+  "version": "1.3.0",
+  "reader": "readData",
   "description": "紧凑多列任务甘特图，支持多层嵌套、汇总排期、拖动改期与依赖校验。",
   "category": "data",
   "scenarios": [

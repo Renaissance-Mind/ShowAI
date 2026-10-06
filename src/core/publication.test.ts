@@ -456,7 +456,10 @@ describe("publication and component delivery", () => {
       await button.click();
       expect(await button.innerText()).toContain("8");
       expect(await page.locator("iframe").getAttribute("sandbox")).toBe(
-        "allow-scripts",
+        "allow-scripts allow-forms",
+      );
+      expect(await page.locator("iframe").getAttribute("srcdoc")).toContain(
+        "form-action 'none'",
       );
       expect(
         await page.locator(".portable-network-note").innerText(),

@@ -22,6 +22,7 @@ import { CATALOG_VIEWS, type CatalogView } from "./disclosure";
 import { assertExportDestination } from "./exporter";
 import type { ExportFormat } from "./exporter";
 import { runtimeInfo, registerRuntime } from "./runtime";
+import type { PageReadOptions } from "./page-reading";
 
 export const CLI_HELP = `ShowAI — interactive pages shared by people and Agents.
 
@@ -37,12 +38,18 @@ Start with one project:
   pages list --project PROJECT
 
 Discover only what you need:
-  guide [workspace|authoring|whiteboard|document|catalog|templates|versions|export|publish]
+  guide [workspace|reading|authoring|containers|document|catalog|component|templates|versions|export|publish]
   catalog list [--kind component|template] [--scope SCOPE] [--limit 20]
   catalog describe ID [--kind component|template] [--view VIEW]
 
 Display a full page or selected blocks:
   export --project PROJECT --page PAGE [--blocks ID,ID] --format html|inline --out PATH
+
+Read one Page through structured data, an image or interactive HTML:
+  pages read PAGE --project PROJECT [--view structured|image|html] [--blocks ID,ID]
+  pages read PAGE --project PROJECT --format markdown [--detail full|outline]
+  pages read PAGE --project PROJECT --view image --theme dark --width 1000 --height 900 --out preview.png
+  pages read PAGE --project PROJECT --view html [--state reading-state.json] --out preview.html
 
 Shared: --home PATH, --project ID, --json, --help.
 Project writes require --project; shared promotion/registration is explicit.
@@ -56,7 +63,7 @@ interface Arguments {
 function parseArguments(args: string[]): Arguments {
   const positional: string[] = [];
   const options: Record<string, string | boolean> = {};
-  const booleans = new Set(["json", "help", "overwrite", "no-open"]);
+  const booleans = new Set(["json", "help", "overwrite", "no-open", "draft"]);
   const strings = new Set([
     "home",
     "port",
@@ -90,6 +97,12 @@ function parseArguments(args: string[]): Arguments {
     "url",
     "components",
     "integrity",
+    "detail",
+    "theme",
+    "width",
+    "height",
+    "state",
+    "rendered",
   ]);
   for (let index = 0; index < args.length; index++) {
     const argument = args[index];
@@ -342,7 +355,52 @@ export async function runCli(argv: string[]): Promise<unknown> {
       }
       if (action === "read") {
         requireCount(args, 3);
-        return service.readPage(project(), id);
+        const state = option(args, "state")
+          ? await readJson(option(args, "state")!)
+          : {};
+        if (!state || typeof state !== "object" || Array.isArray(state))
+          throw new Error(
+            "--state must contain Page reading options such as actions, viewport and draft.",
+          );
+        const readOptions: PageReadOptions = { ...state };
+        const view = option(args, "view");
+        if (view) readOptions.view = view as PageReadOptions["view"];
+        const format = option(args, "format");
+        if (format) readOptions.format = format as PageReadOptions["format"];
+        const detail = option(args, "detail");
+        if (detail) readOptions.detail = detail as PageReadOptions["detail"];
+        const theme = option(args, "theme");
+        if (theme) readOptions.theme = theme as PageReadOptions["theme"];
+        const blocks = option(args, "blocks");
+        if (blocks) readOptions.blockIds = blocks.split(",");
+        const width = option(args, "width"),
+          height = option(args, "height");
+        if (width || height)
+          readOptions.viewport = {
+            width: width
+              ? Number(width)
+              : (readOptions.viewport?.width ?? 1000),
+            height: height
+              ? Number(height)
+              : (readOptions.viewport?.height ?? 900),
+          };
+        const presentation = option(args, "presentation");
+        if (presentation)
+          readOptions.presentation =
+            presentation as PageReadOptions["presentation"];
+        const rendered = option(args, "rendered");
+        if (rendered) {
+          if (!["true", "false"].includes(rendered))
+            throw new Error("--rendered must be true or false.");
+          readOptions.rendered = rendered === "true";
+        }
+        if (args.options.draft) readOptions.draft = true;
+        if (args.options.overwrite) readOptions.overwrite = true;
+        const out = option(args, "out");
+        if (out) readOptions.out = out;
+        const hash = option(args, "base-hash");
+        if (hash) readOptions.expectedHash = hash;
+        return service.readPage(project(), id, readOptions);
       }
       if (action === "save") {
         requireCount(args, 3);
@@ -593,6 +651,16 @@ export async function runCli(argv: string[]): Promise<unknown> {
 }
 
 function printHuman(value: unknown) {
+  if (
+    value &&
+    typeof value === "object" &&
+    "format" in value &&
+    value.format === "markdown" &&
+    "markdown" in value
+  ) {
+    process.stdout.write(String(value.markdown) + "\n");
+    return;
+  }
   if (Array.isArray(value)) {
     if (!value.length) {
       process.stdout.write("No items.\n");

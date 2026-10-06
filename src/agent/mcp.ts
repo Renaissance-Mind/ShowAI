@@ -14,6 +14,8 @@ import type { PageOperation } from "../core/model";
 import type { PublishedComponentLocator } from "../core/publication";
 import { CATALOG_VIEWS } from "./disclosure";
 import { GUIDE_TOPICS } from "./guides";
+import { pageReadSchema, type PageReadResult } from "./page-reading";
+import { readFile } from "node:fs/promises";
 
 const scopeSchema = z.enum([
   "builtin",
@@ -41,7 +43,7 @@ export function createMcpServer(options: {
   const server = new McpServer(
     { name: "showai", version: packageMetadata.version },
     {
-      instructions: `ShowAI creates interactive pages in project ${projectId}. This connection is bound to that project. Use guide for the current task, catalog summaries to choose resources and explicit views for details or source. Read a page and retain its hash before writing. Shared revisions are immutable; fork/merge into this project. Shared promotion or published registration needs an explicit CLI/desktop action.`,
+      instructions: `ShowAI creates interactive pages in project ${projectId}. This connection is bound to that project. Page reading defaults to structured JSON/Markdown. Use image for visual checks and html for browser DOM and interaction checks; guide reading documents viewport, theme, partial scope, actions and temporary draft previews. Retain the source hash before writing. Use catalog summaries to choose resources and explicit views for details or source. Shared revisions are immutable; fork/merge into this project. Shared promotion or published registration needs an explicit CLI/desktop action.`,
     },
   );
   const call = (handler: () => Promise<unknown>) =>
@@ -115,11 +117,34 @@ export function createMcpServer(options: {
     "page_read",
     {
       description:
-        "Read a page and retain its checkpoint hash for the next edit or diff.",
-      inputSchema: { pageId: z.string().min(1) },
+        "Read one Page in structured (default JSON/Markdown), image (PNG) or html (browser accessibility/DOM plus an interactive file) view. Use structured for content/data, image to verify styling, and html/actions to check interactions. detail=outline discovers IDs; blockIds selects a component/region. All views share source hash and pinned component refs. draft=true edits only a temporary preview. See guide reading.",
+      inputSchema: { pageId: z.string().min(1), ...pageReadSchema.shape },
       annotations: readOnly,
     },
-    ({ pageId }) => call(() => service.readPage(projectId, pageId)),
+    ({ pageId, ...readOptions }) =>
+      call(() => service.readPage(projectId, pageId, readOptions)).then(
+        async (result) => {
+          if (!("data" in result.structuredContent)) return result;
+          const data = result.structuredContent.data as PageReadResult;
+          if (data.view !== "image" || !data.path) return result;
+          const png = await readFile(data.path);
+          if (png.length > 8 * 1024 * 1024)
+            throw new Error(
+              "PNG exceeds the 8 MB MCP image limit. Read a smaller blockIds scope or viewport.",
+            );
+          return {
+            ...result,
+            content: [
+              ...result.content,
+              {
+                type: "image" as const,
+                mimeType: "image/png",
+                data: png.toString("base64"),
+              },
+            ],
+          };
+        },
+      ),
   );
   server.registerTool(
     "page_create",

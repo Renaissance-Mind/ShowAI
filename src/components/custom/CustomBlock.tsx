@@ -355,7 +355,7 @@ function SandboxComponent({
         ref={iframe}
         title={component.name}
         srcDoc={html}
-        sandbox="allow-scripts"
+        sandbox="allow-scripts allow-forms"
         referrerPolicy="no-referrer"
         onLoad={sendProps}
         allow="camera 'none'; microphone 'none'; geolocation 'none'; clipboard-read 'none'; clipboard-write 'none'"
