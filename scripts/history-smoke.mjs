@@ -55,7 +55,8 @@ await build({
   format: "esm",
   plugins: [rawSourcePlugin],
 });
-await promisify(execFile)(process.execPath, [bootstrap, home]);
+if (!process.argv.includes("--legacy-import"))
+  await promisify(execFile)(process.execPath, [bootstrap, home]);
 async function freePort() {
   const server = createServer();
   server.listen(0, "127.0.0.1");
@@ -149,6 +150,74 @@ try {
       },
       { action, args },
     );
+  if (process.argv.includes("--legacy-import")) {
+    assert.equal((await api("app:info")).libraryVersion, 1);
+    const oldProject = await api("projects:create", { name: "旧库迁移验收" });
+    const old = await api("pages:create", {
+      projectId: oldProject.id,
+      title: "待迁移的旧页面",
+    });
+    const changed = structuredClone(old.document);
+    changed.title = "迁移前的新标题";
+    const changedRecord = await api("pages:save", {
+      projectId: oldProject.id,
+      pageId: old.document.id,
+      document: changed,
+      baseHash: old.hash,
+    });
+    const original = await readFile(changedRecord.path);
+    await page.getByRole("button", { name: "设置", exact: true }).click();
+    await page
+      .getByRole("button", { name: "启用版本历史", exact: true })
+      .click();
+    let migration = page.getByRole("dialog");
+    await migration
+      .getByText("内容与组件引用已核对", { exact: true })
+      .waitFor();
+    await migration
+      .getByRole("button", { name: "启用版本历史", exact: true })
+      .click();
+    await migration.waitFor({ state: "hidden" });
+    assert.equal((await api("app:info")).libraryVersion, 2);
+    assert.equal((await api("app:info")).home, home);
+    assert.deepEqual(await readFile(changedRecord.path), original);
+    await page.getByRole("button", { name: "返回工作区", exact: true }).click();
+    await page
+      .locator(`[data-library-id="${oldProject.id}"] .studio-tree-main`)
+      .click();
+    await page
+      .getByRole("button", { name: new RegExp(changed.title) })
+      .filter({ has: page.locator("strong") })
+      .first()
+      .click();
+    await page.getByRole("button", { name: "页面历史", exact: true }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "旧快照", exact: true })
+      .click();
+    const archive = page.getByRole("dialog");
+    await archive
+      .getByRole("button", { name: /^旧快照/ })
+      .first()
+      .click();
+    await archive
+      .getByRole("button", { name: "恢复为新版本", exact: true })
+      .click();
+    await archive
+      .getByRole("button", { name: "确认恢复", exact: true })
+      .click();
+    await archive.waitFor({ state: "hidden" });
+    const events = await api("history:list", {
+      projectId: oldProject.id,
+      pageId: old.document.id,
+    });
+    assert.ok(events.items[0].restoredSnapshot);
+    assert.equal(events.items[0].actor.kind, "human");
+    assert.deepEqual(await readFile(changedRecord.path), original);
+    checks.push(
+      "legacy workbench prepares and activates in place, retains original bytes and restores separately labeled old checkpoints as attributed new changes",
+    );
+  }
   const info = await api("app:info");
   assert.equal(info.libraryVersion, 2);
   assert.equal(info.home, home);

@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
+import { isUtf8 } from "node:buffer";
 import { GitLibrary } from "./git-library";
 import { resourceForPath, type HistoryEntry } from "./history-model";
 import { withLibraryLock } from "./library-lock";
@@ -313,7 +314,12 @@ export class LibraryIndex {
         path,
         location,
       });
-    if (!path.endsWith(".json")) {
+    if (
+      !path.endsWith(".json") ||
+      ((owner.kind === "component" || owner.kind === "template") &&
+        !/\/(?:manifest|compiled|template)\.json$/.test(path))
+    ) {
+      if (!isUtf8(bytes) || bytes.includes(0)) return;
       add(path, "source", path.split("/").at(-1)!, bytes.toString("utf8"));
       return;
     }

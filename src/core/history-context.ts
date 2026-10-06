@@ -8,11 +8,13 @@ export interface LibraryMutation {
   expected: Map<string, string | null>;
   origins?: Pick<
     ChangeContext,
-    "restoredFrom" | "mergedFrom" | "externalConflictId"
+    "restoredFrom" | "mergedFrom" | "externalConflictId" | "restoredSnapshot"
   >;
 }
 const actors = new AsyncLocalStorage<ChangeContext>();
 export const libraryMutations = new AsyncLocalStorage<LibraryMutation>();
+/** Serializes legacy writers with the one-time activation barrier. */
+export const legacyMutations = new AsyncLocalStorage<string>();
 
 export function changeContext(): ChangeContext {
   return actors.getStore() ?? { actor: { kind: "unknown" }, channel: "system" };

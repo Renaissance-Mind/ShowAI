@@ -73,6 +73,162 @@ afterAll(async () => {
   await rm(bundleDirectory, { recursive: true, force: true });
 });
 
+test("CLI prepares and activates an old library, and MCP restores an imported checkpoint with project scope and retry identity", async () => {
+  const old = join(home, "legacy-import-source"),
+    target = join(home, "legacy-import-target");
+  const local = (args: string[], root = old) => run(args, { home: root });
+  const project = await local([
+    "projects",
+    "create",
+    "--name",
+    "Import API project",
+  ]);
+  const original = await local([
+    "pages",
+    "create",
+    "--project",
+    project.id,
+    "--title",
+    "旧的可恢复内容",
+  ]);
+  const originalBytes = await readFile(original.path);
+  const report = await local(
+    [
+      "library",
+      "import",
+      "--source",
+      old,
+      "--harness",
+      "codex",
+      "--session",
+      "import-api-session",
+    ],
+    target,
+  );
+  const repeated = await local(["library", "import", "--source", old], target);
+  expect(repeated.id).toBe(report.id);
+  await local(["library", "activate", report.id], target);
+  const current = await local(
+    ["pages", "read", original.document.id, "--project", project.id],
+    target,
+  );
+  expect(current.revision).toBeTruthy();
+  expect(await readFile(original.path)).toEqual(originalBytes);
+  expect((await new GitLibrary(target).history())[0].actor).toMatchObject({
+    kind: "agent",
+    harness: "codex",
+    sessionId: "import-api-session",
+  });
+  const snapshots = await local(
+    [
+      "history",
+      "imported",
+      "--project",
+      project.id,
+      "--page",
+      original.document.id,
+    ],
+    target,
+  );
+  expect(snapshots.length).toBeGreaterThan(0);
+  expect(snapshots[0].editTime).toBeNull();
+  const readSnapshot = await local(
+    [
+      "history",
+      "snapshot",
+      original.document.id,
+      "--project",
+      project.id,
+      "--import",
+      report.id,
+      "--snapshot",
+      snapshots[0].id,
+    ],
+    target,
+  );
+  expect(readSnapshot.document.title).toBe(original.document.title);
+  const client = new Client({ name: "import-api-client", version: "1.0.0" });
+  await client.connect(
+    new StdioClientTransport({
+      command: process.execPath,
+      args: [
+        cli,
+        "mcp",
+        "--home",
+        target,
+        "--project",
+        project.id,
+        "--harness",
+        "codex",
+        "--session",
+        "import-mcp-session",
+      ],
+      env: Object.fromEntries(
+        Object.entries(environment()).filter(
+          (entry): entry is [string, string] => typeof entry[1] === "string",
+        ),
+      ),
+    }),
+  );
+  const unpack = (result: unknown) =>
+    JSON.parse((result as { content: { text: string }[] }).content[0].text);
+  try {
+    const inputs = {
+      pageId: original.document.id,
+      importId: report.id,
+      snapshotId: snapshots[0].id,
+      baseRevision: current.revision,
+      operationId: "import-restore-retry",
+    };
+    const restored = unpack(
+      await client.callTool({
+        name: "history_restore_imported_snapshot",
+        arguments: inputs,
+      }),
+    );
+    expect(restored.ok).toBe(true);
+    expect(
+      unpack(
+        await client.callTool({
+          name: "history_restore_imported_snapshot",
+          arguments: inputs,
+        }),
+      ),
+    ).toEqual(restored);
+    const entries = await new GitLibrary(target).history();
+    expect(entries[0].actor).toMatchObject({
+      kind: "agent",
+      sessionId: "import-mcp-session",
+    });
+    expect(entries[0].restoredSnapshot).toEqual({
+      importId: report.id,
+      snapshotId: snapshots[0].id,
+    });
+    const other = await local(
+      ["projects", "create", "--name", "Foreign project"],
+      target,
+    );
+    const foreign = await local(
+      ["pages", "create", "--project", other.id, "--title", "Private"],
+      target,
+    );
+    expect(
+      unpack(
+        await client.callTool({
+          name: "history_imported_page",
+          arguments: {
+            pageId: foreign.document.id,
+            importId: report.id,
+            snapshotId: snapshots[0].id,
+          },
+        }),
+      ).ok,
+    ).toBe(false);
+  } finally {
+    await client.close();
+  }
+}, 30000);
+
 test("external runtime records an executable launch and exposes only relevant guides", async () => {
   const info = await run(["runtime", "info"]);
   expect(info.protocol).toBe(1);

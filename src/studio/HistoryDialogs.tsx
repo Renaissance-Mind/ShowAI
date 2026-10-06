@@ -14,6 +14,7 @@ import { desktop, errorCode, errorMessage } from "./bridge";
 import type { HistoryEntry } from "../core/history-model";
 import type { PageChange } from "../core/model";
 import type { HistoricalPage } from "../core/library-operations";
+import type { LibraryOperations } from "../core/library-operations";
 import type { SearchResult } from "../core/library-index";
 import type { PageMergePreview } from "../core/page-merge";
 import type { ShowDocument } from "../types";
@@ -169,12 +170,14 @@ export function HistoryDialog({
   onClose,
   beforeRestore,
   onRestored,
+  onImportedSnapshots,
 }: {
   projectId: string;
   pageId?: string;
   onClose: () => void;
   beforeRestore: () => Promise<boolean>;
   onRestored: () => Promise<void>;
+  onImportedSnapshots: () => void;
 }) {
   const [entries, setEntries] = useState<HistoryEntry[]>([]),
     [cursor, setCursor] = useState<string | null>(null),
@@ -341,6 +344,9 @@ export function HistoryDialog({
       className="history-dialog"
     >
       <div className="history-toolbar">
+        <button className="studio-button" onClick={onImportedSnapshots}>
+          旧快照
+        </button>
         <label>
           <Search size={15} />
           <input
@@ -583,6 +589,204 @@ export function HistoryDialog({
               <History size={28} />
               <p>选择一条记录，查看修改内容和来源。</p>
             </div>
+          )}
+        </main>
+      </div>
+    </Dialog>
+  );
+}
+
+type LegacySnapshot = Awaited<
+  ReturnType<LibraryOperations["importedSnapshots"]>
+>[number];
+export function ImportedSnapshotsDialog({
+  projectId,
+  pageId,
+  onClose,
+  beforeRestore,
+  onRestored,
+}: {
+  projectId: string;
+  pageId?: string;
+  onClose: () => void;
+  beforeRestore: () => Promise<boolean>;
+  onRestored: () => Promise<void>;
+}) {
+  const [items, setItems] = useState<LegacySnapshot[]>([]),
+    [selected, setSelected] = useState<LegacySnapshot | null>(null);
+  const [preview, setPreview] = useState<HistoricalPage | null>(null),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [confirm, setConfirm] = useState(false);
+  const request = useRef(0);
+  useEffect(() => {
+    let active = true;
+    setBusy(true);
+    void desktop
+      .invoke<LegacySnapshot[]>("history:importedSnapshots", {
+        projectId,
+        pageId,
+      })
+      .then(
+        (values) => {
+          if (active) setItems(values);
+        },
+        (reason) => {
+          if (active) setError(errorMessage(reason));
+        },
+      )
+      .finally(() => {
+        if (active) setBusy(false);
+      });
+    return () => {
+      active = false;
+      request.current++;
+    };
+  }, [projectId, pageId]);
+  async function choose(item: LegacySnapshot) {
+    const ticket = ++request.current;
+    setSelected(item);
+    setPreview(null);
+    setError("");
+    setConfirm(false);
+    if (item.issue) {
+      setError(item.issue);
+      return;
+    }
+    setBusy(true);
+    try {
+      const value = await desktop.invoke<HistoricalPage>(
+        "history:importedPage",
+        {
+          projectId,
+          pageId: item.pageId,
+          importId: item.importId,
+          snapshotId: item.id,
+        },
+      );
+      if (ticket === request.current) setPreview(value);
+    } catch (reason) {
+      if (ticket === request.current) setError(errorMessage(reason));
+    } finally {
+      if (ticket === request.current) setBusy(false);
+    }
+  }
+  async function restore() {
+    if (!selected || !preview || !(await beforeRestore())) return;
+    setBusy(true);
+    setError("");
+    try {
+      let baseRevision: string | null;
+      try {
+        baseRevision = (
+          await desktop.invoke<{ revision: string }>("pages:get", {
+            projectId,
+            pageId: selected.pageId,
+          })
+        ).revision;
+      } catch (reason) {
+        if (errorCode(reason) !== "NOT_FOUND") throw reason;
+        baseRevision = null;
+      }
+      await desktop.invoke("history:restoreImportedSnapshot", {
+        projectId,
+        pageId: selected.pageId,
+        importId: selected.importId,
+        snapshotId: selected.id,
+        baseRevision,
+      });
+      await onRestored();
+      onClose();
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Dialog
+      title="导入的旧快照"
+      onClose={onClose}
+      wide
+      className="history-dialog"
+    >
+      <p className="history-merge-summary">
+        这些快照来自旧内容库，原修改时间、作者和顺序均未知。恢复会生成一个新的完整修改记录。
+      </p>
+      {error && (
+        <p className="history-error" role="alert">
+          {error}。原始字节仍被保留。
+        </p>
+      )}
+      <div className="history-layout">
+        <aside className="history-timeline" aria-label="旧快照列表">
+          {items.map((item) => (
+            <button
+              key={`${item.importId}:${item.id}`}
+              className={selected?.id === item.id ? "selected" : ""}
+              onClick={() => void choose(item)}
+            >
+              <strong>旧快照 · {item.originalHash.slice(0, 10)}</strong>
+              <span className="history-time">
+                导入于 {time(item.importedAt)}
+              </span>
+              <small>
+                {item.issue ? "原始文件已保留，无法预览" : "可预览和恢复"}
+              </small>
+            </button>
+          ))}
+          {!items.length && !busy && (
+            <p className="history-empty">没有导入的旧快照。</p>
+          )}
+        </aside>
+        <main className="history-detail">
+          {busy && <Loader2 size={20} className="studio-spin" />}
+          {preview && (
+            <>
+              <header className="history-detail-heading">
+                <h3>{preview.document.title || "无标题"}</h3>
+                <button
+                  className="studio-button"
+                  disabled={busy}
+                  onClick={() => setConfirm(true)}
+                >
+                  <RotateCcw size={14} />
+                  恢复为新版本
+                </button>
+              </header>
+              {confirm && (
+                <div className="history-confirm">
+                  <p>恢复当前选中的旧内容，正式版本仍会保留在历史中。</p>
+                  <button
+                    className="studio-button primary"
+                    disabled={busy}
+                    onClick={() => void restore()}
+                  >
+                    确认恢复
+                  </button>
+                </div>
+              )}
+              <div className="history-preview">
+                <CustomComponentsProvider components={preview.components}>
+                  <SurfaceEditor
+                    document={preview.document}
+                    readOnly
+                    onChange={() => {}}
+                  />
+                </CustomComponentsProvider>
+              </div>
+            </>
+          )}
+          {selected && (
+            <details>
+              <summary>原始快照信息</summary>
+              <p>原修改来源：未知</p>
+              <p>原修改时间：未知</p>
+              <code>{selected.originalPath}</code>
+            </details>
+          )}
+          {!selected && !busy && (
+            <p className="history-empty">选择一份旧快照，查看其内容。</p>
           )}
         </main>
       </div>

@@ -266,17 +266,20 @@ export function usePage() {
           revision.current = recoveredSequence + 1;
           retained.current = restored.record;
           recoveredFrom.current = restored.record.recoverySource ?? null;
-          setMergeBase(restored.record.baseRevision ?? loaded.revision);
-          draftBase.current = restored.record.baseRevision ?? loaded.revision;
+          setMergeBase(restored.record.baseRevision);
+          draftBase.current = restored.record.baseRevision;
           const conflict =
             !!loaded.workspaceConflicts?.length ||
+            (!!loaded.revision && !restored.record.baseRevision) ||
             (!!restored.record.baseRevision &&
               restored.record.baseRevision !== loaded.revision);
           blocked.current = conflict;
           setStatus(conflict ? "conflict" : "changed");
           setError(
             conflict
-              ? "已恢复本机草稿，正式版本也有新修改。请比较并处理。"
+              ? !restored.record.baseRevision && loaded.revision
+                ? "这份旧库草稿缺少可靠的基础版本，已保留在本机。可以保留为副本，或载入正式版本。"
+                : "已恢复本机草稿，正式版本也有新修改。请比较并处理。"
               : "",
           );
           setDraftNotice("已恢复本机未提交的草稿");
@@ -340,14 +343,19 @@ export function usePage() {
       const conflict =
         !!conflictId ||
         !!record?.workspaceConflicts?.length ||
+        (!!baseRevision.current && !recovered.record.baseRevision) ||
         (!!recovered.record.baseRevision &&
           recovered.record.baseRevision !== baseRevision.current);
-      setMergeBase(recovered.record.baseRevision ?? baseRevision.current);
-      draftBase.current = recovered.record.baseRevision ?? baseRevision.current;
+      setMergeBase(recovered.record.baseRevision);
+      draftBase.current = recovered.record.baseRevision;
       blocked.current = conflict;
       setStatus(conflict ? "conflict" : "changed");
       setError(
-        conflict ? "已恢复本机草稿，正式版本也有新修改。请比较并处理。" : "",
+        conflict
+          ? !recovered.record.baseRevision && baseRevision.current
+            ? "这份旧库草稿缺少可靠的基础版本，已保留在本机。可以保留为副本，或载入正式版本。"
+            : "已恢复本机草稿，正式版本也有新修改。请比较并处理。"
+          : "",
       );
       setDraftNotice("已恢复选中的本机草稿");
       setAvailableDrafts((items) => items.filter((item) => item.id !== id));

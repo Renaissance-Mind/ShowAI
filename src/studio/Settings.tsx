@@ -121,6 +121,7 @@ export function SettingsPanel({
   onChooseHome,
   onCopyHome,
   onCopyConfig,
+  onMigrate,
 }: {
   section: SettingsSection;
   info: DesktopInfo | null;
@@ -129,6 +130,7 @@ export function SettingsPanel({
   onChooseHome: () => void;
   onCopyHome: () => void;
   onCopyConfig: () => void;
+  onMigrate: () => void;
 }) {
   const current = sections.find((item) => item.id === section)!;
   return (
@@ -172,6 +174,22 @@ export function SettingsPanel({
             </button>
           </div>
           <p className="settings-help">项目、页面和快照保存在这个文件夹中。</p>
+          <div className="settings-row">
+            <div className="settings-row-text">
+              <h3>修改历史</h3>
+              <p>
+                {info?.libraryVersion === 2
+                  ? "已启用版本历史、全文搜索和恢复。"
+                  : "导入现有内容，保留原始文件并启用完整修改记录。"}
+              </p>
+            </div>
+            {info?.libraryVersion === 1 && (
+              <button className="settings-button" onClick={onMigrate}>
+                启用版本历史
+                <ChevronRight size={14} />
+              </button>
+            )}
+          </div>
         </section>
       )}
 

@@ -15,6 +15,8 @@ export interface ChangeContext {
   restoredFrom?: string;
   mergedFrom?: string;
   externalConflictId?: string;
+  /** A legacy content snapshot is not a chronological Git revision. */
+  restoredSnapshot?: { importId: string; snapshotId: string };
   /** Generated from validated API arguments before server dates/IDs are allocated. */
   requestFingerprint?: string;
 }

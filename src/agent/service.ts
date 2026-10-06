@@ -950,6 +950,35 @@ export class AgentService {
   async historicalResource(path: string, revision: string) {
     return this.versioned().describePath(path, revision);
   }
+  importedSnapshots(projectId: string, pageId?: string) {
+    return this.versioned().importedSnapshots(
+      this.requireProject(projectId),
+      pageId,
+    );
+  }
+  importedPage(
+    projectId: string,
+    pageId: string,
+    ref: { importId: string; snapshotId: string },
+  ) {
+    return this.versioned().importedPage(
+      this.requireProject(projectId),
+      pageId,
+      ref,
+    );
+  }
+  restoreImportedSnapshot(input: {
+    projectId: string;
+    pageId: string;
+    importId: string;
+    snapshotId: string;
+    baseRevision: string | null;
+  }) {
+    this.requireProject(input.projectId);
+    return this.mutation("Restore imported snapshot", [input], () =>
+      this.versioned().restoreImportedSnapshot(input),
+    );
+  }
   history(input: HistoryQuery = {}) {
     return this.versioned().history(input);
   }

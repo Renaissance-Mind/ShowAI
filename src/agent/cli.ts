@@ -6,6 +6,7 @@ import { withChangeContext } from "../core/history-context";
 import { mutateLibrary } from "../core/library-runtime";
 import { canonicalJson } from "../core/diff";
 import { GitLibrary } from "../core/git-library";
+import { LibraryImport } from "../core/library-import";
 import type { ChangeContext } from "../core/history-model";
 import { AgentService, errorResult } from "./service";
 import type {
@@ -58,6 +59,13 @@ Read one Page through structured data, an image or interactive HTML:
   pages read PAGE --project PROJECT --view html [--state reading-state.json] --out preview.html
 
 Versioned libraries: library init | verify | compact
+  library import --source OLD_PATH --home NEW_OR_SAME_PATH
+  library activate IMPORT_ID --home PATH
+  library migrate --home PATH (prepare, verify and activate in place; retain originals)
+  library imports --home PATH
+  history imported --project ID [--page ID]
+  history snapshot PAGE --project ID --import IMPORT_ID --snapshot SNAPSHOT_ID
+  history restore-snapshot PAGE --project ID --import IMPORT_ID --snapshot SNAPSHOT_ID --base-revision CURRENT_REVISION
   search --query TEXT [--project ID] [--kind page|component|template|project|source]
   history list [--project ID] [--page ID] [--session SESSION_ID]
   history read PAGE --project ID --revision REVISION
@@ -81,6 +89,9 @@ function parseArguments(args: string[]): Arguments {
   const booleans = new Set(["json", "help", "overwrite", "no-open", "draft"]);
   const strings = new Set([
     "home",
+    "source",
+    "import",
+    "snapshot",
     "port",
     "project",
     "name",
@@ -334,6 +345,24 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
     );
   switch (command) {
     case "library": {
+      const importer = new LibraryImport(service.store.root);
+      if (action === "import") {
+        requireCount(args, 2);
+        return importer.prepare(option(args, "source") ?? service.store.root);
+      }
+      if (action === "imports") {
+        requireCount(args, 2);
+        return importer.list();
+      }
+      if (action === "activate") {
+        requireCount(args, 3);
+        return importer.activate(args.positional[2]);
+      }
+      if (action === "migrate") {
+        requireCount(args, 2);
+        const report = await importer.prepare(service.store.root);
+        return importer.activate(report.id);
+      }
       if (action === "init") {
         requireCount(args, 2);
         return new GitLibrary(service.store.root).initialize();
@@ -363,6 +392,26 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
       });
     }
     case "history": {
+      if (action === "imported") {
+        requireCount(args, 2);
+        return service.importedSnapshots(await project(), option(args, "page"));
+      }
+      if (action === "snapshot" || action === "restore-snapshot") {
+        requireCount(args, 3);
+        const input = {
+          projectId: await project(),
+          pageId: args.positional[2],
+          importId: option(args, "import", true)!,
+          snapshotId: option(args, "snapshot", true)!,
+        };
+        if (action === "snapshot")
+          return service.importedPage(input.projectId, input.pageId, input);
+        const baseRevision = option(args, "base-revision", true)!;
+        return service.restoreImportedSnapshot({
+          ...input,
+          baseRevision: baseRevision === "absent" ? null : baseRevision,
+        });
+      }
       if (action === "list") {
         requireCount(args, 2);
         return service.history({
@@ -875,6 +924,7 @@ export async function runCli(argv: string[]): Promise<unknown> {
     (command === "publish" && ["verify", "register"].includes(action)) ||
     (command === "history" &&
       (action === "restore" ||
+        action === "restore-snapshot" ||
         (action === "merge" && !!option(args, "revision"))));
   if (!mutation || args.options.help)
     return withChangeContext(context, () => runCliCommand(argv));

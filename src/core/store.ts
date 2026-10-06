@@ -20,7 +20,7 @@ import {
   resolve,
   sep,
 } from "node:path";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { parseArtifact, serializeArtifact } from "../portable/validation.mjs";
 import {
   applyOperations,
@@ -358,97 +358,11 @@ export class FileStore {
     }
   }
 
-  private async withLock<T>(key: string, action: () => Promise<T>): Promise<T> {
-    if (versionedLibrary(this.root)) return mutateLibrary(this.root, action);
-    const directory = join(this.root, ".locks");
-    await this.ensureDirectory(directory);
-    const lockName =
-      key.length < 180 ? key : createHash("sha256").update(key).digest("hex");
-    const lock = join(directory, `${lockName}.lock`);
-    const owner = { pid: process.pid, token: randomUUID() };
-    const deadline = Date.now() + 5000;
-    while (true) {
-      await this.safePath(lock);
-      try {
-        await mkdir(lock, { mode: 0o700 });
-        break;
-      } catch (error) {
-        if (!errno(error, "EEXIST")) throw error;
-        // Only a verified dead process permits recovering a lock after a crash.
-        let stale = false;
-        try {
-          const existing = JSON.parse(
-            await readFile(join(lock, "owner.json"), "utf8"),
-          ) as { pid?: number };
-          if (Number.isInteger(existing.pid) && existing.pid! > 0) {
-            try {
-              process.kill(existing.pid!, 0);
-            } catch (probe) {
-              if (errno(probe, "ESRCH")) stale = true;
-              else if (!errno(probe, "EPERM")) throw probe;
-            }
-          }
-        } catch (probe) {
-          if (!errno(probe, "ENOENT") && !(probe instanceof SyntaxError))
-            throw probe;
-        }
-        if (stale) {
-          // Serialise recovery too: a second observer must not remove a new writer's lock.
-          const recovery = `${lock}.recovery`;
-          let acquired = false;
-          try {
-            await mkdir(recovery, { mode: 0o700 });
-            acquired = true;
-          } catch (probe) {
-            if (!errno(probe, "EEXIST")) throw probe;
-          }
-          if (acquired) {
-            try {
-              let existing: { pid?: number } | undefined;
-              try {
-                existing = JSON.parse(
-                  await readFile(join(lock, "owner.json"), "utf8"),
-                ) as { pid?: number };
-              } catch (probe) {
-                if (!errno(probe, "ENOENT") && !(probe instanceof SyntaxError))
-                  throw probe;
-              }
-              if (Number.isInteger(existing?.pid) && existing!.pid! > 0) {
-                let stillDead = false;
-                try {
-                  process.kill(existing!.pid!, 0);
-                } catch (probe) {
-                  if (errno(probe, "ESRCH")) stillDead = true;
-                  else if (!errno(probe, "EPERM")) throw probe;
-                }
-                if (stillDead) await rm(lock, { recursive: true, force: true });
-              }
-            } finally {
-              await rm(recovery, { recursive: true, force: true });
-            }
-          }
-          if (Date.now() >= deadline)
-            throw new CoreError(
-              "LOCKED",
-              `Could not recover the writer lock for ${key}.`,
-            );
-          await new Promise((done) => setTimeout(done, 20));
-          continue;
-        }
-        if (Date.now() >= deadline)
-          throw new CoreError(
-            "LOCKED",
-            `Another writer holds ${key}. Retry after it finishes.`,
-          );
-        await new Promise((done) => setTimeout(done, 20));
-      }
-    }
-    try {
-      await this.atomicWrite(join(lock, "owner.json"), JSON.stringify(owner));
-      return await action();
-    } finally {
-      await rm(lock, { recursive: true, force: true });
-    }
+  private async withLock<T>(
+    _key: string,
+    action: () => Promise<T>,
+  ): Promise<T> {
+    return mutateLibrary(this.root, action);
   }
 
   private async contentNames(
@@ -1078,7 +992,10 @@ export class FileStore {
   ): Promise<PageRecord> {
     await this.readProject(projectId);
     const record = await this.readRecord(projectId, pageId);
-    if (options.checkpoint !== false) await this.checkpoint(projectId, record);
+    if (options.checkpoint !== false && !versionedLibrary(this.root))
+      await this.withLock("checkpoint", () =>
+        this.checkpoint(projectId, record),
+      );
     return record;
   }
 

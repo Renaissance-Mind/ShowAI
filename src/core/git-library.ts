@@ -77,7 +77,7 @@ function assertPath(path: string): string {
     path.includes("\\") ||
     /[\x00-\x1f]/.test(path) ||
     path.split("/").some((part) => !part || part === "." || part === "..") ||
-    !/^(projects\/|packages\/|assets\/|publications\/|sidebar\.json$)/.test(
+    !/^(projects\/|packages\/|assets\/|publications\/|imports\/|sidebar\.json$)/.test(
       path,
     )
   )
@@ -210,7 +210,7 @@ export class GitLibrary {
         await this.recoverUnlocked();
         return this.manifest();
       }
-      for (const name of ["projects", "packages"]) {
+      for (const name of ["projects", "packages", "publications"]) {
         const entries = await readdir(join(this.root, name)).catch(
           (error: NodeJS.ErrnoException) => {
             if (error.code === "ENOENT") return [];
@@ -223,6 +223,11 @@ export class GitLibrary {
             "This directory contains an existing file library. Import it into a new versioned library instead of initializing over it.",
           );
       }
+      if (await readLibraryBytes(this.root, join(this.root, "sidebar.json")))
+        throw new CoreError(
+          "CONFLICT",
+          "Import the existing sidebar into a versioned library before activation.",
+        );
       const result = await gitExec(
         ["init", "--bare", "--quiet", this.repository],
         this.root,
@@ -526,7 +531,7 @@ export class GitLibrary {
         expected: new Map<string, string | null>(),
         origins: {} as Pick<
           ChangeContext,
-          "restoredFrom" | "mergedFrom" | "externalConflictId"
+          "restoredFrom" | "mergedFrom" | "externalConflictId" | "restoredSnapshot"
         >,
       };
       let value: T;

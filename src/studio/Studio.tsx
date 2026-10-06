@@ -87,8 +87,10 @@ import {
   SearchDialog,
   MergeDialog,
   ExternalConflictDialog,
+  ImportedSnapshotsDialog,
 } from "./HistoryDialogs";
 import type { SearchResult } from "../core/library-index";
+import LibraryMigrationDialog from "./LibraryMigrationDialog";
 import {
   SettingsNavigation,
   SettingsPanel,
@@ -106,6 +108,8 @@ type LoadedTemplate = TemplateRecord & {
   previewDocument?: ShowDocument;
 };
 type DialogState =
+  | { type: "migration" }
+  | { type: "importedSnapshots"; projectId: string; pageId?: string }
   | { type: "history"; projectId: string; pageId?: string }
   | { type: "search" }
   | {
@@ -1336,6 +1340,7 @@ export default function Studio() {
                 info={info}
                 dark={dark}
                 onDarkChange={setDark}
+                onMigrate={() => setDialog({ type: "migration" })}
                 onChooseHome={action(async () => {
                   if (!(await page.flush())) return;
                   const next = await desktop.invoke<DesktopInfo | null>(
@@ -2164,10 +2169,43 @@ export default function Studio() {
             {...dialog}
             onClose={closeDialog}
             beforeRestore={page.flush}
+            onImportedSnapshots={() =>
+              setDialog({
+                type: "importedSnapshots",
+                projectId: dialog.projectId,
+                pageId: dialog.pageId,
+              })
+            }
             onRestored={async () => {
               await page.reload();
               await refresh();
               setNotice("历史版本已恢复，原版本保留在历史中");
+            }}
+          />
+        )}
+        {dialog?.type === "importedSnapshots" && (
+          <ImportedSnapshotsDialog
+            {...dialog}
+            onClose={closeDialog}
+            beforeRestore={page.flush}
+            onRestored={async () => {
+              await page.reload();
+              await refresh();
+              setNotice("旧快照已恢复为新版本，原修改来源仍标记为未知");
+            }}
+          />
+        )}
+        {dialog?.type === "migration" && info && (
+          <LibraryMigrationDialog
+            home={info.home}
+            beforePrepare={page.flush}
+            onClose={closeDialog}
+            onActivated={async () => {
+              setInfo(await desktop.invoke<DesktopInfo>("app:info"));
+              await page.reload();
+              await refresh();
+              await loadCatalog();
+              setNotice("版本历史已启用，原始文件和旧快照已保留");
             }}
           />
         )}

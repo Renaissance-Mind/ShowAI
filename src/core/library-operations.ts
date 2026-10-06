@@ -25,6 +25,7 @@ import type {
   PackageRevisionRef,
   TemplateRecord,
 } from "../components/custom/types";
+import type { LibraryImportReport } from "./library-import";
 
 export interface HistoryQuery {
   projectId?: string;
@@ -290,22 +291,26 @@ export class LibraryOperations {
     projectId: string;
     pageId: string;
     revision: string;
-    baseRevision: string;
+    baseRevision: string | null;
+    importedSnapshot?: { importId: string; snapshotId: string };
   }): Promise<PageRecord> {
     const path = this.pagePath(input.projectId, input.pageId),
-      historical = await this.pageAt(
-        input.projectId,
-        input.pageId,
-        input.revision,
-      );
+      historical = input.importedSnapshot
+        ? await this.importedPage(
+            input.projectId,
+            input.pageId,
+            input.importedSnapshot,
+          )
+        : await this.pageAt(input.projectId, input.pageId, input.revision);
     const closure = await this.dependencies(
       historical.document,
       input.projectId,
-      input.revision,
+      historical.sourceRevision,
     );
     const context = {
       ...changeContext(),
-      restoredFrom: input.revision,
+      restoredFrom: historical.sourceRevision,
+      restoredSnapshot: input.importedSnapshot,
       message: changeContext().message ?? "Restore page version",
     };
     return withChangeContext(context, () =>
@@ -344,6 +349,121 @@ export class LibraryOperations {
         context,
       ),
     );
+  }
+
+  async importedSnapshots(projectId: string, pageId?: string) {
+    this.project(projectId);
+    assertId(projectId);
+    if (pageId) assertId(pageId);
+    const head = await this.library.head();
+    if (!head) return [];
+    const manifests = (await this.library.tree(head)).filter((entry) =>
+      /^imports\/[a-f0-9-]{36}\/manifest\.json$/.test(entry.path),
+    );
+    const result = [];
+    for (const entry of manifests) {
+      const descriptor = JSON.parse(
+        (await this.library.readFile(entry.path, head)).toString("utf8"),
+      ) as Omit<LibraryImportReport, "revision">;
+      if (
+        descriptor.format !== "showai-library-import" ||
+        descriptor.version !== 1 ||
+        !Array.isArray(descriptor.snapshots)
+      )
+        throw new CoreError(
+          "INVALID_DATA",
+          "Invalid imported snapshot manifest.",
+        );
+      const sourceRevision = await this.library.resourceRevision(
+        entry.path,
+        head,
+      );
+      for (const snapshot of descriptor.snapshots)
+        if (
+          snapshot.projectId === projectId &&
+          (!pageId || snapshot.pageId === pageId)
+        )
+          result.push({
+            ...snapshot,
+            importId: descriptor.id,
+            importedAt: descriptor.preparedAt,
+            sourceRevision: sourceRevision!,
+          });
+    }
+    return result;
+  }
+  async importedPage(
+    projectId: string,
+    pageId: string,
+    ref: { importId: string; snapshotId: string },
+  ): Promise<HistoricalPage> {
+    const snapshot = (await this.importedSnapshots(projectId, pageId)).find(
+      (item) => item.importId === ref.importId && item.id === ref.snapshotId,
+    );
+    if (!snapshot)
+      throw new CoreError(
+        "NOT_FOUND",
+        "Imported page snapshot not found in this project.",
+      );
+    if (snapshot.issue || !snapshot.path)
+      throw new CoreError(
+        "INVALID_DATA",
+        `This old snapshot is retained as original bytes but cannot be rendered: ${snapshot.issue ?? "missing content"}`,
+      );
+    const path = `imports/${ref.importId}/snapshots/${ref.snapshotId}.json`;
+    if (snapshot.path !== path || !/^[a-f0-9]{64}$/.test(ref.snapshotId))
+      throw new CoreError("INVALID_DATA", "Invalid imported snapshot path.");
+    const document = normalizeDocument(
+      parseArtifact(
+        JSON.parse(
+          (await this.library.readFile(path, snapshot.sourceRevision)).toString(
+            "utf8",
+          ),
+        ),
+      ).document,
+    );
+    if (
+      document.id !== pageId ||
+      documentHash(document) !== snapshot.contentHash
+    )
+      throw new CoreError(
+        "INVALID_DATA",
+        "Imported page content differs from its manifest.",
+      );
+    const closure = await this.dependencies(
+      document,
+      projectId,
+      snapshot.sourceRevision,
+    );
+    return {
+      document,
+      components: closure.components,
+      hash: documentHash(document),
+      path: join(this.library.workspace, path),
+      revision: snapshot.sourceRevision,
+      sourceRevision: snapshot.sourceRevision,
+    };
+  }
+  async restoreImportedSnapshot(input: {
+    projectId: string;
+    pageId: string;
+    importId: string;
+    snapshotId: string;
+    baseRevision: string | null;
+  }) {
+    const snapshot = await this.importedPage(
+      input.projectId,
+      input.pageId,
+      input,
+    );
+    return this.restorePage({
+      ...input,
+      revision: snapshot.sourceRevision,
+      importedSnapshot: {
+        importId: input.importId,
+        snapshotId: input.snapshotId,
+      },
+    });
   }
 
   async previewMerge(input: {

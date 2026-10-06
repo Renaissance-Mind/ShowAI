@@ -1,7 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { GitLibrary } from "./git-library";
-import { changeContext, libraryMutations } from "./history-context";
+import {
+  changeContext,
+  libraryMutations,
+  legacyMutations,
+} from "./history-context";
+import { withLibraryLock } from "./library-lock";
 import { CoreError } from "./model";
 import type { ChangeContext, FileChanges } from "./history-model";
 
@@ -25,7 +30,7 @@ export function logicalPath(home: string, path: string): string | undefined {
   if (isAbsolute(local) || local === ".." || local.startsWith(`..${sep}`))
     return undefined;
   const name = local.split(sep).join("/");
-  return /^(projects\/|packages\/|assets\/|publications\/|sidebar\.json$)/.test(
+  return /^(projects\/|packages\/|assets\/|publications\/|imports\/|sidebar\.json$)/.test(
     name,
   )
     ? name
@@ -38,11 +43,25 @@ export async function mutateLibrary<T>(
   context: ChangeContext = changeContext(),
 ): Promise<T> {
   const library = versionedLibrary(home);
-  if (!library) return action();
+  if (!library) {
+    const root = resolve(home);
+    if (legacyMutations.getStore() === root) return action();
+    const result = await withLibraryLock(root, async () => {
+      // Activation may have completed while this writer waited for its lease.
+      if (versionedLibrary(root)) return { migrated: true as const };
+      return {
+        migrated: false as const,
+        value: await legacyMutations.run(root, action),
+      };
+    });
+    return result.migrated
+      ? mutateLibrary(root, action, context)
+      : result.value;
+  }
   const state = libraryMutations.getStore();
   if (state?.root === library.root) {
     const origins = Object.fromEntries(
-      ["restoredFrom", "mergedFrom", "externalConflictId"]
+      ["restoredFrom", "mergedFrom", "externalConflictId", "restoredSnapshot"]
         .filter((key) => context[key as keyof ChangeContext] !== undefined)
         .map((key) => [key, context[key as keyof ChangeContext]]),
     );

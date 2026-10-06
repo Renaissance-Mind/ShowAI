@@ -266,6 +266,38 @@
   font-size: 20px;
   margin: 0;
 }
+.history-import-path {
+  display: block;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+.history-import-ready {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--action);
+}
+.history-import-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.history-import-counts dt {
+  font-size: 12px;
+  color: var(--muted);
+}
+.history-import-counts dd {
+  margin: 8px 0 0;
+  font-size: 23px;
+}
+.history-import-issue {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
 .history-preview .surface-editor {
   min-height: 360px;
 }

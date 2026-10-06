@@ -602,6 +602,52 @@ export function createMcpServer(options: {
       }),
   );
   server.registerTool(
+    "history_imported_snapshots",
+    {
+      description:
+        "List separately imported old checkpoints. Original edit times, actors and ordering are unknown.",
+      inputSchema: { pageId: z.string().optional() },
+      annotations: readOnly,
+    },
+    ({ pageId }) => call(() => service.importedSnapshots(projectId, pageId)),
+  );
+  server.registerTool(
+    "history_imported_page",
+    {
+      description:
+        "Read a retained old checkpoint and its verified dependencies without assigning a fabricated history order.",
+      inputSchema: {
+        pageId: z.string(),
+        importId: z.string(),
+        snapshotId: z.string(),
+      },
+      annotations: readOnly,
+    },
+    ({ pageId, ...ref }) =>
+      call(() => service.importedPage(projectId, pageId, ref)),
+  );
+  server.registerTool(
+    "history_restore_imported_snapshot",
+    {
+      description:
+        "Restore a reviewed old checkpoint as a new attributed commit while preserving its unknown original provenance.",
+      inputSchema: {
+        ...changeSchema,
+        pageId: z.string(),
+        importId: z.string(),
+        snapshotId: z.string(),
+        baseRevision: z.string().nullable(),
+      },
+      annotations: write,
+    },
+    ({ operationId, message, groupId, ...input }) =>
+      call(() => service.restoreImportedSnapshot({ ...input, projectId }), {
+        operationId,
+        message,
+        groupId,
+      }),
+  );
+  server.registerTool(
     "page_merge_preview",
     {
       description:

@@ -12,6 +12,7 @@ import { mutateLibrary, versionedLibrary } from "../core/library-runtime";
 import { canonicalJson } from "../core/diff";
 import type { ChangeActor } from "../core/history-model";
 import { EditorDrafts, type EditorDraftInput } from "../core/editor-drafts";
+import { LibraryImport } from "../core/library-import";
 import { AgentService } from "../agent/service";
 import { assertExportDestination, exportPage } from "../agent/exporter";
 import { assertId, CoreError, FileStore } from "../core/store";
@@ -59,6 +60,12 @@ import type { DesktopInfo } from "../desktop/bridge";
 
 export const workbenchActions = new Set([
   "app:info",
+  "library:prepareImport",
+  "library:activateImport",
+  "library:imports",
+  "history:importedSnapshots",
+  "history:importedPage",
+  "history:restoreImportedSnapshot",
   "history:list",
   "history:compare",
   "history:page",
@@ -296,6 +303,38 @@ export function createWorkbench(
     args: Record<string, unknown>,
   ): Promise<unknown> {
     switch (action) {
+      case "library:prepareImport":
+        return new LibraryImport(store.root).prepare(
+          text(args, "source", true) ?? store.root,
+        );
+      case "library:activateImport":
+        return new LibraryImport(store.root).activate(required(args, "id"));
+      case "library:imports":
+        return new LibraryImport(store.root).list();
+      case "history:importedSnapshots":
+        return service.importedSnapshots(
+          projectId(args),
+          text(args, "pageId", true),
+        );
+      case "history:importedPage":
+        return service.importedPage(projectId(args), pageId(args), {
+          importId: required(args, "importId"),
+          snapshotId: required(args, "snapshotId"),
+        });
+      case "history:restoreImportedSnapshot":
+        return enrichPage(
+          projectId(args),
+          await service.restoreImportedSnapshot({
+            projectId: projectId(args),
+            pageId: pageId(args),
+            importId: required(args, "importId"),
+            snapshotId: required(args, "snapshotId"),
+            baseRevision:
+              args.baseRevision === null
+                ? null
+                : required(args, "baseRevision"),
+          }),
+        );
       case "app:info":
         return {
           ...(await host.info()),
@@ -1013,6 +1052,9 @@ export function createWorkbench(
     }
   }
   const mutationActions = new Set([
+    "library:prepareImport",
+    "library:activateImport",
+    "history:restoreImportedSnapshot",
     "history:restore",
     "history:mergeSave",
     "history:resolve",
@@ -1046,7 +1088,12 @@ export function createWorkbench(
     "catalog:mergeSave",
     "catalog:verifyPublish",
   ]);
-  const dialogActions = new Set(["components:import", "history:resolve"]);
+  const dialogActions = new Set([
+    "components:import",
+    "history:resolve",
+    "library:prepareImport",
+    "library:activateImport",
+  ]);
   return (action: string, args: Record<string, unknown>): Promise<unknown> => {
     if (!mutationActions.has(action)) return handle(action, args);
     const supplied = args.historyContext as
