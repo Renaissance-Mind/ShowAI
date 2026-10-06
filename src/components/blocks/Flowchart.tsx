@@ -239,6 +239,7 @@ function FlowCanvas({
       aria-label={flow.label}
     >
       <ReactFlow
+        proOptions={{ hideAttribution: true }}
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
