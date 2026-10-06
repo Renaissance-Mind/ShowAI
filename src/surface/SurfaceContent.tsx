@@ -99,6 +99,7 @@ const ContentNode = memo(
     spatial?: boolean;
     renderSurface?: (node: JSONContent) => ReactNode;
   }) {
+    const actions = useContext(ObjectContext);
     const id = node.attrs!.id,
       frame = document.layout?.[id];
     let body: ReactNode;
@@ -122,7 +123,11 @@ const ContentNode = memo(
             else groups.push([child]);
           }
         }
-        if (!groups.length) groups.push([]);
+        if (
+          !groups.length ||
+          (!actions.readOnly && !Array.isArray(groups.at(-1)))
+        )
+          groups.push([]);
         body = (
           <div className="surface-layout-flow">
             {groups.map((group, index) =>
@@ -235,14 +240,14 @@ const ContentNode = memo(
 function AddToRegion({ id }: { id: string }) {
   const actions = useContext(ObjectContext);
   return actions.readOnly ? null : (
-    <button
-      type="button"
-      className="surface-add-to-region"
-      data-surface-ui
-      onClick={() => actions.addComponent?.(id)}
+    <div
+      tabIndex={0}
+      className="surface-empty-region"
+      data-component-container={id}
+      aria-label="空白区域"
     >
-      ＋ 添加组件
-    </button>
+      按 / 插入内容
+    </div>
   );
 }
 
@@ -259,6 +264,7 @@ export function SurfaceContent({
   container?: JSONContent;
   renderSurface?: (node: JSONContent) => ReactNode;
 }) {
+  const actions = useContext(ObjectContext);
   if (
     isResource(document) &&
     container.type === "surface" &&
@@ -276,7 +282,8 @@ export function SurfaceContent({
         else groups.push([node]);
       }
     }
-    if (!groups.length) groups.push([]);
+    if (!groups.length || (!actions.readOnly && !Array.isArray(groups.at(-1))))
+      groups.push([]);
     return (
       <div className="surface-layout-flow">
         {groups.map((group, index) =>

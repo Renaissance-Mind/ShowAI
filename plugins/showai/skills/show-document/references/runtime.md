@@ -4,7 +4,7 @@ ShowAI 软件提供 CLI、阅读器、组件编译器和运行依赖；插件只
 
 本会话已验证的启动配置可以直接复用。首次使用按以下顺序定位：用户提供的启动配置；`SHOWAI_HOME` 指向目录内的 `agent-runtime.json`；默认 `~/.showai/agent-runtime.json`。该文件由软件的 `runtime register` 命令或桌面启动登记，包含 `launch.command`、`launch.args`、`launch.env` 和内容目录。按参数数组调用命令，追加本次 CLI 参数，保留环境变量；不要把配置字符串当 shell 代码执行。
 
-用这个入口执行 `runtime info --json`，确认 protocol 为 1、版本至少为 0.7.1，并保留返回的 home 与 guideTopics。桌面程序通过自带运行时启动 CLI；外部 Node 运行方式要求 Node.js 22.12+。配置缺失时，使用桌面“设置 → 连接 Agent”提供的启动配置；缺少可执行软件或版本不匹配时说明实际缺项，不从插件目录猜测程序位置。
+用这个入口执行 `runtime info --json`，确认 protocol 为 1、版本至少为 0.7.2，并保留返回的 home 与 guideTopics。桌面程序通过自带运行时启动 CLI；外部 Node 运行方式要求 Node.js 22.12+。配置缺失时，使用桌面“设置 → 连接 Agent”提供的启动配置；缺少可执行软件或版本不匹配时说明实际缺项，不从插件目录猜测程序位置。
 
 需要确认按页打包时检查 `readerCompilation.mode`：`page-dependencies` 表示运行包已携带阅读器源码档案，可在导出时按本页组件编译；`prebuilt` 或缺少该字段表示仍使用预构建阅读器。仅更新 skills 不会升级运行程序。
 

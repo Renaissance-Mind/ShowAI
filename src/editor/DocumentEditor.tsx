@@ -1,5 +1,15 @@
 import {
+  useComponentCatalog,
+  RegisterComponentContext,
+} from "../components/useComponentCatalog";
+import type { CatalogComponent } from "../core/component-categories";
+import {
+  splitForComponent,
+  type TextInsertionPoint,
+} from "./component-insertion";
+import {
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -18,7 +28,6 @@ import {
   AlignRight,
   ArrowDown,
   ArrowUp,
-  BarChart3,
   Bold,
   Check,
   CheckSquare,
@@ -55,10 +64,6 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import {
-  createBlockData,
-  blockDefinitions,
-} from "../components/blocks/registry";
 import { TableControls } from "./TableControls";
 import { createExtensions } from "./extensions";
 import "./editor.css";
@@ -69,7 +74,11 @@ export interface DocumentEditorProps {
   readOnly?: boolean;
   minimal?: boolean;
   onEditorReady?: (editor: Editor) => void;
-  onBrowseComponents?: () => void;
+  onInsertNative?: (
+    kind: string,
+    data: Record<string, unknown>,
+    point: TextInsertionPoint,
+  ) => void;
   onDetachBlock?: (node: JSONContent) => void;
 }
 
@@ -81,6 +90,7 @@ interface MenuItem {
   icon: ReactNode;
   group: string;
   run: (editor: Editor) => void;
+  component?: CatalogComponent;
 }
 
 interface SlashState {
@@ -155,7 +165,7 @@ export default function DocumentEditor({
   readOnly = false,
   minimal = true,
   onEditorReady,
-  onBrowseComponents,
+  onInsertNative,
   onDetachBlock,
 }: DocumentEditorProps) {
   const latestOnChange = useRef(onChange);
@@ -170,6 +180,16 @@ export default function DocumentEditor({
   const selectedRef = useRef(0);
   const dragPosition = useRef<number | null>(null);
   const [slash, setSlash] = useState<SlashState | null>(null);
+  const catalog = useComponentCatalog(!!slash);
+  const registerComponent = useContext(RegisterComponentContext);
+  const [inserting, setInserting] = useState(false);
+  const insertionTicket = useRef(0);
+  useEffect(
+    () => () => {
+      insertionTicket.current++;
+    },
+    [],
+  );
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [hover, setHover] = useState<HoverBlock | null>(null);
   const [blockMenu, setBlockMenu] = useState(false);
@@ -763,47 +783,26 @@ export default function DocumentEditor({
             .run();
         },
       },
-      ...blockDefinitions
-        .filter((block) => block.kind !== "custom")
-        .map((block) => ({
-          id: block.kind,
-          title: block.title,
-          description: block.description,
-          keywords: `${block.kind} ${block.title} ${block.description}`,
-          icon:
-            block.kind === "chart" ? (
-              <BarChart3 size={20} />
-            ) : block.kind === "database" ? (
-              <Table2 size={20} />
-            ) : (
-              <PanelTop size={20} />
-            ),
-          group: "交互组件",
-          run: (e: Editor) => {
-            e.chain()
-              .focus()
-              .insertContent({
-                type: "widget",
-                attrs: { kind: block.kind, data: createBlockData(block.kind) },
-              })
-              .run();
-          },
+      ...catalog.items
+        .filter(
+          (item) => !("kind" in item && item.insertion) || !!onInsertNative,
+        )
+        .map((item) => ({
+          id:
+            "catalog:" +
+            ("kind" in item
+              ? item.kind
+              : `${item.id}@${item.version}#${item.integrity}`),
+          title: item.name,
+          description: item.description,
+          keywords: `${"kind" in item ? item.kind : item.id} ${item.description}`,
+          icon: <PanelTop size={20} />,
+          group: "组件",
+          component: item,
+          run: () => {},
         })),
-      ...(onBrowseComponents
-        ? [
-            {
-              id: "custom-library",
-              title: "组件库",
-              description: "选择 Page、Board 或其他组件",
-              keywords: "page board custom component 页面 白板 自定义 组件",
-              icon: <PanelTop size={20} />,
-              group: "交互组件",
-              run: onBrowseComponents,
-            },
-          ]
-        : []),
     ],
-    [openDialog, onBrowseComponents],
+    [openDialog, onInsertNative, catalog.items],
   );
   const filteredItems = items.filter((item) =>
     `${item.title} ${item.keywords}`
@@ -812,10 +811,46 @@ export default function DocumentEditor({
   );
   itemsRef.current = filteredItems;
 
-  const runItem = (index: number) => {
+  const runItem = async (index: number) => {
     const state = menuRef.current;
     const item = itemsRef.current[index];
-    if (!editor || !state || !item) return;
+    if (!editor || !state || !item || inserting) return;
+    if (item.component) {
+      const before = editor.state.doc;
+      const ticket = ++insertionTicket.current;
+      setInserting(true);
+      try {
+        const value = await catalog.resolve(item.component);
+        if (ticket !== insertionTicket.current || editor.isDestroyed) return;
+        if (menuRef.current !== state || !editor.state.doc.eq(before)) return;
+        setSlash(null);
+        menuRef.current = null;
+        if (value.component) registerComponent(value.component);
+        if (value.native && onInsertNative) {
+          const transaction = editor.state.tr.delete(state.from, state.to);
+          onInsertNative(
+            value.kind,
+            value.data,
+            splitForComponent(transaction.doc, state.from),
+          );
+        } else {
+          editor
+            .chain()
+            .focus()
+            .deleteRange({ from: state.from, to: state.to })
+            .insertContent({
+              type: "widget",
+              attrs: { kind: value.kind, data: value.data },
+            })
+            .run();
+        }
+      } catch (reason) {
+        setNotice((reason as Error).message);
+      } finally {
+        if (ticket === insertionTicket.current) setInserting(false);
+      }
+      return;
+    }
     setSlash(null);
     menuRef.current = null;
     if (state.from !== state.to)
@@ -1554,7 +1589,13 @@ export default function DocumentEditor({
                 className="slash-items"
                 role="listbox"
                 aria-label="内容块类型"
+                aria-busy={inserting || catalog.loading}
               >
+                {catalog.error && (
+                  <p role="alert" className="slash-empty">
+                    {catalog.error}
+                  </p>
+                )}
                 {filteredItems.length === 0 && (
                   <div className="slash-empty">没有找到相关内容块</div>
                 )}
@@ -1566,6 +1607,7 @@ export default function DocumentEditor({
                     )}
                     <button
                       role="option"
+                      disabled={inserting}
                       aria-selected={index === selectedIndex}
                       className={`slash-item${index === selectedIndex ? " is-selected" : ""}`}
                       onMouseEnter={() => setSelectedIndex(index)}

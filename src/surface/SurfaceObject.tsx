@@ -17,7 +17,6 @@ export interface ObjectActions {
   select: (id: string | null) => void;
   inspect?: (id: string) => void;
   expand?: (id: string) => void;
-  addComponent?: (id: string) => void;
   remove?: (id: string) => void;
   move?: (id: string, frame: NodeLayout) => void;
   readOnly: boolean;

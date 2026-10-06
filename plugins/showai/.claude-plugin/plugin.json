@@ -1,6 +1,6 @@
 {
   "name": "showai",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Skills for creating ShowAI pages, reusable components and templates through an independently installed ShowAI runtime.",
   "skills": "./skills/"
 }

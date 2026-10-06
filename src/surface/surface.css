@@ -433,10 +433,10 @@
     grid-template-columns: 1fr !important;
   }
 }
-.surface-add-to-region {
+.surface-empty-region {
   min-height: 88px;
   width: 100%;
-  border: 1px dashed var(--line, var(--border));
+  padding: 18px;
   color: var(--muted);
   border-radius: 8px;
   font-size: 13px;

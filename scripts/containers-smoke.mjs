@@ -149,35 +149,48 @@ try {
   await savedText("文章按顺序阅读");
   const add = async (owner, label) => {
     const container = scene(owner);
-    await container
-      .locator(
-        ":scope > .container-page-column > .container-page-add > button, :scope > .container-board-scene > .page-surface > .surface-toolbar > button.container-add-component",
+    assert.equal(
+      await page
+        .locator(
+          ".container-add-component, .container-page-add, .surface-add-to-region",
+        )
+        .count(),
+      0,
+    );
+    if (
+      await container.evaluate((element) =>
+        element.classList.contains("container-page"),
       )
-      .click();
-    const picker = page.getByRole("dialog", { name: "添加组件", exact: true });
-    await picker
-      .getByRole("textbox", { name: "搜索组件", exact: true })
-      .fill(label);
-    await picker
-      .locator(".component-picker-list button")
-      .filter({ hasText: label })
-      .click();
-    assert.equal(
-      await picker.getByText("顺序分组", { exact: true }).count(),
-      0,
-    );
-    assert.equal(
-      await picker.getByText("网格分组", { exact: true }).count(),
-      0,
-    );
-    assert.equal(
-      await picker.getByText("自由分组", { exact: true }).count(),
-      0,
-    );
-    if (label.startsWith("Page") || label.startsWith("Board"))
-      await picker.locator(".native-component-preview").waitFor();
-    await picker.getByRole("button", { name: "插入组件", exact: true }).click();
-    await picker.waitFor({ state: "detached" });
+    ) {
+      const text = container
+        .locator(
+          ":scope > .container-page-column > .surface-layout-flow > div > .document-editor .tiptap",
+        )
+        .last();
+      await text.click();
+      await text.press("ControlOrMeta+End");
+      await text.press("Enter");
+      await text.pressSequentially("/" + label);
+    } else {
+      const board = container.locator(
+        ":scope > .container-board-scene > .page-surface",
+      );
+      await board.focus();
+      await board.press("/");
+      await page
+        .getByRole("textbox", { name: "搜索内容块", exact: true })
+        .fill(label);
+    }
+    const menu = page.getByRole("dialog", { name: "插入内容", exact: true });
+    if (label === "Board 白板" || label === "Page 页面")
+      await page.screenshot({
+        path: join(
+          output,
+          label === "Board 白板" ? "document-slash.png" : "board-slash.png",
+        ),
+      });
+    await menu.getByRole("option").filter({ hasText: label }).last().click();
+    await menu.waitFor({ state: "detached" });
   };
 
   await add(rootId, "Board 白板");
@@ -191,6 +204,18 @@ try {
     (node) => node.type === "surface",
   ).attrs.id;
   const initialFrame = structuredClone(saved.document.layout[boardId]);
+  await page.getByRole("button", { name: "撤销操作", exact: true }).click();
+  await poll(
+    read,
+    (record) => !find(record.document.content, boardId),
+    "slash insertion undoes as one action",
+  );
+  await page.getByRole("button", { name: "重做操作", exact: true }).click();
+  await poll(
+    read,
+    (record) => !!find(record.document.content, boardId),
+    "slash insertion restores the same container",
+  );
   assert.equal(
     await scene(boardId).locator(".container-board-enter").count(),
     1,
@@ -207,6 +232,7 @@ try {
       .locator(".surface-world")
       .first()
       .evaluate((element) => getComputedStyle(element).transform);
+  await object(boardId).scrollIntoViewIfNeeded();
   const inactiveCamera = await world();
   const scrollBefore = await parentPage.evaluate(
     (element) => element.scrollTop,
@@ -315,7 +341,7 @@ try {
           node.attrs?.data?.componentId === customComponent.id &&
           node.attrs.data.props.value === customComponent.defaultData.value + 1,
       ),
-    "custom component inserted and edited through shared picker",
+    "custom component inserted and edited through slash menu",
   );
   result.checks.push(
     "component catalog inserts into the active nested container and returns to that container",
@@ -387,7 +413,7 @@ try {
   );
   await page.getByRole("button", { name: "返回上层", exact: true }).click();
   assert.match(
-    await scene(nestedPageId).locator(".tiptap").innerText(),
+    await scene(nestedPageId).locator(".tiptap").first().innerText(),
     /展开后继续编辑/,
   );
   await page.getByRole("button", { name: "返回上层", exact: true }).click();
@@ -449,9 +475,9 @@ try {
     .first()
     .click();
   await object(boardId).waitFor();
-  await object(nestedPageId).locator(".tiptap").waitFor();
+  await object(nestedPageId).locator(".tiptap").first().waitFor();
   assert.match(
-    await object(nestedPageId).locator(".tiptap").innerText(),
+    await object(nestedPageId).locator(".tiptap").first().innerText(),
     /展开后继续编辑/,
   );
   await object(boardId).scrollIntoViewIfNeeded();

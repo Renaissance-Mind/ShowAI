@@ -1274,24 +1274,6 @@ export default function Studio() {
                   }}
                   onRevealHandled={() => setRevealNode(null)}
                   onChange={page.edit}
-                  onBrowseComponents={(parentId) => {
-                    let owner = parentId
-                      ? findSurfaceNode(page.draft!, parentId)
-                      : undefined;
-                    while (
-                      owner &&
-                      !["surface", "region"].includes(owner.node.type ?? "")
-                    )
-                      owner = owner.parent?.attrs?.id
-                        ? findSurfaceNode(page.draft!, owner.parent.attrs.id)
-                        : undefined;
-                    activeSurface.current = {
-                      pageId: page.draft!.id,
-                      surfaceId:
-                        owner?.node.attrs?.id ?? page.draft!.content.attrs!.id,
-                    };
-                    void navigate("components").catch(report);
-                  }}
                   header={
                     <textarea
                       ref={titleRef}

@@ -52,7 +52,6 @@ interface Props {
   onMove?: ObjectActions["move"];
   onRemove?: (id: string) => void;
   onInspect?: (id: string) => void;
-  onAddComponent?: (id: string) => void;
   onViews?: (views: PageViews) => void;
   extraActions?: ReactNode;
 }
@@ -71,7 +70,6 @@ export default function PageSurface({
   onMove,
   onRemove,
   onInspect,
-  onAddComponent,
   onViews,
   extraActions,
   enabled = true,
@@ -256,7 +254,6 @@ export default function PageSurface({
         select: onSelect,
         inspect: onInspect,
         expand: onExpand,
-        addComponent: onAddComponent,
         remove: onRemove,
         move: onMove,
         readOnly: !onMove,
@@ -315,7 +312,7 @@ export default function PageSurface({
         )}
         {!nodes.length && !drawTool && (
           <div className="surface-empty" data-surface-ui>
-            <p>{onMove ? "添加组件或开始绘画" : "这块白板还没有内容"}</p>
+            <p>{onMove ? "按 / 插入内容，或开始绘画" : "这块白板还没有内容"}</p>
           </div>
         )}
         <div
