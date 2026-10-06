@@ -1,9 +1,12 @@
+export type SurfaceKind = "page" | "board";
+export type DrawingTool = "pen" | "rectangle" | "ellipse" | "arrow";
 export type LayoutMode = "flow" | "grid" | "free";
 export interface NodeLayout {
   x: number;
   y: number;
   width: number;
   height?: number;
+  heightMode?: "fixed" | "auto";
   mode?: LayoutMode;
   columns?: number;
   gap?: number;

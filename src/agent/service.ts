@@ -1,4 +1,5 @@
-import { placeTemplate, upgradeDocument } from "../surface/document.mjs";
+import { placeTemplate } from "../surface/document.mjs";
+import { upgradeResource } from "../surface/containers.mjs";
 import { FileStore } from "../core/store";
 import { applyOperations } from "../core/diff";
 import { CoreError } from "../core/model";
@@ -594,7 +595,7 @@ export class AgentService {
       );
     }
     return this.store.createPage(project, {
-      document: upgradeDocument(document),
+      document: upgradeResource(document),
     });
   }
   async saveTemplate(
@@ -756,6 +757,7 @@ export class AgentService {
     projectId: string,
     input: {
       title?: string;
+      kind?: "page" | "board";
       document?: ShowDocument;
       components?: CompiledComponent[];
       remoteComponents?: PublishedComponentLocator[];

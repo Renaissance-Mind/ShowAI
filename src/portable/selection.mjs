@@ -13,7 +13,7 @@ export function selectDocumentBlocks(source, blockIds) {
   const document = structuredClone(source);
   const available = new Set();
   visitNodes(document.content, (node) => {
-    if (node.attrs?.id && !["doc", "surface", "text"].includes(node.type))
+    if (node.attrs?.id && !["doc", "text"].includes(node.type))
       available.add(node.attrs.id);
   });
   const missing = blockIds.filter((id) => !available.has(id));
@@ -44,7 +44,10 @@ export function selectDocumentBlocks(source, blockIds) {
   if (document.content.type === "surface") {
     reconcileSurface(document, { clone: false });
     // A saved camera focus is a view over the original page, not this selection.
-    document.views.initial = null;
+    if (document.surfaceViews)
+      for (const views of Object.values(document.surfaceViews))
+        views.initial = null;
+    else document.views.initial = null;
   }
   return validateDocument(document);
 }

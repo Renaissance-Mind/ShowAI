@@ -28,8 +28,8 @@ module.exports = async function beforePack(context) {
     await readFile(join(root, "dist-desktop/build-info.json"), "utf8"),
   );
   if (
-    metadata.pageModelVersion !== 2 ||
-    desktop.pageModelVersion !== 2 ||
+    metadata.pageModelVersion !== 3 ||
+    desktop.pageModelVersion !== 3 ||
     metadata.sourceCommit !== desktop.sourceCommit ||
     metadata.sourceCommit === "unknown" ||
     metadata.sourceDirty === true ||

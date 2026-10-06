@@ -76,7 +76,13 @@ interface PanGesture {
   released: boolean;
 }
 
-export function useSurfaceViewport(layoutKey: string, storageKey?: string) {
+export function useSurfaceViewport(
+  layoutKey: string,
+  storageKey?: string,
+  enabled = true,
+) {
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const worldRef = useRef<HTMLDivElement>(null);
@@ -99,6 +105,18 @@ export function useSurfaceViewport(layoutKey: string, storageKey?: string) {
     const root = rootRef.current!,
       scroll = scrollRef.current!,
       world = worldRef.current!;
+    const ownsInput = (target: EventTarget | null) =>
+      enabledRef.current &&
+      (!(target instanceof Element) ||
+        !target.closest("[data-input-surface]") ||
+        target.closest("[data-input-surface]") === root);
+    const outerScale = () =>
+      root.getBoundingClientRect().width / root.clientWidth || 1;
+    const clientPoint = (x: number, y: number) => {
+      const rect = root.getBoundingClientRect(),
+        scale = outerScale();
+      return { x: (x - rect.left) / scale, y: (y - rect.top) / scale };
+    };
     const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0,
       springFrame = 0,
@@ -132,8 +150,14 @@ export function useSurfaceViewport(layoutKey: string, storageKey?: string) {
     const regions = (): SurfaceRegion[] => {
       const base = world.getBoundingClientRect(),
         scale = camera.current.scale;
-      return [...world.querySelectorAll<HTMLElement>("[data-surface-id]")].map(
-        (element) => {
+      return [...world.querySelectorAll<HTMLElement>("[data-surface-id]")]
+        .filter(
+          (element) =>
+            element.closest(".surface-world") === world &&
+            element.closest("[data-container-root]") ===
+              world.closest("[data-container-root]"),
+        )
+        .map((element) => {
           const rect = element.getBoundingClientRect();
           return {
             id: element.dataset.surfaceId!,
@@ -143,8 +167,7 @@ export function useSurfaceViewport(layoutKey: string, storageKey?: string) {
             width: rect.width / scale,
             height: rect.height / scale,
           };
-        },
-      );
+        });
     };
     let previousAnchor: { id: string; x: number; y: number } | null = null;
     const remember = () => {
@@ -442,15 +465,16 @@ export function useSurfaceViewport(layoutKey: string, storageKey?: string) {
         refresh();
       },
       point: (x, y) => {
-        const rect = root.getBoundingClientRect();
+        const local = clientPoint(x, y);
         return {
-          x: (x - rect.left - camera.current.x) / camera.current.scale,
-          y: (y - rect.top - camera.current.y) / camera.current.scale,
+          x: (local.x - camera.current.x) / camera.current.scale,
+          y: (local.y - camera.current.y) / camera.current.scale,
         };
       },
     };
 
     const wheel = (event: WheelEvent) => {
+      if (!ownsInput(event.target)) return;
       if (objectGesture) {
         event.preventDefault();
         return;
@@ -480,23 +504,23 @@ export function useSurfaceViewport(layoutKey: string, storageKey?: string) {
         zoom(
           camera.current.scale * Math.exp(-clamp(delta.y, -100, 100) * 0.008),
           {
-            x: event.clientX - rect.left - bounds().offsetX,
-            y: event.clientY - rect.top,
+            x: (event.clientX - rect.left) / outerScale() - bounds().offsetX,
+            y: (event.clientY - rect.top) / outerScale(),
           },
         );
         return;
       }
       if (!gesture) gesture = beginPan();
-      gesture.delta.x -= delta.x;
-      gesture.delta.y -= delta.y;
+      gesture.delta.x -= delta.x / outerScale();
+      gesture.delta.y -= delta.y / outerScale();
       pan(gesture);
       later();
     };
     const localPoint = (event: PointerEvent) => {
       const rect = root.getBoundingClientRect();
       return {
-        x: event.clientX - rect.left - bounds().offsetX,
-        y: event.clientY - rect.top,
+        x: (event.clientX - rect.left) / outerScale() - bounds().offsetX,
+        y: (event.clientY - rect.top) / outerScale(),
       };
     };
     const pinchMetrics = () => {
@@ -507,6 +531,12 @@ export function useSurfaceViewport(layoutKey: string, storageKey?: string) {
       };
     };
     const down = (event: PointerEvent) => {
+      if (
+        !ownsInput(event.target) ||
+        event.defaultPrevented ||
+        (event.target as Element).closest("[data-board-drawing-input]")
+      )
+        return;
       if (springFrame || gesture) interrupt();
       const target = event.target as Element;
       if (target.closest("[data-surface-handle]")) {
@@ -584,8 +614,8 @@ export function useSurfaceViewport(layoutKey: string, storageKey?: string) {
         return;
       }
       if (!drag || drag.id !== event.pointerId) return;
-      const dx = event.clientX - drag.x,
-        dy = event.clientY - drag.y;
+      const dx = (event.clientX - drag.x) / outerScale(),
+        dy = (event.clientY - drag.y) / outerScale();
       if (!drag.started) {
         if (Math.hypot(dx, dy) < 8 || !window.getSelection()?.isCollapsed)
           return;
@@ -632,6 +662,7 @@ export function useSurfaceViewport(layoutKey: string, storageKey?: string) {
       if (drag?.id === event.pointerId) finish(event, true);
     };
     const keydown = (event: KeyboardEvent) => {
+      if (!ownsInput(event.target)) return;
       if (springFrame) stopSpring();
       if (editable(event.target) && gesture) {
         interrupt();
@@ -720,7 +751,12 @@ export function useSurfaceViewport(layoutKey: string, storageKey?: string) {
     const observedCards = new Set<HTMLElement>();
     const refreshLayout = () => {
       const cards = new Set(
-        world.querySelectorAll<HTMLElement>("[data-surface-id]"),
+        [...world.querySelectorAll<HTMLElement>("[data-surface-id]")].filter(
+          (element) =>
+            element.closest(".surface-world") === world &&
+            element.closest("[data-container-root]") ===
+              world.closest("[data-container-root]"),
+        ),
       );
       for (const card of observedCards) {
         if (!cards.has(card)) {
@@ -749,6 +785,7 @@ export function useSurfaceViewport(layoutKey: string, storageKey?: string) {
     window.addEventListener("blur", blur);
     refreshLayout();
     return () => {
+      remember();
       resize.disconnect();
       cancelAnimationFrame(frame);
       cancelAnimationFrame(springFrame);

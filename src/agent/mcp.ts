@@ -128,16 +128,18 @@ export function createMcpServer(options: {
         "Create a page in the bound project. Optional artifact components are imported into this project; remote components are fetched and verified.",
       inputSchema: {
         title: z.string().optional(),
+        kind: z.enum(["page", "board"]).optional(),
         document: jsonObject.optional(),
         components: z.array(jsonObject).max(100).optional(),
         remoteComponents: z.array(jsonObject).max(100).optional(),
       },
       annotations: { ...write, openWorldHint: true },
     },
-    ({ title, document, components, remoteComponents }) =>
+    ({ title, kind, document, components, remoteComponents }) =>
       call(() =>
         service.createPage(projectId, {
           title,
+          kind,
           ...(document ? { document: validateDocument(document) } : {}),
           components: components as unknown as CompiledComponent[] | undefined,
           remoteComponents: remoteComponents as unknown as

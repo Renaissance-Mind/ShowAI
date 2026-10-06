@@ -1,11 +1,18 @@
+import {
+  isResource,
+  upgradeResource,
+  createSurface,
+  wrapSurface,
+  surfaceViews,
+} from "../surface/containers.mjs";
 import { createHash } from "node:crypto";
 import { validateDocument } from "../portable/validation.mjs";
 import { CoreError } from "./model";
 import {
   isSurface,
-  upgradeDocument,
   reconcileSurface,
   fillSurfaceLayout,
+  visitNodes,
 } from "../surface/document.mjs";
 import type {
   FieldChange,
@@ -188,6 +195,14 @@ export function diffDocuments(
       before: before.content.type,
       after: after.content.type,
     });
+  if (isResource(before) || isResource(after))
+    pageFields.push(
+      ...changesForFields(
+        before.content.attrs ?? {},
+        after.content.attrs ?? {},
+        "content.attrs",
+      ),
+    );
   if (pageFields.length)
     changes.push({ type: "page.changed", fields: pageFields });
   const oldBlocks = indexBlocks(before);
@@ -279,17 +294,33 @@ export function applyOperations(
     if (!found) throw new CoreError("NOT_FOUND", `Block ${id} does not exist.`);
     return found;
   };
+  const viewOwner = (id?: string) => {
+    const node =
+      !id || id === draft.content.attrs?.id ? draft.content : locate(id).node;
+    if (node.type !== "surface" || (!isResource(draft) && id))
+      throw new CoreError(
+        "INVALID_DATA",
+        "Views belong to a Page or Board container.",
+      );
+    return node;
+  };
   const insert = (
     node: JSONContent,
     parentId?: string | null,
     afterId?: string | null,
   ) => {
-    if (["text", "doc", "surface"].includes(node.type ?? ""))
+    if (
+      ["text", "doc"].includes(node.type ?? "") ||
+      (node.type === "surface" && !isResource(draft))
+    )
       throw new CoreError(
         "INVALID_DATA",
         "Insert a block node, not a text or document node.",
       );
-    const parent = parentId ? locate(parentId).node : draft.content;
+    const parent =
+      parentId && parentId !== draft.content.attrs?.id
+        ? locate(parentId).node
+        : draft.content;
     const children = parent.content ?? [];
     let index = children.length;
     if (afterId === null) index = 0;
@@ -312,7 +343,26 @@ export function applyOperations(
       throw new CoreError("INVALID_DATA", "Invalid page operation.");
     switch (operation.type) {
       case "surface.upgrade":
-        draft = upgradeDocument(draft);
+        draft = upgradeResource(draft);
+        break;
+      case "surface.create": {
+        draft = upgradeResource(draft);
+        const node = createSurface(
+          operation.kind,
+          operation.name,
+          operation.nodeId,
+        );
+        insert(node, operation.parentId);
+        fillSurfaceLayout(draft);
+        break;
+      }
+      case "surface.wrap":
+        draft = upgradeResource(draft);
+        draft = wrapSurface(
+          draft,
+          operation.nodeId ?? draft.content.attrs!.id,
+          operation.kind,
+        );
         break;
       case "surface.layout.set": {
         if (
@@ -358,16 +408,27 @@ export function applyOperations(
             "A view requires existing target nodes.",
           );
         for (const id of operation.view.targets) locate(id);
+        const owner = viewOwner(operation.surfaceId),
+          targets = new Set<string>();
+        visitNodes(owner, (node) => {
+          if (node !== owner && node.attrs?.id) targets.add(node.attrs.id);
+        });
+        if (operation.view.targets.some((id) => !targets.has(id)))
+          throw new CoreError(
+            "INVALID_DATA",
+            "View targets must belong to their container.",
+          );
         if (!isSurface(draft))
           throw new CoreError(
             "INVALID_DATA",
             "Upgrade this page before saving a view.",
           );
-        draft.views!.saved = [
-          ...draft.views!.saved.filter((view) => view.id !== operation.view.id),
+        const views = surfaceViews(draft, viewOwner(operation.surfaceId));
+        views.saved = [
+          ...views.saved.filter((view) => view.id !== operation.view.id),
           structuredClone(operation.view),
         ];
-        if (operation.initial) draft.views!.initial = operation.view.id;
+        if (operation.initial) views.initial = operation.view.id;
         break;
       }
       case "surface.view.remove": {
@@ -376,17 +437,16 @@ export function applyOperations(
             "INVALID_DATA",
             "This page has no whiteboard views.",
           );
-        draft.views!.saved = draft.views!.saved.filter(
+        const views = surfaceViews(draft, viewOwner(operation.surfaceId));
+        views.saved = views.saved.filter(
           (view) => view.id !== operation.viewId,
         );
-        if (draft.views!.initial === operation.viewId)
-          draft.views!.initial = null;
+        if (views.initial === operation.viewId) views.initial = null;
         break;
       }
       case "surface.reading-order.set": {
-        const rootIds = new Set(
-          draft.content.content?.map((node) => node.attrs?.id),
-        );
+        const owner = viewOwner(operation.surfaceId);
+        const rootIds = new Set(owner.content?.map((node) => node.attrs?.id));
         if (
           !Array.isArray(operation.nodeIds) ||
           new Set(operation.nodeIds).size !== operation.nodeIds.length ||
@@ -401,7 +461,16 @@ export function applyOperations(
             "INVALID_DATA",
             "This page has no whiteboard reading order.",
           );
-        draft.views!.readingOrder = operation.nodeIds;
+        surfaceViews(draft, owner).readingOrder = operation.nodeIds;
+        if (isResource(draft) && owner.attrs?.kind === "page")
+          owner.content = [
+            ...operation.nodeIds.map((id) =>
+              owner.content!.find((node) => node.attrs?.id === id)!,
+            ),
+            ...owner.content!.filter(
+              (node) => !operation.nodeIds.includes(node.attrs!.id),
+            ),
+          ];
         break;
       }
       case "page.set": {
@@ -415,6 +484,7 @@ export function applyOperations(
           "comments",
           "layout",
           "views",
+          "surfaceViews",
         ]);
         if (
           !operation.fields ||
@@ -438,7 +508,10 @@ export function applyOperations(
       }
       case "block.replace": {
         const target = locate(operation.blockId);
-        if (["text", "doc", "surface"].includes(operation.node.type ?? ""))
+        if (
+          ["text", "doc"].includes(operation.node.type ?? "") ||
+          (operation.node.type === "surface" && !isResource(draft))
+        )
           throw new CoreError(
             "INVALID_DATA",
             "Replacement must be a block node.",
@@ -504,9 +577,14 @@ export function applyOperations(
   }
   // Validate caller-supplied references before intentional structural cleanup.
   const structural = operations.some((operation) =>
-    ["block.remove", "block.replace", "block.move", "block.insert"].includes(
-      operation.type,
-    ),
+    [
+      "block.remove",
+      "block.replace",
+      "block.move",
+      "block.insert",
+      "surface.create",
+      "surface.wrap",
+    ].includes(operation.type),
   );
   return normalizeDocument(
     isSurface(draft) && structural ? reconcileSurface(draft) : draft,

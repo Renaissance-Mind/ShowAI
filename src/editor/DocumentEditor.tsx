@@ -301,7 +301,21 @@ export default function DocumentEditor({
       editor &&
       JSON.stringify(editor.getJSON()) !== JSON.stringify(content)
     ) {
+      const selection =
+        editor.isFocused && editor.state.selection.toJSON().type === "text"
+          ? editor.state.selection
+          : null;
       editor.commands.setContent(content, { emitUpdate: false });
+      if (selection) {
+        const maximum = Math.max(1, editor.state.doc.content.size - 1);
+        const from = Math.min(selection.from, maximum),
+          to = Math.min(selection.to, maximum);
+        if (
+          editor.state.doc.resolve(from).parent.inlineContent &&
+          editor.state.doc.resolve(to).parent.inlineContent
+        )
+          editor.commands.setTextSelection({ from, to });
+      }
       setSlash(null);
       setHover(null);
       setBlockMenu(false);

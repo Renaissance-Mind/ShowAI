@@ -151,14 +151,14 @@ try {
     const nestedCopy=await api.invoke('pages:duplicate',{projectId:project.id,pageId:saved.document.id});
     if(nestedCopy.document.parentId!==childFolder.id)throw new Error('Duplicate lost its folder');
     await api.invoke('pages:remove',{projectId:project.id,pageId:nestedCopy.document.id});
-    const foreignArtifact={format:'showai',version:saved.document.content.type==='surface'?2:1,document:{...saved.document,parentId:'foreign-folder'}};
+    const foreignArtifact={format:'showai',version:saved.document.content.attrs?.kind?3:saved.document.content.type==='surface'?2:1,document:{...saved.document,parentId:'foreign-folder'}};
     const importedNested=await api.invoke('pages:import',{projectId:project.id,parentId:childFolder.id,artifact:foreignArtifact});
     if(importedNested.document.parentId!==childFolder.id)throw new Error('Import ignored its destination folder');
     await api.invoke('pages:remove',{projectId:project.id,pageId:importedNested.document.id});
     const importedRoot=await api.invoke('pages:import',{projectId:project.id,artifact:foreignArtifact});
     if(importedRoot.document.parentId!==null)throw new Error('Import retained a foreign project folder');
     await api.invoke('pages:remove',{projectId:project.id,pageId:importedRoot.document.id});
-    const localArtifact={format:'showai',version:saved.document.content.type==='surface'?2:1,document:saved.document};
+    const localArtifact={format:'showai',version:saved.document.content.attrs?.kind?3:saved.document.content.type==='surface'?2:1,document:saved.document};
     const importedLocal=await api.invoke('pages:import',{projectId:project.id,artifact:localArtifact});
     if(importedLocal.document.parentId!==childFolder.id)throw new Error('Legacy import lost a valid local folder');
     await api.invoke('pages:remove',{projectId:project.id,pageId:importedLocal.document.id});

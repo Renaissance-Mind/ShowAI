@@ -1,4 +1,5 @@
-import { isSurface, upgradeDocument } from "../surface/document.mjs";
+import { artifactVersion } from "../surface/document.mjs";
+import { createResource } from "../surface/containers.mjs";
 import { constants } from "node:fs";
 import {
   lstat,
@@ -945,6 +946,7 @@ export class FileStore {
     projectId: string,
     input: {
       title?: string;
+      kind?: "page" | "board";
       document?: ShowDocument;
       parentId?: string | null;
     } = {},
@@ -975,7 +977,7 @@ export class FileStore {
               createdAt: now,
               updatedAt: now,
             }
-          : upgradeDocument(
+          : createResource(
               {
                 id,
                 title: input.title ?? "未命名页面",
@@ -989,7 +991,7 @@ export class FileStore {
                 content: { type: "doc", content: [{ type: "paragraph" }] },
                 comments: [],
               },
-              { includeTitle: false },
+              input.kind ?? "page",
             ),
       );
       return this.withLock(`page-${projectId}-${id}`, async () => {
@@ -1011,7 +1013,7 @@ export class FileStore {
     current: PageRecord,
     input: ShowDocument,
   ): Promise<PageRecord> {
-    if (isSurface(current.document) && !isSurface(input))
+    if (artifactVersion(current.document) > artifactVersion(input))
       throw new CoreError(
         "INVALID_DATA",
         "A whiteboard cannot be overwritten with a legacy document. Import the legacy source as a separate page.",
@@ -1038,12 +1040,12 @@ export class FileStore {
         "The page changed while saving. Read the changes and retry.",
         { currentHash: latest.hash },
       );
-    if (!isSurface(current.document) && isSurface(document)) {
+    if (artifactVersion(current.document) < artifactVersion(document)) {
       const backup = join(
         this.projectPath(projectId),
         "migrations",
         pageId,
-        "original-v1.json",
+        `original-v${artifactVersion(current.document)}.json`,
       );
       await this.ensureDirectory(dirname(backup));
       await this.safePath(backup);

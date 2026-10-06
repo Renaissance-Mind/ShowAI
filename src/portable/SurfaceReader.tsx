@@ -1,15 +1,8 @@
-import { ObjectContext } from "../surface/SurfaceObject";
 import { useMemo, type ReactNode } from "react";
 import type { ShowDocument } from "../types";
-import PageSurface from "../surface/PageSurface";
-import {
-  nodePaths,
-  upgradeDocument,
-  orderedSurfaceNodes,
-} from "../surface/document.mjs";
-import { SurfaceContent, nodeName } from "../surface/SurfaceContent";
+import { upgradeResource } from "../surface/containers.mjs";
+import { ContainerRuntime } from "../surface/ContainerRuntime";
 import { PageContent } from "./PageContent";
-
 export function SurfaceReader({
   document: input,
   heading,
@@ -22,47 +15,16 @@ export function SurfaceReader({
   partial?: boolean;
 }) {
   const document = useMemo(
-    () => upgradeDocument(input, { includeTitle: !partial }),
+    () => upgradeResource(input, { includeTitle: !partial }),
     [input, partial],
   );
-  if (presentation === "reading")
-    return (
-      <ObjectContext.Provider
-        value={{
-          scale: 1,
-          selected: null,
-          select: () => {},
-          readOnly: true,
-          revealAll: true,
-          revealed: new Set(),
-        }}
-      >
-        <main className="portable-document surface-reading">
-          <div className="surface-reading-heading">{heading}</div>
-          <SurfaceContent
-            document={document}
-            spatial={false}
-            renderContent={({ content }) => <PageContent content={content} />}
-          />
-        </main>
-      </ObjectContext.Provider>
-    );
   return (
-    <PageSurface
-      pageId={document.id}
-      nodes={orderedSurfaceNodes(document).map((node) => ({
-        id: node.attrs!.id,
-        name: nodeName(node),
-      }))}
-      layoutKey={JSON.stringify(document.layout)}
-      paths={nodePaths(document)}
-      views={document.views!}
+    <ContainerRuntime
+      document={document}
+      hideTitle={partial}
       header={heading}
-    >
-      <SurfaceContent
-        document={document}
-        renderContent={({ content }) => <PageContent content={content} />}
-      />
-    </PageSurface>
+      reading={presentation === "reading"}
+      renderContent={({ content }) => <PageContent content={content} />}
+    />
   );
 }

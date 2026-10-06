@@ -27,7 +27,7 @@ describe("file-first project store", () => {
     const { projectId, record } = await page();
     expect(JSON.parse(await readFile(record.path, "utf8"))).toMatchObject({
       format: "showai",
-      version: 2,
+      version: 3,
       document: { id: record.document.id },
     });
     const reopened = new FileStore(store.root);
@@ -39,7 +39,7 @@ describe("file-first project store", () => {
         id: record.document.id,
         title: "A page",
         hash: record.hash,
-        blockCount: 2,
+        blockCount: 1,
       },
     ]);
     expect(await reopened.readPage(projectId, record.document.id)).toEqual(
@@ -109,8 +109,7 @@ describe("file-first project store", () => {
 
   it("keeps checkpoint-based text diffs and rejects stale saves without losing human edits", async () => {
     const { projectId, record } = await page();
-    const blockId = record.document.content.content![0].content![0].attrs!
-      .id as string;
+    const blockId = record.document.content.content![0].attrs!.id as string;
     const changed = await store.applyPage(projectId, record.document.id, {
       baseHash: record.hash,
       operations: [
@@ -272,8 +271,7 @@ describe("file-first project store", () => {
 
   it("does not persist malformed or unsupported patches", async () => {
     const { projectId, record } = await page();
-    const blockId = record.document.content.content![0].content![0].attrs!
-      .id as string;
+    const blockId = record.document.content.content![0].attrs!.id as string;
     await expect(
       store.applyPage(projectId, record.document.id, {
         baseHash: record.hash,

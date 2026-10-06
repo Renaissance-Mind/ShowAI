@@ -363,7 +363,7 @@ describe("whiteboard page model", () => {
       "original-v1.json",
     );
     expect(await readFile(backup, "utf8")).toBe(raw);
-    expect(JSON.parse(await readFile(original.path, "utf8")).version).toBe(2);
+    expect(JSON.parse(await readFile(original.path, "utf8")).version).toBe(3);
     expect(
       (await store.diffPage(project.id, original.document.id, original.hash))
         .changed,

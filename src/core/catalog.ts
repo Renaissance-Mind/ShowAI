@@ -1,4 +1,9 @@
 import {
+  isResource,
+  createResource,
+  insertResourceTemplate,
+} from "../surface/containers.mjs";
+import {
   remapSurfaceIds,
   isSurface,
   upgradeDocument,
@@ -460,6 +465,12 @@ function templateRecord(
                 content: ["doc", "surface"].includes(node.type ?? "")
                   ? node
                   : { type: "doc", content: [node] },
+                ...(part.surfaceViews
+                  ? {
+                      surfaceViews:
+                        part.surfaceViews as ShowDocument["surfaceViews"],
+                    }
+                  : {}),
                 ...(part.layout
                   ? { layout: part.layout as ShowDocument["layout"] }
                   : {}),
@@ -472,7 +483,10 @@ function templateRecord(
                   type: "content",
                   content: normalized.content,
                   layout: normalized.layout,
-                  views: normalized.views,
+                  ...(normalized.views ? { views: normalized.views } : {}),
+                  ...(normalized.surfaceViews
+                    ? { surfaceViews: normalized.surfaceViews }
+                    : {}),
                 };
               return {
                 type: "content",
@@ -796,6 +810,7 @@ export async function saveTemplate(
               ? part.content
               : { type: "doc", content: [part.content] },
             ...(part.layout ? { layout: part.layout } : {}),
+            ...(part.surfaceViews ? { surfaceViews: part.surfaceViews } : {}),
             ...(part.views ? { views: part.views } : {}),
           },
           project,
@@ -803,7 +818,9 @@ export async function saveTemplate(
         composition!.push({
           type: "content",
           content: value.content,
-          ...(value.layout ? { layout: value.layout, views: value.views } : {}),
+          ...(value.layout ? { layout: value.layout } : {}),
+          ...(value.views ? { views: value.views } : {}),
+          ...(value.surfaceViews ? { surfaceViews: value.surfaceViews } : {}),
         });
         await addComponents(value);
       } else {
@@ -2132,6 +2149,7 @@ export async function instantiateTemplateRecord(
             ? structuredClone(part.content)
             : { type: "doc", content: [structuredClone(part.content)] },
           ...(part.layout ? { layout: part.layout } : {}),
+          ...(part.surfaceViews ? { surfaceViews: part.surfaceViews } : {}),
           ...(part.views ? { views: part.views } : {}),
         };
         count(fragment.content);
@@ -2159,6 +2177,18 @@ export async function instantiateTemplateRecord(
           ),
         );
       }
+    }
+    if (documents.some(isResource) || isResource(template.document)) {
+      let result = createResource(
+        template.document,
+        isResource(template.document)
+          ? template.document.content.attrs!.kind
+          : "page",
+      );
+      result.content.content = [];
+      for (const part of documents)
+        result = insertResourceTemplate(result, part);
+      return result;
     }
     if (!documents.some(isSurface))
       return {

@@ -1,5 +1,6 @@
 import { addNode } from "../surface/editing";
-import { upgradeDocument } from "../surface/document.mjs";
+import { findSurfaceNode } from "../surface/document.mjs";
+import { upgradeResource } from "../surface/containers.mjs";
 import {
   useCallback,
   useEffect,
@@ -184,6 +185,9 @@ export default function Studio() {
   const [problem, setProblem] = useState("");
   const [busy, setBusy] = useState(false);
   const [revealNode, setRevealNode] = useState<string | null>(null);
+  const activeSurface = useRef<{ pageId: string; surfaceId: string } | null>(
+    null,
+  );
   const [contextMenu, setContextMenu] = useState<{
     target: LibraryTarget;
     anchor: HTMLElement;
@@ -466,7 +470,11 @@ export default function Studio() {
     }
     setExpandedFolders((current) => ({ ...current, ...expanded }));
   }
-  async function createPage(templateId = "blank", template?: TemplateMetadata) {
+  async function createPage(
+    templateId = "blank",
+    template?: TemplateMetadata,
+    kind?: "page" | "board",
+  ) {
     const projectId =
       dialog?.type === "newPage" ? dialog.projectId : selectedProject;
     const parentId =
@@ -483,6 +491,7 @@ export default function Studio() {
         projectId,
         parentId,
         templateId,
+        kind,
         templateVersion: template?.version,
         templateScope: template?.scope,
         templateIntegrity: template?.integrity,
@@ -808,15 +817,20 @@ export default function Studio() {
       setNotice("先打开一个页面，再插入组件");
       return;
     }
-    const source = upgradeDocument(page.draft);
+    const source = upgradeResource(page.draft);
+    const owner =
+      activeSurface.current?.pageId === source.id
+        ? findSurfaceNode(source, activeSurface.current.surfaceId)?.node
+        : undefined;
+    const destination = owner?.type === "surface" ? owner : source.content;
     const nodeId = crypto.randomUUID();
     const x = Math.min(
       1000000,
       Math.max(
         0,
-        ...source.content.content!.map((node) => {
+        ...(destination.content ?? []).map((node) => {
           const frame = source.layout[node.attrs!.id];
-          return frame.x + frame.width + 64;
+          return frame ? frame.x + frame.width + 64 : 0;
         }),
       ),
     );
@@ -825,6 +839,7 @@ export default function Studio() {
         source,
         { type: "widget", attrs: { id: nodeId, kind, data } },
         { x, y: 0, width: 640 },
+        destination.attrs!.id,
       ),
     );
     if (!(await page.flush())) return;
@@ -1234,6 +1249,9 @@ export default function Studio() {
                 key={page.draft.id}
                 document={page.draft}
                 revealId={revealNode}
+                onActiveSurfaceChange={(surfaceId) => {
+                  activeSurface.current = { pageId: page.draft!.id, surfaceId };
+                }}
                 onRevealHandled={() => setRevealNode(null)}
                 onChange={page.edit}
                 onBrowseComponents={() =>
@@ -1250,7 +1268,7 @@ export default function Studio() {
                     maxLength={1000}
                     onChange={(event) =>
                       page.edit({
-                        ...upgradeDocument(page.draft!),
+                        ...upgradeResource(page.draft!),
                         title: event.target.value.replaceAll("\n", ""),
                       })
                     }
@@ -1626,7 +1644,7 @@ export default function Studio() {
                           ? "没有匹配的内容"
                           : currentFolder
                             ? "文件夹为空"
-                            : "从空白画布开始"}
+                            : "从空白页面开始"}
                       </h2>
                       {!query && (
                         <button
@@ -2060,26 +2078,62 @@ export default function Studio() {
       {dialog?.type === "newPage" && (
         <Dialog title="新页面" onClose={closeDialog}>
           <div className="studio-template-picker">
-            {dialog.templates.map((item) => (
-              <button
-                key={`${item.scope}:${item.id}:${item.version}`}
-                disabled={busy}
-                onClick={() => void createPage(item.id, item)}
-              >
-                <span>
-                  {item.id === "blank" ? (
-                    <FileText size={21} />
-                  ) : (
-                    <LayoutTemplate size={21} />
-                  )}
-                </span>
-                <div>
-                  <strong>{item.name}</strong>
-                  <p>{item.description}</p>
-                </div>
-                <ArrowUpRight size={16} />
-              </button>
-            ))}
+            <button
+              disabled={busy}
+              aria-label="新建 Page"
+              onClick={() => void createPage("blank", undefined, "page")}
+            >
+              <span>
+                <FileText size={21} />
+              </span>
+              <div>
+                <strong>Page 空白页面</strong>
+                <p>从顺序页面开始，可嵌入 Board 白板。</p>
+              </div>
+              <ArrowUpRight size={16} />
+            </button>
+            <button
+              aria-label="新建 Board"
+              disabled={busy}
+              onClick={() => void createPage("blank", undefined, "board")}
+            >
+              <span>
+                <LayoutTemplate size={21} />
+              </span>
+              <div>
+                <strong>Board 白板</strong>
+                <p>自由组织内容，可嵌入 Page 页面。</p>
+              </div>
+              <ArrowUpRight size={16} />
+            </button>
+            {dialog.templates
+              .filter((item) => item.id !== "blank")
+              .map((item) => (
+                <button
+                  key={`${item.scope}:${item.id}:${item.version}`}
+                  disabled={busy}
+                  onClick={() => void createPage(item.id, item)}
+                >
+                  <span>
+                    {item.id === "blank" ? (
+                      <FileText size={21} />
+                    ) : (
+                      <LayoutTemplate size={21} />
+                    )}
+                  </span>
+                  <div>
+                    <strong>
+                      {item.id === "blank" ? "Page 空白页面" : item.name}
+                    </strong>
+                    <p>
+                      {item.id === "blank"
+                        ? "从顺序页面开始，可嵌入 Board 白板。"
+                        : item.description}
+                    </p>
+                  </div>
+                  <ArrowUpRight size={16} />
+                </button>
+              ))}
           </div>
         </Dialog>
       )}

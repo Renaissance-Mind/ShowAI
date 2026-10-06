@@ -319,6 +319,7 @@ try {
   const {
     layout: legacyLayout,
     views: legacyViews,
+    surfaceViews: legacySurfaceViews,
     ...legacyMetadata
   } = sourcePage.document;
   const document = {

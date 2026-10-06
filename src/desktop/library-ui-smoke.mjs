@@ -160,7 +160,7 @@ try {
   };
   const createPage = async (title, ownerProjectId = project.id) => {
     await directoryAction("添加新页面");
-    await page.getByRole("button", { name: /空白画布/ }).click();
+    await page.getByRole("button", { name: "新建 Page", exact: true }).click();
     await page
       .getByRole("textbox", { name: "页面标题", exact: true })
       .fill(title);

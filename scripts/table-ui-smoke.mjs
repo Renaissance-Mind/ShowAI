@@ -116,7 +116,7 @@ try {
       .getByRole("button", { name: /表格对齐$/ })
       .first()
       .click();
-    await page.locator(".surface-object .tiptap").waitFor();
+    await page.locator(".container-page .tiptap").waitFor();
   };
   await open();
   const native = page.locator(".document-content > .tableWrapper table");

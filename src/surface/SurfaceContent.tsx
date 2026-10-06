@@ -1,3 +1,5 @@
+import { Drawing } from "./Drawing";
+import { isResource, resourceNodes, surfaceKind } from "./containers.mjs";
 import {
   memo,
   useContext,
@@ -18,6 +20,8 @@ export function nodeName(node: JSONContent) {
       (
         {
           region: "内容区域",
+          surface: node.attrs?.kind === "board" ? "Board" : "Page",
+          drawing: "绘画",
           richText: "文本",
           image: "图片",
           paragraph: "文本",
@@ -83,23 +87,31 @@ const ContentNode = memo(
     positioned,
     renderContent,
     spatial = true,
+    renderSurface,
   }: {
     node: JSONContent;
     document: ShowDocument;
     positioned: boolean;
     renderContent: ContentRenderer;
     spatial?: boolean;
+    renderSurface?: (node: JSONContent) => ReactNode;
   }) {
     const id = node.attrs!.id,
       frame = document.layout?.[id];
     let body: ReactNode;
-    if (node.type === "region") {
+    if (node.type === "surface") body = renderSurface?.(node);
+    else if (node.type === "drawing") body = <Drawing node={node} />;
+    else if (node.type === "region") {
       const mode = frame?.mode ?? "flow",
         children = node.content ?? [];
       if (mode === "flow") {
         const groups: (JSONContent[] | JSONContent)[] = [];
         for (const child of children) {
-          if (["region", "richText"].includes(child.type ?? ""))
+          if (
+            ["region", "richText", "surface", "drawing"].includes(
+              child.type ?? "",
+            )
+          )
             groups.push(child);
           else {
             const previous = groups.at(-1);
@@ -128,6 +140,7 @@ const ContentNode = memo(
                   positioned={false}
                   spatial={spatial}
                   renderContent={renderContent}
+                  renderSurface={renderSurface}
                 />
               ),
             )}
@@ -143,6 +156,7 @@ const ContentNode = memo(
             positioned={spatial && mode === "free"}
             spatial={spatial}
             renderContent={renderContent}
+            renderSurface={renderSurface}
           />
         ));
         body =
@@ -186,6 +200,13 @@ const ContentNode = memo(
         name={nodeName(node)}
         positioned={positioned}
         region={node.type === "region"}
+        container={node.type === "surface"}
+        drawing={node.type === "drawing"}
+        fixedHeight={
+          (node.type === "surface" &&
+            (surfaceKind(node) === "board" || frame?.heightMode !== "auto")) ||
+          node.type === "drawing"
+        }
         frame={frame}
       >
         {body}
@@ -197,6 +218,7 @@ const ContentNode = memo(
       before.node !== after.node ||
       before.positioned !== after.positioned ||
       before.spatial !== after.spatial ||
+      before.renderSurface !== after.renderSurface ||
       before.renderContent !== after.renderContent
     )
       return false;
@@ -225,14 +247,66 @@ export function SurfaceContent({
   document,
   renderContent,
   spatial = true,
+  container = document.content,
+  renderSurface,
 }: {
   document: ShowDocument;
   renderContent: ContentRenderer;
   spatial?: boolean;
+  container?: JSONContent;
+  renderSurface?: (node: JSONContent) => ReactNode;
 }) {
+  if (
+    isResource(document) &&
+    container.type === "surface" &&
+    surfaceKind(container) === "page"
+  ) {
+    const groups: (JSONContent[] | JSONContent)[] = [];
+    for (const node of container.content ?? []) {
+      if (
+        ["region", "richText", "surface", "drawing"].includes(node.type ?? "")
+      )
+        groups.push(node);
+      else {
+        const last = groups.at(-1);
+        if (Array.isArray(last)) last.push(node);
+        else groups.push([node]);
+      }
+    }
+    if (!groups.length) groups.push([]);
+    return (
+      <div className="surface-layout-flow">
+        {groups.map((group, index) =>
+          Array.isArray(group) ? (
+            <div key={`flow-${index}`}>
+              {renderContent({
+                content: { type: "doc", content: group },
+                parentId: container.attrs!.id,
+                ids: group.map((node) => node.attrs!.id),
+                kind: "children",
+              })}
+            </div>
+          ) : (
+            <ContentNode
+              key={group.attrs!.id}
+              node={group}
+              document={document}
+              positioned={false}
+              spatial={spatial}
+              renderContent={renderContent}
+              renderSurface={renderSurface}
+            />
+          ),
+        )}
+      </div>
+    );
+  }
+  const nodes = isResource(document)
+    ? resourceNodes(document, container)
+    : orderedSurfaceNodes(document);
   return (
     <>
-      {orderedSurfaceNodes(document).map((node) => (
+      {nodes.map((node) => (
         <ContentNode
           key={node.attrs!.id}
           node={node}
@@ -240,6 +314,7 @@ export function SurfaceContent({
           positioned={spatial}
           spatial={spatial}
           renderContent={renderContent}
+          renderSurface={renderSurface}
         />
       ))}
     </>

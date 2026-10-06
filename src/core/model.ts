@@ -79,16 +79,30 @@ export type PageFields = Partial<
     | "comments"
     | "layout"
     | "views"
+    | "surfaceViews"
   >
 >;
 
 /** A null parent identifies the document root; omitted afterId appends. */
 export type PageOperation =
   | { type: "surface.upgrade" }
+  | {
+      type: "surface.create";
+      kind: "page" | "board";
+      name?: string;
+      nodeId?: string;
+      parentId?: string | null;
+    }
+  | { type: "surface.wrap"; nodeId?: string; kind: "page" | "board" }
   | { type: "surface.layout.set"; nodeId: string; layout: Partial<NodeLayout> }
-  | { type: "surface.view.save"; view: SavedView; initial?: boolean }
-  | { type: "surface.view.remove"; viewId: string }
-  | { type: "surface.reading-order.set"; nodeIds: string[] }
+  | {
+      type: "surface.view.save";
+      surfaceId?: string;
+      view: SavedView;
+      initial?: boolean;
+    }
+  | { type: "surface.view.remove"; surfaceId?: string; viewId: string }
+  | { type: "surface.reading-order.set"; surfaceId?: string; nodeIds: string[] }
   | { type: "page.set"; fields: PageFields }
   | {
       type: "block.insert";

@@ -57,9 +57,9 @@ try {
     await readFile(join(distribution, "runtime/assets/build.json"), "utf8"),
   );
   assert.equal(build.version, version);
-  assert.equal(build.pageModelVersion, 2);
+  assert.equal(build.pageModelVersion, 3);
   assert.match(build.sourceCommit, /^[a-f0-9]{40}$/);
-  assert.match(html, /name="showai-model" content="2"/);
+  assert.match(html, /name="showai-model" content="3"/);
   for (const [path, digest] of Object.entries(build.frontendFiles)) {
     const bytes = await readFile(join(distribution, "runtime/web", path));
     assert.equal(
@@ -146,7 +146,7 @@ try {
           verified: [
             "bundled-node",
             "workbench-assets",
-            "page-model-v2-and-frontend-fingerprints",
+            "page-model-v3-and-frontend-fingerprints",
             "CLI-library",
             "component-compiler",
             "HTML-export",

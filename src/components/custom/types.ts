@@ -35,6 +35,7 @@ export type TemplatePart =
       content: JSONContent;
       layout?: ShowDocument["layout"];
       views?: ShowDocument["views"];
+      surfaceViews?: ShowDocument["surfaceViews"];
     }
   | { type: "template"; ref: PackageRevisionRef; title?: string };
 export type TemplatePartInput =
@@ -43,6 +44,7 @@ export type TemplatePartInput =
       content: JSONContent;
       layout?: ShowDocument["layout"];
       views?: ShowDocument["views"];
+      surfaceViews?: ShowDocument["surfaceViews"];
     }
   | {
       type: "template";

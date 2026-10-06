@@ -1,3 +1,4 @@
+import { isResource } from "../surface/containers.mjs";
 import { artifactVersion, assignSurfaceIds } from "../surface/document.mjs";
 import { validateSurface } from "../surface/validation.mjs";
 import { validatePrimitiveData } from "../components/blocks/primitive-contract.mjs";
@@ -12,6 +13,7 @@ const forbiddenKeys = new Set(["__proto__", "prototype", "constructor"]);
 const nodeTypes = new Set([
   "doc",
   "surface",
+  "drawing",
   "region",
   "richText",
   "paragraph",
@@ -394,7 +396,12 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
     throw new Error(`Document exceeds ${MAX_NODES} nodes.`);
   if (depth > MAX_DEPTH) throw new Error("Document is nested too deeply.");
   const node = object(value, path);
-  if (node.type === "surface" && node.attrs && Object.keys(node.attrs).length)
+  if (
+    !counter.resource &&
+    node.type === "surface" &&
+    node.attrs &&
+    Object.keys(node.attrs).length
+  )
     throw new Error(
       "Whiteboard root metadata belongs on the page, not the content node.",
     );
@@ -403,7 +410,7 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
     (typeof node.attrs.name !== "string" || node.attrs.name.length > 200)
   )
     throw new Error("Content names must contain at most 200 characters.");
-  if (node.type === "surface" && depth !== 0)
+  if (!counter.resource && node.type === "surface" && depth !== 0)
     throw new Error("A whiteboard root cannot be nested.");
   if (
     ["region", "richText"].includes(node.type) &&
@@ -423,7 +430,21 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
   } else if (node.text !== undefined)
     throw new Error(`Only text nodes can have a text field: ${path}.`);
   if (node.attrs !== undefined)
-    validateAttrs(node.attrs, `${path}.attrs`, nodeAttributes);
+    validateAttrs(
+      node.attrs,
+      `${path}.attrs`,
+      node.type === "drawing"
+        ? new Set([
+            "id",
+            "name",
+            "tool",
+            "color",
+            "strokeWidth",
+            "extent",
+            "points",
+          ])
+        : nodeAttributes,
+    );
   if (node.attrs?.canvas != null) {
     if (depth !== 1 || node.type !== "callout")
       throw new Error(
@@ -487,9 +508,14 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
     if (!Array.isArray(node.content))
       throw new Error(`${path}.content must be an array.`);
     if (
-      ["text", "image", "widget", "hardBreak", "horizontalRule"].includes(
-        node.type,
-      )
+      [
+        "text",
+        "image",
+        "widget",
+        "drawing",
+        "hardBreak",
+        "horizontalRule",
+      ].includes(node.type)
     )
       throw new Error(`${path} cannot contain child blocks.`);
     node.content.forEach((child, i) =>
@@ -520,8 +546,18 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
   ];
   const allowed = {
     doc: blockTypes,
-    surface: [...blockTypes, "region", "richText"],
-    region: [...blockTypes, "region", "richText"],
+    surface: [
+      ...blockTypes,
+      "region",
+      "richText",
+      ...(counter.resource ? ["surface", "drawing"] : []),
+    ],
+    region: [
+      ...blockTypes,
+      "region",
+      "richText",
+      ...(counter.resource ? ["surface", "drawing"] : []),
+    ],
     richText: blockTypes,
     paragraph: ["text", "hardBreak"],
     heading: ["text", "hardBreak"],
@@ -584,10 +620,19 @@ export function validateDocument(value) {
   if (!["doc", "surface"].includes(document.content?.type))
     throw new Error("Page content must be a doc or surface node.");
   const surface = document.content.type === "surface";
+  const resource = isResource(document);
   if (surface) assignSurfaceIds(document);
-  else if (document.layout !== undefined || document.views !== undefined)
+  else if (
+    document.layout !== undefined ||
+    document.views !== undefined ||
+    document.surfaceViews !== undefined
+  )
     throw new Error("Layout and views require a surface root.");
-  validateNode(document.content, "document.content", { count: 0, surface });
+  validateNode(document.content, "document.content", {
+    count: 0,
+    surface,
+    resource,
+  });
   if (surface) validateSurface(document);
   const canvasIds = new Set(
     (document.content.content ?? [])
@@ -656,7 +701,11 @@ export function validateDocument(value) {
     createdAt: document.createdAt ?? now,
     updatedAt: document.updatedAt ?? now,
     content: structuredClone(document.content),
-    ...(surface ? { layout: document.layout, views: document.views } : {}),
+    ...(resource
+      ? { layout: document.layout, surfaceViews: document.surfaceViews }
+      : surface
+        ? { layout: document.layout, views: document.views }
+        : {}),
     comments,
   };
 }
@@ -697,7 +746,7 @@ function validateSelection(selection, document) {
   object(selection, "selection");
   const ids = new Set();
   const visit = (node) => {
-    if (node.attrs?.id && !["doc", "surface", "text"].includes(node.type))
+    if (node.attrs?.id && !["doc", "text"].includes(node.type))
       ids.add(node.attrs.id);
     node.content?.forEach(visit);
   };
@@ -725,9 +774,9 @@ export function parseArtifact(input) {
     typeof input === "string" ? JSON.parse(input) : input,
     "artifact",
   );
-  if (artifact.format !== "showai" || ![1, 2].includes(artifact.version))
+  if (artifact.format !== "showai" || ![1, 2, 3].includes(artifact.version))
     throw new Error(
-      'Expected a ShowAI artifact with format "showai" and version 1 or 2.',
+      'Expected a ShowAI artifact with format "showai" and version 1, 2 or 3.',
     );
   if (
     artifact.presentation !== undefined &&

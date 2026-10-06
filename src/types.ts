@@ -16,6 +16,7 @@ export interface ShowPage {
   content: JSONContent;
   layout?: Record<string, NodeLayout>;
   views?: PageViews;
+  surfaceViews?: Record<string, PageViews>;
   comments: {
     id: string;
     text: string;
@@ -33,7 +34,7 @@ export interface WhiteboardPage extends ShowPage {
 
 export interface ShowArtifact {
   format: "showai";
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   document: ShowDocument;
   presentation?: "spatial" | "reading";
   /** This artifact contains a projection of the source page, not the whole page. */
@@ -44,3 +45,9 @@ export interface ShowArtifact {
 }
 
 export type WidgetData = Record<string, unknown>;
+
+export interface ContainerDocument extends ShowPage {
+  content: JSONContent & { type: "surface" };
+  layout: Record<string, NodeLayout>;
+  surfaceViews: Record<string, PageViews>;
+}

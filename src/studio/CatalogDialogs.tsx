@@ -39,6 +39,29 @@ import {
 } from "../core/component-categories";
 import "./catalog.css";
 
+function contentPartDocument(
+  document: ShowDocument,
+  part: TemplatePart | null,
+  content: ShowDocument["content"],
+): ShowDocument {
+  const {
+    layout: _layout,
+    views: _views,
+    surfaceViews: _surfaceViews,
+    ...metadata
+  } = document;
+  return {
+    ...metadata,
+    content,
+    ...(part?.type === "content"
+      ? {
+          ...(part.layout ? { layout: part.layout } : {}),
+          ...(part.views ? { views: part.views } : {}),
+          ...(part.surfaceViews ? { surfaceViews: part.surfaceViews } : {}),
+        }
+      : {}),
+  };
+}
 function TemplateContent(
   props: DocumentEditorProps & {
     document?: ShowDocument;
@@ -524,18 +547,11 @@ export function TemplateDialog({
                     content={layoutContent}
                     document={
                       parts.length
-                        ? {
-                            ...document,
-                            content: layoutContent,
-                            layout:
-                              activePart?.type === "content"
-                                ? activePart.layout
-                                : undefined,
-                            views:
-                              activePart?.type === "content"
-                                ? activePart.views
-                                : undefined,
-                          }
+                        ? contentPartDocument(
+                            document,
+                            activePart,
+                            layoutContent,
+                          )
                         : document
                     }
                     onDocumentChange={(next) => {
@@ -547,7 +563,10 @@ export function TemplateDialog({
                                   type: "content",
                                   content: next.content,
                                   layout: next.layout,
-                                  views: next.views,
+                                  ...(next.views ? { views: next.views } : {}),
+                                  ...(next.surfaceViews
+                                    ? { surfaceViews: next.surfaceViews }
+                                    : {}),
                                 }
                               : part,
                           ),
@@ -875,6 +894,15 @@ export function TemplateDialog({
                             {
                               type: "content" as const,
                               content: document.content,
+                              ...(document.layout
+                                ? { layout: document.layout }
+                                : {}),
+                              ...(document.views
+                                ? { views: document.views }
+                                : {}),
+                              ...(document.surfaceViews
+                                ? { surfaceViews: document.surfaceViews }
+                                : {}),
                             },
                           ]),
                       {

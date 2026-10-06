@@ -1,4 +1,5 @@
-import { upgradeDocument, linearContent } from "./surface/document.mjs";
+import { linearContent } from "./surface/document.mjs";
+import { upgradeResource } from "./surface/containers.mjs";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
@@ -38,7 +39,7 @@ function initialPage() {
     if (original && artifact.version === 1 && !localStorage.getItem(backupKey))
       localStorage.setItem(backupKey, original);
     return {
-      document: upgradeDocument(artifact.document),
+      document: upgradeResource(artifact.document),
       components: artifact.components ?? [],
       error: "",
     };

@@ -1,6 +1,10 @@
+import { DrawingInput } from "./Drawing";
+import type { JSONContent } from "@tiptap/core";
+import type { DrawingTool } from "./types";
 import { flushSync } from "react-dom";
 import {
   useEffect,
+  useLayoutEffect,
   useImperativeHandle,
   useRef,
   useState,
@@ -25,11 +29,19 @@ import "./surface.css";
 export interface SurfaceHandle {
   insertPosition: () => NodeLayout;
   reveal: (id: string) => void;
+  point: (x: number, y: number) => { x: number; y: number };
 }
 interface Props {
   children: ReactNode;
   ref?: Ref<SurfaceHandle>;
   pageId: string;
+  enabled?: boolean;
+  printing?: boolean;
+  onExpand?: (id: string) => void;
+  drawTool?: DrawingTool | null;
+  drawColor?: string;
+  onDraw?: (node: JSONContent, frame: NodeLayout) => void;
+  onDrawExit?: () => void;
   nodes: { id: string; name: string }[];
   layoutKey: string;
   paths: Record<string, string[]>;
@@ -64,6 +76,13 @@ export default function PageSurface({
   onAddText,
   onViews,
   extraActions,
+  enabled = true,
+  printing = false,
+  onExpand,
+  drawTool,
+  drawColor = "#252629",
+  onDraw,
+  onDrawExit,
 }: Props) {
   const [localSelection, setLocalSelection] = useState<string | null>(null);
   const selected =
@@ -72,7 +91,8 @@ export default function PageSurface({
   const { rootRef, scrollRef, worldRef, camera, controls, scale } =
     useSurfaceViewport(
       layoutKey,
-      onMove ? `showai.viewport.v2:${pageId}` : undefined,
+      onMove ? `showai.viewport.v3:${pageId}` : undefined,
+      enabled,
     );
   const [revealAll, setRevealAll] = useState(false);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
@@ -88,6 +108,47 @@ export default function PageSurface({
       cancelAnimationFrame(navigationFrames.current.second);
     };
   }, []);
+  useLayoutEffect(() => {
+    const root = rootRef.current!,
+      world = worldRef.current!;
+    if (!printing) return;
+    const fitPrint = () => {
+      const elements = [...world.children].filter(
+        (element): element is HTMLElement => element instanceof HTMLElement,
+      );
+      if (!elements.length) return;
+      const boxes = elements.map((element) => ({
+        x: parseFloat(element.style.left) || 0,
+        y: parseFloat(element.style.top) || 0,
+        width: element.offsetWidth,
+        height: element.offsetHeight,
+      }));
+      const left = Math.min(...boxes.map((box) => box.x)) - 12,
+        top = Math.min(...boxes.map((box) => box.y)) - 12;
+      const width =
+          Math.max(...boxes.map((box) => box.x + box.width)) - left + 12,
+        height = Math.max(...boxes.map((box) => box.y + box.height)) - top + 12;
+      const scale = Math.min(
+        1,
+        Math.max(1, root.clientWidth) / Math.max(1, width),
+        1000 / Math.max(1, height),
+      );
+      root.style.setProperty("--board-print-height", `${height * scale}px`);
+      root.style.setProperty(
+        "--board-print-transform",
+        `scale(${scale}) translate(${-left}px,${-top}px)`,
+      );
+    };
+    fitPrint();
+    const observer = new ResizeObserver(fitPrint);
+    observer.observe(root);
+    for (const child of world.children) observer.observe(child);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--board-print-height");
+      root.style.removeProperty("--board-print-transform");
+    };
+  }, [printing, nodes.length]);
   const navigation = useRef<HTMLDetailsElement>(null);
   const focusAfterMount = (
     ids?: string[],
@@ -150,6 +211,7 @@ export default function PageSurface({
       };
     },
     reveal: (id) => focusAfterMount([id], true),
+    point: (x, y) => controls.current.point(x, y),
   }));
   const names = new Map(nodes.map((node) => [node.id, node.name]));
   const viewTargets = selected
@@ -189,17 +251,20 @@ export default function PageSurface({
         selected,
         select: onSelect,
         inspect: onInspect,
+        expand: onExpand,
         addText: onAddText,
         remove: onRemove,
         move: onMove,
         readOnly: !onMove,
-        revealAll,
+        revealAll: revealAll || printing,
         revealed,
       }}
     >
       <div
         ref={rootRef}
         className="page-surface"
+        data-input-surface={enabled ? pageId : undefined}
+        data-board-id={pageId}
         onPointerDown={(event) => {
           if (
             !(event.target as Element).closest(
@@ -213,6 +278,8 @@ export default function PageSurface({
         tabIndex={0}
         onKeyDown={(event) => {
           if (
+            (event.target as Element).closest("[data-input-surface]") ===
+              event.currentTarget &&
             event.key === "Escape" &&
             !(event.target as Element).closest(
               'input,textarea,[contenteditable="true"]',
@@ -232,7 +299,17 @@ export default function PageSurface({
             {children}
           </div>
         </div>
-        {!nodes.length && (
+        {drawTool && enabled && onDraw && (
+          <DrawingInput
+            tool={drawTool}
+            color={drawColor}
+            camera={camera}
+            point={(x, y) => controls.current.point(x, y)}
+            onDraw={onDraw}
+            onExit={() => onDrawExit?.()}
+          />
+        )}
+        {!nodes.length && !drawTool && (
           <div className="surface-empty" data-surface-ui>
             <p>{onAdd ? "在这里开始一份内容" : "这块白板还没有内容"}</p>
             {onAdd && (

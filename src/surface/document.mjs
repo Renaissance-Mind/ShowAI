@@ -1,6 +1,14 @@
+import {
+  isResource,
+  fillResource,
+  reconcileResource,
+  resourceNodes,
+  insertResourceTemplate,
+} from "./containers.mjs";
 // Shared by Core, Agent, the editor and standalone exports. No DOM dependencies.
 export const isSurface = (document) => document.content?.type === "surface";
-export const artifactVersion = (document) => (isSurface(document) ? 2 : 1);
+export const artifactVersion = (document) =>
+  isResource(document) ? 3 : isSurface(document) ? 2 : 1;
 
 export function visitNodes(node, visitor, parent = null) {
   visitor(node, parent);
@@ -25,7 +33,8 @@ export function assignSurfaceIds(document, { repairLegacy = false } = {}) {
   const walk = (node, path) => {
     const previous = node.attrs?.id;
     if (
-      !["surface", "doc", "text"].includes(node.type) &&
+      (!["surface", "doc", "text"].includes(node.type) ||
+        (node.type === "surface" && isResource(document))) &&
       (!previous ||
         (repairLegacy && (seen.has(previous) || reserved.has(previous))))
     ) {
@@ -51,6 +60,7 @@ export function findSurfaceNode(document, id) {
 }
 
 export function fillSurfaceLayout(document) {
+  if (isResource(document)) return fillResource(document);
   if (!isSurface(document)) return document;
   document.layout ??= {};
   const walk = (parent) => {
@@ -152,6 +162,7 @@ export function reconcileSurface(source, { clone = true } = {}) {
   const document = fillSurfaceLayout(
     assignSurfaceIds(clone ? structuredClone(source) : source),
   );
+  if (isResource(document)) return reconcileResource(document);
   if (!isSurface(document)) return document;
   const ids = new Set(),
     regions = new Set();
@@ -190,6 +201,7 @@ export function reconcileSurface(source, { clone = true } = {}) {
 }
 
 export function orderedSurfaceNodes(document) {
+  if (isResource(document)) return resourceNodes(document);
   if (!isSurface(document)) return document.content.content ?? [];
   const nodes = document.content.content ?? [];
   const order = document.views?.readingOrder ?? [];
@@ -204,7 +216,10 @@ export function orderedSurfaceNodes(document) {
 export function linearContent(document) {
   const flatten = (node) =>
     ["region", "richText", "surface"].includes(node.type)
-      ? (node.content ?? []).flatMap(flatten)
+      ? (node.type === "surface" && isResource(document)
+          ? resourceNodes(document, node)
+          : (node.content ?? [])
+        ).flatMap(flatten)
       : [node];
   return {
     type: "doc",
@@ -217,7 +232,11 @@ export function remapSurfaceIds(source, nextId = () => crypto.randomUUID()) {
   const document = structuredClone(source),
     mapping = new Map();
   visitNodes(document.content, (node) => {
-    if (["doc", "surface", "text"].includes(node.type)) return;
+    if (
+      ["doc", "text"].includes(node.type) ||
+      (node.type === "surface" && !isResource(document))
+    )
+      return;
     const old = node.attrs?.id,
       id = nextId();
     if (old) mapping.set(old, id);
@@ -230,6 +249,30 @@ export function remapSurfaceIds(source, nextId = () => crypto.randomUUID()) {
         value,
       ]),
     );
+    if (isResource(document)) {
+      document.surfaceViews = Object.fromEntries(
+        Object.entries(document.surfaceViews ?? {}).map(([id, views]) => {
+          const viewIds = new Map(
+            views.saved.map((view) => [view.id, nextId()]),
+          );
+          return [
+            mapping.get(id),
+            {
+              initial: viewIds.get(views.initial) ?? null,
+              saved: views.saved.map((view) => ({
+                ...view,
+                id: viewIds.get(view.id),
+                targets: view.targets.map((target) => mapping.get(target)),
+              })),
+              readingOrder: views.readingOrder.map((target) =>
+                mapping.get(target),
+              ),
+            },
+          ];
+        }),
+      );
+      return document;
+    }
     const views = document.views ?? {
       initial: null,
       saved: [],
@@ -261,6 +304,8 @@ export function nodePaths(document) {
 }
 
 export function placeTemplate(source, template, parentId = null) {
+  if (isResource(source) || isResource(template))
+    return insertResourceTemplate(source, template, parentId);
   const page = upgradeDocument(source),
     incoming = remapSurfaceIds(upgradeDocument(template));
   const parent = parentId

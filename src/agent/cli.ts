@@ -63,6 +63,7 @@ function parseArguments(args: string[]): Arguments {
     "project",
     "name",
     "title",
+    "kind",
     "harness",
     "session",
     "source-directory",
@@ -333,6 +334,7 @@ export async function runCli(argv: string[]): Promise<unknown> {
         requireCount(args, 2);
         return service.createPage(project(), {
           title: option(args, "title"),
+          kind: option(args, "kind") as "page" | "board" | undefined,
           ...(option(args, "input")
             ? await readDocument(option(args, "input")!)
             : {}),

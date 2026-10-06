@@ -26,8 +26,8 @@ export function buildIdentity() {
   }
   return {
     version,
-    pageModelVersion: 2,
-    supportedArtifactVersions: [1, 2],
+    pageModelVersion: 3,
+    supportedArtifactVersions: [1, 2, 3],
     sourceCommit,
     sourceDirty,
   };

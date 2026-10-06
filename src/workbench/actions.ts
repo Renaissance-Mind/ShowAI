@@ -1,4 +1,9 @@
-import { upgradeDocument } from "../surface/document.mjs";
+import {
+  upgradeResource,
+  createResource,
+  wrapSurface,
+  surfaceKind,
+} from "../surface/containers.mjs";
 import { readFile, writeFile, stat } from "node:fs/promises";
 import { join, sep } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -387,6 +392,24 @@ export function createWorkbench(
               ? document.parentId
               : null;
         await validateDestination(id, parentId);
+        if (
+          args.kind !== undefined &&
+          !["page", "board"].includes(String(args.kind))
+        )
+          throw new Error("Choose Page or Board.");
+        let resource = upgradeResource(document, {
+          includeTitle: !!templateId || args.document !== undefined,
+        });
+        if (args.kind && args.kind !== surfaceKind(resource.content))
+          resource =
+            (!templateId || templateId === "blank") &&
+            args.document === undefined
+              ? createResource(document, args.kind as "page" | "board")
+              : wrapSurface(
+                  resource,
+                  resource.content.attrs!.id,
+                  args.kind as "page" | "board",
+                );
         return enrichPage(
           id,
           await service.createPage(id, {
@@ -394,9 +417,7 @@ export function createWorkbench(
               ? { title: required(args, "title") }
               : {}),
             document: {
-              ...upgradeDocument(document, {
-                includeTitle: !!templateId || args.document !== undefined,
-              }),
+              ...resource,
               parentId,
             },
           }),

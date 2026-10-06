@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { gzipSync } from "node:zlib";
 
 /** Adapt our self-contained reader to the conversation's isolated HTML surface. */
 export function toInlineFragment(html, id = `showai-${randomUUID()}`) {
@@ -90,7 +91,19 @@ export function toInlineFragment(html, id = `showai-${randomUUID()}`) {
       return `<script type="module">${script}</script>`;
     })
     .join("\n");
-  const fragment = `<section id="${id}" data-showai-inline-root>${markup}</section>\n<style>\n@scope (#${id}) {\n${css}\n.portable-document { max-width: none; padding: 24px 0 12px; }\n.portable-title { padding-right: 96px; font-size: 28px; margin-bottom: 24px; }\n.portable-options { display: none; }\n.portable-app { min-height: 0; }\n}\n</style>\n${code}\n`;
+  let fragment = `<section id="${id}" data-showai-inline-root>${markup}</section>\n<style>\n@scope (#${id}) {\n${css}\n.portable-document { max-width: none; padding: 24px 0 12px; }\n.portable-title { padding-right: 96px; font-size: 28px; margin-bottom: 24px; }\n.portable-options { display: none; }\n.portable-app { min-height: 0; }\n}\n</style>\n${code}\n`;
+  // Keep the editable artifact as plain JSON; pack only our generated reader.
+  // The bootstrap restores a normal inline module without eval, URLs or network.
+  if (Buffer.byteLength(fragment) > 1_000_000) {
+    fragment = fragment.replace(
+      /<script type="module">([\s\S]*?)<\/script>/g,
+      (_tag, script) => {
+        const packed = gzipSync(script, { level: 9 }).toString("base64");
+        const bootstrap = `const bytes=Uint8Array.from(atob("${packed}"),c=>c.charCodeAt(0));const reader=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"))).text();const script=document.createElement("script");script.type="module";script.textContent=reader;document.getElementById("${id}").append(script);`;
+        return `<script type="module" data-showai-packed-reader="gzip">${bootstrap}</script>`;
+      },
+    );
+  }
   if (Buffer.byteLength(fragment) > 1_000_000)
     throw new Error(
       "The inline page exceeds the 1 MB conversation limit. Use a standalone HTML page instead.",
