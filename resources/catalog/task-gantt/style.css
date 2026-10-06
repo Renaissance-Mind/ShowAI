@@ -496,6 +496,18 @@
 .sg-handle-end {
   right: 0;
 }
+@media (hover: hover) and (pointer: fine) {
+  .sg-handle {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+  }
+  .sg-bar-wrap:hover .sg-handle,
+  .sg-bar-wrap:focus-within .sg-handle {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
 .sg-is-milestone .sg-bar {
   overflow: visible;
   background: transparent;
