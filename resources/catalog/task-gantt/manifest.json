@@ -1,0 +1,110 @@
+{
+  "id": "task-gantt",
+  "name": "任务管理甘特图",
+  "version": "1.0.1",
+  "description": "可编辑的任务排期、进度、负责人、里程碑与前置依赖，支持拖动改期和日期表单。",
+  "category": "data",
+  "scenarios": [
+    "管理项目任务的日期、负责人、阶段与完成进度。",
+    "查看并调整排期，识别逾期任务和前置依赖冲突。"
+  ],
+  "effects": [
+    "在同一时间轴上比较任务起止时间、进度与里程碑。",
+    "编辑态保存任务增删与排期；阅读态支持搜索、筛选、时间导航和详情。"
+  ],
+  "entry": "index.tsx",
+  "defaultData": {
+    "title": "项目排期",
+    "tasks": []
+  },
+  "examples": [
+    {
+      "name": "产品交付计划",
+      "request": "展示从需求拆分到交付的示例任务排期。",
+      "data": {
+        "title": "产品交付计划",
+        "description": "示例任务 · 从需求到交付，让时间与进度一目了然",
+        "tasks": [
+          {
+            "id": "scope",
+            "title": "明确需求与任务拆分",
+            "owner": "产品",
+            "phase": "规划",
+            "start": "2026-10-05",
+            "end": "2026-10-07",
+            "progress": 100
+          },
+          {
+            "id": "design",
+            "title": "交互与视觉设计",
+            "owner": "设计",
+            "phase": "设计",
+            "start": "2026-10-08",
+            "end": "2026-10-12",
+            "progress": 40,
+            "dependencies": [
+              "scope"
+            ]
+          },
+          {
+            "id": "model",
+            "title": "任务数据与依赖校验",
+            "owner": "开发",
+            "phase": "开发",
+            "start": "2026-10-08",
+            "end": "2026-10-13",
+            "progress": 25,
+            "dependencies": [
+              "scope"
+            ]
+          },
+          {
+            "id": "timeline",
+            "title": "甘特图与拖动排期",
+            "owner": "开发",
+            "phase": "开发",
+            "start": "2026-10-13",
+            "end": "2026-10-20",
+            "progress": 0,
+            "dependencies": [
+              "design",
+              "model"
+            ]
+          },
+          {
+            "id": "qa",
+            "title": "交互验收与离线导出",
+            "owner": "测试",
+            "phase": "验收",
+            "start": "2026-10-21",
+            "end": "2026-10-24",
+            "progress": 0,
+            "dependencies": [
+              "timeline"
+            ]
+          },
+          {
+            "id": "launch",
+            "title": "交付里程碑",
+            "owner": "团队",
+            "phase": "交付",
+            "start": "2026-10-26",
+            "end": "2026-10-26",
+            "progress": 0,
+            "milestone": true,
+            "dependencies": [
+              "qa"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "空项目",
+      "data": {
+        "title": "新项目",
+        "tasks": []
+      }
+    }
+  ]
+}
