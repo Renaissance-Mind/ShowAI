@@ -20,6 +20,7 @@ import {
   instantiateTemplateRecord,
   listComponents,
   listBuiltinComponents,
+  describeBuiltinComponent,
   listTemplates,
   readComponentSource,
   readBuiltinComponentSource,
@@ -271,10 +272,7 @@ describe("compiled React packages", () => {
       "text",
       "image",
       "table",
-      "callout",
       "toggle",
-      "divider",
-      "code",
       "chart",
       "database",
       "metrics",
@@ -286,6 +284,15 @@ describe("compiled React packages", () => {
     expect(
       builtins.every((item) => item.propsSchema && item.scenarios.length),
     ).toBe(true);
+    expect(builtins.find((item) => item.kind === "text")!.name).toBe(
+      "Markdown",
+    );
+    for (const kind of ["callout", "divider", "code"]) {
+      expect(describeBuiltinComponent(kind).replacedBy).toBe("text");
+      expect(readBuiltinComponentSource(kind).source).toContain(
+        'from "showai:components"',
+      );
+    }
   });
   it("imports actual TSX, bundles React offline, reads its source and resolves document references once", async () => {
     const home = await temporary();
@@ -594,7 +601,7 @@ describe("compiled React packages", () => {
 describe("component composition and editable primitives", () => {
   it("compiles every builtin starting source through the shared SDK", async () => {
     const home = await temporary();
-    for (const item of listBuiltinComponents()) {
+    for (const item of listBuiltinComponents({ includeLegacy: true })) {
       const original = readBuiltinComponentSource(item.kind);
       const compiled = await saveComponent(
         home,

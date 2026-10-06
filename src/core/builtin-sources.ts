@@ -41,7 +41,7 @@ export const builtinSources: Record<string, string> = {
   "theme.css": `${themeTokens}\n${themeContent}`,
 };
 export const builtinExports: Record<string, string> = {
-  text: "Text",
+  text: "Markdown",
   image: "Image",
   table: "Table",
   callout: "Callout",

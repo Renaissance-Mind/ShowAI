@@ -47,6 +47,24 @@ try {
     "INVALID_PATH",
     "capture data stays restricted to the hidden preview frame",
   );
+  const builtinItems = await api("components:list", { scope: "builtin" });
+  assert.equal(
+    builtinItems.find((item) => item.kind === "text").name,
+    "Markdown",
+  );
+  for (const kind of ["callout", "divider", "code"]) {
+    assert.equal(
+      builtinItems.some((item) => item.kind === kind),
+      false,
+    );
+    assert.equal(
+      (await api("components:get", { id: kind, scope: "builtin" })).replacedBy,
+      "text",
+    );
+  }
+  for (const kind of ["image", "table", "toggle"])
+    assert.ok(builtinItems.some((item) => item.kind === kind));
+  const builtinCount = builtinItems.length;
   const a = await api("projects:create", { name: "项目 A" }),
     b = await api("projects:create", { name: "项目 B" });
   const ca = await api("components:createExample", { projectId: a.id });
@@ -60,7 +78,9 @@ try {
     "all",
   );
   await page.waitForFunction(
-    () => document.querySelectorAll(".studio-component-card").length === 16,
+    (expected) =>
+      document.querySelectorAll(".studio-component-card").length === expected,
+    builtinCount + 2,
   );
   const picker = await page.locator(".component-project-picker").boundingBox();
   const button = await page
@@ -78,7 +98,7 @@ try {
       document.querySelectorAll(".component-preview-error").length > 0 ||
       document.querySelectorAll(
         '.component-category[aria-label="文本组件"] .component-card-preview img',
-      ).length === 6,
+      ).length === 3,
     {},
     { timeout: 60000 },
   );
@@ -96,6 +116,33 @@ try {
     fullPage: true,
     animations: "disabled",
   });
+  await page
+    .locator(".studio-component-card")
+    .filter({
+      has: page.getByRole("heading", { name: "Markdown 内置", exact: true }),
+    })
+    .click();
+  const markdownDialog = page.getByRole("dialog", {
+    name: "Markdown",
+    exact: true,
+  });
+  await markdownDialog
+    .getByLabel("组件示例", { exact: true })
+    .selectOption({ label: "代码与分隔线" });
+  await markdownDialog
+    .locator(".sb-text pre code.language-javascript")
+    .waitFor();
+  assert.equal(await markdownDialog.locator(".sb-text hr").count(), 1);
+  await markdownDialog
+    .getByLabel("组件示例", { exact: true })
+    .selectOption({ label: "引用与说明" });
+  assert.equal(
+    await markdownDialog.locator(".sb-text blockquote strong").innerText(),
+    "关键结论",
+  );
+  await markdownDialog
+    .getByRole("button", { name: "关闭弹窗", exact: true })
+    .click();
   const nav = page.getByRole("navigation", { name: "组件类型" });
   for (const label of ["图片", "表格", "数据", "流程", "其他"]) {
     await nav.getByRole("button", { name: label, exact: true }).click();
@@ -119,7 +166,10 @@ try {
       animations: "disabled",
     });
   }
-  assert.equal(await page.locator(".component-card-preview img").count(), 16);
+  assert.equal(
+    await page.locator(".component-card-preview img").count(),
+    builtinCount + 2,
+  );
   const preview = await api("components:thumbnail", {
     id: "text",
     scope: "builtin",
@@ -172,7 +222,9 @@ try {
   await page.getByRole("button", { name: "关闭弹窗", exact: true }).click();
   await page.getByLabel("目录项目", { exact: true }).selectOption(a.id);
   await page.waitForFunction(
-    () => document.querySelectorAll(".studio-component-card").length === 15,
+    (expected) =>
+      document.querySelectorAll(".studio-component-card").length === expected,
+    builtinCount + 1,
   );
   await page
     .getByRole("navigation", { name: "组件来源" })

@@ -369,7 +369,9 @@ export class AgentService {
     }
     const builtinCandidate =
       [undefined, "all", "builtin"].includes(input.scope) &&
-      listBuiltinComponents().some((item) => item.kind === id);
+      listBuiltinComponents({ includeLegacy: true }).some(
+        (item) => item.kind === id,
+      );
     const installedMatch =
       builtinCandidate &&
       input.scope !== "builtin" &&

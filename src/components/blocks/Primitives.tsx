@@ -52,7 +52,15 @@ function markdownNodes(tokens: Token[]): ReactNode {
       case "code":
         return (
           <pre key={index}>
-            <code>{token.text}</code>
+            <code
+              className={
+                token.lang
+                  ? `language-${token.lang.split(/\s+/)[0]}`
+                  : undefined
+              }
+            >
+              {token.text}
+            </code>
           </pre>
         );
       case "blockquote":
@@ -137,7 +145,7 @@ export function TextBlock({ data, onChange, readOnly }: BlockProps) {
     <section
       className="sb-primitive sb-text"
       style={appearance(data)}
-      aria-label="文本框"
+      aria-label="Markdown"
     >
       <div className="sb-rich-text">
         {data.format === "plain" ? (

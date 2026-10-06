@@ -145,6 +145,7 @@ export interface ComponentSource {
 
 export interface BuiltinComponentMetadata {
   kind: string;
+  replacedBy?: string;
   name: string;
   description: string;
   scenarios: string[];

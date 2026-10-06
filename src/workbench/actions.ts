@@ -573,7 +573,9 @@ export function createWorkbench(
         const id = required(args, "id");
         if (
           (!args.scope || args.scope === "builtin") &&
-          listBuiltinComponents().some((item) => item.kind === id)
+          listBuiltinComponents({ includeLegacy: true }).some(
+            (item) => item.kind === id,
+          )
         )
           return { ...describeBuiltinComponent(id), id, scope: "builtin" };
         return getComponent(

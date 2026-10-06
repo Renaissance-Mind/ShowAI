@@ -1,15 +1,15 @@
 [
   {
     "kind": "text",
-    "name": "文本框",
-    "description": "支持 Markdown 与纯文本的基础文本组件，可定制颜色、字号、对齐和背景。",
+    "name": "Markdown",
+    "description": "统一书写标题、段落、列表、引用、代码块和分隔线，可调整字号、颜色、对齐与背景。",
     "scenarios": [
-      "撰写标题、段落、列表、引用和代码，建立页面的文字层次。",
-      "在自定义组件中组合文本和图像，或派生自己的语法与排版。"
+      "在同一个 Markdown 内容中组织标题、段落、列表、引用、代码与分隔线。",
+      "组合基础文字内容，或为自定义组件提供统一的文本表达入口。"
     ],
     "effects": [
-      "统一呈现 Markdown 标题、强调、引用、表格和代码。",
-      "通过组件数据调整颜色与外观；派生源码可扩展解析规则。"
+      "用一份 Markdown 内容呈现完整的文字层次与代码片段。",
+      "统一调整文本的颜色、字号、对齐与背景。"
     ],
     "version": "1.0.0",
     "defaultData": {
@@ -21,7 +21,8 @@
       "properties": {
         "content": {
           "type": "string",
-          "maxLength": 1000000
+          "maxLength": 1000000,
+          "description": "Markdown 内容；标题、列表、引用、代码块和分隔线可在同一份内容中混写。"
         },
         "format": {
           "enum": ["markdown", "plain"]
@@ -73,6 +74,30 @@
           "backgroundColor": "#f7f7f7",
           "padding": 20,
           "radius": 8
+        }
+      },
+      {
+        "name": "引用与说明",
+        "request": "在同一段 Markdown 中展示标题、说明和带强调的引用。",
+        "data": {
+          "format": "markdown",
+          "content": "## 阅读提示\n\n先了解主要结论，再查看依据。\n\n> **关键结论**\n>\n> 把证据放在结论旁边，让读者更容易理解。"
+        }
+      },
+      {
+        "name": "代码与分隔线",
+        "request": "在正文中直接插入带语言标记的代码块与分隔线。",
+        "data": {
+          "format": "markdown",
+          "content": "## 计算矩形面积\n\n先确定长与宽，再计算面积。\n\n```javascript\nconst area = width * height;\n```\n\n---\n\n长为 **3 m**、宽为 **4 m** 时，面积为 **12 m²**。"
+        }
+      },
+      {
+        "name": "列表与任务",
+        "request": "用 Markdown 编写编号、要点和任务清单。",
+        "data": {
+          "format": "markdown",
+          "content": "## 内容检查\n\n1. 明确主要观点\n2. 整理支撑证据\n\n- 保留必要的背景\n- 用 `关键词` 标出重点\n\n### 进度\n\n- [x] 已完成内容整理\n- [ ] 检查表达与排版"
         }
       }
     ]
@@ -334,7 +359,8 @@
           "content": "先看 **主要结论**，再检查每项证据。"
         }
       }
-    ]
+    ],
+    "replacedBy": "text"
   },
   {
     "kind": "toggle",
@@ -459,7 +485,8 @@
           "color": "#dddddd"
         }
       }
-    ]
+    ],
+    "replacedBy": "text"
   },
   {
     "kind": "code",
@@ -523,6 +550,7 @@
           "language": "javascript"
         }
       }
-    ]
+    ],
+    "replacedBy": "text"
   }
 ]

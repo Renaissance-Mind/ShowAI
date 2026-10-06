@@ -2,6 +2,7 @@ import "./block.css";
 import "./theme.css";
 export { GestureBoundary } from "./GestureBoundary";
 export {
+  TextBlock as Markdown,
   TextBlock as Text,
   ImageBlock as Image,
   TableBlock as Table,

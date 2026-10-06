@@ -22,6 +22,50 @@ import { validateDocument } from "../../portable/validation.mjs";
 import type { DatabaseColumn, DatabaseRow } from "./types";
 
 describe("interactive block data", () => {
+  it("offers one Markdown entry while retaining legacy text renderers", () => {
+    expect(getBlockDefinition("text")!.title).toBe("Markdown");
+    for (const kind of ["callout", "divider", "code"]) {
+      expect(blockDefinitions.some((block) => block.kind === kind)).toBe(false);
+      expect(getBlockDefinition(kind)!.replacedBy).toBe("text");
+      expect(
+        renderToStaticMarkup(
+          createElement(Widget, {
+            kind,
+            data: createBlockData(kind),
+            readOnly: true,
+          }),
+        ),
+      ).toContain("sb-primitive");
+    }
+    for (const kind of ["image", "table", "toggle"]) {
+      expect(blockDefinitions.some((block) => block.kind === kind)).toBe(true);
+    }
+  });
+
+  it("renders prose, quotes, lists, code and dividers from one Markdown content", () => {
+    const html = renderToStaticMarkup(
+      createElement(Widget, {
+        kind: "text",
+        data: {
+          content:
+            "## 标题\n\n正文 **强调**\n\n> 引用\n\n- 要点\n\n```javascript\nconst result = 1;\n```\n\n---",
+          format: "markdown",
+        },
+        readOnly: true,
+      }),
+    );
+    for (const markup of [
+      "<h2>",
+      "<strong>",
+      "<blockquote>",
+      "<ul>",
+      '<code class="language-javascript">',
+      "<hr/>",
+    ]) {
+      expect(html).toContain(markup);
+    }
+  });
+
   it("renders and exports every built-in empty block with independent data", () => {
     for (const block of [...blockDefinitions]) {
       const first = createBlockData(block.kind),

@@ -9,6 +9,7 @@ export interface BlockProps {
 
 export interface BlockDefinition {
   kind: string;
+  replacedBy?: string;
   title: string;
   description: string;
   icon: string;

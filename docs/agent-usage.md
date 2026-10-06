@@ -123,33 +123,33 @@ The resolution file contains the same refs, a new `version`, optional `id`, and 
 
 ## Basic components and code composition
 
-All canvas content is discoverable through the component catalog. Basic kinds are `text`, `image`, `table`, `callout`, `toggle`, `divider`, and `code`. Headings, paragraphs, lists, quotations and Markdown tables are part of the text component. Each kind uses the same page node envelope as interactive components:
+The Markdown component (`text`) combines headings, paragraphs, lists, quotations, code blocks and dividers in one content string. Images (`image`) and tables (`table`) have dedicated components for their editing, layout and appearance features. Foldable content (`toggle`) and interactive/custom components use their own kinds. Each kind uses the same page node envelope:
 
-```json
+````json
 {
   "type": "widget",
   "attrs": {
     "kind": "text",
     "data": {
-      "content": "## Main finding\n\nDescribe the evidence.",
+      "content": "## Main finding\n\nDescribe the evidence.\n\n> **Note:** check the inputs.\n\n```javascript\nconst result = input * 2;\n```\n\n---\n\n- Explain the result\n- Link supporting evidence",
       "format": "markdown",
       "color": "#30382e"
     }
   }
 }
-```
+````
 
 Request `--view schema` and `--view examples` for the selected kind. `--view source` returns an editable starting package for builtins as well as custom components. Choose your own manifest ID and version, edit the source or default data, then save to an explicit project. Appearance fields include color, background, alignment, padding, radius and, for text, font size. Image components support dimensions, fit, alt text and captions; simple tables use a string column array and rectangular rows of scalar cells.
 
 Custom React components can compose builtins directly:
 
 ```tsx
-import { Text, Image, Table } from "showai:components";
+import { Markdown, Image, Table } from "showai:components";
 
 export default function Figure({ data, onChange, readOnly }) {
   return (
     <section>
-      <Text
+      <Markdown
         data={data.text}
         readOnly={readOnly}
         onChange={(text) => onChange?.({ ...data, text })}

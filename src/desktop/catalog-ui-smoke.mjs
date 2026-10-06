@@ -167,7 +167,7 @@ try {
   await page
     .locator(".studio-component-card")
     .filter({
-      has: page.getByRole("heading", { name: "文本框 内置", exact: true }),
+      has: page.getByRole("heading", { name: "Markdown 内置", exact: true }),
     })
     .click();
   dialog = page.getByRole("dialog");

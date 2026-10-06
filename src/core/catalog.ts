@@ -81,16 +81,23 @@ export type {
   PackageMergePreview,
 } from "../components/custom/types";
 
-export function listBuiltinComponents(): BuiltinComponentMetadata[] {
-  return structuredClone([
+export function listBuiltinComponents({
+  includeLegacy = false,
+}: { includeLegacy?: boolean } = {}): BuiltinComponentMetadata[] {
+  const components = structuredClone([
     ...primitiveComponents,
     ...builtinComponents,
   ]) as BuiltinComponentMetadata[];
+  return includeLegacy
+    ? components
+    : components.filter((item) => !item.replacedBy);
 }
 export function describeBuiltinComponent(
   kind: string,
 ): BuiltinComponentMetadata {
-  const component = listBuiltinComponents().find((item) => item.kind === kind);
+  const component = listBuiltinComponents({ includeLegacy: true }).find(
+    (item) => item.kind === kind,
+  );
   if (!component) throw new Error(`Built-in component not found: ${kind}.`);
   return component;
 }

@@ -32,6 +32,7 @@ export type {
 
 /** Register before mounting the editor. Existing readers also update if a renderer is added later. */
 export const blockDefinitions: BlockDefinition[] = [];
+const allBlockDefinitions: BlockDefinition[] = [];
 const listeners = new Set<() => void>();
 let revision = 0;
 export const subscribeToBlocks = (listener: () => void) => {
@@ -67,13 +68,14 @@ export function registerBlock(
   if (!definition.title.trim()) throw new Error("Block title is required.");
   definition.defaultData = cloneBlockData(definition.defaultData);
   definition.validate?.(definition.defaultData);
-  blockDefinitions.push(definition);
+  allBlockDefinitions.push(definition);
+  if (!definition.replacedBy) blockDefinitions.push(definition);
   revision++;
   for (const listener of listeners) listener();
 }
 
 export function getBlockDefinition(kind: string): BlockDefinition | undefined {
-  return blockDefinitions.find((definition) => definition.kind === kind);
+  return allBlockDefinitions.find((definition) => definition.kind === kind);
 }
 
 function cloneBlockData(data: BlockData): BlockData {
@@ -139,6 +141,7 @@ function objectArray(data: BlockData, key: string): Record<string, unknown>[] {
 for (const item of primitiveMetadata) {
   registerBlock({
     kind: item.kind,
+    replacedBy: item.replacedBy,
     title: item.name,
     description: item.description,
     icon: (
