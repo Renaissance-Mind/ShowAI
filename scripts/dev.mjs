@@ -254,6 +254,22 @@ async function compile() {
     ],
     { cwd: root, env: { ...process.env, NODE_ENV: "production" } },
   );
+  await promisify(execFile)(
+    process.execPath,
+    [
+      join(root, "node_modules/vite/bin/vite.js"),
+      "build",
+      "--config",
+      join(root, "vite.portable.config.ts"),
+      "--mode",
+      "inline-core",
+      "--outDir",
+      join(staging, "reader-core"),
+      "--logLevel",
+      "warn",
+    ],
+    { cwd: root, env: { ...process.env, NODE_ENV: "production" } },
+  );
   return outputs.flatMap((result) => result.outputFiles);
 }
 async function publish(outputs) {
@@ -266,6 +282,12 @@ async function publish(outputs) {
   const reader = join(runtime, "assets/viewer.html");
   await copyFile(join(staging, "reader/portable.html"), reader + ".tmp");
   await rename(reader + ".tmp", reader);
+  const inlineReader = join(runtime, "assets/inline-core-viewer.html");
+  await copyFile(
+    join(staging, "reader-core/portable.html"),
+    inlineReader + ".tmp",
+  );
+  await rename(inlineReader + ".tmp", inlineReader);
   if (mode === "desktop")
     await writeFile(
       join(directory, "desktop/package.json"),

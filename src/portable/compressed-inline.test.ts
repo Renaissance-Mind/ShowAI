@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createServer } from "node:http";
 import { chromium } from "playwright";
+import { gunzipSync } from "node:zlib";
 import { FileStore } from "../core/store";
 import {
   blankDocument,
@@ -11,7 +12,7 @@ import {
   componentWidgetData,
 } from "../core/catalog";
 import { createResource } from "../surface/containers.mjs";
-import { buildPageHtml } from "../agent/exporter";
+import { buildPageHtml, findInlineViewerTemplate } from "../agent/exporter";
 import { toInlineFragment } from "./inline.mjs";
 it("renders a packed reader with an actual compiled component inside an opaque offline host", async () => {
   const home = await mkdtemp(join(tmpdir(), "showai-inline-packed-"));
@@ -34,15 +35,21 @@ it("renders a packed reader with an actual compiled component inside an opaque o
     },
   ];
   doc.surfaceViews[doc.content.attrs!.id].readingOrder = ["slider"];
-  const html = await buildPageHtml(doc, undefined, [component]);
+  const html = await buildPageHtml(doc, await findInlineViewerTemplate(doc), [
+    component,
+  ]);
   const fragment = toInlineFragment(html);
   expect(Buffer.byteLength(fragment)).toBeLessThanOrEqual(1_000_000);
   expect(fragment).toContain('data-showai-packed-reader="gzip"');
-  const data = JSON.parse(
+  const packed = JSON.parse(
     fragment.match(
-      /<script type="application\/json"[^>]*>([\s\S]*?)<\/script>/,
+      /<script type="application\/json"[^>]*data-showai-packed-data="gzip"[^>]*>([\s\S]*?)<\/script>/,
     )![1],
   );
+  const transport = JSON.parse(
+    gunzipSync(Buffer.from(packed.data, "base64")).toString(),
+  );
+  const data = JSON.parse(transport.artifact);
   expect(data.version).toBe(3);
   expect(data.document.content.attrs.kind).toBe("page");
   expect(data.components[0].html).toBe(component.html);
@@ -71,6 +78,11 @@ it("renders a packed reader with an actual compiled component inside an opaque o
     await slider.waitFor();
     await slider.focus();
     await slider.press("ArrowRight");
+    const restored = await frame
+      .locator('script[type="application/json"]')
+      .first()
+      .textContent();
+    expect(JSON.parse(restored!).components[0]).toEqual(data.components[0]);
     expect(await frame.locator("iframe").count()).toBe(0);
     expect(errors).toEqual([]);
   } finally {

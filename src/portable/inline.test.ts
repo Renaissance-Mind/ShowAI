@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { toInlineFragment } from "./inline.mjs";
+import { randomBytes } from "node:crypto";
+import { gunzipSync } from "node:zlib";
 
 const built =
   '<html><head><script type="module">const parse = text => `<body>${text}</body>`;const root=document.getElementById(`root`);const data=document.getElementById(`showai-data`);window.document.documentElement.dataset.theme="light";</script><style>:root{color:red}body{margin:0}</style></head><body><div id="root"></div><script type="application/json" id="showai-data">{"format":"showai"}</script></body></html>';
@@ -75,8 +77,30 @@ describe("inline page delivery", () => {
     ).toThrow("mount");
     expect(() =>
       toInlineFragment(
-        built.replace("color:red", "color:red;" + " ".repeat(1_000_000)),
+        built.replace(
+          "color:red",
+          "color:red;/*" + randomBytes(1_500_000).toString("base64") + "*/",
+        ),
       ),
     ).toThrow("1 MB");
+  });
+  it("compresses large repetitive styles and restores the entire transport losslessly", () => {
+    const css = "color:red;" + " ".repeat(1_000_000);
+    const fragment = toInlineFragment(
+      built.replace("color:red", css),
+      "showai-test",
+    );
+    expect(Buffer.byteLength(fragment)).toBeLessThan(1_000_000);
+    const packed = JSON.parse(
+      fragment.match(/data-showai-packed-data="gzip">([\s\S]*?)<\/script>/)![1],
+    );
+    const transport = JSON.parse(
+      gunzipSync(Buffer.from(packed.data, "base64")).toString(),
+    );
+    expect(transport.css).toContain(css);
+    expect(transport.artifact).toBe('{"format":"showai"}');
+    expect(transport.modules[0]).toContain(
+      'getElementById("showai-test-root")',
+    );
   });
 });

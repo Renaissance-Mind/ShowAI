@@ -97,6 +97,24 @@ const escapeHtml = (value: string) =>
       ]!,
   );
 
+/** Keep optional chart engines out of ordinary document conversation exports. */
+export async function findInlineViewerTemplate(
+  document: ShowDocument,
+  explicit?: string,
+): Promise<string> {
+  const full = await findViewerTemplate(explicit);
+  const hasG2 = (node: ShowDocument["content"]): boolean =>
+    (node.type === "widget" && String(node.attrs?.kind).startsWith("g2-")) ||
+    !!node.content?.some(hasG2);
+  if (hasG2(document.content)) return full;
+  for (const candidate of [
+    join(dirname(full), "inline-core-viewer.html"),
+    join(dirname(full), "inline-core/portable.html"),
+  ])
+    if (await exists(candidate)) return candidate;
+  return full;
+}
+
 export async function buildPageHtml(
   document: ShowDocument,
   templatePath?: string,
@@ -287,7 +305,9 @@ export async function exportPage(
     const bundledComponents = componentMode === "bundled" ? components : [];
     const html = await buildPageHtml(
       document,
-      options.templatePath,
+      options.format === "inline"
+        ? await findInlineViewerTemplate(document, options.templatePath)
+        : options.templatePath,
       bundledComponents,
       remoteComponents,
       presentation,

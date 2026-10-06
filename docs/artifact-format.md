@@ -221,7 +221,11 @@ components: [{
 
 Some conversation surfaces disallow nested iframes. For those surfaces, `--format inline` explicitly marks the root as `data-showai-inline-root`. The reader uses each component's generated `inline.script` and `inline.styles`, mounted in Shadow DOM inside the host's existing whole-page sandbox. Styles are isolated per component; component JavaScript shares that host page's execution context. This mode is disabled when the desktop bridge (`window.showai`) is present.
 
-The reader does not extract or evaluate scripts from arbitrary component HTML. Packages created before the inline mount bundle was available still work in the ordinary HTML reader; conversation mode reports that their original source must be imported under a new version. The complete UTF-8 fragment must remain under 1 MB. Larger pages should use standalone HTML.
+The reader does not extract or evaluate scripts from arbitrary component HTML. Packages created before the inline mount bundle was available still work in the ordinary HTML reader; conversation mode reports that their original source must be imported under a new version.
+
+Inline export selects the compact document reader when the selected content has no native G2 charts. Native G2 pages retain the full reader. The build and development runtime ship both readers. If the raw fragment exceeds 1 MB, the exporter losslessly gzip-compresses its reader modules, scoped styles and artifact together. A small local bootstrap restores the exact JSON and styles before starting the reader; custom component HTML, inline code and integrity remain intact. The companion `.showai.json` remains complete editable source. No network request is required to unpack or render.
+
+The 1 MB limit applies to the final emitted UTF-8 fragment, after compression. A standalone HTML file larger than 1 MB can still fit in conversation. If the compressed fragment remains too large, export meaningful selected blocks and link the full HTML; the error reports the actual compressed byte count. Large media and incompressible data can still exceed the host limit.
 
 ### Application-level block registration
 

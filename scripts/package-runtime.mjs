@@ -22,6 +22,10 @@ await copyFile(
   join(runtime, "assets/viewer.html"),
 );
 await copyFile(
+  join(root, "dist-portable/inline-core/portable.html"),
+  join(runtime, "assets/inline-core-viewer.html"),
+);
+await copyFile(
   join(root, "dist-agent/cli.mjs"),
   join(runtime, "scripts/cli.mjs"),
 );

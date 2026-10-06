@@ -327,7 +327,8 @@ try {
       "automatic recovery after runtime failure",
     );
     await poll(
-      () => page.evaluate(() => window.showai.invoke("projects:list")),
+      // A successful recovery navigates the page before its bridge is ready.
+      () => page.evaluate(() => window.showai?.invoke("projects:list") ?? []),
       (value) => value.some((item) => item.id === project.id),
       "recovered API",
     );
