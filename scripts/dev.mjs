@@ -109,7 +109,7 @@ const vite = await createServer({
     strictPort: true,
     open: false,
     middlewareMode: true,
-    hmr: { server: frontendServer, clientPort: port },
+    ws: { server: frontendServer, clientPort: port },
     fs: {
       deny: [
         ".env",
