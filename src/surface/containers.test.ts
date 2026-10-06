@@ -122,6 +122,21 @@ describe("recursive Page and Board containers", () => {
       ).saved,
     ).toEqual([]);
   });
+  it("wraps an auto-height Page in a bounded Board without invalidating the parent frame", () => {
+    const source = fixture();
+    const page = createSurface("page", "Auto", "auto-page");
+    const doc = addNode(source, page, {
+      x: 0,
+      y: 0,
+      width: 600,
+      heightMode: "auto",
+    });
+    const wrapped = wrapSurface(doc, "auto-page", "board");
+    const wrapper = findSurfaceNode(wrapped, "auto-page")!.parent!;
+    expect(wrapper.attrs!.kind).toBe("board");
+    expect(wrapped.layout[wrapper.attrs!.id].heightMode).toBe("fixed");
+    expect(() => validateDocument(wrapped)).not.toThrow();
+  });
   it("wraps either kind without copying or discarding the original surface", () => {
     const original = fixture(),
       id = original.content.attrs!.id;

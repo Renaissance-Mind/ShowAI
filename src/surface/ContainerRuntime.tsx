@@ -551,6 +551,13 @@ function containerOptions(document: ShowDocument, id: string) {
     )
       result.push(node);
   });
+  if (target?.type === "drawing")
+    return result.filter((node) => {
+      let owner: JSONContent | undefined = node;
+      while (owner && owner.type !== "surface")
+        owner = findSurfaceNode(document, owner.attrs!.id)?.parent ?? undefined;
+      return owner?.attrs?.kind === "board";
+    });
   return result;
 }
 function ContainerView({

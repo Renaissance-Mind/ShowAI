@@ -222,7 +222,13 @@ export function wrapSurface(source, id, kind) {
   if (target.parent) {
     target.parent.content[target.parent.content.indexOf(target.node)] = wrapper;
     const frame = document.layout[id];
-    if (frame) document.layout[wrapper.attrs.id] = { ...frame };
+    if (frame)
+      document.layout[wrapper.attrs.id] = {
+        ...frame,
+        ...(kind === "board"
+          ? { heightMode: "fixed", height: frame.height ?? 460 }
+          : {}),
+      };
   } else document.content = wrapper;
   document.layout[id] = {
     x: 0,
