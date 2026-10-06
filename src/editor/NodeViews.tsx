@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type PointerEvent, type MouseEvent } from "react";
 import {
   NodeViewContent,
   NodeViewWrapper,
@@ -13,6 +13,7 @@ export function WidgetView({
   updateAttributes,
   editor,
   selected,
+  getPos,
 }: NodeViewProps) {
   const editable = useEditorState({
     editor,
@@ -23,6 +24,34 @@ export function WidgetView({
       className={`document-widget${selected && editable ? " is-selected" : ""}`}
       data-widget-kind={node.attrs.kind}
       data-block-id={node.attrs.id ?? undefined}
+      onPointerDownCapture={(event: PointerEvent<HTMLDivElement>) => {
+        if (
+          !editable ||
+          event.button !== 0 ||
+          event.shiftKey ||
+          event.metaKey ||
+          event.ctrlKey
+        )
+          return;
+        const position = getPos();
+        if (!selected && typeof position === "number")
+          editor.commands.setNodeSelection(position);
+      }}
+      onClick={(event: MouseEvent<HTMLDivElement>) => {
+        if (
+          !editable ||
+          event.button !== 0 ||
+          event.shiftKey ||
+          event.metaKey ||
+          event.ctrlKey
+        )
+          return;
+        const position = getPos();
+        if (typeof position !== "number") return;
+        editor.commands.setNodeSelection(position);
+        // The atom owns the click; ProseMirror must not move its selection to nearby text.
+        event.stopPropagation();
+      }}
     >
       <Widget
         kind={node.attrs.kind}

@@ -277,7 +277,8 @@
 .document-content .ProseMirror-gapcursor:after {
   border-top-color: var(--accent);
 }
-.document-content[contenteditable="true"] .ProseMirror-selectednode {
+.document-content[contenteditable="true"]
+  .ProseMirror-selectednode:not(.node-widget) {
   outline: 2px solid color-mix(in srgb, var(--accent) 65%, transparent);
   outline-offset: 3px;
 }
@@ -482,11 +483,15 @@
 .document-widget {
   position: relative;
   margin: 25px 0;
+  border-radius: 10px;
 }
-.document-widget.is-selected {
-  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+.document-content[contenteditable="true"] .document-widget:hover {
+  outline: 1px solid var(--editor-line);
   outline-offset: 4px;
-  border-radius: 8px;
+}
+.document-content[contenteditable="true"] .document-widget.is-selected {
+  outline: 1px solid var(--accent);
+  outline-offset: 4px;
 }
 .block-handle {
   position: absolute;

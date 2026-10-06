@@ -10,7 +10,8 @@ import {
 import { createPortal } from "react-dom";
 import { EditorContent, useEditor } from "@tiptap/react";
 import type { Editor, JSONContent } from "@tiptap/core";
-import { Selection } from "@tiptap/pm/state";
+import { NodeSelection, Selection } from "@tiptap/pm/state";
+import { clearWidgetSelection } from "./widget-selection";
 import {
   AlignCenter,
   AlignLeft,
@@ -297,13 +298,15 @@ export default function DocumentEditor({
     }
   }, [editor, readOnly]);
   useEffect(() => {
-    if (
-      editor &&
-      JSON.stringify(editor.getJSON()) !== JSON.stringify(content)
-    ) {
+    if (editor && !editor.state.doc.eq(editor.schema.nodeFromJSON(content))) {
       const selection =
         editor.isFocused && editor.state.selection.toJSON().type === "text"
           ? editor.state.selection
+          : null;
+      const widgetId =
+        editor.state.selection instanceof NodeSelection &&
+        editor.state.selection.node.type.name === "widget"
+          ? editor.state.selection.node.attrs.id
           : null;
       editor.commands.setContent(content, { emitUpdate: false });
       if (selection) {
@@ -315,6 +318,21 @@ export default function DocumentEditor({
           editor.state.doc.resolve(to).parent.inlineContent
         )
           editor.commands.setTextSelection({ from, to });
+      }
+      if (widgetId) {
+        let position: number | undefined;
+        editor.state.doc.descendants((node, pos) => {
+          if (node.type.name === "widget" && node.attrs.id === widgetId)
+            position = pos;
+        });
+        if (position !== undefined) editor.commands.setNodeSelection(position);
+        else {
+          const transaction = clearWidgetSelection(editor.state);
+          if (transaction) editor.view.dispatch(transaction);
+        }
+      } else if (!selection) {
+        const transaction = clearWidgetSelection(editor.state);
+        if (transaction) editor.view.dispatch(transaction);
       }
       setSlash(null);
       setHover(null);
@@ -356,6 +374,47 @@ export default function DocumentEditor({
       document.removeEventListener("keydown", onKeyDown, true);
     };
   }, [Boolean(dialog), editor]);
+
+  useEffect(() => {
+    if (!editor || readOnly) return;
+    const clearInitialSelection = () => {
+      const transaction = clearWidgetSelection(editor.state);
+      if (transaction) editor.view.dispatch(transaction);
+    };
+    if (editor.isInitialized) clearInitialSelection();
+    else editor.on("create", clearInitialSelection);
+    const clearOnBlank = (event: PointerEvent) => {
+      if (event.button !== 0 || !(event.target instanceof Element)) return;
+      const target = event.target;
+      const widget = target.closest(".document-widget");
+      if (widget && editor.view.dom.contains(widget)) return;
+      // Keep the selection while using its formatting, menus and dialogs.
+      if (
+        !widget &&
+        target.closest(
+          'button, input, textarea, select, a, summary, [role="button"], [role="dialog"], .block-handle, .editor-toolbar, .editor-bubble, .editor-small-menu, .editor-modal',
+        )
+      )
+        return;
+      const transaction = clearWidgetSelection(editor.state);
+      if (!transaction) return;
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && editor.view.dom.contains(active))
+        active.blur();
+      editor.view.dispatch(transaction);
+      // Editor whitespace otherwise lets ProseMirror select the nearest atom again.
+      if (
+        editor.view.dom.contains(target) &&
+        !target.closest("[data-block-id]")
+      )
+        event.preventDefault();
+    };
+    document.addEventListener("pointerdown", clearOnBlank, true);
+    return () => {
+      editor.off("create", clearInitialSelection);
+      document.removeEventListener("pointerdown", clearOnBlank, true);
+    };
+  }, [editor, readOnly]);
 
   useEffect(() => {
     if (!slash?.manual) return;
