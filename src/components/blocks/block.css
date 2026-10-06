@@ -1116,7 +1116,7 @@
 .sb-bookmark > .sb-header {
   padding-bottom: 8px;
 }
-.sb-block .sb-bookmark-link {
+.sb-block.sb-bookmark .sb-bookmark-link {
   display: flex;
   align-items: stretch;
   gap: 12px;
@@ -1130,7 +1130,7 @@
   overflow: hidden;
   transition: background 0.15s, border-color 0.15s;
 }
-.sb-block .sb-bookmark-link:hover {
+.sb-block.sb-bookmark .sb-bookmark-link:hover {
   background: var(--sb-hover);
   border-color: color-mix(in srgb, var(--sb-accent) 20%, var(--sb-line));
   text-decoration: none;
