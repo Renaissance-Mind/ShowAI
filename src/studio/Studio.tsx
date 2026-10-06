@@ -1187,6 +1187,11 @@ export default function Studio() {
               </button>
             </div>
           )}
+          {view === "page" && page.draftNotice && !page.error && (
+            <div className="studio-conflict" role="status">
+              <p>{page.draftNotice}</p>
+            </div>
+          )}
           {view === "page" && page.error && (
             <div className="studio-conflict" role="alert">
               <div>

@@ -14,6 +14,7 @@ export interface ChangeContext {
   groupId?: string;
   restoredFrom?: string;
   mergedFrom?: string;
+  externalConflictId?: string;
   /** Generated from validated API arguments before server dates/IDs are allocated. */
   requestFingerprint?: string;
 }
@@ -39,6 +40,7 @@ export interface ChangeRecord extends ChangeContext {
 export interface HistoryEntry extends ChangeRecord {
   revision: string;
   parents: string[];
+  workspaceConflicts?: import("./workspace-conflicts").WorkspaceConflict[];
 }
 
 export interface LibraryManifest {

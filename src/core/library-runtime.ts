@@ -54,6 +54,9 @@ export async function mutateLibrary<T>(
     if (path)
       Object.assign(result.value, {
         revision: await library.resourceRevision(path, result.entry.revision),
+        ...(result.entry.workspaceConflicts?.length
+          ? { workspaceConflicts: result.entry.workspaceConflicts }
+          : {}),
       });
   }
   return result.value;

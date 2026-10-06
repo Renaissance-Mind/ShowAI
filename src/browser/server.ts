@@ -113,6 +113,12 @@ export async function startBrowserServer(options: BrowserServerOptions) {
                 ".locks",
                 "tmp",
                 "node_modules",
+                "repository.git",
+                "local",
+                "cache",
+                "index.sqlite",
+                "index.sqlite-wal",
+                "index.sqlite-shm",
               ].includes(part) || part.endsWith(".tmp"),
           ),
     });

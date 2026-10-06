@@ -31,6 +31,7 @@ import {
 } from "./diff";
 import { CoreError } from "./model";
 import { libraryMutations } from "./history-context";
+import { WorkspaceProtection } from "./workspace-conflicts";
 import {
   workspaceRoot,
   versionedLibrary,
@@ -974,11 +975,28 @@ export class FileStore {
           state?.root === this.root ? (state.head ?? undefined) : undefined,
         )
       : undefined;
+    const workspaceConflicts =
+      library && state?.root !== this.root
+        ? [
+            ...(await new WorkspaceProtection(library).inspect(
+              [logicalPath(this.root, path)!],
+              await library.head(),
+            )),
+            ...(await new WorkspaceProtection(library).list(
+              logicalPath(this.root, path)!,
+            )),
+          ].filter(
+            (item, index, all) =>
+              item.state === "unresolved" &&
+              all.findIndex((candidate) => candidate.id === item.id) === index,
+          )
+        : [];
     return {
       document,
       hash: documentHash(document),
       path,
       ...(revision ? { revision } : {}),
+      ...(workspaceConflicts.length ? { workspaceConflicts } : {}),
     };
   }
 

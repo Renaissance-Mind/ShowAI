@@ -98,9 +98,19 @@ async function useHome(home?: string): Promise<void> {
         .split(sep)
         .some(
           (part) =>
-            ["snapshots", "exports", ".locks", "tmp", "node_modules"].includes(
-              part,
-            ) || part.endsWith(".tmp"),
+            [
+              "snapshots",
+              "exports",
+              ".locks",
+              "tmp",
+              "node_modules",
+              "repository.git",
+              "local",
+              "cache",
+              "index.sqlite",
+              "index.sqlite-wal",
+              "index.sqlite-shm",
+            ].includes(part) || part.endsWith(".tmp"),
         ),
   });
   watcher.on("all", () => {

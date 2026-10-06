@@ -1,10 +1,12 @@
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { link, lstat, mkdir, readFile, rm, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { CoreError } from "./model";
+import { atomicLibraryFile, safeLibraryPath } from "./library-files";
 
-function absent(error: unknown): boolean {
-  return (error as NodeJS.ErrnoException).code === "ENOENT";
+interface LeaseOwner {
+  pid: number;
+  token: string;
 }
 function dead(pid: number): boolean {
   try {
@@ -16,8 +18,35 @@ function dead(pid: number): boolean {
     throw error;
   }
 }
+async function ownerAt(
+  root: string,
+  path: string,
+): Promise<LeaseOwner | undefined> {
+  await safeLibraryPath(root, path);
+  const info = await lstat(path).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined;
+    throw error;
+  });
+  if (!info) return undefined;
+  // Earlier development revisions used an owner file inside a lock directory.
+  const source = await readFile(
+    info.isDirectory() ? join(path, "owner.json") : path,
+    "utf8",
+  );
+  const value = JSON.parse(source) as LeaseOwner;
+  if (
+    !Number.isInteger(value.pid) ||
+    value.pid < 1 ||
+    !/^[\w-]{1,200}$/.test(value.token)
+  )
+    throw new CoreError(
+      "INVALID_DATA",
+      "The library lock has invalid ownership information.",
+    );
+  return value;
+}
 
-/** All library writers and maintenance cooperate across processes, without a daemon. */
+/** Publish a fully persisted owner with an atomic hard link: no empty-owner crash window. */
 export async function withLibraryLock<T>(
   root: string,
   action: () => Promise<T>,
@@ -26,77 +55,77 @@ export async function withLibraryLock<T>(
   if (!/^[a-z-]+$/.test(name))
     throw new CoreError("INVALID_PATH", "Invalid library lock name.");
   const local = join(root, "local");
+  await safeLibraryPath(root, local);
   await mkdir(local, { recursive: true });
+  const token = randomUUID(),
+    owner: LeaseOwner = { pid: process.pid, token };
+  const prepared = join(local, "leases", `${name}-${token}.json`);
+  await atomicLibraryFile(root, prepared, Buffer.from(JSON.stringify(owner)));
   const lock = join(local, `${name}.lock`);
-  const token = randomUUID();
   const deadline = Date.now() + 30_000;
-  while (true) {
-    try {
-      await mkdir(lock);
-      break;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      const owner = await readFile(join(lock, "owner.json"), "utf8").then(
-        (source) => JSON.parse(source) as { pid: number; token: string },
-        (error) => {
-          if (absent(error)) return undefined;
+  const reclaim = async (
+    path: string,
+    observed: LeaseOwner,
+    depth = 0,
+  ): Promise<void> => {
+    if (depth > 16)
+      throw new CoreError(
+        "LOCKED",
+        "Too many interrupted recovery leases. Inspect the library before retrying.",
+      );
+    const recovery = `${path}.recover-${observed.token}`;
+    let acquired = false;
+    while (!acquired) {
+      acquired = await link(prepared, recovery).then(
+        () => true,
+        (error: NodeJS.ErrnoException) => {
+          if (error.code === "EEXIST") return false;
           throw error;
         },
       );
-      if (
-        owner &&
-        Number.isInteger(owner.pid) &&
-        owner.pid > 0 &&
-        dead(owner.pid)
-      ) {
-        // One recovery lease ensures we never remove a replacement writer's lock.
-        const lease = join(local, `${name}-recovery.lock`);
-        const acquired = await mkdir(lease).then(
-          () => true,
-          (error) => {
-            if ((error as NodeJS.ErrnoException).code === "EEXIST")
-              return false;
-            throw error;
-          },
-        );
-        if (acquired) {
-          try {
-            const latest = await readFile(
-              join(lock, "owner.json"),
-              "utf8",
-            ).then(
-              (source) => JSON.parse(source) as { pid: number; token: string },
-              (error) => {
-                if (absent(error)) return undefined;
-                throw error;
-              },
-            );
-            if (latest?.token === owner.token && dead(latest.pid)) {
-              const stale = join(local, `dead-writer-${token}`);
-              await rename(lock, stale);
-              await rm(stale, { recursive: true });
-            }
-          } finally {
-            await rm(lease, { recursive: true });
-          }
-        }
+      if (!acquired) {
+        const holder = await ownerAt(root, recovery);
+        if (!holder) continue;
+        if (!dead(holder.pid)) return;
+        await reclaim(recovery, holder, depth + 1);
       }
+    }
+    try {
+      const latest = await ownerAt(root, path);
+      if (latest?.token === observed.token && dead(latest.pid))
+        await rm(path, { recursive: true });
+    } finally {
+      const lease = await ownerAt(root, recovery);
+      if (lease?.token === token) await unlink(recovery);
+    }
+  };
+  let acquired = false;
+  try {
+    while (!acquired) {
+      await safeLibraryPath(root, lock);
+      acquired = await link(prepared, lock).then(
+        () => true,
+        (error: NodeJS.ErrnoException) => {
+          if (error.code === "EEXIST") return false;
+          throw error;
+        },
+      );
+      if (acquired) break;
+      const existing = await ownerAt(root, lock);
+      if (existing && dead(existing.pid)) await reclaim(lock, existing);
       if (Date.now() >= deadline)
         throw new CoreError(
           "LOCKED",
-          "Another library write is still running. Retry after it finishes.",
+          "Another library operation is still running. Retry after it finishes.",
         );
       await new Promise((done) => setTimeout(done, 25));
     }
-  }
-  try {
-    await writeFile(
-      join(lock, "owner.json"),
-      JSON.stringify({ pid: process.pid, token }),
-      { flag: "wx", mode: 0o600 },
-    );
     return await action();
   } finally {
-    await rm(lock, { recursive: true });
+    if (acquired) {
+      const latest = await ownerAt(root, lock);
+      if (latest?.token === token) await unlink(lock);
+    }
+    await rm(prepared, { force: true });
   }
 }

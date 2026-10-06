@@ -1,20 +1,21 @@
 import { createRequire } from "node:module";
-import {
-  access,
-  lstat,
-  mkdir,
-  open,
-  readFile,
-  readdir,
-  rename,
-  rm,
-} from "node:fs/promises";
+import { access, mkdir, readFile, readdir, rename, rm } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { CoreError } from "./model";
 import { encodeFile, decodeFile, nodePrefix } from "./history-codec";
 import { withLibraryLock } from "./library-lock";
 import { libraryMutations } from "./history-context";
+import {
+  WorkspaceProtection,
+  workspaceHash,
+  type WorkspaceConflict,
+} from "./workspace-conflicts";
+import {
+  atomicLibraryFile,
+  readLibraryBytes,
+  safeLibraryPath,
+} from "./library-files";
 import {
   describeResponse,
   restoreResponse,
@@ -66,6 +67,7 @@ interface Journal {
   parent: string | null;
   candidate?: string;
   paths: string[];
+  before: Record<string, string | null>;
 }
 
 function assertPath(path: string): string {
@@ -491,7 +493,17 @@ export class GitLibrary {
                 (path) => join(this.workspace, assertPath(path)),
               )
             : undefined;
-          return { value: value as T, entry: receipt };
+          const unresolved = (
+            await new WorkspaceProtection(this).list()
+          ).filter(
+            (record) =>
+              record.state === "unresolved" &&
+              receipt.paths.includes(record.path),
+          );
+          return {
+            value: value as T,
+            entry: { ...receipt, workspaceConflicts: unresolved },
+          };
         }
       }
       const state = {
@@ -658,6 +670,7 @@ export class GitLibrary {
     context: ChangeContext,
     expected?: Map<string, string | null>,
     response?: ResponseDescriptor,
+    allowedConflicts = new Set<string>(),
   ): Promise<HistoryEntry | null> {
     await this.recoverUnlocked();
     const parent = await this.head();
@@ -744,7 +757,12 @@ export class GitLibrary {
     }
     const transaction = join(this.root, "local", "transactions", randomUUID());
     const id = transaction.split(sep).at(-1)!;
-    const journal: Journal = { id, parent, paths: record.paths };
+    const before = await new WorkspaceProtection(this).baseline(
+      record.paths,
+      parent,
+      allowedConflicts,
+    );
+    const journal: Journal = { id, parent, paths: record.paths, before };
     await mkdir(transaction, { recursive: true });
     await this.atomicFile(
       join(transaction, "journal.json"),
@@ -816,10 +834,16 @@ export class GitLibrary {
       revision,
       parents: parent ? [parent] : [],
     };
-    await this.materialize(record.paths, revision);
+    const workspaceConflicts = await new WorkspaceProtection(this).materialize(
+      record.paths,
+      revision,
+      before,
+    );
+    if (workspaceConflicts.length)
+      entry.workspaceConflicts = workspaceConflicts;
     await this.atomicFile(receiptPath, Buffer.from(JSON.stringify(entry)));
     await this.command(["update-ref", "-d", temporaryRef]);
-    await rm(transaction, { recursive: true });
+    if (!workspaceConflicts.length) await rm(transaction, { recursive: true });
     return entry;
   }
 
@@ -839,51 +863,7 @@ export class GitLibrary {
   }
 
   private async atomicFile(path: string, bytes: Buffer): Promise<void> {
-    const local = relative(this.root, path);
-    if (local === ".." || local.startsWith(`..${sep}`) || isAbsolute(local))
-      throw new CoreError("INVALID_PATH", "Library write leaves its root.");
-    await mkdir(dirname(path), { recursive: true });
-    let ancestor = dirname(path);
-    while (true) {
-      if ((await lstat(ancestor)).isSymbolicLink())
-        throw new CoreError(
-          "INVALID_PATH",
-          "Library paths must not contain symbolic links.",
-        );
-      if (ancestor === this.root) break;
-      ancestor = dirname(ancestor);
-    }
-    const temporary = join(dirname(path), `.${randomUUID()}.tmp`);
-    const file = await open(temporary, "wx", 0o600);
-    try {
-      await file.writeFile(bytes);
-      await file.sync();
-    } finally {
-      await file.close();
-    }
-    await rename(temporary, path);
-    if (process.platform !== "win32") {
-      const directory = await open(dirname(path), "r");
-      try {
-        await directory.sync();
-      } finally {
-        await directory.close();
-      }
-    }
-  }
-
-  private async materialize(paths: string[], revision: string): Promise<void> {
-    const entries = new Set(
-      (await this.tree(revision)).map((entry) => entry.path),
-    );
-    const present = paths.filter((path) => entries.has(path));
-    const files = await this.readFiles(present, revision);
-    for (const path of paths) {
-      const target = join(this.workspace, assertPath(path));
-      const bytes = files.get(path);
-      if (bytes) await this.atomicFile(target, bytes);
-      else await rm(target, { force: true });
-    }
+    return atomicLibraryFile(this.root, path, bytes);
   }
 
   private async recoverUnlocked(): Promise<void> {
@@ -928,7 +908,11 @@ export class GitLibrary {
         committed = ancestry.exitCode === 0;
       }
       if (committed) {
-        await this.materialize(journal.paths, head!);
+        const conflicts = await new WorkspaceProtection(this).materialize(
+          journal.paths,
+          head!,
+          journal.before ?? {},
+        );
         const message = (
           await this.command(["show", "-s", "--format=%B", journal.candidate!])
         ).toString("utf8");
@@ -937,6 +921,7 @@ export class GitLibrary {
           ...record,
           revision: journal.candidate!,
           parents: journal.parent ? [journal.parent] : [],
+          ...(conflicts.length ? { workspaceConflicts: conflicts } : {}),
         };
         await this.atomicFile(
           join(
@@ -947,7 +932,7 @@ export class GitLibrary {
           ),
           Buffer.from(JSON.stringify(receipt)),
         );
-        await rm(directory, { recursive: true });
+        if (!conflicts.length) await rm(directory, { recursive: true });
       } else {
         const drafts = join(this.root, "local", "drafts");
         await mkdir(drafts, { recursive: true });
@@ -959,6 +944,119 @@ export class GitLibrary {
         `refs/showai/transactions/${name}`,
       ]);
     }
+  }
+
+  async resolveWorkspaceConflict<T>(
+    id: string,
+    choice: "discard" | "import" | "merge",
+    context: ChangeContext,
+    apply?: (bytes: Buffer | null, conflict: WorkspaceConflict) => Promise<T>,
+  ): Promise<{
+    value?: T;
+    entry: HistoryEntry | null;
+    conflict: WorkspaceConflict;
+  }> {
+    await this.manifest();
+    return withLibraryLock(this.root, async () => {
+      const protection = new WorkspaceProtection(this);
+      const { conflict, bytes } = await protection.input(id);
+      assertPath(conflict.path);
+      if (conflict.state !== "unresolved")
+        throw new CoreError(
+          "CONFLICT",
+          "This external conflict has already been resolved.",
+        );
+      const head = await this.head();
+      const tree = new Set(
+        (head ? await this.tree(head) : []).map((entry) => entry.path),
+      );
+      const current =
+        head && tree.has(conflict.path)
+          ? await this.readFile(conflict.path, head)
+          : null;
+      const actual = await readLibraryBytes(
+        this.root,
+        join(this.workspace, conflict.path),
+      );
+      const fingerprint = workspaceHash(conflict.path, actual);
+      if (
+        fingerprint !== conflict.observedHash &&
+        fingerprint !== workspaceHash(conflict.path, current)
+      ) {
+        const newer = await protection.capture(
+          conflict.path,
+          head,
+          actual,
+          tree.has(conflict.path),
+        );
+        throw new CoreError(
+          "CONFLICT",
+          "外部文件又有新修改，新版本已保留。请查看最新冲突。",
+          { conflictId: newer.id },
+        );
+      }
+      const state = {
+        root: this.root,
+        head,
+        changes: new Map<string, Buffer | null>(),
+        expected: new Map<string, string | null>(),
+      };
+      let value: T | undefined;
+      if (choice !== "discard") {
+        if (!apply)
+          throw new CoreError(
+            "INVALID_DATA",
+            "Import or merge needs a validated resource operation.",
+          );
+        value = await libraryMutations.run(state, () => apply(bytes, conflict));
+        if (!state.changes.has(conflict.path))
+          throw new CoreError(
+            "INVALID_DATA",
+            "The resolution must update its conflicted resource.",
+          );
+      }
+      // The external bytes are safely retained. Restore the canonical projection
+      // before recovering interrupted commits or applying the validated resolution.
+      const target = join(this.workspace, conflict.path);
+      if (current !== null) await this.atomicFile(target, current);
+      else {
+        await safeLibraryPath(this.root, target);
+        await rm(target, { force: true });
+      }
+      await this.recoverUnlocked();
+      const pending = (await protection.list(conflict.path)).filter(
+        (item) => item.state === "unresolved",
+      );
+      const entry =
+        choice === "discard"
+          ? null
+          : await this.writeUnlocked(
+              state.changes,
+              {
+                ...context,
+                externalConflictId: id,
+                message:
+                  context.message ??
+                  (choice === "merge"
+                    ? "Merge external changes"
+                    : "Import external changes"),
+              },
+              state.expected,
+              undefined,
+              new Set(pending.map((item) => item.id)),
+            );
+      let resolved = conflict;
+      for (const item of pending) {
+        const record = await protection.resolve(
+          item.id,
+          choice,
+          entry?.revision ?? head,
+        );
+        if (item.id === id) resolved = record;
+      }
+      await this.recoverUnlocked();
+      return { value, entry, conflict: resolved };
+    });
   }
 
   async recover(): Promise<void> {

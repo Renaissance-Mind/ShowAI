@@ -4,11 +4,28 @@ import type { PageRecord } from "../core/model";
 import type { CompiledComponent } from "../components/custom/types";
 import type { ShowDocument } from "../types";
 import { desktop, errorCode, errorMessage } from "./bridge";
+import type { EditorDraftRecord } from "../core/editor-drafts";
 
 export interface LoadedPage extends PageRecord {
   components: CompiledComponent[];
 }
 export type SaveStatus = "saved" | "saving" | "changed" | "conflict" | "error";
+
+function pageContentKey(document: ShowDocument): string {
+  const { createdAt: _created, updatedAt: _updated, ...content } = document;
+  const normalize = (value: unknown): unknown =>
+    Array.isArray(value)
+      ? value.map(normalize)
+      : value && typeof value === "object"
+        ? Object.fromEntries(
+            Object.entries(value)
+              .filter(([, item]) => item !== undefined)
+              .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+              .map(([key, item]) => [key, normalize(item)]),
+          )
+        : value;
+  return JSON.stringify(normalize(content));
+}
 
 /** Serializes auto-saves and keeps external edits from silently replacing a draft. */
 export function usePage() {
@@ -27,6 +44,38 @@ export function usePage() {
   const pending = useRef<Promise<boolean> | null>(null);
   const blocked = useRef(false);
   const opening = useRef(0);
+  const clientId = useRef<string | undefined>(undefined);
+  if (!clientId.current) {
+    clientId.current =
+      sessionStorage.getItem("showai:editor-client") ?? crypto.randomUUID();
+    sessionStorage.setItem("showai:editor-client", clientId.current);
+  }
+  const retained = useRef<EditorDraftRecord | null>(null);
+  const [draftNotice, setDraftNotice] = useState("");
+  const persist = useCallback(
+    async (
+      source: ShowDocument,
+      sequence: number,
+      owner: string,
+    ): Promise<EditorDraftRecord> => {
+      const saved = await desktop.invoke<EditorDraftRecord>("drafts:save", {
+        input: {
+          kind: "page",
+          clientId: clientId.current,
+          resourceId: source.id,
+          projectId: owner,
+          baseRevision: baseRevision.current,
+          title: source.title,
+          content: source,
+          sequence,
+        },
+      });
+      if (projectRef.current === owner && current.current?.id === source.id)
+        retained.current = saved;
+      return saved;
+    },
+    [],
+  );
 
   const flush = useCallback(async (): Promise<boolean> => {
     if (pending.current) return pending.current;
@@ -47,6 +96,11 @@ export function usePage() {
         operations.current.set(sequence, operation);
         setStatus("saving");
         try {
+          const savedDraft = await persist(
+            source,
+            sequence,
+            projectRef.current,
+          );
           const saved = await desktop.invoke<LoadedPage>("pages:save", {
             projectId: projectRef.current,
             pageId: source.id,
@@ -68,8 +122,26 @@ export function usePage() {
             current.current = saved.document;
             setDraft(saved.document);
           }
+          if (saved.workspaceConflicts?.length) {
+            blocked.current = true;
+            setStatus("conflict");
+            setError(
+              "正式修改已保存，但外部文件也有修改，外部版本已保留。请处理冲突。",
+            );
+            return false;
+          }
+          if (saved.revision && savedDraft.sequence === sequence) {
+            await desktop.invoke("drafts:complete", {
+              id: savedDraft.id,
+              generation: savedDraft.generation,
+              revision: saved.revision,
+            });
+            if (retained.current?.generation === savedDraft.generation)
+              retained.current = null;
+          }
           setStatus("saved");
           setError("");
+          setDraftNotice("");
         } catch (reason) {
           blocked.current = true;
           setStatus(errorCode(reason) === "CONFLICT" ? "conflict" : "error");
@@ -86,7 +158,7 @@ export function usePage() {
     } finally {
       if (pending.current === promise) pending.current = null;
     }
-  }, []);
+  }, [persist]);
 
   const install = useCallback((projectId: string, page: LoadedPage) => {
     projectRef.current = projectId;
@@ -100,8 +172,15 @@ export function usePage() {
     blocked.current = false;
     setDraft(page.document);
     setRecord(page);
-    setStatus("saved");
-    setError("");
+    retained.current = null;
+    setDraftNotice("");
+    setStatus(page.workspaceConflicts?.length ? "conflict" : "saved");
+    setError(
+      page.workspaceConflicts?.length
+        ? "外部文件有未处理修改，外部版本已保留。"
+        : "",
+    );
+    blocked.current = !!page.workspaceConflicts?.length;
   }, []);
 
   const open = useCallback(
@@ -125,6 +204,49 @@ export function usePage() {
       )
         return true;
       install(projectId, loaded);
+      const drafts = await desktop.invoke<EditorDraftRecord[]>("drafts:list", {
+        kind: "page",
+        projectId,
+        resourceId: pageId,
+      });
+      if (
+        opening.current !== ticket ||
+        projectRef.current !== projectId ||
+        current.current?.id !== pageId
+      )
+        return true;
+      const candidate =
+        drafts.find((item) => item.clientId === clientId.current) ?? drafts[0];
+      if (candidate) {
+        const restored = await desktop.invoke<{
+          record: EditorDraftRecord;
+          content: ShowDocument;
+        }>("drafts:read", { id: candidate.id });
+        if (opening.current !== ticket || revision.current !== 0) return true;
+        const recoveredSequence = restored.record.sequence ?? 0;
+        revision.current = recoveredSequence;
+        savedRevision.current = recoveredSequence;
+        if (
+          pageContentKey(restored.content) !== pageContentKey(loaded.document)
+        ) {
+          current.current = restored.content;
+          setDraft(restored.content);
+          revision.current = recoveredSequence + 1;
+          retained.current = restored.record;
+          const conflict =
+            !!loaded.workspaceConflicts?.length ||
+            (!!restored.record.baseRevision &&
+              restored.record.baseRevision !== loaded.revision);
+          blocked.current = conflict;
+          setStatus(conflict ? "conflict" : "changed");
+          setError(
+            conflict
+              ? "已恢复本机草稿，正式版本也有新修改。请比较并处理。"
+              : "",
+          );
+          setDraftNotice("已恢复本机未提交的草稿");
+        }
+      }
       return true;
     },
     [flush, install],
@@ -157,6 +279,28 @@ export function usePage() {
     return () => clearTimeout(timer);
   }, [draft, status, flush]);
 
+  useEffect(() => {
+    if (
+      !draft ||
+      !projectRef.current ||
+      revision.current <= savedRevision.current
+    )
+      return;
+    const owner = projectRef.current,
+      sequence = revision.current,
+      source = structuredClone(draft);
+    const timer = setTimeout(() => {
+      void persist(source, sequence, owner).catch((reason) => {
+        if (projectRef.current !== owner || current.current?.id !== source.id)
+          return;
+        setError(`本机草稿保存失败：${errorMessage(reason)}`);
+        setStatus("error");
+        blocked.current = true;
+      });
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [draft, persist]);
+
   const refresh = useCallback(async () => {
     if (!projectRef.current || !current.current) return;
     if (pending.current) await pending.current;
@@ -175,10 +319,15 @@ export function usePage() {
         current.current?.id !== pageId ||
         opening.current !== ticket ||
         base.current !== knownBase ||
-        loaded.hash === knownBase
+        (loaded.hash === knownBase &&
+          loaded.revision === baseRevision.current &&
+          !loaded.workspaceConflicts?.length)
       )
         return;
-      if (revision.current > savedRevision.current) {
+      if (
+        revision.current > savedRevision.current ||
+        loaded.workspaceConflicts?.length
+      ) {
         blocked.current = true;
         setStatus("conflict");
         setError("文件已被其他工具修改。请选择保留本地草稿，或载入文件版本。");
@@ -317,6 +466,7 @@ export function usePage() {
     record,
     status,
     error,
+    draftNotice,
     projectId: projectRef.current,
     open,
     edit,

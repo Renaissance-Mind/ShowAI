@@ -11,6 +11,7 @@ import { changeContext, withChangeContext } from "../core/history-context";
 import { mutateLibrary } from "../core/library-runtime";
 import { canonicalJson } from "../core/diff";
 import type { ChangeActor } from "../core/history-model";
+import { EditorDrafts, type EditorDraftInput } from "../core/editor-drafts";
 import { AgentService } from "../agent/service";
 import { assertExportDestination, exportPage } from "../agent/exporter";
 import { assertId, CoreError, FileStore } from "../core/store";
@@ -58,6 +59,11 @@ import type { DesktopInfo } from "../desktop/bridge";
 
 export const workbenchActions = new Set([
   "app:info",
+  "drafts:list",
+  "drafts:read",
+  "drafts:save",
+  "drafts:remove",
+  "drafts:complete",
   "projects:list",
   "projects:create",
   "projects:rename",
@@ -281,6 +287,38 @@ export function createWorkbench(
     switch (action) {
       case "app:info":
         return host.info();
+      case "drafts:list":
+        return new EditorDrafts(store.root).list({
+          clientId: text(args, "clientId", true),
+          projectId: text(args, "projectId", true),
+          resourceId: text(args, "resourceId", true),
+          kind: text(args, "kind", true),
+        });
+      case "drafts:read":
+        return new EditorDrafts(store.root).read(required(args, "id"));
+      case "drafts:save": {
+        const input = args.input as EditorDraftInput;
+        if (!input || typeof input !== "object" || Array.isArray(input))
+          throw new CoreError(
+            "INVALID_DATA",
+            "A draft requires explicit input.",
+          );
+        return new EditorDrafts(store.root).save({
+          ...input,
+          actor: { kind: "human" },
+        });
+      }
+      case "drafts:remove":
+        return new EditorDrafts(store.root).remove(
+          required(args, "id"),
+          text(args, "generation", true),
+        );
+      case "drafts:complete":
+        return new EditorDrafts(store.root).completePage(
+          required(args, "id"),
+          required(args, "generation"),
+          required(args, "revision"),
+        );
       case "projects:list":
         return store.listProjects();
       case "sidebar:get":

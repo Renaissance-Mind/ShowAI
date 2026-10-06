@@ -53,6 +53,7 @@ export interface SidebarOrganization {
 
 export interface PageRecord {
   revision?: string;
+  workspaceConflicts?: import("./workspace-conflicts").WorkspaceConflict[];
   document: ShowDocument;
   hash: string;
   path: string;
@@ -189,16 +190,22 @@ export class CoreError extends Error {
   readonly code: CoreErrorCode;
   readonly currentHash?: string;
   readonly currentRevision?: string;
+  readonly conflictId?: string;
 
   constructor(
     code: CoreErrorCode,
     message: string,
-    details: { currentHash?: string; currentRevision?: string } = {},
+    details: {
+      currentHash?: string;
+      currentRevision?: string;
+      conflictId?: string;
+    } = {},
   ) {
     super(message);
     this.name = "CoreError";
     this.code = code;
     this.currentHash = details.currentHash;
     this.currentRevision = details.currentRevision;
+    this.conflictId = details.conflictId;
   }
 }

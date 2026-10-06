@@ -1067,6 +1067,9 @@ export function errorResult(error: unknown) {
   return {
     code,
     message,
+    ...(error instanceof CoreError && error.conflictId
+      ? { conflictId: error.conflictId }
+      : {}),
     ...(error instanceof CoreError && error.currentRevision
       ? { currentRevision: error.currentRevision }
       : {}),

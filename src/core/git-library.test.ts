@@ -220,7 +220,7 @@ describe("Git-backed content library", () => {
     );
   });
 
-  it("rejects unsafe paths and preserves input drafts after a materialization failure", async () => {
+  it("rejects unsafe workspace paths before publishing a commit", async () => {
     await expect(
       library.writeFiles(new Map([["../outside.json", initial]]), human),
     ).rejects.toMatchObject({ code: "INVALID_PATH" });
@@ -230,12 +230,9 @@ describe("Git-backed content library", () => {
     await expect(library.writeFiles(edits, agent)).rejects.toMatchObject({
       code: "INVALID_PATH",
     });
-    expect(await library.head()).not.toBeNull();
-    expect(
-      await readdir(join(library.root, "local", "transactions")),
-    ).toHaveLength(1);
+    expect(await library.head()).toBeNull();
     await rm(projectDir);
-    await library.recover();
+    await library.writeFiles(edits, agent);
     expect(
       JSON.parse(await readFile(join(library.workspace, path), "utf8")).document
         .content.content[0].content[0].text,
