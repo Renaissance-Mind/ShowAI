@@ -39,11 +39,24 @@ export async function registerRuntime(home: string, launch: RuntimeLaunch) {
   return { path, version, home: resolve(home), launch };
 }
 export async function runtimeInfo(home: string) {
+  const viewer = await findViewerTemplate();
+  const archive = join(dirname(viewer), "reader-source.json");
+  const hasArchive = await access(archive).then(
+    () => true,
+    (error) => {
+      if (error.code === "ENOENT") return false;
+      throw error;
+    },
+  );
   return {
     version,
     protocol: 1,
     home: resolve(home),
-    viewer: await findViewerTemplate(),
+    viewer,
+    readerCompilation: {
+      mode: hasArchive ? "page-dependencies" : "prebuilt",
+      sourceArchive: hasArchive ? archive : null,
+    },
     guideTopics: GUIDE_TOPICS,
     launch: {
       command: process.execPath,

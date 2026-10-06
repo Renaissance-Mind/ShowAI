@@ -27,6 +27,7 @@ import type { PublishedComponentLocator } from "../portable/publication-types";
 import type { CompiledComponent } from "../components/custom/types";
 import { assertOfflineImages } from "../portable/assets.mjs";
 import { toInlineFragment } from "../portable/inline.mjs";
+import { bundleReader } from "../portable/reader-bundle.mjs";
 import {
   injectArtifactIntoHtml,
   serializeArtifact,
@@ -97,22 +98,15 @@ const escapeHtml = (value: string) =>
       ]!,
   );
 
-/** Keep optional chart engines out of ordinary document conversation exports. */
-export async function findInlineViewerTemplate(
-  document: ShowDocument,
+export async function buildReaderTemplate(
+  documents: ShowDocument[],
   explicit?: string,
 ): Promise<string> {
   const full = await findViewerTemplate(explicit);
-  const hasG2 = (node: ShowDocument["content"]): boolean =>
-    (node.type === "widget" && String(node.attrs?.kind).startsWith("g2-")) ||
-    !!node.content?.some(hasG2);
-  if (hasG2(document.content)) return full;
-  for (const candidate of [
-    join(dirname(full), "inline-core-viewer.html"),
-    join(dirname(full), "inline-core/portable.html"),
-  ])
-    if (await exists(candidate)) return candidate;
-  return full;
+  const archive = join(dirname(full), "reader-source.json");
+  return !explicit && (await exists(archive))
+    ? bundleReader(archive, documents)
+    : readFile(full, "utf8");
 }
 
 export async function buildPageHtml(
@@ -125,7 +119,7 @@ export async function buildPageHtml(
 ): Promise<string> {
   assertOfflineImages(document);
   return injectArtifactIntoHtml(
-    await readFile(await findViewerTemplate(templatePath), "utf8"),
+    await buildReaderTemplate([document], templatePath),
     document,
     components,
     remoteComponents,
@@ -305,9 +299,7 @@ export async function exportPage(
     const bundledComponents = componentMode === "bundled" ? components : [];
     const html = await buildPageHtml(
       document,
-      options.format === "inline"
-        ? await findInlineViewerTemplate(document, options.templatePath)
-        : options.templatePath,
+      options.templatePath,
       bundledComponents,
       remoteComponents,
       presentation,
@@ -364,10 +356,6 @@ export async function exportPage(
     selected.map((page) =>
       store.readPage(options.projectId, page.id, { checkpoint: false }),
     ),
-  );
-  const template = await readFile(
-    await findViewerTemplate(options.templatePath),
-    "utf8",
   );
   let documents = records
     .map((record) => record.document)
@@ -461,6 +449,7 @@ export async function exportPage(
       options.projectId,
       join(out, path),
     );
+  const template = await buildReaderTemplate(documents, options.templatePath);
   await mkdir(join(out, "assets"), { recursive: true });
   await mkdir(join(out, "sources"), { recursive: true });
   const sourcePaths: string[] = [];

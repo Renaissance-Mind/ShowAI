@@ -95,7 +95,7 @@ export function toInlineFragment(html, id = `showai-${randomUUID()}`) {
   // Pack the complete transport, including repeated component HTML and CSS.
   // Restore the exact artifact before starting the reader: editable package
   // integrity and source downloads retain their original bytes and fields.
-  if (Buffer.byteLength(fragment) > 1_000_000) {
+  if (Buffer.byteLength(fragment) >= 128_000) {
     const transport = {
       artifact: artifactSource?.[2] ?? "null",
       css: fragment.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "",
@@ -108,7 +108,9 @@ export function toInlineFragment(html, id = `showai-${randomUUID()}`) {
     );
     const packedId = `${id}-packed`;
     const bootstrap = `const packed=JSON.parse(document.getElementById("${packedId}").textContent);const bytes=Uint8Array.from(atob(packed.data),c=>c.charCodeAt(0));const bundle=JSON.parse(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"))).text());const root=document.getElementById("${id}");const style=document.createElement("style");style.textContent=bundle.css;root.append(style);document.getElementById("${dataId}").textContent=bundle.artifact;for(const code of bundle.modules){await new Promise((resolve,reject)=>{const script=document.createElement("script");script.type="module";script.textContent=code;script.onload=resolve;script.onerror=()=>reject(new Error("ShowAI inline reader could not start."));root.append(script);});}`;
-    fragment = `<section id="${id}" data-showai-inline-root>${markup}</section>\n<script type="application/json" id="${dataId}">null</script>\n<script type="application/json" id="${packedId}" data-showai-packed-data="gzip">${JSON.stringify({ encoding: "gzip", data: packed })}</script>\n<script type="module" data-showai-packed-reader="gzip">${bootstrap}</script>\n`;
+    const compressed = `<section id="${id}" data-showai-inline-root>${markup}</section>\n<script type="application/json" id="${dataId}">null</script>\n<script type="application/json" id="${packedId}" data-showai-packed-data="gzip">${JSON.stringify({ encoding: "gzip", data: packed })}</script>\n<script type="module" data-showai-packed-reader="gzip">${bootstrap}</script>\n`;
+    if (Buffer.byteLength(compressed) < Buffer.byteLength(fragment))
+      fragment = compressed;
   }
   if (Buffer.byteLength(fragment) > 1_000_000)
     throw new Error(

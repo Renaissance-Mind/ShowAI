@@ -20,7 +20,7 @@ showai export --project PROJECT --page PAGE --format inline --components bundled
 
 ## 内容过大与局部展示
 
-当前 inline 上限为 1 MB，按实际 inline 导出返回的 `bytes` 判断。先尝试完整页面 inline 导出；运行时自动选择阅读器并在需要时无损压缩代码、样式和页面包，完整 HTML 的大小不代表 inline 大小。只有实际 inline 导出仍超限时，读取最新完整页面，从 `document.content` 获取区域或组件节点的 `attrs.id`，选择保留必要说明、结论和交互的区域：
+当前 inline 上限为 1 MB，按实际 inline 导出返回的 `bytes` 判断。先尝试完整页面 inline 导出；运行时按本页组件及依赖编译阅读器，并在能减小体积时无损压缩代码、样式和页面包，完整 HTML 的大小不代表 inline 大小。只有实际 inline 导出仍超限时，读取最新完整页面，从 `document.content` 获取区域或组件节点的 `attrs.id`，选择保留必要说明、结论和交互的区域：
 
 ```sh
 showai export --project PROJECT --page PAGE --blocks SUMMARY_REGION,COMPARISON_REGION --format inline --components bundled --presentation reading --out /ABSOLUTE_SESSION_OUTPUT/report-preview.html --json

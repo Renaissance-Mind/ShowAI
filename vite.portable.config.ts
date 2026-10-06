@@ -1,7 +1,6 @@
 import { buildIdentityPlugin } from "./scripts/build-info.mjs";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
-import { inlineCoreReaderPlugin } from "./scripts/inline-core-reader.mjs";
 
 /** Inline only our own emitted assets; no runtime CDN or pattern-matching dependency. */
 function portableHtml(): Plugin {
@@ -43,13 +42,8 @@ function portableHtml(): Plugin {
   };
 }
 
-export default defineConfig(({ mode }) => ({
-  plugins: [
-    ...(mode === "inline-core" ? [inlineCoreReaderPlugin()] : []),
-    react(),
-    buildIdentityPlugin(),
-    portableHtml(),
-  ],
+export default defineConfig({
+  plugins: [react(), buildIdentityPlugin(), portableHtml()],
   base: "./",
   publicDir: false,
   build: {
@@ -63,4 +57,4 @@ export default defineConfig(({ mode }) => ({
       output: { codeSplitting: false },
     },
   },
-}));
+});

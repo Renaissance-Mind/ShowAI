@@ -22,9 +22,10 @@ await copyFile(
   join(runtime, "assets/viewer.html"),
 );
 await copyFile(
-  join(root, "dist-portable/inline-core/portable.html"),
-  join(runtime, "assets/inline-core-viewer.html"),
+  join(root, "dist-portable/reader-source.json"),
+  join(runtime, "assets/reader-source.json"),
 );
+await rm(join(runtime, "assets/inline-core-viewer.html"), { force: true });
 await copyFile(
   join(root, "dist-agent/cli.mjs"),
   join(runtime, "scripts/cli.mjs"),
@@ -77,6 +78,7 @@ await build({
   platform: "node",
   format: "esm",
   target: "node22",
+  external: ["esbuild"],
 });
 const metadata = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
 const viewer = await readFile(join(runtime, "assets/viewer.html"), "utf8");

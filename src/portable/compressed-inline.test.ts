@@ -12,7 +12,7 @@ import {
   componentWidgetData,
 } from "../core/catalog";
 import { createResource } from "../surface/containers.mjs";
-import { buildPageHtml, findInlineViewerTemplate } from "../agent/exporter";
+import { buildPageHtml } from "../agent/exporter";
 import { toInlineFragment } from "./inline.mjs";
 it("renders a packed reader with an actual compiled component inside an opaque offline host", async () => {
   const home = await mkdtemp(join(tmpdir(), "showai-inline-packed-"));
@@ -35,9 +35,7 @@ it("renders a packed reader with an actual compiled component inside an opaque o
     },
   ];
   doc.surfaceViews[doc.content.attrs!.id].readingOrder = ["slider"];
-  const html = await buildPageHtml(doc, await findInlineViewerTemplate(doc), [
-    component,
-  ]);
+  const html = await buildPageHtml(doc, undefined, [component]);
   const fragment = toInlineFragment(html);
   expect(Buffer.byteLength(fragment)).toBeLessThanOrEqual(1_000_000);
   expect(fragment).toContain('data-showai-packed-reader="gzip"');

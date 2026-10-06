@@ -254,22 +254,10 @@ async function compile() {
     ],
     { cwd: root, env: { ...process.env, NODE_ENV: "production" } },
   );
-  await promisify(execFile)(
-    process.execPath,
-    [
-      join(root, "node_modules/vite/bin/vite.js"),
-      "build",
-      "--config",
-      join(root, "vite.portable.config.ts"),
-      "--mode",
-      "inline-core",
-      "--outDir",
-      join(staging, "reader-core"),
-      "--logLevel",
-      "warn",
-    ],
-    { cwd: root, env: { ...process.env, NODE_ENV: "production" } },
-  );
+  const readerSources = await (
+    await import("./build-reader-source.mjs")
+  ).buildReaderSource(root, join(staging, "reader/reader-source.json"));
+  for (const path of readerSources) dependencies.add(path);
   return outputs.flatMap((result) => result.outputFiles);
 }
 async function publish(outputs) {
@@ -282,9 +270,9 @@ async function publish(outputs) {
   const reader = join(runtime, "assets/viewer.html");
   await copyFile(join(staging, "reader/portable.html"), reader + ".tmp");
   await rename(reader + ".tmp", reader);
-  const inlineReader = join(runtime, "assets/inline-core-viewer.html");
+  const inlineReader = join(runtime, "assets/reader-source.json");
   await copyFile(
-    join(staging, "reader-core/portable.html"),
+    join(staging, "reader/reader-source.json"),
     inlineReader + ".tmp",
   );
   await rename(inlineReader + ".tmp", inlineReader);

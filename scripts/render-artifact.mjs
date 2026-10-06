@@ -10,6 +10,7 @@ import {
 
 import { assertOfflineImages } from "../src/portable/assets.mjs";
 import { toInlineFragment } from "../src/portable/inline.mjs";
+import { bundleReader } from "../src/portable/reader-bundle.mjs";
 
 const inline = process.argv.includes("--inline");
 const args = process.argv.slice(2).filter((arg) => arg !== "--inline");
@@ -53,7 +54,18 @@ if ((await stat(inputPath)).size > MAX_ARTIFACT_BYTES)
 const artifact = parseArtifact(await readFile(inputPath, "utf8"));
 assertOfflineImages(artifact.document);
 const html = injectArtifactIntoHtml(
-  await readFile(templatePath, "utf8"),
+  !explicitTemplate &&
+    (await stat(join(dirname(templatePath), "reader-source.json")).then(
+      () => true,
+      (error) => {
+        if (error.code === "ENOENT") return false;
+        throw error;
+      },
+    ))
+    ? await bundleReader(join(dirname(templatePath), "reader-source.json"), [
+        artifact.document,
+      ])
+    : await readFile(templatePath, "utf8"),
   artifact.document,
   artifact.components,
   artifact.remoteComponents,
