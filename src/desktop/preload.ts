@@ -46,6 +46,17 @@ if (process.isMainFrame) {
         closeListeners.delete(listener);
       };
     },
+    ...(process.env.SHOWAI_DEV_URL
+      ? {
+          async prepareReload() {
+            return (
+              await Promise.all(
+                [...closeListeners].map((listener) => listener()),
+              )
+            ).every(Boolean);
+          },
+        }
+      : {}),
   };
   contextBridge.exposeInMainWorld("showai", bridge);
 }

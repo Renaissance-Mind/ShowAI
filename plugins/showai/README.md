@@ -6,9 +6,11 @@ This package distributes workflows and reference documents. Install ShowAI deskt
 | ------------------ | -------------------------------------------------------------------------------- |
 | `show-document`    | Create, revise or export a page, report or small site.                           |
 | `create-component` | Build or adapt a reusable component when reuse and composition leave a real gap. |
-| `extract-template` | The user asks to abstract a mature page into a reusable template.                |
+| `create-template`  | Create or revise a reusable template, either directly or by abstracting a page.  |
 
 The active skill resolves the external launch from the selected content directory's `agent-runtime.json`, validates `runtime info`, and loads only the relevant CLI guide and selected catalog views. Runtime locations and installed components are discovered dynamically.
+
+`create-template` supports two workflows. With source material or a page to refine, create and iterate a concrete page, then abstract its reusable structure while preserving the original. With a clear recurring use case, offer natural-language usage prompts, save the selected template definition directly, then apply it to a preview page. Both workflows deliver a saved template, usage prompts in its examples, and an application preview; reusable feedback updates the template, while instance-specific edits stay in the page.
 
 `show-document` can display a complete page or selected page components/regions. Use `export --blocks ID,ID --format inline` for focused conversation updates, or `--format html` for a partial reader. Selection uses page node IDs and preserves the complete stored page. Query `guide export` on the active runtime to confirm block-selection support before using a newly updated skill with an older runtime.
 

@@ -53,6 +53,8 @@ if (process.env.SHOWAI_USER_DATA)
   app.setPath("userData", resolve(process.env.SHOWAI_USER_DATA));
 
 function runtimePath(): string {
+  if (!app.isPackaged && process.env.SHOWAI_DEV_RUNTIME)
+    return resolve(process.env.SHOWAI_DEV_RUNTIME);
   return app.isPackaged
     ? join(process.resourcesPath, "runtime")
     : join(repository, "dist-runtime");
@@ -358,6 +360,10 @@ async function openDeepLink(source: string): Promise<void> {
 
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
+  if (!app.isPackaged && process.env.SHOWAI_DEV_URL)
+    process.on("message", (message) => {
+      if (message === "showai:development-quit") app.quit();
+    });
   app.on("open-url", (event, url) => {
     event.preventDefault();
     if (!app.isReady()) pendingDeepLink = url;
@@ -461,6 +467,8 @@ else {
       );
       if (pendingDeepLink) await openDeepLink(pendingDeepLink);
       else await createWindow();
+      if (!app.isPackaged && process.env.SHOWAI_DEV_URL)
+        process.send?.({ type: "ready", home: store.root });
       app.on("activate", () => {
         if (!windows.size) void createWindow();
       });
@@ -479,7 +487,11 @@ else {
     checkingQuit = true;
     void Promise.all([...windows].map(requestClose)).then(async (results) => {
       checkingQuit = false;
-      if (!results.every(Boolean)) return;
+      if (!results.every(Boolean)) {
+        if (!app.isPackaged && process.env.SHOWAI_DEV_URL)
+          process.send?.({ type: "quit-blocked" });
+        return;
+      }
       allowedQuit = true;
       clearTimeout(notification);
       await watcher?.close();

@@ -67,7 +67,11 @@ npm run build
 npm run desktop
 ```
 
-桌面应用读取构建后的前端。修改代码后重新执行 `npm run build` 再启动。`npm run dev` 提供单页画布开发预览；完整本地工作台通过 `npm run desktop` 或 `npm run browser` 启动。
+日常开发运行 `npm run dev:desktop` 或 `npm run dev:browser`，无需预先构建或打安装包。前端保存后自动更新；本地服务、主进程与 CLI 的相关改动自动构建，并在打开的页面确认保存后重启。保存冲突会暂停更新，处理后点击右下角开发标记重试。
+
+默认地址为 `http://127.0.0.1:5173`，开发内容库为 `.showai-dev/library`。用 `-- --port 5174 --home /absolute/library` 指定端口和内容库，浏览器模式支持 `--no-open`。同一源码目录的多个会话共用一个开发服务；不同 worktree 使用不同端口与内容库。开发标记的提示显示代码目录和启动时分支、提交。
+
+`npm run dev` 提供独立单页画布预览。`npm run desktop` 和 `npm run browser` 运行构建后的工作台；修改代码后需要重新构建。修改依赖、Vite 配置或开发启动器后重新启动开发入口。`npm run test:dev` 在隔离副本中验收浏览器更新行为；`npm run test:dev -- desktop` 验收真实 Electron 更新行为。
 
 构建安装包：
 
@@ -125,7 +129,7 @@ HTML 与 inline 导出同时保存 `.showai.json` 源文件；独立页面的菜
 
 ## Codex 与 Claude Code 插件
 
-插件只分发三个技能：`show-document` 创建和修改页面，`create-component` 定义可复用组件，`extract-template` 将成熟页面抽象为模板。CLI、阅读器和组件编译器由独立安装的 ShowAI 软件提供；本地构建的运行包位于 `dist-runtime/`，桌面安装包把它放入 `Resources/runtime/`。
+插件只分发三个技能：`show-document` 创建和修改页面，`create-component` 定义可复用组件，`create-template` 新建、修改或提炼模板。模板创建支持先做页面再提炼，也支持直接保存模板、提供可选使用提示并生成应用预览。CLI、阅读器和组件编译器由独立安装的 ShowAI 软件提供；本地构建的运行包位于 `dist-runtime/`，桌面安装包把它放入 `Resources/runtime/`。
 
 桌面启动后会在所选内容目录登记 `agent-runtime.json`。使用独立运行包时执行 `npm run runtime:register`；技能读取启动配置并通过 `runtime info` 验证版本与内容目录。
 

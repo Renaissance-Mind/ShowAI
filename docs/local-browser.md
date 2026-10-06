@@ -64,7 +64,9 @@ npm run build:browser
 npm run browser
 ```
 
-开发预览 `npm run dev` 仍是独立单页画布，浏览器工作台通过本地服务启用。
+日常开发使用 `npm run dev:browser`，直接打开支持热更新的完整工作台，无需预先构建。默认地址为 `http://127.0.0.1:5173`，内容库为 `.showai-dev/library`。前端保存后自动更新；本地服务与 CLI 的相关改动自动构建，确认页面已保存后重启。保存冲突会暂停重启，处理后点击开发标记重试。可使用 `npm run dev:browser -- --port 5174 --home /absolute/library --no-open` 自定义启动。
+
+`npm run dev` 仍是独立单页画布；`npm run browser` 用于运行已经构建的浏览器工作台。
 
 ```sh
 node dist-runtime/scripts/cli.mjs serve --port 5175 --no-open
