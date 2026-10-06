@@ -65,6 +65,7 @@
   gap: 0;
   padding: 0;
   overflow: hidden;
+  border: 1px solid transparent;
   border-radius: 13px;
   transition:
     border-color 0.15s,
@@ -72,6 +73,11 @@
 }
 .component-catalog .studio-component-card:hover {
   border-color: var(--muted);
+}
+.component-catalog .studio-component-card.is-selected,
+.component-catalog .studio-component-card:focus-visible {
+  border-color: var(--brand-accent);
+  outline: none;
 }
 .component-source-tabs {
   margin-bottom: 20px;

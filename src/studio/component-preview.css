@@ -28,6 +28,16 @@
 .component-capture-native > .sb-code {
   padding: 24px;
 }
+.component-capture-native > .sb-chart,
+.component-capture-native > .sb-g2-chart {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.component-capture-native > .sb-chart,
+.component-capture-native > .sb-g2-chart:not(.is-dark) {
+  background: transparent;
+}
 .component-capture-native > .sb-divider {
   padding: 0;
   background: transparent;

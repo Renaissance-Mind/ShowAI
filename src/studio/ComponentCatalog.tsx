@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import {
   Blocks,
   PanelsTopLeft,
@@ -15,7 +15,9 @@ import type {
   ComponentGroup,
 } from "../core/component-categories";
 import "./component-catalog.css";
-import ComponentThumbnail from "./ComponentThumbnail";
+import ComponentThumbnail, {
+  componentPreviewReference,
+} from "./ComponentThumbnail";
 
 const categoryIcons = {
   text: Type,
@@ -80,12 +82,37 @@ export function ComponentCatalog({
   browser?: boolean;
   showProjectNames?: boolean;
 }) {
+  const catalog = useRef<HTMLDivElement>(null);
+  const [selected, setSelected] = useState<string | null>(null);
   const sections = useRef(new Map<ComponentCategory, HTMLElement>());
   const destination = useRef<{
     category: ComponentCategory;
     top: number;
     arrived: boolean;
   } | null>(null);
+  useEffect(() => {
+    const clearSelection = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element) || target.closest('[role="dialog"]'))
+        return;
+      if (
+        catalog.current?.contains(target) &&
+        target.closest(".studio-component-card")
+      )
+        return;
+      setSelected(null);
+      const active = document.activeElement;
+      if (
+        active instanceof HTMLElement &&
+        catalog.current?.contains(active) &&
+        active.closest(".studio-component-card")
+      )
+        active.blur();
+    };
+    document.addEventListener("pointerdown", clearSelection, true);
+    return () =>
+      document.removeEventListener("pointerdown", clearSelection, true);
+  }, []);
   useEffect(() => {
     const scroller = scrollRef.current;
     if (!scroller) return;
@@ -192,7 +219,7 @@ export function ComponentCatalog({
 
   const visible = groups.filter(({ items }) => items.length);
   return (
-    <div className="component-catalog">
+    <div className="component-catalog" ref={catalog}>
       {visible.map(({ id, label, items }) => {
         const Icon = categoryIcons[id];
         return (
@@ -213,6 +240,7 @@ export function ComponentCatalog({
             <div className="studio-component-grid">
               {items.map((item) => {
                 const builtin = "kind" in item;
+                const key = JSON.stringify(componentPreviewReference(item));
                 const scope = builtin
                   ? "内置"
                   : ({
@@ -224,13 +252,17 @@ export function ComponentCatalog({
                     }[item.scope] ?? item.scope);
                 return (
                   <button
-                    className="studio-component-card"
+                    className={`studio-component-card${selected === key ? " is-selected" : ""}`}
                     key={
                       builtin
                         ? item.kind
                         : `${item.id}@${item.version}:${item.scope}:${item.projectId ?? ""}:${item.integrity}`
                     }
-                    onClick={() => onOpen(item)}
+                    aria-haspopup="dialog"
+                    onClick={() => {
+                      setSelected(key);
+                      onOpen(item);
+                    }}
                   >
                     <ComponentThumbnail item={item} browser={browser} />
                     <div className="component-card-copy">
