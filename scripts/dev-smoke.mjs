@@ -100,7 +100,7 @@ const receipt = () =>
     if (error.code === "ENOENT") return undefined;
     throw error;
   });
-let browser;
+let browser, observer;
 try {
   const original = await poll(receipt, Boolean, "development launch");
   browser =
@@ -160,6 +160,16 @@ try {
     "function",
   );
   checks.push("complete development workbench and guarded reload bridge load");
+  if (mode === "desktop") {
+    observer = await chromium.launch({ headless: true });
+    const tab = await observer.newPage();
+    await tab.goto(original.url);
+    await tab.locator("[data-showai-development]").waitFor();
+    assert.equal(await tab.evaluate(() => typeof window.showai), "undefined");
+    checks.push(
+      "a browser tab at the desktop URL cannot block desktop updates",
+    );
+  }
 
   const style = join(fixture, "src/design/desktop.css");
   await writeFile(
@@ -384,6 +394,7 @@ try {
   console.error(logs);
   throw error;
 } finally {
+  await observer?.close();
   if (mode === "browser") await browser?.close();
   const exited =
     child.exitCode === null ? once(child, "exit") : Promise.resolve();

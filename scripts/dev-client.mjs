@@ -15,14 +15,19 @@ if (!new URLSearchParams(location.search).has("componentPreview")) {
     frozen = value;
     document.getElementById("root").inert = value;
   }
-  const hello = () =>
-    import.meta.hot.send("showai:hello", { url: location.href });
+  const hello = () => {
+    if (window.showai?.prepareReload)
+      import.meta.hot.send("showai:hello", { url: location.href });
+  };
+  if (info.mode === "desktop" && !window.showai)
+    badge.textContent = "请打开 Applications/ShowAI.app 使用桌面实时测试版";
   hello();
   import.meta.hot.on("vite:ws:connect", hello);
   import.meta.hot.on("showai:status", ({ message }) => {
     badge.textContent = `${label} · ${message}`;
   });
   import.meta.hot.on("showai:prepare-restart", async ({ id }) => {
+    if (!window.showai?.prepareReload) return;
     freeze(true);
     let allow = false;
     try {
