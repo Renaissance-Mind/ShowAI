@@ -4,13 +4,13 @@
   --sg-muted: light-dark(#72727d, #aaaab8);
   --sg-line: light-dark(#e9e9ef, #35353e);
   --sg-soft: light-dark(#f7f7fa, #24242c);
-  --sg-accent: light-dark(#120a8f, #aca4ff);
-  --sg-accent-bg: light-dark(#efedf9, #302c49);
-  --sg-bar: light-dark(#eeeaf8, #393544);
-  --sg-progress: light-dark(#c1b9e3, #77708f);
-  --sg-chart-mark: light-dark(#a49ccc, #b5a9d9);
-  --sg-done: light-dark(#eeecf5, #35323d);
-  --sg-done-strong: light-dark(#d2cee5, #696474);
+  --sg-accent: light-dark(#3e75b6, #9bc5f2);
+  --sg-accent-bg: light-dark(#edf4fc, #273344);
+  --sg-bar: light-dark(#eaf2fc, #303d50);
+  --sg-progress: light-dark(#bad3f0, #6b88ac);
+  --sg-chart-mark: light-dark(#89b0db, #a5c8ed);
+  --sg-done: light-dark(#edf2f8, #303946);
+  --sg-done-strong: light-dark(#c9d8e9, #687a92);
   --sg-danger: light-dark(#b34932, #f3a18c);
   color-scheme: light dark;
   background: var(--sg-bg);
@@ -28,6 +28,34 @@
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
+}
+.sg-gantt .sg-color-purple {
+  --sg-bar: light-dark(#eeeaf8, #393544);
+  --sg-progress: light-dark(#c1b9e3, #77708f);
+  --sg-chart-mark: light-dark(#a49ccc, #b5a9d9);
+  --sg-done: light-dark(#eeecf5, #35323d);
+  --sg-done-strong: light-dark(#d2cee5, #696474);
+}
+.sg-gantt .sg-color-amber {
+  --sg-bar: light-dark(#fcf1e4, #44382c);
+  --sg-progress: light-dark(#f0d3ae, #927757);
+  --sg-chart-mark: light-dark(#d6ad79, #d7b88f);
+  --sg-done: light-dark(#f7f1e9, #3d352c);
+  --sg-done-strong: light-dark(#e7d8c6, #82735f);
+}
+.sg-gantt .sg-color-rose {
+  --sg-bar: light-dark(#fbeef2, #46323c);
+  --sg-progress: light-dark(#eac4d0, #996d7d);
+  --sg-chart-mark: light-dark(#cf9baa, #dfb2c0);
+  --sg-done: light-dark(#f6eef1, #3f3238);
+  --sg-done-strong: light-dark(#e4d0d8, #896e78);
+}
+.sg-gantt .sg-color-slate {
+  --sg-bar: light-dark(#eef1f6, #353c46);
+  --sg-progress: light-dark(#cbd4e1, #788696);
+  --sg-chart-mark: light-dark(#9caabd, #b6c3d3);
+  --sg-done: light-dark(#f0f2f5, #333940);
+  --sg-done-strong: light-dark(#d7dfe8, #788390);
 }
 .sg-gantt * {
   box-sizing: border-box;
@@ -379,8 +407,8 @@
   top: 0;
   height: 100%;
   width: 1px;
-  background: var(--sg-chart-mark);
-  opacity: 0.6;
+  background: var(--sg-accent);
+  opacity: 0.3;
   z-index: 1;
   pointer-events: none;
 }

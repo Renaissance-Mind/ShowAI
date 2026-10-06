@@ -22,7 +22,9 @@ function Preview() {
       ? host.openai.widgetState.privateContent.gantt
       : undefined;
   const [data, setData] = useState<GanttData>(
-    saved && !validate(saved) ? saved : (sample as GanttData),
+    applySampleColors(
+      saved && !validate(saved) ? saved : (sample as GanttData),
+    ),
   );
   useEffect(() => {
     const restore = (event: Event) => {
@@ -33,7 +35,7 @@ function Preview() {
         state.gantt &&
         !validate(state.gantt)
       )
-        setData(state.gantt);
+        setData(applySampleColors(state.gantt));
     };
     window.addEventListener("openai:set_globals", restore);
     return () => window.removeEventListener("openai:set_globals", restore);
@@ -59,5 +61,17 @@ function Preview() {
       }}
     />
   );
+}
+function applySampleColors(data: GanttData): GanttData {
+  const palette = new Map(
+    (sample as GanttData).tasks.map((task) => [task.id, task.color]),
+  );
+  return {
+    ...data,
+    tasks: data.tasks.map((task) => ({
+      ...task,
+      color: task.color ?? palette.get(task.id) ?? "blue",
+    })),
+  };
 }
 createRoot(root).render(<Preview />);

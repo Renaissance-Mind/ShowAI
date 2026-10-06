@@ -1,8 +1,10 @@
 # 任务管理甘特图
 
-独立 React 组件包，入口接收 `{ data, onChange, readOnly }`。版本 `1.1.1`。
+独立 React 组件包，入口接收 `{ data, onChange, readOnly }`。版本 `1.2.0`。
 
-`data` 包含 `title`、可选 `description`、可选 `columns` 和最多 200 个 `tasks`。每个任务需要唯一 `id`、`title`、`start`、`end`（`YYYY-MM-DD`）和整数 `progress`（0–100）；可选 `owner`、`phase`、`dependencies`（前置任务 ID）、`milestone` 及 `parentId`（父任务 ID）。日期按整天计算，包含结束日，项目跨度最多 10 年。
+`data` 包含 `title`、可选 `description`、可选 `columns` 和最多 200 个 `tasks`。每个任务需要唯一 `id`、`title`、`start`、`end`（`YYYY-MM-DD`）和整数 `progress`（0–100）；可选 `owner`、`phase`、`dependencies`（前置任务 ID）、`milestone` 、`parentId`（父任务 ID）及 `color`（任务颜色）。日期按整天计算，包含结束日，项目跨度最多 10 年。
+
+任务默认使用浅蓝色。编辑表单可选择 `blue`、`purple`、`amber`、`rose`、`slate`，分别为蓝、紫、橙、粉、灰；颜色保存在任务数据中，完成状态仍由进度和状态列表达。
 
 默认行高 32px，任务条高 26px，任务与字段保持同一行。`columns` 是有序字段数组，以 `title` 开头；可选 `owner`、`status`、`phase`、`progress`、`start`、`end`。默认显示任务、负责人和状态；显示列设置支持增减和排序，编辑模式经 `onChange` 保存，阅读模式只调整当前视图。窄屏保留任务树，字段详情可点击任务查看。
 

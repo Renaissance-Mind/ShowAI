@@ -1,7 +1,7 @@
 {
   "id": "task-gantt",
   "name": "任务管理甘特图",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "紧凑多列任务甘特图，支持多层嵌套、汇总排期、拖动改期与依赖校验。",
   "category": "data",
   "scenarios": [
@@ -33,7 +33,8 @@
             "owner": "团队",
             "start": "2026-10-05",
             "end": "2026-10-26",
-            "progress": 0
+            "progress": 0,
+            "color": "blue"
           },
           {
             "id": "planning",
@@ -42,7 +43,8 @@
             "start": "2026-10-05",
             "end": "2026-10-26",
             "progress": 0,
-            "parentId": "product"
+            "parentId": "product",
+            "color": "blue"
           },
           {
             "id": "scope",
@@ -52,7 +54,8 @@
             "start": "2026-10-05",
             "end": "2026-10-07",
             "progress": 100,
-            "parentId": "planning"
+            "parentId": "planning",
+            "color": "blue"
           },
           {
             "id": "design",
@@ -63,7 +66,8 @@
             "end": "2026-10-12",
             "progress": 40,
             "dependencies": ["scope"],
-            "parentId": "planning"
+            "parentId": "planning",
+            "color": "purple"
           },
           {
             "id": "development",
@@ -72,7 +76,8 @@
             "start": "2026-10-05",
             "end": "2026-10-26",
             "progress": 0,
-            "parentId": "product"
+            "parentId": "product",
+            "color": "blue"
           },
           {
             "id": "model",
@@ -83,7 +88,8 @@
             "end": "2026-10-13",
             "progress": 25,
             "dependencies": ["scope"],
-            "parentId": "development"
+            "parentId": "development",
+            "color": "blue"
           },
           {
             "id": "timeline",
@@ -94,7 +100,8 @@
             "end": "2026-10-20",
             "progress": 0,
             "dependencies": ["design", "model"],
-            "parentId": "development"
+            "parentId": "development",
+            "color": "blue"
           },
           {
             "id": "qa",
@@ -105,7 +112,8 @@
             "end": "2026-10-24",
             "progress": 0,
             "dependencies": ["timeline"],
-            "parentId": "development"
+            "parentId": "development",
+            "color": "amber"
           },
           {
             "id": "launch",
@@ -117,7 +125,8 @@
             "progress": 0,
             "milestone": true,
             "dependencies": ["qa"],
-            "parentId": "product"
+            "parentId": "product",
+            "color": "rose"
           }
         ],
         "columns": ["title", "owner", "status"]

@@ -1,3 +1,11 @@
+export const taskColors = {
+  blue: "蓝色",
+  purple: "紫色",
+  amber: "橙色",
+  rose: "粉色",
+  slate: "灰色",
+};
+export type TaskColor = keyof typeof taskColors;
 export type Task = {
   id: string;
   title: string;
@@ -9,6 +17,7 @@ export type Task = {
   dependencies?: string[];
   milestone?: boolean;
   parentId?: string;
+  color?: TaskColor;
 };
 export const columnLabels = {
   title: "任务",
@@ -57,6 +66,8 @@ export function validate(data: GanttData): string | null {
   const ids = new Set<string>();
   for (const task of data.tasks) {
     if (!task.id || ids.has(task.id)) return "任务 ID 必须唯一。";
+    if (task.color && !Object.hasOwn(taskColors, task.color))
+      return "请选择有效的任务颜色。";
     ids.add(task.id);
     if (typeof task.title !== "string" || !task.title.trim())
       return "请填写任务名称。";

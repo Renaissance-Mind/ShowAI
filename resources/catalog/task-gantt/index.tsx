@@ -19,10 +19,12 @@ import {
   outline,
   status,
   today,
+  taskColors,
   validate,
   type GanttData,
   type Task,
   type Column,
+  type TaskColor,
 } from "./model";
 import "./style.css";
 
@@ -450,7 +452,7 @@ export default function TaskGantt({
             issues = conflicts(task, all);
           return (
             <div
-              className={`sg-row ${selected === task.id ? "sg-selected" : ""}`}
+              className={`sg-row sg-color-${task.color ?? "blue"} ${selected === task.id ? "sg-selected" : ""}`}
               key={task.id}
             >
               <div
@@ -773,6 +775,22 @@ export default function TaskGantt({
             </button>
           </div>
           <div className="sg-fields">
+            <label>
+              任务颜色
+              <select
+                aria-label="任务颜色"
+                value={draft.color ?? "blue"}
+                onChange={(event) =>
+                  setDraft({ ...draft, color: event.target.value as TaskColor })
+                }
+              >
+                {(Object.keys(taskColors) as TaskColor[]).map((color) => (
+                  <option key={color} value={color}>
+                    {taskColors[color]}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label>
               父任务
               <select

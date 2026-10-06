@@ -67,6 +67,9 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 120
+          },
+          "color": {
+            "enum": ["blue", "purple", "amber", "rose", "slate"]
           }
         }
       }
