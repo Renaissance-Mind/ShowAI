@@ -69,6 +69,8 @@ export const workbenchActions = new Set([
   "history:list",
   "history:compare",
   "history:page",
+  "history:html",
+  "history:importedHtml",
   "history:resource",
   "history:restore",
   "history:mergePreview",
@@ -303,6 +305,17 @@ export function createWorkbench(
     args: Record<string, unknown>,
   ): Promise<unknown> {
     switch (action) {
+      case "history:html":
+        return service.historicalHtml(
+          projectId(args),
+          pageId(args),
+          required(args, "revision"),
+        );
+      case "history:importedHtml":
+        return service.importedHtml(projectId(args), pageId(args), {
+          importId: required(args, "importId"),
+          snapshotId: required(args, "snapshotId"),
+        });
       case "library:prepareImport":
         return new LibraryImport(store.root).prepare(
           text(args, "source", true) ?? store.root,

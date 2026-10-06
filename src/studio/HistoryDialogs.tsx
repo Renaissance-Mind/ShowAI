@@ -18,8 +18,6 @@ import type { LibraryOperations } from "../core/library-operations";
 import type { SearchResult } from "../core/library-index";
 import type { PageMergePreview } from "../core/page-merge";
 import type { ShowDocument } from "../types";
-import SurfaceEditor from "../surface/SurfaceEditor";
-import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import "./history.css";
 
 function time(value: string) {
@@ -185,6 +183,7 @@ export function HistoryDialog({
   const [snapshot, setSnapshot] = useState<HistoricalPage | null>(null),
     [changes, setChanges] = useState<PageChange[]>([]),
     [tab, setTab] = useState<"changes" | "page">("changes");
+  const [frozenHtml, setFrozenHtml] = useState("");
   const [resourcePath, setResourcePath] = useState(""),
     [compareRevision, setCompareRevision] = useState("");
   const [raw, setRaw] = useState<{ before?: string; after?: string } | null>(
@@ -238,6 +237,7 @@ export function HistoryDialog({
     const ticket = ++choiceRequest.current;
     setSelected(entry);
     setSnapshot(null);
+    setFrozenHtml("");
     setChanges([]);
     setConfirm(false);
     setError("");
@@ -291,6 +291,18 @@ export function HistoryDialog({
       });
       if (ticket !== choiceRequest.current) return;
       setSnapshot(value);
+      if (value.reader) {
+        const rendered = await desktop.invoke<{ html: string }>(
+          "history:html",
+          {
+            projectId: pageMatch[1],
+            pageId: pageMatch[2],
+            revision: entry.revision,
+          },
+        );
+        if (ticket !== choiceRequest.current) return;
+        setFrozenHtml(rendered.html);
+      }
       if (parent && before) {
         try {
           const diff = await desktop.invoke<{ changes: PageChange[] }>(
@@ -515,13 +527,18 @@ export function HistoryDialog({
                   <h3 className="history-preview-title">
                     {snapshot.document.title || "无标题"}
                   </h3>
-                  <CustomComponentsProvider components={snapshot.components}>
-                    <SurfaceEditor
-                      document={snapshot.document}
-                      readOnly
-                      onChange={() => {}}
+                  {frozenHtml ? (
+                    <iframe
+                      title="历史页面预览"
+                      sandbox="allow-scripts allow-downloads"
+                      srcDoc={frozenHtml}
+                      className="history-frozen-reader"
                     />
-                  </CustomComponentsProvider>
+                  ) : (
+                    <p className="history-empty">
+                      这个版本没有记录阅读器。页面数据与差异仍可查看。
+                    </p>
+                  )}
                 </div>
               ) : (
                 <>
@@ -618,6 +635,7 @@ export function ImportedSnapshotsDialog({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [confirm, setConfirm] = useState(false);
+  const [frozenHtml, setFrozenHtml] = useState("");
   const request = useRef(0);
   useEffect(() => {
     let active = true;
@@ -647,6 +665,7 @@ export function ImportedSnapshotsDialog({
     const ticket = ++request.current;
     setSelected(item);
     setPreview(null);
+    setFrozenHtml("");
     setError("");
     setConfirm(false);
     if (item.issue) {
@@ -665,6 +684,18 @@ export function ImportedSnapshotsDialog({
         },
       );
       if (ticket === request.current) setPreview(value);
+      if (value.reader) {
+        const rendered = await desktop.invoke<{ html: string }>(
+          "history:importedHtml",
+          {
+            projectId,
+            pageId: item.pageId,
+            importId: item.importId,
+            snapshotId: item.id,
+          },
+        );
+        if (ticket === request.current) setFrozenHtml(rendered.html);
+      }
     } catch (reason) {
       if (ticket === request.current) setError(errorMessage(reason));
     } finally {
@@ -766,14 +797,20 @@ export function ImportedSnapshotsDialog({
                   </button>
                 </div>
               )}
+              <p className="history-merge-summary">
+                原阅读器版本未知，此预览使用导入时保存的阅读器。
+              </p>
               <div className="history-preview">
-                <CustomComponentsProvider components={preview.components}>
-                  <SurfaceEditor
-                    document={preview.document}
-                    readOnly
-                    onChange={() => {}}
+                {frozenHtml ? (
+                  <iframe
+                    title="旧快照预览"
+                    sandbox="allow-scripts allow-downloads"
+                    srcDoc={frozenHtml}
+                    className="history-frozen-reader"
                   />
-                </CustomComponentsProvider>
+                ) : (
+                  <p className="history-empty">这个旧快照未保存阅读器。</p>
+                )}
               </div>
             </>
           )}

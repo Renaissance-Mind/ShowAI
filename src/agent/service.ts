@@ -937,6 +937,8 @@ export class AgentService {
     overwrite?: boolean;
     components?: "bundled" | "remote";
     presentation?: "spatial" | "reading";
+    revision?: string;
+    importedSnapshot?: { importId: string; snapshotId: string };
   }) {
     return exportPage({
       root: this.store.root,
@@ -997,6 +999,24 @@ export class AgentService {
       this.requireProject(projectId),
       pageId,
       revision,
+    );
+  }
+  historicalHtml(projectId: string, pageId: string, revision: string) {
+    return this.versioned().historicalHtml(
+      this.requireProject(projectId),
+      pageId,
+      revision,
+    );
+  }
+  importedHtml(
+    projectId: string,
+    pageId: string,
+    ref: { importId: string; snapshotId: string },
+  ) {
+    return this.versioned().importedHtml(
+      this.requireProject(projectId),
+      pageId,
+      ref,
     );
   }
   restorePage(input: {

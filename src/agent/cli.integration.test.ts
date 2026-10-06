@@ -2309,6 +2309,34 @@ test("versioned history/search/merge/restore are reachable from CLI and project-
       ])
     ).document,
   ).toEqual(first.document);
+  const html = await local([
+    "history",
+    "read",
+    first.document.id,
+    "--project",
+    project.id,
+    "--revision",
+    first.revision,
+    "--view",
+    "html",
+  ]);
+  expect(html.reader.integrity).toMatch(/^[a-f0-9]{64}$/);
+  expect(html.html).toContain("showai-data");
+  const historicOut = join(root, "historical-reader-export.html");
+  await local([
+    "export",
+    "--project",
+    project.id,
+    "--page",
+    first.document.id,
+    "--revision",
+    first.revision,
+    "--format",
+    "html",
+    "--out",
+    historicOut,
+  ]);
+  expect(await readFile(historicOut, "utf8")).toContain("Historical report");
   const restoreArgs = [
     "history",
     "restore",
@@ -2367,6 +2395,14 @@ test("versioned history/search/merge/restore are reachable from CLI and project-
         }),
       ).data.document.content.content[0].content[0].text,
     ).toBe("论文图表检索证据");
+    const rendered = unpack(
+      await client.callTool({
+        name: "history_html",
+        arguments: { pageId: first.document.id, revision: second.revision },
+      }),
+    ).data;
+    expect(rendered.html).toContain("论文图表检索证据");
+    expect(rendered.reader.integrity).toMatch(/^[a-f0-9]{64}$/);
     expect(
       unpack(
         await client.callTool({

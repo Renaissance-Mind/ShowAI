@@ -18,8 +18,10 @@ import {
   resolve,
   sep,
 } from "node:path";
-import { fileURLToPath } from "node:url";
 import { FileStore } from "../core/store";
+import { LibraryOperations } from "../core/library-operations";
+import { versionedLibrary, logicalPath } from "../core/library-runtime";
+import { readArchivedReader } from "../core/archived-reader";
 import { resolveDocumentComponents } from "../core/catalog";
 import { resolvePublishedComponents } from "../core/publication";
 import { publicationRefKey } from "../portable/remote.mjs";
@@ -27,7 +29,11 @@ import type { PublishedComponentLocator } from "../portable/publication-types";
 import type { CompiledComponent } from "../components/custom/types";
 import { assertOfflineImages } from "../portable/assets.mjs";
 import { toInlineFragment } from "../portable/inline.mjs";
-import { bundleReader } from "../portable/reader-bundle.mjs";
+import { buildReaderTemplate } from "../core/reader-template";
+export {
+  buildReaderTemplate,
+  findViewerTemplate,
+} from "../core/reader-template";
 import {
   injectArtifactIntoHtml,
   serializeArtifact,
@@ -44,6 +50,8 @@ export interface ExportOptions {
   format: ExportFormat;
   out: string;
   templatePath?: string;
+  revision?: string;
+  importedSnapshot?: { importId: string; snapshotId: string };
   overwrite?: boolean;
   components?: "bundled" | "remote";
   presentation?: "spatial" | "reading";
@@ -70,25 +78,6 @@ async function exists(path: string): Promise<boolean> {
   );
 }
 
-export async function findViewerTemplate(explicit?: string): Promise<string> {
-  const directory = dirname(fileURLToPath(import.meta.url));
-  const candidates = explicit
-    ? [resolve(explicit)]
-    : [
-        ...(process.env.SHOWAI_VIEWER
-          ? [resolve(process.env.SHOWAI_VIEWER)]
-          : []),
-        resolve(directory, "../assets/viewer.html"),
-        resolve(directory, "../dist-portable/portable.html"),
-        resolve(directory, "../../dist-portable/portable.html"),
-      ];
-  for (const candidate of candidates)
-    if (await exists(candidate)) return candidate;
-  throw new Error(
-    "The ShowAI viewer is missing. Build the application first or set SHOWAI_VIEWER to the bundled viewer.html.",
-  );
-}
-
 const escapeHtml = (value: string) =>
   value.replace(
     /[&<>"']/g,
@@ -98,17 +87,6 @@ const escapeHtml = (value: string) =>
       ]!,
   );
 
-export async function buildReaderTemplate(
-  documents: ShowDocument[],
-  explicit?: string,
-): Promise<string> {
-  const full = await findViewerTemplate(explicit);
-  const archive = join(dirname(full), "reader-source.json");
-  return !explicit && (await exists(archive))
-    ? bundleReader(archive, documents)
-    : readFile(full, "utf8");
-}
-
 export async function buildPageHtml(
   document: ShowDocument,
   templatePath?: string,
@@ -116,10 +94,11 @@ export async function buildPageHtml(
   remoteComponents: PublishedComponentLocator[] = [],
   presentation?: "spatial" | "reading",
   selection?: ShowArtifact["selection"],
+  readerHtml?: string,
 ): Promise<string> {
   assertOfflineImages(document);
   return injectArtifactIntoHtml(
-    await buildReaderTemplate([document], templatePath),
+    readerHtml ?? (await buildReaderTemplate([document], templatePath)),
     document,
     components,
     remoteComponents,
@@ -270,23 +249,46 @@ export async function exportPage(
       "Inline exports must bundle components because the conversation host blocks remote requests.",
     );
   const out = resolve(options.out);
+  if (
+    (options.revision || options.importedSnapshot) &&
+    options.format === "site"
+  )
+    throw new Error(
+      "Historical exports require one page and html or inline format.",
+    );
   await assertExportDestination(store.root, options.projectId, out);
   if (options.format !== "site") {
     if (!options.pageId)
       throw new Error("A page id is required for html or inline export.");
-    const { document: fullDocument } = await store.readPage(
-      options.projectId,
-      options.pageId,
-      { checkpoint: false },
-    );
+    const historical = options.importedSnapshot
+      ? await new LibraryOperations(store.root).importedPage(
+          options.projectId,
+          options.pageId,
+          options.importedSnapshot,
+        )
+      : options.revision
+        ? await new LibraryOperations(store.root).pageAt(
+            options.projectId,
+            options.pageId,
+            options.revision,
+          )
+        : null;
+    const record =
+      historical ??
+      (await store.readPage(options.projectId, options.pageId, {
+        checkpoint: false,
+      }));
+    const fullDocument = record.document;
     const sourceDocument = selection
       ? selectDocumentBlocks(fullDocument, selection.blockIds)
       : fullDocument;
-    const components = await resolveDocumentComponents(
-      store.root,
-      sourceDocument,
-      options.projectId,
-    );
+    const components =
+      historical?.components ??
+      (await resolveDocumentComponents(
+        store.root,
+        sourceDocument,
+        options.projectId,
+      ));
     const document = lockedDocument(sourceDocument, components);
     const remoteComponents =
       componentMode === "remote"
@@ -297,6 +299,18 @@ export async function exportPage(
           )
         : [];
     const bundledComponents = componentMode === "bundled" ? components : [];
+    const library = versionedLibrary(store.root);
+    const selectedRevision =
+      historical?.sourceRevision ??
+      record.revision ??
+      (library ? await library.head() : null);
+    const frozenReader =
+      library && selectedRevision && !options.templatePath
+        ? await readArchivedReader(
+            logicalPath(store.root, record.path)!,
+            (path) => library.readFile(path, selectedRevision),
+          )
+        : null;
     const html = await buildPageHtml(
       document,
       options.templatePath,
@@ -304,6 +318,7 @@ export async function exportPage(
       remoteComponents,
       presentation,
       selection,
+      frozenReader?.html,
     );
     const result = options.format === "inline" ? toInlineFragment(html) : html;
     const sourcePath =

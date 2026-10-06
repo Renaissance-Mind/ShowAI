@@ -170,6 +170,8 @@ export class LibraryIndex {
             (path) =>
               reload.has(path) &&
               !path.startsWith("assets/") &&
+              !path.startsWith("runtimes/") &&
+              !/\/reader\.json$|\.reader\.json$/.test(path) &&
               !/\/pages\/[^/]+\/nodes\//.test(path) &&
               (path.endsWith(".json") || /\.(tsx?|jsx?|md)$/.test(path)),
           );

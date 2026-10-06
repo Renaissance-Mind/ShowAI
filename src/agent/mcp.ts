@@ -285,13 +285,27 @@ export function createMcpServer(options: {
         blockIds: z.array(z.string().min(1)).min(1).optional(),
         format: z.enum(["html", "inline", "site"]),
         presentation: z.enum(["spatial", "reading"]).optional(),
+        revision: z.string().optional(),
+        importedSnapshot: z
+          .object({ importId: z.string(), snapshotId: z.string() })
+          .optional(),
         components: z.enum(["bundled", "remote"]).optional(),
         out: z.string().min(1),
         overwrite: z.boolean().optional(),
       },
       annotations: write,
     },
-    ({ pageId, blockIds, format, components, out, overwrite, presentation }) =>
+    ({
+      pageId,
+      blockIds,
+      format,
+      components,
+      out,
+      overwrite,
+      presentation,
+      revision,
+      importedSnapshot,
+    }) =>
       call(() =>
         service.export({
           projectId,
@@ -302,6 +316,8 @@ export function createMcpServer(options: {
           out,
           overwrite,
           presentation,
+          revision,
+          importedSnapshot,
         }),
       ),
   );
@@ -600,6 +616,17 @@ export function createMcpServer(options: {
         message,
         groupId,
       }),
+  );
+  server.registerTool(
+    "history_html",
+    {
+      description:
+        "Render a historical page with its captured reader code and exact component dependencies.",
+      inputSchema: { pageId: z.string(), revision: z.string() },
+      annotations: readOnly,
+    },
+    ({ pageId, revision }) =>
+      call(() => service.historicalHtml(projectId, pageId, revision)),
   );
   server.registerTool(
     "history_imported_snapshots",

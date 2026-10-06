@@ -439,6 +439,24 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
       }
       if (action === "read") {
         requireCount(args, 3);
+        if (option(args, "view") === "html") {
+          const rendered = await service.historicalHtml(
+            await project(),
+            id,
+            option(args, "revision", true)!,
+          );
+          const out = option(args, "out");
+          if (out)
+            return service.export({
+              projectId: await project(),
+              pageId: id,
+              revision: option(args, "revision", true)!,
+              format: "html",
+              out,
+              overwrite: !!args.options.overwrite,
+            });
+          return rendered;
+        }
         return service.historicalPage(
           await project(),
           id,
@@ -663,6 +681,15 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
         out: option(args, "out", true)!,
         overwrite: !!args.options.overwrite,
         components: componentMode(args),
+        revision: option(args, "revision"),
+        ...(option(args, "import") || option(args, "snapshot")
+          ? {
+              importedSnapshot: {
+                importId: option(args, "import", true)!,
+                snapshotId: option(args, "snapshot", true)!,
+              },
+            }
+          : {}),
         presentation: option(args, "presentation") as
           "spatial" | "reading" | undefined,
       });

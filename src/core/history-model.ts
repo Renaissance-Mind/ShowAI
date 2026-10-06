@@ -55,6 +55,16 @@ export interface LibraryManifest {
 export type FileChanges = Map<string, Buffer | null>;
 
 export function resourceForPath(path: string): HistoryResource {
+  const reader = path.match(
+    /^projects\/([^/]+)\/pages\/([^/]+)\/reader\.json$/,
+  );
+  if (reader)
+    return {
+      kind: "page",
+      projectId: reader[1],
+      id: reader[2],
+      path: `projects/${reader[1]}/pages/${reader[2]}.json`,
+    };
   const page = path.match(/^projects\/([^/]+)\/pages\/([^/]+)\.json$/);
   if (page) return { kind: "page", projectId: page[1], id: page[2], path };
   const project = path.match(/^projects\/([^/]+)\/project\.json$/);

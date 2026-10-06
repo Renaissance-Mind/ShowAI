@@ -268,7 +268,10 @@ try {
     .waitFor();
   await dialog.getByText("修改前", { exact: true }).first().waitFor();
   await dialog.getByRole("button", { name: "完整页面", exact: true }).click();
-  await dialog.getByText("历史检索正文验收", { exact: true }).waitFor();
+  await dialog
+    .frameLocator('iframe[title="历史页面预览"]')
+    .getByText("历史检索正文验收", { exact: true })
+    .waitFor();
   await page.screenshot({ path: join(output, "history.png") });
   await dialog.getByRole("button", { name: /创建页面/ }).click();
   await dialog.getByRole("button", { name: "恢复此版本", exact: true }).click();

@@ -6,6 +6,7 @@ import { CoreError } from "./model";
 import { encodeFile, decodeFile, nodePrefix } from "./history-codec";
 import { withLibraryLock } from "./library-lock";
 import { libraryMutations } from "./history-context";
+import { completePageReaders, readerBindingPath } from "./archived-reader";
 import {
   WorkspaceProtection,
   workspaceHash,
@@ -77,7 +78,7 @@ function assertPath(path: string): string {
     path.includes("\\") ||
     /[\x00-\x1f]/.test(path) ||
     path.split("/").some((part) => !part || part === "." || part === "..") ||
-    !/^(projects\/|packages\/|assets\/|publications\/|imports\/|sidebar\.json$)/.test(
+    !/^(projects\/|packages\/|assets\/|publications\/|imports\/|runtimes\/|sidebar\.json$)/.test(
       path,
     )
   )
@@ -427,6 +428,9 @@ export class GitLibrary {
       "--",
       path,
       nodePrefix(path),
+      ...(/^projects\/[^/]+\/pages\/[^/]+\.json$/.test(path)
+        ? [readerBindingPath(path)]
+        : []),
     ]);
     return output.toString("utf8").trim() || null;
   }
@@ -531,7 +535,10 @@ export class GitLibrary {
         expected: new Map<string, string | null>(),
         origins: {} as Pick<
           ChangeContext,
-          "restoredFrom" | "mergedFrom" | "externalConflictId" | "restoredSnapshot"
+          | "restoredFrom"
+          | "mergedFrom"
+          | "externalConflictId"
+          | "restoredSnapshot"
         >,
       };
       let value: T;
@@ -744,6 +751,37 @@ export class GitLibrary {
           { currentRevision: parent ?? undefined },
         );
     }
+    const existing = await this.tree(parent ?? undefined);
+    changes = new Map(changes);
+    await completePageReaders(changes, async (path) => {
+      if (!parent)
+        throw new CoreError(
+          "NOT_FOUND",
+          `No committed reader dependency exists: ${path}`,
+        );
+      return this.readFile(path, parent);
+    });
+    // Content-addressed runtimes are shared. Avoid rewriting an unchanged reader
+    // or its dependency files on every keystroke save.
+    const existingObjects = new Map(
+      existing.map((entry) => [entry.path, entry.oid]),
+    );
+    for (const [path, bytes] of changes) {
+      if (
+        !bytes ||
+        (!path.startsWith("runtimes/") &&
+          !/\/pages\/[^/]+\/reader\.json$/.test(path))
+      )
+        continue;
+      const original = existingObjects.get(path);
+      if (!original) continue;
+      const encoded = encodeFile(path, bytes).get(path)!;
+      const object = createHash(original.length === 40 ? "sha1" : "sha256")
+        .update(`blob ${encoded!.length}\0`)
+        .update(encoded!)
+        .digest("hex");
+      if (object === original) changes.delete(path);
+    }
     const record: ChangeRecord = {
       ...context,
       format: "showai-change",
@@ -765,7 +803,6 @@ export class GitLibrary {
     // Validate the same metadata shape we accept when reading historical commits.
     parseRecord(changeMessage(record));
     if (!changes.size) return null;
-    const existing = await this.tree(parent ?? undefined);
     const encoded: FileChanges = new Map();
     for (const [path, bytes] of changes) {
       if (/^projects\/[^/]+\/pages\/[^/]+\.json$/.test(path))

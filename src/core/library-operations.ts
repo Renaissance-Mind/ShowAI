@@ -26,6 +26,12 @@ import type {
   TemplateRecord,
 } from "../components/custom/types";
 import type { LibraryImportReport } from "./library-import";
+import {
+  readArchivedReader,
+  readerBindingPath,
+  type ReaderBinding,
+} from "./archived-reader";
+import { injectArtifactIntoHtml } from "../portable/validation.mjs";
 
 export interface HistoryQuery {
   projectId?: string;
@@ -42,6 +48,7 @@ export interface HistoryQuery {
 export interface HistoricalPage extends PageRecord {
   components: CompiledComponent[];
   sourceRevision: string;
+  reader?: ReaderBinding;
 }
 function revision(value: string): string {
   if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(value))
@@ -275,6 +282,7 @@ export class LibraryOperations {
     );
     const document = normalizeDocument(artifact.document),
       closure = await this.dependencies(document, projectId, sourceRevision);
+    const reader = await this.readerAt(path, sourceRevision);
     return {
       document,
       hash: documentHash(document),
@@ -284,6 +292,44 @@ export class LibraryOperations {
         sourceRevision,
       sourceRevision,
       components: closure.components,
+      ...(reader ? { reader: reader.ref } : {}),
+    };
+  }
+  private async readerAt(path: string, sourceRevision: string) {
+    const refPath = readerBindingPath(path);
+    const bytes = await this.library
+      .readFile(refPath, sourceRevision)
+      .catch((error) => {
+        if (error instanceof CoreError && error.code === "NOT_FOUND")
+          return null;
+        throw error;
+      });
+    if (!bytes) return null;
+    return readArchivedReader(path, (name) =>
+      name === refPath
+        ? Promise.resolve(bytes)
+        : this.library.readFile(name, sourceRevision),
+    );
+  }
+  async historicalHtml(
+    projectId: string,
+    pageId: string,
+    sourceRevision: string,
+  ) {
+    const page = await this.pageAt(projectId, pageId, sourceRevision),
+      reader = await this.readerAt(
+        this.pagePath(projectId, pageId),
+        sourceRevision,
+      );
+    if (!reader)
+      throw new CoreError(
+        "NOT_FOUND",
+        "This version predates reader capture. Its content is retained, but its original reader is unavailable.",
+      );
+    return {
+      html: injectArtifactIntoHtml(reader.html, page.document, page.components),
+      reader: reader.ref,
+      revision: sourceRevision,
     };
   }
 
@@ -307,6 +353,23 @@ export class LibraryOperations {
       input.projectId,
       historical.sourceRevision,
     );
+    const reader = await this.readerAt(
+      historical.path.startsWith(this.library.workspace)
+        ? historical.path
+            .slice(this.library.workspace.length + 1)
+            .split("\\")
+            .join("/")
+        : path,
+      historical.sourceRevision,
+    );
+    if (reader) {
+      for (const [name, bytes] of reader.files)
+        if (name.startsWith("runtimes/")) closure.files.set(name, bytes);
+      closure.files.set(
+        readerBindingPath(path),
+        Buffer.from(JSON.stringify(reader.ref)),
+      );
+    }
     const context = {
       ...changeContext(),
       restoredFrom: historical.sourceRevision,
@@ -435,6 +498,7 @@ export class LibraryOperations {
       projectId,
       snapshot.sourceRevision,
     );
+    const reader = await this.readerAt(path, snapshot.sourceRevision);
     return {
       document,
       components: closure.components,
@@ -442,6 +506,28 @@ export class LibraryOperations {
       path: join(this.library.workspace, path),
       revision: snapshot.sourceRevision,
       sourceRevision: snapshot.sourceRevision,
+      ...(reader ? { reader: reader.ref } : {}),
+    };
+  }
+  async importedHtml(
+    projectId: string,
+    pageId: string,
+    ref: { importId: string; snapshotId: string },
+  ) {
+    const page = await this.importedPage(projectId, pageId, ref),
+      reader = await this.readerAt(
+        `imports/${ref.importId}/snapshots/${ref.snapshotId}.json`,
+        page.sourceRevision,
+      );
+    if (!reader)
+      throw new CoreError(
+        "NOT_FOUND",
+        "The imported snapshot reader is unavailable.",
+      );
+    return {
+      html: injectArtifactIntoHtml(reader.html, page.document, page.components),
+      reader: reader.ref,
+      revision: page.sourceRevision,
     };
   }
   async restoreImportedSnapshot(input: {

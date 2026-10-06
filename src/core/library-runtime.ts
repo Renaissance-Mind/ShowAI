@@ -30,7 +30,7 @@ export function logicalPath(home: string, path: string): string | undefined {
   if (isAbsolute(local) || local === ".." || local.startsWith(`..${sep}`))
     return undefined;
   const name = local.split(sep).join("/");
-  return /^(projects\/|packages\/|assets\/|publications\/|imports\/|sidebar\.json$)/.test(
+  return /^(projects\/|packages\/|assets\/|publications\/|imports\/|runtimes\/|sidebar\.json$)/.test(
     name,
   )
     ? name
