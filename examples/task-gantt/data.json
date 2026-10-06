@@ -1,7 +1,24 @@
 {
   "title": "产品交付计划",
-  "description": "示例任务 · 从需求到交付，让时间与进度一目了然",
+  "description": "示例任务 · 分类、拆分与排期",
   "tasks": [
+    {
+      "id": "product",
+      "title": "产品研发",
+      "owner": "团队",
+      "start": "2026-10-05",
+      "end": "2026-10-26",
+      "progress": 0
+    },
+    {
+      "id": "planning",
+      "title": "需求与设计",
+      "owner": "产品",
+      "start": "2026-10-05",
+      "end": "2026-10-26",
+      "progress": 0,
+      "parentId": "product"
+    },
     {
       "id": "scope",
       "title": "明确需求与任务拆分",
@@ -9,7 +26,8 @@
       "phase": "规划",
       "start": "2026-10-05",
       "end": "2026-10-07",
-      "progress": 100
+      "progress": 100,
+      "parentId": "planning"
     },
     {
       "id": "design",
@@ -19,7 +37,17 @@
       "start": "2026-10-08",
       "end": "2026-10-12",
       "progress": 40,
-      "dependencies": ["scope"]
+      "dependencies": ["scope"],
+      "parentId": "planning"
+    },
+    {
+      "id": "development",
+      "title": "开发与验收",
+      "owner": "开发",
+      "start": "2026-10-05",
+      "end": "2026-10-26",
+      "progress": 0,
+      "parentId": "product"
     },
     {
       "id": "model",
@@ -29,17 +57,19 @@
       "start": "2026-10-08",
       "end": "2026-10-13",
       "progress": 25,
-      "dependencies": ["scope"]
+      "dependencies": ["scope"],
+      "parentId": "development"
     },
     {
       "id": "timeline",
       "title": "甘特图与拖动排期",
       "owner": "开发",
       "phase": "开发",
-      "start": "2026-10-13",
+      "start": "2026-10-14",
       "end": "2026-10-20",
       "progress": 0,
-      "dependencies": ["design", "model"]
+      "dependencies": ["design", "model"],
+      "parentId": "development"
     },
     {
       "id": "qa",
@@ -49,7 +79,8 @@
       "start": "2026-10-21",
       "end": "2026-10-24",
       "progress": 0,
-      "dependencies": ["timeline"]
+      "dependencies": ["timeline"],
+      "parentId": "development"
     },
     {
       "id": "launch",
@@ -60,7 +91,9 @@
       "end": "2026-10-26",
       "progress": 0,
       "milestone": true,
-      "dependencies": ["qa"]
+      "dependencies": ["qa"],
+      "parentId": "product"
     }
-  ]
+  ],
+  "columns": ["title", "owner", "status"]
 }

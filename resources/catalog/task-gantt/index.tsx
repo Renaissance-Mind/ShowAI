@@ -1,15 +1,28 @@
-import { useEffect, useId, useRef, useState, type PointerEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type PointerEvent,
+  type CSSProperties,
+} from "react";
 import {
   conflicts,
+  columnLabels,
+  defaultColumns,
+  descendants,
   date,
   day,
   removeTask,
-  shift,
+  shiftBranch,
+  summarize,
+  outline,
   status,
   today,
   validate,
   type GanttData,
   type Task,
+  type Column,
 } from "./model";
 import "./style.css";
 
@@ -32,6 +45,9 @@ export default function TaskGantt({
   const [isNew, setIsNew] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [showColumns, setShowColumns] = useState(false);
+  const [localColumns, setLocalColumns] = useState<Column[] | null>(null);
   const [drag, setDrag] = useState<{
     task: Task;
     delta: number;
@@ -59,14 +75,46 @@ export default function TaskGantt({
       </section>
     );
   const current = today();
-  const all = data.tasks;
-  const rows = all.filter(
-    (task) =>
-      `${task.title} ${task.owner ?? ""} ${task.phase ?? ""}`
-        .toLowerCase()
-        .includes(query.toLowerCase()) &&
-      (filter === "全部状态" || status(task, current) === filter),
+  const raw = data.tasks;
+  const all = summarize(raw);
+  const searching = !!query.trim() || filter !== "全部状态";
+  const matches = (task: Task) =>
+    `${task.title} ${task.owner ?? ""} ${task.phase ?? ""}`
+      .toLowerCase()
+      .includes(query.trim().toLowerCase()) &&
+    (filter === "全部状态" || status(task, current) === filter);
+  const rows = outline(all, collapsed, searching ? matches : undefined);
+  const displayed = new Map(
+    (drag
+      ? summarize(shiftBranch(raw, drag.task.id, drag.delta, drag.mode))
+      : all
+    ).map((task) => [task.id, task]),
   );
+  const columns = localColumns ?? data.columns ?? defaultColumns;
+  const weights: Record<Column, string> = {
+    title: "minmax(0, 2.8fr)",
+    owner: "minmax(0, .8fr)",
+    status: "minmax(0, .9fr)",
+    phase: "minmax(0, .8fr)",
+    progress: "minmax(0, .9fr)",
+    start: "minmax(0, 1fr)",
+    end: "minmax(0, 1fr)",
+  };
+  const gridStyle = {
+    "--sg-columns": columns.map((column) => weights[column]).join(" "),
+    "--sg-list-width":
+      columns.length === 1
+        ? "36%"
+        : `${Math.min(64, 38 + (columns.length - 1) * 7)}%`,
+  } as CSSProperties;
+  const leafTasks = all.filter(
+    (task) => !raw.some((child) => child.parentId === task.id),
+  );
+  function setColumns(next: Column[]) {
+    setLocalColumns(next);
+    if (!readOnly && onChange)
+      commit({ ...data, columns: next }, "显示列已更新");
+  }
   const min = all.length
     ? Math.min(...all.map((task) => day(task.start))) - 1
     : day(current) - 2;
@@ -78,11 +126,14 @@ export default function TaskGantt({
   const origin = scale === "fit" ? min : (anchor ?? min);
   const ticks = Array.from({ length: 7 }, (_, i) => Math.floor((i * span) / 7));
   const pick = all.find((task) => task.id === selected);
-  const completed = all.filter((task) => task.progress === 100).length;
-  const late = all.filter((task) => status(task, current) === "已逾期").length;
-  const mean = all.length
+  const completed = leafTasks.filter((task) => task.progress === 100).length;
+  const late = leafTasks.filter(
+    (task) => status(task, current) === "已逾期",
+  ).length;
+  const mean = leafTasks.length
     ? Math.round(
-        all.reduce((total, task) => total + task.progress, 0) / all.length,
+        leafTasks.reduce((total, task) => total + task.progress, 0) /
+          leafTasks.length,
       )
     : 0;
   function commit(next: GanttData, text: string) {
@@ -97,12 +148,15 @@ export default function TaskGantt({
     setError(null);
     return true;
   }
-  function begin(task?: Task) {
+  function begin(task?: Task, parentId?: string) {
     setError(null);
     setIsNew(!task);
     setDraft(
       task
-        ? { ...task, dependencies: [...(task.dependencies ?? [])] }
+        ? {
+            ...task,
+            dependencies: [...(task.dependencies ?? [])],
+          }
         : {
             id: `task-${crypto.randomUUID()}`,
             title: "",
@@ -112,6 +166,7 @@ export default function TaskGantt({
             owner: "",
             phase: "",
             dependencies: [],
+            ...(parentId ? { parentId } : {}),
           },
     );
   }
@@ -150,11 +205,19 @@ export default function TaskGantt({
     dragRef.current = null;
     setDrag(null);
     if (!active || !active.delta) return;
-    const next = shift(active.task, active.delta, active.mode);
+    const nextTasks = shiftBranch(
+      raw,
+      active.task.id,
+      active.delta,
+      active.mode,
+    );
+    const next = summarize(nextTasks).find(
+      (task) => task.id === active.task.id,
+    )!;
     commit(
       {
         ...data,
-        tasks: all.map((task) => (task.id === next.id ? next : task)),
+        tasks: nextTasks,
       },
       `已调整「${next.title}」：${next.start} 至 ${next.end}`,
     );
@@ -179,7 +242,7 @@ export default function TaskGantt({
       </header>
       <div className="sg-summary">
         <span>
-          <strong>{all.length}</strong> 个任务
+          <strong>{leafTasks.length}</strong> 个任务
         </span>
         <span>
           <strong>{completed}</strong> 已完成
@@ -202,7 +265,74 @@ export default function TaskGantt({
         >
           <i style={{ width: `${mean}%` }} />
         </div>
+        <button
+          type="button"
+          aria-expanded={showColumns}
+          onClick={() => setShowColumns(!showColumns)}
+        >
+          显示列
+        </button>
       </div>
+      {showColumns && (
+        <div className="sg-column-settings" aria-label="显示列设置">
+          {(Object.keys(columnLabels) as Column[]).map((column) => (
+            <label className="sg-check" key={column}>
+              <input
+                type="checkbox"
+                checked={columns.includes(column)}
+                disabled={column === "title"}
+                onChange={(event) =>
+                  setColumns(
+                    event.target.checked
+                      ? [...columns, column]
+                      : columns.filter((item) => item !== column),
+                  )
+                }
+              />
+              {columnLabels[column]}
+            </label>
+          ))}
+          <div className="sg-column-order">
+            {columns.map((column, index) => (
+              <span key={column}>
+                {columnLabels[column]}
+                {index > 1 && (
+                  <button
+                    type="button"
+                    aria-label={`前移${columnLabels[column]}列`}
+                    onClick={() => {
+                      const next = [...columns];
+                      [next[index - 1], next[index]] = [
+                        next[index],
+                        next[index - 1],
+                      ];
+                      setColumns(next);
+                    }}
+                  >
+                    ←
+                  </button>
+                )}
+                {index > 0 && index < columns.length - 1 && (
+                  <button
+                    type="button"
+                    aria-label={`后移${columnLabels[column]}列`}
+                    onClick={() => {
+                      const next = [...columns];
+                      [next[index + 1], next[index]] = [
+                        next[index],
+                        next[index + 1],
+                      ];
+                      setColumns(next);
+                    }}
+                  >
+                    →
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="sg-toolbar">
         <label className="sg-search">
           <span className="sg-sr">搜索任务、负责人或阶段</span>
@@ -279,13 +409,18 @@ export default function TaskGantt({
           </div>
         )}
         <span>
-          {rows.length} 个任务
-          {readOnly ? " · 点击查看详情" : " · 拖动条形调整日期"}
+          {rows.length} 行{readOnly ? " · 点击查看详情" : " · 拖动条形调整日期"}
         </span>
       </div>
-      <div className="sg-grid">
+      <div className="sg-grid" style={gridStyle}>
         <div className="sg-axis">
-          <span>任务 / 负责人</span>
+          <div className="sg-list-head">
+            {columns.map((column) => (
+              <span key={column} className={`sg-col-${column}`}>
+                {columnLabels[column]}
+              </span>
+            ))}
+          </div>
           <div>
             {ticks.map((offset, i) => (
               <span
@@ -300,11 +435,8 @@ export default function TaskGantt({
             ))}
           </div>
         </div>
-        {rows.map((original, index) => {
-          const task =
-            drag?.task.id === original.id
-              ? shift(original, drag.delta, drag.mode)
-              : original;
+        {rows.map(({ task: original, depth, childCount, matched }) => {
+          const task = displayed.get(original.id)!;
           const start = day(task.start),
             end = day(task.end),
             right = origin + span;
@@ -321,27 +453,89 @@ export default function TaskGantt({
               className={`sg-row ${selected === task.id ? "sg-selected" : ""}`}
               key={task.id}
             >
-              <button
-                type="button"
-                className="sg-task"
-                onClick={() => {
-                  setSelected(task.id);
-                  setDraft(null);
-                }}
-                aria-pressed={selected === task.id}
+              <div
+                className={`sg-list-row ${childCount ? "sg-parent" : ""} ${matched ? "" : "sg-context-row"}`}
               >
-                <span className="sg-task-title">
-                  <span
-                    className={`sg-dot ${task.progress === 100 ? "sg-done" : state === "已逾期" ? "sg-late" : ""}`}
-                  />
-                  {task.title}
-                </span>
-                <span className="sg-meta">
-                  {task.phase ? `${task.phase} · ` : ""}
-                  {task.owner || "未分配"} · {state}
-                  {issues.length > 0 ? " · 依赖冲突" : ""}
-                </span>
-              </button>
+                {columns.map((column) =>
+                  column === "title" ? (
+                    <div
+                      className="sg-title-cell sg-col-title"
+                      key={column}
+                      style={{ paddingLeft: Math.min(depth, 6) * 12 }}
+                    >
+                      {childCount > 0 ? (
+                        <button
+                          type="button"
+                          className="sg-expander"
+                          aria-label={`${collapsed.has(task.id) && !searching ? "展开" : "收起"}${task.title}`}
+                          aria-expanded={searching || !collapsed.has(task.id)}
+                          disabled={searching}
+                          onClick={() =>
+                            setCollapsed((previous) => {
+                              const next = new Set(previous);
+                              if (next.has(task.id)) next.delete(task.id);
+                              else next.add(task.id);
+                              return next;
+                            })
+                          }
+                        >
+                          {collapsed.has(task.id) && !searching ? "▸" : "▾"}
+                        </button>
+                      ) : (
+                        <span className="sg-branch-dot">
+                          <i
+                            className={`sg-dot ${task.progress === 100 ? "sg-done" : state === "已逾期" ? "sg-late" : ""}`}
+                          />
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        className="sg-task"
+                        data-tooltip={task.title}
+                        aria-label={`查看任务 ${task.title}，第 ${depth + 1} 层，${state}`}
+                        aria-pressed={selected === task.id}
+                        onClick={() => {
+                          setSelected(task.id);
+                          setDraft(null);
+                        }}
+                      >
+                        <span>{task.title}</span>
+                      </button>
+                      {issues.length > 0 && (
+                        <span
+                          className="sg-conflict"
+                          aria-label="依赖冲突"
+                          data-tooltip="依赖任务尚未结束"
+                        >
+                          !
+                        </span>
+                      )}
+                      {childCount > 0 && (
+                        <span className="sg-child-count">{childCount}</span>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      key={column}
+                      className={`sg-value-cell sg-col-${column}`}
+                      onClick={() => {
+                        setSelected(task.id);
+                        setDraft(null);
+                      }}
+                      aria-label={`${task.title} · ${columnLabels[column]}：${column === "status" ? state : column === "progress" ? `${task.progress}%` : task[column] || "未分配"}`}
+                    >
+                      {column === "status"
+                        ? state
+                        : column === "progress"
+                          ? `${task.progress}%`
+                          : column === "start" || column === "end"
+                            ? task[column].slice(5).replace("-", "/")
+                            : task[column] || "—"}
+                    </button>
+                  ),
+                )}
+              </div>
               <div
                 className="sg-lane"
                 aria-label={`${task.title}：${task.start} 至 ${task.end}，进度 ${task.progress}%`}
@@ -362,9 +556,7 @@ export default function TaskGantt({
                     style={{
                       left: `${((day(current) - origin + 0.5) / span) * 100}%`,
                     }}
-                  >
-                    <span>{index === 0 ? "今天" : ""}</span>
-                  </i>
+                  ></i>
                 )}
                 {visible ? (
                   <div
@@ -373,7 +565,7 @@ export default function TaskGantt({
                   >
                     <button
                       type="button"
-                      className={`sg-bar ${task.progress === 100 ? "sg-done" : state === "已逾期" ? "sg-late" : ""}`}
+                      className={`sg-bar ${childCount ? "sg-summary-bar" : ""} ${task.progress === 100 ? "sg-done" : state === "已逾期" ? "sg-late" : ""}`}
                       onClick={() => setSelected(task.id)}
                       onPointerDown={(event) =>
                         pointerDown(event, task, "move")
@@ -396,28 +588,32 @@ export default function TaskGantt({
                         </>
                       )}
                     </button>
-                    {!readOnly && onChange && !task.milestone && width > 3 && (
-                      <>
-                        <button
-                          type="button"
-                          className="sg-handle sg-handle-start"
-                          aria-label={`调整 ${task.title} 开始日期`}
-                          onPointerDown={(event) =>
-                            pointerDown(event, task, "start")
-                          }
-                          {...pointerHandlers}
-                        />
-                        <button
-                          type="button"
-                          className="sg-handle sg-handle-end"
-                          aria-label={`调整 ${task.title} 结束日期`}
-                          onPointerDown={(event) =>
-                            pointerDown(event, task, "end")
-                          }
-                          {...pointerHandlers}
-                        />
-                      </>
-                    )}
+                    {!readOnly &&
+                      onChange &&
+                      !task.milestone &&
+                      !childCount &&
+                      width > 3 && (
+                        <>
+                          <button
+                            type="button"
+                            className="sg-handle sg-handle-start"
+                            aria-label={`调整 ${task.title} 开始日期`}
+                            onPointerDown={(event) =>
+                              pointerDown(event, task, "start")
+                            }
+                            {...pointerHandlers}
+                          />
+                          <button
+                            type="button"
+                            className="sg-handle sg-handle-end"
+                            aria-label={`调整 ${task.title} 结束日期`}
+                            onPointerDown={(event) =>
+                              pointerDown(event, task, "end")
+                            }
+                            {...pointerHandlers}
+                          />
+                        </>
+                      )}
                   </div>
                 ) : (
                   <button
@@ -447,7 +643,7 @@ export default function TaskGantt({
       <footer className="sg-legend">
         <span>条形深色部分表示进度</span>
         <span>◆ 里程碑</span>
-        <span>浅色列为周末</span>
+        <span>浅色列为周末 · 竖线为今天</span>
       </footer>
       {pick && !draft && (
         <div className="sg-detail">
@@ -470,6 +666,11 @@ export default function TaskGantt({
               {pick.progress}% · {status(pick, current)}
             </span>
           </div>
+          {raw.some((child) => child.parentId === pick.id) && (
+            <p>
+              汇总任务 · 日期与进度由子任务自动计算，拖动可整体调整子任务排期。
+            </p>
+          )}
           {(pick.dependencies ?? []).length > 0 && (
             <p>
               前置任务：
@@ -489,27 +690,45 @@ export default function TaskGantt({
               <button type="button" onClick={() => begin(pick)}>
                 编辑任务
               </button>
-              <button
-                type="button"
-                onClick={() =>
-                  commit(
-                    {
-                      ...data,
-                      tasks: all.map((task) =>
-                        task.id === pick.id
-                          ? {
-                              ...task,
-                              progress: task.progress === 100 ? 0 : 100,
-                            }
-                          : task,
-                      ),
-                    },
-                    "任务进度已更新",
-                  )
-                }
-              >
-                {pick.progress === 100 ? "重新打开" : "标记完成"}
-              </button>
+              {!raw.some((child) => child.parentId === pick.id) && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    commit(
+                      {
+                        ...data,
+                        tasks: raw.map((task) =>
+                          task.id === pick.id
+                            ? {
+                                ...task,
+                                progress: task.progress === 100 ? 0 : 100,
+                              }
+                            : task,
+                        ),
+                      },
+                      "任务进度已更新",
+                    )
+                  }
+                >
+                  {pick.progress === 100 ? "重新打开" : "标记完成"}
+                </button>
+              )}
+              {!pick.milestone && (
+                <button
+                  type="button"
+                  disabled={raw.length >= 200}
+                  onClick={() => {
+                    setCollapsed((previous) => {
+                      const next = new Set(previous);
+                      next.delete(pick.id);
+                      return next;
+                    });
+                    begin(undefined, pick.id);
+                  }}
+                >
+                  ＋ 添加子任务
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -529,8 +748,8 @@ export default function TaskGantt({
                 {
                   ...data,
                   tasks: isNew
-                    ? [...all, task]
-                    : all.map((item) => (item.id === task.id ? task : item)),
+                    ? [...raw, task]
+                    : raw.map((item) => (item.id === task.id ? task : item)),
                 },
                 isNew ? "任务已创建" : "任务已保存",
               )
@@ -554,6 +773,34 @@ export default function TaskGantt({
             </button>
           </div>
           <div className="sg-fields">
+            <label>
+              父任务
+              <select
+                aria-label="父任务"
+                value={draft.parentId ?? ""}
+                onChange={(event) => {
+                  const next = { ...draft };
+                  if (event.target.value) next.parentId = event.target.value;
+                  else delete next.parentId;
+                  setDraft(next);
+                }}
+              >
+                <option value="">无 · 顶层任务</option>
+                {outline(all, new Set())
+                  .filter(
+                    (row) =>
+                      row.task.id !== draft.id &&
+                      !descendants(raw, draft.id).has(row.task.id) &&
+                      !row.task.milestone,
+                  )
+                  .map((row) => (
+                    <option key={row.task.id} value={row.task.id}>
+                      {"　".repeat(row.depth)}
+                      {row.task.title}
+                    </option>
+                  ))}
+              </select>
+            </label>
             <label>
               任务名称
               <input
@@ -581,6 +828,7 @@ export default function TaskGantt({
               <input
                 type="date"
                 required
+                disabled={raw.some((child) => child.parentId === draft.id)}
                 value={draft.start}
                 onChange={(event) =>
                   setDraft({
@@ -596,7 +844,10 @@ export default function TaskGantt({
               <input
                 type="date"
                 required
-                disabled={draft.milestone}
+                disabled={
+                  draft.milestone ||
+                  raw.some((child) => child.parentId === draft.id)
+                }
                 min={draft.start}
                 value={draft.end}
                 onChange={(event) =>
@@ -621,6 +872,7 @@ export default function TaskGantt({
                 min={0}
                 max={100}
                 step={5}
+                disabled={raw.some((child) => child.parentId === draft.id)}
                 value={draft.progress}
                 onChange={(event) =>
                   setDraft({ ...draft, progress: Number(event.target.value) })
@@ -632,6 +884,7 @@ export default function TaskGantt({
             <input
               type="checkbox"
               checked={!!draft.milestone}
+              disabled={raw.some((child) => child.parentId === draft.id)}
               onChange={(event) =>
                 setDraft({
                   ...draft,
@@ -676,7 +929,7 @@ export default function TaskGantt({
                   if (
                     commit(
                       removeTask(data, draft.id),
-                      "任务已删除，相关依赖已移除",
+                      "任务已删除，子任务已提升一层，相关依赖已移除",
                     )
                   ) {
                     setDraft(null);

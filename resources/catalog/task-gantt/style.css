@@ -19,7 +19,7 @@
     "PingFang SC",
     "Microsoft YaHei",
     sans-serif;
-  padding: 24px;
+  padding: 16px;
   border: 1px solid var(--sg-line);
   border-radius: 16px;
   container-type: inline-size;
@@ -54,7 +54,7 @@
   margin: 0;
 }
 .sg-gantt h2 {
-  font-size: 23px;
+  font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.5px;
   margin: 4px 0 6px;
@@ -92,7 +92,7 @@
   align-items: center;
   gap: 18px;
   flex-wrap: wrap;
-  margin: 22px 0;
+  margin: 14px 0;
   color: var(--sg-muted);
   font-size: 12px;
 }
@@ -120,7 +120,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 18px;
+  margin-bottom: 10px;
   align-items: center;
 }
 .sg-gantt input:not([type="checkbox"]):not([type="range"]),
@@ -199,7 +199,7 @@
 .sg-axis,
 .sg-row {
   display: grid;
-  grid-template-columns: 210px minmax(0, 1fr);
+  grid-template-columns: var(--sg-list-width) minmax(0, 1fr);
 }
 .sg-axis {
   height: 34px;
@@ -221,27 +221,127 @@
 }
 .sg-row {
   border-bottom: 1px solid var(--sg-line);
-  min-height: 62px;
+  height: 32px;
+  min-height: 32px;
 }
 .sg-selected {
   background: var(--sg-accent-bg);
 }
-.sg-task {
+.sg-list-head,
+.sg-list-row {
+  display: grid;
+  grid-template-columns: var(--sg-columns);
+  align-items: center;
+  min-width: 0;
+  padding-right: 8px;
+  height: 100%;
+  gap: 6px;
+}
+.sg-list-head > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.sg-title-cell {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  height: 100%;
+  gap: 3px;
+}
+.sg-gantt .sg-task {
   border: 0;
   background: transparent;
   color: var(--sg-fg);
+  padding: 0;
   text-align: left;
-  padding: 10px 12px 10px 0;
   min-width: 0;
-  width: 100%;
+  white-space: nowrap;
+  font-size: 12px;
+  height: 100%;
+  flex: 1;
 }
-.sg-task-title {
+.sg-task > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sg-gantt .sg-value-cell {
+  border: 0;
+  background: transparent;
+  color: var(--sg-muted);
+  padding: 0 2px;
+  text-align: left;
+  font-size: 11px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  height: 100%;
+  font-variant-numeric: tabular-nums;
+}
+.sg-parent .sg-task {
+  font-weight: 600;
+}
+.sg-context-row .sg-task {
+  color: var(--sg-muted);
+}
+.sg-gantt .sg-expander,
+.sg-branch-dot {
   display: flex;
-  gap: 8px;
   align-items: center;
-  overflow-wrap: anywhere;
-  font-size: 13px;
-  font-weight: 500;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--sg-muted);
+  font-size: 12px;
+}
+.sg-child-count {
+  font-size: 10px;
+  color: var(--sg-muted);
+  flex-shrink: 0;
+}
+.sg-conflict {
+  color: var(--sg-danger);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.sg-column-settings {
+  padding: 8px 12px;
+  background: var(--sg-soft);
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+.sg-column-settings .sg-check {
+  margin: 0 12px 0 0;
+}
+.sg-column-order {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+  color: var(--sg-muted);
+  font-size: 11px;
+}
+.sg-gantt .sg-column-order button {
+  border: 0;
+  background: transparent;
+  color: var(--sg-muted);
+  padding: 1px 4px;
+}
+.sg-summary > button {
+  border: 1px solid var(--sg-line);
+  border-radius: 7px;
+  background: var(--sg-bg);
+  color: var(--sg-fg);
+  padding: 5px 10px;
+  margin-left: auto;
+  font-size: 12px;
 }
 .sg-dot {
   width: 6px;
@@ -255,14 +355,6 @@
 }
 .sg-dot.sg-late {
   background: var(--sg-danger);
-}
-.sg-meta {
-  display: block;
-  font-size: 11px;
-  color: var(--sg-muted);
-  padding-left: 14px;
-  margin-top: 3px;
-  overflow-wrap: anywhere;
 }
 .sg-lane {
   position: relative;
@@ -301,7 +393,7 @@
 }
 .sg-bar-wrap {
   position: absolute;
-  height: 25px;
+  height: 26px;
   z-index: 2;
   min-width: 4px;
 }
@@ -342,7 +434,7 @@
   position: relative;
   display: block;
   font-size: 11px;
-  line-height: 25px;
+  line-height: 26px;
   mix-blend-mode: normal;
   color: light-dark(#181332, #fff);
   text-shadow: 0 0 3px var(--sg-bar);
@@ -351,7 +443,7 @@
 .sg-handle {
   position: absolute;
   top: 0;
-  height: 25px;
+  height: 26px;
   width: 8px;
   border: 0;
   background: transparent;
@@ -516,11 +608,18 @@
   white-space: nowrap;
   border: 0;
 }
-@container (max-width:620px) {
-  .sg-axis,
-  .sg-row {
-    grid-template-columns: 165px minmax(0, 1fr);
-  }
+.sg-bar.sg-summary-bar {
+  border-radius: 2px;
+  background: var(--sg-bar);
+  height: 26px;
+}
+.sg-summary-bar .sg-bar-label {
+  line-height: 26px;
+}
+.sg-summary-bar .sg-progress {
+  opacity: 0.45;
+}
+@container (max-width:840px) {
   .sg-tick-1,
   .sg-tick-3,
   .sg-tick-5 {
@@ -535,34 +634,31 @@
   .sg-range > span:last-child {
     margin-left: 0;
   }
-  .sg-overall {
-    max-width: 100px;
-  }
 }
 @container (max-width:420px) {
   .sg-axis,
   .sg-row {
-    grid-template-columns: 112px minmax(0, 1fr);
+    grid-template-columns: 56% minmax(0, 1fr);
+  }
+  .sg-list-head,
+  .sg-list-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sg-list-head > [class]:not(.sg-col-title),
+  .sg-list-row > [class]:not(.sg-col-title) {
+    display: none;
   }
   .sg-tick-2,
   .sg-tick-6 {
     display: none;
   }
-  .sg-task-title {
-    font-size: 12px;
-  }
-  .sg-meta {
-    padding-left: 0;
-  }
   .sg-fields {
     grid-template-columns: 1fr;
   }
   .sg-heading h2 {
-    font-size: 19px;
+    font-size: 18px;
   }
-  .sg-mode {
-    display: none;
-  }
+  .sg-mode,
   .sg-overall {
     display: none;
   }
@@ -582,22 +678,22 @@
   .sg-editor {
     padding: 12px;
   }
-  .sg-gantt .sg-bar-label {
-    font-size: 11px;
+  .sg-child-count {
+    display: none;
   }
 }
 @media (pointer: coarse) {
-  .sg-gantt button,
+  .sg-gantt .sg-row {
+    height: 40px;
+    min-height: 40px;
+  }
+  .sg-gantt .sg-toolbar button,
   .sg-gantt select,
   .sg-gantt input:not([type="checkbox"]) {
-    min-height: 44px;
-  }
-  .sg-gantt .sg-bar,
-  .sg-gantt .sg-handle {
-    min-height: 25px;
+    min-height: 40px;
   }
   .sg-check {
-    min-height: 44px;
+    min-height: 40px;
   }
   .sg-gantt input {
     font-size: 16px;
