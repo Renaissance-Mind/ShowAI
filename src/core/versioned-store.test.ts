@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GitLibrary } from "./git-library";
@@ -132,6 +132,18 @@ describe("FileStore on a versioned library", () => {
       ),
     ).rejects.toThrow("operation failed");
     expect(await store.listPages(project.id)).toHaveLength(2);
+    const failures = (await readdir(join(root, "local", "drafts"))).filter(
+      (name) => name.startsWith("failed-"),
+    );
+    expect(failures).toHaveLength(1);
+    const failure = JSON.parse(
+      await readFile(
+        join(root, "local", "drafts", failures[0], "draft.json"),
+        "utf8",
+      ),
+    );
+    expect(failure.reason).toBe("operation failed");
+    expect(failure.paths).toHaveLength(1);
   });
 
   it("round-trips real component manifest and schema bytes without changing source fingerprints", async () => {

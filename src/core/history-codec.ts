@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { canonicalJson } from "./diff";
 import { CoreError } from "./model";
 import type { FileChanges } from "./history-model";
 
@@ -65,7 +64,7 @@ function encodeJson(value: unknown, files: FileChanges): Buffer {
     value: visit(value, []),
     assets,
   };
-  return Buffer.from(canonicalJson(envelope));
+  return Buffer.from(JSON.stringify(envelope));
 }
 
 async function decodeJson(

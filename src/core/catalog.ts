@@ -40,6 +40,18 @@ import { builtinSources, builtinExports } from "./builtin-sources";
 import { validateDocument } from "../portable/validation.mjs";
 import type { ShowDocument } from "../types";
 import { canonicalJson } from "./diff";
+import {
+  workspaceRoot,
+  versionedLibrary,
+  logicalPath,
+  readLibraryFile,
+  writeLibraryFiles,
+  listLibraryDirectory,
+  libraryFileInfo,
+  libraryPaths,
+  mutateLibrary,
+} from "./library-runtime";
+import { changeContext } from "./history-context";
 import { mergeValues } from "./catalog-merge";
 import { assertJsonValue, assertProps } from "../components/custom/schema";
 import {
@@ -175,13 +187,13 @@ function assertVersion(version: string): void {
     );
 }
 function projectRoot(home: string, projectId?: string): string {
-  if (projectId === undefined) return resolve(home);
+  if (projectId === undefined) return workspaceRoot(home);
   if (
     !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(projectId) ||
     /^(?:con|prn|aux|nul|com[0-9]|lpt[0-9])$/i.test(projectId)
   )
     throw new Error("Invalid project id.");
-  return join(resolve(home), "projects", projectId);
+  return join(workspaceRoot(home), "projects", projectId);
 }
 function inside(root: string, path: string): boolean {
   const rel = relative(root, path);
@@ -190,7 +202,24 @@ function inside(root: string, path: string): boolean {
     (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel))
   );
 }
-async function optionalStat(path: string) {
+async function optionalStat(home: string, path: string) {
+  const managed = logicalPath(home, path);
+  if (managed) {
+    const physical = await lstat(path).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return null;
+      throw error;
+    });
+    if (physical?.isSymbolicLink()) return physical;
+    const info = await libraryFileInfo(home, path);
+    return info
+      ? {
+          isDirectory: () => info.directory,
+          isFile: () => info.file,
+          isSymbolicLink: () => false,
+          size: info.size,
+        }
+      : null;
+  }
   return lstat(path).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return null;
     throw error;
@@ -212,7 +241,7 @@ async function safePath(
   let current = base;
   for (const [index, part] of parts.entries()) {
     current = join(current, part);
-    const stat = await optionalStat(current);
+    const stat = await optionalStat(home, current);
     if (stat?.isSymbolicLink())
       throw new Error("Symbolic links are not allowed inside the catalog.");
     if (index < parts.length - 1) {
@@ -225,6 +254,12 @@ async function safePath(
 }
 async function readJson(home: string, path: string): Promise<unknown> {
   await safePath(home, path);
+  const managed = await readLibraryFile(home, path);
+  if (managed !== undefined) {
+    if (managed.length > 12 * 1024 * 1024)
+      throw new Error("Invalid catalog file.");
+    return JSON.parse(managed.toString("utf8"));
+  }
   const stat = await lstat(path);
   if (!stat.isFile() || stat.size > 12 * 1024 * 1024)
     throw new Error("Invalid catalog file.");
@@ -237,7 +272,7 @@ function packageBase(
   scope?: CatalogScope,
 ): string {
   if (scope === "published")
-    return join(resolve(home), "packages", "published", kind);
+    return join(workspaceRoot(home), "packages", "published", kind);
   return join(projectRoot(home, projectId), "packages", kind);
 }
 function locations(
@@ -370,8 +405,10 @@ function compareVersion(left: string, right: string): number {
   return (apre ?? "").localeCompare(bpre ?? "", undefined, { numeric: true });
 }
 async function children(home: string, path: string): Promise<string[]> {
+  const managed = await listLibraryDirectory(home, path);
+  if (managed) return managed;
   await safePath(home, path);
-  if (!(await optionalStat(path))) return [];
+  if (!(await optionalStat(home, path))) return [];
   return readdir(path);
 }
 function documentCopy(document: ShowDocument): ShowDocument {
@@ -658,7 +695,7 @@ export async function getTemplate(
   for (const location of locations(home, "templates", projectId, options)) {
     const candidates: TemplateRecord[] = [];
     const versionRoot = join(location.path, id);
-    if (await optionalStat(await safePath(home, versionRoot))) {
+    if (await optionalStat(home, await safePath(home, versionRoot))) {
       const versions = options.version
         ? [options.version]
         : (await children(home, versionRoot))
@@ -669,7 +706,7 @@ export async function getTemplate(
           home,
           join(versionRoot, version, "template.json"),
         );
-        if (await optionalStat(path))
+        if (await optionalStat(home, path))
           candidates.push(
             templateRecord(await readJson(home, path), location.scope),
           );
@@ -678,7 +715,7 @@ export async function getTemplate(
     const flat = await safePath(home, join(location.path, `${id}.json`));
     if (
       (!options.version || options.version === "0.0.0-legacy") &&
-      (await optionalStat(flat))
+      (await optionalStat(home, flat))
     )
       candidates.push(
         templateRecord(await readJson(home, flat), location.scope),
@@ -719,6 +756,23 @@ export async function getTemplateByRef(
     scope: ref.scope,
   });
 }
+async function publishVersionedFiles(
+  home: string,
+  destination: string,
+  files: Map<string, Buffer>,
+): Promise<boolean> {
+  if (!versionedLibrary(home)) return false;
+  const changes = new Map<string, Buffer>();
+  for (const [path, bytes] of files) {
+    const target = logicalPath(home, join(destination, path));
+    if (!target)
+      throw new Error("Package output leaves the versioned workspace.");
+    changes.set(target, bytes);
+  }
+  await writeLibraryFiles(home, changes);
+  return true;
+}
+
 async function writeTemplateRevision(
   home: string,
   template: TemplateRecord,
@@ -741,7 +795,7 @@ async function writeTemplateRevision(
     ),
     true,
   );
-  if (await optionalStat(destination)) {
+  if (await optionalStat(home, destination)) {
     const current = templateRecord(
       await readJson(home, join(destination, "template.json")),
       scope,
@@ -752,6 +806,19 @@ async function writeTemplateRevision(
       );
     return current;
   }
+  if (
+    await publishVersionedFiles(
+      home,
+      destination,
+      new Map([
+        [
+          "template.json",
+          Buffer.from(JSON.stringify({ ...template, scope }, null, 2) + "\n"),
+        ],
+      ]),
+    )
+  )
+    return { ...template, scope };
   const staging = join(dirname(destination), `.template-${randomUUID()}`);
   await mkdir(staging);
   try {
@@ -766,7 +833,7 @@ async function writeTemplateRevision(
   }
   return { ...template, scope };
 }
-export async function saveTemplate(
+async function saveTemplateImpl(
   home: string,
   input: SaveTemplateInput,
   projectId?: string,
@@ -1008,7 +1075,41 @@ function componentDependencies(value: unknown): PackageRevisionRef[] {
   return refs;
 }
 
-async function packageFiles(directory: string): Promise<Map<string, Buffer>> {
+async function packageFiles(
+  directory: string,
+  home?: string,
+): Promise<Map<string, Buffer>> {
+  if (home && logicalPath(home, directory)) {
+    const prefix = logicalPath(home, directory)! + "/";
+    const files = new Map<string, Buffer>();
+    let bytes = 0;
+    for (const path of (await libraryPaths(home))!)
+      if (path.startsWith(prefix)) {
+        const name = path.slice(prefix.length);
+        if (
+          name
+            .split("/")
+            .some(
+              (part) =>
+                part.startsWith(".") ||
+                ["node_modules", "compiled.json"].includes(part),
+            ) ||
+          !SOURCE_EXTENSIONS.has(extname(name).toLowerCase())
+        )
+          continue;
+        const data = (await readLibraryFile(
+          home,
+          join(workspaceRoot(home), path),
+        ))!;
+        bytes += data.length;
+        if (files.size >= MAX_FILES || bytes > MAX_PACKAGE_BYTES)
+          throw new Error(
+            "Component package exceeds the 200-file / 8 MB limit.",
+          );
+        files.set(name, data);
+      }
+    return files;
+  }
   const root = await realpath(directory);
   const files = new Map<string, Buffer>();
   let bytes = 0;
@@ -1623,7 +1724,7 @@ async function componentLocation(
   if (version) assertVersion(version);
   for (const location of locations(home, "components", projectId, options)) {
     const base = await safePath(home, join(location.path, id));
-    if (!(await optionalStat(base))) continue;
+    if (!(await optionalStat(home, base))) continue;
     const versions = version
       ? [version]
       : (await children(home, base))
@@ -1631,7 +1732,7 @@ async function componentLocation(
           .sort((a, b) => compareVersion(b, a));
     for (const selected of versions) {
       const path = await safePath(home, join(base, selected));
-      if (!(await optionalStat(path))) continue;
+      if (!(await optionalStat(home, path))) continue;
       const item = compiledRecord(
         await readJson(home, join(path, "compiled.json")),
         location.scope,
@@ -1677,7 +1778,7 @@ export async function getComponentByRef(
     integrity: ref.integrity,
   });
 }
-export async function importComponent(
+async function importComponentImpl(
   home: string,
   packageDirectory: string,
   projectId?: string,
@@ -1706,7 +1807,7 @@ export async function importComponent(
     true,
   );
   const scope: CatalogScope = "project";
-  if (await optionalStat(destination)) {
+  if (await optionalStat(home, destination)) {
     const existing = compiledRecord(
       await readJson(home, join(destination, "compiled.json")),
       scope,
@@ -1737,13 +1838,27 @@ export async function importComponent(
       join(dirname(destination), ".sources", existing.integrity),
       true,
     );
-    if (await optionalStat(cache)) {
-      if (sourceDigest(await packageFiles(cache)) !== sourceIntegrity)
+    if (await optionalStat(home, cache)) {
+      if (sourceDigest(await packageFiles(cache, home)) !== sourceIntegrity)
         throw new Error(
           "Verified component source is immutable. Save a new version.",
         );
       return compiled;
     }
+    if (
+      await publishVersionedFiles(
+        home,
+        cache,
+        new Map([
+          ...files,
+          [
+            ".source-integrity.json",
+            Buffer.from(JSON.stringify({ sourceIntegrity })),
+          ],
+        ]),
+      )
+    )
+      return compiled;
     const stagedSource = join(dirname(cache), `.source-${randomUUID()}`);
     await mkdir(stagedSource);
     try {
@@ -1772,6 +1887,22 @@ export async function importComponent(
     home,
     projectId,
   );
+  if (
+    await publishVersionedFiles(
+      home,
+      destination,
+      new Map([
+        ...files,
+        [
+          "compiled.json",
+          Buffer.from(
+            JSON.stringify({ ...component, sourceIntegrity }, null, 2) + "\n",
+          ),
+        ],
+      ]),
+    )
+  )
+    return component;
   const staging = join(dirname(destination), `.import-${randomUUID()}`);
   await mkdir(staging);
   try {
@@ -1797,6 +1928,7 @@ async function componentSourcePath(
 ): Promise<string | undefined> {
   if (
     await optionalStat(
+      home,
       await safePath(home, join(location.path, "manifest.json")),
     )
   )
@@ -1809,7 +1941,7 @@ async function componentSourcePath(
     home,
     join(dirname(location.path), ".sources", component.integrity),
   );
-  return (await optionalStat(cache)) ? cache : undefined;
+  return (await optionalStat(home, cache)) ? cache : undefined;
 }
 export async function readComponentSource(
   home: string,
@@ -1828,7 +1960,7 @@ export async function readComponentSource(
   await safePath(home, location.path);
   const sourcePath = await componentSourcePath(home, location);
   const files = sourcePath
-    ? await packageFiles(sourcePath)
+    ? await packageFiles(sourcePath, home)
     : new Map<string, Buffer>();
   if (!files.has("manifest.json") || !files.has("props.schema.json"))
     throw new Error(
@@ -1872,7 +2004,7 @@ export async function readComponentSource(
     ),
   };
 }
-export async function saveComponent(
+async function saveComponentImpl(
   home: string,
   input: {
     manifest: ComponentManifest;
@@ -1987,7 +2119,7 @@ export async function resolveDocumentComponents(
 }
 
 /** Installs serialized sandbox runtimes without ever evaluating or executing their code. */
-export async function importCompiledComponents(
+async function importCompiledComponentsImpl(
   home: string,
   components: CompiledComponent[],
   projectId?: string,
@@ -2021,7 +2153,7 @@ export async function importCompiledComponents(
         component.version,
       ),
     );
-    if (await optionalStat(path)) {
+    if (await optionalStat(home, path)) {
       const existing = compiledRecord(
         await readJson(home, join(path, "compiled.json")),
         scope,
@@ -2043,7 +2175,19 @@ export async function importCompiledComponents(
       ),
       true,
     );
-    if (!(await optionalStat(path))) {
+    if (
+      !(await optionalStat(home, path)) &&
+      !(await publishVersionedFiles(
+        home,
+        path,
+        new Map([
+          [
+            "compiled.json",
+            Buffer.from(JSON.stringify(component, null, 2) + "\n"),
+          ],
+        ]),
+      ))
+    ) {
       const staging = join(dirname(path), `.portable-${randomUUID()}`);
       await mkdir(staging);
       try {
@@ -2550,7 +2694,7 @@ async function installBundle(
         target.version,
       ),
     );
-    if (!(await optionalStat(path))) continue;
+    if (!(await optionalStat(home, path))) continue;
     const current =
       target.kind === "components"
         ? compiledRecord(
@@ -2577,7 +2721,35 @@ async function installBundle(
       ),
       true,
     );
-    if (await optionalStat(destination)) continue;
+    if (await optionalStat(home, destination)) continue;
+    const sourceFiles = entry.source
+      ? componentSourceFiles(entry.source)
+      : new Map<string, Buffer>();
+    if (
+      await publishVersionedFiles(
+        home,
+        destination,
+        new Map([
+          ...sourceFiles,
+          [
+            "compiled.json",
+            Buffer.from(
+              JSON.stringify(
+                {
+                  ...component,
+                  sourceIntegrity: entry.source
+                    ? sourceDigest(sourceFiles)
+                    : "portable",
+                },
+                null,
+                2,
+              ),
+            ),
+          ],
+        ]),
+      )
+    )
+      continue;
     const staging = join(dirname(destination), `.install-${randomUUID()}`);
     await mkdir(staging);
     try {
@@ -2635,13 +2807,13 @@ async function installBundle(
   };
 }
 
-export async function importPublishedBundle(
+async function importPublishedBundleImpl(
   home: string,
   bundle: PackageBundle,
 ): Promise<PackageBundle> {
   return installBundle(home, bundle, "published");
 }
-export async function promotePackage(
+async function promotePackageImpl(
   home: string,
   ref: PackageRevisionRef,
   input: { projectId: string; target: "global" },
@@ -2656,7 +2828,7 @@ export async function promotePackage(
   );
 }
 
-export async function forkPackage(
+async function forkPackageImpl(
   home: string,
   input: PackageRevisionRef,
   target: { projectId: string; id?: string; version: string; name?: string },
@@ -2825,7 +2997,7 @@ export async function previewPackageMerge(
     conflicts: result.conflicts,
   };
 }
-export async function savePackageMerge(
+async function savePackageMergeImpl(
   home: string,
   input: PackageMergeInput & {
     id?: string;
@@ -2870,3 +3042,40 @@ export async function savePackageMerge(
     input.projectId,
   );
 }
+
+function catalogMutation<A extends unknown[], R>(
+  operation: (home: string, ...args: A) => Promise<R>,
+  message: string,
+) {
+  return (home: string, ...args: A): Promise<R> =>
+    mutateLibrary(home, () => operation(home, ...args), {
+      ...changeContext(),
+      message: changeContext().message ?? message,
+    });
+}
+export const saveTemplate = catalogMutation(saveTemplateImpl, "saveTemplate");
+export const importComponent = catalogMutation(
+  importComponentImpl,
+  "importComponent",
+);
+export const saveComponent = catalogMutation(
+  saveComponentImpl,
+  "saveComponent",
+);
+export const importCompiledComponents = catalogMutation(
+  importCompiledComponentsImpl,
+  "importCompiledComponents",
+);
+export const importPublishedBundle = catalogMutation(
+  importPublishedBundleImpl,
+  "importPublishedBundle",
+);
+export const promotePackage = catalogMutation(
+  promotePackageImpl,
+  "promotePackage",
+);
+export const forkPackage = catalogMutation(forkPackageImpl, "forkPackage");
+export const savePackageMerge = catalogMutation(
+  savePackageMergeImpl,
+  "savePackageMerge",
+);

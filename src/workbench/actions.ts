@@ -6,7 +6,11 @@ import {
 } from "../surface/containers.mjs";
 import { readFile, writeFile, stat } from "node:fs/promises";
 import { join, sep } from "node:path";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
+import { changeContext, withChangeContext } from "../core/history-context";
+import { mutateLibrary } from "../core/library-runtime";
+import { canonicalJson } from "../core/diff";
+import type { ChangeActor } from "../core/history-model";
 import { AgentService } from "../agent/service";
 import { assertExportDestination, exportPage } from "../agent/exporter";
 import { assertId, CoreError, FileStore } from "../core/store";
@@ -350,6 +354,7 @@ export function createWorkbench(
             {
               pageId: pageId(args),
               baseHash: required(args, "baseHash"),
+              baseRevision: text(args, "baseRevision", true),
               parentId: text(args, "parentId", true),
               version: text(args, "templateVersion", true),
               scope: text(args, "templateScope", true) as Exclude<
@@ -440,6 +445,7 @@ export function createWorkbench(
             pageId(args),
             fields,
             required(args, "baseHash"),
+            text(args, "baseRevision", true),
           ),
         );
       }
@@ -452,6 +458,9 @@ export function createWorkbench(
             pageId(args),
             validateDocument(args.document),
             required(args, "baseHash"),
+            undefined,
+            undefined,
+            text(args, "baseRevision", true),
           ),
         );
       }
@@ -487,6 +496,7 @@ export function createWorkbench(
             original.document.id,
             { ...original.document, archived: true },
             text(args, "baseHash", true) ?? original.hash,
+            text(args, "baseRevision", true) ?? original.revision,
           ),
         );
       }
@@ -863,5 +873,90 @@ export function createWorkbench(
         );
     }
   }
-  return handle;
+  const mutationActions = new Set([
+    "projects:create",
+    "projects:rename",
+    "projects:pin",
+    "projects:remove",
+    "projects:group",
+    "groups:create",
+    "groups:rename",
+    "groups:remove",
+    "folders:create",
+    "folders:rename",
+    "folders:pin",
+    "folders:remove",
+    "pages:create",
+    "pages:save",
+    "pages:insertTemplate",
+    "pages:duplicate",
+    "pages:remove",
+    "pages:rename",
+    "pages:pin",
+    "pages:move",
+    "pages:import",
+    "templates:save",
+    "components:import",
+    "components:save",
+    "components:createExample",
+    "catalog:promote",
+    "catalog:fork",
+    "catalog:mergeSave",
+    "catalog:verifyPublish",
+  ]);
+  const dialogActions = new Set(["components:import"]);
+  return (action: string, args: Record<string, unknown>): Promise<unknown> => {
+    if (!mutationActions.has(action)) return handle(action, args);
+    const supplied = args.historyContext as
+      | {
+          actor?: ChangeActor;
+          operationId?: string;
+          message?: string;
+          groupId?: string;
+        }
+      | undefined;
+    if (supplied && (typeof supplied !== "object" || Array.isArray(supplied)))
+      throw new CoreError("INVALID_DATA", "Invalid change context.");
+    const actor = supplied?.actor ?? { kind: "human" as const };
+    if (
+      !actor ||
+      !["human", "agent", "system", "unknown"].includes(actor.kind) ||
+      (actor.kind === "agent" && (!actor.harness || !actor.sessionId))
+    )
+      throw new CoreError(
+        "INVALID_DATA",
+        "Agent changes require the actual harness and session ID.",
+      );
+    const channel =
+      host.info().mode === "browser"
+        ? ("browser" as const)
+        : ("desktop" as const);
+    const message = supplied?.message ?? action;
+    const requestFingerprint = createHash("sha256")
+      .update(
+        canonicalJson({
+          action,
+          args: { ...args, historyContext: undefined },
+          actor,
+          channel,
+          message,
+          groupId: supplied?.groupId,
+        }),
+      )
+      .digest("hex");
+    const context = {
+      ...changeContext(),
+      actor,
+      channel,
+      operationId: supplied?.operationId ?? randomUUID(),
+      message,
+      groupId: supplied?.groupId,
+      requestFingerprint,
+    };
+    return withChangeContext(context, () =>
+      dialogActions.has(action)
+        ? handle(action, args)
+        : mutateLibrary(store.root, () => handle(action, args), context),
+    );
+  };
 }

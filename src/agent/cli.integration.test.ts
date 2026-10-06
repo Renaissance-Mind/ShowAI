@@ -17,6 +17,7 @@ import { promisify } from "node:util";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { parseArtifact } from "../portable/validation.mjs";
+import { GitLibrary } from "../core/git-library";
 
 const execute = promisify(execFile);
 let home: string;
@@ -1938,4 +1939,140 @@ test("catalog search indexes descriptive examples while returning only summaries
   ]);
   expect(unavailable.source).toContain("showai:components");
   expect(unavailable.next).toHaveProperty("source");
+});
+
+test("versioned CLI and MCP propagate identities, conditional revisions and replay completed requests", async () => {
+  const root = await mkdtemp(join(home, "versioned-cli-"));
+  const workspace = await mkdtemp(join(home, "versioned-workspace-"));
+  const library = new GitLibrary(root);
+  await library.initialize();
+  const runHere = (args: string[], session = "versioned-one") =>
+    run(
+      [
+        ...args,
+        "--source-directory",
+        workspace,
+        "--harness",
+        "codex",
+        "--session",
+        session,
+      ],
+      { home: root, cwd: workspace },
+    );
+  const create = [
+    "pages",
+    "create",
+    "--title",
+    "Versioned report",
+    "--operation-id",
+    "create-report",
+  ];
+  const initial = await runHere(create);
+  const project = (await runHere(["projects", "current"])).project;
+  expect(initial.revision).toBeTruthy();
+  expect(await library.history()).toHaveLength(1);
+  const operations = join(home, "versioned-edit.json");
+  await writeFile(
+    operations,
+    JSON.stringify([{ type: "page.set", fields: { title: "Edited report" } }]),
+  );
+  const edited = await runHere(
+    [
+      "pages",
+      "apply",
+      initial.document.id,
+      "--input",
+      operations,
+      "--base-hash",
+      initial.hash,
+      "--base-revision",
+      initial.revision,
+    ],
+    "versioned-two",
+  );
+  expect(edited.revision).not.toBe(initial.revision);
+  expect(await runHere(create)).toEqual(initial);
+  expect(await runHere(["pages", "list"])).toHaveLength(1);
+  expect((await library.history())[0].actor.sessionId).toBe("versioned-two");
+  const read = await runHere([
+    "pages",
+    "read",
+    initial.document.id,
+    "--rendered",
+    "false",
+  ]);
+  expect(read.revision).toBe(edited.revision);
+  await expect(
+    runHere([
+      "pages",
+      "apply",
+      initial.document.id,
+      "--input",
+      operations,
+      "--base-hash",
+      edited.hash,
+      "--base-revision",
+      initial.revision,
+    ]),
+  ).rejects.toThrow("newer revision");
+  const client = new Client({ name: "versioned-mcp-client", version: "1.0.0" });
+  await client.connect(
+    new StdioClientTransport({
+      command: process.execPath,
+      args: [
+        cli,
+        "mcp",
+        "--home",
+        root,
+        "--project",
+        project.id,
+        "--harness",
+        "codex",
+        "--session",
+        "mcp-versioned",
+      ],
+      env: Object.fromEntries(
+        Object.entries(environment()).filter(
+          (entry): entry is [string, string] => typeof entry[1] === "string",
+        ),
+      ),
+    }),
+  );
+  const unpack = (value: unknown) =>
+    JSON.parse((value as { content: { text: string }[] }).content[0].text);
+  try {
+    const input = {
+      pageId: initial.document.id,
+      baseHash: edited.hash,
+      baseRevision: edited.revision,
+      operations: [{ type: "page.set", fields: { title: "MCP report" } }],
+      operationId: "mcp-edit-report",
+      message: "Update title",
+    };
+    const saved = unpack(
+      await client.callTool({ name: "page_apply", arguments: input }),
+    );
+    expect(saved.ok).toBe(true);
+    expect(
+      unpack(await client.callTool({ name: "page_apply", arguments: input })),
+    ).toEqual(saved);
+    expect((await library.history())[0]).toMatchObject({
+      actor: { kind: "agent", harness: "codex", sessionId: "mcp-versioned" },
+      channel: "mcp",
+      message: "Update title",
+    });
+    expect(
+      unpack(
+        await client.callTool({
+          name: "page_apply",
+          arguments: {
+            ...input,
+            operations: [{ type: "page.set", fields: { title: "different" } }],
+          },
+        }),
+      ).error.code,
+    ).toBe("CONFLICT");
+  } finally {
+    await client.close();
+  }
 });

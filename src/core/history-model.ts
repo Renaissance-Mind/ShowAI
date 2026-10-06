@@ -14,6 +14,8 @@ export interface ChangeContext {
   groupId?: string;
   restoredFrom?: string;
   mergedFrom?: string;
+  /** Generated from validated API arguments before server dates/IDs are allocated. */
+  requestFingerprint?: string;
 }
 
 export interface HistoryResource {
@@ -28,6 +30,7 @@ export interface ChangeRecord extends ChangeContext {
   version: 1;
   operationId: string;
   requestHash: string;
+  response?: import("./history-response").ResponseDescriptor;
   at: string;
   resources: HistoryResource[];
   paths: string[];

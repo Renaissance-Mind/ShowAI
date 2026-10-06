@@ -83,9 +83,9 @@ const guides: Record<
     purpose:
       "Create or revise page content without overwriting edits made by the user or another Agent.",
     rules: [
-      "Read the page, retain its hash and stable block ids, and inspect pages diff against the preceding turn's hash.",
+      "Read the page and retain its hash, revision and stable block IDs. Versioned diffs use the preceding revision; legacy snapshots use the preceding hash.",
       "Default to structured reading. Use guide reading for image checks and browser interaction checks; use the full source Page/current hash for writes.",
-      "Save/apply requires --base-hash. On CONFLICT, read and merge deliberately; do not blindly retry an old document with a newer hash.",
+      "Save/apply requires --base-hash and, when reading returns revision, --base-revision. On CONFLICT, read and merge deliberately. Reuse --operation-id only for the same request; --message and --group describe its purpose and editing group.",
       "New resources default to a Page surface. Page and Board containers nest recursively in artifact v3. Use guide containers for structure; query component schemas when adding components.",
       "Keep an ordinary report in one resource page, with sections, navigation and optional nested containers. Continue revisions in that same page; create multiple resource pages only for a user-requested website or separate documents.",
     ],
@@ -93,9 +93,9 @@ const guides: Record<
       "showai pages create --project PROJECT --title 'Research result' --json",
       "showai pages create --project PROJECT --input page.showai.json --json",
       "showai pages read PAGE --project PROJECT --json",
-      "showai pages diff PAGE --project PROJECT --since PREVIOUS_HASH --json",
-      "showai pages apply PAGE --project PROJECT --input operations.json --base-hash CURRENT_HASH --json",
-      "showai pages save PAGE --project PROJECT --input page.showai.json --base-hash CURRENT_HASH --json",
+      "showai pages diff PAGE --project PROJECT --since PREVIOUS_REVISION --json",
+      "showai pages apply PAGE --project PROJECT --input operations.json --base-hash CURRENT_HASH --base-revision CURRENT_REVISION --json",
+      "showai pages save PAGE --project PROJECT --input page.showai.json --base-hash CURRENT_HASH --base-revision CURRENT_REVISION --json",
     ],
     input: {
       operations: [
@@ -274,7 +274,7 @@ const guides: Record<
     ],
     commands: [
       "showai pages read PAGE --project PROJECT --json",
-      "showai pages diff PAGE --project PROJECT --since PREVIOUS_HASH --json",
+      "showai pages diff PAGE --project PROJECT --since PREVIOUS_REVISION --json",
       "showai catalog list --kind template --project PROJECT --query PURPOSE --limit 8 --json",
       "showai template save --project PROJECT --input template-definition.json --json",
       "showai template apply ID --project PROJECT --scope project --version VERSION --title 'Different content' --json",

@@ -19,6 +19,9 @@ export function usePage() {
   const projectRef = useRef<string | null>(null);
   const current = useRef<ShowDocument | null>(null);
   const base = useRef("");
+  const baseRevision = useRef<string | undefined>(undefined);
+  const operations = useRef(new Map<number, { id: string; groupId: string }>());
+  const editGroup = useRef({ id: crypto.randomUUID(), at: 0 });
   const revision = useRef(0);
   const savedRevision = useRef(0);
   const pending = useRef<Promise<boolean> | null>(null);
@@ -37,6 +40,11 @@ export function usePage() {
       ) {
         const source = structuredClone(current.current);
         const sequence = revision.current;
+        const operation = operations.current.get(sequence) ?? {
+          id: crypto.randomUUID(),
+          groupId: editGroup.current.id,
+        };
+        operations.current.set(sequence, operation);
         setStatus("saving");
         try {
           const saved = await desktop.invoke<LoadedPage>("pages:save", {
@@ -44,8 +52,16 @@ export function usePage() {
             pageId: source.id,
             document: source,
             baseHash: base.current,
+            baseRevision: baseRevision.current,
+            historyContext: {
+              operationId: operation.id,
+              groupId: operation.groupId,
+              message: "编辑页面",
+            },
           });
           base.current = saved.hash;
+          baseRevision.current = saved.revision;
+          operations.current.delete(sequence);
           savedRevision.current = sequence;
           setRecord(saved);
           if (revision.current === sequence) {
@@ -76,6 +92,9 @@ export function usePage() {
     projectRef.current = projectId;
     current.current = page.document;
     base.current = page.hash;
+    baseRevision.current = page.revision;
+    operations.current.clear();
+    editGroup.current = { id: crypto.randomUUID(), at: 0 };
     revision.current = 0;
     savedRevision.current = 0;
     blocked.current = false;
@@ -119,6 +138,10 @@ export function usePage() {
       updatedAt: new Date().toISOString(),
     };
     current.current = next;
+    const now = Date.now();
+    if (now - editGroup.current.at > 2000)
+      editGroup.current.id = crypto.randomUUID();
+    editGroup.current.at = now;
     revision.current++;
     setDraft(next);
     if (!blocked.current) setStatus("changed");
@@ -262,6 +285,8 @@ export function usePage() {
     current.current = null;
     projectRef.current = null;
     base.current = "";
+    baseRevision.current = undefined;
+    operations.current.clear();
     revision.current = 0;
     savedRevision.current = 0;
     setDraft(null);

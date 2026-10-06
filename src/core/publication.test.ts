@@ -14,6 +14,7 @@ import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 import { createServer as createViteServer } from "vite";
 import { FileStore } from "./store";
+import { GitLibrary } from "./git-library";
 import {
   blankDocument,
   componentWidgetData,
@@ -51,11 +52,12 @@ afterEach(async () => {
   );
 });
 
-async function fixture() {
+async function fixture(versioned = false) {
   const root = await mkdtemp(join(tmpdir(), "showai-publication-"));
   roots.push(root);
   const home = join(root, "home"),
     store = new FileStore(home);
+  if (versioned) await new GitLibrary(home).initialize();
   const project = await store.createProject({ name: "Publication checks" });
   const component = await saveComponent(
     home,
@@ -148,6 +150,37 @@ async function serve(directory: string) {
 }
 
 describe("publication and component delivery", () => {
+  it("commits verified package closures and HTTP verification receipts atomically in a versioned library", async () => {
+    const f = await fixture(true);
+    const prepared = await preparePublication(f.home, {
+      refs: [f.ref],
+      projectId: f.project.id,
+      out: join(f.root, "versioned-release"),
+    });
+    const source = await serve(prepared.path);
+    const library = new GitLibrary(f.home);
+    const before = await library.head();
+    const receipt = await verifyPublication(f.home, {
+      manifestUrl: source.origin + "/manifest.json",
+      projectId: f.project.id,
+    });
+    expect(await listPublications(f.home)).toEqual([receipt]);
+    expect((await listPublishedComponents(f.home))[0].ref.integrity).toBe(
+      f.component.integrity,
+    );
+    const latest = (await library.history({ limit: 1 }))[0];
+    expect(latest.parents).toEqual([before]);
+    expect(
+      latest.paths.some((path) =>
+        path.startsWith("packages/published/components/"),
+      ),
+    ).toBe(true);
+    expect(
+      latest.paths.some((path) => path.startsWith("publications/verified/")),
+    ).toBe(true);
+    await library.verify();
+  });
+
   it("prepares without publishing, verifies real HTTP bytes, and exports locked remote or bundled artifacts", async () => {
     const f = await fixture();
     const prepared = await preparePublication(f.home, {

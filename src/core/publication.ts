@@ -1,5 +1,15 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
+  workspaceRoot,
+  versionedLibrary,
+  logicalPath,
+  readLibraryFile,
+  writeLibraryFiles,
+  listLibraryDirectory,
+  mutateLibrary,
+} from "./library-runtime";
+import { changeContext } from "./history-context";
+import {
   lstat,
   mkdir,
   readFile,
@@ -276,7 +286,7 @@ function validateManifest(input: unknown): PublicationManifest {
 }
 
 async function receiptDirectory(home: string): Promise<string> {
-  const root = resolve(home);
+  const root = workspaceRoot(home);
   await mkdir(root, { recursive: true });
   for (const path of [
     root,
@@ -293,7 +303,7 @@ async function receiptDirectory(home: string): Promise<string> {
   return join(root, "publications", "verified");
 }
 
-export async function verifyPublication(
+async function verifyPublicationImpl(
   home: string,
   input: { manifestUrl: string; projectId?: string },
 ): Promise<VerifiedPublication> {
@@ -411,29 +421,42 @@ export async function verifyPublication(
   const directory = await receiptDirectory(home);
   const name =
     sha256(manifestUrl + "\n" + manifestFile.sha256).slice(7) + ".json";
-  const temporary = join(directory, `.${randomUUID()}.tmp`);
-  await writeFile(temporary, serialize(receipt), { flag: "wx", mode: 0o600 });
-  await rename(temporary, join(directory, name));
+  const target = join(directory, name);
+  if (versionedLibrary(home))
+    await writeLibraryFiles(
+      home,
+      new Map([[logicalPath(home, target)!, Buffer.from(serialize(receipt))]]),
+    );
+  else {
+    const temporary = join(directory, `.${randomUUID()}.tmp`);
+    await writeFile(temporary, serialize(receipt), { flag: "wx", mode: 0o600 });
+    await rename(temporary, target);
+  }
   return receipt;
 }
 
 export async function listPublications(
   home: string,
 ): Promise<VerifiedPublication[]> {
-  const path = join(resolve(home), "publications", "verified");
-  if (!(await optionalStat(path))) return [];
-  const directory = await receiptDirectory(home);
+  const path = join(workspaceRoot(home), "publications", "verified");
+  const managed = await listLibraryDirectory(home, path);
+  if (!managed && !(await optionalStat(path))) return [];
+  const directory = managed ? path : await receiptDirectory(home);
   const receipts: VerifiedPublication[] = [];
-  for (const name of (await readdir(directory))
+  for (const name of (managed ?? (await readdir(directory)))
     .filter((name) => /^[a-f0-9]{64}\.json$/.test(name))
     .sort()) {
-    const target = join(directory, name),
-      stat = await lstat(target);
-    if (stat.isSymbolicLink() || !stat.isFile() || stat.size > 4 * 1024 * 1024)
+    const target = join(directory, name);
+    const bytes =
+      (await readLibraryFile(home, target)) ?? (await readFile(target));
+    if (!managed) {
+      const stat = await lstat(target);
+      if (stat.isSymbolicLink() || !stat.isFile())
+        throw new Error("Invalid publication receipt file.");
+    }
+    if (bytes.length > 4 * 1024 * 1024)
       throw new Error("Invalid publication receipt file.");
-    const receipt = JSON.parse(
-      await readFile(target, "utf8"),
-    ) as VerifiedPublication;
+    const receipt = JSON.parse(bytes.toString("utf8")) as VerifiedPublication;
     if (
       receipt.status !== "published" ||
       !/^sha256-[a-f0-9]{64}$/.test(receipt.manifestIntegrity) ||
@@ -507,4 +530,14 @@ export async function resolvePublishedComponents(
       `Remote export requires verified immutable publications. Unpublished dependencies:\n${missing.map((ref) => `- ${ref}`).join("\n")}`,
     );
   return resolved;
+}
+
+export function verifyPublication(
+  home: string,
+  input: { manifestUrl: string; projectId?: string },
+): Promise<VerifiedPublication> {
+  return mutateLibrary(home, () => verifyPublicationImpl(home, input), {
+    ...changeContext(),
+    message: changeContext().message ?? "Verify published packages",
+  });
 }

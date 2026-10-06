@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { version } from "../../package.json";
+import { versionedLibrary } from "../core/library-runtime";
 import { findViewerTemplate } from "./exporter";
 import { GUIDE_TOPICS } from "./guides";
 export interface RuntimeLaunch {
@@ -48,9 +49,17 @@ export async function runtimeInfo(home: string) {
       throw error;
     },
   );
+  const library = versionedLibrary(home);
   return {
     version,
     protocol: 1,
+    storage: library
+      ? {
+          mode: "versioned",
+          version: 2,
+          libraryId: (await library.manifest()).id,
+        }
+      : { mode: "legacy", version: 1 },
     projectResolution: { mode: "directory", command: "projects current" },
     home: resolve(home),
     viewer,

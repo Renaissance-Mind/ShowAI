@@ -1,7 +1,10 @@
 import { placeTemplate } from "../surface/document.mjs";
 import { upgradeResource } from "../surface/containers.mjs";
 import { FileStore } from "../core/store";
-import { applyOperations } from "../core/diff";
+import { applyOperations, canonicalJson } from "../core/diff";
+import { createHash } from "node:crypto";
+import { mutateLibrary } from "../core/library-runtime";
+import { changeContext } from "../core/history-context";
 import { CoreError } from "../core/model";
 import { projectDirectory } from "../core/project-directory";
 import type {
@@ -184,7 +187,7 @@ export class AgentService {
       .filter((project) => !this.projectId || project.id === this.projectId)
       .map(projectSummary);
   }
-  async currentProject(
+  private async currentProjectImpl(
     input: { projectId?: string; sourceDirectory?: string } = {},
   ) {
     const explicit = input.projectId ?? this.projectId;
@@ -212,7 +215,7 @@ export class AgentService {
       next: `showai pages list --project ${shellToken(project.id)} --json`,
     };
   }
-  async createProject(name: string, binding?: ProjectBinding) {
+  private async createProjectImpl(name: string, binding?: ProjectBinding) {
     if (this.projectId)
       throw new CoreError(
         "INVALID_PATH",
@@ -220,7 +223,7 @@ export class AgentService {
       );
     return projectSummary(await this.store.createProject({ name, binding }));
   }
-  async bindProject(projectId: string, binding: ProjectBinding) {
+  private async bindProjectImpl(projectId: string, binding: ProjectBinding) {
     return projectSummary(
       await this.store.bindProject(this.requireProject(projectId), binding),
     );
@@ -578,7 +581,7 @@ export class AgentService {
       mergeBase: template.mergeBase,
     };
   }
-  async importComponent(directory: string, projectId: string) {
+  private async importComponentImpl(directory: string, projectId: string) {
     const project = this.requireProject(projectId);
     await this.store.listPages(project);
     return summarizeCatalog(
@@ -587,7 +590,7 @@ export class AgentService {
       project,
     );
   }
-  async saveComponent(projectId: string, source: ComponentSource) {
+  private async saveComponentImpl(projectId: string, source: ComponentSource) {
     const project = this.requireProject(projectId);
     await this.store.listPages(project);
     source.parents?.forEach((ref) => this.assertReference(ref));
@@ -598,7 +601,7 @@ export class AgentService {
       project,
     );
   }
-  async applyTemplate(
+  private async applyTemplateImpl(
     projectId: string,
     templateId: string,
     title?: string,
@@ -608,6 +611,7 @@ export class AgentService {
       integrity?: string;
       pageId?: string;
       baseHash?: string;
+      baseRevision?: string;
       parentId?: string;
     } = {},
   ) {
@@ -635,13 +639,14 @@ export class AgentService {
         options.pageId,
         placeTemplate(target.document, document, options.parentId),
         options.baseHash,
+        options.baseRevision,
       );
     }
     return this.store.createPage(project, {
       document: upgradeResource(document),
     });
   }
-  async saveTemplate(
+  private async saveTemplateImpl(
     projectId: string,
     pageId: string | undefined,
     input: SaveTemplateInput,
@@ -679,7 +684,11 @@ export class AgentService {
     return summarizeCatalog("template", template, project);
   }
 
-  async promote(projectId: string, ref: PackageRevisionRef, target: "global") {
+  private async promoteImpl(
+    projectId: string,
+    ref: PackageRevisionRef,
+    target: "global",
+  ) {
     this.requireSharedWrite("Global promotion");
     const project = this.requireProject(projectId);
     this.assertReference(ref);
@@ -700,7 +709,7 @@ export class AgentService {
       next: "showai guide publish --json",
     };
   }
-  async fork(
+  private async forkImpl(
     projectId: string,
     ref: PackageRevisionRef,
     options: { id?: string; version: string; name?: string },
@@ -726,7 +735,7 @@ export class AgentService {
       projectId: project,
     });
   }
-  async resolveMerge(
+  private async resolveMergeImpl(
     projectId: string,
     input: Omit<PackageMergeInput, "projectId"> & {
       id?: string;
@@ -762,7 +771,7 @@ export class AgentService {
       next: "Upload the prepared directory only when requested; then run showai publish verify --project PROJECT --url MANIFEST_URL.",
     };
   }
-  async verifyPublication(projectId: string, manifestUrl: string) {
+  private async verifyPublicationImpl(projectId: string, manifestUrl: string) {
     this.requireSharedWrite("Published-library registration");
     const project = this.requireProject(projectId);
     const verified = await verifyPublication(this.store.root, {
@@ -796,7 +805,7 @@ export class AgentService {
   async listPages(projectId: string) {
     return this.store.listPages(this.requireProject(projectId));
   }
-  async createPage(
+  private async createPageImpl(
     projectId: string,
     input: {
       title?: string;
@@ -843,13 +852,14 @@ export class AgentService {
       options,
     );
   }
-  async savePage(
+  private async savePageImpl(
     projectId: string,
     pageId: string,
     document: ShowDocument,
     baseHash: string,
     components?: CompiledComponent[],
     remoteComponents?: PublishedComponentLocator[],
+    baseRevision?: string,
   ) {
     const project = this.requireProject(projectId);
     const current = await this.store.readPage(project, pageId);
@@ -877,9 +887,14 @@ export class AgentService {
       pageId,
       document,
       baseHash,
+      baseRevision,
     );
   }
-  async applyPage(projectId: string, pageId: string, input: ApplyPageInput) {
+  private async applyPageImpl(
+    projectId: string,
+    pageId: string,
+    input: ApplyPageInput,
+  ) {
     const project = this.requireProject(projectId);
     const current = await this.store.readPage(project, pageId);
     if (current.hash !== input.baseHash)
@@ -893,7 +908,13 @@ export class AgentService {
       applyOperations(current.document, input.operations),
       project,
     );
-    return this.store.savePage(project, pageId, document, input.baseHash);
+    return this.store.savePage(
+      project,
+      pageId,
+      document,
+      input.baseHash,
+      input.baseRevision,
+    );
   }
   async diffPage(projectId: string, pageId: string, sinceHash: string) {
     return this.store.diffPage(
@@ -917,6 +938,126 @@ export class AgentService {
       ...input,
       projectId: this.requireProject(input.projectId),
     });
+  }
+  private mutation<T>(
+    name: string,
+    args: unknown[],
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const context = changeContext();
+    const requestFingerprint =
+      context.requestFingerprint ??
+      createHash("sha256")
+        .update(
+          canonicalJson({
+            name,
+            args,
+            actor: context.actor,
+            channel: context.channel,
+            message: context.message,
+            groupId: context.groupId,
+          }),
+        )
+        .digest("hex");
+    return mutateLibrary(this.store.root, operation, {
+      ...context,
+      requestFingerprint,
+      message: context.message ?? name,
+    });
+  }
+  async currentProject(
+    ...args: Parameters<AgentService["currentProjectImpl"]>
+  ): ReturnType<AgentService["currentProjectImpl"]> {
+    return this.mutation("Resolve directory project", args, () =>
+      this.currentProjectImpl(...args),
+    );
+  }
+  async createProject(
+    ...args: Parameters<AgentService["createProjectImpl"]>
+  ): ReturnType<AgentService["createProjectImpl"]> {
+    return this.mutation("Create project", args, () =>
+      this.createProjectImpl(...args),
+    );
+  }
+  async bindProject(
+    ...args: Parameters<AgentService["bindProjectImpl"]>
+  ): ReturnType<AgentService["bindProjectImpl"]> {
+    return this.mutation("Bind project session", args, () =>
+      this.bindProjectImpl(...args),
+    );
+  }
+  async importComponent(
+    ...args: Parameters<AgentService["importComponentImpl"]>
+  ): ReturnType<AgentService["importComponentImpl"]> {
+    return this.mutation("Import component", args, () =>
+      this.importComponentImpl(...args),
+    );
+  }
+  async saveComponent(
+    ...args: Parameters<AgentService["saveComponentImpl"]>
+  ): ReturnType<AgentService["saveComponentImpl"]> {
+    return this.mutation("Save component version", args, () =>
+      this.saveComponentImpl(...args),
+    );
+  }
+  async applyTemplate(
+    ...args: Parameters<AgentService["applyTemplateImpl"]>
+  ): ReturnType<AgentService["applyTemplateImpl"]> {
+    return this.mutation("Apply template", args, () =>
+      this.applyTemplateImpl(...args),
+    );
+  }
+  async saveTemplate(
+    ...args: Parameters<AgentService["saveTemplateImpl"]>
+  ): ReturnType<AgentService["saveTemplateImpl"]> {
+    return this.mutation("Save template version", args, () =>
+      this.saveTemplateImpl(...args),
+    );
+  }
+  async promote(
+    ...args: Parameters<AgentService["promoteImpl"]>
+  ): ReturnType<AgentService["promoteImpl"]> {
+    return this.mutation("Register global package", args, () =>
+      this.promoteImpl(...args),
+    );
+  }
+  async fork(
+    ...args: Parameters<AgentService["forkImpl"]>
+  ): ReturnType<AgentService["forkImpl"]> {
+    return this.mutation("Fork package", args, () => this.forkImpl(...args));
+  }
+  async resolveMerge(
+    ...args: Parameters<AgentService["resolveMergeImpl"]>
+  ): ReturnType<AgentService["resolveMergeImpl"]> {
+    return this.mutation("Merge package changes", args, () =>
+      this.resolveMergeImpl(...args),
+    );
+  }
+  async verifyPublication(
+    ...args: Parameters<AgentService["verifyPublicationImpl"]>
+  ): ReturnType<AgentService["verifyPublicationImpl"]> {
+    return this.mutation("Verify publication", args, () =>
+      this.verifyPublicationImpl(...args),
+    );
+  }
+  async createPage(
+    ...args: Parameters<AgentService["createPageImpl"]>
+  ): ReturnType<AgentService["createPageImpl"]> {
+    return this.mutation("Create page", args, () =>
+      this.createPageImpl(...args),
+    );
+  }
+  async savePage(
+    ...args: Parameters<AgentService["savePageImpl"]>
+  ): ReturnType<AgentService["savePageImpl"]> {
+    return this.mutation("Edit page", args, () => this.savePageImpl(...args));
+  }
+  async applyPage(
+    ...args: Parameters<AgentService["applyPageImpl"]>
+  ): ReturnType<AgentService["applyPageImpl"]> {
+    return this.mutation("Apply page changes", args, () =>
+      this.applyPageImpl(...args),
+    );
   }
 }
 

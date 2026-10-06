@@ -100,6 +100,7 @@ export type PageReadOptions = z.input<typeof pageReadSchema>;
 export type ReadingOptions = z.output<typeof pageReadSchema>;
 export type ReadingAction = z.output<typeof readingActionSchema>;
 export interface ReadIdentity {
+  revision?: string;
   projectId: string;
   pageId: string;
   title: string;
@@ -343,6 +344,7 @@ export async function readPageView(
     pageId,
     title: record.document.title,
     hash: record.hash,
+    ...(record.revision ? { revision: record.revision } : {}),
     view: options.view,
     partial: !!options.blockIds,
     ...(options.blockIds ? { blockIds: options.blockIds } : {}),

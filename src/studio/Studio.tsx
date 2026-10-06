@@ -667,6 +667,7 @@ export default function Studio() {
           projectId: target.projectId,
           pageId: target.id,
           baseHash: record.hash,
+          baseRevision: record.revision,
           ...(change.name !== undefined
             ? { title: change.name }
             : { pinned: change.pinned }),
@@ -723,7 +724,11 @@ export default function Studio() {
         projectId: target.projectId,
         ...(target.kind === "folder" ? { folderId: target.id } : {}),
         ...(currentRecord
-          ? { pageId: target.id, baseHash: currentRecord.hash }
+          ? {
+              pageId: target.id,
+              baseHash: currentRecord.hash,
+              baseRevision: currentRecord.revision,
+            }
           : {}),
       },
     );
@@ -1788,6 +1793,7 @@ export default function Studio() {
                                         projectId: selectedProject,
                                         pageId: id,
                                         baseHash: latest.hash,
+                                        baseRevision: latest.revision,
                                         templateId: item.id,
                                         templateVersion: item.version,
                                         templateScope: item.scope,

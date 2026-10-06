@@ -25,6 +25,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { startBrowserServer } from "./server";
 import { AgentService } from "../agent/service";
+import { GitLibrary } from "../core/git-library";
 import type { DesktopInfo, DesktopResponse } from "../desktop/bridge";
 import type { LoadedPage } from "../studio/usePage";
 
@@ -476,3 +477,48 @@ test("packaged serve command starts, prints its address, serves the full workben
     if (child.exitCode === null) child.kill();
   }
 }, 10000);
+
+test("versioned browser bridge attributes human edits and replays a saved request without duplicating content", async () => {
+  const library = new GitLibrary(home);
+  await library.initialize();
+  const project = await invoke<{ id: string }>("projects:create", {
+    name: "Versioned browser",
+  });
+  const createArgs = {
+    projectId: project.id,
+    title: "Browser report",
+    historyContext: { operationId: "browser-create", message: "创建报告" },
+  };
+  const page = await invoke<LoadedPage>("pages:create", createArgs);
+  const saveArgs = {
+    projectId: project.id,
+    pageId: page.document.id,
+    document: { ...page.document, title: "Edited browser report" },
+    baseHash: page.hash,
+    baseRevision: page.revision,
+    historyContext: {
+      operationId: "browser-save",
+      groupId: "browser-group",
+      message: "编辑标题",
+    },
+  };
+  const saved = await invoke<LoadedPage>("pages:save", saveArgs);
+  expect(saved.revision).not.toBe(page.revision);
+  expect(await invoke<LoadedPage>("pages:save", saveArgs)).toEqual(saved);
+  expect(await invoke<LoadedPage>("pages:create", createArgs)).toEqual(page);
+  expect(
+    await invoke<unknown[]>("pages:list", { projectId: project.id }),
+  ).toHaveLength(1);
+  expect((await library.history({ limit: 1 }))[0]).toMatchObject({
+    actor: { kind: "human" },
+    channel: "browser",
+    message: "编辑标题",
+    groupId: "browser-group",
+  });
+  await expect(
+    invoke("pages:save", {
+      ...saveArgs,
+      document: { ...saved.document, title: "Other" },
+    }),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+});

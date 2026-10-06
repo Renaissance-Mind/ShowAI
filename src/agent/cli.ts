@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { createHash, randomUUID } from "node:crypto";
+import { withChangeContext } from "../core/history-context";
+import { mutateLibrary } from "../core/library-runtime";
+import { canonicalJson } from "../core/diff";
+import type { ChangeContext } from "../core/history-model";
 import { AgentService, errorResult } from "./service";
 import type {
   PageOperation,
@@ -77,6 +82,11 @@ function parseArguments(args: string[]): Arguments {
     "source-directory",
     "input",
     "base-hash",
+    "base-revision",
+    "message",
+    "operation-id",
+    "group",
+    "actor",
     "since",
     "page",
     "blocks",
@@ -268,7 +278,7 @@ async function saveOutput(
   return path;
 }
 
-export async function runCli(argv: string[]): Promise<unknown> {
+async function runCliCommand(argv: string[]): Promise<unknown> {
   const args = parseArguments(argv);
   const [command, action, id] = args.positional;
   if (!command || (args.options.help && !command)) {
@@ -427,6 +437,7 @@ export async function runCli(argv: string[]): Promise<unknown> {
           option(args, "base-hash", true)!,
           input.components,
           input.remoteComponents,
+          option(args, "base-revision"),
         );
       }
       if (action === "apply") {
@@ -443,6 +454,7 @@ export async function runCli(argv: string[]): Promise<unknown> {
           );
         return service.applyPage(await project(), id, {
           baseHash: option(args, "base-hash", true)!,
+          baseRevision: option(args, "base-revision"),
           operations: operations as PageOperation[],
         });
       }
@@ -621,6 +633,7 @@ export async function runCli(argv: string[]): Promise<unknown> {
             version: option(args, "version"),
             integrity: option(args, "integrity"),
             pageId: option(args, "page"),
+            baseRevision: option(args, "base-revision"),
             baseHash: option(args, "page")
               ? option(args, "base-hash", true)
               : undefined,
@@ -687,6 +700,74 @@ export async function runCli(argv: string[]): Promise<unknown> {
   }
   throw new Error(
     `Unknown command: ${args.positional.join(" ")}. Run showai --help.`,
+  );
+}
+
+function commandContext(args: Arguments): ChangeContext {
+  const kind = option(args, "actor");
+  if (kind && !["human", "agent", "system", "unknown"].includes(kind))
+    throw new Error("--actor must be human, agent, system or unknown.");
+  const sessionId = option(args, "session") ?? process.env.CODEX_THREAD_ID;
+  const harness =
+    option(args, "harness") ??
+    (process.env.CODEX_THREAD_ID ? "codex" : undefined);
+  const actor =
+    kind && kind !== "agent"
+      ? { kind: kind as "human" | "system" | "unknown" }
+      : sessionId && harness
+        ? { kind: "agent" as const, harness, sessionId }
+        : kind === "agent"
+          ? undefined
+          : { kind: "unknown" as const };
+  if (!actor)
+    throw new Error(
+      "Agent attribution requires a real --harness and --session, or CODEX_THREAD_ID.",
+    );
+  return {
+    actor,
+    channel: "cli",
+    operationId: option(args, "operation-id"),
+    groupId: option(args, "group"),
+    message: option(args, "message"),
+  };
+}
+export async function runCli(argv: string[]): Promise<unknown> {
+  const args = parseArguments(argv);
+  const context = commandContext(args);
+  const [command, action, mode] = args.positional;
+  const mutation =
+    (command === "projects" &&
+      ["current", "create", "bind"].includes(action)) ||
+    (command === "pages" && ["create", "save", "apply"].includes(action)) ||
+    (command === "template" &&
+      ["apply", "instantiate", "save"].includes(action)) ||
+    (command === "catalog" &&
+      (["import", "save", "promote", "fork"].includes(action) ||
+        (action === "merge" && mode === "resolve"))) ||
+    (command === "publish" && ["verify", "register"].includes(action));
+  if (!mutation || args.options.help)
+    return withChangeContext(context, () => runCliCommand(argv));
+  const requestFingerprint = createHash("sha256")
+    .update(
+      canonicalJson({
+        positional: args.positional,
+        options: {
+          ...args.options,
+          "operation-id": undefined,
+          json: undefined,
+        },
+      }),
+    )
+    .digest("hex");
+  const marked = {
+    ...context,
+    operationId: context.operationId ?? randomUUID(),
+    requestFingerprint,
+    message: context.message ?? args.positional.join(" "),
+  };
+  const service = new AgentService({ root: option(args, "home") });
+  return withChangeContext(marked, () =>
+    mutateLibrary(service.store.root, () => runCliCommand(argv), marked),
   );
 }
 

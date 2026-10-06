@@ -16,6 +16,11 @@ import { encodeFile, decodeFile, nodePrefix } from "./history-codec";
 import { withLibraryLock } from "./library-lock";
 import { libraryMutations } from "./history-context";
 import {
+  describeResponse,
+  restoreResponse,
+  type ResponseDescriptor,
+} from "./history-response";
+import {
   resourceForPath,
   type ChangeContext,
   type ChangeRecord,
@@ -25,21 +30,29 @@ import {
 } from "./history-model";
 
 const CURRENT = "refs/heads/content";
-const runtimeRoot =
-  process.env.SHOWAI_DEV_RUNTIME ??
-  (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
 const runtimeRequire = createRequire(
-  runtimeRoot
-    ? join(
-        runtimeRoot,
-        process.env.SHOWAI_DEV_RUNTIME
-          ? "package.json"
-          : "runtime/package.json",
-      )
+  process.env.SHOWAI_DEV_RUNTIME
+    ? join(process.env.SHOWAI_DEV_RUNTIME, "package.json")
     : import.meta.url,
 );
+function gitPackage(): string {
+  try {
+    return runtimeRequire.resolve("dugite");
+  } catch (error) {
+    const resources = (process as NodeJS.Process & { resourcesPath?: string })
+      .resourcesPath;
+    if (
+      (error as NodeJS.ErrnoException).code !== "MODULE_NOT_FOUND" ||
+      !resources
+    )
+      throw error;
+    return createRequire(join(resources, "runtime/package.json")).resolve(
+      "dugite",
+    );
+  }
+}
 const { exec: gitExec, resolveEmbeddedGitDir } = runtimeRequire(
-  "dugite",
+  gitPackage(),
 ) as typeof import("dugite");
 const oid = (value: string) => /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(value);
 const sha = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -460,17 +473,148 @@ export class GitLibrary {
     await this.manifest();
     return withLibraryLock(this.root, async () => {
       await this.recoverUnlocked();
+      if (context.operationId && context.requestFingerprint) {
+        if (!/^[a-f0-9]{64}$/.test(context.requestFingerprint))
+          throw new CoreError("INVALID_DATA", "Invalid request fingerprint.");
+        const receipt = await this.receipt(context.operationId);
+        if (receipt) {
+          if (receipt.requestFingerprint !== context.requestFingerprint)
+            throw new CoreError(
+              "CONFLICT",
+              "This operation ID was already used for a different request.",
+            );
+          const value = receipt.response
+            ? await restoreResponse(
+                receipt.response,
+                receipt.revision,
+                (path) => this.readFile(path, receipt.revision),
+                (path) => join(this.workspace, assertPath(path)),
+              )
+            : undefined;
+          return { value: value as T, entry: receipt };
+        }
+      }
       const state = {
         root: this.root,
         head: await this.head(),
         changes: new Map<string, Buffer | null>(),
         expected: new Map<string, string | null>(),
       };
-      const value = await libraryMutations.run(state, action);
+      let value: T;
+      try {
+        value = await libraryMutations.run(state, action);
+      } catch (error) {
+        if (state.changes.size) {
+          const draft = join(
+            this.root,
+            "local",
+            "drafts",
+            `failed-${randomUUID()}`,
+          );
+          try {
+            await this.atomicFile(
+              join(draft, "draft.json"),
+              Buffer.from(
+                JSON.stringify({
+                  format: "showai-failed-operation",
+                  version: 1,
+                  baseRevision: state.head,
+                  at: new Date().toISOString(),
+                  context,
+                  paths: [...state.changes.keys()],
+                  reason:
+                    error instanceof Error ? error.message : String(error),
+                }),
+              ),
+            );
+            for (const [path, bytes] of state.changes)
+              if (bytes !== null)
+                await this.atomicFile(
+                  join(draft, "input", assertPath(path)),
+                  bytes,
+                );
+          } catch (persistenceError) {
+            throw new AggregateError(
+              [error, persistenceError],
+              "The operation failed and its draft could not be persisted.",
+            );
+          }
+        }
+        throw error;
+      }
+      const responseFiles = new Map(state.changes);
+      if (context.operationId && context.requestFingerprint && state.head) {
+        const components = new Map<
+          string,
+          { id: string; version: string; integrity: string; scope?: string }
+        >();
+        const inspect = (entry: unknown): void => {
+          if (Array.isArray(entry)) {
+            entry.forEach(inspect);
+            return;
+          }
+          if (!entry || typeof entry !== "object") return;
+          const object = entry as Record<string, unknown>;
+          if (
+            typeof object.id === "string" &&
+            typeof object.version === "string" &&
+            typeof object.integrity === "string" &&
+            typeof object.html === "string"
+          ) {
+            components.set(
+              `${object.id}@${object.version}:${object.integrity}`,
+              object as {
+                id: string;
+                version: string;
+                integrity: string;
+                scope?: string;
+              },
+            );
+            return;
+          }
+          for (const [key, child] of Object.entries(object))
+            if (key !== "document") inspect(child);
+        };
+        inspect(value);
+        const tree = components.size ? await this.tree(state.head) : [];
+        for (const component of components.values()) {
+          const suffix = `/components/${component.id}/${component.version}/compiled.json`;
+          for (const entry of tree)
+            if (entry.path.endsWith(suffix) && !responseFiles.has(entry.path)) {
+              if (
+                (component.scope === "project" &&
+                  !entry.path.startsWith("projects/")) ||
+                (component.scope === "global" &&
+                  !entry.path.startsWith("packages/components/")) ||
+                (component.scope === "published" &&
+                  !entry.path.startsWith("packages/published/"))
+              )
+                continue;
+              const bytes = await this.readFile(entry.path, state.head);
+              if (
+                JSON.parse(bytes.toString("utf8")).integrity ===
+                component.integrity
+              ) {
+                responseFiles.set(entry.path, bytes);
+                break;
+              }
+            }
+        }
+      }
+      const response =
+        context.operationId && context.requestFingerprint
+          ? describeResponse(value, responseFiles, (path) => {
+              const local = relative(this.workspace, path).split(sep).join("/");
+              return local.startsWith("../") || isAbsolute(local)
+                ? undefined
+                : local;
+            })
+          : undefined;
       const entry = await this.writeUnlocked(
         state.changes,
         context,
         state.expected,
+        response,
       );
       return { value, entry };
     });
@@ -513,6 +657,7 @@ export class GitLibrary {
     changes: FileChanges,
     context: ChangeContext,
     expected?: Map<string, string | null>,
+    response?: ResponseDescriptor,
   ): Promise<HistoryEntry | null> {
     await this.recoverUnlocked();
     const parent = await this.head();
@@ -570,6 +715,7 @@ export class GitLibrary {
       version: 1,
       operationId,
       requestHash,
+      ...(response ? { response } : {}),
       at: new Date().toISOString(),
       paths: [...changes.keys()].map(assertPath),
       resources: [
@@ -675,6 +821,21 @@ export class GitLibrary {
     await this.command(["update-ref", "-d", temporaryRef]);
     await rm(transaction, { recursive: true });
     return entry;
+  }
+
+  private async receipt(
+    operationId: string,
+  ): Promise<HistoryEntry | undefined> {
+    return readFile(
+      join(this.root, "local", "receipts", `${sha(operationId)}.json`),
+      "utf8",
+    ).then(
+      (value) => JSON.parse(value) as HistoryEntry,
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return undefined;
+        throw error;
+      },
+    );
   }
 
   private async atomicFile(path: string, bytes: Buffer): Promise<void> {

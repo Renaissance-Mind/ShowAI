@@ -1,5 +1,5 @@
 import { artifactVersion } from "../surface/document.mjs";
-import { createResource } from "../surface/containers.mjs";
+import { createResource, upgradeResource } from "../surface/containers.mjs";
 import { constants } from "node:fs";
 import {
   lstat,
@@ -923,6 +923,7 @@ export class FileStore {
       archived?: boolean;
     },
     baseHash: string,
+    baseRevision?: string,
   ): Promise<PageRecord> {
     this.pagePath(projectId, pageId);
     if (
@@ -938,6 +939,7 @@ export class FileStore {
         requireActiveFolder(project, fields.parentId);
       return this.applyPage(projectId, pageId, {
         baseHash,
+        baseRevision,
         operations: [{ type: "page.set", fields }],
       });
     });
@@ -1088,7 +1090,9 @@ export class FileStore {
       const document = normalizeDocument(
         input.document
           ? {
-              ...input.document,
+              ...(versionedLibrary(this.root)
+                ? upgradeResource(input.document)
+                : input.document),
               id,
               ...(input.title !== undefined ? { title: input.title } : {}),
               ...(input.parentId !== undefined

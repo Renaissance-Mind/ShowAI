@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { changeContext, withChangeContext } from "../core/history-context";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -43,12 +45,33 @@ export function createMcpServer(options: {
   const server = new McpServer(
     { name: "showai", version: packageMetadata.version },
     {
-      instructions: `ShowAI creates interactive pages in project ${projectId}. This connection is bound to that project. Page reading defaults to structured JSON/Markdown. Use image for visual checks and html for browser DOM and interaction checks; guide reading documents viewport, theme, partial scope, actions and temporary draft previews. Retain the source hash before writing. Use catalog summaries to choose resources and explicit views for details or source. Shared revisions are immutable; fork/merge into this project. Shared promotion or published registration needs an explicit CLI/desktop action.`,
+      instructions: `ShowAI creates interactive pages in project ${projectId}. This connection is bound to that project. Page reading defaults to structured JSON/Markdown. Use image for visual checks and html for browser DOM and interaction checks; guide reading documents viewport, theme, partial scope, actions and temporary draft previews. Retain the source hash and revision before writing; versioned page writes require baseRevision. Use catalog summaries to choose resources and explicit views for details or source. Shared revisions are immutable; fork/merge into this project. Shared promotion or published registration needs an explicit CLI/desktop action.`,
     },
   );
-  const call = (handler: () => Promise<unknown>) =>
+  const inherited = changeContext();
+  const changeSchema = {
+    operationId: z.string().max(1000).optional(),
+    message: z.string().max(4000).optional(),
+    groupId: z.string().max(1000).optional(),
+  };
+  const call = (
+    handler: () => Promise<unknown>,
+    metadata: { operationId?: string; message?: string; groupId?: string } = {},
+  ) =>
     Promise.resolve()
-      .then(handler)
+      .then(() =>
+        withChangeContext(
+          {
+            ...inherited,
+            channel: "mcp",
+            operationId: metadata.operationId ?? randomUUID(),
+            requestFingerprint: undefined,
+            message: metadata.message ?? inherited.message,
+            groupId: metadata.groupId ?? inherited.groupId,
+          },
+          handler,
+        ),
+      )
       .then(
         (data) => ({
           content: [
@@ -152,6 +175,7 @@ export function createMcpServer(options: {
       description:
         "Create a page in the bound project. Optional artifact components are imported into this project; remote components are fetched and verified.",
       inputSchema: {
+        ...changeSchema,
         title: z.string().optional(),
         kind: z.enum(["page", "board"]).optional(),
         document: jsonObject.optional(),
@@ -160,16 +184,19 @@ export function createMcpServer(options: {
       },
       annotations: { ...write, openWorldHint: true },
     },
-    ({ title, kind, document, components, remoteComponents }) =>
-      call(() =>
-        service.createPage(projectId, {
-          title,
-          kind,
-          ...(document ? { document: validateDocument(document) } : {}),
-          components: components as unknown as CompiledComponent[] | undefined,
-          remoteComponents: remoteComponents as unknown as
-            PublishedComponentLocator[] | undefined,
-        }),
+    ({ title, kind, document, components, remoteComponents, ...metadata }) =>
+      call(
+        () =>
+          service.createPage(projectId, {
+            title,
+            kind,
+            ...(document ? { document: validateDocument(document) } : {}),
+            components: components as unknown as
+              CompiledComponent[] | undefined,
+            remoteComponents: remoteComponents as unknown as
+              PublishedComponentLocator[] | undefined,
+          }),
+        metadata,
       ),
   );
   server.registerTool(
@@ -178,25 +205,38 @@ export function createMcpServer(options: {
       description:
         "Save a page with its current baseHash; rejects stale content with CONFLICT. Use guide authoring for the editing workflow.",
       inputSchema: {
+        ...changeSchema,
         pageId: z.string(),
         document: jsonObject,
         baseHash: z.string().min(1),
+        baseRevision: z.string().optional(),
         components: z.array(jsonObject).max(100).optional(),
         remoteComponents: z.array(jsonObject).max(100).optional(),
       },
       annotations: { ...write, openWorldHint: true },
     },
-    ({ pageId, document, baseHash, components, remoteComponents }) =>
-      call(() =>
-        service.savePage(
-          projectId,
-          pageId,
-          validateDocument(document),
-          baseHash,
-          components as unknown as CompiledComponent[] | undefined,
-          remoteComponents as unknown as
-            PublishedComponentLocator[] | undefined,
-        ),
+    ({
+      pageId,
+      document,
+      baseHash,
+      baseRevision,
+      components,
+      remoteComponents,
+      ...metadata
+    }) =>
+      call(
+        () =>
+          service.savePage(
+            projectId,
+            pageId,
+            validateDocument(document),
+            baseHash,
+            components as unknown as CompiledComponent[] | undefined,
+            remoteComponents as unknown as
+              PublishedComponentLocator[] | undefined,
+            baseRevision,
+          ),
+        metadata,
       ),
   );
   server.registerTool(
@@ -205,18 +245,23 @@ export function createMcpServer(options: {
       description:
         "Apply stable-block-id operations with a current baseHash. Query guide authoring for the operation shapes.",
       inputSchema: {
+        ...changeSchema,
         pageId: z.string(),
         baseHash: z.string().min(1),
+        baseRevision: z.string().optional(),
         operations: z.array(jsonObject).max(1000),
       },
       annotations: write,
     },
-    ({ pageId, baseHash, operations }) =>
-      call(() =>
-        service.applyPage(projectId, pageId, {
-          baseHash,
-          operations: operations as PageOperation[],
-        }),
+    ({ pageId, baseHash, baseRevision, operations, ...metadata }) =>
+      call(
+        () =>
+          service.applyPage(projectId, pageId, {
+            baseHash,
+            baseRevision,
+            operations: operations as PageOperation[],
+          }),
+        metadata,
       ),
   );
   server.registerTool(
@@ -301,23 +346,28 @@ export function createMcpServer(options: {
     {
       description:
         "Import and compile a local component package into this project. Existing revisions cannot be overwritten.",
-      inputSchema: { directory: z.string().min(1) },
+      inputSchema: { ...changeSchema, directory: z.string().min(1) },
       annotations: write,
     },
-    ({ directory }) =>
-      call(() => service.importComponent(directory, projectId)),
+    ({ directory, ...metadata }) =>
+      call(() => service.importComponent(directory, projectId), metadata),
   );
   server.registerTool(
     "component_save",
     {
       description:
         "Save explicitly supplied component source as a new immutable revision in this project. Read guide catalog and source view first.",
-      inputSchema: { source: jsonObject },
+      inputSchema: { ...changeSchema, source: jsonObject },
       annotations: write,
     },
-    ({ source }) =>
-      call(() =>
-        service.saveComponent(projectId, source as unknown as ComponentSource),
+    ({ source, ...metadata }) =>
+      call(
+        () =>
+          service.saveComponent(
+            projectId,
+            source as unknown as ComponentSource,
+          ),
+        metadata,
       ),
   );
   server.registerTool(
@@ -326,9 +376,11 @@ export function createMcpServer(options: {
       description:
         "Create a whiteboard from a template, or insert into pageId with its baseHash and optional parentId. Returns the updated page and hash.",
       inputSchema: {
+        ...changeSchema,
         templateId: z.string(),
         pageId: z.string().optional(),
         baseHash: z.string().optional(),
+        baseRevision: z.string().optional(),
         parentId: z.string().optional(),
         title: z.string().optional(),
         scope: z.enum(["builtin", "global", "published", "project"]).optional(),
@@ -337,9 +389,10 @@ export function createMcpServer(options: {
       },
       annotations: write,
     },
-    ({ templateId, title, ...selection }) =>
-      call(() =>
-        service.applyTemplate(projectId, templateId, title, selection),
+    ({ templateId, title, operationId, message, groupId, ...selection }) =>
+      call(
+        () => service.applyTemplate(projectId, templateId, title, selection),
+        { operationId, message, groupId },
       ),
   );
   server.registerTool(
@@ -347,16 +400,22 @@ export function createMcpServer(options: {
     {
       description:
         "Create an immutable project template from a page or explicit metadata/composition. Use guide templates for input shape.",
-      inputSchema: { pageId: z.string().optional(), input: jsonObject },
+      inputSchema: {
+        ...changeSchema,
+        pageId: z.string().optional(),
+        input: jsonObject,
+      },
       annotations: write,
     },
-    ({ pageId, input }) =>
-      call(() =>
-        service.saveTemplate(
-          projectId,
-          pageId,
-          input as unknown as SaveTemplateInput,
-        ),
+    ({ pageId, input, ...metadata }) =>
+      call(
+        () =>
+          service.saveTemplate(
+            projectId,
+            pageId,
+            input as unknown as SaveTemplateInput,
+          ),
+        metadata,
       ),
   );
   server.registerTool(
@@ -365,6 +424,7 @@ export function createMcpServer(options: {
       description:
         "Fork an exact shared or current-project revision into a new revision owned by this project.",
       inputSchema: {
+        ...changeSchema,
         ref: refSchema,
         id: z.string().optional(),
         version: z.string(),
@@ -372,7 +432,12 @@ export function createMcpServer(options: {
       },
       annotations: write,
     },
-    ({ ref, ...target }) => call(() => service.fork(projectId, ref, target)),
+    ({ ref, operationId, message, groupId, ...target }) =>
+      call(() => service.fork(projectId, ref, target), {
+        operationId,
+        message,
+        groupId,
+      }),
   );
   server.registerTool(
     "catalog_merge_preview",
@@ -413,6 +478,7 @@ export function createMcpServer(options: {
       description:
         "Save a reviewed merge resolution as a new project revision. Shared scopes cannot be overwritten from this connection.",
       inputSchema: {
+        ...changeSchema,
         base: refSchema,
         ours: refSchema,
         theirs: refSchema,
@@ -422,12 +488,14 @@ export function createMcpServer(options: {
       },
       annotations: write,
     },
-    ({ resolved, ...input }) =>
-      call(() =>
-        service.resolveMerge(projectId, {
-          ...input,
-          resolved: resolved as unknown as EditablePackage,
-        }),
+    ({ resolved, operationId, message, groupId, ...input }) =>
+      call(
+        () =>
+          service.resolveMerge(projectId, {
+            ...input,
+            resolved: resolved as unknown as EditablePackage,
+          }),
+        { operationId, message, groupId },
       ),
   );
   server.registerTool(
