@@ -1119,18 +1119,26 @@
 .sb-block .sb-bookmark-link {
   display: flex;
   align-items: stretch;
+  gap: 12px;
   color: inherit;
   text-decoration: none;
-  margin: 0 0 0;
-  transition: background 0.15s;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--sb-line);
+  border-radius: 8px;
+  background: var(--sb-soft);
+  overflow: hidden;
+  transition: background 0.15s, border-color 0.15s;
 }
 .sb-block .sb-bookmark-link:hover {
-  background: var(--sb-soft);
+  background: var(--sb-hover);
+  border-color: color-mix(in srgb, var(--sb-accent) 20%, var(--sb-line));
+  text-decoration: none;
 }
 .sb-bookmark-copy {
   flex: 1;
   min-width: 0;
-  padding: 7px 19px 19px;
+  padding: 10px 12px;
 }
 .sb-bookmark-copy > strong {
   font-size: 13px;
@@ -1140,8 +1148,8 @@
 .sb-bookmark-copy > p {
   font-size: 11px;
   color: var(--sb-muted);
-  line-height: 1.8;
-  margin: 7px 0 12px !important;
+  line-height: 1.6;
+  margin: 4px 0 6px !important;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -1153,7 +1161,7 @@
   align-items: center;
   color: var(--sb-muted);
   font-size: 9px;
-  margin-top: 12px;
+  margin-top: 6px;
 }
 .sb-bookmark-domain > svg:last-child {
   margin-left: auto;
@@ -1161,12 +1169,11 @@
 .sb-bookmark-link > img {
   display: block;
   object-fit: cover;
-  width: 155px;
-  max-height: 160px;
+  width: 120px;
+  max-height: 140px;
   align-self: stretch;
-  border-left: 1px solid var(--sb-line);
-  border-top: 1px solid var(--sb-line);
-  border-top-left-radius: 5px;
+  border: 0;
+  border-radius: 0;
 }
 .sb-gallery-grid {
   display: grid;
@@ -1522,7 +1529,7 @@
     min-width: 185px;
   }
   .sb-bookmark-copy {
-    padding: 7px 13px 14px;
+    padding: 10px 12px;
   }
   .sb-bookmark-link > img {
     width: 100px;
@@ -1796,16 +1803,6 @@
 .sb-chart-legend {
   padding-left: 0;
   padding-right: 0;
-}
-.sb-bookmark-copy {
-  padding: 8px 0;
-}
-.sb-block .sb-bookmark-link {
-  gap: 16px;
-}
-.sb-bookmark-link > img {
-  border: 0;
-  border-radius: 4px;
 }
 .sb-g2-chart > .sb-g2-toolbar {
   position: absolute;
