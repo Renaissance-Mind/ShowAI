@@ -120,6 +120,41 @@ try {
   const info = await page.evaluate(() => window.showai.invoke("app:info"));
   assert.equal(info.home, home);
   assert.equal(info.packaged, false);
+  const shared = await fetch(original.url + "__showai-dev/status").then(
+    (response) => response.json(),
+  );
+  assert.equal(shared.protocol, "showai-development-v1");
+  assert.equal(shared.backendPid, original.backendPid);
+  assert.equal(shared.home, home);
+  assert.equal(
+    (
+      await fetch(original.url + "__showai-dev/focus", {
+        method: "POST",
+        headers: { Origin: "https://example.com" },
+      })
+    ).status,
+    403,
+  );
+  const reuse = () =>
+    promisify(execFile)(
+      process.execPath,
+      [
+        join(fixture, "scripts/dev-open.mjs"),
+        mode,
+        "--port",
+        String(port),
+        "--home",
+        home,
+        "--no-focus",
+      ],
+      { cwd: fixture },
+    ).then((response) => JSON.parse(response.stdout));
+  const [first, second] = await Promise.all([reuse(), reuse()]);
+  assert.equal(first.backendPid, original.backendPid);
+  assert.equal(second.backendPid, original.backendPid);
+  checks.push(
+    "concurrent launch requests reuse one backend and reject foreign origins",
+  );
   assert.equal(
     await page.evaluate(() => typeof window.showai.prepareReload),
     "function",

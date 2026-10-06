@@ -363,6 +363,23 @@ else {
   if (!app.isPackaged && process.env.SHOWAI_DEV_URL)
     process.on("message", (message) => {
       if (message === "showai:development-quit") app.quit();
+      if (
+        message &&
+        typeof message === "object" &&
+        "type" in message &&
+        message.type === "showai:development-focus"
+      ) {
+        if ("url" in message && typeof message.url === "string")
+          void openDeepLink(message.url).catch((error) =>
+            dialog.showErrorBox("无法打开页面", errorResult(error).message),
+          );
+        else {
+          const window = [...windows][0];
+          window?.restore();
+          window?.show();
+          window?.focus();
+        }
+      }
     });
   app.on("open-url", (event, url) => {
     event.preventDefault();

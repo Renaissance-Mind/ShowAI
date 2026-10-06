@@ -12,6 +12,7 @@ import { build as bundle } from "esbuild";
 import { createServer } from "vite";
 import { rawSourcePlugin } from "./raw-source-plugin.mjs";
 import { developmentSessions } from "./dev-session.mjs";
+import { developmentControl } from "./dev-control.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 process.chdir(root);
@@ -142,7 +143,34 @@ const vite = await createServer({
         : undefined,
   },
 });
-frontendServer.on("request", vite.middlewares);
+frontendServer.on(
+  "request",
+  developmentControl(
+    origin,
+    () => ({
+      root: resolve(root),
+      mode,
+      url: origin + "/",
+      home: environment.SHOWAI_HOME,
+      branch: git(["branch", "--show-current"]),
+      sourceCommit: git(["rev-parse", "HEAD"]),
+      pid: process.pid,
+      backendPid: child?.pid,
+      ready: !!child && !!readyReceipt,
+      cli: {
+        command: process.execPath,
+        args: [join(runtime, "scripts/cli.mjs")],
+        env: { SHOWAI_HOME: environment.SHOWAI_HOME },
+      },
+    }),
+    (url) => {
+      if (mode === "desktop")
+        child?.send({ type: "showai:development-focus", url });
+      else child?.send("showai:development-open");
+    },
+    vite.middlewares,
+  ),
+);
 const sessions = developmentSessions(vite.ws);
 let child,
   watcher,
@@ -288,6 +316,7 @@ async function publish(outputs) {
     );
 }
 async function launch() {
+  readyReceipt = undefined;
   const args =
     mode === "desktop"
       ? [join(directory, "desktop")]

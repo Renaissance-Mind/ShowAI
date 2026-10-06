@@ -67,7 +67,9 @@ npm run build
 npm run desktop
 ```
 
-日常开发运行 `npm run dev:desktop` 或 `npm run dev:browser`，无需预先构建或打安装包。前端保存后自动更新；本地服务、主进程与 CLI 的相关改动自动构建，并在打开的页面确认保存后重启。保存冲突会暂停更新，处理后点击右下角开发标记重试。
+日常开发使用 `npm run dev:open` 打开桌面开发版。再次运行会连接同一个进程；`npm run dev:status` 返回实际代码目录、分支、内容库与 CLI 配置。前端保存后自动更新；本地服务、主进程与 CLI 的相关改动自动构建，并在打开的页面确认保存后重启。保存冲突会暂停更新，处理后点击右下角开发标记重试。
+
+macOS 可执行 `npm run dev:install -- --home /absolute/library`，安装固定的 `~/Applications/ShowAI.app` 入口。打开它即可启动或显示实时开发版，无需生成安装包。启动器配置保存在本机 `.showai-dev/launcher.json`，后台日志位于 `.showai-dev/desktop-5173/development.log`。需要在后台连接时使用 `npm run dev:open -- --no-focus`。
 
 默认地址为 `http://127.0.0.1:5173`，开发内容库为 `.showai-dev/library`。用 `-- --port 5174 --home /absolute/library` 指定端口和内容库，浏览器模式支持 `--no-open`。同一源码目录的多个会话共用一个开发服务；不同 worktree 使用不同端口与内容库。开发标记的提示显示代码目录和启动时分支、提交。
 
