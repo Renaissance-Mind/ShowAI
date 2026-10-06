@@ -232,6 +232,7 @@ try {
       .locator(".surface-world")
       .first()
       .evaluate((element) => getComputedStyle(element).transform);
+  await object(boardId).scrollIntoViewIfNeeded();
   const inactiveCamera = await world();
   const scrollBefore = await parentPage.evaluate(
     (element) => element.scrollTop,
