@@ -79,10 +79,13 @@ export function mergeText(
   base: string,
   ours: string,
   theirs: string,
+  units: "lines" | "characters" = "lines",
 ): string | undefined {
-  const lines = base.split(/(?<=\n)/);
-  const left = hunks(lines, ours.split(/(?<=\n)/)),
-    right = hunks(lines, theirs.split(/(?<=\n)/));
+  const split = (value: string) =>
+    units === "characters" ? Array.from(value) : value.split(/(?<=\n)/);
+  const lines = split(base);
+  const left = hunks(lines, split(ours)),
+    right = hunks(lines, split(theirs));
   const changes = [...left];
   for (const candidate of right) {
     let duplicate = false;

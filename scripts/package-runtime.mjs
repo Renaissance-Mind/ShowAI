@@ -46,6 +46,7 @@ async function copyPackage(name) {
     await copyPackage(dependency);
 }
 for (const name of [
+  "dugite",
   "esbuild",
   "playwright-core",
   "react",

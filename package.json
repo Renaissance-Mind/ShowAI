@@ -64,6 +64,7 @@
     "chokidar": "^5.0.0",
     "d3-interpolate": "3.0.1",
     "d3-regression": "2.2.0",
+    "dugite": "3.2.3",
     "esbuild": "^0.28.2",
     "lucide-react": "^1.50.0",
     "marked": "^18.0.14",
@@ -97,5 +98,8 @@
     "app-builder-lib": {
       "@electron/get": "5.1.0"
     }
+  },
+  "allowScripts": {
+    "dugite@3.2.3": true
   }
 }
