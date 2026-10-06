@@ -36,6 +36,8 @@ import type {
   ProjectSummary,
   PageSummary,
   FolderMetadata,
+  ProjectGroup,
+  SidebarOrganization,
 } from "../core/model";
 import type { DesktopInfo } from "../desktop/bridge";
 import type { ShowArtifact, ShowDocument } from "../types";
@@ -62,6 +64,7 @@ import {
   type LibraryTarget,
 } from "./LibraryNavigation";
 import Dialog from "./Dialog";
+import ProjectSidebar from "./ProjectSidebar";
 import { ComponentCatalog, ComponentNavigation } from "./ComponentCatalog";
 import {
   groupComponents,
@@ -93,7 +96,9 @@ type LoadedTemplate = TemplateRecord & {
   previewDocument?: ShowDocument;
 };
 type DialogState =
-  | { type: "project"; project?: ProjectSummary }
+  | { type: "project"; project?: ProjectSummary; groupId?: string }
+  | { type: "group"; group?: ProjectGroup; projectId?: string }
+  | { type: "moveProject"; projectId: string }
   | {
       type: "newPage";
       projectId: string;
@@ -138,6 +143,14 @@ function Scope({ value }: { value: string }) {
 export default function Studio() {
   const [info, setInfo] = useState<DesktopInfo | null>(null);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [organization, setOrganization] = useState<SidebarOrganization>({
+    groups: [],
+    projectGroups: {},
+  });
+  const [groupMenu, setGroupMenu] = useState<{
+    group: ProjectGroup;
+    anchor: HTMLElement;
+  } | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [contents, setContents] = useState<
     Record<string, { pages: PageSummary[]; folders: FolderMetadata[] }>
@@ -227,8 +240,12 @@ export default function Studio() {
     return next;
   }, []);
   const refresh = useCallback(async () => {
-    const next = await desktop.invoke<ProjectSummary[]>("projects:list");
+    const [next, sidebar] = await Promise.all([
+      desktop.invoke<ProjectSummary[]>("projects:list"),
+      desktop.invoke<SidebarOrganization>("sidebar:get"),
+    ]);
     setProjects(next);
+    setOrganization(sidebar);
     const visibleIds = next
       .filter(
         (item) =>
@@ -607,6 +624,10 @@ export default function Studio() {
     if (!expandedProjects[id]) await loadProjectContents(id);
     setExpandedProjects((current) => ({ ...current, [id]: !current[id] }));
   }
+  async function moveProject(projectId: string, groupId: string | null) {
+    await desktop.invoke("projects:group", { projectId, groupId });
+    await refresh();
+  }
   async function updateTarget(
     target: LibraryTarget,
     change: { name?: string; pinned?: boolean },
@@ -966,24 +987,18 @@ export default function Studio() {
                 }}
               />
             ) : (
-              <div className="studio-sidebar-projects">
-                <div className="studio-sidebar-label">
-                  项目
-                  <button
-                    className="studio-icon studio-row-menu"
-                    aria-label="项目列表操作"
-                    aria-haspopup="menu"
-                    onClick={(event) => {
-                      const anchor = event.currentTarget;
-                      setProjectsMenu((current) =>
-                        current === anchor ? null : anchor,
-                      );
-                    }}
-                  >
-                    <MoreHorizontal size={17} />
-                  </button>
-                </div>
-                {projects.map((item) => (
+              <ProjectSidebar
+                projects={projects}
+                organization={organization}
+                selectedProject={selectedProject}
+                onCreate={(groupId) => setDialog({ type: "project", groupId })}
+                onMenu={(anchor) =>
+                  setProjectsMenu((current) =>
+                    current === anchor ? null : anchor,
+                  )
+                }
+                onGroupMenu={(group, anchor) => setGroupMenu({ group, anchor })}
+                renderProject={(item) => (
                   <div key={item.id}>
                     <LibraryRow
                       target={projectTarget(item)}
@@ -1003,8 +1018,8 @@ export default function Studio() {
                       </div>
                     )}
                   </div>
-                ))}
-              </div>
+                )}
+              />
             )}
             <div className="studio-sidebar-bottom">
               <button onClick={action(() => navigate("settings"))}>
@@ -1764,6 +1779,44 @@ export default function Studio() {
               icon: <FolderPlus size={15} />,
               onSelect: () => setDialog({ type: "project" }),
             },
+            {
+              label: "新建分组",
+              icon: <FolderPlus size={15} />,
+              onSelect: () => setDialog({ type: "group" }),
+            },
+          ]}
+        />
+      )}
+      {groupMenu && (
+        <LibraryContextMenu
+          anchor={groupMenu.anchor}
+          label={`${groupMenu.group.name}的分组操作`}
+          onClose={() => setGroupMenu(null)}
+          items={[
+            {
+              label: "新建项目",
+              icon: <Plus size={15} />,
+              onSelect: () =>
+                setDialog({ type: "project", groupId: groupMenu.group.id }),
+            },
+            {
+              label: "重命名分组",
+              icon: <Pencil size={15} />,
+              onSelect: () =>
+                setDialog({ type: "group", group: groupMenu.group }),
+            },
+            {
+              label: "移除分组",
+              icon: <Trash2 size={15} />,
+              separatorBefore: true,
+              onSelect: action(async () => {
+                await desktop.invoke("groups:remove", {
+                  groupId: groupMenu.group.id,
+                });
+                await refresh();
+                setNotice("已移除分组，项目已移回项目列表");
+              }),
+            },
           ]}
         />
       )}
@@ -1817,6 +1870,29 @@ export default function Studio() {
                 }),
               ),
             },
+            ...(contextMenu.target.kind === "project"
+              ? [
+                  {
+                    label: "移到分组…",
+                    icon: <Folder size={15} />,
+                    onSelect: () =>
+                      setDialog({
+                        type: "moveProject",
+                        projectId: contextMenu.target.projectId,
+                      }),
+                  },
+                  ...(organization.projectGroups[contextMenu.target.projectId]
+                    ? [
+                        {
+                          label: "移出分组",
+                          onSelect: action(() =>
+                            moveProject(contextMenu.target.projectId, null),
+                          ),
+                        },
+                      ]
+                    : []),
+                ]
+              : []),
             ...(contextMenu.pageTools
               ? [
                   {
@@ -1887,6 +1963,41 @@ export default function Studio() {
           ]}
         />
       )}
+      {dialog?.type === "group" && (
+        <NameDialog
+          title={dialog.group ? "重命名分组" : "新建分组"}
+          inputLabel="分组名称"
+          initialValue={dialog.group?.name}
+          onClose={closeDialog}
+          onSave={async (name) => {
+            const sidebar = await desktop.invoke<SidebarOrganization>(
+              dialog.group ? "groups:rename" : "groups:create",
+              {
+                name,
+                ...(dialog.group ? { groupId: dialog.group.id } : {}),
+              },
+            );
+            if (dialog.projectId)
+              await moveProject(dialog.projectId, sidebar.groups.at(-1)!.id);
+            await refresh();
+            setDialog(null);
+          }}
+        />
+      )}
+      {dialog?.type === "moveProject" && (
+        <MoveProjectDialog
+          groups={organization.groups}
+          currentGroup={organization.projectGroups[dialog.projectId] ?? ""}
+          onClose={closeDialog}
+          onCreate={() =>
+            setDialog({ type: "group", projectId: dialog.projectId })
+          }
+          onSave={async (groupId) => {
+            await moveProject(dialog.projectId, groupId);
+            setDialog(null);
+          }}
+        />
+      )}
       {dialog?.type === "folder" && (
         <NameDialog
           title="新文件夹"
@@ -1939,6 +2050,7 @@ export default function Studio() {
               : await desktop.invoke<ProjectSummary>("projects:create", {
                   name,
                 });
+            if (dialog.groupId) await moveProject(result.id, dialog.groupId);
             await refresh();
             await openProject(result.id);
             setDialog(null);
@@ -2049,6 +2161,73 @@ export default function Studio() {
         />
       )}
     </div>
+  );
+}
+
+function MoveProjectDialog({
+  groups,
+  currentGroup,
+  onClose,
+  onCreate,
+  onSave,
+}: {
+  groups: ProjectGroup[];
+  currentGroup: string;
+  onClose: () => void;
+  onCreate: () => void;
+  onSave: (groupId: string | null) => Promise<void>;
+}) {
+  const [groupId, setGroupId] = useState(currentGroup);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  return (
+    <Dialog title="移到分组" onClose={onClose}>
+      <form
+        className="studio-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (busy) return;
+          setBusy(true);
+          setError("");
+          void onSave(groupId || null)
+            .catch((reason) => setError(errorMessage(reason)))
+            .finally(() => setBusy(false));
+        }}
+      >
+        <label>
+          分组
+          <select
+            aria-label="目标分组"
+            value={groupId}
+            onChange={(event) => setGroupId(event.target.value)}
+          >
+            <option value="">项目（未分组）</option>
+            {groups.map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button className="studio-button" type="button" onClick={onCreate}>
+          <Plus size={15} />
+          新建分组
+        </button>
+        {error && (
+          <p className="studio-form-error" role="alert">
+            {error}
+          </p>
+        )}
+        <footer>
+          <button className="studio-button" type="button" onClick={onClose}>
+            取消
+          </button>
+          <button className="studio-button primary" disabled={busy}>
+            {busy && <Loader2 size={14} className="studio-spin" />}移动
+          </button>
+        </footer>
+      </form>
+    </Dialog>
   );
 }
 

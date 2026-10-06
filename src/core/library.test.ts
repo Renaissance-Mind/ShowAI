@@ -130,6 +130,75 @@ describe("persistent project, folder, and page organization", () => {
     ).toBe(false);
   });
 
+  it("persists groups and membership, preserving pinning and pages when a group is removed", async () => {
+    const project = await store.createProject({ name: "Grouped project" });
+    const page = await store.createPage(project.id, { title: "Keep me" });
+    const group = (await store.createProjectGroup("Research")).groups[0];
+    await store.moveProjectToGroup(project.id, group.id);
+    await store.updateProject(project.id, { pinned: true });
+    await store.updateProjectGroup(group.id, "Reading");
+    const reopened = new FileStore(home);
+    expect(await reopened.readSidebar()).toEqual({
+      groups: [{ id: group.id, name: "Reading" }],
+      projectGroups: { [project.id]: group.id },
+    });
+    await reopened.updateProjectGroup(group.id, null);
+    expect(await store.readSidebar()).toEqual({
+      groups: [],
+      projectGroups: {},
+    });
+    expect((await store.listProjects())[0].pinned).toBe(true);
+    expect((await store.readPage(project.id, page.document.id)).hash).toBe(
+      page.hash,
+    );
+  });
+
+  it("serializes group edits and rejects missing destinations without losing membership", async () => {
+    const first = await store.createProject({ name: "First" });
+    const second = await store.createProject({ name: "Second" });
+    await Promise.all([
+      store.createProjectGroup("A"),
+      new FileStore(home).createProjectGroup("B"),
+    ]);
+    const groups = (await store.readSidebar()).groups;
+    expect(groups).toHaveLength(2);
+    await Promise.all([
+      store.moveProjectToGroup(first.id, groups[0].id),
+      new FileStore(home).moveProjectToGroup(second.id, groups[1].id),
+    ]);
+    await expect(
+      store.moveProjectToGroup(first.id, "missing-group"),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(
+      store.moveProjectToGroup("missing-project", groups[0].id),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect((await store.readSidebar()).projectGroups).toEqual({
+      [first.id]: groups[0].id,
+      [second.id]: groups[1].id,
+    });
+    await store.moveProjectToGroup(first.id, null);
+    expect((await store.readSidebar()).projectGroups).toEqual({
+      [second.id]: groups[1].id,
+    });
+  });
+
+  it("reports corrupt sidebar data without replacing it with empty groups", async () => {
+    expect(await store.readSidebar()).toEqual({
+      groups: [],
+      projectGroups: {},
+    });
+    await writeFile(
+      join(home, "sidebar.json"),
+      JSON.stringify({
+        groups: [],
+        projectGroups: { project: "missing-group" },
+      }),
+    );
+    await expect(store.readSidebar()).rejects.toMatchObject({
+      code: "INVALID_DATA",
+    });
+  });
+
   it("moves pages only to existing visible folders with a matching content hash", async () => {
     const project = await store.createProject({ name: "Project" });
     const folder = await store.createFolder(project.id, {

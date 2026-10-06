@@ -54,6 +54,11 @@ export const workbenchActions = new Set([
   "projects:rename",
   "projects:pin",
   "projects:remove",
+  "sidebar:get",
+  "groups:create",
+  "groups:rename",
+  "groups:remove",
+  "projects:group",
   "folders:list",
   "folders:create",
   "folders:rename",
@@ -269,6 +274,22 @@ export function createWorkbench(
         return host.info();
       case "projects:list":
         return store.listProjects();
+      case "sidebar:get":
+        return store.readSidebar();
+      case "groups:create":
+        return store.createProjectGroup(required(args, "name"));
+      case "groups:rename":
+        return store.updateProjectGroup(
+          required(args, "groupId"),
+          required(args, "name"),
+        );
+      case "groups:remove":
+        return store.updateProjectGroup(required(args, "groupId"), null);
+      case "projects:group":
+        return store.moveProjectToGroup(
+          projectId(args),
+          args.groupId === null ? null : required(args, "groupId"),
+        );
       case "projects:create":
         return service.createProject(
           required(args, "name"),

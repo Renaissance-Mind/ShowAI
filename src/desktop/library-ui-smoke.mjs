@@ -226,7 +226,7 @@ try {
   const labels = await firstMenu.getByRole("menuitem").allTextContents();
   assert.deepEqual(
     labels.map((label) => label.trim()).sort(),
-    ["添加新页面", "新文件夹", "重命名", "删除", "置顶"].sort(),
+    ["添加新页面", "新文件夹", "重命名", "删除", "置顶", "移到分组…"].sort(),
   );
   await poll(
     () =>
@@ -293,7 +293,7 @@ try {
   await page.locator(".studio-section-heading h1").click();
   await page.getByRole("menu").waitFor({ state: "detached" });
   result.checks.push(
-    "Five-action menu fits viewport; initial focus, arrows, End, Escape restoration, Tab and outside click work",
+    "Project menu fits viewport; initial focus, arrows, End, Escape restoration, Tab and outside click work",
   );
 
   await choose(project.id, "重命名");

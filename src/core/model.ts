@@ -39,6 +39,16 @@ export interface ProjectSummary extends ProjectMetadata {
   pageCount: number;
 }
 
+export interface ProjectGroup {
+  id: string;
+  name: string;
+}
+
+export interface SidebarOrganization {
+  groups: ProjectGroup[];
+  projectGroups: Record<string, string>;
+}
+
 export interface PageRecord {
   document: ShowDocument;
   hash: string;

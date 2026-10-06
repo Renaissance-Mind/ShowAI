@@ -30,6 +30,7 @@ import type {
   ProjectBinding,
   ProjectMetadata,
   ProjectSummary,
+  SidebarOrganization,
   ShowDocument,
 } from "./model";
 
@@ -415,6 +416,109 @@ export class FileStore {
       await this.readJson(join(this.projectPath(projectId), "project.json")),
       projectId,
     );
+  }
+
+  async readSidebar(): Promise<SidebarOrganization> {
+    let value;
+    try {
+      value = await this.readJson(join(this.root, "sidebar.json"));
+    } catch (error) {
+      if (error instanceof CoreError && error.code === "NOT_FOUND")
+        return { groups: [], projectGroups: {} };
+      throw error;
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      throw new CoreError("INVALID_DATA", "Invalid sidebar organization.");
+    const sidebar = value as SidebarOrganization;
+    if (
+      !Array.isArray(sidebar.groups) ||
+      sidebar.groups.length > 1000 ||
+      !sidebar.projectGroups ||
+      typeof sidebar.projectGroups !== "object" ||
+      Array.isArray(sidebar.projectGroups)
+    )
+      throw new CoreError("INVALID_DATA", "Invalid sidebar organization.");
+    const ids = new Set<string>();
+    for (const group of sidebar.groups) {
+      if (!group || typeof group !== "object")
+        throw new CoreError("INVALID_DATA", "Invalid project group.");
+      assertId(group.id);
+      validateName(group.name);
+      if (ids.has(group.id))
+        throw new CoreError("INVALID_DATA", "Duplicate project group.");
+      ids.add(group.id);
+    }
+    for (const [projectId, groupId] of Object.entries(sidebar.projectGroups)) {
+      assertId(projectId);
+      if (!ids.has(groupId))
+        throw new CoreError("INVALID_DATA", "Project group is missing.");
+    }
+    return sidebar;
+  }
+
+  async createProjectGroup(name: string): Promise<SidebarOrganization> {
+    const normalized = validateName(name);
+    return this.withLock("sidebar", async () => {
+      const sidebar = await this.readSidebar();
+      if (sidebar.groups.length >= 1000)
+        throw new CoreError("INVALID_DATA", "Too many project groups.");
+      sidebar.groups.push({ id: randomUUID(), name: normalized });
+      await this.atomicWrite(
+        join(this.root, "sidebar.json"),
+        JSON.stringify(sidebar, null, 2),
+      );
+      return sidebar;
+    });
+  }
+
+  async updateProjectGroup(
+    groupId: string,
+    name: string | null,
+  ): Promise<SidebarOrganization> {
+    assertId(groupId);
+    const normalized = name === null ? null : validateName(name);
+    return this.withLock("sidebar", async () => {
+      const sidebar = await this.readSidebar();
+      const group = sidebar.groups.find((item) => item.id === groupId);
+      if (!group) throw new CoreError("NOT_FOUND", "Project group is missing.");
+      if (normalized === null) {
+        sidebar.groups = sidebar.groups.filter((item) => item.id !== groupId);
+        sidebar.projectGroups = Object.fromEntries(
+          Object.entries(sidebar.projectGroups).filter(
+            ([, id]) => id !== groupId,
+          ),
+        );
+      } else group.name = normalized;
+      await this.atomicWrite(
+        join(this.root, "sidebar.json"),
+        JSON.stringify(sidebar, null, 2),
+      );
+      return sidebar;
+    });
+  }
+
+  async moveProjectToGroup(
+    projectId: string,
+    groupId: string | null,
+  ): Promise<SidebarOrganization> {
+    const project = await this.readProject(projectId);
+    if (project.archived)
+      throw new CoreError("INVALID_DATA", "This project is archived.");
+    if (groupId !== null) assertId(groupId);
+    return this.withLock("sidebar", async () => {
+      const sidebar = await this.readSidebar();
+      if (groupId === null) delete sidebar.projectGroups[projectId];
+      else {
+        if (!sidebar.groups.some((group) => group.id === groupId))
+          throw new CoreError("NOT_FOUND", "Project group is missing.");
+        sidebar.projectGroups[projectId] = groupId;
+      }
+      await this.atomicWrite(
+        join(this.root, "sidebar.json"),
+        JSON.stringify(sidebar, null, 2),
+      );
+      return sidebar;
+    });
   }
 
   async listProjects(
