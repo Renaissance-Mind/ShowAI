@@ -8,6 +8,7 @@ import {
   CodeBlock,
   validatePrimitiveData,
 } from "./Primitives";
+import { createElement } from "react";
 import primitiveMetadata from "../../../resources/catalog/primitives.json";
 import componentMetadata from "../../../resources/catalog/components.json";
 import { BookmarkBlock } from "./Bookmark";
@@ -19,6 +20,9 @@ import { PlaygroundBlock } from "./Playground";
 import { FlowchartBlock } from "./Flowchart";
 import { validateFlowchartData } from "./flowchart-contract.mjs";
 import { parseChartData } from "./helpers";
+import g2Metadata from "../../../resources/catalog/g2.json";
+import { G2ChartBlock } from "./G2Chart";
+import { validateG2Data } from "./g2/contract.mjs";
 import { CustomBlock } from "../custom/CustomBlock";
 import { readCustomBlockData } from "../custom/contract";
 import type { BlockData, BlockDefinition, BlockRegistration } from "./types";
@@ -327,3 +331,16 @@ registerBlock({
     readCustomBlockData(data);
   },
 });
+
+for (const item of g2Metadata) {
+  registerBlock({
+    kind: item.kind,
+    title: item.name,
+    description: item.description,
+    icon: "↗",
+    defaultData: item.defaultData as BlockData,
+    renderer: (props) =>
+      createElement(G2ChartBlock, { ...props, chartType: item.kind.slice(3) }),
+    validate: validateG2Data,
+  });
+}

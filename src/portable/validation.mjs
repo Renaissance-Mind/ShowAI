@@ -3,6 +3,7 @@ import { artifactVersion, assignSurfaceIds } from "../surface/document.mjs";
 import { validateSurface } from "../surface/validation.mjs";
 import { validatePrimitiveData } from "../components/blocks/primitive-contract.mjs";
 import { validateFlowchartData } from "../components/blocks/flowchart-contract.mjs";
+import { validateG2Data } from "../components/blocks/g2/contract.mjs";
 // Shared by the browser importer and the dependency-free artifact command.
 import { validateRemoteComponents } from "./remote.mjs";
 export const MAX_ARTIFACT_BYTES = 10 * 1024 * 1024;
@@ -225,6 +226,10 @@ function validateAttrs(attrs, path, permitted) {
 }
 
 function validateWidgetData(kind, data, path) {
+  if (kind.startsWith("g2-")) {
+    validateG2Data(data);
+    return;
+  }
   if (kind === "flowchart") {
     validateFlowchartData(data);
     return;

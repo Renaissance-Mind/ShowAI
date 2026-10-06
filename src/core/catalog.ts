@@ -136,7 +136,7 @@ export default function Component({ data, onChange, readOnly }) {
 
 const MAX_PACKAGE_BYTES = 8 * 1024 * 1024;
 const MAX_FILES = 200;
-const MAX_HTML_BYTES = 2 * 1024 * 1024;
+const MAX_HTML_BYTES = 8 * 1024 * 1024;
 const SOURCE_EXTENSIONS = new Set([
   ".ts",
   ".tsx",
@@ -1121,7 +1121,13 @@ async function compilePackage(
   const runtimeRoots = new Map<string, string>();
   const includeRuntime = (name: string): void => {
     if (runtimeRoots.has(name)) return;
-    let directory = dirname(require.resolve(name));
+    const packagePath = require.resolve
+      .paths(name)
+      ?.map((base) => join(base, name, "package.json"))
+      .find(existsSync);
+    if (!packagePath)
+      throw new Error(`Missing installed runtime package: ${name}`);
+    let directory = dirname(packagePath);
     while (true) {
       const metadataPath = join(directory, "package.json");
       if (existsSync(metadataPath)) {
@@ -1149,6 +1155,12 @@ async function compilePackage(
     "lucide-react",
     "@xyflow/react",
     "@dagrejs/dagre",
+    "@antv/g2",
+    "@antv/g2-extension-plot",
+    "@antv/g-svg",
+    "d3-interpolate",
+    "d3-regression",
+    "topojson-client",
   ].forEach(includeRuntime);
   const trusted = [...runtimeRoots.values()];
   const lucideRoot = dirname(require.resolve("lucide-react/package.json"));
@@ -1329,6 +1341,12 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
               "@xyflow/react",
               "@xyflow/react/dist/style.css",
               "@dagrejs/dagre",
+              "@antv/g2",
+              "@antv/g2-extension-plot",
+              "@antv/g-svg",
+              "d3-interpolate",
+              "d3-regression",
+              "topojson-client",
             ].includes(args.path))
         ) {
           return {

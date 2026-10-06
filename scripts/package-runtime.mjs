@@ -55,6 +55,12 @@ for (const name of [
   "lucide-react",
   "@xyflow/react",
   "@dagrejs/dagre",
+  "@antv/g2",
+  "@antv/g2-extension-plot",
+  "@antv/g-svg",
+  "d3-interpolate",
+  "d3-regression",
+  "topojson-client",
 ])
   await copyPackage(name);
 const compilerPackages = await readdir(join(root, "node_modules/@esbuild"));

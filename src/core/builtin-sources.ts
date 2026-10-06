@@ -1,3 +1,5 @@
+import { g2BuiltinSources } from "./g2-builtin-sources";
+import g2Exports from "../components/blocks/g2/exports-map.json";
 import themeTokens from "../design/tokens.css?raw";
 import themeContent from "../design/content.css?raw";
 import contract from "../components/blocks/primitive-contract.mjs?raw";
@@ -20,6 +22,7 @@ import flowchartCss from "../components/blocks/flowchart.css?raw";
 import flowchartContract from "../components/blocks/flowchart-contract.mjs?raw";
 
 export const builtinSources: Record<string, string> = {
+  ...g2BuiltinSources,
   "primitive-contract.mjs": contract,
   "sdk.tsx": sdk,
   "GestureBoundary.tsx": gestureBoundary,
@@ -41,6 +44,7 @@ export const builtinSources: Record<string, string> = {
   "theme.css": `${themeTokens}\n${themeContent}`,
 };
 export const builtinExports: Record<string, string> = {
+  ...g2Exports,
   text: "Markdown",
   image: "Image",
   table: "Table",

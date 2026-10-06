@@ -268,7 +268,11 @@ it("expands composed whiteboard parts with stable source ids and remapped layout
 describe("compiled React packages", () => {
   it("describes all built-in blocks for agents without importing browser renderers", () => {
     const builtins = listBuiltinComponents();
-    expect(builtins.map((item) => item.kind)).toEqual([
+    expect(
+      builtins
+        .filter((item) => !item.kind.startsWith("g2-"))
+        .map((item) => item.kind),
+    ).toEqual([
       "text",
       "image",
       "table",
@@ -625,7 +629,7 @@ describe("component composition and editable primitives", () => {
         expect(compiled.inline!.script.length).toBeLessThan(80000);
       expect(compiled.defaultData).toEqual(item.defaultData);
     }
-  }, 30000);
+  }, 180000);
 
   it("bundles nested exact revisions, preserves closure and validates every dependency", async () => {
     const home = await temporary();

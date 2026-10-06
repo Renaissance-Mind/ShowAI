@@ -45,7 +45,10 @@ export type ComponentGroup = (typeof componentCategories)[number] & {
 };
 
 export function componentCategory(item: CatalogComponent): ComponentCategory {
-  if ("kind" in item) return builtinCategories[item.kind] ?? "other";
+  if ("kind" in item)
+    return item.kind.startsWith("g2-")
+      ? "data"
+      : (builtinCategories[item.kind] ?? "other");
   if (item.category) return item.category;
   return builtinCategories[item.id.replace(/^my-/, "")] ?? "other";
 }

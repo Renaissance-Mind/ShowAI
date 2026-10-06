@@ -225,7 +225,11 @@ try {
   const temporary = baseline.path + ".external-write";
   await writeFile(
     temporary,
-    JSON.stringify({ format: "showai", version: 2, document: external }),
+    JSON.stringify({
+      format: "showai",
+      version: external.content?.attrs?.kind ? 3 : 2,
+      document: external,
+    }),
   );
   await rename(temporary, baseline.path);
   await page.getByText("这个文件有新的修改", { exact: true }).waitFor();
