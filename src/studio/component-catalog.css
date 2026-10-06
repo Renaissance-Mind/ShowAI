@@ -166,6 +166,11 @@
   font-size: 13px;
   color: var(--muted);
 }
+.component-project-hint {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
 .component-project-picker select {
   background: var(--paper);
   border: 1px solid var(--line);

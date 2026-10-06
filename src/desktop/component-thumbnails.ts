@@ -118,7 +118,9 @@ ipcMain.handle(
       }
       if (!reference.id)
         throw new CoreError("INVALID_DATA", "Preview needs a component id.");
-      const renderer = await readFile(join(directory, "index.html"));
+      const renderer = process.env.SHOWAI_DEV_URL
+        ? Buffer.from(process.env.SHOWAI_DEV_URL)
+        : await readFile(join(directory, "index.html"));
       const key = createHash("sha256")
         .update(renderer)
         .update(JSON.stringify(reference))

@@ -1373,6 +1373,11 @@ export default function Studio() {
                           项目：
                           <select
                             aria-label="目录项目"
+                            aria-describedby={
+                              componentProject === "all"
+                                ? "component-project-help"
+                                : undefined
+                            }
                             value={componentProject}
                             onChange={(event) => {
                               const id = event.target.value;
@@ -1399,6 +1404,16 @@ export default function Studio() {
                         <button
                           className="studio-button"
                           disabled={componentProject === "all"}
+                          title={
+                            componentProject === "all"
+                              ? "请选择组件所属项目"
+                              : undefined
+                          }
+                          aria-describedby={
+                            componentProject === "all"
+                              ? "component-project-help"
+                              : undefined
+                          }
                           onClick={action(async () => {
                             const result =
                               await desktop.invoke<CompiledComponent | null>(
@@ -1419,6 +1434,16 @@ export default function Studio() {
                         <button
                           className="studio-button primary"
                           disabled={componentProject === "all"}
+                          title={
+                            componentProject === "all"
+                              ? "请选择组件所属项目"
+                              : undefined
+                          }
+                          aria-describedby={
+                            componentProject === "all"
+                              ? "component-project-help"
+                              : undefined
+                          }
                           onClick={action(async () => {
                             const result =
                               await desktop.invoke<CompiledComponent>(
@@ -1441,6 +1466,14 @@ export default function Studio() {
                     )}
                   </div>
                 </div>
+                {view === "components" && componentProject === "all" && (
+                  <p
+                    id="component-project-help"
+                    className="component-project-hint"
+                  >
+                    选择一个项目后，可导入或新建组件。
+                  </p>
+                )}
                 {view === "components" && (
                   <nav
                     className="studio-filter-tabs component-source-tabs"

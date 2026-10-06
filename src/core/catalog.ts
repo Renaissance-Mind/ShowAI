@@ -10,7 +10,7 @@ import {
 } from "../surface/document.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import {
   lstat,
   mkdir,
@@ -1133,7 +1133,7 @@ async function compilePackage(
       if (existsSync(metadataPath)) {
         const metadata = JSON.parse(readFileSync(metadataPath, "utf8"));
         if (metadata.name === name) {
-          runtimeRoots.set(name, directory);
+          runtimeRoots.set(name, realpathSync(directory));
           Object.keys(metadata.dependencies ?? {})
             .filter((name) => !name.startsWith("@types/"))
             .forEach(includeRuntime);

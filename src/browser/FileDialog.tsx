@@ -159,6 +159,7 @@ function FileDialog({
           </button>
           <input
             aria-label="本地目录路径"
+            disabled={loading}
             value={pathInput}
             onChange={(event) => setPathInput(event.target.value)}
             placeholder="输入本地目录路径"

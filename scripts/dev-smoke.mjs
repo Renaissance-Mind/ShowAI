@@ -100,7 +100,7 @@ const receipt = () =>
     if (error.code === "ENOENT") return undefined;
     throw error;
   });
-let browser, observer;
+let browser, observer, debugPage;
 try {
   const original = await poll(receipt, Boolean, "development launch");
   browser =
@@ -111,6 +111,10 @@ try {
     mode === "desktop"
       ? browser.contexts()[0].pages()[0]
       : await browser.newPage();
+  debugPage = page;
+  page.on("pageerror", (error) => {
+    logs += `\nRenderer error: ${error.message}\n`;
+  });
   if (mode === "browser") await page.goto(original.url);
   await page
     .getByRole("button", { name: "新建项目", exact: true })
@@ -219,6 +223,121 @@ try {
     "--name",
     "Development smoke",
   );
+  await page
+    .getByRole("navigation", { name: "主要导航" })
+    .getByRole("button", { name: "组件", exact: true })
+    .click();
+  await page
+    .getByText("选择一个项目后，可导入或新建组件。", { exact: true })
+    .waitFor();
+  assert.equal(
+    await page
+      .getByRole("button", { name: "新建组件", exact: true })
+      .isEnabled(),
+    false,
+  );
+  assert.equal(
+    await page
+      .getByRole("button", { name: "导入组件", exact: true })
+      .isEnabled(),
+    false,
+  );
+  if (mode === "desktop") {
+    await page.waitForFunction(
+      () =>
+        document.querySelectorAll(
+          '.component-category[aria-label="文本组件"] .component-card-preview img',
+        ).length === 3,
+      undefined,
+      { timeout: 60000 },
+    );
+    assert.equal(await page.locator(".component-preview-error").count(), 0);
+    checks.push(
+      "desktop component thumbnails render without a packaged index.html",
+    );
+  }
+  await page.getByLabel("目录项目", { exact: true }).selectOption(project.id);
+  await page.getByRole("button", { name: "新建组件", exact: true }).click();
+  const componentDialog = page.getByRole("dialog", {
+    name: "计数器",
+    exact: true,
+  });
+  const counter = componentDialog.frameLocator("iframe");
+  await counter.getByRole("button", { name: "增加", exact: true }).click();
+  assert.equal(await counter.locator("output").innerText(), "1");
+  await componentDialog
+    .getByRole("button", { name: "关闭弹窗", exact: true })
+    .click();
+  const packages = await page.evaluate(
+    (projectId) =>
+      window.showai.invoke("components:list", { projectId, scope: "project" }),
+    project.id,
+  );
+  assert.equal(packages.length, 1);
+  checks.push(
+    "project selection enables component creation and the new component preview works",
+  );
+  if (mode === "browser") {
+    const componentSource = await page.evaluate(
+      ({ projectId, id }) =>
+        window.showai.invoke("components:source", {
+          projectId,
+          id,
+          scope: "project",
+        }),
+      { projectId: project.id, id: packages[0].id },
+    );
+    const importedDirectory = join(output, "import-source");
+    await mkdir(importedDirectory);
+    await writeFile(
+      join(importedDirectory, "manifest.json"),
+      JSON.stringify({
+        ...componentSource.manifest,
+        id: "imported-development-counter",
+        name: "导入计数器",
+      }),
+    );
+    await writeFile(
+      join(importedDirectory, "props.schema.json"),
+      JSON.stringify(componentSource.schema),
+    );
+    await writeFile(
+      join(importedDirectory, componentSource.manifest.entry),
+      componentSource.source,
+    );
+    await page.getByRole("button", { name: "导入组件", exact: true }).click();
+    const fileDialog = page.getByRole("dialog", {
+      name: "选择组件源码目录",
+      exact: true,
+    });
+    await fileDialog.getByLabel("本地目录路径").fill(importedDirectory);
+    await fileDialog.getByRole("button", { name: "前往", exact: true }).click();
+    await poll(
+      () => fileDialog.locator(".local-file-footer span").innerText(),
+      (value) => value === importedDirectory,
+      "file selector navigates to the component package",
+    );
+    await fileDialog
+      .getByRole("button", { name: "选择目录", exact: true })
+      .click();
+    await page.getByText("组件已安装", { exact: true }).waitFor();
+    assert.equal(
+      (
+        await page.evaluate(
+          (projectId) =>
+            window.showai.invoke("components:list", {
+              projectId,
+              scope: "project",
+            }),
+          project.id,
+        )
+      ).length,
+      2,
+    );
+    checks.push(
+      "component import works through the real file selector and compiler",
+    );
+  }
   const created = await page.evaluate(
     (projectId) =>
       window.showai.invoke("pages:create", {
@@ -391,6 +510,18 @@ try {
   });
   console.log(JSON.stringify({ mode, output, checks }, null, 2));
 } catch (error) {
+  if (debugPage && !debugPage.isClosed()) {
+    await debugPage.screenshot({
+      path: join(output, "failure.png"),
+      fullPage: true,
+    });
+    console.error(
+      JSON.stringify({
+        alerts: await debugPage.getByRole("alert").allTextContents(),
+        dialogs: await debugPage.getByRole("dialog").allTextContents(),
+      }).slice(0, 3000),
+    );
+  }
   console.error(logs);
   throw error;
 } finally {
