@@ -42,6 +42,6 @@ Agent 首先只见技能名称与描述，选择当前目标后读取该 skill�
 
 ## 局部展示
 
-用户要求展示结果时，`show-document` 在支持的宿主对话中发送实际呈现引用。Codex 读取当前 visualize 技能的输出契约，导出 inline 片段，并在最终回复引用返回的绝对路径。预览面板用于检查，完整 HTML 链接可作为补充。具体步骤见 [对话展示](../plugins/showai/skills/show-document/references/conversation-display.md)。
+`show-document` 创建、整理或修改页面后，默认在支持的宿主对话中发送 inline 预览。Codex 按当前 visualize 的片段与输出引用契约，导出 inline 并在最终回复引用返回的绝对路径；ShowAI 技能定义这个默认交付步骤。预览面板用于检查，完整 HTML 链接可作为补充。具体步骤见 [对话展示](../plugins/showai/skills/show-document/references/conversation-display.md)。
 
-通过页面节点 ID 和 `export --blocks`，可以只导出一个组件、多个组件或区域。整页超过 inline 的 1 MB 限制时，展示可独立理解的关键区域或按阅读顺序导出少量片段，并附完整报告。局部修改结果和自动化更新同样保留完整项目页面，只展示相关组件。具体命令按需读取 `guide export`；导出旁边的 JSON 是选区内容，后续编辑仍使用完整页面。宿主没有对话 HTML 呈现能力时，打开可用预览并提供文件或地址，说明展示位置。
+通过页面节点 ID 和 `export --blocks`，可以只导出一个组件、多个组件或区域。整页超过 inline 的 1 MB 限制时，展示可独立理解的关键区域或按阅读顺序导出少量片段，并附完整报告。局部修改结果和自动化更新同样保留完整项目页面，只展示相关组件。具体命令按需读取 `guide export`；导出旁边的 JSON 是选区内容，后续编辑仍使用完整页面。宿主没有对话 HTML 呈现能力时，打开可用预览并提供文件或地址，说明展示位置。用户明确要求只保存、只交付文件、只在面板展示或后台执行时采用其指定方式。

@@ -157,7 +157,7 @@ claude plugin install showai@renaissance-mind
 
 MCP 是可选的工具入口，通过 `mcp --project PROJECT_ID` 启动并固定到一个项目。具体配置见 [Agent 使用说明](docs/agent-usage.md#optional-mcp)。插件不会设置跨会话共享的全局活动项目。
 
-用户要求展示时，Codex 在支持的对话可视化通道引用 inline 片段；超过 1 MB 的报告展示关键区域并附完整 HTML。预览面板用于检查，完整文件链接用于阅读或下载。普通终端或仅支持 MCP 工具的客户端返回 HTML 文件或预览地址，并说明展示位置。具体步骤见 [对话展示](plugins/showai/skills/show-document/references/conversation-display.md)。
+创建、整理或修改 ShowAI 页面后，Codex 默认在支持的对话可视化通道引用 inline 片段；超过 1 MB 的报告展示关键区域并附完整 HTML。预览面板用于检查，完整文件链接用于阅读或下载。普通终端或仅支持 MCP 工具的客户端返回 HTML 文件或预览地址，并说明展示位置。用户明确要求只保存、只交付文件、只在面板展示或后台执行时采用其指定方式。具体步骤见 [对话展示](plugins/showai/skills/show-document/references/conversation-display.md)。
 
 ## 组件与模板
 

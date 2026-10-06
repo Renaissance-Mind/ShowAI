@@ -305,7 +305,7 @@
                       "label": "导出与展示",
                       "kind": "result",
                       "subtitle": "真实页面 + 主要交互",
-                      "detail": "请求展示时，导出 inline 并在最终回复发送宿主实际呈现引用。Codex 使用当前 visualize 契约；超过上限则展示关键区域并附完整 HTML，所有片段保留同一源页面。",
+                      "detail": "创建、整理或修改页面后，默认导出 inline 并在最终回复发送宿主实际呈现引用。Codex 使用当前 visualize 片段与输出引用契约；超过上限则展示关键区域并附完整 HTML，所有片段保留同一源页面。",
                       "commands": ["guide export --json"],
                       "position": {
                         "x": 528,
