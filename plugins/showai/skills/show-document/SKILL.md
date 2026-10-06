@@ -1,11 +1,11 @@
 ---
 name: show-document
-description: 用 ShowAI 创建、修改或导出交互页面、报告和小型网站，也可只可视化选定组件或区域，在 Agent 对话中展示局部结果。复用已有组件与模板；组件开发和模板创建由专门技能处理。
+description: 用 ShowAI 创建、修改或导出交互页面、报告和小型网站。优先在明确的已有项目中创作，普通报告默认一页，用户要求展示时在支持的 Agent 对话中呈现完整页面或选定区域。复用已有组件与模板；组件开发和模板创建由专门技能处理。
 ---
 
 ShowAI 将内容组织成可阅读、可探索的页面。工作台与 Agent 使用同一份项目文件；组件负责表达，模板负责内容组织。先明确读者需要理解什么，再选择布局与交互，使用用户材料或可核实的数据。
 
-插件只分发技能。沿用本会话已验证的 ShowAI CLI 命令前缀与内容目录；首次使用时读取 [运行入口](references/runtime.md)。下文 `showai` 代表该外部命令前缀。
+插件只分发技能。沿用本会话已验证的 ShowAI CLI 命令前缀与内容目录；首次使用或目标项目不明确时读取 [运行入口与项目选择](references/runtime.md)。下文 `showai` 代表该外部命令前缀。
 
 先检查本会话已有的项目绑定：
 
@@ -13,14 +13,17 @@ ShowAI 将内容组织成可阅读、可探索的页面。工作台与 Agent 使
 showai projects current --harness HOST --session ACTUAL_SESSION_ID --json
 ```
 
-有绑定就使用返回的项目；用户指定其他项目时先 `projects list --json`，明确选择后绑定。没有绑定时，新建项目：
+用户指定的项目或请求中的“当前项目”优先于旧绑定。用户明确 @ShowAI 应用或要求在当前工作台创作时，可读取该应用实际可见的项目，并用 `projects list --json` 核对身份及内容目录；目标明确后绑定。其他情况沿用已有会话绑定。没有绑定时先列出现有项目：
 
 ```sh
-showai projects create --name "主题" --harness HOST --session ACTUAL_SESSION_ID --json
+showai projects list --json
+showai projects bind PROJECT --harness HOST --session ACTUAL_SESSION_ID --json
 showai pages list --project PROJECT --json
 ```
 
-使用宿主提供的真实会话 id；无法获得时省略绑定，保留新项目 id。每次写入明确指定项目。默认内容库为 `~/.showai`，用 `--home` 与桌面设置保持一致。
+已有项目中目标明确就复用；只有一个可用项目且用户未要求另建时采用该项目。存在多个候选且无法确定时，列出项目名称让用户选择，等待期间继续资料调研。用户要求独立项目，或内容库没有项目时才 `projects create`。使用宿主提供的真实会话 id；无法获得时省略绑定，在会话保留已选项目 id。每次写入明确指定项目。默认内容库为 `~/.showai`，用 `--home` 与用户选择的工作台内容库保持一致。
+
+普通调研、对比或报告默认保存为项目内的一份 Page。用区域、标题、目录、折叠内容和嵌套容器组织章节；章节数量与内容长度由页面布局处理。用户明确要求网站、多份独立文档或多个页面时再拆分资源；完整项目站点导出用于这些任务。后续补充和修改继续使用同一页面，先 `pages list/read` 定位已有内容，保留其身份。
 
 按本次操作读取 CLI 指南，普通创作先使用 `guide authoring`；构造 Page 结构时读取 `guide containers`，区域内部的富文本区块再读 `guide document`。
 
@@ -40,7 +43,7 @@ Page 和 Board 本身也是组件目录条目，可查询 guide、schema 和 exa
 
 用户要求新建或修改可复用模板，或把页面提炼成模板时，进入 [create-template](../create-template/SKILL.md)。该技能可先按本技能完成实例再提炼，也可直接保存模板再生成应用预览；完成实例后返回模板创建流程。应用已有模板创建普通页面仍属于本技能，使用 `guide templates` 与所选模板的 `guide`；普通页面完成不会自动触发模板创建。
 
-根据本次需求选择展示范围：完整页面、一个组件、多个组件或整个区域都可以。用户只要局部修改结果，或自动化只更新监控进度时，保存完整页面后只展示相关部分。沿用对应节点的稳定 ID，让后续更新能重复选择同一组件。
+用户要求“展示”“给我看”或在对话里查看结果时，保存页面后读取 [对话展示](references/conversation-display.md)，执行当前宿主的实际呈现流程。Codex 支持对话可视化时，在最终回复发送 inline 文件的可视化引用；打开 ShowAI 或预览面板用于检查，完整 HTML 链接作为补充交付。展示范围可以是完整页面、一个组件、多个组件或整个区域。用户只要局部修改结果，或自动化只更新监控进度时，保存完整页面后只展示相关部分。沿用对应节点的稳定 ID，让后续更新能重复选择同一组件。
 
 局部展示先从 `pages read` 的 `document.content` 找到节点 `attrs.id`，再读取 `guide export` 确认当前运行时支持 `--blocks`。旧运行时缺少该参数时先更新 ShowAI 软件：
 
@@ -51,4 +54,4 @@ showai export --project PROJECT --page PAGE --blocks CHART_BLOCK_ID,METRICS_BLOC
 
 `--blocks` 使用页面中的组件实例或区域 ID；选中区域会包含其全部子内容。多个 ID 用逗号分隔，按页面顺序展示。自定义组件代码内部的子组件需要成为独立页面节点才能单独选择。局部导出默认使用 reading 布局并隐藏页面总标题，保留必要父容器，只打包相关组件；显式 `--presentation spatial` 可保留白板布局。旁边的 `.showai.json` 也是局部源文件；页面编辑继续读取完整页面、使用当前 hash 和稳定节点 ID。
 
-交付时把返回 `path` 的 inline HTML 内容交给宿主支持的对话可视化通道，聊天里可以只呈现选中的组件。按宿主能力提供 HTML 文件或预览网址也有效。需要完整页面时省略 `--blocks`；整站导出使用 `--format site`。完整工作台管理界面不进入读者收到的页面。
+整页展示可省略 `--blocks`。inline 内容超过宿主上限时，用 `--blocks` 导出可独立理解的关键区域，或按阅读顺序分成少量片段，在对话里展示并附完整 HTML 链接；继续保留单份完整源页面。宿主未提供对话 HTML 呈现能力时，打开支持的预览并给出完整文件或地址，说明展示位置。交付前检查导出文件与主要交互，最终回复包含实际呈现引用和简短说明。完整工作台管理界面不进入读者收到的页面。

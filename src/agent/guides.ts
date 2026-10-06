@@ -30,7 +30,9 @@ const guides: Record<
     rules: [
       "Storage defaults to ~/.showai; use --home or SHOWAI_HOME to match the desktop content library.",
       "Use the actual harness/session identifier. projects current only reports an existing binding; it never chooses the most recent project.",
-      "All page and project-catalog writes require --project. Reuse a different project only when the user selects it.",
+      "An unbound conversation should list existing projects before choosing a destination. Resolve user-specified projects or a verified visible ShowAI project first; otherwise keep the existing binding, reuse the only available project, or ask the user to choose among multiple candidates. Create a project when explicitly requested or the library is empty.",
+      "Verify visible app/browser project identity against projects list and the selected content home. Background global selection, modification time and repository cwd do not identify a write destination. Bind the resolved project using the real session id when available.",
+      "All page and project-catalog writes require --project. Ordinary research and comparison reports default to one Page, organized with sections, regions and nested containers. Separate resource pages and site export follow an explicit website or multi-document request.",
     ],
     commands: [
       "showai projects current --harness codex --session SESSION_ID --json",
@@ -48,6 +50,7 @@ const guides: Record<
       "Read the page, retain its hash and stable block ids, and inspect pages diff against the preceding turn's hash.",
       "Save/apply requires --base-hash. On CONFLICT, read and merge deliberately; do not blindly retry an old document with a newer hash.",
       "New resources default to a Page surface. Page and Board containers nest recursively in artifact v3. Use guide containers for structure; query component schemas when adding components.",
+      "Keep an ordinary report in one resource page, with sections, navigation and optional nested containers. Continue revisions in that same page; create multiple resource pages only for a user-requested website or separate documents.",
     ],
     commands: [
       "showai pages create --project PROJECT --title 'Research result' --json",
@@ -318,6 +321,8 @@ const guides: Record<
       "bundled is the default: reader, content and exact component runtimes are included. Raster images must be embedded for offline delivery.",
       "remote requires previously verified published component locators and network access when reading. It does not implicitly upload or publish components.",
       "inline must use bundled components and fit the host's size limit. Rendering a conversation fragment requires a supported host display surface; MCP alone does not supply one.",
+      "When the user asks to see the result in a supported conversation, export inline and include the host's actual rendering reference in the final reply. In Codex use the current visualize skill's output contract with the returned absolute path. Opening an app or preview panel and linking a file are supplementary delivery actions.",
+      "If full inline exceeds the current 1 MB limit, export meaningful blocks as one or a few inline previews and provide the complete HTML separately. Preserve one complete source page; preview fragments do not require new projects or resource pages. Without a supported conversation display surface, deliver a preview/file and state where it is shown.",
       "A whole-project site omits archived pages. Existing deliverables require explicit --overwrite. Export outside authoring sources or into the selected project's exports directory.",
     ],
     commands: [

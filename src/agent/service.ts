@@ -189,7 +189,7 @@ export class AgentService {
       project: project ? projectSummary(project) : null,
       next: project
         ? `showai pages list --project ${shellToken(project.id)} --json`
-        : "showai guide workspace --json",
+        : "showai projects list --json",
     };
   }
   async createProject(name: string, binding?: ProjectBinding) {
