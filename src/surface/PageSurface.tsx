@@ -55,8 +55,8 @@ export default function PageSurface({
   paths,
   views,
   header,
-  selected = null,
-  onSelect = () => {},
+  selected: controlledSelection,
+  onSelect: selectControlled,
   onAdd,
   onMove,
   onRemove,
@@ -65,6 +65,10 @@ export default function PageSurface({
   onViews,
   extraActions,
 }: Props) {
+  const [localSelection, setLocalSelection] = useState<string | null>(null);
+  const selected =
+    controlledSelection === undefined ? localSelection : controlledSelection;
+  const onSelect = selectControlled ?? setLocalSelection;
   const { rootRef, scrollRef, worldRef, camera, controls, scale } =
     useSurfaceViewport(
       layoutKey,

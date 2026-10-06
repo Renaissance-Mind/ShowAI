@@ -550,6 +550,18 @@ try {
   await reader.goto(`file://${sideExport.path}`);
   await reader.getByRole("region", { name: "白板", exact: true }).waitFor();
   assert.equal(await reader.locator('[contenteditable="true"]').count(), 0);
+  await reader.getByLabel("区域与视图", { exact: true }).click();
+  await reader
+    .locator(".surface-navigation-row > button:first-child")
+    .first()
+    .click();
+  assert.equal(
+    await reader
+      .getByRole("button", { name: "定位所选", exact: true })
+      .isEnabled(),
+    true,
+  );
+  await reader.getByRole("button", { name: "定位所选", exact: true }).click();
   await reader.getByRole("button", { name: "总览", exact: true }).click();
   await delay(850);
   await reader.screenshot({ path: join(output, "spatial-export.png") });
