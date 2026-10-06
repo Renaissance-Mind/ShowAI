@@ -267,7 +267,8 @@ export function SettingsPanel({
               </pre>
             </details>
             <p className="settings-help">
-              先创建或绑定项目，再把 projectId 传给命令。
+              默认按 Agent
+              的项目目录定位，同一目录的多个会话共用项目；也可指定项目。
             </p>
           </section>
           <section

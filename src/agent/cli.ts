@@ -31,7 +31,7 @@ Local browser workbench (same files as the desktop app and CLI):
 
 Start with one project:
   runtime info | runtime register
-  projects current --harness HOST --session SESSION_ID
+  projects current [--source-directory PROJECT_DIRECTORY] [--project ID]
   projects list
   projects create --name NAME [--harness HOST --session SESSION_ID]
   projects bind PROJECT --harness HOST --session SESSION_ID
@@ -52,7 +52,8 @@ Read one Page through structured data, an image or interactive HTML:
   pages read PAGE --project PROJECT --view html [--state reading-state.json] --out preview.html
 
 Shared: --home PATH, --project ID, --json, --help.
-Project writes require --project; shared promotion/registration is explicit.
+Project defaults to the host project directory (Git root of cwd); --project overrides it.
+Shared promotion/registration is explicit.
 Use showai guide TOPIC for exact authoring, versioning and delivery commands.
 `;
 
@@ -248,11 +249,13 @@ async function saveOutput(
   const output = option(args, "out");
   if (!output) return;
   const path = resolve(output);
-  const projectId = option(args, "project");
-  if (!projectId)
-    throw new Error(
-      "Writing a catalog/merge output requires --project; choose a project export location or an external path.",
-    );
+  const projectId =
+    option(args, "project") ??
+    (
+      await service.currentProject({
+        sourceDirectory: option(args, "source-directory"),
+      })
+    ).project.id;
   await assertExportDestination(
     service.store.root,
     service.requireProject(projectId),
@@ -279,7 +282,16 @@ export async function runCli(argv: string[]): Promise<unknown> {
     return undefined;
   }
   const service = new AgentService({ root: option(args, "home") });
-  const project = () => service.requireProject(option(args, "project"));
+  let resolvedProject: Promise<string> | undefined;
+  const project = (): Promise<string> => {
+    const explicit = option(args, "project");
+    if (explicit) return Promise.resolve(service.requireProject(explicit));
+    return (resolvedProject ??= service
+      .currentProject({
+        sourceDirectory: option(args, "source-directory"),
+      })
+      .then((result) => result.project.id));
+  };
   if (args.options.help)
     return service.guide(
       (
@@ -320,7 +332,10 @@ export async function runCli(argv: string[]): Promise<unknown> {
     case "projects":
       if (action === "current") {
         requireCount(args, 2);
-        return service.currentProject(binding(args, true)!);
+        return service.currentProject({
+          projectId: option(args, "project"),
+          sourceDirectory: option(args, "source-directory"),
+        });
       }
       if (action === "list") {
         requireCount(args, 2);
@@ -341,11 +356,11 @@ export async function runCli(argv: string[]): Promise<unknown> {
     case "pages":
       if (action === "list") {
         requireCount(args, 2);
-        return service.listPages(project());
+        return service.listPages(await project());
       }
       if (action === "create") {
         requireCount(args, 2);
-        return service.createPage(project(), {
+        return service.createPage(await project(), {
           title: option(args, "title"),
           kind: option(args, "kind") as "page" | "board" | undefined,
           ...(option(args, "input")
@@ -400,13 +415,13 @@ export async function runCli(argv: string[]): Promise<unknown> {
         if (out) readOptions.out = out;
         const hash = option(args, "base-hash");
         if (hash) readOptions.expectedHash = hash;
-        return service.readPage(project(), id, readOptions);
+        return service.readPage(await project(), id, readOptions);
       }
       if (action === "save") {
         requireCount(args, 3);
         const input = await readDocument(option(args, "input", true)!);
         return service.savePage(
-          project(),
+          await project(),
           id,
           input.document,
           option(args, "base-hash", true)!,
@@ -426,14 +441,18 @@ export async function runCli(argv: string[]): Promise<unknown> {
           throw new Error(
             "Expected a JSON array of operations, or { operations: [...] }.",
           );
-        return service.applyPage(project(), id, {
+        return service.applyPage(await project(), id, {
           baseHash: option(args, "base-hash", true)!,
           operations: operations as PageOperation[],
         });
       }
       if (action === "diff") {
         requireCount(args, 3);
-        return service.diffPage(project(), id, option(args, "since", true)!);
+        return service.diffPage(
+          await project(),
+          id,
+          option(args, "since", true)!,
+        );
       }
       break;
     case "export": {
@@ -442,7 +461,7 @@ export async function runCli(argv: string[]): Promise<unknown> {
       if (!["html", "inline", "site"].includes(format!))
         throw new Error("--format must be html, inline or site.");
       return service.export({
-        projectId: project(),
+        projectId: await project(),
         pageId: option(args, "page"),
         ...(Object.hasOwn(args.options, "blocks")
           ? {
@@ -466,7 +485,12 @@ export async function runCli(argv: string[]): Promise<unknown> {
       if (action === "list") {
         requireCount(args, 2);
         return service.catalogList({
-          projectId: option(args, "project"),
+          projectId:
+            option(args, "project") ??
+            (!catalogScope(args) ||
+            ["all", "project"].includes(catalogScope(args)!)
+              ? await project()
+              : undefined),
           kind,
           scope: catalogScope(args),
           query: option(args, "query"),
@@ -477,7 +501,12 @@ export async function runCli(argv: string[]): Promise<unknown> {
       if (action === "describe") {
         requireCount(args, 3);
         const result = await service.catalogDescribe(id, {
-          projectId: option(args, "project"),
+          projectId:
+            option(args, "project") ??
+            (!catalogScope(args) ||
+            ["all", "project"].includes(catalogScope(args)!)
+              ? await project()
+              : undefined),
           kind,
           scope: catalogScope(args),
           version: option(args, "version"),
@@ -500,14 +529,14 @@ export async function runCli(argv: string[]): Promise<unknown> {
         requireCount(args, 2);
         return service.importComponent(
           resolve(option(args, "input", true)!),
-          project(),
+          await project(),
         );
       }
       if (action === "save") {
         requireCount(args, 2);
         const input = objectInput(await readJson(option(args, "input", true)!));
         return service.saveComponent(
-          project(),
+          await project(),
           objectInput(
             typeof input.source === "object" ? input.source : input,
           ) as unknown as ComponentSource,
@@ -525,9 +554,9 @@ export async function runCli(argv: string[]): Promise<unknown> {
             throw new Error(
               "Promotion requires explicit --to global. It registers a local shared revision, not a public upload.",
             );
-          return service.promote(project(), ref, "global");
+          return service.promote(await project(), ref, "global");
         }
-        return service.fork(project(), ref, {
+        return service.fork(await project(), ref, {
           id: option(args, "id"),
           version: option(args, "version", true)!,
           name: option(args, "name"),
@@ -536,11 +565,14 @@ export async function runCli(argv: string[]): Promise<unknown> {
       if (action === "merge") {
         requireCount(args, 3);
         const input = objectInput(await readJson(option(args, "input", true)!));
-        if (input.projectId !== undefined && input.projectId !== project())
+        if (
+          input.projectId !== undefined &&
+          input.projectId !== (await project())
+        )
           throw new Error("The input projectId must match --project.");
         if (id === "preview") {
           const preview = await service.previewMerge(
-            project(),
+            await project(),
             input as unknown as Omit<PackageMergeInput, "projectId">,
           );
           const path = await saveOutput(service, args, preview);
@@ -566,7 +598,7 @@ export async function runCli(argv: string[]): Promise<unknown> {
               "Resolve requires a reviewed resolved package and a new version in the input file.",
             );
           return service.resolveMerge(
-            project(),
+            await project(),
             input as unknown as Omit<PackageMergeInput, "projectId"> & {
               id?: string;
               version: string;
@@ -580,16 +612,21 @@ export async function runCli(argv: string[]): Promise<unknown> {
     case "template": {
       if (action === "apply" || action === "instantiate") {
         requireCount(args, 3);
-        return service.applyTemplate(project(), id, option(args, "title"), {
-          scope: catalogScope(args, false) as CatalogScope | undefined,
-          version: option(args, "version"),
-          integrity: option(args, "integrity"),
-          pageId: option(args, "page"),
-          baseHash: option(args, "page")
-            ? option(args, "base-hash", true)
-            : undefined,
-          parentId: option(args, "parent"),
-        });
+        return service.applyTemplate(
+          await project(),
+          id,
+          option(args, "title"),
+          {
+            scope: catalogScope(args, false) as CatalogScope | undefined,
+            version: option(args, "version"),
+            integrity: option(args, "integrity"),
+            pageId: option(args, "page"),
+            baseHash: option(args, "page")
+              ? option(args, "base-hash", true)
+              : undefined,
+            parentId: option(args, "parent"),
+          },
+        );
       }
       if (action === "save") {
         requireCount(args, 2);
@@ -599,7 +636,7 @@ export async function runCli(argv: string[]): Promise<unknown> {
         const input = objectInput(
           raw.source ?? raw.template ?? raw,
         ) as unknown as SaveTemplateInput;
-        return service.saveTemplate(project(), option(args, "page"), {
+        return service.saveTemplate(await project(), option(args, "page"), {
           ...input,
           ...(option(args, "id") ? { id: option(args, "id") } : {}),
           ...(option(args, "version")
@@ -625,21 +662,24 @@ export async function runCli(argv: string[]): Promise<unknown> {
         const refs = Array.isArray(raw) ? raw : objectInput(raw).refs;
         if (!Array.isArray(refs))
           throw new Error("Publication input requires a refs array.");
-        return service.preparePublication(project(), {
+        return service.preparePublication(await project(), {
           refs: refs as PackageRevisionRef[],
           out: resolve(option(args, "out", true)!),
         });
       }
       if (action === "verify" || action === "register") {
         requireCount(args, 2);
-        return service.verifyPublication(project(), option(args, "url", true)!);
+        return service.verifyPublication(
+          await project(),
+          option(args, "url", true)!,
+        );
       }
       break;
     }
     case "mcp": {
       requireCount(args, 1);
       const { startMcp } = await import("./mcp");
-      await startMcp({ root: service.store.root, projectId: project() });
+      await startMcp({ root: service.store.root, projectId: await project() });
       return undefined;
     }
     default:

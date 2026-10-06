@@ -29,9 +29,13 @@ const environment = () => ({
   SHOWAI_VIEWER: join(repository, "dist-portable/portable.html"),
 });
 
-async function run(args: string[]) {
+async function run(
+  args: string[],
+  options: { cwd?: string; home?: string } = {},
+) {
   const output = await execute(process.execPath, [cli, ...args, "--json"], {
-    env: environment(),
+    env: { ...environment(), SHOWAI_HOME: options.home ?? home },
+    cwd: options.cwd,
   }).catch((error) => {
     throw new Error(
       `CLI ${args.join(" ")} failed: ${error.stdout || error.stderr || error.message}`,
@@ -71,6 +75,7 @@ afterAll(async () => {
 test("external runtime records an executable launch and exposes only relevant guides", async () => {
   const info = await run(["runtime", "info"]);
   expect(info.protocol).toBe(1);
+  expect(info.projectResolution.mode).toBe("directory");
   expect(info.launch.args).toEqual([cli]);
   expect(info.guideTopics).toContain("template-extraction");
   const registration = await run(["runtime", "register"]);
@@ -251,17 +256,10 @@ test("real CLI binds sessions, detects user changes and rejects stale writes", a
     code: "CONFLICT",
     currentHash: changed.hash,
   });
-  const absentProject = await execute(
-    process.execPath,
-    [cli, "pages", "list", "--json"],
-    { env: environment() },
-  ).then(
-    () => {
-      throw new Error("Implicit project unexpectedly accepted.");
-    },
-    (error) => error,
+  const defaultProject = await run(["projects", "current"]);
+  expect(await run(["pages", "list"])).toEqual(
+    await run(["pages", "list", "--project", defaultProject.project.id]),
   );
-  expect(JSON.parse(absentProject.stdout).error.message).toContain("--project");
 });
 
 test("real CLI and MCP export selected components and repeat focused updates without changing the full page", async () => {
@@ -1068,97 +1066,134 @@ test("exports stay in the selected project's output subtree and skip archived si
   ).toBe(first.hash);
 });
 
-test("a fresh conversation discovers and explicitly binds an existing project without creating another", async () => {
-  const existing = await run([
+test("directory projects are shared across sessions, canonical paths and concurrent first use", async () => {
+  const library = await mkdtemp(join(home, "directory-library-"));
+  const workspace = await mkdtemp(join(home, "directory-workspace-"));
+  const other = await mkdtemp(join(home, "other-workspace-"));
+  const nested = join(workspace, "src");
+  await mkdir(nested);
+  await execute("git", ["init", "--quiet", workspace]);
+  const runHere = (args: string[], cwd = workspace) =>
+    run(args, { home: library, cwd });
+  const firstUse = await Promise.all([
+    runHere(["projects", "current", "--harness", "codex", "--session", "one"]),
+    runHere(["projects", "current", "--harness", "codex", "--session", "two"]),
+  ]);
+  expect(firstUse[0].project.id).toBe(firstUse[1].project.id);
+  expect(firstUse.filter((item) => item.created)).toHaveLength(1);
+  const root = firstUse[0];
+  expect(root).toMatchObject({
+    bound: true,
+    resolution: "directory",
+    home: library,
+  });
+  expect((await runHere(["projects", "current"], nested)).project.id).toBe(
+    root.project.id,
+  );
+  const alias = join(home, "directory-alias");
+  await symlink(workspace, alias, "dir");
+  expect(
+    (await runHere(["projects", "current", "--source-directory", alias]))
+      .project.id,
+  ).toBe(root.project.id);
+  const exact = await runHere([
+    "projects",
+    "current",
+    "--source-directory",
+    nested,
+  ]);
+  expect(exact.project.id).not.toBe(root.project.id);
+  const elsewhere = await runHere(
+    ["projects", "current", "--harness", "codex", "--session", "one"],
+    other,
+  );
+  expect(elsewhere.project.id).not.toBe(root.project.id);
+  const page = await runHere([
+    "pages",
+    "create",
+    "--title",
+    "Directory report",
+  ]);
+  expect(
+    (await runHere(["pages", "list"], nested)).map(
+      (item: { id: string }) => item.id,
+    ),
+  ).toContain(page.document.id);
+  expect(await runHere(["pages", "list"], other)).toEqual([]);
+  const manual = await runHere([
     "projects",
     "create",
     "--name",
-    "Existing report workspace",
-    "--harness",
-    "codex",
-    "--session",
-    "existing-report-session",
+    "Explicit destination",
   ]);
-  const projectsBefore = await run(["projects", "list"]);
-  const fresh = await run([
-    "projects",
-    "current",
-    "--harness",
-    "codex",
-    "--session",
-    "fresh-report-session",
+  expect(
+    await runHere([
+      "projects",
+      "current",
+      "--project",
+      manual.id,
+      "--source-directory",
+      "/does-not-exist",
+    ]),
+  ).toMatchObject({
+    resolution: "explicit",
+    created: false,
+    project: { id: manual.id },
+  });
+  await runHere([
+    "pages",
+    "create",
+    "--project",
+    manual.id,
+    "--title",
+    "Explicit page",
   ]);
-  expect(fresh).toMatchObject({ bound: false, project: null });
-  const [command, ...args] = fresh.next.split(" ");
-  expect(command).toBe("showai");
-  const candidates = await run(args.filter((arg: string) => arg !== "--json"));
-  expect(candidates.map((project: { id: string }) => project.id)).toContain(
-    existing.id,
+  expect(await runHere(["pages", "list"])).toHaveLength(1);
+  expect(await runHere(["pages", "list", "--project", manual.id])).toHaveLength(
+    1,
   );
-  expect(candidates).toHaveLength(projectsBefore.length);
-  expect(
-    await run([
-      "projects",
-      "current",
-      "--harness",
-      "codex",
-      "--session",
-      "fresh-report-session",
-    ]),
-  ).toMatchObject({ bound: false, project: null });
-  await run([
-    "projects",
-    "bind",
-    existing.id,
-    "--harness",
-    "codex",
-    "--session",
-    "fresh-report-session",
-  ]);
-  expect(
-    await run([
-      "projects",
-      "current",
-      "--harness",
-      "codex",
-      "--session",
-      "fresh-report-session",
-    ]),
-  ).toMatchObject({ bound: true, project: { id: existing.id } });
-  expect(await run(["projects", "list"])).toHaveLength(projectsBefore.length);
+  expect(await runHere(["projects", "list"])).toHaveLength(4);
+  const client = new Client({ name: "directory-client", version: "1.0.0" });
+  await client.connect(
+    new StdioClientTransport({
+      command: process.execPath,
+      args: [cli, "mcp"],
+      cwd: nested,
+      env: Object.fromEntries(
+        Object.entries({ ...environment(), SHOWAI_HOME: library }).filter(
+          (entry): entry is [string, string] => typeof entry[1] === "string",
+        ),
+      ),
+    }),
+  );
+  try {
+    const context = await client.callTool({
+      name: "project_context",
+      arguments: {},
+    });
+    const payload = JSON.parse(
+      (context.content as { text: string }[])[0].text,
+    ).data;
+    expect(payload.project.id).toBe(root.project.id);
+    expect(payload.root).toBe(library);
+  } finally {
+    await client.close();
+  }
+  const recordPath = join(library, "projects", root.project.id, "project.json");
+  const record = JSON.parse(await readFile(recordPath, "utf8"));
+  await writeFile(recordPath, JSON.stringify({ ...record, archived: true }));
+  await expect(runHere(["projects", "current"])).rejects.toThrow("archived");
 });
 
 test("progressive CLI discovery is paginated and keeps detailed content opt-in", async () => {
-  const before = await run([
-    "projects",
-    "current",
-    "--harness",
-    "codex",
-    "--session",
-    "progressive-discovery",
-  ]);
-  expect(before).toMatchObject({ bound: false, project: null });
   const project = await run([
     "projects",
     "create",
     "--name",
     "Progressive discovery",
-    "--harness",
-    "codex",
-    "--session",
-    "progressive-discovery",
   ]);
   expect(
-    (
-      await run([
-        "projects",
-        "current",
-        "--harness",
-        "codex",
-        "--session",
-        "progressive-discovery",
-      ])
-    ).project.id,
+    (await run(["projects", "current", "--project", project.id])).project.id,
   ).toBe(project.id);
   const guide = await run(["guide"]);
   expect(guide.topics.map((item: { topic: string }) => item.topic)).toContain(
@@ -1262,24 +1297,25 @@ test("progressive CLI discovery is paginated and keeps detailed content opt-in",
     project.id,
   ]);
   expect(source.source.document || source.source.composition).toBeTruthy();
-  const rejected = await execute(
-    process.execPath,
-    [
-      cli,
-      "catalog",
-      "import",
-      "--input",
-      join(repository, "resources/catalog/value-slider"),
-      "--json",
-    ],
-    { env: environment() },
-  ).then(
-    () => {
-      throw new Error("Implicit global import unexpectedly succeeded.");
-    },
-    (error) => error,
-  );
-  expect(JSON.parse(rejected.stdout).error.message).toContain("--project");
+  const imported = await run([
+    "catalog",
+    "import",
+    "--input",
+    join(repository, "resources/catalog/value-slider"),
+  ]);
+  expect(imported.scope).toBe("project");
+  expect(
+    (
+      await run([
+        "catalog",
+        "list",
+        "--scope",
+        "global",
+        "--query",
+        "value-slider",
+      ])
+    ).items,
+  ).toEqual([]);
 });
 
 test("real catalog versions promote explicitly, fork and resolve an immutable source merge", async () => {

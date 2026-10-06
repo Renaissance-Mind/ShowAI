@@ -11,7 +11,15 @@ import {
   rm,
 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { parseArtifact, serializeArtifact } from "../portable/validation.mjs";
 import {
@@ -124,6 +132,15 @@ function validateProject(value: unknown, expectedId: string): ProjectMetadata {
       `Invalid project metadata: ${expectedId}.`,
     );
   validateName(project.name);
+  if (
+    project.sourceDirectory !== undefined &&
+    (typeof project.sourceDirectory !== "string" ||
+      !isAbsolute(project.sourceDirectory))
+  )
+    throw new CoreError(
+      "INVALID_DATA",
+      "Project sourceDirectory must be an absolute directory.",
+    );
   if (project.binding) validateBinding(project.binding);
   if (project.bindings !== undefined) {
     if (!Array.isArray(project.bindings))
@@ -580,47 +597,92 @@ export class FileStore {
         );
         if (existing) return existing;
       }
-      const now = new Date().toISOString();
-      const project: ProjectMetadata = {
-        format: "showai-project",
-        version: 1,
-        id: randomUUID(),
-        name,
-        createdAt: now,
-        updatedAt: now,
-        pinned: false,
-        archived: false,
-        folders: [],
-        ...(binding ? { binding, bindings: [binding] } : {}),
-      };
-      const destination = this.projectPath(project.id);
-      const staging = join(dirname(destination), `.create-${project.id}`);
-      const syncDirectory = async (path: string) => {
-        if (process.platform === "win32") return;
-        const directory = await open(path, "r");
-        try {
-          await directory.sync();
-        } finally {
-          await directory.close();
-        }
-      };
-      try {
-        // Readers ignore the hidden staging directory. Publish a complete project
-        // in one rename so filesystem watchers never observe a missing manifest.
-        await this.atomicWrite(
-          join(staging, "project.json"),
-          JSON.stringify(project, null, 2),
-        );
-        await this.ensureDirectory(join(staging, "pages"));
-        await syncDirectory(staging);
-        await this.safePath(destination);
-        await rename(staging, destination);
-        await syncDirectory(dirname(destination));
-        return { ...project, pageCount: 0 };
-      } finally {
-        await rm(staging, { recursive: true, force: true });
-      }
+      return this.writeNewProject(name, binding);
     });
+  }
+
+  async resolveDirectoryProject(sourceDirectory: string): Promise<{
+    project: ProjectSummary;
+    created: boolean;
+  }> {
+    if (!isAbsolute(sourceDirectory))
+      throw new CoreError(
+        "INVALID_PATH",
+        "Expected a canonical project directory.",
+      );
+    return this.withLock("projects", async () => {
+      const matches = (
+        await this.listProjects({ includeArchived: true })
+      ).filter((project) => project.sourceDirectory === sourceDirectory);
+      if (matches.length > 1)
+        throw new CoreError(
+          "CONFLICT",
+          "Multiple ShowAI projects own this source directory. Specify --project.",
+        );
+      const project = matches[0];
+      if (project?.archived)
+        throw new CoreError(
+          "CONFLICT",
+          "The project for this directory is archived. Restore it or specify --project.",
+        );
+      if (project) return { project, created: false };
+      return {
+        project: await this.writeNewProject(
+          basename(sourceDirectory) || sourceDirectory,
+          undefined,
+          sourceDirectory,
+        ),
+        created: true,
+      };
+    });
+  }
+
+  private async writeNewProject(
+    name: string,
+    binding?: ProjectBinding,
+    sourceDirectory?: string,
+  ): Promise<ProjectSummary> {
+    const now = new Date().toISOString();
+    const project: ProjectMetadata = {
+      format: "showai-project",
+      version: 1,
+      id: randomUUID(),
+      name,
+      createdAt: now,
+      updatedAt: now,
+      pinned: false,
+      archived: false,
+      folders: [],
+      ...(binding ? { binding, bindings: [binding] } : {}),
+      ...(sourceDirectory ? { sourceDirectory } : {}),
+    };
+    const destination = this.projectPath(project.id);
+    const staging = join(dirname(destination), `.create-${project.id}`);
+    const syncDirectory = async (path: string) => {
+      if (process.platform === "win32") return;
+      const directory = await open(path, "r");
+      try {
+        await directory.sync();
+      } finally {
+        await directory.close();
+      }
+    };
+    try {
+      // Readers ignore the hidden staging directory. Publish a complete project
+      // in one rename so filesystem watchers never observe a missing manifest.
+      await this.atomicWrite(
+        join(staging, "project.json"),
+        JSON.stringify(project, null, 2),
+      );
+      await this.ensureDirectory(join(staging, "pages"));
+      await syncDirectory(staging);
+      await this.safePath(destination);
+      await rename(staging, destination);
+      await syncDirectory(dirname(destination));
+      return { ...project, pageCount: 0 };
+    } finally {
+      await rm(staging, { recursive: true, force: true });
+    }
   }
 
   async updateProject(

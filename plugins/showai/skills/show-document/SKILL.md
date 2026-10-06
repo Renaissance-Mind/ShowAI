@@ -7,27 +7,21 @@ ShowAI 将内容组织成可阅读、可探索的页面。工作台与 Agent 使
 
 插件只分发技能。沿用本会话已验证的 ShowAI CLI 命令前缀与内容目录；首次使用或目标项目不明确时读取 [运行入口与项目选择](references/runtime.md)。下文 `showai` 代表该外部命令前缀。
 
-先检查本会话已有的项目绑定：
+用户指定 ShowAI 项目名称、ID 或页面归属时，核对后使用该项目。用户未指定时，按宿主项目目录定位：
 
 ```sh
-showai projects current --harness HOST --session ACTUAL_SESSION_ID --json
+showai projects current --json
 ```
 
-用户指定的项目或请求中的“当前项目”优先于旧绑定。用户明确 @ShowAI 应用或要求在当前工作台创作时，可读取该应用实际可见的项目，并用 `projects list --json` 核对身份及内容目录；目标明确后绑定。其他情况沿用已有会话绑定。没有绑定时先列出现有项目：
+该命令默认从当前工作目录向上寻找 Git 仓库根目录；没有 Git 仓库时使用当前目录。宿主提供明确的 Codex/Agent 项目目录时，传入 `--source-directory /absolute/project`，该目录按真实路径精确匹配。相同项目目录下的不同 session 共用一个 ShowAI 项目；首次使用时自动创建并记录目录。命令返回 `project.id`、`sourceDirectory`、`resolution` 和 `created`。页面、组件和模板操作省略 `--project` 时沿用同一目录规则；显式 `--project PROJECT` 优先。
 
-```sh
-showai projects list --json
-showai projects bind PROJECT --harness HOST --session ACTUAL_SESSION_ID --json
-showai pages list --project PROJECT --json
-```
-
-已有项目中目标明确就复用；只有一个可用项目且用户未要求另建时采用该项目。存在多个候选且无法确定时，列出项目名称让用户选择，等待期间继续资料调研。用户要求独立项目，或内容库没有项目时才 `projects create`。使用宿主提供的真实会话 id；无法获得时省略绑定，在会话保留已选项目 id。每次写入明确指定项目。默认内容库为 `~/.showai`，用 `--home` 与用户选择的工作台内容库保持一致。
+用户明确要求独立项目时使用 `projects create`，后续传入其项目 ID。目录项目的归属与 session ID 无关。默认内容库为 `~/.showai`；`--home /absolute/library` 指定另一份内容库，Agent 使用软件提供的启动配置与工作台保持一致。
 
 普通调研、对比或报告默认保存为项目内的一份 Page。用区域、标题、目录、折叠内容和嵌套容器组织章节；章节数量与内容长度由页面布局处理。用户明确要求网站、多份独立文档或多个页面时再拆分资源；完整项目站点导出用于这些任务。后续补充和修改继续使用同一页面，先 `pages list/read` 定位已有内容，保留其身份。
 
 按本次操作读取 CLI 指南，普通创作先使用 `guide authoring`；构造 Page 结构时读取 `guide containers`，区域内部的富文本区块再读 `guide document`。
 
-- `guide workspace`：项目与绑定。
+- `guide workspace`：项目目录定位与显式项目选择。
 - `guide reading`：同一 Page 的结构化、图像与 HTML 读取。
 - `guide authoring`：读取、差异、编辑和冲突处理。
 - `guide containers`：Page/Board 嵌套、外框、视图与旧页迁移。

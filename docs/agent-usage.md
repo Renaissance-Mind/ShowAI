@@ -32,17 +32,18 @@ Template application preserves container kind. Add `--page PAGE --base-hash HASH
 
 ## Select the current project
 
-Storage defaults to `~/.showai`. Use `SHOWAI_HOME` or `--home /absolute/path` to match the desktop content library.
+Storage defaults to `~/.showai`. `--home /absolute/library` specifies the content library directory; `SHOWAI_HOME` supplies that directory in the launch environment.
 
 ```sh
-showai projects current --harness codex --session ACTUAL_SESSION_ID --json
-showai projects list --json
-showai projects create --name "A research topic" --harness codex --session ACTUAL_SESSION_ID --json
-showai projects bind PROJECT --harness claude-code --session ACTUAL_SESSION_ID --json
-showai pages list --project PROJECT --json
+showai projects current --json
+showai projects current --source-directory /absolute/host-project --json
+showai projects current --project PROJECT --json
+showai pages create --title "A research report" --json
 ```
 
-`projects current` reports the current Agent conversation's binding. An unbound result points to `projects list`: discover existing projects before selecting a destination. Prioritize a user-specified project or a verified visible ShowAI project when the user invokes the app/current workspace; check its identity and content home against the CLI list. Otherwise keep an existing binding, reuse the sole available project, or ask the user to choose among multiple candidates. Create a project for an explicit independent-project request or an empty library. Use the real session identifier when supplied; without one, retain the selected project id in the conversation and omit binding. Every page or project-catalog write requires `--project`.
+A user-specified project takes priority. Otherwise `projects current` resolves or creates the ShowAI project for the host project directory. An explicit `--source-directory` is used exactly; without it, the CLI finds the nearest Git root above cwd, or uses cwd outside Git. Directories resolve to real absolute paths, so symbolic-link aliases share the same project. Different sessions in the same directory share one project, and concurrent first use creates only one. The response includes `home`, `project`, `sourceDirectory`, `resolution` and `created`.
+
+Page, component, template and MCP commands use the same directory resolution when `--project` is omitted. Explicit `projects create` remains available for a requested independent project; subsequent commands select it with `--project`. Session bindings remain metadata and do not choose the default destination. An archived directory project produces a conflict instead of creating a replacement.
 
 Ordinary research, comparison and report tasks default to one resource Page. Organize its chapters with regions, navigation, collapsible content and nested containers, and continue revisions in the same page. Create multiple resource pages for a requested website or separate documents. Displaying multiple excerpts does not create multiple stored pages.
 

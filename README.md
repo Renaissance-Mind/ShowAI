@@ -98,7 +98,7 @@ node dist-runtime/scripts/cli.mjs template apply research --project PROJECT_ID -
 node dist-runtime/scripts/cli.mjs pages list --project PROJECT_ID --json
 ```
 
-上例用于明确需要新建项目的任务。已有内容先用 `projects current` 查询会话绑定，未绑定时用 `projects list` 选择已有项目；用户指定或当前工作台的目标项目核对后优先采用。只有一个可用项目时复用，多个候选且目标不明确时请用户选择。把 `PROJECT_ID` 替换为已选项目 id，每条页面命令显式指定项目；绑定使用真实的 `--harness codex --session ACTUAL_SESSION_ID`。
+上例用于用户明确要求新建独立项目的任务。未指定项目时，`projects current --json` 按当前目录对应的 Git 仓库根目录定位，没有 Git 仓库时使用当前目录；宿主提供项目目录时传入 `--source-directory /absolute/project`，按该目录精确定位。第一次使用会自动创建目录项目，同一目录下的多个会话共用一个项目。页面、组件、模板和 MCP 操作省略 `--project` 时使用同样的规则；用户指定项目时传入 `--project PROJECT_ID` 优先采用。
 
 普通调研报告默认在已选项目中保存为一份 Page，用章节和区域组织内容，后续修改延续同一页面。网站或多份独立文档按用户要求拆分。
 

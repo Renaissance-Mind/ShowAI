@@ -107,6 +107,31 @@ describe("file-first project store", () => {
     expect(await store.listProjects()).toHaveLength(1);
   });
 
+  it("serializes directory ownership across stores and rejects archived or ambiguous ownership", async () => {
+    const source = join(directory, "host-project");
+    const results = await Promise.all([
+      store.resolveDirectoryProject(source),
+      new FileStore(store.root).resolveDirectoryProject(source),
+    ]);
+    expect(results[0].project.id).toBe(results[1].project.id);
+    expect(results.filter((item) => item.created)).toHaveLength(1);
+    await store.updateProject(results[0].project.id, { archived: true });
+    await expect(store.resolveDirectoryProject(source)).rejects.toMatchObject({
+      code: "CONFLICT",
+    });
+    await store.updateProject(results[0].project.id, { archived: false });
+    const duplicate = await store.createProject({ name: "Duplicate" });
+    const path = join(store.projectPath(duplicate.id), "project.json");
+    const metadata = JSON.parse(await readFile(path, "utf8"));
+    await writeFile(
+      path,
+      JSON.stringify({ ...metadata, sourceDirectory: source }),
+    );
+    await expect(store.resolveDirectoryProject(source)).rejects.toMatchObject({
+      code: "CONFLICT",
+    });
+  });
+
   it("keeps checkpoint-based text diffs and rejects stale saves without losing human edits", async () => {
     const { projectId, record } = await page();
     const blockId = record.document.content.content![0].attrs!.id as string;

@@ -51,6 +51,7 @@ export async function runtimeInfo(home: string) {
   return {
     version,
     protocol: 1,
+    projectResolution: { mode: "directory", command: "projects current" },
     home: resolve(home),
     viewer,
     readerCompilation: {

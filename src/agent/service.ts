@@ -3,6 +3,7 @@ import { upgradeResource } from "../surface/containers.mjs";
 import { FileStore } from "../core/store";
 import { applyOperations } from "../core/diff";
 import { CoreError } from "../core/model";
+import { projectDirectory } from "../core/project-directory";
 import type {
   ApplyPageInput,
   ProjectBinding,
@@ -77,11 +78,15 @@ const projectSummary = (project: {
   name: string;
   pageCount: number;
   binding?: ProjectBinding;
+  sourceDirectory?: string;
 }) => ({
   id: project.id,
   name: project.name,
   pageCount: project.pageCount,
   ...(project.binding ? { binding: project.binding } : {}),
+  ...(project.sourceDirectory
+    ? { sourceDirectory: project.sourceDirectory }
+    : {}),
 });
 
 function rebindImportedComponents(
@@ -135,7 +140,7 @@ export class AgentService {
     if (!projectId)
       throw new CoreError(
         "INVALID_DATA",
-        "Specify --project explicitly. ShowAI does not use a global active project. Run showai guide workspace.",
+        "A resolved projectId is required. Resolve the host directory with projects current, or specify --project.",
       );
     if (this.projectId && projectId !== this.projectId)
       throw new CoreError(
@@ -179,23 +184,32 @@ export class AgentService {
       .filter((project) => !this.projectId || project.id === this.projectId)
       .map(projectSummary);
   }
-  async currentProject(binding: ProjectBinding) {
-    const projects = await this.store.listProjects();
-    const project = projects.find(
-      (project) =>
-        (!this.projectId || project.id === this.projectId) &&
-        (project.bindings ?? (project.binding ? [project.binding] : [])).some(
-          (item) =>
-            item.harness === binding.harness &&
-            item.sessionId === binding.sessionId,
-        ),
-    );
+  async currentProject(
+    input: { projectId?: string; sourceDirectory?: string } = {},
+  ) {
+    const explicit = input.projectId ?? this.projectId;
+    const directory = explicit
+      ? undefined
+      : await projectDirectory(input.sourceDirectory);
+    const resolved = explicit
+      ? {
+          project: (await this.store.listProjects()).find(
+            (project) => project.id === this.requireProject(explicit),
+          ),
+          created: false,
+        }
+      : await this.store.resolveDirectoryProject(directory!);
+    const project = resolved.project;
+    if (!project)
+      throw new CoreError("NOT_FOUND", `Project not found: ${explicit}`);
     return {
-      bound: !!project,
-      project: project ? projectSummary(project) : null,
-      next: project
-        ? `showai pages list --project ${shellToken(project.id)} --json`
-        : "showai projects list --json",
+      bound: true,
+      created: resolved.created,
+      resolution: explicit ? "explicit" : "directory",
+      home: this.store.root,
+      ...(directory ? { sourceDirectory: directory } : {}),
+      project: projectSummary(project),
+      next: `showai pages list --project ${shellToken(project.id)} --json`,
     };
   }
   async createProject(name: string, binding?: ProjectBinding) {

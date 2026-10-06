@@ -62,20 +62,20 @@ const guides: Record<
   },
   workspace: {
     purpose:
-      "Bind one conversation to an explicit ShowAI project, shared with the desktop application.",
+      "Resolve a ShowAI project from the host project directory, shared across Agent sessions.",
     rules: [
-      "Storage defaults to ~/.showai; use --home or SHOWAI_HOME to match the desktop content library.",
-      "Use the actual harness/session identifier. projects current only reports an existing binding; it never chooses the most recent project.",
-      "An unbound conversation should list existing projects before choosing a destination. Resolve user-specified projects or a verified visible ShowAI project first; otherwise keep the existing binding, reuse the only available project, or ask the user to choose among multiple candidates. Create a project when explicitly requested or the library is empty.",
-      "Verify visible app/browser project identity against projects list and the selected content home. Background global selection, modification time and repository cwd do not identify a write destination. Bind the resolved project using the real session id when available.",
-      "All page and project-catalog writes require --project. Ordinary research and comparison reports default to one Page, organized with sections, regions and nested containers. Separate resource pages and site export follow an explicit website or multi-document request.",
+      "Storage defaults to ~/.showai. --home specifies the content library directory; SHOWAI_HOME supplies it through the launch environment.",
+      "A user-specified --project takes priority. Otherwise projects current resolves or creates the project for the host directory. Session bindings and the number of projects in the library do not select the destination.",
+      "--source-directory is the exact host project directory. Without it, use cwd's nearest Git root, or cwd outside Git. Canonical real paths identify directories. An archived directory project requires restoration or an explicit project.",
+      "Page, component, template and MCP commands use the same directory default when --project is omitted. Directory resolution is serialized so concurrent sessions create only one project.",
+      "Ordinary reports default to one Page, organized with sections, regions and nested containers. Separate resource pages and site export follow an explicit website or multi-document request.",
     ],
     commands: [
-      "showai projects current --harness codex --session SESSION_ID --json",
-      "showai projects list --json",
-      "showai projects create --name 'Research topic' --harness codex --session SESSION_ID --json",
-      "showai projects bind PROJECT --harness codex --session SESSION_ID --json",
-      "showai pages list --project PROJECT --json",
+      "showai projects current --json",
+      "showai projects current --source-directory /absolute/host-project --json",
+      "showai projects current --project PROJECT --json",
+      "showai pages list --json",
+      "showai projects create --name 'Independent project' --json",
     ],
   },
   authoring: {

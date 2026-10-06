@@ -12,13 +12,11 @@ ShowAI 软件提供 CLI、阅读器、组件编译器和运行依赖；插件只
 
 ## 选择目标项目
 
-`projects current --harness HOST --session ACTUAL_SESSION_ID --json` 查询当前 Agent 会话的绑定。`bound: false` 表示尚未建立绑定，接下来查询 `projects list --json` 发现已有内容。所有页面和项目目录写入显式指定 `--project`。
+用户指定 ShowAI 项目名称、ID 或页面归属时，核对后采用该项目，并通过 `--project PROJECT` 指定。未指定时执行 `projects current --json`；命令按当前工作目录对应的 Git 仓库根目录定位，没有 Git 仓库则使用当前目录。宿主提供明确的项目目录时使用 `projects current --source-directory /absolute/project --json`，直接按该目录定位。
 
-用户指定项目名称/id、页面归属或“当前项目”时，先核对并采用该目标。用户明确 @ShowAI 桌面应用或要求在当前工作台创作时，可用宿主的应用/浏览器读取能力查看实际可见的项目，再用 CLI 列表核对名称、id 与内容目录；核对失败时保留待确认目标。读取可见界面是当前任务的上下文查询；后台保存的全局选择、最近修改时间和代码目录不用于推断写入目标。
+目录会解析为真实绝对路径。同一目录下的多个 Agent session 共用同一 ShowAI 项目；首次使用时自动创建，名称取目录名。返回内容包含内容库路径、项目身份、实际项目目录、定位依据及是否新建。页面、组件、模板和 MCP 省略 `--project` 时使用同样的目录规则；显式项目优先。项目会话绑定不参与默认选择。
 
-目标已明确就用 `projects bind PROJECT --harness HOST --session ACTUAL_SESSION_ID --json` 建立或切换绑定。没有新的用户目标时沿用已有绑定。既无明确目标也无绑定时，只有一个可用项目就复用；多个候选时让用户选择，可先继续独立的材料调研。用户要求独立项目，或列表为空时再创建。
-
-使用真实会话 id；宿主未提供时省略绑定，在对话保留已选项目 id。新建、提取或验证模板和开发组件也沿用这个已选项目。
+检查 `runtime info` 的 `projectResolution.mode` 为 `directory`，确认软件支持该流程。缺少能力时更新 ShowAI 软件运行时；skills 更新不替代软件更新。用户要求独立项目时才显式 `projects create`，后续操作使用返回的项目 ID。
 
 ## 按需披露
 

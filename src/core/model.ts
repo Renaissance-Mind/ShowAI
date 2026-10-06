@@ -18,6 +18,8 @@ export interface ProjectMetadata {
   name: string;
   createdAt: string;
   updatedAt: string;
+  /** Canonical host project directory, shared by all Agent sessions in it. */
+  sourceDirectory?: string;
   binding?: ProjectBinding;
   bindings?: ProjectBinding[];
   pinned?: boolean;
