@@ -154,5 +154,16 @@ export function installBrowserBridge() {
     setDirty(value) {
       dirty = value;
     },
+    ...(import.meta.env.DEV
+      ? {
+          async prepareReload() {
+            return (
+              await Promise.all(
+                [...closeListeners].map((listener) => listener()),
+              )
+            ).every(Boolean);
+          },
+        }
+      : {}),
   };
 }

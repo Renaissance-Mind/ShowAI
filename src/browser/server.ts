@@ -34,10 +34,24 @@ export interface BrowserServerOptions {
   webRoot: string;
   cliEntry: string;
   settingsPath: string;
+  /** Only the source development launcher supplies this loopback frontend. */
+  development?: { origin: string; token: string };
 }
 
 /** Loopback-only host for the exact same workbench actions used by Electron. */
 export async function startBrowserServer(options: BrowserServerOptions) {
+  if (options.development) {
+    const frontend = new URL(options.development.origin);
+    if (
+      frontend.protocol !== "http:" ||
+      frontend.hostname !== "127.0.0.1" ||
+      frontend.origin !== options.development.origin ||
+      !/^[a-f0-9]{64}$/.test(options.development.token)
+    )
+      throw new Error(
+        "Development requires a loopback origin and a random access token.",
+      );
+  }
   const fixedHome = options.home ?? process.env.SHOWAI_HOME;
   let savedHome: string | undefined;
   if (!fixedHome) {
@@ -56,17 +70,17 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   }
   let store = new FileStore(fixedHome ?? savedHome);
   let service = new AgentService({ root: store.root });
-  const token = randomBytes(32).toString("hex");
+  const token = options.development?.token ?? randomBytes(32).toString("hex");
   const webRoot = await realpath(options.webRoot);
   const clients = new Set<ServerResponse>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let watcher!: ReturnType<typeof watch>;
-  let origin = "";
+  let origin = options.development?.origin ?? "";
   const info = (): DesktopInfo => ({
     home: store.root,
     version,
     platform: process.platform,
-    packaged: true,
+    packaged: !options.development,
     mode: "browser",
     cli: {
       command: process.execPath,
@@ -467,7 +481,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   const address = server.address();
   if (!address || typeof address === "string")
     throw new Error("Missing local server address.");
-  origin = `http://127.0.0.1:${address.port}`;
+  origin ||= `http://127.0.0.1:${address.port}`;
   return {
     url: origin + "/",
     home: store.root,

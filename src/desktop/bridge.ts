@@ -25,6 +25,7 @@ export interface ShowAIBridge {
   ): Promise<T>;
   onChange(listener: (change: DesktopChange) => void): () => void;
   onBeforeClose(listener: () => Promise<boolean>): () => void;
+  prepareReload?(): Promise<boolean>;
 }
 
 export type DesktopResponse<T = unknown> =

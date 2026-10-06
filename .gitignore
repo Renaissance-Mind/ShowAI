@@ -18,4 +18,5 @@ dist-agent/
 dist-runtime/
 dist-desktop/
 release/
+.showai-dev/
 plugins/showai/scripts/cli.mjs
