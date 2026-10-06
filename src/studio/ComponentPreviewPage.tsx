@@ -1,3 +1,4 @@
+import { BuiltinPreview } from "../components/BuiltinPreview";
 import { useEffect, useRef, useState } from "react";
 import type {
   BuiltinComponentMetadata,
@@ -118,7 +119,7 @@ export default function ComponentPreviewPage() {
       <div className="component-capture-native" ref={native}>
         {component &&
           ("kind" in component ? (
-            <Widget kind={component.kind} data={data} readOnly />
+            <BuiltinPreview component={component} data={data} />
           ) : (
             <CustomComponentsProvider components={[component]}>
               <Widget

@@ -39,6 +39,30 @@ export function CustomComponentsProvider({
   );
 }
 
+export function useAvailableComponents() {
+  return [...useContext(ComponentsContext).values()];
+}
+
+export function AdditionalComponentsProvider({
+  components,
+  children,
+}: {
+  components: CompiledComponent[];
+  children: ReactNode;
+}) {
+  const current = useContext(ComponentsContext),
+    inlineHost = useContext(InlineHostContext);
+  const merged = useMemo(
+    () => [...current.values(), ...components],
+    [current, components],
+  );
+  return (
+    <CustomComponentsProvider components={merged} inlineHost={inlineHost}>
+      {children}
+    </CustomComponentsProvider>
+  );
+}
+
 function safeJson(value: unknown): string {
   return JSON.stringify(value)
     .replace(/</g, "\\u003c")

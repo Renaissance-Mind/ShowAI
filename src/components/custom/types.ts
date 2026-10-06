@@ -99,7 +99,7 @@ export interface ComponentExample {
 
 /** User packages contain manifest.json, props.schema.json and a local React entry. */
 export type ComponentCategory =
-  "text" | "image" | "table" | "data" | "flow" | "other";
+  "text" | "image" | "table" | "data" | "flow" | "surface" | "other";
 
 export interface ComponentManifest {
   id: string;
@@ -146,6 +146,7 @@ export interface ComponentSource {
 }
 
 export interface BuiltinComponentMetadata {
+  insertion?: { nodeType: "surface"; surfaceKind: "page" | "board" };
   kind: string;
   replacedBy?: string;
   name: string;

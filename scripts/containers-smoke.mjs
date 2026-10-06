@@ -151,14 +151,35 @@ try {
     const container = scene(owner);
     await container
       .locator(
-        ":scope > .container-page-column > .container-page-add > details > summary, :scope > .container-board-scene > .page-surface > .surface-toolbar > details.container-menu > summary",
+        ":scope > .container-page-column > .container-page-add > button, :scope > .container-board-scene > .page-surface > .surface-toolbar > button.container-add-component",
       )
       .click();
-    await container
-      .locator("details.container-menu[open]")
-      .getByRole("button", { name: label, exact: true })
+    const picker = page.getByRole("dialog", { name: "添加组件", exact: true });
+    await picker
+      .getByRole("textbox", { name: "搜索组件", exact: true })
+      .fill(label);
+    await picker
+      .locator(".component-picker-list button")
+      .filter({ hasText: label })
       .click();
+    assert.equal(
+      await picker.getByText("顺序分组", { exact: true }).count(),
+      0,
+    );
+    assert.equal(
+      await picker.getByText("网格分组", { exact: true }).count(),
+      0,
+    );
+    assert.equal(
+      await picker.getByText("自由分组", { exact: true }).count(),
+      0,
+    );
+    if (label.startsWith("Page") || label.startsWith("Board"))
+      await picker.locator(".native-component-preview").waitFor();
+    await picker.getByRole("button", { name: "插入组件", exact: true }).click();
+    await picker.waitFor({ state: "detached" });
   };
+
   await add(rootId, "Board 白板");
   let saved = await poll(
     read,
@@ -278,6 +299,24 @@ try {
     false,
   );
   await scene(nestedPageId).locator(".sb-metrics").waitFor();
+  const customComponent = await api("components:createExample", {
+    projectId: project.id,
+  });
+  await add(nestedPageId, customComponent.name);
+  const customFrame = scene(nestedPageId).frameLocator(
+    `iframe[title="${customComponent.name}"]`,
+  );
+  await customFrame.getByRole("button", { name: "增加", exact: true }).click();
+  await poll(
+    read,
+    (record) =>
+      find(record.document.content, nestedPageId).content.some(
+        (node) =>
+          node.attrs?.data?.componentId === customComponent.id &&
+          node.attrs.data.props.value === customComponent.defaultData.value + 1,
+      ),
+    "custom component inserted and edited through shared picker",
+  );
   result.checks.push(
     "component catalog inserts into the active nested container and returns to that container",
   );

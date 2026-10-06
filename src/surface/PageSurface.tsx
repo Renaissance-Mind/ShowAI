@@ -49,11 +49,10 @@ interface Props {
   header?: ReactNode;
   selected?: string | null;
   onSelect?: (id: string | null) => void;
-  onAdd?: (kind: "flow" | "grid" | "free" | "text" | "image") => void;
   onMove?: ObjectActions["move"];
   onRemove?: (id: string) => void;
   onInspect?: (id: string) => void;
-  onAddText?: (id: string) => void;
+  onAddComponent?: (id: string) => void;
   onViews?: (views: PageViews) => void;
   extraActions?: ReactNode;
 }
@@ -69,11 +68,10 @@ export default function PageSurface({
   header,
   selected: controlledSelection,
   onSelect: selectControlled,
-  onAdd,
   onMove,
   onRemove,
   onInspect,
-  onAddText,
+  onAddComponent,
   onViews,
   extraActions,
   enabled = true,
@@ -258,7 +256,7 @@ export default function PageSurface({
         select: onSelect,
         inspect: onInspect,
         expand: onExpand,
-        addText: onAddText,
+        addComponent: onAddComponent,
         remove: onRemove,
         move: onMove,
         readOnly: !onMove,
@@ -317,13 +315,7 @@ export default function PageSurface({
         )}
         {!nodes.length && !drawTool && (
           <div className="surface-empty" data-surface-ui>
-            <p>{onAdd ? "在这里开始一份内容" : "这块白板还没有内容"}</p>
-            {onAdd && (
-              <button type="button" onClick={() => onAdd("flow")}>
-                <Plus size={16} />
-                开始写作
-              </button>
-            )}
+            <p>{onMove ? "添加组件或开始绘画" : "这块白板还没有内容"}</p>
           </div>
         )}
         <div
@@ -502,36 +494,6 @@ export default function PageSurface({
           >
             <Plus size={15} />
           </button>
-          {onAdd && (
-            <details className="surface-popover-anchor">
-              <summary aria-label="添加内容">
-                <Plus size={15} />
-                <span>添加</span>
-              </summary>
-              <div className="surface-add-menu">
-                {(
-                  [
-                    ["flow", "顺序区域"],
-                    ["grid", "网格区域"],
-                    ["free", "自由区域"],
-                    ["text", "独立文本"],
-                    ["image", "图片"],
-                  ] as const
-                ).map(([kind, label]) => (
-                  <button
-                    type="button"
-                    key={kind}
-                    onClick={(event) => {
-                      onAdd(kind);
-                      event.currentTarget.closest("details")!.open = false;
-                    }}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </details>
-          )}
           {extraActions}
         </div>
       </div>

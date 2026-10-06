@@ -34,8 +34,8 @@ import { build, type Plugin } from "esbuild";
 import Ajv from "ajv";
 import standaloneCode from "ajv/dist/standalone/index.js";
 import templates from "../../resources/catalog/templates.json";
-import builtinComponents from "../../resources/catalog/components.json";
-import primitiveComponents from "../../resources/catalog/primitives.json";
+import { builtinComponentCatalog } from "../components/catalog";
+
 import { builtinSources, builtinExports } from "./builtin-sources";
 import { validateDocument } from "../portable/validation.mjs";
 import type { ShowDocument } from "../types";
@@ -89,13 +89,7 @@ export type {
 export function listBuiltinComponents({
   includeLegacy = false,
 }: { includeLegacy?: boolean } = {}): BuiltinComponentMetadata[] {
-  const components = structuredClone([
-    ...primitiveComponents,
-    ...builtinComponents,
-  ]) as BuiltinComponentMetadata[];
-  return includeLegacy
-    ? components
-    : components.filter((item) => !item.replacedBy);
+  return builtinComponentCatalog({ includeLegacy });
 }
 export function describeBuiltinComponent(
   kind: string,
@@ -109,6 +103,10 @@ export function describeBuiltinComponent(
 
 export function readBuiltinComponentSource(kind: string): ComponentSource {
   const item = describeBuiltinComponent(kind);
+  if (item.insertion)
+    throw new Error(
+      "Page and Board use native container editing. Insert the component to edit its content and layout, or save it as a template.",
+    );
   const exported = builtinExports[kind];
   if (!exported) throw new Error(`No editable source for ${kind}.`);
   const source = `import { ${exported} } from "showai:components";

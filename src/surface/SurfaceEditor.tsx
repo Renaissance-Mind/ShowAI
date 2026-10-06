@@ -30,7 +30,7 @@ export default function SurfaceEditor({
   document: ShowDocument;
   onChange: (document: ShowDocument) => void;
   header?: ReactNode;
-  onBrowseComponents?: () => void;
+  onBrowseComponents?: (parentId?: string) => void;
   readOnly?: boolean;
   revealId?: string | null;
   onRevealHandled?: () => void;
@@ -123,7 +123,9 @@ export default function SurfaceEditor({
       <DocumentEditor
         content={content}
         readOnly={readOnly}
-        onBrowseComponents={onBrowseComponents}
+        onBrowseComponents={
+          onBrowseComponents ? () => onBrowseComponents(parentId) : undefined
+        }
         minimal
         onDetachBlock={
           readOnly
@@ -192,7 +194,9 @@ export default function SurfaceEditor({
           event.nativeEvent.isComposing ||
           !(event.metaKey || event.ctrlKey) ||
           event.altKey ||
-          (event.target as Element).closest("input,textarea,select")
+          (event.target as Element).closest(
+            'input,textarea,select,[role="dialog"]',
+          )
         )
           return;
         if (

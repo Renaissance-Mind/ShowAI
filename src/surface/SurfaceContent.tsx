@@ -239,9 +239,9 @@ function AddToRegion({ id }: { id: string }) {
       type="button"
       className="surface-add-to-region"
       data-surface-ui
-      onClick={() => actions.addText?.(id)}
+      onClick={() => actions.addComponent?.(id)}
     >
-      ＋ 添加文本
+      ＋ 添加组件
     </button>
   );
 }

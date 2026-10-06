@@ -471,3 +471,19 @@
     min-height: var(--free-height, 200px) !important;
   }
 }
+.container-add-component {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.container-add-component:hover {
+  background: var(--hover);
+  color: var(--text);
+}

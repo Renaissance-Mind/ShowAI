@@ -1,3 +1,4 @@
+import { BuiltinPreview } from "../components/BuiltinPreview";
 import { useState, useId } from "react";
 import {
   ArrowDown,
@@ -1189,7 +1190,7 @@ export function ComponentDialog({
                 )}
                 <div className="studio-component-preview catalog-preview-stage">
                   {builtin ? (
-                    <Widget kind={builtin.kind} data={data} readOnly />
+                    <BuiltinPreview component={builtin} data={data} />
                   ) : (
                     <CustomComponentsProvider components={[custom!]}>
                       <Widget

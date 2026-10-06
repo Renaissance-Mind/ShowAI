@@ -85,6 +85,12 @@ export type PageFields = Partial<
 
 /** A null parent identifies the document root; omitted afterId appends. */
 export type PageOperation =
+  | {
+      type: "component.insert";
+      kind: string;
+      data: Record<string, unknown>;
+      parentId?: string | null;
+    }
   | { type: "surface.upgrade" }
   | {
       type: "surface.create";

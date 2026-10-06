@@ -1,8 +1,12 @@
+import { AdditionalComponentsProvider } from "../components/custom/CustomBlock";
+import type { CompiledComponent } from "../components/custom/types";
 import { flushSync } from "react-dom";
-import { MAX_ARTIFACT_BYTES } from "../portable/validation.mjs";
+import { ComponentPicker } from "../components/ComponentPicker";
+import { insertComponent } from "./component-insertion";
 import {
   createContext,
   useContext,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -29,7 +33,7 @@ import {
   Redo2,
 } from "lucide-react";
 import type { ContainerDocument, ShowDocument } from "../types";
-import type { DrawingTool, NodeLayout, SurfaceKind } from "./types";
+import type { DrawingTool, NodeLayout } from "./types";
 import {
   SurfaceContent,
   nodeName,
@@ -37,13 +41,7 @@ import {
 } from "./SurfaceContent";
 import PageSurface, { type SurfaceHandle } from "./PageSurface";
 import { ObjectContext, type ObjectActions } from "./SurfaceObject";
-import {
-  addNode,
-  createRegion,
-  editNode,
-  moveNode,
-  removeNode,
-} from "./editing";
+import { addNode, editNode, moveNode, removeNode } from "./editing";
 import {
   findSurfaceNode,
   nodePaths,
@@ -51,7 +49,6 @@ import {
   visitNodes,
 } from "./document.mjs";
 import {
-  createSurface,
   resourceNodes,
   surfaceKind,
   surfaceViews,
@@ -59,7 +56,6 @@ import {
 } from "./containers.mjs";
 import "./containers.css";
 
-type AddKind = SurfaceKind | "flow" | "grid" | "free" | "text" | "image";
 interface Runtime {
   document: ContainerDocument;
   current: RefObject<ContainerDocument>;
@@ -76,6 +72,7 @@ interface Runtime {
   scrolls: Map<string, number>;
   revealRequest: string | null;
   requestReveal: (id: string | null) => void;
+  browseComponents: (parentId: string) => void;
 }
 const Context = createContext<Runtime>(null!);
 export function ContainerRuntime({
@@ -114,6 +111,11 @@ export function ContainerRuntime({
     [expanded, expand] = useState<string | null>(null),
     [active, activate] = useState(document.content.attrs!.id),
     [revealRequest, requestReveal] = useState<string | null>(null);
+  const [pickerOwner, setPickerOwner] = useState<string | null>(null);
+  const [loadedComponents, setLoadedComponents] = useState<CompiledComponent[]>(
+    [],
+  );
+  const closePicker = useCallback(() => setPickerOwner(null), []);
   const [printing, setPrinting] = useState(false);
   useEffect(() => {
     const media = matchMedia("print");
@@ -183,6 +185,15 @@ export function ContainerRuntime({
     scrolls: scrolls.current,
     revealRequest,
     requestReveal,
+    browseComponents: (parentId) => {
+      let owner = findSurfaceNode(current.current, parentId);
+      while (owner && owner.node.type !== "surface")
+        owner = owner.parent?.attrs?.id
+          ? findSurfaceNode(current.current, owner.parent.attrs.id)
+          : undefined;
+      activate(owner?.node.attrs?.id ?? current.current.content.attrs!.id);
+      setPickerOwner(parentId);
+    },
   };
   const selectedEntry = inspecting
     ? findSurfaceNode(document, inspecting)
@@ -196,344 +207,370 @@ export function ContainerRuntime({
       }),
     );
   return (
-    <Context.Provider value={runtime}>
-      <div
-        className="container-workspace"
-        data-resource-id={document.id}
-        onKeyDown={(event) => {
-          if (event.defaultPrevented || event.nativeEvent.isComposing) return;
-          if (
-            event.key === "Escape" &&
-            !(event.target as Element).closest("input,textarea,select")
-          ) {
-            if (inspecting) {
-              inspect(null);
-              return;
+    <AdditionalComponentsProvider components={loadedComponents}>
+      <Context.Provider value={runtime}>
+        {pickerOwner && (
+          <ComponentPicker
+            onClose={closePicker}
+            onInsert={(kind, data, component) => {
+              if (component)
+                setLoadedComponents((items) => [...items, component]);
+              const inserted = insertComponent(
+                current.current,
+                pickerOwner,
+                kind,
+                data,
+              );
+              runtime.commit(inserted.document);
+              select(inserted.nodeId);
+              requestReveal(inserted.nodeId);
+              closePicker();
+            }}
+          />
+        )}
+        <div
+          className="container-workspace"
+          data-resource-id={document.id}
+          onKeyDown={(event) => {
+            if (event.defaultPrevented || event.nativeEvent.isComposing) return;
+            if (
+              event.key === "Escape" &&
+              !(event.target as Element).closest("input,textarea,select")
+            ) {
+              if (inspecting) {
+                inspect(null);
+                return;
+              }
+              if (active !== root.attrs!.id) {
+                activate(root.attrs!.id);
+                return;
+              }
+              if (chain.length > 1) focusSurface(chain.at(-2)!.attrs!.id);
             }
-            if (active !== root.attrs!.id) {
-              activate(root.attrs!.id);
-              return;
-            }
-            if (chain.length > 1) focusSurface(chain.at(-2)!.attrs!.id);
-          }
-        }}
-      >
-        {(!runtime.readOnly || chain.length > 1) && (
-          <div className="container-workspace-bar" data-surface-ui>
-            <nav aria-label="内容层级">
-              {chain.map((node, index) => (
-                <span key={node.attrs!.id}>
-                  {index > 0 && <ChevronRight size={13} />}
+          }}
+        >
+          {(!runtime.readOnly || chain.length > 1) && (
+            <div className="container-workspace-bar" data-surface-ui>
+              <nav aria-label="内容层级">
+                {chain.map((node, index) => (
+                  <span key={node.attrs!.id}>
+                    {index > 0 && <ChevronRight size={13} />}
+                    <button
+                      type="button"
+                      aria-current={node === root ? "page" : undefined}
+                      onClick={() => focusSurface(node.attrs!.id)}
+                    >
+                      {surfaceKind(node) === "page" ? (
+                        <FileText size={14} />
+                      ) : (
+                        <LayoutDashboard size={14} />
+                      )}
+                      <span>
+                        {index === 0
+                          ? (!hideTitle && document.title) ||
+                            (surfaceKind(node) === "page" && "Page") ||
+                            "Board"
+                          : nodeName(node)}
+                      </span>
+                    </button>
+                  </span>
+                ))}
+              </nav>
+              {chain.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => focusSurface(chain.at(-2)!.attrs!.id)}
+                >
+                  <ArrowLeft size={14} />
+                  返回上层
+                </button>
+              )}
+              {onChange && (
+                <>
                   <button
                     type="button"
-                    aria-current={node === root ? "page" : undefined}
-                    onClick={() => focusSurface(node.attrs!.id)}
+                    aria-label="撤销操作"
+                    disabled={!canUndo}
+                    onClick={undo}
                   >
-                    {surfaceKind(node) === "page" ? (
-                      <FileText size={14} />
-                    ) : (
-                      <LayoutDashboard size={14} />
-                    )}
-                    <span>
-                      {index === 0
-                        ? (!hideTitle && document.title) ||
-                          (surfaceKind(node) === "page" && "Page") ||
-                          "Board"
-                        : nodeName(node)}
-                    </span>
+                    <Undo2 size={15} />
                   </button>
-                </span>
-              ))}
-            </nav>
-            {chain.length > 1 && (
-              <button
-                type="button"
-                onClick={() => focusSurface(chain.at(-2)!.attrs!.id)}
-              >
-                <ArrowLeft size={14} />
-                返回上层
-              </button>
-            )}
-            {onChange && (
-              <>
-                <button
-                  type="button"
-                  aria-label="撤销操作"
-                  disabled={!canUndo}
-                  onClick={undo}
-                >
-                  <Undo2 size={15} />
-                </button>
-                <button
-                  type="button"
-                  aria-label="重做操作"
-                  disabled={!canRedo}
-                  onClick={redo}
-                >
-                  <Redo2 size={15} />
-                </button>
-                <details className="container-menu">
-                  <summary aria-label="容器操作">
-                    {surfaceKind(root) === "page" ? "Page" : "Board"} ▾
-                  </summary>
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const next = wrapSurface(
-                          current.current,
-                          root.attrs!.id,
-                          "board",
-                        );
-                        runtime.commit(next);
-                        focusSurface(
-                          findSurfaceNode(next, root.attrs!.id)?.parent?.attrs
-                            ?.id ?? next.content.attrs!.id,
-                        );
-                      }}
-                    >
-                      放入 Board
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const next = wrapSurface(
-                          current.current,
-                          root.attrs!.id,
-                          "page",
-                        );
-                        runtime.commit(next);
-                        focusSurface(
-                          findSurfaceNode(next, root.attrs!.id)?.parent?.attrs
-                            ?.id ?? next.content.attrs!.id,
-                        );
-                      }}
-                    >
-                      放入 Page
-                    </button>
-                  </div>
-                </details>
-              </>
-            )}
+                  <button
+                    type="button"
+                    aria-label="重做操作"
+                    disabled={!canRedo}
+                    onClick={redo}
+                  >
+                    <Redo2 size={15} />
+                  </button>
+                  <details className="container-menu">
+                    <summary aria-label="容器操作">
+                      {surfaceKind(root) === "page" ? "Page" : "Board"} ▾
+                    </summary>
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = wrapSurface(
+                            current.current,
+                            root.attrs!.id,
+                            "board",
+                          );
+                          runtime.commit(next);
+                          focusSurface(
+                            findSurfaceNode(next, root.attrs!.id)?.parent?.attrs
+                              ?.id ?? next.content.attrs!.id,
+                          );
+                        }}
+                      >
+                        放入 Board
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = wrapSurface(
+                            current.current,
+                            root.attrs!.id,
+                            "page",
+                          );
+                          runtime.commit(next);
+                          focusSurface(
+                            findSurfaceNode(next, root.attrs!.id)?.parent?.attrs
+                              ?.id ?? next.content.attrs!.id,
+                          );
+                        }}
+                      >
+                        放入 Page
+                      </button>
+                    </div>
+                  </details>
+                </>
+              )}
+            </div>
+          )}
+          <div className="container-main">
+            <ContainerView
+              key={root.attrs!.id}
+              node={root}
+              root
+              header={
+                root === document.content ? header : <h1>{nodeName(root)}</h1>
+              }
+              reading={reading}
+            />
           </div>
-        )}
-        <div className="container-main">
-          <ContainerView
-            key={root.attrs!.id}
-            node={root}
-            root
-            header={
-              root === document.content ? header : <h1>{nodeName(root)}</h1>
-            }
-            reading={reading}
-          />
-        </div>
-        {selectedEntry && (
-          <aside
-            className="surface-inspector container-inspector"
-            data-surface-ui
-            aria-label="模块设置"
-          >
-            <header>
-              <strong>模块设置</strong>
-              <button
-                type="button"
-                aria-label="关闭模块设置"
-                onClick={() => inspect(null)}
-              >
-                <X size={16} />
-              </button>
-            </header>
-            <label>
-              名称
-              <input
-                aria-label="模块名称"
-                value={
-                  selectedEntry.node.attrs?.name ?? nodeName(selectedEntry.node)
-                }
-                maxLength={200}
-                onChange={(event) =>
-                  runtime.commit(
-                    editNode(current.current, inspecting!, (node) => {
-                      node.attrs = { ...node.attrs, name: event.target.value };
-                    }),
-                  )
-                }
-              />
-            </label>
-            {selectedEntry.node.type === "region" && (
-              <label>
-                排列
-                <select
-                  aria-label="区域布局"
-                  value={frame?.mode ?? "flow"}
-                  onChange={(event) =>
-                    updateFrame({
-                      ...frame!,
-                      mode: event.target.value as NodeLayout["mode"],
-                    })
-                  }
+          {selectedEntry && (
+            <aside
+              className="surface-inspector container-inspector"
+              data-surface-ui
+              aria-label="模块设置"
+            >
+              <header>
+                <strong>模块设置</strong>
+                <button
+                  type="button"
+                  aria-label="关闭模块设置"
+                  onClick={() => inspect(null)}
                 >
-                  <option value="flow">顺序</option>
-                  <option value="grid">网格</option>
-                  <option value="free">自由</option>
-                </select>
-              </label>
-            )}
-            {frame?.mode === "grid" && (
+                  <X size={16} />
+                </button>
+              </header>
               <label>
-                列数
+                名称
                 <input
-                  aria-label="网格列数"
-                  type="number"
-                  min={1}
-                  max={12}
-                  value={frame.columns ?? 2}
-                  onChange={(event) => {
-                    const value = Number(event.target.value);
-                    if (Number.isInteger(value) && value >= 1 && value <= 12)
-                      updateFrame({ ...frame, columns: value });
-                  }}
+                  aria-label="模块名称"
+                  value={
+                    selectedEntry.node.attrs?.name ??
+                    nodeName(selectedEntry.node)
+                  }
+                  maxLength={200}
+                  onChange={(event) =>
+                    runtime.commit(
+                      editNode(current.current, inspecting!, (node) => {
+                        node.attrs = {
+                          ...node.attrs,
+                          name: event.target.value,
+                        };
+                      }),
+                    )
+                  }
                 />
               </label>
-            )}
-            {frame && (
-              <>
+              {selectedEntry.node.type === "region" && (
                 <label>
-                  宽度
+                  排列
+                  <select
+                    aria-label="区域布局"
+                    value={frame?.mode ?? "flow"}
+                    onChange={(event) =>
+                      updateFrame({
+                        ...frame!,
+                        mode: event.target.value as NodeLayout["mode"],
+                      })
+                    }
+                  >
+                    <option value="flow">顺序</option>
+                    <option value="grid">网格</option>
+                    <option value="free">自由</option>
+                  </select>
+                </label>
+              )}
+              {frame?.mode === "grid" && (
+                <label>
+                  列数
                   <input
-                    aria-label="模块宽度"
+                    aria-label="网格列数"
                     type="number"
-                    min={120}
-                    max={10000}
-                    value={Math.round(frame.width)}
+                    min={1}
+                    max={12}
+                    value={frame.columns ?? 2}
                     onChange={(event) => {
-                      const width = Number(event.target.value);
-                      if (width >= 120 && width <= 10000)
-                        updateFrame({ ...frame, width });
+                      const value = Number(event.target.value);
+                      if (Number.isInteger(value) && value >= 1 && value <= 12)
+                        updateFrame({ ...frame, columns: value });
                     }}
                   />
                 </label>
-                {selectedEntry.node.type === "surface" && (
-                  <>
-                    <label>
-                      高度方式
-                      <select
-                        aria-label="模块高度方式"
-                        value={frame.heightMode ?? "fixed"}
-                        onChange={(event) =>
-                          updateFrame({
-                            ...frame,
-                            heightMode: event.target.value as "fixed" | "auto",
-                          })
-                        }
-                      >
-                        <option value="fixed">固定窗口</option>
-                        {surfaceKind(selectedEntry.node) === "page" && (
-                          <option value="auto">随内容增长</option>
-                        )}
-                      </select>
-                    </label>
-                    {frame.heightMode !== "auto" && (
+              )}
+              {frame && (
+                <>
+                  <label>
+                    宽度
+                    <input
+                      aria-label="模块宽度"
+                      type="number"
+                      min={120}
+                      max={10000}
+                      value={Math.round(frame.width)}
+                      onChange={(event) => {
+                        const width = Number(event.target.value);
+                        if (width >= 120 && width <= 10000)
+                          updateFrame({ ...frame, width });
+                      }}
+                    />
+                  </label>
+                  {selectedEntry.node.type === "surface" && (
+                    <>
                       <label>
-                        高度
-                        <input
-                          aria-label="模块高度"
-                          type="number"
-                          min={180}
-                          max={5000}
-                          value={frame.height ?? 460}
-                          onChange={(event) => {
-                            const height = Number(event.target.value);
-                            if (height >= 180 && height <= 5000)
-                              updateFrame({ ...frame, height });
-                          }}
-                        />
+                        高度方式
+                        <select
+                          aria-label="模块高度方式"
+                          value={frame.heightMode ?? "fixed"}
+                          onChange={(event) =>
+                            updateFrame({
+                              ...frame,
+                              heightMode: event.target.value as
+                                "fixed" | "auto",
+                            })
+                          }
+                        >
+                          <option value="fixed">固定窗口</option>
+                          {surfaceKind(selectedEntry.node) === "page" && (
+                            <option value="auto">随内容增长</option>
+                          )}
+                        </select>
                       </label>
-                    )}
-                  </>
-                )}
-              </>
-            )}
-            <label>
-              所属容器
-              <select
-                aria-label="所属容器"
-                value={selectedEntry.parent?.attrs?.id ?? ""}
-                onChange={(event) => {
-                  const parentId = event.target.value;
-                  runtime.commit(
-                    moveNode(current.current, inspecting!, parentId, {
-                      ...(frame ?? { width: 640 }),
-                      x: 0,
-                      y: 0,
-                    }),
-                  );
-                  inspect(null);
-                  focusSurface(parentId);
-                  requestReveal(inspecting);
-                }}
-              >
-                {containerOptions(document, inspecting!).map((node) => (
-                  <option key={node.attrs!.id} value={node.attrs!.id}>
-                    {node === document.content ? "根 " : ""}
-                    {nodeName(node)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="surface-inspector-actions">
-              {[-1, 1].map((delta) => (
-                <button
-                  type="button"
-                  key={delta}
-                  onClick={() => {
-                    const entry = findSurfaceNode(
-                        current.current,
-                        inspecting!,
-                      )!,
-                      parent = entry.parent!;
-                    const index = parent.content!.indexOf(entry.node);
-                    const next = moveNode(
-                      current.current,
-                      inspecting!,
-                      parent.attrs?.id,
-                      undefined,
-                      Math.max(
-                        0,
-                        Math.min(parent.content!.length - 1, index + delta),
-                      ),
+                      {frame.heightMode !== "auto" && (
+                        <label>
+                          高度
+                          <input
+                            aria-label="模块高度"
+                            type="number"
+                            min={180}
+                            max={5000}
+                            value={frame.height ?? 460}
+                            onChange={(event) => {
+                              const height = Number(event.target.value);
+                              if (height >= 180 && height <= 5000)
+                                updateFrame({ ...frame, height });
+                            }}
+                          />
+                        </label>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+              <label>
+                所属容器
+                <select
+                  aria-label="所属容器"
+                  value={selectedEntry.parent?.attrs?.id ?? ""}
+                  onChange={(event) => {
+                    const parentId = event.target.value;
+                    runtime.commit(
+                      moveNode(current.current, inspecting!, parentId, {
+                        ...(frame ?? { width: 640 }),
+                        x: 0,
+                        y: 0,
+                      }),
                     );
-                    const newParent = findSurfaceNode(
-                      next,
-                      parent.attrs!.id,
-                    )!.node;
-                    const views = next.surfaceViews![parent.attrs!.id];
-                    if (views)
-                      views.readingOrder = newParent.content!.map(
-                        (node) => node.attrs!.id,
-                      );
-                    runtime.commit(next);
+                    inspect(null);
+                    focusSurface(parentId);
+                    requestReveal(inspecting);
                   }}
                 >
-                  {delta < 0 ? "向前排列" : "向后排列"}
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                runtime.commit(removeNode(current.current, inspecting!));
-                inspect(null);
-                select(null);
-              }}
-            >
-              删除模块
-            </button>
-          </aside>
-        )}
-      </div>
-    </Context.Provider>
+                  {containerOptions(document, inspecting!).map((node) => (
+                    <option key={node.attrs!.id} value={node.attrs!.id}>
+                      {node === document.content ? "根 " : ""}
+                      {nodeName(node)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="surface-inspector-actions">
+                {[-1, 1].map((delta) => (
+                  <button
+                    type="button"
+                    key={delta}
+                    onClick={() => {
+                      const entry = findSurfaceNode(
+                          current.current,
+                          inspecting!,
+                        )!,
+                        parent = entry.parent!;
+                      const index = parent.content!.indexOf(entry.node);
+                      const next = moveNode(
+                        current.current,
+                        inspecting!,
+                        parent.attrs?.id,
+                        undefined,
+                        Math.max(
+                          0,
+                          Math.min(parent.content!.length - 1, index + delta),
+                        ),
+                      );
+                      const newParent = findSurfaceNode(
+                        next,
+                        parent.attrs!.id,
+                      )!.node;
+                      const views = next.surfaceViews![parent.attrs!.id];
+                      if (views)
+                        views.readingOrder = newParent.content!.map(
+                          (node) => node.attrs!.id,
+                        );
+                      runtime.commit(next);
+                    }}
+                  >
+                    {delta < 0 ? "向前排列" : "向后排列"}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  runtime.commit(removeNode(current.current, inspecting!));
+                  inspect(null);
+                  select(null);
+                }}
+              >
+                删除模块
+              </button>
+            </aside>
+          )}
+        </div>
+      </Context.Provider>
+    </AdditionalComponentsProvider>
   );
 }
 function containerOptions(document: ShowDocument, id: string) {
@@ -575,15 +612,6 @@ function ContainerView({
     id = node.attrs!.id,
     kind = surfaceKind(node),
     readOnly = runtime.readOnly;
-  const file = useRef<HTMLInputElement>(null),
-    imageTicket = useRef(0);
-  const [fileError, setFileError] = useState("");
-  useEffect(
-    () => () => {
-      imageTicket.current++;
-    },
-    [],
-  );
   const viewport = useRef<SurfaceHandle>(null),
     page = useRef<HTMLDivElement>(null);
   const [tool, setTool] = useState<DrawingTool | null>(null),
@@ -606,11 +634,16 @@ function ContainerView({
   }, [runtime.printing, persistKey]);
   useEffect(() => {
     const target = runtime.revealRequest;
-    if (
-      !target ||
-      !(node.content ?? []).some((child) => child.attrs?.id === target)
-    )
-      return;
+    if (!target) return;
+    const path = nodePaths(runtime.current.current)[target] ?? [];
+    const owner = [...path]
+      .reverse()
+      .find(
+        (parent) =>
+          findSurfaceNode(runtime.current.current, parent)?.node.type ===
+          "surface",
+      );
+    if (owner !== id) return;
     if (kind === "board" && !reading) viewport.current?.reveal(target);
     else
       requestAnimationFrame(() =>
@@ -622,50 +655,6 @@ function ContainerView({
       );
     runtime.requestReveal(null);
   }, [runtime.revealRequest]);
-  const insert = (kind: AddKind) => {
-    if (kind === "image") {
-      file.current?.click();
-      return;
-    }
-    const document = runtime.current.current;
-    const parent = findSurfaceNode(document, id)?.node;
-    if (!parent) return;
-    let child: JSONContent, frame: NodeLayout;
-    if (kind === "page" || kind === "board") {
-      child = createSurface(kind);
-      frame = {
-        x: 0,
-        y: 0,
-        width: 760,
-        height: 460,
-        heightMode:
-          kind === "page" && surfaceKind(node) === "page" ? "auto" : "fixed",
-      };
-    } else if (["flow", "grid", "free"].includes(kind)) {
-      const region = createRegion("内容区域", kind as "flow" | "grid" | "free");
-      child = region.node;
-      frame = region.frame;
-    } else {
-      child = {
-        type: "richText",
-        attrs: { id: crypto.randomUUID(), name: "文本" },
-        content: [{ type: "paragraph" }],
-      };
-      frame = { x: 0, y: 0, width: 420 };
-    }
-    if (surfaceKind(parent) === "board")
-      frame.x = Math.max(
-        0,
-        ...(parent.content ?? []).map((child) => {
-          const f = document.layout[child.attrs!.id];
-          return f ? f.x + f.width + 48 : 0;
-        }),
-      );
-    runtime.commit(addNode(document, child, frame, id));
-    runtime.select(child.attrs!.id);
-    runtime.activate(id);
-    runtime.requestReveal(child.attrs!.id);
-  };
   const actions: ObjectActions = {
     scale: 1,
     selected: runtime.selected,
@@ -690,130 +679,21 @@ function ContainerView({
           runtime.commit(removeNode(runtime.current.current, nodeId));
           runtime.select(null);
         },
-    addText: readOnly
+    addComponent: readOnly
       ? undefined
-      : (parentId) =>
-          runtime.commit(
-            addNode(
-              runtime.current.current,
-              {
-                type: "richText",
-                attrs: { id: crypto.randomUUID(), name: "文本" },
-                content: [{ type: "paragraph" }],
-              },
-              { x: 0, y: 0, width: 360 },
-              parentId,
-            ),
-          ),
+      : (parentId) => runtime.browseComponents(parentId),
   };
   const renderSurface = (child: JSONContent) => <ContainerView node={child} />;
-  const addMenu = !readOnly && (
-    <>
-      <details className="container-menu">
-        <summary aria-label={`添加到 ${nodeName(node)}`}>
-          <Plus size={14} />
-          添加
-        </summary>
-        <div>
-          {(
-            [
-              ["page", "Page 页面"],
-              ["board", "Board 白板"],
-              ["text", "文本"],
-              ["image", "图片"],
-              ["flow", "顺序分组"],
-              ["grid", "网格分组"],
-              ["free", "自由分组"],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              type="button"
-              key={value}
-              onClick={(event) => {
-                insert(value);
-                event.currentTarget.closest("details")!.open = false;
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </details>
-      <input
-        ref={file}
-        type="file"
-        className="hidden"
-        aria-label="添加图片文件"
-        accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
-        onChange={(event) => {
-          const image = event.target.files?.[0];
-          event.target.value = "";
-          if (!image) return;
-          if (
-            image.size > 8 * 1024 * 1024 ||
-            !/^image\/(png|jpeg|webp|gif|avif)$/.test(image.type)
-          ) {
-            setFileError("请选择 8 MB 以内的常见图片文件。");
-            return;
-          }
-          const ticket = ++imageTicket.current,
-            reader = new FileReader();
-          reader.onerror = () => {
-            if (ticket === imageTicket.current) setFileError("图片读取失败。");
-          };
-          reader.onload = () => {
-            if (
-              ticket !== imageTicket.current ||
-              !findSurfaceNode(runtime.current.current, id)
-            )
-              return;
-            const before = runtime.current.current;
-            if (
-              new TextEncoder().encode(JSON.stringify(before)).length +
-                String(reader.result).length +
-                4096 >
-              MAX_ARTIFACT_BYTES
-            ) {
-              setFileError("图片会超出页面的 10 MB 保存上限，请先缩小图片。");
-              return;
-            }
-            const parent = findSurfaceNode(before, id)!.node;
-            const x =
-              kind === "board"
-                ? Math.max(
-                    0,
-                    ...(parent.content ?? []).map((node) => {
-                      const frame = before.layout[node.attrs!.id];
-                      return frame ? frame.x + frame.width + 48 : 0;
-                    }),
-                  )
-                : 0;
-            const node = {
-              type: "image",
-              attrs: {
-                id: crypto.randomUUID(),
-                name: image.name.slice(0, 200),
-                alt: image.name,
-                src: reader.result,
-              },
-            };
-            runtime.commit(addNode(before, node, { x, y: 0, width: 480 }, id));
-            runtime.select(node.attrs.id);
-            runtime.requestReveal(node.attrs.id);
-            setFileError("");
-          };
-          reader.readAsDataURL(image);
-        }}
-      />
-      {fileError && (
-        <span className="container-file-error" role="alert">
-          {fileError}
-          <button type="button" onClick={() => setFileError("")}>
-            关闭
-          </button>
-        </span>
-      )}
-    </>
+  const addComponent = !readOnly && (
+    <button
+      type="button"
+      className="container-add-component"
+      aria-label={`添加组件到 ${nodeName(node)}`}
+      onClick={() => runtime.browseComponents(id)}
+    >
+      <Plus size={14} />
+      添加组件
+    </button>
   );
   if (kind === "page" || reading)
     return (
@@ -847,7 +727,7 @@ function ContainerView({
             />
             {!readOnly && (
               <div className="container-page-add" data-surface-ui>
-                {addMenu}
+                {addComponent}
               </div>
             )}
           </div>
@@ -907,7 +787,7 @@ function ContainerView({
           onExpand={runtime.expand}
           onMove={actions.move}
           onRemove={actions.remove}
-          onAddText={actions.addText}
+          onAddComponent={actions.addComponent}
           onViews={
             readOnly
               ? undefined
@@ -933,7 +813,7 @@ function ContainerView({
           }
           extraActions={
             <>
-              {addMenu}
+              {addComponent}
               {!readOnly && (
                 <>
                   <span className="surface-toolbar-divider" />

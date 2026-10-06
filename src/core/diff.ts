@@ -1,3 +1,4 @@
+import { insertComponent } from "../surface/component-insertion";
 import {
   isResource,
   upgradeResource,
@@ -342,6 +343,14 @@ export function applyOperations(
     if (!operation || typeof operation !== "object")
       throw new CoreError("INVALID_DATA", "Invalid page operation.");
     switch (operation.type) {
+      case "component.insert":
+        draft = insertComponent(
+          draft,
+          operation.parentId ?? null,
+          operation.kind,
+          operation.data,
+        ).document;
+        break;
       case "surface.upgrade":
         draft = upgradeResource(draft);
         break;

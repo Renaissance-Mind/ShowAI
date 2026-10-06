@@ -10,6 +10,7 @@ export const componentCategories = [
   { id: "table", label: "表格" },
   { id: "data", label: "数据" },
   { id: "flow", label: "流程" },
+  { id: "surface", label: "页面与白板" },
   { id: "other", label: "其他" },
 ] as const satisfies readonly { id: ComponentCategory; label: string }[];
 
@@ -28,6 +29,8 @@ const builtinCategories: Record<string, ComponentCategory> = {
   metrics: "data",
   playground: "data",
   flowchart: "flow",
+  page: "surface",
+  board: "surface",
 };
 
 export type CatalogCustomComponent = ComponentMetadata & {

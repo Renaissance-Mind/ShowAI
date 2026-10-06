@@ -87,6 +87,72 @@ test("external runtime records an executable launch and exposes only relevant gu
   );
 });
 
+test("native catalog guides insert Page and Board through the common component operation", async () => {
+  const project = await run([
+    "projects",
+    "create",
+    "--name",
+    "Native components",
+  ]);
+  const created = await run([
+    "pages",
+    "create",
+    "--project",
+    project.id,
+    "--title",
+    "Nested components",
+  ]);
+  let page = created;
+  for (const kind of ["board", "page"]) {
+    const guide = await run([
+      "catalog",
+      "describe",
+      kind,
+      "--scope",
+      "builtin",
+      "--view",
+      "guide",
+    ]);
+    expect(guide.usage.nodeType).toBe("surface");
+    expect(guide.next.source).toBeUndefined();
+    const operations = join(home, "native-component-operations.json");
+    const destination =
+      kind === "board"
+        ? page.document.content
+        : page.document.content.content.find(
+            (node: { type: string }) => node.type === "surface",
+          );
+    await writeFile(
+      operations,
+      JSON.stringify([
+        {
+          ...guide.usage.operation,
+          parentId: destination.attrs.id,
+        },
+      ]),
+    );
+    page = await run([
+      "pages",
+      "apply",
+      created.document.id,
+      "--project",
+      project.id,
+      "--input",
+      operations,
+      "--base-hash",
+      page.hash,
+    ]);
+  }
+  const board = page.document.content.content.find(
+    (node: { type: string }) => node.type === "surface",
+  );
+  expect(board.attrs.kind).toBe("board");
+  expect(
+    board.content.find((node: { type: string }) => node.type === "surface")
+      .attrs.kind,
+  ).toBe("page");
+});
+
 test("real CLI binds sessions, detects user changes and rejects stale writes", async () => {
   const project = await run([
     "projects",

@@ -144,7 +144,7 @@ try {
     .getByRole("button", { name: "关闭弹窗", exact: true })
     .click();
   const nav = page.getByRole("navigation", { name: "组件类型" });
-  for (const label of ["图片", "表格", "数据", "流程", "其他"]) {
+  for (const label of ["页面与白板", "图片", "表格", "数据", "流程", "其他"]) {
     await nav.getByRole("button", { name: label, exact: true }).click();
     await page.waitForFunction(
       (label) => {
@@ -170,6 +170,40 @@ try {
     await page.locator(".component-card-preview img").count(),
     builtinCount + 2,
   );
+  for (const name of ["Page 页面", "Board 白板"]) {
+    await page
+      .locator(".studio-component-card")
+      .filter({
+        has: page.getByRole("heading", { name: name + " 内置", exact: true }),
+      })
+      .click();
+    const nativeDialog = page.getByRole("dialog", { name, exact: true });
+    await nativeDialog
+      .locator(".native-component-preview .container-workspace")
+      .waitFor();
+    assert.equal(
+      await nativeDialog
+        .getByRole("button", { name: "定制组件", exact: true })
+        .count(),
+      0,
+    );
+    await nativeDialog
+      .getByLabel("组件示例", { exact: true })
+      .selectOption({ label: "内容示例" });
+    await nativeDialog
+      .getByText("文字、图片和组件都可以放在这里。", { exact: true })
+      .waitFor();
+    await page.screenshot({
+      path: join(
+        output,
+        name.startsWith("Page") ? "page-detail.png" : "board-detail.png",
+      ),
+      animations: "disabled",
+    });
+    await nativeDialog
+      .getByRole("button", { name: "关闭弹窗", exact: true })
+      .click();
+  }
   const preview = await api("components:thumbnail", {
     id: "text",
     scope: "builtin",

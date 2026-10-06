@@ -392,8 +392,15 @@ export class AgentService {
           integrity: input.integrity,
         });
     const summary = summarizeCatalog("component", component, projectId);
+    const native = "insertion" in component ? component.insertion : undefined;
     const next = Object.fromEntries(
-      ["guide", "schema", "examples", "dependencies", "source"].map((view) => [
+      [
+        "guide",
+        "schema",
+        "examples",
+        "dependencies",
+        ...(native ? [] : ["source"]),
+      ].map((view) => [
         view,
         describeCommand(summary, projectId, view as CatalogView),
       ]),
@@ -406,31 +413,47 @@ export class AgentService {
       return {
         ...summary,
         view,
-        usage: {
-          nodeType: "widget",
-          kind: builtin ? id : "custom",
-          reference: summary.ref,
-          node: {
-            type: "widget",
-            attrs: {
+        usage: native
+          ? {
+              nodeType: native.nodeType,
+              kind: id,
+              reference: summary.ref,
+              operation: {
+                type: "component.insert",
+                kind: id,
+                data: component.defaultData,
+              },
+              steps: [
+                "Read schema and examples for initial content.",
+                "Insert this component with component.insert and the destination parentId, using the current page hash.",
+                "Edit or nest its content directly, expand it, or save it as a template for reuse.",
+              ],
+            }
+          : {
+              nodeType: "widget",
               kind: builtin ? id : "custom",
-              data: builtin
-                ? {}
-                : {
-                    componentId: id,
-                    version: summary.version,
-                    integrity: summary.integrity,
-                    scope: summary.scope,
-                    props: {},
-                  },
+              reference: summary.ref,
+              node: {
+                type: "widget",
+                attrs: {
+                  kind: builtin ? id : "custom",
+                  data: builtin
+                    ? {}
+                    : {
+                        componentId: id,
+                        version: summary.version,
+                        integrity: summary.integrity,
+                        scope: summary.scope,
+                        props: {},
+                      },
+                },
+              },
+              steps: [
+                "Read schema for required props.",
+                "Choose an example only when it matches the content.",
+                "Insert a widget into the selected page using its current hash.",
+              ],
             },
-          },
-          steps: [
-            "Read schema for required props.",
-            "Choose an example only when it matches the content.",
-            "Insert a widget into the selected page using its current hash.",
-          ],
-        },
         next,
       };
     if (view === "schema") return { ...summary, view, schema, next };

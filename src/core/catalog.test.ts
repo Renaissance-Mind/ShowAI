@@ -280,6 +280,8 @@ describe("compiled React packages", () => {
       "gallery",
       "bookmark",
       "flowchart",
+      "page",
+      "board",
     ]);
     expect(
       builtins.every((item) => item.propsSchema && item.scenarios.length),
@@ -599,9 +601,15 @@ describe("compiled React packages", () => {
 });
 
 describe("component composition and editable primitives", () => {
-  it("compiles every builtin starting source through the shared SDK", async () => {
+  it("compiles editable builtin sources and identifies native container components", async () => {
     const home = await temporary();
     for (const item of listBuiltinComponents({ includeLegacy: true })) {
+      if (item.insertion) {
+        expect(() => readBuiltinComponentSource(item.kind)).toThrow(
+          /native container editing/,
+        );
+        continue;
+      }
       const original = readBuiltinComponentSource(item.kind);
       const compiled = await saveComponent(
         home,

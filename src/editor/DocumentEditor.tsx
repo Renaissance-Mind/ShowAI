@@ -734,9 +734,9 @@ export default function DocumentEditor({
         ? [
             {
               id: "custom-library",
-              title: "自定义组件",
-              description: "从组件库选择已安装的组件",
-              keywords: "custom component 自定义 组件",
+              title: "组件库",
+              description: "选择 Page、Board 或其他组件",
+              keywords: "page board custom component 页面 白板 自定义 组件",
               icon: <PanelTop size={20} />,
               group: "交互组件",
               run: onBrowseComponents,

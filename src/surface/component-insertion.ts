@@ -1,0 +1,106 @@
+import type { JSONContent } from "@tiptap/core";
+import type { ShowDocument } from "../types";
+import type { NodeLayout } from "./types";
+import { builtinComponent } from "../components/catalog";
+import { createSurface, upgradeResource, surfaceKind } from "./containers.mjs";
+import {
+  findSurfaceNode,
+  reconcileSurface,
+  remapSurfaceIds,
+} from "./document.mjs";
+import { validateDocument } from "../portable/validation.mjs";
+
+export function nativeComponentDocument(
+  kind: string,
+  data: Record<string, unknown>,
+) {
+  const definition = builtinComponent(kind);
+  if (!definition?.insertion)
+    throw new Error(`Component ${kind} is not a native container.`);
+  if (
+    Object.keys(data).some(
+      (key) => !["title", "content", "layout", "surfaceViews"].includes(key),
+    )
+  )
+    throw new Error("Unsupported container component property.");
+  const node = createSurface(
+    definition.insertion.surfaceKind,
+    data.title === undefined ? undefined : (data.title as string),
+  );
+  if (data.content !== undefined)
+    node.content = structuredClone(data.content) as JSONContent[];
+  return validateDocument({
+    id: crypto.randomUUID(),
+    title: "",
+    content: node,
+    ...(data.layout !== undefined ? { layout: data.layout } : {}),
+    ...(data.surfaceViews !== undefined
+      ? { surfaceViews: data.surfaceViews }
+      : {}),
+  });
+}
+/** Every catalog item enters the same insertion path; containers remain native nodes. */
+export function insertComponent(
+  source: ShowDocument,
+  parentId: string | null,
+  kind: string,
+  data: Record<string, unknown>,
+) {
+  if (!data || typeof data !== "object" || Array.isArray(data))
+    throw new Error("Component data must be an object.");
+  const document = upgradeResource(source);
+  const parent = parentId
+    ? findSurfaceNode(document, parentId)?.node
+    : document.content;
+  if (!parent || !["surface", "region"].includes(parent.type ?? ""))
+    throw new Error("Component destination must be a container.");
+  const definition = builtinComponent(kind);
+  if (!definition && kind !== "custom")
+    throw new Error(`Unknown component: ${kind}.`);
+  let node: JSONContent, frame: NodeLayout;
+  if (definition?.insertion) {
+    const incoming = remapSurfaceIds(nativeComponentDocument(kind, data));
+    node = incoming.content;
+    Object.assign(document.layout, incoming.layout);
+    Object.assign(document.surfaceViews, incoming.surfaceViews);
+    const free =
+      parent.type === "surface"
+        ? surfaceKind(parent) === "board"
+        : document.layout[parent.attrs!.id]?.mode === "free";
+    frame = {
+      x: 0,
+      y: 0,
+      width: 760,
+      height: 460,
+      heightMode: surfaceKind(node) === "page" && !free ? "auto" : "fixed",
+    };
+  } else {
+    node = {
+      type: "widget",
+      attrs: { id: crypto.randomUUID(), kind, data: structuredClone(data) },
+    };
+    frame = { x: 0, y: 0, width: 640 };
+  }
+  const siblings = parent.content ?? [];
+  if (
+    (parent.type === "surface" && surfaceKind(parent) === "board") ||
+    (parent.type === "region" &&
+      document.layout[parent.attrs!.id]?.mode === "free")
+  )
+    frame.x = Math.min(
+      1000000,
+      Math.max(
+        0,
+        ...siblings.map((sibling) => {
+          const f = document.layout[sibling.attrs!.id];
+          return f ? f.x + f.width + 48 : 0;
+        }),
+      ),
+    );
+  parent.content = [...siblings, node];
+  document.layout[node.attrs!.id] = frame;
+  return {
+    document: reconcileSurface(document),
+    nodeId: node.attrs!.id as string,
+  };
+}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, type RefObject } from "react";
 import {
   Blocks,
+  PanelsTopLeft,
   ChartNoAxesCombined,
   Code2,
   Image,
@@ -22,6 +23,7 @@ const categoryIcons = {
   table: Table2,
   data: ChartNoAxesCombined,
   flow: Workflow,
+  surface: PanelsTopLeft,
   other: Blocks,
 };
 

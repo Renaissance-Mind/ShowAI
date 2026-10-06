@@ -24,6 +24,8 @@ Every successful `--json` command returns `{ "ok": true, "data": ... }`. Failure
 
 New resources use artifact v3 and default to Page. Use `pages create --kind board` for a spatial workspace. `showai guide containers --json` describes recursive surfaces, parent-owned frames, per-surface views and drawing nodes. Content lives in the tree, frames in layout and saved views in surfaceViews. The project folder parentId differs from a content operation's container parentId.
 
+Page and Board are native entries in the component catalog. Read `catalog read page --view guide` or the Board equivalent. `component.insert` takes kind, data and optional parentId for both ordinary and native components; native insertion preserves the surface node and recursively remaps content and views. Native containers are customized through content/layout and templates.
+
 `surface.create` inserts a Page or Board, and `surface.wrap` wraps an existing surface while preserving its identity and descendants. Block operations edit the tree; surface.layout.set changes frames; view and reading-order operations accept a surfaceId. Supply the current base hash. surface.upgrade adapts older sources and the first managed save preserves original bytes and snapshots.
 
 Template application preserves container kind. Add `--page PAGE --base-hash HASH`, optionally `--parent SURFACE_ID`, to insert its root as a module. Every node, layout key and view reference is remapped together. Export selection may target any nested surface; it includes descendants and necessary ancestors.
