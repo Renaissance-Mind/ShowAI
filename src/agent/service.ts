@@ -926,6 +926,9 @@ export function errorResult(error: unknown) {
   return {
     code,
     message,
+    ...(error instanceof CoreError && error.currentRevision
+      ? { currentRevision: error.currentRevision }
+      : {}),
     ...(error instanceof CoreError && error.currentHash
       ? { currentHash: error.currentHash }
       : {}),

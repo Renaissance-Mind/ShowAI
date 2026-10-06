@@ -52,12 +52,14 @@ export interface SidebarOrganization {
 }
 
 export interface PageRecord {
+  revision?: string;
   document: ShowDocument;
   hash: string;
   path: string;
 }
 
 export interface PageSummary {
+  revision?: string;
   id: string;
   title: string;
   updatedAt: string;
@@ -130,6 +132,7 @@ export type PageOperation =
   | { type: "block.text.set"; blockId: string; text: string };
 
 export interface ApplyPageInput {
+  baseRevision?: string;
   baseHash: string;
   operations: PageOperation[];
 }
@@ -164,6 +167,8 @@ export type PageChange =
     };
 
 export interface PageDiff {
+  baseRevision?: string;
+  currentRevision?: string;
   projectId: string;
   pageId: string;
   baseHash: string;
@@ -183,15 +188,17 @@ export type CoreErrorCode =
 export class CoreError extends Error {
   readonly code: CoreErrorCode;
   readonly currentHash?: string;
+  readonly currentRevision?: string;
 
   constructor(
     code: CoreErrorCode,
     message: string,
-    details: { currentHash?: string } = {},
+    details: { currentHash?: string; currentRevision?: string } = {},
   ) {
     super(message);
     this.name = "CoreError";
     this.code = code;
     this.currentHash = details.currentHash;
+    this.currentRevision = details.currentRevision;
   }
 }

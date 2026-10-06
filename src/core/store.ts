@@ -30,6 +30,16 @@ import {
   normalizeDocument,
 } from "./diff";
 import { CoreError } from "./model";
+import { libraryMutations } from "./history-context";
+import {
+  workspaceRoot,
+  versionedLibrary,
+  logicalPath,
+  readLibraryFile,
+  writeLibraryFiles,
+  listLibraryDirectory,
+  mutateLibrary,
+} from "./library-runtime";
 import type {
   ApplyPageInput,
   FolderMetadata,
@@ -238,7 +248,7 @@ export class FileStore {
   }
 
   projectPath(projectId: string): string {
-    return join(this.root, "projects", assertId(projectId));
+    return join(workspaceRoot(this.root), "projects", assertId(projectId));
   }
 
   pagePath(projectId: string, pageId: string): string {
@@ -285,6 +295,8 @@ export class FileStore {
 
   private async readJson(path: string): Promise<unknown> {
     await this.safePath(path);
+    const managed = await readLibraryFile(this.root, path);
+    if (managed !== undefined) return JSON.parse(managed.toString("utf8"));
     let file;
     try {
       file = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
@@ -311,6 +323,14 @@ export class FileStore {
   }
 
   private async atomicWrite(path: string, source: string): Promise<void> {
+    const managed = logicalPath(this.root, path);
+    if (managed) {
+      await writeLibraryFiles(
+        this.root,
+        new Map([[managed, Buffer.from(source)]]),
+      );
+      return;
+    }
     await this.ensureDirectory(dirname(path));
     await this.safePath(path);
     const temporary = join(dirname(path), `.${randomUUID()}.tmp`);
@@ -338,6 +358,7 @@ export class FileStore {
   }
 
   private async withLock<T>(key: string, action: () => Promise<T>): Promise<T> {
+    if (versionedLibrary(this.root)) return mutateLibrary(this.root, action);
     const directory = join(this.root, ".locks");
     await this.ensureDirectory(directory);
     const lockName =
@@ -429,6 +450,36 @@ export class FileStore {
     }
   }
 
+  private async contentNames(
+    path: string,
+    kind: "directory" | "json",
+  ): Promise<string[]> {
+    const managed = await listLibraryDirectory(this.root, path);
+    if (managed)
+      return managed.filter(
+        (name) =>
+          !name.startsWith(".") &&
+          (kind === "directory" || name.endsWith(".json")),
+      );
+    await this.ensureDirectory(path);
+    const names: string[] = [];
+    for (const entry of await readdir(path, { withFileTypes: true })) {
+      if (entry.isSymbolicLink())
+        throw new CoreError(
+          "INVALID_PATH",
+          `Content entry cannot be a symbolic link: ${entry.name}`,
+        );
+      if (entry.name.startsWith(".")) continue;
+      if (
+        kind === "directory"
+          ? entry.isDirectory()
+          : entry.isFile() && entry.name.endsWith(".json")
+      )
+        names.push(entry.name);
+    }
+    return names;
+  }
+
   private async readProject(projectId: string): Promise<ProjectMetadata> {
     return validateProject(
       await this.readJson(join(this.projectPath(projectId), "project.json")),
@@ -439,7 +490,9 @@ export class FileStore {
   async readSidebar(): Promise<SidebarOrganization> {
     let value;
     try {
-      value = await this.readJson(join(this.root, "sidebar.json"));
+      value = await this.readJson(
+        join(workspaceRoot(this.root), "sidebar.json"),
+      );
     } catch (error) {
       if (error instanceof CoreError && error.code === "NOT_FOUND")
         return { groups: [], projectGroups: {} };
@@ -482,7 +535,7 @@ export class FileStore {
         throw new CoreError("INVALID_DATA", "Too many project groups.");
       sidebar.groups.push({ id: randomUUID(), name: normalized });
       await this.atomicWrite(
-        join(this.root, "sidebar.json"),
+        join(workspaceRoot(this.root), "sidebar.json"),
         JSON.stringify(sidebar, null, 2),
       );
       return sidebar;
@@ -508,7 +561,7 @@ export class FileStore {
         );
       } else group.name = normalized;
       await this.atomicWrite(
-        join(this.root, "sidebar.json"),
+        join(workspaceRoot(this.root), "sidebar.json"),
         JSON.stringify(sidebar, null, 2),
       );
       return sidebar;
@@ -532,7 +585,7 @@ export class FileStore {
         sidebar.projectGroups[projectId] = groupId;
       }
       await this.atomicWrite(
-        join(this.root, "sidebar.json"),
+        join(workspaceRoot(this.root), "sidebar.json"),
         JSON.stringify(sidebar, null, 2),
       );
       return sidebar;
@@ -542,17 +595,11 @@ export class FileStore {
   async listProjects(
     options: { includeArchived?: boolean } = {},
   ): Promise<ProjectSummary[]> {
-    const path = join(this.root, "projects");
-    await this.ensureDirectory(path);
+    const path = join(workspaceRoot(this.root), "projects");
+    const names = await this.contentNames(path, "directory");
     const projects: ProjectSummary[] = [];
-    for (const entry of await readdir(path, { withFileTypes: true })) {
-      if (entry.isSymbolicLink())
-        throw new CoreError(
-          "INVALID_PATH",
-          `Project directory cannot be a symbolic link: ${entry.name}`,
-        );
-      if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
-      const project = await this.readProject(entry.name);
+    for (const name of names) {
+      const project = await this.readProject(name);
       if (project.archived && !options.includeArchived) continue;
       const pages = await this.listPages(project.id, {
         includeArchived: !!options.includeArchived,
@@ -656,6 +703,13 @@ export class FileStore {
       ...(binding ? { binding, bindings: [binding] } : {}),
       ...(sourceDirectory ? { sourceDirectory } : {}),
     };
+    if (versionedLibrary(this.root)) {
+      await this.atomicWrite(
+        join(this.projectPath(project.id), "project.json"),
+        JSON.stringify(project, null, 2),
+      );
+      return { ...project, pageCount: 0 };
+    }
     const destination = this.projectPath(project.id);
     const staging = join(dirname(destination), `.create-${project.id}`);
     const syncDirectory = async (path: string) => {
@@ -910,7 +964,20 @@ export class FileStore {
         "INVALID_DATA",
         `Page id does not match its filename: ${pageId}`,
       );
-    return { document, hash: documentHash(document), path };
+    const library = versionedLibrary(this.root);
+    const state = libraryMutations.getStore();
+    const revision = library
+      ? await library.resourceRevision(
+          logicalPath(this.root, path)!,
+          state?.root === this.root ? (state.head ?? undefined) : undefined,
+        )
+      : undefined;
+    return {
+      document,
+      hash: documentHash(document),
+      path,
+      ...(revision ? { revision } : {}),
+    };
   }
 
   async listPages(
@@ -921,21 +988,10 @@ export class FileStore {
     if (project.archived && options.includeArchived === false) return [];
     const folders = project.folders ?? [];
     const path = join(this.projectPath(projectId), "pages");
-    await this.ensureDirectory(path);
+    const names = await this.contentNames(path, "json");
     const pages: PageSummary[] = [];
-    for (const entry of await readdir(path, { withFileTypes: true })) {
-      if (entry.isSymbolicLink())
-        throw new CoreError(
-          "INVALID_PATH",
-          `Page cannot be a symbolic link: ${entry.name}`,
-        );
-      if (
-        !entry.isFile() ||
-        !entry.name.endsWith(".json") ||
-        entry.name.startsWith(".")
-      )
-        continue;
-      const record = await this.readRecord(projectId, entry.name.slice(0, -5));
+    for (const name of names) {
+      const record = await this.readRecord(projectId, name.slice(0, -5));
       const parentId = record.document.parentId;
       const hasFolder =
         parentId !== null && folders.some((folder) => folder.id === parentId);
@@ -951,6 +1007,7 @@ export class FileStore {
         updatedAt: record.document.updatedAt,
         icon: record.document.icon,
         hash: record.hash,
+        ...(record.revision ? { revision: record.revision } : {}),
         blockCount: indexBlocks(record.document).size,
         parentId:
           options.includeArchived === false && !hasFolder ? null : parentId,
@@ -969,6 +1026,7 @@ export class FileStore {
     projectId: string,
     record: PageRecord,
   ): Promise<void> {
+    if (versionedLibrary(this.root)) return;
     const path = join(
       this.projectPath(projectId),
       "snapshots",
@@ -1135,17 +1193,50 @@ export class FileStore {
     return record;
   }
 
+  private checkPageRevision(current: PageRecord, provided?: string): void {
+    if (!versionedLibrary(this.root)) return;
+    const state = libraryMutations.getStore();
+    if (!state || state.root !== this.root)
+      throw new CoreError(
+        "INVALID_DATA",
+        "Page writes need a library transaction.",
+      );
+    const path = logicalPath(this.root, current.path)!;
+    // A transaction can continue editing a page it has already staged. Its first
+    // external baseline remains the condition for committing the complete operation.
+    if (!provided && state.changes.has(path)) {
+      state.expected.set(
+        path,
+        state.expected.get(path) ?? current.revision ?? null,
+      );
+      return;
+    }
+    if (!provided)
+      throw new CoreError(
+        "INVALID_DATA",
+        "Versioned page writes require the baseRevision returned by reading the page.",
+      );
+    if (current.revision !== provided)
+      throw new CoreError("CONFLICT", "The page has a newer revision.", {
+        currentHash: current.hash,
+        currentRevision: current.revision,
+      });
+    state.expected.set(path, provided);
+  }
+
   async savePage(
     projectId: string,
     pageId: string,
     document: ShowDocument,
     baseHash: string,
+    baseRevision?: string,
   ): Promise<PageRecord> {
     assertHash(baseHash);
     this.pagePath(projectId, pageId);
     await this.readProject(projectId);
     return this.withLock(`page-${projectId}-${pageId}`, async () => {
       const current = await this.readRecord(projectId, pageId);
+      this.checkPageRevision(current, baseRevision);
       if (current.hash !== baseHash)
         throw new CoreError(
           "CONFLICT",
@@ -1166,6 +1257,7 @@ export class FileStore {
     await this.readProject(projectId);
     return this.withLock(`page-${projectId}-${pageId}`, async () => {
       const current = await this.readRecord(projectId, pageId);
+      this.checkPageRevision(current, input.baseRevision);
       if (current.hash !== input.baseHash)
         throw new CoreError(
           "CONFLICT",
@@ -1186,6 +1278,38 @@ export class FileStore {
     pageId: string,
     sinceHash: string,
   ): Promise<PageDiff> {
+    const library = versionedLibrary(this.root);
+    if (library) {
+      if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(sinceHash))
+        throw new CoreError(
+          "INVALID_DATA",
+          "Versioned page diffs require a revision identifier.",
+        );
+      const current = await this.readPage(projectId, pageId);
+      const baseline = normalizeDocument(
+        parseArtifact(
+          JSON.parse(
+            (
+              await library.readFile(
+                logicalPath(this.root, current.path)!,
+                sinceHash,
+              )
+            ).toString("utf8"),
+          ),
+        ).document,
+      );
+      const baseHash = documentHash(baseline);
+      return {
+        projectId,
+        pageId,
+        baseHash,
+        currentHash: current.hash,
+        baseRevision: sinceHash,
+        currentRevision: current.revision,
+        changed: baseHash !== current.hash,
+        changes: diffDocuments(baseline, current.document),
+      };
+    }
     assertHash(sinceHash);
     const current = await this.readPage(projectId, pageId);
     const path = join(

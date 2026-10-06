@@ -22,6 +22,13 @@ type NodeValue = {
 };
 const digest = (bytes: Buffer) =>
   createHash("sha256").update(bytes).digest("hex");
+function jsonEnvelope(path: string): boolean {
+  // Component source fingerprints cover exact bytes, including JSON formatting.
+  return (
+    path.endsWith(".json") &&
+    (!/\/components\//.test(path) || path.endsWith("/compiled.json"))
+  );
+}
 
 /** Extract only actual data URLs. Slot locations avoid reserving keys in component props. */
 function encodeJson(value: unknown, files: FileChanges): Buffer {
@@ -127,7 +134,7 @@ function nodePath(path: string, id: string): string {
 /** Storage splits pages, while callers and portable exports keep full readable artifacts. */
 export function encodeFile(path: string, bytes: Buffer): FileChanges {
   const files: FileChanges = new Map();
-  if (!path.endsWith(".json")) {
+  if (!jsonEnvelope(path)) {
     files.set(path, bytes);
     return files;
   }
@@ -166,7 +173,7 @@ export async function decodeFile(
   read: (path: string) => Promise<Buffer>,
 ): Promise<Buffer> {
   const bytes = await read(path);
-  if (!path.endsWith(".json")) return bytes;
+  if (!jsonEnvelope(path)) return bytes;
   const value = (await decodeJson(bytes, read)) as {
     document?: { content: unknown };
   };

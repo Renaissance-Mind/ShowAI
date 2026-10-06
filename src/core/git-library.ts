@@ -14,6 +14,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { CoreError } from "./model";
 import { encodeFile, decodeFile, nodePrefix } from "./history-codec";
 import { withLibraryLock } from "./library-lock";
+import { libraryMutations } from "./history-context";
 import {
   resourceForPath,
   type ChangeContext,
@@ -61,7 +62,9 @@ function assertPath(path: string): string {
     path.includes("\\") ||
     /[\x00-\x1f]/.test(path) ||
     path.split("/").some((part) => !part || part === "." || part === "..") ||
-    !/^(projects\/|packages\/|assets\/|sidebar\.json$)/.test(path)
+    !/^(projects\/|packages\/|assets\/|publications\/|sidebar\.json$)/.test(
+      path,
+    )
   )
     throw new CoreError(
       "INVALID_PATH",
@@ -447,182 +450,231 @@ export class GitLibrary {
     return result;
   }
 
+  async transaction<T>(
+    context: ChangeContext,
+    action: () => Promise<T>,
+  ): Promise<{ value: T; entry: HistoryEntry | null }> {
+    const nested = libraryMutations.getStore();
+    if (nested?.root === this.root)
+      return { value: await action(), entry: null };
+    await this.manifest();
+    return withLibraryLock(this.root, async () => {
+      await this.recoverUnlocked();
+      const state = {
+        root: this.root,
+        head: await this.head(),
+        changes: new Map<string, Buffer | null>(),
+        expected: new Map<string, string | null>(),
+      };
+      const value = await libraryMutations.run(state, action);
+      const entry = await this.writeUnlocked(
+        state.changes,
+        context,
+        state.expected,
+      );
+      return { value, entry };
+    });
+  }
+
+  async stageFiles(
+    changes: FileChanges,
+    expected?: Map<string, string | null>,
+  ): Promise<void> {
+    const state = libraryMutations.getStore();
+    if (!state || state.root !== this.root)
+      throw new CoreError(
+        "INVALID_DATA",
+        "Staged content needs an active library transaction.",
+      );
+    for (const [path, bytes] of changes)
+      state.changes.set(assertPath(path), bytes);
+    for (const [path, revision] of expected ?? []) {
+      if (state.expected.has(path) && state.expected.get(path) !== revision)
+        throw new CoreError(
+          "CONFLICT",
+          "A transaction supplied incompatible resource baselines.",
+        );
+      state.expected.set(assertPath(path), revision);
+    }
+  }
+
   async writeFiles(
     changes: FileChanges,
     context: ChangeContext,
     expected?: Map<string, string | null>,
   ): Promise<HistoryEntry | null> {
     await this.manifest();
-    return withLibraryLock(this.root, async () => {
-      await this.recoverUnlocked();
-      const parent = await this.head();
-      const operationId = context.operationId ?? randomUUID();
-      if (
-        !operationId ||
-        operationId.length > 1000 ||
-        /[\x00-\x1f]/.test(operationId)
-      )
-        throw new CoreError("INVALID_DATA", "Invalid operation identifier.");
-      const receiptPath = join(
-        this.root,
-        "local",
-        "receipts",
-        `${sha(operationId)}.json`,
-      );
-      const receipt = await readFile(receiptPath, "utf8").then(
-        (value) => JSON.parse(value) as HistoryEntry,
-        (error: NodeJS.ErrnoException) => {
-          if (error.code === "ENOENT") return undefined;
-          throw error;
-        },
-      );
-      const request = createHash("sha256");
-      request.update(JSON.stringify({ ...context, operationId: undefined }));
-      for (const [path, bytes] of [...changes].sort(([a], [b]) =>
-        a.localeCompare(b),
-      )) {
-        request
-          .update(assertPath(path))
-          .update("\0")
-          .update(bytes === null ? "delete\0" : "write\0");
-        if (bytes !== null) request.update(bytes);
+    return withLibraryLock(this.root, () =>
+      this.writeUnlocked(changes, context, expected),
+    );
+  }
+
+  private async writeUnlocked(
+    changes: FileChanges,
+    context: ChangeContext,
+    expected?: Map<string, string | null>,
+  ): Promise<HistoryEntry | null> {
+    await this.recoverUnlocked();
+    const parent = await this.head();
+    const operationId = context.operationId ?? randomUUID();
+    if (
+      !operationId ||
+      operationId.length > 1000 ||
+      /[\x00-\x1f]/.test(operationId)
+    )
+      throw new CoreError("INVALID_DATA", "Invalid operation identifier.");
+    const receiptPath = join(
+      this.root,
+      "local",
+      "receipts",
+      `${sha(operationId)}.json`,
+    );
+    const receipt = await readFile(receiptPath, "utf8").then(
+      (value) => JSON.parse(value) as HistoryEntry,
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return undefined;
+        throw error;
+      },
+    );
+    const request = createHash("sha256");
+    request.update(JSON.stringify({ ...context, operationId: undefined }));
+    for (const [path, bytes] of [...changes].sort(([a], [b]) =>
+      a.localeCompare(b),
+    )) {
+      request
+        .update(assertPath(path))
+        .update("\0")
+        .update(bytes === null ? "delete\0" : "write\0");
+      if (bytes !== null) request.update(bytes);
+    }
+    const requestHash = request.digest("hex");
+    if (receipt) {
+      if (receipt.requestHash !== requestHash)
+        throw new CoreError(
+          "CONFLICT",
+          "This operation ID was already used for different edits.",
+        );
+      return receipt;
+    }
+    for (const [path, revision] of expected ?? []) {
+      if ((await this.resourceRevision(path, parent ?? undefined)) !== revision)
+        throw new CoreError(
+          "CONFLICT",
+          `The resource has newer changes: ${path}`,
+          { currentRevision: parent ?? undefined },
+        );
+    }
+    const record: ChangeRecord = {
+      ...context,
+      format: "showai-change",
+      version: 1,
+      operationId,
+      requestHash,
+      at: new Date().toISOString(),
+      paths: [...changes.keys()].map(assertPath),
+      resources: [
+        ...new Map(
+          [...changes.keys()].map((path) => {
+            const resource = resourceForPath(assertPath(path));
+            return [resource.path, resource];
+          }),
+        ).values(),
+      ],
+    };
+    // Validate the same metadata shape we accept when reading historical commits.
+    parseRecord(changeMessage(record));
+    if (!changes.size) return null;
+    const existing = await this.tree(parent ?? undefined);
+    const encoded: FileChanges = new Map();
+    for (const [path, bytes] of changes) {
+      if (/^projects\/[^/]+\/pages\/[^/]+\.json$/.test(path))
+        for (const entry of existing)
+          if (entry.path.startsWith(nodePrefix(path)))
+            encoded.set(entry.path, null);
+      if (bytes === null) encoded.set(path, null);
+      else
+        for (const [name, contents] of encodeFile(path, bytes))
+          encoded.set(name, contents);
+    }
+    const transaction = join(this.root, "local", "transactions", randomUUID());
+    const id = transaction.split(sep).at(-1)!;
+    const journal: Journal = { id, parent, paths: record.paths };
+    await mkdir(transaction, { recursive: true });
+    await this.atomicFile(
+      join(transaction, "journal.json"),
+      Buffer.from(JSON.stringify(journal)),
+    );
+    // Persist incoming edits as recoverable drafts before touching the committed head.
+    for (const [path, bytes] of changes)
+      if (bytes !== null)
+        await this.atomicFile(join(transaction, "input", path), bytes);
+    const temporaryRef = `refs/showai/transactions/${id}`;
+    const chunks: Buffer[] = [];
+    let mark = 0;
+    const marks = new Map<string, number>();
+    for (const [path, bytes] of encoded)
+      if (bytes !== null) {
+        marks.set(path, ++mark);
+        chunks.push(
+          Buffer.from(`blob\nmark :${mark}\ndata ${bytes.length}\n`),
+          bytes,
+          Buffer.from("\n"),
+        );
       }
-      const requestHash = request.digest("hex");
-      if (receipt) {
-        if (receipt.requestHash !== requestHash)
-          throw new CoreError(
-            "CONFLICT",
-            "This operation ID was already used for different edits.",
-          );
-        return receipt;
-      }
-      for (const [path, revision] of expected ?? []) {
-        if (
-          (await this.resourceRevision(path, parent ?? undefined)) !== revision
-        )
-          throw new CoreError(
-            "CONFLICT",
-            `The resource has newer changes: ${path}`,
-            { currentHash: parent ?? undefined },
-          );
-      }
-      const record: ChangeRecord = {
-        ...context,
-        format: "showai-change",
-        version: 1,
-        operationId,
-        requestHash,
-        at: new Date().toISOString(),
-        paths: [...changes.keys()].map(assertPath),
-        resources: [
-          ...new Map(
-            [...changes.keys()].map((path) => {
-              const resource = resourceForPath(assertPath(path));
-              return [resource.path, resource];
-            }),
-          ).values(),
-        ],
-      };
-      // Validate the same metadata shape we accept when reading historical commits.
-      parseRecord(changeMessage(record));
-      if (!changes.size) return null;
-      const existing = await this.tree(parent ?? undefined);
-      const encoded: FileChanges = new Map();
-      for (const [path, bytes] of changes) {
-        if (/^projects\/[^/]+\/pages\/[^/]+\.json$/.test(path))
-          for (const entry of existing)
-            if (entry.path.startsWith(nodePrefix(path)))
-              encoded.set(entry.path, null);
-        if (bytes === null) encoded.set(path, null);
-        else
-          for (const [name, contents] of encodeFile(path, bytes))
-            encoded.set(name, contents);
-      }
-      const transaction = join(
-        this.root,
-        "local",
-        "transactions",
-        randomUUID(),
-      );
-      const id = transaction.split(sep).at(-1)!;
-      const journal: Journal = { id, parent, paths: record.paths };
-      await mkdir(transaction, { recursive: true });
-      await this.atomicFile(
-        join(transaction, "journal.json"),
-        Buffer.from(JSON.stringify(journal)),
-      );
-      // Persist incoming edits as recoverable drafts before touching the committed head.
-      for (const [path, bytes] of changes)
-        if (bytes !== null)
-          await this.atomicFile(join(transaction, "input", path), bytes);
-      const temporaryRef = `refs/showai/transactions/${id}`;
-      const chunks: Buffer[] = [];
-      let mark = 0;
-      const marks = new Map<string, number>();
-      for (const [path, bytes] of encoded)
-        if (bytes !== null) {
-          marks.set(path, ++mark);
-          chunks.push(
-            Buffer.from(`blob\nmark :${mark}\ndata ${bytes.length}\n`),
-            bytes,
-            Buffer.from("\n"),
-          );
-        }
-      const message = Buffer.from(changeMessage(record));
-      const actorLabel =
-        context.actor.label ??
-        (context.actor.kind === "agent"
-          ? `${context.actor.harness ?? "agent"}:${context.actor.sessionId ?? "unknown"}`
-          : context.actor.kind);
-      if (/[<>\r\n\x00]/.test(actorLabel))
-        throw new CoreError("INVALID_DATA", "Invalid actor label.");
+    const message = Buffer.from(changeMessage(record));
+    const actorLabel =
+      context.actor.label ??
+      (context.actor.kind === "agent"
+        ? `${context.actor.harness ?? "agent"}:${context.actor.sessionId ?? "unknown"}`
+        : context.actor.kind);
+    if (/[<>\r\n\x00]/.test(actorLabel))
+      throw new CoreError("INVALID_DATA", "Invalid actor label.");
+    chunks.push(
+      Buffer.from(
+        `commit ${temporaryRef}\nauthor ${actorLabel} <showai@localhost> ${Math.floor(Date.parse(record.at) / 1000)} +0000\ncommitter ShowAI <showai@localhost> ${Math.floor(Date.parse(record.at) / 1000)} +0000\ndata ${message.length}\n`,
+      ),
+      message,
+      Buffer.from(`\n${parent ? `from ${parent}\n` : ""}`),
+    );
+    for (const [path, bytes] of encoded)
       chunks.push(
         Buffer.from(
-          `commit ${temporaryRef}\nauthor ${actorLabel} <showai@localhost> ${Math.floor(Date.parse(record.at) / 1000)} +0000\ncommitter ShowAI <showai@localhost> ${Math.floor(Date.parse(record.at) / 1000)} +0000\ndata ${message.length}\n`,
+          bytes === null
+            ? `D ${JSON.stringify(path)}\n`
+            : `M 100644 :${marks.get(path)} ${JSON.stringify(path)}\n`,
         ),
-        message,
-        Buffer.from(`\n${parent ? `from ${parent}\n` : ""}`),
       );
-      for (const [path, bytes] of encoded)
-        chunks.push(
-          Buffer.from(
-            bytes === null
-              ? `D ${JSON.stringify(path)}\n`
-              : `M 100644 :${marks.get(path)} ${JSON.stringify(path)}\n`,
-          ),
-        );
-      chunks.push(Buffer.from("\ndone\n"));
-      await this.command(
-        ["fast-import", "--quiet", "--done"],
-        Buffer.concat(chunks),
-      );
-      const revision = (await this.command(["rev-parse", temporaryRef]))
-        .toString("utf8")
-        .trim();
-      if (!oid(revision))
-        throw new CoreError("INVALID_DATA", "Git returned an invalid commit.");
-      journal.candidate = revision;
-      await this.atomicFile(
-        join(transaction, "journal.json"),
-        Buffer.from(JSON.stringify(journal)),
-      );
-      await this.command([
-        "update-ref",
-        CURRENT,
-        revision,
-        parent ?? "0".repeat(revision.length),
-      ]);
-      const entry: HistoryEntry = {
-        ...record,
-        revision,
-        parents: parent ? [parent] : [],
-      };
-      await this.materialize(record.paths, revision);
-      await this.atomicFile(receiptPath, Buffer.from(JSON.stringify(entry)));
-      await this.command(["update-ref", "-d", temporaryRef]);
-      await rm(transaction, { recursive: true });
-      return entry;
-    });
+    chunks.push(Buffer.from("\ndone\n"));
+    await this.command(
+      ["fast-import", "--quiet", "--done"],
+      Buffer.concat(chunks),
+    );
+    const revision = (await this.command(["rev-parse", temporaryRef]))
+      .toString("utf8")
+      .trim();
+    if (!oid(revision))
+      throw new CoreError("INVALID_DATA", "Git returned an invalid commit.");
+    journal.candidate = revision;
+    await this.atomicFile(
+      join(transaction, "journal.json"),
+      Buffer.from(JSON.stringify(journal)),
+    );
+    await this.command([
+      "update-ref",
+      CURRENT,
+      revision,
+      parent ?? "0".repeat(revision.length),
+    ]);
+    const entry: HistoryEntry = {
+      ...record,
+      revision,
+      parents: parent ? [parent] : [],
+    };
+    await this.materialize(record.paths, revision);
+    await this.atomicFile(receiptPath, Buffer.from(JSON.stringify(entry)));
+    await this.command(["update-ref", "-d", temporaryRef]);
+    await rm(transaction, { recursive: true });
+    return entry;
   }
 
   private async atomicFile(path: string, bytes: Buffer): Promise<void> {
