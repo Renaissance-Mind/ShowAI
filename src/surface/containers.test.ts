@@ -137,6 +137,24 @@ describe("recursive Page and Board containers", () => {
     expect(wrapped.layout[wrapper.attrs!.id].heightMode).toBe("fixed");
     expect(() => validateDocument(wrapped)).not.toThrow();
   });
+  it("keeps a legacy document title in metadata without adding a duplicate body heading", () => {
+    const source = blankDocument();
+    source.title = "Original report";
+    source.content.content = [
+      {
+        type: "paragraph",
+        attrs: { id: "paragraph" },
+        content: [{ type: "text", text: "Original content" }],
+      },
+    ];
+    const upgraded = upgradeResource(source);
+    expect(upgraded.content.content).toEqual(source.content.content);
+    expect(upgraded.title).toBe(source.title);
+    expect(upgraded.content.attrs!.name).toBe(source.title);
+    expect(
+      upgradeResource(source, { includeTitle: false }).content.attrs!.name,
+    ).toBe("Page");
+  });
   it("wraps either kind without copying or discarding the original surface", () => {
     const original = fixture(),
       id = original.content.attrs!.id;

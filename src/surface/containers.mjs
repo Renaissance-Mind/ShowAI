@@ -119,15 +119,13 @@ export function upgradeResource(source, { includeTitle = true } = {}) {
   ) {
     assignSurfaceIds(page, { repairLegacy: true });
     const content = page.content.content ?? [];
-    if (includeTitle && page.title)
-      content.unshift({
-        type: "heading",
-        attrs: { level: 1 },
-        content: [{ type: "text", text: page.title }],
-      });
     page.content = {
       type: "surface",
-      attrs: { id: rootId, kind: "page", name: "Page" },
+      attrs: {
+        id: rootId,
+        kind: "page",
+        name: includeTitle && page.title ? page.title.slice(0, 200) : "Page",
+      },
       content,
     };
     page.layout = {};
