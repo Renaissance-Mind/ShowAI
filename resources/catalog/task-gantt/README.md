@@ -1,6 +1,6 @@
 # 任务管理甘特图
 
-独立 React 组件包，入口接收 `{ data, onChange, readOnly }`。版本 `1.2.1`。
+独立 React 组件包，入口接收 `{ data, onChange, readOnly }`。版本 `1.2.2`。
 
 `data` 包含 `title`、可选 `description`、可选 `columns` 和最多 200 个 `tasks`。每个任务需要唯一 `id`、`title`、`start`、`end`（`YYYY-MM-DD`）和整数 `progress`（0–100）；可选 `owner`、`phase`、`dependencies`（前置任务 ID）、`milestone` 、`parentId`（父任务 ID）及 `color`（任务颜色）。日期按整天计算，包含结束日，项目跨度最多 10 年。
 

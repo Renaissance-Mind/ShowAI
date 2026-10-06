@@ -5,7 +5,7 @@
   --sg-line: light-dark(#e9e9ef, #35353e);
   --sg-soft: light-dark(#f7f7fa, #24242c);
   --sg-accent: light-dark(#3e75b6, #9bc5f2);
-  --sg-accent-bg: light-dark(#edf4fc, #273344);
+  --sg-selection: light-dark(#f0f1f4, #2b2e34);
   --sg-bar: light-dark(#eaf2fc, #303d50);
   --sg-progress: light-dark(#bad3f0, #6b88ac);
   --sg-chart-mark: light-dark(#89b0db, #a5c8ed);
@@ -254,8 +254,21 @@
   height: 32px;
   min-height: 32px;
 }
-.sg-selected {
-  background: var(--sg-accent-bg);
+.sg-selected .sg-list-row {
+  background: var(--sg-selection);
+  box-shadow: inset 3px 0 0 var(--sg-accent);
+}
+.sg-selected .sg-task {
+  font-weight: 600;
+}
+.sg-selected .sg-bar:not(:focus-visible) {
+  box-shadow: 0 0 0 1.5px var(--sg-accent);
+}
+.sg-selected .sg-is-milestone .sg-bar {
+  box-shadow: none;
+}
+.sg-selected .sg-diamond {
+  box-shadow: 0 0 0 1.5px var(--sg-accent);
 }
 .sg-list-head,
 .sg-list-row {
