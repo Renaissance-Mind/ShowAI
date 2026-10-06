@@ -96,7 +96,7 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
         2,
       ),
     );
-    setDraftTitle(text(data.title, "数据图表"));
+    setDraftTitle(text(data.title));
     setDraftUnit(text(data.unit));
     setError("");
     setEditing(!editing);
@@ -135,16 +135,17 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
           ),
         })),
       ),
-      `${text(data.title, "图表")}.csv`,
+      `${text(data.title) || "图表"}.csv`,
       "text/csv;charset=utf-8",
     );
   return (
     <section
       className="sb-block sb-chart"
-      aria-label={text(data.title, "数据图表")}
+      aria-label={text(data.title) || "数据图表"}
     >
       <BlockHeader
-        title={text(data.title, "数据图表")}
+        title={text(data.title)}
+        defaultTitle="数据图表"
         description={text(data.description)}
         icon={<ChartNoAxesCombined size={17} />}
         editable={editable}
@@ -270,7 +271,7 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
             <svg
               viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
               role="img"
-              aria-label={`${text(data.title, "图表")}，${labels.length} 个数据点，${series.length} 个系列`}
+              aria-label={`${text(data.title) || "图表"}，${labels.length} 个数据点，${series.length} 个系列`}
               onPointerMove={(event) => {
                 const rect = event.currentTarget.getBoundingClientRect();
                 const relative =

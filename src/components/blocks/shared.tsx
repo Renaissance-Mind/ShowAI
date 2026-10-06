@@ -1,16 +1,70 @@
 import { Settings2, X } from "lucide-react";
 import type { ReactNode } from "react";
 
+const genericTitles = new Set([
+  "数据图表",
+  "数据库",
+  "关键指标",
+  "交互计算",
+  "图片画廊",
+  "交互流程图",
+  "G2 图表",
+  "柱状图",
+  "折线图",
+  "面积图",
+  "散点图",
+  "气泡图",
+  "分组柱状图",
+  "双向条形图",
+  "雷达图",
+  "径向条形图",
+  "平行坐标",
+  "回归曲线",
+  "饼图",
+  "环图",
+  "堆叠柱状图",
+  "堆叠面积图",
+  "玫瑰图",
+  "马赛克图",
+  "矩形树图",
+  "旭日图",
+  "漏斗图",
+  "直方图",
+  "箱线图",
+  "小提琴图",
+  "分布曲线",
+  "密度热力图",
+  "色块图",
+  "等高线图",
+  "茎叶图",
+  "桑基图",
+  "弦图",
+  "弧图",
+  "圆形打包图",
+  "韦恩图",
+  "甘特图",
+  "K 线图",
+  "Kagi 转向图",
+  "螺旋图",
+  "分级设色地图",
+  "点地图",
+  "气泡地图",
+  "仪表盘",
+  "子弹图",
+  "词云",
+]);
+
 export function BlockHeader({
   title,
+  defaultTitle,
   description,
-  icon,
   editable,
   editing,
   onEdit,
   children,
 }: {
-  title: string;
+  title?: string;
+  defaultTitle?: string;
   description?: string;
   icon?: ReactNode;
   editable?: boolean;
@@ -18,29 +72,42 @@ export function BlockHeader({
   onEdit?: () => void;
   children?: ReactNode;
 }) {
+  const caption = title?.trim();
+
+  const visibleTitle =
+    caption && caption !== defaultTitle && !genericTitles.has(caption)
+      ? caption
+      : "";
+  const hasCaption = Boolean(visibleTitle || description?.trim());
+  if (!hasCaption && !children && !editable) return null;
   return (
-    <div className="sb-header">
-      <div className="sb-heading">
-        <div className="sb-title">
-          {icon}
-          {title}
+    <div
+      className={`sb-header${hasCaption ? " has-caption" : ""}${editing ? " is-editing" : ""}`}
+    >
+      {hasCaption && (
+        <div className="sb-heading">
+          {visibleTitle && <div className="sb-title">{visibleTitle}</div>}
+          {description?.trim() && (
+            <p className="sb-description">{description}</p>
+          )}
         </div>
-        {description && <p className="sb-description">{description}</p>}
-      </div>
-      <div className="sb-actions">
-        {children}
-        {editable && (
-          <button
-            type="button"
-            className={`sb-icon-button ${editing ? "is-active" : ""}`}
-            onClick={onEdit}
-            aria-label={editing ? "关闭设置" : "编辑区块"}
-            title={editing ? "关闭设置" : "编辑区块"}
-          >
-            {editing ? <X size={16} /> : <Settings2 size={16} />}
-          </button>
-        )}
-      </div>
+      )}
+      {(children || editable) && (
+        <div className="sb-actions" role="group" aria-label="组件操作">
+          {children}
+          {editable && (
+            <button
+              type="button"
+              className={`sb-icon-button ${editing ? "is-active" : ""}`}
+              onClick={onEdit}
+              aria-label={editing ? "关闭设置" : "编辑区块"}
+              title={editing ? "关闭设置" : "编辑区块"}
+            >
+              {editing ? <X size={16} /> : <Settings2 size={16} />}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

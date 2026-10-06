@@ -249,7 +249,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     setPage(0);
   };
   const openEditor = () => {
-    setDraftTitle(text(data.title, "数据库"));
+    setDraftTitle(text(data.title));
     setDraftColumns(
       columns.map((column) => ({
         ...column,
@@ -316,10 +316,11 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   return (
     <section
       className="sb-block sb-database"
-      aria-label={text(data.title, "数据库")}
+      aria-label={text(data.title) || "数据库"}
     >
       <BlockHeader
-        title={text(data.title, "数据库")}
+        title={text(data.title)}
+        defaultTitle="数据库"
         icon={<Table2 size={17} />}
         editable={editable}
         editing={editing}
@@ -340,6 +341,87 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
         >
           <Download size={15} />
         </button>
+        <details className="sb-tools-menu">
+          <summary aria-label="数据库视图与筛选">视图与筛选</summary>
+          <div className="sb-database-toolbar">
+            <div className="sb-view-tabs">
+              <button
+                type="button"
+                className={view === "table" ? "is-active" : ""}
+                onClick={() => setView("table")}
+              >
+                <Table2 size={14} />
+                表格
+              </button>
+              <button
+                type="button"
+                className={view === "board" ? "is-active" : ""}
+                onClick={() => setView("board")}
+              >
+                <Columns3 size={14} />
+                看板
+              </button>
+            </div>
+            <div className="sb-database-tools">
+              <label className="sb-search">
+                <Search size={14} />
+                <input
+                  aria-label="搜索数据库"
+                  placeholder="搜索…"
+                  value={query}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setPage(0);
+                  }}
+                />
+                {query && (
+                  <button
+                    type="button"
+                    className="sb-icon-button"
+                    aria-label="清除搜索"
+                    onClick={() => setQuery("")}
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </label>
+              <button
+                type="button"
+                className={`sb-icon-button ${showFilter || filter.column ? "is-active" : ""}`}
+                aria-label="筛选数据库"
+                onClick={() => setShowFilter(!showFilter)}
+              >
+                <Filter size={15} />
+              </button>
+              {editable && (
+                <button
+                  type="button"
+                  className="sb-button sb-primary sb-small"
+                  onClick={() => addRow()}
+                >
+                  <Plus size={14} />
+                  新建
+                </button>
+              )}
+            </div>
+            {view === "board" && selectColumns.length > 0 && (
+              <div className="sb-board-grouping">
+                <span>分组依据</span>
+                <select
+                  aria-label="看板分组属性"
+                  value={groupColumn?.id ?? ""}
+                  onChange={(event) => setGrouping(event.target.value)}
+                >
+                  {selectColumns.map((column) => (
+                    <option key={column.id} value={column.id}>
+                      {column.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        </details>
       </BlockHeader>
       {editing && (
         <div className="sb-editor-panel">
@@ -432,68 +514,6 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           </div>
         </div>
       )}
-      <div className="sb-database-toolbar">
-        <div className="sb-view-tabs">
-          <button
-            type="button"
-            className={view === "table" ? "is-active" : ""}
-            onClick={() => setView("table")}
-          >
-            <Table2 size={14} />
-            表格
-          </button>
-          <button
-            type="button"
-            className={view === "board" ? "is-active" : ""}
-            onClick={() => setView("board")}
-          >
-            <Columns3 size={14} />
-            看板
-          </button>
-        </div>
-        <div className="sb-database-tools">
-          <label className="sb-search">
-            <Search size={14} />
-            <input
-              aria-label="搜索数据库"
-              placeholder="搜索…"
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setPage(0);
-              }}
-            />
-            {query && (
-              <button
-                type="button"
-                className="sb-icon-button"
-                aria-label="清除搜索"
-                onClick={() => setQuery("")}
-              >
-                <X size={12} />
-              </button>
-            )}
-          </label>
-          <button
-            type="button"
-            className={`sb-icon-button ${showFilter || filter.column ? "is-active" : ""}`}
-            aria-label="筛选数据库"
-            onClick={() => setShowFilter(!showFilter)}
-          >
-            <Filter size={15} />
-          </button>
-          {editable && (
-            <button
-              type="button"
-              className="sb-button sb-primary sb-small"
-              onClick={() => addRow()}
-            >
-              <Plus size={14} />
-              新建
-            </button>
-          )}
-        </div>
-      </div>
       {showFilter && (
         <div className="sb-filter-row">
           <Filter size={13} />
@@ -622,38 +642,9 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
               }
             />
           )}
-          {editable && (
-            <button
-              type="button"
-              className="sb-add-row"
-              onClick={() => addRow()}
-            >
-              <Plus size={14} />
-              新记录
-            </button>
-          )}
         </>
       ) : (
         <>
-          {selectColumns.length > 0 && (
-            <div className="sb-board-grouping">
-              <span>分组依据</span>
-              <select
-                aria-label="看板分组属性"
-                value={groupColumn?.id ?? ""}
-                onChange={(event) => setGrouping(event.target.value)}
-              >
-                {selectColumns.map((column) => (
-                  <option key={column.id} value={column.id}>
-                    {column.name}
-                  </option>
-                ))}
-              </select>
-              {editable && (
-                <span className="sb-board-hint">拖动卡片调整分组</span>
-              )}
-            </div>
-          )}
           {!groupColumn && (
             <p className="sb-inline-hint">
               添加一个「单选」属性，即可按选项分组。

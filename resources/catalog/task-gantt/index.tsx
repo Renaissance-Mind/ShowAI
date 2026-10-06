@@ -236,11 +236,9 @@ export default function TaskGantt({
     <section className="sg-gantt" aria-label={data.title}>
       <header className="sg-heading">
         <div>
-          <span className="sg-eyebrow">项目排期</span>
-          <h2>{data.title}</h2>
+          {data.title && !["任务甘特图", "项目排期", "甘特图"].includes(data.title.trim()) && <h2>{data.title}</h2>}
           {data.description && <p>{data.description}</p>}
         </div>
-        <span className="sg-mode">{readOnly ? "阅读模式" : "可编辑"}</span>
       </header>
       <div className="sg-summary">
         <span>
@@ -267,13 +265,7 @@ export default function TaskGantt({
         >
           <i style={{ width: `${mean}%` }} />
         </div>
-        <button
-          type="button"
-          aria-expanded={showColumns}
-          onClick={() => setShowColumns(!showColumns)}
-        >
-          显示列
-        </button>
+
       </div>
       {showColumns && (
         <div className="sg-column-settings" aria-label="显示列设置">
@@ -335,7 +327,16 @@ export default function TaskGantt({
           </div>
         </div>
       )}
+      <details className="sg-tools-menu">
+        <summary aria-label="甘特图视图与筛选">视图与筛选</summary>
       <div className="sg-toolbar">
+        <button
+          type="button"
+          aria-expanded={showColumns}
+          onClick={() => setShowColumns(!showColumns)}
+        >
+          显示列
+        </button>
         <label className="sg-search">
           <span className="sg-sr">搜索任务、负责人或阶段</span>
           <input
@@ -385,6 +386,7 @@ export default function TaskGantt({
           </button>
         )}
       </div>
+      </details>
       <div className="sg-range">
         <span>
           {date(origin)} — {date(origin + span - 1)}
@@ -411,7 +413,7 @@ export default function TaskGantt({
           </div>
         )}
         <span>
-          {rows.length} 行{readOnly ? " · 点击查看详情" : " · 拖动条形调整日期"}
+          {rows.length} 行
         </span>
       </div>
       <div className="sg-grid" style={gridStyle}>

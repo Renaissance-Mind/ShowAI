@@ -189,7 +189,7 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
   const visibleImages = images.filter((item) => safeImageUrl(item.src));
   const columns = data.columns === 1 || data.columns === 3 ? data.columns : 2;
   const openEditor = () => {
-    setDraftTitle(text(data.title, "图片画廊"));
+    setDraftTitle(text(data.title));
     setDraftImages(images.map((item) => ({ ...item })));
     setDraftColumns(columns);
     setError("");
@@ -250,10 +250,11 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
     <section
       ref={galleryRoot}
       className="sb-block sb-gallery"
-      aria-label={text(data.title, "图片画廊")}
+      aria-label={text(data.title) || "图片画廊"}
     >
       <BlockHeader
-        title={text(data.title, "图片画廊")}
+        title={text(data.title)}
+        defaultTitle="图片画廊"
         description={text(data.description)}
         icon={<Images size={17} />}
         editable={editable && !busy}

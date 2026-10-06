@@ -19,10 +19,7 @@ export default function ValueSlider({
   return (
     <section
       style={{
-        padding: 20,
-        border: "1px solid #dfe6df",
-        borderRadius: 12,
-        background: "#f7faf6",
+        padding: "8px 0",
         color: "#294733",
       }}
     >

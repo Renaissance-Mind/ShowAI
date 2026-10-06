@@ -47,10 +47,9 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
   return (
     <section
       className="sb-block sb-bookmark"
-      aria-label={text(data.title, "来源书签")}
+      aria-label={text(data.title) || "来源书签"}
     >
       <BlockHeader
-        title="来源书签"
         icon={<Bookmark size={16} />}
         editable={editable}
         editing={editing}

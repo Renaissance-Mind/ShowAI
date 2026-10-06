@@ -99,10 +99,11 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
   return (
     <section
       className="sb-block sb-playground"
-      aria-label={text(data.title, "交互计算")}
+      aria-label={text(data.title) || "交互计算"}
     >
       <BlockHeader
-        title={text(data.title, "交互计算")}
+        title={text(data.title)}
+        defaultTitle="交互计算"
         description={text(data.description)}
         icon={<FlaskConical size={17} />}
         editable={editable}

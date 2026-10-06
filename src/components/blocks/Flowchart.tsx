@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState, useId } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
-  Background,
-  BackgroundVariant,
   Handle,
   Position,
   MarkerType,
@@ -14,7 +12,7 @@ import {
   type Edge,
 } from "@xyflow/react";
 import { graphlib, layout } from "@dagrejs/dagre";
-import { Maximize2, Minus, Plus, Route } from "lucide-react";
+import { Maximize2, Minus, Plus, X } from "lucide-react";
 import type { BlockProps, BlockData } from "./types";
 import { BlockHeader, EmptyState } from "./shared";
 import { validateFlowchartData } from "./flowchart-contract.mjs";
@@ -79,7 +77,7 @@ function DiagramCard({ data, selected }: NodeProps<DiagramNode>) {
               : Position.Top
         }
       />
-      <span className="sf-node-kind">{kinds[data.kind ?? "query"]}</span>
+      {data.kind && <span className="sf-node-kind">{kinds[data.kind]}</span>}
       <strong>{data.label}</strong>
       {data.subtitle && (
         <span className="sf-node-subtitle">{data.subtitle}</span>
@@ -259,9 +257,23 @@ function FlowCanvas({
           instance.fitView({ padding: 0.08 });
         }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
         <FlowControls />
       </ReactFlow>
+      <details className="sf-node-picker">
+        <summary aria-label="节点列表">节点</summary>
+        <div>
+          {flow.nodes.map((item) => (
+            <button
+              type="button"
+              key={item.id}
+              aria-pressed={selected === item.id}
+              onClick={() => onSelect(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </details>
     </div>
   );
 }
@@ -274,10 +286,10 @@ export function FlowchartBlock({
   const data = validateFlowchartData(raw) as FlowData;
   const [flowId, setFlowId] = useState(data.flows[0]?.id ?? "");
   const flow = data.flows.find((item) => item.id === flowId) ?? data.flows[0];
-  const [selected, setSelected] = useState(flow?.nodes[0]?.id ?? "");
+  const [selected, setSelected] = useState("");
   useEffect(() => {
     if (flow && !flow.nodes.some((node) => node.id === selected))
-      setSelected(flow.nodes[0]?.id ?? "");
+      setSelected("");
   }, [flow, selected]);
   const node = flow?.nodes.find((item) => item.id === selected);
   const changeNode = (id: string, patch: Partial<FlowNode>) =>
@@ -295,11 +307,11 @@ export function FlowchartBlock({
       ),
     });
   return (
-    <section className="sb-block sf-block">
+    <section className="sb-block sf-block" aria-label={data.title || "流程图"}>
       <BlockHeader
-        title={data.title || "交互流程图"}
+        title={data.title}
+        defaultTitle="交互流程图"
         description={data.description}
-        icon={<Route size={17} />}
       />
       {!flow ? (
         <EmptyState
@@ -320,7 +332,7 @@ export function FlowchartBlock({
                   aria-controls={`${instanceId}-panel-${item.id}`}
                   onClick={() => {
                     setFlowId(item.id);
-                    setSelected(item.nodes[0]?.id ?? "");
+                    setSelected("");
                   }}
                 >
                   {item.label}
@@ -350,49 +362,49 @@ export function FlowchartBlock({
                 }}
               />
             </ReactFlowProvider>
-            <div className="sf-node-picker" aria-label="节点列表">
-              {flow.nodes.map((item) => (
-                <button
-                  type="button"
-                  key={item.id}
-                  aria-pressed={selected === item.id}
-                  onClick={() => setSelected(item.id)}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-            {node && (
-              <div className="sf-detail" aria-live="polite">
-                <div className="sf-detail-heading">
-                  <span>{kinds[node.kind ?? "query"]}</span>
-                  <strong>{node.label}</strong>
+            {node &&
+              (node.detail ||
+                node.commands?.length ||
+                node.references?.length ||
+                (!readOnly && onChange)) && (
+                <div className="sf-detail" aria-live="polite">
+                  <div className="sf-detail-heading">
+                    {node.kind && <span>{kinds[node.kind]}</span>}
+                    <strong>{node.label}</strong>
+                    <button
+                      type="button"
+                      className="sb-icon-button"
+                      aria-label="关闭节点详情"
+                      onClick={() => setSelected("")}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                  {node.detail && <p>{node.detail}</p>}
+                  {!!node.commands?.length && (
+                    <div className="sf-detail-group">
+                      <span>按需查询</span>
+                      {node.commands.map((command) => (
+                        <code key={command}>{command}</code>
+                      ))}
+                    </div>
+                  )}
+                  {!!node.references?.length && (
+                    <div className="sf-detail-group">
+                      <span>此时读取</span>
+                      {node.references.map((reference) => (
+                        <code key={reference}>{reference}</code>
+                      ))}
+                    </div>
+                  )}
+                  {!readOnly && onChange && (
+                    <NodeEditor
+                      node={node}
+                      onSave={(patch) => changeNode(node.id, patch)}
+                    />
+                  )}
                 </div>
-                {node.detail && <p>{node.detail}</p>}
-                {!!node.commands?.length && (
-                  <div className="sf-detail-group">
-                    <span>按需查询</span>
-                    {node.commands.map((command) => (
-                      <code key={command}>{command}</code>
-                    ))}
-                  </div>
-                )}
-                {!!node.references?.length && (
-                  <div className="sf-detail-group">
-                    <span>此时读取</span>
-                    {node.references.map((reference) => (
-                      <code key={reference}>{reference}</code>
-                    ))}
-                  </div>
-                )}
-                {!readOnly && onChange && (
-                  <NodeEditor
-                    node={node}
-                    onSave={(patch) => changeNode(node.id, patch)}
-                  />
-                )}
-              </div>
-            )}
+              )}
           </div>
         </>
       )}

@@ -25,7 +25,7 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
   const items: Metric[] = Array.isArray(data.items) ? data.items : [];
   const editable = Boolean(onChange && !readOnly);
   const openEditor = () => {
-    setDraftTitle(text(data.title, "关键指标"));
+    setDraftTitle(text(data.title));
     setDraftItems(items.map((item) => ({ ...item })));
     setEditing(!editing);
   };
@@ -38,10 +38,11 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
   return (
     <section
       className="sb-block sb-metrics"
-      aria-label={text(data.title, "关键指标")}
+      aria-label={text(data.title) || "关键指标"}
     >
       <BlockHeader
-        title={text(data.title, "关键指标")}
+        title={text(data.title)}
+        defaultTitle="关键指标"
         icon={<Gauge size={17} />}
         editable={editable}
         editing={editing}
