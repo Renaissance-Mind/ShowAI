@@ -31,13 +31,15 @@ import {
   injectArtifactIntoHtml,
   serializeArtifact,
 } from "../portable/validation.mjs";
-import type { ShowDocument } from "../types";
+import type { ShowArtifact, ShowDocument } from "../types";
+import { selectDocumentBlocks } from "../portable/selection.mjs";
 
 export type ExportFormat = "html" | "inline" | "site";
 export interface ExportOptions {
   root?: string;
   projectId: string;
   pageId?: string;
+  blockIds?: string[];
   format: ExportFormat;
   out: string;
   templatePath?: string;
@@ -49,6 +51,7 @@ export interface ExportResult {
   format: ExportFormat;
   projectId: string;
   pageIds: string[];
+  blockIds?: string[];
   path: string;
   sourcePaths: string[];
   bytes: number;
@@ -100,6 +103,7 @@ export async function buildPageHtml(
   components: CompiledComponent[] = [],
   remoteComponents: PublishedComponentLocator[] = [],
   presentation?: "spatial" | "reading",
+  selection?: ShowArtifact["selection"],
 ): Promise<string> {
   assertOfflineImages(document);
   return injectArtifactIntoHtml(
@@ -108,6 +112,7 @@ export async function buildPageHtml(
     components,
     remoteComponents,
     presentation,
+    selection,
   );
 }
 
@@ -237,6 +242,14 @@ export async function exportPage(
   )
     throw new Error("Presentation must be spatial or reading.");
   const store = new FileStore(options.root);
+  if (options.blockIds !== undefined && options.format === "site")
+    throw new Error(
+      "Block selection is supported for html and inline exports, not site export.",
+    );
+  const selection =
+    options.blockIds === undefined ? undefined : { blockIds: options.blockIds };
+  const presentation =
+    options.presentation ?? (selection ? "reading" : "spatial");
   const componentMode = options.components ?? "bundled";
   if (!["bundled", "remote"].includes(componentMode))
     throw new Error("Choose bundled or remote components.");
@@ -249,11 +262,14 @@ export async function exportPage(
   if (options.format !== "site") {
     if (!options.pageId)
       throw new Error("A page id is required for html or inline export.");
-    const { document: sourceDocument } = await store.readPage(
+    const { document: fullDocument } = await store.readPage(
       options.projectId,
       options.pageId,
       { checkpoint: false },
     );
+    const sourceDocument = selection
+      ? selectDocumentBlocks(fullDocument, selection.blockIds)
+      : fullDocument;
     const components = await resolveDocumentComponents(
       store.root,
       sourceDocument,
@@ -274,7 +290,8 @@ export async function exportPage(
       options.templatePath,
       bundledComponents,
       remoteComponents,
-      options.presentation ?? "spatial",
+      presentation,
+      selection,
     );
     const result = options.format === "inline" ? toInlineFragment(html) : html;
     const sourcePath =
@@ -293,7 +310,8 @@ export async function exportPage(
         document,
         bundledComponents,
         remoteComponents,
-        options.presentation ?? "spatial",
+        presentation,
+        selection,
       ),
       {
         flag: options.overwrite ? "w" : "wx",
@@ -304,6 +322,7 @@ export async function exportPage(
       format: options.format,
       projectId: options.projectId,
       pageIds: [document.id],
+      ...(selection ? { blockIds: selection.blockIds } : {}),
       path: out,
       sourcePaths: [sourcePath],
       bytes: Buffer.byteLength(result),

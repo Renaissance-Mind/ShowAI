@@ -36,6 +36,8 @@ export interface ShowArtifact {
   version: 1 | 2;
   document: ShowDocument;
   presentation?: "spatial" | "reading";
+  /** This artifact contains a projection of the source page, not the whole page. */
+  selection?: { blockIds: string[] };
   components?: CompiledComponent[];
   /** Exact published packages required by an intentionally network-dependent export. */
   remoteComponents?: PublishedComponentLocator[];

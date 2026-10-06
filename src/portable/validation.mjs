@@ -693,6 +693,28 @@ function validateComponents(input) {
   });
 }
 
+function validateSelection(selection, document) {
+  object(selection, "selection");
+  const ids = new Set();
+  const visit = (node) => {
+    if (node.attrs?.id && !["doc", "surface", "text"].includes(node.type))
+      ids.add(node.attrs.id);
+    node.content?.forEach(visit);
+  };
+  visit(document.content);
+  const blocks = selection.blockIds;
+  if (
+    !Array.isArray(blocks) ||
+    !blocks.length ||
+    blocks.some((id) => typeof id !== "string" || !ids.has(id)) ||
+    new Set(blocks).size !== blocks.length
+  )
+    throw new Error(
+      "Artifact selection must reference unique existing block ids.",
+    );
+  return { blockIds: [...blocks] };
+}
+
 export function parseArtifact(input) {
   if (
     typeof input === "string" &&
@@ -720,6 +742,11 @@ export function parseArtifact(input) {
     version: artifact.version,
     document,
     ...(artifact.presentation ? { presentation: artifact.presentation } : {}),
+    ...(artifact.selection === undefined
+      ? {}
+      : {
+          selection: validateSelection(artifact.selection, document),
+        }),
     ...(artifact.components === undefined
       ? {}
       : { components: validateComponents(artifact.components) }),
@@ -736,6 +763,7 @@ export function serializeArtifact(
   components,
   remoteComponents,
   presentation,
+  selection,
 ) {
   if (
     presentation !== undefined &&
@@ -748,6 +776,9 @@ export function serializeArtifact(
       version: artifactVersion(document),
       document: validateDocument(document),
       ...(presentation ? { presentation } : {}),
+      ...(selection
+        ? { selection: validateSelection(selection, document) }
+        : {}),
       ...(components?.length
         ? { components: validateComponents(components) }
         : {}),
@@ -778,6 +809,7 @@ export function injectArtifactIntoHtml(
   components,
   remoteComponents,
   presentation,
+  selection,
 ) {
   if (
     presentation !== undefined &&
@@ -789,6 +821,7 @@ export function injectArtifactIntoHtml(
     version: artifactVersion(document),
     document: validateDocument(document),
     ...(presentation ? { presentation } : {}),
+    ...(selection ? { selection: validateSelection(selection, document) } : {}),
     ...(components?.length
       ? { components: validateComponents(components) }
       : {}),

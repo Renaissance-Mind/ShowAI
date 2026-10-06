@@ -1,6 +1,6 @@
 ---
 name: show-document
-description: 用 ShowAI 创建、修改或导出交互页面、报告和小型网站。复用已有组件与模板；组件开发和从成熟页面提取模板由专门技能处理。
+description: 用 ShowAI 创建、修改或导出交互页面、报告和小型网站，也可只可视化选定组件或区域，在 Agent 对话中展示局部结果。复用已有组件与模板；组件开发和从成熟页面提取模板由专门技能处理。
 ---
 
 ShowAI 将内容组织成可阅读、可探索的页面。工作台与 Agent 使用同一份项目文件；组件负责表达，模板负责内容组织。先明确读者需要理解什么，再选择布局与交互，使用用户材料或可核实的数据。
@@ -28,7 +28,7 @@ showai pages list --project PROJECT --json
 - `guide authoring`：读取、差异、编辑和冲突处理。
 - `guide whiteboard`：平等区域、布局、视图和旧页迁移。
 - `guide catalog`：摘要搜索，再按需查看用途、输入、示例或源码。
-- `guide export`：单 HTML、会话展示和网站。
+- `guide export`：整页或局部组件的 HTML、会话展示和网站。
 
 新 Page 默认使用版本 2 白板模型。按表达需要选择区域内的纵向、网格或自由布局，保留已有节点 ID。调整位置使用 layout，指定网页阅读顺序使用 views.readingOrder。模板可建立新页面或加入现有页面；导出用 spatial 保留白板，用 reading 呈现响应式阅读顺序，两者均保存完整可编辑源。
 
@@ -38,4 +38,15 @@ showai pages list --project PROJECT --json
 
 用户明确要求把迭代成熟的页面保存为可复用模板时，进入 [extract-template](../extract-template/SKILL.md)。应用已有模板仍属于本技能，使用 `guide templates` 与所选模板的 `guide`；页面完成不会自动触发模板提取。
 
-交付时使用宿主支持的页面展示通道；文件与网址也是有效交付。完整工作台管理界面不进入读者收到的页面。
+根据本次需求选择展示范围：完整页面、一个组件、多个组件或整个区域都可以。用户只要局部修改结果，或自动化只更新监控进度时，保存完整页面后只展示相关部分。沿用对应节点的稳定 ID，让后续更新能重复选择同一组件。
+
+局部展示先从 `pages read` 的 `document.content` 找到节点 `attrs.id`，再读取 `guide export` 确认当前运行时支持 `--blocks`。旧运行时缺少该参数时先更新 ShowAI 软件：
+
+```sh
+showai export --project PROJECT --page PAGE --blocks PROGRESS_BLOCK_ID --format inline --out ./progress-inline.html --overwrite --json
+showai export --project PROJECT --page PAGE --blocks CHART_BLOCK_ID,METRICS_BLOCK_ID --format html --out ./selected.html --json
+```
+
+`--blocks` 使用页面中的组件实例或区域 ID；选中区域会包含其全部子内容。多个 ID 用逗号分隔，按页面顺序展示。自定义组件代码内部的子组件需要成为独立页面节点才能单独选择。局部导出默认使用 reading 布局并隐藏页面总标题，保留必要父容器，只打包相关组件；显式 `--presentation spatial` 可保留白板布局。旁边的 `.showai.json` 也是局部源文件；页面编辑继续读取完整页面、使用当前 hash 和稳定节点 ID。
+
+交付时把返回 `path` 的 inline HTML 内容交给宿主支持的对话可视化通道，聊天里可以只呈现选中的组件。按宿主能力提供 HTML 文件或预览网址也有效。需要完整页面时省略 `--blocks`；整站导出使用 `--format site`。完整工作台管理界面不进入读者收到的页面。

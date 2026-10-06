@@ -194,10 +194,15 @@ Composition parts are `{ "type": "content", "content": DOC_NODE }` or `{ "type":
 ```sh
 showai export --project PROJECT --page PAGE --format html --components bundled --out ./report.html --json
 showai export --project PROJECT --page PAGE --format inline --components bundled --out ./report-inline.html --json
+showai export --project PROJECT --page PAGE --blocks PROGRESS_BLOCK_ID --format inline --out ./progress-inline.html --overwrite --json
 showai export --project PROJECT --format site --components remote --out ./site --json
 ```
 
-`--presentation spatial` is the default. Use `--presentation reading` for a responsive document-style projection in reading order. Both retain the same complete v2 editable source.
+Full-page export defaults to `--presentation spatial`. Use `--presentation reading` for a responsive document-style projection in reading order. Both full-page modes retain the same complete v2 editable source.
+
+For partial visualization, pass `--blocks ID,ID` with html or inline. IDs identify page node instances (`attrs.id` from `pages read`), rather than catalog packages or children internal to component code. A selected region includes its descendants; multiple selections preserve page order and necessary ancestor containers without duplicates. Partial exports default to reading presentation and hide the page title. Explicit spatial presentation retains whiteboard positioning. Only selected content and its referenced runtimes enter the HTML and companion JSON. The stored page is unchanged; the partial JSON must not replace it. Site export rejects block selection.
+
+For focused revision results or automated progress updates, save the complete page using its current hash, then export the relevant stable block IDs and pass the inline file contents to the host's conversation display channel. This can display just the progress component even when the full page also contains explanations. MCP `page_export` accepts the equivalent `blockIds` array.
 
 Bundled is the default. The reader, content and exact custom runtimes travel together; raster images must be embedded for offline delivery. HTML and inline exports also save editable source JSON. A static site includes relative navigation, source files and shared reader assets, and is intended for HTTP/static hosting. Whole-project export omits archived pages.
 

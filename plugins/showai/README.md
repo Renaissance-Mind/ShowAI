@@ -10,6 +10,8 @@ This package distributes workflows and reference documents. Install ShowAI deskt
 
 The active skill resolves the external launch from the selected content directory's `agent-runtime.json`, validates `runtime info`, and loads only the relevant CLI guide and selected catalog views. Runtime locations and installed components are discovered dynamically.
 
+`show-document` can display a complete page or selected page components/regions. Use `export --blocks ID,ID --format inline` for focused conversation updates, or `--format html` for a partial reader. Selection uses page node IDs and preserves the complete stored page. Query `guide export` on the active runtime to confirm block-selection support before using a newly updated skill with an older runtime.
+
 From the source repository, use `npm run plugin:install` or `npm run plugin:update`. These prepare the skills-only package, install through official Codex marketplace commands and verify the installed copy byte-for-byte. Start a new chat to load changed skills. Build external software with `npm run build`; register the standalone runtime with `npm run runtime:register`, or use the desktop application's Settings → Connect Agent launch configuration.
 
 Claude Code can register this repository with `claude plugin marketplace add ./` and install `showai@renaissance-mind`. For an extracted plugin bundle, use a marketplace entry pointing at this plugin directory. Install a compatible ShowAI runtime before running its workflows.

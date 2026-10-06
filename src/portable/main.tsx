@@ -22,11 +22,24 @@ function downloadSource(
   document: ShowDocument,
   components: ShowArtifact["components"],
   remoteComponents: ShowArtifact["remoteComponents"],
+  presentation: ShowArtifact["presentation"],
+  selection: ShowArtifact["selection"],
 ) {
   const url = URL.createObjectURL(
-    new Blob([serializeArtifact(document, components, remoteComponents)], {
-      type: "application/json",
-    }),
+    new Blob(
+      [
+        serializeArtifact(
+          document,
+          components,
+          remoteComponents,
+          presentation,
+          selection,
+        ),
+      ],
+      {
+        type: "application/json",
+      },
+    ),
   );
   const link = window.document.createElement("a");
   link.href = url;
@@ -107,7 +120,9 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
   }, [menuOpen]);
 
   return (
-    <div className="portable-app">
+    <div
+      className={`portable-app${artifact.selection ? " portable-partial" : ""}`}
+    >
       <div className="portable-options" ref={menuRef}>
         <button
           ref={menuButtonRef}
@@ -127,6 +142,8 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
                   document,
                   artifact.components,
                   artifact.remoteComponents,
+                  artifact.presentation,
+                  artifact.selection,
                 );
                 setMenuOpen(false);
               }}
@@ -160,9 +177,10 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
         <SurfaceReader
           document={document}
           presentation={artifact.presentation}
+          partial={!!artifact.selection}
           heading={
             <>
-              {document.title && (
+              {!artifact.selection && document.title && (
                 <h1 className="portable-title">{document.title}</h1>
               )}
               {!!artifact.remoteComponents?.length && (

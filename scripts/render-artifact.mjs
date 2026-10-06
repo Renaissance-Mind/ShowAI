@@ -57,6 +57,8 @@ const html = injectArtifactIntoHtml(
   artifact.document,
   artifact.components,
   artifact.remoteComponents,
+  artifact.presentation,
+  artifact.selection,
 );
 await mkdir(dirname(resolve(outputPath)), { recursive: true });
 const output = inline ? toInlineFragment(html) : html;

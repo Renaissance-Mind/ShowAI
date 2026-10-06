@@ -41,6 +41,9 @@ Discover only what you need:
   catalog list [--kind component|template] [--scope SCOPE] [--limit 20]
   catalog describe ID [--kind component|template] [--view VIEW]
 
+Display a full page or selected blocks:
+  export --project PROJECT --page PAGE [--blocks ID,ID] --format html|inline --out PATH
+
 Shared: --home PATH, --project ID, --json, --help.
 Project writes require --project; shared promotion/registration is explicit.
 Use showai guide TOPIC for exact authoring, versioning and delivery commands.
@@ -67,6 +70,7 @@ function parseArguments(args: string[]): Arguments {
     "base-hash",
     "since",
     "page",
+    "blocks",
     "format",
     "presentation",
     "parent",
@@ -380,6 +384,13 @@ export async function runCli(argv: string[]): Promise<unknown> {
       return service.export({
         projectId: project(),
         pageId: option(args, "page"),
+        ...(Object.hasOwn(args.options, "blocks")
+          ? {
+              blockIds: option(args, "blocks", true)!
+                .split(",")
+                .map((id) => id.trim()),
+            }
+          : {}),
         format: format as ExportFormat,
         out: option(args, "out", true)!,
         overwrite: !!args.options.overwrite,

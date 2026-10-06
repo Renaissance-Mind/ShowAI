@@ -122,6 +122,12 @@ html {
   margin: 0 0 32px;
   overflow-wrap: anywhere;
 }
+.portable-partial .portable-document {
+  padding: 24px;
+}
+.portable-partial .surface-reading-heading:empty {
+  display: none;
+}
 /* Reader typography is independent of the editing application. */
 .portable-content {
   font-size: 14px;

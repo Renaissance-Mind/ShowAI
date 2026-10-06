@@ -292,9 +292,12 @@ const guides: Record<
   },
   export: {
     purpose:
-      "Deliver one page or a static website without carrying the authoring workbench.",
+      "Deliver a page, selected components/regions or a static website without carrying the authoring workbench.",
     rules: [
-      "presentation defaults to spatial: all regions share an infinite whiteboard. --presentation reading renders responsive reading order; both exports retain the full v2 layout and views in editable source.",
+      "For partial display, add --blocks ID,ID to html or inline export. IDs are page node attrs.id from pages read, not catalog component IDs. A selected container includes its entire subtree; multiple selections keep page order and shared ancestors without duplication.",
+      "Partial exports default to reading presentation, hide the page title, and include only selected content, necessary ancestor containers and referenced runtimes. Use --presentation spatial explicitly to retain whiteboard positioning. Unknown, empty or duplicate IDs and site selections are rejected.",
+      "After saving edits to the complete page with the current hash, show only the relevant blocks when the user asks for a focused result or an automation updates progress. Export selection does not change the stored page. The companion .showai.json is a partial projection: do not use it to replace the full page.",
+      "Full-page presentation defaults to spatial: all regions share an infinite whiteboard. --presentation reading renders responsive reading order; full-page exports retain the full v2 layout and views in editable source.",
       "bundled is the default: reader, content and exact component runtimes are included. Raster images must be embedded for offline delivery.",
       "remote requires previously verified published component locators and network access when reading. It does not implicitly upload or publish components.",
       "inline must use bundled components and fit the host's size limit. Rendering a conversation fragment requires a supported host display surface; MCP alone does not supply one.",
@@ -303,6 +306,8 @@ const guides: Record<
     commands: [
       "showai export --project PROJECT --page PAGE --format html --components bundled --out ./report.html --json",
       "showai export --project PROJECT --page PAGE --format inline --components bundled --out ./report-inline.html --json",
+      "showai export --project PROJECT --page PAGE --blocks PROGRESS_BLOCK_ID --format inline --out ./progress-inline.html --overwrite --json",
+      "showai export --project PROJECT --page PAGE --blocks CHART_BLOCK_ID,METRICS_BLOCK_ID --format html --out ./selected.html --json",
       "showai export --project PROJECT --format site --components remote --out ./site --json",
     ],
   },

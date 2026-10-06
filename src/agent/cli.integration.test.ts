@@ -16,6 +16,7 @@ import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { parseArtifact } from "../portable/validation.mjs";
 
 const execute = promisify(execFile);
 let home: string;
@@ -196,6 +197,252 @@ test("real CLI binds sessions, detects user changes and rejects stale writes", a
   );
   expect(JSON.parse(absentProject.stdout).error.message).toContain("--project");
 });
+
+test("real CLI and MCP export selected components and repeat focused updates without changing the full page", async () => {
+  const project = await run([
+    "projects",
+    "create",
+    "--name",
+    "Partial monitor",
+  ]);
+  const component = await run([
+    "catalog",
+    "import",
+    "--project",
+    project.id,
+    "--input",
+    join(repository, "resources/catalog/value-slider"),
+  ]);
+  const examples = await run([
+    "catalog",
+    "describe",
+    component.id,
+    "--project",
+    project.id,
+    "--view",
+    "examples",
+  ]);
+  const input = join(home, "partial-page-input.json");
+  await writeFile(
+    input,
+    JSON.stringify({
+      id: "partial-monitor",
+      title: "Complete monitoring report",
+      comments: [],
+      content: {
+        type: "surface",
+        content: [
+          {
+            type: "region",
+            attrs: { id: "status", name: "Progress" },
+            content: [
+              {
+                type: "widget",
+                attrs: {
+                  id: "progress",
+                  kind: "metrics",
+                  data: {
+                    title: "Processing progress",
+                    items: [{ label: "Completed", value: 62, unit: "%" }],
+                  },
+                },
+              },
+              {
+                type: "paragraph",
+                attrs: { id: "explanation" },
+                content: [{ type: "text", text: "UNRELATED EXPLANATION" }],
+              },
+            ],
+          },
+          {
+            type: "widget",
+            attrs: {
+              id: "control",
+              kind: "custom",
+              data: {
+                componentId: component.id,
+                version: component.version,
+                integrity: component.integrity,
+                props: examples.defaultData,
+              },
+            },
+          },
+        ],
+      },
+      layout: {
+        status: { x: 2000, y: 900, width: 700, mode: "flow" },
+        control: { x: 4000, y: 900, width: 400 },
+      },
+      views: { initial: null, saved: [], readingOrder: ["control", "status"] },
+    }),
+  );
+  const page = await run([
+    "pages",
+    "create",
+    "--project",
+    project.id,
+    "--input",
+    input,
+  ]);
+  const pagePath = join(
+    home,
+    "projects",
+    project.id,
+    "pages",
+    `${page.document.id}.json`,
+  );
+  const before = await readFile(pagePath, "utf8");
+  const args = ["export", "--project", project.id, "--page", page.document.id];
+  const out = join(home, "progress-only.html");
+  const exported = await run([
+    ...args,
+    "--blocks",
+    "progress",
+    "--format",
+    "inline",
+    "--out",
+    out,
+  ]);
+  expect(exported.blockIds).toEqual(["progress"]);
+  const artifact = parseArtifact(
+    await readFile(exported.sourcePaths[0], "utf8"),
+  );
+  expect(artifact.presentation).toBe("reading");
+  expect(artifact.selection).toEqual({ blockIds: ["progress"] });
+  expect(artifact.components).toBeUndefined();
+  expect(JSON.stringify(artifact.document.content)).not.toContain("UNRELATED");
+  expect(JSON.stringify(artifact.document.content)).not.toContain('"control"');
+  expect(Object.keys(artifact.document.layout!)).toEqual(["status"]);
+  expect(await readFile(pagePath, "utf8")).toBe(before);
+  const inline = await readFile(out, "utf8");
+  expect(inline).toContain("data-showai-inline-root");
+  expect(inline).not.toContain("UNRELATED EXPLANATION");
+
+  const ops = join(home, "partial-update-ops.json");
+  await writeFile(
+    ops,
+    JSON.stringify([
+      {
+        type: "block.attrs.set",
+        blockId: "progress",
+        attrs: {
+          data: {
+            title: "Processing progress",
+            items: [{ label: "Completed", value: 78, unit: "%" }],
+          },
+        },
+      },
+    ]),
+  );
+  const updated = await run([
+    "pages",
+    "apply",
+    page.document.id,
+    "--project",
+    project.id,
+    "--base-hash",
+    page.hash,
+    "--input",
+    ops,
+  ]);
+  await run([
+    ...args,
+    "--blocks",
+    "progress",
+    "--format",
+    "inline",
+    "--out",
+    out,
+    "--overwrite",
+  ]);
+  const refreshed = parseArtifact(
+    await readFile(exported.sourcePaths[0], "utf8"),
+  );
+  expect(
+    refreshed.document.content.content?.[0].content?.[0].attrs?.data.items[0]
+      .value,
+  ).toBe(78);
+  expect(JSON.stringify(updated.document.content)).toContain(
+    "UNRELATED EXPLANATION",
+  );
+
+  const chosen = await run([
+    ...args,
+    "--blocks",
+    "progress,control",
+    "--format",
+    "inline",
+    "--out",
+    join(home, "selected-components.html"),
+  ]);
+  const selected = parseArtifact(await readFile(chosen.sourcePaths[0], "utf8"));
+  expect(selected.components).toHaveLength(1);
+  expect(selected.components?.[0].inline?.script).toBeTruthy();
+  expect(selected.document.views?.readingOrder).toEqual(["control", "status"]);
+  expect(
+    selected.document.content.content?.map((node) => node.attrs?.id),
+  ).toEqual(["status", "control"]);
+
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [cli, "mcp", "--project", project.id],
+    env: environment() as Record<string, string>,
+  });
+  const client = new Client({ name: "partial-export-test", version: "1.0.0" });
+  await client.connect(transport);
+  try {
+    const result = await client.callTool({
+      name: "page_export",
+      arguments: {
+        pageId: page.document.id,
+        blockIds: ["control"],
+        format: "html",
+        out: join(home, "mcp-selected.html"),
+      },
+    });
+    expect(result.isError).not.toBe(true);
+    const data = JSON.parse(
+      (result.content as { text: string }[])[0].text,
+    ).data;
+    expect(data.blockIds).toEqual(["control"]);
+    const selected = parseArtifact(await readFile(data.sourcePaths[0], "utf8"));
+    expect(selected.document.content.content).toHaveLength(1);
+    expect(selected.components).toHaveLength(1);
+  } finally {
+    await client.close();
+  }
+
+  for (const ids of [
+    "missing",
+    "progress,missing",
+    "progress,",
+    "progress,progress",
+    " ",
+  ])
+    await expect(
+      run([
+        ...args,
+        "--blocks",
+        ids,
+        "--format",
+        "html",
+        "--out",
+        join(home, "invalid-partial.html"),
+      ]),
+    ).rejects.toThrow();
+  await expect(
+    run([
+      ...args,
+      "--blocks",
+      "progress",
+      "--format",
+      "site",
+      "--out",
+      join(home, "invalid-site"),
+    ]),
+  ).rejects.toThrow("not site");
+  await expect(access(join(home, "invalid-partial.html"))).rejects.toThrow();
+}, 30000);
 
 test("real exports include readable source and working relative multi-page site assets", async () => {
   const project = await run(["projects", "create", "--name", "Export checks"]);

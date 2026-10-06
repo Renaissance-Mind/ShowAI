@@ -843,6 +843,7 @@ export class AgentService {
   async export(input: {
     projectId: string;
     pageId?: string;
+    blockIds?: string[];
     format: ExportFormat;
     out: string;
     overwrite?: boolean;

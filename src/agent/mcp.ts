@@ -207,9 +207,10 @@ export function createMcpServer(options: {
     "page_export",
     {
       description:
-        "Build HTML, a conversation fragment or a static site. Bundled is offline; remote needs verified locators. Inline requires bundled. This does not upload a site.",
+        "Build HTML, a conversation fragment or a static site. Select page blocks with blockIds for partial HTML/inline display; partial exports default to reading layout. Bundled is offline; remote needs verified locators. Inline requires bundled. This does not upload a site.",
       inputSchema: {
         pageId: z.string().optional(),
+        blockIds: z.array(z.string().min(1)).min(1).optional(),
         format: z.enum(["html", "inline", "site"]),
         presentation: z.enum(["spatial", "reading"]).optional(),
         components: z.enum(["bundled", "remote"]).optional(),
@@ -218,11 +219,12 @@ export function createMcpServer(options: {
       },
       annotations: write,
     },
-    ({ pageId, format, components, out, overwrite, presentation }) =>
+    ({ pageId, blockIds, format, components, out, overwrite, presentation }) =>
       call(() =>
         service.export({
           projectId,
           pageId,
+          blockIds,
           format,
           components,
           out,

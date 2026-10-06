@@ -11,6 +11,7 @@ export function serializeArtifact(
   components?: CompiledComponent[],
   remoteComponents?: PublishedComponentLocator[],
   presentation?: "spatial" | "reading",
+  selection?: ShowArtifact["selection"],
 ): string;
 export function escapeJsonForHtml(value: unknown): string;
 export function injectArtifactIntoHtml(
@@ -19,4 +20,5 @@ export function injectArtifactIntoHtml(
   components?: CompiledComponent[],
   remoteComponents?: PublishedComponentLocator[],
   presentation?: "spatial" | "reading",
+  selection?: ShowArtifact["selection"],
 ): string;

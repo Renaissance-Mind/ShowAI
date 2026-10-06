@@ -14,12 +14,17 @@ export function SurfaceReader({
   document: input,
   heading,
   presentation = "spatial",
+  partial = false,
 }: {
   document: ShowDocument;
   heading: ReactNode;
   presentation?: "spatial" | "reading";
+  partial?: boolean;
 }) {
-  const document = useMemo(() => upgradeDocument(input), [input]);
+  const document = useMemo(
+    () => upgradeDocument(input, { includeTitle: !partial }),
+    [input, partial],
+  );
   if (presentation === "reading")
     return (
       <ObjectContext.Provider

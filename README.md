@@ -103,6 +103,7 @@ node dist-runtime/scripts/cli.mjs pages list --project PROJECT_ID --json
 ```sh
 node dist-runtime/scripts/cli.mjs export --project PROJECT_ID --page PAGE_ID --format html --out ./report.html --json
 node dist-runtime/scripts/cli.mjs export --project PROJECT_ID --page PAGE_ID --format inline --out ./report-inline.html --json
+node dist-runtime/scripts/cli.mjs export --project PROJECT_ID --page PAGE_ID --blocks PROGRESS_BLOCK_ID --format inline --out ./progress-inline.html --overwrite --json
 node dist-runtime/scripts/cli.mjs export --project PROJECT_ID --format site --out ./site --json
 ```
 
@@ -117,6 +118,8 @@ node dist-runtime/scripts/cli.mjs export --project PROJECT_ID --format site --ou
 增加 `--presentation reading` 可导出按阅读顺序排列的响应式网页；默认 `spatial` 保留白板浏览。两种呈现保存相同的完整空间源文件。
 
 HTML 与 inline 导出同时保存 `.showai.json` 源文件；独立页面的菜单也可下载源文件。桌面工作台可以导入 ShowAI HTML 或 JSON，继续编辑。自定义组件的运行代码随交付物保存，重新导入后仍可呈现；要修改该组件的 React 源代码，需要其原始组件包。
+
+加上 `--blocks ID,ID` 可以只可视化一个或多个页面组件，也可以选中整个区域。ID 来自 `pages read` 返回节点的 `attrs.id`，表示页面中的组件实例。局部导出保留必要父容器、页面顺序和所需组件运行代码，默认使用 reading 布局并隐藏页面总标题；需要保留白板位置时显式使用 `--presentation spatial`。局部 HTML 和 inline 及其源 JSON 只包含选中部分，原页面保持完整。修改结果或自动化进度更新可以只在 Agent 聊天里展示对应组件；后续编辑仍读取完整页面并使用当前 hash。`--blocks` 适用于 html 和 inline，整站导出不接受该参数。
 
 整站导出只包含项目中未归档的页面，使用相对导航和共享阅读器资源。导出不会自动上传到网络。首次写入不会覆盖已有文件；需要更新已有交付物时显式使用 `--overwrite`。
 
