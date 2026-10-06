@@ -42,7 +42,9 @@ showai projects bind PROJECT --harness claude-code --session ACTUAL_SESSION_ID -
 showai pages list --project PROJECT --json
 ```
 
-`projects current` only reports an existing binding. It never chooses the latest project or creates one implicitly. Use the real session identifier supplied by the harness. If none is available, create without a binding and retain the returned id in the conversation. Reusing another project requires an explicit selection. Every page or project-catalog write requires `--project`.
+`projects current` reports the current Agent conversation's binding. An unbound result points to `projects list`: discover existing projects before selecting a destination. Prioritize a user-specified project or a verified visible ShowAI project when the user invokes the app/current workspace; check its identity and content home against the CLI list. Otherwise keep an existing binding, reuse the sole available project, or ask the user to choose among multiple candidates. Create a project for an explicit independent-project request or an empty library. Use the real session identifier when supplied; without one, retain the selected project id in the conversation and omit binding. Every page or project-catalog write requires `--project`.
+
+Ordinary research, comparison and report tasks default to one resource Page. Organize its chapters with regions, navigation, collapsible content and nested containers, and continue revisions in the same page. Create multiple resource pages for a requested website or separate documents. Displaying multiple excerpts does not create multiple stored pages.
 
 ## Discover resources, then request one view
 
@@ -206,11 +208,13 @@ Full-page export defaults to `--presentation spatial`. Use `--presentation readi
 
 For partial visualization, pass `--blocks ID,ID` with html or inline. IDs identify page node instances (`attrs.id` from `pages read`), rather than catalog packages or children internal to component code. A selected region includes its descendants; multiple selections preserve page order and necessary ancestor containers without duplicates. Partial exports default to reading presentation and hide the page title. Explicit spatial presentation retains whiteboard positioning. Only selected content and its referenced runtimes enter the HTML and companion JSON. The stored page is unchanged; the partial JSON must not replace it. Site export rejects block selection.
 
-For focused revision results or automated progress updates, save the complete page using its current hash, then export the relevant stable block IDs and pass the inline file contents to the host's conversation display channel. This can display just the progress component even when the full page also contains explanations. MCP `page_export` accepts the equivalent `blockIds` array.
+For requested conversation display, save the complete page using its current hash, export inline, and include the host's actual display reference in the final reply. Codex follows its current visualize skill's output contract, using the returned absolute path. Open a preview for verification and optionally provide the full HTML link. See [conversation display](../plugins/showai/skills/show-document/references/conversation-display.md). For focused revision results or automated progress updates, export the relevant stable block IDs. MCP `page_export` accepts the equivalent `blockIds` array.
 
 Bundled is the default. The reader, content and exact custom runtimes travel together; raster images must be embedded for offline delivery. HTML and inline exports also save editable source JSON. A static site includes relative navigation, source files and shared reader assets, and is intended for HTTP/static hosting. Whole-project export omits archived pages.
 
 Inline is a UTF-8 fragment for a host-supported visualization surface and must remain under 1 MB. It requires bundled components. A terminal or generic MCP client does not acquire HTML display simply by connecting ShowAI. Desktop/ordinary HTML use component iframes; conversation inline mode uses the host's whole-page sandbox with per-component Shadow DOM styles.
+
+When a full report exceeds the inline limit, show meaningful selected blocks or a few ordered excerpts and link the full HTML report. Keep one complete source page. If the host lacks conversation HTML rendering, deliver an available preview/file and state where the result is shown.
 
 Remote delivery uses previously verified exact component locators and requires network access when reading. The HTML does not silently choose a newer version. Prepare and register published files explicitly:
 

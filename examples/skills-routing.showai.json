@@ -209,9 +209,10 @@
                       "label": "项目与版本上下文",
                       "kind": "query",
                       "subtitle": "显式项目 + 当前 hash",
-                      "detail": "先查询真实会话绑定。修订前读页面与差异，保存时使用当前 hash。",
+                      "detail": "核对用户指定或可见工作台的项目；沿用绑定，未绑定先列已有项目，多个候选目标不明时请用户选择。报告默认在一份 Page 中按章节组织，修订前读取最新内容与 hash。",
                       "commands": [
                         "projects current --harness codex --session SESSION --json",
+                        "无绑定时：projects list --json",
                         "guide authoring --json",
                         "pages read PAGE --project PROJECT --json",
                         "pages diff PAGE --project PROJECT --since HASH --json"
@@ -304,14 +305,17 @@
                       "label": "导出与展示",
                       "kind": "result",
                       "subtitle": "真实页面 + 主要交互",
-                      "detail": "导出不等于上传。保留可编辑源数据，按宿主支持的展示方式交付。",
+                      "detail": "请求展示时，导出 inline 并在最终回复发送宿主实际呈现引用。Codex 使用当前 visualize 契约；超过上限则展示关键区域并附完整 HTML，所有片段保留同一源页面。",
                       "commands": ["guide export --json"],
                       "position": {
                         "x": 528,
                         "y": 435
                       },
                       "sourceSide": "bottom",
-                      "targetSide": "left"
+                      "targetSide": "left",
+                      "references": [
+                        "skills/show-document/references/conversation-display.md"
+                      ]
                     }
                   ],
                   "edges": [

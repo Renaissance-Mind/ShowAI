@@ -96,7 +96,9 @@ node dist-runtime/scripts/cli.mjs template apply research --project PROJECT_ID -
 node dist-runtime/scripts/cli.mjs pages list --project PROJECT_ID --json
 ```
 
-把 `PROJECT_ID` 替换为新建项目返回的 id。每条页面命令显式指定项目。需要绑定会话时，创建项目时加上 `--harness codex --session ACTUAL_SESSION_ID`；只有用户选择复用已有项目时才绑定到该项目。
+上例用于明确需要新建项目的任务。已有内容先用 `projects current` 查询会话绑定，未绑定时用 `projects list` 选择已有项目；用户指定或当前工作台的目标项目核对后优先采用。只有一个可用项目时复用，多个候选且目标不明确时请用户选择。把 `PROJECT_ID` 替换为已选项目 id，每条页面命令显式指定项目；绑定使用真实的 `--harness codex --session ACTUAL_SESSION_ID`。
+
+普通调研报告默认在已选项目中保存为一份 Page，用章节和区域组织内容，后续修改延续同一页面。网站或多份独立文档按用户要求拆分。
 
 编辑前读取页面并保留返回的 `hash`。后续使用 `pages diff --since HASH` 查看用户修改，写入时通过 `--base-hash HASH` 防止覆盖更新。完整命令、操作格式和 Python 调用示例见 [Agent 使用说明](docs/agent-usage.md)。
 
@@ -155,7 +157,7 @@ claude plugin install showai@renaissance-mind
 
 MCP 是可选的工具入口，通过 `mcp --project PROJECT_ID` 启动并固定到一个项目。具体配置见 [Agent 使用说明](docs/agent-usage.md#optional-mcp)。插件不会设置跨会话共享的全局活动项目。
 
-会话内 HTML 展示取决于宿主能力。Codex 的 visualize 展示通道可以接收 inline 片段；普通终端或仅支持 MCP 工具的客户端返回 HTML 文件或预览地址。安装 MCP 工具本身不会增加网页渲染能力。
+用户要求展示时，Codex 在支持的对话可视化通道引用 inline 片段；超过 1 MB 的报告展示关键区域并附完整 HTML。预览面板用于检查，完整文件链接用于阅读或下载。普通终端或仅支持 MCP 工具的客户端返回 HTML 文件或预览地址，并说明展示位置。具体步骤见 [对话展示](plugins/showai/skills/show-document/references/conversation-display.md)。
 
 ## 组件与模板
 

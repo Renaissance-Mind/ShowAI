@@ -1068,6 +1068,66 @@ test("exports stay in the selected project's output subtree and skip archived si
   ).toBe(first.hash);
 });
 
+test("a fresh conversation discovers and explicitly binds an existing project without creating another", async () => {
+  const existing = await run([
+    "projects",
+    "create",
+    "--name",
+    "Existing report workspace",
+    "--harness",
+    "codex",
+    "--session",
+    "existing-report-session",
+  ]);
+  const projectsBefore = await run(["projects", "list"]);
+  const fresh = await run([
+    "projects",
+    "current",
+    "--harness",
+    "codex",
+    "--session",
+    "fresh-report-session",
+  ]);
+  expect(fresh).toMatchObject({ bound: false, project: null });
+  const [command, ...args] = fresh.next.split(" ");
+  expect(command).toBe("showai");
+  const candidates = await run(args.filter((arg: string) => arg !== "--json"));
+  expect(candidates.map((project: { id: string }) => project.id)).toContain(
+    existing.id,
+  );
+  expect(candidates).toHaveLength(projectsBefore.length);
+  expect(
+    await run([
+      "projects",
+      "current",
+      "--harness",
+      "codex",
+      "--session",
+      "fresh-report-session",
+    ]),
+  ).toMatchObject({ bound: false, project: null });
+  await run([
+    "projects",
+    "bind",
+    existing.id,
+    "--harness",
+    "codex",
+    "--session",
+    "fresh-report-session",
+  ]);
+  expect(
+    await run([
+      "projects",
+      "current",
+      "--harness",
+      "codex",
+      "--session",
+      "fresh-report-session",
+    ]),
+  ).toMatchObject({ bound: true, project: { id: existing.id } });
+  expect(await run(["projects", "list"])).toHaveLength(projectsBefore.length);
+});
+
 test("progressive CLI discovery is paginated and keeps detailed content opt-in", async () => {
   const before = await run([
     "projects",
