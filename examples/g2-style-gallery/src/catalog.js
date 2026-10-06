@@ -1,0 +1,153 @@
+const entries = [
+  ["bar", "柱状图", "Bar", "常规比较", "比较类别之间的数值"],
+  ["line", "折线图", "Line", "常规比较", "观察连续变化与趋势"],
+  ["area", "面积图", "Area", "常规比较", "通过填充面积强调趋势"],
+  ["scatter-plot", "散点图", "Scatter", "常规比较", "观察变量关系与离群点"],
+  [
+    "bubble-chart",
+    "气泡图",
+    "Bubble",
+    "常规比较",
+    "用气泡大小增加一个数值维度",
+  ],
+  [
+    "multi-set-bar",
+    "分组柱状图",
+    "Grouped bar",
+    "常规比较",
+    "并排比较不同系列",
+  ],
+  [
+    "bi-directional-bar",
+    "双向条形图",
+    "Diverging bar",
+    "常规比较",
+    "向两侧比较正负或两组数据",
+  ],
+  ["radar-chart", "雷达图", "Radar", "常规比较", "比较多个维度的轮廓"],
+  ["radial-bar", "径向条形图", "Radial bar", "常规比较", "在极坐标中排列条形"],
+  [
+    "parallel",
+    "平行坐标",
+    "Parallel coordinates",
+    "常规比较",
+    "观察多维数值的组合模式",
+  ],
+  [
+    "regressioncurve",
+    "回归曲线",
+    "Regression",
+    "常规比较",
+    "在散点上叠加拟合趋势",
+  ],
+  ["pie", "饼图", "Pie", "比例组成", "展示整体中的类别占比"],
+  ["donut-chart", "环图", "Donut", "比例组成", "中心留白的比例表达"],
+  [
+    "stacked-bar",
+    "堆叠柱状图",
+    "Stacked bar",
+    "比例组成",
+    "比较总量及各部分构成",
+  ],
+  [
+    "stacked-area",
+    "堆叠面积图",
+    "Stacked area",
+    "比例组成",
+    "观察构成随时间变化",
+  ],
+  ["rose", "玫瑰图", "Rose", "比例组成", "以扇区半径表现数值差异"],
+  ["mosaic", "马赛克图", "Mosaic", "比例组成", "以宽度与面积表现分类构成"],
+  ["treemap", "矩形树图", "Treemap", "比例组成", "用嵌套矩形表现层级与占比"],
+  ["sunburst", "旭日图", "Sunburst", "比例组成", "按同心层级展开组成"],
+  ["funnel", "漏斗图", "Funnel", "比例组成", "展示阶段数量的变化"],
+  ["histogram", "直方图", "Histogram", "统计分布", "分箱观察数值频率"],
+  ["boxplot", "箱线图", "Box plot", "统计分布", "展示分位数与离群值"],
+  ["violin", "小提琴图", "Violin", "统计分布", "叠加密度与分布摘要"],
+  [
+    "distributioncurve",
+    "分布曲线",
+    "Distribution",
+    "统计分布",
+    "观察连续概率或密度形状",
+  ],
+  [
+    "heatmap",
+    "密度热力图",
+    "Density heatmap",
+    "统计分布",
+    "观察二维空间的热点",
+  ],
+  ["color-map", "色块图", "Color map", "统计分布", "用颜色编码网格中的数值"],
+  [
+    "contourline",
+    "等高线图",
+    "Contour lines",
+    "统计分布",
+    "用等值曲线表达连续场",
+  ],
+  [
+    "stem-leaf",
+    "茎叶图",
+    "Stem-and-leaf",
+    "统计分布",
+    "保留数值细节并展示分布",
+  ],
+  ["sankey", "桑基图", "Sankey", "关系流向", "连接宽度表达流量"],
+  ["chord", "弦图", "Chord", "关系流向", "圆环内展示关系强度"],
+  ["arcdiagram", "弧图", "Arc diagram", "关系流向", "在线性节点之间连接弧线"],
+  ["pack", "圆形打包图", "Circle packing", "关系流向", "用包含关系表达层级"],
+  ["venn", "韦恩图", "Venn", "关系流向", "展示集合及交集"],
+  ["gantt", "甘特图", "Gantt", "时间业务", "展示任务的开始与结束区间"],
+  ["k-chart", "K 线图", "Candlestick", "时间业务", "展示开盘、收盘与高低值"],
+  ["kagi", "Kagi 转向图", "Kagi", "时间业务", "按价格反转形成竖线与粗细变化"],
+  ["spiral", "螺旋图", "Spiral", "时间业务", "把连续序列排列在螺旋坐标上"],
+  [
+    "choropleth-map",
+    "分级设色地图",
+    "Choropleth",
+    "地理地图",
+    "按区域数值设置颜色",
+  ],
+  ["dot-map", "点地图", "Dot map", "地理地图", "在地图上标记真实位置"],
+  [
+    "bubble-map",
+    "气泡地图",
+    "Bubble map",
+    "地理地图",
+    "用圆的大小表现地理数值",
+  ],
+  ["gauge", "仪表盘", "Gauge", "指标与其他", "用圆弧表达进度或指标"],
+  ["bullet", "子弹图", "Bullet", "指标与其他", "同时显示实际、目标与区间"],
+  ["wordcloud", "词云", "Word cloud", "指标与其他", "用字号表达词语权重"],
+];
+
+const combination = new Set([
+  "arcdiagram",
+  "k-chart",
+  "violin",
+  "regressioncurve",
+  "stem-leaf",
+  "contourline",
+]);
+export const catalog = entries.map(
+  ([id, name, english, group, description], index) => ({
+    id,
+    name,
+    english,
+    group,
+    description,
+    index,
+    implementation:
+      id === "sunburst"
+        ? "官方扩展"
+        : id === "kagi"
+          ? "自定义组合"
+          : combination.has(id)
+            ? "图形组合"
+            : "官方示例",
+    source: `https://github.com/antvis/G2/blob/v5/site/docs/charts/${id}.en.mdx`,
+    docs: `https://g2.antv.antgroup.com/en/charts/${id}`,
+  }),
+);
+export const groups = [...new Set(catalog.map((entry) => entry.group))];

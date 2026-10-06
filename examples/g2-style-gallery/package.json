@@ -1,0 +1,21 @@
+{
+  "name": "showai-g2-style-gallery",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5175 --strictPort",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@antv/g-svg": "2.1.1",
+    "@antv/g2": "5.4.8",
+    "@antv/g2-extension-plot": "0.2.2",
+    "d3-interpolate": "3.0.1",
+    "d3-regression": "2.2.0",
+    "topojson-client": "3.1.0"
+  },
+  "devDependencies": {
+    "vite": "8.3.2"
+  }
+}
