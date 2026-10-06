@@ -116,14 +116,6 @@
   > .surface-object-content {
   padding: 14px 20px;
 }
-.container-page-add {
-  display: flex;
-  justify-content: flex-start;
-  margin-top: 16px;
-  border-top: 1px solid var(--line, var(--border));
-  padding-top: 12px;
-  color: var(--muted);
-}
 .container-menu {
   position: relative;
 }
@@ -150,10 +142,6 @@
   display: flex;
   width: 100%;
   white-space: nowrap;
-}
-.container-page-add .container-menu > div {
-  left: 0;
-  right: auto;
 }
 .surface-toolbar .container-menu > div {
   top: auto;
@@ -329,7 +317,6 @@
     max-width: none !important;
   }
   .container-workspace-bar,
-  .container-page-add,
   .container-activation,
   .container-board-enter,
   .board-drawing-input,
@@ -470,20 +457,4 @@
     position: relative !important;
     min-height: var(--free-height, 200px) !important;
   }
-}
-.container-add-component {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 12px;
-  cursor: pointer;
-}
-.container-add-component:hover {
-  background: var(--hover);
-  color: var(--text);
 }

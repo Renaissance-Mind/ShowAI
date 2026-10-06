@@ -104,3 +104,67 @@ export function insertComponent(
     nodeId: node.attrs!.id as string,
   };
 }
+
+/** Insert a structural component at a text caret, splitting only the active text run. */
+export function insertComponentAtText(
+  source: ShowDocument,
+  context: { parentId: string; ids: string[]; kind: "single" | "children" },
+  point: { before: JSONContent[]; after: JSONContent[] },
+  kind: string,
+  data: Record<string, unknown>,
+) {
+  const draft = upgradeResource(source);
+  const target = findSurfaceNode(draft, context.parentId);
+  if (!target) throw new Error("插入位置已不存在。");
+  const text = target.node.type === "richText";
+  const parent =
+    text || context.kind === "single" ? target.parent : target.node;
+  if (!parent || !["surface", "region"].includes(parent.type ?? ""))
+    throw new Error("组件需要放在页面或白板中。");
+  const inserted = insertComponent(draft, parent.attrs!.id, kind, data);
+  const destination = findSurfaceNode(
+    inserted.document,
+    parent.attrs!.id,
+  )!.node;
+  const component = destination.content!.pop()!;
+  const replaced =
+    text || context.kind === "single" ? [target.node.attrs!.id] : context.ids;
+  const start = destination.content!.findIndex((node) =>
+    replaced.includes(node.attrs?.id),
+  );
+  const index = start < 0 ? destination.content!.length : start;
+  let before = structuredClone(point.before),
+    after = structuredClone(point.after);
+  if (text) {
+    const wrapper = (content: JSONContent[], id: string) => ({
+      ...target.node,
+      attrs: { ...target.node.attrs, id },
+      content,
+    });
+    const original = target.node.attrs!.id;
+    before = before.length ? [wrapper(before, original)] : [];
+    after = after.length
+      ? [wrapper(after, before.length ? crypto.randomUUID() : original)]
+      : [];
+    if (before.length && after.length && draft.layout[original]) {
+      const frame = inserted.document.layout[component.attrs!.id];
+      inserted.document.layout[after[0].attrs!.id] = {
+        ...draft.layout[original],
+        x: frame.x + frame.width + 48,
+      };
+    }
+  }
+  destination.content = [
+    ...destination.content!.slice(0, index),
+    ...before,
+    component,
+    ...after,
+    ...destination
+      .content!.slice(index)
+      .filter((node) => !replaced.includes(node.attrs?.id)),
+  ];
+  return {
+    document: reconcileSurface(inserted.document),
+    nodeId: inserted.nodeId,
+  };
+}

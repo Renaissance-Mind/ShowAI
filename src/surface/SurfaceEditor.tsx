@@ -1,3 +1,4 @@
+import { insertComponentAtText } from "./component-insertion";
 import {
   useCallback,
   useEffect,
@@ -21,7 +22,6 @@ export default function SurfaceEditor({
   document: input,
   onChange,
   header,
-  onBrowseComponents,
   revealId,
   onRevealHandled,
   readOnly = false,
@@ -30,7 +30,6 @@ export default function SurfaceEditor({
   document: ShowDocument;
   onChange: (document: ShowDocument) => void;
   header?: ReactNode;
-  onBrowseComponents?: (parentId?: string) => void;
   readOnly?: boolean;
   revealId?: string | null;
   onRevealHandled?: () => void;
@@ -48,6 +47,7 @@ export default function SurfaceEditor({
     at: number;
   }>({ past: [], future: [], group: "", at: 0 });
   const [, refresh] = useState(0);
+  const [insertedId, setInsertedId] = useState<string | null>(null);
   const latestChange = useRef(onChange);
   latestChange.current = onChange;
   useEffect(() => {
@@ -123,8 +123,20 @@ export default function SurfaceEditor({
       <DocumentEditor
         content={content}
         readOnly={readOnly}
-        onBrowseComponents={
-          onBrowseComponents ? () => onBrowseComponents(parentId) : undefined
+        onInsertNative={
+          readOnly
+            ? undefined
+            : (componentKind, data, point) => {
+                const inserted = insertComponentAtText(
+                  current.current,
+                  { parentId, ids, kind },
+                  point,
+                  componentKind,
+                  data,
+                );
+                commit(inserted.document);
+                setInsertedId(inserted.nodeId);
+              }
         }
         minimal
         onDetachBlock={
@@ -216,6 +228,7 @@ export default function SurfaceEditor({
         header={header}
         renderContent={stableRender}
         revealId={revealId}
+        revealInPlace={insertedId}
         onRevealHandled={onRevealHandled}
         undo={() => travel()}
         redo={() => travel(true)}
