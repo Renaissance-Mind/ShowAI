@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { EditorDrafts } from "./editor-drafts";
@@ -59,6 +59,7 @@ describe("persistent local editor drafts", () => {
     await drafts.remove(second.id, first.generation);
     expect(await drafts.list()).toHaveLength(1);
     await drafts.remove(second.id, second.generation);
+    await drafts.remove(second.id, second.generation);
     expect(await drafts.list()).toEqual([]);
     expect(
       await readdir(join(root, "local", "discarded-drafts", second.id)),
@@ -115,6 +116,16 @@ describe("persistent local editor drafts", () => {
       content: code,
     });
     expect((await drafts.read(component.id)).content).toEqual(code);
+    const form = { schema: '{"unfinished":', source: code };
+    const formDraft = await drafts.save({
+      kind: "component",
+      clientId: "form-window",
+      resourceId: "form",
+      content: form,
+    });
+    expect((await drafts.read(formDraft.id)).content).toEqual(form);
+    const assetFiles = await readdir(join(root, "local", "draft-assets"));
+    expect(assetFiles).toHaveLength(1);
     const template = await drafts.save({
       kind: "template",
       clientId: "editor-window",
@@ -124,6 +135,20 @@ describe("persistent local editor drafts", () => {
     expect((await drafts.read(template.id)).content).toEqual({
       composition: "incomplete",
     });
-    expect(await drafts.list()).toHaveLength(4);
+    expect(await drafts.list()).toHaveLength(5);
+  });
+  it("rejects a modified manifest that points outside its generation", async () => {
+    const record = await drafts.save(input);
+    const path = join(root, "local", "editor-drafts", record.id, "draft.json");
+    await writeFile(
+      path,
+      JSON.stringify({ ...record, path: "../../../../library.json" }),
+    );
+    await expect(drafts.read(record.id)).rejects.toMatchObject({
+      code: "INVALID_DATA",
+    });
+    await expect(drafts.save({ ...input, sequence: 2 })).rejects.toMatchObject({
+      code: "INVALID_DATA",
+    });
   });
 });

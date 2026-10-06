@@ -30,6 +30,7 @@ import {
   MoreHorizontal,
   Plus,
   Search,
+  History,
   Settings2,
   Upload,
   X,
@@ -82,6 +83,13 @@ import {
 } from "./CatalogDialogs";
 import "./studio.css";
 import {
+  HistoryDialog,
+  SearchDialog,
+  MergeDialog,
+  ExternalConflictDialog,
+} from "./HistoryDialogs";
+import type { SearchResult } from "../core/library-index";
+import {
   SettingsNavigation,
   SettingsPanel,
   type SettingsSection,
@@ -98,6 +106,15 @@ type LoadedTemplate = TemplateRecord & {
   previewDocument?: ShowDocument;
 };
 type DialogState =
+  | { type: "history"; projectId: string; pageId?: string }
+  | { type: "search" }
+  | {
+      type: "merge";
+      projectId: string;
+      document: ShowDocument;
+      baseRevision: string;
+    }
+  | { type: "externalConflict"; id: string }
   | { type: "project"; project?: ProjectSummary; groupId?: string }
   | { type: "group"; group?: ProjectGroup; projectId?: string }
   | { type: "moveProject"; projectId: string }
@@ -110,7 +127,12 @@ type DialogState =
   | { type: "folder"; projectId: string; parentId: string | null }
   | { type: "rename"; target: LibraryTarget }
   | { type: "delete"; target: LibraryTarget }
-  | { type: "template"; record: LoadedTemplate; copy?: boolean }
+  | {
+      type: "template";
+      record: LoadedTemplate;
+      copy?: boolean;
+      projectId?: string;
+    }
   | { type: "saveTemplate" }
   | { type: "publish"; ref: PackageRevisionRef; projectId?: string }
   | {
@@ -182,6 +204,8 @@ export default function Studio() {
   catalogScopeRef.current = catalogScope;
   const [query, setQuery] = useState("");
   const [dialog, setDialog] = useState<DialogState>(null);
+  const dialogRef = useRef(dialog);
+  dialogRef.current = dialog;
   const [notice, setNotice] = useState("");
   const [problem, setProblem] = useState("");
   const [busy, setBusy] = useState(false);
@@ -428,7 +452,7 @@ export default function Studio() {
   async function openProject(id: string, folderId: string | null = null) {
     if (!(await page.flush())) {
       setView("page");
-      return;
+      return false;
     }
     selectedRef.current = id;
     setSelectedProject(id);
@@ -440,9 +464,10 @@ export default function Studio() {
     const loaded = await loadProjectContents(id);
     expandFolderPath(loaded.folders, folderId);
     await loadCatalog();
+    return true;
   }
   async function openPage(id: string, projectId = selectedProject) {
-    if (!projectId) return;
+    if (!projectId) return false;
     if (await page.open(projectId, id)) {
       selectedRef.current = projectId;
       setSelectedProject(projectId);
@@ -454,7 +479,9 @@ export default function Studio() {
       expandFolderPath(loaded.folders, parentId);
       setView("page");
       setContextMenu(null);
+      return true;
     }
+    return false;
   }
   async function beginNewPage(projectId: string, parentId: string | null) {
     const choices = await desktop.invoke<TemplateMetadata[]>("templates:list", {
@@ -842,7 +869,10 @@ export default function Studio() {
     selectedRef.current = page.projectId;
     setView("page");
   }
-  async function viewComponent(item: CatalogComponent) {
+  async function viewComponent(
+    item: CatalogComponent,
+    expectedDialog?: Exclude<DialogState, null>,
+  ) {
     const owner =
       !("kind" in item) && item.projectId
         ? item.projectId
@@ -880,7 +910,8 @@ export default function Studio() {
         if (!errorMessage(reason).includes("source")) throw reason;
       }
     }
-    setDialog({ type: "component", custom, source, projectId: owner });
+    if (!expectedDialog || dialogRef.current === expectedDialog)
+      setDialog({ type: "component", custom, source, projectId: owner });
   }
 
   const pickerLibrary = useMemo(
@@ -1121,6 +1152,34 @@ export default function Studio() {
               </div>
             )}
             <div className="studio-header-actions">
+              {info?.libraryVersion === 2 && (
+                <>
+                  <button
+                    className="studio-icon"
+                    aria-label="搜索内容库"
+                    title="搜索内容库"
+                    onClick={() => setDialog({ type: "search" })}
+                  >
+                    <Search size={16} />
+                  </button>
+                  {selectedProject && (
+                    <button
+                      className="studio-icon"
+                      aria-label={view === "page" ? "页面历史" : "项目历史"}
+                      title={view === "page" ? "页面历史" : "项目历史"}
+                      onClick={() =>
+                        setDialog({
+                          type: "history",
+                          projectId: selectedProject,
+                          pageId: view === "page" ? page.draft?.id : undefined,
+                        })
+                      }
+                    >
+                      <History size={16} />
+                    </button>
+                  )}
+                </>
+              )}
               {view === "page" && page.draft && (
                 <>
                   <span className={`studio-save-state ${page.status}`}>
@@ -1214,10 +1273,52 @@ export default function Studio() {
                 保留为副本
               </button>
               {page.status === "conflict" ? (
-                <button onClick={action(page.reload)}>载入文件版本</button>
+                <>
+                  {page.conflictId ? (
+                    <button
+                      onClick={action(async () => {
+                        await page.retainDraft();
+                        setDialog({
+                          type: "externalConflict",
+                          id: page.conflictId!,
+                        });
+                      })}
+                    >
+                      处理外部修改
+                    </button>
+                  ) : page.mergeBase && page.draft && selectedProject ? (
+                    <button
+                      onClick={action(async () => {
+                        await page.retainDraft();
+                        setDialog({
+                          type: "merge",
+                          projectId: selectedProject,
+                          document: structuredClone(page.draft!),
+                          baseRevision: page.mergeBase!,
+                        });
+                      })}
+                    >
+                      比较并合并
+                    </button>
+                  ) : null}
+                  <button onClick={action(page.reload)}>载入文件版本</button>
+                </>
               ) : (
                 <button onClick={action(page.retry)}>重试保存</button>
               )}
+            </div>
+          )}
+          {view === "page" && !!page.availableDrafts.length && (
+            <div className="studio-conflict" role="status">
+              <p>有其他编辑窗口留下的本机草稿，可选择恢复。</p>
+              {page.availableDrafts.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={action(() => page.recoverDraft(item.id))}
+                >
+                  恢复草稿 · {new Date(item.savedAt).toLocaleString("zh-CN")}
+                </button>
+              ))}
             </div>
           )}
           <div
@@ -2058,6 +2159,108 @@ export default function Studio() {
             ]}
           />
         )}
+        {dialog?.type === "history" && (
+          <HistoryDialog
+            {...dialog}
+            onClose={closeDialog}
+            beforeRestore={page.flush}
+            onRestored={async () => {
+              await page.reload();
+              await refresh();
+              setNotice("历史版本已恢复，原版本保留在历史中");
+            }}
+          />
+        )}
+        {dialog?.type === "search" && (
+          <SearchDialog
+            onClose={closeDialog}
+            onOpen={async (result: SearchResult) => {
+              const scope = result.projectId
+                ? "project"
+                : result.path.startsWith("packages/published/")
+                  ? "published"
+                  : "global";
+              const match = result.path.match(
+                /^projects\/([^/]+)\/pages\/([^/]+)\.json$/,
+              );
+              if (match) {
+                if (!(await openPage(match[2], match[1])))
+                  throw new Error("请先保存或处理当前页面的草稿。");
+                setRevealNode(result.blockId);
+                closeDialog();
+              } else if (result.kind === "project" && result.projectId) {
+                if (!(await openProject(result.projectId)))
+                  throw new Error("请先保存或处理当前页面的草稿。");
+                closeDialog();
+              } else if (
+                result.kind === "component" ||
+                result.kind === "source"
+              ) {
+                const packageMatch = result.path.match(
+                  /(?:^|\/)components\/([^/]+)\/([^/]+)\//,
+                );
+                if (!packageMatch)
+                  throw new Error("这个结果没有可打开的组件版本。");
+                const custom = await desktop.invoke<CompiledComponent>(
+                  "components:get",
+                  {
+                    id: packageMatch[1],
+                    version: packageMatch[2],
+                    projectId: result.projectId ?? undefined,
+                    scope,
+                  },
+                );
+                await viewComponent({
+                  ...custom,
+                  projectId: result.projectId ?? undefined,
+                });
+              } else if (result.kind === "template") {
+                const packageMatch = result.path.match(
+                  /(?:^|\/)templates\/([^/]+)\/([^/]+)\//,
+                );
+                if (!packageMatch)
+                  throw new Error("这个结果没有可打开的模板版本。");
+                const record = await desktop.invoke<LoadedTemplate>(
+                  "templates:get",
+                  {
+                    id: packageMatch[1],
+                    version: packageMatch[2],
+                    projectId: result.projectId ?? undefined,
+                    scope,
+                  },
+                );
+                setDialog({
+                  type: "template",
+                  record,
+                  projectId: result.projectId ?? undefined,
+                });
+              }
+            }}
+          />
+        )}
+        {dialog?.type === "merge" && (
+          <MergeDialog
+            {...dialog}
+            pageId={dialog.document.id}
+            onClose={closeDialog}
+            onMerged={async () => {
+              await page.acceptResolution();
+              await refresh();
+              setNotice("合并版本已保存");
+            }}
+          />
+        )}
+        {dialog?.type === "externalConflict" && (
+          <ExternalConflictDialog
+            id={dialog.id}
+            onClose={closeDialog}
+            onResolved={async () => {
+              await page.acceptResolution();
+              await refresh();
+              setNotice("外部修改已处理，快照仍可保留查看");
+            }}
+          />
+        )}
         {dialog?.type === "group" && (
           <NameDialog
             title={dialog.group ? "重命名分组" : "新建分组"}
@@ -2238,11 +2441,11 @@ export default function Studio() {
             components={dialog.record.components ?? []}
             templates={templates}
             onPublish={(ref) => setDialog({ type: "publish", ref })}
-            projectId={selectedProject ?? undefined}
+            projectId={dialog.projectId ?? selectedProject ?? undefined}
             onClose={closeDialog}
             onSaved={async () => {
               await loadCatalog();
-              setDialog(null);
+              if (dialogRef.current === dialog) setDialog(null);
               setNotice("模板目录已更新");
             }}
           />
@@ -2290,10 +2493,13 @@ export default function Studio() {
             onClose={closeDialog}
             onSaved={async (component) => {
               await loadCatalog();
-              await viewComponent({
-                ...component,
-                projectId: dialog.projectId,
-              });
+              await viewComponent(
+                {
+                  ...component,
+                  projectId: dialog.projectId,
+                },
+                dialog,
+              );
               setNotice("组件目录已更新");
             }}
           />

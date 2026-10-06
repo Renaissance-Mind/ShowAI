@@ -1,5 +1,6 @@
 import { BuiltinPreview } from "../components/BuiltinPreview";
 import { useState, useId } from "react";
+import { useCatalogDraft, CatalogDraftRecovery } from "./useCatalogDraft";
 import {
   ArrowDown,
   ArrowUp,
@@ -338,6 +339,41 @@ export function TemplateDialog({
   const [related, setRelated] = useState(record.related ?? []);
   const [examples, setExamples] = useState(record.examples ?? []);
   const [parts, setParts] = useState<TemplatePart[]>(record.composition ?? []);
+  const [origin, setOrigin] = useState<PackageRevisionRef | undefined>(
+    record.integrity ? revision("template", record, projectId) : undefined,
+  );
+  const form = {
+    name,
+    description,
+    version,
+    document,
+    scenarios,
+    contentGuide,
+    related,
+    examples,
+    parts,
+    origin,
+  };
+  const localDraft = useCatalogDraft({
+    kind: "template",
+    projectId,
+    resourceId: record.id || "new-template",
+    title: name,
+    content: form,
+    onRestore: (value) => {
+      setName(value.name);
+      setDescription(value.description);
+      setVersion(value.version);
+      setDocument(value.document);
+      setScenarios(value.scenarios);
+      setContentGuide(value.contentGuide);
+      setRelated(value.related);
+      setExamples(value.examples);
+      setParts(value.parts);
+      setOrigin(value.origin);
+      setTab("edit");
+    },
+  });
   const [selectedPart, setSelectedPart] = useState("");
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
@@ -372,6 +408,7 @@ export function TemplateDialog({
   async function save() {
     if (!projectId)
       throw new Error("先选择一个项目，定制版本会保存在该项目中。");
+    const retained = await localDraft.persist(true);
     await desktop.invoke("templates:save", {
       projectId,
       id: record.id || undefined,
@@ -384,15 +421,19 @@ export function TemplateDialog({
       related,
       examples,
       composition: parts.length ? parts : undefined,
-      parents: record.integrity
-        ? [revision("template", record, projectId)]
-        : undefined,
+      parents: origin ? [origin] : undefined,
     });
+    await localDraft.complete(retained, form);
     await onSaved();
   }
   return (
-    <Dialog title={record.id ? record.name : "新建模板"} onClose={onClose} wide>
+    <Dialog
+      title={record.id ? record.name : "新建模板"}
+      onClose={() => void localDraft.close(onClose)}
+      wide
+    >
       <div className="studio-template-edit catalog-detail">
+        <CatalogDraftRecovery draft={localDraft} />
         {!!record.id && <Lineage item={record} />}
         <div className="studio-detail-tabs">
           <button
@@ -961,6 +1002,7 @@ export function TemplateDialog({
               disabled={busy}
               onClick={() =>
                 run(async () => {
+                  await localDraft.persist();
                   await desktop.invoke("catalog:promote", {
                     ref: revision("template", record, projectId),
                     projectId,
@@ -976,7 +1018,12 @@ export function TemplateDialog({
           {record.integrity && (
             <button
               className="studio-button"
-              onClick={() => onPublish(revision("template", record, projectId))}
+              onClick={() =>
+                run(async () => {
+                  await localDraft.persist();
+                  onPublish(revision("template", record, projectId));
+                })
+              }
             >
               <Upload size={14} />
               发布
@@ -1046,6 +1093,49 @@ export function ComponentDialog({
   const [componentId, setComponentId] = useState(
     custom?.id ?? `my-${builtin?.kind}`,
   );
+  const [workingSource, setWorkingSource] = useState(source);
+  const [origin, setOrigin] = useState<PackageRevisionRef | undefined>(
+    custom ? revision("component", custom, projectId) : undefined,
+  );
+  const form = {
+    code,
+    schema,
+    defaults,
+    examplesJson,
+    name,
+    description,
+    scenarios,
+    effects,
+    version,
+    componentId,
+    category,
+    source: workingSource,
+    origin,
+  };
+  const localDraft = useCatalogDraft({
+    kind: "component",
+    projectId,
+    resourceId: custom?.id ?? `builtin:${builtin?.kind}`,
+    title: name,
+    content: form,
+    enabled: !!source,
+    onRestore: (value) => {
+      setCode(value.code);
+      setSchema(value.schema);
+      setDefaults(value.defaults);
+      setExamplesJson(value.examplesJson);
+      setName(value.name);
+      setDescription(value.description);
+      setScenarios(value.scenarios);
+      setEffects(value.effects);
+      setVersion(value.version);
+      setComponentId(value.componentId);
+      setCategory(value.category);
+      setWorkingSource(value.source);
+      setOrigin(value.origin);
+      setTab("code");
+    },
+  });
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [example, setExample] = useState(0);
@@ -1059,9 +1149,11 @@ export function ComponentDialog({
       .finally(() => setBusy(false));
   };
   async function save() {
-    if (!projectId || !source)
+    if (!projectId || !workingSource)
       throw new Error("选择项目并提供组件源码后才能保存定制版本。");
-    const { mergeBase: _previousMerge, ...baseManifest } = source.manifest;
+    const retained = await localDraft.persist(true);
+    const { mergeBase: _previousMerge, ...baseManifest } =
+      workingSource.manifest;
     const saved = await desktop.invoke<CompiledComponent>("components:save", {
       projectId,
       manifest: {
@@ -1075,21 +1167,20 @@ export function ComponentDialog({
         effects: lines(effects),
         defaultData: JSON.parse(defaults),
         examples: JSON.parse(examplesJson),
-        ...(custom
-          ? { parents: [revision("component", custom, projectId)] }
-          : {}),
+        ...(origin ? { parents: [origin] } : {}),
       },
       schema: JSON.parse(schema),
       source: code,
-      files: source.files,
-      assets: source.assets,
+      files: workingSource.files,
+      assets: workingSource.assets,
     });
+    await localDraft.complete(retained, form);
     await onSaved(saved);
   }
   return (
     <Dialog
       title={item.name}
-      onClose={onClose}
+      onClose={() => void localDraft.close(onClose)}
       wide
       className="catalog-component-dialog"
       titleAccessory={
@@ -1126,6 +1217,7 @@ export function ComponentDialog({
       }
     >
       <div className="studio-component-detail catalog-detail">
+        <CatalogDraftRecovery draft={localDraft} />
         {custom && <Lineage item={custom} />}
         {tab === "about" && (
           <>
@@ -1344,6 +1436,7 @@ export function ComponentDialog({
               disabled={busy}
               onClick={() =>
                 run(async () => {
+                  await localDraft.persist();
                   const result = await desktop.invoke<CompiledComponent>(
                     "catalog:promote",
                     {
@@ -1363,7 +1456,10 @@ export function ComponentDialog({
             <button
               className="studio-button"
               onClick={() =>
-                onPublish(revision("component", custom, projectId))
+                run(async () => {
+                  await localDraft.persist();
+                  onPublish(revision("component", custom, projectId));
+                })
               }
             >
               <Upload size={14} />
@@ -1384,14 +1480,15 @@ export function ComponentDialog({
             className="studio-button primary"
             disabled={!canInsert}
             onClick={() =>
-              run(() =>
-                onInsert(
+              run(async () => {
+                await localDraft.persist();
+                await onInsert(
                   builtin?.kind ?? "custom",
                   builtin
                     ? structuredClone(data)
                     : componentWidgetData(custom!, data),
-                ),
-              )
+                );
+              })
             }
           >
             <Plus size={15} />

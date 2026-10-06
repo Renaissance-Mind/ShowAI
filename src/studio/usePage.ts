@@ -33,10 +33,13 @@ export function usePage() {
   const [record, setRecord] = useState<LoadedPage | null>(null);
   const [status, setStatus] = useState<SaveStatus>("saved");
   const [error, setError] = useState("");
+  const [conflictId, setConflictId] = useState<string | undefined>();
+  const [mergeBase, setMergeBase] = useState<string | undefined>();
   const projectRef = useRef<string | null>(null);
   const current = useRef<ShowDocument | null>(null);
   const base = useRef("");
   const baseRevision = useRef<string | undefined>(undefined);
+  const draftBase = useRef<string | undefined>(undefined);
   const operations = useRef(new Map<number, { id: string; groupId: string }>());
   const editGroup = useRef({ id: crypto.randomUUID(), at: 0 });
   const revision = useRef(0);
@@ -51,6 +54,13 @@ export function usePage() {
     sessionStorage.setItem("showai:editor-client", clientId.current);
   }
   const retained = useRef<EditorDraftRecord | null>(null);
+  const recoveredFrom = useRef<Pick<
+    EditorDraftRecord,
+    "id" | "generation"
+  > | null>(null);
+  const [availableDrafts, setAvailableDrafts] = useState<EditorDraftRecord[]>(
+    [],
+  );
   const [draftNotice, setDraftNotice] = useState("");
   const persist = useCallback(
     async (
@@ -64,10 +74,11 @@ export function usePage() {
           clientId: clientId.current,
           resourceId: source.id,
           projectId: owner,
-          baseRevision: baseRevision.current,
+          baseRevision: draftBase.current,
           title: source.title,
           content: source,
           sequence,
+          recoverySource: recoveredFrom.current ?? undefined,
         },
       });
       if (projectRef.current === owner && current.current?.id === source.id)
@@ -115,6 +126,8 @@ export function usePage() {
           });
           base.current = saved.hash;
           baseRevision.current = saved.revision;
+          draftBase.current = saved.revision;
+          setMergeBase(saved.revision);
           operations.current.delete(sequence);
           savedRevision.current = sequence;
           setRecord(saved);
@@ -123,6 +136,7 @@ export function usePage() {
             setDraft(saved.document);
           }
           if (saved.workspaceConflicts?.length) {
+            setConflictId(saved.workspaceConflicts[0].id);
             blocked.current = true;
             setStatus("conflict");
             setError(
@@ -138,11 +152,22 @@ export function usePage() {
             });
             if (retained.current?.generation === savedDraft.generation)
               retained.current = null;
+            if (recoveredFrom.current) {
+              const original = recoveredFrom.current;
+              await desktop.invoke("drafts:remove", {
+                id: original.id,
+                generation: original.generation,
+              });
+              recoveredFrom.current = null;
+            }
           }
           setStatus("saved");
           setError("");
+          setConflictId(undefined);
           setDraftNotice("");
         } catch (reason) {
+          if (reason && typeof reason === "object" && "conflictId" in reason)
+            setConflictId(String(reason.conflictId));
           blocked.current = true;
           setStatus(errorCode(reason) === "CONFLICT" ? "conflict" : "error");
           setError(errorMessage(reason));
@@ -165,6 +190,9 @@ export function usePage() {
     current.current = page.document;
     base.current = page.hash;
     baseRevision.current = page.revision;
+    draftBase.current = page.revision;
+    setMergeBase(page.revision);
+    setConflictId(page.workspaceConflicts?.[0]?.id);
     operations.current.clear();
     editGroup.current = { id: crypto.randomUUID(), at: 0 };
     revision.current = 0;
@@ -173,6 +201,8 @@ export function usePage() {
     setDraft(page.document);
     setRecord(page);
     retained.current = null;
+    recoveredFrom.current = null;
+    setAvailableDrafts([]);
     setDraftNotice("");
     setStatus(page.workspaceConflicts?.length ? "conflict" : "saved");
     setError(
@@ -215,8 +245,10 @@ export function usePage() {
         current.current?.id !== pageId
       )
         return true;
-      const candidate =
-        drafts.find((item) => item.clientId === clientId.current) ?? drafts[0];
+      const candidate = drafts.find(
+        (item) => item.clientId === clientId.current,
+      );
+      setAvailableDrafts(drafts.filter((item) => item.id !== candidate?.id));
       if (candidate) {
         const restored = await desktop.invoke<{
           record: EditorDraftRecord;
@@ -233,6 +265,9 @@ export function usePage() {
           setDraft(restored.content);
           revision.current = recoveredSequence + 1;
           retained.current = restored.record;
+          recoveredFrom.current = restored.record.recoverySource ?? null;
+          setMergeBase(restored.record.baseRevision ?? loaded.revision);
+          draftBase.current = restored.record.baseRevision ?? loaded.revision;
           const conflict =
             !!loaded.workspaceConflicts?.length ||
             (!!restored.record.baseRevision &&
@@ -271,6 +306,53 @@ export function usePage() {
   const editContent = useCallback(
     (content: JSONContent) => edit({ content }),
     [edit],
+  );
+  const recoverDraft = useCallback(
+    async (id: string) => {
+      if (!current.current || !projectRef.current) return;
+      const ticket = opening.current,
+        source = current.current,
+        owner = projectRef.current;
+      if (revision.current > savedRevision.current)
+        await persist(source, revision.current, owner);
+      const sequence = revision.current;
+      const recovered = await desktop.invoke<{
+        record: EditorDraftRecord;
+        content: ShowDocument;
+      }>("drafts:read", { id });
+      if (
+        opening.current !== ticket ||
+        revision.current !== sequence ||
+        current.current?.id !== source.id
+      ) {
+        setError("读取草稿期间又有新的编辑，当前编辑已保留。请再次选择草稿。");
+        return;
+      }
+      if (
+        recovered.record.projectId !== owner ||
+        recovered.record.resourceId !== source.id
+      )
+        throw new Error("草稿不属于当前页面。");
+      current.current = recovered.content;
+      setDraft(recovered.content);
+      recoveredFrom.current = recovered.record;
+      revision.current++;
+      const conflict =
+        !!conflictId ||
+        !!record?.workspaceConflicts?.length ||
+        (!!recovered.record.baseRevision &&
+          recovered.record.baseRevision !== baseRevision.current);
+      setMergeBase(recovered.record.baseRevision ?? baseRevision.current);
+      draftBase.current = recovered.record.baseRevision ?? baseRevision.current;
+      blocked.current = conflict;
+      setStatus(conflict ? "conflict" : "changed");
+      setError(
+        conflict ? "已恢复本机草稿，正式版本也有新修改。请比较并处理。" : "",
+      );
+      setDraftNotice("已恢复选中的本机草稿");
+      setAvailableDrafts((items) => items.filter((item) => item.id !== id));
+    },
+    [persist, record, conflictId],
   );
 
   useEffect(() => {
@@ -328,6 +410,7 @@ export function usePage() {
         revision.current > savedRevision.current ||
         loaded.workspaceConflicts?.length
       ) {
+        setConflictId(loaded.workspaceConflicts?.[0]?.id);
         blocked.current = true;
         setStatus("conflict");
         setError("文件已被其他工具修改。请选择保留本地草稿，或载入文件版本。");
@@ -424,8 +507,34 @@ export function usePage() {
   const retry = useCallback(async () => {
     blocked.current = false;
     setError("");
-    return flush();
+    const saved = await flush();
+    if (saved) setStatus("saved");
+    return saved;
   }, [flush]);
+
+  // A reviewed merge or external resolution supersedes this draft. Archive its
+  // exact generation; another window's newer draft must remain recoverable.
+  const acceptResolution = useCallback(async () => {
+    const saved = retained.current;
+    if (saved)
+      await desktop.invoke("drafts:remove", {
+        id: saved.id,
+        generation: saved.generation,
+      });
+    if (recoveredFrom.current) {
+      const original = recoveredFrom.current;
+      await desktop.invoke("drafts:remove", {
+        id: original.id,
+        generation: original.generation,
+      });
+    }
+    await reload();
+  }, [reload]);
+
+  const retainDraft = useCallback(async () => {
+    if (current.current && projectRef.current)
+      await persist(current.current, revision.current, projectRef.current);
+  }, [persist]);
 
   const clear = useCallback(async () => {
     const ticket = ++opening.current;
@@ -435,6 +544,7 @@ export function usePage() {
     projectRef.current = null;
     base.current = "";
     baseRevision.current = undefined;
+    draftBase.current = undefined;
     operations.current.clear();
     revision.current = 0;
     savedRevision.current = 0;
@@ -467,12 +577,18 @@ export function usePage() {
     status,
     error,
     draftNotice,
+    conflictId,
+    mergeBase,
     projectId: projectRef.current,
     open,
     edit,
     editContent,
     flush,
     reload,
+    acceptResolution,
+    retainDraft,
+    availableDrafts,
+    recoverDraft,
     keepCopy,
     retry,
     refresh,

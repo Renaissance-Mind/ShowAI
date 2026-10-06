@@ -19,6 +19,8 @@ export default function Dialog({
   headerContent?: ReactNode;
 }) {
   const panel = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
     const previous = document.activeElement as HTMLElement;
     (
@@ -32,7 +34,7 @@ export default function Dialog({
         [...document.querySelectorAll('[role="dialog"]')].at(-1)
       )
         return;
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") close.current();
       if (event.key === "Tab") {
         const items = [
           ...(panel.current?.querySelectorAll<HTMLElement>(
@@ -56,7 +58,7 @@ export default function Dialog({
       document.removeEventListener("keydown", handle);
       previous?.focus();
     };
-  }, [onClose]);
+  }, []);
   return (
     <div
       className="studio-modal-shade"

@@ -2,6 +2,8 @@ export interface DesktopError {
   code: string;
   message: string;
   currentHash?: string;
+  currentRevision?: string;
+  conflictId?: string;
 }
 
 export interface DesktopInfo {
@@ -10,6 +12,7 @@ export interface DesktopInfo {
   platform: string;
   packaged: boolean;
   mode?: "desktop" | "browser";
+  libraryVersion?: 1 | 2;
   cli: { command: string; args: string[]; env: Record<string, string> };
 }
 

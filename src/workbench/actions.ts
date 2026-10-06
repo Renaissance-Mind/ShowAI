@@ -8,7 +8,7 @@ import { readFile, writeFile, stat } from "node:fs/promises";
 import { join, sep } from "node:path";
 import { randomUUID, createHash } from "node:crypto";
 import { changeContext, withChangeContext } from "../core/history-context";
-import { mutateLibrary } from "../core/library-runtime";
+import { mutateLibrary, versionedLibrary } from "../core/library-runtime";
 import { canonicalJson } from "../core/diff";
 import type { ChangeActor } from "../core/history-model";
 import { EditorDrafts, type EditorDraftInput } from "../core/editor-drafts";
@@ -62,6 +62,7 @@ export const workbenchActions = new Set([
   "history:list",
   "history:compare",
   "history:page",
+  "history:resource",
   "history:restore",
   "history:mergePreview",
   "history:mergeSave",
@@ -296,7 +297,15 @@ export function createWorkbench(
   ): Promise<unknown> {
     switch (action) {
       case "app:info":
-        return host.info();
+        return {
+          ...(await host.info()),
+          libraryVersion: (await versionedLibrary(store.root)) ? 2 : 1,
+        };
+      case "history:resource":
+        return service.historicalResource(
+          required(args, "path"),
+          required(args, "revision"),
+        );
       case "library:search":
         return service.search({
           query: required(args, "query"),

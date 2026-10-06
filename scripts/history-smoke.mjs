@@ -1,0 +1,454 @@
+// Real versioned library, browser/Electron workbench, retained drafts and Git commits.
+import assert from "node:assert/strict";
+import { spawn, execFile } from "node:child_process";
+import { once } from "node:events";
+import { createServer } from "node:net";
+import {
+  cp,
+  mkdir,
+  mkdtemp,
+  readFile,
+  writeFile,
+  symlink,
+} from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { promisify } from "node:util";
+import { build } from "esbuild";
+import { chromium } from "playwright";
+import { rawSourcePlugin } from "./raw-source-plugin.mjs";
+const root = resolve(import.meta.dirname, ".."),
+  mode = process.argv.includes("--desktop") ? "desktop" : "browser";
+await mkdir(join(root, "output/playwright"), { recursive: true });
+const output = await mkdtemp(join(root, "output/playwright/history-")),
+  fixture = join(output, "checkout"),
+  home = join(output, "library");
+await mkdir(fixture);
+for (const path of [
+  "src",
+  "resources",
+  "scripts",
+  "public",
+  "index.html",
+  "portable.html",
+  "package.json",
+  "vite.config.ts",
+  "vite.portable.config.ts",
+  "tsconfig.json",
+])
+  await cp(join(root, path), join(fixture, path), { recursive: true });
+await symlink(
+  join(root, "node_modules"),
+  join(fixture, "node_modules"),
+  process.platform === "win32" ? "junction" : "dir",
+);
+const bootstrap = join(output, "bootstrap.mjs");
+await build({
+  stdin: {
+    contents:
+      'import {GitLibrary} from "./src/core/git-library.ts"; await new GitLibrary(process.argv[2]).initialize();',
+    resolveDir: root,
+  },
+  outfile: bootstrap,
+  bundle: true,
+  packages: "external",
+  platform: "node",
+  format: "esm",
+  plugins: [rawSourcePlugin],
+});
+await promisify(execFile)(process.execPath, [bootstrap, home]);
+async function freePort() {
+  const server = createServer();
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const port = server.address().port;
+  await new Promise((done) => server.close(done));
+  return port;
+}
+const port = await freePort(),
+  debugPort = await freePort();
+const child = spawn(
+  process.execPath,
+  [
+    join(fixture, "scripts/dev.mjs"),
+    mode,
+    "--port",
+    String(port),
+    "--home",
+    home,
+    "--no-open",
+  ],
+  {
+    cwd: fixture,
+    env: { ...process.env, SHOWAI_DEV_DEBUG_PORT: String(debugPort) },
+    stdio: ["ignore", "pipe", "pipe"],
+  },
+);
+let logs = "",
+  browser,
+  page;
+const errors = [],
+  checks = [];
+child.stdout.on("data", (data) => {
+  logs += data;
+});
+child.stderr.on("data", (data) => {
+  logs += data;
+});
+const delay = (ms) => new Promise((done) => setTimeout(done, ms));
+async function poll(read, accepts, label, timeout = 40000) {
+  let value;
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    value = await read();
+    if (accepts(value)) return value;
+    await delay(100);
+  }
+  throw new Error(`${label}: ${JSON.stringify(value)}`);
+}
+const sessionFile = join(
+  fixture,
+  ".showai-dev",
+  `${mode}-${port}`,
+  "session.json",
+);
+const result = { passed: false, mode, output, home, checks, errors };
+try {
+  const session = await poll(
+    () =>
+      readFile(sessionFile, "utf8").then(JSON.parse, (error) => {
+        if (error.code === "ENOENT") return undefined;
+        throw error;
+      }),
+    Boolean,
+    "development startup",
+  );
+  browser =
+    mode === "desktop"
+      ? await chromium.connectOverCDP(`http://127.0.0.1:${debugPort}`)
+      : await chromium.launch();
+  page =
+    mode === "desktop"
+      ? browser.contexts()[0].pages()[0]
+      : await browser.newPage();
+  await page.setViewportSize({ width: 1440, height: 960 });
+  if (mode === "browser") await page.goto(session.url);
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.setDefaultTimeout(15000);
+  await page
+    .getByRole("button", { name: "新建项目", exact: true })
+    .first()
+    .waitFor();
+  const api = (action, args = {}) =>
+    page.evaluate(
+      async ({ action, args }) => {
+        try {
+          return await window.showai.invoke(action, args);
+        } catch (error) {
+          throw new Error(JSON.stringify(error));
+        }
+      },
+      { action, args },
+    );
+  const info = await api("app:info");
+  assert.equal(info.libraryVersion, 2);
+  assert.equal(info.home, home);
+  const project = await api("projects:create", { name: "版本历史验收项目" });
+  const created = await api("pages:create", {
+      projectId: project.id,
+      title: "版本历史验收",
+    }),
+    pageId = created.document.id;
+  const read = () => api("pages:get", { projectId: project.id, pageId });
+  const save = (record, document, message, actor) =>
+    api("pages:save", {
+      projectId: project.id,
+      pageId,
+      document,
+      baseHash: record.hash,
+      baseRevision: record.revision,
+      historyContext: { message, ...(actor ? { actor } : {}) },
+    });
+  const modified = structuredClone(created.document);
+  modified.title = "更新后历史验收";
+  modified.content.content[0].content = [
+    { type: "text", text: "历史检索正文验收" },
+  ];
+  const saved = await save(created, modified, "修改标题与正文", {
+    kind: "agent",
+    harness: "codex",
+    sessionId: "history-ui-test",
+  });
+  const open = async () => {
+    await page
+      .locator(`[data-library-id="${project.id}"] .studio-tree-main`)
+      .click();
+    await page
+      .getByRole("button", { name: new RegExp((await read()).document.title) })
+      .filter({ has: page.locator("strong") })
+      .first()
+      .click();
+    await page.getByRole("button", { name: "页面历史", exact: true }).waitFor();
+  };
+  await open();
+  await page.getByRole("button", { name: "页面历史", exact: true }).click();
+  let dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: /修改标题与正文/ }).click();
+  await dialog
+    .getByText("codex · history-ui-test", { exact: true })
+    .last()
+    .waitFor();
+  await dialog.getByText("修改前", { exact: true }).first().waitFor();
+  await dialog.getByRole("button", { name: "完整页面", exact: true }).click();
+  await dialog.getByText("历史检索正文验收", { exact: true }).waitFor();
+  await page.screenshot({ path: join(output, "history.png") });
+  await dialog.getByRole("button", { name: /创建页面/ }).click();
+  await dialog.getByRole("button", { name: "恢复此版本", exact: true }).click();
+  await dialog.getByRole("button", { name: "确认恢复", exact: true }).click();
+  await dialog.waitFor({ state: "hidden" });
+  const restored = await poll(
+    read,
+    (record) => record.document.title === created.document.title,
+    "restored version",
+  );
+  assert.notEqual(restored.revision, saved.revision);
+  assert.equal(
+    (await api("history:list", { projectId: project.id, pageId })).items[0]
+      .restoredFrom,
+    created.revision,
+  );
+  checks.push(
+    "history shows full timestamps, Agent session, structured changes, complete page and restore as a new commit",
+  );
+  // The restored revision is the shared base; the retained local draft and formal
+  // update each modify an independent field and must both survive the merge UI.
+  const local = structuredClone(restored.document);
+  local.title = "合并后的本机标题";
+  await api("drafts:save", {
+    input: {
+      kind: "page",
+      clientId: "retained-ui-fixture",
+      projectId: project.id,
+      resourceId: pageId,
+      baseRevision: restored.revision,
+      content: local,
+      sequence: 12,
+    },
+  });
+  const remote = structuredClone(restored.document);
+  remote.content.content[0].content = [
+    { type: "text", text: "历史检索正文验收" },
+  ];
+  await save(restored, remote, "另一个会话修改正文");
+  await page.reload();
+  await open();
+  await page
+    .getByRole("button", { name: /^恢复草稿/ })
+    .first()
+    .click();
+  await delay(350);
+  await page.reload();
+  await open();
+  await page.getByRole("button", { name: "比较并合并", exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByText("修改可以自动合并，请检查结果后保存。").waitFor();
+  await dialog
+    .getByRole("button", { name: "保存合并版本", exact: true })
+    .click();
+  await dialog.waitFor({ state: "hidden" });
+  const merged = await read();
+  assert.equal(merged.document.title, local.title);
+  assert.match(JSON.stringify(merged.document.content), /历史检索正文验收/);
+  assert.equal(
+    (
+      await api("drafts:list", {
+        projectId: project.id,
+        kind: "page",
+        resourceId: pageId,
+      })
+    ).length,
+    0,
+  );
+  checks.push(
+    "recovered local draft is merged against its actual base without losing independent formal changes",
+  );
+  await page.getByRole("button", { name: "搜索内容库", exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("textbox", { name: "搜索正文和组件" })
+    .fill("检索正文");
+  await dialog.locator(".history-search-result").first().waitFor();
+  await dialog.locator(".history-search-result").first().click();
+  await dialog.waitFor({ state: "hidden" });
+  checks.push("Chinese full-text search opens the matching page and block");
+  const external = {
+    format: "showai",
+    version: 3,
+    document: { ...merged.document, title: "外部修改标题" },
+  };
+  await writeFile(merged.path, JSON.stringify(external));
+  const attempt = structuredClone(merged.document);
+  attempt.icon = "📝";
+  await assert.rejects(
+    save(merged, attempt, "detect external change"),
+    /CONFLICT.*conflictId/,
+  );
+  await page.reload();
+  await open();
+  await page.getByRole("button", { name: "处理外部修改", exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("button", { name: "导入外部修改", exact: true })
+    .click();
+  await dialog.waitFor({ state: "hidden" });
+  assert.equal((await read()).document.title, external.document.title);
+  checks.push(
+    "external filesystem edits are retained and explicitly imported through the workbench",
+  );
+  // Real compilation, then leave an invalid JSON form and reopen it via search.
+  const manifest = JSON.parse(
+    await readFile(
+      join(root, "resources/catalog/value-slider/manifest.json"),
+      "utf8",
+    ),
+  );
+  const source = await readFile(
+    join(root, "resources/catalog/value-slider/index.tsx"),
+    "utf8",
+  );
+  const schema = JSON.parse(
+    await readFile(
+      join(root, "resources/catalog/value-slider/props.schema.json"),
+      "utf8",
+    ),
+  );
+  const component = await api("components:save", {
+    projectId: project.id,
+    manifest: {
+      ...manifest,
+      id: "history-draft-component",
+      name: "草稿恢复组件验收",
+    },
+    source,
+    schema,
+  });
+  const searchOpen = async (query) => {
+    await page.getByRole("button", { name: "搜索内容库", exact: true }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("textbox", { name: "搜索正文和组件" })
+      .fill(query);
+    await page
+      .getByRole("dialog")
+      .locator(".history-search-result")
+      .first()
+      .click();
+  };
+  await searchOpen(component.name);
+  dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "数据结构", exact: true }).click();
+  await dialog
+    .getByRole("textbox", { name: "组件参数规则", exact: true })
+    .fill('{"unfinished":');
+  await dialog.getByRole("button", { name: "关闭弹窗", exact: true }).click();
+  await dialog.waitFor({ state: "hidden" });
+  await searchOpen(component.name);
+  dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("button", { name: /^恢复草稿/ })
+    .first()
+    .click();
+  await dialog.getByRole("button", { name: "数据结构", exact: true }).click();
+  assert.equal(
+    await dialog
+      .getByRole("textbox", { name: "组件参数规则", exact: true })
+      .inputValue(),
+    '{"unfinished":',
+  );
+  // Focus must stay on the edited field as the draft notice updates.
+  await dialog
+    .getByRole("textbox", { name: "组件参数规则", exact: true })
+    .fill('{"type":"object"}');
+  await delay(350);
+  assert.equal(
+    await page.evaluate(() =>
+      document.activeElement?.getAttribute("aria-label"),
+    ),
+    "组件参数规则",
+  );
+  await dialog
+    .getByRole("button", { name: "保存项目新版本", exact: true })
+    .click();
+  await poll(
+    () =>
+      api("drafts:list", {
+        projectId: project.id,
+        kind: "component",
+        resourceId: component.id,
+      }),
+    (items) => items.length === 0,
+    "published component draft cleared",
+  );
+  await dialog.getByRole("button", { name: "关闭弹窗", exact: true }).click();
+  await dialog.waitFor({ state: "hidden" });
+  const drafts = await api("drafts:list", {
+    projectId: project.id,
+    kind: "component",
+    resourceId: component.id,
+  });
+  assert.equal(drafts.length, 0);
+  checks.push(
+    "component forms preserve incomplete JSON, restore chosen drafts, keep input focus and clear only committed generations",
+  );
+  const template = await api("templates:save", {
+    projectId: project.id,
+    id: "history-draft-template",
+    version: "1.0.0",
+    name: "草稿恢复模板验收",
+    description: "版本化模板草稿验收",
+    document: (await read()).document,
+  });
+  await searchOpen(template.name);
+  dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "定制说明", exact: true }).click();
+  await dialog
+    .getByRole("textbox", { name: "模板简述", exact: true })
+    .fill("未发布的模板说明");
+  await dialog.getByRole("button", { name: "关闭弹窗", exact: true }).click();
+  await dialog.waitFor({ state: "hidden" });
+  await searchOpen(template.name);
+  dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("button", { name: /^恢复草稿/ })
+    .first()
+    .click();
+  assert.equal(
+    await dialog
+      .getByRole("textbox", { name: "模板简述", exact: true })
+      .inputValue(),
+    "未发布的模板说明",
+  );
+  await dialog
+    .getByRole("button", { name: "保存项目新版本", exact: true })
+    .click();
+  await dialog.waitFor({ state: "hidden" });
+  checks.push(
+    "template descriptions and layout forms recover and publish a new version through the actual catalog",
+  );
+  assert.deepEqual(errors, []);
+  await page.screenshot({ path: join(output, "complete.png") });
+  result.passed = true;
+} catch (error) {
+  result.failure = error.stack;
+  throw error;
+} finally {
+  await writeFile(join(output, "result.json"), JSON.stringify(result, null, 2));
+  await writeFile(join(output, "service.log"), logs);
+  if (!result.passed && page && !page.isClosed())
+    await page
+      .screenshot({ path: join(output, "failure.png") })
+      .catch(() => {});
+  await browser?.close();
+  child.kill("SIGTERM");
+  if (child.exitCode === null) await once(child, "exit");
+  console.log(JSON.stringify(result, null, 2));
+}

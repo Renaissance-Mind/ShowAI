@@ -12,6 +12,7 @@
     "dev:status": "node scripts/dev-open.mjs --status",
     "dev:install": "node scripts/install-dev-app.mjs",
     "test:dev": "node scripts/dev-smoke.mjs",
+    "test:history": "node scripts/history-smoke.mjs",
     "build:portable": "vite build --config vite.portable.config.ts && node scripts/copy-viewer.mjs",
     "build": "tsc -b && npm run build:portable && vite build && npm run build:agent && npm run package:runtime && npm run package:plugin && npm run desktop:build",
     "preview": "vite preview --host 127.0.0.1",

@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { encodeFile, decodeFile } from "./history-codec";
+import { encodeFile, decodeFile, nodePrefix } from "./history-codec";
 import { atomicLibraryFile, readLibraryBytes } from "./library-files";
 import { withLibraryLock } from "./library-lock";
 import { CoreError } from "./model";
@@ -20,6 +20,7 @@ export interface EditorDraftInput {
   actor?: ChangeActor;
   content: unknown;
   sequence?: number;
+  recoverySource?: { id: string; generation: string };
 }
 export interface EditorDraftRecord extends Omit<EditorDraftInput, "content"> {
   format: "showai-editor-draft";
@@ -30,6 +31,7 @@ export interface EditorDraftRecord extends Omit<EditorDraftInput, "content"> {
   path: string;
   assets: string[];
   base64Assets: string[];
+  base64AssetPaths?: string[][];
   storage: "page-nodes" | "json";
   normalizationWarning?: string;
 }
@@ -60,6 +62,64 @@ function identifier(value: string, field: string): void {
   )
     throw new CoreError("INVALID_DATA", `Invalid draft ${field}.`);
 }
+const generationPattern =
+  /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+function validateRecord(record: EditorDraftRecord, id: string) {
+  if (
+    !record ||
+    record.format !== "showai-editor-draft" ||
+    record.version !== 1 ||
+    record.id !== id ||
+    identity(record) !== id ||
+    !["page", "component", "template"].includes(record.kind) ||
+    !generationPattern.test(record.generation) ||
+    !["page-nodes", "json"].includes(record.storage) ||
+    !Array.isArray(record.assets) ||
+    record.assets.some(
+      (asset) => typeof asset !== "string" || !/^[a-f0-9]{64}$/.test(asset),
+    ) ||
+    !Array.isArray(record.base64Assets) ||
+    record.base64Assets.some((name) => typeof name !== "string")
+  )
+    throw new CoreError("INVALID_DATA", "Invalid editor draft manifest.");
+  identifier(record.clientId, "clientId");
+  identifier(record.resourceId, "resourceId");
+  if (record.projectId) identifier(record.projectId, "projectId");
+  const expected =
+    record.storage === "page-nodes"
+      ? `projects/${record.projectId}/pages/${record.resourceId}.json`
+      : `drafts/${id}.json`;
+  if (
+    record.path !== expected ||
+    (record.storage === "page-nodes" &&
+      (!/^[\w-]{1,128}$/.test(record.projectId ?? "") ||
+        !/^[\w-]{1,128}$/.test(record.resourceId)))
+  )
+    throw new CoreError(
+      "INVALID_DATA",
+      "Draft content path differs from its identity.",
+    );
+  if (
+    record.base64AssetPaths &&
+    (!Array.isArray(record.base64AssetPaths) ||
+      record.base64AssetPaths.some(
+        (path) =>
+          !Array.isArray(path) ||
+          !path.every((part) => typeof part === "string") ||
+          !(
+            (path.length === 2 && path[0] === "assets") ||
+            (path.length === 3 && path[0] === "source" && path[1] === "assets")
+          ),
+      ))
+  )
+    throw new CoreError("INVALID_DATA", "Invalid draft asset slots.");
+  if (
+    record.recoverySource &&
+    (!/^[a-f0-9]{64}$/.test(record.recoverySource.id) ||
+      !generationPattern.test(record.recoverySource.generation))
+  )
+    throw new CoreError("INVALID_DATA", "Invalid recovery draft identity.");
+}
 
 /** Draft generations are local; formal history begins only after a successful commit. */
 export class EditorDrafts {
@@ -70,6 +130,12 @@ export class EditorDrafts {
     identifier(input.clientId, "clientId");
     identifier(input.resourceId, "resourceId");
     if (input.projectId) identifier(input.projectId, "projectId");
+    if (
+      input.recoverySource &&
+      (!/^[a-f0-9]{64}$/.test(input.recoverySource.id) ||
+        !generationPattern.test(input.recoverySource.generation))
+    )
+      throw new CoreError("INVALID_DATA", "Invalid recovery draft identity.");
     const raw = JSON.stringify(input.content);
     if (
       input.sequence !== undefined &&
@@ -94,29 +160,43 @@ export class EditorDrafts {
           this.root,
           join(directory, "draft.json"),
         );
-        if (previous && input.sequence !== undefined) {
+        if (previous) {
           const record = JSON.parse(
             previous.toString("utf8"),
           ) as EditorDraftRecord;
-          if ((record.sequence ?? -1) > input.sequence) return record;
+          validateRecord(record, id);
+          if (
+            input.sequence !== undefined &&
+            (record.sequence ?? -1) > input.sequence
+          )
+            return record;
         }
         let content = JSON.parse(raw),
           path = `drafts/${id}.json`,
           storage: EditorDraftRecord["storage"] = "json";
         const base64Assets: string[] = [];
-        if (
-          input.kind === "component" &&
-          content?.assets &&
-          typeof content.assets === "object"
-        )
-          for (const [name, value] of Object.entries(content.assets)) {
+        const base64AssetPaths: string[][] = [];
+        if (input.kind === "component")
+          for (const [holder, prefix] of [
+            [content, []],
+            [content?.source, ["source"]],
+          ] as [Record<string, unknown> | undefined, string[]][]) {
             if (
-              typeof value === "string" &&
-              Buffer.from(value, "base64").toString("base64") === value
-            ) {
-              content.assets[name] =
-                `data:application/octet-stream;base64,${value}`;
-              base64Assets.push(name);
+              !holder?.assets ||
+              typeof holder.assets !== "object" ||
+              Array.isArray(holder.assets)
+            )
+              continue;
+            for (const [name, value] of Object.entries(holder.assets)) {
+              if (
+                typeof value === "string" &&
+                Buffer.from(value, "base64").toString("base64") === value
+              ) {
+                (holder.assets as Record<string, string>)[name] =
+                  `data:application/octet-stream;base64,${value}`;
+                base64AssetPaths.push([...prefix, "assets", name]);
+                if (!prefix.length) base64Assets.push(name);
+              }
             }
           }
         let files: ReturnType<typeof encodeFile>,
@@ -181,6 +261,7 @@ export class EditorDrafts {
           savedAt: new Date().toISOString(),
           assets,
           base64Assets,
+          base64AssetPaths,
           ...(normalizationWarning ? { normalizationWarning } : {}),
         };
         await atomicLibraryFile(
@@ -222,14 +303,7 @@ export class EditorDrafts {
       );
       if (!bytes) continue;
       const record = JSON.parse(bytes.toString()) as EditorDraftRecord;
-      if (
-        record.format !== "showai-editor-draft" ||
-        record.version !== 1 ||
-        record.id !== id ||
-        identity(record) !== id ||
-        !/^[a-f0-9-]{36}$/.test(record.generation)
-      )
-        throw new CoreError("INVALID_DATA", "Invalid editor draft manifest.");
+      validateRecord(record, id);
       if (
         Object.entries(input).every(
           ([key, value]) =>
@@ -264,6 +338,11 @@ export class EditorDrafts {
     );
     const bytes = await decodeFile(record.path, async (path) => {
       if (path.startsWith("assets/")) {
+        if (!record.assets.includes(path.slice(7)))
+          throw new CoreError(
+            "INVALID_DATA",
+            "Draft references an undeclared asset.",
+          );
         const asset = await readLibraryBytes(
           this.root,
           join(this.root, "local", "draft-assets", path.slice(7)),
@@ -271,16 +350,55 @@ export class EditorDrafts {
         if (!asset) throw new CoreError("NOT_FOUND", "Draft asset is missing.");
         return asset;
       }
+      if (
+        path !== record.path &&
+        !(
+          record.storage === "page-nodes" &&
+          path.startsWith(nodePrefix(record.path)) &&
+          /^[a-f0-9]{64}\.json$/.test(
+            path.slice(nodePrefix(record.path).length),
+          )
+        )
+      )
+        throw new CoreError(
+          "INVALID_PATH",
+          "Draft references another generation or resource.",
+        );
       const value = await readLibraryBytes(this.root, join(directory, path));
       if (!value) throw new CoreError("NOT_FOUND", "Draft content is missing.");
       return value;
     });
     let content = JSON.parse(bytes.toString("utf8"));
     if (record.storage === "page-nodes") content = content.document;
-    for (const name of record.base64Assets)
-      content.assets[name] = content.assets[name].slice(
-        "data:application/octet-stream;base64,".length,
-      );
+    for (const path of record.base64AssetPaths ??
+      record.base64Assets.map((name) => ["assets", name])) {
+      let parent = content;
+      for (const part of path.slice(0, -1)) {
+        if (
+          !parent ||
+          typeof parent !== "object" ||
+          !Object.hasOwn(parent, part)
+        )
+          throw new CoreError("INVALID_DATA", "Invalid draft asset slot.");
+        parent = parent[part];
+      }
+      const key = path.at(-1)!,
+        prefix = "data:application/octet-stream;base64,";
+      if (
+        !parent ||
+        typeof parent !== "object" ||
+        !Object.hasOwn(parent, key) ||
+        typeof parent[key] !== "string" ||
+        !parent[key].startsWith(prefix)
+      )
+        throw new CoreError("INVALID_DATA", "Invalid draft asset value.");
+      Object.defineProperty(parent, key, {
+        value: parent[key].slice(prefix.length),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+    }
     return { record, content };
   }
 
@@ -288,6 +406,15 @@ export class EditorDrafts {
     return withLibraryLock(
       this.root,
       async () => {
+        if (!/^[a-f0-9]{64}$/.test(id))
+          throw new CoreError("INVALID_PATH", "Invalid draft identity.");
+        if (
+          !(await readLibraryBytes(
+            this.root,
+            join(this.root, "local", "editor-drafts", id, "draft.json"),
+          ))
+        )
+          return;
         const { record, content: payload } = await this.readUnlocked(id);
         if (expectedGeneration && record.generation !== expectedGeneration)
           return;

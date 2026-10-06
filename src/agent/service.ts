@@ -947,6 +947,9 @@ export class AgentService {
   private versioned() {
     return new LibraryOperations(this.store.root, this.projectId);
   }
+  async historicalResource(path: string, revision: string) {
+    return this.versioned().describePath(path, revision);
+  }
   history(input: HistoryQuery = {}) {
     return this.versioned().history(input);
   }
