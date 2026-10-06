@@ -40,7 +40,15 @@ export async function mutateLibrary<T>(
   const library = versionedLibrary(home);
   if (!library) return action();
   const state = libraryMutations.getStore();
-  if (state?.root === library.root) return action();
+  if (state?.root === library.root) {
+    const origins = Object.fromEntries(
+      ["restoredFrom", "mergedFrom", "externalConflictId"]
+        .filter((key) => context[key as keyof ChangeContext] !== undefined)
+        .map((key) => [key, context[key as keyof ChangeContext]]),
+    );
+    state.origins = { ...state.origins, ...origins };
+    return action();
+  }
   const result = await library.transaction(context, action);
   if (
     result.entry &&

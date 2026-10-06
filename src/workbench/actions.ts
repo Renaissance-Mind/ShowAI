@@ -59,6 +59,16 @@ import type { DesktopInfo } from "../desktop/bridge";
 
 export const workbenchActions = new Set([
   "app:info",
+  "history:list",
+  "history:compare",
+  "history:page",
+  "history:restore",
+  "history:mergePreview",
+  "history:mergeSave",
+  "history:conflicts",
+  "history:conflict",
+  "history:resolve",
+  "library:search",
   "drafts:list",
   "drafts:read",
   "drafts:save",
@@ -287,6 +297,88 @@ export function createWorkbench(
     switch (action) {
       case "app:info":
         return host.info();
+      case "library:search":
+        return service.search({
+          query: required(args, "query"),
+          projectId: text(args, "projectId", true),
+          kind: text(args, "kind", true) as
+            | "page"
+            | "component"
+            | "template"
+            | "project"
+            | "source"
+            | undefined,
+          limit: args.limit as number | undefined,
+          cursor: text(args, "cursor", true),
+        });
+      case "history:list":
+        return service.history({
+          projectId: text(args, "projectId", true),
+          pageId: text(args, "pageId", true),
+          path: text(args, "path", true),
+          harness: text(args, "harness", true),
+          sessionId: text(args, "sessionId", true),
+          query: text(args, "query", true),
+          before: text(args, "cursor", true),
+          limit: args.limit as number | undefined,
+        });
+      case "history:compare":
+        return service.compareHistory(
+          required(args, "before"),
+          required(args, "after"),
+          {
+            projectId: text(args, "projectId", true),
+            pageId: text(args, "pageId", true),
+          },
+        );
+      case "history:page":
+        return service.historicalPage(
+          projectId(args),
+          pageId(args),
+          required(args, "revision"),
+        );
+      case "history:restore":
+        return enrichPage(
+          projectId(args),
+          await service.restorePage({
+            projectId: projectId(args),
+            pageId: pageId(args),
+            revision: required(args, "revision"),
+            baseRevision: required(args, "baseRevision"),
+          }),
+        );
+      case "history:mergePreview":
+        return service.pageMergePreview({
+          projectId: projectId(args),
+          pageId: pageId(args),
+          baseRevision: required(args, "baseRevision"),
+          document: validateDocument(args.document),
+        });
+      case "history:mergeSave":
+        return enrichPage(
+          projectId(args),
+          await service.pageMergeSave({
+            projectId: projectId(args),
+            pageId: pageId(args),
+            baseRevision: required(args, "baseRevision"),
+            currentRevision: required(args, "currentRevision"),
+            document: validateDocument(args.document),
+          }),
+        );
+      case "history:conflicts":
+        return service.workspaceConflicts(text(args, "projectId", true));
+      case "history:conflict":
+        return service.workspaceConflict(required(args, "id"));
+      case "history:resolve": {
+        const resolution = required(args, "resolution");
+        if (!["discard", "import", "merge"].includes(resolution))
+          throw new CoreError("INVALID_DATA", "Invalid conflict resolution.");
+        return service.resolveWorkspaceConflict({
+          id: required(args, "id"),
+          resolution: resolution as "discard" | "import" | "merge",
+          document: args.document ? validateDocument(args.document) : undefined,
+        });
+      }
       case "drafts:list":
         return new EditorDrafts(store.root).list({
           clientId: text(args, "clientId", true),
@@ -912,6 +1004,9 @@ export function createWorkbench(
     }
   }
   const mutationActions = new Set([
+    "history:restore",
+    "history:mergeSave",
+    "history:resolve",
     "projects:create",
     "projects:rename",
     "projects:pin",
@@ -942,7 +1037,7 @@ export function createWorkbench(
     "catalog:mergeSave",
     "catalog:verifyPublish",
   ]);
-  const dialogActions = new Set(["components:import"]);
+  const dialogActions = new Set(["components:import", "history:resolve"]);
   return (action: string, args: Record<string, unknown>): Promise<unknown> => {
     if (!mutationActions.has(action)) return handle(action, args);
     const supplied = args.historyContext as

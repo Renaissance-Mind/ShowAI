@@ -4,7 +4,12 @@ import { FileStore } from "../core/store";
 import { applyOperations, canonicalJson } from "../core/diff";
 import { createHash } from "node:crypto";
 import { mutateLibrary } from "../core/library-runtime";
-import { changeContext } from "../core/history-context";
+import { changeContext, withChangeContext } from "../core/history-context";
+import {
+  LibraryOperations,
+  type HistoryQuery,
+} from "../core/library-operations";
+import type { SearchOptions } from "../core/library-index";
 import { CoreError } from "../core/model";
 import { projectDirectory } from "../core/project-directory";
 import type {
@@ -939,6 +944,83 @@ export class AgentService {
       projectId: this.requireProject(input.projectId),
     });
   }
+  private versioned() {
+    return new LibraryOperations(this.store.root, this.projectId);
+  }
+  history(input: HistoryQuery = {}) {
+    return this.versioned().history(input);
+  }
+  search(input: SearchOptions) {
+    return this.versioned().search(input);
+  }
+  compareHistory(
+    before: string,
+    after: string,
+    input: { projectId?: string; pageId?: string } = {},
+  ) {
+    return this.versioned().changes(before, after, input);
+  }
+  historicalPage(projectId: string, pageId: string, revision: string) {
+    return this.versioned().pageAt(
+      this.requireProject(projectId),
+      pageId,
+      revision,
+    );
+  }
+  restorePage(input: {
+    projectId: string;
+    pageId: string;
+    revision: string;
+    baseRevision: string;
+  }) {
+    this.requireProject(input.projectId);
+    return withChangeContext(
+      { ...changeContext(), restoredFrom: input.revision },
+      () =>
+        this.mutation("Restore page", [input], () =>
+          this.versioned().restorePage(input),
+        ),
+    );
+  }
+  pageMergePreview(input: {
+    projectId: string;
+    pageId: string;
+    baseRevision: string;
+    document: ShowDocument;
+  }) {
+    this.requireProject(input.projectId);
+    return this.versioned().previewMerge(input);
+  }
+  pageMergeSave(input: {
+    projectId: string;
+    pageId: string;
+    baseRevision: string;
+    currentRevision: string;
+    document: ShowDocument;
+  }) {
+    this.requireProject(input.projectId);
+    return withChangeContext(
+      { ...changeContext(), mergedFrom: input.baseRevision },
+      () =>
+        this.mutation("Merge page", [input], () =>
+          this.versioned().saveMerge(input),
+        ),
+    );
+  }
+  workspaceConflicts(projectId?: string) {
+    return this.versioned().conflicts(projectId);
+  }
+  workspaceConflict(id: string) {
+    return this.versioned().conflict(id);
+  }
+  resolveWorkspaceConflict(input: {
+    id: string;
+    resolution: "discard" | "import" | "merge";
+    document?: ShowDocument;
+  }) {
+    return this.versioned().resolveConflict(input);
+  }
+
   private mutation<T>(
     name: string,
     args: unknown[],

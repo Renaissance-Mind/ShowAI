@@ -740,6 +740,32 @@ export async function getTemplate(
     )
       return item;
   }
+  if (
+    projectId &&
+    options.integrity &&
+    (!options.scope || ["all", "project"].includes(options.scope))
+  ) {
+    const path = await safePath(
+      home,
+      join(
+        projectRoot(home, projectId),
+        "packages",
+        "historical",
+        "templates",
+        options.integrity,
+        "template.json",
+      ),
+    );
+    if (await optionalStat(home, path)) {
+      const item = templateRecord(await readJson(home, path), "project");
+      if (
+        item.id === id &&
+        (!options.version || item.version === options.version) &&
+        item.integrity === options.integrity
+      )
+        return item;
+    }
+  }
   throw new Error(
     `Exact template not found: ${id}${options.version ? `@${options.version}` : ""}${options.integrity ? ` (integrity ${options.integrity})` : ""}.`,
   );
@@ -1741,6 +1767,34 @@ async function componentLocation(
         throw new Error("Component path and identity differ.");
       if (!options.integrity || options.integrity === item.integrity)
         return { path, scope: location.scope };
+    }
+  }
+  if (
+    projectId &&
+    options.integrity &&
+    (!options.scope || ["all", "project"].includes(options.scope))
+  ) {
+    const path = await safePath(
+      home,
+      join(
+        projectRoot(home, projectId),
+        "packages",
+        "historical",
+        "components",
+        options.integrity,
+      ),
+    );
+    if (await optionalStat(home, path)) {
+      const item = compiledRecord(
+        await readJson(home, join(path, "compiled.json")),
+        "project",
+      );
+      if (
+        item.id === id &&
+        (!version || item.version === version) &&
+        item.integrity === options.integrity
+      )
+        return { path, scope: "project" };
     }
   }
   throw new Error(

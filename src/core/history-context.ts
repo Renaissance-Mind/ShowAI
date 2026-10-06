@@ -6,6 +6,10 @@ export interface LibraryMutation {
   head: string | null;
   changes: FileChanges;
   expected: Map<string, string | null>;
+  origins?: Pick<
+    ChangeContext,
+    "restoredFrom" | "mergedFrom" | "externalConflictId"
+  >;
 }
 const actors = new AsyncLocalStorage<ChangeContext>();
 export const libraryMutations = new AsyncLocalStorage<LibraryMutation>();

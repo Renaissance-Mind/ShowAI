@@ -5,6 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { withChangeContext } from "../core/history-context";
 import { mutateLibrary } from "../core/library-runtime";
 import { canonicalJson } from "../core/diff";
+import { GitLibrary } from "../core/git-library";
 import type { ChangeContext } from "../core/history-model";
 import { AgentService, errorResult } from "./service";
 import type {
@@ -56,6 +57,14 @@ Read one Page through structured data, an image or interactive HTML:
   pages read PAGE --project PROJECT --view image --theme dark --width 1000 --height 900 --out preview.png
   pages read PAGE --project PROJECT --view html [--state reading-state.json] --out preview.html
 
+Versioned libraries: library init | verify | compact
+  search --query TEXT [--project ID] [--kind page|component|template|project|source]
+  history list [--project ID] [--page ID] [--session SESSION_ID]
+  history read PAGE --project ID --revision REVISION
+  history compare --before REVISION --after REVISION [--project ID] [--page ID]
+  history restore PAGE --project ID --revision REVISION --base-revision CURRENT_REVISION
+  history merge PAGE --project ID --input DRAFT --base-revision BASE [--revision CURRENT_TO_SAVE]
+  history conflicts [--project ID] | conflict CONFLICT_ID | resolve CONFLICT_ID --resolution discard|import|merge
 Shared: --home PATH, --project ID, --json, --help.
 Project defaults to the host project directory (Git root of cwd); --project overrides it.
 Shared promotion/registration is explicit.
@@ -88,6 +97,13 @@ function parseArguments(args: string[]): Arguments {
     "group",
     "actor",
     "since",
+    "revision",
+    "before",
+    "after",
+    "from",
+    "until",
+    "resolution",
+    "path",
     "page",
     "blocks",
     "format",
@@ -317,6 +333,118 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
       )[command],
     );
   switch (command) {
+    case "library": {
+      if (action === "init") {
+        requireCount(args, 2);
+        return new GitLibrary(service.store.root).initialize();
+      }
+      if (action === "verify") {
+        requireCount(args, 2);
+        await new GitLibrary(service.store.root).verify();
+        return { verified: true };
+      }
+      if (action === "compact") {
+        requireCount(args, 2);
+        return new GitLibrary(service.store.root).compact();
+      }
+      break;
+    }
+    case "search": {
+      requireCount(args, 1);
+      return service.search({
+        query: option(args, "query", true)!,
+        projectId: option(args, "project"),
+        kind: option(args, "kind") as
+          "page" | "component" | "template" | "project" | "source" | undefined,
+        limit: option(args, "limit")
+          ? Number(option(args, "limit"))
+          : undefined,
+        cursor: option(args, "cursor"),
+      });
+    }
+    case "history": {
+      if (action === "list") {
+        requireCount(args, 2);
+        return service.history({
+          projectId: option(args, "project"),
+          pageId: option(args, "page"),
+          path: option(args, "path"),
+          harness: option(args, "harness"),
+          sessionId: option(args, "session"),
+          query: option(args, "query"),
+          from: option(args, "from"),
+          to: option(args, "until"),
+          before: option(args, "cursor"),
+          limit: option(args, "limit")
+            ? Number(option(args, "limit"))
+            : undefined,
+        });
+      }
+      if (action === "compare") {
+        requireCount(args, 2);
+        return service.compareHistory(
+          option(args, "before", true)!,
+          option(args, "after", true)!,
+          { projectId: option(args, "project"), pageId: option(args, "page") },
+        );
+      }
+      if (action === "read") {
+        requireCount(args, 3);
+        return service.historicalPage(
+          await project(),
+          id,
+          option(args, "revision", true)!,
+        );
+      }
+      if (action === "restore") {
+        requireCount(args, 3);
+        return service.restorePage({
+          projectId: await project(),
+          pageId: id,
+          revision: option(args, "revision", true)!,
+          baseRevision: option(args, "base-revision", true)!,
+        });
+      }
+      if (action === "merge") {
+        requireCount(args, 3);
+        const document = (await readDocument(option(args, "input", true)!))
+          .document;
+        const selection = {
+          projectId: await project(),
+          pageId: id,
+          baseRevision: option(args, "base-revision", true)!,
+          document,
+        };
+        return option(args, "revision")
+          ? service.pageMergeSave({
+              ...selection,
+              currentRevision: option(args, "revision", true)!,
+            })
+          : service.pageMergePreview(selection);
+      }
+      if (action === "conflicts") {
+        requireCount(args, 2);
+        return service.workspaceConflicts(option(args, "project"));
+      }
+      if (action === "conflict") {
+        requireCount(args, 3);
+        return service.workspaceConflict(id);
+      }
+      if (action === "resolve") {
+        requireCount(args, 3);
+        const resolution = option(args, "resolution", true);
+        if (!resolution || !["discard", "import", "merge"].includes(resolution))
+          throw new Error("--resolution must be discard, import or merge.");
+        return service.resolveWorkspaceConflict({
+          id,
+          resolution: resolution as "discard" | "import" | "merge",
+          document: option(args, "input")
+            ? (await readDocument(option(args, "input")!)).document
+            : undefined,
+        });
+      }
+      break;
+    }
     case "serve": {
       requireCount(args, 1);
       const { runBrowser } = await import("../browser/launch");
@@ -744,7 +872,10 @@ export async function runCli(argv: string[]): Promise<unknown> {
     (command === "catalog" &&
       (["import", "save", "promote", "fork"].includes(action) ||
         (action === "merge" && mode === "resolve"))) ||
-    (command === "publish" && ["verify", "register"].includes(action));
+    (command === "publish" && ["verify", "register"].includes(action)) ||
+    (command === "history" &&
+      (action === "restore" ||
+        (action === "merge" && !!option(args, "revision"))));
   if (!mutation || args.options.help)
     return withChangeContext(context, () => runCliCommand(argv));
   const requestFingerprint = createHash("sha256")

@@ -521,6 +521,174 @@ export function createMcpServer(options: {
     },
     (input) => call(() => service.publications(input)),
   );
+  server.registerTool(
+    "history_list",
+    {
+      description:
+        "List committed change times, actors, sessions and touched resources in this project.",
+      inputSchema: {
+        pageId: z.string().optional(),
+        harness: z.string().optional(),
+        sessionId: z.string().optional(),
+        query: z.string().optional(),
+        limit: z.number().int().min(1).max(200).optional(),
+        before: z.string().optional(),
+      },
+      annotations: readOnly,
+    },
+    (input) => call(() => service.history({ ...input, projectId })),
+  );
+  server.registerTool(
+    "library_search",
+    {
+      description:
+        "Search this project's page body, nested containers, component/template descriptions and source, returning node locations.",
+      inputSchema: {
+        query: z.string(),
+        kind: z
+          .enum(["page", "component", "template", "project", "source"])
+          .optional(),
+        limit: z.number().int().min(1).max(50).optional(),
+        cursor: z.string().optional(),
+      },
+      annotations: readOnly,
+    },
+    (input) => call(() => service.search({ ...input, projectId })),
+  );
+  server.registerTool(
+    "history_compare",
+    {
+      description:
+        "Compare two exact committed revisions, optionally for one page.",
+      inputSchema: {
+        before: z.string(),
+        after: z.string(),
+        pageId: z.string().optional(),
+      },
+      annotations: readOnly,
+    },
+    ({ before, after, pageId }) =>
+      call(() => service.compareHistory(before, after, { projectId, pageId })),
+  );
+  server.registerTool(
+    "history_page",
+    {
+      description:
+        "Read a historical page with its exact verified component dependency closure.",
+      inputSchema: { pageId: z.string(), revision: z.string() },
+      annotations: readOnly,
+    },
+    ({ pageId, revision }) =>
+      call(() => service.historicalPage(projectId, pageId, revision)),
+  );
+  server.registerTool(
+    "history_restore",
+    {
+      description:
+        "Restore a page and its needed component/source versions as a new change. Requires the current resource revision.",
+      inputSchema: {
+        ...changeSchema,
+        pageId: z.string(),
+        revision: z.string(),
+        baseRevision: z.string(),
+      },
+      annotations: write,
+    },
+    ({ operationId, message, groupId, ...input }) =>
+      call(() => service.restorePage({ ...input, projectId }), {
+        operationId,
+        message,
+        groupId,
+      }),
+  );
+  server.registerTool(
+    "page_merge_preview",
+    {
+      description:
+        "Compare a local draft, its exact base and the current page; conflicts retain all three values.",
+      inputSchema: {
+        pageId: z.string(),
+        baseRevision: z.string(),
+        document: jsonObject,
+      },
+      annotations: readOnly,
+    },
+    ({ document, ...input }) =>
+      call(() =>
+        service.pageMergePreview({
+          ...input,
+          projectId,
+          document: validateDocument(document),
+        }),
+      ),
+  );
+  server.registerTool(
+    "page_merge_save",
+    {
+      description:
+        "Commit a reviewed resolved page, rechecking the current resource revision.",
+      inputSchema: {
+        ...changeSchema,
+        pageId: z.string(),
+        baseRevision: z.string(),
+        currentRevision: z.string(),
+        document: jsonObject,
+      },
+      annotations: write,
+    },
+    ({ operationId, message, groupId, document, ...input }) =>
+      call(
+        () =>
+          service.pageMergeSave({
+            ...input,
+            projectId,
+            document: validateDocument(document),
+          }),
+        { operationId, message, groupId },
+      ),
+  );
+  server.registerTool(
+    "workspace_conflicts",
+    {
+      description: "List retained external file changes in this project.",
+      inputSchema: {},
+      annotations: readOnly,
+    },
+    () => call(() => service.workspaceConflicts(projectId)),
+  );
+  server.registerTool(
+    "workspace_conflict",
+    {
+      description:
+        "Read the preserved external bytes and their formal/baseline versions.",
+      inputSchema: { id: z.string() },
+      annotations: readOnly,
+    },
+    ({ id }) => call(() => service.workspaceConflict(id)),
+  );
+  server.registerTool(
+    "workspace_resolve",
+    {
+      description:
+        "Resolve an external change by discard, validated page import or reviewed merge. Preserved external snapshots remain available.",
+      inputSchema: {
+        ...changeSchema,
+        id: z.string(),
+        resolution: z.enum(["discard", "import", "merge"]),
+        document: jsonObject.optional(),
+      },
+      annotations: write,
+    },
+    ({ operationId, message, groupId, document, ...input }) =>
+      call(
+        () =>
+          service.resolveWorkspaceConflict({
+            ...input,
+            ...(document ? { document: validateDocument(document) } : {}),
+          }),
+        { operationId, message, groupId },
+      ),
+  );
   return server;
 }
 

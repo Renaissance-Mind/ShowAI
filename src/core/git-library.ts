@@ -210,6 +210,19 @@ export class GitLibrary {
         await this.recoverUnlocked();
         return this.manifest();
       }
+      for (const name of ["projects", "packages"]) {
+        const entries = await readdir(join(this.root, name)).catch(
+          (error: NodeJS.ErrnoException) => {
+            if (error.code === "ENOENT") return [];
+            throw error;
+          },
+        );
+        if (entries.length)
+          throw new CoreError(
+            "CONFLICT",
+            "This directory contains an existing file library. Import it into a new versioned library instead of initializing over it.",
+          );
+      }
       const result = await gitExec(
         ["init", "--bare", "--quiet", this.repository],
         this.root,
@@ -511,6 +524,10 @@ export class GitLibrary {
         head: await this.head(),
         changes: new Map<string, Buffer | null>(),
         expected: new Map<string, string | null>(),
+        origins: {} as Pick<
+          ChangeContext,
+          "restoredFrom" | "mergedFrom" | "externalConflictId"
+        >,
       };
       let value: T;
       try {
@@ -624,7 +641,7 @@ export class GitLibrary {
           : undefined;
       const entry = await this.writeUnlocked(
         state.changes,
-        context,
+        { ...context, ...state.origins },
         state.expected,
         response,
       );

@@ -2076,3 +2076,155 @@ test("versioned CLI and MCP propagate identities, conditional revisions and repl
     await client.close();
   }
 });
+
+test("versioned history/search/merge/restore are reachable from CLI and project-bound MCP", async () => {
+  const root = await mkdtemp(join(home, "history-api-"));
+  const local = (args: string[]) => run(args, { home: root });
+  await local(["library", "init"]);
+  const project = await local(["projects", "create", "--name", "History API"]);
+  const first = await local([
+    "pages",
+    "create",
+    "--project",
+    project.id,
+    "--title",
+    "Historical report",
+  ]);
+  const ops = join(home, "history-body.json");
+  await writeFile(
+    ops,
+    JSON.stringify([
+      {
+        type: "block.text.set",
+        blockId: first.document.content.content[0].attrs.id,
+        text: "论文图表检索证据",
+      },
+    ]),
+  );
+  const second = await local([
+    "pages",
+    "apply",
+    first.document.id,
+    "--project",
+    project.id,
+    "--input",
+    ops,
+    "--base-hash",
+    first.hash,
+    "--base-revision",
+    first.revision,
+  ]);
+  expect(
+    (await local(["search", "--query", "图表", "--project", project.id]))
+      .items[0].blockId,
+  ).toBe(first.document.content.content[0].attrs.id);
+  const history = await local([
+    "history",
+    "list",
+    "--project",
+    project.id,
+    "--page",
+    first.document.id,
+  ]);
+  expect(history.items).toHaveLength(2);
+  const comparison = await local([
+    "history",
+    "compare",
+    "--project",
+    project.id,
+    "--page",
+    first.document.id,
+    "--before",
+    first.revision,
+    "--after",
+    second.revision,
+  ]);
+  expect(comparison.changes.length).toBeGreaterThan(0);
+  expect(
+    (
+      await local([
+        "history",
+        "read",
+        first.document.id,
+        "--project",
+        project.id,
+        "--revision",
+        first.revision,
+      ])
+    ).document,
+  ).toEqual(first.document);
+  const restoreArgs = [
+    "history",
+    "restore",
+    first.document.id,
+    "--project",
+    project.id,
+    "--revision",
+    first.revision,
+    "--base-revision",
+    second.revision,
+    "--operation-id",
+    "restore-history-api",
+  ];
+  const restored = await local(restoreArgs);
+  expect(await local(restoreArgs)).toEqual(restored);
+  expect(
+    (
+      await local([
+        "history",
+        "list",
+        "--project",
+        project.id,
+        "--page",
+        first.document.id,
+      ])
+    ).items[0].restoredFrom,
+  ).toBe(first.revision);
+  const client = new Client({ name: "history-api-client", version: "1.0.0" });
+  await client.connect(
+    new StdioClientTransport({
+      command: process.execPath,
+      args: [cli, "mcp", "--home", root, "--project", project.id],
+      env: Object.fromEntries(
+        Object.entries(environment()).filter(
+          (entry): entry is [string, string] => typeof entry[1] === "string",
+        ),
+      ),
+    }),
+  );
+  const unpack = (result: unknown) =>
+    JSON.parse((result as { content: { text: string }[] }).content[0].text);
+  try {
+    expect(
+      unpack(
+        await client.callTool({
+          name: "history_list",
+          arguments: { pageId: first.document.id },
+        }),
+      ).data.items,
+    ).toHaveLength(3);
+    expect(
+      unpack(
+        await client.callTool({
+          name: "history_page",
+          arguments: { pageId: first.document.id, revision: second.revision },
+        }),
+      ).data.document.content.content[0].content[0].text,
+    ).toBe("论文图表检索证据");
+    expect(
+      unpack(
+        await client.callTool({
+          name: "library_search",
+          arguments: { query: "图表" },
+        }),
+      ).data.items,
+    ).toEqual([]);
+    expect(
+      unpack(
+        await client.callTool({ name: "workspace_conflicts", arguments: {} }),
+      ).data,
+    ).toEqual([]);
+  } finally {
+    await client.close();
+  }
+});
