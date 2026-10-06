@@ -5,7 +5,6 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { chromium, _electron } from "playwright";
-import electron from "electron";
 const root = resolve(import.meta.dirname, "..");
 await mkdir(join(root, "output/playwright"), { recursive: true });
 const output = await mkdtemp(join(root, "output/playwright/whiteboard-v2-"));
@@ -79,7 +78,8 @@ try {
   browser = await chromium.launch();
   if (desktop) {
     application = await _electron.launch({
-      executablePath: process.env.SHOWAI_SMOKE_BINARY || electron,
+      executablePath:
+        process.env.SHOWAI_SMOKE_BINARY || (await import("electron")).default,
       args: process.env.SHOWAI_SMOKE_BINARY ? [] : [root],
       cwd: root,
       env,
@@ -210,6 +210,46 @@ try {
     image: getComputedStyle(element).backgroundImage,
   }));
   assert.deepEqual(colors, { background: "rgb(255, 255, 255)", image: "none" });
+  const longEditor = object(firstId).locator(".tiptap");
+  await longEditor.press("End");
+  await longEditor.press("Enter");
+  await page.keyboard.insertText(
+    "长文阅读保持连续，编辑、选择和浏览共享同一个区域。".repeat(120),
+  );
+  await poll(
+    read,
+    (record) => JSON.stringify(record.document).includes("长文阅读"),
+    "long article persisted",
+  );
+  await settled();
+  await page.getByLabel("区域与视图", { exact: true }).click();
+  await page
+    .locator(".surface-navigation-row")
+    .getByRole("button", { name: roots(created)[0].attrs.name, exact: true })
+    .click();
+  await settled();
+  const beforeReading = await camera();
+  result.reading = {
+    before: beforeReading,
+    anchorBefore: await surface.getAttribute("data-anchor"),
+    bounds: await object(firstId).boundingBox(),
+  };
+  const readingBox = await surface.boundingBox();
+  await page.mouse.move(
+    readingBox.x + readingBox.width / 2,
+    readingBox.y + readingBox.height / 2,
+  );
+  // Keep the wheel step inside the article across native OS delta scaling.
+  await page.mouse.wheel(0, 80);
+  await poll(
+    camera,
+    (value) => value.y < beforeReading.y - 40,
+    "uninterrupted vertical reading",
+  );
+  await settled();
+  assert.ok(Math.abs((await camera()).x - beforeReading.x) < 1);
+  result.reading.after = await camera();
+  result.reading.anchorAfter = await surface.getAttribute("data-anchor");
   await resistance(firstId);
   result.checks.push(
     "white background, visible resistance in both directions and interruptible animated return in a normal reading region",

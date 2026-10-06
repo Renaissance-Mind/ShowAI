@@ -1,7 +1,14 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 // Exercises the real desktop catalog across two real project directories.
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rename, writeFile } from "node:fs/promises";
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rename,
+  writeFile,
+} from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -652,39 +659,50 @@ try {
       },
     },
   });
-  const inlineExport = JSON.parse(
-    execFileSync(
-      process.execPath,
-      [
-        join(root, "dist-agent/cli.mjs"),
-        "export",
-        "--project",
-        a.id,
-        "--page",
-        compact.document.id,
-        "--format",
-        "inline",
-        "--out",
-        join(output, "nested-inline.html"),
-        "--json",
-      ],
-      { env, encoding: "utf8" },
-    ),
-  ).data;
-  const inlineOpened = application.waitForEvent("window");
-  await application.evaluate(async ({ BrowserWindow }, path) => {
-    const window = new BrowserWindow({
-      show: false,
-      webPreferences: { contextIsolation: true, sandbox: true },
+  const inlineResult = spawnSync(
+    process.execPath,
+    [
+      join(root, "dist-agent/cli.mjs"),
+      "export",
+      "--project",
+      a.id,
+      "--page",
+      compact.document.id,
+      "--format",
+      "inline",
+      "--out",
+      join(output, "nested-inline.html"),
+      "--json",
+    ],
+    { env, encoding: "utf8" },
+  );
+  const inlineResponse = JSON.parse(inlineResult.stdout);
+  if (inlineResult.status !== 0) {
+    assert.equal(inlineResponse.ok, false);
+    assert.match(inlineResponse.error.message, /1 MB conversation limit/);
+    await assert.rejects(access(join(output, "nested-inline.html")), {
+      code: "ENOENT",
     });
-    await window.loadFile(path);
-  }, inlineExport.path);
-  const inlinePage = await inlineOpened;
-  await inlinePage
-    .getByRole("heading", { name: "组合中的文本", exact: true })
-    .waitFor();
-  assert.equal(await inlinePage.locator("iframe").count(), 0);
-  result.inlineExportBytes = inlineExport.bytes;
+    result.checks.push(
+      "oversize inline delivery rejects before writing output and points to the verified standalone HTML",
+    );
+  } else {
+    const inlineExport = inlineResponse.data;
+    const inlineOpened = application.waitForEvent("window");
+    await application.evaluate(async ({ BrowserWindow }, path) => {
+      const window = new BrowserWindow({
+        show: false,
+        webPreferences: { contextIsolation: true, sandbox: true },
+      });
+      await window.loadFile(path);
+    }, inlineExport.path);
+    const inlinePage = await inlineOpened;
+    await inlinePage
+      .getByRole("heading", { name: "组合中的文本", exact: true })
+      .waitFor();
+    assert.equal(await inlinePage.locator("iframe").count(), 0);
+    result.inlineExportBytes = inlineExport.bytes;
+  }
 
   await page.screenshot({
     path: join(output, "nested-component.png"),
