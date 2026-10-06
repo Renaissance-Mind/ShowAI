@@ -16,9 +16,17 @@ showai guide workspace --json
 showai guide catalog --json
 ```
 
-Choose one topic for the current operation: `workspace`, `authoring`, `document`, `catalog`, `templates`, `versions`, `export` or `publish`. `document` explains the JSON block format; it is only needed when authoring blocks directly. Catalog summaries and command receipts include a useful next step.
+Choose one topic for the current operation: `workspace`, `authoring`, `whiteboard`, `document`, `catalog`, `templates`, `versions`, `export` or `publish`. `whiteboard` explains Page roots, regions, layout and saved views; `document` explains rich-text blocks inside regions and legacy v1 sources; it is only needed when authoring blocks directly. Catalog summaries and command receipts include a useful next step.
 
 Every successful `--json` command returns `{ "ok": true, "data": ... }`. Failures return `{ "ok": false, "error": { "code", "message", "currentHash"? } }` and a nonzero exit code (`3` for page conflicts).
+
+## Whiteboard pages
+
+New pages default to artifact version 2 with a `surface` root. Every root node is equal; all may be removed. Regions use `flow`, `grid` or `free` layouts. Read `showai guide whiteboard --json` before constructing spatial pages. Content lives in the node tree, position and region rules in `layout`, and named views/reading order in `views`.
+
+Use `block.insert/move/replace/remove` for structure, `surface.layout.set` for geometry, `surface.view.save/remove` for views and `surface.reading-order.set` for linear delivery. Supply the current base hash. Existing v1 pages can be migrated with `surface.upgrade`; Core preserves the original bytes and snapshots. Keep version 2 roots when editing a whiteboard.
+
+Templates can be inserted into an existing page with `template apply ID --project PROJECT --page PAGE --base-hash HASH`, optionally `--parent REGION_ID`. This remaps every node and view reference, places new content beside existing content, and preserves the target initial view.
 
 ## Select the current project
 
@@ -161,6 +169,8 @@ export default function Figure({ data, onChange, readOnly }) {
 }
 ```
 
+Components that handle scrolling or zoom can import `GestureBoundary` from `showai:components` and set `axes={["x"]}`, `["y"]`, `["zoom"]` or a combination. Claim only the input axes needed by that interaction.
+
 The SDK also exports `Callout`, `Toggle`, `Divider`, `Code`, `Chart`, `Database`, `Metrics`, `Playground`, `Gallery`, and `Bookmark`. Package-local React modules can nest normally. To reuse an existing custom component, declare its exact component ref in `manifest.dependencies`, then import its default export from `showai:component/ID`. The child must have verified editable source available in the selected project or shared catalog. Pass `readOnly` and connect child `onChange` callbacks to the parent's data; each child validates its own schema. The parent schema should define the complete data it stores, including nested child data.
 
 Composition is compiled into the parent's runtime and works in desktop, offline HTML and inline conversation exports. Global registration and publication preserve all exact dependency sources. Cycles, missing fingerprints, imports outside a package, and compositions deeper than 16 levels are rejected. Nesting is authored in code.
@@ -186,6 +196,8 @@ showai export --project PROJECT --page PAGE --format html --components bundled -
 showai export --project PROJECT --page PAGE --format inline --components bundled --out ./report-inline.html --json
 showai export --project PROJECT --format site --components remote --out ./site --json
 ```
+
+`--presentation spatial` is the default. Use `--presentation reading` for a responsive document-style projection in reading order. Both retain the same complete v2 editable source.
 
 Bundled is the default. The reader, content and exact custom runtimes travel together; raster images must be embedded for offline delivery. HTML and inline exports also save editable source JSON. A static site includes relative navigation, source files and shared reader assets, and is intended for HTTP/static hosting. Whole-project export omits archived pages.
 

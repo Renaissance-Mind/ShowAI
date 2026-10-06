@@ -1,451 +1,453 @@
+import { flushSync } from "react-dom";
 import {
-  useImperativeHandle,
   useEffect,
+  useImperativeHandle,
   useRef,
   useState,
   type ReactNode,
   type Ref,
-  type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
-  ArrowDownToLine,
-  FileText,
-  GripHorizontal,
-  Minus,
+  Focus,
+  List,
   Maximize2,
-  MoveUpRight,
+  Minus,
   Plus,
+  BookmarkPlus,
+  Star,
   Trash2,
 } from "lucide-react";
-import { MAX_ZOOM, MIN_ZOOM, type CanvasPlacement } from "./model";
 import { useSurfaceViewport } from "./useSurfaceViewport";
+import { ObjectContext, type ObjectActions } from "./SurfaceObject";
+import type { NodeLayout, PageViews, SavedView } from "./types";
 import "./surface.css";
 
 export interface SurfaceHandle {
-  insertPosition: () => CanvasPlacement;
-  reveal: (position: CanvasPlacement) => void;
+  insertPosition: () => NodeLayout;
+  reveal: (id: string) => void;
 }
-
-export interface SurfaceItem {
-  id: string;
-  position: CanvasPlacement;
-  content: ReactNode;
-}
-
 interface Props {
   children: ReactNode;
-  items: SurfaceItem[];
   ref?: Ref<SurfaceHandle>;
-  onAdd?: () => void;
-  onMove?: (id: string, position: CanvasPlacement) => void;
-  onDock?: (id: string) => void;
-  onDelete?: (id: string) => void;
+  pageId: string;
+  nodes: { id: string; name: string }[];
+  layoutKey: string;
+  paths: Record<string, string[]>;
+  views: PageViews;
+  header?: ReactNode;
+  selected?: string | null;
+  onSelect?: (id: string | null) => void;
+  onAdd?: (kind: "flow" | "grid" | "free" | "text" | "image") => void;
+  onMove?: ObjectActions["move"];
+  onRemove?: (id: string) => void;
+  onInspect?: (id: string) => void;
+  onAddText?: (id: string) => void;
+  onViews?: (views: PageViews) => void;
   extraActions?: ReactNode;
 }
 
-function SurfaceCard({
-  item,
-  scale,
-  onMove,
-  onDock,
-  onDelete,
-}: { item: SurfaceItem; scale: number } & Pick<
-  Props,
-  "onMove" | "onDock" | "onDelete"
->) {
-  const cardRef = useRef<HTMLElement>(null);
-  const current = useRef({ item, onMove });
-  current.current = { item, onMove };
-  const [moving, setMoving] = useState(false);
-  const pending = useRef<null | {
-    id: number;
-    x: number;
-    y: number;
-    initial: CanvasPlacement;
-    next: CanvasPlacement;
-    resize: boolean;
-  }>(null);
-  const handleRef = useRef<HTMLButtonElement | null>(null);
-  const cancelDrag = () => {
-    const drag = pending.current;
-    if (!drag) return;
-    pending.current = null;
-    setMoving(false);
-    const position = current.current.item.position;
-    const card = cardRef.current!;
-    card.style.left = `${position.x}px`;
-    card.style.top = `${position.y}px`;
-    card.style.width = `${position.width}px`;
-    if (handleRef.current?.hasPointerCapture(drag.id))
-      handleRef.current.releasePointerCapture(drag.id);
-  };
-  useEffect(() => {
-    window.addEventListener("blur", cancelDrag);
-    return () => window.removeEventListener("blur", cancelDrag);
-  }, []);
-
-  const start = (
-    event: ReactPointerEvent<HTMLButtonElement>,
-    resize = false,
-  ) => {
-    if (event.button !== 0 || !onMove) return;
-    event.preventDefault();
-    event.stopPropagation();
-    event.currentTarget.focus({ preventScroll: true });
-    event.currentTarget.setPointerCapture(event.pointerId);
-    handleRef.current = event.currentTarget;
-    pending.current = {
-      id: event.pointerId,
-      x: event.clientX,
-      y: event.clientY,
-      initial: item.position,
-      next: item.position,
-      resize,
-    };
-    setMoving(true);
-  };
-  const move = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    const drag = pending.current;
-    if (!drag || drag.id !== event.pointerId) return;
-    const dx = (event.clientX - drag.x) / scale,
-      dy = (event.clientY - drag.y) / scale;
-    drag.next = drag.resize
-      ? {
-          ...drag.initial,
-          width: Math.max(240, Math.min(1600, drag.initial.width + dx)),
-        }
-      : {
-          ...drag.initial,
-          x: Math.max(-1000000, Math.min(1000000, drag.initial.x + dx)),
-          y: Math.max(-1000000, Math.min(1000000, drag.initial.y + dy)),
-        };
-    const card = cardRef.current!;
-    card.style.left = `${drag.next.x}px`;
-    card.style.top = `${drag.next.y}px`;
-    card.style.width = `${drag.next.width}px`;
-  };
-  const finish = (
-    event: ReactPointerEvent<HTMLButtonElement>,
-    cancelled = false,
-  ) => {
-    const drag = pending.current;
-    if (!drag || drag.id !== event.pointerId) return;
-    pending.current = null;
-    setMoving(false);
-    // A file refresh during a drag wins; never overwrite it with stale coordinates.
-    const latest = current.current.item.position;
-    const unchanged =
-      latest.x === drag.initial.x &&
-      latest.y === drag.initial.y &&
-      latest.width === drag.initial.width;
-    const position =
-      cancelled || !unchanged ? current.current.item.position : drag.next;
-    const card = cardRef.current!;
-    card.style.left = `${position.x}px`;
-    card.style.top = `${position.y}px`;
-    card.style.width = `${position.width}px`;
-    if (event.currentTarget.hasPointerCapture(event.pointerId))
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    if (!cancelled && unchanged) current.current.onMove?.(item.id, position);
-  };
-  const handlers = {
-    onPointerMove: move,
-    onPointerUp: (event: ReactPointerEvent<HTMLButtonElement>) => finish(event),
-    onPointerCancel: (event: ReactPointerEvent<HTMLButtonElement>) =>
-      finish(event, true),
-    onLostPointerCapture: (event: ReactPointerEvent<HTMLButtonElement>) =>
-      finish(event, true),
-  };
-  return (
-    <section
-      ref={cardRef}
-      className={`surface-card${moving ? " is-moving" : ""}`}
-      data-surface-content
-      data-surface-item={item.id}
-      style={{
-        left: item.position.x,
-        top: item.position.y,
-        width: item.position.width,
-      }}
-      aria-label="画布内容"
-      onKeyDownCapture={(event) => {
-        if (event.key === "Escape" && pending.current) {
-          event.preventDefault();
-          event.stopPropagation();
-          cancelDrag();
-        }
-      }}
-    >
-      <div className="surface-card-bar" data-surface-ui>
-        {onMove ? (
-          <button
-            className="surface-card-grip"
-            data-surface-handle
-            aria-label="移动画布内容"
-            title="拖动移动；方向键微调，Shift 加速"
-            onPointerDown={(event) => start(event)}
-            {...handlers}
-            onKeyDown={(event) => {
-              const deltas: Record<string, [number, number]> = {
-                ArrowLeft: [-1, 0],
-                ArrowRight: [1, 0],
-                ArrowUp: [0, -1],
-                ArrowDown: [0, 1],
-              };
-              const delta = deltas[event.key];
-              if (delta) {
-                event.preventDefault();
-                event.stopPropagation();
-                const step = event.shiftKey ? 50 : 10;
-                onMove(item.id, {
-                  ...item.position,
-                  x: Math.max(
-                    -1000000,
-                    Math.min(1000000, item.position.x + delta[0] * step),
-                  ),
-                  y: Math.max(
-                    -1000000,
-                    Math.min(1000000, item.position.y + delta[1] * step),
-                  ),
-                });
-              }
-            }}
-          >
-            <GripHorizontal size={16} />
-            <span>画布内容</span>
-          </button>
-        ) : (
-          <span>画布内容</span>
-        )}
-        {onDock && (
-          <button
-            aria-label="收回正文"
-            title="将内容移到正文末尾"
-            onClick={() => onDock(item.id)}
-          >
-            <ArrowDownToLine size={15} />
-          </button>
-        )}
-        {onDelete && (
-          <button
-            aria-label="删除画布内容"
-            title="删除画布内容"
-            onClick={() => onDelete(item.id)}
-          >
-            <Trash2 size={14} />
-          </button>
-        )}
-      </div>
-      <div className="surface-card-content">{item.content}</div>
-      {onMove && (
-        <button
-          className="surface-card-resize"
-          data-surface-handle
-          aria-label="调整画布内容宽度"
-          title="拖动调整宽度；左右方向键微调"
-          onPointerDown={(event) => start(event, true)}
-          {...handlers}
-          onKeyDown={(event) => {
-            if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
-            event.preventDefault();
-            event.stopPropagation();
-            onMove(item.id, {
-              ...item.position,
-              width: Math.max(
-                240,
-                Math.min(
-                  1600,
-                  item.position.width +
-                    (event.key === "ArrowLeft" ? -1 : 1) *
-                      (event.shiftKey ? 100 : 20),
-                ),
-              ),
-            });
-          }}
-        >
-          <MoveUpRight size={13} />
-        </button>
-      )}
-    </section>
-  );
-}
-
-/** All content shares one camera and one elastic navigation model. */
 export default function PageSurface({
   children,
-  items,
   ref,
+  pageId,
+  nodes,
+  layoutKey,
+  paths,
+  views,
+  header,
+  selected = null,
+  onSelect = () => {},
   onAdd,
   onMove,
-  onDock,
-  onDelete,
+  onRemove,
+  onInspect,
+  onAddText,
+  onViews,
   extraActions,
 }: Props) {
-  const viewport = useSurfaceViewport(
-    items
-      .map(
-        (item) =>
-          `${item.id}:${item.position.x}:${item.position.y}:${item.position.width}`,
-      )
-      .join("|"),
-  );
-  const { rootRef, scrollRef, worldRef, documentRef, scale, camera, controls } =
-    viewport;
-  const reveal = (position: CanvasPlacement) => {
-    const root = rootRef.current!,
-      world = worldRef.current!;
-    const left = (scrollRef.current!.clientWidth - world.offsetWidth) / 2;
-    const target = {
-      x:
-        root.clientWidth / 2 -
-        left -
-        (position.x + position.width / 2) * camera.current.scale,
-      y: root.clientHeight * 0.25 - position.y * camera.current.scale,
-      scale: camera.current.scale,
+  const { rootRef, scrollRef, worldRef, camera, controls, scale } =
+    useSurfaceViewport(
+      layoutKey,
+      onMove ? `showai.viewport.v2:${pageId}` : undefined,
+    );
+  const [revealAll, setRevealAll] = useState(false);
+  const [revealed, setRevealed] = useState<Set<string>>(new Set());
+  const [viewName, setViewName] = useState("");
+  const initialized = useRef(false);
+  const navigationFrames = useRef({ first: 0, second: 0 });
+  useEffect(() => {
+    const print = () => flushSync(() => setRevealAll(true));
+    window.addEventListener("beforeprint", print);
+    return () => {
+      window.removeEventListener("beforeprint", print);
+      cancelAnimationFrame(navigationFrames.current.first);
+      cancelAnimationFrame(navigationFrames.current.second);
     };
-    controls.current.moveTo(target);
+  }, []);
+  const navigation = useRef<HTMLDetailsElement>(null);
+  const focusAfterMount = (
+    ids?: string[],
+    single = false,
+    immediate = false,
+  ) => {
+    if (ids?.length)
+      setRevealed(
+        (current) =>
+          new Set([
+            ...current,
+            ...ids.flatMap((id) => [...(paths[id] ?? []), id]),
+          ]),
+      );
+    else setRevealAll(true);
+    cancelAnimationFrame(navigationFrames.current.first);
+    cancelAnimationFrame(navigationFrames.current.second);
+    navigationFrames.current.first = requestAnimationFrame(
+      () =>
+        (navigationFrames.current.second = requestAnimationFrame(() => {
+          if (single && ids?.[0]) controls.current.focus(ids[0], immediate);
+          else controls.current.fit(ids, immediate);
+        })),
+    );
   };
-  const fit = () => {
-    const root = rootRef.current!,
-      world = worldRef.current!,
-      body = documentRef.current!;
-    const cards = [...world.querySelectorAll<HTMLElement>(".surface-card")];
-    const minX = Math.min(0, ...items.map((item) => item.position.x));
-    const minY = Math.min(0, ...items.map((item) => item.position.y));
-    const maxX = Math.max(
-      world.offsetWidth,
-      ...items.map((item) => item.position.x + item.position.width),
-    );
-    const maxY = Math.max(
-      body.offsetHeight,
-      ...items.map(
-        (item, index) => item.position.y + (cards[index]?.offsetHeight ?? 160),
-      ),
-    );
-    const scale = Math.max(
-      MIN_ZOOM,
-      Math.min(
-        1,
-        (root.clientWidth - 80) / (maxX - minX),
-        (root.clientHeight - 140) / (maxY - minY),
-      ),
-    );
-    const left = (scrollRef.current!.clientWidth - world.offsetWidth) / 2;
-    const target = {
-      x: root.clientWidth / 2 - left - ((minX + maxX) / 2) * scale,
-      y: 48 - minY * scale,
-      scale,
-    };
-    controls.current.moveTo(target);
-  };
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+    if (
+      controls.current.restored &&
+      (!controls.current.restoredAnchor ||
+        Object.hasOwn(paths, controls.current.restoredAnchor))
+    ) {
+      const saved = controls.current.restoredTargets;
+      const available = saved.filter((id) => Object.hasOwn(paths, id));
+      if (!saved.length || available.length) {
+        setRevealed(
+          new Set(available.flatMap((id) => [...(paths[id] ?? []), id])),
+        );
+        navigationFrames.current.first = requestAnimationFrame(() => {
+          navigationFrames.current.second = requestAnimationFrame(() =>
+            controls.current.restore(),
+          );
+        });
+        return;
+      }
+    }
+    const initial = views.saved.find((view) => view.id === views.initial);
+    if (initial) focusAfterMount(initial.targets, false, true);
+    else if (nodes[0]) focusAfterMount([nodes[0].id], true, true);
+  }, []);
   useImperativeHandle(ref, () => ({
     insertPosition: () => {
       const root = rootRef.current!,
-        world = worldRef.current!;
-      const left = (scrollRef.current!.clientWidth - world.offsetWidth) / 2;
-      const c = camera.current;
-      let x = (root.clientWidth / 2 - left - c.x) / c.scale - 180;
-      if (x > -400 && x < world.offsetWidth + 40)
-        x = world.offsetWidth + 64 + (items.length % 4) * 32;
+        c = camera.current;
       return {
-        x,
-        y: (root.clientHeight * 0.25 - c.y) / c.scale,
+        x: (root.clientWidth / 2 - c.x) / c.scale,
+        y: (root.clientHeight / 3 - c.y) / c.scale,
         width: 360,
       };
     },
-    reveal,
+    reveal: (id) => focusAfterMount([id], true),
   }));
+  const names = new Map(nodes.map((node) => [node.id, node.name]));
+  const viewTargets = selected
+    ? [selected]
+    : !navigation.current?.open
+      ? []
+      : [
+          ...(worldRef.current?.querySelectorAll<HTMLElement>(
+            "[data-surface-id]",
+          ) ?? []),
+        ]
+          .filter((element) => {
+            const rect = element.getBoundingClientRect(),
+              viewport = rootRef.current!.getBoundingClientRect();
+            return (
+              rect.right > viewport.left &&
+              rect.left < viewport.right &&
+              rect.bottom > viewport.top &&
+              rect.top < viewport.bottom
+            );
+          })
+          .map((element) => element.dataset.surfaceId!);
+  const saveView = () => {
+    if (!viewName.trim() || !onViews || !viewTargets.length) return;
+    const view: SavedView = {
+      id: crypto.randomUUID(),
+      name: viewName.trim(),
+      targets: viewTargets,
+    };
+    onViews({ ...views, saved: [...views.saved, view] });
+    setViewName("");
+  };
   return (
-    <div
-      ref={rootRef}
-      className="page-surface"
-      tabIndex={0}
-      role="region"
-      aria-label="页面工作区"
-      aria-description="在白板上滚动或拖动空白处浏览。横向滑动带有弹性阻力，完整可见的内容会轻微吸附；持续滑动可以离开。Escape 回到正文。"
+    <ObjectContext.Provider
+      value={{
+        scale,
+        selected,
+        select: onSelect,
+        inspect: onInspect,
+        addText: onAddText,
+        remove: onRemove,
+        move: onMove,
+        readOnly: !onMove,
+        revealAll,
+        revealed,
+      }}
     >
-      <div ref={scrollRef} className="surface-scroll">
-        <div ref={worldRef} className="surface-world">
-          <div
-            ref={documentRef}
-            className="surface-document"
-            data-surface-content
-          >
+      <div
+        ref={rootRef}
+        className="page-surface"
+        onPointerDown={(event) => {
+          if (
+            !(event.target as Element).closest(
+              "[data-surface-content], [data-surface-ui]",
+            )
+          )
+            onSelect(null);
+        }}
+        role="region"
+        aria-label="白板"
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (
+            event.key === "Escape" &&
+            !(event.target as Element).closest(
+              'input,textarea,[contenteditable="true"]',
+            )
+          ) {
+            onSelect(null);
+            if (navigation.current) navigation.current.open = false;
+          }
+        }}
+        aria-description="在白板上滚动或拖动空白处浏览。内容区域支持弹性滑动和轻微吸附。方向键浏览，0 总览；Escape 取消当前操作。"
+      >
+        <div className="surface-metadata" data-surface-ui>
+          {header}
+        </div>
+        <div ref={scrollRef} className="surface-scroll">
+          <div ref={worldRef} className="surface-world">
             {children}
           </div>
-          {items.map((item) => (
-            <SurfaceCard
-              key={item.id}
-              item={item}
-              scale={scale}
-              onMove={onMove}
-              onDock={onDock}
-              onDelete={onDelete}
-            />
-          ))}
         </div>
-      </div>
-      <div
-        className="surface-toolbar"
-        data-surface-ui
-        role="group"
-        aria-label="页面视图"
-      >
-        <button
-          onClick={() => controls.current.home()}
-          title="回到正文位置（Escape）"
-        >
-          <FileText size={15} />
-          <span>回到正文</span>
-        </button>
-        <span className="surface-toolbar-divider" />
-        <button
-          aria-label="缩小画布"
-          disabled={scale <= MIN_ZOOM}
-          onClick={() => controls.current.zoom(scale / 1.2)}
-        >
-          <Minus size={15} />
-        </button>
-        <button
-          className="surface-zoom"
-          aria-label="重置画布缩放"
-          title="重置为 100%"
-          onClick={() => controls.current.zoom(1)}
-        >
-          {Math.round(scale * 100)}%
-        </button>
-        <button
-          aria-label="放大画布"
-          disabled={scale >= MAX_ZOOM}
-          onClick={() => controls.current.zoom(scale * 1.2)}
-        >
-          <Plus size={15} />
-        </button>
-        <button aria-label="总览画布内容" title="总览画布内容" onClick={fit}>
-          <Maximize2 size={15} />
-        </button>
-        {onAdd && (
-          <>
-            <span className="surface-toolbar-divider" />
-            <button onClick={onAdd}>
-              <Plus size={15} />
-              <span>添加内容</span>
-            </button>
-          </>
+        {!nodes.length && (
+          <div className="surface-empty" data-surface-ui>
+            <p>{onAdd ? "在这里开始一份内容" : "这块白板还没有内容"}</p>
+            {onAdd && (
+              <button type="button" onClick={() => onAdd("flow")}>
+                <Plus size={16} />
+                开始写作
+              </button>
+            )}
+          </div>
         )}
-        {extraActions}
-      </div>
-      {items.length > 0 && (
-        <div className="surface-orientation" data-surface-ui>
-          <span>{`${items.length} 个内容区域`}</span>
-          {items.length > 0 && (
-            <button onClick={() => reveal(items[0].position)}>定位内容</button>
+        <div
+          className="surface-toolbar"
+          data-surface-ui
+          role="group"
+          aria-label="白板工具"
+        >
+          <details
+            ref={navigation}
+            className="surface-popover-anchor"
+            onKeyDownCapture={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                navigation.current!.open = false;
+                navigation.current!.querySelector("summary")?.focus();
+              }
+            }}
+          >
+            <summary aria-label="区域与视图" title="区域与视图">
+              <List size={16} />
+            </summary>
+            <div className="surface-navigation">
+              <strong>区域与内容</strong>
+              {nodes.map((node) => (
+                <div className="surface-navigation-row" key={node.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSelect(node.id);
+                      focusAfterMount([node.id], true);
+                      navigation.current!.open = false;
+                    }}
+                  >
+                    {node.name}
+                  </button>
+                  {onViews && (
+                    <>
+                      <button
+                        type="button"
+                        aria-label={`前移 ${node.name} 阅读顺序`}
+                        disabled={views.readingOrder.indexOf(node.id) < 1}
+                        onClick={() => {
+                          const order = [...views.readingOrder],
+                            index = order.indexOf(node.id);
+                          [order[index - 1], order[index]] = [
+                            order[index],
+                            order[index - 1],
+                          ];
+                          onViews({ ...views, readingOrder: order });
+                        }}
+                      >
+                        ↑
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+              {!nodes.length && <p>添加内容后可在这里定位。</p>}
+              <strong>命名视图</strong>
+              {views.saved.map((view) => (
+                <div className="surface-navigation-row" key={view.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      focusAfterMount(view.targets);
+                      navigation.current!.open = false;
+                    }}
+                  >
+                    {view.name}
+                  </button>
+                  {onViews && (
+                    <>
+                      <button
+                        type="button"
+                        aria-label={`设为初始视图 ${view.name}`}
+                        aria-pressed={views.initial === view.id}
+                        onClick={() =>
+                          onViews({
+                            ...views,
+                            initial: views.initial === view.id ? null : view.id,
+                          })
+                        }
+                      >
+                        <Star size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`删除视图 ${view.name}`}
+                        onClick={() =>
+                          onViews({
+                            ...views,
+                            initial:
+                              views.initial === view.id ? null : views.initial,
+                            saved: views.saved.filter(
+                              (entry) => entry.id !== view.id,
+                            ),
+                          })
+                        }
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+              {onViews && (
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    saveView();
+                  }}
+                >
+                  <input
+                    aria-label="视图名称"
+                    placeholder={
+                      selected
+                        ? `${names.get(selected) || "所选内容"}的视图`
+                        : "当前可见内容的视图"
+                    }
+                    maxLength={200}
+                    value={viewName}
+                    onChange={(event) => setViewName(event.target.value)}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!viewName.trim() || !viewTargets.length}
+                  >
+                    <BookmarkPlus size={14} />
+                    保存视图
+                  </button>
+                </form>
+              )}
+            </div>
+          </details>
+          <button
+            type="button"
+            aria-label="总览"
+            title="总览全部内容（0）"
+            onClick={() => focusAfterMount()}
+          >
+            <Maximize2 size={15} />
+          </button>
+          <button
+            type="button"
+            aria-label="定位所选"
+            title="定位所选内容"
+            disabled={!selected}
+            onClick={() => selected && focusAfterMount([selected], true)}
+          >
+            <Focus size={15} />
+          </button>
+          <span className="surface-toolbar-divider" />
+          <button
+            type="button"
+            aria-label="缩小白板"
+            disabled={scale <= 0.25}
+            onClick={() => controls.current.zoom(scale / 1.2)}
+          >
+            <Minus size={15} />
+          </button>
+          <button
+            type="button"
+            className="surface-zoom"
+            aria-label="重置缩放"
+            onClick={() => controls.current.zoom(1)}
+          >
+            {Math.round(scale * 100)}%
+          </button>
+          <button
+            type="button"
+            aria-label="放大白板"
+            disabled={scale >= 2}
+            onClick={() => controls.current.zoom(scale * 1.2)}
+          >
+            <Plus size={15} />
+          </button>
+          {onAdd && (
+            <details className="surface-popover-anchor">
+              <summary aria-label="添加内容">
+                <Plus size={15} />
+                <span>添加</span>
+              </summary>
+              <div className="surface-add-menu">
+                {(
+                  [
+                    ["flow", "顺序区域"],
+                    ["grid", "网格区域"],
+                    ["free", "自由区域"],
+                    ["text", "独立文本"],
+                    ["image", "图片"],
+                  ] as const
+                ).map(([kind, label]) => (
+                  <button
+                    type="button"
+                    key={kind}
+                    onClick={(event) => {
+                      onAdd(kind);
+                      event.currentTarget.closest("details")!.open = false;
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </details>
           )}
-          <span className="surface-gesture-help">
-            拖动空白处 · 双指平移与缩放
-          </span>
+          {extraActions}
         </div>
-      )}
-    </div>
+      </div>
+    </ObjectContext.Provider>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useId } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -28,11 +28,8 @@ import type {
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import { componentWidgetData } from "../components/custom/contract";
 import { Widget } from "../components/blocks/Widget";
-import DocumentEditor, {
-  type DocumentEditorProps,
-} from "../editor/DocumentEditor";
+import type { DocumentEditorProps } from "../editor/DocumentEditor";
 import SurfaceEditor from "../surface/SurfaceEditor";
-import { splitContent } from "../surface/model";
 import { newDocument } from "../lib/document";
 import { desktop, errorMessage } from "./bridge";
 import Dialog from "./Dialog";
@@ -42,17 +39,28 @@ import {
 } from "../core/component-categories";
 import "./catalog.css";
 
-function TemplateContent(props: DocumentEditorProps) {
-  if (!splitContent(props.content).items.length)
-    return <DocumentEditor {...props} />;
+function TemplateContent(
+  props: DocumentEditorProps & {
+    document?: ShowDocument;
+    onDocumentChange?: (document: ShowDocument) => void;
+  },
+) {
+  const id = useId();
+  const source = props.document ?? {
+    ...newDocument(),
+    id: `template-${id}`,
+    content: props.content,
+  };
   return (
     <div className="surface-template">
       <SurfaceEditor
-        content={props.content}
-        onChange={props.onChange}
+        document={source}
+        onChange={(document) =>
+          props.onDocumentChange
+            ? props.onDocumentChange(document)
+            : props.onChange(document.content)
+        }
         readOnly={props.readOnly}
-        title={null}
-        pageClassName="surface-template-body"
       />
     </div>
   );
@@ -321,7 +329,7 @@ export function TemplateDialog({
   const activePart = activePartIndex >= 0 ? parts[activePartIndex] : null;
   const layoutContent =
     activePart?.type === "content"
-      ? activePart.content.type === "doc"
+      ? ["doc", "surface"].includes(activePart.content.type ?? "")
         ? activePart.content
         : { type: "doc", content: [activePart.content] }
       : document.content;
@@ -459,6 +467,7 @@ export function TemplateDialog({
                         content={
                           (record.previewDocument ?? record.document).content
                         }
+                        document={record.previewDocument ?? record.document}
                         onChange={() => {}}
                         readOnly
                         minimal
@@ -513,6 +522,38 @@ export function TemplateDialog({
                   <TemplateContent
                     key={parts.length ? activePartIndex : "document"}
                     content={layoutContent}
+                    document={
+                      parts.length
+                        ? {
+                            ...document,
+                            content: layoutContent,
+                            layout:
+                              activePart?.type === "content"
+                                ? activePart.layout
+                                : undefined,
+                            views:
+                              activePart?.type === "content"
+                                ? activePart.views
+                                : undefined,
+                          }
+                        : document
+                    }
+                    onDocumentChange={(next) => {
+                      if (parts.length && activePartIndex >= 0)
+                        setParts((current) =>
+                          current.map((part, index) =>
+                            index === activePartIndex
+                              ? {
+                                  type: "content",
+                                  content: next.content,
+                                  layout: next.layout,
+                                  views: next.views,
+                                }
+                              : part,
+                          ),
+                        );
+                      else setDocument(next);
+                    }}
                     onChange={(content) => {
                       if (parts.length && activePartIndex >= 0)
                         setParts((current) =>
@@ -536,6 +577,7 @@ export function TemplateDialog({
                 <CustomComponentsProvider components={components}>
                   <TemplateContent
                     content={record.previewDocument.content}
+                    document={record.previewDocument}
                     onChange={() => {}}
                     readOnly
                     minimal

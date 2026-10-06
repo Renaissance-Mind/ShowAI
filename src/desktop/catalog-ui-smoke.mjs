@@ -57,10 +57,56 @@ try {
     .first()
     .waitFor();
   const api = (action, args = {}) =>
-    page.evaluate(({ action, args }) => window.showai.invoke(action, args), {
-      action,
-      args,
+    page.evaluate(
+      async ({ action, args }) => {
+        try {
+          return await window.showai.invoke(action, args);
+        } catch (error) {
+          throw new Error(JSON.stringify(error));
+        }
+      },
+      { action, args },
+    );
+  const clickEmbeddedControl = async (selector, name) => {
+    const host = page.locator(selector);
+    await host.scrollIntoViewIfNeeded();
+    let lastBounds = "",
+      stableSince = Date.now();
+    await poll(
+      async () => {
+        const next = JSON.stringify(await host.boundingBox());
+        if (next !== lastBounds) {
+          lastBounds = next;
+          stableSince = Date.now();
+        }
+        return Date.now() - stableSince;
+      },
+      (elapsed) => elapsed > 250,
+      "component geometry settled",
+    );
+    // Convert the local control rectangle through the actual parent transform.
+    // The iframe locator's automatic click omits this ancestor scale in Electron.
+    const outer = await host.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        x: rect.x,
+        y: rect.y,
+        sx: rect.width / element.offsetWidth,
+        sy: rect.height / element.offsetHeight,
+      };
     });
+    const inner = await page
+      .frameLocator(selector)
+      .getByRole("button", { name, exact: true })
+      .evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+      });
+    await page.mouse.click(
+      outer.x + inner.x * outer.sx,
+      outer.y + inner.y * outer.sy,
+    );
+  };
   const a = await api("projects:create", { name: "Catalog project A" }),
     b = await api("projects:create", { name: "Catalog project B" });
   result.projectIds = [a.id, b.id];
@@ -263,8 +309,13 @@ try {
     projectId: b.id,
     title: "Composition source",
   });
+  const {
+    layout: legacyLayout,
+    views: legacyViews,
+    ...legacyMetadata
+  } = sourcePage.document;
   const document = {
-    ...sourcePage.document,
+    ...legacyMetadata,
     content: {
       type: "doc",
       content: [
@@ -416,7 +467,7 @@ try {
     (value) => value === "7",
     "nested exact component initial props",
   );
-  await frame.getByRole("button", { name: "增加", exact: true }).click();
+  await clickEmbeddedControl('iframe[title="Project B counter"]', "增加");
   await poll(
     () => frame.getByRole("status").innerText(),
     (value) => value === "8",
@@ -517,7 +568,7 @@ try {
     .getByRole("heading", { name: "组合中的文本", exact: true })
     .waitFor();
   assert.equal(await panelFrame.locator("iframe").count(), 0);
-  await panelFrame.getByRole("button", { name: "增加", exact: true }).click();
+  await clickEmbeddedControl('iframe[title="嵌套面板"]', "增加");
   await poll(
     () => panelFrame.getByRole("status").innerText(),
     (value) => value === "1",

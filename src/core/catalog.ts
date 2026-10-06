@@ -1,3 +1,8 @@
+import {
+  remapSurfaceIds,
+  isSurface,
+  upgradeDocument,
+} from "../surface/document.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { existsSync, readFileSync } from "node:fs";
@@ -435,19 +440,51 @@ function templateRecord(
             throw new Error(
               "Template composition must contain at most 100 ordered parts.",
             );
-          return item.composition.map((value): TemplatePart => {
+          return item.composition.map((value, index): TemplatePart => {
             const part = record(value, "Template part");
             if (part.type === "content") {
               const node = record(
                 part.content,
                 "Template content",
               ) as ShowDocument["content"];
-              documentCopy({
+              const normalized = documentCopy({
                 ...blankDocument(),
-                content:
-                  node.type === "doc" ? node : { type: "doc", content: [node] },
+                id: `${item.id}:part:${index}`,
+                content: ["doc", "surface"].includes(node.type ?? "")
+                  ? node
+                  : { type: "doc", content: [node] },
+                ...(part.layout
+                  ? { layout: part.layout as ShowDocument["layout"] }
+                  : {}),
+                ...(part.views
+                  ? { views: part.views as ShowDocument["views"] }
+                  : {}),
               });
-              return { type: "content", content: structuredClone(node) };
+              if (node.type === "surface")
+                return {
+                  type: "content",
+                  content: normalized.content,
+                  layout: normalized.layout,
+                  views: normalized.views,
+                };
+              return {
+                type: "content",
+                content: structuredClone(node),
+                ...(part.layout
+                  ? {
+                      layout: structuredClone(
+                        part.layout,
+                      ) as ShowDocument["layout"],
+                    }
+                  : {}),
+                ...(part.views
+                  ? {
+                      views: structuredClone(
+                        part.views,
+                      ) as ShowDocument["views"],
+                    }
+                  : {}),
+              };
             }
             if (
               part.type !== "template" ||
@@ -748,14 +785,19 @@ export async function saveTemplate(
           home,
           {
             ...blankDocument(),
-            content:
-              part.content.type === "doc"
-                ? part.content
-                : { type: "doc", content: [part.content] },
+            content: ["doc", "surface"].includes(part.content.type ?? "")
+              ? part.content
+              : { type: "doc", content: [part.content] },
+            ...(part.layout ? { layout: part.layout } : {}),
+            ...(part.views ? { views: part.views } : {}),
           },
           project,
         );
-        composition!.push({ type: "content", content: value.content });
+        composition!.push({
+          type: "content",
+          content: value.content,
+          ...(value.layout ? { layout: value.layout, views: value.views } : {}),
+        });
         await addComponents(value);
       } else {
         if (part.type !== "template" || part.ref.kind !== "template")
@@ -824,14 +866,8 @@ export async function saveTemplate(
   return writeTemplateRevision(home, item, "project", project);
 }
 export function instantiateTemplate(document: ShowDocument): ShowDocument {
-  const copy = documentCopy(document),
+  const copy = remapSurfaceIds(documentCopy(document), randomUUID),
     date = new Date().toISOString();
-  const visit = (node: typeof copy.content) => {
-    if (node.type !== "doc" && node.type !== "text")
-      node.attrs = { ...node.attrs, id: randomUUID() };
-    node.content?.forEach(visit);
-  };
-  visit(copy.content);
   return {
     ...copy,
     id: randomUUID(),
@@ -2071,44 +2107,88 @@ export async function instantiateTemplateRecord(
       );
     if (depth > 16) throw new Error("Template composition exceeds 16 levels.");
     const active = new Set(ancestors).add(identity);
-    const content: ShowDocument["content"][] = [];
-    const append = (nodes: ShowDocument["content"][]) => {
-      const count = (node: ShowDocument["content"]) => {
-        expandedNodes++;
-        node.content?.forEach(count);
-      };
-      nodes.forEach(count);
-      if (expandedNodes > 12000)
+    const documents: ShowDocument[] = [];
+    const count = (node: ShowDocument["content"]) => {
+      if (++expandedNodes > 12000)
         throw new Error("Expanded template exceeds 12000 nodes.");
-      content.push(...nodes);
+      node.content?.forEach(count);
     };
-    if (template.composition) {
-      for (const part of template.composition) {
-        if (part.type === "content")
-          append(
-            structuredClone(
-              part.content.type === "doc"
-                ? (part.content.content ?? [])
-                : [part.content],
-            ),
-          );
-        else {
-          if (part.title)
-            append([
-              {
-                type: "heading",
-                attrs: { level: 2 },
-                content: [{ type: "text", text: part.title }],
-              },
-            ]);
-          const nested = await getTemplateByRef(home, part.ref, projectId);
-          const result = await expand(nested, active, depth + 1);
-          // Nested nodes have already contributed to the expansion limit.
-          content.push(...(result.content.content ?? []));
-        }
+    if (!template.composition) {
+      count(template.document.content);
+      return structuredClone(template.document);
+    }
+    for (const part of template.composition) {
+      if (part.type === "content") {
+        const fragment = {
+          ...blankDocument(),
+          content: ["doc", "surface"].includes(part.content.type ?? "")
+            ? structuredClone(part.content)
+            : { type: "doc", content: [structuredClone(part.content)] },
+          ...(part.layout ? { layout: part.layout } : {}),
+          ...(part.views ? { views: part.views } : {}),
+        };
+        count(fragment.content);
+        documents.push(fragment);
+      } else {
+        if (part.title)
+          documents.push({
+            ...blankDocument(),
+            content: {
+              type: "doc",
+              content: [
+                {
+                  type: "heading",
+                  attrs: { level: 2 },
+                  content: [{ type: "text", text: part.title }],
+                },
+              ],
+            },
+          });
+        documents.push(
+          await expand(
+            await getTemplateByRef(home, part.ref, projectId),
+            active,
+            depth + 1,
+          ),
+        );
       }
-    } else append(structuredClone(template.document.content.content ?? []));
-    return { ...template.document, content: { type: "doc", content } };
+    }
+    if (!documents.some(isSurface))
+      return {
+        ...template.document,
+        content: {
+          type: "doc",
+          content: documents.flatMap((item) => item.content.content ?? []),
+        },
+      };
+    const combined = upgradeDocument({
+      ...template.document,
+      content: { type: "doc", content: [] },
+      title: "",
+    });
+    combined.title = template.document.title;
+    let offset = 0;
+    for (const source of documents) {
+      const part = remapSurfaceIds(upgradeDocument(source), randomUUID);
+      const roots = part.content.content ?? [];
+      const minX = Math.min(
+        0,
+        ...roots.map((node) => part.layout![node.attrs!.id].x),
+      );
+      let edge = offset;
+      for (const node of roots) {
+        const frame = part.layout![node.attrs!.id];
+        frame.x += offset - minX;
+        edge = Math.max(edge, frame.x + frame.width);
+      }
+      combined.content.content!.push(...roots);
+      Object.assign(combined.layout!, part.layout);
+      combined.views!.saved.push(...part.views!.saved);
+      combined.views!.initial ??= part.views!.initial;
+      combined.views!.readingOrder.push(...part.views!.readingOrder);
+      offset = edge + 64;
+    }
+    return combined;
   };
   return instantiateTemplate(
     await lockDocumentComponents(

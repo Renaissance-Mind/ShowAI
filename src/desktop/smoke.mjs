@@ -151,14 +151,14 @@ try {
     const nestedCopy=await api.invoke('pages:duplicate',{projectId:project.id,pageId:saved.document.id});
     if(nestedCopy.document.parentId!==childFolder.id)throw new Error('Duplicate lost its folder');
     await api.invoke('pages:remove',{projectId:project.id,pageId:nestedCopy.document.id});
-    const foreignArtifact={format:'showai',version:1,document:{...saved.document,parentId:'foreign-folder'}};
+    const foreignArtifact={format:'showai',version:saved.document.content.type==='surface'?2:1,document:{...saved.document,parentId:'foreign-folder'}};
     const importedNested=await api.invoke('pages:import',{projectId:project.id,parentId:childFolder.id,artifact:foreignArtifact});
     if(importedNested.document.parentId!==childFolder.id)throw new Error('Import ignored its destination folder');
     await api.invoke('pages:remove',{projectId:project.id,pageId:importedNested.document.id});
     const importedRoot=await api.invoke('pages:import',{projectId:project.id,artifact:foreignArtifact});
     if(importedRoot.document.parentId!==null)throw new Error('Import retained a foreign project folder');
     await api.invoke('pages:remove',{projectId:project.id,pageId:importedRoot.document.id});
-    const localArtifact={format:'showai',version:1,document:saved.document};
+    const localArtifact={format:'showai',version:saved.document.content.type==='surface'?2:1,document:saved.document};
     const importedLocal=await api.invoke('pages:import',{projectId:project.id,artifact:localArtifact});
     if(importedLocal.document.parentId!==childFolder.id)throw new Error('Legacy import lost a valid local folder');
     await api.invoke('pages:remove',{projectId:project.id,pageId:importedLocal.document.id});
@@ -185,7 +185,7 @@ try {
     const asset='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==';
     const nextComponent=await api.invoke('components:save',{projectId:project.id,manifest:{...source.manifest,version:'1.0.1'},schema:source.schema,source:source.source,files:source.files,assets:{'pixel.png':asset}});
     const nextSource=await api.invoke('components:source',{projectId:project.id,id:nextComponent.id,version:nextComponent.version});
-    const savedCustom=await api.invoke('pages:save',{projectId:project.id,pageId:saved.document.id,baseHash:saved.hash,document:{...saved.document,content:{type:'doc',content:[...saved.document.content.content,{type:'widget',attrs:{kind:'custom',data:{componentId:nextComponent.id,version:nextComponent.version,integrity:nextComponent.integrity,props:nextComponent.defaultData}}}]}}});
+    const savedCustom=await api.invoke('pages:save',{projectId:project.id,pageId:saved.document.id,baseHash:saved.hash,document:{...saved.document,content:{...saved.document.content,content:[...saved.document.content.content,{type:'widget',attrs:{kind:'custom',data:{componentId:nextComponent.id,version:nextComponent.version,integrity:nextComponent.integrity,props:nextComponent.defaultData}}}]}}});
     const frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts');frame.style.width='500px';
     const frameReady=new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(new Error('Component did not run under the desktop CSP.')),10000);window.addEventListener('message',function receive(event){if(event.source!==frame.contentWindow||event.data?.channel!=='desktop-smoke')return;if(event.data.type==='showai:error'){clearTimeout(timeout);window.removeEventListener('message',receive);reject(new Error(event.data.message));}else if(event.data.type==='showai:ready'){frame.contentWindow.postMessage({channel:'desktop-smoke',type:'showai:validate',requestId:'check',props:component.defaultData},'*');}else if(event.data.type==='showai:validation'&&event.data.requestId==='check'&&event.data.valid){clearTimeout(timeout);window.removeEventListener('message',receive);resolve(true);}})});
     frame.srcdoc=component.html.replace('<!--SHOWAI_COMPONENT_DATA-->','<script id="showai-component-data" type="application/json">'+JSON.stringify({channel:'desktop-smoke',props:component.defaultData,readOnly:false})+'</script>');document.body.append(frame);

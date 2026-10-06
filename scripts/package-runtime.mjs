@@ -1,3 +1,4 @@
+import { frontendManifest } from "./build-info.mjs";
 import { build } from "esbuild";
 import {
   copyFile,
@@ -78,6 +79,7 @@ await writeFile(
   join(runtime, "assets/build.json"),
   JSON.stringify(
     {
+      ...frontendManifest(),
       version: metadata.version,
       platform: process.platform,
       architecture: process.arch,

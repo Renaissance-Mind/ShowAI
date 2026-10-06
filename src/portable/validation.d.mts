@@ -10,6 +10,7 @@ export function serializeArtifact(
   document: ShowDocument,
   components?: CompiledComponent[],
   remoteComponents?: PublishedComponentLocator[],
+  presentation?: "spatial" | "reading",
 ): string;
 export function escapeJsonForHtml(value: unknown): string;
 export function injectArtifactIntoHtml(
@@ -17,4 +18,5 @@ export function injectArtifactIntoHtml(
   document: ShowDocument,
   components?: CompiledComponent[],
   remoteComponents?: PublishedComponentLocator[],
+  presentation?: "spatial" | "reading",
 ): string;

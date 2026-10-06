@@ -1,31 +1,63 @@
-import type { JSONContent } from "@tiptap/core";
-import type { ReactNode } from "react";
+import { ObjectContext } from "../surface/SurfaceObject";
+import { useMemo, type ReactNode } from "react";
+import type { ShowDocument } from "../types";
 import PageSurface from "../surface/PageSurface";
-import { placement, splitContent } from "../surface/model";
+import {
+  nodePaths,
+  upgradeDocument,
+  orderedSurfaceNodes,
+} from "../surface/document.mjs";
+import { SurfaceContent, nodeName } from "../surface/SurfaceContent";
 import { PageContent } from "./PageContent";
 
 export function SurfaceReader({
-  content,
+  document: input,
   heading,
+  presentation = "spatial",
 }: {
-  content: JSONContent;
+  document: ShowDocument;
   heading: ReactNode;
+  presentation?: "spatial" | "reading";
 }) {
-  const { body, items } = splitContent(content);
+  const document = useMemo(() => upgradeDocument(input), [input]);
+  if (presentation === "reading")
+    return (
+      <ObjectContext.Provider
+        value={{
+          scale: 1,
+          selected: null,
+          select: () => {},
+          readOnly: true,
+          revealAll: true,
+          revealed: new Set(),
+        }}
+      >
+        <main className="portable-document surface-reading">
+          <div className="surface-reading-heading">{heading}</div>
+          <SurfaceContent
+            document={document}
+            spatial={false}
+            renderContent={({ content }) => <PageContent content={content} />}
+          />
+        </main>
+      </ObjectContext.Provider>
+    );
   return (
     <PageSurface
-      items={items.map((node) => ({
+      pageId={document.id}
+      nodes={orderedSurfaceNodes(document).map((node) => ({
         id: node.attrs!.id,
-        position: placement(node)!,
-        content: (
-          <PageContent content={{ type: "doc", content: node.content ?? [] }} />
-        ),
+        name: nodeName(node),
       }))}
+      layoutKey={JSON.stringify(document.layout)}
+      paths={nodePaths(document)}
+      views={document.views!}
+      header={heading}
     >
-      <main className="portable-document">
-        {heading}
-        <PageContent content={body} />
-      </main>
+      <SurfaceContent
+        document={document}
+        renderContent={({ content }) => <PageContent content={content} />}
+      />
     </PageSurface>
   );
 }

@@ -37,7 +37,7 @@ Start with one project:
   pages list --project PROJECT
 
 Discover only what you need:
-  guide [workspace|authoring|document|catalog|templates|versions|export|publish]
+  guide [workspace|authoring|whiteboard|document|catalog|templates|versions|export|publish]
   catalog list [--kind component|template] [--scope SCOPE] [--limit 20]
   catalog describe ID [--kind component|template] [--view VIEW]
 
@@ -68,6 +68,8 @@ function parseArguments(args: string[]): Arguments {
     "since",
     "page",
     "format",
+    "presentation",
+    "parent",
     "out",
     "kind",
     "query",
@@ -382,6 +384,8 @@ export async function runCli(argv: string[]): Promise<unknown> {
         out: option(args, "out", true)!,
         overwrite: !!args.options.overwrite,
         components: componentMode(args),
+        presentation: option(args, "presentation") as
+          "spatial" | "reading" | undefined,
       });
     }
     case "catalog": {
@@ -509,6 +513,11 @@ export async function runCli(argv: string[]): Promise<unknown> {
           scope: catalogScope(args, false) as CatalogScope | undefined,
           version: option(args, "version"),
           integrity: option(args, "integrity"),
+          pageId: option(args, "page"),
+          baseHash: option(args, "page")
+            ? option(args, "base-hash", true)
+            : undefined,
+          parentId: option(args, "parent"),
         });
       }
       if (action === "save") {

@@ -116,7 +116,7 @@ try {
       .getByRole("button", { name: /表格对齐$/ })
       .first()
       .click();
-    await page.locator(".surface-document .tiptap").waitFor();
+    await page.locator(".surface-object .tiptap").waitFor();
   };
   await open();
   const native = page.locator(".document-content > .tableWrapper table");
@@ -376,12 +376,12 @@ try {
   );
   await page.locator(".studio-save-state.saved").waitFor();
   const saved = await read();
-  const savedNative = saved.document.content.content.find(
-    (node) => node.type === "table",
-  );
-  const savedBasic = saved.document.content.content.find(
-    (node) => node.type === "widget",
-  ).attrs.data;
+  const findNode = (node, type) =>
+    node.type === type
+      ? node
+      : node.content?.map((child) => findNode(child, type)).find(Boolean);
+  const savedNative = findNode(saved.document.content, "table");
+  const savedBasic = findNode(saved.document.content, "widget").attrs.data;
   assert.equal(savedNative.attrs.textAlign, "center");
   assert.deepEqual(savedBasic.columnAlignments, [null, "center", null]);
   await open();

@@ -1,5 +1,6 @@
 const { readFile, access } = require("node:fs/promises");
 const { join } = require("node:path");
+const { createHash } = require("node:crypto");
 const { Arch } = require("builder-util");
 
 module.exports = async function beforePack(context) {
@@ -22,6 +23,33 @@ module.exports = async function beforePack(context) {
     throw new Error(
       "Runtime does not match this application version/platform. Run npm run build on the target machine before packaging.",
     );
+  }
+  const desktop = JSON.parse(
+    await readFile(join(root, "dist-desktop/build-info.json"), "utf8"),
+  );
+  if (
+    metadata.pageModelVersion !== 2 ||
+    desktop.pageModelVersion !== 2 ||
+    metadata.sourceCommit !== desktop.sourceCommit ||
+    metadata.sourceCommit === "unknown" ||
+    metadata.sourceDirty === true ||
+    desktop.sourceDirty === true ||
+    JSON.stringify(metadata.frontendFiles) !==
+      JSON.stringify(desktop.frontendFiles)
+  )
+    throw new Error(
+      "Desktop and runtime were not built from the same page model and frontend. Rebuild before packaging.",
+    );
+  for (const [file, expected] of Object.entries(metadata.frontendFiles)) {
+    for (const directory of ["dist", "dist-runtime/web"]) {
+      const actual = createHash("sha256")
+        .update(await readFile(join(root, directory, file)))
+        .digest("hex");
+      if (actual !== expected)
+        throw new Error(
+          `Built frontend changed after its manifest was created: ${directory}/${file}`,
+        );
+    }
   }
   await access(
     join(

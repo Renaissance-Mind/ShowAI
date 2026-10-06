@@ -1,3 +1,4 @@
+import { placeTemplate, upgradeDocument } from "../surface/document.mjs";
 import { FileStore } from "../core/store";
 import { applyOperations } from "../core/diff";
 import { CoreError } from "../core/model";
@@ -559,6 +560,9 @@ export class AgentService {
       scope?: CatalogScope;
       version?: string;
       integrity?: string;
+      pageId?: string;
+      baseHash?: string;
+      parentId?: string;
     } = {},
   ) {
     const project = this.requireProject(projectId);
@@ -574,7 +578,22 @@ export class AgentService {
       project,
     );
     if (title !== undefined) document.title = title;
-    return this.store.createPage(project, { document });
+    if (options.pageId) {
+      if (!options.baseHash)
+        throw new Error(
+          "Inserting a template requires the destination page base hash.",
+        );
+      const target = await this.store.readPage(project, options.pageId);
+      return this.store.savePage(
+        project,
+        options.pageId,
+        placeTemplate(target.document, document, options.parentId),
+        options.baseHash,
+      );
+    }
+    return this.store.createPage(project, {
+      document: upgradeDocument(document),
+    });
   }
   async saveTemplate(
     projectId: string,
@@ -828,6 +847,7 @@ export class AgentService {
     out: string;
     overwrite?: boolean;
     components?: "bundled" | "remote";
+    presentation?: "spatial" | "reading";
   }) {
     return exportPage({
       root: this.store.root,

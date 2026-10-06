@@ -211,13 +211,14 @@ export function createMcpServer(options: {
       inputSchema: {
         pageId: z.string().optional(),
         format: z.enum(["html", "inline", "site"]),
+        presentation: z.enum(["spatial", "reading"]).optional(),
         components: z.enum(["bundled", "remote"]).optional(),
         out: z.string().min(1),
         overwrite: z.boolean().optional(),
       },
       annotations: write,
     },
-    ({ pageId, format, components, out, overwrite }) =>
+    ({ pageId, format, components, out, overwrite, presentation }) =>
       call(() =>
         service.export({
           projectId,
@@ -226,6 +227,7 @@ export function createMcpServer(options: {
           components,
           out,
           overwrite,
+          presentation,
         }),
       ),
   );
@@ -293,9 +295,12 @@ export function createMcpServer(options: {
     "template_apply",
     {
       description:
-        "Create an independent page from a template, expanding its pinned composition. Returns the new page and hash.",
+        "Create a whiteboard from a template, or insert into pageId with its baseHash and optional parentId. Returns the updated page and hash.",
       inputSchema: {
         templateId: z.string(),
+        pageId: z.string().optional(),
+        baseHash: z.string().optional(),
+        parentId: z.string().optional(),
         title: z.string().optional(),
         scope: z.enum(["builtin", "global", "published", "project"]).optional(),
         version: z.string().optional(),

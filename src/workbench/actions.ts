@@ -1,3 +1,4 @@
+import { upgradeDocument } from "../surface/document.mjs";
 import { readFile, writeFile, stat } from "node:fs/promises";
 import { join, sep } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -61,6 +62,7 @@ export const workbenchActions = new Set([
   "pages:list",
   "pages:get",
   "pages:create",
+  "pages:insertTemplate",
   "pages:save",
   "pages:duplicate",
   "pages:remove",
@@ -311,6 +313,28 @@ export function createWorkbench(
         return activePages(projectId(args));
       case "pages:get":
         return pageRecord(projectId(args), pageId(args));
+      case "pages:insertTemplate": {
+        const id = projectId(args);
+        return enrichPage(
+          id,
+          await service.applyTemplate(
+            id,
+            required(args, "templateId"),
+            undefined,
+            {
+              pageId: pageId(args),
+              baseHash: required(args, "baseHash"),
+              parentId: text(args, "parentId", true),
+              version: text(args, "templateVersion", true),
+              scope: text(args, "templateScope", true) as Exclude<
+                CatalogReadOptions["scope"],
+                "all"
+              >,
+              integrity: text(args, "templateIntegrity", true),
+            },
+          ),
+        );
+      }
       case "pages:create": {
         const id = projectId(args);
         const templateId = text(args, "templateId", true);
@@ -348,7 +372,12 @@ export function createWorkbench(
             ...(args.title !== undefined
               ? { title: required(args, "title") }
               : {}),
-            document: { ...document, parentId },
+            document: {
+              ...upgradeDocument(document, {
+                includeTitle: !!templateId || args.document !== undefined,
+              }),
+              parentId,
+            },
           }),
         );
       }
@@ -755,6 +784,8 @@ export function createWorkbench(
           pageId: page,
           format,
           components: componentDelivery(args),
+          presentation: text(args, "presentation", true) as
+            "spatial" | "reading" | undefined,
           out: selection.filePath,
           overwrite: true,
         });

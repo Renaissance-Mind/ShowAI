@@ -1,6 +1,12 @@
 import { createHash } from "node:crypto";
 import { validateDocument } from "../portable/validation.mjs";
 import { CoreError } from "./model";
+import {
+  isSurface,
+  upgradeDocument,
+  reconcileSurface,
+  fillSurfaceLayout,
+} from "../surface/document.mjs";
 import type {
   FieldChange,
   JSONContent,
@@ -56,6 +62,7 @@ export function normalizeDocument(
   const collectOld = (node: JSONContent) => {
     if (
       node.type !== "doc" &&
+      node.type !== "surface" &&
       node.type !== "text" &&
       typeof node.attrs?.id === "string"
     ) {
@@ -66,7 +73,7 @@ export function normalizeDocument(
   };
   if (previous) collectOld(previous.content);
   const visit = (node: JSONContent, path: string) => {
-    if (node.type !== "doc" && node.type !== "text") {
+    if (!["doc", "surface", "text"].includes(node.type ?? "")) {
       let id =
         typeof node.attrs?.id === "string" && node.attrs.id.trim()
           ? node.attrs.id
@@ -175,6 +182,12 @@ export function diffDocuments(
     return rest;
   };
   const pageFields = changesForFields(metadata(before), metadata(after));
+  if (before.content.type !== after.content.type)
+    pageFields.push({
+      field: "content.type",
+      before: before.content.type,
+      after: after.content.type,
+    });
   if (pageFields.length)
     changes.push({ type: "page.changed", fields: pageFields });
   const oldBlocks = indexBlocks(before);
@@ -248,7 +261,7 @@ export function applyOperations(
       "INVALID_DATA",
       "Expected at most 1000 page operations.",
     );
-  const draft = structuredClone(document);
+  let draft = structuredClone(document);
   const locate = (
     id: string,
   ): { parent: JSONContent; index: number; node: JSONContent } => {
@@ -271,7 +284,7 @@ export function applyOperations(
     parentId?: string | null,
     afterId?: string | null,
   ) => {
-    if (node.type === "text" || node.type === "doc")
+    if (["text", "doc", "surface"].includes(node.type ?? ""))
       throw new CoreError(
         "INVALID_DATA",
         "Insert a block node, not a text or document node.",
@@ -298,6 +311,99 @@ export function applyOperations(
     if (!operation || typeof operation !== "object")
       throw new CoreError("INVALID_DATA", "Invalid page operation.");
     switch (operation.type) {
+      case "surface.upgrade":
+        draft = upgradeDocument(draft);
+        break;
+      case "surface.layout.set": {
+        if (
+          !operation.layout ||
+          typeof operation.layout !== "object" ||
+          Array.isArray(operation.layout)
+        )
+          throw new CoreError("INVALID_DATA", "Layout must be an object.");
+        if (!isSurface(draft))
+          throw new CoreError(
+            "INVALID_DATA",
+            "Upgrade this page before changing its whiteboard layout.",
+          );
+        const target = locate(operation.nodeId);
+        if (target.parent.type !== "surface" && target.parent.type !== "region")
+          throw new CoreError(
+            "INVALID_DATA",
+            "Layout belongs to a region or its direct content.",
+          );
+        if (
+          target.node.type !== "region" &&
+          ["mode", "columns", "gap"].some((key) => key in operation.layout)
+        )
+          throw new CoreError(
+            "INVALID_DATA",
+            "Only regions can define mode, columns and gap.",
+          );
+        fillSurfaceLayout(draft);
+        draft.layout![operation.nodeId] = {
+          ...(draft.layout![operation.nodeId] ?? { x: 0, y: 0, width: 360 }),
+          ...operation.layout,
+        };
+        break;
+      }
+      case "surface.view.save": {
+        if (
+          !operation.view ||
+          !Array.isArray(operation.view.targets) ||
+          !operation.view.targets.length
+        )
+          throw new CoreError(
+            "INVALID_DATA",
+            "A view requires existing target nodes.",
+          );
+        for (const id of operation.view.targets) locate(id);
+        if (!isSurface(draft))
+          throw new CoreError(
+            "INVALID_DATA",
+            "Upgrade this page before saving a view.",
+          );
+        draft.views!.saved = [
+          ...draft.views!.saved.filter((view) => view.id !== operation.view.id),
+          structuredClone(operation.view),
+        ];
+        if (operation.initial) draft.views!.initial = operation.view.id;
+        break;
+      }
+      case "surface.view.remove": {
+        if (!isSurface(draft))
+          throw new CoreError(
+            "INVALID_DATA",
+            "This page has no whiteboard views.",
+          );
+        draft.views!.saved = draft.views!.saved.filter(
+          (view) => view.id !== operation.viewId,
+        );
+        if (draft.views!.initial === operation.viewId)
+          draft.views!.initial = null;
+        break;
+      }
+      case "surface.reading-order.set": {
+        const rootIds = new Set(
+          draft.content.content?.map((node) => node.attrs?.id),
+        );
+        if (
+          !Array.isArray(operation.nodeIds) ||
+          new Set(operation.nodeIds).size !== operation.nodeIds.length ||
+          operation.nodeIds.some((id) => !rootIds.has(id))
+        )
+          throw new CoreError(
+            "INVALID_DATA",
+            "Reading order requires unique root node ids.",
+          );
+        if (!isSurface(draft))
+          throw new CoreError(
+            "INVALID_DATA",
+            "This page has no whiteboard reading order.",
+          );
+        draft.views!.readingOrder = operation.nodeIds;
+        break;
+      }
       case "page.set": {
         const allowed = new Set([
           "title",
@@ -307,6 +413,8 @@ export function applyOperations(
           "favorite",
           "archived",
           "comments",
+          "layout",
+          "views",
         ]);
         if (
           !operation.fields ||
@@ -330,7 +438,7 @@ export function applyOperations(
       }
       case "block.replace": {
         const target = locate(operation.blockId);
-        if (["text", "doc"].includes(operation.node.type ?? ""))
+        if (["text", "doc", "surface"].includes(operation.node.type ?? ""))
           throw new CoreError(
             "INVALID_DATA",
             "Replacement must be a block node.",
@@ -394,5 +502,14 @@ export function applyOperations(
         );
     }
   }
-  return normalizeDocument(draft, document);
+  // Validate caller-supplied references before intentional structural cleanup.
+  const structural = operations.some((operation) =>
+    ["block.remove", "block.replace", "block.move", "block.insert"].includes(
+      operation.type,
+    ),
+  );
+  return normalizeDocument(
+    isSurface(draft) && structural ? reconcileSurface(draft) : draft,
+    document,
+  );
 }

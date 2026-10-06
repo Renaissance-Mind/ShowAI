@@ -4,7 +4,6 @@ import {
   clamp,
   nearestSnap,
   panFrom,
-  snapRegion,
   springStep,
   type SurfaceAnchor,
   type SurfaceRegion,
@@ -27,8 +26,21 @@ function ownsWheel(
   boundary: HTMLElement,
   x: number,
   y: number,
+  zoom: boolean,
 ) {
   if (!(target instanceof Element)) return false;
+  const ownership =
+    target
+      .closest("[data-surface-gesture]")
+      ?.getAttribute("data-surface-gesture")
+      ?.split(/\s+/) ?? [];
+  if (
+    ownership.includes("own") ||
+    (zoom
+      ? ownership.includes("zoom")
+      : ownership.includes(Math.abs(x) > Math.abs(y) ? "x" : "y"))
+  )
+    return true;
   if (
     target.closest(
       '[data-surface-ui], [data-surface-gesture="own"], .react-flow, input[type="range"], select',
@@ -64,15 +76,20 @@ interface PanGesture {
   released: boolean;
 }
 
-export function useSurfaceViewport(layoutKey: string) {
+export function useSurfaceViewport(layoutKey: string, storageKey?: string) {
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const worldRef = useRef<HTMLDivElement>(null);
-  const documentRef = useRef<HTMLDivElement>(null);
   const camera = useRef<Camera>({ x: 0, y: 0, scale: 1 });
   const [scale, setScale] = useState(1);
   const controls = useRef({
-    home: () => {},
+    fit: (_ids?: string[], _immediate?: boolean) => {},
+    focus: (_id: string, _immediate?: boolean) => {},
+    point: (_x: number, _y: number) => ({ x: 0, y: 0 }),
+    restored: false,
+    restoredTargets: [] as string[],
+    restoredAnchor: null as string | null,
+    restore: () => {},
     zoom: (_scale: number) => {},
     moveTo: (_camera: Camera) => {},
     refresh: () => {},
@@ -81,8 +98,7 @@ export function useSurfaceViewport(layoutKey: string) {
   useEffect(() => {
     const root = rootRef.current!,
       scroll = scrollRef.current!,
-      world = worldRef.current!,
-      body = documentRef.current!;
+      world = worldRef.current!;
     const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0,
       springFrame = 0,
@@ -111,29 +127,101 @@ export function useSurfaceViewport(layoutKey: string) {
     const bounds = () => ({
       width: scroll.clientWidth,
       height: root.clientHeight,
-      offsetX: (scroll.clientWidth - world.offsetWidth) / 2,
+      offsetX: 0,
     });
     const regions = (): SurfaceRegion[] => {
-      return [
-        {
-          id: "document",
-          label: "正文",
-          x: 0,
-          y: 0,
-          width: world.offsetWidth,
-          height: body.offsetHeight,
+      const base = world.getBoundingClientRect(),
+        scale = camera.current.scale;
+      return [...world.querySelectorAll<HTMLElement>("[data-surface-id]")].map(
+        (element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            id: element.dataset.surfaceId!,
+            label: element.dataset.surfaceName || "内容区域",
+            x: (rect.left - base.left) / scale,
+            y: (rect.top - base.top) / scale,
+            width: rect.width / scale,
+            height: rect.height / scale,
+          };
         },
-        ...[...world.querySelectorAll<HTMLElement>(".surface-card")].map(
-          (element) => ({
-            id: element.dataset.surfaceItem!,
-            label: "内容区域",
-            x: element.offsetLeft,
-            y: element.offsetTop,
-            width: element.offsetWidth,
-            height: element.offsetHeight,
+      );
+    };
+    let previousAnchor: { id: string; x: number; y: number } | null = null;
+    const remember = () => {
+      if (!storageKey) return;
+      const visible = regions()
+        .filter((item) => {
+          const c = camera.current;
+          return (
+            item.x * c.scale + c.x < root.clientWidth &&
+            (item.x + item.width) * c.scale + c.x > 0 &&
+            item.y * c.scale + c.y < root.clientHeight &&
+            (item.y + item.height) * c.scale + c.y > 0
+          );
+        })
+        .slice(0, 100);
+      const anchorId = anchor?.id;
+      const anchored =
+        anchorId && regions().find((item) => item.id === anchorId);
+      try {
+        localStorage.setItem(
+          storageKey,
+          JSON.stringify({
+            ...camera.current,
+            visibleIds: visible.map((item) => item.id),
+            anchor: anchored
+              ? { id: anchored.id, x: anchored.x, y: anchored.y }
+              : null,
           }),
-        ),
-      ];
+        );
+      } catch {
+        /* Personal view state is disposable; content uses the normal save path. */
+      }
+    };
+    if (storageKey) {
+      try {
+        const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+        if (
+          saved &&
+          [saved.x, saved.y, saved.scale].every(Number.isFinite) &&
+          saved.scale >= 0.25 &&
+          saved.scale <= 2 &&
+          Array.isArray(saved.visibleIds) &&
+          saved.visibleIds.length <= 100 &&
+          saved.visibleIds.every((id: unknown) => typeof id === "string")
+        ) {
+          camera.current = { x: saved.x, y: saved.y, scale: saved.scale };
+          controls.current.restored = true;
+          controls.current.restoredTargets = saved.visibleIds;
+          if (
+            saved.anchor &&
+            typeof saved.anchor.id === "string" &&
+            [saved.anchor.x, saved.anchor.y].every(Number.isFinite)
+          )
+            previousAnchor = saved.anchor;
+        }
+      } catch {
+        /* Ignore unavailable or invalid personal view state. */
+      }
+    }
+    const targetRegion = (id: string): SurfaceRegion | undefined => {
+      const region = regions().find((candidate) => candidate.id === id);
+      if (region) return region;
+      const element = world.querySelector<HTMLElement>(
+        `[data-block-id="${CSS.escape(id)}"]`,
+      );
+      if (!element) return;
+      const rect = element.getBoundingClientRect(),
+        base = world.getBoundingClientRect(),
+        scale = camera.current.scale;
+      return {
+        id,
+        label: "内容",
+        x: (rect.left - base.left) / scale,
+        y: (rect.top - base.top) / scale,
+        width: rect.width / scale,
+        height: rect.height / scale,
+      };
     };
     const setAnchor = (next: SurfaceAnchor | null) => {
       anchor = next;
@@ -165,6 +253,7 @@ export function useSurfaceViewport(layoutKey: string) {
         camera.current = target;
         paintNow();
         complete?.();
+        remember();
         return;
       }
       root.dataset.settling = "true";
@@ -196,6 +285,7 @@ export function useSurfaceViewport(layoutKey: string) {
         if (settled) {
           stopSpring();
           complete?.();
+          remember();
         } else springFrame = requestAnimationFrame(step);
       };
       springFrame = requestAnimationFrame(step);
@@ -228,6 +318,7 @@ export function useSurfaceViewport(layoutKey: string) {
       const snap = nearestSnap(regions(), camera.current, bounds());
       setAnchor(snap?.anchor ?? null);
       if (snap) springTo(snap.camera);
+      else remember();
     };
     const later = () => {
       clearTimeout(idle);
@@ -254,27 +345,62 @@ export function useSurfaceViewport(layoutKey: string) {
       if (current.released) setAnchor(null);
       paint();
     };
-    const moveTo = (target: Camera) => {
+    const moveTo = (target: Camera, immediate = false) => {
       interrupt();
       setAnchor(null);
-      springTo(target, refresh);
+      if (immediate) {
+        camera.current = target;
+        paintNow();
+        refresh();
+      } else springTo(target, refresh);
     };
-    const home = () => {
-      interrupt();
-      const viewport = bounds();
-      const target = {
-        x: 0,
-        y: clamp(
-          camera.current.y / camera.current.scale,
-          Math.min(0, viewport.height - 76 - body.offsetHeight),
-          0,
+    const fit = (ids?: string[], immediate = false) => {
+      const all = regions(),
+        chosen = ids?.length
+          ? ids
+              .map(targetRegion)
+              .filter((region): region is SurfaceRegion => !!region)
+          : all;
+      if (!chosen.length) {
+        moveTo({ x: 64, y: 64, scale: 1 }, immediate);
+        return;
+      }
+      const minX = Math.min(...chosen.map((item) => item.x)),
+        minY = Math.min(...chosen.map((item) => item.y));
+      const maxX = Math.max(...chosen.map((item) => item.x + item.width)),
+        maxY = Math.max(...chosen.map((item) => item.y + item.height));
+      const scale = Math.max(
+        0.25,
+        Math.min(
+          1,
+          (root.clientWidth - 96) / Math.max(1, maxX - minX),
+          (root.clientHeight - 140) / Math.max(1, maxY - minY),
         ),
-        scale: 1,
-      };
-      const bodyRegion = regions()[0];
-      const snap = snapRegion(bodyRegion, target, viewport);
-      setAnchor(snap?.anchor ?? null);
-      springTo(target);
+      );
+      moveTo(
+        {
+          x: root.clientWidth / 2 - ((minX + maxX) / 2) * scale,
+          y: 64 - minY * scale,
+          scale,
+        },
+        immediate,
+      );
+    };
+    const focus = (id: string, immediate = false) => {
+      const target = targetRegion(id);
+      if (!target) return;
+      const scale = Math.max(
+        0.25,
+        Math.min(1, (root.clientWidth - 96) / target.width),
+      );
+      moveTo(
+        {
+          x: root.clientWidth / 2 - (target.x + target.width / 2) * scale,
+          y: 64 - target.y * scale,
+          scale,
+        },
+        immediate,
+      );
     };
     const zoom = (
       value: number,
@@ -289,7 +415,40 @@ export function useSurfaceViewport(layoutKey: string) {
       paint();
       later();
     };
-    controls.current = { home, zoom, moveTo, refresh };
+    controls.current = {
+      fit,
+      focus,
+      zoom,
+      moveTo,
+      refresh,
+      restored: controls.current.restored,
+      restoredTargets: controls.current.restoredTargets,
+      restoredAnchor: previousAnchor?.id ?? null,
+      restore: () => {
+        const next =
+          previousAnchor &&
+          regions().find((item) => item.id === previousAnchor!.id);
+        if (next && previousAnchor)
+          camera.current = {
+            ...camera.current,
+            x:
+              camera.current.x +
+              (previousAnchor.x - next.x) * camera.current.scale,
+            y:
+              camera.current.y +
+              (previousAnchor.y - next.y) * camera.current.scale,
+          };
+        paintNow();
+        refresh();
+      },
+      point: (x, y) => {
+        const rect = root.getBoundingClientRect();
+        return {
+          x: (x - rect.left - camera.current.x) / camera.current.scale,
+          y: (y - rect.top - camera.current.y) / camera.current.scale,
+        };
+      },
+    };
 
     const wheel = (event: WheelEvent) => {
       if (objectGesture) {
@@ -307,7 +466,13 @@ export function useSurfaceViewport(layoutKey: string) {
       const now = performance.now();
       if (now - lastWheel > GESTURE_IDLE) nestedGesture = false;
       lastWheel = now;
-      nestedGesture ||= ownsWheel(event.target, scroll, delta.x, delta.y);
+      nestedGesture ||= ownsWheel(
+        event.target,
+        scroll,
+        delta.x,
+        delta.y,
+        event.ctrlKey || event.metaKey,
+      );
       if (nestedGesture) return;
       event.preventDefault();
       if (event.ctrlKey || event.metaKey) {
@@ -342,7 +507,7 @@ export function useSurfaceViewport(layoutKey: string) {
       };
     };
     const down = (event: PointerEvent) => {
-      if (springFrame) interrupt();
+      if (springFrame || gesture) interrupt();
       const target = event.target as Element;
       if (target.closest("[data-surface-handle]")) {
         if (event.button === 0) {
@@ -468,6 +633,10 @@ export function useSurfaceViewport(layoutKey: string) {
     };
     const keydown = (event: KeyboardEvent) => {
       if (springFrame) stopSpring();
+      if (editable(event.target) && gesture) {
+        interrupt();
+        refresh();
+      }
       if (event.defaultPrevented || event.isComposing || editable(event.target))
         return;
       if (event.code === "Space" && !interactive(event.target)) {
@@ -477,7 +646,6 @@ export function useSurfaceViewport(layoutKey: string) {
       }
       if (event.key === "Escape") {
         if (drag || pinch) finish(undefined, true);
-        else home();
       }
       if (event.target !== root) return;
       const step = event.shiftKey ? 320 : 120;
@@ -507,7 +675,7 @@ export function useSurfaceViewport(layoutKey: string) {
       }
       if (event.key === "0" || event.key === "Home") {
         event.preventDefault();
-        home();
+        fit();
       }
     };
     const keyup = (event: KeyboardEvent) => {
@@ -549,11 +717,10 @@ export function useSurfaceViewport(layoutKey: string) {
         refresh();
     });
     resize.observe(root);
-    resize.observe(body);
     const observedCards = new Set<HTMLElement>();
     const refreshLayout = () => {
       const cards = new Set(
-        world.querySelectorAll<HTMLElement>(".surface-card"),
+        world.querySelectorAll<HTMLElement>("[data-surface-id]"),
       );
       for (const card of observedCards) {
         if (!cards.has(card)) {
@@ -601,5 +768,5 @@ export function useSurfaceViewport(layoutKey: string) {
   useEffect(() => {
     controls.current.refresh();
   }, [layoutKey]);
-  return { rootRef, scrollRef, worldRef, documentRef, scale, camera, controls };
+  return { rootRef, scrollRef, worldRef, scale, camera, controls };
 }

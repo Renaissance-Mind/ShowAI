@@ -43,6 +43,7 @@ export interface ExportOptions {
   templatePath?: string;
   overwrite?: boolean;
   components?: "bundled" | "remote";
+  presentation?: "spatial" | "reading";
 }
 export interface ExportResult {
   format: ExportFormat;
@@ -98,6 +99,7 @@ export async function buildPageHtml(
   templatePath?: string,
   components: CompiledComponent[] = [],
   remoteComponents: PublishedComponentLocator[] = [],
+  presentation?: "spatial" | "reading",
 ): Promise<string> {
   assertOfflineImages(document);
   return injectArtifactIntoHtml(
@@ -105,6 +107,7 @@ export async function buildPageHtml(
     document,
     components,
     remoteComponents,
+    presentation,
   );
 }
 
@@ -228,6 +231,11 @@ export async function assertExportDestination(
 export async function exportPage(
   options: ExportOptions,
 ): Promise<ExportResult> {
+  if (
+    options.presentation !== undefined &&
+    !["spatial", "reading"].includes(options.presentation)
+  )
+    throw new Error("Presentation must be spatial or reading.");
   const store = new FileStore(options.root);
   const componentMode = options.components ?? "bundled";
   if (!["bundled", "remote"].includes(componentMode))
@@ -266,6 +274,7 @@ export async function exportPage(
       options.templatePath,
       bundledComponents,
       remoteComponents,
+      options.presentation ?? "spatial",
     );
     const result = options.format === "inline" ? toInlineFragment(html) : html;
     const sourcePath =
@@ -280,7 +289,12 @@ export async function exportPage(
     await mkdir(dirname(out), { recursive: true });
     await writeFile(
       sourcePath,
-      serializeArtifact(document, bundledComponents, remoteComponents),
+      serializeArtifact(
+        document,
+        bundledComponents,
+        remoteComponents,
+        options.presentation ?? "spatial",
+      ),
       {
         flag: options.overwrite ? "w" : "wx",
       },
@@ -432,6 +446,7 @@ export async function exportPage(
       document,
       components,
       remoteComponents,
+      options.presentation ?? "spatial",
     );
     // Each page shares one reader bundle and stylesheet; page data remains embedded.
     const scripts: string[] = [];
@@ -480,7 +495,12 @@ export async function exportPage(
     );
     await writeFile(
       sourcePath,
-      serializeArtifact(document, components, remoteComponents),
+      serializeArtifact(
+        document,
+        components,
+        remoteComponents,
+        options.presentation ?? "spatial",
+      ),
     );
     sourcePaths.push(sourcePath);
     bytes += Buffer.byteLength(html);

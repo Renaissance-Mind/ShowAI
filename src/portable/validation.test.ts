@@ -185,7 +185,7 @@ describe("portable artifact boundaries", () => {
         version: 2,
         document: documentWith([]),
       }),
-    ).toThrow("version 1");
+    ).toThrow("version");
   });
 
   it("enforces depth, node count, byte limits and finite numeric values", () => {

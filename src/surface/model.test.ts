@@ -11,14 +11,7 @@ import {
   serializeArtifact,
   validateDocument,
 } from "../portable/validation.mjs";
-import {
-  dockItem,
-  makeCanvasItem,
-  normalizedWheel,
-  replaceBody,
-  splitContent,
-  zoomAt,
-} from "./model";
+import { normalizedWheel, zoomAt } from "./model";
 
 const paragraph = (text: string): JSONContent => ({
   type: "paragraph",
@@ -30,7 +23,19 @@ const sample = () => ({
   ...newDocument("Spatial page"),
   content: {
     type: "doc",
-    content: [paragraph("body"), makeCanvasItem([paragraph("side")], position)],
+    content: [
+      paragraph("body"),
+      {
+        type: "callout",
+        attrs: {
+          id: "legacy-floating",
+          icon: "",
+          tone: "neutral",
+          canvas: { ...position },
+        },
+        content: [paragraph("side")],
+      },
+    ],
   },
 });
 
@@ -56,28 +61,13 @@ describe("shared camera coordinates", () => {
   });
 });
 
-describe("spatial content remains part of the canonical document", () => {
-  it("round trips JSON without losing side content or placing it in the body", () => {
+describe("legacy v1 spatial source compatibility", () => {
+  it("round trips legacy JSON while preserving all content", () => {
     const document = sample();
     expect(parseArtifact(serializeArtifact(document)).document).toEqual(
       document,
     );
-    const { body, items } = splitContent(document.content);
-    expect(body.content).toHaveLength(1);
-    expect(items).toHaveLength(1);
-    const edited = replaceBody(document.content, {
-      type: "doc",
-      content: [paragraph("edited")],
-    });
-    expect(edited.content[1]).toEqual(items[0]);
-    expect(toMarkdown(edited)).toContain("side");
-  });
-  it("docks every child and retains its block id", () => {
-    const document = sample();
-    const item = document.content.content[1];
-    const docked = dockItem(document.content, item.attrs!.id);
-    expect(splitContent(docked).items).toHaveLength(0);
-    expect(docked.content?.[1]).toEqual(paragraph("side"));
+    expect(toMarkdown(document.content)).toContain("side");
   });
   it("exposes movement, editing and deletion through existing Agent operations and diffs", () => {
     const before = normalizeDocument(sample());
@@ -107,7 +97,7 @@ describe("spatial content remains part of the canonical document", () => {
     const deleted = applyOperations(edited, [
       { type: "block.remove", blockId: id },
     ]);
-    expect(splitContent(deleted.content).items).toHaveLength(0);
+    expect(deleted.content.content).toHaveLength(1);
   });
   it.each([NaN, Infinity, "20", 1000001])(
     "rejects unsafe canvas coordinates %s",

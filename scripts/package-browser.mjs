@@ -129,6 +129,11 @@ await writeFile(
   JSON.stringify(
     {
       version,
+      pageModelVersion: metadata.pageModelVersion,
+      supportedArtifactVersions: metadata.supportedArtifactVersions,
+      sourceCommit: metadata.sourceCommit,
+      sourceDirty: metadata.sourceDirty,
+      frontendFiles: metadata.frontendFiles,
       platform: process.platform,
       architecture: process.arch,
       node: nodeVersionTag,

@@ -1,5 +1,6 @@
 import "./block.css";
 import "./theme.css";
+export { GestureBoundary } from "./GestureBoundary";
 export {
   TextBlock as Text,
   ImageBlock as Image,

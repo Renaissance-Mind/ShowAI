@@ -1,36 +1,54 @@
-# ShowAI artifact format, version 1
+# ShowAI artifact format, version 2
 
-A `.showai.json` file describes one interactive page. The rendered `.html` contains that source, the React reader, styles, and interactive block components. It opens directly in a browser without a server. The visible surface is the page title and content; a small corner menu provides source download, appearance, and print. Reader interactions are temporary; edit the source or import it into the ShowAI desktop project to save content changes.
+A `.showai.json` file describes one interactive Page. Version 2 uses an infinite whiteboard with equal regions and independent content nodes. The rendered HTML includes the source, reader, styles and component runtimes. Reader interactions are temporary; import the source into a project to persist edits.
 
 ## Envelope
 
 ```json
 {
   "format": "showai",
-  "version": 1,
+  "version": 2,
+  "presentation": "spatial",
   "document": {
     "id": "research-result",
     "title": "Research result",
     "content": {
-      "type": "doc",
+      "type": "surface",
       "content": [
         {
-          "type": "paragraph",
-          "content": [{ "type": "text", "text": "Start with the question." }]
+          "type": "region",
+          "attrs": { "id": "region-1", "name": "Research" },
+          "content": [
+            {
+              "type": "paragraph",
+              "attrs": { "id": "intro" },
+              "content": [
+                { "type": "text", "text": "Start with the question." }
+              ]
+            }
+          ]
         }
       ]
-    }
+    },
+    "layout": { "region-1": { "x": 0, "y": 0, "width": 920, "mode": "flow" } },
+    "views": { "initial": null, "saved": [], "readingOrder": ["region-1"] }
   }
 }
 ```
 
-`id`, `title`, and a `doc` content node are required. `createdAt` and `updatedAt` use ISO date strings; missing dates use import time. Sources may also contain `icon`, `cover`, `parentId`, `favorite`, `archived`, and `comments`. These fields do not add navigation, decorations, or comments to a single rendered page. The authoring store uses `archived` to exclude removed pages from normal listings and whole-project site exports. Import creates an editable page in the selected project.
+`id`, `title`, and a `surface` content node are required for version 2. Version 1 requires a `doc` root and remains readable. Envelope and root versions must match. Missing dates use import time. Metadata can include `icon`, `cover`, `parentId`, `favorite`, `archived`, and `comments`.
 
-Every stored non-text block has a stable `attrs.id`, assigned when the page enters the file store. Keep these ids when revising a page so diffs can distinguish moved and changed blocks. The page's content hash is returned by the CLI/store, not stored in this artifact envelope. Agent updates require that hash separately through `--base-hash`; see [Agent usage](agent-usage.md).
+Every non-text node below the root has a unique stable `attrs.id`. Missing IDs are assigned deterministically; duplicate, reserved and dangling IDs are rejected in version 2. Preserve IDs when revising a page. The content hash is returned separately by the store; updates require that value through `--base-hash`.
 
-An optional top-level `components` array contains the exact compiled custom runtimes used by a bundled artifact. A remote artifact can instead include `remoteComponents` containing verified exact publication locators. Authoring page JSON stores component references; exported sources include the compiled dependencies so another installation can display the page.
+`surface` contains equal `region`, `richText`, native block or widget nodes. Regions can nest regions and rich text. `richText` holds ordinary rich-text blocks. `layout` maps node IDs to `{x, y, width, height?, mode?, columns?, gap?}`. Root nodes and direct free-layout children are positioned relative to their parent; flow and grid children follow tree order. Region `mode` is `flow`, `grid` or `free`. Height is a minimum. Node names are optional `attrs.name` strings up to 200 characters. See [Page whiteboard](page-surface.md) for bounds and gesture behavior.
 
-See [the complete example](../examples/welcome.showai.json), which pairs a mathematical chart with a two-input calculator. In the installed plugin the example is under `../examples/` relative to this reference.
+`views` contains `initial: viewId | null`, `saved: {id, name, targets: nodeId[]}[]`, and `readingOrder: rootNodeId[]`. Omitted root IDs are appended in tree order. Named views reference content rather than absolute viewport pixels. Personal camera state is local and excluded from the document hash.
+
+Optional envelope `presentation` is `spatial` (default) or `reading`. Reading projects regions into responsive reading order; it retains the full layout and views in embedded source. Print and Markdown also follow reading order.
+
+Optional `components` bundles the exact compiled custom runtimes. `remoteComponents` can instead contain verified publication locators. Authoring files store references; exported sources carry the dependencies needed to display them.
+
+Legacy files open without being rewritten. Their body and old floating callouts become ordinary regions when edited. A first managed migration preserves original bytes under `migrations/<page-id>/original-v1.json` and retains snapshots. A version 2 page cannot be overwritten with a version 1 document; import a separate page when needed. [The legacy example](../examples/welcome.showai.json) remains valid.
 
 ## Text and document blocks
 

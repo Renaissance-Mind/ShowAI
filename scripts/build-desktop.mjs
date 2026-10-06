@@ -1,3 +1,4 @@
+import { frontendManifest } from "./build-info.mjs";
 import { rawSourcePlugin } from "./raw-source-plugin.mjs";
 import { build } from "esbuild";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -47,4 +48,8 @@ await build({
   bundle: true,
   external: ["electron"],
 });
+await writeFile(
+  join(root, "dist-desktop/build-info.json"),
+  JSON.stringify(frontendManifest(), null, 2) + "\n",
+);
 console.log("Built ShowAI desktop main and sandboxed preload.");

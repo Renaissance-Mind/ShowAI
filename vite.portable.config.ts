@@ -1,3 +1,4 @@
+import { buildIdentityPlugin } from "./scripts/build-info.mjs";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -42,7 +43,7 @@ function portableHtml(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), portableHtml()],
+  plugins: [react(), buildIdentityPlugin(), portableHtml()],
   base: "./",
   publicDir: false,
   build: {

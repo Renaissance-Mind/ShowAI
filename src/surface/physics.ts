@@ -31,6 +31,19 @@ export function elasticDisplacement(distance: number) {
     (HORIZONTAL_GAIN * length - 50.4 * (1 - Math.exp(-length / 120)))
   );
 }
+/** Resume a pull from its currently displayed spring position without compressing it twice. */
+export function elasticInput(displacement: number) {
+  const target = Math.abs(displacement);
+  let input = target / HORIZONTAL_GAIN;
+  for (let iteration = 0; iteration < 8; iteration++)
+    input = Math.max(
+      0,
+      input -
+        (elasticDisplacement(input) - target) /
+          (HORIZONTAL_GAIN - 0.42 * Math.exp(-input / 120)),
+    );
+  return Math.sign(displacement) * input;
+}
 export const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
 
@@ -48,8 +61,9 @@ export function panFrom(
       },
       released: true,
     };
-  const rawX = origin.x + delta.x,
-    rawY = origin.y + delta.y;
+  const startY = clamp(origin.y, anchor.minY, anchor.maxY);
+  const rawX = anchor.x + elasticInput(origin.x - anchor.x) + delta.x,
+    rawY = startY + elasticInput(origin.y - startY) + delta.y;
   const boundedY = clamp(rawY, anchor.minY, anchor.maxY);
   const overX = rawX - anchor.x,
     overY = rawY - boundedY;
@@ -85,14 +99,14 @@ export function snapRegion(
   const x =
     Math.abs(camera.x - centerX) <= 48 ? centerX : clamp(camera.x, minX, maxX);
   if (Math.abs(x - camera.x) > 56) return null;
-  const top = region.id === "document" ? 0 : 16;
+  const top = 48;
   const bottom = bounds.height - 76;
   const start = top - region.y * camera.scale;
   const end = bottom - (region.y + region.height) * camera.scale;
   const minY = Math.min(start, end),
     maxY = Math.max(start, end);
   let y = clamp(camera.y, minY, maxY);
-  if (height <= bottom - top && region.id !== "document") {
+  if (height <= bottom - top) {
     const centerY = (start + end) / 2;
     if (Math.abs(camera.y - centerY) <= 36) y = centerY;
   }

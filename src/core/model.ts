@@ -1,5 +1,6 @@
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
+import type { NodeLayout, SavedView } from "../surface/types";
 
 export type { ShowArtifact, ShowDocument } from "../types";
 export type { JSONContent } from "@tiptap/core";
@@ -66,11 +67,18 @@ export type PageFields = Partial<
     | "favorite"
     | "archived"
     | "comments"
+    | "layout"
+    | "views"
   >
 >;
 
 /** A null parent identifies the document root; omitted afterId appends. */
 export type PageOperation =
+  | { type: "surface.upgrade" }
+  | { type: "surface.layout.set"; nodeId: string; layout: Partial<NodeLayout> }
+  | { type: "surface.view.save"; view: SavedView; initial?: boolean }
+  | { type: "surface.view.remove"; viewId: string }
+  | { type: "surface.reading-order.set"; nodeIds: string[] }
   | { type: "page.set"; fields: PageFields }
   | {
       type: "block.insert";

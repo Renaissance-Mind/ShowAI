@@ -1,5 +1,5 @@
+import { upgradeDocument, linearContent } from "./surface/document.mjs";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { JSONContent } from "@tiptap/core";
 import {
   ArrowUpRight,
   FileJson,
@@ -33,8 +33,12 @@ import type { ShowArtifact, ShowDocument } from "./types";
 function initialPage() {
   try {
     const artifact = loadCanvasArtifact(localStorage);
+    const original = localStorage.getItem(CANVAS_KEY);
+    const backupKey = `showai.migration.v1:${artifact.document.id}`;
+    if (original && artifact.version === 1 && !localStorage.getItem(backupKey))
+      localStorage.setItem(backupKey, original);
     return {
-      document: artifact.document,
+      document: upgradeDocument(artifact.document),
       components: artifact.components ?? [],
       error: "",
     };
@@ -165,10 +169,6 @@ export default function App() {
       updatedAt: new Date().toISOString(),
     }));
   }, []);
-  const changeContent = useCallback(
-    (content: JSONContent) => update({ content }),
-    [update],
-  );
 
   async function exportPage(kind: "html" | "json" | "md") {
     setMenuOpen(false);
@@ -197,7 +197,7 @@ export default function App() {
         downloadFile(
           `${name}.md`,
           (source.title ? `# ${source.title}\n\n` : "") +
-            toMarkdown(source.content),
+            toMarkdown(linearContent(source)),
           "text/markdown;charset=utf-8",
         );
       setNotice("已导出");
@@ -380,13 +380,12 @@ export default function App() {
       <CustomComponentsProvider components={components}>
         <SurfaceEditor
           key={page.id}
-          content={page.content}
-          onChange={changeContent}
-          pageClassName="canvas-page"
-          title={
+          document={page}
+          onChange={(next) => update(next)}
+          header={
             <textarea
               ref={titleRef}
-              className="canvas-title"
+              className="surface-page-title"
               aria-label="页面标题"
               placeholder="无标题"
               rows={1}

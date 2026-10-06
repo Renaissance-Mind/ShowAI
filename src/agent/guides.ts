@@ -2,6 +2,7 @@ export const GUIDE_TOPICS = [
   "workspace",
   "authoring",
   "document",
+  "whiteboard",
   "catalog",
   "component",
   "templates",
@@ -39,13 +40,13 @@ const guides: Record<
     ],
   },
   authoring: {
-    next: "showai guide document --json",
+    next: "showai guide whiteboard --json",
     purpose:
       "Create or revise page content without overwriting edits made by the user or another Agent.",
     rules: [
       "Read the page, retain its hash and stable block ids, and inspect pages diff against the preceding turn's hash.",
       "Save/apply requires --base-hash. On CONFLICT, read and merge deliberately; do not blindly retry an old document with a newer hash.",
-      "Page content is the validated document tree. Query a component's schema and examples only when adding that component.",
+      "New pages use a surface root with equal regions/components, independent layout and views. Use guide whiteboard for structure; query component schemas when adding components.",
     ],
     commands: [
       "showai pages create --project PROJECT --title 'Research result' --json",
@@ -73,11 +74,59 @@ const guides: Record<
       ],
     },
   },
+  whiteboard: {
+    purpose:
+      "Create, arrange and share whiteboard pages with equal regions and components.",
+    rules: [
+      "New pages default to artifact version 2. content.type is surface; root content nodes are equal and can all be removed. There is no privileged document node.",
+      "A region is {type:'region',attrs:{id,name},content:[...]}. It may contain rich text blocks, components or nested regions. richText is a component containing ordinary document blocks.",
+      "Positions and layout live in page.layout keyed by stable node id: {x,y,width,mode?,columns?,gap?,height?}. Region mode is flow, grid or free. Root and free-layout children use coordinates; flow/grid derive child positions. Height is a minimum frame height.",
+      "views.saved contains {id,name,targets:[nodeId]}; views.initial names a saved view; views.readingOrder orders root ids for linear delivery. Current camera and selections are personal state and must not be written as content.",
+      "Use block.insert/move/remove/text.set with parentId for content. Use surface.layout.set, surface.view.save/remove, and surface.reading-order.set for arrangement and navigation.",
+      "Legacy version 1 files remain readable. Read a page and apply surface.upgrade with its base hash to migrate; the original source and snapshots are preserved. Do not replace a whiteboard with a legacy document.",
+      "Template apply creates a new whiteboard by default. Add --page PAGE --base-hash HASH (and optionally --parent REGION) to insert it into an existing page without duplicating identities.",
+    ],
+    commands: [
+      "showai pages read PAGE --project PROJECT --json",
+      "showai pages apply PAGE --project PROJECT --input operations.json --base-hash HASH --json",
+      "showai template apply TEMPLATE --project PROJECT --page PAGE --base-hash HASH --json",
+    ],
+    input: {
+      operations: [
+        { type: "surface.upgrade" },
+        {
+          type: "block.insert",
+          node: {
+            type: "region",
+            attrs: { id: "region-a", name: "Findings" },
+            content: [
+              {
+                type: "paragraph",
+                attrs: { id: "finding" },
+                content: [{ type: "text", text: "Source-backed finding." }],
+              },
+            ],
+          },
+        },
+        {
+          type: "surface.layout.set",
+          nodeId: "region-a",
+          layout: { x: 1200, y: 0, width: 900, mode: "flow" },
+        },
+        {
+          type: "surface.view.save",
+          view: { id: "findings", name: "Findings", targets: ["region-a"] },
+          initial: true,
+        },
+      ],
+    },
+    next: "showai guide document --json",
+  },
   document: {
     purpose:
       "Read the page JSON format only when authoring document blocks directly.",
     rules: [
-      "A .showai.json artifact wraps {format:'showai',version:1,document}. pages create/save also accept the document object directly.",
+      "This guide describes rich-text payloads inside regions and legacy v1 sources. New whiteboard pages use version 2; see guide whiteboard. Explicit legacy documents remain compatible inputs.",
       "A document requires id, title and a doc content node. The store assigns the page identity and stable attrs.id values; retain existing block ids when revising.",
       "Text nodes use {type:'text',text,marks?}; empty paragraphs have content:[] rather than an empty text node.",
       "Headings use attrs.level 1–3. Lists contain listItem children starting with a paragraph. taskList contains taskItem with attrs.checked. Tables contain tableRow then tableCell/tableHeader, each containing paragraphs/blocks.",
@@ -142,6 +191,7 @@ const guides: Record<
     rules: [
       "Describe input data, reader actions and resulting state before choosing an implementation. Search component summaries first; read source only for the chosen component being changed.",
       "A local package contains manifest.json, props.schema.json and its React entry. The entry receives {data, onChange, readOnly}; onChange persists valid edits, while reading interactions keep source content unchanged.",
+      "Interactive components can import GestureBoundary from showai:components and set axes to x, y and/or zoom to own those gestures. Do not intercept unneeded axes. Native scroll regions and iframe contents already own their inputs.",
       "manifest needs id, name, version, description, scenarios, entry, defaultData and examples. Default data and every example must pass the schema.",
       "Use React, package-local imports or showai:components, including Flowchart. Custom children use showai:component/ID with exact manifest.dependencies refs. External npm libraries belong in the installed ShowAI runtime, not the skill package.",
       "Import into the selected project, use it in a real page and check the main interaction in desktop and exported HTML. New versions are immutable; shared promotion is explicit.",
@@ -193,7 +243,7 @@ const guides: Record<
       "Use or compose reusable content structures while keeping template revisions immutable.",
     rules: [
       "Use a template's scenarios to choose it, guide to learn its content structure and related resources, and examples to see realistic sequences.",
-      "Applying a template creates a new page. Composition expands referenced templates through the core and preserves exact dependency revisions.",
+      "Applying a template creates a whiteboard. --page with --base-hash inserts into an existing whiteboard. Composition expands referenced templates and preserves exact dependency revisions.",
       "Save accepts a page or an input file with name, description, version, scenarios, contentGuide, related, examples and optional document/composition. To revise an existing template id, use a new version.",
       "A composition part is either {type:'content', content:DOC_NODE} or {type:'template', ref:EXACT_REF, title?:TEXT}. The core pins referenced integrity. Query --view dependencies to inspect the resulting graph.",
     ],
@@ -244,6 +294,7 @@ const guides: Record<
     purpose:
       "Deliver one page or a static website without carrying the authoring workbench.",
     rules: [
+      "presentation defaults to spatial: all regions share an infinite whiteboard. --presentation reading renders responsive reading order; both exports retain the full v2 layout and views in editable source.",
       "bundled is the default: reader, content and exact component runtimes are included. Raster images must be embedded for offline delivery.",
       "remote requires previously verified published component locators and network access when reading. It does not implicitly upload or publish components.",
       "inline must use bundled components and fit the host's size limit. Rendering a conversation fragment requires a supported host display surface; MCP alone does not supply one.",

@@ -1,6 +1,6 @@
 {
   "name": "showai",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "description": "Offline desktop canvas with file-based projects and Agent tools.",
@@ -30,7 +30,9 @@
     "package:browser": "npm run build:browser && node scripts/package-browser.mjs",
     "test:browser": "npm run build:portable && vitest run src/browser/server.test.ts",
     "test:browser:package": "node scripts/browser-package-smoke.mjs",
-    "test:component-gallery": "npm run build && node src/desktop/component-gallery-ui-smoke.mjs"
+    "test:component-gallery": "npm run build && node src/desktop/component-gallery-ui-smoke.mjs",
+    "test:whiteboard": "node scripts/whiteboard-v2-smoke.mjs",
+    "test:whiteboard:desktop": "node src/desktop/surface-ui-smoke.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",

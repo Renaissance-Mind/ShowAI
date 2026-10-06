@@ -69,7 +69,7 @@ export interface DocumentEditorProps {
   minimal?: boolean;
   onEditorReady?: (editor: Editor) => void;
   onBrowseComponents?: () => void;
-  onMoveToCanvas?: (node: JSONContent) => void;
+  onDetachBlock?: (node: JSONContent) => void;
 }
 
 interface MenuItem {
@@ -155,7 +155,7 @@ export default function DocumentEditor({
   minimal = true,
   onEditorReady,
   onBrowseComponents,
-  onMoveToCanvas,
+  onDetachBlock,
 }: DocumentEditorProps) {
   const latestOnChange = useRef(onChange);
   latestOnChange.current = onChange;
@@ -1251,17 +1251,17 @@ export default function DocumentEditor({
                         <div className="menu-rule" />
                       </>
                     )}
-                  {onMoveToCanvas && (
+                  {onDetachBlock && (
                     <button
                       onClick={() => {
                         const node = editor.state.doc.nodeAt(hover.pos);
-                        if (node) onMoveToCanvas(node.toJSON());
+                        if (node) onDetachBlock(node.toJSON());
                         setBlockMenu(false);
                         setHover(null);
                       }}
                     >
                       <Expand size={15} />
-                      移至画布
+                      移出区域
                     </button>
                   )}
                   <button

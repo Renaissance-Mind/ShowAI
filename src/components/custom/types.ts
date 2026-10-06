@@ -30,10 +30,20 @@ export interface TemplateExample {
   steps: RelatedPackage[];
 }
 export type TemplatePart =
-  | { type: "content"; content: JSONContent }
+  | {
+      type: "content";
+      content: JSONContent;
+      layout?: ShowDocument["layout"];
+      views?: ShowDocument["views"];
+    }
   | { type: "template"; ref: PackageRevisionRef; title?: string };
 export type TemplatePartInput =
-  | { type: "content"; content: JSONContent }
+  | {
+      type: "content";
+      content: JSONContent;
+      layout?: ShowDocument["layout"];
+      views?: ShowDocument["views"];
+    }
   | {
       type: "template";
       ref: Omit<PackageRevisionRef, "integrity"> & { integrity?: string };

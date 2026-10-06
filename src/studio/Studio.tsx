@@ -1,3 +1,5 @@
+import { addNode } from "../surface/editing";
+import { upgradeDocument } from "../surface/document.mjs";
 import {
   useCallback,
   useEffect,
@@ -6,7 +8,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { JSONContent } from "@tiptap/core";
 import {
   ArrowUpRight,
   Blocks,
@@ -169,6 +170,7 @@ export default function Studio() {
   const [notice, setNotice] = useState("");
   const [problem, setProblem] = useState("");
   const [busy, setBusy] = useState(false);
+  const [revealNode, setRevealNode] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     target: LibraryTarget;
     anchor: HTMLElement;
@@ -242,13 +244,18 @@ export default function Studio() {
     const requestedProject = componentProjectRef.current;
     const loadComponents = async (): Promise<CatalogComponent[]> => {
       if (requestedProject !== "all") {
+        const project = (
+          await desktop.invoke<ProjectSummary[]>("projects:list")
+        ).find((item) => item.id === requestedProject);
+        if (!project) {
+          componentProjectRef.current = "all";
+          setComponentProject("all");
+          return [];
+        }
         const items = await desktop.invoke<CatalogComponent[]>(
           "components:list",
           { projectId: requestedProject, scope: "all" },
         );
-        const project = (
-          await desktop.invoke<ProjectSummary[]>("projects:list")
-        ).find((item) => item.id === requestedProject);
         return items.map((item) =>
           !("kind" in item) && item.scope === "project"
             ? {
@@ -505,6 +512,7 @@ export default function Studio() {
   async function exportPage(
     format: "html" | "json" | "inline",
     components: "bundled" | "remote" = "bundled",
+    presentation?: "spatial" | "reading",
   ) {
     if (!selectedProject || !page.draft || !(await page.flush())) return;
     setBusy(true);
@@ -517,6 +525,7 @@ export default function Studio() {
           pageId: page.draft.id,
           format,
           components,
+          presentation,
         },
       );
       if (result) setNotice("页面已导出");
@@ -778,17 +787,28 @@ export default function Studio() {
       setNotice("先打开一个页面，再插入组件");
       return;
     }
-    const content: JSONContent = {
-      ...page.draft.content,
-      content: [
-        ...(page.draft.content.content ?? []),
-        { type: "widget", attrs: { id: crypto.randomUUID(), kind, data } },
-        { type: "paragraph", attrs: { id: crypto.randomUUID() } },
-      ],
-    };
-    page.editContent(content);
+    const source = upgradeDocument(page.draft);
+    const nodeId = crypto.randomUUID();
+    const x = Math.min(
+      1000000,
+      Math.max(
+        0,
+        ...source.content.content!.map((node) => {
+          const frame = source.layout[node.attrs!.id];
+          return frame.x + frame.width + 64;
+        }),
+      ),
+    );
+    page.edit(
+      addNode(
+        source,
+        { type: "widget", attrs: { id: nodeId, kind, data } },
+        { x, y: 0, width: 640 },
+      ),
+    );
     if (!(await page.flush())) return;
     setDialog(null);
+    setRevealNode(nodeId);
     setSelectedProject(page.projectId);
     selectedRef.current = page.projectId;
     setView("page");
@@ -1197,16 +1217,17 @@ export default function Studio() {
             >
               <SurfaceEditor
                 key={page.draft.id}
-                content={page.draft.content}
-                onChange={page.editContent}
-                pageClassName="studio-editor-page"
+                document={page.draft}
+                revealId={revealNode}
+                onRevealHandled={() => setRevealNode(null)}
+                onChange={page.edit}
                 onBrowseComponents={() =>
                   void navigate("components").catch(report)
                 }
-                title={
+                header={
                   <textarea
                     ref={titleRef}
-                    className="studio-page-title"
+                    className="surface-page-title"
                     aria-label="页面标题"
                     placeholder="无标题"
                     value={page.draft.title}
@@ -1214,6 +1235,7 @@ export default function Studio() {
                     maxLength={1000}
                     onChange={(event) =>
                       page.edit({
+                        ...upgradeDocument(page.draft!),
                         title: event.target.value.replaceAll("\n", ""),
                       })
                     }
@@ -1656,6 +1678,32 @@ export default function Studio() {
                             使用模板
                             <ArrowUpRight size={14} />
                           </button>
+                          {page.draft && page.projectId === selectedProject && (
+                            <button
+                              className="studio-text-button"
+                              onClick={action(async () => {
+                                if (!(await page.flush())) return;
+                                const id = page.draft!.id;
+                                const latest = await desktop.invoke<LoadedPage>(
+                                  "pages:get",
+                                  { projectId: selectedProject, pageId: id },
+                                );
+                                await desktop.invoke("pages:insertTemplate", {
+                                  projectId: selectedProject,
+                                  pageId: id,
+                                  baseHash: latest.hash,
+                                  templateId: item.id,
+                                  templateVersion: item.version,
+                                  templateScope: item.scope,
+                                  templateIntegrity: item.integrity,
+                                });
+                                await openPage(id, selectedProject!);
+                                setNotice("模板已加入白板");
+                              })}
+                            >
+                              加入当前白板
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1810,6 +1858,12 @@ export default function Studio() {
                   {
                     label: "导出会话片段",
                     onSelect: () => void exportPage("inline"),
+                  },
+                  {
+                    label: "导出阅读网页",
+                    icon: <ArrowUpRight size={15} />,
+                    onSelect: () =>
+                      void exportPage("html", "bundled", "reading"),
                   },
                   {
                     label: "在独立窗口打开",

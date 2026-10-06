@@ -1,3 +1,5 @@
+import { artifactVersion, assignSurfaceIds } from "../surface/document.mjs";
+import { validateSurface } from "../surface/validation.mjs";
 import { validatePrimitiveData } from "../components/blocks/primitive-contract.mjs";
 import { validateFlowchartData } from "../components/blocks/flowchart-contract.mjs";
 // Shared by the browser importer and the dependency-free artifact command.
@@ -9,6 +11,9 @@ const MAX_DEPTH = 48;
 const forbiddenKeys = new Set(["__proto__", "prototype", "constructor"]);
 const nodeTypes = new Set([
   "doc",
+  "surface",
+  "region",
+  "richText",
   "paragraph",
   "text",
   "heading",
@@ -64,6 +69,7 @@ const nodeAttributes = new Set([
   "kind",
   "data",
   "canvas",
+  "name",
 ]);
 const markAttributes = new Set([
   "href",
@@ -383,11 +389,29 @@ function validateWidgetData(kind, data, path) {
   }
 }
 
-function validateNode(value, path, counter, depth = 0) {
+function validateNode(value, path, counter, depth = 0, parentType = null) {
   if (++counter.count > MAX_NODES)
     throw new Error(`Document exceeds ${MAX_NODES} nodes.`);
   if (depth > MAX_DEPTH) throw new Error("Document is nested too deeply.");
   const node = object(value, path);
+  if (node.type === "surface" && node.attrs && Object.keys(node.attrs).length)
+    throw new Error(
+      "Whiteboard root metadata belongs on the page, not the content node.",
+    );
+  if (
+    node.attrs?.name !== undefined &&
+    (typeof node.attrs.name !== "string" || node.attrs.name.length > 200)
+  )
+    throw new Error("Content names must contain at most 200 characters.");
+  if (node.type === "surface" && depth !== 0)
+    throw new Error("A whiteboard root cannot be nested.");
+  if (
+    ["region", "richText"].includes(node.type) &&
+    (!["surface", "region"].includes(parentType) || !counter.surface)
+  )
+    throw new Error(`${node.type} requires a whiteboard or region parent.`);
+  if (counter.surface && node.attrs?.canvas != null)
+    throw new Error("Whiteboard layout must be stored outside content.");
   if (!nodeTypes.has(node.type))
     throw new Error(`Unsupported block type at ${path}: ${String(node.type)}.`);
   for (const key of Object.keys(node))
@@ -469,7 +493,13 @@ function validateNode(value, path, counter, depth = 0) {
     )
       throw new Error(`${path} cannot contain child blocks.`);
     node.content.forEach((child, i) =>
-      validateNode(child, `${path}.content[${i}]`, counter, depth + 1),
+      validateNode(
+        child,
+        `${path}.content[${i}]`,
+        counter,
+        depth + 1,
+        node.type,
+      ),
     );
   }
   const children = node.content ?? [];
@@ -490,6 +520,9 @@ function validateNode(value, path, counter, depth = 0) {
   ];
   const allowed = {
     doc: blockTypes,
+    surface: [...blockTypes, "region", "richText"],
+    region: [...blockTypes, "region", "richText"],
+    richText: blockTypes,
     paragraph: ["text", "hardBreak"],
     heading: ["text", "hardBreak"],
     codeBlock: ["text"],
@@ -544,13 +577,18 @@ export function validateDocument(value) {
     new TextEncoder().encode(JSON.stringify(value)).length > MAX_ARTIFACT_BYTES
   )
     throw new Error("Document exceeds the 10 MB limit.");
-  const document = object(value, "document");
+  const document = structuredClone(object(value, "document"));
   string(document.id, "document.id", 200);
   string(document.title, "document.title", 1000);
   if (!document.id) throw new Error("Document id is required.");
-  if (document.content?.type !== "doc")
-    throw new Error("Document content must be a doc node.");
-  validateNode(document.content, "document.content", { count: 0 });
+  if (!["doc", "surface"].includes(document.content?.type))
+    throw new Error("Page content must be a doc or surface node.");
+  const surface = document.content.type === "surface";
+  if (surface) assignSurfaceIds(document);
+  else if (document.layout !== undefined || document.views !== undefined)
+    throw new Error("Layout and views require a surface root.");
+  validateNode(document.content, "document.content", { count: 0, surface });
+  if (surface) validateSurface(document);
   const canvasIds = new Set(
     (document.content.content ?? [])
       .filter((node) => node.attrs?.canvas != null)
@@ -618,6 +656,7 @@ export function validateDocument(value) {
     createdAt: document.createdAt ?? now,
     updatedAt: document.updatedAt ?? now,
     content: structuredClone(document.content),
+    ...(surface ? { layout: document.layout, views: document.views } : {}),
     comments,
   };
 }
@@ -664,14 +703,23 @@ export function parseArtifact(input) {
     typeof input === "string" ? JSON.parse(input) : input,
     "artifact",
   );
-  if (artifact.format !== "showai" || artifact.version !== 1)
+  if (artifact.format !== "showai" || ![1, 2].includes(artifact.version))
     throw new Error(
-      'Expected a ShowAI artifact with format "showai" and version 1.',
+      'Expected a ShowAI artifact with format "showai" and version 1 or 2.',
     );
+  if (
+    artifact.presentation !== undefined &&
+    !["spatial", "reading"].includes(artifact.presentation)
+  )
+    throw new Error("Unknown page presentation.");
+  const document = validateDocument(artifact.document);
+  if (artifact.version !== artifactVersion(document))
+    throw new Error("Artifact version does not match its page model.");
   return {
     format: "showai",
-    version: 1,
-    document: validateDocument(artifact.document),
+    version: artifact.version,
+    document,
+    ...(artifact.presentation ? { presentation: artifact.presentation } : {}),
     ...(artifact.components === undefined
       ? {}
       : { components: validateComponents(artifact.components) }),
@@ -683,12 +731,23 @@ export function parseArtifact(input) {
   };
 }
 
-export function serializeArtifact(document, components, remoteComponents) {
+export function serializeArtifact(
+  document,
+  components,
+  remoteComponents,
+  presentation,
+) {
+  if (
+    presentation !== undefined &&
+    !["spatial", "reading"].includes(presentation)
+  )
+    throw new Error("Unknown page presentation.");
   const result = JSON.stringify(
     {
       format: "showai",
-      version: 1,
+      version: artifactVersion(document),
       document: validateDocument(document),
+      ...(presentation ? { presentation } : {}),
       ...(components?.length
         ? { components: validateComponents(components) }
         : {}),
@@ -718,11 +777,18 @@ export function injectArtifactIntoHtml(
   document,
   components,
   remoteComponents,
+  presentation,
 ) {
+  if (
+    presentation !== undefined &&
+    !["spatial", "reading"].includes(presentation)
+  )
+    throw new Error("Unknown page presentation.");
   const artifact = {
     format: "showai",
-    version: 1,
+    version: artifactVersion(document),
     document: validateDocument(document),
+    ...(presentation ? { presentation } : {}),
     ...(components?.length
       ? { components: validateComponents(components) }
       : {}),

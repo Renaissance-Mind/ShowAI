@@ -1,3 +1,4 @@
+import { isSurface, upgradeDocument } from "../surface/document.mjs";
 import { constants } from "node:fs";
 import {
   lstat,
@@ -870,19 +871,22 @@ export class FileStore {
               createdAt: now,
               updatedAt: now,
             }
-          : {
-              id,
-              title: input.title ?? "未命名页面",
-              icon: "",
-              cover: "none",
-              parentId: input.parentId ?? null,
-              favorite: false,
-              archived: false,
-              createdAt: now,
-              updatedAt: now,
-              content: { type: "doc", content: [{ type: "paragraph" }] },
-              comments: [],
-            },
+          : upgradeDocument(
+              {
+                id,
+                title: input.title ?? "未命名页面",
+                icon: "",
+                cover: "none",
+                parentId: input.parentId ?? null,
+                favorite: false,
+                archived: false,
+                createdAt: now,
+                updatedAt: now,
+                content: { type: "doc", content: [{ type: "paragraph" }] },
+                comments: [],
+              },
+              { includeTitle: false },
+            ),
       );
       return this.withLock(`page-${projectId}-${id}`, async () => {
         const record = {
@@ -903,6 +907,11 @@ export class FileStore {
     current: PageRecord,
     input: ShowDocument,
   ): Promise<PageRecord> {
+    if (isSurface(current.document) && !isSurface(input))
+      throw new CoreError(
+        "INVALID_DATA",
+        "A whiteboard cannot be overwritten with a legacy document. Import the legacy source as a separate page.",
+      );
     const document = normalizeDocument(
       {
         ...input,
@@ -925,6 +934,35 @@ export class FileStore {
         "The page changed while saving. Read the changes and retry.",
         { currentHash: latest.hash },
       );
+    if (!isSurface(current.document) && isSurface(document)) {
+      const backup = join(
+        this.projectPath(projectId),
+        "migrations",
+        pageId,
+        "original-v1.json",
+      );
+      await this.ensureDirectory(dirname(backup));
+      await this.safePath(backup);
+      const source = await readFile(current.path);
+      const file = await open(backup, "wx").catch((error) => {
+        if (errno(error, "EEXIST")) return null;
+        throw error;
+      });
+      if (file) {
+        try {
+          await file.writeFile(source);
+        } finally {
+          await file.close();
+        }
+      }
+      const checked = await this.readRecord(projectId, pageId);
+      if (checked.hash !== current.hash)
+        throw new CoreError(
+          "CONFLICT",
+          "The page changed while preserving its legacy source.",
+          { currentHash: checked.hash },
+        );
+    }
     await this.atomicWrite(record.path, serializeArtifact(document));
     return record;
   }

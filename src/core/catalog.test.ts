@@ -17,6 +17,7 @@ import {
   importComponent,
   importCompiledComponents,
   instantiateTemplate,
+  instantiateTemplateRecord,
   listComponents,
   listBuiltinComponents,
   listTemplates,
@@ -30,6 +31,7 @@ import {
   promotePackage,
   packageRevisionRef,
 } from "./catalog";
+import { upgradeDocument, visitNodes } from "../surface/document.mjs";
 import { FileStore } from "./store";
 import type { ComponentManifest } from "../components/custom/types";
 
@@ -215,6 +217,51 @@ describe("filesystem template catalog", () => {
       "project",
     );
   });
+});
+
+it("expands composed whiteboard parts with stable source ids and remapped layout and view references", async () => {
+  const home = await temporary();
+  const page = upgradeDocument({ ...blankDocument(), title: "Spatial source" });
+  const regionId = page.content.content![0].attrs!.id;
+  page.views = {
+    initial: "start",
+    saved: [{ id: "start", name: "Start", targets: [regionId] }],
+    readingOrder: [regionId],
+  };
+  const part = {
+    type: "content" as const,
+    content: page.content,
+    layout: page.layout,
+    views: page.views,
+  };
+  const saved = await saveTemplate(
+    home,
+    {
+      name: "Whiteboard composition",
+      description: "Two equal regions",
+      document: page,
+      composition: [part, part],
+    },
+    project(home),
+  );
+  const reread = await getTemplate(home, saved.id, project(home), {
+    version: saved.version,
+  });
+  expect(reread.integrity).toBe(saved.integrity);
+  const expanded = await instantiateTemplateRecord(home, reread, project(home));
+  expect(expanded.content.type).toBe("surface");
+  expect(expanded.content.content).toHaveLength(2);
+  const ids: string[] = [];
+  visitNodes(expanded.content, (node) => {
+    if (node.attrs?.id) ids.push(node.attrs.id);
+  });
+  expect(new Set(ids).size).toBe(ids.length);
+  expect(expanded.views!.saved).toHaveLength(2);
+  expect(expanded.views!.initial).toBe(expanded.views!.saved[0].id);
+  for (const view of expanded.views!.saved)
+    expect(ids).toContain(view.targets[0]);
+  for (const node of expanded.content.content!)
+    expect(expanded.layout![node.attrs!.id].mode).toBe("flow");
 });
 
 describe("compiled React packages", () => {

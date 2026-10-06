@@ -53,15 +53,29 @@ describe("unified whiteboard resistance", () => {
   it("keeps vertical reading fluid within the region and dampens edge overscroll", () => {
     const snap = snapRegion(body, origin, bounds)!;
     expect(panFrom(origin, { x: 0, y: -200 }, snap.anchor).camera.y).toBe(-500);
-    const edge = panFrom(origin, { x: 0, y: 340 }, snap.anchor);
-    expect(edge.camera.y).toBeGreaterThan(0);
-    expect(edge.camera.y).toBeLessThan(40);
+    const edge = panFrom(
+      origin,
+      { x: 0, y: snap.anchor.maxY - origin.y + 40 },
+      snap.anchor,
+    );
+    expect(edge.camera.y).toBeGreaterThan(snap.anchor.maxY);
+    expect(edge.camera.y).toBeLessThan(snap.anchor.maxY + 40);
     expect(edge.released).toBe(false);
   });
   it("retains horizontal drag resistance between regions", () => {
     const moved = panFrom(origin, { x: 100, y: 100 }, null);
     expect(moved.camera.x).toBe(72);
     expect(moved.camera.y).toBe(-200);
+  });
+  it("continues an interrupted spring at its actual position", () => {
+    const snap = snapRegion(body, origin, bounds)!;
+    const displayed = { ...snap.camera, x: snap.camera.x + 23 };
+    expect(
+      panFrom(displayed, { x: 0, y: 0 }, snap.anchor).camera.x,
+    ).toBeCloseTo(displayed.x, 6);
+    const moved = panFrom(displayed, { x: 1, y: 0 }, snap.anchor).camera.x;
+    expect(moved).toBeGreaterThan(displayed.x);
+    expect(moved).toBeLessThan(displayed.x + 1);
   });
 });
 

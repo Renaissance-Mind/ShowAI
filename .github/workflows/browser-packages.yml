@@ -22,6 +22,8 @@ jobs:
       - run: npm run package:browser
       - run: npm run test:browser
       - run: node scripts/browser-package-smoke.mjs
+      - run: npx playwright install chromium
+      - run: npm run test:whiteboard
       - uses: actions/upload-artifact@v4
         with:
           name: ShowAI-browser-${{ runner.os }}-${{ runner.arch }}

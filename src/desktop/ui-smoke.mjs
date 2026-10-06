@@ -178,12 +178,12 @@ try {
   const draftText = "Desktop draft must survive the concurrent file update.";
   const externalText = "External file revision must stay in the original page.";
   const external = structuredClone(baseline.document);
-  external.content.content = [
-    {
-      ...external.content.content[0],
-      type: "paragraph",
-      content: [{ type: "text", text: externalText }],
-    },
+  const findParagraph = (node) =>
+    node.type === "paragraph"
+      ? node
+      : node.content?.map(findParagraph).find(Boolean);
+  findParagraph(external.content).content = [
+    { type: "text", text: externalText },
   ];
   external.updatedAt = new Date().toISOString();
   // Both writes are real. The editor's normal 450 ms auto-save races an atomic
@@ -193,7 +193,11 @@ try {
   await writeFile(
     pendingPath,
     JSON.stringify(
-      { format: "showai", version: 1, document: external },
+      {
+        format: "showai",
+        version: external.content.type === "surface" ? 2 : 1,
+        document: external,
+      },
       null,
       2,
     ) + "\n",

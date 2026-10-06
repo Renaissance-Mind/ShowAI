@@ -41,6 +41,9 @@ export function toMarkdown(node: JSONContent, depth = 0): string {
   }
   switch (node.type) {
     case "doc":
+    case "surface":
+    case "region":
+    case "richText":
       return children().trim() + "\n";
     case "heading":
       return "#".repeat(node.attrs?.level ?? 2) + " " + children() + "\n\n";

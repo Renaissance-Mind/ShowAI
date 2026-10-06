@@ -1,3 +1,9 @@
+.surface-editor-shell {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+}
 .page-surface {
   position: relative;
   height: 100%;
@@ -17,20 +23,123 @@
   overflow-anchor: none;
 }
 .surface-world {
-  width: min(100%, 1000px);
-  margin: 0 auto;
-  position: relative;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
   transform-origin: 0 0;
   will-change: transform;
 }
-.surface-document {
-  min-height: 100%;
+.surface-metadata {
+  position: absolute;
+  left: 22px;
+  top: 14px;
+  z-index: 15;
+  max-width: min(50%, 480px);
+  color: var(--muted);
+  background: var(--paper, var(--bg));
+}
+.surface-page-title,
+.surface-metadata .portable-title {
+  display: block;
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 550;
+  border: 0;
+  background: transparent;
+  resize: none;
+  padding: 4px;
+  margin: 0;
+  height: auto;
+  line-height: 1.5;
+}
+.surface-object {
+  border: 1px solid transparent;
+  border-radius: 10px;
   background: transparent;
 }
-.surface-document > article {
-  width: 100%;
-  min-height: 100%;
-  animation: none;
+.surface-object:hover {
+  border-color: var(--line, var(--border));
+}
+.surface-object.is-selected {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.surface-object:focus-within,
+.surface-object.is-moving {
+  z-index: 2;
+}
+.surface-object.is-moving {
+  user-select: none;
+}
+.surface-object-content {
+  padding: 18px 28px 26px;
+  min-width: 0;
+}
+.surface-object.is-region > .surface-object-content {
+  padding: 26px 44px 44px;
+}
+.surface-object-header {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 7px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.surface-object-header button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.surface-object-header .surface-object-grip {
+  flex: 1;
+  justify-content: flex-start;
+  text-align: left;
+  min-width: 0;
+}
+.surface-object-grip span {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.surface-object-grip[data-surface-handle] {
+  cursor: grab;
+  touch-action: none;
+}
+.surface-object-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 4px 7px;
+  border: 0;
+  color: var(--muted);
+  cursor: ew-resize;
+  touch-action: none;
+  border-radius: 5px;
+}
+.surface-object-content .document-content {
+  min-height: 80px;
+}
+.surface-layout-flow > * + * {
+  margin-top: 16px;
+}
+.surface-layout-grid {
+  display: grid;
+  align-items: start;
+}
+.surface-layout-free {
+  position: relative;
+}
+.surface-layout-free > .surface-object {
+  max-width: none;
 }
 .surface-toolbar {
   position: absolute;
@@ -48,7 +157,8 @@
   background: var(--paper, var(--bg));
   box-shadow: 0 4px 20px #0000000a;
 }
-.surface-toolbar button {
+.surface-toolbar button,
+.surface-toolbar summary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -61,10 +171,17 @@
   font-size: 12px;
   white-space: nowrap;
   color: var(--text);
+  cursor: pointer;
 }
 .surface-toolbar button:disabled {
   opacity: 0.35;
   cursor: default;
+}
+.surface-toolbar summary::-webkit-details-marker {
+  display: none;
+}
+.surface-toolbar summary:hover {
+  background: var(--hover);
 }
 .surface-toolbar .surface-zoom {
   min-width: 48px;
@@ -78,98 +195,127 @@
   margin: 0 3px;
   flex-shrink: 0;
 }
-.surface-orientation {
-  position: absolute;
-  top: 14px;
-  left: 18px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 11px;
-  color: var(--muted);
-  pointer-events: none;
+.surface-popover-anchor {
+  position: relative;
 }
-.surface-orientation button {
-  pointer-events: auto;
-  color: var(--accent);
-  font-size: 11px;
-  padding: 3px 6px;
-  border-radius: 4px;
-}
-.surface-card {
+.surface-navigation,
+.surface-add-menu {
   position: absolute;
-  border: 1px solid transparent;
+  bottom: 44px;
+  left: 0;
+  width: 280px;
+  max-height: min(480px, 70dvh);
+  overflow: auto;
+  background: var(--paper, var(--bg));
+  border: 1px solid var(--line, var(--border));
   border-radius: 12px;
-  background: transparent;
+  box-shadow: 0 8px 36px #00000012;
+  padding: 10px;
 }
-.surface-card:hover {
-  border-color: var(--line, var(--border));
+.surface-add-menu {
+  width: 160px;
+  left: auto;
+  right: 0;
+  display: grid;
 }
-.surface-card:focus-within {
-  z-index: 2;
-  border-color: var(--accent);
+.surface-navigation strong {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin: 7px 8px;
 }
-.surface-card.is-moving {
-  z-index: 3;
-  user-select: none;
+.surface-navigation p {
+  font-size: 12px;
+  margin: 8px;
 }
-.surface-card-bar {
+.surface-navigation-row {
   display: flex;
   align-items: center;
-  padding: 5px 7px;
-  min-height: 34px;
-  border-bottom: 1px solid transparent;
-  color: var(--muted);
-  font-size: 11px;
 }
-.surface-card-bar button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 5px;
-  border-radius: 5px;
-}
-.surface-card-bar > span {
-  flex: 1;
-  padding: 5px 7px;
-}
-.surface-card-bar .surface-card-grip {
+.surface-navigation-row > button:first-child {
   flex: 1;
   justify-content: flex-start;
-  cursor: grab;
-  touch-action: none;
-  text-align: left;
-  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.surface-card-grip:active {
-  cursor: grabbing;
+.surface-navigation form {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line, var(--border));
 }
-.surface-card-content {
-  padding: 22px 30px 24px;
-  min-height: 100px;
+.surface-navigation input,
+.surface-inspector input,
+.surface-inspector select {
+  width: 100%;
+  border: 1px solid var(--line, var(--border));
+  padding: 7px 8px;
+  font-size: 13px;
+  background: var(--paper, var(--bg));
+  border-radius: 6px;
 }
-.surface-card-content .document-content {
-  min-height: 70px;
-  font-size: 15px;
-}
-.surface-card-content .editor-readonly-note {
-  display: none;
-}
-.surface-card-resize {
+.surface-empty {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  display: grid;
-  place-items: center;
-  padding: 6px;
-  border-radius: 6px 0 12px;
-  cursor: ew-resize;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
   color: var(--muted);
-  touch-action: none;
+  font-size: 14px;
+  text-align: center;
 }
-.surface-card-resize svg {
-  transform: rotate(90deg);
+.surface-empty button {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--line, var(--border));
+  border-radius: 8px;
+  padding: 9px 14px;
+  color: var(--text);
+}
+.surface-inspector {
+  position: absolute;
+  right: 16px;
+  top: 56px;
+  width: 250px;
+  max-height: calc(100% - 150px);
+  overflow: auto;
+  z-index: 25;
+  background: var(--paper, var(--bg));
+  border: 1px solid var(--line, var(--border));
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 8px 32px #0000000a;
+  font-size: 13px;
+}
+.surface-inspector header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.surface-inspector label {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  color: var(--muted);
+}
+.surface-inspector-actions {
+  display: flex;
+  gap: 6px;
+}
+.surface-inspector button {
+  padding: 6px;
+  border-radius: 5px;
+}
+.surface-error {
+  position: absolute;
+  z-index: 35;
+  bottom: 80px;
+  left: 24px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
 }
 .page-surface.is-hand,
 .page-surface.is-hand .surface-scroll {
@@ -181,34 +327,23 @@
   user-select: none !important;
 }
 .page-surface.is-panning iframe,
-.surface-card.is-moving iframe {
+.surface-object.is-moving iframe {
   pointer-events: none;
 }
-.surface-sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
 .surface-template {
-  height: 560px;
+  height: 580px;
   max-height: 70dvh;
-}
-.surface-template-body {
-  padding: 40px 52px 110px;
 }
 .studio-scroll.has-page-surface {
   position: relative;
   overflow: hidden;
   min-height: 0;
 }
-.studio-scroll.has-page-surface > .page-surface {
+.studio-scroll.has-page-surface > .surface-editor-shell {
   position: absolute;
   inset: 0;
 }
-.canvas-app:has(> .page-surface) {
+.canvas-app:has(.surface-editor-shell) {
   height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -220,46 +355,121 @@
   .surface-toolbar {
     bottom: 12px;
   }
-  .surface-toolbar button {
+  .surface-toolbar button,
+  .surface-toolbar summary {
     padding: 6px;
   }
-  .surface-gesture-help {
-    display: none;
+  .surface-inspector {
+    width: 220px;
+    right: 10px;
   }
-  .surface-orientation {
-    top: 10px;
-    left: 12px;
+  .surface-metadata {
+    left: 10px;
+  }
+  .surface-navigation {
+    width: 255px;
   }
 }
 @media print {
   .portable-app:has(> .page-surface),
-  .page-surface {
+  .page-surface,
+  .surface-editor-shell {
     height: auto;
     overflow: visible;
   }
-  .surface-scroll {
+  .surface-scroll,
+  .surface-world,
+  .surface-metadata {
     position: static;
-    overflow: visible !important;
+    width: auto;
+    height: auto;
+    transform: none !important;
   }
   .surface-world {
-    transform: none !important;
-    width: 100%;
-  }
-  .surface-document {
-    box-shadow: none !important;
+    will-change: auto;
   }
   .surface-toolbar,
-  .surface-orientation,
-  .surface-card-bar,
-  .surface-card-resize {
+  .surface-object-header,
+  .surface-object-resize,
+  .surface-inspector,
+  .surface-empty {
     display: none;
   }
-  .page-surface .surface-card {
-    display: block !important;
-    position: static;
+  .surface-object {
+    position: static !important;
     width: auto !important;
-    margin: 20px 32px;
-    box-shadow: none;
-    break-inside: avoid;
+    min-height: 0 !important;
+    left: auto !important;
+    top: auto !important;
+    margin: 12px 0;
+    border: 0 !important;
+    break-inside: auto;
+  }
+  .surface-layout-grid {
+    display: block;
+  }
+  .surface-layout-free {
+    min-height: 0 !important;
+  }
+  .surface-object-content,
+  .surface-object.is-region > .surface-object-content {
+    padding: 0;
+  }
+}
+.surface-reading > .surface-object {
+  width: 100%;
+}
+.surface-reading-heading .portable-title {
+  font-size: 18px;
+  color: var(--muted);
+  margin-bottom: 28px;
+}
+.surface-reading .surface-object-content {
+  padding-left: 0;
+  padding-right: 0;
+}
+@media (max-width: 640px) {
+  .surface-reading .surface-layout-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+.surface-add-to-region {
+  min-height: 88px;
+  width: 100%;
+  border: 1px dashed var(--line, var(--border));
+  color: var(--muted);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.surface-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+.surface-editor-shell {
+  display: flex;
+  min-width: 0;
+}
+.page-surface {
+  min-width: 0;
+}
+.surface-inspector {
+  position: relative;
+  flex: 0 0 250px;
+  right: auto;
+  top: auto;
+  margin: 56px 16px 80px 0;
+  align-self: flex-start;
+}
+@media (max-width: 640px) {
+  .surface-inspector {
+    position: absolute;
+    top: auto;
+    bottom: 70px;
+    right: 10px;
+    margin: 0;
+    width: min(280px, calc(100% - 20px));
+    max-height: 55%;
   }
 }

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { execFile, spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -52,6 +53,21 @@ try {
   const { url } = await startup;
   const html = await (await fetch(url)).text();
   assert.match(html, /__SHOWAI_LOCAL__/);
+  const build = JSON.parse(
+    await readFile(join(distribution, "runtime/assets/build.json"), "utf8"),
+  );
+  assert.equal(build.version, version);
+  assert.equal(build.pageModelVersion, 2);
+  assert.match(build.sourceCommit, /^[a-f0-9]{40}$/);
+  assert.match(html, /name="showai-model" content="2"/);
+  for (const [path, digest] of Object.entries(build.frontendFiles)) {
+    const bytes = await readFile(join(distribution, "runtime/web", path));
+    assert.equal(
+      createHash("sha256").update(bytes).digest("hex"),
+      digest,
+      path,
+    );
+  }
   const script = html.match(/src="([^\"]+\.js)"/)[1];
   assert.equal((await fetch(new URL(script, url))).status, 200);
   const run = async (args) => {
@@ -69,6 +85,7 @@ try {
     "--title",
     "Bundled runtime",
   ]);
+  assert.equal(page.document.content.type, "surface");
   await run([
     "catalog",
     "import",
@@ -120,12 +137,16 @@ try {
       JSON.stringify(
         {
           version,
+          pageModelVersion: build.pageModelVersion,
+          sourceCommit: build.sourceCommit,
+          sourceDirty: build.sourceDirty,
           platform: process.platform,
           architecture: process.arch,
           distribution,
           verified: [
             "bundled-node",
             "workbench-assets",
+            "page-model-v2-and-frontend-fingerprints",
             "CLI-library",
             "component-compiler",
             "HTML-export",

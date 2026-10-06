@@ -158,7 +158,8 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
         inlineHost={inlineHost}
       >
         <SurfaceReader
-          content={document.content}
+          document={document}
+          presentation={artifact.presentation}
           heading={
             <>
               {document.title && (
