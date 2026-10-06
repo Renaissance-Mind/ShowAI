@@ -497,6 +497,15 @@
   z-index: 15;
   transition: top 0.07s ease;
 }
+/* Bridge the gap to the block without changing document layout. */
+.block-handle::after {
+  content: "";
+  position: absolute;
+  left: 100%;
+  top: -6px;
+  bottom: -6px;
+  width: 8px;
+}
 .block-handle > button {
   display: flex;
   align-items: center;

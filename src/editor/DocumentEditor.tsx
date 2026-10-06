@@ -172,6 +172,30 @@ export default function DocumentEditor({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [hover, setHover] = useState<HoverBlock | null>(null);
   const [blockMenu, setBlockMenu] = useState(false);
+  const hoverHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoverMenuOpen = useRef(blockMenu);
+  hoverMenuOpen.current = blockMenu;
+  const keepBlockHandle = useCallback(() => {
+    if (hoverHideTimer.current !== null) {
+      clearTimeout(hoverHideTimer.current);
+      hoverHideTimer.current = null;
+    }
+  }, []);
+  const hideBlockHandleLater = useCallback(() => {
+    if (hoverHideTimer.current !== null) return;
+    hoverHideTimer.current = setTimeout(() => {
+      hoverHideTimer.current = null;
+      const handle = wrapperRef.current?.querySelector(".block-handle");
+      if (
+        hoverMenuOpen.current ||
+        dragPosition.current !== null ||
+        handle?.contains(document.activeElement)
+      )
+        return;
+      setHover(null);
+    }, 450);
+  }, []);
+  useEffect(() => keepBlockHandle, [keepBlockHandle]);
   const [styleMenu, setStyleMenu] = useState(false);
   const [insertMenu, setInsertMenu] = useState(false);
   const [dialog, setDialog] = useState<DialogState | null>(null);
@@ -1094,8 +1118,13 @@ export default function DocumentEditor({
             openDialog("link");
           }
         }}
+        onMouseEnter={keepBlockHandle}
         onMouseMove={(event) => {
           if (readOnly || blockMenu || dragPosition.current !== null) return;
+          if ((event.target as Element).closest(".block-handle")) {
+            keepBlockHandle();
+            return;
+          }
           const wrapper = wrapperRef.current;
           if (!wrapper) return;
           let next: HoverBlock | null = null;
@@ -1117,11 +1146,12 @@ export default function DocumentEditor({
                     wrapper.offsetWidth || 1),
               };
           });
-          setHover(next);
+          if (next) {
+            keepBlockHandle();
+            setHover(next);
+          } else hideBlockHandleLater();
         }}
-        onMouseLeave={() => {
-          if (!blockMenu) setHover(null);
-        }}
+        onMouseLeave={hideBlockHandleLater}
         onDragOver={(event) => {
           if (
             dragPosition.current !== null ||
@@ -1134,7 +1164,12 @@ export default function DocumentEditor({
         <EditorContent editor={editor} />
         {!readOnly && <TableControls editor={editor} />}
         {!readOnly && hover && (
-          <div className="block-handle" style={{ top: hover.top }}>
+          <div
+            className="block-handle"
+            style={{ top: hover.top }}
+            onMouseEnter={keepBlockHandle}
+            onFocus={keepBlockHandle}
+          >
             <button
               aria-label="在下方添加内容"
               title="添加内容"
@@ -1148,6 +1183,7 @@ export default function DocumentEditor({
               title="拖动排序 · 点击管理"
               draggable
               onDragStart={(event) => {
+                keepBlockHandle();
                 dragPosition.current = hover.pos;
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData(
