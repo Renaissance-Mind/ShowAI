@@ -16,17 +16,17 @@ showai guide workspace --json
 showai guide catalog --json
 ```
 
-Choose one topic for the current operation: `workspace`, `authoring`, `whiteboard`, `document`, `catalog`, `templates`, `versions`, `export` or `publish`. `whiteboard` explains Page roots, regions, layout and saved views; `document` explains rich-text blocks inside regions and legacy v1 sources; it is only needed when authoring blocks directly. Catalog summaries and command receipts include a useful next step.
+Choose one topic for the current operation: `workspace`, `authoring`, `containers`, `whiteboard`, `document`, `catalog`, `templates`, `versions`, `export` or `publish`. `containers` explains recursive Page/Board roots, frames and views; `document` explains rich-text blocks inside regions and legacy v1 sources; it is only needed when authoring blocks directly. Catalog summaries and command receipts include a useful next step.
 
 Every successful `--json` command returns `{ "ok": true, "data": ... }`. Failures return `{ "ok": false, "error": { "code", "message", "currentHash"? } }` and a nonzero exit code (`3` for page conflicts).
 
-## Whiteboard pages
+## Page and Board containers
 
-New pages default to artifact version 2 with a `surface` root. Every root node is equal; all may be removed. Regions use `flow`, `grid` or `free` layouts. Read `showai guide whiteboard --json` before constructing spatial pages. Content lives in the node tree, position and region rules in `layout`, and named views/reading order in `views`.
+New resources use artifact v3 and default to Page. Use `pages create --kind board` for a spatial workspace. `showai guide containers --json` describes recursive surfaces, parent-owned frames, per-surface views and drawing nodes. Content lives in the tree, frames in layout and saved views in surfaceViews. The project folder parentId differs from a content operation's container parentId.
 
-Use `block.insert/move/replace/remove` for structure, `surface.layout.set` for geometry, `surface.view.save/remove` for views and `surface.reading-order.set` for linear delivery. Supply the current base hash. Existing v1 pages can be migrated with `surface.upgrade`; Core preserves the original bytes and snapshots. Keep version 2 roots when editing a whiteboard.
+`surface.create` inserts a Page or Board, and `surface.wrap` wraps an existing surface while preserving its identity and descendants. Block operations edit the tree; surface.layout.set changes frames; view and reading-order operations accept a surfaceId. Supply the current base hash. surface.upgrade adapts older sources and the first managed save preserves original bytes and snapshots.
 
-Templates can be inserted into an existing page with `template apply ID --project PROJECT --page PAGE --base-hash HASH`, optionally `--parent REGION_ID`. This remaps every node and view reference, places new content beside existing content, and preserves the target initial view.
+Template application preserves container kind. Add `--page PAGE --base-hash HASH`, optionally `--parent SURFACE_ID`, to insert its root as a module. Every node, layout key and view reference is remapped together. Export selection may target any nested surface; it includes descendants and necessary ancestors.
 
 ## Select the current project
 

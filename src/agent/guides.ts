@@ -3,6 +3,7 @@ export const GUIDE_TOPICS = [
   "authoring",
   "document",
   "whiteboard",
+  "containers",
   "catalog",
   "component",
   "templates",
@@ -40,13 +41,13 @@ const guides: Record<
     ],
   },
   authoring: {
-    next: "showai guide whiteboard --json",
+    next: "showai guide containers --json",
     purpose:
       "Create or revise page content without overwriting edits made by the user or another Agent.",
     rules: [
       "Read the page, retain its hash and stable block ids, and inspect pages diff against the preceding turn's hash.",
       "Save/apply requires --base-hash. On CONFLICT, read and merge deliberately; do not blindly retry an old document with a newer hash.",
-      "New pages use a surface root with equal regions/components, independent layout and views. Use guide whiteboard for structure; query component schemas when adding components.",
+      "New resources default to a Page surface. Page and Board containers nest recursively in artifact v3. Use guide containers for structure; query component schemas when adding components.",
     ],
     commands: [
       "showai pages create --project PROJECT --title 'Research result' --json",
@@ -74,59 +75,74 @@ const guides: Record<
       ],
     },
   },
-  whiteboard: {
+  containers: {
     purpose:
-      "Create, arrange and share whiteboard pages with equal regions and components.",
+      "Create native Page and Board containers that can nest, expand and share one editable source.",
     rules: [
-      "New pages default to artifact version 2. content.type is surface; root content nodes are equal and can all be removed. There is no privileged document node.",
-      "A region is {type:'region',attrs:{id,name},content:[...]}. It may contain rich text blocks, components or nested regions. richText is a component containing ordinary document blocks.",
-      "Positions and layout live in page.layout keyed by stable node id: {x,y,width,mode?,columns?,gap?,height?}. Region mode is flow, grid or free. Root and free-layout children use coordinates; flow/grid derive child positions. Height is a minimum frame height.",
-      "views.saved contains {id,name,targets:[nodeId]}; views.initial names a saved view; views.readingOrder orders root ids for linear delivery. Current camera and selections are personal state and must not be written as content.",
-      "Use block.insert/move/remove/text.set with parentId for content. Use surface.layout.set, surface.view.save/remove, and surface.reading-order.set for arrangement and navigation.",
-      "Legacy version 1 files remain readable. Read a page and apply surface.upgrade with its base hash to migrate; the original source and snapshots are preserved. Do not replace a whiteboard with a legacy document.",
-      "Template apply creates a new whiteboard by default. Add --page PAGE --base-hash HASH (and optionally --parent REGION) to insert it into an existing page without duplicating identities.",
+      "New resources use artifact version 3. The root and nested containers are {type:'surface',attrs:{id,kind:'page'|'board',name},content:[...]}. New resources default to Page; --kind board creates an empty Board.",
+      "Page lays out its children in tree order and uses normal vertical reading. Board places its children in a local coordinate space and owns its own pan/zoom. Regions are flow/grid/free layout groups; they do not create another viewport.",
+      "The parent owns each child's outer frame in document.layout[nodeId]: {x,y,width,height?,heightMode?}. Surface heightMode is fixed or auto; auto is only for Pages. Board frames remain bounded even when internal content extends far away. Root nodes have no parent frame.",
+      "document.surfaceViews[surfaceId] stores {initial,saved:[{id,name,targets}],readingOrder}. Every target must belong to that surface. Page order follows the content tree. Current cameras, scroll, selection and expansion are personal state and never enter content hashes.",
+      "Use surface.create with kind, optional name/nodeId/parentId; surface.wrap wraps nodeId (or the root) in a new Page or Board while retaining all original identities. Use block.insert/move/remove/text.set for content and surface.layout.set for frames. surface.view.save/remove and surface.reading-order.set accept optional surfaceId.",
+      "Drawings live inside Boards: {type:'drawing',attrs:{id,name,tool:'pen'|'rectangle'|'ellipse'|'arrow',color:'#252629',strokeWidth:2.5,extent:[width,height],points:[{x,y},...]}}. Points are local to their frame; frame position is in layout. Keep shapes inside a Board when inserting them into a Page.",
+      "Inline containers are owned subtrees in one resource. Expanding edits the same node; it does not create a new page or reference another file. resource.parentId is a project folder id; operation.parentId is a content-container id.",
+      "Legacy v1 documents adapt to Page, v2 whiteboards retain Board placement. surface.upgrade migrates explicitly with a base hash. First managed saves preserve exact originals and existing snapshots. Never downgrade a stored resource's model version.",
+      "Template application preserves container kinds. Insertion into an existing resource adds the template root as a module and remaps all node, layout and view references. Exports and --blocks selections retain necessary container ancestors.",
     ],
     commands: [
-      "showai pages read PAGE --project PROJECT --json",
+      "showai pages create --project PROJECT --kind page --title 'Report' --json",
+      "showai pages create --project PROJECT --kind board --title 'Workspace' --json",
       "showai pages apply PAGE --project PROJECT --input operations.json --base-hash HASH --json",
-      "showai template apply TEMPLATE --project PROJECT --page PAGE --base-hash HASH --json",
+      "showai template apply TEMPLATE --project PROJECT --page PAGE --parent SURFACE_ID --base-hash HASH --json",
     ],
     input: {
       operations: [
         { type: "surface.upgrade" },
         {
-          type: "block.insert",
-          node: {
-            type: "region",
-            attrs: { id: "region-a", name: "Findings" },
-            content: [
-              {
-                type: "paragraph",
-                attrs: { id: "finding" },
-                content: [{ type: "text", text: "Source-backed finding." }],
-              },
-            ],
-          },
+          type: "surface.create",
+          kind: "board",
+          nodeId: "analysis",
+          name: "Analysis",
+        },
+        {
+          type: "surface.create",
+          kind: "page",
+          parentId: "analysis",
+          nodeId: "evidence",
+          name: "Evidence",
         },
         {
           type: "surface.layout.set",
-          nodeId: "region-a",
-          layout: { x: 1200, y: 0, width: 900, mode: "flow" },
+          nodeId: "analysis",
+          layout: { x: 0, y: 0, width: 800, height: 460, heightMode: "fixed" },
         },
         {
           type: "surface.view.save",
-          view: { id: "findings", name: "Findings", targets: ["region-a"] },
+          surfaceId: "analysis",
+          view: { id: "reading", name: "Evidence", targets: ["evidence"] },
           initial: true,
         },
       ],
     },
     next: "showai guide document --json",
   },
+  whiteboard: {
+    purpose:
+      "Board layout and drawing use the shared recursive container model.",
+    rules: [
+      "New content defaults to Page. Board is an explicit container kind and can be embedded at any container level. Read guide containers for the complete v3 schema, ownership and operations.",
+    ],
+    commands: [
+      "showai guide containers --json",
+      "showai pages create --project PROJECT --kind board --json",
+    ],
+    next: "showai guide containers --json",
+  },
   document: {
     purpose:
       "Read the page JSON format only when authoring document blocks directly.",
     rules: [
-      "This guide describes rich-text payloads inside regions and legacy v1 sources. New whiteboard pages use version 2; see guide whiteboard. Explicit legacy documents remain compatible inputs.",
+      "This guide describes rich-text payloads inside regions and legacy v1 sources. New Page and Board resources use version 3; see guide containers. Explicit legacy documents remain compatible inputs.",
       "A document requires id, title and a doc content node. The store assigns the page identity and stable attrs.id values; retain existing block ids when revising.",
       "Text nodes use {type:'text',text,marks?}; empty paragraphs have content:[] rather than an empty text node.",
       "Headings use attrs.level 1–3. Lists contain listItem children starting with a paragraph. taskList contains taskItem with attrs.checked. Tables contain tableRow then tableCell/tableHeader, each containing paragraphs/blocks.",
@@ -243,7 +259,7 @@ const guides: Record<
       "Use or compose reusable content structures while keeping template revisions immutable.",
     rules: [
       "Use a template's scenarios to choose it, guide to learn its content structure and related resources, and examples to see realistic sequences.",
-      "Applying a template creates a whiteboard. --page with --base-hash inserts into an existing whiteboard. Composition expands referenced templates and preserves exact dependency revisions.",
+      "Applying a template creates a resource with the template container kind. --page with --base-hash inserts its root as a module into an existing container. Composition expands referenced templates and preserves exact dependency revisions.",
       "Save accepts a page or an input file with name, description, version, scenarios, contentGuide, related, examples and optional document/composition. To revise an existing template id, use a new version.",
       "A composition part is either {type:'content', content:DOC_NODE} or {type:'template', ref:EXACT_REF, title?:TEXT}. The core pins referenced integrity. Query --view dependencies to inspect the resulting graph.",
     ],

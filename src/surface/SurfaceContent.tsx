@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type CSSProperties,
 } from "react";
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
@@ -73,7 +74,9 @@ function FreeLayout({
     <div
       className="surface-layout-free"
       ref={ref}
-      style={{ minHeight: height }}
+      style={
+        { minHeight: height, "--free-height": `${height}px` } as CSSProperties
+      }
     >
       {children}
     </div>

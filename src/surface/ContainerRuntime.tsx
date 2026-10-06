@@ -593,6 +593,10 @@ function ContainerView({
       writeScroll(persistKey, element.scrollTop);
     };
   }, [persistKey]);
+  useLayoutEffect(() => {
+    if (!runtime.printing && page.current && runtime.scrolls.has(persistKey))
+      page.current.scrollTop = runtime.scrolls.get(persistKey)!;
+  }, [runtime.printing, persistKey]);
   useEffect(() => {
     const target = runtime.revealRequest;
     if (
@@ -813,6 +817,10 @@ function ContainerView({
           data-container-root={id}
           data-input-surface={id}
           aria-label={`Page ${nodeName(node)}`}
+          onScroll={(event) => {
+            if (!runtime.printing && !matchMedia("print").matches)
+              runtime.scrolls.set(persistKey, event.currentTarget.scrollTop);
+          }}
           onPointerDownCapture={(event) => {
             if (
               (event.target as Element).closest("[data-container-root]") ===
@@ -826,7 +834,7 @@ function ContainerView({
             <SurfaceContent
               document={runtime.document}
               container={node}
-              spatial={false}
+              spatial={!reading}
               renderContent={runtime.render}
               renderSurface={renderSurface}
             />

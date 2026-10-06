@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { chromium, _electron } from "playwright";
 const root = resolve(import.meta.dirname, "..");
@@ -252,6 +253,34 @@ try {
     await page.locator(`[data-container-root="${nestedPageId}"]`).count(),
     1,
   );
+  await page
+    .getByRole("navigation", { name: "主要导航" })
+    .getByRole("button", { name: "组件", exact: true })
+    .click();
+  await page
+    .locator(".studio-component-card")
+    .filter({ has: page.getByRole("heading", { name: /^关键指标/ }) })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "插入页面", exact: true })
+    .click();
+  saved = await poll(
+    read,
+    (record) =>
+      find(record.document.content, nestedPageId).content.some(
+        (node) => node.type === "widget",
+      ),
+    "component inserted into active nested Page",
+  );
+  assert.equal(
+    saved.document.content.content.some((node) => node.type === "widget"),
+    false,
+  );
+  await scene(nestedPageId).locator(".sb-metrics").waitFor();
+  result.checks.push(
+    "component catalog inserts into the active nested container and returns to that container",
+  );
   await add(nestedPageId, "Board 白板");
   saved = await poll(
     read,
@@ -459,7 +488,7 @@ try {
     viewport: { width: 1280, height: 900 },
   });
   reader.on("pageerror", (error) => result.errors.push(error.message));
-  await reader.goto(new URL("file://" + standalone.path).href);
+  await reader.goto(pathToFileURL(standalone.path).href);
   await reader.locator(".container-page.is-root").waitFor();
   assert.equal(await reader.locator('[contenteditable="true"]').count(), 0);
   await reader
@@ -479,7 +508,7 @@ try {
     .click();
   await reader.locator(".board-drawing").waitFor();
   await reader.screenshot({ path: join(output, "expanded-drawing.png") });
-  await reader.goto(new URL("file://" + partial.path).href);
+  await reader.goto(pathToFileURL(partial.path).href);
   await reader.locator(".container-workspace").waitFor();
   assert.equal(
     await reader
@@ -491,6 +520,22 @@ try {
   assert.ok(
     await reader.evaluate(() => document.documentElement.scrollWidth <= 391),
   );
+  await reader.emulateMedia({ media: "print" });
+  await reader.locator(".board-drawing").waitFor();
+  const printGeometry = await reader
+    .locator(".board-drawing rect")
+    .first()
+    .boundingBox();
+  assert.ok(
+    printGeometry && printGeometry.width > 5 && printGeometry.height > 3,
+  );
+  assert.ok(
+    Math.abs(printGeometry.width / printGeometry.height - 200 / 120) < 0.12,
+  );
+  await reader.screenshot({
+    path: join(output, "print-layout.png"),
+    fullPage: true,
+  });
   await reader.pdf({ path: join(output, "nested.pdf"), format: "A4" });
   await reader.close();
   result.checks.push(

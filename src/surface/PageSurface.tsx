@@ -133,10 +133,16 @@ export default function PageSurface({
         Math.max(1, root.clientWidth) / Math.max(1, width),
         1000 / Math.max(1, height),
       );
-      root.style.setProperty("--board-print-height", `${height * scale}px`);
+      const heading =
+        root.querySelector<HTMLElement>(":scope > .surface-metadata")
+          ?.offsetHeight ?? 0;
+      root.style.setProperty(
+        "--board-print-height",
+        `${height * scale + heading}px`,
+      );
       root.style.setProperty(
         "--board-print-transform",
-        `scale(${scale}) translate(${-left}px,${-top}px)`,
+        `translateY(${heading}px) scale(${scale}) translate(${-left}px,${-top}px)`,
       );
     };
     fitPrint();

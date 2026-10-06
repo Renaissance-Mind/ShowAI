@@ -22,15 +22,15 @@ showai pages list --project PROJECT --json
 
 使用宿主提供的真实会话 id；无法获得时省略绑定，保留新项目 id。每次写入明确指定项目。默认内容库为 `~/.showai`，用 `--home` 与桌面设置保持一致。
 
-按本次操作读取 CLI 指南，普通创作先使用 `guide authoring`；构造 Page 结构时读取 `guide whiteboard`，区域内部的富文本区块再读 `guide document`。
+按本次操作读取 CLI 指南，普通创作先使用 `guide authoring`；构造 Page 结构时读取 `guide containers`，区域内部的富文本区块再读 `guide document`。
 
 - `guide workspace`：项目与绑定。
 - `guide authoring`：读取、差异、编辑和冲突处理。
-- `guide whiteboard`：平等区域、布局、视图和旧页迁移。
+- `guide containers`：Page/Board 嵌套、外框、视图与旧页迁移。
 - `guide catalog`：摘要搜索，再按需查看用途、输入、示例或源码。
 - `guide export`：整页或局部组件的 HTML、会话展示和网站。
 
-新 Page 默认使用版本 2 白板模型。按表达需要选择区域内的纵向、网格或自由布局，保留已有节点 ID。调整位置使用 layout，指定网页阅读顺序使用 views.readingOrder。模板可建立新页面或加入现有页面；导出用 spatial 保留白板，用 reading 呈现响应式阅读顺序，两者均保存完整可编辑源。
+新资源默认使用版本 3 的 Page 顺序页面，Board 是独立空间容器。两者可以原生嵌套与展开。内容树记录归属，layout 保存父级外框，surfaceViews 保存各层视图。绘画保存在 Board 内。模板保留容器类型，可用于新建或作为模块插入；局部导出包含所选子树及必要祖先。
 
 先按用途搜索组件或模板摘要，限制结果数；选中后取 `--view guide`，准备填入数据时取 `schema`，需要参考用法时取 `examples`。普通页面创作无需读取组件源码或整个目录。修改已有页面前读取当前版本、查看差异，并使用当前 hash 保存。
 

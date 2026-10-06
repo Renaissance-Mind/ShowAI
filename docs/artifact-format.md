@@ -1,54 +1,59 @@
-# ShowAI artifact format, version 2
+# ShowAI artifact format, version 3
 
-A `.showai.json` file describes one interactive Page. Version 2 uses an infinite whiteboard with equal regions and independent content nodes. The rendered HTML includes the source, reader, styles and component runtimes. Reader interactions are temporary; import the source into a project to persist edits.
+Version 3 stores recursively nested Page and Board surfaces. A Page is ordered content; a Board is a local spatial workspace. Both may be the root or an embedded module. New resources default to Page. Versions 1 (doc) and 2 (legacy whiteboard) remain readable.
 
-## Envelope
+## Envelope and containers
 
 ```json
 {
   "format": "showai",
-  "version": 2,
-  "presentation": "spatial",
+  "version": 3,
   "document": {
-    "id": "research-result",
-    "title": "Research result",
+    "id": "research",
+    "title": "Research",
     "content": {
       "type": "surface",
+      "attrs": { "id": "page-root", "kind": "page", "name": "Page" },
       "content": [
         {
-          "type": "region",
-          "attrs": { "id": "region-1", "name": "Research" },
-          "content": [
-            {
-              "type": "paragraph",
-              "attrs": { "id": "intro" },
-              "content": [
-                { "type": "text", "text": "Start with the question." }
-              ]
-            }
-          ]
+          "type": "surface",
+          "attrs": { "id": "board", "kind": "board", "name": "Analysis" },
+          "content": []
         }
       ]
     },
-    "layout": { "region-1": { "x": 0, "y": 0, "width": 920, "mode": "flow" } },
-    "views": { "initial": null, "saved": [], "readingOrder": ["region-1"] }
+    "layout": {
+      "board": {
+        "x": 0,
+        "y": 0,
+        "width": 800,
+        "height": 460,
+        "heightMode": "fixed"
+      }
+    },
+    "surfaceViews": {
+      "page-root": { "initial": null, "saved": [], "readingOrder": ["board"] },
+      "board": { "initial": null, "saved": [], "readingOrder": [] }
+    }
   }
 }
 ```
 
-`id`, `title`, and a `surface` content node are required for version 2. Version 1 requires a `doc` root and remains readable. Envelope and root versions must match. Missing dates use import time. Metadata can include `icon`, `cover`, `parentId`, `favorite`, `archived`, and `comments`.
+All non-text nodes, including surfaces, have unique stable `attrs.id`. Surface kind is `page` or `board`; nested surfaces require a surface or region parent. `region` remains a flow/grid/free layout group and `richText` holds ordinary editor blocks. The resource ID identifies the file; the root container ID identifies its content node.
 
-Every non-text node below the root has a unique stable `attrs.id`. Missing IDs are assigned deterministically; duplicate, reserved and dangling IDs are rejected in version 2. Preserve IDs when revising a page. The content hash is returned separately by the store; updates require that value through `--base-hash`.
+`layout[nodeId]` describes the parent-owned frame: x, y, width, optional height and heightMode (`fixed` or `auto`). Auto height is supported for Page modules; Board modules keep a bounded viewport. Board and free-group children use local coordinates. Page and flow/grid children follow tree order. Region-only fields are mode, columns and gap. See [Page and Board](page-surface.md) for limits and interactions.
 
-`surface` contains equal `region`, `richText`, native block or widget nodes. Regions can nest regions and rich text. `richText` holds ordinary rich-text blocks. `layout` maps node IDs to `{x, y, width, height?, mode?, columns?, gap?}`. Root nodes and direct free-layout children are positioned relative to their parent; flow and grid children follow tree order. Region `mode` is `flow`, `grid` or `free`. Height is a minimum. Node names are optional `attrs.name` strings up to 200 characters. See [Page whiteboard](page-surface.md) for bounds and gesture behavior.
+`surfaceViews[surfaceId]` contains `initial: viewId | null`, `saved: {id,name,targets: nodeId[]}[]`, and `readingOrder: childNodeId[]`. Targets belong to their owner; current scroll/camera/selection are local user state. Missing defaults are supplied at normalization. Invalid ids, geometry, kinds and references are rejected.
 
-`views` contains `initial: viewId | null`, `saved: {id, name, targets: nodeId[]}[]`, and `readingOrder: rootNodeId[]`. Omitted root IDs are appended in tree order. Named views reference content rather than absolute viewport pixels. Personal camera state is local and excluded from the document hash.
+Optional envelope `presentation` is `spatial` (default) or `reading`. Page retains its ordinary flow under either; reading projects the selected root Board into reading order. Optional `selection: {blockIds}` identifies a partial artifact, preserving necessary container ancestors. Optional `components` bundles exact runtimes; `remoteComponents` contains verified publication locators. Sources retain complete editable geometry for their selected content.
 
-Optional envelope `presentation` is `spatial` (default) or `reading`. Reading projects regions into responsive reading order; it retains the full layout and views in embedded source. Print and Markdown also follow reading order.
+Metadata includes ISO createdAt/updatedAt, icon, cover, parentId (project folder), favorite, archived and comments. Root title is metadata. The store returns a separate semantic hash; updates require that hash as base-hash.
 
-Optional `components` bundles the exact compiled custom runtimes. `remoteComponents` can instead contain verified publication locators. Authoring files store references; exported sources carry the dependencies needed to display them.
+Legacy v1 ordinary documents adapt to Page; v2 and legacy floating content retain Board arrangement. Managed upgrades preserve exact original bytes under migrations/resource-id/original-v1.json or original-v2.json and retain snapshots. Downgrading a stored resource is rejected.
 
-Legacy files open without being rewritten. Their body and old floating callouts become ordinary regions when edited. A first managed migration preserves original bytes under `migrations/<page-id>/original-v1.json` and retains snapshots. A version 2 page cannot be overwritten with a version 1 document; import a separate page when needed. [The legacy example](../examples/welcome.showai.json) remains valid.
+## Board drawings
+
+A drawing is `{type:'drawing',attrs:{id,name,tool,color,strokeWidth,extent,points}}`. Tool is pen, rectangle, ellipse or arrow; color is six-digit hex; strokeWidth is 0.5–40; extent is [width,height]; points is 2–20000 local {x,y} values. Drawings belong to Boards and have no children. Layout stores their position and displayed dimensions. Moving a drawing preserves its local points; resizing changes its frame. Keep drawings inside a Board module when placing them into a Page.
 
 ## Text and document blocks
 

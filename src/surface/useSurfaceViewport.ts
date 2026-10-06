@@ -722,6 +722,7 @@ export function useSurfaceViewport(
       if (gesture) settle();
     };
     const nativeScroll = () => {
+      if (matchMedia("print").matches) return;
       if (!scroll.scrollTop && !scroll.scrollLeft) return;
       const x = scroll.scrollLeft,
         y = scroll.scrollTop;

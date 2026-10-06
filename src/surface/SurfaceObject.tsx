@@ -209,6 +209,11 @@ export function SurfaceObject({
       : { position: "relative", minWidth: 0 };
   if (container && !positioned && frame)
     style.width = `min(100%, ${frame.width}px)`;
+  if (frame) {
+    (style as Record<string, unknown>)["--frame-width"] = `${frame.width}px`;
+    (style as Record<string, unknown>)["--frame-x"] = `${frame.x}px`;
+    (style as Record<string, unknown>)["--frame-y"] = `${frame.y}px`;
+  }
   if (frame?.height)
     (style as Record<string, unknown>)["--frame-height"] = `${frame.height}px`;
   if (fixedHeight) {

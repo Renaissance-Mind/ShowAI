@@ -211,6 +211,12 @@ export function wrapSurface(source, id, kind) {
     target = findSurfaceNode(document, id);
   if (target?.node.type !== "surface")
     throw new Error("Only a Page or Board can be wrapped.");
+  if (
+    target.node === document.content &&
+    document.title &&
+    ["Page", "Board"].includes(target.node.attrs.name)
+  )
+    target.node.attrs.name = document.title.slice(0, 200);
   const wrapper = createSurface(kind);
   wrapper.content = [target.node];
   if (target.parent) {
@@ -231,6 +237,8 @@ export function wrapSurface(source, id, kind) {
 export function insertResourceTemplate(source, template, parentId) {
   const document = upgradeResource(source),
     incoming = remapSurfaceIds(upgradeResource(template));
+  if (incoming.title && ["Page", "Board"].includes(incoming.content.attrs.name))
+    incoming.content.attrs.name = incoming.title.slice(0, 200);
   const parent = parentId
     ? findSurfaceNode(document, parentId)?.node
     : document.content;

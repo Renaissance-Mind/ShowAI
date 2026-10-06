@@ -458,3 +458,16 @@
 .container-workspace {
   isolation: isolate;
 }
+@media print {
+  .container-board .surface-world > .surface-object,
+  .container-board .surface-layout-free > .surface-object {
+    position: absolute !important;
+    left: var(--frame-x, 0px) !important;
+    top: var(--frame-y, 0px) !important;
+    width: var(--frame-width, 360px) !important;
+  }
+  .container-board .surface-layout-free {
+    position: relative !important;
+    min-height: var(--free-height, 200px) !important;
+  }
+}
