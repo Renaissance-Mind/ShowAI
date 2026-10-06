@@ -215,7 +215,7 @@ async function install() {
         "plugin.json",
         "skills/show-document/SKILL.md",
         "skills/create-component/SKILL.md",
-        "skills/extract-template/SKILL.md",
+        "skills/create-template/SKILL.md",
       ].map((path) => [path, actual.entries.get(path)?.sha256]),
     ),
     verifiedAt: new Date().toISOString(),

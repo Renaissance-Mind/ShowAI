@@ -12,7 +12,7 @@
           "content": [
             {
               "type": "text",
-              "text": "三个 skills 分别负责页面创作、组件定制和模板提取。插件只提供技能与文档；外部 ShowAI 软件提供 CLI、阅读器和编译能力。选择流程或节点，查看触发条件、此时读取的资料和动态查询。"
+              "text": "三个 skills 分别负责页面创作、组件定制和模板创建。插件只提供技能与文档；外部 ShowAI 软件提供 CLI、阅读器和编译能力。选择流程或节点，查看触发条件、此时读取的资料和动态查询。"
             }
           ]
         },
@@ -36,7 +36,7 @@
                       "label": "用户的当前目标",
                       "kind": "request",
                       "subtitle": "决定加载哪个 skill",
-                      "detail": "创建和编辑页面、开发新的表达组件、或把成熟页面抽象成模板，分别进入不同技能。完成页面不会自动触发模板提取。",
+                      "detail": "创建和编辑页面、开发新组件、或新建及提炼可复用模板，分别进入对应技能。",
                       "position": {
                         "x": 264,
                         "y": 0
@@ -68,11 +68,11 @@
                     },
                     {
                       "id": "template",
-                      "label": "模板提取",
+                      "label": "模板创建",
                       "kind": "skill",
-                      "subtitle": "extract-template",
-                      "detail": "用户主动要求把已迭代好的页面提取为模板时进入。保留源页面，抽象填写约定，并应用不同材料验证。",
-                      "references": ["skills/extract-template/SKILL.md"],
+                      "subtitle": "create-template",
+                      "detail": "用户要求新建、修改或提炼模板时进入。支持先做页面再提炼，或直接创建模板并提供可选使用提示，最后验证应用结果。",
+                      "references": ["skills/create-template/SKILL.md"],
                       "position": {
                         "x": 528,
                         "y": 180
@@ -139,7 +139,7 @@
                       "id": "overview-2",
                       "source": "intent",
                       "target": "template",
-                      "label": "提取模板"
+                      "label": "创建模板"
                     },
                     {
                       "id": "overview-3",
@@ -534,71 +534,90 @@
                 },
                 {
                   "id": "template-work",
-                  "label": "模板提取",
-                  "description": "由保存模板的用户意图触发，抽象成熟页面而非只复制实例。",
+                  "label": "模板创建",
+                  "description": "根据材料与结构选择先做页面再提炼，或直接保存模板再应用预览。",
                   "direction": "TB",
                   "nodes": [
                     {
                       "id": "request",
-                      "label": "成熟页面 + 提取请求",
+                      "label": "新建、修改或提炼模板",
                       "kind": "request",
                       "subtitle": "用户主动提出目标",
-                      "detail": "“把这页整理成可复用模板”才进入该流程。普通页面完成时继续交付即可。",
-                      "position": {
-                        "x": 0,
-                        "y": 0
-                      },
-                      "targetSide": "top",
-                      "sourceSide": "right"
-                    },
-                    {
-                      "id": "skill",
-                      "label": "extract-template",
-                      "kind": "skill",
-                      "subtitle": "独立技能入口",
-                      "detail": "读取模板抽象说明与当前 CLI 指南。",
-                      "commands": ["guide template-extraction --json"],
-                      "references": [
-                        "skills/extract-template/SKILL.md",
-                        "skills/extract-template/references/template-abstraction.md"
-                      ],
+                      "detail": "“我想做一个项目周报模板”或“把这页整理成模板”进入此流程。从对话获取读者、输入材料、固定结构与可选内容。",
                       "position": {
                         "x": 264,
                         "y": 0
                       },
-                      "targetSide": "left",
-                      "sourceSide": "right"
+                      "targetSide": "top",
+                      "sourceSide": "bottom"
+                    },
+                    {
+                      "id": "skill",
+                      "label": "create-template",
+                      "kind": "skill",
+                      "subtitle": "独立技能入口",
+                      "detail": "沿用用户指定方式；有具体材料或需看效果时先做页面，结构明确时直接创建。只询问影响结果的缺项。",
+                      "commands": [
+                        "guide templates --json",
+                        "catalog list --kind template --project PROJECT --query 用途 --limit 8 --json"
+                      ],
+                      "references": ["skills/create-template/SKILL.md"],
+                      "position": {
+                        "x": 264,
+                        "y": 180
+                      },
+                      "targetSide": "top",
+                      "sourceSide": "bottom"
                     },
                     {
                       "id": "read",
-                      "label": "读取最新页面与差异",
+                      "label": "先做页面再提炼",
                       "kind": "query",
                       "subtitle": "纳入用户手动修改",
-                      "detail": "源页面继续保留。相似模板从摘要筛选，避免只换名称的重复模板。",
+                      "detail": "已有成熟页面直接读取；否则用用户材料创建页面并根据预览反馈迭代。提炼前读取最新内容和差异，保留原实例。",
                       "commands": [
+                        "按需：guide template-extraction --json",
                         "pages read PAGE --project PROJECT --json",
-                        "pages diff PAGE --project PROJECT --since HASH --json",
-                        "catalog list --kind template --project PROJECT --query 用途 --limit 8 --json"
+                        "pages diff PAGE --project PROJECT --since HASH --json"
+                      ],
+                      "position": {
+                        "x": 0,
+                        "y": 360
+                      },
+                      "targetSide": "top",
+                      "sourceSide": "bottom",
+                      "references": [
+                        "skills/create-template/references/template-abstraction.md"
+                      ]
+                    },
+                    {
+                      "id": "direct",
+                      "label": "直接创建模板",
+                      "kind": "reference",
+                      "subtitle": "选择使用提示并落实结构",
+                      "detail": "按场景提供少量有差别的使用提示，用户选择、组合或自由描述。需求明确时直接采用合适方向；把选定结构保存为模板后生成应用预览。",
+                      "references": [
+                        "skills/create-template/references/template-creation.md"
                       ],
                       "position": {
                         "x": 528,
-                        "y": 0
+                        "y": 360
                       },
-                      "targetSide": "left",
+                      "targetSide": "top",
                       "sourceSide": "bottom"
                     },
                     {
                       "id": "abstract",
-                      "label": "抽象稳定结构与填写内容",
+                      "label": "定义可复用结构与填写规则",
                       "kind": "decision",
                       "subtitle": "结构 / 数据 / 可选部分",
-                      "detail": "保留叙事顺序、布局与组件关系；实例事实替换为填写提示或空状态。contentGuide 说明输入与证据要求，related/examples 描述组合与用法。",
+                      "detail": "保存布局、阅读顺序与组件引用，用填写提示或有效空状态替换实例事实。contentGuide 记录必需材料、组织方式与可选条件，examples.request 保存使用提示。",
                       "position": {
-                        "x": 528,
-                        "y": 180
+                        "x": 264,
+                        "y": 540
                       },
                       "targetSide": "top",
-                      "sourceSide": "left"
+                      "sourceSide": "bottom"
                     },
                     {
                       "id": "save",
@@ -611,43 +630,43 @@
                       ],
                       "position": {
                         "x": 264,
-                        "y": 180
+                        "y": 720
                       },
-                      "targetSide": "right",
-                      "sourceSide": "left"
+                      "targetSide": "top",
+                      "sourceSide": "bottom"
                     },
                     {
                       "id": "validate",
-                      "label": "用不同材料应用",
+                      "label": "应用、预览与反馈",
                       "kind": "result",
                       "subtitle": "原实例事实不泄漏",
-                      "detail": "创建新页面检查结构、组件依赖、可选内容和导出效果。",
+                      "detail": "应用模板并执行所选提示，填入用户材料，检查结构、依赖、交互与导出。提炼模式用不同材料验证；缺材料时展示空状态并说明待补项。通用结构反馈更新模板并创建新版本；本次内容修改实例。",
                       "commands": [
                         "template apply ID --project PROJECT --scope project --version VERSION --title 新内容 --json"
                       ],
                       "position": {
-                        "x": 0,
-                        "y": 180
+                        "x": 264,
+                        "y": 900
                       },
-                      "targetSide": "right",
+                      "targetSide": "top",
                       "sourceSide": "bottom"
                     },
                     {
                       "id": "library",
-                      "label": "项目模板与应用结果",
+                      "label": "模板、使用提示与预览",
                       "kind": "result",
                       "subtitle": "共享与发布按请求进入",
-                      "detail": "模板和验证页面分别保存。全局提升、远端发布是另外的明确操作。",
+                      "detail": "交付精确模板引用、可复制的使用提示与应用结果，保留原实例和验证页面。后续反馈继续迭代同一模板。",
                       "commands": [
                         "按需：guide versions --json",
                         "按需：guide publish --json"
                       ],
                       "position": {
-                        "x": 0,
-                        "y": 360
+                        "x": 264,
+                        "y": 1080
                       },
                       "targetSide": "top",
-                      "sourceSide": "right"
+                      "sourceSide": "bottom"
                     }
                   ],
                   "edges": [
@@ -659,7 +678,8 @@
                     {
                       "id": "template-work-1",
                       "source": "skill",
-                      "target": "read"
+                      "target": "read",
+                      "label": "先做页面"
                     },
                     {
                       "id": "template-work-2",
@@ -680,6 +700,17 @@
                       "id": "template-work-5",
                       "source": "validate",
                       "target": "library"
+                    },
+                    {
+                      "id": "template-work-direct-0",
+                      "source": "skill",
+                      "target": "direct",
+                      "label": "直接创建"
+                    },
+                    {
+                      "id": "template-work-direct-1",
+                      "source": "direct",
+                      "target": "abstract"
                     }
                   ]
                 },
@@ -720,11 +751,12 @@
                       "label": "条件性的静态参考",
                       "kind": "reference",
                       "subtitle": "需要时才读",
-                      "detail": "运行入口首次读；组件契约在开发时读；模板抽象在提取时读。",
+                      "detail": "运行入口首次读；组件契约在开发时读；按模板模式读取直接创建或模板抽象参考。",
                       "references": [
                         "show-document/references/runtime.md",
                         "create-component/references/component-authoring.md",
-                        "extract-template/references/template-abstraction.md"
+                        "create-template/references/template-abstraction.md",
+                        "create-template/references/template-creation.md"
                       ],
                       "position": {
                         "x": 0,

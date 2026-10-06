@@ -187,6 +187,8 @@ showai template apply TEMPLATE_ID --project PROJECT --version VERSION --title "M
 
 A template definition includes `name`, `description`, optional `id`/`version`, `scenarios`, `contentGuide`, `related`, `examples`, and either `document` or `composition`. Query the template guide for usage and source view only when editing its definition.
 
+The `create-template` skill can refine a concrete page before abstracting it, or save a template definition directly and apply it to a preview page. For direct creation, offer relevant natural-language usage prompts when the structure needs a choice, then implement the selected direction. Store these prompts in `examples.request` with a `name` and `steps`; use `contentGuide` for required materials, organization and optional sections. Both workflows validate an applied page. Reusable feedback creates a new template version; instance edits remain in the page. See [skill workflows](skills.md).
+
 Composition parts are `{ "type": "content", "content": DOC_NODE }` or `{ "type": "template", "ref": EXACT_REF, "title": OPTIONAL_TITLE }`. The core locks references, checks the dependency graph, and expands composed templates when creating a page. `--view dependencies` exposes the pinned graph. Applying a template creates independent page and block identities.
 
 ## Deliver locally or prepare a publication

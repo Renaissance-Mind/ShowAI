@@ -125,7 +125,7 @@ HTML 与 inline 导出同时保存 `.showai.json` 源文件；独立页面的菜
 
 ## Codex 与 Claude Code 插件
 
-插件只分发三个技能：`show-document` 创建和修改页面，`create-component` 定义可复用组件，`extract-template` 将成熟页面抽象为模板。CLI、阅读器和组件编译器由独立安装的 ShowAI 软件提供；本地构建的运行包位于 `dist-runtime/`，桌面安装包把它放入 `Resources/runtime/`。
+插件只分发三个技能：`show-document` 创建和修改页面，`create-component` 定义可复用组件，`create-template` 新建、修改或提炼模板。模板创建支持先做页面再提炼，也支持直接保存模板、提供可选使用提示并生成应用预览。CLI、阅读器和组件编译器由独立安装的 ShowAI 软件提供；本地构建的运行包位于 `dist-runtime/`，桌面安装包把它放入 `Resources/runtime/`。
 
 桌面启动后会在所选内容目录登记 `agent-runtime.json`。使用独立运行包时执行 `npm run runtime:register`；技能读取启动配置并通过 `runtime info` 验证版本与内容目录。
 
