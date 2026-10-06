@@ -210,6 +210,22 @@ async function handle(
   })(action, args);
 }
 
+function isWorkbenchLocation(source: string): boolean {
+  if (!URL.canParse(source)) return false;
+  const location = new URL(source);
+  if (process.env.SHOWAI_DEV_URL) {
+    const entry = new URL(process.env.SHOWAI_DEV_URL);
+    return (
+      location.origin === entry.origin && location.pathname === entry.pathname
+    );
+  }
+  return (
+    location.protocol === "file:" &&
+    (!location.host || location.host === "localhost") &&
+    fileURLToPath(location) === join(directory, "index.html")
+  );
+}
+
 function trustedSender(
   event: IpcMainInvokeEvent | IpcMainEvent,
 ): BrowserWindow {
@@ -223,13 +239,7 @@ function trustedSender(
       "INVALID_PATH",
       "Desktop actions are only available to the ShowAI application frame.",
     );
-  const url = event.senderFrame.url;
-  const location = new URL(url);
-  const trusted = process.env.SHOWAI_DEV_URL
-    ? location.origin === new URL(process.env.SHOWAI_DEV_URL).origin
-    : location.protocol === "file:" &&
-      fileURLToPath(location) === join(directory, "index.html");
-  if (!trusted)
+  if (!isWorkbenchLocation(event.senderFrame.url))
     throw new CoreError("INVALID_PATH", "Untrusted application location.");
   return window;
 }
@@ -312,6 +322,17 @@ async function createWindow(page?: {
     windows.delete(window);
   });
   window.webContents.setWindowOpenHandler(({ url }) => {
+    if (isWorkbenchLocation(url)) {
+      const params = new URL(url).searchParams;
+      const projectId = params.get("project"),
+        pageId = params.get("page");
+      void createWindow(
+        projectId && pageId ? { projectId, pageId } : undefined,
+      ).catch((error) =>
+        dialog.showErrorBox("无法打开页面", errorResult(error).message),
+      );
+      return { action: "deny" };
+    }
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
     return { action: "deny" };
   });
@@ -319,6 +340,7 @@ async function createWindow(page?: {
     event.preventDefault(),
   );
   window.webContents.on("will-navigate", (event) => {
+    if (isWorkbenchLocation(event.url)) return;
     event.preventDefault();
     if (/^https?:\/\//i.test(event.url)) void shell.openExternal(event.url);
   });

@@ -165,6 +165,21 @@ try {
   );
   checks.push("complete development workbench and guarded reload bridge load");
   if (mode === "desktop") {
+    const navigated = page.waitForEvent("framenavigated", {
+      predicate: (frame) => frame === page.mainFrame(),
+      timeout: 15000,
+    });
+    await page.evaluate(() => location.reload());
+    await navigated;
+    await page
+      .getByRole("button", { name: "新建项目", exact: true })
+      .first()
+      .waitFor();
+    assert.equal(page.url(), original.url);
+    assert.equal((await receipt()).backendPid, original.backendPid);
+    checks.push("JavaScript reload stays inside the same desktop window");
+  }
+  if (mode === "desktop") {
     observer = await chromium.launch({ headless: true });
     const tab = await observer.newPage();
     await tab.goto(original.url);
