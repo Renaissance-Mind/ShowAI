@@ -1,0 +1,305 @@
+{
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "scope": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "slides": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "nav": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "kicker": {
+            "type": "string",
+            "maxLength": 140
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "lead": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "diagram": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "enum": [
+                  "roles",
+                  "context",
+                  "exchange",
+                  "filetree",
+                  "pipeline",
+                  "hooks",
+                  "overview"
+                ]
+              },
+              "nodes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "maxLength": 160
+                    },
+                    "role": {
+                      "enum": ["agent", "host", "resource"]
+                    },
+                    "detail": {
+                      "type": "string",
+                      "maxLength": 300
+                    },
+                    "tag": {
+                      "type": "string",
+                      "maxLength": 100
+                    }
+                  },
+                  "required": ["label"],
+                  "additionalProperties": false
+                },
+                "maxItems": 6
+              },
+              "steps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "maxLength": 160
+                    },
+                    "role": {
+                      "enum": ["agent", "host", "resource"]
+                    },
+                    "detail": {
+                      "type": "string",
+                      "maxLength": 300
+                    },
+                    "tag": {
+                      "type": "string",
+                      "maxLength": 100
+                    }
+                  },
+                  "required": ["label"],
+                  "additionalProperties": false
+                },
+                "maxItems": 6
+              },
+              "facts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "maxLength": 220
+                    },
+                    "source": {
+                      "type": "string",
+                      "maxLength": 140
+                    }
+                  },
+                  "required": ["label", "source"],
+                  "additionalProperties": false
+                },
+                "maxItems": 30
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    "note": {
+                      "type": "string",
+                      "maxLength": 220
+                    },
+                    "depth": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 5
+                    },
+                    "selected": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["name", "note", "depth"],
+                  "additionalProperties": false
+                },
+                "maxItems": 12
+              },
+              "hooks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "maxLength": 120
+                    },
+                    "event": {
+                      "type": "string",
+                      "maxLength": 120
+                    },
+                    "index": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 4
+                    },
+                    "output": {
+                      "type": "string",
+                      "maxLength": 220
+                    }
+                  },
+                  "required": ["label", "event", "index", "output"],
+                  "additionalProperties": false
+                },
+                "maxItems": 5
+              },
+              "frames": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "maxLength": 100
+                    },
+                    "action": {
+                      "type": "string",
+                      "maxLength": 220
+                    },
+                    "facts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "maxLength": 220
+                      },
+                      "maxItems": 30
+                    },
+                    "added": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "maxLength": 220
+                      },
+                      "maxItems": 30
+                    }
+                  },
+                  "required": ["label", "action", "facts", "added"],
+                  "additionalProperties": false
+                },
+                "maxItems": 12
+              },
+              "caption": {
+                "type": "string",
+                "maxLength": 300
+              }
+            },
+            "required": ["kind", "nodes"],
+            "additionalProperties": false
+          },
+          "added": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 220
+            },
+            "maxItems": 8
+          },
+          "context": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "maxLength": 220
+                },
+                "source": {
+                  "type": "string",
+                  "maxLength": 140
+                }
+              },
+              "required": ["label", "source"],
+              "additionalProperties": false
+            },
+            "maxItems": 30
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "maxLength": 180
+                },
+                "explanation": {
+                  "type": "string",
+                  "maxLength": 4000
+                },
+                "code": {
+                  "type": "string",
+                  "maxLength": 30000
+                },
+                "result": {
+                  "type": "string",
+                  "maxLength": 5000
+                },
+                "url": {
+                  "type": "string",
+                  "pattern": "^https?://",
+                  "maxLength": 2000
+                }
+              },
+              "required": ["label", "explanation"],
+              "additionalProperties": false
+            },
+            "maxItems": 10
+          }
+        },
+        "required": [
+          "id",
+          "nav",
+          "kicker",
+          "title",
+          "lead",
+          "diagram",
+          "added",
+          "context",
+          "note",
+          "evidence"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 24,
+      "minItems": 1
+    }
+  },
+  "required": ["title", "scope", "slides"],
+  "additionalProperties": false,
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

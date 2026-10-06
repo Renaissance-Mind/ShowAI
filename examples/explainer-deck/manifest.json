@@ -1,0 +1,277 @@
+{
+  "id": "explainer-deck",
+  "name": "分步演示讲解",
+  "version": "1.0.1",
+  "description": "将工作流与机制整理成可翻页演示，每屏展示一个结论、关系图和新增信息，可展开实际调用与累计上下文。",
+  "scenarios": [
+    "逐步解释 Agent 工作流、插件加载或系统机制。",
+    "将长报告整理为清楚的演示式阅读，并保留可查验的调用细节。"
+  ],
+  "entry": "index.tsx",
+  "reader": "readData",
+  "defaultData": {
+    "title": "一次插件请求",
+    "scope": "概念讲解",
+    "slides": [
+      {
+        "id": "roles",
+        "nav": "分工",
+        "kicker": "先确定信息的来源",
+        "title": "先分清：作者、宿主和 Agent",
+        "lead": "插件作者定义能力，Codex 宿主提供运行环境，Agent 根据任务决定下一步。",
+        "diagram": {
+          "kind": "roles",
+          "nodes": [
+            {
+              "label": "插件作者",
+              "detail": "写 Skill 工作说明，配置 MCP 连接和可选 hooks。",
+              "role": "resource",
+              "tag": "编写能力包"
+            },
+            {
+              "label": "Codex 宿主",
+              "detail": "提供执行工具、接入能力，执行模型提出的调用。",
+              "role": "host",
+              "tag": "应用与运行时"
+            },
+            {
+              "label": "Agent",
+              "detail": "读取说明、选择工具、填写参数，再根据返回结果继续。",
+              "role": "agent",
+              "tag": "负责决策的模型端"
+            }
+          ]
+        },
+        "added": [],
+        "context": [],
+        "note": "每一步显示参与者、操作以及取得的信息。",
+        "evidence": [
+          {
+            "label": "插件官方说明",
+            "explanation": "插件包含可复用的技能、工具连接和可选运行事件。",
+            "url": "https://developers.openai.com/codex/plugins"
+          }
+        ]
+      },
+      {
+        "id": "initial",
+        "nav": "请求起点",
+        "kicker": "主线 · 第一次推理前",
+        "title": "@插件之后，模型先拿到能力线索",
+        "lead": "宿主汇总本次请求可用的信息。任务来自用户，技能元信息来自作者，执行工具来自 Codex。",
+        "diagram": {
+          "kind": "context",
+          "nodes": [
+            {
+              "label": "创建一页插件文档",
+              "detail": "本次目标",
+              "role": "resource",
+              "tag": "用户"
+            },
+            {
+              "label": "ShowAI 能力标识",
+              "detail": "插件身份与技能前缀",
+              "role": "host",
+              "tag": "宿主"
+            },
+            {
+              "label": "Skill 索引",
+              "detail": "名称、描述、正文路径",
+              "role": "resource",
+              "tag": "作者 → 宿主"
+            },
+            {
+              "label": "执行工具定义",
+              "detail": "运行命令与调用接口的方法",
+              "role": "host",
+              "tag": "Codex"
+            }
+          ],
+          "facts": [
+            {
+              "label": "用户任务",
+              "source": "用户"
+            },
+            {
+              "label": "插件能力标识",
+              "source": "宿主"
+            },
+            {
+              "label": "技能名称、描述、路径",
+              "source": "作者填写，宿主提供"
+            },
+            {
+              "label": "执行工具定义",
+              "source": "Codex 宿主"
+            }
+          ]
+        },
+        "added": [],
+        "context": [
+          {
+            "label": "用户任务",
+            "source": "用户"
+          },
+          {
+            "label": "插件能力标识",
+            "source": "宿主"
+          },
+          {
+            "label": "技能名称、描述、路径",
+            "source": "作者填写，宿主提供"
+          },
+          {
+            "label": "执行工具定义",
+            "source": "Codex 宿主"
+          }
+        ],
+        "note": "每一步显示参与者、操作以及取得的信息。",
+        "evidence": [
+          {
+            "label": "插件官方说明",
+            "explanation": "插件包含可复用的技能、工具连接和可选运行事件。",
+            "url": "https://developers.openai.com/codex/plugins"
+          }
+        ]
+      }
+    ]
+  },
+  "examples": [
+    {
+      "name": "插件分工与初始输入",
+      "request": "用演示式页面说明插件作者、宿主与 Agent 的分工及初始上下文。",
+      "data": {
+        "title": "一次插件请求",
+        "scope": "概念讲解",
+        "slides": [
+          {
+            "id": "roles",
+            "nav": "分工",
+            "kicker": "先确定信息的来源",
+            "title": "先分清：作者、宿主和 Agent",
+            "lead": "插件作者定义能力，Codex 宿主提供运行环境，Agent 根据任务决定下一步。",
+            "diagram": {
+              "kind": "roles",
+              "nodes": [
+                {
+                  "label": "插件作者",
+                  "detail": "写 Skill 工作说明，配置 MCP 连接和可选 hooks。",
+                  "role": "resource",
+                  "tag": "编写能力包"
+                },
+                {
+                  "label": "Codex 宿主",
+                  "detail": "提供执行工具、接入能力，执行模型提出的调用。",
+                  "role": "host",
+                  "tag": "应用与运行时"
+                },
+                {
+                  "label": "Agent",
+                  "detail": "读取说明、选择工具、填写参数，再根据返回结果继续。",
+                  "role": "agent",
+                  "tag": "负责决策的模型端"
+                }
+              ]
+            },
+            "added": [],
+            "context": [],
+            "note": "每一步显示参与者、操作以及取得的信息。",
+            "evidence": [
+              {
+                "label": "插件官方说明",
+                "explanation": "插件包含可复用的技能、工具连接和可选运行事件。",
+                "url": "https://developers.openai.com/codex/plugins"
+              }
+            ]
+          },
+          {
+            "id": "initial",
+            "nav": "请求起点",
+            "kicker": "主线 · 第一次推理前",
+            "title": "@插件之后，模型先拿到能力线索",
+            "lead": "宿主汇总本次请求可用的信息。任务来自用户，技能元信息来自作者，执行工具来自 Codex。",
+            "diagram": {
+              "kind": "context",
+              "nodes": [
+                {
+                  "label": "创建一页插件文档",
+                  "detail": "本次目标",
+                  "role": "resource",
+                  "tag": "用户"
+                },
+                {
+                  "label": "ShowAI 能力标识",
+                  "detail": "插件身份与技能前缀",
+                  "role": "host",
+                  "tag": "宿主"
+                },
+                {
+                  "label": "Skill 索引",
+                  "detail": "名称、描述、正文路径",
+                  "role": "resource",
+                  "tag": "作者 → 宿主"
+                },
+                {
+                  "label": "执行工具定义",
+                  "detail": "运行命令与调用接口的方法",
+                  "role": "host",
+                  "tag": "Codex"
+                }
+              ],
+              "facts": [
+                {
+                  "label": "用户任务",
+                  "source": "用户"
+                },
+                {
+                  "label": "插件能力标识",
+                  "source": "宿主"
+                },
+                {
+                  "label": "技能名称、描述、路径",
+                  "source": "作者填写，宿主提供"
+                },
+                {
+                  "label": "执行工具定义",
+                  "source": "Codex 宿主"
+                }
+              ]
+            },
+            "added": [],
+            "context": [
+              {
+                "label": "用户任务",
+                "source": "用户"
+              },
+              {
+                "label": "插件能力标识",
+                "source": "宿主"
+              },
+              {
+                "label": "技能名称、描述、路径",
+                "source": "作者填写，宿主提供"
+              },
+              {
+                "label": "执行工具定义",
+                "source": "Codex 宿主"
+              }
+            ],
+            "note": "每一步显示参与者、操作以及取得的信息。",
+            "evidence": [
+              {
+                "label": "插件官方说明",
+                "explanation": "插件包含可复用的技能、工具连接和可选运行事件。",
+                "url": "https://developers.openai.com/codex/plugins"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "effects": [
+    "支持屏幕选择、前后翻页与键盘导航。",
+    "按需查看当前屏的证据和累计信息，阅读操作保留源数据。",
+    "编辑态可修改当前屏标题与导语。"
+  ]
+}
