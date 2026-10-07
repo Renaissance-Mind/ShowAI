@@ -7,6 +7,12 @@ description: 为 ShowAI 新建、修改可复用模板，或从已有页面提�
 
 沿用已验证的外部 CLI、内容库与用户选定的项目；首次使用或缺少基础信息时读取 [统一使用指南](../use-showai/SKILL.md)，按需核实入口与对象归属。读取 `guide templates --json`，按用途查询 `catalog list --kind template --project PROJECT --query 用途 --limit 8 --json`，选中后读取 guide/examples；复用、修改或合成定义时才读取所选源码。已有模板可作为基础；说明新增结构或填写约定的用途。
 
+## 模板结构与填写材料
+
+模板的 `document` 使用页面的数据结构。新建定义采用版本 3 的 Page/Board 容器，保留所需容器类型；`layout` 保存父级外框，`surfaceViews[surfaceId]` 保存各容器的命名视图、初始视图和阅读顺序。构造这些字段前读取 `guide containers`。旧版本 2 白板使用 `views`，旧版本 1 文档没有容器视图字段；从已有页面提炼或修改旧模板时，先核对实际模型并保留其有效结构。需要升级时按容器指南转换内容、布局与视图，不直接重命名视图字段。
+
+可复用定义中的实例事实替换为填写提示或符合组件 schema 的空状态。组件不接受空数据时，先以文本说明待填写材料。缺少真实材料时，验证页面展示结构与空状态，说明内容和跨材料验证的未覆盖范围。用户明确要求演示数据时才生成，并在页面标明为演示；演示数值不作为实际项目状态或验证真实内容的证据。`examples.request` 与 `examples.steps` 保存使用提示和步骤，不要求编造业务数据。
+
 ## 选择创建方式
 
 - **先做页面再提炼**：用户提供现有页面、具体材料或视觉参考，需要通过实际内容确定布局与交互。读取 [模板抽象](references/template-abstraction.md)，按 [show-document](../show-document/SKILL.md) 创建或迭代实例，然后回到本技能提炼；已有成熟页面可直接提炼。
