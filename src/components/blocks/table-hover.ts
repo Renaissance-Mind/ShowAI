@@ -85,12 +85,26 @@ export function useTableHover(
         keep();
         return;
       }
+      const current = latest.current.target;
+      if (current?.cell?.isConnected) {
+        const cell = current.cell.getBoundingClientRect();
+        const column = tableControlPositions(current, 0).column;
+        // Keep the header's controls while crossing the gap below it, even over a body cell.
+        if (
+          event.clientX >= Math.min(cell.left, column.left) &&
+          event.clientX <= Math.max(cell.right, column.left + 88) &&
+          event.clientY >= cell.bottom &&
+          event.clientY <= column.top
+        ) {
+          keep();
+          return;
+        }
+      }
       const next = find(element);
       if (next) {
         enter(next);
         return;
       }
-      const current = latest.current.target;
       if (current?.table.isConnected) {
         const rect = current.table.getBoundingClientRect();
         // The controls float immediately above the border; crossing that gap must not hide them.
@@ -189,16 +203,17 @@ export function tableControlPositions(
   );
   const globalLeft = Math.max(8, right - globalWidth);
   const top = Math.max(8, rect.top - 36);
-  let columnLeft = target.cell
-    ? Math.min(target.cell.getBoundingClientRect().right, right) - 88
-    : globalLeft;
-  if (columnLeft + 88 > globalLeft - 6) columnLeft = globalLeft - 94;
+  const cell = target.cell?.getBoundingClientRect();
+  const columnLeft = cell ? (cell.left + cell.right - 88) / 2 : globalLeft;
   return {
     global: target.context ?? {
       left: Math.max(globalWidth + 8, right),
       top,
       transform: "translateX(-100%)",
     },
-    column: { left: Math.max(8, columnLeft), top },
+    column: {
+      left: Math.max(8, Math.min(columnLeft, right - 88)),
+      top: cell ? cell.bottom + 4 : top,
+    },
   };
 }
