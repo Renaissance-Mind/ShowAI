@@ -67,8 +67,10 @@
     "d3-regression": "2.2.0",
     "dugite": "3.2.3",
     "esbuild": "^0.28.2",
+    "katex": "0.19.0",
     "lucide-react": "^1.50.0",
     "marked": "^18.0.14",
+    "pdfjs-dist": "6.4.299",
     "playwright-core": "1.63.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
@@ -77,6 +79,7 @@
   },
   "devDependencies": {
     "@playwright/cli": "^0.1.22",
+    "@types/katex": "^0.16.8",
     "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

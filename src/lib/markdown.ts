@@ -1,10 +1,37 @@
 import { generateJSON, type JSONContent } from "@tiptap/core";
 import { marked } from "marked";
+import { mathMarkdown } from "../components/blocks/markdown-math.mjs";
 import { createExtensions } from "../editor/extensions";
 
 /** Convert GFM tasks and serialized widgets into the editor's native node format. */
 export function parseMarkdown(source: string): JSONContent {
-  const html = marked.parse(source, { async: false });
+  // Keep math-bearing blocks as editable Markdown widgets. This preserves TeX source
+  // through imports, saving and exports instead of flattening it into plain text.
+  const tokens = mathMarkdown.lexer(source);
+  const definitions = Object.entries(tokens.links)
+    .map(
+      ([id, link]) =>
+        `[${id}]: <${link.href}>${link.title ? " " + JSON.stringify(link.title) : ""}`,
+    )
+    .join("\n");
+  const html = tokens
+    .map((token) => {
+      let hasMath = false;
+      mathMarkdown.walkTokens([token], (entry) => {
+        if (entry.type === "mathBlock" || entry.type === "mathInline")
+          hasMath = true;
+      });
+      if (!hasMath) return marked.parser([token], { async: false });
+      const attrs = JSON.stringify({
+        content: token.raw + (definitions ? "\n\n" + definitions : ""),
+        format: "markdown",
+      })
+        .replaceAll("&", "&amp;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("<", "&lt;");
+      return `<div data-showai-widget kind="text" data-widget-content="${attrs}"></div>`;
+    })
+    .join("");
   const dom = new DOMParser().parseFromString(html, "text/html");
   dom
     .querySelectorAll("script,style,iframe,object,embed")

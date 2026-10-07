@@ -4,7 +4,10 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { marked, type Token, type Tokens } from "marked";
+import { type Token, type Tokens } from "marked";
+import { mathMarkdown, mathHtml } from "./markdown-math.mjs";
+import "./katex.css";
+import "./research-media.css";
 import { safeImageUrl, safeUrl, text } from "./helpers";
 import type { BlockProps } from "./types";
 
@@ -32,6 +35,17 @@ function markdownNodes(tokens: Token[]): ReactNode {
     const t = token as Token & { tokens?: Token[]; text?: string };
     const children = t.tokens ? markdownNodes(t.tokens) : t.text;
     switch (token.type) {
+      case "mathBlock":
+      case "mathInline": {
+        const math = token as Token & { text: string; display: boolean };
+        return createElement(token.type === "mathBlock" ? "div" : "span", {
+          key: index,
+          className: math.display ? "sb-math-display" : "sb-math-inline",
+          dangerouslySetInnerHTML: {
+            __html: mathHtml(math.text, math.display),
+          },
+        });
+      }
       case "space":
         return null;
       case "heading":
@@ -73,9 +87,13 @@ function markdownNodes(tokens: Token[]): ReactNode {
         return (
           <a
             key={index}
-            href={safeUrl(token.href) || undefined}
+            href={
+              token.href.startsWith("#")
+                ? token.href
+                : safeUrl(token.href) || undefined
+            }
             title={token.title ?? undefined}
-            target="_blank"
+            target={token.href.startsWith("#") ? undefined : "_blank"}
             rel="noopener noreferrer"
           >
             {children}
@@ -151,7 +169,7 @@ export function TextBlock({ data, onChange, readOnly }: BlockProps) {
         {data.format === "plain" ? (
           <p style={{ whiteSpace: "pre-wrap" }}>{content}</p>
         ) : (
-          markdownNodes(marked.lexer(content))
+          markdownNodes(mathMarkdown.lexer(content))
         )}
       </div>
       {!readOnly && onChange && (

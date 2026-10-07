@@ -16,6 +16,16 @@ import metrics from "../components/blocks/Metrics.tsx?raw";
 import playground from "../components/blocks/Playground.tsx?raw";
 import gallery from "../components/blocks/Gallery.tsx?raw";
 import bookmark from "../components/blocks/Bookmark.tsx?raw";
+import media from "../components/blocks/Media.tsx?raw";
+import pdf from "../components/blocks/Pdf.tsx?raw";
+import pdfEngine from "../components/blocks/pdf-engine.ts?raw";
+import pdfAssets from "../components/blocks/pdf-assets.json?raw";
+import references from "../components/blocks/References.tsx?raw";
+import resourceEditor from "../components/blocks/ResourceEditor.tsx?raw";
+import researchContract from "../components/blocks/research-contract.mjs?raw";
+import researchCss from "../components/blocks/research-media.css?raw";
+import math from "../components/blocks/markdown-math.mjs?raw";
+import katexCss from "../components/blocks/katex.css?raw";
 import shared from "../components/blocks/shared.tsx?raw";
 import helpers from "../components/blocks/helpers.ts?raw";
 import css from "../components/blocks/block.css?raw";
@@ -45,6 +55,16 @@ const sources: Record<string, string> = {
   "Playground.tsx": playground,
   "Gallery.tsx": gallery,
   "Bookmark.tsx": bookmark,
+  "Media.tsx": media,
+  "Pdf.tsx": pdf,
+  "pdf-engine.ts": pdfEngine,
+  "pdf-assets.json": pdfAssets,
+  "References.tsx": references,
+  "ResourceEditor.tsx": resourceEditor,
+  "research-contract.mjs": researchContract,
+  "research-media.css": researchCss,
+  "markdown-math.mjs": math,
+  "katex.css": katexCss,
   "shared.tsx": shared,
   "helpers.ts": helpers,
   "block.css": css,
@@ -82,4 +102,8 @@ export const builtinExports: Record<string, string> = {
   playground: "Playground",
   gallery: "Gallery",
   bookmark: "Bookmark",
+  video: "Video",
+  audio: "Audio",
+  pdf: "PDF",
+  references: "References",
 };

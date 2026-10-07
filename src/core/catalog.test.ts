@@ -284,6 +284,10 @@ describe("compiled React packages", () => {
       "gallery",
       "bookmark",
       "flowchart",
+      "video",
+      "audio",
+      "pdf",
+      "references",
       "page",
       "board",
     ]);
@@ -626,7 +630,8 @@ describe("component composition and editable primitives", () => {
       expect(compiled.html).toContain("Content-Security-Policy");
       expect(compiled.inline?.script).toBeTruthy();
       if (item.kind === "text")
-        expect(compiled.inline!.script.length).toBeLessThan(80000);
+        // Markdown now includes the offline KaTeX renderer (but no graph/PDF engine).
+        expect(compiled.inline!.script.length).toBeLessThan(400000);
       expect(compiled.defaultData).toEqual(item.defaultData);
     }
   }, 180000);

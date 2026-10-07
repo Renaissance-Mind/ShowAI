@@ -2,7 +2,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createServer, type Server } from "node:http";
 import { once } from "node:events";
 import type { AddressInfo } from "node:net";
-import { embedDocumentImages, externalImageUrls } from "./assets.mjs";
+import {
+  assertOfflineImages,
+  embedDocumentImages,
+  externalImageUrls,
+  externalResourceUrls,
+} from "./assets.mjs";
 import { validateDocument } from "./validation.mjs";
 import { upgradeResource, createSurface } from "../surface/containers.mjs";
 
@@ -22,6 +27,11 @@ beforeAll(async () => {
       response.end(png);
       return;
     }
+    if (request.url === "/document.pdf") {
+      response.writeHead(200, { "content-type": "application/pdf" });
+      response.end(Buffer.from("%PDF-1.7\n%%EOF"));
+      return;
+    }
     response.writeHead(404);
     response.end("missing");
   }).listen(0, "127.0.0.1");
@@ -36,6 +46,44 @@ afterAll(
 );
 
 describe("self-contained image export", () => {
+  it("embeds PDF files and video posters in nested containers without changing their source", async () => {
+    const document = validateDocument({
+      id: "files",
+      title: "Files",
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "widget",
+            attrs: { kind: "pdf", data: { src: `${origin}/document.pdf` } },
+          },
+          {
+            type: "widget",
+            attrs: {
+              kind: "video",
+              data: {
+                src: "data:video/mp4;base64,AA==",
+                poster: `${origin}/image.png`,
+              },
+            },
+          },
+        ],
+      },
+    });
+    expect(externalResourceUrls(document)).toHaveLength(2);
+    expect(() => assertOfflineImages(document)).toThrow("need embedding");
+    const result = await embedDocumentImages(document);
+    expect(result.content.content?.[0].attrs?.data.src).toMatch(
+      /^data:application\/pdf;base64,/,
+    );
+    expect(result.content.content?.[1].attrs?.data.poster).toMatch(
+      /^data:image\/png;base64,/,
+    );
+    expect(externalResourceUrls(result)).toEqual([]);
+    expect(document.content.content?.[0].attrs?.data.src).toBe(
+      `${origin}/document.pdf`,
+    );
+  });
   it("embeds root and nested Page icons with one download and leaves Emoji unchanged", async () => {
     const src = `${origin}/image.png`;
     const document = upgradeResource(

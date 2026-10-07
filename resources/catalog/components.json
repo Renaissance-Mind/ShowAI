@@ -24,10 +24,7 @@
           "type": "string"
         },
         "type": {
-          "enum": [
-            "line",
-            "bar"
-          ]
+          "enum": ["line", "bar"]
         },
         "labels": {
           "type": "array",
@@ -54,20 +51,14 @@
                 "type": "string"
               }
             },
-            "required": [
-              "name",
-              "values"
-            ]
+            "required": ["name", "values"]
           }
         },
         "unit": {
           "type": "string"
         }
       },
-      "required": [
-        "labels",
-        "series"
-      ]
+      "required": ["labels", "series"]
     },
     "examples": [
       {
@@ -75,19 +66,11 @@
         "data": {
           "title": "y = x",
           "type": "line",
-          "labels": [
-            "0",
-            "1",
-            "2"
-          ],
+          "labels": ["0", "1", "2"],
           "series": [
             {
               "name": "y = x",
-              "values": [
-                0,
-                1,
-                2
-              ]
+              "values": [0, 1, 2]
             }
           ]
         },
@@ -137,13 +120,7 @@
                 "type": "string"
               },
               "type": {
-                "enum": [
-                  "text",
-                  "number",
-                  "select",
-                  "checkbox",
-                  "url"
-                ]
+                "enum": ["text", "number", "select", "checkbox", "url"]
               },
               "options": {
                 "type": "array",
@@ -152,11 +129,7 @@
                 }
               }
             },
-            "required": [
-              "id",
-              "name",
-              "type"
-            ]
+            "required": ["id", "name", "type"]
           }
         },
         "rows": {
@@ -168,15 +141,9 @@
                 "type": "string"
               }
             },
-            "required": [
-              "id"
-            ],
+            "required": ["id"],
             "additionalProperties": {
-              "type": [
-                "string",
-                "number",
-                "boolean"
-              ]
+              "type": ["string", "number", "boolean"]
             }
           }
         },
@@ -184,10 +151,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "columns",
-        "rows"
-      ]
+      "required": ["columns", "rows"]
     },
     "examples": [
       {
@@ -260,10 +224,7 @@
                 "type": "string"
               },
               "value": {
-                "type": [
-                  "string",
-                  "number"
-                ]
+                "type": ["string", "number"]
               },
               "unit": {
                 "type": "string"
@@ -275,16 +236,11 @@
                 "type": "number"
               }
             },
-            "required": [
-              "label",
-              "value"
-            ]
+            "required": ["label", "value"]
           }
         }
       },
-      "required": [
-        "items"
-      ]
+      "required": ["items"]
     },
     "examples": [
       {
@@ -369,22 +325,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "id",
-              "label",
-              "min",
-              "max",
-              "step",
-              "value"
-            ]
+            "required": ["id", "label", "min", "max", "step", "value"]
           }
         },
         "operation": {
-          "enum": [
-            "sum",
-            "product",
-            "average"
-          ]
+          "enum": ["sum", "product", "average"]
         },
         "resultLabel": {
           "type": "string"
@@ -396,10 +341,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "inputs",
-        "operation"
-      ]
+      "required": ["inputs", "operation"]
     },
     "examples": [
       {
@@ -481,15 +423,11 @@
                 "type": "string"
               }
             },
-            "required": [
-              "src"
-            ]
+            "required": ["src"]
           }
         }
       },
-      "required": [
-        "images"
-      ]
+      "required": ["images"]
     },
     "examples": [
       {
@@ -551,9 +489,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "url"
-      ]
+      "required": ["url"]
     },
     "examples": [
       {
@@ -657,10 +593,7 @@
                 "type": "string"
               },
               "direction": {
-                "enum": [
-                  "TB",
-                  "LR"
-                ]
+                "enum": ["TB", "LR"]
               },
               "nodes": {
                 "type": "array",
@@ -713,32 +646,16 @@
                           "type": "number"
                         }
                       },
-                      "required": [
-                        "x",
-                        "y"
-                      ]
+                      "required": ["x", "y"]
                     },
                     "sourceSide": {
-                      "enum": [
-                        "top",
-                        "bottom",
-                        "left",
-                        "right"
-                      ]
+                      "enum": ["top", "bottom", "left", "right"]
                     },
                     "targetSide": {
-                      "enum": [
-                        "top",
-                        "bottom",
-                        "left",
-                        "right"
-                      ]
+                      "enum": ["top", "bottom", "left", "right"]
                     }
                   },
-                  "required": [
-                    "id",
-                    "label"
-                  ]
+                  "required": ["id", "label"]
                 },
                 "maxItems": 200
               },
@@ -760,28 +677,17 @@
                       "type": "string"
                     }
                   },
-                  "required": [
-                    "id",
-                    "source",
-                    "target"
-                  ]
+                  "required": ["id", "source", "target"]
                 },
                 "maxItems": 400
               }
             },
-            "required": [
-              "id",
-              "label",
-              "nodes",
-              "edges"
-            ]
+            "required": ["id", "label", "nodes", "edges"]
           },
           "maxItems": 20
         }
       },
-      "required": [
-        "flows"
-      ]
+      "required": ["flows"]
     },
     "examples": [
       {
@@ -826,6 +732,274 @@
                   "target": "result"
                 }
               ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "kind": "video",
+    "name": "视频",
+    "description": "保留画面比例的视频播放器，支持本地上传、在线文件、封面与说明。",
+    "version": "1.0.0",
+    "scenarios": ["展示操作演示、实验录像和视频资料。"],
+    "effects": [
+      "沿用页面主题与容器布局，阅读态隐藏编辑设置。",
+      "本地上传文件内嵌保存并保留离线阅读；在线文件需要网络，浏览器支持的编码决定能否播放。"
+    ],
+    "defaultData": {
+      "title": "",
+      "src": "",
+      "caption": "",
+      "fileName": "",
+      "aspectRatio": "16:9"
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "caption": {
+          "type": "string"
+        },
+        "fileName": {
+          "type": "string"
+        },
+        "src": {
+          "type": "string",
+          "description": "http/https 文件地址，或对应 MIME 的 base64 data URI。本地上传单文件最多 6 MB；整页最多 10 MB。"
+        },
+        "poster": {
+          "type": "string"
+        },
+        "aspectRatio": {
+          "enum": ["16:9", "4:3", "1:1", "9:16"]
+        },
+        "loop": {
+          "type": "boolean"
+        },
+        "muted": {
+          "type": "boolean"
+        }
+      },
+      "required": ["src"],
+      "additionalProperties": false
+    },
+    "examples": [
+      {
+        "name": "添加文件",
+        "request": "插入组件并填写文件或文献信息。",
+        "data": {
+          "title": "",
+          "src": "",
+          "caption": "",
+          "fileName": "",
+          "aspectRatio": "16:9"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "audio",
+    "name": "音频",
+    "description": "紧凑音频播放器，支持本地上传、在线文件与说明。",
+    "version": "1.0.0",
+    "scenarios": ["收听讲解、访谈与音频资料。"],
+    "effects": [
+      "沿用页面主题与容器布局，阅读态隐藏编辑设置。",
+      "本地上传文件内嵌保存并保留离线阅读；在线文件需要网络，浏览器支持的编码决定能否播放。"
+    ],
+    "defaultData": {
+      "title": "",
+      "src": "",
+      "caption": "",
+      "fileName": ""
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "caption": {
+          "type": "string"
+        },
+        "fileName": {
+          "type": "string"
+        },
+        "src": {
+          "type": "string",
+          "description": "http/https 文件地址，或对应 MIME 的 base64 data URI。本地上传单文件最多 6 MB；整页最多 10 MB。"
+        },
+        "loop": {
+          "type": "boolean"
+        }
+      },
+      "required": ["src"],
+      "additionalProperties": false
+    },
+    "examples": [
+      {
+        "name": "添加文件",
+        "request": "插入组件并填写文件或文献信息。",
+        "data": {
+          "title": "",
+          "src": "",
+          "caption": "",
+          "fileName": ""
+        }
+      }
+    ]
+  },
+  {
+    "kind": "pdf",
+    "name": "PDF 文档",
+    "description": "内置 PDF 阅读器，支持翻页、缩放、初始页码、本页文字和下载。",
+    "version": "1.0.0",
+    "scenarios": ["在页面或白板中阅读论文与报告。"],
+    "effects": [
+      "沿用页面主题与容器布局，阅读态隐藏编辑设置。",
+      "本地上传文件内嵌保存并保留离线阅读；在线文件需要网络，浏览器支持的编码决定能否播放。"
+    ],
+    "defaultData": {
+      "title": "",
+      "src": "",
+      "caption": "",
+      "fileName": "",
+      "page": 1,
+      "height": 560
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "caption": {
+          "type": "string"
+        },
+        "fileName": {
+          "type": "string"
+        },
+        "src": {
+          "type": "string",
+          "description": "http/https 文件地址，或对应 MIME 的 base64 data URI。本地上传单文件最多 6 MB；整页最多 10 MB。"
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "height": {
+          "type": "number",
+          "minimum": 240,
+          "maximum": 1200
+        }
+      },
+      "required": ["src"],
+      "additionalProperties": false
+    },
+    "examples": [
+      {
+        "name": "添加文件",
+        "request": "插入组件并填写文件或文献信息。",
+        "data": {
+          "title": "",
+          "src": "",
+          "caption": "",
+          "fileName": "",
+          "page": 1,
+          "height": 560
+        }
+      }
+    ]
+  },
+  {
+    "kind": "references",
+    "name": "参考文献",
+    "description": "按编号组织作者、年份、标题、出处、DOI、链接与备注，支持正文锚点引用。",
+    "version": "1.0.0",
+    "scenarios": [
+      "整理可追溯的参考文献；Markdown 可使用 [1](#ref-attention-2017) 跳转到对应文献。"
+    ],
+    "effects": [
+      "沿用页面主题与容器布局，阅读态隐藏编辑设置。",
+      "编号跟随顺序更新；正文锚点使用稳定的条目 id，DOI 自动生成链接。"
+    ],
+    "defaultData": {
+      "title": "参考文献",
+      "items": []
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 500,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "authors": {
+                "type": "string"
+              },
+              "year": {
+                "type": "string"
+              },
+              "venue": {
+                "type": "string"
+              },
+              "doi": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "title"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    },
+    "examples": [
+      {
+        "name": "文献示例",
+        "request": "插入组件并填写文件或文献信息。",
+        "data": {
+          "title": "参考文献",
+          "items": [
+            {
+              "id": "attention-2017",
+              "title": "Attention Is All You Need",
+              "authors": "Ashish Vaswani et al.",
+              "year": "2017",
+              "venue": "NeurIPS",
+              "url": "https://arxiv.org/abs/1706.03762"
             }
           ]
         }

@@ -12,6 +12,10 @@ import { createElement, lazy } from "react";
 import primitiveMetadata from "../../../resources/catalog/primitives.json";
 import componentMetadata from "../../../resources/catalog/components.json";
 import { BookmarkBlock } from "./Bookmark";
+import { VideoBlock, AudioBlock } from "./Media";
+import { PdfBlock } from "./Pdf";
+import { ReferencesBlock } from "./References";
+import { validateResearchData } from "./research-contract.mjs";
 import { ChartBlock } from "./Chart";
 import { DatabaseBlock } from "./Database";
 import { GalleryBlock } from "./Gallery";
@@ -318,6 +322,51 @@ registerBlock({
   icon: "↗",
   defaultData: { title: "", description: "", url: "", image: "" },
   renderer: BookmarkBlock,
+});
+
+registerBlock({
+  kind: "video",
+  title: "视频",
+  description: componentMetadata.find((item) => item.kind === "video")!
+    .description,
+  icon: "▷",
+  defaultData: componentMetadata.find((item) => item.kind === "video")!
+    .defaultData as BlockData,
+  renderer: VideoBlock,
+  validate: (data) => validateResearchData("video", data),
+});
+registerBlock({
+  kind: "audio",
+  title: "音频",
+  description: componentMetadata.find((item) => item.kind === "audio")!
+    .description,
+  icon: "♫",
+  defaultData: componentMetadata.find((item) => item.kind === "audio")!
+    .defaultData as BlockData,
+  renderer: AudioBlock,
+  validate: (data) => validateResearchData("audio", data),
+});
+registerBlock({
+  kind: "pdf",
+  title: "PDF 文档",
+  description: componentMetadata.find((item) => item.kind === "pdf")!
+    .description,
+  icon: "▤",
+  defaultData: componentMetadata.find((item) => item.kind === "pdf")!
+    .defaultData as BlockData,
+  renderer: PdfBlock,
+  validate: (data) => validateResearchData("pdf", data),
+});
+registerBlock({
+  kind: "references",
+  title: "参考文献",
+  description: componentMetadata.find((item) => item.kind === "references")!
+    .description,
+  icon: "[1]",
+  defaultData: componentMetadata.find((item) => item.kind === "references")!
+    .defaultData as BlockData,
+  renderer: ReferencesBlock,
+  validate: (data) => validateResearchData("references", data),
 });
 
 registerBlock({

@@ -21,6 +21,7 @@ const builtinCategories: Record<string, ComponentCategory> = {
   divider: "text",
   code: "text",
   bookmark: "text",
+  references: "text",
   image: "image",
   gallery: "image",
   table: "table",

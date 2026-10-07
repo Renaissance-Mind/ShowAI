@@ -1,4 +1,5 @@
 import { marked } from "marked";
+import { resourceMime } from "../components/blocks/research-contract.mjs";
 import { isImageIcon } from "../lib/page-icon.mjs";
 import {
   isSafeUrl,
@@ -54,10 +55,41 @@ function imageSlots(document) {
       node.attrs.data?.image
     )
       slots.push([node.attrs.data, "image"]);
+    if (
+      node.type === "widget" &&
+      node.attrs?.kind === "video" &&
+      node.attrs.data?.poster
+    )
+      slots.push([node.attrs.data, "poster"]);
     node.content?.forEach(visit);
   };
   visit(document.content);
   return slots;
+}
+
+function fileSlots(document) {
+  const slots = [];
+  const visit = (node) => {
+    if (
+      node.type === "widget" &&
+      ["video", "audio", "pdf"].includes(node.attrs?.kind) &&
+      node.attrs.data?.src
+    )
+      slots.push([node.attrs.data, "src", node.attrs.kind]);
+    node.content?.forEach(visit);
+  };
+  visit(document.content);
+  return slots;
+}
+export function externalResourceUrls(document) {
+  return [
+    ...new Set([
+      ...externalImageUrls(document),
+      ...fileSlots(document)
+        .map(([object, key]) => object[key])
+        .filter((url) => !url.startsWith("data:")),
+    ]),
+  ];
 }
 
 export function externalImageUrls(document) {
@@ -71,15 +103,16 @@ export function externalImageUrls(document) {
 }
 
 export function assertOfflineImages(document) {
-  const urls = externalImageUrls(document);
+  const urls = externalResourceUrls(document);
   if (urls.length)
     throw new Error(
-      `Cannot create an offline document: ${urls.length} image URL(s) need embedding. Use embedded raster data URIs, or export HTML from the ShowAI browser application while online.`,
+      `Cannot create an offline document: ${urls.length} resource URL(s) need embedding. Upload local files, use embedded data URIs, or export HTML from the ShowAI browser application while online.`,
     );
 }
 
-async function imageDataUrl(url) {
-  if (!isSafeUrl(url, true)) throw new Error(`Unsupported image URL: ${url}`);
+async function resourceDataUrl(url, kind = "image") {
+  if (!isSafeUrl(url, kind === "image"))
+    throw new Error(`Unsupported resource URL: ${url}`);
   const response = await fetch(url, {
     credentials: "omit",
     signal: AbortSignal.timeout(15000),
@@ -92,9 +125,13 @@ async function imageDataUrl(url) {
     .split(";")[0]
     .trim()
     .toLowerCase();
-  if (!/^image\/(png|jpeg|gif|webp|avif)$/.test(mime))
+  if (
+    !(kind === "image"
+      ? /^image\/(png|jpeg|gif|webp|avif)$/.test(mime)
+      : resourceMime(kind, `data:${mime};base64,AA==`))
+  )
     throw new Error(
-      "Offline export supports PNG, JPEG, GIF, WebP, and AVIF images. Upload a supported image file and try again.",
+      `Offline export requires a supported ${kind} file MIME type. Upload a local file and try again.`,
     );
   const declaredLength = Number(response.headers.get("content-length") ?? 0);
   if (declaredLength > MAX_ARTIFACT_BYTES)
@@ -129,19 +166,23 @@ async function imageDataUrl(url) {
 export async function embedDocumentImages(document) {
   const copy = validateDocument(document);
   const downloaded = new Map();
-  for (const [object, key] of imageSlots(copy)) {
+  for (const [object, key, kind = "image"] of [
+    ...imageSlots(copy),
+    ...fileSlots(copy),
+  ]) {
     const url = object[key];
     if (url.startsWith("data:")) continue;
-    if (!downloaded.has(url)) {
+    const cacheKey = `${kind}:${url}`;
+    if (!downloaded.has(cacheKey)) {
       try {
-        downloaded.set(url, await imageDataUrl(url));
+        downloaded.set(cacheKey, await resourceDataUrl(url, kind));
       } catch (error) {
         throw new Error(
-          `无法嵌入图片，离线导出已停止。请将图片下载后重新上传。${error instanceof Error ? ` ${error.message}` : ""}`,
+          `无法嵌入${kind === "image" ? "图片" : "文件"}，离线导出已停止。请将文件下载后重新上传。${error instanceof Error ? ` ${error.message}` : ""}`,
         );
       }
     }
-    object[key] = downloaded.get(url);
+    object[key] = downloaded.get(cacheKey);
   }
   return validateDocument(copy);
 }

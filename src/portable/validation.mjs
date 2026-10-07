@@ -5,6 +5,7 @@ import { validateSurface } from "../surface/validation.mjs";
 import { validatePrimitiveData } from "../components/blocks/primitive-contract.mjs";
 import { validateFlowchartData } from "../components/blocks/flowchart-contract.mjs";
 import { validateG2Data } from "../components/blocks/g2/contract.mjs";
+import { validateResearchData } from "../components/blocks/research-contract.mjs";
 // Shared by the browser importer and the dependency-free artifact command.
 import { validateRemoteComponents } from "./remote.mjs";
 export const MAX_ARTIFACT_BYTES = 10 * 1024 * 1024;
@@ -231,6 +232,10 @@ function validateAttrs(attrs, path, permitted, surfaceIcon = false) {
 }
 
 function validateWidgetData(kind, data, path) {
+  if (["video", "audio", "pdf", "references"].includes(kind)) {
+    validateResearchData(kind, data);
+    return;
+  }
   if (kind.startsWith("g2-")) {
     validateG2Data(data);
     return;

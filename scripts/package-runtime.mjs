@@ -64,6 +64,8 @@ for (const name of [
   "scheduler",
   "ajv",
   "marked",
+  "katex",
+  "pdfjs-dist",
   "lucide-react",
   "@xyflow/react",
   "@dagrejs/dagre",

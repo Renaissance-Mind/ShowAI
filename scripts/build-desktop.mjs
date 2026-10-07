@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 await mkdir(join(root, "dist-desktop"), { recursive: true });
 const policy =
-  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; connect-src 'none'; frame-src 'self' about: data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'";
+  "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; media-src 'self' data: https: http:; font-src 'self' data:; connect-src https: http:; frame-src 'self' about: data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'";
 const html = (await readFile(join(root, "dist/index.html"), "utf8"))
   .replace(
     /<head>/i,

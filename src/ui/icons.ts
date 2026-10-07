@@ -76,6 +76,7 @@ export {
   Minus,
   Monitor,
   Moon,
+  Music2,
   MoreHorizontal,
   MousePointer2,
   Package,
@@ -115,6 +116,7 @@ export {
   UnlockKeyhole,
   Upload,
   User,
+  Video,
   Workflow,
   X,
 } from "lucide-react";

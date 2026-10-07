@@ -15,6 +15,9 @@ export { MetricsBlock as Metrics } from "./Metrics";
 export { PlaygroundBlock as Playground } from "./Playground";
 export { GalleryBlock as Gallery } from "./Gallery";
 export { BookmarkBlock as Bookmark } from "./Bookmark";
+export { VideoBlock as Video, AudioBlock as Audio } from "./Media";
+export { PdfBlock as PDF } from "./Pdf";
+export { ReferencesBlock as References } from "./References";
 export {
   CalloutBlock as Callout,
   ToggleBlock as Toggle,

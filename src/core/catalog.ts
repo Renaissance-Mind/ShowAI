@@ -1284,6 +1284,8 @@ async function compilePackage(
     "scheduler",
     "ajv",
     "marked",
+    "katex",
+    "pdfjs-dist",
     "lucide-react",
     "@xyflow/react",
     "@dagrejs/dagre",
@@ -1459,6 +1461,12 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
           return { path: require.resolve(args.path) };
         const sdkImport = args.namespace === "showai-builtin";
         if (
+          sdkImport &&
+          args.kind === "url-token" &&
+          /^data:font\/woff2;base64,[a-z\d+/=]+$/i.test(args.path)
+        )
+          return { path: args.path, external: true };
+        if (
           [
             "react",
             "react/jsx-runtime",
@@ -1469,6 +1477,9 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
             [
               "react-dom",
               "marked",
+              "katex",
+              "pdfjs-dist",
+              "pdfjs-dist/build/pdf.worker.min.mjs",
               "lucide-react",
               "@xyflow/react",
               "@xyflow/react/dist/style.css",
@@ -1655,7 +1666,7 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
     MAX_HTML_BYTES
   )
     throw new Error("Compiled inline component exceeds 2 MB.");
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"><style>html,body{margin:0;padding:0;font:14px/1.6 system-ui,sans-serif;color:#292d29}*{box-sizing:border-box}button,input,select,textarea{font:inherit}#component-root{display:flow-root;overflow-wrap:anywhere}${css.replace(/<\/style/gi, "<\\/style")}</style></head><body><div id="component-root"></div>${COMPONENT_DATA_MARKER}<script>${script.replace(/<\/script/gi, "<\\/script")}</script></body></html>`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data:; media-src data:; font-src data:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"><style>html,body{margin:0;padding:0;font:14px/1.6 system-ui,sans-serif;color:#292d29}*{box-sizing:border-box}button,input,select,textarea{font:inherit}#component-root{display:flow-root;overflow-wrap:anywhere}${css.replace(/<\/style/gi, "<\\/style")}</style></head><body><div id="component-root"></div>${COMPONENT_DATA_MARKER}<script>${script.replace(/<\/script/gi, "<\\/script")}</script></body></html>`;
   if (Buffer.byteLength(html) > MAX_HTML_BYTES)
     throw new Error("Compiled component exceeds 2 MB.");
   const component: CompiledComponent = {
