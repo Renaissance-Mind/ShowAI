@@ -8,7 +8,7 @@ ShowAI 提供桌面工作台、React 组件与模板，以及供 Codex、Claude 
 
 ## 桌面使用
 
-构建后的安装包位于 `release/`。macOS arm64 使用 `ShowAI-0.7.2-arm64.dmg`：打开后将 ShowAI 拖入「应用程序」，再启动应用。当前构建采用临时签名，尚未进行 Apple 公证；请通过系统提供的「仍要打开」流程打开你信任的本地构建。
+构建后的安装包位于 `release/`。macOS arm64 使用 `ShowAI-版本-arm64.dmg`：打开后将 ShowAI 拖入「应用程序」，再启动应用。当前构建采用临时签名，尚未进行 Apple 公证；请通过系统提供的「仍要打开」流程打开你信任的本地构建。
 
 Windows x64 的 NSIS 安装配置已包含在仓库中，应在 Windows 构建并验收后分发。当前仓库没有公开发布的安装包或 npm/PyPI 安装入口。
 
@@ -19,6 +19,16 @@ Windows x64 的 NSIS 安装配置已包含在仓库中，应在 Windows 构建�
 项目、文件夹和页面的操作集中在悬停或键盘聚焦时出现的省略号菜单中，可新建页面或嵌套文件夹、重命名、删除和置顶。置顶项排在同级列表前面；删除文件夹时，其下内容会一并退出列表和整站导出，源文件仍保留在内容库中。
 
 默认内容库为 `~/.showai`，可在「设置 → 内容位置」中更改。项目文件、页面与变更快照保存在磁盘中；CLI 和桌面应用使用同一目录时，可以互相看到修改。
+
+macOS arm64 本机开发时，可以另装 `~/Applications/ShowAI 稳定版.app` 用于日常工作。它自带固定的界面、服务和 Agent 运行时，代码保存或开发服务重启不会更新它。明确需要安装或更新稳定版时执行：
+
+```sh
+node scripts/update-stable-app.mjs
+# 固定使用某个已提交版本
+node scripts/update-stable-app.mjs --ref COMMIT
+```
+
+更新程序在临时目录中从 Git 提交构建，验证类型、单元测试和安装包签名后安装；工作目录中未提交的改动不进入稳定版。依赖必须与所选提交一致。更新前保存内容并退出稳定版，开发版可继续运行。旧 App 保存在 `~/Library/Application Support/ShowAI/stable-backups/`，安装记录位于 `artifacts/stable-install.json`。稳定版默认读取 `~/.showai`，也可在设置中选择内容库；使用同一内容库时，项目编辑会在两个 App 中同步显示，程序更新由手动安装控制。
 
 ## 本地浏览器版
 
