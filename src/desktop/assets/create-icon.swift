@@ -2,24 +2,34 @@
 import AppKit
 
 let target = CommandLine.arguments[1]
-let image = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 1024, pixelsHigh: 1024,
-                            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
-                            isPlanar: false, colorSpaceName: .deviceRGB,
-                            bytesPerRow: 0, bitsPerPixel: 0)!
-NSGraphicsContext.saveGraphicsState()
-NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: image)
-NSColor(calibratedRed: 247 / 255.0, green: 248 / 255.0, blue: 243 / 255.0, alpha: 1).setFill()
-NSBezierPath(roundedRect: NSRect(x: 60, y: 60, width: 904, height: 904), xRadius: 208, yRadius: 208).fill()
-NSColor(calibratedRed: 80 / 255.0, green: 116 / 255.0, blue: 94 / 255.0, alpha: 1).setStroke()
-for index in 0..<4 {
-    let angle = Double(index) * Double.pi / 4
-    let dx = 240 * cos(angle), dy = 240 * sin(angle)
-    let stroke = NSBezierPath()
-    stroke.lineWidth = 84
-    stroke.lineCapStyle = .round
-    stroke.move(to: NSPoint(x: 512 - dx, y: 512 - dy))
-    stroke.line(to: NSPoint(x: 512 + dx, y: 512 + dy))
-    stroke.stroke()
+let context = CGContext(data: nil, width: 1024, height: 1024,
+                        bitsPerComponent: 8, bytesPerRow: 4096,
+                        space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+context.scaleBy(x: 2, y: 2)
+context.translateBy(x: 0, y: 512)
+context.scaleBy(x: 1, y: -1)
+context.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
+context.fill(CGRect(x: 0, y: 0, width: 512, height: 512))
+
+func card(x: CGFloat, y: CGFloat, red: CGFloat = 0, green: CGFloat = 0,
+          blue: CGFloat = 0, separated: Bool = true) {
+    let path = CGPath(roundedRect: CGRect(x: x, y: y, width: 180, height: 240),
+                      cornerWidth: 18, cornerHeight: 18, transform: nil)
+    if separated {
+        context.addPath(path)
+        context.setStrokeColor(red: 1, green: 1, blue: 1, alpha: 1)
+        context.setLineWidth(20)
+        context.strokePath()
+    }
+    context.addPath(path)
+    context.setFillColor(red: red, green: green, blue: blue, alpha: 1)
+    context.fillPath()
 }
-NSGraphicsContext.restoreGraphicsState()
+
+card(x: 226, y: 88, separated: false)
+card(x: 166, y: 136)
+card(x: 106, y: 184, red: 18 / 255.0, green: 10 / 255.0, blue: 143 / 255.0)
+
+let image = NSBitmapImageRep(cgImage: context.makeImage()!)
 try image.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: target))
