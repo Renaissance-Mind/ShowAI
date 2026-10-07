@@ -43,6 +43,8 @@ import {
   readComponentSource,
   readBuiltinComponentSource,
   resolveDocumentComponents,
+  importCompiledComponents,
+  lockDocumentComponents,
   saveComponent,
   saveTemplate,
 } from "../core/catalog";
@@ -108,6 +110,8 @@ export const workbenchActions = new Set([
   "projects:pin",
   "projects:remove",
   "sidebar:get",
+  "sidebar:moveProject",
+  "sidebar:moveEntry",
   "groups:create",
   "groups:rename",
   "groups:remove",
@@ -547,6 +551,60 @@ export function createWorkbench(
         return store.listProjects();
       case "sidebar:get":
         return store.readSidebar();
+      case "sidebar:moveProject": {
+        const placement = args.placement ?? "before";
+        if (placement !== "before" && placement !== "after")
+          throw new CoreError("INVALID_DATA", "Invalid placement.");
+        return store.arrangeProject(
+          projectId(args),
+          required(args, "sectionId"),
+          text(args, "relativeId", true),
+          placement,
+        );
+      }
+      case "sidebar:moveEntry": {
+        const kind = required(args, "kind"),
+          placement = args.placement ?? "before";
+        if (
+          (kind !== "page" && kind !== "folder") ||
+          (placement !== "before" && placement !== "after")
+        )
+          throw new CoreError("INVALID_DATA", "Invalid sidebar move.");
+        const source = projectId(args),
+          destination = assertId(required(args, "destinationProjectId"));
+        return store.arrangeEntry(
+          {
+            kind,
+            projectId: source,
+            id: assertId(required(args, "id")),
+            destinationProjectId: destination,
+            parentId: parentFolder(args),
+            relativeId: text(args, "relativeId", true),
+            placement,
+            baseHash: text(args, "baseHash", true),
+            baseRevision: text(args, "baseRevision", true),
+          },
+          async (document) => {
+            const locked = await lockDocumentComponents(
+              store.root,
+              document,
+              source,
+            );
+            const components = await resolveDocumentComponents(
+              store.root,
+              locked,
+              source,
+            );
+            if (components.length)
+              await importCompiledComponents(
+                store.root,
+                components,
+                destination,
+              );
+            return lockDocumentComponents(store.root, locked, destination);
+          },
+        );
+      }
       case "groups:create":
         return store.createProjectGroup(required(args, "name"));
       case "groups:rename":
@@ -1137,6 +1195,8 @@ export function createWorkbench(
     }
   }
   const mutationActions = new Set([
+    "sidebar:moveProject",
+    "sidebar:moveEntry",
     "library:prepareImport",
     "library:activateImport",
     "history:restoreImportedSnapshot",

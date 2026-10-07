@@ -75,6 +75,12 @@ import {
 import Dialog from "./Dialog";
 import ExpandableSearch from "../components/ExpandableSearch";
 import ProjectSidebar from "./ProjectSidebar";
+import {
+  LibraryDragContext,
+  useLibraryDragController,
+  type LibraryDrop,
+} from "./LibraryDrag";
+import { orderSidebarItems } from "../core/sidebar-order";
 import { readSidebarExpansion, sidebarExpansionKey } from "./sidebar-state";
 import SidebarNavigation from "./SidebarNavigation";
 import RecentPages, { recentPages } from "./RecentPages";
@@ -802,6 +808,97 @@ export default function Studio() {
     await desktop.invoke("projects:group", { projectId, groupId });
     await refresh();
   }
+  const movingLibrary = useRef(false);
+  async function dropLibraryItem(drop: LibraryDrop) {
+    if (movingLibrary.current) return;
+    movingLibrary.current = true;
+    const source = drop.source;
+    const reopen =
+      source.kind === "page" &&
+      page.projectId === source.projectId &&
+      page.draft?.id === source.id;
+    let moved = false;
+    let cleared = false;
+    try {
+      if (!(await page.flush())) {
+        setView("page");
+        return;
+      }
+      if (source.kind === "project") {
+        await desktop.invoke("sidebar:moveProject", {
+          projectId: source.id,
+          sectionId: drop.sectionId,
+          relativeId: drop.relativeId,
+          placement: drop.placement,
+        });
+        if (drop.sectionId)
+          setCollapsedSections((current) => ({
+            ...current,
+            [drop.sectionId!]: false,
+          }));
+      } else {
+        const record =
+          source.kind === "page"
+            ? await desktop.invoke<LoadedPage>("pages:get", {
+                projectId: source.projectId,
+                pageId: source.id,
+              })
+            : null;
+        if (reopen && !(await page.clear())) return;
+        cleared = reopen;
+        await desktop.invoke("sidebar:moveEntry", {
+          kind: source.kind,
+          projectId: source.projectId,
+          id: source.id,
+          destinationProjectId: drop.projectId,
+          parentId: drop.parentId,
+          relativeId: drop.relativeId,
+          placement: drop.placement,
+          baseHash: record?.hash,
+          baseRevision: record?.revision,
+        });
+        moved = true;
+        setExpandedProjects((current) => ({
+          ...current,
+          [drop.projectId!]: true,
+        }));
+        if (drop.parentId)
+          setExpandedFolders((current) => ({
+            ...current,
+            [drop.parentId!]: true,
+          }));
+      }
+      await refresh();
+      if (reopen) await openPage(source.id, drop.projectId!);
+      setNotice("已调整位置");
+    } catch (error) {
+      if (reopen && cleared)
+        await openPage(
+          source.id,
+          moved ? drop.projectId! : source.projectId,
+        ).catch(report);
+      report(error);
+    } finally {
+      movingLibrary.current = false;
+    }
+  }
+  const libraryDrag = useLibraryDragController({
+    sectionFor: (id) =>
+      projects.find((item) => item.id === id)?.pinned
+        ? "pinned"
+        : (organization.projectGroups[id] ?? "projects"),
+    parentFor: (projectId, id) =>
+      contents[projectId]?.folders.find((item) => item.id === id)?.parentId ??
+      null,
+    onDrop: (drop) => {
+      void dropLibraryItem(drop);
+    },
+    onStart: () => {
+      setContextMenu(null);
+      setProjectsMenu(null);
+      setGroupMenu(null);
+    },
+  });
   async function updateTarget(
     target: LibraryTarget,
     change: { name?: string; pinned?: boolean },
@@ -924,19 +1021,22 @@ export default function Studio() {
     const current = contents[projectId];
     if (!current) return null;
     const folderIds = new Set(current.folders.map((item) => item.id));
-    const targets: LibraryTarget[] = [
-      ...current.folders
-        .filter((item) => (item.parentId ?? null) === parentId)
-        .map((item) => folderTarget(item, projectId)),
-      ...current.pages
-        .filter(
-          (item) =>
-            (item.parentId && folderIds.has(item.parentId)
-              ? item.parentId
-              : null) === parentId,
-        )
-        .map((item) => pageTarget(item, projectId)),
-    ].sort((a, b) => Number(b.pinned) - Number(a.pinned));
+    const targets = orderSidebarItems<LibraryTarget>(
+      [
+        ...current.folders
+          .filter((item) => (item.parentId ?? null) === parentId)
+          .map((item) => folderTarget(item, projectId)),
+        ...current.pages
+          .filter(
+            (item) =>
+              (item.parentId && folderIds.has(item.parentId)
+                ? item.parentId
+                : null) === parentId,
+          )
+          .map((item) => pageTarget(item, projectId)),
+      ].sort((a, b) => Number(b.pinned) - Number(a.pinned)),
+      organization.entryOrder?.[projectId],
+    );
     return targets.map((target) => (
       <div key={target.id}>
         <LibraryRow
@@ -1089,16 +1189,21 @@ export default function Studio() {
       item.name.toLowerCase().includes(query.toLowerCase()) &&
       (query || (item.parentId ?? null) === selectedFolder),
   );
-  const visibleEntries = [
-    ...filteredFolders.map((item) => ({
-      target: folderTarget(item, selectedProject!),
-      updatedAt: item.updatedAt,
-    })),
-    ...filteredPages.map((item) => ({
-      target: pageTarget(item, selectedProject!),
-      updatedAt: item.updatedAt,
-    })),
-  ].sort((a, b) => Number(b.target.pinned) - Number(a.target.pinned));
+  const visibleEntries = orderSidebarItems(
+    [
+      ...filteredFolders.map((item) => ({
+        target: folderTarget(item, selectedProject!),
+        updatedAt: item.updatedAt,
+      })),
+      ...filteredPages.map((item) => ({
+        target: pageTarget(item, selectedProject!),
+        updatedAt: item.updatedAt,
+      })),
+    ]
+      .sort((a, b) => Number(b.target.pinned) - Number(a.target.pinned))
+      .map((item) => ({ ...item, id: item.target.id })),
+    organization.entryOrder?.[selectedProject ?? ""],
+  );
   const breadcrumbFolders: FolderMetadata[] = [];
   let breadcrumbFolder = currentFolder;
   while (
@@ -1203,70 +1308,89 @@ export default function Studio() {
             enabled={view === "page" && !!page.draft}
             interactionHeld={
               !!dialog ||
+              libraryDrag.dragging ||
               !!projectsMenu ||
               !!groupMenu ||
               !!contextMenu?.anchor.closest(".studio-sidebar")
             }
           >
-            <div className="studio-brand">
-              <span>✳</span>
-              <strong>ShowAI</strong>
-            </div>
-            {view === "settings" ? (
-              <SettingsNavigation
-                section={settingsSection}
-                onSelect={setSettingsSection}
-              />
-            ) : view === "components" ? (
-              <ComponentNavigation
-                groups={componentGroups}
-                active={componentCategory}
-                onSelect={(category) => {
-                  setComponentCategory(category);
-                  setCategoryRequest((current) => ({
-                    category,
-                    sequence: (current?.sequence ?? 0) + 1,
-                  }));
-                }}
-              />
-            ) : (
-              <ProjectSidebar
-                projects={projects}
-                organization={organization}
-                selectedProject={selectedProject}
-                collapsed={collapsedSections}
-                setCollapsed={setCollapsedSections}
-                onCreate={(groupId) => setDialog({ type: "project", groupId })}
-                onMenu={(anchor) =>
-                  setProjectsMenu((current) =>
-                    current === anchor ? null : anchor,
-                  )
-                }
-                onGroupMenu={(group, anchor) => setGroupMenu({ group, anchor })}
-                renderProject={(item) => (
-                  <div key={item.id}>
-                    <LibraryRow
-                      target={projectTarget(item)}
-                      active={
-                        selectedProject === item.id &&
-                        view === "project" &&
-                        !selectedFolder
-                      }
-                      expanded={!!expandedProjects[item.id]}
-                      onToggle={action(() => toggleProject(item.id))}
-                      onOpen={action(() => openProject(item.id))}
-                      onMenu={showMenu}
-                    />
-                    {expandedProjects[item.id] && (
-                      <div className="studio-tree-children">
-                        {renderChildren(item.id)}
-                      </div>
-                    )}
-                  </div>
-                )}
-              />
-            )}
-            {sidebarNavigation}
+            <LibraryDragContext.Provider value={libraryDrag.bindings}>
+              <div className="studio-brand">
+                <span>✳</span>
+                <strong>ShowAI</strong>
+              </div>
+              {view === "settings" ? (
+                <SettingsNavigation
+                  section={settingsSection}
+                  onSelect={setSettingsSection}
+                />
+              ) : view === "components" ? (
+                <ComponentNavigation
+                  groups={componentGroups}
+                  active={componentCategory}
+                  onSelect={(category) => {
+                    setComponentCategory(category);
+                    setCategoryRequest((current) => ({
+                      category,
+                      sequence: (current?.sequence ?? 0) + 1,
+                    }));
+                  }}
+                />
+              ) : (
+                <ProjectSidebar
+                  projects={projects}
+                  organization={organization}
+                  selectedProject={selectedProject}
+                  collapsed={collapsedSections}
+                  setCollapsed={setCollapsedSections}
+                  onCreate={(groupId) =>
+                    setDialog({ type: "project", groupId })
+                  }
+                  onMenu={(anchor) =>
+                    setProjectsMenu((current) =>
+                      current === anchor ? null : anchor,
+                    )
+                  }
+                  onGroupMenu={(group, anchor) =>
+                    setGroupMenu({ group, anchor })
+                  }
+                  renderProject={(item) => (
+                    <div key={item.id}>
+                      <LibraryRow
+                        target={projectTarget(item)}
+                        active={
+                          selectedProject === item.id &&
+                          view === "project" &&
+                          !selectedFolder
+                        }
+                        expanded={!!expandedProjects[item.id]}
+                        onToggle={action(() => toggleProject(item.id))}
+                        onOpen={action(() => openProject(item.id))}
+                        onMenu={showMenu}
+                      />
+                      {expandedProjects[item.id] && (
+                        <div className="studio-tree-children">
+                          {renderChildren(item.id)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                />
+              )}
+              {sidebarNavigation}
+              {libraryDrag.preview && (
+                <div
+                  className="studio-library-drag-preview"
+                  aria-hidden="true"
+                  style={{
+                    left: libraryDrag.preview.x,
+                    top: libraryDrag.preview.y,
+                  }}
+                >
+                  {libraryDrag.preview.title}
+                </div>
+              )}
+            </LibraryDragContext.Provider>
           </AutoHideSidebar>
         )}
         <main className="studio-main">

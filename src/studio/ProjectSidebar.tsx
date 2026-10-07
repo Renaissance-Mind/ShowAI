@@ -11,6 +11,8 @@ import type {
   ProjectSummary,
   SidebarOrganization,
 } from "../core/model";
+import { orderSidebarItems } from "../core/sidebar-order";
+import { useLibraryDrag } from "./LibraryDrag";
 
 export default function ProjectSidebar({
   projects,
@@ -33,6 +35,8 @@ export default function ProjectSidebar({
   onMenu: (anchor: HTMLElement) => void;
   onGroupMenu: (group: ProjectGroup, anchor: HTMLElement) => void;
 }) {
+  const drag = useLibraryDrag();
+  projects = orderSidebarItems(projects, organization.projectOrder);
   const selected = projects.find((item) => item.id === selectedProject);
   const selectedSection =
     selected && !selected.pinned
@@ -67,7 +71,12 @@ export default function ProjectSidebar({
       data-project-section={id}
       aria-label={name}
     >
-      <div className="studio-sidebar-label">
+      <div
+        className="studio-sidebar-label"
+        {...drag?.section(id, () =>
+          setCollapsed((current) => ({ ...current, [id]: false })),
+        )}
+      >
         {group ? (
           <button
             className="studio-section-toggle"
@@ -112,7 +121,12 @@ export default function ProjectSidebar({
         </div>
       </div>
       {(!group || !collapsed[id]) && (
-        <div className="studio-project-section-items">
+        <div
+          className="studio-project-section-items"
+          {...drag?.section(id, () =>
+            setCollapsed((current) => ({ ...current, [id]: false })),
+          )}
+        >
           {items.map(renderProject)}
           {!items.length && group && (
             <div className="studio-group-empty">暂无项目</div>
