@@ -64,6 +64,11 @@ import type {
 } from "../components/custom/types";
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import SurfaceEditor from "../surface/SurfaceEditor";
+import {
+  EditorHistoryButtons,
+  containerMenuItems,
+  type EditorControls,
+} from "../surface/EditorControls";
 import { parseArtifact } from "../lib/artifact";
 import { parseMarkdown } from "../lib/markdown";
 import { newDocument } from "../lib/document";
@@ -262,6 +267,9 @@ export default function Studio() {
   const [problem, setProblem] = useState("");
   const [busy, setBusy] = useState(false);
   const [revealNode, setRevealNode] = useState<string | null>(null);
+  const [editorControls, setEditorControls] = useState<EditorControls | null>(
+    null,
+  );
   const activeSurface = useRef<{ pageId: string; surfaceId: string } | null>(
     null,
   );
@@ -1737,6 +1745,13 @@ export default function Studio() {
         </div>
         {view === "page" && page.draft && (
           <>
+            <EditorHistoryButtons
+              controls={
+                editorControls?.documentId === page.draft.id
+                  ? editorControls
+                  : null
+              }
+            />
             <span className={`studio-save-state ${page.status}`}>
               {page.status === "saving" ? (
                 <Loader2 size={12} className="studio-spin" />
@@ -1963,6 +1978,7 @@ export default function Studio() {
                   <SurfaceEditor
                     key={page.draft.id}
                     document={page.draft}
+                    onControlsChange={setEditorControls}
                     revealId={revealNode}
                     onActiveSurfaceChange={(surfaceId) => {
                       activeSurface.current = {
@@ -2390,7 +2406,12 @@ export default function Studio() {
                     {
                       label: "设置图标…",
                       icon: <FileText size={15} />,
-                      onSelect: action(() => beginPageIcon(contextMenu.target)),
+                      onSelect:
+                        contextMenu.pageTools &&
+                        editorControls?.documentId === contextMenu.target.id &&
+                        !editorControls.nested
+                          ? editorControls.setIcon
+                          : action(() => beginPageIcon(contextMenu.target)),
                     },
                   ]
                 : []),
@@ -2430,6 +2451,15 @@ export default function Studio() {
                         ]
                       : []),
                   ]
+                : []),
+              ...(contextMenu.pageTools &&
+              editorControls?.documentId === contextMenu.target.id
+                ? containerMenuItems(editorControls, editorControls.nested).map(
+                    (item, index) => ({
+                      ...item,
+                      separatorBefore: editorControls.nested && index === 0,
+                    }),
+                  )
                 : []),
               ...(contextMenu.pageTools
                 ? [

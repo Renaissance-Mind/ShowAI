@@ -486,3 +486,16 @@
     grid-row: 1;
   }
 }
+
+.catalog-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.studio-detail-tabs .catalog-editor-actions button {
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+}

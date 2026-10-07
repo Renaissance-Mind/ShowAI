@@ -79,6 +79,9 @@ a {
   min-height: 100dvh;
   background: var(--paper);
 }
+.canvas-app .container-page-column {
+  padding-top: 80px;
+}
 .canvas-actions {
   position: fixed;
   top: 20px;

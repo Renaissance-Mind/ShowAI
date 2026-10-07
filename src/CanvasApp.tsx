@@ -13,6 +13,11 @@ import {
 } from "./ui/icons";
 import SurfaceEditor from "./surface/SurfaceEditor";
 import {
+  EditorHistoryButtons,
+  containerMenuItems,
+  type EditorControls,
+} from "./surface/EditorControls";
+import {
   parseArtifact,
   serializeArtifact,
   validateDocument,
@@ -58,6 +63,9 @@ export default function App() {
   const [components, setComponents] = useState(initial.components);
   const [error, setError] = useState(initial.error);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [editorControls, setEditorControls] = useState<EditorControls | null>(
+    null,
+  );
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [dark, setDark] = useState(
@@ -286,6 +294,12 @@ export default function App() {
   return (
     <div className="canvas-app">
       <div className="canvas-actions">
+        <EditorHistoryButtons
+          controls={
+            editorControls?.documentId === page.id ? editorControls : null
+          }
+          className="canvas-icon-button"
+        />
         <button
           className="canvas-icon-button"
           aria-label="导出页面"
@@ -325,6 +339,20 @@ export default function App() {
                   setMenuOpen(false);
               }}
             >
+              {editorControls?.documentId === page.id &&
+                containerMenuItems(editorControls).map((item) => (
+                  <button
+                    key={item.label}
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      item.onSelect();
+                    }}
+                  >
+                    {item.icon}
+                    {item.label}
+                  </button>
+                ))}
               <button
                 role="menuitem"
                 onClick={() => {
@@ -382,6 +410,7 @@ export default function App() {
         <SurfaceEditor
           key={page.id}
           document={page}
+          onControlsChange={setEditorControls}
           onChange={(next) => update(next)}
           header={
             <textarea

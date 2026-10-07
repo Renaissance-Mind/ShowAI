@@ -1,3 +1,4 @@
+import type { EditorControls } from "./EditorControls";
 import { insertComponentAtText } from "./component-insertion";
 import {
   useCallback,
@@ -37,6 +38,7 @@ export default function SurfaceEditor({
   onRevealHandled,
   readOnly = false,
   onActiveSurfaceChange,
+  onControlsChange,
 }: {
   document: ShowDocument;
   onChange: (document: ShowDocument) => void;
@@ -45,6 +47,7 @@ export default function SurfaceEditor({
   revealId?: string | null;
   onRevealHandled?: () => void;
   onActiveSurfaceChange?: (id: string) => void;
+  onControlsChange?: (controls: EditorControls | null) => void;
 }) {
   const document = useMemo(
     () => (isResource(input) ? input : upgradeResource(input)),
@@ -104,7 +107,7 @@ export default function SurfaceEditor({
     latestChange.current(next);
     refresh((value) => value + 1);
   }, []);
-  const travel = (redo = false) => {
+  const travel = useCallback((redo = false) => {
     const stack = history.current,
       source = redo ? stack.future : stack.past,
       target = redo ? stack.past : stack.future,
@@ -122,7 +125,10 @@ export default function SurfaceEditor({
     current.current = restored;
     latestChange.current(restored);
     refresh((value) => value + 1);
-  };
+  }, []);
+  const undo = useCallback(() => travel(), [travel]);
+  const redo = useCallback(() => travel(true), [travel]);
+  const change = useCallback((next: ShowDocument) => commit(next), [commit]);
   const render = ({
     content,
     parentId,
@@ -286,14 +292,15 @@ export default function SurfaceEditor({
       <ContainerRuntime
         document={document}
         onActiveSurfaceChange={onActiveSurfaceChange}
-        onChange={readOnly ? undefined : (next) => commit(next)}
+        onChange={readOnly ? undefined : change}
         header={header}
         renderContent={stableRender}
         revealId={revealId}
         revealInPlace={insertedId}
         onRevealHandled={onRevealHandled}
-        undo={() => travel()}
-        redo={() => travel(true)}
+        undo={undo}
+        redo={redo}
+        onControlsChange={onControlsChange}
         canUndo={!!history.current.past.length}
         canRedo={!!history.current.future.length}
       />

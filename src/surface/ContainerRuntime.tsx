@@ -1,3 +1,4 @@
+import type { EditorControls } from "./EditorControls";
 import { AdditionalComponentsProvider } from "../components/custom/CustomBlock";
 import type { CompiledComponent } from "../components/custom/types";
 import { flushSync } from "react-dom";
@@ -20,8 +21,6 @@ import type { JSONContent } from "@tiptap/core";
 import {
   ArrowLeft,
   ChevronRight,
-  ChevronDown,
-  FileText,
   LayoutDashboard,
   MousePointer2,
   Pencil,
@@ -29,8 +28,6 @@ import {
   Circle,
   ArrowUpRight,
   X,
-  Undo2,
-  Redo2,
 } from "../ui/icons";
 import type { ContainerDocument, ShowDocument } from "../types";
 import type { DrawingTool, NodeLayout } from "./types";
@@ -91,6 +88,7 @@ export function ContainerRuntime({
   reading = false,
   hideTitle = false,
   onActiveSurfaceChange,
+  onControlsChange,
 }: {
   document: ContainerDocument;
   onChange?: (next: ShowDocument) => void;
@@ -106,6 +104,7 @@ export function ContainerRuntime({
   reading?: boolean;
   hideTitle?: boolean;
   onActiveSurfaceChange?: (id: string) => void;
+  onControlsChange?: (controls: EditorControls | null) => void;
 }) {
   const current = useRef(document);
   current.current = document;
@@ -151,12 +150,79 @@ export function ContainerRuntime({
   const chain = [...(paths[root.attrs!.id] ?? []), root.attrs!.id]
     .map((id) => findSurfaceNode(document, id)?.node)
     .filter((node) => node?.type === "surface") as JSONContent[];
-  const focusSurface = (id: string) => {
-    expand(id === document.content.attrs!.id ? null : id);
-    activate(id);
-    select(null);
-    inspect(null);
-  };
+  const rootId = document.content.attrs!.id;
+  const focusSurface = useCallback(
+    (id: string) => {
+      expand(id === rootId ? null : id);
+      activate(id);
+      select(null);
+      inspect(null);
+    },
+    [rootId],
+  );
+  const surfaceId = root.attrs!.id;
+  const setSurfaceIcon = useCallback(
+    () => setIconTarget(surfaceId),
+    [surfaceId],
+  );
+  const wrap = useCallback(
+    (kind: "page" | "board") => {
+      const next = wrapSurface(current.current, surfaceId, kind);
+      current.current = next;
+      onChange?.(next);
+      focusSurface(
+        findSurfaceNode(next, surfaceId)?.parent?.attrs?.id ??
+          next.content.attrs!.id,
+      );
+    },
+    [surfaceId, onChange, focusSurface],
+  );
+  const name =
+    root === document.content
+      ? document.title || nodeName(root)
+      : nodeName(root);
+  const kind = surfaceKind(root);
+  const controls = useMemo<EditorControls | null>(
+    () =>
+      onChange && undo && redo
+        ? {
+            documentId: document.id,
+            surfaceId,
+            name,
+            kind,
+            nested: surfaceId !== rootId,
+            canUndo,
+            canRedo,
+            undo,
+            redo,
+            setIcon: setSurfaceIcon,
+            wrap,
+          }
+        : null,
+    [
+      document.id,
+      surfaceId,
+      name,
+      kind,
+      rootId,
+      canUndo,
+      canRedo,
+      undo,
+      redo,
+      setSurfaceIcon,
+      wrap,
+      onChange,
+    ],
+  );
+  useLayoutEffect(() => {
+    onControlsChange?.(controls);
+  }, [onControlsChange, controls]);
+  useLayoutEffect(
+    () => () => {
+      onControlsChange?.(null);
+    },
+    [onControlsChange],
+  );
   useEffect(() => {
     if (expanded && !target) focusSurface(document.content.attrs!.id);
   }, [expanded, !!target]);
@@ -323,7 +389,7 @@ export function ContainerRuntime({
               }
             }}
           >
-            {(!runtime.readOnly || chain.length > 1) && (
+            {chain.length > 1 && (
               <div className="container-workspace-bar" data-surface-ui>
                 <nav aria-label="内容层级">
                   {chain.map((node, index) => (
@@ -365,87 +431,6 @@ export function ContainerRuntime({
                     <ArrowLeft size={14} />
                     返回上层
                   </button>
-                )}
-                {onChange && (
-                  <>
-                    <button
-                      type="button"
-                      aria-label="撤销操作"
-                      disabled={!canUndo}
-                      onClick={undo}
-                    >
-                      <Undo2 size={15} />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="重做操作"
-                      disabled={!canRedo}
-                      onClick={redo}
-                    >
-                      <Redo2 size={15} />
-                    </button>
-                    <details className="container-menu">
-                      <summary aria-label="容器操作">
-                        {surfaceKind(root) === "page" ? (
-                          <FileText size={15} />
-                        ) : (
-                          <LayoutDashboard size={15} />
-                        )}
-                        {surfaceKind(root) === "page" ? "Page" : "Board"}
-                        <ChevronDown size={13} />
-                      </summary>
-                      <div>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.currentTarget
-                              .closest("details")
-                              ?.removeAttribute("open");
-                            setIconTarget(root.attrs!.id);
-                          }}
-                        >
-                          <FileText size={15} />
-                          设置图标…
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = wrapSurface(
-                              current.current,
-                              root.attrs!.id,
-                              "board",
-                            );
-                            runtime.commit(next);
-                            focusSurface(
-                              findSurfaceNode(next, root.attrs!.id)?.parent
-                                ?.attrs?.id ?? next.content.attrs!.id,
-                            );
-                          }}
-                        >
-                          <LayoutDashboard size={15} aria-hidden="true" />
-                          放入 Board
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = wrapSurface(
-                              current.current,
-                              root.attrs!.id,
-                              "page",
-                            );
-                            runtime.commit(next);
-                            focusSurface(
-                              findSurfaceNode(next, root.attrs!.id)?.parent
-                                ?.attrs?.id ?? next.content.attrs!.id,
-                            );
-                          }}
-                        >
-                          <FileText size={15} aria-hidden="true" />
-                          放入 Page
-                        </button>
-                      </div>
-                    </details>
-                  </>
                 )}
               </div>
             )}

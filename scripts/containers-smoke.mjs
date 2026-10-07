@@ -74,7 +74,15 @@ async function poll(read, test, label) {
   }
   throw new Error(`Timed out: ${label}: ${JSON.stringify(value).slice(-1500)}`);
 }
-const result = { passed: false, output, cli, checks: [], errors: [] };
+const editorOnly = process.argv.includes("--editor-only");
+const result = {
+  passed: false,
+  scope: editorOnly ? "editor" : "full",
+  output,
+  cli,
+  checks: [],
+  errors: [],
+};
 let browser, page, application;
 try {
   browser = await chromium.launch();
@@ -371,6 +379,14 @@ try {
   await object(nestedPageId)
     .getByRole("button", { name: "展开 Page", exact: true })
     .click();
+  assert.equal(await page.locator(".container-workspace-bar").count(), 1);
+  assert.equal(
+    await page
+      .locator(".container-workspace-bar")
+      .getByRole("button", { name: "撤销操作", exact: true })
+      .count(),
+    0,
+  );
   await scene(nestedPageId)
     .locator(".tiptap")
     .fill("展开后继续编辑同一个 Page。");
@@ -538,8 +554,16 @@ try {
   result.checks.push(
     "cross-container moves retain every descendant id and undo as one transaction",
   );
-  await page.getByLabel("容器操作", { exact: true }).click();
-  await page.getByRole("button", { name: "放入 Board", exact: true }).click();
+  assert.equal(await page.locator(".container-workspace-bar").count(), 0);
+  assert.equal(
+    await page
+      .locator(".studio-header-actions")
+      .getByRole("button", { name: "撤销操作", exact: true })
+      .count(),
+    1,
+  );
+  await page.getByRole("button", { name: "页面操作", exact: true }).click();
+  await page.getByRole("menuitem", { name: "放入 Board", exact: true }).click();
   saved = await poll(
     read,
     (record) => record.document.content.attrs.kind === "board",
@@ -609,92 +633,94 @@ try {
   };
   walkCopy(copy.content);
   assert.ok(copiedIds.every((id) => !originalIds.has(id)));
-  const standalone = await run(
-    "export",
-    "--project",
-    project.id,
-    "--page",
-    pageId,
-    "--format",
-    "html",
-    "--out",
-    join(output, "nested.html"),
-  );
-  const partial = await run(
-    "export",
-    "--project",
-    project.id,
-    "--page",
-    pageId,
-    "--blocks",
-    sketchId,
-    "--format",
-    "inline",
-    "--out",
-    join(output, "sketch-inline.html"),
-  );
-  const source = JSON.parse(
-    await readFile(join(output, "nested.showai.json"), "utf8"),
-  );
-  assert.equal(source.version, 3);
-  assert.equal(source.document.content.attrs.kind, "page");
-  const reader = await browser.newPage({
-    viewport: { width: 1280, height: 900 },
-  });
-  reader.on("pageerror", (error) => result.errors.push(error.message));
-  await reader.goto(pathToFileURL(standalone.path).href);
-  await reader.locator(".container-page.is-root").waitFor();
-  assert.equal(await reader.locator('[contenteditable="true"]').count(), 0);
-  await reader
-    .locator(`[data-surface-id="${boardId}"]`)
-    .locator(":scope > .surface-object-header")
-    .getByRole("button", { name: "展开 Board", exact: true })
-    .click();
-  await reader
-    .locator(`[data-surface-id="${nestedPageId}"]`)
-    .locator(":scope > .surface-object-header")
-    .getByRole("button", { name: "展开 Page", exact: true })
-    .click();
-  await reader
-    .locator(`[data-surface-id="${sketchId}"]`)
-    .locator(":scope > .surface-object-header")
-    .getByRole("button", { name: "展开 Board", exact: true })
-    .click();
-  await reader.locator(".board-drawing").waitFor();
-  await reader.screenshot({ path: join(output, "expanded-drawing.png") });
-  await reader.goto(pathToFileURL(partial.path).href);
-  await reader.locator(".container-workspace").waitFor();
-  assert.equal(
+  if (!editorOnly) {
+    const standalone = await run(
+      "export",
+      "--project",
+      project.id,
+      "--page",
+      pageId,
+      "--format",
+      "html",
+      "--out",
+      join(output, "nested.html"),
+    );
+    const partial = await run(
+      "export",
+      "--project",
+      project.id,
+      "--page",
+      pageId,
+      "--blocks",
+      sketchId,
+      "--format",
+      "inline",
+      "--out",
+      join(output, "sketch-inline.html"),
+    );
+    const source = JSON.parse(
+      await readFile(join(output, "nested.showai.json"), "utf8"),
+    );
+    assert.equal(source.version, 3);
+    assert.equal(source.document.content.attrs.kind, "page");
+    const reader = await browser.newPage({
+      viewport: { width: 1280, height: 900 },
+    });
+    reader.on("pageerror", (error) => result.errors.push(error.message));
+    await reader.goto(pathToFileURL(standalone.path).href);
+    await reader.locator(".container-page.is-root").waitFor();
+    assert.equal(await reader.locator('[contenteditable="true"]').count(), 0);
     await reader
-      .getByText("文章按顺序阅读，局部白板可以展开编辑。", { exact: true })
-      .count(),
-    0,
-  );
-  await reader.setViewportSize({ width: 390, height: 844 });
-  assert.ok(
-    await reader.evaluate(() => document.documentElement.scrollWidth <= 391),
-  );
-  await reader.emulateMedia({ media: "print" });
-  await reader.locator(".board-drawing").waitFor();
-  const printGeometry = await reader
-    .locator(".board-drawing rect")
-    .first()
-    .boundingBox();
-  assert.ok(
-    printGeometry && printGeometry.width > 5 && printGeometry.height > 3,
-  );
-  assert.ok(
-    Math.abs(printGeometry.width / printGeometry.height - 200 / 120) < 0.12,
-  );
-  await reader.screenshot({
-    path: join(output, "print-layout.png"),
-    fullPage: true,
-  });
-  await reader.pdf({ path: join(output, "nested.pdf"), format: "A4" });
-  await reader.close();
-  result.checks.push(
-    "reload, templates, recursive offline HTML, partial inline delivery and narrow-screen reading preserve container structure",
-  );
+      .locator(`[data-surface-id="${boardId}"]`)
+      .locator(":scope > .surface-object-header")
+      .getByRole("button", { name: "展开 Board", exact: true })
+      .click();
+    await reader
+      .locator(`[data-surface-id="${nestedPageId}"]`)
+      .locator(":scope > .surface-object-header")
+      .getByRole("button", { name: "展开 Page", exact: true })
+      .click();
+    await reader
+      .locator(`[data-surface-id="${sketchId}"]`)
+      .locator(":scope > .surface-object-header")
+      .getByRole("button", { name: "展开 Board", exact: true })
+      .click();
+    await reader.locator(".board-drawing").waitFor();
+    await reader.screenshot({ path: join(output, "expanded-drawing.png") });
+    await reader.goto(pathToFileURL(partial.path).href);
+    await reader.locator(".container-workspace").waitFor();
+    assert.equal(
+      await reader
+        .getByText("文章按顺序阅读，局部白板可以展开编辑。", { exact: true })
+        .count(),
+      0,
+    );
+    await reader.setViewportSize({ width: 390, height: 844 });
+    assert.ok(
+      await reader.evaluate(() => document.documentElement.scrollWidth <= 391),
+    );
+    await reader.emulateMedia({ media: "print" });
+    await reader.locator(".board-drawing").waitFor();
+    const printGeometry = await reader
+      .locator(".board-drawing rect")
+      .first()
+      .boundingBox();
+    assert.ok(
+      printGeometry && printGeometry.width > 5 && printGeometry.height > 3,
+    );
+    assert.ok(
+      Math.abs(printGeometry.width / printGeometry.height - 200 / 120) < 0.12,
+    );
+    await reader.screenshot({
+      path: join(output, "print-layout.png"),
+      fullPage: true,
+    });
+    await reader.pdf({ path: join(output, "nested.pdf"), format: "A4" });
+    await reader.close();
+    result.checks.push(
+      "reload, templates, recursive offline HTML, partial inline delivery and narrow-screen reading preserve container structure",
+    );
+  }
   assert.deepEqual(result.errors, []);
   result.passed = true;
 } catch (error) {

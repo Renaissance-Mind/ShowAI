@@ -5,7 +5,8 @@ import { resolve } from "node:path";
 import { chromium, type Browser } from "playwright";
 import g2 from "../../resources/catalog/g2.json";
 import { blankDocument } from "../core/catalog";
-import { createResource } from "../surface/containers.mjs";
+import { createResource, createSurface } from "../surface/containers.mjs";
+import { addNode } from "../surface/editing";
 import { buildPageHtml, buildReaderTemplate } from "./exporter";
 import { toInlineFragment } from "../portable/inline.mjs";
 import { readerKinds } from "../portable/reader-bundle.mjs";
@@ -58,6 +59,46 @@ test("text documents exclude unused renderers, preserve source and remain readab
   const source = await page.locator("#showai-data").textContent();
   expect(JSON.parse(source!).document.id).toBe(doc.id);
   expect(requests.every((url) => url.startsWith(address))).toBe(true);
+  await page.close();
+});
+
+test("readers show navigation only after entering a nested container and omit editing controls", async () => {
+  let doc = createResource(blankDocument());
+  doc.title = "Nested reading";
+  const child = createSurface("page", "Evidence", "evidence-page");
+  child.content = [
+    {
+      type: "paragraph",
+      attrs: { id: "evidence-text" },
+      content: [{ type: "text", text: "Nested evidence." }],
+    },
+  ];
+  doc = addNode(doc, child, {
+    x: 0,
+    y: 0,
+    width: 760,
+    height: 400,
+    heightMode: "auto",
+  }) as typeof doc;
+  pages.set("/navigation", await buildPageHtml(doc));
+  const page = await browser.newPage();
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.stack ?? error.message));
+  await page.goto(address + "/navigation");
+  await page.getByText("Nested evidence.", { exact: true }).waitFor();
+  expect(await page.locator(".container-workspace-bar").count()).toBe(0);
+  await page
+    .getByRole("button", { name: "展开 Evidence", exact: true })
+    .click();
+  await page.getByRole("button", { name: "返回上层", exact: true }).waitFor();
+  expect(await page.locator(".container-workspace-bar").count()).toBe(1);
+  expect(
+    await page.getByRole("button", { name: "撤销操作", exact: true }).count(),
+  ).toBe(0);
+  expect(await page.getByLabel("容器操作", { exact: true }).count()).toBe(0);
+  await page.getByRole("button", { name: "返回上层", exact: true }).click();
+  expect(await page.locator(".container-workspace-bar").count()).toBe(0);
+  expect(errors).toEqual([]);
   await page.close();
 });
 

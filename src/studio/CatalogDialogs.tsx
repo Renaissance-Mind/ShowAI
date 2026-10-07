@@ -32,6 +32,11 @@ import { componentWidgetData } from "../components/custom/contract";
 import { Widget } from "../components/blocks/Widget";
 import type { DocumentEditorProps } from "../editor/DocumentEditor";
 import SurfaceEditor from "../surface/SurfaceEditor";
+import {
+  EditorHistoryButtons,
+  EditorContainerMenu,
+  type EditorControls,
+} from "../surface/EditorControls";
 import { newDocument } from "../lib/document";
 import { desktop, errorMessage } from "./bridge";
 import Dialog from "./Dialog";
@@ -68,6 +73,7 @@ function TemplateContent(
   props: DocumentEditorProps & {
     document?: ShowDocument;
     onDocumentChange?: (document: ShowDocument) => void;
+    onControlsChange?: (controls: EditorControls | null) => void;
   },
 ) {
   const id = useId();
@@ -86,6 +92,7 @@ function TemplateContent(
             : props.onChange(document.content)
         }
         readOnly={props.readOnly}
+        onControlsChange={props.onControlsChange}
       />
     </div>
   );
@@ -387,6 +394,9 @@ export function TemplateDialog({
     [busy, setBusy] = useState(false);
   const [templateExample, setTemplateExample] = useState(0);
   const [editingPart, setEditingPart] = useState(0);
+  const [editorControls, setEditorControls] = useState<EditorControls | null>(
+    null,
+  );
   const localParts = parts
     .map((part, index) => ({ part, index }))
     .filter((item) => item.part.type === "content");
@@ -491,6 +501,12 @@ export function TemplateDialog({
           >
             组合模板
           </button>
+          {tab === "layout" && editorControls && (
+            <div className="catalog-editor-actions">
+              <EditorHistoryButtons controls={editorControls} />
+              <EditorContainerMenu controls={editorControls} />
+            </div>
+          )}
         </div>
         {tab === "about" && (
           <>
@@ -612,6 +628,7 @@ export function TemplateDialog({
                 <CustomComponentsProvider components={components}>
                   <TemplateContent
                     key={parts.length ? activePartIndex : "document"}
+                    onControlsChange={setEditorControls}
                     content={layoutContent}
                     document={
                       parts.length
