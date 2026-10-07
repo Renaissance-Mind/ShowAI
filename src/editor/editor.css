@@ -650,6 +650,7 @@
   position: fixed;
   z-index: 80;
   display: flex;
+  align-items: center;
   gap: 2px;
   padding: 5px;
   border: 1px solid var(--line, #e8ece5);
@@ -657,6 +658,24 @@
   background: var(--paper, #fff);
   box-shadow: 0 5px 20px #2434291c;
   animation: editor-menu-appear 0.13s ease;
+  max-width: calc(100vw - 16px);
+  overflow-x: auto;
+}
+.editor-table-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.editor-menu-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 .slash-dismiss {
   position: fixed;
@@ -1125,7 +1144,8 @@
   box-shadow: 0 8px 28px #00000018;
   font-size: 12px;
 }
-.document-table-menu > button {
+.document-table-menu > button,
+.document-table-menu .editor-table-actions > button {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1136,10 +1156,13 @@
   background: transparent;
 }
 .document-table-menu > button:hover,
-.document-table-menu > button:focus-visible {
+.document-table-menu > button:focus-visible,
+.document-table-menu .editor-table-actions > button:hover,
+.document-table-menu .editor-table-actions > button:focus-visible {
   background: var(--hover);
 }
-.document-table-menu > button:disabled {
+.document-table-menu > button:disabled,
+.document-table-menu .editor-table-actions > button:disabled {
   opacity: 0.4;
   cursor: default;
 }
@@ -1153,42 +1176,10 @@
   font-size: 11px;
   line-height: 1.5;
 }
-.document-table-selection-controls {
-  position: fixed;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface, #fff);
-  box-shadow: 0 8px 28px #00000018;
-  font-size: 12px;
+.document-table-menu .editor-table-actions {
+  display: contents;
 }
-.document-table-selection-controls > span {
-  padding: 0 6px;
-  color: var(--muted);
-}
-.document-table-selection-controls > button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  padding: 6px 8px;
-  border-radius: 4px;
-  color: var(--text);
-  background: var(--hover);
-}
-.document-table-selection-controls > button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-.document-table-selection-controls > button:hover:not(:disabled) {
-  background: var(--editor-hover);
-}
-@media print {
-  .document-table-selection-controls {
-    display: none;
-  }
+.document-table-menu .editor-table-actions > button {
+  width: auto;
+  height: auto;
 }

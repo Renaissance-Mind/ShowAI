@@ -3,13 +3,14 @@ import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
 import { closeHistory } from "@tiptap/pm/history";
-import { MoreHorizontal, Plus, Trash2, X } from "lucide-react";
+import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { TableMap } from "@tiptap/pm/tables";
 import {
   AlignmentButtons,
   type TableAlignment,
 } from "../components/blocks/TableAlignment";
 import { alignDocumentTable, tableAlignmentValue } from "./table-alignment";
+import { TableSelectionActions } from "./TableSelectionActions";
 import {
   documentTableSelection,
   documentTableActionMeta,
@@ -28,12 +29,8 @@ export function TableControls({ editor }: { editor: Editor }) {
   const [, refresh] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const selected = documentTableSelection(editor.state);
-  const {
-    target: hovered,
-    setTarget,
-    owner,
-  } = useTableHover(editor.view.dom, {
-    keepOpen: menuOpen || Boolean(selected),
+  const { target, setTarget, owner } = useTableHover(editor.view.dom, {
+    keepOpen: menuOpen,
     accept: acceptDocumentTable,
     onDismiss: () => setMenuOpen(false),
   });
@@ -65,23 +62,16 @@ export function TableControls({ editor }: { editor: Editor }) {
     };
   }, [editor, owner]);
 
-  // Cell selection stays actionable even when the pointer leaves the table.
-  const selectedDOM = selected
-    ? editor.view.nodeDOM(selected.tablePosition)
-    : null;
-  const selectedTable =
-    selectedDOM instanceof HTMLTableElement
-      ? selectedDOM
-      : selectedDOM instanceof Element
-        ? selectedDOM.querySelector("table")
-        : null;
-  const target =
-    selectedTable instanceof HTMLTableElement &&
-    selected?.tablePosition !== undefined &&
-    (!hovered || !hovered.table.contains(selectedTable))
-      ? { table: selectedTable, cell: null, context: null }
-      : hovered;
   if (!target || !target.table.isConnected || !editor.isEditable) return null;
+  // An active selection menu owns this editor's actions; hover yields to it.
+  if (
+    !target.context &&
+    (selected ||
+      (editor.isFocused &&
+        editor.state.selection instanceof TextSelection &&
+        !editor.state.selection.empty))
+  )
+    return null;
   // Resolve DOM to current document positions after edits, undo, and table movement.
   const resolved = editor.state.doc.resolve(
     editor.view.posAtDOM(target.table, 0),
@@ -110,12 +100,6 @@ export function TableControls({ editor }: { editor: Editor }) {
   }
   const positions = tableControlPositions(target, 128);
   const menuAbove = positions.global.top > window.innerHeight / 2;
-  const selectionBottom = Math.max(
-    ...Array.from(
-      target.table.querySelectorAll(".selectedCell"),
-      (cell) => cell.getBoundingClientRect().bottom,
-    ),
-  );
   const prepareSelection = () => {
     const { $from } = editor.state.selection;
     const inTarget = Array.from(
@@ -152,14 +136,6 @@ export function TableControls({ editor }: { editor: Editor }) {
       if (transaction) editor.view.dispatch(transaction);
       editor.view.focus();
     });
-  const clearSelection = () => {
-    editor.view.dispatch(
-      editor.state.tr.setSelection(
-        TextSelection.near(editor.state.selection.$from),
-      ),
-    );
-    editor.view.focus();
-  };
   const align = (col: number | null, value: TableAlignment) => {
     editor.view.dispatch(
       alignDocumentTable(editor.state, position, col, value).setMeta(
@@ -176,6 +152,7 @@ export function TableControls({ editor }: { editor: Editor }) {
     <>
       <div
         className="document-table-controls table-global-alignment"
+        data-editor-menu-trigger={target.context ? "context" : "hover"}
         role={target.context ? "dialog" : undefined}
         aria-label="表格对齐设置"
         data-table-controls-owner={owner}
@@ -203,7 +180,7 @@ export function TableControls({ editor }: { editor: Editor }) {
             <MoreHorizontal size={16} />
           </button>
         )}
-        {menuOpen && !target.context && (
+        {(menuOpen || target.context) && (
           <div
             className="document-table-menu"
             role="menu"
@@ -264,28 +241,16 @@ export function TableControls({ editor }: { editor: Editor }) {
             <p className="document-table-menu-hint">
               拖动选择，或按住 Shift 点击另一单元格
             </p>
-            <button
-              role="menuitem"
-              disabled={!editor.can().mergeCells()}
-              onClick={() =>
-                runAction(() => {
-                  tableAction().mergeCells().run();
-                })
-              }
-            >
-              合并单元格
-            </button>
-            <button
-              role="menuitem"
-              disabled={!editor.can().splitCell()}
-              onClick={() =>
-                runAction(() => {
-                  tableAction().splitCell().run();
-                })
-              }
-            >
-              拆分单元格
-            </button>
+            {target.context && (
+              <TableSelectionActions
+                editor={editor}
+                context
+                onAction={() => {
+                  setTarget(null);
+                  setMenuOpen(false);
+                }}
+              />
+            )}
             <button
               role="menuitem"
               onClick={() =>
@@ -322,52 +287,6 @@ export function TableControls({ editor }: { editor: Editor }) {
           </div>
         )}
       </div>
-      {selected?.tablePosition === position && (
-        <div
-          className="document-table-selection-controls"
-          role="group"
-          aria-label="单元格合并"
-          data-table-controls-owner={owner}
-          style={{
-            left: positions.global.left,
-            top: Math.max(
-              8,
-              Math.min(window.innerHeight - 48, selectionBottom + 4),
-            ),
-            transform: "translateX(-100%)",
-            maxWidth: "calc(100vw - 16px)",
-          }}
-          onMouseDown={(event) => event.preventDefault()}
-        >
-          <span role="status">
-            {selected.rows === 1 && selected.columns === 1
-              ? "按住 Shift 点击另一单元格"
-              : `已选 ${selected.rows} 行 × ${selected.columns} 列`}
-          </span>
-          <button
-            type="button"
-            disabled={!editor.can().mergeCells()}
-            onClick={() => runAction(() => tableAction().mergeCells().run())}
-          >
-            合并单元格
-          </button>
-          <button
-            type="button"
-            disabled={!editor.can().splitCell()}
-            onClick={() => runAction(() => tableAction().splitCell().run())}
-          >
-            拆分单元格
-          </button>
-          <button
-            type="button"
-            aria-label="取消单元格选择"
-            title="取消单元格选择"
-            onClick={clearSelection}
-          >
-            <X size={14} />
-          </button>
-        </div>
-      )}
       {column !== null && !target.context && (
         <div
           className="document-table-controls table-column-alignment"

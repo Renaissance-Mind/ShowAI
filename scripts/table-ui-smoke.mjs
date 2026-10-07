@@ -367,9 +367,25 @@ try {
     "Native table header hover, column alignment, corner controls, context menu and inherited alignment in new rows",
   );
 
-  const mergeControls = page.getByRole("group", {
-    name: "单元格合并",
+  const selectionMenu = page.getByRole("toolbar", {
+    name: "选中文字格式",
     exact: true,
+  });
+  const mergeControls = selectionMenu.getByRole("group", {
+    name: "单元格操作",
+    exact: true,
+  });
+  await page.locator(".document-content > p").first().click({ clickCount: 3 });
+  await selectionMenu.waitFor();
+  await native.locator("th").first().hover();
+  assert.equal(
+    await page.locator(".document-table-controls").count(),
+    0,
+    "Text selection also takes priority over table hover controls",
+  );
+  await page.screenshot({
+    path: join(output, "selection-priority.png"),
+    animations: "disabled",
   });
   const cell = (row, col) =>
     mergeTable.locator("tr").nth(row).locator("td, th").nth(col);
@@ -430,14 +446,54 @@ try {
   await cell(2, 1).click({ modifiers: ["Shift"] });
   assert.equal(await mergeTable.locator(".selectedCell").count(), 4);
   assert.equal(
-    await page.locator(".editor-bubble").count(),
+    await page.locator(".document-table-selection-controls").count(),
     0,
-    "Cell selection uses the table toolbar without a floating text toolbar",
   );
+  assert.equal(
+    await page.locator(".document-table-controls").count(),
+    0,
+    "Hover menus yield to the selection menu",
+  );
+  assert.equal(await selectionMenu.count(), 1);
+  const actionOrder = await selectionMenu
+    .locator("button")
+    .evaluateAll((buttons) =>
+      buttons.map((button) => button.getAttribute("aria-label")),
+    );
+  assert.ok(
+    actionOrder.indexOf("合并单元格") > actionOrder.indexOf("添加链接 ⇧⌘K"),
+    "Table actions append after the existing formatting actions",
+  );
+  await selectionMenu
+    .getByRole("button", { name: "粗体 ⌘B", exact: true })
+    .click();
+  assert.equal(await mergeTable.locator(".selectedCell strong").count(), 4);
+  await selectionMenu
+    .getByRole("button", { name: "粗体 ⌘B", exact: true })
+    .click();
+  assert.equal(await mergeTable.locator(".selectedCell").count(), 4);
   assert.ok((await mergeControls.innerText()).includes("已选 2 行 × 2 列"));
   await page.mouse.move(100, 100);
   await mergeControls.waitFor();
-  await merge();
+  await cell(2, 1).click({ button: "right" });
+  const contextMenu = page.getByRole("menu", {
+    name: "表格操作菜单",
+    exact: true,
+  });
+  await contextMenu.waitFor();
+  assert.equal(
+    await selectionMenu.count(),
+    0,
+    "The context menu replaces the selection menu",
+  );
+  assert.ok(
+    await contextMenu
+      .getByRole("menuitem", { name: "添加行", exact: true })
+      .isVisible(),
+  );
+  await contextMenu
+    .getByRole("menuitem", { name: "合并单元格", exact: true })
+    .click();
   assert.equal(await cell(1, 0).getAttribute("colspan"), "2");
   assert.equal(await cell(1, 0).getAttribute("rowspan"), "2");
   await mergeControls
@@ -470,10 +526,24 @@ try {
   assert.equal(await mergeTable.locator(".selectedCell").count(), 2);
   await merge();
   assert.equal(await cell(1, 1).getAttribute("rowspan"), "2");
+  await page.setViewportSize({ width: 700, height: 780 });
+  const selectionBounds = await selectionMenu.boundingBox();
+  assert.ok(
+    selectionBounds.x >= 8 && selectionBounds.x + selectionBounds.width <= 692,
+    "The composed selection menu fits a narrow viewport",
+  );
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({ path: join(output, "merged-cells.png") });
+  await mergeTable.screenshot({
+    path: join(output, "selection-menu.png"),
+    animations: "disabled",
+  });
   await clear();
   result.checks.push(
     "Shift-click and drag select rectangles, horizontal/vertical/rectangular merge, split and undo of split",
+  );
+  result.checks.push(
+    "One composed selection menu, formatting before cell actions, stable selection through formatting, shared context actions and narrow viewport positioning",
   );
 
   await basic.locator("th").nth(1).hover();

@@ -12,6 +12,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useId,
   useRef,
   useState,
   type DragEvent,
@@ -20,9 +21,11 @@ import {
 import { createPortal } from "react-dom";
 import { EditorContent, useEditor } from "@tiptap/react";
 import type { Editor, JSONContent } from "@tiptap/core";
-import { NodeSelection, Selection } from "@tiptap/pm/state";
+import { NodeSelection, Selection, TextSelection } from "@tiptap/pm/state";
 import { clearWidgetSelection } from "./widget-selection";
 import { CellSelection } from "@tiptap/pm/tables";
+import { SelectionToolbar } from "./SelectionToolbar";
+import { TableSelectionActions } from "./TableSelectionActions";
 import {
   documentTableActionMeta,
   restoreDocumentTableCellSelection,
@@ -177,6 +180,7 @@ export default function DocumentEditor({
   onDetachBlock,
 }: DocumentEditorProps) {
   const latestOnChange = useRef(onChange);
+  const selectionMenuId = useId();
   latestOnChange.current = onChange;
   const wrapperRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -514,7 +518,6 @@ export default function DocumentEditor({
       }
       if (
         !empty &&
-        !(selection instanceof CellSelection) &&
         editor.isFocused &&
         !editor.isActive("codeBlock") &&
         !editor.isActive("widget")
@@ -522,18 +525,19 @@ export default function DocumentEditor({
         const start = editor.view.coordsAtPos(from);
         const end = editor.view.coordsAtPos(to);
         setBubble({
-          left: Math.max(
-            16,
-            Math.min(
-              (start.left + end.right) / 2 - 128,
-              window.innerWidth - 282,
-            ),
-          ),
-          top: Math.max(12, start.top - 48),
+          left: (start.left + end.right) / 2,
+          top: start.top,
         });
       } else setBubble(null);
     };
     const hideBubble = () => setBubble(null);
+    const blur = ({ event }: { event: FocusEvent }) => {
+      if (
+        !(event.relatedTarget instanceof Element) ||
+        event.relatedTarget.closest(".editor-bubble")?.id !== selectionMenuId
+      )
+        hideBubble();
+    };
     const viewportChanged = (event: Event) => {
       if (
         !(event.target instanceof Element) ||
@@ -547,17 +551,21 @@ export default function DocumentEditor({
     };
     editor.on("transaction", refresh);
     editor.on("focus", refresh);
-    editor.on("blur", hideBubble);
+    editor.on("blur", blur);
+    editor.view.dom.addEventListener("contextmenu", hideBubble);
     window.addEventListener("scroll", hideBubble, true);
+    window.addEventListener("resize", refresh);
     window.addEventListener("showai:viewport-change", viewportChanged);
     return () => {
       editor.off("transaction", refresh);
       editor.off("focus", refresh);
-      editor.off("blur", hideBubble);
+      editor.off("blur", blur);
+      editor.view.dom.removeEventListener("contextmenu", hideBubble);
       window.removeEventListener("scroll", hideBubble, true);
+      window.removeEventListener("resize", refresh);
       window.removeEventListener("showai:viewport-change", viewportChanged);
     };
-  }, [editor]);
+  }, [editor, selectionMenuId]);
 
   useEffect(() => setSelectedIndex(0), [slash?.query]);
   useEffect(() => {
@@ -1535,19 +1543,25 @@ export default function DocumentEditor({
         </div>
       )}
 
-      {bubble &&
-        !readOnly &&
-        createPortal(
-          <div
-            className="editor-bubble"
-            role="toolbar"
-            aria-label="选中文字格式"
-            style={bubble}
-          >
-            {formatButtons}
-          </div>,
-          document.body,
-        )}
+      {bubble && !readOnly && (
+        <SelectionToolbar
+          id={selectionMenuId}
+          anchor={bubble}
+          onEscape={() => {
+            if (editor.state.selection instanceof CellSelection)
+              editor.view.dispatch(
+                editor.state.tr.setSelection(
+                  TextSelection.near(editor.state.selection.$from),
+                ),
+              );
+            setBubble(null);
+            editor.view.focus();
+          }}
+        >
+          {formatButtons}
+          <TableSelectionActions editor={editor} />
+        </SelectionToolbar>
+      )}
 
       {slash &&
         !readOnly &&
