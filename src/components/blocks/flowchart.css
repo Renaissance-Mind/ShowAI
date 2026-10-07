@@ -82,10 +82,6 @@
 .sf-node.sf-decision {
   border-style: dashed;
 }
-.sf-node.is-selected {
-  outline: 2px solid var(--sb-accent);
-  outline-offset: 3px;
-}
 .sf-block .react-flow__handle {
   width: 6px;
   height: 6px;

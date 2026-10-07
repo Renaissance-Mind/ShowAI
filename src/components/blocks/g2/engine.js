@@ -65,12 +65,43 @@ function remap(value, fields) {
     if (Object.hasOwn(value, actual)) copy[expected] = value[actual];
   return copy;
 }
+const viewportInteractions = [
+  "brushFilter",
+  "brushHighlight",
+  "sliderFilter",
+  "scrollbarFilter",
+  "fisheye",
+];
+
+function chartInteractions(interaction) {
+  return Array.isArray(interaction)
+    ? Object.fromEntries(
+        interaction.map(({ type, ...options }) => [type, options]),
+      )
+    : (interaction ?? {});
+}
+
+/** Only gestures changed by the reading lock require a lock control. */
+export function hasG2ViewportInteraction(spec) {
+  const interaction = chartInteractions(spec.interaction);
+  const enabled = (value) =>
+    value === true || (value && typeof value === "object");
+  return viewportInteractions.some((type) => {
+    if (interaction[type] === false) return false;
+    if (type === "sliderFilter" || type === "scrollbarFilter") {
+      const guide = spec[type === "sliderFilter" ? "slider" : "scrollbar"];
+      return guide && Object.values(guide).some(enabled);
+    }
+    return enabled(interaction[type]);
+  });
+}
 export function createG2Context(container, chartType, data, locked = false) {
   const ChartBase = extend(Runtime, { ...stdlib(), ...plotlib() });
   const charts = [],
     renders = new Set();
   let renderError;
   let disposed = false;
+  let hasViewportInteraction = false;
   const selected = g2Themes[data.theme ?? "indigo"];
   const palette = data.appearance?.palette ?? selected.palette;
   const textColor = selected.base === "classicDark" ? "#E6E8F0" : "#333";
@@ -90,6 +121,7 @@ export function createG2Context(container, chartType, data, locked = false) {
     delete spec.autoFit;
     delete spec.width;
     delete spec.height;
+    spec.interaction = chartInteractions(spec.interaction);
     if (root) {
       spec.theme = {
         type: selected.base,
@@ -101,13 +133,9 @@ export function createG2Context(container, chartType, data, locked = false) {
       spec.paddingRight = 26;
       spec.paddingTop = 20;
       spec.paddingBottom = 42;
-      const interactions = Array.isArray(spec.interaction)
-        ? Object.fromEntries(
-            spec.interaction.map(({ type, ...options }) => [type, options]),
-          )
-        : spec.interaction;
-      spec.interaction = { ...interactions, ...data.interaction };
+      spec.interaction = { ...spec.interaction, ...data.interaction };
     }
+    hasViewportInteraction ||= hasG2ViewportInteraction(spec);
     if (locked)
       spec.interaction = {
         ...spec.interaction,
@@ -274,6 +302,9 @@ export function createG2Context(container, chartType, data, locked = false) {
     }
   }
   return {
+    get hasViewportInteraction() {
+      return hasViewportInteraction;
+    },
     Chart,
     container,
     math,

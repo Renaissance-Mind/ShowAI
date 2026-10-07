@@ -58,7 +58,7 @@
 .sb-header.has-caption:has(~ .viewport-lock-button) > .sb-actions {
   right: 42px;
 }
-.sb-g2-chart > .sb-g2-toolbar {
+.sb-g2-chart:has(> .viewport-lock-button) > .sb-g2-toolbar {
   padding-right: 42px;
 }
 @media print {

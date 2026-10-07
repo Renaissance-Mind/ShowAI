@@ -117,12 +117,15 @@ try {
       name: "沙盒阅读锁流程图",
     },
   });
-  const widget = (kind, id) => ({
+  const widget = (kind, id, interaction) => ({
     type: "widget",
     attrs: {
       id,
       kind,
-      data: catalog.find((item) => item.kind === kind).defaultData,
+      data: {
+        ...catalog.find((item) => item.kind === kind).defaultData,
+        ...(interaction ? { interaction } : {}),
+      },
     },
   });
   const paragraph = (id) => ({
@@ -135,7 +138,8 @@ try {
     content: [
       widget("flowchart", "flow-one"),
       widget("flowchart", "flow-two"),
-      widget("g2-bar", "chart-one"),
+      widget("g2-bar", "chart-static"),
+      widget("g2-bar", "chart-one", { tooltip: true, brushFilter: true }),
       {
         type: "surface",
         attrs: { id: "board-one", kind: "board", name: "锁定白板" },
@@ -293,6 +297,26 @@ try {
   result.checks.push(
     "Lock persistence after reload is independent per component instance",
   );
+  const staticChart = page.locator(
+    '[data-block-id="chart-static"] .sb-g2-chart',
+  );
+  await staticChart.scrollIntoViewIfNeeded();
+  await poll(
+    () => staticChart.locator(".sb-g2-plot").getAttribute("aria-busy"),
+    (value) => value === "false",
+    "static chart ready",
+  );
+  assert.equal(await staticChart.locator(".viewport-lock-button").count(), 0);
+  assert.equal(await staticChart.getAttribute("data-viewport-locked"), "false");
+  assert.equal(
+    await staticChart
+      .locator("[data-surface-gesture]")
+      .getAttribute("data-surface-gesture"),
+    "",
+  );
+  result.checks.push(
+    "Default G2 chart has no ineffective lock or gesture ownership",
+  );
   const chart = page.locator('[data-block-id="chart-one"] .sb-g2-chart');
   await chart.scrollIntoViewIfNeeded();
   await poll(
@@ -317,7 +341,7 @@ try {
     "x y zoom",
   );
   result.checks.push(
-    "G2 releases reading gestures while locked and keeps theme controls interactive",
+    "G2 releases reading gestures while locked and keeps theme controls interactive; filter completion is not covered",
   );
 
   const board = page.locator('[data-container-root="board-one"]');

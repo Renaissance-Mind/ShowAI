@@ -63,12 +63,6 @@
   border-radius: 10px;
   background: transparent;
 }
-.surface-object:hover {
-  border-color: var(--line, var(--border));
-}
-.surface-object.is-selected {
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-}
 /* Bare media in a Board uses the existing object controls without a second frame. */
 .surface-object:has(> .surface-object-content > .sb-media),
 .surface-object:has(> .surface-object-content > .sb-pdf) {

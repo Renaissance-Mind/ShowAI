@@ -20,6 +20,7 @@ export function G2ChartBlock({
   const lock = useViewportLock("g2");
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
+  const [hasViewportInteraction, setHasViewportInteraction] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [draftError, setDraftError] = useState("");
@@ -73,6 +74,7 @@ export function G2ChartBlock({
       current?.destroy();
       target.replaceChildren();
       setReady(false);
+      setHasViewportInteraction(false);
       setError("");
       current = createG2Context(
         target,
@@ -83,7 +85,10 @@ export function G2ChartBlock({
       current
         .render()
         .then(() => {
-          if (!stopped && generation === run) setReady(true);
+          if (!stopped && generation === run) {
+            setHasViewportInteraction(current!.hasViewportInteraction);
+            setReady(true);
+          }
         })
         .catch((caught) => {
           if (!stopped && generation === run) {
@@ -163,7 +168,7 @@ export function G2ChartBlock({
     <section
       ref={lock.ref}
       data-viewport-lock-scope="g2"
-      data-viewport-locked={lock.locked}
+      data-viewport-locked={hasViewportInteraction && lock.locked}
       className={"sb-block sb-g2-chart" + (theme === "dark" ? " is-dark" : "")}
       aria-label={text(data.title, "图表")}
       data-g2-type={chartType}
@@ -188,7 +193,13 @@ export function G2ChartBlock({
           <Download size={16} />
         </button>
       </BlockHeader>
-      <ViewportLockButton {...lock} label="图表" />
+      {hasViewportInteraction && (
+        <ViewportLockButton
+          {...lock}
+          label="图表"
+          unlockDescription="允许框选、拖动等图表交互"
+        />
+      )}
       <div className="sb-g2-toolbar">
         <label>
           主题{" "}
@@ -358,7 +369,9 @@ export function G2ChartBlock({
           图表绘制失败：{error}
         </p>
       )}
-      <GestureBoundary axes={lock.locked ? [] : ["x", "y", "zoom"]}>
+      <GestureBoundary
+        axes={hasViewportInteraction && !lock.locked ? ["x", "y", "zoom"] : []}
+      >
         <div
           ref={plot}
           className="sb-g2-plot"

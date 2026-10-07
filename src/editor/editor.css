@@ -277,10 +277,8 @@
 .document-content .ProseMirror-gapcursor:after {
   border-top-color: var(--accent);
 }
-.document-content[contenteditable="true"]
-  .ProseMirror-selectednode:not(.node-widget) {
-  outline: 2px solid color-mix(in srgb, var(--accent) 65%, transparent);
-  outline-offset: 3px;
+.document-content .ProseMirror-selectednode {
+  outline: none;
 }
 .document-content .document-image,
 .portable-editor .document-image {
@@ -484,18 +482,6 @@
   position: relative;
   margin: 25px 0;
   border-radius: 10px;
-}
-.document-content[contenteditable="true"] .document-widget:hover {
-  outline: 1px solid var(--editor-line);
-  outline-offset: 4px;
-}
-.document-content[contenteditable="true"] .document-widget.is-selected {
-  outline: 1px solid var(--accent);
-  outline-offset: 4px;
-}
-/* Media owns its visible bounds; node selection and block handles still work. */
-.document-content[contenteditable="true"] .document-widget:is([data-widget-kind="video"], [data-widget-kind="audio"], [data-widget-kind="pdf"]):is(:hover, .is-selected) {
-  outline: none;
 }
 .block-handle {
   position: absolute;

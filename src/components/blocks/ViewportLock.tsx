@@ -133,11 +133,13 @@ export function ViewportLockButton({
   toggle,
   error = "",
   label,
+  unlockDescription = "允许缩放和移动",
 }: {
   locked: boolean;
   toggle: () => void;
   error?: string;
   label: string;
+  unlockDescription?: string;
 }) {
   const action = `${locked ? "解锁" : "锁定"}${label}`;
   return (
@@ -149,7 +151,7 @@ export function ViewportLockButton({
       aria-pressed={locked}
       title={
         error ||
-        `${action}：${locked ? "允许缩放和移动" : "保持视图，正常滚动阅读"}`
+        `${action}：${locked ? unlockDescription : "保持视图，正常滚动阅读"}`
       }
       onClick={toggle}
     >
