@@ -11,6 +11,7 @@ export const GUIDE_TOPICS = [
   "template-extraction",
   "versions",
   "history",
+  "sync",
   "export",
   "publish",
 ] as const;
@@ -26,6 +27,39 @@ const guides: Record<
     next?: string;
   }
 > = {
+  sync: {
+    purpose:
+      "Connect project-scoped servers, inspect synchronization, join invitations and retain complete history across devices.",
+    rules: [
+      "Servers manage projects with admin, editor and viewer roles. Identity and tokens are per server; each local project binds one server project and one account connection. There is no server administrator or owner role.",
+      "Settings → 服务器与同步 configures connections, the default storage for future projects, project accounts, invitation acceptance and the embedded project Dashboard. Existing local projects are attached explicitly; default changes do not upload existing projects.",
+      "Use real connection/project IDs returned by status/projects. Credentials come from password-file/token-file/registration-key-file or SHOWAI_SERVER_PASSWORD/SHOWAI_SERVER_TOKEN/SHOWAI_REGISTRATION_KEY. Outputs omit connection tokens. view register creates a password account; configured deployment currently supports password and token authentication.",
+      "The running desktop/browser workbench synchronizes in the background. A standalone Agent can explicitly invoke sync run after local writes; disconnected edits and revisions remain on disk. A local save is not proof of successful remote publication: inspect project status/error and remoteHead.",
+      "Project transfer includes formal history, source/compiled dependencies and archived readers. Shared local library Git IDs differ from remote snapshot IDs; syncOrigin preserves original time/actor/source revision/remote parents. Device paths and directory bindings remain local. Never upload the whole content library to share one project.",
+      "Viewer/revoked connections cannot commit project edits. Same-content A→B→A versions remain distinct. Concurrent independent fields merge; ambiguous changes retain base/local/remote files until explicitly resolved. Restoring an old page creates a new commit and syncs normally.",
+      "Invitations expire, are revocable and single-use; signing into an existing server account reuses that identity. Removing a local connection retains content and does not delete the server project. Account switching is restricted to the project's same server; other-server same-ID projects receive separate local IDs.",
+    ],
+    commands: [
+      "showai sync status --json",
+      "showai sync connect --url SERVER_URL --account ACCOUNT --password-file PRIVATE_FILE --json",
+      "showai sync connect --url SERVER_URL --account ACCOUNT --password-file PRIVATE_FILE --registration-key-file KEY_FILE --view register --json",
+      "showai sync default --connection CONNECTION_ID --json",
+      "showai sync projects --connection CONNECTION_ID --json",
+      "showai sync attach PROJECT --connection CONNECTION_ID --json",
+      "showai sync join --url INVITE_URL --connection CONNECTION_ID --json",
+      "showai sync subscribe REMOTE_PROJECT --connection CONNECTION_ID --json",
+      "showai sync account LOCAL_PROJECT --connection CONNECTION_ID --json",
+      "showai sync run --project LOCAL_PROJECT --json",
+      "showai sync conflict LOCAL_PROJECT --json",
+      "showai sync resolve LOCAL_PROJECT --input CHOICES_JSON --json",
+      "showai sync dashboard --connection CONNECTION_ID --project REMOTE_PROJECT --json",
+    ],
+    input: {
+      conflictChoices: {
+        "projects/LOCAL_PROJECT/pages/PAGE.json": "local or remote",
+      },
+    },
+  },
   history: {
     purpose:
       "Inspect attributed content history, search full content, merge drafts and restore exact versions safely.",

@@ -1,0 +1,16 @@
+{
+  "name": "showai-server",
+  "main": "../../dist-server/worker.mjs",
+  "compatibility_date": "2025-06-01",
+  "vars": { "SHOWAI_SERVER_NAME": "ShowAI Server" },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "showai-server",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+    },
+  ],
+  "r2_buckets": [
+    { "binding": "CONTENT", "bucket_name": "showai-server-content" },
+  ],
+}

@@ -19,6 +19,17 @@ export interface ChangeContext {
   restoredSnapshot?: { importId: string; snapshotId: string };
   /** Generated from validated API arguments before server dates/IDs are allocated. */
   requestFingerprint?: string;
+  /** Original project history received through the sync protocol; local Git IDs differ. */
+  syncOrigin?: {
+    serverId: string;
+    projectId: string;
+    revision: string;
+    parents: string[];
+    at: string;
+    sourceRevision?: string;
+    restoredFrom?: string;
+    mergedFrom?: string;
+  };
 }
 
 export interface HistoryResource {

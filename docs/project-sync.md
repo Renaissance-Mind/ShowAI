@@ -1,0 +1,54 @@
+# 项目服务器与同步
+
+ShowAI Server 按项目管理共享内容。每个项目使用管理员、编辑者、查看者三个角色，创建者是管理员，项目始终保留至少一位管理员。一个用户可以管理自己的项目，同时加入其他服务器上的项目。账号和设备 Token 属于服务器；项目成员记录决定权限。没有服务器管理员或所有者角色。
+
+设置中的「服务器与同步」管理服务器账号、默认存储、每个项目的账号连接和同步状态。管理员在同一页面的项目 Dashboard 中管理成员和邀请。改变默认连接只影响随后新建的项目，已有项目通过明确的连接操作上传。解除同步保留本地内容；移出成员阻止后续服务器访问，已下载副本仍由对方设备持有。
+
+## 部署
+
+两种部署使用 `src/server/app.ts` 中相同的 HTTP 请求处理器和 `src/sync/protocol.ts` 中相同的协议。Linux 使用 Node.js 24、SQLite 和磁盘对象存储；Cloudflare Workers 使用 D1 和私有 R2。客户端不依赖后端类型。服务器只存储、验证和分发内容，不执行上传的组件代码。
+
+```sh
+node scripts/build-server.mjs
+SHOWAI_SERVER_HOME=/absolute/private/data SHOWAI_SERVER_PORT=8788 node dist-server/server.mjs
+```
+
+Linux 环境变量：`SHOWAI_SERVER_HOST`（默认 `127.0.0.1`）、`SHOWAI_SERVER_PORT`（默认 `8788`）、`SHOWAI_SERVER_HOME`、`SHOWAI_SERVER_NAME`、`SHOWAI_SERVER_URL`、`SHOWAI_REGISTRATION_KEY`。URL 未配置时，邀请使用请求的服务器地址。注册密钥可选，持有有效邀请的新成员可以通过邀请注册。服务数据目录应仅供服务进程读写。
+
+`deployments/server/Dockerfile` 和 `compose.yml` 使用相同构建结果。挂载数据目录的 UID 需要允许容器内 UID 1000 写入。用户级 systemd 模板在 `deployments/server/showai-project-sync.service`，示例安装目录是 `~/services/showai-project-server`，运行时放在其中的 `runtime/`，服务配置放在权限为 0600 的 `server.env`。独立运行时不会替换系统 Node.js。
+
+Cloudflare 部署：
+
+```sh
+npx wrangler@4.148.0 d1 create showai-server
+npx wrangler@4.148.0 r2 bucket create showai-server-content
+# 将返回的数据库 ID 写入 deployments/cloudflare/wrangler.jsonc。
+npx wrangler@4.148.0 secret put SHOWAI_REGISTRATION_KEY --config deployments/cloudflare/wrangler.jsonc
+npx wrangler@4.148.0 deploy --config deployments/cloudflare/wrangler.jsonc
+```
+
+数据库表在首次请求时创建。若预先初始化，可使用构建生成的 `dist-server/schema.sql`。本地 Cloudflare 验收运行 `wrangler dev --local`，使用真实 D1/R2 本地实现，不替代 Linux 验收。当前代码没有进行真实 Cloudflare 账户下的远端部署。
+
+## 账户与项目权限
+
+当前支持账号密码注册、登录和已有 Token 连接。密码使用独立盐和 PBKDF2 摘要，设备 Token 随机生成，服务器保存 Token 摘要，设备可独立撤销。会话有效期为 180 天；过期后重新登录。GitHub/Google 登录尚未提供。账号密码与服务器注册密钥属于部署配置，客户端输出隐藏连接 Token。
+
+项目管理员可以邀请成员、改变权限、移出成员和归档项目；编辑者可以写入项目内容；查看者可以读取、下载和查看历史。服务端每次访问检查会话与当前成员权限。最后一位管理员不能退出或降级。所有已登录用户都可以创建自己的项目。
+
+邀请有效期为七天，可以撤销，默认只能由一个账号领取。同一账号重复确认同一邀请不会重复创建成员。邀请页面提供 `showai://join` 入口，也可以在 App 设置中粘贴链接。App 先展示服务器、项目和角色，用户确认并登录或注册后加入；加入不自动授予其他项目权限。
+
+## 同步与历史
+
+协议传输的是按项目提取的不可变快照和内容对象。首次连接传输完整正式项目历史，每个版本包含精确源码、编译依赖与捕获的历史阅读器；图片等数据使用摘要复用。工作台启动后每五秒检查服务器与本地版本；独立 CLI 可执行 `sync run`。保存成功只代表本地提交，`sync status` 返回的项目状态、错误与 remoteHead 用于核对服务器发布。
+
+当前传输协议为 `showai-project-sync-v2`，键排序采用语言无关的 UTF-16 顺序，中文和英文设备生成相同摘要。读取保留 v1 历史兼容；旧格式记录按原服务器保存的序列化内容验证。客户端和服务端需要使用匹配的当前协议。
+
+每个快照记录父快照、来源时间、actor、入口、操作 ID 和来源 Git revision。本地内容库共用 Git，而服务器按项目隔离，因此接收端的本地 Git revision 与源设备及云端快照 revision 不相同。`syncOrigin` 保留来源身份、原始时间和远端父版本，历史界面标记同步来源。接收端的本地父提交表示实际导入过程。客户端提供的 actor 与时间是来源记录，服务器会另外记录实际提交账号与接收时间。
+
+服务器先验证并保存对象，再用数据库条件更新发布版本；D1/SQLite 与对象存储之间没有跨系统事务。失败可能留下未发布对象或历史分支，当前不会自动删除这些内容。并发发布失败会保留上传版本。离线修改从本地 Git 历史重新发现；下载对象、快照、连接状态和冲突保存于内容库的 `local/sync/`。
+
+导入前会保存完整合并恢复计划及其内容摘要，按版本逐条回放历史，避免把全部历史正文同时放入内存。客户端在历史回放中或本地合并完成后被强制结束，下一次同步从保存的计划恢复并重试发布；恢复计划完成后才清除。尚有待恢复的合并计划时，解除连接会明确提示先完成恢复，保留全部数据。Linux 对象文件和目录在发布数据库指针前完成持久写入。
+
+不同字段的页面修改通过现有结构化合并处理；同处编辑保留基准、本地和服务器版本，确认选择后产生新的合并版本。恢复历史通过现有恢复动作创建新本地提交，再同步到服务器。目录路径与 Agent 目录绑定只保存在设备上。不同服务器中相同的项目 ID 可以映射为不同的本地 ID；同一服务器项目切换账号复用本地项目。
+
+项目同步包括正式提交内容和项目自己的旧格式导入检查点；旧检查点保留原始字节、已捕获的阅读器及未知的时间、作者和顺序，迁移描述只包含该项目。尚未提交的编辑器草稿仍保存在所属设备。当前单对象上传上限为 64 MB，超限明确报错并保留本地内容。同步数据不包含全局侧栏组织、其他项目、设备登录凭证或本机运行配置。

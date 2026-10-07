@@ -37,6 +37,12 @@ export function readerBindingPath(pagePath: string) {
     return `${pagePath.slice(0, -5)}/reader.json`;
   if (/^imports\/[a-f0-9-]{36}\/snapshots\/[a-f0-9]{64}\.json$/.test(pagePath))
     return `${pagePath.slice(0, -5)}.reader.json`;
+  if (
+    /^projects\/[^/]+\/history\/imports\/[a-f0-9-]{36}\/snapshots\/[a-f0-9]{64}\.json$/.test(
+      pagePath,
+    )
+  )
+    return `${pagePath.slice(0, -5)}.reader.json`;
   throw new CoreError(
     "INVALID_PATH",
     "A reader binding requires a page or an imported snapshot.",

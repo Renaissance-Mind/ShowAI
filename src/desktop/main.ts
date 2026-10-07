@@ -18,6 +18,7 @@ import { randomUUID } from "node:crypto";
 import { tabShortcut } from "../workbench/tab-shortcuts";
 import { AgentService, errorResult } from "../agent/service";
 import { MaintenanceScheduler } from "../core/maintenance-scheduler";
+import { syncManager } from "../sync/manager";
 import { openLibrary } from "../core/open-library";
 import { registerRuntime } from "../agent/runtime";
 import { assertId, CoreError, FileStore } from "../core/store";
@@ -90,6 +91,7 @@ function broadcast(type: DesktopChange["type"], change?: DesktopChange): void {
 }
 
 async function useHome(home?: string): Promise<void> {
+  if (store) await syncManager(store.root).stop();
   await maintenance?.stop();
   await watcher?.close();
   store = new FileStore(home);
@@ -97,6 +99,7 @@ async function useHome(home?: string): Promise<void> {
   service = new AgentService({ root: store.root });
   await registerRuntime(store.root, info().cli);
   maintenance = new MaintenanceScheduler(store.root).start();
+  syncManager(store.root).start();
   watcher = watch(store.root, {
     ignoreInitial: true,
     depth: 9,
@@ -308,8 +311,9 @@ function requestClose(window: BrowserWindow): Promise<boolean> {
 }
 
 async function createWindow(page?: {
-  projectId: string;
-  pageId: string;
+  projectId?: string;
+  pageId?: string;
+  invite?: string;
 }): Promise<BrowserWindow> {
   const window = new BrowserWindow({
     width: page ? 1120 : 1320,
@@ -394,9 +398,12 @@ async function createWindow(page?: {
       event.preventDefault();
   });
   window.once("ready-to-show", () => window.show());
-  const query: Record<string, string> = page
-    ? { project: page.projectId, page: page.pageId, focus: "1" }
-    : {};
+  const query: Record<string, string> =
+    page?.projectId && page.pageId
+      ? { project: page.projectId, page: page.pageId, focus: "1" }
+      : page?.invite
+        ? { invite: page.invite }
+        : {};
   if (process.env.SHOWAI_DEV_URL) {
     const url = new URL(process.env.SHOWAI_DEV_URL);
     for (const [key, value] of Object.entries(query))
@@ -408,6 +415,22 @@ async function createWindow(page?: {
 
 async function openDeepLink(source: string): Promise<void> {
   const url = new URL(source);
+  if (url.protocol === "showai:" && url.hostname === "join") {
+    const server = new URL(url.searchParams.get("server") ?? ""),
+      invite = url.searchParams.get("invite");
+    if (
+      !["http:", "https:"].includes(server.protocol) ||
+      server.username ||
+      server.password ||
+      !invite ||
+      !/^[a-f0-9]{64}$/.test(invite)
+    )
+      throw new CoreError("INVALID_PATH", "项目邀请链接无效。");
+    const link = new URL("/join", server.origin);
+    link.hash = `invite=${invite}`;
+    await createWindow({ invite: link.toString() });
+    return;
+  }
   const parts = url.pathname.split("/").filter(Boolean);
   if (
     url.protocol !== "showai:" ||
@@ -612,6 +635,7 @@ else {
       clearTimeout(notification);
       await watcher?.close();
       await maintenance?.stop();
+      await syncManager(store.root).stop();
       for (const window of windows) if (!window.isDestroyed()) window.destroy();
       app.quit();
     });

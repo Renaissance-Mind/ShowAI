@@ -1,0 +1,14 @@
+services:
+  showai:
+    build:
+      context: ../..
+      dockerfile: deployments/server/Dockerfile
+    ports:
+      - "8788:8788"
+    environment:
+      SHOWAI_SERVER_NAME: ${SHOWAI_SERVER_NAME:-ShowAI Server}
+      SHOWAI_SERVER_URL: ${SHOWAI_SERVER_URL:-http://localhost:8788}
+      SHOWAI_REGISTRATION_KEY: ${SHOWAI_REGISTRATION_KEY:-}
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

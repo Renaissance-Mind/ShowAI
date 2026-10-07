@@ -186,6 +186,7 @@ export class LibraryOperations {
     document: ShowDocument,
     projectId: string,
     sourceRevision: string,
+    extraRefs: PackageRevisionRef[] = [],
   ): Promise<{ components: CompiledComponent[]; files: Map<string, Buffer> }> {
     const tree = await this.library.tree(sourceRevision),
       paths = new Set(tree.map((entry) => entry.path));
@@ -261,6 +262,7 @@ export class LibraryOperations {
         ...(ref.scope ? { scope: ref.scope } : {}),
       }),
     );
+    refs.push(...extraRefs);
     for (const ref of refs) await walk(ref, 0);
     for (const root of refs)
       validatePackageBundle({
@@ -271,6 +273,149 @@ export class LibraryOperations {
         templates,
       });
     return { components, files };
+  }
+
+  /** Complete project projection with only its precise shared dependencies and readers. */
+  async projectFiles(
+    projectId: string,
+    sourceRevision: string,
+  ): Promise<Map<string, Buffer>> {
+    const project = this.project(projectId)!;
+    const tree = await this.library.tree(sourceRevision);
+    const paths = tree
+      .map((entry) => entry.path)
+      .filter(
+        (path) =>
+          path.startsWith(`projects/${project}/`) &&
+          !/\/pages\/[^/]+\/nodes\//.test(path) &&
+          !path.includes("/.sync/"),
+      );
+    const files = await this.library.readFiles(paths, sourceRevision);
+    for (const [path, bytes] of [...files]) {
+      if (path.endsWith("/reader.json") || path.endsWith(".reader.json")) {
+        const binding = JSON.parse(bytes.toString()) as ReaderBinding;
+        if (binding.format === "showai-page-reader") {
+          const roots = tree
+            .filter((entry) =>
+              entry.path.startsWith(`runtimes/readers/${binding.integrity}/`),
+            )
+            .map((entry) => entry.path);
+          for (const [name, content] of await this.library.readFiles(
+            roots,
+            sourceRevision,
+          ))
+            files.set(name, content);
+        }
+      }
+      if (/^projects\/[^/]+\/pages\/[^/]+\.json$/.test(path)) {
+        const document = parseArtifact(JSON.parse(bytes.toString())).document;
+        const closure = await this.dependencies(
+          document,
+          project,
+          sourceRevision,
+        );
+        for (const [name, content] of closure.files) files.set(name, content);
+        const reader = await this.readerAt(path, sourceRevision);
+        if (reader)
+          for (const [name, content] of reader.files) files.set(name, content);
+      }
+      if (/\/(?:compiled|template)\.json$/.test(path)) {
+        const record = JSON.parse(bytes.toString()) as
+          CompiledComponent | TemplateRecord;
+        if (record.dependencies?.length) {
+          const document = {
+            content: {
+              type: "surface",
+              attrs: { id: "sync-dependencies", kind: "page" },
+              content: [],
+            },
+          } as unknown as ShowDocument;
+          const closure = await this.dependencies(
+            document,
+            project,
+            sourceRevision,
+            record.dependencies,
+          );
+          for (const [name, content] of closure.files) files.set(name, content);
+        }
+      }
+    }
+    const metadataPath = `projects/${project}/project.json`;
+    const metadata = JSON.parse(files.get(metadataPath)!.toString());
+    // Host paths and Agent directory bindings remain device-local.
+    delete metadata.sourceDirectory;
+    delete metadata.binding;
+    delete metadata.bindings;
+    files.set(
+      metadataPath,
+      Buffer.from(JSON.stringify(metadata, null, 2) + "\n"),
+    );
+    const available = new Set(tree.map((entry) => entry.path));
+    for (const entry of tree.filter((entry) =>
+      /^imports\/[a-f0-9-]{36}\/manifest\.json$/.test(entry.path),
+    )) {
+      const descriptor = JSON.parse(
+        (await this.library.readFile(entry.path, sourceRevision)).toString(),
+      ) as LibraryImportReport;
+      const snapshots = descriptor.snapshots.filter(
+        (snapshot) => snapshot.projectId === project,
+      );
+      if (!snapshots.length) continue;
+      const target = `projects/${project}/history/imports/${descriptor.id}`;
+      const projected = [];
+      for (const snapshot of snapshots) {
+        const copy = { ...snapshot };
+        const original = `imports/${descriptor.id}/originals/${snapshot.originalHash}.gz`;
+        if (available.has(original))
+          files.set(
+            `${target}/originals/${snapshot.originalHash}.gz`,
+            await this.library.readFile(original, sourceRevision),
+          );
+        if (snapshot.path && available.has(snapshot.path)) {
+          const bytes = await this.library.readFile(
+              snapshot.path,
+              sourceRevision,
+            ),
+            path = `${target}/snapshots/${snapshot.id}.json`;
+          const document = parseArtifact(JSON.parse(bytes.toString())).document;
+          files.set(path, bytes);
+          copy.path = path;
+          const closure = await this.dependencies(
+            document,
+            project,
+            sourceRevision,
+          );
+          for (const [name, content] of closure.files) files.set(name, content);
+          const reader = await this.readerAt(snapshot.path, sourceRevision);
+          if (reader)
+            for (const [name, content] of reader.files)
+              files.set(
+                name === readerBindingPath(snapshot.path)
+                  ? readerBindingPath(path)
+                  : name,
+                content,
+              );
+        }
+        projected.push(copy);
+      }
+      files.set(
+        `${target}/manifest.json`,
+        Buffer.from(
+          JSON.stringify(
+            {
+              format: descriptor.format,
+              version: descriptor.version,
+              id: descriptor.id,
+              preparedAt: descriptor.preparedAt,
+              snapshots: projected,
+            },
+            null,
+            2,
+          ),
+        ),
+      );
+    }
+    return files;
   }
 
   async pageAt(
@@ -425,8 +570,11 @@ export class LibraryOperations {
     if (pageId) assertId(pageId);
     const head = await this.library.head();
     if (!head) return [];
-    const manifests = (await this.library.tree(head)).filter((entry) =>
-      /^imports\/[a-f0-9-]{36}\/manifest\.json$/.test(entry.path),
+    const manifests = (await this.library.tree(head)).filter(
+      (entry) =>
+        /^imports\/[a-f0-9-]{36}\/manifest\.json$/.test(entry.path) ||
+        (entry.path.startsWith(`projects/${projectId}/history/imports/`) &&
+          entry.path.endsWith("/manifest.json")),
     );
     const result = [];
     for (const entry of manifests) {
@@ -478,8 +626,13 @@ export class LibraryOperations {
         "INVALID_DATA",
         `This old snapshot is retained as original bytes but cannot be rendered: ${snapshot.issue ?? "missing content"}`,
       );
-    const path = `imports/${ref.importId}/snapshots/${ref.snapshotId}.json`;
-    if (snapshot.path !== path || !/^[a-f0-9]{64}$/.test(ref.snapshotId))
+    const traditional = `imports/${ref.importId}/snapshots/${ref.snapshotId}.json`,
+      scoped = `projects/${projectId}/history/imports/${ref.importId}/snapshots/${ref.snapshotId}.json`;
+    const path = snapshot.path;
+    if (
+      (path !== traditional && path !== scoped) ||
+      !/^[a-f0-9]{64}$/.test(ref.snapshotId)
+    )
       throw new CoreError("INVALID_DATA", "Invalid imported snapshot path.");
     const document = normalizeDocument(
       parseArtifact(
@@ -521,7 +674,10 @@ export class LibraryOperations {
   ) {
     const page = await this.importedPage(projectId, pageId, ref),
       reader = await this.readerAt(
-        `imports/${ref.importId}/snapshots/${ref.snapshotId}.json`,
+        page.path
+          .slice(this.library.workspace.length + 1)
+          .split(/[\\/]/)
+          .join("/"),
         page.sourceRevision,
       );
     if (!reader)

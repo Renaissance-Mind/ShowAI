@@ -6,6 +6,7 @@ import { withChangeContext } from "../core/history-context";
 import { mutateLibrary } from "../core/library-runtime";
 import { canonicalJson } from "../core/diff";
 import { GitLibrary } from "../core/git-library";
+import { syncManager } from "../sync/manager";
 import { openLibrary } from "../core/open-library";
 import { LibraryImport } from "../core/library-import";
 import {
@@ -54,7 +55,7 @@ Start with one project:
   pages list --project PROJECT
 
 Discover only what you need:
-  guide [workspace|reading|authoring|containers|document|catalog|component|templates|versions|history|export|publish]
+  guide [workspace|reading|authoring|containers|document|catalog|component|templates|versions|history|sync|export|publish]
   catalog list [--kind component|template] [--scope SCOPE] [--limit 20]
   catalog describe ID [--kind component|template] [--view VIEW]
 
@@ -155,6 +156,12 @@ function parseArguments(args: string[]): Arguments {
     "height",
     "state",
     "rendered",
+    "connection",
+    "account",
+    "password-file",
+    "token-file",
+    "registration-key-file",
+    "invite",
   ]);
   for (let index = 0; index < args.length; index++) {
     const argument = args[index];
@@ -354,10 +361,77 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
           export: "export",
           publish: "publish",
           mcp: "workspace",
+          sync: "sync",
         } as Record<string, string>
       )[command],
     );
   switch (command) {
+    case "sync": {
+      const manager = syncManager(service.store.root);
+      const credential = async (fileOption: string, environment: string) => {
+        const path = option(args, fileOption);
+        return path
+          ? (await readFile(resolve(path), "utf8")).trim()
+          : process.env[environment];
+      };
+      if (action === "status") return manager.status();
+      if (action === "connect")
+        return manager.connect({
+          url: option(args, "url", true)!,
+          account: option(args, "account"),
+          password: await credential("password-file", "SHOWAI_SERVER_PASSWORD"),
+          token: await credential("token-file", "SHOWAI_SERVER_TOKEN"),
+          registrationKey: await credential(
+            "registration-key-file",
+            "SHOWAI_REGISTRATION_KEY",
+          ),
+          register: option(args, "view") === "register",
+          invite: option(args, "invite"),
+        });
+      if (action === "default")
+        return manager.setDefault(option(args, "connection") ?? null);
+      if (action === "projects")
+        return manager.remoteProjects(option(args, "connection", true)!);
+      if (action === "attach")
+        return manager.attach(
+          option(args, "connection", true)!,
+          id ?? (await project()),
+        );
+      if (action === "join")
+        return manager.join(
+          option(args, "connection", true)!,
+          option(args, "url", true)!,
+        );
+      if (action === "subscribe")
+        return manager.subscribe(option(args, "connection", true)!, id);
+      if (action === "detach") return manager.detach(id ?? (await project()));
+      if (action === "account")
+        return manager.changeAccount(
+          id ?? (await project()),
+          option(args, "connection", true)!,
+        );
+      if (action === "run") return manager.run(option(args, "project"));
+      if (action === "conflict")
+        return manager.conflict(id ?? (await project()));
+      if (action === "resolve")
+        return manager.resolveConflict(
+          id ?? (await project()),
+          (await readJson(option(args, "input", true)!)) as Record<
+            string,
+            "local" | "remote"
+          >,
+        );
+      if (action === "dashboard")
+        return manager.dashboard(
+          option(args, "connection", true)!,
+          option(args, "project"),
+        );
+      if (action === "disconnect")
+        return manager.disconnect(option(args, "connection", true)!);
+      throw new Error(
+        "Use sync status/connect/default/projects/attach/join/subscribe/detach/account/run/conflict/resolve/dashboard/disconnect.",
+      );
+    }
     case "library": {
       if (action === "stats") {
         requireCount(args, 2);

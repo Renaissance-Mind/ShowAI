@@ -15,8 +15,14 @@ import type { DesktopInfo } from "../desktop/bridge";
 import "./settings.css";
 import LibrarySpace from "./LibrarySpace";
 import IconViewer from "./IconViewer";
+import SyncSettings from "./SyncSettings";
 
 const sections = [
+  {
+    id: "sync",
+    label: "服务器与同步",
+    icon: Folder,
+  },
   {
     id: "general",
     label: "通用",
@@ -127,6 +133,7 @@ export function SettingsPanel({
         <h2>{current.label}</h2>
       </header>
       {section === "icons" && <IconViewer />}
+      {section === "sync" && <SyncSettings />}
       {section === "general" && (
         <section
           className="settings-group"

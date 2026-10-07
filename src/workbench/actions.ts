@@ -1,4 +1,5 @@
 import { validatePageIcon } from "../lib/page-icon.mjs";
+import { syncManager } from "../sync/manager";
 import {
   upgradeResource,
   createResource,
@@ -70,6 +71,25 @@ import type { ComponentManifest, JsonSchema } from "../components/custom/types";
 import type { DesktopInfo } from "../desktop/bridge";
 
 export const workbenchActions = new Set([
+  "sync:status",
+  "sync:connect",
+  "sync:default",
+  "sync:disconnect",
+  "sync:projects",
+  "sync:attach",
+  "sync:subscribe",
+  "sync:detach",
+  "sync:previewInvite",
+  "sync:join",
+  "sync:dashboard",
+  "sync:manage",
+  "sync:run",
+  "sync:conflict",
+  "sync:resolve",
+  "sync:sessions",
+  "sync:revokeToken",
+  "sync:createProject",
+  "sync:changeAccount",
   "app:info",
   "library:storage",
   "library:compact",
@@ -292,6 +312,9 @@ export function createWorkbench(
   }
 
   async function enrichPage(id: string, record: PageRecord, known?: unknown) {
+    const projectConnection = (
+      await syncManager(store.root).configuration()
+    ).projects.find((project) => project.projectId === id);
     const components = await resolveDocumentComponents(
       store.root,
       record.document,
@@ -320,6 +343,9 @@ export function createWorkbench(
       );
     return {
       ...record,
+      readOnly:
+        projectConnection?.role === "viewer" ||
+        projectConnection?.status === "revoked",
       components: reused ? [] : components,
       ...(reused ? { reuseComponents: true } : {}),
     };
@@ -350,6 +376,93 @@ export function createWorkbench(
     action: string,
     args: Record<string, unknown>,
   ): Promise<unknown> {
+    if (action.startsWith("sync:")) {
+      const sync = syncManager(store.root);
+      sync.start();
+      switch (action) {
+        case "sync:status":
+          return sync.status();
+        case "sync:connect":
+          return sync.connect(
+            args as unknown as Parameters<typeof sync.connect>[0],
+          );
+        case "sync:default":
+          return sync.setDefault(
+            args.connectionId === null ? null : required(args, "connectionId"),
+          );
+        case "sync:disconnect":
+          return sync.disconnect(required(args, "connectionId"));
+        case "sync:projects":
+          return sync.remoteProjects(required(args, "connectionId"));
+        case "sync:attach":
+          return sync.attach(required(args, "connectionId"), projectId(args));
+        case "sync:subscribe":
+          return sync.subscribe(
+            required(args, "connectionId"),
+            required(args, "remoteProjectId"),
+          );
+        case "sync:detach":
+          return sync.detach(projectId(args));
+        case "sync:changeAccount":
+          return sync.changeAccount(
+            projectId(args),
+            required(args, "connectionId"),
+          );
+        case "sync:previewInvite":
+          return sync.previewInvite(required(args, "link"));
+        case "sync:join":
+          return sync.join(
+            required(args, "connectionId"),
+            required(args, "link"),
+          );
+        case "sync:dashboard":
+          return sync.dashboard(
+            required(args, "connectionId"),
+            text(args, "projectId", true),
+          );
+        case "sync:manage": {
+          const operation = required(args, "operation");
+          if (
+            !["invite", "member", "revokeInvite", "project"].includes(
+              operation,
+            ) ||
+            !args.input ||
+            typeof args.input !== "object" ||
+            Array.isArray(args.input)
+          )
+            throw new CoreError("INVALID_DATA", "无效的项目管理操作。");
+          return sync.manage(
+            required(args, "connectionId"),
+            projectId(args),
+            operation as "invite" | "member" | "revokeInvite" | "project",
+            args.input as Record<string, unknown>,
+          );
+        }
+        case "sync:run":
+          return sync.run(text(args, "projectId", true));
+        case "sync:conflict":
+          return sync.conflict(projectId(args));
+        case "sync:resolve":
+          return sync.resolveConflict(
+            projectId(args),
+            args.choices as Record<string, "local" | "remote">,
+          );
+        case "sync:sessions":
+          return sync.sessions(required(args, "connectionId"));
+        case "sync:revokeToken":
+          return sync.revokeToken(
+            required(args, "connectionId"),
+            required(args, "digest"),
+          );
+        case "sync:createProject": {
+          const project = await store.createProject({
+            name: required(args, "name"),
+          });
+          await sync.attach(required(args, "connectionId"), project.id);
+          return project;
+        }
+      }
+    }
     switch (action) {
       case "library:storage":
         return new LibraryMaintenance(store.root).storage({
@@ -551,7 +664,9 @@ export function createWorkbench(
           required(args, "revision"),
         );
       case "projects:list":
-        return store.listProjects();
+        return store.listProjects({
+          includeArchived: args.includeArchived === true,
+        });
       case "sidebar:get":
         return store.readSidebar();
       case "sidebar:moveProject": {

@@ -17,6 +17,7 @@ import { watch } from "chokidar";
 import { version } from "../../package.json";
 import { AgentService, errorResult } from "../agent/service";
 import { MaintenanceScheduler } from "../core/maintenance-scheduler";
+import { syncManager } from "../sync/manager";
 import { openLibrary } from "../core/open-library";
 import { registerRuntime } from "../agent/runtime";
 import { CoreError, FileStore, assertId } from "../core/store";
@@ -99,12 +100,14 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       );
   };
   async function useHome(home: string) {
+    await syncManager(store.root).stop();
     await maintenance?.stop();
     store = new FileStore(home);
     await openLibrary(store.root);
     service = new AgentService({ root: store.root });
     await registerRuntime(store.root, info().cli);
     maintenance = new MaintenanceScheduler(store.root).start();
+    syncManager(store.root).start();
     watcher = watch(store.root, {
       ignoreInitial: true,
       depth: 9,
@@ -487,6 +490,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     throw error;
   }
   async function close() {
+    await syncManager(store.root).stop();
     if (closed) return;
     closed = true;
     clearInterval(heartbeat);

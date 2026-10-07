@@ -228,6 +228,35 @@ export default function Studio() {
     anchor: HTMLElement;
   } | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [syncReadOnly, setSyncReadOnly] = useState<boolean | undefined>();
+  useEffect(() => {
+    let active = true;
+    setSyncReadOnly(undefined);
+    const refreshPermission = async () => {
+      const state = await desktop.invoke<{
+        projects: { projectId: string; role: string; status: string }[];
+      }>("sync:status");
+      const connection = state.projects.find(
+        (project) => project.projectId === selectedProject,
+      );
+      if (active)
+        setSyncReadOnly(
+          connection?.role === "viewer" || connection?.status === "revoked",
+        );
+    };
+    void refreshPermission().catch((error) =>
+      console.error("无法更新项目同步权限", error),
+    );
+    const timer = setInterval(() => {
+      void refreshPermission().catch((error) =>
+        console.error("无法更新项目同步权限", error),
+      );
+    }, 3000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [selectedProject, info?.home]);
   const [contents, setContents] = useState<
     Record<string, { pages: PageSummary[]; folders: FolderMetadata[] }>
   >({});
@@ -248,9 +277,14 @@ export default function Studio() {
   const folders = selectedProject
     ? (contents[selectedProject]?.folders ?? [])
     : [];
-  const [view, setView] = useState<View>("projects");
-  const [settingsSection, setSettingsSection] =
-    useState<SettingsSection>("general");
+  const [view, setView] = useState<View>(() =>
+    new URLSearchParams(location.search).has("invite")
+      ? "settings"
+      : "projects",
+  );
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>(() =>
+    new URLSearchParams(location.search).has("invite") ? "sync" : "general",
+  );
   const [templates, setTemplates] = useState<TemplateMetadata[]>([]);
   const [templateType, setTemplateType] = useState<TemplateType>("all");
   const [catalog, setCatalog] = useState<Catalog>({ builtin: [], custom: [] });
@@ -1653,6 +1687,7 @@ export default function Studio() {
               <input
                 className="studio-page-title-input"
                 aria-label="页面标题"
+                readOnly={syncReadOnly ?? page.record?.readOnly}
                 placeholder="无标题"
                 value={page.draft?.title ?? ""}
                 maxLength={1000}
@@ -2153,8 +2188,9 @@ export default function Studio() {
                   components={page.record?.components ?? []}
                 >
                   <SurfaceEditor
-                    key={`${page.draft.id}:${page.renderVersion}`}
+                    key={`${info?.home}:${selectedProject}:${page.draft.id}:${page.renderVersion}`}
                     document={page.draft}
+                    readOnly={syncReadOnly ?? page.record?.readOnly}
                     onControlsChange={setEditorControls}
                     revealId={revealNode}
                     onActiveSurfaceChange={(surfaceId) => {

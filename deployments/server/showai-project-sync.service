@@ -1,0 +1,14 @@
+[Unit]
+Description=ShowAI project synchronization server
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/services/showai-project-server
+EnvironmentFile=%h/services/showai-project-server/server.env
+ExecStart=%h/services/showai-project-server/runtime/bin/node %h/services/showai-project-server/dist-server/server.mjs
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

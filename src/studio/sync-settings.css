@@ -1,0 +1,141 @@
+.sync-settings {
+  display: grid;
+  gap: 6px;
+}
+.sync-settings input:not([type="radio"]),
+.sync-settings select {
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  min-width: 0;
+}
+.sync-settings select {
+  max-width: 250px;
+}
+.sync-connection,
+.sync-project-heading,
+.sync-inline-form,
+.sync-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.sync-connection {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.sync-connection:last-of-type {
+  margin-bottom: 14px;
+}
+.sync-project {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.sync-settings .settings-row-text {
+  min-width: 170px;
+}
+.sync-settings .settings-row-text p {
+  overflow-wrap: anywhere;
+}
+.sync-settings h3 {
+  font-size: 13px;
+  font-weight: 500;
+}
+.sync-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 18px 0;
+}
+.sync-form label {
+  display: grid;
+  gap: 7px;
+  font-size: 12px;
+}
+.sync-form label:first-child {
+  grid-column: 1 / -1;
+}
+.sync-form .settings-button {
+  justify-self: start;
+  align-self: end;
+}
+.sync-inline-form {
+  margin: 14px 0;
+}
+.sync-inline-form > input {
+  flex: 1;
+  min-width: 180px;
+}
+.sync-error {
+  color: var(--danger, #c73e40) !important;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.sync-message {
+  color: var(--accent);
+  font-size: 12px;
+}
+.sync-invitation {
+  margin-top: 14px;
+  border-left: 2px solid var(--accent);
+  padding: 1px 16px;
+}
+.sync-invitation p {
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.sync-section-heading {
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+.sync-section-heading h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+.sync-dashboard {
+  padding-top: 8px !important;
+}
+.sync-conflict-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.sync-conflict-columns label {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+}
+.sync-conflict pre {
+  max-height: 220px;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .sync-form,
+  .sync-conflict-columns {
+    grid-template-columns: 1fr;
+  }
+  .sync-settings .settings-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .sync-project-heading {
+    align-items: flex-start;
+  }
+}

@@ -856,6 +856,32 @@ export class GitLibrary {
     }
     const existing = await this.tree(parent ?? undefined);
     changes = new Map(changes);
+    if (!context.syncOrigin) {
+      const syncConfig = await readFile(
+        join(this.root, "local", "sync", "config.json"),
+        "utf8",
+      ).then(
+        (value) =>
+          JSON.parse(value) as {
+            projects: { projectId: string; role: string; status: string }[];
+          },
+        (error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") return undefined;
+          throw error;
+        },
+      );
+      for (const path of changes.keys()) {
+        const projectId = path.match(/^projects\/([^/]+)\//)?.[1];
+        const connection = syncConfig?.projects.find(
+          (project) => project.projectId === projectId,
+        );
+        if (connection?.role === "viewer" || connection?.status === "revoked")
+          throw new CoreError(
+            "CONFLICT",
+            "当前账号没有该项目的编辑权限，修改已保留为本地草稿。",
+          );
+      }
+    }
     await completePageReaders(changes, async (path) => {
       if (!parent)
         throw new CoreError(
@@ -892,7 +918,7 @@ export class GitLibrary {
       operationId,
       requestHash,
       ...(response ? { response } : {}),
-      at: new Date().toISOString(),
+      at: context.syncOrigin?.at ?? new Date().toISOString(),
       paths: [...changes.keys()].map(assertPath),
       resources: [
         ...new Map(
@@ -1251,6 +1277,37 @@ export class GitLibrary {
       { ...context, restoredFrom: revision },
       expected,
     );
+  }
+
+  /** Import under one writer lease. Every input remains recoverable through normal journals. */
+  async replayImported(
+    entries:
+      | Iterable<{ changes: FileChanges; context: ChangeContext }>
+      | AsyncIterable<{ changes: FileChanges; context: ChangeContext }>,
+    expectedHead: string | null,
+  ): Promise<HistoryEntry[]> {
+    return withLibraryLock(this.root, async () => {
+      await this.recoverUnlocked();
+      if ((await this.head()) !== expectedHead)
+        throw new CoreError(
+          "CONFLICT",
+          "Local content changed while downloading project history. Retry synchronization.",
+        );
+      const result: HistoryEntry[] = [];
+      for await (const entry of entries) {
+        if (
+          !entry.context.syncOrigin ||
+          !Number.isFinite(Date.parse(entry.context.syncOrigin.at))
+        )
+          throw new CoreError(
+            "INVALID_DATA",
+            "Imported history requires its original timestamp and source identity.",
+          );
+        const written = await this.writeUnlocked(entry.changes, entry.context);
+        if (written) result.push(written);
+      }
+      return result;
+    });
   }
 
   async compact(): Promise<{ before: string; after: string }> {

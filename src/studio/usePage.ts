@@ -10,6 +10,7 @@ import type { EditorDraftRecord } from "../core/editor-drafts";
 export interface LoadedPage extends PageRecord {
   components: CompiledComponent[];
   reuseComponents?: boolean;
+  readOnly?: boolean;
 }
 export type SaveStatus = "saved" | "saving" | "changed" | "conflict" | "error";
 

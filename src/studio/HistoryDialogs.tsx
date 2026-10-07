@@ -464,6 +464,7 @@ export function HistoryDialog({
               </span>
               <small>
                 {entry.resources.length} 项内容
+                {entry.syncOrigin ? " · 来自项目同步" : ""}
                 {entry.groupId && entries[index + 1]?.groupId === entry.groupId
                   ? " · 连续编辑"
                   : ""}

@@ -15,6 +15,11 @@ plugins/showai/scripts/render-artifact.mjs
 plugins/showai/skills/show-document/examples/
 
 dist-agent/
+dist-server/
+showai-server-data/
+deployments/server/data/
+deployments/server/.env
+deployments/cloudflare/.wrangler/
 dist-runtime/
 dist-desktop/
 release/
