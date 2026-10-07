@@ -1,18 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="showai-light-title showai-light-description">
   <title id="showai-light-title">ShowAI information funnel — light</title>
-  <desc id="showai-light-description">A wide funnel with neutral sides and a continuous violet gradient that darkens downward through RGB(18, 10, 143). The curves cross near the bottom and meet the frame.</desc>
+  <desc id="showai-light-description">A wide funnel with neutral sides and a continuous violet gradient that darkens downward through RGB(18, 10, 143). The curves form a broad waist at 71.5 percent of the height, then open into a larger lower section that meets the frame.</desc>
   <defs>
     <linearGradient id="showai-light-region-1" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
       <stop offset="0%" stop-color="#C8C2F1"/>
       <stop offset="50%" stop-color="#7465CD"/>
-      <stop offset="83.203125%" stop-color="#120A8F"/>
+      <stop offset="71.484375%" stop-color="#120A8F"/>
       <stop offset="100%" stop-color="#090447"/>
     </linearGradient>
     <clipPath id="showai-light-frame"><rect width="512" height="512" rx="88"/></clipPath>
   </defs>
   <g clip-path="url(#showai-light-frame)">
-    <path id="showai-light-center" d="M -64 0 H 576 C 468 0 352 96 310 246 C 277 352 267 384 256 426 C 245 470 227 497 208 512 H 304 C 285 497 267 470 256 426 C 245 384 235 352 202 246 C 160 96 44 0 -64 0 Z" fill="url(#showai-light-region-1)" fill-rule="evenodd"/>
-    <path id="showai-light-left" d="M -64 0 C 44 0 160 96 202 246 C 235 352 245 384 256 426 C 245 470 227 497 208 512 H 0 V 0 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.5"/>
-    <path id="showai-light-right" d="M 576 0 C 468 0 352 96 310 246 C 277 352 267 384 256 426 C 267 470 285 497 304 512 H 512 V 0 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.5"/>
+    <path id="showai-light-center" d="M -64 0 H 576 C 468 0 352 96 316 226 C 292 302 284 330 284 366 C 284 421 311 478 342 512 H 170 C 201 478 228 421 228 366 C 228 330 220 302 196 226 C 160 96 44 0 -64 0 Z" fill="url(#showai-light-region-1)"/>
+    <path id="showai-light-left" d="M -64 0 C 44 0 160 96 196 226 C 220 302 228 330 228 366 C 228 421 201 478 170 512 H 0 V 0 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.5"/>
+    <path id="showai-light-right" d="M 576 0 C 468 0 352 96 316 226 C 292 302 284 330 284 366 C 284 421 311 478 342 512 H 512 V 0 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.5"/>
   </g>
 </svg>
