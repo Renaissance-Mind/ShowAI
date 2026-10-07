@@ -47,6 +47,34 @@ describe("file-first project store", () => {
     );
   });
 
+  it("persists project icons, preserves them on rename and clears them without changing pages", async () => {
+    const created = await store.createProject({
+      name: "Icon project",
+      icon: "🧪",
+    });
+    const page = await store.createPage(created.id, {
+      title: "Keep this page",
+    });
+    const reopened = new FileStore(store.root);
+    expect((await reopened.listProjects())[0].icon).toBe("🧪");
+    await reopened.updateProject(created.id, { name: "Renamed" });
+    expect((await reopened.readProject(created.id)).icon).toBe("🧪");
+    await reopened.updateProject(created.id, {
+      icon: "https://example.com/icon.png",
+    });
+    expect((await new FileStore(store.root).listProjects())[0].icon).toBe(
+      "https://example.com/icon.png",
+    );
+    await expect(
+      reopened.updateProject(created.id, { icon: "javascript:alert(1)" }),
+    ).rejects.toThrow("project.icon");
+    await reopened.updateProject(created.id, { icon: "" });
+    expect((await reopened.readProject(created.id)).icon).toBe("");
+    expect(
+      (await reopened.readPage(created.id, page.document.id)).document,
+    ).toEqual(page.document);
+  });
+
   it("uses stable harness/session bindings independently of cwd and project names", async () => {
     const first = await store.createProject({
       name: "First",

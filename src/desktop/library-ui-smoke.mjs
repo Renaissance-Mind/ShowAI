@@ -297,7 +297,7 @@ try {
   );
 
   await choose(project.id, "重命名");
-  await nameDialog("名称", "Renamed project");
+  await nameDialog("项目名称", "Renamed project");
   await choose(project.id, "置顶");
   await poll(
     projectData,

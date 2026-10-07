@@ -98,7 +98,66 @@ try {
     .getByRole("button", { name: "新建项目", exact: true })
     .first()
     .waitFor();
-  const project = await api("projects:create", { name: "导航验收" });
+  await page.getByRole("button", { name: "新项目", exact: true }).click();
+  const projectDialog = page.getByRole("dialog", {
+    name: "新项目",
+    exact: true,
+  });
+  await projectDialog
+    .getByRole("textbox", { name: "项目名称", exact: true })
+    .fill("导航验收");
+  await projectDialog
+    .getByRole("button", { name: "设置项目图标", exact: true })
+    .click();
+  const iconDialog = page.getByRole("dialog", {
+    name: "项目图标",
+    exact: true,
+  });
+  await iconDialog
+    .getByRole("button", { name: "使用 🧪", exact: true })
+    .click();
+  await iconDialog.getByRole("button", { name: "保存", exact: true }).click();
+  await iconDialog.waitFor({ state: "hidden" });
+  assert.equal(
+    await projectDialog.getByRole("textbox", { name: "项目名称" }).inputValue(),
+    "导航验收",
+  );
+  await projectDialog
+    .getByRole("button", { name: "创建项目", exact: true })
+    .click();
+  await projectDialog.waitFor({ state: "hidden" });
+  const project = (await api("projects:list")).find(
+    (item) => item.name === "导航验收",
+  );
+  assert.equal(project.icon, "🧪");
+  const brand = page.locator(".studio-app-brand");
+  assert.equal(
+    await brand
+      .locator("img")
+      .evaluate((el) => el.complete && el.naturalWidth > 0),
+    true,
+  );
+  assert.equal(
+    await brand
+      .locator("strong")
+      .evaluate((el) => getComputedStyle(el).fontSize),
+    "16px",
+  );
+  // The left segment inherits the window header's background.
+  const rightBackground = await page
+    .locator(".studio-topbar")
+    .evaluate((el) => getComputedStyle(el).backgroundColor);
+  const leftBackground = await page
+    .locator(".studio-window-topbar")
+    .evaluate((el) => getComputedStyle(el).backgroundColor);
+  assert.notEqual(leftBackground, rightBackground);
+  assert.equal(
+    await page.locator(".studio-breadcrumb .page-icon").textContent(),
+    "🧪",
+  );
+  result.checks.push(
+    "New project above the project sections creates a titled project with its selected icon; application icon, larger brand, distinct header backgrounds and project breadcrumb render",
+  );
   const created = await api("pages:create", {
     projectId: project.id,
     title: "自动收起交互",
@@ -146,6 +205,32 @@ try {
   await page.keyboard.press("Escape");
   await documentRow.locator(".studio-tree-main").click();
   await page.locator(".studio-scroll.has-page-surface").waitFor();
+  await sidebar
+    .locator(`[data-library-id="${project.id}"]`)
+    .getByRole("button", { name: /的操作$/ })
+    .click();
+  await page.getByRole("menuitem", { name: "重命名", exact: true }).click();
+  const projectSettings = page.getByRole("dialog", {
+    name: "项目设置",
+    exact: true,
+  });
+  await projectSettings.getByRole("button", { name: "设置项目图标" }).click();
+  const editIcon = page.getByRole("dialog", { name: "项目图标", exact: true });
+  await editIcon.getByRole("button", { name: "使用 📚", exact: true }).click();
+  await editIcon.getByRole("button", { name: "保存", exact: true }).click();
+  await editIcon.waitFor({ state: "hidden" });
+  await projectSettings
+    .getByRole("button", { name: "保存", exact: true })
+    .click();
+  await projectSettings.waitFor({ state: "hidden" });
+  assert.equal(
+    (await api("projects:list")).find((item) => item.id === project.id).icon,
+    "📚",
+  );
+  await page.locator(".studio-scroll.has-page-surface").waitFor();
+  result.checks.push(
+    "Changing an existing project's title/icon through its menu preserves the open page and updates persistent metadata",
+  );
   await modeIs("docked");
   const dockedWidth = await width();
   await moveOut();
@@ -172,8 +257,10 @@ try {
     "overlay",
     "stationary pointer inside the panel keeps it open",
   );
-  const brand = await topbar.locator(".studio-topbar-brand").boundingBox();
-  await page.mouse.move(brand.x + 80, brand.y + 12);
+  const brandBounds = await topbar
+    .locator(".studio-topbar-brand")
+    .boundingBox();
+  await page.mouse.move(brandBounds.x + 80, brandBounds.y + 12);
   await page.waitForTimeout(1100);
   assert.equal(
     await shell.getAttribute("data-sidebar-mode"),
@@ -331,6 +418,7 @@ try {
     await page.mouse.move(start + delta, 450, { steps: 12 });
     if (release) await page.mouse.up();
   };
+  await waitWidth(240);
   await dragWidth(360);
   await waitWidth(360);
   await poll(

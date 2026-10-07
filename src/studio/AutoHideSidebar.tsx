@@ -6,7 +6,8 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { LockKeyhole, LockKeyholeOpen } from "../ui/icons";
+import { PanelLeft } from "../ui/icons";
+import appIcon from "../desktop/assets/icon.svg";
 import "./auto-hide-sidebar.css";
 
 const minimumWidth = 200;
@@ -219,7 +220,10 @@ export default function AutoHideSidebar({
             onPointerEnter={reveal}
             onPointerLeave={leave}
           >
-            <strong>ShowAI</strong>
+            <span className="studio-app-brand">
+              <img src={appIcon} alt="" draggable={false} />
+              <strong>ShowAI</strong>
+            </span>
             <button
               type="button"
               className="studio-sidebar-lock"
@@ -232,11 +236,7 @@ export default function AutoHideSidebar({
                 setLocked(next);
               }}
             >
-              {locked ? (
-                <LockKeyhole size={16} />
-              ) : (
-                <LockKeyholeOpen size={16} />
-              )}
+              <PanelLeft size={19} strokeWidth={1.7} aria-hidden="true" />
             </button>
           </div>
         )}

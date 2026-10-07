@@ -137,6 +137,14 @@ export default function ProjectSidebar({
   );
   return (
     <div className="studio-sidebar-projects">
+      <button
+        className="studio-new-project"
+        type="button"
+        onClick={() => onCreate()}
+      >
+        <Plus size={17} aria-hidden="true" />
+        <span>新项目</span>
+      </button>
       {!!pinned.length && section("pinned", "置顶", pinned)}
       {section("projects", "项目", ungrouped)}
       {organization.groups.map((group) =>

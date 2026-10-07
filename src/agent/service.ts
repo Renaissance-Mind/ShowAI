@@ -226,13 +226,19 @@ export class AgentService {
       next: `showai pages list --project ${shellToken(project.id)} --json`,
     };
   }
-  private async createProjectImpl(name: string, binding?: ProjectBinding) {
+  private async createProjectImpl(
+    name: string,
+    binding?: ProjectBinding,
+    icon?: string,
+  ) {
     if (this.projectId)
       throw new CoreError(
         "INVALID_PATH",
         "A project-bound connection cannot create or switch projects.",
       );
-    return projectSummary(await this.store.createProject({ name, binding }));
+    return projectSummary(
+      await this.store.createProject({ name, binding, icon }),
+    );
   }
   private async bindProjectImpl(projectId: string, binding: ProjectBinding) {
     return projectSummary(

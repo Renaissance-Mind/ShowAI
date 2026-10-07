@@ -1,3 +1,4 @@
+import { validatePageIcon } from "../lib/page-icon.mjs";
 import { artifactVersion } from "../surface/document.mjs";
 import { createResource, upgradeResource } from "../surface/containers.mjs";
 import { constants } from "node:fs";
@@ -151,6 +152,8 @@ function validateProject(value: unknown, expectedId: string): ProjectMetadata {
       `Invalid project metadata: ${expectedId}.`,
     );
   validateName(project.name);
+  if (project.icon !== undefined)
+    validatePageIcon(project.icon, "project.icon");
   if (
     project.sourceDirectory !== undefined &&
     (typeof project.sourceDirectory !== "string" ||
@@ -808,9 +811,14 @@ export class FileStore {
 
   async createProject(input: {
     name: string;
+    icon?: string;
     binding?: ProjectBinding;
   }): Promise<ProjectSummary> {
     const name = validateName(input.name);
+    const icon =
+      input.icon === undefined
+        ? undefined
+        : validatePageIcon(input.icon, "project.icon");
     const binding = input.binding ? validateBinding(input.binding) : undefined;
     return this.withLock("projects", async () => {
       if (binding) {
@@ -825,7 +833,7 @@ export class FileStore {
         );
         if (existing) return existing;
       }
-      return this.writeNewProject(name, binding);
+      return this.writeNewProject(name, binding, undefined, icon);
     });
   }
 
@@ -869,6 +877,7 @@ export class FileStore {
     name: string,
     binding?: ProjectBinding,
     sourceDirectory?: string,
+    icon?: string,
   ): Promise<ProjectSummary> {
     const now = new Date().toISOString();
     const project: ProjectMetadata = {
@@ -876,6 +885,7 @@ export class FileStore {
       version: 1,
       id: randomUUID(),
       name,
+      ...(icon !== undefined ? { icon } : {}),
       createdAt: now,
       updatedAt: now,
       pinned: false,
@@ -922,7 +932,12 @@ export class FileStore {
 
   async updateProject(
     projectId: string,
-    input: { name?: string; pinned?: boolean; archived?: boolean },
+    input: {
+      name?: string;
+      icon?: string;
+      pinned?: boolean;
+      archived?: boolean;
+    },
   ): Promise<ProjectSummary> {
     assertId(projectId);
     return this.withLock(`project-${projectId}`, async () => {
@@ -933,6 +948,9 @@ export class FileStore {
       const project = {
         ...current,
         ...(input.name !== undefined ? { name: validateName(input.name) } : {}),
+        ...(input.icon !== undefined
+          ? { icon: validatePageIcon(input.icon, "project.icon") }
+          : {}),
         ...(input.pinned !== undefined ? { pinned: input.pinned } : {}),
         ...(input.archived !== undefined ? { archived: input.archived } : {}),
         updatedAt: new Date().toISOString(),

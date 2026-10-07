@@ -16,6 +16,7 @@ export interface ProjectMetadata {
   version: 1;
   id: string;
   name: string;
+  icon?: string;
   createdAt: string;
   updatedAt: string;
   /** Canonical host project directory, shared by all Agent sessions in it. */

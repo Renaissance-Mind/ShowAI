@@ -213,6 +213,45 @@ async function runCli(args: string[]) {
   return result.data;
 }
 
+test("workbench project creation accepts empty, emoji and embedded image icons and retains them across reads", async () => {
+  const created = await invoke<{ id: string }>("projects:create", {
+    name: "With icon",
+    icon: "🧪",
+  });
+  const blank = await invoke<{ id: string }>("projects:create", {
+    name: "Without icon",
+    icon: "",
+  });
+  const image =
+    "data:image/png;base64," +
+    (await readFile(join(repository, "src/desktop/assets/icon.png"))).toString(
+      "base64",
+    );
+  expect(image.length).toBeGreaterThan(10000);
+  const imageProject = await invoke<{ id: string }>("projects:create", {
+    name: "Created image icon",
+    icon: image,
+  });
+  await invoke("projects:rename", {
+    projectId: created.id,
+    name: "Image icon",
+    icon: image,
+  });
+  let projects = await invoke<{ id: string; icon?: string }[]>("projects:list");
+  expect(projects.find((item) => item.id === created.id)?.icon).toBe(image);
+  expect(projects.find((item) => item.id === imageProject.id)?.icon).toBe(
+    image,
+  );
+  expect(projects.find((item) => item.id === blank.id)?.icon).toBe("");
+  await invoke("projects:rename", {
+    projectId: created.id,
+    name: "Cleared",
+    icon: "",
+  });
+  projects = await invoke<{ id: string; icon?: string }[]>("projects:list");
+  expect(projects.find((item) => item.id === created.id)?.icon).toBe("");
+});
+
 test("browser workbench, standalone CLI and a second client share real files and preserve conflicts", async () => {
   const info = await invoke<DesktopInfo>("app:info");
   expect(info.mode).toBe("browser");

@@ -15,6 +15,8 @@ import {
 import {
   ArrowUpRight,
   AppWindow,
+  Blocks,
+  Settings2,
   CodeXml,
   Download,
   FolderMinus,
@@ -86,6 +88,7 @@ import { orderSidebarItems } from "../core/sidebar-order";
 import { readSidebarExpansion, sidebarExpansionKey } from "./sidebar-state";
 import SidebarNavigation from "./SidebarNavigation";
 import RecentPages, { recentPages } from "./RecentPages";
+import appIcon from "../desktop/assets/icon.svg";
 import AutoHideSidebar from "./AutoHideSidebar";
 import { useWindowFullscreen } from "./useWindowFullscreen";
 import { ComponentCatalog, ComponentNavigation } from "./ComponentCatalog";
@@ -766,6 +769,7 @@ export default function Studio() {
     projectId: item.id,
     id: item.id,
     title: item.name,
+    icon: item.icon,
     pinned: !!item.pinned,
     parentId: null,
   });
@@ -1397,19 +1401,45 @@ export default function Studio() {
       view === "projects" ||
       view === "templates" ||
       view === "components" ? (
-        <h1 className="studio-topbar-title">{heading}</h1>
+        <h1 className="studio-topbar-title">
+          {view === "projects" ? (
+            <History size={17} aria-hidden="true" />
+          ) : view === "templates" ? (
+            <LayoutTemplate size={17} aria-hidden="true" />
+          ) : view === "components" ? (
+            <Blocks size={17} aria-hidden="true" />
+          ) : (
+            <Settings2 size={17} aria-hidden="true" />
+          )}
+          <span>{heading}</span>
+        </h1>
       ) : (
         <div className="studio-breadcrumb">
           {focusWindow ? (
-            <span>ShowAI</span>
+            <span className="studio-breadcrumb-folder">
+              <img
+                className="studio-breadcrumb-app-icon"
+                src={appIcon}
+                alt=""
+              />
+              ShowAI
+            </span>
           ) : (
-            <button onClick={action(() => navigate("projects"))}>最近</button>
+            <button onClick={action(() => navigate("projects"))}>
+              <History size={16} aria-hidden="true" />
+              <span>最近</span>
+            </button>
           )}
           {selectedProject && (
             <>
               <ChevronRight size={13} />
               <button onClick={action(() => openProject(selectedProject))}>
-                {project?.name ?? "项目"}
+                <PageIcon
+                  value={project?.icon}
+                  size={17}
+                  fallback={<Folder size={17} />}
+                />
+                <span>{project?.name ?? "项目"}</span>
               </button>
             </>
           )}
@@ -1419,7 +1449,8 @@ export default function Studio() {
               <button
                 onClick={action(() => openProject(selectedProject!, item.id))}
               >
-                {item.name}
+                <Folder size={16} aria-hidden="true" />
+                <span>{item.name}</span>
               </button>
             </span>
           ))}
@@ -2306,8 +2337,19 @@ export default function Studio() {
               {
                 label: "重命名",
                 icon: <Pencil size={15} />,
-                onSelect: () =>
-                  setDialog({ type: "rename", target: contextMenu.target }),
+                onSelect: () => {
+                  const currentProject =
+                    contextMenu.target.kind === "project"
+                      ? projects.find(
+                          (item) => item.id === contextMenu.target.projectId,
+                        )
+                      : undefined;
+                  setDialog(
+                    currentProject
+                      ? { type: "project", project: currentProject }
+                      : { type: "rename", target: contextMenu.target },
+                  );
+                },
               },
               ...(contextMenu.target.kind === "page"
                 ? [
@@ -2667,18 +2709,20 @@ export default function Studio() {
           <ProjectDialog
             project={dialog.project}
             onClose={closeDialog}
-            onSave={async (name) => {
+            onSave={async (name, icon) => {
               const result = dialog.project
                 ? await desktop.invoke<ProjectSummary>("projects:rename", {
                     projectId: dialog.project.id,
                     name,
+                    icon,
                   })
                 : await desktop.invoke<ProjectSummary>("projects:create", {
                     name,
+                    icon,
                   });
               if (dialog.groupId) await moveProject(result.id, dialog.groupId);
               await refresh();
-              await openProject(result.id);
+              if (!dialog.project) await openProject(result.id);
               setDialog(null);
             }}
           />
@@ -3011,51 +3055,76 @@ function ProjectDialog({
 }: {
   project?: ProjectSummary;
   onClose: () => void;
-  onSave: (name: string) => Promise<void>;
+  onSave: (name: string, icon: string) => Promise<void>;
 }) {
   const [name, setName] = useState(project?.name ?? "");
+  const [icon, setIcon] = useState(project?.icon ?? "");
+  const [choosingIcon, setChoosingIcon] = useState(false);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   return (
-    <Dialog title={project ? "项目名称" : "新建项目"} onClose={onClose}>
-      <form
-        className="studio-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          setBusy(true);
-          void onSave(name.trim())
-            .catch((reason) => setError(errorMessage(reason)))
-            .finally(() => setBusy(false));
-        }}
-      >
-        <label>
-          名称
-          <input
-            aria-label="项目名称"
-            placeholder="例如：多模态模型调研"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            maxLength={1000}
-          />
-        </label>
-        {error && (
-          <p className="studio-form-error" role="alert">
-            {error}
-          </p>
-        )}
-        <footer>
-          <button type="button" className="studio-button" onClick={onClose}>
-            取消
-          </button>
+    <>
+      <Dialog title={project ? "项目设置" : "新项目"} onClose={onClose}>
+        <form
+          className="studio-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setBusy(true);
+            void onSave(name.trim(), icon)
+              .catch((reason) => setError(errorMessage(reason)))
+              .finally(() => setBusy(false));
+          }}
+        >
+          <label>
+            名称
+            <input
+              aria-label="项目名称"
+              placeholder="例如：多模态模型调研"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              maxLength={1000}
+            />
+          </label>
           <button
-            className="studio-button primary"
-            disabled={!name.trim() || busy}
+            type="button"
+            className="studio-button studio-project-icon-choice"
+            disabled={busy}
+            onClick={() => setChoosingIcon(true)}
+            aria-label="设置项目图标"
           >
-            {busy ? <Loader2 size={15} className="studio-spin" /> : null}
-            {project ? "保存" : "创建项目"}
+            <PageIcon value={icon} size={28} fallback={<Folder size={28} />} />
+            <span>设置图标</span>
           </button>
-        </footer>
-      </form>
-    </Dialog>
+          {error && (
+            <p className="studio-form-error" role="alert">
+              {error}
+            </p>
+          )}
+          <footer>
+            <button type="button" className="studio-button" onClick={onClose}>
+              取消
+            </button>
+            <button
+              className="studio-button primary"
+              disabled={!name.trim() || busy}
+            >
+              {busy ? <Loader2 size={15} className="studio-spin" /> : null}
+              {project ? "保存" : "创建项目"}
+            </button>
+          </footer>
+        </form>
+      </Dialog>
+      {choosingIcon && (
+        <PageIconDialog
+          title="项目图标"
+          value={icon}
+          fallback={<Folder size={56} />}
+          onClose={() => setChoosingIcon(false)}
+          onSave={async (next) => {
+            setIcon(next);
+          }}
+        />
+      )}
+    </>
   );
 }

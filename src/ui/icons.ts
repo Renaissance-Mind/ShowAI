@@ -79,6 +79,7 @@ export {
   MoreHorizontal,
   MousePointer2,
   Package,
+  PanelLeft,
   PanelTop,
   PanelsTopLeft,
   Pencil,

@@ -89,12 +89,23 @@
   flex-shrink: 0;
   height: 44px;
   min-width: 0;
-  padding: 0 14px 0 19px;
-  gap: 8px;
+  padding: 0 8px 0 19px;
+  gap: 4px;
   user-select: none;
 }
+.studio-app-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.studio-app-brand img {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
 .studio-topbar-brand strong {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   letter-spacing: -0.2px;
   overflow: hidden;
@@ -103,7 +114,7 @@
 }
 .studio[data-native-titlebar="mac"]:not([data-window-fullscreen="true"])
   .studio-topbar-brand {
-  padding-left: 88px;
+  padding-left: 80px;
 }
 .studio-sidebar-lock {
   display: grid;

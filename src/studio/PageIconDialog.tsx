@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import PageIcon from "../components/PageIcon";
 import {
   isImageIcon,
@@ -70,8 +70,12 @@ export default function PageIconDialog({
   value,
   onSave,
   onClose,
+  title = "页面图标",
+  fallback,
 }: {
   value: string;
+  title?: string;
+  fallback?: ReactNode;
   onSave: (value: string) => Promise<unknown>;
   onClose: () => void;
 }) {
@@ -110,7 +114,7 @@ export default function PageIconDialog({
     }
   };
   return (
-    <Dialog title="页面图标" onClose={onClose}>
+    <Dialog title={title} onClose={onClose}>
       <form
         className="page-icon-form"
         onSubmit={(event) => {
@@ -119,7 +123,7 @@ export default function PageIconDialog({
         }}
       >
         <div className="page-icon-preview">
-          <PageIcon value={preview} size={56} />
+          <PageIcon value={preview} size={56} fallback={fallback} />
         </div>
         <label>
           文字或 Emoji

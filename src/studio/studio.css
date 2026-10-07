@@ -199,6 +199,7 @@ button.studio-tree-chevron:hover {
   padding: 0 18px;
   -webkit-app-region: drag;
   gap: 12px;
+  background: var(--paper);
 }
 .studio-topbar .expandable-search {
   position: static;
@@ -1290,4 +1291,61 @@ button.studio-tree-chevron:hover {
     gap: 0;
     margin: 0;
   }
+}
+
+.studio-new-project {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 9px;
+  margin-bottom: 12px;
+  border-radius: 6px;
+  text-align: left;
+  color: var(--text);
+  font-weight: 500;
+}
+.studio-new-project:hover {
+  background: var(--hover);
+}
+.studio-new-project:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.studio-breadcrumb button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.studio-breadcrumb button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.studio-breadcrumb button > svg {
+  flex-shrink: 0;
+}
+.studio-topbar-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.studio-topbar-title > svg {
+  flex-shrink: 0;
+}
+.studio-project-icon-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  justify-self: start;
+}
+
+.studio-breadcrumb-app-icon {
+  width: 18px;
+  height: 18px;
+}
+.studio-topbar-title > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

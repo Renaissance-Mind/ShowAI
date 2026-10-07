@@ -1,3 +1,4 @@
+import { validatePageIcon } from "../lib/page-icon.mjs";
 import {
   upgradeResource,
   createResource,
@@ -623,10 +624,17 @@ export function createWorkbench(
         return service.createProject(
           required(args, "name"),
           args.binding as ProjectBinding | undefined,
+          args.icon === undefined
+            ? undefined
+            : validatePageIcon(args.icon, "project.icon"),
         );
       case "projects:rename":
         return store.updateProject(projectId(args), {
           name: required(args, "name"),
+          icon:
+            args.icon === undefined
+              ? undefined
+              : validatePageIcon(args.icon, "project.icon"),
         });
       case "projects:pin":
         return store.updateProject(projectId(args), {

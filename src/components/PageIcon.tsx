@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { FileText } from "../ui/icons";
 import { isImageIcon } from "../lib/page-icon.mjs";
 
 export default function PageIcon({
   value = "",
   size = 18,
+  fallback,
 }: {
   value?: string;
   size?: number;
+  fallback?: ReactNode;
 }) {
   const [failed, setFailed] = useState<string | null>(null);
   const image = isImageIcon(value);
@@ -45,7 +47,7 @@ export default function PageIcon({
       ) : value && !image ? (
         value
       ) : (
-        <FileText size={size} />
+        (fallback ?? <FileText size={size} />)
       )}
     </span>
   );

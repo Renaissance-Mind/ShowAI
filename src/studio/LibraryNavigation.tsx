@@ -24,6 +24,7 @@ import { useLibraryDrag } from "./LibraryDrag";
 export type LibraryTarget =
   | {
       kind: "project";
+      icon?: string;
       projectId: string;
       id: string;
       title: string;
@@ -126,7 +127,8 @@ export function LibraryRow({
         title={title}
         onClick={() => onOpen(target)}
       >
-        {target.kind === "page" ? (
+        {target.kind === "page" ||
+        (target.kind === "project" && target.icon) ? (
           <PageIcon value={target.icon} size={15} />
         ) : (
           <Icon size={15} aria-hidden="true" />
