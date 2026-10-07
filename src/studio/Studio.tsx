@@ -72,6 +72,7 @@ import {
 import Dialog from "./Dialog";
 import ExpandableSearch from "../components/ExpandableSearch";
 import ProjectSidebar from "./ProjectSidebar";
+import { readSidebarExpansion, sidebarExpansionKey } from "./sidebar-state";
 import SidebarNavigation from "./SidebarNavigation";
 import RecentPages, { recentPages } from "./RecentPages";
 import AutoHideSidebar from "./AutoHideSidebar";
@@ -198,6 +199,10 @@ export default function Studio() {
   const [expandedFolders, setExpandedFolders] = useState<
     Record<string, boolean>
   >({});
+  const [collapsedSections, setCollapsedSections] = useState<
+    Record<string, boolean>
+  >({});
+  const sidebarHome = useRef<string | null>(null);
   const expandedRef = useRef(expandedProjects);
   expandedRef.current = expandedProjects;
   const pages = selectedProject ? (contents[selectedProject]?.pages ?? []) : [];
@@ -291,6 +296,14 @@ export default function Studio() {
       desktop.invoke<SidebarOrganization>("sidebar:get"),
       desktop.invoke<DesktopInfo>("app:info"),
     ]);
+    if (sidebarHome.current !== appInfo.home) {
+      const saved = readSidebarExpansion(appInfo.home);
+      sidebarHome.current = appInfo.home;
+      expandedRef.current = saved.projects;
+      setExpandedProjects(saved.projects);
+      setExpandedFolders(saved.folders);
+      setCollapsedSections(saved.collapsedSections);
+    }
     setInfo(appInfo);
     setProjects(next);
     setOrganization(sidebar);
@@ -430,6 +443,17 @@ export default function Studio() {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     localStorage.setItem("showai:appearance", dark ? "dark" : "light");
   }, [dark]);
+  useEffect(() => {
+    if (!info || sidebarHome.current !== info.home) return;
+    localStorage.setItem(
+      sidebarExpansionKey(info.home),
+      JSON.stringify({
+        projects: expandedProjects,
+        folders: expandedFolders,
+        collapsedSections,
+      }),
+    );
+  }, [info?.home, expandedProjects, expandedFolders, collapsedSections]);
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(""), 3000);
@@ -1127,6 +1151,8 @@ export default function Studio() {
                   projects={projects}
                   organization={organization}
                   selectedProject={selectedProject}
+                  collapsed={collapsedSections}
+                  setCollapsed={setCollapsedSections}
                   onCreate={(groupId) =>
                     setDialog({ type: "project", groupId })
                   }

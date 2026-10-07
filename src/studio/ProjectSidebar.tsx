@@ -1,4 +1,10 @@
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  type Dispatch,
+  type SetStateAction,
+  type ReactNode,
+} from "react";
 import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from "../ui/icons";
 import type {
   ProjectGroup,
@@ -10,6 +16,8 @@ export default function ProjectSidebar({
   projects,
   organization,
   selectedProject,
+  collapsed,
+  setCollapsed,
   renderProject,
   onCreate,
   onMenu,
@@ -18,22 +26,30 @@ export default function ProjectSidebar({
   projects: ProjectSummary[];
   organization: SidebarOrganization;
   selectedProject: string | null;
+  collapsed: Record<string, boolean>;
+  setCollapsed: Dispatch<SetStateAction<Record<string, boolean>>>;
   renderProject: (project: ProjectSummary) => ReactNode;
   onCreate: (groupId?: string) => void;
   onMenu: (anchor: HTMLElement) => void;
   onGroupMenu: (group: ProjectGroup, anchor: HTMLElement) => void;
 }) {
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const selected = projects.find((item) => item.id === selectedProject);
   const selectedSection = selected?.pinned
     ? "pinned"
     : selected
       ? (organization.projectGroups[selected.id] ?? "projects")
       : null;
+  const previousSelection = useRef({ selectedProject, selectedSection });
   useEffect(() => {
-    if (selectedSection)
+    const previous = previousSelection.current;
+    previousSelection.current = { selectedProject, selectedSection };
+    if (
+      selectedSection &&
+      (previous.selectedProject !== selectedProject ||
+        previous.selectedSection !== selectedSection)
+    )
       setCollapsed((current) => ({ ...current, [selectedSection]: false }));
-  }, [selectedProject, selectedSection]);
+  }, [selectedProject, selectedSection, setCollapsed]);
   const toggle = (id: string) =>
     setCollapsed((current) => ({ ...current, [id]: !current[id] }));
   const ungrouped = projects.filter(
