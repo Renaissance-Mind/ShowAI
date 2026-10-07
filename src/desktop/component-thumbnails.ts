@@ -32,7 +32,8 @@ const requests = new Map<string, PreviewLease>();
 let previewWindow: BrowserWindow | undefined;
 let previewIdle: ReturnType<typeof setTimeout> | undefined;
 const observedOwners = new WeakSet<WebContents>();
-let developmentRenderer: Promise<Buffer> | undefined;
+let developmentRenderer:
+  { identity: string; bytes: Promise<Buffer> } | undefined;
 function closePreview() {
   clearTimeout(previewIdle);
   if (previewWindow && !previewWindow.isDestroyed()) previewWindow.destroy();
@@ -215,10 +216,15 @@ ipcMain.handle(
       if (requestId) requests.set(requestKey, lease);
       let renderer: Buffer;
       if (process.env.SHOWAI_DEV_URL) {
-        developmentRenderer ??= readFile(
-          join(process.env.SHOWAI_DEV_RUNTIME!, "assets/reader-source.json"),
+        const archive = join(
+          process.env.SHOWAI_DEV_RUNTIME!,
+          "assets/reader-source.json",
         );
-        renderer = await developmentRenderer;
+        const metadata = await stat(archive);
+        const identity = `${metadata.ino}:${metadata.size}:${metadata.mtimeMs}:${metadata.ctimeMs}`;
+        if (developmentRenderer?.identity !== identity)
+          developmentRenderer = { identity, bytes: readFile(archive) };
+        renderer = await developmentRenderer.bytes;
       } else renderer = await readFile(join(directory, "index.html"));
       const keySource = createHash("sha256")
         .update(renderer)
@@ -227,6 +233,8 @@ ipcMain.handle(
         for (const path of [
           "src/studio/ComponentPreviewPage.tsx",
           "src/studio/component-catalog.css",
+          "src/studio/component-preview.css",
+          "src/components/BuiltinPreview.tsx",
           "src/design/desktop.css",
         ])
           keySource.update(await readFile(join(process.cwd(), path)));

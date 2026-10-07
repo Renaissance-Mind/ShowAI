@@ -65,28 +65,51 @@ export function usePage() {
     [],
   );
   const [draftNotice, setDraftNotice] = useState("");
+  const draftWrites = useRef(new Map<string, Promise<EditorDraftRecord>>());
   const persist = useCallback(
     async (
       source: ShowDocument,
       sequence: number,
       owner: string,
     ): Promise<EditorDraftRecord> => {
-      const saved = await desktop.invoke<EditorDraftRecord>("drafts:save", {
-        input: {
-          kind: "page",
-          clientId: clientId.current,
-          resourceId: source.id,
-          projectId: owner,
-          baseRevision: draftBase.current,
-          title: source.title,
-          content: source,
-          sequence,
-          recoverySource: recoveredFrom.current ?? undefined,
-        },
-      });
-      if (projectRef.current === owner && current.current?.id === source.id)
-        retained.current = saved;
-      return saved;
+      const key = JSON.stringify([
+        owner,
+        source.id,
+        sequence,
+        draftBase.current,
+        recoveredFrom.current,
+      ]);
+      const pending = draftWrites.current.get(key);
+      if (pending) return pending;
+      const task = (async () => {
+        const saved = await desktop.invoke<EditorDraftRecord>("drafts:save", {
+          input: {
+            kind: "page",
+            clientId: clientId.current,
+            resourceId: source.id,
+            projectId: owner,
+            baseRevision: draftBase.current,
+            title: source.title,
+            content: source,
+            sequence,
+            recoverySource: recoveredFrom.current ?? undefined,
+          },
+        });
+        if (
+          projectRef.current === owner &&
+          current.current?.id === source.id &&
+          (retained.current?.sequence ?? -1) <= (saved.sequence ?? sequence)
+        )
+          retained.current = saved;
+        return saved;
+      })();
+      draftWrites.current.set(key, task);
+      try {
+        return await task;
+      } finally {
+        if (draftWrites.current.get(key) === task)
+          draftWrites.current.delete(key);
+      }
     },
     [],
   );

@@ -242,6 +242,14 @@ export class EditorDrafts {
             files = encodeFile(path, Buffer.from(JSON.stringify(content)));
           }
         } else files = encodeFile(path, Buffer.from(JSON.stringify(content)));
+        if (storage === "page-nodes") {
+          // Local recovery snapshots don't need Git's per-node object layout.
+          // Keep the existing JSON representation and asset deduplication so one
+          // keystroke cannot require thousands of individual durable writes.
+          path = `drafts/${id}.json`;
+          storage = "json";
+          files = encodeFile(path, Buffer.from(JSON.stringify(content)));
+        }
         const assets: string[] = [];
         for (const [name, bytes] of files)
           if (bytes !== null) {

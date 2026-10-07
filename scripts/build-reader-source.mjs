@@ -28,10 +28,17 @@ export async function buildReaderSource(root, destination) {
     logLevel: "silent",
   });
   const files = {};
+  const vendor = createHash("sha256");
   for (const path of Object.keys(graph.metafile.inputs).sort()) {
-    if (path.startsWith("node_modules/")) continue;
-    files[path] = await readFile(resolve(root, path), "utf8");
+    const normalized = path.replaceAll("\\", "/");
+    const nodeModules = normalized.indexOf("node_modules/");
+    const bytes = await readFile(resolve(root, path));
+    if (nodeModules >= 0) {
+      vendor.update(normalized.slice(nodeModules));
+      vendor.update(createHash("sha256").update(bytes).digest("hex"));
+    } else files[path] = bytes.toString("utf8");
   }
+  const vendorIntegrity = vendor.digest("hex");
   const registryPath = "src/components/blocks/registry.ts";
   const registry = statements(files[registryPath], registryPath).flatMap(
     (node) => {
@@ -138,6 +145,7 @@ export async function buildReaderSource(root, destination) {
   };
   const payload = {
     version: 1,
+    vendorIntegrity,
     files,
     registry,
     draws,

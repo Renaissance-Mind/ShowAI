@@ -160,9 +160,9 @@ export async function bundleReader(archivePath, documents) {
     .update(JSON.stringify([archive.integrity, kinds, compilerIdentity]))
     .digest("hex");
   if (cache.has(key)) return cache.get(key);
-  const job = persistentReader(key, () =>
-    compileReader(archivePath, archive, kinds),
-  );
+  const job = archive.vendorIntegrity
+    ? persistentReader(key, () => compileReader(archivePath, archive, kinds))
+    : compileReader(archivePath, archive, kinds);
   cache.set(key, job);
   if (cache.size > 16) cache.delete(cache.keys().next().value);
   job.catch(() => cache.delete(key));

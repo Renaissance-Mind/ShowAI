@@ -134,7 +134,10 @@ try {
   await editor.press("Enter");
   const edited = performance.now();
   await editor.pressSequentially("Performance edit retained", { delay: 20 });
+  measurements.typingMs = Math.round(performance.now() - edited);
+  const saving = performance.now();
   await page.locator(".studio-save-state.saved").waitFor({ timeout: 30000 });
+  measurements.afterTypingSaveMs = Math.round(performance.now() - saving);
   measurements.typeAndSaveMs = Math.round(performance.now() - edited);
   const saved = await page.evaluate(
     ({ projectId, pageId }) =>

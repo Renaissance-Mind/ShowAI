@@ -243,6 +243,7 @@ export function reconcileResource(document) {
       if (node.attrs?.id) local.add(node.attrs.id);
     });
     const roots = (container.content ?? []).map((node) => node.attrs.id);
+    const rootIds = new Set(roots);
     const before = document.surfaceViews[id];
     const saved = before.saved
       .map((view) => ({
@@ -259,7 +260,7 @@ export function reconcileResource(document) {
       saved,
       readingOrder: [
         ...new Set([
-          ...before.readingOrder.filter((target) => roots.includes(target)),
+          ...before.readingOrder.filter((target) => rootIds.has(target)),
           ...roots,
         ]),
       ],

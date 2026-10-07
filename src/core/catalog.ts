@@ -2320,7 +2320,12 @@ export async function resolveDocumentComponents(
     integrity?: string;
     scope?: string;
   }) =>
-    JSON.stringify([ref.componentId, ref.version, ref.integrity, ref.scope]);
+    JSON.stringify([
+      ref.componentId,
+      ref.version,
+      ref.integrity,
+      ref.integrity ? undefined : ref.scope,
+    ]);
   const schemas = new Map(
     refs.map((ref, index) => [key(ref), components[index].schema]),
   );

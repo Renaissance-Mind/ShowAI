@@ -187,6 +187,7 @@ function reconcileSurfaceDocument(source, { clone = true } = {}) {
     }
   }
   const roots = (document.content.content ?? []).map((node) => node.attrs.id);
+  const rootIds = new Set(roots);
   const saved = document.views.saved
     .map((view) => ({
       ...view,
@@ -200,7 +201,7 @@ function reconcileSurfaceDocument(source, { clone = true } = {}) {
     saved,
     readingOrder: [
       ...new Set([
-        ...document.views.readingOrder.filter((id) => roots.includes(id)),
+        ...document.views.readingOrder.filter((id) => rootIds.has(id)),
         ...roots,
       ]),
     ],
@@ -213,11 +214,11 @@ export function orderedSurfaceNodes(document) {
   if (!isSurface(document)) return document.content.content ?? [];
   const nodes = document.content.content ?? [];
   const order = document.views?.readingOrder ?? [];
+  const byId = new Map(nodes.map((node) => [node.attrs?.id, node]));
+  const ordered = new Set(order);
   return [
-    ...order
-      .map((id) => nodes.find((node) => node.attrs?.id === id))
-      .filter(Boolean),
-    ...nodes.filter((node) => !order.includes(node.attrs.id)),
+    ...order.map((id) => byId.get(id)).filter(Boolean),
+    ...nodes.filter((node) => !ordered.has(node.attrs.id)),
   ];
 }
 
