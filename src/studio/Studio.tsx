@@ -1339,7 +1339,9 @@ export default function Studio() {
 
   const sidebarContent = (
     <LibraryDragContext.Provider value={libraryDrag.bindings}>
-      {view !== "projects" && (
+      {(view === "templates" ||
+        view === "components" ||
+        view === "settings") && (
         <button
           className="studio-sidebar-back"
           aria-label="返回最近"
