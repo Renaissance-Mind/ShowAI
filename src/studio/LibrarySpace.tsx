@@ -68,166 +68,180 @@ export default function LibrarySpace({ home }: { home: string }) {
       className="settings-group library-space"
       aria-label="内容库空间管理"
     >
-      <div className="settings-row">
-        <div className="settings-row-text">
-          <h3>存储空间</h3>
-          <p>
+      <section className="library-space-section" aria-label="存储空间">
+        <div className="settings-row">
+          <div className="settings-row-text">
+            <h3>存储空间</h3>
+          </div>
+          <button
+            className="settings-button settings-button-icon"
+            disabled={busy}
+            aria-label="刷新空间统计"
+            title="刷新空间统计"
+            onClick={() => void run(async () => {})}
+          >
+            <RefreshCw size={14} />
+          </button>
+        </div>
+        <div className="library-space-section-content">
+          <p className="library-space-summary">
             {storage
               ? `文件大小 ${bytes(storage.totalBytes)} · 磁盘分配 ${bytes(storage.allocatedBytes)} · ${storage.files.toLocaleString()} 个文件`
               : "正在核对文件与历史…"}
           </p>
-        </div>
-        <button
-          className="settings-button settings-button-icon"
-          disabled={busy}
-          aria-label="刷新空间统计"
-          title="刷新空间统计"
-          onClick={() => void run(async () => {})}
-        >
-          <RefreshCw size={14} />
-        </button>
-      </div>
-      {storage && (
-        <div className="library-space-breakdown">
-          {Object.entries(storage.categories)
-            .filter(([, item]) => item.files)
-            .map(([name, item]) => (
-              <div key={name}>
-                <span>{labels[name as StorageCategory]}</span>
-                <span>{bytes(item.bytes)}</span>
-              </div>
-            ))}
-          <p>
-            {storage.git.packs} 个存储包 ·{" "}
-            {storage.git.looseObjects.toLocaleString()} 个未打包对象
-          </p>
-        </div>
-      )}
-      <div className="settings-row">
-        <div className="settings-row-text">
-          <h3>自动压缩</h3>
-        </div>
-        <label className="library-space-toggle">
-          <input
-            type="checkbox"
-            aria-label="自动压缩历史"
-            checked={policy?.automatic ?? true}
-            disabled={!policy || busy}
-            onChange={(event) =>
-              void run(async () => {
-                setPolicy(
-                  await desktop.invoke<MaintenancePolicy>(
-                    "library:setMaintenancePolicy",
-                    { automatic: event.target.checked },
-                  ),
-                );
-              })
-            }
-          />
-          开启
-        </label>
-      </div>
-      <div className="library-space-actions">
-        <button
-          className="settings-button"
-          disabled={busy}
-          onClick={() =>
-            void run(async () => {
-              const result = await desktop.invoke<{
-                beforeBytes: number;
-                afterBytes: number;
-              }>("library:compact");
-              setNotice(
-                `压缩完成：${bytes(result.beforeBytes)} → ${bytes(result.afterBytes)}，历史完整保留。`,
-              );
-            })
-          }
-        >
-          立即压缩
-        </button>
-        <button
-          className="settings-button"
-          disabled={busy}
-          onClick={() =>
-            void run(async () => {
-              setPlan(await desktop.invoke<CleanupPlan>("library:cleanupPlan"));
-            })
-          }
-        >
-          检查可清理文件
-        </button>
-        <button
-          className="settings-button"
-          disabled={busy}
-          onClick={() =>
-            void run(async () => {
-              await desktop.invoke("library:rebuildIndex");
-              setNotice("搜索、引用和历史索引已重建。 ");
-            })
-          }
-        >
-          重建搜索索引
-        </button>
-        {busy && <Loader2 size={15} className="studio-spin" />}
-      </div>
-      {plan && (
-        <div className="library-space-plan">
-          <p>
-            可清理 {plan.files.length} 个文件，共 {bytes(plan.bytes)}。保留{" "}
-            {plan.protectedDrafts} 份草稿及 {plan.protectedConflicts}{" "}
-            份冲突快照。
-          </p>
-          <details>
-            <summary>查看待清理文件</summary>
-            {plan.files.map((item) => (
-              <p key={item.path}>
-                <code>{item.path}</code> · {bytes(item.bytes)}
+          {storage && (
+            <div className="library-space-breakdown">
+              {Object.entries(storage.categories)
+                .filter(([, item]) => item.files)
+                .map(([name, item]) => (
+                  <div key={name}>
+                    <span>{labels[name as StorageCategory]}</span>
+                    <span>{bytes(item.bytes)}</span>
+                  </div>
+                ))}
+              <p>
+                {storage.git.packs} 个存储包 ·{" "}
+                {storage.git.looseObjects.toLocaleString()} 个未打包对象
               </p>
-            ))}
-          </details>
-          <button
-            className="settings-button"
-            disabled={busy || !plan.files.length}
-            onClick={() =>
-              void run(async () => {
-                await desktop.invoke("library:cleanup", { id: plan.id });
-                setPlan(null);
-                setNotice("清理完成，正式内容和完整历史已保留。");
-              })
-            }
-          >
-            清理这些文件
-          </button>
+            </div>
+          )}
         </div>
-      )}
-      <div className="settings-row">
-        <div className="settings-row-text">
-          <h3>完整归档</h3>
+      </section>
+      <section className="library-space-section" aria-label="自动压缩">
+        <div className="settings-row">
+          <div className="settings-row-text">
+            <h3>自动压缩</h3>
+          </div>
+          <label className="library-space-toggle">
+            <input
+              type="checkbox"
+              aria-label="自动压缩历史"
+              checked={policy?.automatic ?? true}
+              disabled={!policy || busy}
+              onChange={(event) =>
+                void run(async () => {
+                  setPolicy(
+                    await desktop.invoke<MaintenancePolicy>(
+                      "library:setMaintenancePolicy",
+                      { automatic: event.target.checked },
+                    ),
+                  );
+                })
+              }
+            />
+            开启
+          </label>
         </div>
-      </div>
-      <div className="library-space-archive">
-        <input
-          aria-label="归档保存位置"
-          placeholder="完整的新文件夹路径"
-          value={archivePath}
-          onChange={(event) => setArchivePath(event.target.value)}
-        />
-        <button
-          className="settings-button"
-          disabled={busy || !archivePath.trim()}
-          onClick={() =>
-            void run(async () => {
-              const result = await desktop.invoke<{ path: string }>(
-                "library:archive",
-                { out: archivePath },
-              );
-              setNotice(`完整归档已保存并验证：${result.path}`);
-            })
-          }
-        >
-          保存完整归档
-        </button>
-      </div>
+        <div className="library-space-section-content">
+          <div className="library-space-actions">
+            <button
+              className="settings-button"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  const result = await desktop.invoke<{
+                    beforeBytes: number;
+                    afterBytes: number;
+                  }>("library:compact");
+                  setNotice(
+                    `压缩完成：${bytes(result.beforeBytes)} → ${bytes(result.afterBytes)}，历史完整保留。`,
+                  );
+                })
+              }
+            >
+              立即压缩
+            </button>
+            <button
+              className="settings-button"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  setPlan(
+                    await desktop.invoke<CleanupPlan>("library:cleanupPlan"),
+                  );
+                })
+              }
+            >
+              检查可清理文件
+            </button>
+            <button
+              className="settings-button"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  await desktop.invoke("library:rebuildIndex");
+                  setNotice("搜索、引用和历史索引已重建。 ");
+                })
+              }
+            >
+              重建搜索索引
+            </button>
+            {busy && <Loader2 size={15} className="studio-spin" />}
+          </div>
+          {plan && (
+            <div className="library-space-plan">
+              <p>
+                可清理 {plan.files.length} 个文件，共 {bytes(plan.bytes)}。保留{" "}
+                {plan.protectedDrafts} 份草稿及 {plan.protectedConflicts}{" "}
+                份冲突快照。
+              </p>
+              <details>
+                <summary>查看待清理文件</summary>
+                {plan.files.map((item) => (
+                  <p key={item.path}>
+                    <code>{item.path}</code> · {bytes(item.bytes)}
+                  </p>
+                ))}
+              </details>
+              <button
+                className="settings-button"
+                disabled={busy || !plan.files.length}
+                onClick={() =>
+                  void run(async () => {
+                    await desktop.invoke("library:cleanup", { id: plan.id });
+                    setPlan(null);
+                    setNotice("清理完成，正式内容和完整历史已保留。");
+                  })
+                }
+              >
+                清理这些文件
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+      <section className="library-space-section" aria-label="完整归档">
+        <div className="settings-row">
+          <div className="settings-row-text">
+            <h3>完整归档</h3>
+          </div>
+        </div>
+        <div className="library-space-section-content">
+          <div className="library-space-archive">
+            <input
+              aria-label="归档保存位置"
+              placeholder="完整的新文件夹路径"
+              value={archivePath}
+              onChange={(event) => setArchivePath(event.target.value)}
+            />
+            <button
+              className="settings-button"
+              disabled={busy || !archivePath.trim()}
+              onClick={() =>
+                void run(async () => {
+                  const result = await desktop.invoke<{ path: string }>(
+                    "library:archive",
+                    { out: archivePath },
+                  );
+                  setNotice(`完整归档已保存并验证：${result.path}`);
+                })
+              }
+            >
+              保存完整归档
+            </button>
+          </div>
+        </div>
+      </section>
       {storage?.maintenance?.state === "running" && (
         <p role="status">后台维护正在进行，编辑草稿仍可保留。</p>
       )}
