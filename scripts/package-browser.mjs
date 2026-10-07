@@ -40,7 +40,10 @@ const name = `ShowAI-browser-${version}-${process.platform}-${process.arch}`;
 const output = join(root, "release", name);
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
-await cp(runtime, join(output, "runtime"), { recursive: true });
+await cp(runtime, join(output, "runtime"), {
+  recursive: true,
+  verbatimSymlinks: true,
+});
 await mkdir(join(output, "bin"));
 // Use the standalone official distribution: developer Node installations can depend
 // on Homebrew/system libraries that are absent on the recipient's machine.

@@ -1,5 +1,5 @@
-const { access } = require("node:fs/promises");
-const { join } = require("node:path");
+const { access, lstat, readdir, realpath } = require("node:fs/promises");
+const { join, sep } = require("node:path");
 const { Arch } = require("builder-util");
 
 module.exports = async function afterPack(context) {
@@ -13,6 +13,21 @@ module.exports = async function afterPack(context) {
         )
       : join(context.appOutDir, "resources");
   const plugin = join(resources, "runtime");
+  const canonical = await realpath(plugin);
+  async function verifyLinks(directory) {
+    for (const name of await readdir(directory)) {
+      const path = join(directory, name),
+        info = await lstat(path);
+      if (info.isSymbolicLink()) {
+        const target = await realpath(path);
+        if (target !== canonical && !target.startsWith(canonical + sep))
+          throw new Error(
+            `Packaged runtime link escapes its own bundle: ${path}`,
+          );
+      } else if (info.isDirectory()) await verifyLinks(path);
+    }
+  }
+  await verifyLinks(plugin);
   for (const file of [
     "scripts/cli.mjs",
     "node_modules/dugite/git/bin/" +

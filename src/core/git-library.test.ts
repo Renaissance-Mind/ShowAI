@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtemp, readFile, readdir, rm, symlink } from "node:fs/promises";
+import {
+  chmod,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GitLibrary } from "./git-library";
@@ -220,6 +228,31 @@ describe("Git-backed content library", () => {
     );
   });
 
+  it("reports damaged committed objects and retains readable files without inventing a repair", async () => {
+    const saved = await library.writeFiles(
+      new Map([[path, content("durable original")]]),
+      human,
+    );
+    const projection = await readFile(join(library.workspace, path)),
+      formal = await library.readFile(path, saved!.revision);
+    const object = join(
+      library.repository,
+      "objects",
+      saved!.revision.slice(0, 2),
+      saved!.revision.slice(2),
+    );
+    const original = await readFile(object),
+      damaged = Buffer.from("damaged Git object");
+    await chmod(object, 0o600);
+    await writeFile(object, damaged);
+    await expect(library.verify()).rejects.toThrow();
+    await expect(library.readFile(path, saved!.revision)).rejects.toThrow();
+    expect(await readFile(object)).toEqual(damaged);
+    expect(await readFile(join(library.workspace, path))).toEqual(projection);
+    await writeFile(object, original);
+    await library.verify();
+    expect(await library.readFile(path, saved!.revision)).toEqual(formal);
+  });
   it("rejects unsafe workspace paths before publishing a commit", async () => {
     await expect(
       library.writeFiles(new Map([["../outside.json", initial]]), human),

@@ -16,7 +16,10 @@ const runtime = join(root, "dist-runtime");
 await mkdir(join(runtime, "assets"), { recursive: true });
 await mkdir(join(runtime, "scripts"), { recursive: true });
 await rm(join(runtime, "web"), { recursive: true, force: true });
-await cp(join(root, "dist"), join(runtime, "web"), { recursive: true });
+await cp(join(root, "dist"), join(runtime, "web"), {
+  recursive: true,
+  verbatimSymlinks: true,
+});
 await copyFile(
   join(root, "dist-portable/portable.html"),
   join(runtime, "assets/viewer.html"),
@@ -39,7 +42,10 @@ async function copyPackage(name) {
   const metadata = JSON.parse(
     await readFile(join(source, "package.json"), "utf8"),
   );
-  await cp(source, join(runtime, "node_modules", name), { recursive: true });
+  await cp(source, join(runtime, "node_modules", name), {
+    recursive: true,
+    verbatimSymlinks: true,
+  });
   for (const dependency of Object.keys(metadata.dependencies ?? {}).filter(
     (name) => !name.startsWith("@types/"),
   ))
@@ -70,7 +76,7 @@ for (const name of compilerPackages)
   await cp(
     join(root, "node_modules/@esbuild", name),
     join(runtime, "node_modules/@esbuild", name),
-    { recursive: true, force: true },
+    { recursive: true, force: true, verbatimSymlinks: true },
   );
 await build({
   entryPoints: [join(root, "scripts/render-artifact.mjs")],
