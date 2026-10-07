@@ -7,7 +7,7 @@
 }
 .studio-sidebar {
   width: 240px;
-  padding: 44px 16px 16px;
+  padding: 44px 16px 6px;
   background: var(--paper);
 }
 .studio-brand {
@@ -43,6 +43,14 @@
 .studio-main-nav button.active svg,
 .studio-sidebar-bottom > button.active svg {
   color: var(--accent);
+}
+.studio-sidebar-bottom {
+  flex-shrink: 0;
+  padding-top: 4px;
+}
+.studio-sidebar-bottom > button {
+  min-height: 32px;
+  padding: 6px 12px;
 }
 .studio-sidebar-projects {
   margin-top: 16px;
