@@ -98,7 +98,6 @@ export interface DocumentEditorProps {
 interface MenuItem {
   id: string;
   title: string;
-  description: string;
   keywords: string;
   icon: ReactNode;
   group: string;
@@ -662,7 +661,6 @@ export default function DocumentEditor({
       {
         id: "text",
         title: "正文",
-        description: "从一个简单的段落开始",
         keywords: "text paragraph 正文 文本",
         icon: <Type size={20} />,
         group: "基础内容",
@@ -673,9 +671,6 @@ export default function DocumentEditor({
       ...([1, 2, 3] as const).map((level) => ({
         id: `heading-${level}`,
         title: `标题 ${level}`,
-        description: ["清晰的章节标题", "内容的次级标题", "细分主题的小标题"][
-          level - 1
-        ],
         keywords: `heading h${level} 标题`,
         icon:
           level === 1 ? (
@@ -693,7 +688,6 @@ export default function DocumentEditor({
       {
         id: "bullet",
         title: "无序列表",
-        description: "梳理想法与要点",
         keywords: "bullet list 无序 列表",
         icon: <List size={20} />,
         group: "基础内容",
@@ -704,7 +698,6 @@ export default function DocumentEditor({
       {
         id: "ordered",
         title: "有序列表",
-        description: "有条理地组织步骤",
         keywords: "ordered numbered list 有序 编号 列表",
         icon: <ListOrdered size={20} />,
         group: "基础内容",
@@ -715,7 +708,6 @@ export default function DocumentEditor({
       {
         id: "todo",
         title: "待办事项",
-        description: "将想法变成可勾选的行动",
         keywords: "todo task check 待办 任务 清单",
         icon: <CheckSquare size={20} />,
         group: "基础内容",
@@ -726,7 +718,6 @@ export default function DocumentEditor({
       {
         id: "quote",
         title: "引用",
-        description: "值得留意的一段话",
         keywords: "blockquote quote 引用",
         icon: <Quote size={20} />,
         group: "基础内容",
@@ -737,7 +728,6 @@ export default function DocumentEditor({
       {
         id: "callout",
         title: "提示块",
-        description: "为关键发现留一点空间",
         keywords: "callout note 提示 高亮 注释",
         icon: <MessageSquareQuote size={20} />,
         group: "基础内容",
@@ -762,7 +752,6 @@ export default function DocumentEditor({
       {
         id: "toggle",
         title: "折叠内容",
-        description: "让补充细节按需展开",
         keywords: "toggle details 折叠 展开",
         icon: <ChevronRight size={20} />,
         group: "基础内容",
@@ -780,7 +769,6 @@ export default function DocumentEditor({
       {
         id: "divider",
         title: "分割线",
-        description: "给内容一个自然的停顿",
         keywords: "divider hr 分割 线",
         icon: <Minus size={20} />,
         group: "基础内容",
@@ -791,7 +779,6 @@ export default function DocumentEditor({
       {
         id: "image",
         title: "图片",
-        description: "上传图片或粘贴图片链接",
         keywords: "image photo 图片 照片",
         icon: <ImagePlus size={20} />,
         group: "丰富内容",
@@ -800,7 +787,6 @@ export default function DocumentEditor({
       {
         id: "code",
         title: "代码块",
-        description: "保留格式的代码与片段",
         keywords: "code snippet 代码",
         icon: <CodeXml size={20} />,
         group: "丰富内容",
@@ -811,7 +797,6 @@ export default function DocumentEditor({
       {
         id: "table",
         title: "简单表格",
-        description: "整理一组结构化的信息",
         keywords: "table 表格",
         icon: <Table2 size={20} />,
         group: "丰富内容",
@@ -833,7 +818,6 @@ export default function DocumentEditor({
               ? item.kind
               : `${item.id}@${item.version}#${item.integrity}`),
           title: item.name,
-          description: item.description,
           keywords: `${"kind" in item ? item.kind : item.id} ${item.description}`,
           icon: <PanelTop size={20} />,
           group: "组件",
@@ -1510,7 +1494,6 @@ export default function DocumentEditor({
           </div>
         )}
       </div>
-
       {!readOnly && !minimal && (
         <button
           className="document-add-block"
@@ -1556,7 +1539,6 @@ export default function DocumentEditor({
           </button>
         </div>
       )}
-
       {bubble && !readOnly && (
         <SelectionToolbar
           id={selectionMenuId}
@@ -1576,7 +1558,6 @@ export default function DocumentEditor({
           <TableSelectionActions editor={editor} />
         </SelectionToolbar>
       )}
-
       {slash &&
         !readOnly &&
         createPortal(
@@ -1665,7 +1646,6 @@ export default function DocumentEditor({
                       <span className="slash-item-icon">{item.icon}</span>
                       <span>
                         <strong>{item.title}</strong>
-                        {!minimal && <small>{item.description}</small>}
                       </span>
                       {index === selectedIndex && (
                         <span className="slash-enter">↵</span>
@@ -1678,7 +1658,6 @@ export default function DocumentEditor({
           </>,
           document.body,
         )}
-
       {dialog &&
         createPortal(
           <div

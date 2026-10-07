@@ -305,7 +305,6 @@ export function ComponentCatalog({
         <div className="studio-empty">
           <Blocks size={33} strokeWidth={1.3} />
           <h2>暂无组件</h2>
-          <p>导入本地组件包，或从一个可编辑的示例开始。</p>
         </div>
       )}
     </div>

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
-  History,
   Loader2,
   RotateCcw,
   Bot,
@@ -552,7 +551,6 @@ export function HistoryDialog({
               </div>
               {confirm && (
                 <div className="history-confirm" role="alert">
-                  <p>将此内容恢复为一个新版本，当前版本会保留在历史中。</p>
                   <button
                     className="studio-button primary"
                     disabled={busy}
@@ -663,12 +661,7 @@ export function HistoryDialog({
                 </>
               )}
             </>
-          ) : (
-            <div className="history-empty">
-              <History size={28} />
-              <p>选择一条记录，查看修改内容和来源。</p>
-            </div>
-          )}
+          ) : null}
         </main>
       </div>
     </Dialog>
@@ -883,9 +876,6 @@ export function ImportedSnapshotsDialog({
               <p>原修改时间：未知</p>
               <code>{selected.originalPath}</code>
             </details>
-          )}
-          {!selected && !busy && (
-            <p className="history-empty">选择一份旧快照，查看其内容。</p>
           )}
         </main>
       </div>

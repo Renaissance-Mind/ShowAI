@@ -21,31 +21,26 @@ const sections = [
     id: "general",
     label: "通用",
     icon: Settings2,
-    description: "管理 ShowAI 的本地内容库。",
   },
   {
     id: "appearance",
     label: "外观",
     icon: Sun,
-    description: "选择适合你的界面主题。",
   },
   {
     id: "agent",
     label: "Agent",
     icon: Bot,
-    description: "连接 Agent，让它读取和编辑你的项目。",
   },
   {
     id: "icons",
     label: "图标",
     icon: Shapes,
-    description: "浏览应用使用的图标，比较尺寸、线宽与配色。",
   },
   {
     id: "about",
     label: "关于",
     icon: Info,
-    description: "应用版本与运行信息。",
   },
 ] as const;
 
@@ -131,9 +126,7 @@ export function SettingsPanel({
       <header className="settings-heading">
         <h2>{current.label}</h2>
       </header>
-
       {section === "icons" && <IconViewer />}
-
       {section === "general" && (
         <section
           className="settings-group"
@@ -143,7 +136,6 @@ export function SettingsPanel({
           <div className="settings-row">
             <div className="settings-row-text">
               <h3>存储位置</h3>
-              <p>选择已有内容库，或使用一个新文件夹。</p>
             </div>
             <button
               className="settings-button"
@@ -167,7 +159,7 @@ export function SettingsPanel({
               <Copy size={15} aria-hidden="true" />
             </button>
           </div>
-          <p className="settings-help">项目、页面和快照保存在这个文件夹中。</p>
+
           <div className="settings-row">
             <div className="settings-row-text">
               <h3>修改历史</h3>
@@ -189,7 +181,6 @@ export function SettingsPanel({
       {section === "general" && info?.libraryVersion === 2 && (
         <LibrarySpace home={info.home} />
       )}
-
       {section === "appearance" && (
         <section
           className="settings-group"
@@ -199,7 +190,6 @@ export function SettingsPanel({
           <div className="settings-row">
             <div className="settings-row-text">
               <label htmlFor="settings-theme">主题</label>
-              <p>应用于工作区与文档编辑界面。</p>
             </div>
             <div className="settings-select">
               <select
@@ -242,10 +232,8 @@ export function SettingsPanel({
               );
             })}
           </fieldset>
-          <p className="settings-help">主题会自动保存，下次打开时继续使用。</p>
         </section>
       )}
-
       {section === "agent" && (
         <>
           <section
@@ -256,7 +244,6 @@ export function SettingsPanel({
             <div className="settings-row">
               <div className="settings-row-text">
                 <h3>启动配置</h3>
-                <p>使用随应用提供的 CLI 操作 ShowAI 项目。</p>
               </div>
               <button
                 className="settings-button"
@@ -281,10 +268,6 @@ export function SettingsPanel({
                 </code>
               </pre>
             </details>
-            <p className="settings-help">
-              默认按 Agent
-              的项目目录定位，同一目录的多个会话共用项目；也可指定项目。
-            </p>
           </section>
           <section
             className="settings-group"
@@ -294,14 +277,12 @@ export function SettingsPanel({
             <div className="settings-row">
               <div className="settings-row-text">
                 <h3>MCP</h3>
-                <p>可按项目配置 MCP，让 Agent 通过工具访问项目内容。</p>
               </div>
               <span className="settings-value">按项目配置</span>
             </div>
           </section>
         </>
       )}
-
       {section === "about" && (
         <>
           <div className="settings-product">
@@ -310,7 +291,6 @@ export function SettingsPanel({
             </span>
             <div>
               <h2>ShowAI</h2>
-              <p>本地画布与交互文档</p>
             </div>
           </div>
           <section

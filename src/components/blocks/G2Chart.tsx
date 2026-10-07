@@ -332,10 +332,6 @@ export function G2ChartBlock({
                 spellCheck={false}
               />
             </Field>
-            <p>
-              datasets 保存数据；fields
-              将示例字段对应到自己的字段。高级参数与上方设置同步保存。
-            </p>
           </details>
           {draftError && (
             <p role="alert" className="sb-error">

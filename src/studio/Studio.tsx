@@ -1311,13 +1311,7 @@ export default function Studio() {
                           query={query}
                           onOpen={openSearchResult}
                         />
-                      ) : (
-                        <p className="studio-search-hint">
-                          {view === "projects"
-                            ? "按页面名称或所属项目筛选最近页面"
-                            : "按名称筛选当前项目的页面和文件夹"}
-                        </p>
-                      )}
+                      ) : null}
                     </>
                   )}
                 </ExpandableSearch>
@@ -1410,11 +1404,6 @@ export default function Studio() {
                       项目：
                       <select
                         aria-label="目录项目"
-                        aria-describedby={
-                          componentProject === "all"
-                            ? "component-project-help"
-                            : undefined
-                        }
                         value={componentProject}
                         onChange={(event) => {
                           const id = event.target.value;
@@ -1446,11 +1435,6 @@ export default function Studio() {
                           ? "请选择组件所属项目"
                           : undefined
                       }
-                      aria-describedby={
-                        componentProject === "all"
-                          ? "component-project-help"
-                          : undefined
-                      }
                       onClick={action(async () => {
                         const result =
                           await desktop.invoke<CompiledComponent | null>(
@@ -1476,11 +1460,6 @@ export default function Studio() {
                           ? "请选择组件所属项目"
                           : undefined
                       }
-                      aria-describedby={
-                        componentProject === "all"
-                          ? "component-project-help"
-                          : undefined
-                      }
                       onClick={action(async () => {
                         const result = await desktop.invoke<CompiledComponent>(
                           "components:createExample",
@@ -1501,7 +1480,6 @@ export default function Studio() {
                   </>
                 )}
               </div>
-
               {view === "page" && page.draft && (
                 <>
                   <span className={`studio-save-state ${page.status}`}>
@@ -1715,14 +1693,6 @@ export default function Studio() {
               <div
                 className={`studio-library${view === "components" ? " studio-component-library" : ""}`}
               >
-                {view === "components" && componentProject === "all" && (
-                  <p
-                    id="component-project-help"
-                    className="component-project-hint"
-                  >
-                    选择一个项目后，可导入或新建组件。
-                  </p>
-                )}
                 {view === "components" && (
                   <nav
                     className="studio-filter-tabs component-source-tabs"
@@ -1800,12 +1770,8 @@ export default function Studio() {
                         </select>
                       </label>
                     )}
-                    {!selectedProject && (
-                      <span>先选择项目，再创建或定制。</span>
-                    )}
                   </div>
                 )}
-
                 {view === "projects" && (
                   <RecentPages
                     pages={recent}
@@ -1971,11 +1937,6 @@ export default function Studio() {
                         </div>
                       ))}
                     </div>
-                    {!selectedProject && (
-                      <p className="studio-caption">
-                        打开一个项目后，可以用模板创建页面。
-                      </p>
-                    )}
                   </>
                 )}
                 {view === "components" && (
@@ -2461,7 +2422,6 @@ export default function Studio() {
                 </span>
                 <div>
                   <strong>Page 空白页面</strong>
-                  <p>从顺序页面开始，可嵌入 Board 白板。</p>
                 </div>
                 <ArrowUpRight size={16} />
               </button>
@@ -2475,7 +2435,6 @@ export default function Studio() {
                 </span>
                 <div>
                   <strong>Board 白板</strong>
-                  <p>自由组织内容，可嵌入 Page 页面。</p>
                 </div>
                 <ArrowUpRight size={16} />
               </button>
@@ -2498,11 +2457,7 @@ export default function Studio() {
                       <strong>
                         {item.id === "blank" ? "Page 空白页面" : item.name}
                       </strong>
-                      <p>
-                        {item.id === "blank"
-                          ? "从顺序页面开始，可嵌入 Board 白板。"
-                          : item.description}
-                      </p>
+                      <p>{item.description}</p>
                     </div>
                     <ArrowUpRight size={16} />
                   </button>

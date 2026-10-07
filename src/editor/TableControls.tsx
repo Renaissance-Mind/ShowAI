@@ -250,9 +250,6 @@ export function TableControls({ editor }: { editor: Editor }) {
               <TableColumnsSplit size={14} aria-hidden="true" />
               选择当前列
             </button>
-            <p className="document-table-menu-hint">
-              拖动选择，或按住 Shift 点击另一单元格
-            </p>
             {target.context && (
               <TableSelectionActions
                 editor={editor}

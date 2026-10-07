@@ -195,10 +195,6 @@
   font-size: 12px;
   color: var(--muted);
 }
-.icon-viewer-detail .icon-viewer-note {
-  font-size: 12px;
-  margin-top: 12px;
-}
 .icon-viewer-source {
   display: block;
   font-size: 11px;

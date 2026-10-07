@@ -109,7 +109,6 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
             </p>
           )}
           <div className="sb-panel-footer">
-            <span>点击书签将在新窗口打开来源。</span>
             <button
               type="button"
               className="sb-button sb-primary"
@@ -150,7 +149,6 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
         <EmptyState
           icon={<Bookmark size={27} strokeWidth={1.4} />}
           title="为结论留下出处"
-          description="保存网页、论文或项目链接，让信息可以追溯。"
           action={
             editable && !editing ? (
               <button type="button" className="sb-button" onClick={openEditor}>

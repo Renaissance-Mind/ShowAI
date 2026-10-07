@@ -334,9 +334,9 @@ export default function PageSurface({
             onExit={() => onDrawExit?.()}
           />
         )}
-        {!nodes.length && !drawTool && (
+        {!nodes.length && !drawTool && !onMove && (
           <div className="surface-empty" data-surface-ui>
-            <p>{onMove ? "按 / 插入内容，或开始绘画" : "这块白板还没有内容"}</p>
+            <p>这块白板还没有内容</p>
           </div>
         )}
         <div
@@ -398,7 +398,7 @@ export default function PageSurface({
                   )}
                 </div>
               ))}
-              {!nodes.length && <p>添加内容后可在这里定位。</p>}
+
               <strong>命名视图</strong>
               {views.saved.map((view) => (
                 <div className="surface-navigation-row" key={view.id}>

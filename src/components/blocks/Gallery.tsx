@@ -413,9 +413,6 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
               保存画廊
             </button>
           </div>
-          <p className="sb-inline-hint">
-            本地图片嵌入文档，支持离线查看。单张最多 4 MB。
-          </p>
         </div>
       )}
       {visibleImages.length ? (
@@ -445,7 +442,6 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
         <EmptyState
           icon={<Images size={29} strokeWidth={1.4} />}
           title="给想法更多画面"
-          description="上传图片或添加图片链接，支持图注和全屏预览。"
           action={
             editable && !editing ? (
               <button type="button" className="sb-button" onClick={openEditor}>

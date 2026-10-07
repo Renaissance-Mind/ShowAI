@@ -194,7 +194,6 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
         <EmptyState
           icon={<Gauge size={28} strokeWidth={1.4} />}
           title="把关键数字放在眼前"
-          description="每个指标可以包含数值、单位、说明和变化率。"
           action={
             editable && !editing ? (
               <button type="button" className="sb-button" onClick={openEditor}>

@@ -336,10 +336,7 @@ export function FlowchartBlock({
       />
       <ViewportLockButton {...lock} label="流程图" />
       {!flow ? (
-        <EmptyState
-          title="添加一条流程"
-          description="定义节点和连线后即可查看流程图。"
-        />
+        <EmptyState title="添加一条流程" />
       ) : (
         <>
           {data.flows.length > 1 && (

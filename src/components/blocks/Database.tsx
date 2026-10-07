@@ -623,21 +623,11 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
             <EmptyState
               icon={<LayoutList size={25} strokeWidth={1.4} />}
               title={rows.length ? "没有符合条件的记录" : "从第一条记录开始"}
-              description={
-                rows.length
-                  ? "尝试调整搜索或筛选条件。"
-                  : "添加记录，也可以在区块设置中定义属性。"
-              }
             />
           )}
         </>
       ) : (
         <>
-          {!groupColumn && (
-            <p className="sb-inline-hint">
-              添加一个「单选」属性，即可按选项分组。
-            </p>
-          )}
           <div className="sb-board">
             {groupNames.map((group, groupIndex) => {
               const groupRows = groupColumn

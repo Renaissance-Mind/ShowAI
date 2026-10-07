@@ -77,11 +77,6 @@ export default function RecentPages({
       <div className="studio-empty">
         <FileText size={34} strokeWidth={1.2} />
         <h2>{term ? "没有找到页面" : "暂无最近编辑的页面"}</h2>
-        <p>
-          {term
-            ? "试试页面名称或项目名称。"
-            : "创建或编辑页面后，会显示在这里。"}
-        </p>
         {!term && (
           <button className="studio-button primary" onClick={onCreateProject}>
             新建项目

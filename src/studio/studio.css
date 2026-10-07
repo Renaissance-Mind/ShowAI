@@ -298,12 +298,6 @@ button.studio-tree-chevron:hover {
   color: var(--accent);
   background: var(--accent-soft);
 }
-.studio-search-hint {
-  margin: 0;
-  padding: 12px 18px;
-  color: var(--muted);
-  font-size: 13px;
-}
 .studio-topbar .component-project-picker select {
   min-height: 30px;
   max-width: 150px;

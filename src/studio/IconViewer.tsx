@@ -304,10 +304,7 @@ export default function IconViewer() {
             {notice}
           </div>
           {error && <p role="alert">{error}</p>}
-          <p className="icon-viewer-note">
-            调整参数可比较图标效果，下载的 SVG
-            会保留这些参数。应用图标由共享目录管理，新增后会自动出现在这里。
-          </p>
+
           <code className="icon-viewer-source">src/ui/icons.ts</code>
         </aside>
       </div>
