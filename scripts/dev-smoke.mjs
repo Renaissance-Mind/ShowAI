@@ -333,9 +333,11 @@ try {
     .getByRole("navigation", { name: "主要导航" })
     .getByRole("button", { name: "组件", exact: true })
     .click();
-  await page
-    .getByText("选择一个项目后，可导入或新建组件。", { exact: true })
-    .waitFor();
+  await page.getByLabel("目录项目", { exact: true }).waitFor();
+  assert.equal(
+    await page.getByLabel("目录项目", { exact: true }).inputValue(),
+    "all",
+  );
   assert.equal(
     await page
       .getByRole("button", { name: "新建组件", exact: true })
