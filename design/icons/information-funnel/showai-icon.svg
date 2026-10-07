@@ -1,51 +1,96 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="showai-title showai-description">
   <title id="showai-title">ShowAI icon</title>
-  <desc id="showai-description">Three translucent blue glass discs form an inverted cone, viewed from a higher oblique angle. The largest top disc is pale blue, the middle disc is medium blue, and the smallest bottom disc is deepest. Real layer opacity reveals overlapping discs through the glass.</desc>
+  <desc id="showai-description">Three descending glass discs, pale at the top and deep blue at the bottom, seen from an oblique top view. Transparent faces reveal the layers beneath; thick refractive edges, directional reflections and contact shadows give the stack a glass material. All colors come from RGB(18, 10, 143) and white.</desc>
   <defs>
-    <linearGradient id="showai-glass" x1="18%" y1="0%" x2="65%" y2="100%">
+    <linearGradient id="bottom-face" x1="12%" y1="0%" x2="74%" y2="100%">
+      <stop offset="0%" stop-color="#120A8F" stop-opacity="0.251"/>
+      <stop offset="45%" stop-color="#120A8F" stop-opacity="0.449"/>
+      <stop offset="100%" stop-color="#120A8F" stop-opacity="0.660"/>
+    </linearGradient>
+    <linearGradient id="bottom-edge" x1="0%" y1="0%" x2="100%" y2="12%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.9"/>
+      <stop offset="9%" stop-color="#120A8F" stop-opacity="0.363"/>
+      <stop offset="48%" stop-color="#120A8F" stop-opacity="0.820"/>
+      <stop offset="86%" stop-color="#120A8F" stop-opacity="0.940"/>
+      <stop offset="100%" stop-color="#120A8F" stop-opacity="0.800"/>
+    </linearGradient>
+    <linearGradient id="middle-face" x1="12%" y1="0%" x2="74%" y2="100%">
+      <stop offset="0%" stop-color="#120A8F" stop-opacity="0.182"/>
+      <stop offset="45%" stop-color="#120A8F" stop-opacity="0.326"/>
+      <stop offset="100%" stop-color="#120A8F" stop-opacity="0.480"/>
+    </linearGradient>
+    <linearGradient id="middle-edge" x1="0%" y1="0%" x2="100%" y2="12%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.9"/>
+      <stop offset="9%" stop-color="#120A8F" stop-opacity="0.264"/>
+      <stop offset="48%" stop-color="#120A8F" stop-opacity="0.640"/>
+      <stop offset="86%" stop-color="#120A8F" stop-opacity="0.800"/>
+      <stop offset="100%" stop-color="#120A8F" stop-opacity="0.620"/>
+    </linearGradient>
+    <linearGradient id="top-face" x1="12%" y1="0%" x2="74%" y2="100%">
+      <stop offset="0%" stop-color="#120A8F" stop-opacity="0.122"/>
+      <stop offset="45%" stop-color="#120A8F" stop-opacity="0.218"/>
+      <stop offset="100%" stop-color="#120A8F" stop-opacity="0.320"/>
+    </linearGradient>
+    <linearGradient id="top-edge" x1="0%" y1="0%" x2="100%" y2="12%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.9"/>
+      <stop offset="9%" stop-color="#120A8F" stop-opacity="0.176"/>
+      <stop offset="48%" stop-color="#120A8F" stop-opacity="0.480"/>
+      <stop offset="86%" stop-color="#120A8F" stop-opacity="0.640"/>
+      <stop offset="100%" stop-color="#120A8F" stop-opacity="0.460"/>
+    </linearGradient>
+    <radialGradient id="specular" cx="26%" cy="12%" r="72%" fx="18%" fy="8%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.76"/>
+      <stop offset="33%" stop-color="#FFFFFF" stop-opacity="0.28"/>
+      <stop offset="76%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rim-light" x1="12%" y1="0%" x2="85%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.98"/>
+      <stop offset="39%" stop-color="#FFFFFF" stop-opacity="0.6"/>
+      <stop offset="65%" stop-color="#120A8F" stop-opacity="0.13"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="lower-rim" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.3"/>
-      <stop offset="65%" stop-color="#FFFFFF" stop-opacity="0.06"/>
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="47%" stop-color="#FFFFFF" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.12"/>
     </linearGradient>
-    <linearGradient id="showai-bottom-edge" x1="0%" y1="0%" x2="100%" y2="35%">
-      <stop offset="0%" stop-color="#FFFFFF"/>
-      <stop offset="18%" stop-color="#5954B1"/>
-      <stop offset="100%" stop-color="#5954B1"/>
-    </linearGradient>
-    <linearGradient id="showai-middle-edge" x1="0%" y1="0%" x2="100%" y2="35%">
-      <stop offset="0%" stop-color="#FFFFFF"/>
-      <stop offset="18%" stop-color="#7D78C1"/>
-      <stop offset="100%" stop-color="#7D78C1"/>
-    </linearGradient>
-    <linearGradient id="showai-top-edge" x1="0%" y1="0%" x2="100%" y2="35%">
-      <stop offset="0%" stop-color="#FFFFFF"/>
-      <stop offset="18%" stop-color="#A09DD2"/>
-      <stop offset="100%" stop-color="#A09DD2"/>
-    </linearGradient>
-    <filter id="showai-shadow" x="-35%" y="-55%" width="170%" height="220%" color-interpolation-filters="sRGB">
-      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#5954B1" flood-opacity="0.12"/>
+    <filter id="layer-shadow" x="-45%" y="-60%" width="190%" height="245%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="4" dy="12" stdDeviation="10" flood-color="#120A8F" flood-opacity="0.11"/>
+      <feDropShadow dx="0" dy="3" stdDeviation="2.4" flood-color="#120A8F" flood-opacity="0.08"/>
     </filter>
     <clipPath id="showai-frame"><rect width="512" height="512" rx="88"/></clipPath>
   </defs>
   <g clip-path="url(#showai-frame)">
     <rect width="512" height="512" fill="#FFFFFF"/>
-    <g id="showai-bottom-disc" opacity="0.9" filter="url(#showai-shadow)">
-      <ellipse cx="256" cy="368" rx="88" ry="49" fill="url(#showai-bottom-edge)"/>
-      <ellipse cx="256" cy="354" rx="88" ry="49" fill="#5954B1"/>
-      <ellipse cx="256" cy="354" rx="88" ry="49" fill="url(#showai-glass)" stroke="#FFFFFF" stroke-opacity="0.65" stroke-width="1.6"/>
-      <path d="M 168 368 A 88 49 0 0 0 344 368" fill="none" stroke="#FFFFFF" stroke-opacity="0.42" stroke-width="1.6"/>
+    <g id="showai-bottom-disc" filter="url(#layer-shadow)">
+      <ellipse cx="256" cy="370" rx="88" ry="49" fill="#120A8F" fill-opacity="0.079"/>
+      <ellipse cx="256" cy="370" rx="88" ry="49" fill="none" stroke="#120A8F" stroke-opacity="0.06" stroke-width="1"/>
+      <ellipse cx="256" cy="354" rx="88" ry="49" fill="url(#bottom-face)"/>
+      <path d="M 168 354 A 88 49 0 0 0 344 354 L 344 370 A 88 49 0 0 1 168 370 Z" fill="url(#bottom-edge)"/>
+      <ellipse cx="256" cy="354" rx="88" ry="49" fill="url(#specular)"/>
+      <ellipse cx="256" cy="354" rx="86.5" ry="48" fill="none" stroke="url(#rim-light)" stroke-width="2"/>
+      <path d="M 168 370 A 88 49 0 0 0 344 370" fill="none" stroke="url(#lower-rim)" stroke-width="1.5"/>
+      <path d="M 176 351 A 80 46 0 0 1 256 306" fill="none" stroke="#FFFFFF" stroke-opacity="0.82" stroke-width="2.2" stroke-linecap="round"/>
     </g>
-    <g id="showai-middle-disc" opacity="0.82" filter="url(#showai-shadow)">
-      <ellipse cx="256" cy="290" rx="136" ry="75" fill="url(#showai-middle-edge)"/>
-      <ellipse cx="256" cy="274" rx="136" ry="75" fill="#7D78C1"/>
-      <ellipse cx="256" cy="274" rx="136" ry="75" fill="url(#showai-glass)" stroke="#FFFFFF" stroke-opacity="0.65" stroke-width="1.6"/>
-      <path d="M 120 290 A 136 75 0 0 0 392 290" fill="none" stroke="#FFFFFF" stroke-opacity="0.42" stroke-width="1.6"/>
+    <g id="showai-middle-disc" filter="url(#layer-shadow)">
+      <ellipse cx="256" cy="292" rx="136" ry="75" fill="#120A8F" fill-opacity="0.058"/>
+      <ellipse cx="256" cy="292" rx="136" ry="75" fill="none" stroke="#120A8F" stroke-opacity="0.06" stroke-width="1"/>
+      <ellipse cx="256" cy="274" rx="136" ry="75" fill="url(#middle-face)"/>
+      <path d="M 120 274 A 136 75 0 0 0 392 274 L 392 292 A 136 75 0 0 1 120 292 Z" fill="url(#middle-edge)"/>
+      <ellipse cx="256" cy="274" rx="136" ry="75" fill="url(#specular)"/>
+      <ellipse cx="256" cy="274" rx="134.5" ry="74" fill="none" stroke="url(#rim-light)" stroke-width="2"/>
+      <path d="M 120 292 A 136 75 0 0 0 392 292" fill="none" stroke="url(#lower-rim)" stroke-width="1.5"/>
+      <path d="M 128 271 A 128 72 0 0 1 256 200" fill="none" stroke="#FFFFFF" stroke-opacity="0.82" stroke-width="2.2" stroke-linecap="round"/>
     </g>
-    <g id="showai-top-disc" opacity="0.73" filter="url(#showai-shadow)">
-      <ellipse cx="256" cy="196" rx="184" ry="102" fill="url(#showai-top-edge)"/>
-      <ellipse cx="256" cy="178" rx="184" ry="102" fill="#A09DD2"/>
-      <ellipse cx="256" cy="178" rx="184" ry="102" fill="url(#showai-glass)" stroke="#FFFFFF" stroke-opacity="0.65" stroke-width="1.6"/>
-      <path d="M 72 196 A 184 102 0 0 0 440 196" fill="none" stroke="#FFFFFF" stroke-opacity="0.42" stroke-width="1.6"/>
+    <g id="showai-top-disc" filter="url(#layer-shadow)">
+      <ellipse cx="256" cy="198" rx="184" ry="102" fill="#120A8F" fill-opacity="0.038"/>
+      <ellipse cx="256" cy="198" rx="184" ry="102" fill="none" stroke="#120A8F" stroke-opacity="0.06" stroke-width="1"/>
+      <ellipse cx="256" cy="178" rx="184" ry="102" fill="url(#top-face)"/>
+      <path d="M 72 178 A 184 102 0 0 0 440 178 L 440 198 A 184 102 0 0 1 72 198 Z" fill="url(#top-edge)"/>
+      <ellipse cx="256" cy="178" rx="184" ry="102" fill="url(#specular)"/>
+      <ellipse cx="256" cy="178" rx="182.5" ry="101" fill="none" stroke="url(#rim-light)" stroke-width="2"/>
+      <path d="M 72 198 A 184 102 0 0 0 440 198" fill="none" stroke="url(#lower-rim)" stroke-width="1.5"/>
+      <path d="M 80 175 A 176 99 0 0 1 256 77" fill="none" stroke="#FFFFFF" stroke-opacity="0.82" stroke-width="2.2" stroke-linecap="round"/>
     </g>
   </g>
 </svg>
