@@ -67,6 +67,7 @@ import { usePage, type LoadedPage } from "./usePage";
 import {
   LibraryRow,
   LibraryContextMenu,
+  type LibraryMenuPoint,
   type LibraryTarget,
 } from "./LibraryNavigation";
 import Dialog from "./Dialog";
@@ -239,6 +240,7 @@ export default function Studio() {
   const [contextMenu, setContextMenu] = useState<{
     target: LibraryTarget;
     anchor: HTMLElement;
+    point?: LibraryMenuPoint;
     pageTools?: boolean;
   } | null>(null);
   const [projectsMenu, setProjectsMenu] = useState<HTMLElement | null>(null);
@@ -701,12 +703,13 @@ export default function Studio() {
   const showMenu = (
     target: LibraryTarget,
     anchor: HTMLElement,
+    point?: LibraryMenuPoint,
     pageTools = false,
   ) =>
     setContextMenu((current) =>
-      current?.anchor === anchor && current.target.id === target.id
+      !point && current?.anchor === anchor && current.target.id === target.id
         ? null
-        : { target, anchor, pageTools },
+        : { target, anchor, point, pageTools },
     );
   async function toggleProject(id: string) {
     if (!expandedProjects[id]) await loadProjectContents(id);
@@ -1571,7 +1574,8 @@ export default function Studio() {
                     aria-haspopup="menu"
                     onClick={(event) => {
                       const target = activePageTarget();
-                      if (target) showMenu(target, event.currentTarget, true);
+                      if (target)
+                        showMenu(target, event.currentTarget, undefined, true);
                     }}
                   >
                     <MoreHorizontal size={18} />
@@ -2098,6 +2102,7 @@ export default function Studio() {
         {contextMenu && (
           <LibraryContextMenu
             anchor={contextMenu.anchor}
+            point={contextMenu.point}
             label={`${contextMenu.target.title}的操作`}
             onClose={() => setContextMenu(null)}
             items={[
