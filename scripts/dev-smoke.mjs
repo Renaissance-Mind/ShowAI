@@ -135,7 +135,11 @@ const receipt = () =>
   });
 let browser, observer, debugPage;
 try {
-  const original = await poll(receipt, Boolean, "development launch");
+  const original = await poll(
+    receipt,
+    (value) => !!value?.startup && !!value?.backendPid,
+    "development launch with completed timing receipt",
+  );
   browser =
     mode === "desktop"
       ? await chromium.connectOverCDP(`http://127.0.0.1:${debugPort}`)
