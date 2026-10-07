@@ -493,6 +493,10 @@
   outline: 1px solid var(--accent);
   outline-offset: 4px;
 }
+/* Media owns its visible bounds; node selection and block handles still work. */
+.document-content[contenteditable="true"] .document-widget:is([data-widget-kind="video"], [data-widget-kind="audio"], [data-widget-kind="pdf"]):is(:hover, .is-selected) {
+  outline: none;
+}
 .block-handle {
   position: absolute;
   left: -48px;

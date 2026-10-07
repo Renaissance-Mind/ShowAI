@@ -28,6 +28,9 @@
 .sb-media-figure {
   margin: 0;
 }
+.sb-media {
+  margin: 0;
+}
 .sb-media video {
   display: block;
   width: 100%;
@@ -35,6 +38,61 @@
   object-fit: contain;
   background: #171b1c;
   border-radius: 10px;
+}
+.sb-video-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+}
+.sb-video .sb-video-stage > .sb-header {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 8;
+  min-height: 54px;
+  padding: 12px 14px 26px;
+  background: linear-gradient(#0009, #0000);
+  color: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.sb-video-stage:hover > .sb-header,
+.sb-video-stage:focus-within > .sb-header,
+.sb-video-stage > .sb-header.is-editing {
+  opacity: 1;
+}
+.sb-video-stage .sb-heading {
+  padding-right: 42px;
+}
+.sb-video-stage .sb-title {
+  color: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sb-video-stage > .sb-header > .sb-actions {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: transparent;
+  color: inherit;
+  opacity: 1;
+  pointer-events: none;
+}
+.sb-video-stage:hover > .sb-header > .sb-actions,
+.sb-video-stage:focus-within > .sb-header > .sb-actions,
+.sb-video-stage > .sb-header.is-editing > .sb-actions {
+  pointer-events: auto;
+}
+.sb-video-stage .sb-icon-button:hover {
+  background: #ffffff26;
+}
+@media print {
+  .sb-video-stage > .sb-header {
+    display: none;
+  }
 }
 .sb-resource-caption {
   margin: 10px 2px 0;
@@ -47,10 +105,9 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 18px 20px;
-  border: 1px solid var(--sb-line);
-  border-radius: 10px;
-  background: var(--sb-soft);
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 .sb-audio-icon {
   display: grid;
@@ -110,7 +167,7 @@
   margin-top: 12px;
 }
 .sb-pdf-reader {
-  border: 1px solid var(--sb-line);
+  border: 0;
   border-radius: 10px;
   overflow: hidden;
   background: var(--sb-soft);
@@ -278,7 +335,7 @@
 }
 @media (max-width: 480px) {
   .sb-audio-body {
-    padding: 12px;
+    padding: 0;
     gap: 8px;
   }
   .sb-audio-icon {

@@ -69,6 +69,34 @@
 .surface-object.is-selected {
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
+/* Bare media in a Board uses the existing object controls without a second frame. */
+.surface-object:has(> .surface-object-content > .sb-media),
+.surface-object:has(> .surface-object-content > .sb-pdf) {
+  border: 0;
+}
+.surface-object:has(> .surface-object-content > .sb-media) > .surface-object-content,
+.surface-object:has(> .surface-object-content > .sb-pdf) > .surface-object-content {
+  padding: 0;
+}
+.surface-object-content > .sb-media,
+.surface-object-content > .sb-pdf { margin: 0; }
+.surface-object:has(> .surface-object-content > .sb-media) > .surface-object-header,
+.surface-object:has(> .surface-object-content > .sb-pdf) > .surface-object-header {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+.surface-object:has(> .surface-object-content > .sb-media).is-selected > .surface-object-header,
+.surface-object:has(> .surface-object-content > .sb-pdf).is-selected > .surface-object-header,
+.surface-object:has(> .surface-object-content > .sb-media) > .surface-object-header:focus-within,
+.surface-object:has(> .surface-object-content > .sb-pdf) > .surface-object-header:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+.surface-object:has(> .surface-object-content > .sb-media) > .surface-object-header .surface-object-grip > span,
+.surface-object:has(> .surface-object-content > .sb-pdf) > .surface-object-header .surface-object-grip > span { display: none; }
 .surface-object:focus-within,
 .surface-object.is-moving {
   z-index: 2;

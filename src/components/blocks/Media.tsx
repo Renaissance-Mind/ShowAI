@@ -24,13 +24,13 @@ function MediaBlock({
       className={`sb-block sb-media sb-${kind}`}
       aria-label={text(data.title) || label}
     >
-      <BlockHeader
-        title={kind === "video" ? text(data.title) : undefined}
-        defaultTitle={label}
-        editable={editable}
-        editing={editing}
-        onEdit={() => setEditing(!editing)}
-      />
+      {(kind === "audio" || !src) && (
+        <BlockHeader
+          editable={editable}
+          editing={editing}
+          onEdit={() => setEditing(!editing)}
+        />
+      )}
       {editing && (
         <ResourceEditor
           kind={kind}
@@ -46,23 +46,35 @@ function MediaBlock({
       {src ? (
         <figure className="sb-media-figure">
           {kind === "video" ? (
-            <video
-              key={src}
-              controls
-              playsInline
-              preload="metadata"
-              poster={safeImageUrl(data.poster)}
-              loop={data.loop === true}
-              muted={data.muted === true}
-              style={{
-                aspectRatio: text(data.aspectRatio, "16:9").replace(":", " / "),
-              }}
-              src={src}
-              aria-label={text(data.title) || "视频播放器"}
-              onError={() => setFailed(src)}
-            />
+            <div className="sb-video-stage" data-surface-gesture="own">
+              <BlockHeader
+                title={text(data.title)}
+                defaultTitle={label}
+                editable={editable}
+                editing={editing}
+                onEdit={() => setEditing(!editing)}
+              />
+              <video
+                key={src}
+                controls
+                playsInline
+                preload="metadata"
+                poster={safeImageUrl(data.poster)}
+                loop={data.loop === true}
+                muted={data.muted === true}
+                style={{
+                  aspectRatio: text(data.aspectRatio, "16:9").replace(
+                    ":",
+                    " / ",
+                  ),
+                }}
+                src={src}
+                aria-label={text(data.title) || "视频播放器"}
+                onError={() => setFailed(src)}
+              />
+            </div>
           ) : (
-            <div className="sb-audio-body">
+            <div className="sb-audio-body" data-surface-gesture="own">
               <div className="sb-audio-icon">
                 <Music2 size={20} />
               </div>
