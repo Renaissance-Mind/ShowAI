@@ -1,4 +1,5 @@
 import type { DesktopChange, DesktopWindowState } from "../desktop/bridge";
+import type { TabCommand } from "../workbench/tab-shortcuts";
 export interface DesktopBridge {
   getWindowState?(): Promise<DesktopWindowState>;
   onWindowStateChange?(
@@ -9,6 +10,7 @@ export interface DesktopBridge {
     args?: Record<string, unknown>,
   ): Promise<T>;
   onChange(listener: (change: DesktopChange) => void): () => void;
+  onTabCommand?(listener: (command: TabCommand) => void): () => void;
   onRefreshPage?(listener: () => void): () => void;
   onBeforeClose(listener: () => Promise<boolean>): () => void;
   setDirty?(dirty: boolean): void;
@@ -31,6 +33,9 @@ export const desktop = {
   },
   onChange(listener: (change: DesktopChange) => void) {
     return window.showai?.onChange(listener) ?? (() => {});
+  },
+  onTabCommand(listener: (command: TabCommand) => void) {
+    return window.showai?.onTabCommand?.(listener) ?? (() => {});
   },
   onRefreshPage(listener: () => void) {
     return window.showai?.onRefreshPage?.(listener) ?? (() => {});

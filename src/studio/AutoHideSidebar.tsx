@@ -22,6 +22,7 @@ export default function AutoHideSidebar({
   navigation,
   topbar,
   focusWindow,
+  switchingTab,
 }: {
   enabled: boolean;
   interactionHeld: boolean;
@@ -29,6 +30,7 @@ export default function AutoHideSidebar({
   navigation: ReactNode;
   topbar: ReactNode;
   focusWindow: boolean;
+  switchingTab: boolean;
 }) {
   const [locked, setLocked] = useState(
     () => localStorage.getItem("showai:sidebar-locked") === "true",
@@ -242,7 +244,11 @@ export default function AutoHideSidebar({
         )}
         {topbar}
       </header>
-      <div className="studio-workspace">
+      <div
+        className="studio-workspace"
+        inert={switchingTab}
+        aria-busy={switchingTab}
+      >
         {!focusWindow && (
           <div
             className="studio-sidebar-shell"

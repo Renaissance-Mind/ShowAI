@@ -99,6 +99,10 @@ import TemplateNavigation, {
 } from "./TemplateNavigation";
 import RecentPages, { recentPages } from "./RecentPages";
 import AutoHideSidebar from "./AutoHideSidebar";
+import WorkspaceTabs from "./WorkspaceTabs";
+import { useWorkspaceTabs } from "./useWorkspaceTabs";
+import type { WorkspaceEntry, WorkspaceView } from "./workspace-tabs";
+import { tabShortcut, type TabCommand } from "../workbench/tab-shortcuts";
 import { useWindowFullscreen } from "./useWindowFullscreen";
 import { ComponentCatalog, ComponentNavigation } from "./ComponentCatalog";
 import {
@@ -130,8 +134,7 @@ import {
   type SettingsSection,
 } from "./Settings";
 
-type View =
-  "projects" | "project" | "page" | "templates" | "components" | "settings";
+type View = WorkspaceView;
 type Catalog = {
   builtin: BuiltinComponentMetadata[];
   custom: CatalogCustomComponent[];
@@ -209,6 +212,9 @@ function Scope({ value }: { value: string }) {
 
 export default function Studio() {
   const [navigationUpdating, setNavigationUpdating] = useState(true);
+  const [workspaceReady, setWorkspaceReady] = useState(false);
+  const [routing, setRouting] = useState(false);
+  const routingRef = useRef(false);
   const catalogLoaded = useRef(false);
   const windowFullscreen = useWindowFullscreen();
   const [info, setInfo] = useState<DesktopInfo | null>(null);
@@ -525,6 +531,7 @@ export default function Studio() {
         );
       }
       await verification;
+      setWorkspaceReady(true);
     })().catch(report);
   }, [refresh, loadCatalog, page, report]);
 
@@ -621,58 +628,85 @@ export default function Studio() {
   }, []);
 
   async function navigate(next: View) {
-    if (!(await page.flush())) {
-      setView("page");
-      return;
+    if (routingRef.current) return;
+    workspace.rememberScroll();
+    routingRef.current = true;
+    setRouting(true);
+    try {
+      if (!(await page.flush())) {
+        setView("page");
+        return;
+      }
+      setContextMenu(null);
+      setQuery("");
+      setView(next);
+      if (next === "projects") {
+        setSelectedProject(null);
+        selectedRef.current = null;
+        setSelectedFolder(null);
+        await refresh();
+      }
+      if (next === "templates" || next === "components") await loadCatalog();
+    } finally {
+      routingRef.current = false;
+      setRouting(false);
     }
-    setContextMenu(null);
-    setQuery("");
-    setView(next);
-    if (next === "projects") {
-      setSelectedProject(null);
-      selectedRef.current = null;
-      setSelectedFolder(null);
-      await refresh();
-    }
-    if (next === "templates" || next === "components") await loadCatalog();
   }
   async function openProject(id: string, folderId: string | null = null) {
-    if (!(await page.flush())) {
-      setView("page");
-      return false;
+    if (routingRef.current) return false;
+    workspace.rememberScroll();
+    routingRef.current = true;
+    setRouting(true);
+    try {
+      if (!(await page.flush())) {
+        setView("page");
+        return false;
+      }
+      selectedRef.current = id;
+      setSelectedProject(id);
+      setSelectedFolder(folderId);
+      setExpandedProjects((current) => ({ ...current, [id]: true }));
+      setQuery("");
+      setView("project");
+      setContextMenu(null);
+      const loaded = await loadProjectContents(id);
+      expandFolderPath(loaded.folders, folderId);
+      if (catalogLoaded.current) void loadCatalog().catch(report);
+      return true;
+    } finally {
+      routingRef.current = false;
+      setRouting(false);
     }
-    selectedRef.current = id;
-    setSelectedProject(id);
-    setSelectedFolder(folderId);
-    setExpandedProjects((current) => ({ ...current, [id]: true }));
-    setQuery("");
-    setView("project");
-    setContextMenu(null);
-    const loaded = await loadProjectContents(id);
-    expandFolderPath(loaded.folders, folderId);
-    if (catalogLoaded.current) void loadCatalog().catch(report);
-    return true;
   }
   async function openPage(id: string, projectId = selectedProject) {
-    if (!projectId) return false;
-    if (await page.open(projectId, id)) {
-      selectedRef.current = projectId;
-      setSelectedProject(projectId);
-      setExpandedProjects((current) => ({ ...current, [projectId]: true }));
-      setView("page");
-      const loaded = await loadProjectContents(projectId);
-      const parentId =
-        loaded.pages.find((item) => item.id === id)?.parentId ?? null;
-      setSelectedFolder(parentId);
-      expandFolderPath(loaded.folders, parentId);
-      setView("page");
-      performance.clearMarks("showai:page-visible");
-      performance.mark("showai:page-visible");
-      void loadCatalog().catch(report);
-      setContextMenu(null);
-      return true;
+    if (routingRef.current) return false;
+    workspace.rememberScroll();
+    routingRef.current = true;
+    setRouting(true);
+    try {
+      if (!projectId) return false;
+      if (await page.open(projectId, id)) {
+        selectedRef.current = projectId;
+        setSelectedProject(projectId);
+        setExpandedProjects((current) => ({ ...current, [projectId]: true }));
+        setView("page");
+        const loaded = await loadProjectContents(projectId);
+        const parentId =
+          loaded.pages.find((item) => item.id === id)?.parentId ?? null;
+        setSelectedFolder(parentId);
+        expandFolderPath(loaded.folders, parentId);
+        setView("page");
+        performance.clearMarks("showai:page-visible");
+        performance.mark("showai:page-visible");
+        void loadCatalog().catch(report);
+        setContextMenu(null);
+        return true;
+      }
+      return false;
+    } finally {
+      routingRef.current = false;
+      setRouting(false);
     }
-    return false;
   }
   async function beginNewPage(projectId: string, parentId: string | null) {
     const choices = await desktop.invoke<TemplateMetadata[]>("templates:list", {
@@ -1295,6 +1329,122 @@ export default function Studio() {
             : view === "settings"
               ? "设置"
               : page.draft?.title || "无标题";
+  const workspaceEntry = useMemo<WorkspaceEntry>(
+    () => ({
+      location: {
+        view,
+        projectId: selectedProject,
+        folderId: selectedFolder,
+        pageId: view === "page" ? (page.draft?.id ?? null) : null,
+      },
+      title: heading,
+      icon:
+        view === "page"
+          ? page.draft?.icon
+          : view === "project" && !selectedFolder
+            ? project?.icon
+            : undefined,
+      scrollTop: 0,
+    }),
+    [
+      view,
+      selectedProject,
+      selectedFolder,
+      page.draft?.id,
+      page.draft?.icon,
+      project?.icon,
+      heading,
+    ],
+  );
+  const workspace = useWorkspaceTabs({
+    home: info?.home,
+    ready: workspaceReady && !routing,
+    entry: workspaceEntry,
+    getScroll: () => catalogScrollRef.current?.scrollTop ?? 0,
+    onError: report,
+    restore: async (entry) => {
+      const target = entry.location;
+      if (!(await page.flush())) {
+        setView("page");
+        return false;
+      }
+      const loaded = target.projectId
+        ? await loadProjectContents(target.projectId)
+        : null;
+      if (target.view === "page" && target.projectId && target.pageId) {
+        if (!(await page.open(target.projectId, target.pageId))) return false;
+      } else if (!(await page.clear())) return false;
+      selectedRef.current = target.projectId;
+      setSelectedProject(target.projectId);
+      const folderId =
+        target.view === "page"
+          ? (loaded?.pages.find((item) => item.id === target.pageId)
+              ?.parentId ?? null)
+          : target.folderId;
+      setSelectedFolder(folderId);
+      if (target.projectId) {
+        setExpandedProjects((current) => ({
+          ...current,
+          [target.projectId!]: true,
+        }));
+        expandFolderPath(loaded?.folders ?? [], folderId);
+      }
+      setContextMenu(null);
+      setProjectsMenu(null);
+      setGroupMenu(null);
+      setExportMenu(null);
+      setQuery("");
+      setSearchLibrary(false);
+      setRevealNode(null);
+      if (target.view !== "page") setEditorControls(null);
+      setView(target.view);
+      if (
+        target.view === "templates" ||
+        target.view === "components" ||
+        catalogLoaded.current
+      )
+        void loadCatalog().catch(report);
+      requestAnimationFrame(() => {
+        catalogScrollRef.current?.scrollTo({ top: entry.scrollTop });
+      });
+      return true;
+    },
+  });
+  useEffect(() => {
+    const command = (command: TabCommand) => {
+      if (dialogRef.current || !workspaceReady || routingRef.current) return;
+      const index = workspace.tabs.findIndex(
+        (tab) => tab.id === workspace.activeId,
+      );
+      const operation =
+        command === "new"
+          ? workspace.add
+          : command === "close"
+            ? () => workspace.close()
+            : () =>
+                workspace.select(
+                  workspace.tabs[
+                    (index +
+                      (command === "next" ? 1 : workspace.tabs.length - 1)) %
+                      workspace.tabs.length
+                  ].id,
+                );
+      void operation().catch(report);
+    };
+    const key = (event: KeyboardEvent) => {
+      const shortcut = tabShortcut(event);
+      if (!shortcut || event.defaultPrevented || dialogRef.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (!event.repeat) command(shortcut);
+    };
+    const unsubscribe = desktop.onTabCommand(command);
+    window.addEventListener("keydown", key, true);
+    return () => {
+      unsubscribe();
+      window.removeEventListener("keydown", key, true);
+    };
+  }, [workspace, workspaceReady, report]);
   const action = (operation: () => Promise<unknown>) => () => {
     void operation().catch(report);
   };
@@ -1836,10 +1986,31 @@ export default function Studio() {
             !!contextMenu?.anchor.closest(".studio-sidebar")
           }
           focusWindow={focusWindow}
+          switchingTab={workspace.switching || routing}
           navigation={sidebarContent}
-          topbar={topbar}
+          topbar={
+            <WorkspaceTabs
+              tabs={workspace.tabs}
+              activeId={workspace.activeId}
+              busy={
+                workspace.switching || routing || !workspaceReady || !!dialog
+              }
+              canBack={workspace.canBack}
+              canForward={workspace.canForward}
+              onSelect={(id) => void workspace.select(id).catch(report)}
+              onClose={(id) => void workspace.close(id).catch(report)}
+              onAdd={() => void workspace.add().catch(report)}
+              onStep={(offset) => void workspace.step(offset).catch(report)}
+            />
+          }
         >
-          <main className="studio-main">
+          <main
+            className="studio-main"
+            id="studio-tab-panel"
+            role="tabpanel"
+            aria-labelledby={`workspace-tab-${workspace.activeId}`}
+          >
+            {topbar}
             {problem && (
               <div className="studio-problem" role="alert">
                 <span>{problem}</span>

@@ -15,6 +15,7 @@ import { mkdir, readFile, writeFile, rename, realpath } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
+import { tabShortcut } from "../workbench/tab-shortcuts";
 import { AgentService, errorResult } from "../agent/service";
 import { MaintenanceScheduler } from "../core/maintenance-scheduler";
 import { openLibrary } from "../core/open-library";
@@ -320,7 +321,7 @@ async function createWindow(page?: {
     show: false,
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
     trafficLightPosition:
-      process.platform === "darwin" ? { x: 16, y: 16 } : undefined,
+      process.platform === "darwin" ? { x: 16, y: 12 } : undefined,
     webPreferences: {
       preload: join(directory, "preload.cjs"),
       contextIsolation: true,
@@ -331,6 +332,20 @@ async function createWindow(page?: {
     },
   });
   windows.add(window);
+  window.webContents.on("before-input-event", (event, input) => {
+    if (input.type !== "keyDown") return;
+    const command = tabShortcut({
+      key: input.key,
+      metaKey: input.meta,
+      ctrlKey: input.control,
+      shiftKey: input.shift,
+      altKey: input.alt,
+    });
+    if (!command) return;
+    event.preventDefault();
+    if (!input.isAutoRepeat)
+      window.webContents.send("showai:tab-command", command);
+  });
   const sendWindowState = () => {
     window.webContents.send("showai:window-state-changed", {
       fullScreen: window.isFullScreen(),

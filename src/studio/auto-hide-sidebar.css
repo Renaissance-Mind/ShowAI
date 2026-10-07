@@ -67,7 +67,7 @@
 .studio-window-topbar {
   display: flex;
   align-items: center;
-  height: 44px;
+  height: 36px;
   flex-shrink: 0;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
@@ -87,7 +87,7 @@
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
-  height: 44px;
+  height: 36px;
   min-width: 0;
   padding: 0 8px 0 19px;
   gap: 4px;
@@ -136,7 +136,7 @@
 }
 .studio-sidebar-edge {
   position: fixed;
-  inset: 45px auto 0 0;
+  inset: 37px auto 0 0;
   z-index: 101;
   width: 12px;
   display: grid;

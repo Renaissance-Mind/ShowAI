@@ -206,9 +206,10 @@ button.studio-tree-chevron:hover {
 .studio-topbar {
   position: relative;
   z-index: 20;
-  height: 44px;
+  box-sizing: border-box;
+  height: 36px;
   min-width: 0;
-  flex: 1;
+  flex: 0 0 36px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -216,6 +217,7 @@ button.studio-tree-chevron:hover {
   -webkit-app-region: drag;
   gap: 12px;
   background: var(--paper);
+  border-bottom: 1px solid var(--line);
 }
 .studio-topbar .expandable-search {
   position: static;
@@ -684,10 +686,6 @@ button.studio-tree-chevron:hover {
 .studio-page-title::placeholder {
   color: var(--muted);
   opacity: 0.65;
-}
-.focus-window[data-native-titlebar="mac"]:not([data-window-fullscreen="true"])
-  .studio-topbar {
-  padding-left: 88px;
 }
 .studio-template-grid {
   display: grid;

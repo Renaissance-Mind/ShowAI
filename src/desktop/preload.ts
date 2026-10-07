@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type { TabCommand } from "../workbench/tab-shortcuts";
 import type {
   DesktopChange,
   DesktopResponse,
@@ -66,6 +67,14 @@ if (process.isMainFrame) {
       return () => {
         closeListeners.delete(listener);
       };
+    },
+    onTabCommand(listener) {
+      const receive = (
+        _event: Electron.IpcRendererEvent,
+        command: TabCommand,
+      ) => listener(command);
+      ipcRenderer.on("showai:tab-command", receive);
+      return () => ipcRenderer.removeListener("showai:tab-command", receive);
     },
     onRefreshPage(listener) {
       const receive = () => listener();

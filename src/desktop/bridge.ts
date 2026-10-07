@@ -1,3 +1,5 @@
+import type { TabCommand } from "../workbench/tab-shortcuts";
+
 export interface DesktopError {
   code: string;
   message: string;
@@ -42,6 +44,7 @@ export interface ShowAIBridge {
     args?: Record<string, unknown>,
   ): Promise<T>;
   onChange(listener: (change: DesktopChange) => void): () => void;
+  onTabCommand?(listener: (command: TabCommand) => void): () => void;
   onRefreshPage?(listener: () => void): () => void;
   onBeforeClose(listener: () => Promise<boolean>): () => void;
   prepareReload?(): Promise<boolean>;
