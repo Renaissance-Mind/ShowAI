@@ -246,7 +246,7 @@ for (const entry of catalog) {
   };
   templates.push({
     kind,
-    name: entry.name + " · G2",
+    name: entry.name,
     description: entry.description + "，支持编辑数据、主题和交互。",
     scenarios: [entry.description, "按统一视觉规范创建可复用的数据图表。"],
     effects: [

@@ -165,12 +165,12 @@ export function G2ChartBlock({
       data-viewport-lock-scope="g2"
       data-viewport-locked={lock.locked}
       className={"sb-block sb-g2-chart" + (theme === "dark" ? " is-dark" : "")}
-      aria-label={text(data.title, "G2 图表")}
+      aria-label={text(data.title, "图表")}
       data-g2-type={chartType}
       data-third-party-licenses={JSON.stringify(licenses)}
     >
       <BlockHeader
-        title={text(data.title, "G2 图表")}
+        title={text(data.title, "图表")}
         description={text(data.description)}
         icon={<BarChart3 size={18} />}
         editable={editable}
@@ -199,7 +199,7 @@ export function G2ChartBlock({
             onChange={(e) => changeTheme(e.target.value)}
           >
             <option value="indigo">ShowAI 靛蓝</option>
-            <option value="classic">G2 经典</option>
+            <option value="classic">经典</option>
             <option value="dark">深色</option>
           </select>
         </label>
