@@ -13,6 +13,14 @@ import { canonicalJson } from "../core/diff";
 import type { ChangeActor } from "../core/history-model";
 import { EditorDrafts, type EditorDraftInput } from "../core/editor-drafts";
 import { LibraryImport } from "../core/library-import";
+import {
+  LibraryMaintenance,
+  verifyLibraryArchive,
+} from "../core/library-maintenance";
+import {
+  maintenancePolicy,
+  setMaintenancePolicy,
+} from "../core/maintenance-scheduler";
 import { AgentService } from "../agent/service";
 import { assertExportDestination, exportPage } from "../agent/exporter";
 import { assertId, CoreError, FileStore } from "../core/store";
@@ -60,6 +68,15 @@ import type { DesktopInfo } from "../desktop/bridge";
 
 export const workbenchActions = new Set([
   "app:info",
+  "library:storage",
+  "library:compact",
+  "library:cleanupPlan",
+  "library:cleanup",
+  "library:rebuildIndex",
+  "library:maintenancePolicy",
+  "library:setMaintenancePolicy",
+  "library:archive",
+  "library:verifyArchive",
   "library:prepareImport",
   "library:activateImport",
   "library:imports",
@@ -305,6 +322,30 @@ export function createWorkbench(
     args: Record<string, unknown>,
   ): Promise<unknown> {
     switch (action) {
+      case "library:storage":
+        return new LibraryMaintenance(store.root).storage();
+      case "library:compact":
+        return new LibraryMaintenance(store.root).compact();
+      case "library:cleanupPlan":
+        return new LibraryMaintenance(store.root).prepareCleanup();
+      case "library:cleanup":
+        return new LibraryMaintenance(store.root).cleanup(required(args, "id"));
+      case "library:rebuildIndex":
+        return {
+          revision: await new LibraryMaintenance(store.root).rebuildIndex(),
+        };
+      case "library:maintenancePolicy":
+        return maintenancePolicy(store.root);
+      case "library:setMaintenancePolicy":
+        return setMaintenancePolicy(store.root, {
+          automatic: args.automatic as boolean,
+        });
+      case "library:archive":
+        return new LibraryMaintenance(store.root).archive(
+          required(args, "out"),
+        );
+      case "library:verifyArchive":
+        return verifyLibraryArchive(required(args, "path"));
       case "history:html":
         return service.historicalHtml(
           projectId(args),

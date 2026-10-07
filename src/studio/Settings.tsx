@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { DesktopInfo } from "../desktop/bridge";
 import "./settings.css";
+import LibrarySpace from "./LibrarySpace";
 
 const sections = [
   {
@@ -191,6 +192,9 @@ export function SettingsPanel({
             )}
           </div>
         </section>
+      )}
+      {section === "general" && info?.libraryVersion === 2 && (
+        <LibrarySpace home={info.home} />
       )}
 
       {section === "appearance" && (

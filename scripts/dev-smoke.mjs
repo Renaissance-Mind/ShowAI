@@ -511,7 +511,21 @@ try {
     );
     await poll(
       // A successful recovery navigates the page before its bridge is ready.
-      () => page.evaluate(() => window.showai?.invoke("projects:list") ?? []),
+      async () => {
+        try {
+          return await page.evaluate(
+            () => window.showai?.invoke("projects:list") ?? [],
+          );
+        } catch (error) {
+          if (
+            /Execution context was destroyed|Cannot find context with specified id/.test(
+              error.message,
+            )
+          )
+            return [];
+          throw error;
+        }
+      },
       (value) => value.some((item) => item.id === project.id),
       "recovered API",
     );

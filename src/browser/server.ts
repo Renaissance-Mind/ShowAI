@@ -15,6 +15,7 @@ import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { watch } from "chokidar";
 import { version } from "../../package.json";
 import { AgentService, errorResult } from "../agent/service";
+import { MaintenanceScheduler } from "../core/maintenance-scheduler";
 import { registerRuntime } from "../agent/runtime";
 import { CoreError, FileStore, assertId } from "../core/store";
 import {
@@ -75,6 +76,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   const clients = new Set<ServerResponse>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let watcher!: ReturnType<typeof watch>;
+  let maintenance: MaintenanceScheduler | undefined;
   let origin = options.development?.origin ?? "";
   const info = (): DesktopInfo => ({
     home: store.root,
@@ -93,10 +95,12 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       client.write(`data: ${JSON.stringify({ type, home: store.root })}\n\n`);
   };
   async function useHome(home: string) {
+    await maintenance?.stop();
     store = new FileStore(home);
     service = new AgentService({ root: store.root });
     await store.listProjects();
     await registerRuntime(store.root, info().cli);
+    maintenance = new MaintenanceScheduler(store.root).start();
     watcher = watch(store.root, {
       ignoreInitial: true,
       depth: 9,
@@ -478,6 +482,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     clearInterval(heartbeat);
     clearTimeout(timer);
     await watcher.close();
+    await maintenance?.stop();
     for (const client of clients) client.end();
     await new Promise<void>((done, reject) => {
       server.close((error) => (error ? reject(error) : done()));

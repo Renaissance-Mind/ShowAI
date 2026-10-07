@@ -15,6 +15,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { AgentService, errorResult } from "../agent/service";
+import { MaintenanceScheduler } from "../core/maintenance-scheduler";
 import { registerRuntime } from "../agent/runtime";
 import { assertId, CoreError, FileStore } from "../core/store";
 import {
@@ -32,6 +33,7 @@ const windows = new Set<BrowserWindow>();
 let store: FileStore;
 let service: AgentService;
 let watcher: FSWatcher | undefined;
+let maintenance: MaintenanceScheduler | undefined;
 let notification: ReturnType<typeof setTimeout> | undefined;
 let pendingDeepLink = process.argv.find((argument) =>
   argument.startsWith("showai://"),
@@ -84,11 +86,13 @@ function broadcast(type: DesktopChange["type"]): void {
 }
 
 async function useHome(home?: string): Promise<void> {
+  await maintenance?.stop();
   await watcher?.close();
   store = new FileStore(home);
   service = new AgentService({ root: store.root });
   await store.listProjects();
   await registerRuntime(store.root, info().cli);
+  maintenance = new MaintenanceScheduler(store.root).start();
   watcher = watch(store.root, {
     ignoreInitial: true,
     depth: 9,
@@ -544,6 +548,7 @@ else {
       allowedQuit = true;
       clearTimeout(notification);
       await watcher?.close();
+      await maintenance?.stop();
       for (const window of windows) if (!window.isDestroyed()) window.destroy();
       app.quit();
     });

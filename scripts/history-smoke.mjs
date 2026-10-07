@@ -507,6 +507,41 @@ try {
     "template descriptions and layout forms recover and publish a new version through the actual catalog",
   );
   assert.deepEqual(errors, []);
+  const revisionBeforeMaintenance = (
+    await api("history:list", { projectId: project.id, pageId })
+  ).items[0].revision;
+  await page.getByRole("button", { name: "设置", exact: true }).click();
+  await page.getByRole("button", { name: "立即压缩", exact: true }).click();
+  await page.getByText(/压缩完成：/).waitFor();
+  await page
+    .getByRole("button", { name: "检查可清理文件", exact: true })
+    .click();
+  await page.getByText(/可清理 \d+ 个文件/).waitFor();
+  const clean = page.getByRole("button", { name: "清理这些文件", exact: true });
+  if (await clean.isEnabled()) {
+    await clean.click();
+    await page
+      .getByText("清理完成，正式内容和完整历史已保留。", { exact: true })
+      .waitFor();
+  }
+  const archive = join(output, "complete.showai-archive");
+  await page
+    .getByRole("textbox", { name: "归档保存位置", exact: true })
+    .fill(archive);
+  await page.getByRole("button", { name: "保存完整归档", exact: true }).click();
+  await page.getByText(/^完整归档已保存并验证：/).waitFor();
+  assert.equal(
+    (await api("library:verifyArchive", { path: archive })).verified,
+    true,
+  );
+  assert.equal(
+    (await api("history:list", { projectId: project.id, pageId })).items[0]
+      .revision,
+    revisionBeforeMaintenance,
+  );
+  checks.push(
+    "space controls compact without changing history, review cache cleanup and create a verified complete library archive",
+  );
   await page.screenshot({ path: join(output, "complete.png") });
   result.passed = true;
 } catch (error) {

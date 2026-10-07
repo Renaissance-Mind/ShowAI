@@ -7,6 +7,7 @@ import { FileStore } from "../core/store";
 import { CoreError } from "../core/model";
 import { versionedLibrary, logicalPath } from "../core/library-runtime";
 import { readArchivedReader } from "../core/archived-reader";
+import { recordReadingCache } from "../core/reading-cache";
 import { resolveDocumentComponents } from "../core/catalog";
 import { selectDocumentBlocks } from "../portable/selection.mjs";
 import { assertExportDestination, buildPageHtml } from "./exporter";
@@ -439,6 +440,8 @@ export async function readPageView(
       options.overwrite,
     );
     await writeFile(path, html, "utf8");
+    if (!(options.view === "html" && options.out))
+      await recordReadingCache(store.root, path, html);
     capture = await renderReading(path, options);
   }
   const computed = capture?.components ?? [];

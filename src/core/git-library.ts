@@ -7,6 +7,7 @@ import { encodeFile, decodeFile, nodePrefix } from "./history-codec";
 import { withLibraryLock } from "./library-lock";
 import { libraryMutations } from "./history-context";
 import { completePageReaders, readerBindingPath } from "./archived-reader";
+import { OperationReceipts } from "./operation-receipts";
 import {
   WorkspaceProtection,
   workspaceHash,
@@ -486,6 +487,22 @@ export class GitLibrary {
     }
     return result;
   }
+  async entryAt(revision: string): Promise<HistoryEntry> {
+    if (!oid(revision))
+      throw new CoreError("INVALID_DATA", "Invalid change revision.");
+    const fields = (
+      await this.command(["show", "-s", "--format=%P%x00%B", revision])
+    )
+      .toString("utf8")
+      .split("\0");
+    if (fields.length !== 2)
+      throw new CoreError("INVALID_DATA", "Invalid committed change metadata.");
+    return {
+      ...parseRecord(fields[1]),
+      revision,
+      parents: fields[0].trim().split(" ").filter(Boolean),
+    };
+  }
 
   async transaction<T>(
     context: ChangeContext,
@@ -716,13 +733,7 @@ export class GitLibrary {
       "receipts",
       `${sha(operationId)}.json`,
     );
-    const receipt = await readFile(receiptPath, "utf8").then(
-      (value) => JSON.parse(value) as HistoryEntry,
-      (error: NodeJS.ErrnoException) => {
-        if (error.code === "ENOENT") return undefined;
-        throw error;
-      },
-    );
+    const receipt = await this.receipt(operationId);
     const request = createHash("sha256");
     request.update(JSON.stringify({ ...context, operationId: undefined }));
     for (const [path, bytes] of [...changes].sort(([a], [b]) =>
@@ -901,6 +912,7 @@ export class GitLibrary {
     if (workspaceConflicts.length)
       entry.workspaceConflicts = workspaceConflicts;
     await this.atomicFile(receiptPath, Buffer.from(JSON.stringify(entry)));
+    await new OperationReceipts(this).record(entry);
     await this.command(["update-ref", "-d", temporaryRef]);
     if (!workspaceConflicts.length) await rm(transaction, { recursive: true });
     return entry;
@@ -909,7 +921,7 @@ export class GitLibrary {
   private async receipt(
     operationId: string,
   ): Promise<HistoryEntry | undefined> {
-    return readFile(
+    const cached = await readFile(
       join(this.root, "local", "receipts", `${sha(operationId)}.json`),
       "utf8",
     ).then(
@@ -919,6 +931,19 @@ export class GitLibrary {
         throw error;
       },
     );
+    if (cached) {
+      const entry = await this.entryAt(cached.revision);
+      if (
+        entry.operationId !== operationId ||
+        entry.requestHash !== cached.requestHash
+      )
+        throw new CoreError(
+          "INVALID_DATA",
+          "The operation receipt differs from its committed change.",
+        );
+      return entry;
+    }
+    return new OperationReceipts(this).lookup(operationId);
   }
 
   private async atomicFile(path: string, bytes: Buffer): Promise<void> {
@@ -1142,12 +1167,41 @@ export class GitLibrary {
       const before = (await this.command(["count-objects", "-v"])).toString(
         "utf8",
       );
-      await this.command(["repack", "-a", "-d"]);
+      await this.command([
+        "repack",
+        "-a",
+        "-d",
+        "--threads=2",
+        "--window-memory=64m",
+      ]);
       const after = (await this.command(["count-objects", "-v"])).toString(
         "utf8",
       );
       return { before, after };
     });
+  }
+  async objectStatistics() {
+    const output = (await this.command(["count-objects", "-v"])).toString(
+      "utf8",
+    );
+    const values = Object.fromEntries(
+      output
+        .trim()
+        .split("\n")
+        .map((line) => {
+          const [name, value] = line.split(": ");
+          return [name, Number(value)];
+        }),
+    );
+    return {
+      looseObjects: values.count,
+      looseBytes: values.size * 1024,
+      packedObjects: values["in-pack"],
+      packs: values.packs,
+      packedBytes: values["size-pack"] * 1024,
+      garbageObjects: values.garbage,
+      garbageBytes: values["size-garbage"] * 1024,
+    };
   }
 
   async isAncestor(ancestor: string, revision: string): Promise<boolean> {

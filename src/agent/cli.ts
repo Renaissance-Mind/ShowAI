@@ -7,6 +7,14 @@ import { mutateLibrary } from "../core/library-runtime";
 import { canonicalJson } from "../core/diff";
 import { GitLibrary } from "../core/git-library";
 import { LibraryImport } from "../core/library-import";
+import {
+  LibraryMaintenance,
+  verifyLibraryArchive,
+} from "../core/library-maintenance";
+import {
+  maintenancePolicy,
+  setMaintenancePolicy,
+} from "../core/maintenance-scheduler";
 import type { ChangeContext } from "../core/history-model";
 import { AgentService, errorResult } from "./service";
 import type {
@@ -59,6 +67,9 @@ Read one Page through structured data, an image or interactive HTML:
   pages read PAGE --project PROJECT --view html [--state reading-state.json] --out preview.html
 
 Versioned libraries: library init | verify | compact
+  library stats | cleanup-plan [--older-than-days DAYS] | cleanup PLAN_ID
+  library rebuild-index | policy [--automatic true|false]
+  library archive --out ABSOLUTE_NEW_DIRECTORY | verify-archive ARCHIVE_DIRECTORY
   library import --source OLD_PATH --home NEW_OR_SAME_PATH
   library activate IMPORT_ID --home PATH
   library migrate --home PATH (prepare, verify and activate in place; retain originals)
@@ -89,6 +100,8 @@ function parseArguments(args: string[]): Arguments {
   const booleans = new Set(["json", "help", "overwrite", "no-open", "draft"]);
   const strings = new Set([
     "home",
+    "automatic",
+    "older-than-days",
     "source",
     "import",
     "snapshot",
@@ -345,6 +358,52 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
     );
   switch (command) {
     case "library": {
+      if (action === "stats") {
+        requireCount(args, 2);
+        return new LibraryMaintenance(service.store.root).storage();
+      }
+      if (action === "cleanup-plan") {
+        requireCount(args, 2);
+        return new LibraryMaintenance(service.store.root).prepareCleanup({
+          olderThanDays: option(args, "older-than-days")
+            ? Number(option(args, "older-than-days"))
+            : undefined,
+        });
+      }
+      if (action === "cleanup") {
+        requireCount(args, 3);
+        return new LibraryMaintenance(service.store.root).cleanup(
+          args.positional[2],
+        );
+      }
+      if (action === "rebuild-index") {
+        requireCount(args, 2);
+        return {
+          revision: await new LibraryMaintenance(
+            service.store.root,
+          ).rebuildIndex(),
+        };
+      }
+      if (action === "archive") {
+        requireCount(args, 2);
+        return new LibraryMaintenance(service.store.root).archive(
+          option(args, "out", true)!,
+        );
+      }
+      if (action === "verify-archive") {
+        requireCount(args, 3);
+        return verifyLibraryArchive(resolve(args.positional[2]));
+      }
+      if (action === "policy") {
+        requireCount(args, 2);
+        const automatic = option(args, "automatic");
+        if (!automatic) return maintenancePolicy(service.store.root);
+        if (!["true", "false"].includes(automatic))
+          throw new Error("--automatic must be true or false.");
+        return setMaintenancePolicy(service.store.root, {
+          automatic: automatic === "true",
+        });
+      }
       const importer = new LibraryImport(service.store.root);
       if (action === "import") {
         requireCount(args, 2);
@@ -374,7 +433,7 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
       }
       if (action === "compact") {
         requireCount(args, 2);
-        return new GitLibrary(service.store.root).compact();
+        return new LibraryMaintenance(service.store.root).compact();
       }
       break;
     }

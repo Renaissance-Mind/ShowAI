@@ -2337,6 +2337,13 @@ test("versioned history/search/merge/restore are reachable from CLI and project-
     historicOut,
   ]);
   expect(await readFile(historicOut, "utf8")).toContain("Historical report");
+  const stats = await local(["library", "stats"]);
+  expect(stats.categories.repository.bytes).toBeGreaterThan(0);
+  const currentHead = await new GitLibrary(root).head();
+  await local(["library", "compact"]);
+  expect(await new GitLibrary(root).head()).toBe(currentHead);
+  const cleanPlan = await local(["library", "cleanup-plan"]);
+  await local(["library", "cleanup", cleanPlan.id]);
   const restoreArgs = [
     "history",
     "restore",
