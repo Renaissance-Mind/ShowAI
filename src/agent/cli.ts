@@ -54,7 +54,7 @@ Start with one project:
   pages list --project PROJECT
 
 Discover only what you need:
-  guide [workspace|reading|authoring|containers|document|catalog|component|templates|versions|export|publish]
+  guide [workspace|reading|authoring|containers|document|catalog|component|templates|versions|history|export|publish]
   catalog list [--kind component|template] [--scope SCOPE] [--limit 20]
   catalog describe ID [--kind component|template] [--view VIEW]
 

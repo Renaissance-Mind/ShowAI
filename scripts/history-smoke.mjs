@@ -174,9 +174,37 @@ try {
     await migration
       .getByText("内容与组件引用已核对", { exact: true })
       .waitFor();
-    await migration
-      .getByRole("button", { name: "启用版本历史", exact: true })
-      .click();
+    if (process.argv.includes("--external-activation")) {
+      const imports = await api("library:imports");
+      await migration
+        .getByRole("button", { name: "关闭弹窗", exact: true })
+        .click();
+      await promisify(execFile)(
+        process.execPath,
+        [
+          join(
+            fixture,
+            ".showai-dev",
+            `${mode}-${port}`,
+            "runtime/scripts/cli.mjs",
+          ),
+          "library",
+          "activate",
+          imports[0].id,
+          "--home",
+          home,
+          "--json",
+        ],
+        { env: process.env },
+      );
+      checks.push(
+        "CLI activation updates the already open workbench without reloading",
+      );
+    } else {
+      await migration
+        .getByRole("button", { name: "启用版本历史", exact: true })
+        .click();
+    }
     await migration.waitFor({ state: "hidden" });
     assert.equal((await api("app:info")).libraryVersion, 2);
     assert.equal((await api("app:info")).home, home);

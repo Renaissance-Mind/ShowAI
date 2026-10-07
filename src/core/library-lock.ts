@@ -32,7 +32,12 @@ async function ownerAt(
   const source = await readFile(
     info.isDirectory() ? join(path, "owner.json") : path,
     "utf8",
-  );
+  ).catch((error: NodeJS.ErrnoException) => {
+    // A cooperating owner may release the lease between stat and read.
+    if (error.code === "ENOENT") return undefined;
+    throw error;
+  });
+  if (source === undefined) return undefined;
   const value = JSON.parse(source) as LeaseOwner;
   if (
     !Number.isInteger(value.pid) ||

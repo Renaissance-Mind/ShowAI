@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { build } from "esbuild";
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
+import { promisify } from "node:util";
 import {
   mkdtemp,
   mkdir,
@@ -22,7 +23,7 @@ describe("cross-process library leases", () => {
     entry = join(root, "worker.mjs");
     await build({
       stdin: {
-        contents: `import { withLibraryLock } from ${JSON.stringify(resolve(import.meta.dirname, "library-lock.ts"))};await withLibraryLock(process.argv[2],async()=>{process.stdout.write('locked\\n');await new Promise(()=>{setInterval(()=>{},1000)});});`,
+        contents: `import {readFile,writeFile} from "node:fs/promises";import {join} from "node:path";import { withLibraryLock } from ${JSON.stringify(resolve(import.meta.dirname, "library-lock.ts"))};if(process.argv[3]==="churn"){for(let i=0;i<100;i++)await withLibraryLock(process.argv[2],async()=>{const file=join(process.argv[2],"counter");const value=Number(await readFile(file,"utf8"));await writeFile(file,String(value+1));});}else await withLibraryLock(process.argv[2],async()=>{process.stdout.write('locked\\n');await new Promise(()=>{setInterval(()=>{},1000)});});`,
         resolveDir: process.cwd(),
         sourcefile: "lock-worker.ts",
         loader: "ts",
@@ -63,6 +64,20 @@ describe("cross-process library leases", () => {
     return child;
   }
 
+  it("serializes rapidly released leases across real independent processes", async () => {
+    const path = join(root, "contention");
+    await mkdir(path);
+    await writeFile(join(path, "counter"), "0");
+    await Promise.all(
+      Array.from({ length: 4 }, () =>
+        promisify(execFile)(process.execPath, [entry, path, "churn"], {
+          timeout: 30000,
+        }),
+      ),
+    );
+    expect(await readFile(join(path, "counter"), "utf8")).toBe("400");
+    expect(await readdir(join(path, "local"))).not.toContain("writer.lock");
+  }, 35000);
   it("recovers a lease after the actual owning process is killed", async () => {
     const path = join(root, "crash");
     await mkdir(path);

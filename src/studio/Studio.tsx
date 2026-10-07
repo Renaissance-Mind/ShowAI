@@ -275,10 +275,12 @@ export default function Studio() {
     return next;
   }, []);
   const refresh = useCallback(async () => {
-    const [next, sidebar] = await Promise.all([
+    const [next, sidebar, appInfo] = await Promise.all([
       desktop.invoke<ProjectSummary[]>("projects:list"),
       desktop.invoke<SidebarOrganization>("sidebar:get"),
+      desktop.invoke<DesktopInfo>("app:info"),
     ]);
+    setInfo(appInfo);
     setProjects(next);
     setOrganization(sidebar);
     const visibleIds = next
@@ -362,7 +364,6 @@ export default function Studio() {
     if (initialized.current) return;
     initialized.current = true;
     void (async () => {
-      setInfo(await desktop.invoke<DesktopInfo>("app:info"));
       await refresh();
       await loadCatalog();
       const params = new URLSearchParams(location.search);
