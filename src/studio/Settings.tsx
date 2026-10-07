@@ -6,14 +6,16 @@ import {
   Copy,
   Folder,
   Info,
+  Shapes,
   Moon,
   Settings2,
   Sun,
   Terminal,
-} from "lucide-react";
+} from "../ui/icons";
 import type { DesktopInfo } from "../desktop/bridge";
 import "./settings.css";
 import LibrarySpace from "./LibrarySpace";
+import IconViewer from "./IconViewer";
 
 const sections = [
   {
@@ -33,6 +35,12 @@ const sections = [
     label: "Agent",
     icon: Bot,
     description: "连接 Agent，让它读取和编辑你的项目。",
+  },
+  {
+    id: "icons",
+    label: "图标",
+    icon: Shapes,
+    description: "浏览应用使用的图标，比较尺寸、线宽与配色。",
   },
   {
     id: "about",
@@ -140,6 +148,8 @@ export function SettingsPanel({
         <h1>{current.label === "关于" ? "关于 ShowAI" : current.label}</h1>
         <p>{current.description}</p>
       </header>
+
+      {section === "icons" && <IconViewer />}
 
       {section === "general" && (
         <section

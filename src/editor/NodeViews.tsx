@@ -5,7 +5,7 @@ import {
   useEditorState,
   type NodeViewProps,
 } from "@tiptap/react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight } from "../ui/icons";
 import { Widget } from "../components/blocks/Widget";
 
 export function WidgetView({

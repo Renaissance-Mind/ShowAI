@@ -3,7 +3,15 @@ import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
 import { closeHistory } from "@tiptap/pm/history";
-import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import {
+  MoreHorizontal,
+  Plus,
+  Trash2,
+  TableProperties,
+  TableRowsSplit,
+  TableColumnsSplit,
+  SquareDashed,
+} from "../ui/icons";
 import { TableMap } from "@tiptap/pm/tables";
 import {
   AlignmentButtons,
@@ -227,15 +235,19 @@ export function TableControls({ editor }: { editor: Editor }) {
                 })
               }
             >
+              <TableProperties size={14} aria-hidden="true" />
               切换表头
             </button>
             <button role="menuitem" onClick={() => select("cell")}>
+              <SquareDashed size={14} aria-hidden="true" />
               选择单元格区域
             </button>
             <button role="menuitem" onClick={() => select("row")}>
+              <TableRowsSplit size={14} aria-hidden="true" />
               选择当前行
             </button>
             <button role="menuitem" onClick={() => select("column")}>
+              <TableColumnsSplit size={14} aria-hidden="true" />
               选择当前列
             </button>
             <p className="document-table-menu-hint">
@@ -259,6 +271,7 @@ export function TableControls({ editor }: { editor: Editor }) {
                 })
               }
             >
+              <TableRowsSplit size={14} aria-hidden="true" />
               删除行
             </button>
             <button
@@ -269,6 +282,7 @@ export function TableControls({ editor }: { editor: Editor }) {
                 })
               }
             >
+              <TableColumnsSplit size={14} aria-hidden="true" />
               删除列
             </button>
             <button

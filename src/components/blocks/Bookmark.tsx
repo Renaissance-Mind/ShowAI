@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bookmark, Check, ExternalLink, Link2 } from "lucide-react";
+import { Bookmark, Check, ExternalLink, Link2 } from "../../ui/icons";
 import { safeImageUrl, safeUrl, text } from "./helpers";
 import { BlockHeader, EmptyState, Field } from "./shared";
 import type { BlockProps } from "./types";

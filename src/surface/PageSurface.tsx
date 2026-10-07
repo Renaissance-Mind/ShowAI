@@ -13,6 +13,8 @@ import {
 } from "react";
 import {
   Focus,
+  ArrowUp,
+  PanelTop,
   List,
   Maximize2,
   Minus,
@@ -20,7 +22,7 @@ import {
   BookmarkPlus,
   Star,
   Trash2,
-} from "lucide-react";
+} from "../ui/icons";
 import { useSurfaceViewport } from "./useSurfaceViewport";
 import {
   useViewportLock,
@@ -367,6 +369,7 @@ export default function PageSurface({
                       navigation.current!.open = false;
                     }}
                   >
+                    <PanelTop size={14} aria-hidden="true" />
                     {node.name}
                   </button>
                   {onViews && (
@@ -385,7 +388,7 @@ export default function PageSurface({
                           onViews({ ...views, readingOrder: order });
                         }}
                       >
-                        ↑
+                        <ArrowUp size={13} aria-hidden="true" />
                       </button>
                     </>
                   )}
@@ -403,6 +406,7 @@ export default function PageSurface({
                       navigation.current!.open = false;
                     }}
                   >
+                    <BookmarkPlus size={14} aria-hidden="true" />
                     {view.name}
                   </button>
                   {onViews && (

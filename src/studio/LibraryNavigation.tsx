@@ -16,7 +16,7 @@ import {
   FolderOpen,
   MoreHorizontal,
   Pin,
-} from "lucide-react";
+} from "../ui/icons";
 
 export type LibraryTarget =
   | {
@@ -138,7 +138,7 @@ export function LibraryRow({
 
 export interface LibraryContextMenuItem {
   label: string;
-  icon?: ReactNode;
+  icon: ReactNode;
   onSelect: () => void;
   danger?: boolean;
   disabled?: boolean;

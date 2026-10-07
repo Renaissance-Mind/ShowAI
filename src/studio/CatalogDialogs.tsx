@@ -13,7 +13,7 @@ import {
   Plus,
   Trash2,
   Upload,
-} from "lucide-react";
+} from "../ui/icons";
 import type { ShowDocument } from "../types";
 import type {
   BuiltinComponentMetadata,

@@ -1,6 +1,6 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { PanelTop, Search } from "lucide-react";
+import { PanelTop, Search } from "../ui/icons";
 import {
   useComponentCatalog,
   RegisterComponentContext,

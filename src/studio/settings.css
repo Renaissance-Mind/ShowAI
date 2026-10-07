@@ -513,7 +513,7 @@
     margin-bottom: 12px;
   }
   .settings-nav {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
   .settings-nav button {
     justify-content: center;

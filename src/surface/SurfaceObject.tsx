@@ -8,7 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { GripHorizontal, Settings2, Trash2, Maximize2 } from "lucide-react";
+import { GripHorizontal, Settings2, Trash2, Maximize2 } from "../ui/icons";
 import type { NodeLayout } from "./types";
 
 export interface ObjectActions {

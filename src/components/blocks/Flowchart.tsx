@@ -12,7 +12,7 @@ import {
   type Edge,
 } from "@xyflow/react";
 import { graphlib, layout } from "@dagrejs/dagre";
-import { Maximize2, Minus, Plus, X } from "lucide-react";
+import { Maximize2, Minus, Plus, X } from "../../ui/icons";
 import type { BlockProps, BlockData } from "./types";
 import { BlockHeader, EmptyState } from "./shared";
 import { useViewportLock, ViewportLockButton } from "./ViewportLock";

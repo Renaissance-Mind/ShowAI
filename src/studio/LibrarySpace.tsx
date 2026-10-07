@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw } from "../ui/icons";
 import { desktop, errorMessage } from "./bridge";
 import type {
   LibraryStorage,

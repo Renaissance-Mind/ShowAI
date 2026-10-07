@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { Check, FlaskConical, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Check, FlaskConical, Plus, RotateCcw, Trash2 } from "../../ui/icons";
 import { finite, text, uid } from "./helpers";
 import { BlockHeader, Field } from "./shared";
 import type { BlockProps } from "./types";

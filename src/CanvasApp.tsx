@@ -10,7 +10,7 @@ import {
   Sun,
   Upload,
   X,
-} from "lucide-react";
+} from "./ui/icons";
 import SurfaceEditor from "./surface/SurfaceEditor";
 import {
   parseArtifact,

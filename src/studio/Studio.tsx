@@ -12,6 +12,12 @@ import {
 } from "react";
 import {
   ArrowUpRight,
+  AppWindow,
+  CodeXml,
+  Download,
+  FolderMinus,
+  Globe,
+  Package,
   Blocks,
   Check,
   ChevronRight,
@@ -34,7 +40,7 @@ import {
   Settings2,
   Upload,
   X,
-} from "lucide-react";
+} from "../ui/icons";
 import type {
   ProjectSummary,
   PageSummary,
@@ -1127,6 +1133,7 @@ export default function Studio() {
                     {
                       general: "通用",
                       appearance: "外观",
+                      icons: "图标",
                       agent: "Agent",
                       about: "关于",
                     }[settingsSection]
@@ -1985,10 +1992,12 @@ export default function Studio() {
             items={[
               {
                 label: "离线网站 · 打包组件",
+                icon: <Package size={15} />,
                 onSelect: () => void exportSite("bundled"),
               },
               {
                 label: "联网网站 · 引用发布组件",
+                icon: <Globe size={15} />,
                 onSelect: () => void exportSite("remote"),
               },
             ]}
@@ -2111,6 +2120,7 @@ export default function Studio() {
                       ? [
                           {
                             label: "移出分组",
+                            icon: <FolderMinus size={15} />,
                             onSelect: action(() =>
                               moveProject(contextMenu.target.projectId, null),
                             ),
@@ -2151,14 +2161,17 @@ export default function Studio() {
                     },
                     {
                       label: "下载源文件",
+                      icon: <Download size={15} />,
                       onSelect: () => void exportPage("json"),
                     },
                     {
                       label: "引用已发布组件导出",
+                      icon: <Globe size={15} />,
                       onSelect: () => void exportPage("html", "remote"),
                     },
                     {
                       label: "导出会话片段",
+                      icon: <CodeXml size={15} />,
                       onSelect: () => void exportPage("inline"),
                     },
                     {
@@ -2169,6 +2182,7 @@ export default function Studio() {
                     },
                     {
                       label: "在独立窗口打开",
+                      icon: <AppWindow size={15} />,
                       onSelect: action(() =>
                         desktop.invoke("app:openPageWindow", {
                           projectId: contextMenu.target.projectId,

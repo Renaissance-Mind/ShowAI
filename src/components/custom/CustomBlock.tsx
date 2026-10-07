@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Settings2 } from "lucide-react";
+import { Settings2 } from "../../ui/icons";
 import type { BlockProps } from "../blocks/types";
 import {
   viewportLockKey,

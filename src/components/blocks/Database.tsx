@@ -13,7 +13,7 @@ import {
   Table2,
   Trash2,
   X,
-} from "lucide-react";
+} from "../../ui/icons";
 import {
   downloadFile,
   filterSortRows,
@@ -342,7 +342,10 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           <Download size={15} />
         </button>
         <details className="sb-tools-menu">
-          <summary aria-label="数据库视图与筛选">视图与筛选</summary>
+          <summary aria-label="数据库视图与筛选">
+            <Filter size={14} aria-hidden="true" />
+            视图与筛选
+          </summary>
           <div className="sb-database-toolbar">
             <div className="sb-view-tabs">
               <button

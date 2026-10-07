@@ -20,6 +20,7 @@ import type { JSONContent } from "@tiptap/core";
 import {
   ArrowLeft,
   ChevronRight,
+  ChevronDown,
   FileText,
   LayoutDashboard,
   MousePointer2,
@@ -30,7 +31,7 @@ import {
   X,
   Undo2,
   Redo2,
-} from "lucide-react";
+} from "../ui/icons";
 import type { ContainerDocument, ShowDocument } from "../types";
 import type { DrawingTool, NodeLayout } from "./types";
 import {
@@ -347,7 +348,13 @@ export function ContainerRuntime({
                     </button>
                     <details className="container-menu">
                       <summary aria-label="容器操作">
-                        {surfaceKind(root) === "page" ? "Page" : "Board"} ▾
+                        {surfaceKind(root) === "page" ? (
+                          <FileText size={15} />
+                        ) : (
+                          <LayoutDashboard size={15} />
+                        )}
+                        {surfaceKind(root) === "page" ? "Page" : "Board"}
+                        <ChevronDown size={13} />
                       </summary>
                       <div>
                         <button
@@ -365,6 +372,7 @@ export function ContainerRuntime({
                             );
                           }}
                         >
+                          <LayoutDashboard size={15} aria-hidden="true" />
                           放入 Board
                         </button>
                         <button
@@ -382,6 +390,7 @@ export function ContainerRuntime({
                             );
                           }}
                         >
+                          <FileText size={15} aria-hidden="true" />
                           放入 Page
                         </button>
                       </div>

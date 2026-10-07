@@ -1,7 +1,7 @@
 import type { Editor } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
 import { closeHistory } from "@tiptap/pm/history";
-import { TableCellsMerge, TableCellsSplit, X } from "lucide-react";
+import { TableCellsMerge, TableCellsSplit, X } from "../ui/icons";
 import {
   documentTableActionMeta,
   documentTableSelection,

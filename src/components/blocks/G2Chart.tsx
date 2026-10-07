@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BarChart3, Download } from "lucide-react";
+import { BarChart3, Download } from "../../ui/icons";
 import { BlockHeader, Field } from "./shared";
 import { GestureBoundary } from "./GestureBoundary";
 import { useViewportLock, ViewportLockButton } from "./ViewportLock";

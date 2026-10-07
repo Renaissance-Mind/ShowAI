@@ -6,7 +6,7 @@ import {
   Gauge,
   Plus,
   Trash2,
-} from "lucide-react";
+} from "../../ui/icons";
 import { finite, text } from "./helpers";
 import { BlockHeader, EmptyState, Field } from "./shared";
 import type { BlockProps } from "./types";

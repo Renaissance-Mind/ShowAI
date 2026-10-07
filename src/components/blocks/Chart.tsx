@@ -5,7 +5,7 @@ import {
   Check,
   Database,
   Download,
-} from "lucide-react";
+} from "../../ui/icons";
 import {
   COLORS,
   downloadFile,

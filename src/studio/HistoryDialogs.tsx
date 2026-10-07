@@ -8,7 +8,7 @@ import {
   Bot,
   User,
   FileText,
-} from "lucide-react";
+} from "../ui/icons";
 import Dialog from "./Dialog";
 import { desktop, errorCode, errorMessage } from "./bridge";
 import type { HistoryEntry } from "../core/history-model";

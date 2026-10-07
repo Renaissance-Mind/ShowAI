@@ -8,7 +8,7 @@ import {
   Table2,
   Type,
   Workflow,
-} from "lucide-react";
+} from "../ui/icons";
 import type { ComponentCategory } from "../components/custom/types";
 import type {
   CatalogComponent,

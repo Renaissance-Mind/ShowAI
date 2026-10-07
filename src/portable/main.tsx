@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Download, Moon, MoreHorizontal, Printer, Sun } from "lucide-react";
+import { Download, Moon, MoreHorizontal, Printer, Sun } from "../ui/icons";
 import { parseArtifact, serializeArtifact } from "./validation.mjs";
 import type { ShowArtifact, ShowDocument } from "../types";
 import { loadRemoteComponents } from "./remote.mjs";

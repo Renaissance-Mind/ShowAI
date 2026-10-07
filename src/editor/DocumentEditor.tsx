@@ -71,7 +71,7 @@ import {
   Undo2,
   Upload,
   X,
-} from "lucide-react";
+} from "../ui/icons";
 import { TableControls } from "./TableControls";
 import { createExtensions } from "./extensions";
 import "./editor.css";
@@ -1353,35 +1353,36 @@ export default function DocumentEditor({
                       editor.state.doc.nodeAt(hover.pos)?.type.name ?? "",
                     ) && (
                       <>
-                        <select
-                          className="block-style-select"
+                        <div
+                          className="align-tools"
+                          role="group"
                           aria-label="内容块样式"
-                          value={
-                            editor.state.doc.nodeAt(hover.pos)?.attrs.level ??
-                            "text"
-                          }
-                          onChange={(event) => {
-                            const chain = editor
-                              .chain()
-                              .focus()
-                              .setTextSelection(hover.pos + 1);
-                            if (event.target.value === "text")
-                              chain.setParagraph().run();
-                            else
-                              chain
-                                .setHeading({
-                                  level: Number(event.target.value) as
-                                    1 | 2 | 3,
-                                })
-                                .run();
-                            setBlockMenu(false);
-                          }}
                         >
-                          <option value="text">正文</option>
-                          <option value="1">标题 1</option>
-                          <option value="2">标题 2</option>
-                          <option value="3">标题 3</option>
-                        </select>
+                          {items.slice(0, 4).map((item, index) => (
+                            <ToolButton
+                              key={item.id}
+                              label={item.title}
+                              active={
+                                index === 0
+                                  ? editor.state.doc.nodeAt(hover.pos)?.type
+                                      .name === "paragraph"
+                                  : editor.state.doc.nodeAt(hover.pos)?.attrs
+                                      .level === index
+                              }
+                              onClick={() => {
+                                editor
+                                  .chain()
+                                  .focus()
+                                  .setTextSelection(hover.pos + 1)
+                                  .run();
+                                item.run(editor);
+                                setBlockMenu(false);
+                              }}
+                            >
+                              {item.icon}
+                            </ToolButton>
+                          ))}
+                        </div>
                         <div className="align-tools">
                           {(
                             [

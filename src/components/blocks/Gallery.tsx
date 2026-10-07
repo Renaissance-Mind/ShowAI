@@ -12,7 +12,7 @@ import {
   Trash2,
   Upload,
   X,
-} from "lucide-react";
+} from "../../ui/icons";
 import { safeImageUrl, text, uid } from "./helpers";
 import { BlockHeader, EmptyState, Field } from "./shared";
 import type { BlockProps } from "./types";

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { ArrowUp, File, Folder, Loader2, Plus } from "lucide-react";
+import { ArrowUp, File, Folder, Loader2, Plus } from "../ui/icons";
 import Dialog from "../studio/Dialog";
 import { errorMessage } from "../studio/bridge";
 import "./browser.css";
