@@ -30,8 +30,8 @@ module.exports = async function afterPack(context) {
   await verifyLinks(plugin);
   for (const file of [
     "scripts/cli.mjs",
-    "node_modules/dugite/git/bin/" +
-      (context.electronPlatformName === "win32" ? "git.exe" : "git"),
+    "node_modules/dugite/git/" +
+      (context.electronPlatformName === "win32" ? "cmd/git.exe" : "bin/git"),
     "assets/viewer.html",
     "node_modules/esbuild/lib/main.js",
     "node_modules/react/package.json",
