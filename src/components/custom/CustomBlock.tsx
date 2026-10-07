@@ -9,6 +9,11 @@ import {
 } from "react";
 import { Settings2 } from "lucide-react";
 import type { BlockProps } from "../blocks/types";
+import {
+  viewportLockKey,
+  readViewportLock,
+  writeViewportLock,
+} from "../blocks/ViewportLock";
 import { COMPONENT_DATA_MARKER, readCustomBlockData } from "./contract";
 import type { CompiledComponent } from "./types";
 import { InlineComponent } from "./InlineComponent";
@@ -255,6 +260,70 @@ function SandboxComponent({
       if (event.data.type === "showai:error")
         setError(String(event.data.message || "组件无法显示。").slice(0, 500));
       if (event.data.type === "showai:valid") setError("");
+      if (
+        ["showai:viewport-lock-get", "showai:viewport-lock-set"].includes(
+          event.data.type,
+        ) &&
+        typeof event.data.scope === "string" &&
+        /^[a-z0-9-]+:\d{1,4}$/.test(event.data.scope)
+      ) {
+        const scope = event.data.scope;
+        const key = viewportLockKey(iframe.current!, scope);
+        let locked = true,
+          error = "";
+        try {
+          if (
+            event.data.type === "showai:viewport-lock-set" &&
+            typeof event.data.locked === "boolean"
+          )
+            writeViewportLock(key, event.data.locked);
+          locked = readViewportLock(key);
+        } catch (caught) {
+          error = `无法保存阅读锁状态：${String(caught)}`;
+        }
+        iframe.current?.contentWindow?.postMessage(
+          { channel, type: "showai:viewport-lock-state", scope, locked, error },
+          "*",
+        );
+      }
+      if (
+        event.data.type === "showai:reading-wheel" &&
+        [event.data.deltaX, event.data.deltaY, event.data.deltaMode].every(
+          Number.isFinite,
+        )
+      ) {
+        const frame = iframe.current!;
+        const wheel = new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          deltaX: event.data.deltaX,
+          deltaY: event.data.deltaY,
+          deltaMode: event.data.deltaMode,
+          ctrlKey: event.data.ctrlKey === true,
+          metaKey: event.data.metaKey === true,
+          shiftKey: event.data.shiftKey === true,
+        });
+        if (frame.dispatchEvent(wheel) && !wheel.ctrlKey && !wheel.metaKey) {
+          let remaining =
+            wheel.deltaY *
+            (wheel.deltaMode === 1
+              ? 16
+              : wheel.deltaMode === 2
+                ? frame.clientHeight
+                : 1);
+          for (
+            let element = frame.parentElement;
+            element && remaining;
+            element = element.parentElement
+          ) {
+            if (!/auto|scroll/.test(getComputedStyle(element).overflowY))
+              continue;
+            const before = element.scrollTop;
+            element.scrollTop += remaining;
+            remaining -= element.scrollTop - before;
+          }
+        }
+      }
       const current = latest.current;
       const pending = pendingValidation.current;
       if (

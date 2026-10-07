@@ -4,6 +4,9 @@
   min-height: 0;
   flex: 1;
 }
+.surface-extra-actions {
+  display: contents;
+}
 .page-surface {
   position: relative;
   height: 100%;

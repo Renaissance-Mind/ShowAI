@@ -29,6 +29,7 @@ function ownsWheel(
   zoom: boolean,
 ) {
   if (!(target instanceof Element)) return false;
+  const locked = target.closest('[data-viewport-locked="true"]');
   const ownership =
     target
       .closest("[data-surface-gesture]")
@@ -43,10 +44,11 @@ function ownsWheel(
     return true;
   if (
     target.closest(
-      '[data-surface-ui], [data-surface-gesture="own"], .react-flow, input[type="range"], select',
+      '[data-surface-ui], [data-surface-gesture="own"], input[type="range"], select',
     )
   )
     return true;
+  if (!locked && target.closest(".react-flow")) return true;
   for (
     let element: Element | null = target;
     element && element !== boundary;
@@ -99,6 +101,7 @@ export function useSurfaceViewport(
     zoom: (_scale: number) => {},
     moveTo: (_camera: Camera) => {},
     refresh: () => {},
+    cancel: () => {},
   });
 
   useEffect(() => {
@@ -444,6 +447,7 @@ export function useSurfaceViewport(
       zoom,
       moveTo,
       refresh,
+      cancel: controls.current.cancel,
       restored: controls.current.restored,
       restoredTargets: controls.current.restoredTargets,
       restoredAnchor: previousAnchor?.id ?? null,
@@ -656,6 +660,18 @@ export function useSurfaceViewport(
       root.classList.remove("is-panning");
     };
     const up = (event: PointerEvent) => finish(event);
+    controls.current.cancel = () => {
+      interrupt();
+      if (drag && root.hasPointerCapture(drag.id))
+        root.releasePointerCapture(drag.id);
+      drag = null;
+      pinch = null;
+      touches.clear();
+      objectGesture = false;
+      nestedGesture = false;
+      space = false;
+      root.classList.remove("is-panning", "is-hand");
+    };
     const cancel = (event: PointerEvent) => finish(event, true);
     const lostCapture = (event: PointerEvent) => {
       objectGesture = false;
@@ -728,6 +744,7 @@ export function useSurfaceViewport(
         y = scroll.scrollTop;
       scroll.scrollTop = 0;
       scroll.scrollLeft = 0;
+      if (!enabledRef.current) return;
       // Editor transactions may request scroll while a region is being revealed.
       // The camera owns that transition; a real pointer/key event interrupts it.
       if (springFrame) {
@@ -806,5 +823,8 @@ export function useSurfaceViewport(
   useEffect(() => {
     controls.current.refresh();
   }, [layoutKey]);
+  useEffect(() => {
+    if (!enabled) controls.current.cancel();
+  }, [enabled]);
   return { rootRef, scrollRef, worldRef, scale, camera, controls };
 }

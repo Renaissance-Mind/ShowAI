@@ -108,6 +108,9 @@ export function SurfaceObject({
     window.addEventListener("blur", cancel);
     return () => window.removeEventListener("blur", cancel);
   }, []);
+  useEffect(() => {
+    if (!actions.move) cancel();
+  }, [actions.move]);
   const start = (
     event: ReactPointerEvent<HTMLButtonElement>,
     resize = false,
@@ -256,7 +259,7 @@ export function SurfaceObject({
             <button
               type="button"
               className="surface-object-grip"
-              data-surface-handle={positioned || undefined}
+              data-surface-handle={(positioned && !!actions.move) || undefined}
               aria-label={`移动 ${name}`}
               title={positioned ? "拖动移动；方向键微调" : "选择内容"}
               onPointerDown={(event) =>
@@ -336,6 +339,7 @@ export function SurfaceObject({
         <button
           type="button"
           className="surface-object-resize"
+          disabled={!actions.move}
           data-surface-handle
           aria-label={`调整 ${name} ${fixedHeight ? "尺寸" : "宽度"}`}
           title="拖动调宽；左右方向键微调"

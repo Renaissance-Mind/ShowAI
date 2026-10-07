@@ -65,7 +65,7 @@ function remap(value, fields) {
     if (Object.hasOwn(value, actual)) copy[expected] = value[actual];
   return copy;
 }
-export function createG2Context(container, chartType, data) {
+export function createG2Context(container, chartType, data, locked = false) {
   const ChartBase = extend(Runtime, { ...stdlib(), ...plotlib() });
   const charts = [],
     renders = [];
@@ -107,6 +107,15 @@ export function createG2Context(container, chartType, data) {
         : spec.interaction;
       spec.interaction = { ...interactions, ...data.interaction };
     }
+    if (locked)
+      spec.interaction = {
+        ...spec.interaction,
+        brushFilter: false,
+        brushHighlight: false,
+        sliderFilter: false,
+        scrollbarFilter: false,
+        fisheye: false,
+      };
     if (input.data?.type === "fetch")
       spec.data = { ...input.data, type: "inline", value: get(path) };
     else if (Array.isArray(input.data))

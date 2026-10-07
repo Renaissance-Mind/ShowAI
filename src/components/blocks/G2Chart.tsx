@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { BarChart3, Download } from "lucide-react";
 import { BlockHeader, Field } from "./shared";
 import { GestureBoundary } from "./GestureBoundary";
+import { useViewportLock, ViewportLockButton } from "./ViewportLock";
 import { downloadFile, text } from "./helpers";
 import { createG2Context } from "./g2/engine.js";
 import { validateG2Data } from "./g2/contract.mjs";
@@ -16,6 +17,7 @@ export function G2ChartBlock({
   readOnly,
 }: BlockProps & { chartType: string }) {
   const plot = useRef<HTMLDivElement>(null);
+  const lock = useViewportLock("g2");
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -72,7 +74,12 @@ export function G2ChartBlock({
       target.replaceChildren();
       setReady(false);
       setError("");
-      current = createG2Context(target, chartType, { ...data, theme });
+      current = createG2Context(
+        target,
+        chartType,
+        { ...data, theme },
+        lock.locked,
+      );
       current
         .render()
         .then(() => {
@@ -99,7 +106,7 @@ export function G2ChartBlock({
       observer.disconnect();
       current?.destroy();
     };
-  }, [chartType, data, theme]);
+  }, [chartType, data, theme, lock.locked]);
   const open = () => {
     baseline.current = JSON.stringify(data);
     setDraft(JSON.stringify(data, null, 2));
@@ -144,6 +151,9 @@ export function G2ChartBlock({
   };
   return (
     <section
+      ref={lock.ref}
+      data-viewport-lock-scope="g2"
+      data-viewport-locked={lock.locked}
       className={"sb-block sb-g2-chart" + (theme === "dark" ? " is-dark" : "")}
       aria-label={text(data.title, "G2 图表")}
       data-g2-type={chartType}
@@ -168,6 +178,7 @@ export function G2ChartBlock({
           <Download size={16} />
         </button>
       </BlockHeader>
+      <ViewportLockButton {...lock} label="图表" />
       <div className="sb-g2-toolbar">
         <label>
           主题{" "}
@@ -341,7 +352,7 @@ export function G2ChartBlock({
           图表绘制失败：{error}
         </p>
       )}
-      <GestureBoundary axes={["x", "y", "zoom"]}>
+      <GestureBoundary axes={lock.locked ? [] : ["x", "y", "zoom"]}>
         <div
           ref={plot}
           className="sb-g2-plot"

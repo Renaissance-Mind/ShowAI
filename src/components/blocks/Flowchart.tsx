@@ -15,6 +15,7 @@ import { graphlib, layout } from "@dagrejs/dagre";
 import { Maximize2, Minus, Plus, X } from "lucide-react";
 import type { BlockProps, BlockData } from "./types";
 import { BlockHeader, EmptyState } from "./shared";
+import { useViewportLock, ViewportLockButton } from "./ViewportLock";
 import { validateFlowchartData } from "./flowchart-contract.mjs";
 import "@xyflow/react/dist/style.css";
 import "./flowchart.css";
@@ -164,13 +165,14 @@ export function layoutFlow(flow: Flow): DiagramNode[] {
     };
   });
 }
-function FlowControls() {
+function FlowControls({ locked }: { locked: boolean }) {
   const graph = useReactFlow();
   return (
     <div className="sf-controls" aria-label="流程图视图">
       <button
         type="button"
         onClick={() => graph.zoomIn()}
+        disabled={locked}
         aria-label="放大流程图"
       >
         <Plus size={16} />
@@ -178,6 +180,7 @@ function FlowControls() {
       <button
         type="button"
         onClick={() => graph.zoomOut()}
+        disabled={locked}
         aria-label="缩小流程图"
       >
         <Minus size={16} />
@@ -185,6 +188,7 @@ function FlowControls() {
       <button
         type="button"
         onClick={() => graph.fitView({ padding: 0.08, duration: 200 })}
+        disabled={locked}
         aria-label="显示完整流程"
       >
         <Maximize2 size={16} />
@@ -196,6 +200,7 @@ function FlowCanvas({
   flow,
   height,
   readOnly,
+  locked,
   onPosition,
   selected,
   onSelect,
@@ -203,6 +208,7 @@ function FlowCanvas({
   flow: Flow;
   height: number;
   readOnly: boolean;
+  locked: boolean;
   onPosition: (id: string, position: { x: number; y: number }) => void;
   selected: string;
   onSelect: (id: string) => void;
@@ -248,7 +254,14 @@ function FlowCanvas({
         fitViewOptions={{ padding: 0.08 }}
         minZoom={0.25}
         maxZoom={2}
-        nodesDraggable={!readOnly}
+        nodesDraggable={!readOnly && !locked}
+        panOnDrag={!locked}
+        zoomOnScroll={!locked}
+        zoomOnPinch={!locked}
+        zoomOnDoubleClick={!locked}
+        preventScrolling={!locked}
+        autoPanOnNodeFocus={!locked}
+        autoPanOnNodeDrag={!locked}
         nodesConnectable={false}
         edgesFocusable={false}
         deleteKeyCode={null}
@@ -258,7 +271,7 @@ function FlowCanvas({
           instance.fitView({ padding: 0.08 });
         }}
       >
-        <FlowControls />
+        <FlowControls locked={locked} />
       </ReactFlow>
       <details className="sf-node-picker">
         <summary aria-label="节点列表">节点</summary>
@@ -284,6 +297,7 @@ export function FlowchartBlock({
   readOnly = false,
 }: BlockProps) {
   const instanceId = useId();
+  const lock = useViewportLock("flowchart");
   const data = validateFlowchartData(raw) as FlowData;
   const [flowId, setFlowId] = useState(data.flows[0]?.id ?? "");
   const flow = data.flows.find((item) => item.id === flowId) ?? data.flows[0];
@@ -308,12 +322,19 @@ export function FlowchartBlock({
       ),
     });
   return (
-    <section className="sb-block sf-block" aria-label={data.title || "流程图"}>
+    <section
+      ref={lock.ref}
+      className="sb-block sf-block"
+      aria-label={data.title || "流程图"}
+      data-viewport-lock-scope="flowchart"
+      data-viewport-locked={lock.locked}
+    >
       <BlockHeader
         title={data.title}
         defaultTitle="交互流程图"
         description={data.description}
       />
+      <ViewportLockButton {...lock} label="流程图" />
       {!flow ? (
         <EmptyState
           title="添加一条流程"
@@ -356,6 +377,7 @@ export function FlowchartBlock({
                 flow={flow}
                 height={data.height ?? 580}
                 readOnly={readOnly}
+                locked={lock.locked}
                 selected={selected}
                 onSelect={setSelected}
                 onPosition={(id, position) => {

@@ -5,6 +5,8 @@ import themeContent from "../design/content.css?raw";
 import contract from "../components/blocks/primitive-contract.mjs?raw";
 import sdk from "../components/blocks/sdk.tsx?raw";
 import gestureBoundary from "../components/blocks/GestureBoundary.tsx?raw";
+import viewportLock from "../components/blocks/ViewportLock.tsx?raw";
+import viewportLockCss from "../components/blocks/viewport-lock.css?raw";
 import tableHover from "../components/blocks/table-hover.ts?raw";
 import tableAlignment from "../components/blocks/TableAlignment.tsx?raw";
 import primitives from "../components/blocks/Primitives.tsx?raw";
@@ -26,6 +28,8 @@ export const builtinSources: Record<string, string> = {
   "primitive-contract.mjs": contract,
   "sdk.tsx": sdk,
   "GestureBoundary.tsx": gestureBoundary,
+  "ViewportLock.tsx": viewportLock,
+  "viewport-lock.css": viewportLockCss,
   "Primitives.tsx": primitives,
   "TableAlignment.tsx": tableAlignment,
   "table-hover.ts": tableHover,

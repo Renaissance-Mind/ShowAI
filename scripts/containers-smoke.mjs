@@ -217,7 +217,9 @@ try {
     "slash insertion restores the same container",
   );
   assert.equal(
-    await scene(boardId).locator(".container-board-enter").count(),
+    await scene(boardId)
+      .getByRole("button", { name: "解锁白板", exact: true })
+      .count(),
     1,
   );
   assert.equal(
@@ -247,7 +249,7 @@ try {
   );
   assert.equal(await world(), inactiveCamera);
   await scene(boardId)
-    .getByRole("button", { name: "操作白板", exact: true })
+    .getByRole("button", { name: "解锁白板", exact: true })
     .click();
   await add(boardId, "Page 页面");
   saved = await poll(
@@ -360,6 +362,9 @@ try {
   ).attrs.id;
   await object(sketchId)
     .getByRole("button", { name: "展开 Board", exact: true })
+    .click();
+  await scene(sketchId)
+    .getByRole("button", { name: "解锁白板", exact: true })
     .click();
   await scene(sketchId)
     .getByRole("button", { name: "矩形", exact: true })

@@ -92,6 +92,9 @@ it("keeps edges and SVG markers visible in standalone and opaque inline hosts", 
       expect(geometry.pathLength).toBeGreaterThan(40);
       expect(geometry.markerExists).toBe(true);
       await frame
+        .getByRole("button", { name: "解锁流程图" })
+        .click({ timeout: 3000 });
+      await frame
         .getByRole("button", { name: "放大流程图" })
         .click({ timeout: 3000 });
       expect(

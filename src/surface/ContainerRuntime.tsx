@@ -22,7 +22,6 @@ import {
   ChevronRight,
   FileText,
   LayoutDashboard,
-  Maximize2,
   MousePointer2,
   Pencil,
   Square,
@@ -768,39 +767,19 @@ function ContainerView({
       className={`container-board${root ? " is-root" : ""}${enabled ? " is-active" : ""}`}
       data-container-root={id}
       aria-label={`Board ${nodeName(node)}`}
+      onPointerDownCapture={(event) => {
+        if (
+          (event.target as Element).closest("[data-container-root]") ===
+          event.currentTarget
+        )
+          runtime.activate(id);
+      }}
     >
-      {!root && (
-        <div className="container-activation" data-surface-ui>
-          <button
-            type="button"
-            aria-pressed={enabled}
-            onClick={() =>
-              runtime.activate(
-                enabled ? runtime.document.content.attrs!.id : id,
-              )
-            }
-          >
-            {enabled ? "结束操作" : "操作白板"}
-          </button>
-          {!readOnly && (
-            <button
-              type="button"
-              onClick={() => {
-                runtime.activate(id);
-                setTool("pen");
-              }}
-            >
-              <Pencil size={13} />
-              绘画
-            </button>
-          )}
-        </div>
-      )}
-      <div className={`container-board-scene${enabled ? "" : " is-passive"}`}>
+      <div className="container-board-scene">
         <PageSurface
           ref={viewport}
           pageId={`${runtime.document.id}:${id}:${root ? "expanded" : "embedded"}`}
-          enabled={enabled}
+          enabled
           printing={runtime.printing}
           nodes={resourceNodes(runtime.document, node).map((child) => ({
             id: child.attrs!.id,
@@ -893,16 +872,6 @@ function ContainerView({
           />
         </PageSurface>
       </div>
-      {!enabled && (
-        <button
-          className="container-board-enter"
-          aria-label={`进入 ${nodeName(node)}`}
-          onClick={() => runtime.activate(id)}
-        >
-          <Maximize2 size={15} />
-          点击操作白板
-        </button>
-      )}
     </div>
   );
 }
