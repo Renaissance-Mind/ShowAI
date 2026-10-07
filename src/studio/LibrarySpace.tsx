@@ -78,9 +78,10 @@ export default function LibrarySpace({ home }: { home: string }) {
           </p>
         </div>
         <button
-          className="settings-button"
+          className="settings-button settings-button-icon"
           disabled={busy}
           aria-label="刷新空间统计"
+          title="刷新空间统计"
           onClick={() => void run(async () => {})}
         >
           <RefreshCw size={14} />
