@@ -34,10 +34,9 @@ export default function ProjectSidebar({
   onGroupMenu: (group: ProjectGroup, anchor: HTMLElement) => void;
 }) {
   const selected = projects.find((item) => item.id === selectedProject);
-  const selectedSection = selected?.pinned
-    ? "pinned"
-    : selected
-      ? (organization.projectGroups[selected.id] ?? "projects")
+  const selectedSection =
+    selected && !selected.pinned
+      ? (organization.projectGroups[selected.id] ?? null)
       : null;
   const previousSelection = useRef({ selectedProject, selectedSection });
   useEffect(() => {
@@ -69,18 +68,22 @@ export default function ProjectSidebar({
       aria-label={name}
     >
       <div className="studio-sidebar-label">
-        <button
-          className="studio-section-toggle"
-          aria-expanded={!collapsed[id]}
-          onClick={() => toggle(id)}
-        >
-          {collapsed[id] ? (
-            <ChevronRight size={13} />
-          ) : (
-            <ChevronDown size={13} />
-          )}
-          <span>{name}</span>
-        </button>
+        {group ? (
+          <button
+            className="studio-section-toggle"
+            aria-expanded={!collapsed[id]}
+            onClick={() => toggle(id)}
+          >
+            {collapsed[id] ? (
+              <ChevronRight size={13} />
+            ) : (
+              <ChevronDown size={13} />
+            )}
+            <span>{name}</span>
+          </button>
+        ) : (
+          <span className="studio-section-title">{name}</span>
+        )}
         <div className="studio-section-tools">
           {id !== "pinned" && (
             <button
@@ -108,7 +111,7 @@ export default function ProjectSidebar({
           )}
         </div>
       </div>
-      {!collapsed[id] && (
+      {(!group || !collapsed[id]) && (
         <div className="studio-project-section-items">
           {items.map(renderProject)}
           {!items.length && group && (

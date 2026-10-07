@@ -60,6 +60,7 @@
 .studio-project-section + .studio-project-section {
   margin-top: 12px;
 }
+.studio-section-title,
 .studio-section-toggle {
   display: flex;
   align-items: center;
@@ -74,6 +75,7 @@
   font-weight: inherit;
   border-radius: 6px;
 }
+.studio-section-title,
 .studio-section-toggle span {
   overflow: hidden;
   text-overflow: ellipsis;
