@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" color-interpolation="sRGB" role="img" aria-labelledby="showai-auto-title showai-auto-description">
   <title id="showai-auto-title">ShowAI information funnel — auto</title>
-  <desc id="showai-auto-description">Two circular arcs cross at 65 percent of the square height. The left field is the brand RGB(18, 10, 143) lightened with 30 percent white, the right field is white, and the middle continuously transitions from white at the top to the same lightened blue at the bottom. This two-color palette works on both light and dark backgrounds.</desc>
+  <desc id="showai-auto-description">Two circular arcs create a wide open top and meet tangentially at the bottom edge, closing the funnel. The left field is the brand RGB(18, 10, 143) lightened with 30 percent white, the right field is white, and the middle continuously transitions from white at the top to the same lightened blue at the bottom. This two-color palette works on both light and dark backgrounds.</desc>
   <defs>
     <linearGradient id="showai-auto-region-1" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
       <stop offset="0%" stop-color="#FFFFFF"/>
@@ -9,8 +9,8 @@
     <clipPath id="showai-auto-frame"><rect width="512" height="512" rx="88"/></clipPath>
   </defs>
   <g clip-path="url(#showai-auto-frame)">
-    <path id="showai-auto-left" d="M -400 -96.285379 A 716 716 0 0 1 -400 1335.714621 Z" fill="#5954B1"/>
-    <path id="showai-auto-right" d="M 912 -96.285379 A 716 716 0 0 0 912 1335.714621 Z" fill="#FFFFFF"/>
-    <path id="showai-auto-center" d="M -41.377932 0 H 553.377932 A 716 716 0 0 0 204.148631 512 H 307.851369 A 716 716 0 0 0 -41.377932 0 Z" fill="url(#showai-auto-region-1)" fill-rule="evenodd"/>
+    <path id="showai-auto-left" d="M -384 -128 A 640 640 0 0 1 -384 1152 Z" fill="#5954B1"/>
+    <path id="showai-auto-right" d="M 896 -128 A 640 640 0 0 0 896 1152 Z" fill="#FFFFFF"/>
+    <path id="showai-auto-center" d="M 0 0 H 512 A 640 640 0 0 0 256 512 A 640 640 0 0 0 0 0 Z" fill="url(#showai-auto-region-1)" fill-rule="evenodd"/>
   </g>
 </svg>
