@@ -165,6 +165,55 @@ try {
   checks.push(
     "1500-paragraph editing saves actual content and preserves undo after saving",
   );
+  const openedWindow = app.waitForEvent("window");
+  await page.evaluate(
+    ({ projectId, pageId }) =>
+      window.showai.invoke("app:openPageWindow", { projectId, pageId }),
+    { projectId: project.id, pageId: large.document.id },
+  );
+  const otherWindow = await openedWindow;
+  const otherEditor = otherWindow
+    .getByRole("textbox", { name: "文档内容", exact: true })
+    .first();
+  await otherEditor.waitFor({ timeout: 30000 });
+  const prior = await otherWindow.evaluate(
+    ({ projectId, pageId }) =>
+      window.showai.invoke("pages:get", { projectId, pageId }),
+    { projectId: project.id, pageId: large.document.id },
+  );
+  await editor.click();
+  await editor.press("ControlOrMeta+End");
+  await editor.press("Enter");
+  await editor.pressSequentially("Native windows synchronize", { delay: 10 });
+  await page.locator(".studio-save-state.saved").waitFor({ timeout: 30000 });
+  await otherWindow.waitForFunction(
+    () =>
+      document
+        .querySelector('[role="textbox"][aria-label="文档内容"]')
+        ?.textContent?.includes("Native windows synchronize"),
+    undefined,
+    { timeout: 30000 },
+  );
+  const conflict = await otherWindow.evaluate(
+    async ({ projectId, prior }) => {
+      try {
+        await window.showai.invoke("pages:save", {
+          projectId,
+          pageId: prior.document.id,
+          document: prior.document,
+          baseHash: prior.hash,
+          baseRevision: prior.revision,
+        });
+        return "unexpected overwrite";
+      } catch (error) {
+        return error.code;
+      }
+    },
+    { projectId: project.id, prior },
+  );
+  assert.equal(conflict, "CONFLICT");
+  await otherWindow.close();
+  checks.push("two native windows reconcile changes and reject stale writes");
   await page.goto(url(chartPage.document.id));
   await page
     .locator('.sb-g2-plot[aria-busy="false"] svg')
@@ -198,6 +247,14 @@ try {
   );
 } catch (error) {
   failed = true;
+  for (const [index, window] of app.windows().entries()) {
+    await window.screenshot({ path: join(output, `failure-${index}.png`) });
+    console.error(
+      "Fixture window",
+      index,
+      (await window.locator("body").innerText()).slice(-2000),
+    );
+  }
   console.error(error);
   throw error;
 } finally {
