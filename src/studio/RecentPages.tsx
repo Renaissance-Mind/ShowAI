@@ -1,5 +1,28 @@
+import { useEffect, useState } from "react";
 import { FileText } from "../ui/icons";
 import type { PageSummary, ProjectSummary } from "../core/model";
+
+const absoluteTime = new Intl.DateTimeFormat("zh-CN", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+function recentTime(value: string, now: number): string {
+  const date = new Date(value);
+  const elapsed = Math.max(0, now - date.getTime());
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  if (elapsed >= 3 * day) return absoluteTime.format(date);
+  if (elapsed >= day) return `${Math.floor(elapsed / day)} 天前`;
+  if (elapsed >= hour) return `${Math.floor(elapsed / hour)} 小时前`;
+  if (elapsed >= minute) return `${Math.floor(elapsed / minute)} 分钟前`;
+  return "刚刚";
+}
 
 export type RecentPage = PageSummary & {
   projectId: string;
@@ -40,6 +63,11 @@ export default function RecentPages({
   onOpen: (page: RecentPage) => void;
   onCreateProject: () => void;
 }) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const term = query.trim().toLocaleLowerCase();
   const visible = pages.filter((page) =>
     `${page.title} ${page.projectName}`.toLocaleLowerCase().includes(term),
@@ -86,11 +114,11 @@ export default function RecentPages({
                 {page.projectName}
               </span>
             </span>
-            <time dateTime={page.updatedAt}>
-              {new Intl.DateTimeFormat("zh-CN", {
-                month: "short",
-                day: "numeric",
-              }).format(new Date(page.updatedAt))}
+            <time
+              dateTime={page.updatedAt}
+              title={absoluteTime.format(new Date(page.updatedAt))}
+            >
+              {recentTime(page.updatedAt, now)}
             </time>
           </button>
         </div>
