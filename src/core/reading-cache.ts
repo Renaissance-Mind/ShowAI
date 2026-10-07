@@ -12,7 +12,7 @@ export interface ReadingCacheRecord {
   createdAt: string;
 }
 export const readingCachePath =
-  /^projects\/[A-Za-z0-9_-]+\/exports\/reads\/[A-Za-z0-9_-]+-[a-f0-9]{12}-[a-f0-9-]{36}\.html$/;
+  /^(?:workspace\/)?projects\/[A-Za-z0-9_-]+\/exports\/reads\/[A-Za-z0-9_-]+-[a-f0-9]{12}-[a-f0-9-]{36}\.html$/;
 export async function recordReadingCache(
   root: string,
   absolute: string,

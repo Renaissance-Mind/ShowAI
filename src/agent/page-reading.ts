@@ -401,9 +401,7 @@ export async function readPageView(
   let capture: ReadingCapture | undefined;
   let path: string | undefined;
   const generated = join(
-    store.root,
-    "projects",
-    projectId,
+    store.projectPath(projectId),
     "exports",
     "reads",
     `${pageId}-${record.hash.slice(0, 12)}-${randomUUID()}`,

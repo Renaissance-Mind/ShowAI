@@ -102,7 +102,7 @@ node dist-runtime/scripts/cli.mjs pages list --project PROJECT_ID --json
 
 普通调研报告默认在已选项目中保存为一份 Page，用章节和区域组织内容，后续修改延续同一页面。网站或多份独立文档按用户要求拆分。
 
-编辑前读取页面并保留返回的 `hash`。后续使用 `pages diff --since HASH` 查看用户修改，写入时通过 `--base-hash HASH` 防止覆盖更新。完整命令、操作格式和 Python 调用示例见 [Agent 使用说明](docs/agent-usage.md)。
+新空内容库默认启用 Git 管理的版本历史。编辑前保留返回的 `hash`、`revision` 与稳定节点 ID；使用 `pages diff --since REVISION` 查看修改，保存时同时传 `--base-hash HASH --base-revision REVISION`。历史记录包含时间、修改内容和人工／Agent 会话来源，支持比较、合并、恢复、全文搜索及空间管理。已有旧库可在设置中导入并启用，原始文件和旧快照会保留。完整命令、操作格式和 Python 调用示例见 [Agent 使用说明](docs/agent-usage.md)。
 
 桌面安装包内也带有 CLI 和运行时。打开「设置 → 连接 Agent」，复制启动配置即可取得可执行文件、参数和内容库路径；使用这份配置的 Agent 不需要另装 Node.js。
 

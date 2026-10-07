@@ -26,9 +26,9 @@ New resources use artifact v3 and default to Page. Use `pages create --kind boar
 
 Page and Board are native entries in the component catalog. Read `catalog read page --view guide` or the Board equivalent. `component.insert` takes kind, data and optional parentId for both ordinary and native components; native insertion preserves the surface node and recursively remaps content and views. Native containers are customized through content/layout and templates.
 
-`surface.create` inserts a Page or Board, and `surface.wrap` wraps an existing surface while preserving its identity and descendants. Block operations edit the tree; surface.layout.set changes frames; view and reading-order operations accept a surfaceId. Supply the current base hash. surface.upgrade adapts older sources and the first managed save preserves original bytes and snapshots.
+`surface.create` inserts a Page or Board, and `surface.wrap` wraps an existing surface while preserving its identity and descendants. Block operations edit the tree; surface.layout.set changes frames; view and reading-order operations accept a surfaceId. Supply the current base hash and, for versioned libraries, the resource revision. surface.upgrade adapts older sources and the first managed save preserves original bytes and snapshots.
 
-Template application preserves container kind. Add `--page PAGE --base-hash HASH`, optionally `--parent SURFACE_ID`, to insert its root as a module. Every node, layout key and view reference is remapped together. Export selection may target any nested surface; it includes descendants and necessary ancestors.
+Template application preserves container kind. Add `--page PAGE --base-hash HASH --base-revision REVISION`, optionally `--parent SURFACE_ID`, to insert its root as a module. Every node, layout key and view reference is remapped together. Export selection may target any nested surface; it includes descendants and necessary ancestors.
 
 ## Select the current project
 
@@ -89,8 +89,8 @@ Built-in renderer source is maintained in the ShowAI repository. Compiled-only i
 showai pages create --project PROJECT --input page.showai.json --json
 showai pages read PAGE --project PROJECT --json
 showai pages diff PAGE --project PROJECT --since PREVIOUS_HASH --json
-showai pages apply PAGE --project PROJECT --input operations.json --base-hash CURRENT_HASH --json
-showai pages save PAGE --project PROJECT --input revised.showai.json --base-hash CURRENT_HASH --json
+showai pages apply PAGE --project PROJECT --input operations.json --base-hash CURRENT_HASH --base-revision CURRENT_REVISION --json
+showai pages save PAGE --project PROJECT --input revised.showai.json --base-hash CURRENT_HASH --base-revision CURRENT_REVISION --json
 ```
 
 Read before writing, retain stable block ids and inspect user changes against the previous checkpoint. On `CONFLICT`, read again and merge deliberately; do not reuse an old full-document replacement with a newer hash. The authoring guide gives operation shapes, while the document guide covers the JSON tree. An input path of `-` reads JSON from stdin.
@@ -209,7 +209,7 @@ Full-page export defaults to `--presentation spatial`. Use `--presentation readi
 
 For partial visualization, pass `--blocks ID,ID` with html or inline. IDs identify page node instances (`attrs.id` from `pages read`), rather than catalog packages or children internal to component code. A selected region includes its descendants; multiple selections preserve page order and necessary ancestor containers without duplicates. Partial exports default to reading presentation and hide the page title. Explicit spatial presentation retains whiteboard positioning. Only selected content and its referenced runtimes enter the HTML and companion JSON. The stored page is unchanged; the partial JSON must not replace it. Site export rejects block selection.
 
-After creating, organizing or revising a ShowAI page, save the complete page using its current hash, export inline, and include the host's actual display reference in the final reply by default. This applies to standalone-page tasks as well. Codex uses its current visualize fragment/path/output-reference contract with the returned absolute path; ShowAI defines the delivery step. Open a preview for verification and optionally provide the full HTML link. See [conversation display](../plugins/showai/skills/show-document/references/conversation-display.md). For focused revision results or automated progress updates, export the relevant stable block IDs. MCP `page_export` accepts the equivalent `blockIds` array.
+After creating, organizing or revising a ShowAI page, save the complete page using its current hash and revision, export inline, and include the host's actual display reference in the final reply by default. This applies to standalone-page tasks as well. Codex uses its current visualize fragment/path/output-reference contract with the returned absolute path; ShowAI defines the delivery step. Open a preview for verification and optionally provide the full HTML link. See [conversation display](../plugins/showai/skills/show-document/references/conversation-display.md). For focused revision results or automated progress updates, export the relevant stable block IDs. MCP `page_export` accepts the equivalent `blockIds` array.
 
 Bundled is the default. The reader, content and exact custom runtimes travel together; raster images must be embedded for offline delivery. HTML and inline exports also save editable source JSON. A static site includes relative navigation, source files and shared reader assets, and is intended for HTTP/static hosting. Whole-project export omits archived pages.
 
@@ -280,3 +280,13 @@ result = subprocess.run(
 )
 guide = json.loads(result.stdout)["data"]
 ```
+
+## Versioned libraries and recovery
+
+New empty homes initialize versioned storage automatically. Existing file libraries require a reviewed `library import` and `library activate`, or `library migrate` in place; original files and old checkpoints remain retained. Old checkpoints have unknown original edit times, actors and order.
+
+Keep `hash`, `revision` and stable node IDs from a full read. Supply both `--base-hash` and `--base-revision` for save/apply and template insertion. Use `--operation-id` only when retrying the same request; `--message` and `--group` describe purpose and continuous edits. Agent attribution uses the actual harness/session when available (including `CODEX_THREAD_ID`); missing provenance is explicitly unknown.
+
+`history list/read/compare/merge/restore` exposes independent changes, actor/session filters and reviewed three-way merges. `history read --view html` and `export --revision` use the captured reader and pinned dependencies. `history imported/snapshot/restore-snapshot` handles old checkpoints separately. `search --query` searches bodies, nested containers, component/template descriptions and sources.
+
+`history conflicts` discovers external files. `history recover-package CONFLICT_ID --project PROJECT` retains edited source/schema/assets as an editable draft and restores the immutable package projection. Repair the draft and publish a new version. `library stats/compact/cleanup-plan/cleanup/rebuild-index/archive/verify-archive/policy` exposes space accounting and verified maintenance; cleanup never removes formal history.

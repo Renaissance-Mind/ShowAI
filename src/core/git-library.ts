@@ -230,6 +230,44 @@ export class GitLibrary {
           "CONFLICT",
           "Import the existing sidebar into a versioned library before activation.",
         );
+      const bootstrapPath = join(this.root, "local", "library-bootstrap.json");
+      const bootstrapBytes = await readLibraryBytes(this.root, bootstrapPath);
+      const manifest: LibraryManifest = bootstrapBytes
+        ? JSON.parse(bootstrapBytes.toString("utf8"))
+        : {
+            format: "showai-library",
+            version: 2,
+            id: randomUUID(),
+            createdAt: new Date().toISOString(),
+          };
+      if (
+        manifest.format !== "showai-library" ||
+        manifest.version !== 2 ||
+        !/^[a-f0-9-]{36}$/.test(manifest.id) ||
+        !Number.isFinite(Date.parse(manifest.createdAt))
+      )
+        throw new CoreError(
+          "INVALID_DATA",
+          "Invalid interrupted library initialization.",
+        );
+      if (
+        !bootstrapBytes &&
+        (await access(this.repository).then(
+          () => true,
+          (error: NodeJS.ErrnoException) => {
+            if (error.code === "ENOENT") return false;
+            throw error;
+          },
+        ))
+      )
+        throw new CoreError(
+          "CONFLICT",
+          "This repository has no format marker or initialization journal. Existing data was retained.",
+        );
+      await this.atomicFile(
+        bootstrapPath,
+        Buffer.from(JSON.stringify(manifest)),
+      );
       const result = await gitExec(
         ["init", "--bare", "--quiet", this.repository],
         this.root,
@@ -241,12 +279,7 @@ export class GitLibrary {
           `Could not create the library repository: ${result.stderr}`,
         );
       await mkdir(this.workspace, { recursive: true });
-      const manifest: LibraryManifest = {
-        format: "showai-library",
-        version: 2,
-        id: randomUUID(),
-        createdAt: new Date().toISOString(),
-      };
+      await this.command(["symbolic-ref", "HEAD", CURRENT]);
       await this.atomicFile(
         join(this.root, "library.json"),
         Buffer.from(JSON.stringify(manifest, null, 2) + "\n"),

@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "showai",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "description": "Skills for creating ShowAI pages, reusable components and templates through an independently installed ShowAI runtime.",
   "keywords": [
     "research",

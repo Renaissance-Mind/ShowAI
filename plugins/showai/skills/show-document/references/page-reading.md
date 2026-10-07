@@ -18,7 +18,7 @@ showai pages read PAGE --project PROJECT --view image --theme light --width 1000
 showai pages read PAGE --project PROJECT --view html --state reading-state.json --out ./gantt.html --json
 ```
 
-`--base-hash` 固定此次检查的源页面版本；页面已变化时返回冲突。`--out` 已存在时明确传 `--overwrite`。图片和 HTML 的 `.read.json` 保留来源、渲染状态和交互快照。正式写入继续走 `pages apply/save` 与当前 hash。
+`--base-hash` 固定此次检查的源页面版本；页面已变化时返回冲突。`--out` 已存在时明确传 `--overwrite`。图片和 HTML 的 `.read.json` 保留来源、渲染状态和交互快照。正式写入继续走 `pages apply/save`，同时保留并传入当前 hash、revision 与稳定节点 ID。
 
 ## 交互与临时编辑
 

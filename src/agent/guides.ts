@@ -10,6 +10,7 @@ export const GUIDE_TOPICS = [
   "templates",
   "template-extraction",
   "versions",
+  "history",
   "export",
   "publish",
 ] as const;
@@ -25,6 +26,28 @@ const guides: Record<
     next?: string;
   }
 > = {
+  history: {
+    purpose:
+      "Inspect attributed content history, search full content, merge drafts and restore exact versions safely.",
+    rules: [
+      "New empty libraries use versioned storage. Existing libraries require reviewed import; preserve original files and mark old checkpoint times/actors/order unknown.",
+      "Retain the full page hash, resource revision and stable node IDs. Save/apply requires both base-hash and base-revision. Reuse operation-id only for an identical request.",
+      "History preview/export uses the captured reader and exact component dependencies. Restore creates a new attributed commit; simultaneous changes require another review.",
+      "External package files recover into local editable drafts before saving a new immutable version. Space cleanup preserves formal history, unresolved conflicts and live drafts.",
+    ],
+    commands: [
+      "showai history list --project PROJECT --page PAGE --session ACTUAL_SESSION --json",
+      "showai history compare --project PROJECT --page PAGE --before REVISION --after REVISION --json",
+      "showai history read PAGE --project PROJECT --revision REVISION --view html --out historical.html --json",
+      "showai history merge PAGE --project PROJECT --base-revision BASE --input draft.showai.json --json",
+      "showai history restore PAGE --project PROJECT --revision REVISION --base-revision CURRENT_REVISION --json",
+      "showai search --query TEXT --project PROJECT --json",
+      "showai history conflicts --project PROJECT --json",
+      "showai history recover-package CONFLICT_ID --project PROJECT --json",
+      "showai library stats --json",
+      "showai library cleanup-plan --json",
+    ],
+  },
   reading: {
     purpose:
       "Read the same Page through structured data, rendered pixels or interactive HTML, preserving one source identity.",
@@ -133,8 +156,8 @@ const guides: Record<
     commands: [
       "showai pages create --project PROJECT --kind page --title 'Report' --json",
       "showai pages create --project PROJECT --kind board --title 'Workspace' --json",
-      "showai pages apply PAGE --project PROJECT --input operations.json --base-hash HASH --json",
-      "showai template apply TEMPLATE --project PROJECT --page PAGE --parent SURFACE_ID --base-hash HASH --json",
+      "showai pages apply PAGE --project PROJECT --input operations.json --base-hash HASH --base-revision REVISION --json",
+      "showai template apply TEMPLATE --project PROJECT --page PAGE --parent SURFACE_ID --base-hash HASH --base-revision REVISION --json",
     ],
     input: {
       operations: [

@@ -93,6 +93,8 @@ function category(path: string): StorageCategory {
   if (path.startsWith("repository.git/")) return "repository";
   if (/^(index\.sqlite|local\/operation-index\.sqlite)(?:-|$)/.test(path))
     return "indexes";
+  if (/^(?:workspace\/)?projects\/[^/]+\/exports\/reads\//.test(path))
+    return "cache";
   if (path.startsWith("workspace/")) return "workspace";
   if (path.startsWith("local/receipts/")) return "receipts";
   if (

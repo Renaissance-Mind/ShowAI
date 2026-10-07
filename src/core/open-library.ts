@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { versionedLibrary } from "./library-runtime";
 import { GitLibrary } from "./git-library";
 import { CoreError } from "./model";
-import { safeLibraryPath } from "./library-files";
+import { safeLibraryPath, readLibraryBytes } from "./library-files";
 const entries = (path: string) =>
   readdir(path).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return [];
@@ -27,6 +27,12 @@ export async function openLibrary(home: string) {
     existing = versionedLibrary(root);
   if (existing) return { mode: "versioned" as const, initialized: false };
   await safeLibraryPath(root, root);
+  if (
+    await readLibraryBytes(root, join(root, "local", "library-bootstrap.json"))
+  ) {
+    await new GitLibrary(root).initialize();
+    return { mode: "versioned" as const, initialized: true };
+  }
   if (!(await empty(root)))
     return { mode: "legacy" as const, initialized: false };
   try {
