@@ -1,18 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="showai-dark-title showai-dark-description">
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" color-interpolation="sRGB" role="img" aria-labelledby="showai-dark-title showai-dark-description">
   <title id="showai-dark-title">ShowAI information funnel — dark</title>
-  <desc id="showai-dark-description">Two circular arcs cross at 65 percent of the square height, with each arc continuing smoothly through the crossing toward the bottom edge. Neutral sides surround a continuous lavender-to-indigo middle field that darkens downward to RGB(18, 10, 143).</desc>
+  <desc id="showai-dark-description">Two circular arcs cross at 65 percent of the square height. The left field is blue, the right field is warm rose, and the middle is their actual multiply blend. All fields deepen downward; the bottom blend is RGB(18, 10, 143).</desc>
   <defs>
-    <linearGradient id="showai-dark-region-1" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
-      <stop offset="0%" stop-color="#CDC6F8"/>
-      <stop offset="38%" stop-color="#8B7BD9"/>
-      <stop offset="65%" stop-color="#4834B2"/>
-      <stop offset="100%" stop-color="#120A8F"/>
+    <linearGradient id="showai-dark-layer-0" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
+      <stop offset="0%" stop-color="#80AAF0"/>
+      <stop offset="50%" stop-color="#587FCF"/>
+      <stop offset="100%" stop-color="#1E30DD"/>
+    </linearGradient>
+    <linearGradient id="showai-dark-layer-1" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
+      <stop offset="0%" stop-color="#ECA0C3"/>
+      <stop offset="50%" stop-color="#D47FB7"/>
+      <stop offset="100%" stop-color="#9935A5"/>
     </linearGradient>
     <clipPath id="showai-dark-frame"><rect width="512" height="512" rx="88"/></clipPath>
+    <clipPath id="showai-dark-overlap"><path d="M -41.377932 0 H 553.377932 A 716 716 0 0 0 204.148631 512 H 307.851369 A 716 716 0 0 0 -41.377932 0 Z" clip-rule="evenodd"/></clipPath>
   </defs>
   <g clip-path="url(#showai-dark-frame)">
-    <path id="showai-dark-left" d="M -400 -96.285379 A 716 716 0 0 1 -400 1335.714621 Z" fill="#0A0A0A"/>
-    <path id="showai-dark-right" d="M 912 -96.285379 A 716 716 0 0 0 912 1335.714621 Z" fill="#0A0A0A"/>
-    <path id="showai-dark-center" d="M -41.377932 0 H 553.377932 A 716 716 0 0 0 204.148631 512 H 307.851369 A 716 716 0 0 0 -41.377932 0 Z" fill="url(#showai-dark-region-1)" fill-rule="evenodd"/>
+    <path id="showai-dark-left" d="M -400 -96.285379 A 716 716 0 0 1 -400 1335.714621 Z" fill="url(#showai-dark-layer-0)"/>
+    <path id="showai-dark-right" d="M 912 -96.285379 A 716 716 0 0 0 912 1335.714621 Z" fill="url(#showai-dark-layer-1)"/>
+    <g id="showai-dark-center" clip-path="url(#showai-dark-overlap)" style="isolation:isolate">
+      <rect width="512" height="512" fill="url(#showai-dark-layer-0)"/>
+      <rect width="512" height="512" fill="url(#showai-dark-layer-1)" style="mix-blend-mode:multiply"/>
+    </g>
   </g>
 </svg>
