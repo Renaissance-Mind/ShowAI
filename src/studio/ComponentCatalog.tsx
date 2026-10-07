@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { useAppearanceTheme } from "../design/useAppearanceTheme";
 import {
   Blocks,
   PanelsTopLeft,
@@ -83,6 +84,7 @@ export function ComponentCatalog({
   showProjectNames?: boolean;
 }) {
   const catalog = useRef<HTMLDivElement>(null);
+  const theme = useAppearanceTheme();
   const [selected, setSelected] = useState<string | null>(null);
   const sections = useRef(new Map<ComponentCategory, HTMLElement>());
   const destination = useRef<{
@@ -264,7 +266,11 @@ export function ComponentCatalog({
                       onOpen(item);
                     }}
                   >
-                    <ComponentThumbnail item={item} browser={browser} />
+                    <ComponentThumbnail
+                      item={item}
+                      browser={browser}
+                      theme={theme}
+                    />
                     <div className="component-card-copy">
                       <div className="component-card-identity">
                         <span className="studio-component-symbol">

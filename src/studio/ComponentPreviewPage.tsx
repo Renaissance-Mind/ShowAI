@@ -1,5 +1,5 @@
 import { BuiltinPreview } from "../components/BuiltinPreview";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   BuiltinComponentMetadata,
   CompiledComponent,
@@ -17,6 +17,13 @@ export default function ComponentPreviewPage() {
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
   const native = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const args = JSON.parse(
+      new URLSearchParams(location.search).get("componentPreview")!,
+    );
+    document.documentElement.dataset.theme =
+      args.theme === "dark" ? "dark" : "light";
+  }, []);
   useEffect(() => {
     let cancelled = false;
     const params = new URLSearchParams(location.search);

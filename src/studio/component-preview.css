@@ -3,8 +3,8 @@
   width: 720px;
   height: 420px;
   overflow: hidden;
-  background: #f3f4f7;
-  color: #252630;
+  background: var(--surface);
+  color: var(--text);
 }
 .component-capture-native {
   position: absolute;
@@ -16,8 +16,8 @@
 }
 .component-capture-native > .sb-primitive,
 .component-capture-native > .sb-block {
-  background: white;
-  border: 1px solid #e7e7ee;
+  background: var(--paper);
+  border: 1px solid var(--line);
   border-radius: 12px;
   box-shadow: 0 8px 30px #2123410a;
   margin: 0;
