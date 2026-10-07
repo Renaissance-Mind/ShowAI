@@ -105,6 +105,7 @@ try {
   });
   const shell = page.locator(".studio-sidebar-shell");
   const sidebar = page.locator(".studio-sidebar");
+  const topbar = page.locator(".studio-window-topbar");
   const modeIs = (expected) =>
     poll(
       () => shell.getAttribute("data-sidebar-mode"),
@@ -119,7 +120,7 @@ try {
   const reveal = async () => {
     await page.mouse.move(2, 400);
     await modeIs("overlay");
-    await sidebar
+    await topbar
       .getByRole("button", { name: "锁定项目栏", exact: true })
       .waitFor();
     await poll(
@@ -171,7 +172,7 @@ try {
     "overlay",
     "stationary pointer inside the panel keeps it open",
   );
-  const brand = await sidebar.locator(".studio-brand").boundingBox();
+  const brand = await topbar.locator(".studio-topbar-brand").boundingBox();
   await page.mouse.move(brand.x + 80, brand.y + 12);
   await page.waitForTimeout(1100);
   assert.equal(
@@ -255,9 +256,7 @@ try {
   );
 
   await reveal();
-  await sidebar
-    .getByRole("button", { name: "锁定项目栏", exact: true })
-    .click();
+  await topbar.getByRole("button", { name: "锁定项目栏", exact: true }).click();
   await modeIs("docked");
   await moveOut();
   await page.waitForTimeout(650);
@@ -268,7 +267,7 @@ try {
     "lock reserves navigation width",
   );
   await page.reload();
-  await sidebar
+  await topbar
     .getByRole("button", {
       name: "解锁项目栏，打开文档后自动收起",
       exact: true,
@@ -280,7 +279,7 @@ try {
   await moveOut();
   await page.waitForTimeout(650);
   await modeIs("docked");
-  await sidebar
+  await topbar
     .getByRole("button", {
       name: "解锁项目栏，打开文档后自动收起",
       exact: true,
@@ -405,9 +404,7 @@ try {
   await reveal();
   await waitWidth(480);
   await page.screenshot({ path: join(output, "resized-overlay.png") });
-  await sidebar
-    .getByRole("button", { name: "锁定项目栏", exact: true })
-    .click();
+  await topbar.getByRole("button", { name: "锁定项目栏", exact: true }).click();
   await modeIs("docked");
   await poll(width, (value) => value === 960, "locking reserves resized width");
   result.checks.push(

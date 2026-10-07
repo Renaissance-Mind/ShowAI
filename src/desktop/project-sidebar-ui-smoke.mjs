@@ -80,7 +80,7 @@ try {
     .locator(".studio-main-nav")
     .getByRole("button", { name: "最近", exact: true })
     .focus();
-  await page.locator(".studio-brand").hover();
+  await page.locator(".studio-topbar-brand").hover();
   const add = section("projects").getByRole("button", {
     name: "新建项目",
     exact: true,
@@ -115,7 +115,7 @@ try {
   assert.equal(layout.headerSize, "14px");
   assert.ok(layout.gap >= 0 && layout.gap <= 2, JSON.stringify(layout));
   result.layout = layout;
-  await page.locator(".studio-brand").hover();
+  await page.locator(".studio-topbar-brand").hover();
   await add.focus();
   await poll(
     () => add.evaluate((element) => getComputedStyle(element).opacity),

@@ -320,7 +320,7 @@ async function createWindow(page?: {
     show: false,
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
     trafficLightPosition:
-      process.platform === "darwin" ? { x: 16, y: 18 } : undefined,
+      process.platform === "darwin" ? { x: 16, y: 16 } : undefined,
     webPreferences: {
       preload: join(directory, "preload.cjs"),
       contextIsolation: true,
@@ -331,6 +331,13 @@ async function createWindow(page?: {
     },
   });
   windows.add(window);
+  const sendWindowState = () => {
+    window.webContents.send("showai:window-state-changed", {
+      fullScreen: window.isFullScreen(),
+    });
+  };
+  window.on("enter-full-screen", sendWindowState);
+  window.on("leave-full-screen", sendWindowState);
   window.on("close", (event) => {
     if (allowedQuit) return;
     event.preventDefault();
@@ -491,6 +498,9 @@ else {
           { role: "windowMenu" },
         ]),
       );
+      ipcMain.handle("showai:window-state", (event) => ({
+        fullScreen: trustedSender(event).isFullScreen(),
+      }));
       ipcMain.on("showai:close-result", (event, payload: unknown) => {
         let window: BrowserWindow;
         try {

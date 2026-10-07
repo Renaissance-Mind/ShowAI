@@ -18,10 +18,16 @@ export default function AutoHideSidebar({
   enabled,
   interactionHeld,
   children,
+  navigation,
+  topbar,
+  focusWindow,
 }: {
   enabled: boolean;
   interactionHeld: boolean;
   children: ReactNode;
+  navigation: ReactNode;
+  topbar: ReactNode;
+  focusWindow: boolean;
 }) {
   const [locked, setLocked] = useState(
     () => localStorage.getItem("showai:sidebar-locked") === "true",
@@ -59,7 +65,7 @@ export default function AutoHideSidebar({
     preferredWidth ?? (viewportWidth <= 1100 ? 208 : 240),
   );
   const sidebar = useRef<HTMLElement>(null);
-  const automatic = enabled && !locked;
+  const automatic = enabled && !locked && !focusWindow;
   const mode = automatic ? position : "docked";
   const hidden = mode === "hidden";
 
@@ -69,7 +75,7 @@ export default function AutoHideSidebar({
       !!bounds &&
       point.x >= bounds.left &&
       point.x <= bounds.left + width + 4 &&
-      point.y >= bounds.top &&
+      point.y >= bounds.top - 44 &&
       point.y <= bounds.bottom
     );
   };
@@ -204,138 +210,164 @@ export default function AutoHideSidebar({
   };
 
   return (
-    <div
-      className="studio-sidebar-shell"
-      data-sidebar-mode={mode}
-      data-sidebar-resizing={resizing || undefined}
-      style={{ "--navigation-width": `${width}px` } as CSSProperties}
-    >
-      <aside
-        ref={sidebar}
-        id="studio-project-navigation"
-        className="studio-sidebar"
-        aria-label="项目导航"
-        inert={hidden}
-        onPointerEnter={reveal}
-        onPointerLeave={leave}
-        onFocusCapture={(event) => {
-          if (event.target.matches(":focus-visible")) setKeyboardFocus(true);
-        }}
-        onBlurCapture={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget))
-            setKeyboardFocus(false);
-        }}
-        onKeyDown={(event) => {
-          if (event.key !== "Escape" || !automatic || interactionHeld) return;
-          event.preventDefault();
-          event.stopPropagation();
-          if (document.activeElement instanceof HTMLElement)
-            document.activeElement.blur();
-          setKeyboardFocus(false);
-          setHovered(false);
-          setPosition("hidden");
-        }}
-      >
+    <>
+      <header className="studio-window-topbar">
+        {!focusWindow && (
+          <div
+            className="studio-topbar-brand"
+            style={{ width } as CSSProperties}
+            onPointerEnter={reveal}
+            onPointerLeave={leave}
+          >
+            <strong>ShowAI</strong>
+            <button
+              type="button"
+              className="studio-sidebar-lock"
+              aria-label={lockLabel}
+              title={lockLabel}
+              aria-pressed={locked}
+              onClick={() => {
+                const next = !locked;
+                localStorage.setItem("showai:sidebar-locked", String(next));
+                setLocked(next);
+              }}
+            >
+              {locked ? (
+                <LockKeyhole size={16} />
+              ) : (
+                <LockKeyholeOpen size={16} />
+              )}
+            </button>
+          </div>
+        )}
+        {topbar}
+      </header>
+      <div className="studio-workspace">
+        {!focusWindow && (
+          <div
+            className="studio-sidebar-shell"
+            data-sidebar-mode={mode}
+            data-sidebar-resizing={resizing || undefined}
+            style={{ "--navigation-width": `${width}px` } as CSSProperties}
+          >
+            <aside
+              ref={sidebar}
+              id="studio-project-navigation"
+              className="studio-sidebar"
+              aria-label="项目导航"
+              inert={hidden}
+              onPointerEnter={reveal}
+              onPointerLeave={leave}
+              onFocusCapture={(event) => {
+                if (event.target.matches(":focus-visible"))
+                  setKeyboardFocus(true);
+              }}
+              onBlurCapture={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget))
+                  setKeyboardFocus(false);
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== "Escape" || !automatic || interactionHeld)
+                  return;
+                event.preventDefault();
+                event.stopPropagation();
+                if (document.activeElement instanceof HTMLElement)
+                  document.activeElement.blur();
+                setKeyboardFocus(false);
+                setHovered(false);
+                setPosition("hidden");
+              }}
+            >
+              {navigation}
+              <div
+                ref={resizeHandle}
+                className="studio-sidebar-resizer"
+                role="separator"
+                tabIndex={0}
+                aria-label="调整项目栏宽度"
+                aria-orientation="vertical"
+                aria-controls="studio-project-navigation"
+                aria-valuemin={minimumWidth}
+                aria-valuemax={widthLimit}
+                aria-valuenow={width}
+                aria-valuetext={`${width} 像素`}
+                onPointerDown={(event) => {
+                  if (event.button !== 0 || resize.current) return;
+                  event.preventDefault();
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                  resize.current = {
+                    pointerId: event.pointerId,
+                    startX: event.clientX,
+                    startWidth: width,
+                    originalPreference: preferredWidth,
+                    currentWidth: width,
+                  };
+                  setResizing(true);
+                }}
+                onPointerMove={(event) => {
+                  const current = resize.current;
+                  if (!current || current.pointerId !== event.pointerId) return;
+                  current.currentWidth = clampWidth(
+                    current.startWidth + event.clientX - current.startX,
+                  );
+                  setPreferredWidth(current.currentWidth);
+                }}
+                onPointerUp={endResize}
+                onPointerCancel={(event) => endResize(event, true)}
+                onLostPointerCapture={(event) => endResize(event, true)}
+                onDoubleClick={() => {
+                  localStorage.removeItem(widthPreference);
+                  setPreferredWidth(null);
+                }}
+                onKeyDown={(event) => {
+                  const next =
+                    event.key === "ArrowLeft"
+                      ? width - (event.shiftKey ? 32 : 8)
+                      : event.key === "ArrowRight"
+                        ? width + (event.shiftKey ? 32 : 8)
+                        : event.key === "Home"
+                          ? minimumWidth
+                          : event.key === "End"
+                            ? widthLimit
+                            : null;
+                  if (next === null) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  saveWidth(next);
+                }}
+              />
+            </aside>
+            {automatic && (
+              <button
+                type="button"
+                className="studio-sidebar-edge"
+                aria-label="展开项目导航"
+                aria-controls="studio-project-navigation"
+                aria-expanded={!hidden}
+                tabIndex={hidden ? 0 : -1}
+                onPointerEnter={reveal}
+                onPointerLeave={leave}
+                onFocus={() => {
+                  setKeyboardFocus(true);
+                  setPosition("overlay");
+                  focusNavigation();
+                }}
+                onBlur={(event) => {
+                  if (!sidebar.current?.contains(event.relatedTarget))
+                    setKeyboardFocus(false);
+                }}
+                onClick={() => {
+                  setPosition("overlay");
+                  focusNavigation();
+                }}
+              >
+                <span aria-hidden="true" />
+              </button>
+            )}
+          </div>
+        )}
         {children}
-        <button
-          type="button"
-          className="studio-sidebar-lock"
-          aria-label={lockLabel}
-          title={lockLabel}
-          aria-pressed={locked}
-          onClick={() => {
-            const next = !locked;
-            localStorage.setItem("showai:sidebar-locked", String(next));
-            setLocked(next);
-          }}
-        >
-          {locked ? <LockKeyhole size={16} /> : <LockKeyholeOpen size={16} />}
-        </button>
-        <div
-          ref={resizeHandle}
-          className="studio-sidebar-resizer"
-          role="separator"
-          tabIndex={0}
-          aria-label="调整项目栏宽度"
-          aria-orientation="vertical"
-          aria-controls="studio-project-navigation"
-          aria-valuemin={minimumWidth}
-          aria-valuemax={widthLimit}
-          aria-valuenow={width}
-          aria-valuetext={`${width} 像素`}
-          onPointerDown={(event) => {
-            if (event.button !== 0 || resize.current) return;
-            event.preventDefault();
-            event.currentTarget.setPointerCapture(event.pointerId);
-            resize.current = {
-              pointerId: event.pointerId,
-              startX: event.clientX,
-              startWidth: width,
-              originalPreference: preferredWidth,
-              currentWidth: width,
-            };
-            setResizing(true);
-          }}
-          onPointerMove={(event) => {
-            const current = resize.current;
-            if (!current || current.pointerId !== event.pointerId) return;
-            current.currentWidth = clampWidth(
-              current.startWidth + event.clientX - current.startX,
-            );
-            setPreferredWidth(current.currentWidth);
-          }}
-          onPointerUp={endResize}
-          onPointerCancel={(event) => endResize(event, true)}
-          onLostPointerCapture={(event) => endResize(event, true)}
-          onDoubleClick={() => {
-            localStorage.removeItem(widthPreference);
-            setPreferredWidth(null);
-          }}
-          onKeyDown={(event) => {
-            const next =
-              event.key === "ArrowLeft"
-                ? width - (event.shiftKey ? 32 : 8)
-                : event.key === "ArrowRight"
-                  ? width + (event.shiftKey ? 32 : 8)
-                  : event.key === "Home"
-                    ? minimumWidth
-                    : event.key === "End"
-                      ? widthLimit
-                      : null;
-            if (next === null) return;
-            event.preventDefault();
-            event.stopPropagation();
-            saveWidth(next);
-          }}
-        />
-      </aside>
-      {automatic && (
-        <button
-          type="button"
-          className="studio-sidebar-edge"
-          aria-label="展开项目导航"
-          aria-controls="studio-project-navigation"
-          aria-expanded={!hidden}
-          tabIndex={hidden ? 0 : -1}
-          onPointerEnter={reveal}
-          onPointerLeave={leave}
-          onFocus={() => {
-            setKeyboardFocus(true);
-            setPosition("overlay");
-            focusNavigation();
-          }}
-          onBlur={(event) => {
-            if (!sidebar.current?.contains(event.relatedTarget))
-              setKeyboardFocus(false);
-          }}
-          onClick={() => {
-            setPosition("overlay");
-            focusNavigation();
-          }}
-        >
-          <span aria-hidden="true" />
-        </button>
-      )}
-    </div>
+      </div>
+    </>
   );
 }

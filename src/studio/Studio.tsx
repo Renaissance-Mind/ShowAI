@@ -87,6 +87,7 @@ import { readSidebarExpansion, sidebarExpansionKey } from "./sidebar-state";
 import SidebarNavigation from "./SidebarNavigation";
 import RecentPages, { recentPages } from "./RecentPages";
 import AutoHideSidebar from "./AutoHideSidebar";
+import { useWindowFullscreen } from "./useWindowFullscreen";
 import { ComponentCatalog, ComponentNavigation } from "./ComponentCatalog";
 import {
   groupComponents,
@@ -197,6 +198,7 @@ function Scope({ value }: { value: string }) {
 export default function Studio() {
   const [navigationUpdating, setNavigationUpdating] = useState(true);
   const catalogLoaded = useRef(false);
+  const windowFullscreen = useWindowFullscreen();
   const [info, setInfo] = useState<DesktopInfo | null>(null);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [organization, setOrganization] = useState<SidebarOrganization>({
@@ -1315,892 +1317,883 @@ export default function Studio() {
     />
   );
 
+  const sidebarContent = (
+    <LibraryDragContext.Provider value={libraryDrag.bindings}>
+      {view === "settings" ? (
+        <SettingsNavigation
+          section={settingsSection}
+          onSelect={setSettingsSection}
+        />
+      ) : view === "components" ? (
+        <ComponentNavigation
+          groups={componentGroups}
+          active={componentCategory}
+          onSelect={(category) => {
+            setComponentCategory(category);
+            setCategoryRequest((current) => ({
+              category,
+              sequence: (current?.sequence ?? 0) + 1,
+            }));
+          }}
+        />
+      ) : (
+        <ProjectSidebar
+          projects={projects}
+          organization={organization}
+          selectedProject={selectedProject}
+          collapsed={collapsedSections}
+          setCollapsed={setCollapsedSections}
+          onCreate={(groupId) => setDialog({ type: "project", groupId })}
+          onMenu={(anchor) =>
+            setProjectsMenu((current) => (current === anchor ? null : anchor))
+          }
+          onGroupMenu={(group, anchor) => setGroupMenu({ group, anchor })}
+          renderProject={(item) => (
+            <div key={item.id}>
+              <LibraryRow
+                target={projectTarget(item)}
+                active={
+                  selectedProject === item.id &&
+                  view === "project" &&
+                  !selectedFolder
+                }
+                expanded={!!expandedProjects[item.id]}
+                onToggle={action(() => toggleProject(item.id))}
+                onOpen={action(() => openProject(item.id))}
+                onMenu={showMenu}
+              />
+              {expandedProjects[item.id] && (
+                <div className="studio-tree-children">
+                  {renderChildren(item.id)}
+                </div>
+              )}
+            </div>
+          )}
+        />
+      )}
+      {sidebarNavigation}
+      {libraryDrag.preview && (
+        <div
+          className="studio-library-drag-preview"
+          aria-hidden="true"
+          style={{
+            left: libraryDrag.preview.x,
+            top: libraryDrag.preview.y,
+          }}
+        >
+          {libraryDrag.preview.title}
+        </div>
+      )}
+    </LibraryDragContext.Provider>
+  );
+  const topbar = (
+    <div className="studio-topbar">
+      {navigationUpdating && (
+        <span className="studio-navigation-updating" role="status">
+          正在更新项目列表…
+        </span>
+      )}
+      {view === "settings" ||
+      view === "projects" ||
+      view === "templates" ||
+      view === "components" ? (
+        <h1 className="studio-topbar-title">{heading}</h1>
+      ) : (
+        <div className="studio-breadcrumb">
+          {focusWindow ? (
+            <span>ShowAI</span>
+          ) : (
+            <button onClick={action(() => navigate("projects"))}>最近</button>
+          )}
+          {selectedProject && (
+            <>
+              <ChevronRight size={13} />
+              <button onClick={action(() => openProject(selectedProject))}>
+                {project?.name ?? "项目"}
+              </button>
+            </>
+          )}
+          {breadcrumbFolders.map((item) => (
+            <span className="studio-breadcrumb-folder" key={item.id}>
+              <ChevronRight size={13} />
+              <button
+                onClick={action(() => openProject(selectedProject!, item.id))}
+              >
+                {item.name}
+              </button>
+            </span>
+          ))}
+          {view === "page" && (
+            <>
+              <ChevronRight size={13} />
+              <PageIcon value={page.draft?.icon} size={18} />
+              <input
+                className="studio-page-title-input"
+                aria-label="页面标题"
+                placeholder="无标题"
+                value={page.draft?.title ?? ""}
+                maxLength={1000}
+                onChange={(event) =>
+                  page.edit({
+                    ...upgradeResource(page.draft!),
+                    title: event.target.value.replaceAll("\n", ""),
+                  })
+                }
+              />
+            </>
+          )}
+        </div>
+      )}
+      <div className="studio-header-actions">
+        {info?.libraryVersion === 2 && (
+          <>
+            <button
+              className="studio-icon"
+              aria-label="查看外部文件修改"
+              title="查看外部文件修改"
+              onClick={() => setDialog({ type: "workspaceConflicts" })}
+            >
+              <FolderOpen size={16} />
+            </button>
+            {selectedProject && (
+              <button
+                className="studio-icon"
+                aria-label={view === "page" ? "页面历史" : "项目历史"}
+                title={view === "page" ? "页面历史" : "项目历史"}
+                onClick={() =>
+                  setDialog({
+                    type: "history",
+                    projectId: selectedProject,
+                    pageId: view === "page" ? page.draft?.id : undefined,
+                  })
+                }
+              >
+                <History size={16} />
+              </button>
+            )}
+          </>
+        )}
+        {(view === "projects" ||
+          view === "project" ||
+          info?.libraryVersion === 2) && (
+          <ExpandableSearch
+            key={`${view}:${selectedProject}:${selectedFolder}:${searchRevision}`}
+            label={
+              !searchLibrary && view === "projects"
+                ? "搜索最近页面"
+                : !searchLibrary && view === "project"
+                  ? "搜索页面"
+                  : "搜索内容库"
+            }
+            value={query}
+            onChange={setQuery}
+          >
+            {info?.libraryVersion === 2 && (
+              <>
+                {(view === "projects" || view === "project") && (
+                  <nav className="studio-search-scopes" aria-label="搜索范围">
+                    <button
+                      aria-pressed={!searchLibrary}
+                      onClick={() => setSearchLibrary(false)}
+                    >
+                      {view === "projects" ? "最近页面" : "当前项目页面"}
+                    </button>
+                    <button
+                      aria-pressed={searchLibrary}
+                      onClick={() => setSearchLibrary(true)}
+                    >
+                      整个内容库
+                    </button>
+                  </nav>
+                )}
+                {searchLibrary ||
+                (view !== "projects" && view !== "project") ? (
+                  <LibrarySearchResults
+                    query={query}
+                    onOpen={openSearchResult}
+                  />
+                ) : null}
+              </>
+            )}
+          </ExpandableSearch>
+        )}
+        <div className="studio-section-actions studio-topbar-view-actions">
+          {view === "projects" && (
+            <button
+              className="studio-icon"
+              onClick={() => setDialog({ type: "project" })}
+              aria-label="新建项目"
+              title="新建项目"
+            >
+              <Plus size={15} />
+            </button>
+          )}
+          {view === "project" && project && (
+            <>
+              <button
+                className="studio-icon"
+                aria-label="打开项目目录"
+                title="打开项目目录"
+                onClick={action(() =>
+                  desktop.invoke("fs:reveal", {
+                    projectId: selectedProject,
+                  }),
+                )}
+              >
+                <FolderOpen size={16} />
+              </button>
+              <button
+                className="studio-icon"
+                onClick={action(importPage)}
+                aria-label="导入"
+                title="导入"
+              >
+                <Upload size={15} />
+              </button>
+              <button
+                className="studio-icon"
+                disabled={!pages.length || busy}
+                aria-haspopup="menu"
+                onClick={(event) => {
+                  const anchor = event.currentTarget;
+                  setExportMenu((current) =>
+                    current === anchor ? null : anchor,
+                  );
+                }}
+                aria-label="导出网站"
+                title="导出网站"
+              >
+                <ArrowUpRight size={15} />
+              </button>
+              <button
+                className="studio-icon"
+                aria-label="当前目录操作"
+                aria-haspopup="menu"
+                onClick={(event) =>
+                  showMenu(
+                    currentFolder
+                      ? folderTarget(currentFolder, project.id)
+                      : projectTarget(project),
+                    event.currentTarget,
+                  )
+                }
+              >
+                <MoreHorizontal size={18} />
+              </button>
+            </>
+          )}
+          {view === "templates" && (
+            <button
+              disabled={!selectedProject}
+              className="studio-icon"
+              onClick={() =>
+                setDialog({
+                  type: "template",
+                  record: blankTemplate(),
+                  copy: true,
+                })
+              }
+              aria-label="新建模板"
+              title="新建模板"
+            >
+              <Plus size={15} />
+            </button>
+          )}
+          {view === "components" && (
+            <>
+              <label className="component-project-picker">
+                项目：
+                <select
+                  aria-label="目录项目"
+                  value={componentProject}
+                  onChange={(event) => {
+                    const id = event.target.value;
+                    void (async () => {
+                      if (!(await page.flush())) return;
+                      componentProjectRef.current = id;
+                      setComponentProject(id);
+                      if (id !== "all") {
+                        selectedRef.current = id;
+                        setSelectedProject(id);
+                        setSelectedFolder(null);
+                      }
+                    })().catch(report);
+                  }}
+                >
+                  <option value="all">全部</option>
+                  {projects.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className="studio-icon"
+                disabled={componentProject === "all"}
+                title={
+                  componentProject === "all" ? "请选择组件所属项目" : undefined
+                }
+                onClick={action(async () => {
+                  const result = await desktop.invoke<CompiledComponent | null>(
+                    "components:import",
+                    componentProject !== "all"
+                      ? { projectId: componentProject }
+                      : {},
+                  );
+                  if (result) {
+                    await loadCatalog();
+                    setNotice("组件已安装");
+                  }
+                })}
+                aria-label="导入组件"
+              >
+                <Upload size={15} />
+              </button>
+              <button
+                className="studio-icon"
+                disabled={componentProject === "all"}
+                title={
+                  componentProject === "all" ? "请选择组件所属项目" : undefined
+                }
+                onClick={action(async () => {
+                  const result = await desktop.invoke<CompiledComponent>(
+                    "components:createExample",
+                    componentProject !== "all"
+                      ? { projectId: componentProject }
+                      : {},
+                  );
+                  await loadCatalog();
+                  await viewComponent({
+                    ...result,
+                    projectId: componentProject,
+                  });
+                })}
+                aria-label="新建组件"
+              >
+                <Plus size={15} />
+              </button>
+            </>
+          )}
+        </div>
+        {view === "page" && page.draft && (
+          <>
+            <span className={`studio-save-state ${page.status}`}>
+              {page.status === "saving" ? (
+                <Loader2 size={12} className="studio-spin" />
+              ) : (
+                <Check size={12} />
+              )}
+              {
+                {
+                  saved: "已保存",
+                  saving: "保存中",
+                  changed: "待保存",
+                  conflict: "文件已更新",
+                  error: "保存失败",
+                }[page.status]
+              }
+            </span>
+            <button
+              className="studio-icon"
+              aria-label="显示页面文件"
+              title="显示页面文件"
+              onClick={action(() =>
+                desktop.invoke("fs:reveal", {
+                  projectId: selectedProject,
+                  pageId: page.draft!.id,
+                }),
+              )}
+            >
+              <FolderOpen size={16} />
+            </button>
+            <button
+              className="studio-icon"
+              aria-label="导出"
+              title="导出页面"
+              disabled={busy}
+              onClick={() => void exportPage("html")}
+            >
+              <ArrowUpRight size={14} />
+            </button>
+            <button
+              className="studio-icon"
+              aria-label="页面操作"
+              aria-haspopup="menu"
+              onClick={(event) => {
+                const target = activePageTarget();
+                if (target)
+                  showMenu(target, event.currentTarget, undefined, true);
+              }}
+            >
+              <MoreHorizontal size={18} />
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <ComponentLibraryContext.Provider value={pickerLibrary}>
       <div
         className={`studio ${focusWindow ? "focus-window" : ""} ${view === "components" ? "components-view" : ""}`}
         data-navigation-state={navigationUpdating ? "updating" : "current"}
+        data-window-fullscreen={windowFullscreen}
         data-native-titlebar={
           info?.platform === "darwin" && info.mode !== "browser"
             ? "mac"
             : undefined
         }
       >
-        {!focusWindow && (
-          <AutoHideSidebar
-            enabled={view === "page" && !!page.draft}
-            interactionHeld={
-              !!dialog ||
-              libraryDrag.dragging ||
-              !!projectsMenu ||
-              !!groupMenu ||
-              !!contextMenu?.anchor.closest(".studio-sidebar")
-            }
-          >
-            <LibraryDragContext.Provider value={libraryDrag.bindings}>
-              <div className="studio-brand">
-                <span>✳</span>
-                <strong>ShowAI</strong>
+        <AutoHideSidebar
+          enabled={view === "page" && !!page.draft}
+          interactionHeld={
+            !!dialog ||
+            libraryDrag.dragging ||
+            !!projectsMenu ||
+            !!groupMenu ||
+            !!contextMenu?.anchor.closest(".studio-sidebar")
+          }
+          focusWindow={focusWindow}
+          navigation={sidebarContent}
+          topbar={topbar}
+        >
+          <main className="studio-main">
+            {problem && (
+              <div className="studio-problem" role="alert">
+                <span>{problem}</span>
+                <button
+                  className="studio-icon"
+                  aria-label="关闭错误提示"
+                  onClick={() => setProblem("")}
+                >
+                  <X size={15} />
+                </button>
               </div>
+            )}
+            {view === "page" && page.draftNotice && !page.error && (
+              <div className="studio-conflict" role="status">
+                <p>{page.draftNotice}</p>
+              </div>
+            )}
+            {view === "page" && page.error && (
+              <div className="studio-conflict" role="alert">
+                <div>
+                  <strong>
+                    {page.status === "conflict"
+                      ? "这个文件有新的修改"
+                      : "保存遇到问题"}
+                  </strong>
+                  <p>{page.error}</p>
+                </div>
+                <button
+                  onClick={action(async () => {
+                    const copy = await page.keepCopy();
+                    if (copy) {
+                      await refresh();
+                      setNotice("草稿已保留为副本");
+                    }
+                  })}
+                >
+                  保留为副本
+                </button>
+                {page.status === "conflict" ? (
+                  <>
+                    {page.conflictId ? (
+                      <button
+                        onClick={action(async () => {
+                          await page.retainDraft();
+                          setDialog({
+                            type: "externalConflict",
+                            id: page.conflictId!,
+                          });
+                        })}
+                      >
+                        处理外部修改
+                      </button>
+                    ) : page.mergeBase && page.draft && selectedProject ? (
+                      <button
+                        onClick={action(async () => {
+                          await page.retainDraft();
+                          setDialog({
+                            type: "merge",
+                            projectId: selectedProject,
+                            document: structuredClone(page.draft!),
+                            baseRevision: page.mergeBase!,
+                          });
+                        })}
+                      >
+                        比较并合并
+                      </button>
+                    ) : null}
+                    <button onClick={action(page.reload)}>载入文件版本</button>
+                  </>
+                ) : (
+                  <button onClick={action(page.retry)}>重试保存</button>
+                )}
+              </div>
+            )}
+            {view === "page" && !!page.availableDrafts.length && (
+              <div className="studio-conflict" role="status">
+                <p>有其他编辑窗口留下的本机草稿，可选择恢复。</p>
+                {page.availableDrafts.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={action(() => page.recoverDraft(item.id))}
+                  >
+                    恢复草稿 · {new Date(item.savedAt).toLocaleString("zh-CN")}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div
+              ref={catalogScrollRef}
+              className={`studio-scroll${view === "page" && page.draft ? " has-page-surface" : ""}`}
+            >
+              {loading && (
+                <div className="studio-loading">
+                  <Loader2 size={24} className="studio-spin" />
+                </div>
+              )}
               {view === "settings" ? (
-                <SettingsNavigation
+                <SettingsPanel
                   section={settingsSection}
-                  onSelect={setSettingsSection}
+                  info={info}
+                  dark={dark}
+                  onDarkChange={setDark}
+                  onMigrate={() => setDialog({ type: "migration" })}
+                  onChooseHome={action(async () => {
+                    if (!(await page.flush())) return;
+                    const next = await desktop.invoke<DesktopInfo | null>(
+                      "settings:chooseHome",
+                    );
+                    if (next) {
+                      await page.clear();
+                      setInfo(next);
+                      setSelectedProject(null);
+                      selectedRef.current = null;
+                      setSelectedFolder(null);
+                      setContents({});
+                      setExpandedProjects({});
+                      setExpandedFolders({});
+                      await refresh();
+                      await loadCatalog();
+                      setNotice("内容库已切换");
+                    }
+                  })}
+                  onCopyHome={action(async () => {
+                    if (!info) return;
+                    await desktop.invoke("clipboard:write", {
+                      text: info.home,
+                    });
+                    setNotice("内容库路径已复制");
+                  })}
+                  onCopyConfig={action(async () => {
+                    if (!info) return;
+                    await desktop.invoke("clipboard:write", {
+                      text: JSON.stringify(info.cli, null, 2),
+                    });
+                    setNotice("本地启动配置已复制");
+                  })}
                 />
-              ) : view === "components" ? (
-                <ComponentNavigation
-                  groups={componentGroups}
-                  active={componentCategory}
-                  onSelect={(category) => {
-                    setComponentCategory(category);
-                    setCategoryRequest((current) => ({
-                      category,
-                      sequence: (current?.sequence ?? 0) + 1,
-                    }));
-                  }}
-                />
+              ) : view === "page" && page.draft ? (
+                <CustomComponentsProvider
+                  components={page.record?.components ?? []}
+                >
+                  <SurfaceEditor
+                    key={page.draft.id}
+                    document={page.draft}
+                    revealId={revealNode}
+                    onActiveSurfaceChange={(surfaceId) => {
+                      activeSurface.current = {
+                        pageId: page.draft!.id,
+                        surfaceId,
+                      };
+                    }}
+                    onRevealHandled={() => setRevealNode(null)}
+                    onChange={page.edit}
+                  />
+                </CustomComponentsProvider>
               ) : (
-                <ProjectSidebar
-                  projects={projects}
-                  organization={organization}
-                  selectedProject={selectedProject}
-                  collapsed={collapsedSections}
-                  setCollapsed={setCollapsedSections}
-                  onCreate={(groupId) =>
-                    setDialog({ type: "project", groupId })
-                  }
-                  onMenu={(anchor) =>
-                    setProjectsMenu((current) =>
-                      current === anchor ? null : anchor,
-                    )
-                  }
-                  onGroupMenu={(group, anchor) =>
-                    setGroupMenu({ group, anchor })
-                  }
-                  renderProject={(item) => (
-                    <div key={item.id}>
-                      <LibraryRow
-                        target={projectTarget(item)}
-                        active={
-                          selectedProject === item.id &&
-                          view === "project" &&
-                          !selectedFolder
-                        }
-                        expanded={!!expandedProjects[item.id]}
-                        onToggle={action(() => toggleProject(item.id))}
-                        onOpen={action(() => openProject(item.id))}
-                        onMenu={showMenu}
-                      />
-                      {expandedProjects[item.id] && (
-                        <div className="studio-tree-children">
-                          {renderChildren(item.id)}
-                        </div>
+                <div
+                  className={`studio-library${view === "components" ? " studio-component-library" : ""}`}
+                >
+                  {view === "components" && (
+                    <nav
+                      className="studio-filter-tabs component-source-tabs"
+                      aria-label="组件来源"
+                    >
+                      {(
+                        [
+                          ["all", "全部"],
+                          ["builtin", "默认"],
+                          ["custom", "自定义"],
+                        ] as const
+                      ).map(([filter, label]) => (
+                        <button
+                          key={filter}
+                          className={componentFilter === filter ? "active" : ""}
+                          aria-pressed={componentFilter === filter}
+                          onClick={() => {
+                            setComponentFilter(filter);
+                            setCategoryRequest(null);
+                            catalogScrollRef.current?.scrollTo({
+                              top: 0,
+                              behavior: "instant",
+                            });
+                          }}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </nav>
+                  )}
+                  {view === "templates" && (
+                    <div className="studio-library-toolbar catalog-scope-controls">
+                      <label>
+                        定制项目
+                        <select
+                          aria-label="目录项目"
+                          value={selectedProject ?? ""}
+                          onChange={(event) => {
+                            const id = event.target.value;
+                            void (async () => {
+                              if (!(await page.flush())) return;
+                              selectedRef.current = id || null;
+                              setSelectedProject(id || null);
+                              setSelectedFolder(null);
+                              if (id) await loadProjectContents(id);
+                              await loadCatalog();
+                            })().catch(report);
+                          }}
+                        >
+                          <option value="">选择项目</option>
+                          {projects.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {view === "templates" && (
+                        <label>
+                          查看范围
+                          <select
+                            aria-label="目录范围"
+                            value={catalogScope ?? "all"}
+                            onChange={(event) =>
+                              setCatalogScope(
+                                event.target
+                                  .value as CatalogReadOptions["scope"],
+                              )
+                            }
+                          >
+                            <option value="all">全部</option>
+                            <option value="project">项目</option>
+                            <option value="global">全局</option>
+                            <option value="published">已发布</option>
+                            <option value="builtin">内置</option>
+                          </select>
+                        </label>
                       )}
                     </div>
                   )}
-                />
-              )}
-              {sidebarNavigation}
-              {libraryDrag.preview && (
-                <div
-                  className="studio-library-drag-preview"
-                  aria-hidden="true"
-                  style={{
-                    left: libraryDrag.preview.x,
-                    top: libraryDrag.preview.y,
-                  }}
-                >
-                  {libraryDrag.preview.title}
-                </div>
-              )}
-            </LibraryDragContext.Provider>
-          </AutoHideSidebar>
-        )}
-        <main className="studio-main">
-          <header className="studio-topbar">
-            {navigationUpdating && (
-              <span className="studio-navigation-updating" role="status">
-                正在更新项目列表…
-              </span>
-            )}
-            {view === "settings" ||
-            view === "projects" ||
-            view === "templates" ||
-            view === "components" ? (
-              <h1 className="studio-topbar-title">{heading}</h1>
-            ) : (
-              <div className="studio-breadcrumb">
-                {focusWindow ? (
-                  <span>ShowAI</span>
-                ) : (
-                  <button onClick={action(() => navigate("projects"))}>
-                    最近
-                  </button>
-                )}
-                {selectedProject && (
-                  <>
-                    <ChevronRight size={13} />
-                    <button
-                      onClick={action(() => openProject(selectedProject))}
-                    >
-                      {project?.name ?? "项目"}
-                    </button>
-                  </>
-                )}
-                {breadcrumbFolders.map((item) => (
-                  <span className="studio-breadcrumb-folder" key={item.id}>
-                    <ChevronRight size={13} />
-                    <button
-                      onClick={action(() =>
-                        openProject(selectedProject!, item.id),
-                      )}
-                    >
-                      {item.name}
-                    </button>
-                  </span>
-                ))}
-                {view === "page" && (
-                  <>
-                    <ChevronRight size={13} />
-                    <PageIcon value={page.draft?.icon} size={18} />
-                    <input
-                      className="studio-page-title-input"
-                      aria-label="页面标题"
-                      placeholder="无标题"
-                      value={page.draft?.title ?? ""}
-                      maxLength={1000}
-                      onChange={(event) =>
-                        page.edit({
-                          ...upgradeResource(page.draft!),
-                          title: event.target.value.replaceAll("\n", ""),
-                        })
+                  {view === "projects" && (
+                    <RecentPages
+                      pages={recent}
+                      query={query}
+                      onOpen={(item) =>
+                        void openPage(item.id, item.projectId).catch(report)
                       }
+                      onCreateProject={() => setDialog({ type: "project" })}
                     />
-                  </>
-                )}
-              </div>
-            )}
-            <div className="studio-header-actions">
-              {info?.libraryVersion === 2 && (
-                <>
-                  <button
-                    className="studio-icon"
-                    aria-label="查看外部文件修改"
-                    title="查看外部文件修改"
-                    onClick={() => setDialog({ type: "workspaceConflicts" })}
-                  >
-                    <FolderOpen size={16} />
-                  </button>
-                  {selectedProject && (
-                    <button
-                      className="studio-icon"
-                      aria-label={view === "page" ? "页面历史" : "项目历史"}
-                      title={view === "page" ? "页面历史" : "项目历史"}
-                      onClick={() =>
-                        setDialog({
-                          type: "history",
-                          projectId: selectedProject,
-                          pageId: view === "page" ? page.draft?.id : undefined,
-                        })
-                      }
-                    >
-                      <History size={16} />
-                    </button>
                   )}
-                </>
-              )}
-              {(view === "projects" ||
-                view === "project" ||
-                info?.libraryVersion === 2) && (
-                <ExpandableSearch
-                  key={`${view}:${selectedProject}:${selectedFolder}:${searchRevision}`}
-                  label={
-                    !searchLibrary && view === "projects"
-                      ? "搜索最近页面"
-                      : !searchLibrary && view === "project"
-                        ? "搜索页面"
-                        : "搜索内容库"
-                  }
-                  value={query}
-                  onChange={setQuery}
-                >
-                  {info?.libraryVersion === 2 && (
+                  {view === "project" && (
                     <>
-                      {(view === "projects" || view === "project") && (
-                        <nav
-                          className="studio-search-scopes"
-                          aria-label="搜索范围"
-                        >
-                          <button
-                            aria-pressed={!searchLibrary}
-                            onClick={() => setSearchLibrary(false)}
-                          >
-                            {view === "projects" ? "最近页面" : "当前项目页面"}
-                          </button>
-                          <button
-                            aria-pressed={searchLibrary}
-                            onClick={() => setSearchLibrary(true)}
-                          >
-                            整个内容库
-                          </button>
-                        </nav>
-                      )}
-                      {searchLibrary ||
-                      (view !== "projects" && view !== "project") ? (
-                        <LibrarySearchResults
-                          query={query}
-                          onOpen={openSearchResult}
-                        />
-                      ) : null}
-                    </>
-                  )}
-                </ExpandableSearch>
-              )}
-              <div className="studio-section-actions studio-topbar-view-actions">
-                {view === "projects" && (
-                  <button
-                    className="studio-icon"
-                    onClick={() => setDialog({ type: "project" })}
-                    aria-label="新建项目"
-                    title="新建项目"
-                  >
-                    <Plus size={15} />
-                  </button>
-                )}
-                {view === "project" && project && (
-                  <>
-                    <button
-                      className="studio-icon"
-                      aria-label="打开项目目录"
-                      title="打开项目目录"
-                      onClick={action(() =>
-                        desktop.invoke("fs:reveal", {
-                          projectId: selectedProject,
-                        }),
-                      )}
-                    >
-                      <FolderOpen size={16} />
-                    </button>
-                    <button
-                      className="studio-icon"
-                      onClick={action(importPage)}
-                      aria-label="导入"
-                      title="导入"
-                    >
-                      <Upload size={15} />
-                    </button>
-                    <button
-                      className="studio-icon"
-                      disabled={!pages.length || busy}
-                      aria-haspopup="menu"
-                      onClick={(event) => {
-                        const anchor = event.currentTarget;
-                        setExportMenu((current) =>
-                          current === anchor ? null : anchor,
-                        );
-                      }}
-                      aria-label="导出网站"
-                      title="导出网站"
-                    >
-                      <ArrowUpRight size={15} />
-                    </button>
-                    <button
-                      className="studio-icon"
-                      aria-label="当前目录操作"
-                      aria-haspopup="menu"
-                      onClick={(event) =>
-                        showMenu(
-                          currentFolder
-                            ? folderTarget(currentFolder, project.id)
-                            : projectTarget(project),
-                          event.currentTarget,
-                        )
-                      }
-                    >
-                      <MoreHorizontal size={18} />
-                    </button>
-                  </>
-                )}
-                {view === "templates" && (
-                  <button
-                    disabled={!selectedProject}
-                    className="studio-icon"
-                    onClick={() =>
-                      setDialog({
-                        type: "template",
-                        record: blankTemplate(),
-                        copy: true,
-                      })
-                    }
-                    aria-label="新建模板"
-                    title="新建模板"
-                  >
-                    <Plus size={15} />
-                  </button>
-                )}
-                {view === "components" && (
-                  <>
-                    <label className="component-project-picker">
-                      项目：
-                      <select
-                        aria-label="目录项目"
-                        value={componentProject}
-                        onChange={(event) => {
-                          const id = event.target.value;
-                          void (async () => {
-                            if (!(await page.flush())) return;
-                            componentProjectRef.current = id;
-                            setComponentProject(id);
-                            if (id !== "all") {
-                              selectedRef.current = id;
-                              setSelectedProject(id);
-                              setSelectedFolder(null);
-                            }
-                          })().catch(report);
-                        }}
-                      >
-                        <option value="all">全部</option>
-                        {projects.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <button
-                      className="studio-icon"
-                      disabled={componentProject === "all"}
-                      title={
-                        componentProject === "all"
-                          ? "请选择组件所属项目"
-                          : undefined
-                      }
-                      onClick={action(async () => {
-                        const result =
-                          await desktop.invoke<CompiledComponent | null>(
-                            "components:import",
-                            componentProject !== "all"
-                              ? { projectId: componentProject }
-                              : {},
-                          );
-                        if (result) {
-                          await loadCatalog();
-                          setNotice("组件已安装");
-                        }
-                      })}
-                      aria-label="导入组件"
-                    >
-                      <Upload size={15} />
-                    </button>
-                    <button
-                      className="studio-icon"
-                      disabled={componentProject === "all"}
-                      title={
-                        componentProject === "all"
-                          ? "请选择组件所属项目"
-                          : undefined
-                      }
-                      onClick={action(async () => {
-                        const result = await desktop.invoke<CompiledComponent>(
-                          "components:createExample",
-                          componentProject !== "all"
-                            ? { projectId: componentProject }
-                            : {},
-                        );
-                        await loadCatalog();
-                        await viewComponent({
-                          ...result,
-                          projectId: componentProject,
-                        });
-                      })}
-                      aria-label="新建组件"
-                    >
-                      <Plus size={15} />
-                    </button>
-                  </>
-                )}
-              </div>
-              {view === "page" && page.draft && (
-                <>
-                  <span className={`studio-save-state ${page.status}`}>
-                    {page.status === "saving" ? (
-                      <Loader2 size={12} className="studio-spin" />
-                    ) : (
-                      <Check size={12} />
-                    )}
-                    {
-                      {
-                        saved: "已保存",
-                        saving: "保存中",
-                        changed: "待保存",
-                        conflict: "文件已更新",
-                        error: "保存失败",
-                      }[page.status]
-                    }
-                  </span>
-                  <button
-                    className="studio-icon"
-                    aria-label="显示页面文件"
-                    title="显示页面文件"
-                    onClick={action(() =>
-                      desktop.invoke("fs:reveal", {
-                        projectId: selectedProject,
-                        pageId: page.draft!.id,
-                      }),
-                    )}
-                  >
-                    <FolderOpen size={16} />
-                  </button>
-                  <button
-                    className="studio-icon"
-                    aria-label="导出"
-                    title="导出页面"
-                    disabled={busy}
-                    onClick={() => void exportPage("html")}
-                  >
-                    <ArrowUpRight size={14} />
-                  </button>
-                  <button
-                    className="studio-icon"
-                    aria-label="页面操作"
-                    aria-haspopup="menu"
-                    onClick={(event) => {
-                      const target = activePageTarget();
-                      if (target)
-                        showMenu(target, event.currentTarget, undefined, true);
-                    }}
-                  >
-                    <MoreHorizontal size={18} />
-                  </button>
-                </>
-              )}
-            </div>
-          </header>
-          {problem && (
-            <div className="studio-problem" role="alert">
-              <span>{problem}</span>
-              <button
-                className="studio-icon"
-                aria-label="关闭错误提示"
-                onClick={() => setProblem("")}
-              >
-                <X size={15} />
-              </button>
-            </div>
-          )}
-          {view === "page" && page.draftNotice && !page.error && (
-            <div className="studio-conflict" role="status">
-              <p>{page.draftNotice}</p>
-            </div>
-          )}
-          {view === "page" && page.error && (
-            <div className="studio-conflict" role="alert">
-              <div>
-                <strong>
-                  {page.status === "conflict"
-                    ? "这个文件有新的修改"
-                    : "保存遇到问题"}
-                </strong>
-                <p>{page.error}</p>
-              </div>
-              <button
-                onClick={action(async () => {
-                  const copy = await page.keepCopy();
-                  if (copy) {
-                    await refresh();
-                    setNotice("草稿已保留为副本");
-                  }
-                })}
-              >
-                保留为副本
-              </button>
-              {page.status === "conflict" ? (
-                <>
-                  {page.conflictId ? (
-                    <button
-                      onClick={action(async () => {
-                        await page.retainDraft();
-                        setDialog({
-                          type: "externalConflict",
-                          id: page.conflictId!,
-                        });
-                      })}
-                    >
-                      处理外部修改
-                    </button>
-                  ) : page.mergeBase && page.draft && selectedProject ? (
-                    <button
-                      onClick={action(async () => {
-                        await page.retainDraft();
-                        setDialog({
-                          type: "merge",
-                          projectId: selectedProject,
-                          document: structuredClone(page.draft!),
-                          baseRevision: page.mergeBase!,
-                        });
-                      })}
-                    >
-                      比较并合并
-                    </button>
-                  ) : null}
-                  <button onClick={action(page.reload)}>载入文件版本</button>
-                </>
-              ) : (
-                <button onClick={action(page.retry)}>重试保存</button>
-              )}
-            </div>
-          )}
-          {view === "page" && !!page.availableDrafts.length && (
-            <div className="studio-conflict" role="status">
-              <p>有其他编辑窗口留下的本机草稿，可选择恢复。</p>
-              {page.availableDrafts.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={action(() => page.recoverDraft(item.id))}
-                >
-                  恢复草稿 · {new Date(item.savedAt).toLocaleString("zh-CN")}
-                </button>
-              ))}
-            </div>
-          )}
-          <div
-            ref={catalogScrollRef}
-            className={`studio-scroll${view === "page" && page.draft ? " has-page-surface" : ""}`}
-          >
-            {loading && (
-              <div className="studio-loading">
-                <Loader2 size={24} className="studio-spin" />
-              </div>
-            )}
-            {view === "settings" ? (
-              <SettingsPanel
-                section={settingsSection}
-                info={info}
-                dark={dark}
-                onDarkChange={setDark}
-                onMigrate={() => setDialog({ type: "migration" })}
-                onChooseHome={action(async () => {
-                  if (!(await page.flush())) return;
-                  const next = await desktop.invoke<DesktopInfo | null>(
-                    "settings:chooseHome",
-                  );
-                  if (next) {
-                    await page.clear();
-                    setInfo(next);
-                    setSelectedProject(null);
-                    selectedRef.current = null;
-                    setSelectedFolder(null);
-                    setContents({});
-                    setExpandedProjects({});
-                    setExpandedFolders({});
-                    await refresh();
-                    await loadCatalog();
-                    setNotice("内容库已切换");
-                  }
-                })}
-                onCopyHome={action(async () => {
-                  if (!info) return;
-                  await desktop.invoke("clipboard:write", { text: info.home });
-                  setNotice("内容库路径已复制");
-                })}
-                onCopyConfig={action(async () => {
-                  if (!info) return;
-                  await desktop.invoke("clipboard:write", {
-                    text: JSON.stringify(info.cli, null, 2),
-                  });
-                  setNotice("本地启动配置已复制");
-                })}
-              />
-            ) : view === "page" && page.draft ? (
-              <CustomComponentsProvider
-                components={page.record?.components ?? []}
-              >
-                <SurfaceEditor
-                  key={page.draft.id}
-                  document={page.draft}
-                  revealId={revealNode}
-                  onActiveSurfaceChange={(surfaceId) => {
-                    activeSurface.current = {
-                      pageId: page.draft!.id,
-                      surfaceId,
-                    };
-                  }}
-                  onRevealHandled={() => setRevealNode(null)}
-                  onChange={page.edit}
-                />
-              </CustomComponentsProvider>
-            ) : (
-              <div
-                className={`studio-library${view === "components" ? " studio-component-library" : ""}`}
-              >
-                {view === "components" && (
-                  <nav
-                    className="studio-filter-tabs component-source-tabs"
-                    aria-label="组件来源"
-                  >
-                    {(
-                      [
-                        ["all", "全部"],
-                        ["builtin", "默认"],
-                        ["custom", "自定义"],
-                      ] as const
-                    ).map(([filter, label]) => (
-                      <button
-                        key={filter}
-                        className={componentFilter === filter ? "active" : ""}
-                        aria-pressed={componentFilter === filter}
-                        onClick={() => {
-                          setComponentFilter(filter);
-                          setCategoryRequest(null);
-                          catalogScrollRef.current?.scrollTo({
-                            top: 0,
-                            behavior: "instant",
-                          });
-                        }}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </nav>
-                )}
-                {view === "templates" && (
-                  <div className="studio-library-toolbar catalog-scope-controls">
-                    <label>
-                      定制项目
-                      <select
-                        aria-label="目录项目"
-                        value={selectedProject ?? ""}
-                        onChange={(event) => {
-                          const id = event.target.value;
-                          void (async () => {
-                            if (!(await page.flush())) return;
-                            selectedRef.current = id || null;
-                            setSelectedProject(id || null);
-                            setSelectedFolder(null);
-                            if (id) await loadProjectContents(id);
-                            await loadCatalog();
-                          })().catch(report);
-                        }}
-                      >
-                        <option value="">选择项目</option>
-                        {projects.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    {view === "templates" && (
-                      <label>
-                        查看范围
-                        <select
-                          aria-label="目录范围"
-                          value={catalogScope ?? "all"}
-                          onChange={(event) =>
-                            setCatalogScope(
-                              event.target.value as CatalogReadOptions["scope"],
-                            )
-                          }
-                        >
-                          <option value="all">全部</option>
-                          <option value="project">项目</option>
-                          <option value="global">全局</option>
-                          <option value="published">已发布</option>
-                          <option value="builtin">内置</option>
-                        </select>
-                      </label>
-                    )}
-                  </div>
-                )}
-                {view === "projects" && (
-                  <RecentPages
-                    pages={recent}
-                    query={query}
-                    onOpen={(item) =>
-                      void openPage(item.id, item.projectId).catch(report)
-                    }
-                    onCreateProject={() => setDialog({ type: "project" })}
-                  />
-                )}
-                {view === "project" && (
-                  <>
-                    {visibleEntries.length ? (
-                      <div className="studio-page-list">
-                        {visibleEntries.map(({ target, updatedAt }) => (
-                          <div key={target.id} className="studio-page-list-row">
-                            <button
-                              className="studio-page-list-open"
-                              onClick={action(() =>
-                                target.kind === "folder"
-                                  ? openProject(target.projectId, target.id)
-                                  : openPage(target.id, target.projectId),
-                              )}
+                      {visibleEntries.length ? (
+                        <div className="studio-page-list">
+                          {visibleEntries.map(({ target, updatedAt }) => (
+                            <div
+                              key={target.id}
+                              className="studio-page-list-row"
                             >
-                              <span className="studio-page-list-icon">
-                                {target.kind === "folder" ? (
-                                  <Folder size={19} />
-                                ) : (
-                                  <PageIcon
-                                    value={
-                                      target.kind === "page" ? target.icon : ""
-                                    }
-                                    size={19}
-                                  />
+                              <button
+                                className="studio-page-list-open"
+                                onClick={action(() =>
+                                  target.kind === "folder"
+                                    ? openProject(target.projectId, target.id)
+                                    : openPage(target.id, target.projectId),
                                 )}
-                              </span>
-                              <strong>{target.title}</strong>
-                              {target.pinned && (
-                                <Pin size={12} aria-label="已置顶" />
-                              )}
-                              <time>{shortDate(updatedAt)}</time>
-                            </button>
-                            <button
-                              className="studio-icon studio-row-menu"
-                              aria-label={`${target.title}的操作`}
-                              aria-haspopup="menu"
-                              onClick={(event) =>
-                                showMenu(target, event.currentTarget)
-                              }
-                            >
-                              <MoreHorizontal size={17} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="studio-empty">
-                        <FilePlus2 size={30} strokeWidth={1.2} />
-                        <h2>
-                          {query
-                            ? "没有匹配的内容"
-                            : currentFolder
-                              ? "文件夹为空"
-                              : "从空白页面开始"}
-                        </h2>
-                        {!query && (
-                          <button
-                            className="studio-text-button"
-                            onClick={action(() =>
-                              beginNewPage(selectedProject!, selectedFolder),
-                            )}
-                          >
-                            创建页面
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
-                {view === "templates" && (
-                  <>
-                    <div className="studio-template-grid">
-                      {templates.map((item, index) => (
-                        <div
-                          className="studio-template-card"
-                          key={`${item.scope}:${item.id}:${item.version}`}
-                        >
-                          <button
-                            className={`studio-template-art art-${index % 4}`}
-                            aria-label={`查看模板 ${item.name} ${item.version} ${item.scope}`}
-                            onClick={action(async () => {
-                              const record =
-                                await desktop.invoke<LoadedTemplate>(
-                                  "templates:get",
-                                  {
-                                    id: item.id,
-                                    ...(selectedProject
-                                      ? { projectId: selectedProject }
-                                      : {}),
-                                  },
-                                );
-                              setDialog({
-                                type: "template",
-                                record,
-                                copy: item.scope === "builtin",
-                              });
-                            })}
-                          >
-                            <div className="template-sheet">
-                              <i />
-                              <i />
-                              <i />
-                              <div />
-                              <i />
-                              <i />
+                              >
+                                <span className="studio-page-list-icon">
+                                  {target.kind === "folder" ? (
+                                    <Folder size={19} />
+                                  ) : (
+                                    <PageIcon
+                                      value={
+                                        target.kind === "page"
+                                          ? target.icon
+                                          : ""
+                                      }
+                                      size={19}
+                                    />
+                                  )}
+                                </span>
+                                <strong>{target.title}</strong>
+                                {target.pinned && (
+                                  <Pin size={12} aria-label="已置顶" />
+                                )}
+                                <time>{shortDate(updatedAt)}</time>
+                              </button>
+                              <button
+                                className="studio-icon studio-row-menu"
+                                aria-label={`${target.title}的操作`}
+                                aria-haspopup="menu"
+                                onClick={(event) =>
+                                  showMenu(target, event.currentTarget)
+                                }
+                              >
+                                <MoreHorizontal size={17} />
+                              </button>
                             </div>
-                          </button>
-                          <div className="studio-template-info">
-                            <div>
-                              <h2>{item.name}</h2>
-                              <Scope value={item.scope} />
-                            </div>
-                            <p>{item.description}</p>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="studio-empty">
+                          <FilePlus2 size={30} strokeWidth={1.2} />
+                          <h2>
+                            {query
+                              ? "没有匹配的内容"
+                              : currentFolder
+                                ? "文件夹为空"
+                                : "从空白页面开始"}
+                          </h2>
+                          {!query && (
                             <button
                               className="studio-text-button"
-                              disabled={!selectedProject}
-                              onClick={() => void createPage(item.id, item)}
+                              onClick={action(() =>
+                                beginNewPage(selectedProject!, selectedFolder),
+                              )}
                             >
-                              使用模板
-                              <ArrowUpRight size={14} />
+                              创建页面
                             </button>
-                            {page.draft &&
-                              page.projectId === selectedProject && (
-                                <button
-                                  className="studio-text-button"
-                                  onClick={action(async () => {
-                                    if (!(await page.flush())) return;
-                                    const id = page.draft!.id;
-                                    const latest =
-                                      await desktop.invoke<LoadedPage>(
-                                        "pages:get",
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {view === "templates" && (
+                    <>
+                      <div className="studio-template-grid">
+                        {templates.map((item, index) => (
+                          <div
+                            className="studio-template-card"
+                            key={`${item.scope}:${item.id}:${item.version}`}
+                          >
+                            <button
+                              className={`studio-template-art art-${index % 4}`}
+                              aria-label={`查看模板 ${item.name} ${item.version} ${item.scope}`}
+                              onClick={action(async () => {
+                                const record =
+                                  await desktop.invoke<LoadedTemplate>(
+                                    "templates:get",
+                                    {
+                                      id: item.id,
+                                      ...(selectedProject
+                                        ? { projectId: selectedProject }
+                                        : {}),
+                                    },
+                                  );
+                                setDialog({
+                                  type: "template",
+                                  record,
+                                  copy: item.scope === "builtin",
+                                });
+                              })}
+                            >
+                              <div className="template-sheet">
+                                <i />
+                                <i />
+                                <i />
+                                <div />
+                                <i />
+                                <i />
+                              </div>
+                            </button>
+                            <div className="studio-template-info">
+                              <div>
+                                <h2>{item.name}</h2>
+                                <Scope value={item.scope} />
+                              </div>
+                              <p>{item.description}</p>
+                              <button
+                                className="studio-text-button"
+                                disabled={!selectedProject}
+                                onClick={() => void createPage(item.id, item)}
+                              >
+                                使用模板
+                                <ArrowUpRight size={14} />
+                              </button>
+                              {page.draft &&
+                                page.projectId === selectedProject && (
+                                  <button
+                                    className="studio-text-button"
+                                    onClick={action(async () => {
+                                      if (!(await page.flush())) return;
+                                      const id = page.draft!.id;
+                                      const latest =
+                                        await desktop.invoke<LoadedPage>(
+                                          "pages:get",
+                                          {
+                                            projectId: selectedProject,
+                                            pageId: id,
+                                          },
+                                        );
+                                      await desktop.invoke(
+                                        "pages:insertTemplate",
                                         {
                                           projectId: selectedProject,
                                           pageId: id,
+                                          baseHash: latest.hash,
+                                          baseRevision: latest.revision,
+                                          templateId: item.id,
+                                          templateVersion: item.version,
+                                          templateScope: item.scope,
+                                          templateIntegrity: item.integrity,
                                         },
                                       );
-                                    await desktop.invoke(
-                                      "pages:insertTemplate",
-                                      {
-                                        projectId: selectedProject,
-                                        pageId: id,
-                                        baseHash: latest.hash,
-                                        baseRevision: latest.revision,
-                                        templateId: item.id,
-                                        templateVersion: item.version,
-                                        templateScope: item.scope,
-                                        templateIntegrity: item.integrity,
-                                      },
-                                    );
-                                    await openPage(id, selectedProject!);
-                                    setNotice("模板已加入白板");
-                                  })}
-                                >
-                                  加入当前白板
-                                </button>
-                              )}
+                                      await openPage(id, selectedProject!);
+                                      setNotice("模板已加入白板");
+                                    })}
+                                  >
+                                    加入当前白板
+                                  </button>
+                                )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-                {view === "components" && (
-                  <ComponentCatalog
-                    groups={componentGroups}
-                    browser={
-                      !!info && "mode" in info && info.mode === "browser"
-                    }
-                    showProjectNames={componentProject === "all"}
-                    scrollRef={catalogScrollRef}
-                    request={categoryRequest}
-                    onActiveChange={setComponentCategory}
-                    onOpen={(item) => void viewComponent(item).catch(report)}
-                  />
-                )}
-              </div>
-            )}
-          </div>
-        </main>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {view === "components" && (
+                    <ComponentCatalog
+                      groups={componentGroups}
+                      browser={
+                        !!info && "mode" in info && info.mode === "browser"
+                      }
+                      showProjectNames={componentProject === "all"}
+                      scrollRef={catalogScrollRef}
+                      request={categoryRequest}
+                      onActiveChange={setComponentCategory}
+                      onOpen={(item) => void viewComponent(item).catch(report)}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          </main>
+        </AutoHideSidebar>
         {notice && (
           <div className="studio-toast" role="status">
             <Check size={14} />

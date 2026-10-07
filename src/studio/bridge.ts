@@ -1,5 +1,9 @@
-import type { DesktopChange } from "../desktop/bridge";
+import type { DesktopChange, DesktopWindowState } from "../desktop/bridge";
 export interface DesktopBridge {
+  getWindowState?(): Promise<DesktopWindowState>;
+  onWindowStateChange?(
+    listener: (state: DesktopWindowState) => void,
+  ): () => void;
   invoke<T = unknown>(
     action: string,
     args?: Record<string, unknown>,

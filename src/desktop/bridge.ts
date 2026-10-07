@@ -28,7 +28,15 @@ export interface DesktopChange {
   allPages?: boolean;
 }
 
+export interface DesktopWindowState {
+  fullScreen: boolean;
+}
+
 export interface ShowAIBridge {
+  getWindowState?(): Promise<DesktopWindowState>;
+  onWindowStateChange?(
+    listener: (state: DesktopWindowState) => void,
+  ): () => void;
   invoke<T = unknown>(
     action: string,
     args?: Record<string, unknown>,

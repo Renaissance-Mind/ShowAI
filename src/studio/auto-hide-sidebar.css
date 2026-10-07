@@ -29,7 +29,7 @@
 }
 .studio-sidebar-resizer {
   position: absolute;
-  inset: 40px -4px 0 auto;
+  inset: 0 -4px 0 auto;
   width: 8px;
   cursor: col-resize;
   touch-action: none;
@@ -64,21 +64,51 @@
 .studio:has(.studio-sidebar-shell[data-sidebar-resizing]) iframe {
   pointer-events: none;
 }
-.studio[data-native-titlebar="mac"]:has(
-    > .studio-sidebar-shell:not([data-sidebar-mode="docked"])
-  )
-  .studio-topbar {
+.studio-window-topbar {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  position: relative;
+  z-index: 110;
+  -webkit-app-region: drag;
+}
+.studio-workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.studio-topbar-brand {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  height: 44px;
+  min-width: 0;
+  padding: 0 14px 0 19px;
+  gap: 8px;
+  user-select: none;
+}
+.studio-topbar-brand strong {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.studio[data-native-titlebar="mac"]:not([data-window-fullscreen="true"])
+  .studio-topbar-brand {
   padding-left: 88px;
 }
-.studio-sidebar-shell .studio-brand {
-  padding-right: 32px;
-}
 .studio-sidebar-lock {
-  position: absolute;
-  top: 48px;
-  right: 16px;
   display: grid;
   place-items: center;
+  flex-shrink: 0;
   width: 28px;
   height: 28px;
   border-radius: 6px;
@@ -95,7 +125,7 @@
 }
 .studio-sidebar-edge {
   position: fixed;
-  inset: 40px auto 0 0;
+  inset: 45px auto 0 0;
   z-index: 101;
   width: 12px;
   display: grid;
@@ -124,9 +154,6 @@
 @media (max-width: 1100px) {
   .studio-sidebar-shell {
     --navigation-width: 208px;
-  }
-  .studio-sidebar-lock {
-    right: 12px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

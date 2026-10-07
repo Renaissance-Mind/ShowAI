@@ -37,6 +37,7 @@
 }
 .studio {
   display: flex;
+  flex-direction: column;
   height: 100dvh;
   overflow: hidden;
   background: var(--paper);
@@ -49,24 +50,8 @@
   border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  padding: 42px 10px 10px;
+  padding: 10px;
   user-select: none;
-}
-.studio-brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  padding: 0 9px 10px;
-  margin-bottom: 6px;
-  letter-spacing: -0.35px;
-  font-size: 18px;
-  -webkit-app-region: drag;
-}
-.studio-brand > span {
-  font-size: 24px;
-  color: var(--brand-accent);
-  line-height: 1;
 }
 .studio-main-nav {
   display: grid;
@@ -206,12 +191,12 @@ button.studio-tree-chevron:hover {
   position: relative;
   z-index: 20;
   height: 44px;
-  flex-shrink: 0;
+  min-width: 0;
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 18px;
-  border-bottom: 1px solid var(--line);
   -webkit-app-region: drag;
   gap: 12px;
 }
@@ -683,7 +668,8 @@ button.studio-tree-chevron:hover {
   color: var(--muted);
   opacity: 0.65;
 }
-.focus-window .studio-topbar {
+.focus-window[data-native-titlebar="mac"]:not([data-window-fullscreen="true"])
+  .studio-topbar {
   padding-left: 88px;
 }
 .studio-template-grid {

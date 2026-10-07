@@ -1,5 +1,10 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { DesktopChange, DesktopResponse, ShowAIBridge } from "./bridge";
+import type {
+  DesktopChange,
+  DesktopResponse,
+  DesktopWindowState,
+  ShowAIBridge,
+} from "./bridge";
 
 if (process.isMainFrame) {
   const closeListeners = new Set<() => Promise<boolean>>();
@@ -15,6 +20,18 @@ if (process.isMainFrame) {
     ipcRenderer.send("showai:close-result", { requestId, allow });
   });
   const bridge: ShowAIBridge = {
+    getWindowState() {
+      return ipcRenderer.invoke("showai:window-state");
+    },
+    onWindowStateChange(listener) {
+      const receive = (
+        _event: Electron.IpcRendererEvent,
+        state: DesktopWindowState,
+      ) => listener(state);
+      ipcRenderer.on("showai:window-state-changed", receive);
+      return () =>
+        ipcRenderer.removeListener("showai:window-state-changed", receive);
+    },
     async invoke<T>(
       action: string,
       args: Record<string, unknown> = {},
