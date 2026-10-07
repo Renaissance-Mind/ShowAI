@@ -98,7 +98,6 @@ import TemplateNavigation, {
   type TemplateType,
 } from "./TemplateNavigation";
 import RecentPages, { recentPages } from "./RecentPages";
-import appIcon from "../desktop/assets/icon.svg";
 import AutoHideSidebar from "./AutoHideSidebar";
 import { useWindowFullscreen } from "./useWindowFullscreen";
 import { ComponentCatalog, ComponentNavigation } from "./ComponentCatalog";
@@ -1451,33 +1450,15 @@ export default function Studio() {
         </h1>
       ) : (
         <div className="studio-breadcrumb">
-          {focusWindow ? (
-            <span className="studio-breadcrumb-folder">
-              <img
-                className="studio-breadcrumb-app-icon"
-                src={appIcon}
-                alt=""
-              />
-              ShowAI
-            </span>
-          ) : (
-            <button onClick={action(() => navigate("projects"))}>
-              <History size={16} aria-hidden="true" />
-              <span>最近</span>
-            </button>
-          )}
           {selectedProject && (
-            <>
-              <ChevronRight size={13} />
-              <button onClick={action(() => openProject(selectedProject))}>
-                <PageIcon
-                  value={project?.icon}
-                  size={17}
-                  fallback={<Folder size={17} />}
-                />
-                <span>{project?.name ?? "项目"}</span>
-              </button>
-            </>
+            <button onClick={action(() => openProject(selectedProject))}>
+              <PageIcon
+                value={project?.icon}
+                size={17}
+                fallback={<Folder size={17} />}
+              />
+              <span>{project?.name ?? "项目"}</span>
+            </button>
           )}
           {breadcrumbFolders.map((item) => (
             <span className="studio-breadcrumb-folder" key={item.id}>
