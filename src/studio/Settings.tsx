@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   ArrowLeft,
   Bot,
@@ -57,11 +58,13 @@ export function SettingsNavigation({
   info,
   onSelect,
   onBack,
+  navigation,
 }: {
   section: SettingsSection;
   info: DesktopInfo | null;
   onSelect: (section: SettingsSection) => void;
   onBack: () => void;
+  navigation?: ReactNode;
 }) {
   return (
     <aside className="studio-sidebar studio-settings-sidebar">
@@ -89,6 +92,7 @@ export function SettingsNavigation({
         <span>ShowAI</span>
         {info && <span className="settings-version">v{info.version}</span>}
       </div>
+      {navigation}
     </aside>
   );
 }

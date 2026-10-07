@@ -70,18 +70,22 @@
 }
 .studio-main-nav {
   display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 2px;
+  flex-shrink: 0;
 }
 .studio-main-nav button,
 .studio-sidebar-bottom > button {
   display: flex;
   align-items: center;
-  gap: 9px;
+  justify-content: center;
   width: 100%;
+  min-width: 0;
   min-height: 32px;
-  padding: 5px 9px;
+  padding: 5px 0;
   border-radius: 5px;
-  text-align: left;
+  text-align: center;
+  white-space: nowrap;
   color: var(--muted);
   font-size: 14px;
   line-height: 20px;
@@ -199,6 +203,7 @@ button.studio-tree-chevron:hover {
   background: var(--line);
 }
 .studio-sidebar-bottom {
+  margin-top: 8px;
   border-top: 1px solid var(--line);
   padding-top: 8px;
 }
@@ -562,6 +567,21 @@ button.studio-tree-chevron:hover {
   color: var(--muted);
   margin-left: 6px;
   flex-shrink: 0;
+}
+.studio-recent-page-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.studio-recent-page-project {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+.studio-recent-pages .studio-page-list-open {
+  min-height: 60px;
 }
 .studio-editor-page {
   max-width: 1000px;

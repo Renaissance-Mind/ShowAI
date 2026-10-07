@@ -18,7 +18,6 @@ import {
   FolderMinus,
   Globe,
   Package,
-  Blocks,
   Check,
   ChevronRight,
   Copy,
@@ -37,7 +36,6 @@ import {
   Plus,
   Search,
   History,
-  Settings2,
   Upload,
   X,
 } from "../ui/icons";
@@ -74,6 +72,8 @@ import {
 } from "./LibraryNavigation";
 import Dialog from "./Dialog";
 import ProjectSidebar from "./ProjectSidebar";
+import SidebarNavigation from "./SidebarNavigation";
+import RecentPages, { recentPages } from "./RecentPages";
 import AutoHideSidebar from "./AutoHideSidebar";
 import { ComponentCatalog, ComponentNavigation } from "./ComponentCatalog";
 import {
@@ -290,14 +290,28 @@ export default function Studio() {
     setInfo(appInfo);
     setProjects(next);
     setOrganization(sidebar);
-    const visibleIds = next
-      .filter(
-        (item) =>
-          expandedRef.current[item.id] || item.id === selectedRef.current,
-      )
-      .map((item) => item.id);
-    await Promise.all(visibleIds.map(loadProjectContents));
-  }, [loadProjectContents]);
+    const nextContents = await Promise.all(
+      next.map(async (item) => {
+        const [pages, folders] = await Promise.all([
+          desktop.invoke<PageSummary[]>("pages:list", { projectId: item.id }),
+          expandedRef.current[item.id] || item.id === selectedRef.current
+            ? desktop.invoke<FolderMetadata[]>("folders:list", {
+                projectId: item.id,
+              })
+            : Promise.resolve(undefined),
+        ]);
+        return { id: item.id, pages, folders };
+      }),
+    );
+    setContents((current) =>
+      Object.fromEntries(
+        nextContents.map(({ id, pages, folders }) => [
+          id,
+          { pages, folders: folders ?? current[id]?.folders ?? [] },
+        ]),
+      ),
+    );
+  }, []);
   const loadCatalog = useCallback(async () => {
     const id = selectedRef.current;
     const requestedScope = catalogScopeRef.current;
@@ -460,6 +474,7 @@ export default function Studio() {
       setSelectedProject(null);
       selectedRef.current = null;
       setSelectedFolder(null);
+      await refresh();
     }
     if (next === "templates" || next === "components") await loadCatalog();
   }
@@ -947,10 +962,9 @@ export default function Studio() {
     [selectedProject],
   );
   const loading = !info && !problem;
-  const filteredProjects = projects.filter((item) =>
-    (item.name + " " + (item.binding?.harness ?? ""))
-      .toLowerCase()
-      .includes(query.toLowerCase()),
+  const recent = useMemo(
+    () => recentPages(projects, contents),
+    [projects, contents],
   );
   const folderIds = new Set(folders.map((item) => item.id));
   const currentFolder = folders.find((item) => item.id === selectedFolder);
@@ -990,7 +1004,7 @@ export default function Studio() {
   }
   const heading =
     view === "projects"
-      ? "项目"
+      ? "最近"
       : view === "project"
         ? (currentFolder?.name ?? project?.name ?? "项目")
         : view === "templates"
@@ -1003,6 +1017,19 @@ export default function Studio() {
   const action = (operation: () => Promise<unknown>) => () => {
     void operation().catch(report);
   };
+
+  const sidebarNavigation = (
+    <SidebarNavigation
+      active={
+        view === "templates" || view === "components" || view === "settings"
+          ? view
+          : "recent"
+      }
+      onSelect={(section) =>
+        void navigate(section === "recent" ? "projects" : section).catch(report)
+      }
+    />
+  );
 
   return (
     <ComponentLibraryContext.Provider value={pickerLibrary}>
@@ -1021,6 +1048,7 @@ export default function Studio() {
               info={info}
               onSelect={setSettingsSection}
               onBack={action(() => navigate(settingsReturnView.current))}
+              navigation={sidebarNavigation}
             />
           ) : (
             <AutoHideSidebar
@@ -1036,33 +1064,6 @@ export default function Studio() {
                 <span>✳</span>
                 <strong>ShowAI</strong>
               </div>
-              <nav className="studio-main-nav" aria-label="主要导航">
-                <button
-                  className={
-                    ["projects", "project", "page"].includes(view)
-                      ? "active"
-                      : ""
-                  }
-                  onClick={action(() => navigate("projects"))}
-                >
-                  <FolderOpen size={17} />
-                  项目
-                </button>
-                <button
-                  className={view === "templates" ? "active" : ""}
-                  onClick={action(() => navigate("templates"))}
-                >
-                  <LayoutTemplate size={17} />
-                  模板
-                </button>
-                <button
-                  className={view === "components" ? "active" : ""}
-                  onClick={action(() => navigate("components"))}
-                >
-                  <Blocks size={17} />
-                  组件
-                </button>
-              </nav>
               {view === "components" ? (
                 <ComponentNavigation
                   groups={componentGroups}
@@ -1114,12 +1115,7 @@ export default function Studio() {
                   )}
                 />
               )}
-              <div className="studio-sidebar-bottom">
-                <button onClick={action(() => navigate("settings"))}>
-                  <Settings2 size={15} />
-                  设置
-                </button>
-              </div>
+              {sidebarNavigation}
             </AutoHideSidebar>
           ))}
         <main className="studio-main">
@@ -1146,7 +1142,7 @@ export default function Studio() {
                   <span>ShowAI</span>
                 ) : (
                   <button onClick={action(() => navigate("projects"))}>
-                    项目
+                    最近
                   </button>
                 )}
                 {selectedProject && (
@@ -1712,69 +1708,21 @@ export default function Studio() {
                       <label className="studio-search">
                         <Search size={15} />
                         <input
-                          aria-label="搜索项目"
-                          placeholder="搜索项目"
+                          aria-label="搜索最近页面"
+                          placeholder="搜索最近页面"
                           value={query}
                           onChange={(event) => setQuery(event.target.value)}
                         />
                       </label>
                     </div>
-                    {filteredProjects.length ? (
-                      <div className="studio-project-grid">
-                        {filteredProjects.map((item) => (
-                          <div className="studio-project-card" key={item.id}>
-                            <button
-                              className="studio-card-open"
-                              onClick={action(() => openProject(item.id))}
-                            >
-                              <span className="studio-folder-symbol">
-                                <Folder size={21} strokeWidth={1.6} />
-                              </span>
-                              <h2>
-                                {item.name}
-                                {item.pinned && (
-                                  <Pin size={12} aria-label="已置顶" />
-                                )}
-                              </h2>
-                              <p>{item.binding?.harness ?? "本地项目"}</p>
-                              <footer>{shortDate(item.updatedAt)}</footer>
-                            </button>
-                            <button
-                              className="studio-icon studio-row-menu"
-                              aria-label={`${item.name}的操作`}
-                              aria-haspopup="menu"
-                              onClick={(event) =>
-                                showMenu(
-                                  projectTarget(item),
-                                  event.currentTarget,
-                                )
-                              }
-                            >
-                              <MoreHorizontal size={17} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="studio-empty">
-                        <FolderOpen size={34} strokeWidth={1.2} />
-                        <h2>{query ? "没有找到项目" : "创建一个项目"}</h2>
-                        <p>
-                          {query
-                            ? "试试其他关键词。"
-                            : "页面会按项目保存在这台设备上。"}
-                        </p>
-                        {!query && (
-                          <button
-                            className="studio-button primary"
-                            onClick={() => setDialog({ type: "project" })}
-                          >
-                            <Plus size={15} />
-                            新建项目
-                          </button>
-                        )}
-                      </div>
-                    )}
+                    <RecentPages
+                      pages={recent}
+                      query={query}
+                      onOpen={(item) =>
+                        void openPage(item.id, item.projectId).catch(report)
+                      }
+                      onCreateProject={() => setDialog({ type: "project" })}
+                    />
                   </>
                 )}
                 {view === "project" && (
