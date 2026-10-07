@@ -89,6 +89,18 @@ export default function ComponentPreviewPage() {
           });
     void (async () => {
       await sandboxReady;
+      const deadline = Date.now() + 10000;
+      while (
+        element.querySelector(
+          '[data-preview-pending="true"],[aria-busy="true"]',
+        )
+      ) {
+        if (cancelled) return;
+        if (Date.now() >= deadline) throw new Error("组件示例加载超时。");
+        await new Promise((resolve) => setTimeout(resolve, 30));
+      }
+      const failure = element.querySelector('[role="alert"]');
+      if (failure) throw new Error(failure.textContent || "组件无法显示。");
       await document.fonts.ready;
       await Promise.all(
         [...element.querySelectorAll("img")].map((img) => img.decode()),

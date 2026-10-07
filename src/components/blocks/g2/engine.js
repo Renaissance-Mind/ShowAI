@@ -68,7 +68,8 @@ function remap(value, fields) {
 export function createG2Context(container, chartType, data, locked = false) {
   const ChartBase = extend(Runtime, { ...stdlib(), ...plotlib() });
   const charts = [],
-    renders = [];
+    renders = new Set();
+  let renderError;
   let disposed = false;
   const selected = g2Themes[data.theme ?? "indigo"];
   const palette = data.appearance?.palette ?? selected.palette;
@@ -261,7 +262,14 @@ export function createG2Context(container, chartType, data, locked = false) {
     }
     render() {
       const task = super.render();
-      renders.push(task);
+      renders.add(task);
+      task.then(
+        () => renders.delete(task),
+        (error) => {
+          renders.delete(task);
+          renderError ??= error;
+        },
+      );
       return task;
     }
   }
@@ -280,10 +288,20 @@ export function createG2Context(container, chartType, data, locked = false) {
       const draw = draws[chartType];
       if (!draw) throw new Error("不支持的图表类型：" + chartType);
       await draw(this);
-      await Promise.all(renders);
+      await Promise.all([...renders]);
+      if (renderError) throw renderError;
+    },
+    async resize() {
+      if (disposed) return;
+      await Promise.all(
+        charts.map((chart) =>
+          chart.changeSize(container.clientWidth, data.height ?? 320),
+        ),
+      );
     },
     async flush() {
-      await Promise.all(renders);
+      await Promise.all([...renders]);
+      if (renderError) throw renderError;
     },
     destroy() {
       disposed = true;

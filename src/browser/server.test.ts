@@ -14,6 +14,7 @@ import { request as httpRequest } from "node:http";
 import {
   cp,
   mkdir,
+  copyFile,
   mkdtemp,
   readFile,
   realpath,
@@ -22,7 +23,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { startBrowserServer } from "./server";
 import { AgentService } from "../agent/service";
 import { GitLibrary } from "../core/git-library";
@@ -136,6 +137,10 @@ beforeAll(async () => {
       js: 'import { createRequire as __showaiCreateRequire } from "node:module"; const require = __showaiCreateRequire(import.meta.url);',
     },
   });
+  await copyFile(
+    join(repository, "dist-agent/index-worker.mjs"),
+    join(dirname(cli), "index-worker.mjs"),
+  );
   await execute(
     process.execPath,
     [

@@ -95,7 +95,17 @@ export function G2ChartBlock({
     const observer = new ResizeObserver(() => {
       if (Math.abs(target.clientWidth - lastWidth) < 1) return;
       clearTimeout(timer);
-      timer = setTimeout(render, 80);
+      timer = setTimeout(() => {
+        lastWidth = target.clientWidth;
+        if (current)
+          void current.resize().catch((caught) => {
+            if (!stopped)
+              setError(
+                caught instanceof Error ? caught.message : String(caught),
+              );
+          });
+        else render();
+      }, 80);
     });
     observer.observe(target);
     render();

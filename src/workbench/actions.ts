@@ -5,7 +5,7 @@ import {
   surfaceKind,
 } from "../surface/containers.mjs";
 import { readFile, writeFile, stat } from "node:fs/promises";
-import { join, sep } from "node:path";
+import { join, sep, resolve } from "node:path";
 import { randomUUID, createHash } from "node:crypto";
 import { changeContext, withChangeContext } from "../core/history-context";
 import { mutateLibrary, versionedLibrary } from "../core/library-runtime";
@@ -277,7 +277,7 @@ export function createWorkbench(
     args: Record<string, unknown>,
   ): Promise<string | undefined> {
     const id = text(args, "projectId", true);
-    if (id) await store.listPages(assertId(id));
+    if (id) await store.readProject(assertId(id));
     return id;
   }
 
@@ -290,14 +290,37 @@ export function createWorkbench(
     return enrichPage(id, record);
   }
 
-  async function enrichPage(id: string, record: PageRecord) {
+  async function enrichPage(id: string, record: PageRecord, known?: unknown) {
+    const components = await resolveDocumentComponents(
+      store.root,
+      record.document,
+      id,
+    );
+    const key = (component: {
+      id: string;
+      version: string;
+      integrity: string;
+      scope?: string;
+    }) =>
+      JSON.stringify([
+        component.id,
+        component.version,
+        component.integrity,
+        component.scope,
+      ]);
+    const reused =
+      Array.isArray(known) &&
+      known.length === components.length &&
+      components.every((component) =>
+        known.some(
+          (ref) =>
+            ref && typeof ref === "object" && key(ref) === key(component),
+        ),
+      );
     return {
       ...record,
-      components: await resolveDocumentComponents(
-        store.root,
-        record.document,
-        id,
-      ),
+      components: reused ? [] : components,
+      ...(reused ? { reuseComponents: true } : {}),
     };
   }
 
@@ -759,6 +782,7 @@ export function createWorkbench(
             undefined,
             text(args, "baseRevision", true),
           ),
+          args.knownComponents,
         );
       }
       case "pages:duplicate": {
@@ -1216,6 +1240,12 @@ export function createWorkbench(
     "library:activateImport",
   ]);
   return (action: string, args: Record<string, unknown>): Promise<unknown> => {
+    if (
+      args.expectedHome !== undefined &&
+      (typeof args.expectedHome !== "string" ||
+        resolve(args.expectedHome) !== store.root)
+    )
+      throw new CoreError("CONFLICT", "内容库已切换，请重新载入。");
     if (!mutationActions.has(action)) return handle(action, args);
     const supplied = args.historyContext as
       | {

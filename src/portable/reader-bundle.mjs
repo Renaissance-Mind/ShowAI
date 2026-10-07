@@ -1,9 +1,116 @@
-import { build } from "esbuild";
-import { readFile } from "node:fs/promises";
+import { build, version as compilerVersion } from "esbuild";
+import {
+  readFile,
+  mkdir,
+  mkdtemp,
+  lstat,
+  writeFile,
+  rename,
+  readdir,
+  stat,
+  rm,
+} from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join, posix } from "node:path";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 const cache = new Map();
+const archives = new Map();
+
+let defaultCacheDirectory;
+const cacheDirectory = async () => {
+  if (process.env.SHOWAI_READER_CACHE) return process.env.SHOWAI_READER_CACHE;
+  defaultCacheDirectory ??=
+    process.env.NODE_ENV === "test"
+      ? mkdtemp(join(tmpdir(), "showai-readers-"))
+      : Promise.resolve(join(homedir(), ".cache", "showai", "readers"));
+  return defaultCacheDirectory;
+};
+const optionalRead = (path) =>
+  readFile(path, "utf8").catch((error) => {
+    if (error.code === "ENOENT") return;
+    throw error;
+  });
+async function readerCacheFile(key) {
+  const directory = await cacheDirectory();
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const metadata = await lstat(directory);
+  if (
+    !metadata.isDirectory() ||
+    metadata.isSymbolicLink() ||
+    (process.platform !== "win32" &&
+      (metadata.mode & 0o022 || metadata.uid !== process.getuid()))
+  )
+    throw new Error(
+      "The reader cache must be a private directory owned by the current user.",
+    );
+  const path = join(directory, key + ".json");
+  return { directory, path, bytes: await optionalRead(path) };
+}
+async function persistentReader(key, buildReader) {
+  const prepared = await readerCacheFile(key).catch((error) => {
+    console.warn("阅读器缓存不可用，将直接生成", error.message);
+    return undefined;
+  });
+  if (!prepared) return buildReader();
+  const { directory, path, bytes } = prepared;
+  if (bytes) {
+    let entry;
+    try {
+      entry = JSON.parse(bytes);
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+    }
+    if (
+      entry?.version === 1 &&
+      entry.key === key &&
+      typeof entry.html === "string" &&
+      createHash("sha256").update(entry.html).digest("hex") === entry.integrity
+    )
+      return entry.html;
+  }
+  const html = await buildReader();
+  await writeReaderCache(directory, path, key, html).catch((error) =>
+    console.warn("无法保存阅读器缓存", error.message),
+  );
+  return html;
+}
+
+async function writeReaderCache(directory, path, key, html) {
+  const temporary = path + "." + randomUUID() + ".tmp";
+  await writeFile(
+    temporary,
+    JSON.stringify({
+      version: 1,
+      key,
+      html,
+      integrity: createHash("sha256").update(html).digest("hex"),
+    }),
+    { mode: 0o600 },
+  );
+  await rename(temporary, path);
+  const paths = (await readdir(directory)).filter((name) =>
+    /^[a-f0-9]{64}\.json$/.test(name),
+  );
+  if (paths.length > 32) {
+    const entries = await Promise.all(
+      paths.map(async (name) => ({
+        path: join(directory, name),
+        modified: (
+          await stat(join(directory, name)).catch((error) => {
+            if (error.code === "ENOENT") return;
+            throw error;
+          })
+        )?.mtimeMs,
+      })),
+    );
+    const present = entries.filter((entry) => entry.modified !== undefined);
+    present.sort((a, b) => b.modified - a.modified);
+    for (const entry of present.slice(32))
+      await rm(entry.path, { force: true });
+  }
+}
+
 export function readerKinds(documents) {
   const kinds = new Set();
   const visit = (node) => {
@@ -18,22 +125,44 @@ const removeRanges = (source, ranges) => {
     source = source.slice(0, start) + source.slice(end);
   return source;
 };
+const compilerIdentity = createHash("sha256")
+  .update(
+    JSON.stringify([
+      compilerVersion,
+      compileReader.toString(),
+      removeRanges.toString(),
+      readerKinds.toString(),
+    ]),
+  )
+  .digest("hex");
 
 /** Build the exact dependency closure from the software's immutable source archive. */
 export async function bundleReader(archivePath, documents) {
   const archiveText = await readFile(archivePath, "utf8");
-  const archive = JSON.parse(archiveText);
-  const { integrity, ...payload } = archive;
-  if (
-    archive.version !== 1 ||
-    createHash("sha256").update(JSON.stringify(payload)).digest("hex") !==
-      integrity
-  )
-    throw new Error("The reader source archive is invalid or corrupted.");
+  const archiveKey = createHash("sha256").update(archiveText).digest("hex");
+  let archive = archives.get(archiveKey);
+  if (!archive) {
+    archive = JSON.parse(archiveText);
+    const { integrity, ...payload } = archive;
+    if (
+      archive.version !== 1 ||
+      createHash("sha256").update(JSON.stringify(payload)).digest("hex") !==
+        integrity
+    )
+      throw new Error("The reader source archive is invalid or corrupted.");
+    if (Buffer.byteLength(archiveText) < 8 * 1024 * 1024) {
+      archives.set(archiveKey, archive);
+      if (archives.size > 2) archives.delete(archives.keys().next().value);
+    }
+  }
   const kinds = readerKinds(documents);
-  const key = integrity + JSON.stringify(kinds);
+  const key = createHash("sha256")
+    .update(JSON.stringify([archive.integrity, kinds, compilerIdentity]))
+    .digest("hex");
   if (cache.has(key)) return cache.get(key);
-  const job = compileReader(archivePath, archive, kinds);
+  const job = archive.vendorIntegrity
+    ? persistentReader(key, () => compileReader(archivePath, archive, kinds))
+    : compileReader(archivePath, archive, kinds);
   cache.set(key, job);
   if (cache.size > 16) cache.delete(cache.keys().next().value);
   job.catch(() => cache.delete(key));

@@ -740,3 +740,39 @@ describe("component composition and editable primitives", () => {
     ).rejects.toThrow(/integrity|not found/);
   }, 30000);
 });
+
+it("validates pinned component instances independently of optional scope hints", async () => {
+  const home = await temporary();
+  const metadata = await saveComponent(
+    home,
+    { manifest, schema, source },
+    project(home),
+  );
+  const compiled = await getComponent(
+    home,
+    metadata.id,
+    metadata.version,
+    project(home),
+  );
+  const document = blankDocument();
+  const scoped = {
+    ...componentWidgetData(compiled, { value: 1 }),
+    scope: "project",
+  };
+  const unscoped = { ...componentWidgetData(compiled, { value: 2 }) };
+  delete unscoped.scope;
+  document.content.content = [
+    { type: "widget", attrs: { id: "scoped", kind: "custom", data: scoped } },
+    {
+      type: "widget",
+      attrs: { id: "unscoped", kind: "custom", data: unscoped },
+    },
+  ];
+  expect(
+    await resolveDocumentComponents(home, document, project(home)),
+  ).toHaveLength(1);
+  document.content.content[0].attrs!.data.props.value = "invalid";
+  await expect(
+    resolveDocumentComponents(home, document, project(home)),
+  ).rejects.toThrow("Invalid component props");
+});

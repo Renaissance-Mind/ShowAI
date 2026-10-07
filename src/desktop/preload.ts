@@ -20,11 +20,15 @@ if (process.isMainFrame) {
       args: Record<string, unknown> = {},
     ): Promise<T> {
       const result = (
-        action === "components:thumbnail" || action === "components:previewData"
+        action === "components:thumbnail" ||
+        action === "components:thumbnailCancel" ||
+        action === "components:previewData"
           ? await ipcRenderer.invoke(
               action === "components:thumbnail"
                 ? "showai:thumbnail"
-                : "showai:previewData",
+                : action === "components:thumbnailCancel"
+                  ? "showai:thumbnail-cancel"
+                  : "showai:previewData",
               args,
             )
           : await ipcRenderer.invoke("showai:invoke", action, args)

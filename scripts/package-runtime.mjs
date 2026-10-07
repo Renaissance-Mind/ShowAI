@@ -33,6 +33,10 @@ await copyFile(
   join(root, "dist-agent/cli.mjs"),
   join(runtime, "scripts/cli.mjs"),
 );
+await copyFile(
+  join(root, "dist-agent/index-worker.mjs"),
+  join(runtime, "scripts/index-worker.mjs"),
+);
 await rm(join(runtime, "node_modules"), { recursive: true, force: true });
 const packages = new Set();
 async function copyPackage(name) {

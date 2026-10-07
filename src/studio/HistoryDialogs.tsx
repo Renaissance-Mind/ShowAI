@@ -1,3 +1,4 @@
+import { latestRequest } from "../lib/latest-request";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -899,6 +900,14 @@ export function LibrarySearchResults({
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const request = useRef(0);
+  const searchQueue =
+    useRef(
+      latestRequest<{
+        items: SearchResult[];
+        total: number;
+        nextCursor: string | null;
+      }>(),
+    );
   const find = useCallback(
     async (next?: string) => {
       const ticket = ++request.current;
@@ -913,16 +922,18 @@ export function LibrarySearchResults({
       setBusy(true);
       setError("");
       try {
-        const result = await desktop.invoke<{
-          items: SearchResult[];
-          total: number;
-          nextCursor: string | null;
-        }>("library:search", {
-          projectId,
-          query,
-          kind: kind || undefined,
-          cursor: next,
-        });
+        const result = await searchQueue.current(() =>
+          desktop.invoke<{
+            items: SearchResult[];
+            total: number;
+            nextCursor: string | null;
+          }>("library:search", {
+            projectId,
+            query,
+            kind: kind || undefined,
+            cursor: next,
+          }),
+        );
         if (ticket !== request.current) return;
         setResults((current) =>
           next ? [...current, ...result.items] : result.items,

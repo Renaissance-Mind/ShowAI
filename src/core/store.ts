@@ -34,6 +34,7 @@ import { CoreError } from "./model";
 import { libraryMutations, legacyMutations } from "./history-context";
 import { withLibraryLock } from "./library-lock";
 const projectionReads = new AsyncLocalStorage<string>();
+import { pageSummaries } from "./page-summaries";
 import { WorkspaceProtection } from "./workspace-conflicts";
 import { orderSidebarItems, placeSidebarItem } from "./sidebar-order";
 import {
@@ -44,6 +45,8 @@ import {
   writeLibraryFiles,
   listLibraryDirectory,
   mutateLibrary,
+  withLibrarySnapshot,
+  libraryReadSnapshot,
 } from "./library-runtime";
 import type {
   ApplyPageInput,
@@ -400,7 +403,7 @@ export class FileStore {
     return names;
   }
 
-  private async readProject(projectId: string): Promise<ProjectMetadata> {
+  async readProject(projectId: string): Promise<ProjectMetadata> {
     return validateProject(
       await this.readJson(join(this.projectPath(projectId), "project.json")),
       projectId,
@@ -767,6 +770,12 @@ export class FileStore {
   async listProjects(
     options: { includeArchived?: boolean } = {},
   ): Promise<ProjectSummary[]> {
+    if (
+      !libraryReadSnapshot.getStore() &&
+      !libraryMutations.getStore() &&
+      versionedLibrary(this.root)
+    )
+      return withLibrarySnapshot(this.root, () => this.listProjects(options));
     const path = join(workspaceRoot(this.root), "projects");
     const names = await this.contentNames(path, "directory");
     const projects: ProjectSummary[] = [];
@@ -1203,8 +1212,54 @@ export class FileStore {
     projectId: string,
     options: { includeArchived?: boolean } = {},
   ): Promise<PageSummary[]> {
+    if (
+      !libraryReadSnapshot.getStore() &&
+      !libraryMutations.getStore() &&
+      versionedLibrary(this.root)
+    )
+      return withLibrarySnapshot(this.root, () =>
+        this.listPages(projectId, options),
+      );
     const project = await this.readProject(projectId);
     if (project.archived && options.includeArchived === false) return [];
+    const snapshot = libraryReadSnapshot.getStore();
+    if (
+      snapshot?.root === this.root &&
+      snapshot.revision &&
+      !libraryMutations.getStore()
+    ) {
+      const summaries = await pageSummaries(
+        snapshot.library,
+        snapshot.revision,
+      );
+      const prefix = `projects/${projectId}/pages/`;
+      return Object.entries(summaries)
+        .filter(([path]) => path.startsWith(prefix))
+        .map(([, entry]) => ({ ...entry.summary }))
+        .filter(
+          (page) =>
+            options.includeArchived !== false ||
+            (!page.archived &&
+              (page.parentId === null ||
+                !project.folders?.some(
+                  (folder) => folder.id === page.parentId,
+                ) ||
+                folderVisible(project.folders ?? [], page.parentId))),
+        )
+        .map((page) => ({
+          ...page,
+          parentId:
+            options.includeArchived === false &&
+            !project.folders?.some((folder) => folder.id === page.parentId)
+              ? null
+              : page.parentId,
+        }))
+        .sort(
+          (a, b) =>
+            Number(b.favorite) - Number(a.favorite) ||
+            b.updatedAt.localeCompare(a.updatedAt),
+        );
+    }
     const folders = project.folders ?? [];
     const path = join(this.projectPath(projectId), "pages");
     const names = await this.contentNames(path, "json");

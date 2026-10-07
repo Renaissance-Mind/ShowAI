@@ -68,13 +68,14 @@ export function replaceChildren(
   replacement: JSONContent[],
 ) {
   return editNode(source, parentId, (node) => {
+    const selected = new Set(ids);
     const content = node.content ?? [],
-      start = content.findIndex((child) => ids.includes(child.attrs?.id));
+      start = content.findIndex((child) => selected.has(child.attrs?.id));
     const index = start < 0 ? content.length : start;
     node.content = [
       ...content.slice(0, index),
       ...replacement,
-      ...content.slice(index).filter((child) => !ids.includes(child.attrs?.id)),
+      ...content.slice(index).filter((child) => !selected.has(child.attrs?.id)),
     ];
   });
 }

@@ -1,9 +1,10 @@
+import { IndexClient } from "./index-client";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { CoreError, type PageRecord, type ShowDocument } from "./model";
 import { FileStore, assertId } from "./store";
 import { GitLibrary } from "./git-library";
-import { LibraryIndex, type SearchOptions } from "./library-index";
+import { type SearchOptions } from "./library-index";
 import {
   versionedLibrary,
   mutateLibrary,
@@ -67,7 +68,7 @@ function revision(value: string): string {
 export class LibraryOperations {
   readonly library: GitLibrary;
   readonly store: FileStore;
-  readonly index: LibraryIndex;
+  readonly index: IndexClient;
   constructor(
     readonly home: string,
     readonly boundProject?: string,
@@ -80,7 +81,7 @@ export class LibraryOperations {
       );
     this.library = library;
     this.store = new FileStore(home);
-    this.index = new LibraryIndex(home);
+    this.index = new IndexClient(home);
   }
   private project(value?: string): string | undefined {
     const selected = value ?? this.boundProject;

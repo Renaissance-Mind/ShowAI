@@ -1,6 +1,13 @@
 import { beforeAll, afterAll, expect, test } from "vitest";
-import { mkdtemp, readFile, rm, mkdir, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import {
+  copyFile,
+  mkdtemp,
+  readFile,
+  rm,
+  mkdir,
+  writeFile,
+} from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { build } from "esbuild";
 import { execFile } from "node:child_process";
@@ -50,6 +57,10 @@ beforeAll(async () => {
       js: 'import { createRequire as __showaiCreateRequire } from "node:module"; const require = __showaiCreateRequire(import.meta.url);',
     },
   });
+  await copyFile(
+    join(root, "dist-agent/index-worker.mjs"),
+    join(dirname(cli), "index-worker.mjs"),
+  );
   const project = await run([
     "projects",
     "create",

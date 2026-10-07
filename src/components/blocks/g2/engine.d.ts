@@ -4,4 +4,8 @@ export function createG2Context(
   chartType: string,
   data: Record<string, unknown>,
   locked?: boolean,
-): { render: () => Promise<void>; destroy: () => void };
+): {
+  render: () => Promise<void>;
+  resize: () => Promise<void>;
+  destroy: () => void;
+};

@@ -158,7 +158,15 @@ export function upgradeDocument(source, { includeTitle = true } = {}) {
 }
 
 /** Cleanup is explicit after structural edits; the file validator rejects dangling refs. */
-export function reconcileSurface(source, { clone = true } = {}) {
+const reconciledDocuments = new WeakSet();
+export const isReconciledSurface = (document) =>
+  reconciledDocuments.has(document);
+export function reconcileSurface(source, options = {}) {
+  const document = reconcileSurfaceDocument(source, options);
+  reconciledDocuments.add(document);
+  return document;
+}
+function reconcileSurfaceDocument(source, { clone = true } = {}) {
   const document = fillSurfaceLayout(
     assignSurfaceIds(clone ? structuredClone(source) : source),
   );
@@ -179,6 +187,7 @@ export function reconcileSurface(source, { clone = true } = {}) {
     }
   }
   const roots = (document.content.content ?? []).map((node) => node.attrs.id);
+  const rootIds = new Set(roots);
   const saved = document.views.saved
     .map((view) => ({
       ...view,
@@ -192,7 +201,7 @@ export function reconcileSurface(source, { clone = true } = {}) {
     saved,
     readingOrder: [
       ...new Set([
-        ...document.views.readingOrder.filter((id) => roots.includes(id)),
+        ...document.views.readingOrder.filter((id) => rootIds.has(id)),
         ...roots,
       ]),
     ],
@@ -205,11 +214,11 @@ export function orderedSurfaceNodes(document) {
   if (!isSurface(document)) return document.content.content ?? [];
   const nodes = document.content.content ?? [];
   const order = document.views?.readingOrder ?? [];
+  const byId = new Map(nodes.map((node) => [node.attrs?.id, node]));
+  const ordered = new Set(order);
   return [
-    ...order
-      .map((id) => nodes.find((node) => node.attrs?.id === id))
-      .filter(Boolean),
-    ...nodes.filter((node) => !order.includes(node.attrs.id)),
+    ...order.map((id) => byId.get(id)).filter(Boolean),
+    ...nodes.filter((node) => !ordered.has(node.attrs.id)),
   ];
 }
 

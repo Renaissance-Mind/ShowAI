@@ -1,3 +1,5 @@
+import { encodeFile } from "./history-codec";
+import { atomicLibraryFile } from "./library-files";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -32,6 +34,52 @@ describe("persistent local editor drafts", () => {
   });
   afterEach(async () => {
     await rm(root, { recursive: true, force: true });
+  });
+
+  it("keeps large local page drafts compact and reads the prior per-node representation", async () => {
+    const content = structuredClone(
+      input.content,
+    ) as import("./model").ShowDocument;
+    content.content.content = Array.from({ length: 1500 }, (_, index) => ({
+      type: "paragraph",
+      attrs: { id: `paragraph-${index}` },
+      content: [{ type: "text", text: `Evidence ${index}` }],
+    }));
+    content.surfaceViews![content.content.attrs!.id].readingOrder =
+      content.content.content.map((node) => node.attrs!.id);
+    const saved = await drafts.save({ ...input, content });
+    expect(saved.storage).toBe("json");
+    const directory = join(
+      root,
+      "local/editor-drafts",
+      saved.id,
+      saved.generation,
+    );
+    expect(await readdir(directory)).toEqual(["drafts"]);
+    expect((await drafts.read(saved.id)).content).toEqual(content);
+    const path = `projects/${input.projectId}/pages/${input.resourceId}.json`;
+    // A real old-format generation remains recoverable by a fresh store.
+    const files = encodeFile(
+      path,
+      Buffer.from(
+        JSON.stringify({
+          format: "showai",
+          version: 3,
+          document: input.content,
+        }),
+      ),
+    );
+    for (const [name, bytes] of files)
+      if (bytes) await atomicLibraryFile(root, join(directory, name), bytes);
+    const legacy = { ...saved, storage: "page-nodes", path };
+    await atomicLibraryFile(
+      root,
+      join(root, "local/editor-drafts", saved.id, "draft.json"),
+      Buffer.from(JSON.stringify(legacy)),
+    );
+    expect((await new EditorDrafts(root).read(saved.id)).content).toEqual(
+      input.content,
+    );
   });
 
   it("persists and reloads a page without creating formal history, reusing image bytes across generations", async () => {

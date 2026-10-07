@@ -1,9 +1,10 @@
+import type { DesktopChange } from "../desktop/bridge";
 export interface DesktopBridge {
   invoke<T = unknown>(
     action: string,
     args?: Record<string, unknown>,
   ): Promise<T>;
-  onChange(listener: () => void): () => void;
+  onChange(listener: (change: DesktopChange) => void): () => void;
   onBeforeClose(listener: () => Promise<boolean>): () => void;
   setDirty?(dirty: boolean): void;
   prepareReload?(): Promise<boolean>;
@@ -23,7 +24,7 @@ export const desktop = {
     if (!window.showai) throw new Error("Desktop integration is unavailable.");
     return window.showai.invoke<T>(action, args);
   },
-  onChange(listener: () => void) {
+  onChange(listener: (change: DesktopChange) => void) {
     return window.showai?.onChange(listener) ?? (() => {});
   },
   onBeforeClose(listener: () => Promise<boolean>) {

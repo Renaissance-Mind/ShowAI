@@ -129,6 +129,13 @@ function parseRecord(message: string): ChangeRecord {
   return value;
 }
 
+// Git objects and revision trees are immutable. Bound reuse across store instances
+// without caching HEAD, working files, conflicts or mutable operation state.
+const treeReads = new Map<string, Promise<TreeEntry[]>>();
+const objectReads = new Map<string, Buffer>();
+let objectBytes = 0;
+const objectBudget = 32 * 1024 * 1024;
+
 /** Git is authoritative. Working files and indexes are recoverable projections. */
 export class GitLibrary {
   readonly root: string;
@@ -328,6 +335,23 @@ export class GitLibrary {
     if (!selected) return [];
     if (!oid(selected))
       throw new CoreError("INVALID_DATA", "Invalid revision identifier.");
+    const key = `${this.repository}:${selected}`;
+    let task = treeReads.get(key);
+    if (task) {
+      treeReads.delete(key);
+      treeReads.set(key, task);
+    } else {
+      task = this.loadTree(selected);
+      treeReads.set(key, task);
+      if (treeReads.size > 16) treeReads.delete(treeReads.keys().next().value!);
+      task.catch(() => {
+        if (treeReads.get(key) === task) treeReads.delete(key);
+      });
+    }
+    return (await task).map((entry) => ({ ...entry }));
+  }
+
+  private async loadTree(selected: string): Promise<TreeEntry[]> {
     const output = await this.command([
       "ls-tree",
       "-r",
@@ -358,6 +382,40 @@ export class GitLibrary {
     if (ids.some((id) => !oid(id)))
       throw new CoreError("INVALID_DATA", "Invalid content object identifier.");
     if (!ids.length) return new Map();
+    const found = new Map<string, Buffer>();
+    const missing: string[] = [];
+    for (const id of new Set(ids)) {
+      const key = `${this.repository}:${id}`;
+      const cached = objectReads.get(key);
+      if (cached) {
+        objectReads.delete(key);
+        objectReads.set(key, cached);
+        found.set(id, cached);
+      } else missing.push(id);
+    }
+    if (missing.length) {
+      const loaded = await this.loadBlobs(missing);
+      for (const [id, bytes] of loaded) {
+        found.set(id, bytes);
+        if (bytes.length > objectBudget) continue;
+        const key = `${this.repository}:${id}`;
+        const previous = objectReads.get(key);
+        if (previous) objectBytes -= previous.length;
+        // Detach slices from the full cat-file response before retaining them.
+        const retained = Buffer.from(bytes);
+        objectReads.set(key, retained);
+        objectBytes += retained.length;
+        while (objectBytes > objectBudget) {
+          const oldest = objectReads.keys().next().value!;
+          objectBytes -= objectReads.get(oldest)!.length;
+          objectReads.delete(oldest);
+        }
+      }
+    }
+    return found;
+  }
+
+  private async loadBlobs(ids: string[]): Promise<Map<string, Buffer>> {
     const output = await this.command(
       ["cat-file", "--batch"],
       ids.join("\n") + "\n",
@@ -435,7 +493,8 @@ export class GitLibrary {
     return new Map(
       await Promise.all(
         paths.map(
-          async (path) => [path, await decodeFile(path, read)] as const,
+          async (path) =>
+            [path, Buffer.from(await decodeFile(path, read))] as const,
         ),
       ),
     );
@@ -1287,6 +1346,17 @@ export class GitLibrary {
   }
 
   async verify(): Promise<void> {
-    await this.command(["fsck", "--full", "--strict"]);
+    try {
+      await this.command(["fsck", "--full", "--strict"]);
+    } finally {
+      const prefix = this.repository + ":";
+      for (const key of treeReads.keys())
+        if (key.startsWith(prefix)) treeReads.delete(key);
+      for (const [key, bytes] of objectReads)
+        if (key.startsWith(prefix)) {
+          objectReads.delete(key);
+          objectBytes -= bytes.length;
+        }
+    }
   }
 }

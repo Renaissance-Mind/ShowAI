@@ -1,3 +1,4 @@
+import { IndexClient } from "./index-client";
 import { createHash, randomUUID } from "node:crypto";
 import {
   copyFile,
@@ -19,7 +20,6 @@ import {
   safeLibraryPath,
 } from "./library-files";
 import { EditorDrafts } from "./editor-drafts";
-import { LibraryIndex } from "./library-index";
 import type { LibraryManifest } from "./history-model";
 import { libraryFingerprint } from "./library-fingerprints";
 import { readingCacheRecords, readingCachePath } from "./reading-cache";
@@ -550,7 +550,7 @@ export class LibraryMaintenance {
     );
   }
   async rebuildIndex() {
-    return new LibraryIndex(this.root).synchronize(true);
+    return new IndexClient(this.root).synchronize(true);
   }
   async archive(destination: string) {
     destination = resolve(destination);

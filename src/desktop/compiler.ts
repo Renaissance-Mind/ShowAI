@@ -3,6 +3,12 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import type { BuildOptions, BuildResult } from "esbuild";
 
+export const version: string = createRequire(
+  app.isPackaged
+    ? join(process.resourcesPath, "runtime", "scripts", "cli.mjs")
+    : import.meta.url,
+)("esbuild/package.json").version;
+
 /** Load the compiler beside its native binary after the desktop runtime is ready. */
 export function build<T extends BuildOptions>(
   options: T & { [Key in Exclude<keyof T, keyof BuildOptions>]: never },

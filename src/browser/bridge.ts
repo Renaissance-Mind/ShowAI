@@ -1,5 +1,5 @@
 import { chooseLocalPath, type FileDialogOptions } from "./FileDialog";
-import type { DesktopResponse } from "../desktop/bridge";
+import type { DesktopChange, DesktopResponse } from "../desktop/bridge";
 import type { LoadedPage } from "../studio/usePage";
 
 declare global {
@@ -11,7 +11,7 @@ declare global {
 export function installBrowserBridge() {
   const config = window.__SHOWAI_LOCAL__;
   if (!config || window.showai) return;
-  const listeners = new Set<() => void>();
+  const listeners = new Set<(change: DesktopChange) => void>();
   const closeListeners = new Set<() => Promise<boolean>>();
   let dirty = false;
   async function request<T>(
@@ -116,12 +116,14 @@ export function installBrowserBridge() {
     const events = new EventSource(
       `/api/events?token=${encodeURIComponent(config.token)}`,
     );
-    events.onmessage = () => {
-      for (const listener of listeners) listener();
+    events.onmessage = (event) => {
+      const change = JSON.parse(event.data) as DesktopChange;
+      for (const listener of listeners) listener(change);
     };
     // Reconnects trigger a refresh even if changes happened while the connection was lost.
     events.onopen = () => {
-      for (const listener of listeners) listener();
+      for (const listener of listeners)
+        listener({ type: "files", home: "", all: true });
     };
   }
   window.addEventListener("beforeunload", (event) => {

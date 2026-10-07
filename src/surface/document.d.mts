@@ -36,3 +36,7 @@ export function placeTemplate(
   template: ShowDocument,
   parentId?: string | null,
 ): ShowDocument;
+
+export function isReconciledSurface(
+  document: import("../types").ShowDocument,
+): boolean;

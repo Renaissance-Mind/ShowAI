@@ -3,6 +3,7 @@ import { afterAll, beforeAll, expect, test } from "vitest";
 import { build } from "esbuild";
 import { execFile } from "node:child_process";
 import {
+  copyFile,
   mkdtemp,
   mkdir,
   readFile,
@@ -70,6 +71,10 @@ beforeAll(async () => {
       js: 'import { createRequire as __showaiCreateRequire } from "node:module"; const require = __showaiCreateRequire(import.meta.url);',
     },
   });
+  await copyFile(
+    join(repository, "dist-agent/index-worker.mjs"),
+    join(bundleDirectory, "index-worker.mjs"),
+  );
 }, 30000);
 
 afterAll(async () => {

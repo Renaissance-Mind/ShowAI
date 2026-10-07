@@ -8,7 +8,7 @@ import { join, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs, promisify } from "node:util";
 import { watch } from "chokidar";
-import { build as bundle } from "esbuild";
+import { context as createBundleContext } from "esbuild";
 import { createServer } from "vite";
 import { rawSourcePlugin } from "./raw-source-plugin.mjs";
 import { developmentSessions } from "./dev-session.mjs";
@@ -54,6 +54,28 @@ const readIdentity = () => ({
 });
 let identity = readIdentity();
 const cache = developmentCache(root, directory, mode);
+const readerCache = developmentCache(root, directory, "reader", {
+  name: "reader-build-cache.json",
+  folders: [
+    "src/portable",
+    "src/components/blocks",
+    "src/components/custom",
+    "src/surface",
+    "resources/catalog",
+  ],
+  inputs: [
+    "package.json",
+    "package-lock.json",
+    "node_modules/.package-lock.json",
+    "portable.html",
+    "vite.portable.config.ts",
+    "scripts/build-reader-source.mjs",
+    "scripts/build-info.mjs",
+  ],
+});
+const compilers = new Map();
+let readerDependencies = new Set();
+let backendDependencies = new Set();
 let startup;
 let launchedAt;
 let startedCommit;
@@ -189,11 +211,14 @@ let child,
   stopping = false,
   rebuilding = false,
   requested = false,
+  backendRequested = false,
+  scheduledBackend = false,
   timer;
 let dependencies = new Set();
 let readyReceipt;
 const environment = {
   ...process.env,
+  SHOWAI_INDEX_WORKER: join(runtime, "scripts/index-worker.mjs"),
   SHOWAI_DEV_URL: origin,
   SHOWAI_DEV_RUNTIME: runtime,
   SHOWAI_VIEWER: join(runtime, "assets/viewer.html"),
@@ -218,6 +243,13 @@ const desktopCompiler = {
   },
 };
 const entrypoints = [
+  {
+    input: "src/core/index-worker.ts",
+    output: "runtime/scripts/index-worker.mjs",
+    external: ["esbuild"],
+    plugins: [rawSourcePlugin],
+    banner,
+  },
   {
     input: "src/agent/cli.ts",
     output: "runtime/scripts/cli.mjs",
@@ -255,32 +287,45 @@ async function compile() {
   const before = await cache.fingerprint();
   const outputs = await Promise.all(
     entrypoints.map(async (entry) => {
-      const result = await bundle({
-        entryPoints: [join(root, entry.input)],
-        outfile: join(directory, entry.output),
-        platform: "node",
-        target: "node22",
-        format: entry.format ?? "esm",
-        bundle: true,
-        write: false,
-        metafile: true,
-        external: entry.external,
-        plugins: entry.plugins,
-        banner: entry.banner,
-      });
-      return result;
+      let compiler = compilers.get(entry.input);
+      if (!compiler) {
+        compiler = await createBundleContext({
+          entryPoints: [join(root, entry.input)],
+          outfile: join(directory, entry.output),
+          platform: "node",
+          target: "node22",
+          format: entry.format ?? "esm",
+          bundle: true,
+          write: false,
+          metafile: true,
+          external: entry.external,
+          plugins: entry.plugins,
+          banner: entry.banner,
+        });
+        compilers.set(entry.input, compiler);
+      }
+      return compiler.rebuild();
     }),
   );
   const inputs = outputs.flatMap((result) =>
     Object.keys(result.metafile.inputs),
   );
-  dependencies = new Set(
+  backendDependencies = new Set(
     inputs.map((input) =>
       resolve(root, input.replace(/^showai-embedded-source:/, "")),
     ),
   );
-  // A separate process keeps the portable production reader independent of
-  // Vite's development NODE_ENV and the running React refresh server.
+  await compileReader();
+  dependencies = new Set([...backendDependencies, ...readerDependencies]);
+  return { files: outputs.flatMap((result) => result.outputFiles), before };
+}
+async function compileReader() {
+  const cached = await readerCache.restore();
+  if (cached) {
+    readerDependencies = new Set(cached);
+    return;
+  }
+  const before = await readerCache.fingerprint();
   await promisify(execFile)(
     process.execPath,
     [
@@ -295,11 +340,14 @@ async function compile() {
     ],
     { cwd: root, env: { ...process.env, NODE_ENV: "production" } },
   );
-  const readerSources = await (
+  const sources = await (
     await import("./build-reader-source.mjs")
   ).buildReaderSource(root, join(staging, "reader/reader-source.json"));
-  for (const path of readerSources) dependencies.add(path);
-  return { files: outputs.flatMap((result) => result.outputFiles), before };
+  readerDependencies = new Set(sources);
+  await readerCache.save(before, readerDependencies, [
+    join(staging, "reader/portable.html"),
+    join(staging, "reader/reader-source.json"),
+  ]);
 }
 async function publish({ files, before }) {
   for (const output of files) {
@@ -308,15 +356,13 @@ async function publish({ files, before }) {
     await writeFile(temporary, output.contents);
     await rename(temporary, output.path);
   }
-  const reader = join(runtime, "assets/viewer.html");
-  await copyFile(join(staging, "reader/portable.html"), reader + ".tmp");
-  await rename(reader + ".tmp", reader);
-  const inlineReader = join(runtime, "assets/reader-source.json");
-  await copyFile(
-    join(staging, "reader/reader-source.json"),
-    inlineReader + ".tmp",
+  const { reader, inlineReader } = await publishReader();
+  const backendInputs = join(directory, "backend-inputs.json");
+  await writeFile(
+    backendInputs + ".tmp",
+    JSON.stringify([...backendDependencies]),
   );
-  await rename(inlineReader + ".tmp", inlineReader);
+  await rename(backendInputs + ".tmp", backendInputs);
   if (mode === "desktop")
     await writeFile(
       join(directory, "desktop/package.json"),
@@ -331,8 +377,21 @@ async function publish({ files, before }) {
     ...files.map((output) => output.path),
     reader,
     inlineReader,
+    backendInputs,
     ...(mode === "desktop" ? [join(directory, "desktop/package.json")] : []),
   ]);
+}
+async function publishReader() {
+  const reader = join(runtime, "assets/viewer.html");
+  await copyFile(join(staging, "reader/portable.html"), reader + ".tmp");
+  await rename(reader + ".tmp", reader);
+  const inlineReader = join(runtime, "assets/reader-source.json");
+  await copyFile(
+    join(staging, "reader/reader-source.json"),
+    inlineReader + ".tmp",
+  );
+  await rename(inlineReader + ".tmp", inlineReader);
+  return { reader, inlineReader };
 }
 function writeSession() {
   const snapshot =
@@ -443,16 +502,34 @@ async function stopChild() {
   // The desktop's normal close path waits for page saves. Never force-kill drafts.
   return await exited;
 }
-async function rebuild() {
+async function rebuild(backend = true) {
   requested = true;
+  backendRequested ||= backend;
   if (rebuilding || stopping) return;
   rebuilding = true;
   try {
     while (requested && !stopping) {
       requested = false;
-      vite.ws.send("showai:status", { message: "正在构建本地服务" });
-      const outputs = await compile();
+      const restartBackend = backendRequested;
+      backendRequested = false;
+      vite.ws.send("showai:status", {
+        message: restartBackend ? "正在构建本地服务" : "正在更新阅读器",
+      });
+      const outputs = restartBackend
+        ? await compile()
+        : (await compileReader(), undefined);
       if (stopping) break;
+      if (requested) {
+        backendRequested ||= restartBackend;
+        continue;
+      }
+      if (!restartBackend) {
+        await publishReader();
+        dependencies = new Set([...backendDependencies, ...readerDependencies]);
+        console.log("阅读器已更新，本地服务与窗口保持运行。");
+        vite.ws.send("showai:status", { message: "阅读器已更新" });
+        continue;
+      }
       if (!(await sessions.prepare())) {
         console.log(
           "更新已暂停：打开的页面未确认保存。处理保存问题后，点击开发标记重试。",
@@ -494,6 +571,9 @@ async function stop() {
   vite.ws.send("showai:stopped", {});
   await watcher?.close();
   await identityWatcher?.close();
+  await Promise.all(
+    [...compilers.values()].map((compiler) => compiler.dispose()),
+  );
   await vite.close();
   if (frontendServer.listening) {
     await new Promise((done, reject) => {
@@ -517,6 +597,12 @@ try {
   const cached = await cache.restore();
   if (cached) {
     dependencies = new Set(cached);
+    readerDependencies = new Set((await readerCache.restore()) ?? []);
+    backendDependencies = new Set(
+      JSON.parse(
+        await readFile(join(directory, "backend-inputs.json"), "utf8"),
+      ),
+    );
     console.log("源码与运行产物校验通过，复用本地构建缓存。");
   } else await publish(await compile());
   const preparedAt = performance.now();
@@ -576,8 +662,16 @@ try {
       local !== "package.json"
     )
       return;
+    scheduledBackend ||=
+      backendDependencies.has(resolve(path)) ||
+      /^src\/(?:core|agent|workbench|browser|desktop)\//.test(local) ||
+      local === "package.json";
     clearTimeout(timer);
-    timer = setTimeout(() => void rebuild(), 250);
+    timer = setTimeout(() => {
+      const backend = scheduledBackend;
+      scheduledBackend = false;
+      void rebuild(backend);
+    }, 250);
   });
   watcher.on("error", (error) => {
     console.error(error);
