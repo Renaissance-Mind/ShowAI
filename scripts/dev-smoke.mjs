@@ -712,6 +712,32 @@ try {
   record(
     "malformed cached rows are discarded and replaced by verified navigation",
   );
+  for (const field of ["projectOrder", "entryOrder"]) {
+    await updatedPage.evaluate(
+      ({ home, field }) => {
+        const key = `showai:navigation:v1:${home}`;
+        const cached = JSON.parse(localStorage.getItem(key));
+        cached.organization[field] = "invalid ordering";
+        localStorage.setItem(key, JSON.stringify(cached));
+      },
+      { home, field },
+    );
+    await updatedPage.reload();
+    await updatedPage.locator('[data-navigation-state="current"]').waitFor();
+    assert.equal(
+      await updatedPage.evaluate(
+        () => performance.getEntriesByName("showai:navigation-cached").length,
+      ),
+      0,
+    );
+    await updatedPage
+      .getByText(verifiedName, { exact: true })
+      .first()
+      .waitFor();
+  }
+  record(
+    "malformed manual ordering is discarded before cached navigation renders",
+  );
 
   // A full quit/relaunch must reuse validated artifacts and still load real APIs.
   const beforeRelaunch = await receipt();

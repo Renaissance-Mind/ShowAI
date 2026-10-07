@@ -47,6 +47,27 @@ export function readNavigationCache(
     )
   )
     return;
+  const organization = value.organization as SidebarOrganization & {
+    projectOrder?: unknown;
+    entryOrder?: unknown;
+  };
+  const order = (items: unknown) =>
+    Array.isArray(items) &&
+    items.length <= 100000 &&
+    items.every((id) => typeof id === "string" && /^[\w-]{1,128}$/.test(id)) &&
+    new Set(items).size === items.length;
+  if (
+    (organization.projectOrder !== undefined &&
+      !order(organization.projectOrder)) ||
+    (organization.entryOrder !== undefined &&
+      (!organization.entryOrder ||
+        typeof organization.entryOrder !== "object" ||
+        Array.isArray(organization.entryOrder) ||
+        Object.entries(organization.entryOrder).some(
+          ([id, items]) => !/^[\w-]{1,128}$/.test(id) || !order(items),
+        )))
+  )
+    return;
   if (
     value.projects.some(
       (project) =>
