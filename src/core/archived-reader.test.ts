@@ -11,6 +11,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 import { FileStore } from "./store";
 import { GitLibrary } from "./git-library";
@@ -108,9 +109,9 @@ describe("frozen historical readers", () => {
     const browser = await chromium.launch();
     try {
       const page = await browser.newPage();
-      await page.setContent(
-        await readFile(join(directory, "historical.html"), "utf8"),
-      );
+      const errors: string[] = [];
+      page.on("pageerror", (error) => errors.push(error.message));
+      await page.goto(pathToFileURL(join(directory, "historical.html")).href);
       await page.locator('html[data-reader-proof="A"]').waitFor();
       expect(
         await page.evaluate(() =>
@@ -122,8 +123,11 @@ describe("frozen historical readers", () => {
       expect(
         await page.getByText("原始阅读器页面", { exact: true }).count(),
       ).toBeGreaterThan(0);
-      await page.setContent(current.html);
+      const currentPath = join(directory, "current.html");
+      await writeFile(currentPath, current.html);
+      await page.goto(pathToFileURL(currentPath).href);
       await page.locator('html[data-reader-proof="B"]').waitFor();
+      expect(errors).toEqual([]);
     } finally {
       await browser.close();
     }
