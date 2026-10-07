@@ -1,26 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" color-interpolation="sRGB" role="img" aria-labelledby="showai-light-title showai-light-description">
   <title id="showai-light-title">ShowAI information funnel — light</title>
-  <desc id="showai-light-description">Two circular arcs cross at 65 percent of the square height. The left field is blue, the right field is warm rose, and the middle is their actual multiply blend. All fields deepen downward; the bottom blend is RGB(18, 10, 143).</desc>
+  <desc id="showai-light-description">Two circular arcs cross at 65 percent of the square height. The left field is RGB(18, 10, 143), the right field is white, and the middle continuously transitions from white at the top to the same brand blue at the bottom. This two-color palette works on both light and dark backgrounds.</desc>
   <defs>
-    <linearGradient id="showai-light-layer-0" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
-      <stop offset="0%" stop-color="#90BDF5"/>
-      <stop offset="50%" stop-color="#608DDD"/>
-      <stop offset="100%" stop-color="#1E30DD"/>
-    </linearGradient>
-    <linearGradient id="showai-light-layer-1" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
-      <stop offset="0%" stop-color="#F6B6CC"/>
-      <stop offset="50%" stop-color="#E18BC1"/>
-      <stop offset="100%" stop-color="#9935A5"/>
+    <linearGradient id="showai-light-region-1" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#120A8F"/>
     </linearGradient>
     <clipPath id="showai-light-frame"><rect width="512" height="512" rx="88"/></clipPath>
-    <clipPath id="showai-light-overlap"><path d="M -41.377932 0 H 553.377932 A 716 716 0 0 0 204.148631 512 H 307.851369 A 716 716 0 0 0 -41.377932 0 Z" clip-rule="evenodd"/></clipPath>
   </defs>
   <g clip-path="url(#showai-light-frame)">
-    <path id="showai-light-left" d="M -400 -96.285379 A 716 716 0 0 1 -400 1335.714621 Z" fill="url(#showai-light-layer-0)"/>
-    <path id="showai-light-right" d="M 912 -96.285379 A 716 716 0 0 0 912 1335.714621 Z" fill="url(#showai-light-layer-1)"/>
-    <g id="showai-light-center" clip-path="url(#showai-light-overlap)" style="isolation:isolate">
-      <rect width="512" height="512" fill="url(#showai-light-layer-0)"/>
-      <rect width="512" height="512" fill="url(#showai-light-layer-1)" style="mix-blend-mode:multiply"/>
-    </g>
+    <path id="showai-light-left" d="M -400 -96.285379 A 716 716 0 0 1 -400 1335.714621 Z" fill="#120A8F"/>
+    <path id="showai-light-right" d="M 912 -96.285379 A 716 716 0 0 0 912 1335.714621 Z" fill="#FFFFFF"/>
+    <path id="showai-light-center" d="M -41.377932 0 H 553.377932 A 716 716 0 0 0 204.148631 512 H 307.851369 A 716 716 0 0 0 -41.377932 0 Z" fill="url(#showai-light-region-1)" fill-rule="evenodd"/>
   </g>
 </svg>
