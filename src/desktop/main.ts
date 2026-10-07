@@ -494,7 +494,26 @@ else {
             ? [{ role: "appMenu" as const }]
             : []),
           { role: "editMenu" },
-          { role: "viewMenu" },
+          {
+            role: "viewMenu",
+            submenu: [
+              {
+                label: "刷新当前页面",
+                accelerator: "CommandOrControl+R",
+                click: (_item, window) => {
+                  if (window instanceof BrowserWindow && windows.has(window))
+                    window.webContents.send("showai:refresh-page");
+                },
+              },
+              { role: "toggleDevTools" },
+              { type: "separator" },
+              { role: "resetZoom" },
+              { role: "zoomIn" },
+              { role: "zoomOut" },
+              { type: "separator" },
+              { role: "togglefullscreen" },
+            ],
+          },
           { role: "windowMenu" },
         ]),
       );

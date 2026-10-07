@@ -139,6 +139,7 @@ try {
     .getByRole("button", { name: "新建项目", exact: true })
     .first()
     .waitFor();
+  await page.getByRole("button", { name: "锁定项目栏", exact: true }).click();
   const api = (action, args = {}) =>
     page.evaluate(
       async ({ action, args }) => {
@@ -287,6 +288,49 @@ try {
     await page.getByRole("button", { name: "页面历史", exact: true }).waitFor();
   };
   await open();
+  const refreshShortcut =
+    process.platform === "darwin" ? "Meta+r" : "Control+r";
+  const timeOrigin = await page.evaluate(() => performance.timeOrigin);
+  const workbench = await page.locator(".studio").elementHandle();
+  const title = page.getByRole("textbox", { name: "页面标题", exact: true });
+  for (const refreshedTitle of ["快捷键刷新后保留的标题", modified.title]) {
+    const surface = await page.locator(".surface-editor-shell").elementHandle();
+    await title.fill(refreshedTitle);
+    await page.keyboard.press(refreshShortcut);
+    await poll(
+      read,
+      (record) => record.document.title === refreshedTitle,
+      "refresh saves pending edits",
+    );
+    await poll(
+      () => surface.evaluate((element) => element.isConnected),
+      (connected) => !connected,
+      "only the current page remounts",
+    );
+    assert.equal(await page.evaluate(() => performance.timeOrigin), timeOrigin);
+    assert.equal(
+      await workbench.evaluate((element) => element.isConnected),
+      true,
+    );
+    assert.equal(await title.inputValue(), refreshedTitle);
+    await page.locator(".surface-editor-shell").waitFor();
+    await surface.dispose();
+  }
+  const cleanSurface = await page
+    .locator(".surface-editor-shell")
+    .elementHandle();
+  await page.keyboard.press(refreshShortcut);
+  await poll(
+    () => cleanSurface.evaluate((element) => element.isConnected),
+    (connected) => !connected,
+    "unchanged page components remount on refresh",
+  );
+  assert.equal(await page.evaluate(() => performance.timeOrigin), timeOrigin);
+  await cleanSurface.dispose();
+  await workbench.dispose();
+  checks.push(
+    "page refresh saves pending edits and remounts the current page, including unchanged content, without reloading the workbench",
+  );
   await page.getByRole("button", { name: "页面历史", exact: true }).click();
   let dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: /修改标题与正文/ }).click();
@@ -345,7 +389,33 @@ try {
     .getByRole("button", { name: /^恢复草稿/ })
     .first()
     .click();
+  await page.getByRole("button", { name: "比较并合并", exact: true }).waitFor();
+  const conflictedSurface = await page
+    .locator(".surface-editor-shell")
+    .elementHandle();
+  const conflictedOrigin = await page.evaluate(() => performance.timeOrigin);
+  await page.keyboard.press(refreshShortcut);
   await delay(350);
+  assert.equal(await title.inputValue(), local.title);
+  assert.equal((await read()).document.title, remote.title);
+  assert.equal(
+    await page.evaluate(() => performance.timeOrigin),
+    conflictedOrigin,
+  );
+  assert.equal(
+    await conflictedSurface.evaluate((element) => element.isConnected),
+    true,
+  );
+  assert.equal(
+    await page
+      .getByRole("button", { name: "比较并合并", exact: true })
+      .isVisible(),
+    true,
+  );
+  await conflictedSurface.dispose();
+  checks.push(
+    "page refresh leaves a conflicted draft and its resolution controls intact",
+  );
   await page.reload();
   await open();
   await page.getByRole("button", { name: "比较并合并", exact: true }).click();
@@ -372,13 +442,11 @@ try {
     "recovered local draft is merged against its actual base without losing independent formal changes",
   );
   await page.getByRole("button", { name: "搜索内容库", exact: true }).click();
-  dialog = page.getByRole("dialog");
-  await dialog
-    .getByRole("textbox", { name: "搜索正文和组件" })
+  await page
+    .getByRole("searchbox", { name: "搜索内容库", exact: true })
     .fill("检索正文");
-  await dialog.locator(".history-search-result").first().waitFor();
-  await dialog.locator(".history-search-result").first().click();
-  await dialog.waitFor({ state: "hidden" });
+  await page.locator(".history-search-result").first().click();
+  await page.locator(".history-search-results").waitFor({ state: "hidden" });
   checks.push("Chinese full-text search opens the matching page and block");
   const external = {
     format: "showai",
@@ -434,14 +502,9 @@ try {
   const searchOpen = async (query) => {
     await page.getByRole("button", { name: "搜索内容库", exact: true }).click();
     await page
-      .getByRole("dialog")
-      .getByRole("textbox", { name: "搜索正文和组件" })
+      .getByRole("searchbox", { name: "搜索内容库", exact: true })
       .fill(query);
-    await page
-      .getByRole("dialog")
-      .locator(".history-search-result")
-      .first()
-      .click();
+    await page.locator(".history-search-result").first().click();
   };
   await searchOpen(component.name);
   dialog = page.getByRole("dialog");

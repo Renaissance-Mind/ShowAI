@@ -67,6 +67,11 @@ if (process.isMainFrame) {
         closeListeners.delete(listener);
       };
     },
+    onRefreshPage(listener) {
+      const receive = () => listener();
+      ipcRenderer.on("showai:refresh-page", receive);
+      return () => ipcRenderer.removeListener("showai:refresh-page", receive);
+    },
     ...(process.env.SHOWAI_DEV_URL
       ? {
           async prepareReload() {

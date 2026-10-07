@@ -32,6 +32,8 @@ function pageContentKey(document: ShowDocument): string {
 /** Serializes auto-saves and keeps external edits from silently replacing a draft. */
 export function usePage() {
   const [draft, setDraft] = useState<ShowDocument | null>(null);
+  const [renderVersion, setRenderVersion] = useState(0);
+  const refreshingPage = useRef(false);
   const [record, setRecord] = useState<LoadedPage | null>(null);
   const recordRef = useRef<LoadedPage | null>(null);
   const [status, setStatus] = useState<SaveStatus>("saved");
@@ -346,6 +348,28 @@ export function usePage() {
     },
     [flush, install],
   );
+
+  // Reopening flushes edits before and after the read, and refuses to replace
+  // unresolved drafts. Only the page's renderer needs a fresh mount.
+  const reloadCurrent = useCallback(async () => {
+    if (!projectRef.current || !current.current || refreshingPage.current)
+      return false;
+    const projectId = projectRef.current,
+      pageId = current.current.id;
+    refreshingPage.current = true;
+    try {
+      if (
+        !(await open(projectId, pageId)) ||
+        projectRef.current !== projectId ||
+        current.current?.id !== pageId
+      )
+        return false;
+      setRenderVersion((version) => version + 1);
+      return true;
+    } finally {
+      refreshingPage.current = false;
+    }
+  }, [open]);
 
   const edit = useCallback((patch: Partial<ShowDocument>) => {
     if (!current.current) return;
@@ -670,6 +694,7 @@ export function usePage() {
 
   return {
     draft,
+    renderVersion,
     record,
     status,
     error,
@@ -682,6 +707,7 @@ export function usePage() {
     editContent,
     flush,
     reload,
+    reloadCurrent,
     acceptResolution,
     retainDraft,
     availableDrafts,

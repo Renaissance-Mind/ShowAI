@@ -318,6 +318,29 @@ export default function Studio() {
     (error: unknown) => setProblem(errorMessage(error)),
     [],
   );
+  useEffect(() => {
+    if (view !== "page") return;
+    const refreshPage = () => {
+      void page.reloadCurrent().catch(report);
+    };
+    const key = (event: KeyboardEvent) => {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        event.key.toLowerCase() === "r"
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!event.repeat) refreshPage();
+      }
+    };
+    const unsubscribe = desktop.onRefreshPage(refreshPage);
+    window.addEventListener("keydown", key, true);
+    return () => {
+      unsubscribe();
+      window.removeEventListener("keydown", key, true);
+    };
+  }, [view, page.reloadCurrent, report]);
   const loadProjectContents = useCallback(async (id: string) => {
     const [nextPages, nextFolders] = await Promise.all([
       desktop.invoke<PageSummary[]>("pages:list", { projectId: id }),
@@ -1959,7 +1982,7 @@ export default function Studio() {
                   components={page.record?.components ?? []}
                 >
                   <SurfaceEditor
-                    key={page.draft.id}
+                    key={`${page.draft.id}:${page.renderVersion}`}
                     document={page.draft}
                     onControlsChange={setEditorControls}
                     revealId={revealNode}

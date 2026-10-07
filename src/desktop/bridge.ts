@@ -42,6 +42,7 @@ export interface ShowAIBridge {
     args?: Record<string, unknown>,
   ): Promise<T>;
   onChange(listener: (change: DesktopChange) => void): () => void;
+  onRefreshPage?(listener: () => void): () => void;
   onBeforeClose(listener: () => Promise<boolean>): () => void;
   prepareReload?(): Promise<boolean>;
 }

@@ -9,6 +9,7 @@ export interface DesktopBridge {
     args?: Record<string, unknown>,
   ): Promise<T>;
   onChange(listener: (change: DesktopChange) => void): () => void;
+  onRefreshPage?(listener: () => void): () => void;
   onBeforeClose(listener: () => Promise<boolean>): () => void;
   setDirty?(dirty: boolean): void;
   prepareReload?(): Promise<boolean>;
@@ -30,6 +31,9 @@ export const desktop = {
   },
   onChange(listener: (change: DesktopChange) => void) {
     return window.showai?.onChange(listener) ?? (() => {});
+  },
+  onRefreshPage(listener: () => void) {
+    return window.showai?.onRefreshPage?.(listener) ?? (() => {});
   },
   onBeforeClose(listener: () => Promise<boolean>) {
     return window.showai?.onBeforeClose(listener) ?? (() => {});
