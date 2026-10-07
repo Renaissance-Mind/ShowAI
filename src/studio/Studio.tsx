@@ -68,6 +68,7 @@ import {
 } from "./LibraryNavigation";
 import Dialog from "./Dialog";
 import ProjectSidebar from "./ProjectSidebar";
+import AutoHideSidebar from "./AutoHideSidebar";
 import { ComponentCatalog, ComponentNavigation } from "./ComponentCatalog";
 import {
   groupComponents,
@@ -1001,6 +1002,11 @@ export default function Studio() {
     <ComponentLibraryContext.Provider value={pickerLibrary}>
       <div
         className={`studio ${focusWindow ? "focus-window" : ""} ${view === "settings" ? "settings-view" : ""} ${view === "components" ? "components-view" : ""}`}
+        data-native-titlebar={
+          info?.platform === "darwin" && info.mode !== "browser"
+            ? "mac"
+            : undefined
+        }
       >
         {!focusWindow &&
           (view === "settings" ? (
@@ -1011,7 +1017,15 @@ export default function Studio() {
               onBack={action(() => navigate(settingsReturnView.current))}
             />
           ) : (
-            <aside className="studio-sidebar">
+            <AutoHideSidebar
+              enabled={view === "page" && !!page.draft}
+              interactionHeld={
+                !!dialog ||
+                !!projectsMenu ||
+                !!groupMenu ||
+                !!contextMenu?.anchor.closest(".studio-sidebar")
+              }
+            >
               <div className="studio-brand">
                 <span>✳</span>
                 <strong>ShowAI</strong>
@@ -1100,7 +1114,7 @@ export default function Studio() {
                   设置
                 </button>
               </div>
-            </aside>
+            </AutoHideSidebar>
           ))}
         <main className="studio-main">
           <header className="studio-topbar">
