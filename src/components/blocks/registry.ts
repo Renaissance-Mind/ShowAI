@@ -8,7 +8,7 @@ import {
   CodeBlock,
   validatePrimitiveData,
 } from "./Primitives";
-import { createElement } from "react";
+import { createElement, lazy } from "react";
 import primitiveMetadata from "../../../resources/catalog/primitives.json";
 import componentMetadata from "../../../resources/catalog/components.json";
 import { BookmarkBlock } from "./Bookmark";
@@ -17,11 +17,15 @@ import { DatabaseBlock } from "./Database";
 import { GalleryBlock } from "./Gallery";
 import { MetricsBlock } from "./Metrics";
 import { PlaygroundBlock } from "./Playground";
-import { FlowchartBlock } from "./Flowchart";
+const FlowchartBlock = /* @__PURE__ */ lazy(() =>
+  import("./Flowchart").then((module) => ({ default: module.FlowchartBlock })),
+);
 import { validateFlowchartData } from "./flowchart-contract.mjs";
 import { parseChartData } from "./helpers";
 import g2Metadata from "../../../resources/catalog/g2.json";
-import { G2ChartBlock } from "./G2Chart";
+const G2ChartBlock = /* @__PURE__ */ lazy(() =>
+  import("./G2Chart").then((module) => ({ default: module.G2ChartBlock })),
+);
 import { validateG2Data } from "./g2/contract.mjs";
 import { CustomBlock } from "../custom/CustomBlock";
 import { readCustomBlockData } from "../custom/contract";

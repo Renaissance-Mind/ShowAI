@@ -1,3 +1,4 @@
+import { changedResources } from "../core/change-notification";
 import { createServer, type ServerResponse } from "node:http";
 import {
   access,
@@ -27,7 +28,7 @@ import {
   required,
   text,
 } from "../workbench/actions";
-import type { DesktopInfo } from "../desktop/bridge";
+import type { DesktopChange, DesktopInfo } from "../desktop/bridge";
 import { openLocalPath } from "./system";
 
 export interface BrowserServerOptions {
@@ -91,16 +92,17 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       env: { SHOWAI_HOME: store.root },
     },
   });
-  const notify = (type: "home" | "files") => {
+  const notify = (type: "home" | "files", change?: DesktopChange) => {
     for (const client of clients)
-      client.write(`data: ${JSON.stringify({ type, home: store.root })}\n\n`);
+      client.write(
+        `data: ${JSON.stringify({ type, home: store.root, ...change })}\n\n`,
+      );
   };
   async function useHome(home: string) {
     await maintenance?.stop();
     store = new FileStore(home);
     await openLibrary(store.root);
     service = new AgentService({ root: store.root });
-    await store.listProjects();
     await registerRuntime(store.root, info().cli);
     maintenance = new MaintenanceScheduler(store.root).start();
     watcher = watch(store.root, {
@@ -128,9 +130,14 @@ export async function startBrowserServer(options: BrowserServerOptions) {
               ].includes(part) || part.endsWith(".tmp"),
           ),
     });
-    watcher.on("all", () => {
+    const paths = new Set<string>();
+    watcher.on("all", (_event, path) => {
+      paths.add(path);
       clearTimeout(timer);
-      timer = setTimeout(() => notify("files"), 180);
+      timer = setTimeout(() => {
+        notify("files", changedResources(store.root, paths));
+        paths.clear();
+      }, 180);
     });
     watcher.on("error", (error) =>
       console.error("ShowAI file watcher:", error),
@@ -155,6 +162,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     return resolved;
   }
   async function invoke(action: string, args: Record<string, unknown>) {
+    maintenance?.markActivity();
     return createWorkbench(store, service, {
       info,
       openDialog: async (dialog) => ({

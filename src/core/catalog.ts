@@ -50,9 +50,14 @@ import {
   libraryFileInfo,
   libraryPaths,
   mutateLibrary,
+  withLibrarySnapshot,
+  libraryReadSnapshot,
 } from "./library-runtime";
+import { atomicLibraryFile, readLibraryBytes } from "./library-files";
+import { libraryMutations } from "./history-context";
 import { changeContext } from "./history-context";
 import { mergeValues } from "./catalog-merge";
+import { readCustomBlockData } from "../components/custom/contract";
 import { assertJsonValue, assertProps } from "../components/custom/schema";
 import {
   COMPONENT_DATA_MARKER,
@@ -1666,6 +1671,140 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
   return component;
 }
 
+interface CatalogProjection {
+  entries: Record<string, ComponentMetadata>;
+  writes: Promise<void>;
+}
+const catalogProjections = new Map<string, Promise<CatalogProjection>>();
+const compiledReads = new Map<string, StoredComponent>();
+let compiledBytes = 0;
+const compiledBudget = 24 * 1024 * 1024;
+const compiledSize = (value: StoredComponent) =>
+  Buffer.byteLength(value.html) +
+  Buffer.byteLength(value.inline?.script ?? "") +
+  Buffer.byteLength(value.inline?.styles ?? "");
+async function componentIdentity(home: string, path: string) {
+  const snapshot = libraryReadSnapshot.getStore();
+  if (
+    snapshot?.root !== resolve(home) ||
+    !snapshot.revision ||
+    libraryMutations.getStore()
+  )
+    return;
+  const local = logicalPath(home, path);
+  return (await snapshot.library.tree(snapshot.revision)).find(
+    (entry) => entry.path === local,
+  )?.oid;
+}
+async function readCompiled(
+  home: string,
+  path: string,
+  scope: CatalogScope,
+): Promise<StoredComponent> {
+  const identity = await componentIdentity(home, path);
+  const key = identity ? `${resolve(home)}:${identity}:${scope}` : undefined;
+  if (key && compiledReads.has(key))
+    return structuredClone(compiledReads.get(key)!);
+  const value = compiledRecord(await readJson(home, path), scope);
+  if (key && compiledSize(value) <= compiledBudget) {
+    const retained = structuredClone(value);
+    if (compiledReads.has(key))
+      compiledBytes -= compiledSize(compiledReads.get(key)!);
+    compiledReads.set(key, retained);
+    compiledBytes += compiledSize(retained);
+    while (compiledBytes > compiledBudget) {
+      const oldest = compiledReads.keys().next().value!;
+      compiledBytes -= compiledSize(compiledReads.get(oldest)!);
+      compiledReads.delete(oldest);
+    }
+  }
+  return value;
+}
+async function componentMetadata(
+  home: string,
+  path: string,
+  scope: CatalogScope,
+): Promise<ComponentMetadata> {
+  const identity = await componentIdentity(home, path);
+  const cacheKey = identity
+    ? `${logicalPath(home, path)}:${identity}:${scope}`
+    : undefined;
+  let projection: CatalogProjection | undefined;
+  if (cacheKey) {
+    const root = resolve(home);
+    let task = catalogProjections.get(root);
+    if (!task) {
+      task = (async () => {
+        const bytes = await readLibraryBytes(
+          root,
+          join(root, "local/catalog-metadata.json"),
+        );
+        let entries: Record<string, ComponentMetadata> = {};
+        if (bytes) {
+          let cache;
+          try {
+            cache = JSON.parse(bytes.toString("utf8"));
+          } catch (error) {
+            if (!(error instanceof SyntaxError)) throw error;
+          }
+          if (
+            cache?.version === 1 &&
+            cache.entries &&
+            cache.integrity ===
+              createHash("sha256")
+                .update(JSON.stringify(cache.entries))
+                .digest("hex")
+          )
+            entries = cache.entries;
+        }
+        return { entries, writes: Promise.resolve() };
+      })();
+      catalogProjections.set(root, task);
+      if (catalogProjections.size > 8)
+        catalogProjections.delete(catalogProjections.keys().next().value!);
+      task.catch(() => {
+        if (catalogProjections.get(root) === task)
+          catalogProjections.delete(root);
+      });
+    }
+    projection = await task;
+    if (projection.entries[cacheKey])
+      return structuredClone(projection.entries[cacheKey]);
+  }
+  const {
+    html: _html,
+    inline: _inline,
+    schema: _schema,
+    sourceIntegrity: _source,
+    ...metadata
+  } = await readCompiled(home, path, scope);
+  if (projection && cacheKey) {
+    projection.entries[cacheKey] = structuredClone(metadata);
+    // Bound retained historic metadata too; it is always derivable from immutable packages.
+    while (Object.keys(projection.entries).length > 512)
+      delete projection.entries[Object.keys(projection.entries)[0]];
+    const state = projection;
+    state.writes = state.writes.then(async () => {
+      const entries = state.entries;
+      await atomicLibraryFile(
+        home,
+        join(home, "local/catalog-metadata.json"),
+        Buffer.from(
+          JSON.stringify({
+            version: 1,
+            entries,
+            integrity: createHash("sha256")
+              .update(JSON.stringify(entries))
+              .digest("hex"),
+          }),
+        ),
+      );
+    });
+    await state.writes;
+  }
+  return metadata;
+}
+
 interface StoredComponent extends CompiledComponent {
   sourceIntegrity: string;
 }
@@ -1710,6 +1849,14 @@ export async function listComponents(
   projectId?: string,
   options: CatalogReadOptions = {},
 ): Promise<ComponentMetadata[]> {
+  if (
+    libraryReadSnapshot.getStore()?.root !== resolve(home) &&
+    !libraryMutations.getStore() &&
+    versionedLibrary(home)
+  )
+    return withLibrarySnapshot(home, () =>
+      listComponents(home, projectId, options),
+    );
   const result: ComponentMetadata[] = [];
   for (const location of locations(home, "components", projectId, options)) {
     for (const id of (await children(home, location.path))
@@ -1718,17 +1865,9 @@ export async function listComponents(
       for (const version of (await children(home, join(location.path, id)))
         .filter((version) => COMPONENT_VERSION.test(version))
         .sort((a, b) => compareVersion(b, a))) {
-        const {
-          html: _html,
-          inline: _inline,
-          schema: _schema,
-          sourceIntegrity: _source,
-          ...metadata
-        } = compiledRecord(
-          await readJson(
-            home,
-            join(location.path, id, version, "compiled.json"),
-          ),
+        const metadata = await componentMetadata(
+          home,
+          join(location.path, id, version, "compiled.json"),
           location.scope,
         );
         if (metadata.id !== id || metadata.version !== version)
@@ -1759,8 +1898,9 @@ async function componentLocation(
     for (const selected of versions) {
       const path = await safePath(home, join(base, selected));
       if (!(await optionalStat(home, path))) continue;
-      const item = compiledRecord(
-        await readJson(home, join(path, "compiled.json")),
+      const item = await readCompiled(
+        home,
+        join(path, "compiled.json"),
         location.scope,
       );
       if (item.id !== id || item.version !== selected)
@@ -1808,6 +1948,14 @@ export async function getComponent(
   projectId?: string,
   options: CatalogReadOptions = {},
 ): Promise<CompiledComponent> {
+  if (
+    libraryReadSnapshot.getStore()?.root !== resolve(home) &&
+    !libraryMutations.getStore() &&
+    versionedLibrary(home)
+  )
+    return withLibrarySnapshot(home, () =>
+      getComponent(home, id, version, projectId, options),
+    );
   const location = await componentLocation(
     home,
     id,
@@ -1815,8 +1963,9 @@ export async function getComponent(
     projectId,
     options,
   );
-  const { sourceIntegrity: _source, ...component } = compiledRecord(
-    await readJson(home, join(location.path, "compiled.json")),
+  const { sourceIntegrity: _source, ...component } = await readCompiled(
+    home,
+    join(location.path, "compiled.json"),
     location.scope,
   );
   return component;
@@ -2140,8 +2289,17 @@ export async function resolveDocumentComponents(
   document: ShowDocument,
   projectId?: string,
 ): Promise<CompiledComponent[]> {
-  return Promise.all(
-    collectCustomComponentRefs(document).map(async (ref) => {
+  if (
+    libraryReadSnapshot.getStore()?.root !== resolve(home) &&
+    !libraryMutations.getStore() &&
+    versionedLibrary(home)
+  )
+    return withLibrarySnapshot(home, () =>
+      resolveDocumentComponents(home, document, projectId),
+    );
+  const refs = collectCustomComponentRefs(document);
+  const components = await Promise.all(
+    refs.map(async (ref) => {
       const component = await getComponent(
         home,
         ref.componentId,
@@ -2153,23 +2311,31 @@ export async function resolveDocumentComponents(
         throw new Error(
           `Component integrity mismatch: ${ref.componentId}@${ref.version}.`,
         );
-      const visit = (node: typeof document.content) => {
-        if (
-          node.type === "widget" &&
-          node.attrs?.kind === "custom" &&
-          node.attrs.data?.componentId === component.id &&
-          node.attrs.data?.version === component.version &&
-          (node.attrs.data?.integrity
-            ? node.attrs.data.integrity === component.integrity
-            : !ref.integrity && node.attrs.data?.scope === ref.scope)
-        )
-          assertProps(component.schema, node.attrs.data.props);
-        node.content?.forEach(visit);
-      };
-      visit(document.content);
       return component;
     }),
   );
+  const key = (ref: {
+    componentId: string;
+    version: string;
+    integrity?: string;
+    scope?: string;
+  }) =>
+    JSON.stringify([ref.componentId, ref.version, ref.integrity, ref.scope]);
+  const schemas = new Map(
+    refs.map((ref, index) => [key(ref), components[index].schema]),
+  );
+  const visit = (node: typeof document.content) => {
+    if (node.type === "widget" && node.attrs?.kind === "custom") {
+      const data = readCustomBlockData(node.attrs.data);
+      const reference = key(data);
+      if (!schemas.has(reference))
+        throw new Error("A custom component reference was not resolved.");
+      assertProps(schemas.get(reference)!, data.props);
+    }
+    node.content?.forEach(visit);
+  };
+  visit(document.content);
+  return components;
 }
 
 /** Installs serialized sandbox runtimes without ever evaluating or executing their code. */

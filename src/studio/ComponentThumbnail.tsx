@@ -24,7 +24,7 @@ export default function ComponentThumbnail({
 }) {
   const container = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
-  const [image, setImage] = useState("");
+  const [image, setImage] = useState({ key: "", data: "" });
   const [error, setError] = useState("");
   const [scale, setScale] = useState(1);
   const key = JSON.stringify(componentPreviewReference(item));
@@ -32,10 +32,7 @@ export default function ComponentThumbnail({
     if (!container.current) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisible(true);
-          observer.disconnect();
-        }
+        setVisible(entry.isIntersecting);
       },
       { rootMargin: "180px" },
     );
@@ -50,29 +47,32 @@ export default function ComponentThumbnail({
     };
   }, []);
   useEffect(() => {
-    if (!visible || browser) return;
+    if (!visible || browser || image.key === key) return;
     let cancelled = false;
-    setImage("");
+    const requestId = crypto.randomUUID();
     setError("");
     void desktop
-      .invoke<string>("components:thumbnail", JSON.parse(key))
+      .invoke<string>("components:thumbnail", { ...JSON.parse(key), requestId })
       .then((image) => {
-        if (!cancelled) setImage(image);
+        if (!cancelled) setImage({ key, data: image });
       })
       .catch((reason) => {
         if (!cancelled) setError(errorMessage(reason));
       });
     return () => {
       cancelled = true;
+      void desktop
+        .invoke("components:thumbnailCancel", { requestId })
+        .catch((reason) => console.warn("无法取消组件预览", reason));
     };
-  }, [key, visible, browser]);
+  }, [key, visible, browser, image.key]);
   const previewUrl = new URL(location.href);
   previewUrl.search = "";
   previewUrl.searchParams.set("componentPreview", key);
   return (
     <div className="component-card-preview" ref={container} aria-hidden="true">
-      {image ? (
-        <img src={image} alt="" draggable={false} />
+      {image.key === key && image.data ? (
+        <img src={image.data} alt="" draggable={false} />
       ) : visible && browser ? (
         <iframe
           title={`${item.name}缩略预览`}

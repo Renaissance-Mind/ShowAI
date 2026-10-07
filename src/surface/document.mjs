@@ -158,7 +158,15 @@ export function upgradeDocument(source, { includeTitle = true } = {}) {
 }
 
 /** Cleanup is explicit after structural edits; the file validator rejects dangling refs. */
-export function reconcileSurface(source, { clone = true } = {}) {
+const reconciledDocuments = new WeakSet();
+export const isReconciledSurface = (document) =>
+  reconciledDocuments.has(document);
+export function reconcileSurface(source, options = {}) {
+  const document = reconcileSurfaceDocument(source, options);
+  reconciledDocuments.add(document);
+  return document;
+}
+function reconcileSurfaceDocument(source, { clone = true } = {}) {
   const document = fillSurfaceLayout(
     assignSurfaceIds(clone ? structuredClone(source) : source),
   );

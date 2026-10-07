@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { coalescedTask } from "../lib/coalesced-task";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { JSONContent } from "@tiptap/core";
 import type { PageRecord } from "../core/model";
 import type { CompiledComponent } from "../components/custom/types";
@@ -8,6 +9,7 @@ import type { EditorDraftRecord } from "../core/editor-drafts";
 
 export interface LoadedPage extends PageRecord {
   components: CompiledComponent[];
+  reuseComponents?: boolean;
 }
 export type SaveStatus = "saved" | "saving" | "changed" | "conflict" | "error";
 
@@ -31,6 +33,7 @@ function pageContentKey(document: ShowDocument): string {
 export function usePage() {
   const [draft, setDraft] = useState<ShowDocument | null>(null);
   const [record, setRecord] = useState<LoadedPage | null>(null);
+  const recordRef = useRef<LoadedPage | null>(null);
   const [status, setStatus] = useState<SaveStatus>("saved");
   const [error, setError] = useState("");
   const [conflictId, setConflictId] = useState<string | undefined>();
@@ -98,7 +101,8 @@ export function usePage() {
         current.current &&
         projectRef.current
       ) {
-        const source = structuredClone(current.current);
+        const editingSource = current.current;
+        const source = structuredClone(editingSource);
         const sequence = revision.current;
         const operation = operations.current.get(sequence) ?? {
           id: crypto.randomUUID(),
@@ -107,23 +111,41 @@ export function usePage() {
         operations.current.set(sequence, operation);
         setStatus("saving");
         try {
-          const savedDraft = await persist(
-            source,
-            sequence,
-            projectRef.current,
-          );
-          const saved = await desktop.invoke<LoadedPage>("pages:save", {
+          const existingDraft = retained.current;
+          const savedDraft =
+            existingDraft?.sequence === sequence &&
+            existingDraft.projectId === projectRef.current &&
+            existingDraft.resourceId === source.id &&
+            existingDraft.baseRevision === draftBase.current
+              ? existingDraft
+              : await persist(source, sequence, projectRef.current);
+          const response = await desktop.invoke<LoadedPage>("pages:save", {
             projectId: projectRef.current,
             pageId: source.id,
             document: source,
             baseHash: base.current,
             baseRevision: baseRevision.current,
+            knownComponents: recordRef.current?.components.map(
+              ({ id, version, integrity, scope }) => ({
+                id,
+                version,
+                integrity,
+                scope,
+              }),
+            ),
             historyContext: {
               operationId: operation.id,
               groupId: operation.groupId,
               message: "编辑页面",
             },
           });
+          const saved = {
+            ...response,
+            components: response.reuseComponents
+              ? (recordRef.current?.components ?? [])
+              : response.components,
+          };
+          recordRef.current = saved;
           base.current = saved.hash;
           baseRevision.current = saved.revision;
           draftBase.current = saved.revision;
@@ -132,8 +154,19 @@ export function usePage() {
           savedRevision.current = sequence;
           setRecord(saved);
           if (revision.current === sequence) {
-            current.current = saved.document;
-            setDraft(saved.document);
+            const keys = (value: ShowDocument) =>
+              JSON.stringify([value.content, value.layout, value.surfaceViews]);
+            const installed =
+              keys(source) === keys(saved.document)
+                ? {
+                    ...saved.document,
+                    content: editingSource.content,
+                    layout: editingSource.layout,
+                    surfaceViews: editingSource.surfaceViews,
+                  }
+                : saved.document;
+            current.current = installed;
+            setDraft(installed);
           }
           if (saved.workspaceConflicts?.length) {
             setConflictId(saved.workspaceConflicts[0].id);
@@ -200,6 +233,7 @@ export function usePage() {
     blocked.current = false;
     setDraft(page.document);
     setRecord(page);
+    recordRef.current = page;
     retained.current = null;
     recoveredFrom.current = null;
     setAvailableDrafts([]);
@@ -377,9 +411,9 @@ export function usePage() {
     )
       return;
     const owner = projectRef.current,
-      sequence = revision.current,
-      source = structuredClone(draft);
+      sequence = revision.current;
     const timer = setTimeout(() => {
+      const source = structuredClone(draft);
       void persist(source, sequence, owner).catch((reason) => {
         if (projectRef.current !== owner || current.current?.id !== source.id)
           return;
@@ -391,54 +425,71 @@ export function usePage() {
     return () => clearTimeout(timer);
   }, [draft, persist]);
 
-  const refresh = useCallback(async () => {
-    if (!projectRef.current || !current.current) return;
-    if (pending.current) await pending.current;
-    if (!projectRef.current || !current.current) return;
-    const projectId = projectRef.current,
-      pageId = current.current.id;
-    const knownBase = base.current,
-      ticket = opening.current;
-    try {
-      const loaded = await desktop.invoke<LoadedPage>("pages:get", {
-        projectId,
-        pageId,
-      });
-      if (
-        projectRef.current !== projectId ||
-        current.current?.id !== pageId ||
-        opening.current !== ticket ||
-        base.current !== knownBase ||
-        (loaded.hash === knownBase &&
-          loaded.revision === baseRevision.current &&
-          !loaded.workspaceConflicts?.length)
-      )
-        return;
-      if (
-        revision.current > savedRevision.current ||
-        loaded.workspaceConflicts?.length
-      ) {
-        setConflictId(loaded.workspaceConflicts?.[0]?.id);
-        blocked.current = true;
-        setStatus("conflict");
-        setError("文件已被其他工具修改。请选择保留本地草稿，或载入文件版本。");
-      } else install(projectId, loaded);
-    } catch (reason) {
-      if (
-        projectRef.current !== projectId ||
-        current.current?.id !== pageId ||
-        opening.current !== ticket ||
-        base.current !== knownBase
-      )
-        return;
-      setError(errorMessage(reason));
-      setStatus("error");
-    }
-  }, [install]);
+  const refresh = useMemo(
+    () =>
+      coalescedTask(async () => {
+        if (!projectRef.current || !current.current) return;
+        if (pending.current) await pending.current;
+        if (!projectRef.current || !current.current) return;
+        const projectId = projectRef.current,
+          pageId = current.current.id;
+        const knownBase = base.current,
+          ticket = opening.current;
+        try {
+          const loaded = await desktop.invoke<LoadedPage>("pages:get", {
+            projectId,
+            pageId,
+          });
+          if (
+            projectRef.current !== projectId ||
+            current.current?.id !== pageId ||
+            opening.current !== ticket ||
+            base.current !== knownBase ||
+            (loaded.hash === knownBase &&
+              loaded.revision === baseRevision.current &&
+              !loaded.workspaceConflicts?.length)
+          )
+            return;
+          if (
+            revision.current > savedRevision.current ||
+            loaded.workspaceConflicts?.length
+          ) {
+            setConflictId(loaded.workspaceConflicts?.[0]?.id);
+            blocked.current = true;
+            setStatus("conflict");
+            setError(
+              "文件已被其他工具修改。请选择保留本地草稿，或载入文件版本。",
+            );
+          } else install(projectId, loaded);
+        } catch (reason) {
+          if (
+            projectRef.current !== projectId ||
+            current.current?.id !== pageId ||
+            opening.current !== ticket ||
+            base.current !== knownBase
+          )
+            return;
+          setError(errorMessage(reason));
+          setStatus("error");
+        }
+      }),
+    [install],
+  );
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
-    const unsubscribe = desktop.onChange(() => {
+    const unsubscribe = desktop.onChange((change) => {
+      if (
+        change.type !== "home" &&
+        !change.all &&
+        !(
+          change.allPages &&
+          change.projectIds?.includes(projectRef.current ?? "")
+        ) &&
+        change.pageIds &&
+        !change.pageIds.includes(current.current?.id ?? "")
+      )
+        return;
       clearTimeout(timer);
       timer = setTimeout(() => void refresh(), 300);
     });

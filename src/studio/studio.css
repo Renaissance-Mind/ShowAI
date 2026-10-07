@@ -1178,3 +1178,10 @@ button.studio-tree-chevron:hover {
     transition: none !important;
   }
 }
+
+.studio-navigation-updating {
+  font-size: 12px;
+  color: var(--text-muted, #667085);
+  margin-inline: 12px;
+  white-space: nowrap;
+}

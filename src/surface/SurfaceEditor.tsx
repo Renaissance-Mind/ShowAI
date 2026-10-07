@@ -13,7 +13,11 @@ import DocumentEditor from "../editor/DocumentEditor";
 import { ContainerRuntime } from "./ContainerRuntime";
 import { isResource, upgradeResource } from "./containers.mjs";
 import { editNode, replaceChildren, detachBlock } from "./editing";
-import { findSurfaceNode, reconcileSurface } from "./document.mjs";
+import {
+  findSurfaceNode,
+  reconcileSurface,
+  isReconciledSurface,
+} from "./document.mjs";
 import type { ContentRenderProps } from "./SurfaceContent";
 
 const contentKey = (document: ShowDocument) =>
@@ -51,16 +55,33 @@ export default function SurfaceEditor({
   const latestChange = useRef(onChange);
   latestChange.current = onChange;
   useEffect(() => {
-    if (contentKey(current.current) !== contentKey(document)) {
+    const before = current.current;
+    if (
+      before.content !== document.content ||
+      before.layout !== document.layout ||
+      before.surfaceViews !== document.surfaceViews
+    ) {
+      if (contentKey(before) === contentKey(document)) {
+        current.current = document;
+        return;
+      }
       history.current = { past: [], future: [], group: "", at: 0 };
       refresh((value) => value + 1);
     }
     current.current = document;
   }, [document]);
   const commit = useCallback((value: ShowDocument, group = "") => {
-    const next = reconcileSurface(value) as ContainerDocument;
+    const next = (
+      isReconciledSurface(value) ? value : reconcileSurface(value)
+    ) as ContainerDocument;
     const before = current.current;
-    if (contentKey(next) === contentKey(before)) return;
+    if (
+      next === before ||
+      (next.content === before.content &&
+        next.layout === before.layout &&
+        next.surfaceViews === before.surfaceViews)
+    )
+      return;
     const stack = history.current,
       now = Date.now();
     if (!group || group !== stack.group || now - stack.at > 800) {

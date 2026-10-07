@@ -1,4 +1,9 @@
-import { Component, useSyncExternalStore, type ReactNode } from "react";
+import {
+  Component,
+  Suspense,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { FileJson, Puzzle } from "lucide-react";
 import {
   getBlockDefinition,
@@ -106,11 +111,31 @@ export function Widget({
   const Renderer = definition.renderer;
   return (
     <BlockBoundary key={kind} kind={kind} data={data}>
-      <Renderer
-        data={data}
-        onChange={readOnly ? undefined : onChange}
-        readOnly={readOnly}
-      />
+      <Suspense
+        fallback={
+          <section
+            className="sb-block"
+            data-preview-pending="true"
+            role="status"
+            style={{
+              minHeight:
+                typeof data.height === "number"
+                  ? data.height
+                  : kind.startsWith("g2-")
+                    ? 320
+                    : 180,
+            }}
+          >
+            正在加载组件…
+          </section>
+        }
+      >
+        <Renderer
+          data={data}
+          onChange={readOnly ? undefined : onChange}
+          readOnly={readOnly}
+        />
+      </Suspense>
     </BlockBoundary>
   );
 }

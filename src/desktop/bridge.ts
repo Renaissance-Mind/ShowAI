@@ -19,6 +19,13 @@ export interface DesktopInfo {
 export interface DesktopChange {
   type: "files" | "home";
   home: string;
+  projectIds?: string[];
+  pageIds?: string[];
+  catalog?: boolean;
+  projects?: boolean;
+  sidebar?: boolean;
+  all?: boolean;
+  allPages?: boolean;
 }
 
 export interface ShowAIBridge {

@@ -18,7 +18,11 @@ function portableHtml(): Plugin {
           const asset = bundle[url.replace(/^\.\//, "").replace(/^\//, "")];
           if (!asset || asset.type !== "chunk")
             throw new Error(`Missing portable script: ${url}`);
-          if (asset.imports.length || asset.dynamicImports.length)
+          // Inlined lazy modules may be reported as a reference to this same chunk.
+          if (
+            asset.imports.length ||
+            asset.dynamicImports.some((name) => name !== asset.fileName)
+          )
             throw new Error(
               "Portable scripts must be bundled without external imports.",
             );

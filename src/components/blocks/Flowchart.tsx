@@ -213,13 +213,14 @@ function FlowCanvas({
   selected: string;
   onSelect: (id: string) => void;
 }) {
+  const layoutNodes = useMemo(() => layoutFlow(flow), [flow]);
   const initialNodes = useMemo(
     () =>
-      layoutFlow(flow).map((node) => ({
+      layoutNodes.map((node) => ({
         ...node,
         selected: node.id === selected,
       })),
-    [flow, selected],
+    [layoutNodes, selected],
   );
   const [nodes, setNodes, onNodesChange] =
     useNodesState<DiagramNode>(initialNodes);

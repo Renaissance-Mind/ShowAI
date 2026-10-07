@@ -9,14 +9,15 @@ const optionalRead = (path) =>
   });
 
 // Hash content rather than mtimes so edits, deletions and restored files invalidate.
-export function developmentCache(root, directory, mode) {
-  const receipt = join(directory, "build-cache.json");
+export function developmentCache(root, directory, mode, options = {}) {
+  const receipt = join(directory, options.name ?? "build-cache.json");
   const configuration = JSON.stringify({
     version: 1,
     mode,
     node: process.version,
     platform: process.platform,
     arch: process.arch,
+    options,
   });
   async function fingerprint(dependencies = []) {
     const paths = new Set(dependencies);
@@ -27,9 +28,9 @@ export function developmentCache(root, directory, mode) {
         else paths.add(path);
       }
     }
-    for (const folder of ["src", "scripts", "resources"])
+    for (const folder of options.folders ?? ["src", "scripts", "resources"])
       await walk(join(root, folder));
-    for (const path of [
+    for (const path of options.inputs ?? [
       "package.json",
       "package-lock.json",
       "node_modules/.package-lock.json",

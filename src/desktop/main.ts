@@ -1,3 +1,4 @@
+import { changedResources } from "../core/change-notification";
 import "./component-thumbnails";
 import {
   app,
@@ -77,12 +78,13 @@ function info(): DesktopInfo {
   };
 }
 
-function broadcast(type: DesktopChange["type"]): void {
+function broadcast(type: DesktopChange["type"], change?: DesktopChange): void {
   for (const window of windows)
     if (!window.isDestroyed())
       window.webContents.send("showai:changed", {
         type,
         home: store.root,
+        ...change,
       } satisfies DesktopChange);
 }
 
@@ -92,7 +94,6 @@ async function useHome(home?: string): Promise<void> {
   store = new FileStore(home);
   await openLibrary(store.root);
   service = new AgentService({ root: store.root });
-  await store.listProjects();
   await registerRuntime(store.root, info().cli);
   maintenance = new MaintenanceScheduler(store.root).start();
   watcher = watch(store.root, {
@@ -119,9 +120,14 @@ async function useHome(home?: string): Promise<void> {
             ].includes(part) || part.endsWith(".tmp"),
         ),
   });
-  watcher.on("all", () => {
+  const paths = new Set<string>();
+  watcher.on("all", (_event, path) => {
+    paths.add(path);
     clearTimeout(notification);
-    notification = setTimeout(() => broadcast("files"), 180);
+    notification = setTimeout(() => {
+      broadcast("files", changedResources(store.root, paths));
+      paths.clear();
+    }, 180);
   });
   watcher.on("error", (error) => console.error("ShowAI file watcher:", error));
 }
@@ -217,6 +223,7 @@ async function handle(
   args: Record<string, unknown>,
   window: BrowserWindow,
 ): Promise<unknown> {
+  maintenance?.markActivity();
   return createWorkbench(store, service, {
     info,
     openDialog: (options) =>
@@ -455,6 +462,11 @@ else {
         "viewer.html",
       );
       if (app.isPackaged) {
+        process.env.SHOWAI_INDEX_WORKER = join(
+          runtimePath(),
+          "scripts",
+          "index-worker.mjs",
+        );
         process.env.SHOWAI_RUNTIME_ENTRY = join(
           runtimePath(),
           "scripts",

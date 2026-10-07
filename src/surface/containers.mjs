@@ -40,11 +40,11 @@ export function resourceNodes(document, node = document.content) {
   const children = node.content ?? [];
   if (surfaceKind(node) === "page" || node.type !== "surface") return children;
   const order = surfaceViews(document, node).readingOrder;
+  const nodes = new Map(children.map((node) => [node.attrs?.id, node]));
+  const ordered = new Set(order);
   return [
-    ...order
-      .map((id) => children.find((child) => child.attrs?.id === id))
-      .filter(Boolean),
-    ...children.filter((child) => !order.includes(child.attrs.id)),
+    ...order.map((id) => nodes.get(id)).filter(Boolean),
+    ...children.filter((child) => !ordered.has(child.attrs.id)),
   ];
 }
 export function fillResource(document) {

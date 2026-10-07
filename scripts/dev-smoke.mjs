@@ -81,6 +81,11 @@ async function freePort() {
   return port;
 }
 const checks = [];
+function record(...messages) {
+  checks.push(...messages);
+  if (process.env.SHOWAI_SMOKE_PROGRESS)
+    for (const message of messages) console.log(message);
+}
 const mode = process.argv[2] ?? "browser";
 assert.ok(["browser", "desktop"].includes(mode));
 const port = await freePort();
@@ -184,14 +189,21 @@ try {
   const [first, second] = await Promise.all([reuse(), reuse()]);
   assert.equal(first.backendPid, original.backendPid);
   assert.equal(second.backendPid, original.backendPid);
-  checks.push(
+  record(
     "concurrent launch requests reuse one backend and reject foreign origins",
   );
   assert.equal(
     await page.evaluate(() => typeof window.showai.prepareReload),
     "function",
   );
-  checks.push("complete development workbench and guarded reload bridge load");
+  await page.locator('[data-navigation-state="current"]').waitFor();
+  assert.ok(
+    await page.evaluate(
+      (home) => !!localStorage.getItem(`showai:navigation:v1:${home}`),
+      home,
+    ),
+  );
+  record("complete development workbench and guarded reload bridge load");
   const revision = await commit("test: update development identity");
   await page
     .locator("[data-showai-development]")
@@ -206,7 +218,7 @@ try {
     ).sourceCommit,
     revision,
   );
-  checks.push(
+  record(
     "commits update the source badge and session without reloading the workbench or backend",
   );
   if (mode === "desktop") {
@@ -222,7 +234,7 @@ try {
       .waitFor();
     assert.equal(page.url(), original.url);
     assert.equal((await receipt()).backendPid, original.backendPid);
-    checks.push("JavaScript reload stays inside the same desktop window");
+    record("JavaScript reload stays inside the same desktop window");
     const closed = page.waitForEvent("close");
     await page.evaluate(() => window.close());
     await closed;
@@ -239,7 +251,7 @@ try {
       .first()
       .waitFor();
     assert.equal((await receipt()).backendPid, original.backendPid);
-    checks.push(
+    record(
       "reopening after closing every desktop window reuses the running backend",
     );
   }
@@ -253,9 +265,7 @@ try {
       .locator("[data-showai-development]")
       .filter({ hasText: "请打开 Applications/ShowAI.app" })
       .waitFor();
-    checks.push(
-      "a browser tab at the desktop URL cannot block desktop updates",
-    );
+    record("a browser tab at the desktop URL cannot block desktop updates");
   }
 
   const style = join(fixture, "src/design/desktop.css");
@@ -271,7 +281,7 @@ try {
         .trim() === "live",
   );
   assert.equal((await receipt()).backendPid, original.backendPid);
-  checks.push("CSS updates through HMR without restarting the backend");
+  record("CSS updates through HMR without restarting the backend");
 
   const studio = join(fixture, "src/studio/Studio.tsx");
   await writeFile(
@@ -283,9 +293,22 @@ try {
     .first()
     .waitFor();
   assert.equal((await receipt()).backendPid, original.backendPid);
-  checks.push(
-    "React source updates through HMR without restarting the backend",
+  record("React source updates through HMR without restarting the backend");
+  const portable = join(fixture, "src/portable/main.tsx");
+  await writeFile(
+    portable,
+    (await readFile(portable, "utf8")) +
+      "\n// Reader-only development refresh\n",
   );
+  await poll(
+    () => logs,
+    (value) =>
+      value.includes("阅读器已更新") || value.includes("read-only reader"),
+    "reader-only refresh",
+    40000,
+  );
+  assert.equal((await receipt()).backendPid, original.backendPid);
+  record("reader-only updates preserve the backend, live editor and window");
 
   const cli = async (...args) => {
     const response = await promisify(execFile)(
@@ -335,9 +358,7 @@ try {
       { timeout: 60000 },
     );
     assert.equal(await page.locator(".component-preview-error").count(), 0);
-    checks.push(
-      "desktop component thumbnails render without a packaged index.html",
-    );
+    record("desktop component thumbnails render without a packaged index.html");
   }
   await page.getByLabel("目录项目", { exact: true }).selectOption(project.id);
   await page.getByRole("button", { name: "新建组件", exact: true }).click();
@@ -357,7 +378,7 @@ try {
     project.id,
   );
   assert.equal(packages.length, 1);
-  checks.push(
+  record(
     "project selection enables component creation and the new component preview works",
   );
   if (mode === "browser") {
@@ -417,7 +438,7 @@ try {
       ).length,
       2,
     );
-    checks.push(
+    record(
       "component import works through the real file selector and compiler",
     );
   }
@@ -436,6 +457,16 @@ try {
   await editor.waitFor();
   await editor.fill("Draft survives a backend update.");
   await page.locator(".studio-save-state.saved").waitFor();
+  const searchAt = performance.now();
+  const search = await page.evaluate(
+    (projectId) =>
+      window.showai.invoke("library:search", { query: "Draft", projectId }),
+    project.id,
+  );
+  assert.ok(search.items.length > 0);
+  record(
+    `search runs through the real index worker and IPC (${Math.round(performance.now() - searchAt)} ms)`,
+  );
 
   // A real syntax error must leave the last working backend running.
   const backend = join(
@@ -455,7 +486,7 @@ try {
       .document.id,
     created.document.id,
   );
-  checks.push("compilation failure preserves the last working backend and CLI");
+  record("compilation failure preserves the last working backend and CLI");
 
   // Race the real autosave with an independent atomic file write.
   const baseline = await cli(
@@ -491,7 +522,7 @@ try {
     false,
   );
   assert.match(await editor.innerText(), /Local draft retained/);
-  checks.push(
+  record(
     "a real file conflict blocks automatic restart and keeps the draft editable",
   );
   if (mode === "desktop") {
@@ -503,7 +534,7 @@ try {
     );
     assert.equal(child.exitCode, null);
     assert.equal((await receipt()).backendPid, original.backendPid);
-    checks.push(
+    record(
       "desktop shutdown with a conflict keeps the app and development service running",
     );
   }
@@ -573,10 +604,10 @@ try {
     exported,
   );
   assert.match(await readFile(exported, "utf8"), /showai-data/);
-  checks.push(
+  record(
     "the rebuilt CLI exports using the development reader without production build artifacts",
   );
-  checks.push(
+  record(
     "retry restarts the backend, reconnects the workbench and preserves both revisions",
   );
   if (mode === "browser") {
@@ -616,7 +647,7 @@ try {
       (value) => value.some((item) => item.id === project.id),
       "recovered API",
     );
-    checks.push(
+    record(
       "runtime startup failure keeps the frontend running and recovers after the source is fixed",
     );
   }
@@ -624,6 +655,62 @@ try {
     path: join(output, `${mode}-updated.png`),
     fullPage: true,
   });
+  await updatedPage.reload();
+  await updatedPage.locator('[data-navigation-state="current"]').waitFor();
+  const startupMarks = await updatedPage.evaluate(() => ({
+    cached: performance.getEntriesByName("showai:navigation-cached").at(-1)
+      ?.startTime,
+    current: performance.getEntriesByName("showai:navigation-current").at(-1)
+      ?.startTime,
+  }));
+  assert.equal(typeof startupMarks.cached, "number");
+  assert.ok(startupMarks.current >= startupMarks.cached);
+  record(
+    `startup restores cached navigation before current verification (${Math.round(startupMarks.cached)} → ${Math.round(startupMarks.current)} ms)`,
+  );
+
+  const verifiedName = "Verified current navigation";
+  await updatedPage.evaluate(
+    ({ projectId, name }) =>
+      window.showai.invoke("projects:rename", { projectId, name }),
+    { projectId: project.id, name: verifiedName },
+  );
+  await updatedPage.reload();
+  await updatedPage.locator('[data-navigation-state="current"]').waitFor();
+  await updatedPage.getByText(verifiedName, { exact: true }).first().waitFor();
+  record(
+    "cached navigation reconciles a real project rename with the current library",
+  );
+  await updatedPage.evaluate(
+    (home) =>
+      localStorage.setItem(
+        `showai:navigation:v1:${home}`,
+        JSON.stringify({
+          version: 1,
+          home,
+          projects: [{ id: "corrupt", name: "Corrupt cache", pageCount: 0 }],
+          organization: { groups: [], projectGroups: {} },
+        }),
+      ),
+    home,
+  );
+  await updatedPage.reload();
+  await updatedPage.locator('[data-navigation-state="current"]').waitFor();
+  assert.equal(
+    await updatedPage.getByText("Corrupt cache", { exact: true }).count(),
+    0,
+  );
+  assert.equal(
+    await updatedPage.evaluate(
+      () => performance.getEntriesByName("showai:navigation-cached").length,
+    ),
+    0,
+  );
+  await updatedPage.getByText(verifiedName, { exact: true }).first().waitFor();
+  record(
+    "malformed cached rows are discarded and replaced by verified navigation",
+  );
+
   // A full quit/relaunch must reuse validated artifacts and still load real APIs.
   const beforeRelaunch = await receipt();
   await observer?.close();
@@ -653,7 +740,7 @@ try {
     (value) => value.some((item) => item.id === project.id),
     "warm relaunch API",
   );
-  checks.push(
+  record(
     `validated warm relaunch uses cache: cold ${original.startup.totalMs} ms, warm ${warm.startup.totalMs} ms (preparation ${original.startup.preparationMs} → ${warm.startup.preparationMs} ms)`,
   );
   console.log(

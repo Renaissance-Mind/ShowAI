@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { GitLibrary } from "./git-library";
@@ -10,8 +11,33 @@ import { withLibraryLock } from "./library-lock";
 import { CoreError } from "./model";
 import type { ChangeContext, FileChanges } from "./history-model";
 
+export const libraryReadSnapshot = new AsyncLocalStorage<{
+  root: string;
+  library: GitLibrary;
+  revision: string | null;
+}>();
+export async function withLibrarySnapshot<T>(
+  home: string,
+  action: () => Promise<T>,
+): Promise<T> {
+  const root = resolve(home);
+  if (
+    libraryReadSnapshot.getStore()?.root === root ||
+    libraryMutations.getStore()?.root === root
+  )
+    return action();
+  const library = versionedLibrary(root);
+  if (!library) return action();
+  return libraryReadSnapshot.run(
+    { root, library, revision: await library.head() },
+    action,
+  );
+}
+
 export function versionedLibrary(home: string): GitLibrary | undefined {
   const root = resolve(home);
+  const snapshot = libraryReadSnapshot.getStore();
+  if (snapshot?.root === root) return snapshot.library;
   const marker = join(root, "library.json");
   if (!existsSync(marker)) return undefined;
   const manifest = JSON.parse(readFileSync(marker, "utf8"));
@@ -124,7 +150,11 @@ export async function readLibraryFile(
   }
   return library.readFile(
     name,
-    state?.root === library.root ? (state.head ?? undefined) : undefined,
+    state?.root === library.root
+      ? (state.head ?? undefined)
+      : libraryReadSnapshot.getStore()?.root === library.root
+        ? (libraryReadSnapshot.getStore()!.revision ?? undefined)
+        : undefined,
   );
 }
 
@@ -134,7 +164,13 @@ export async function libraryPaths(
   const library = versionedLibrary(home);
   if (!library) return undefined;
   const state = libraryMutations.getStore();
-  const head = state?.root === library.root ? state.head : await library.head();
+  const snapshot = libraryReadSnapshot.getStore();
+  const head =
+    state?.root === library.root
+      ? state.head
+      : snapshot?.root === library.root
+        ? snapshot.revision
+        : await library.head();
   const paths = new Set(
     head
       ? (await library.tree(head))

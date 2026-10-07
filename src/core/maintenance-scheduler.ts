@@ -1,3 +1,4 @@
+import { IndexClient } from "./index-client";
 import { versionedLibrary } from "./library-runtime";
 import { LibraryMaintenance } from "./library-maintenance";
 import { atomicLibraryFile, readLibraryBytes } from "./library-files";
@@ -67,6 +68,9 @@ export class MaintenanceScheduler {
     readonly onError: (error: unknown) => void = (error) =>
       console.error("ShowAI library maintenance:", error),
   ) {}
+  markActivity() {
+    this.changedAt = Date.now();
+  }
   async tick() {
     const library = versionedLibrary(this.root);
     if (!library || this.stopped) return;
@@ -78,6 +82,8 @@ export class MaintenanceScheduler {
       this.changedAt = Date.now();
     }
     if (!head || Date.now() - this.changedAt < policy.idleMs) return;
+    await new IndexClient(this.root).synchronize();
+    if (this.stopped || Date.now() - this.changedAt < policy.idleMs) return;
     const objects = await library.objectStatistics();
     if (
       objects.packs < policy.minimumPacks &&

@@ -1,7 +1,7 @@
 import { frontendManifest } from "./build-info.mjs";
 import { rawSourcePlugin } from "./raw-source-plugin.mjs";
 import { build } from "esbuild";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -53,3 +53,9 @@ await writeFile(
   JSON.stringify(frontendManifest(), null, 2) + "\n",
 );
 console.log("Built ShowAI desktop main and sandboxed preload.");
+
+await import("./build-index-worker.mjs");
+await copyFile(
+  join(root, "dist-agent/index-worker.mjs"),
+  join(root, "dist-desktop/index-worker.mjs"),
+);

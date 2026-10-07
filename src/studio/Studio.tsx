@@ -1,3 +1,5 @@
+import { coalescedTask } from "../lib/coalesced-task";
+import { readNavigationCache, writeNavigationCache } from "./navigation-cache";
 import { ComponentLibraryContext } from "../components/ComponentLibrary";
 import { insertComponent } from "../surface/component-insertion";
 import { findSurfaceNode } from "../surface/document.mjs";
@@ -172,6 +174,8 @@ function Scope({ value }: { value: string }) {
 }
 
 export default function Studio() {
+  const [navigationUpdating, setNavigationUpdating] = useState(true);
+  const catalogLoaded = useRef(false);
   const [info, setInfo] = useState<DesktopInfo | null>(null);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [organization, setOrganization] = useState<SidebarOrganization>({
@@ -275,122 +279,190 @@ export default function Studio() {
     setContents((current) => ({ ...current, [id]: next }));
     return next;
   }, []);
-  const refresh = useCallback(async () => {
-    const [next, sidebar, appInfo] = await Promise.all([
-      desktop.invoke<ProjectSummary[]>("projects:list"),
-      desktop.invoke<SidebarOrganization>("sidebar:get"),
-      desktop.invoke<DesktopInfo>("app:info"),
-    ]);
-    setInfo(appInfo);
-    setProjects(next);
-    setOrganization(sidebar);
-    const visibleIds = next
-      .filter(
-        (item) =>
-          expandedRef.current[item.id] || item.id === selectedRef.current,
-      )
-      .map((item) => item.id);
-    await Promise.all(visibleIds.map(loadProjectContents));
-  }, [loadProjectContents]);
-  const loadCatalog = useCallback(async () => {
-    const id = selectedRef.current;
-    const requestedScope = catalogScopeRef.current;
-    const scope = { ...(id ? { projectId: id } : {}), scope: requestedScope };
-    const requestedProject = componentProjectRef.current;
-    const loadComponents = async (): Promise<CatalogComponent[]> => {
-      if (requestedProject !== "all") {
-        const project = (
-          await desktop.invoke<ProjectSummary[]>("projects:list")
-        ).find((item) => item.id === requestedProject);
-        if (!project) {
-          componentProjectRef.current = "all";
-          setComponentProject("all");
-          return [];
+  const refresh = useMemo(
+    () =>
+      coalescedTask(async () => {
+        const appInfo = await desktop.invoke<DesktopInfo>("app:info");
+        const scope = { expectedHome: appInfo.home };
+        const [next, sidebar] = await Promise.all([
+          desktop.invoke<ProjectSummary[]>("projects:list", scope),
+          desktop.invoke<SidebarOrganization>("sidebar:get", scope),
+        ]);
+        const verifiedInfo = await desktop.invoke<DesktopInfo>("app:info");
+        if (verifiedInfo.home !== appInfo.home) return;
+        setInfo(appInfo);
+        setProjects(next);
+        setOrganization(sidebar);
+        setNavigationUpdating(false);
+        performance.clearMarks("showai:navigation-current");
+        performance.mark("showai:navigation-current");
+        try {
+          writeNavigationCache(localStorage, {
+            home: appInfo.home,
+            projects: next,
+            organization: sidebar,
+          });
+        } catch (error) {
+          console.warn("无法缓存项目列表", error);
         }
-        const items = await desktop.invoke<CatalogComponent[]>(
-          "components:list",
-          { projectId: requestedProject, scope: "all" },
-        );
-        return items.map((item) =>
-          !("kind" in item) && item.scope === "project"
-            ? {
+        const visibleIds = next
+          .filter(
+            (item) =>
+              expandedRef.current[item.id] || item.id === selectedRef.current,
+          )
+          .map((item) => item.id);
+        await Promise.all(visibleIds.map(loadProjectContents));
+      }),
+    [loadProjectContents],
+  );
+  const loadCatalog = useMemo(
+    () =>
+      coalescedTask(async () => {
+        const id = selectedRef.current;
+        const requestedScope = catalogScopeRef.current;
+        const scope = {
+          ...(id ? { projectId: id } : {}),
+          scope: requestedScope,
+        };
+        const requestedProject = componentProjectRef.current;
+        const loadComponents = async (): Promise<CatalogComponent[]> => {
+          if (requestedProject !== "all") {
+            const project = (
+              await desktop.invoke<ProjectSummary[]>("projects:list")
+            ).find((item) => item.id === requestedProject);
+            if (!project) {
+              componentProjectRef.current = "all";
+              setComponentProject("all");
+              return [];
+            }
+            const items = await desktop.invoke<CatalogComponent[]>(
+              "components:list",
+              { projectId: requestedProject, scope: "all" },
+            );
+            return items.map((item) =>
+              !("kind" in item) && item.scope === "project"
+                ? {
+                    ...item,
+                    projectId: requestedProject,
+                    projectName: project?.name,
+                  }
+                : item,
+            );
+          }
+          const [shared, allProjects] = await Promise.all([
+            desktop.invoke<CatalogComponent[]>("components:list", {
+              scope: "all",
+            }),
+            desktop.invoke<ProjectSummary[]>("projects:list"),
+          ]);
+          const local = await Promise.all(
+            allProjects.map(async (project) => {
+              const items = await desktop.invoke<CatalogCustomComponent[]>(
+                "components:list",
+                { projectId: project.id, scope: "project" },
+              );
+              return items.map((item) => ({
                 ...item,
-                projectId: requestedProject,
-                projectName: project?.name,
-              }
-            : item,
-        );
-      }
-      const [shared, allProjects] = await Promise.all([
-        desktop.invoke<CatalogComponent[]>("components:list", { scope: "all" }),
-        desktop.invoke<ProjectSummary[]>("projects:list"),
-      ]);
-      const local = await Promise.all(
-        allProjects.map(async (project) => {
-          const items = await desktop.invoke<CatalogCustomComponent[]>(
-            "components:list",
-            { projectId: project.id, scope: "project" },
+                projectId: project.id,
+                projectName: project.name,
+              }));
+            }),
           );
-          return items.map((item) => ({
-            ...item,
-            projectId: project.id,
-            projectName: project.name,
-          }));
-        }),
-      );
-      return [...shared, ...local.flat()];
-    };
-    const [nextTemplates, nextCatalog] = await Promise.all([
-      desktop.invoke<TemplateMetadata[]>("templates:list", scope),
-      loadComponents(),
-    ]);
-    if (
-      selectedRef.current !== id ||
-      catalogScopeRef.current !== requestedScope ||
-      componentProjectRef.current !== requestedProject
-    )
-      return;
-    setTemplates(nextTemplates);
-    setCatalog({
-      builtin: nextCatalog.filter(
-        (item): item is BuiltinComponentMetadata => "kind" in item,
-      ),
-      custom: nextCatalog.filter(
-        (item): item is CatalogCustomComponent => !("kind" in item),
-      ),
-    });
-  }, []);
+          return [...shared, ...local.flat()];
+        };
+        const [nextTemplates, nextCatalog] = await Promise.all([
+          desktop.invoke<TemplateMetadata[]>("templates:list", scope),
+          loadComponents(),
+        ]);
+        if (
+          selectedRef.current !== id ||
+          catalogScopeRef.current !== requestedScope ||
+          componentProjectRef.current !== requestedProject
+        )
+          return;
+        catalogLoaded.current = true;
+        setTemplates(nextTemplates);
+        setCatalog({
+          builtin: nextCatalog.filter(
+            (item): item is BuiltinComponentMetadata => "kind" in item,
+          ),
+          custom: nextCatalog.filter(
+            (item): item is CatalogCustomComponent => !("kind" in item),
+          ),
+        });
+      }),
+    [],
+  );
 
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
     void (async () => {
-      await refresh();
-      await loadCatalog();
+      const appInfo = await desktop.invoke<DesktopInfo>("app:info");
+      setInfo(appInfo);
+      try {
+        const cached = readNavigationCache(localStorage, appInfo.home);
+        if (cached) {
+          setProjects(cached.projects);
+          setOrganization(cached.organization);
+          performance.clearMarks("showai:navigation-cached");
+          performance.mark("showai:navigation-cached");
+        }
+      } catch (error) {
+        console.warn("无法读取项目列表缓存", error);
+      }
+      const verification = refresh();
       const params = new URLSearchParams(location.search);
       const projectId = params.get("project"),
         pageId = params.get("page");
       if (projectId && pageId) {
         selectedRef.current = projectId;
         setSelectedProject(projectId);
+        setExpandedProjects((current) => ({ ...current, [projectId]: true }));
+        if (await page.open(projectId, pageId)) {
+          setView("page");
+          void loadCatalog().catch(report);
+        }
         const loaded = await loadProjectContents(projectId);
         setSelectedFolder(
           loaded.pages.find((item) => item.id === pageId)?.parentId ?? null,
         );
-        setExpandedProjects((current) => ({ ...current, [projectId]: true }));
-        await page.open(projectId, pageId);
-        setView("page");
       }
+      await verification;
     })().catch(report);
   }, [refresh, loadCatalog, page, report]);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
-    const unsubscribe = desktop.onChange(() => {
+    let queued = {
+      all: false,
+      projects: false,
+      sidebar: false,
+      catalog: false,
+    };
+    const unsubscribe = desktop.onChange((change) => {
+      const all = change.type === "home" || change.all || !change.projectIds;
+      queued = {
+        all: queued.all || !!all,
+        projects: queued.projects || !!change.projects,
+        sidebar: queued.sidebar || !!change.sidebar,
+        catalog: queued.catalog || !!change.catalog,
+      };
+      if (!all && !change.projects && !change.sidebar && !change.catalog)
+        return;
       clearTimeout(timer);
       timer = setTimeout(() => {
-        void refresh().catch(report);
-        void loadCatalog().catch(report);
+        const work = queued;
+        queued = {
+          all: false,
+          projects: false,
+          sidebar: false,
+          catalog: false,
+        };
+        if (work.all || work.projects || work.sidebar)
+          void refresh().catch(report);
+        if ((work.all || work.catalog) && catalogLoaded.current)
+          void loadCatalog().catch(report);
       }, 250);
     });
     return () => {
@@ -399,8 +471,15 @@ export default function Studio() {
     };
   }, [refresh, loadCatalog, report]);
   useEffect(() => {
-    if (initialized.current) void loadCatalog().catch(report);
-  }, [catalogScope, componentProject, loadCatalog, report]);
+    if (["components", "templates"].includes(view) || catalogLoaded.current)
+      void loadCatalog().catch(report);
+  }, [
+    view === "components" || view === "templates",
+    catalogScope,
+    componentProject,
+    loadCatalog,
+    report,
+  ]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
@@ -471,7 +550,7 @@ export default function Studio() {
     setContextMenu(null);
     const loaded = await loadProjectContents(id);
     expandFolderPath(loaded.folders, folderId);
-    await loadCatalog();
+    if (catalogLoaded.current) void loadCatalog().catch(report);
     return true;
   }
   async function openPage(id: string, projectId = selectedProject) {
@@ -480,12 +559,16 @@ export default function Studio() {
       selectedRef.current = projectId;
       setSelectedProject(projectId);
       setExpandedProjects((current) => ({ ...current, [projectId]: true }));
+      setView("page");
       const loaded = await loadProjectContents(projectId);
       const parentId =
         loaded.pages.find((item) => item.id === id)?.parentId ?? null;
       setSelectedFolder(parentId);
       expandFolderPath(loaded.folders, parentId);
       setView("page");
+      performance.clearMarks("showai:page-visible");
+      performance.mark("showai:page-visible");
+      void loadCatalog().catch(report);
       setContextMenu(null);
       return true;
     }
@@ -1002,6 +1085,7 @@ export default function Studio() {
     <ComponentLibraryContext.Provider value={pickerLibrary}>
       <div
         className={`studio ${focusWindow ? "focus-window" : ""} ${view === "settings" ? "settings-view" : ""} ${view === "components" ? "components-view" : ""}`}
+        data-navigation-state={navigationUpdating ? "updating" : "current"}
         data-native-titlebar={
           info?.platform === "darwin" && info.mode !== "browser"
             ? "mac"
@@ -1118,6 +1202,11 @@ export default function Studio() {
           ))}
         <main className="studio-main">
           <header className="studio-topbar">
+            {navigationUpdating && (
+              <span className="studio-navigation-updating" role="status">
+                正在更新项目列表…
+              </span>
+            )}
             {view === "settings" ? (
               <div className="settings-breadcrumb">
                 <span>设置</span>
