@@ -1,41 +1,51 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="showai-title showai-description">
   <title id="showai-title">ShowAI icon</title>
-  <desc id="showai-description">Three blue glass-like circular discs are stacked vertically, decreasing in diameter from top to bottom to form an inverted cone. White highlights and subtle blue shadows give the layers depth on a white background.</desc>
+  <desc id="showai-description">Three translucent blue glass discs form an inverted cone, viewed from a higher oblique angle. The largest top disc is pale blue, the middle disc is medium blue, and the smallest bottom disc is deepest. Real layer opacity reveals overlapping discs through the glass.</desc>
   <defs>
     <linearGradient id="showai-glass" x1="18%" y1="0%" x2="65%" y2="100%">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.64"/>
-      <stop offset="65%" stop-color="#FFFFFF" stop-opacity="0.27"/>
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.1"/>
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.3"/>
+      <stop offset="65%" stop-color="#FFFFFF" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
     </linearGradient>
-    <linearGradient id="showai-edge" x1="0%" y1="0%" x2="100%" y2="30%">
+    <linearGradient id="showai-bottom-edge" x1="0%" y1="0%" x2="100%" y2="35%">
       <stop offset="0%" stop-color="#FFFFFF"/>
-      <stop offset="22%" stop-color="#5954B1"/>
+      <stop offset="18%" stop-color="#5954B1"/>
       <stop offset="100%" stop-color="#5954B1"/>
     </linearGradient>
-    <filter id="showai-shadow" x="-35%" y="-70%" width="170%" height="250%" color-interpolation-filters="sRGB">
-      <feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#5954B1" flood-opacity="0.17"/>
+    <linearGradient id="showai-middle-edge" x1="0%" y1="0%" x2="100%" y2="35%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="18%" stop-color="#7D78C1"/>
+      <stop offset="100%" stop-color="#7D78C1"/>
+    </linearGradient>
+    <linearGradient id="showai-top-edge" x1="0%" y1="0%" x2="100%" y2="35%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="18%" stop-color="#A09DD2"/>
+      <stop offset="100%" stop-color="#A09DD2"/>
+    </linearGradient>
+    <filter id="showai-shadow" x="-35%" y="-55%" width="170%" height="220%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#5954B1" flood-opacity="0.12"/>
     </filter>
     <clipPath id="showai-frame"><rect width="512" height="512" rx="88"/></clipPath>
   </defs>
   <g clip-path="url(#showai-frame)">
     <rect width="512" height="512" fill="#FFFFFF"/>
-    <g id="showai-bottom-disc" filter="url(#showai-shadow)">
-      <ellipse cx="256" cy="368" rx="88" ry="32" fill="url(#showai-edge)"/>
-      <ellipse cx="256" cy="356" rx="88" ry="32" fill="#5954B1"/>
-      <ellipse cx="256" cy="356" rx="88" ry="32" fill="url(#showai-glass)" stroke="#FFFFFF" stroke-opacity="0.42" stroke-width="1.5"/>
-      <path d="M 168 368 A 88 32 0 0 0 344 368" fill="none" stroke="#FFFFFF" stroke-opacity="0.28" stroke-width="1.5"/>
+    <g id="showai-bottom-disc" opacity="0.9" filter="url(#showai-shadow)">
+      <ellipse cx="256" cy="368" rx="88" ry="49" fill="url(#showai-bottom-edge)"/>
+      <ellipse cx="256" cy="354" rx="88" ry="49" fill="#5954B1"/>
+      <ellipse cx="256" cy="354" rx="88" ry="49" fill="url(#showai-glass)" stroke="#FFFFFF" stroke-opacity="0.65" stroke-width="1.6"/>
+      <path d="M 168 368 A 88 49 0 0 0 344 368" fill="none" stroke="#FFFFFF" stroke-opacity="0.42" stroke-width="1.6"/>
     </g>
-    <g id="showai-middle-disc" filter="url(#showai-shadow)">
-      <ellipse cx="256" cy="284" rx="136" ry="49" fill="url(#showai-edge)"/>
-      <ellipse cx="256" cy="270" rx="136" ry="49" fill="#5954B1"/>
-      <ellipse cx="256" cy="270" rx="136" ry="49" fill="url(#showai-glass)" stroke="#FFFFFF" stroke-opacity="0.42" stroke-width="1.5"/>
-      <path d="M 120 284 A 136 49 0 0 0 392 284" fill="none" stroke="#FFFFFF" stroke-opacity="0.28" stroke-width="1.5"/>
+    <g id="showai-middle-disc" opacity="0.82" filter="url(#showai-shadow)">
+      <ellipse cx="256" cy="290" rx="136" ry="75" fill="url(#showai-middle-edge)"/>
+      <ellipse cx="256" cy="274" rx="136" ry="75" fill="#7D78C1"/>
+      <ellipse cx="256" cy="274" rx="136" ry="75" fill="url(#showai-glass)" stroke="#FFFFFF" stroke-opacity="0.65" stroke-width="1.6"/>
+      <path d="M 120 290 A 136 75 0 0 0 392 290" fill="none" stroke="#FFFFFF" stroke-opacity="0.42" stroke-width="1.6"/>
     </g>
-    <g id="showai-top-disc" filter="url(#showai-shadow)">
-      <ellipse cx="256" cy="180" rx="184" ry="66" fill="url(#showai-edge)"/>
-      <ellipse cx="256" cy="164" rx="184" ry="66" fill="#5954B1"/>
-      <ellipse cx="256" cy="164" rx="184" ry="66" fill="url(#showai-glass)" stroke="#FFFFFF" stroke-opacity="0.42" stroke-width="1.5"/>
-      <path d="M 72 180 A 184 66 0 0 0 440 180" fill="none" stroke="#FFFFFF" stroke-opacity="0.28" stroke-width="1.5"/>
+    <g id="showai-top-disc" opacity="0.73" filter="url(#showai-shadow)">
+      <ellipse cx="256" cy="196" rx="184" ry="102" fill="url(#showai-top-edge)"/>
+      <ellipse cx="256" cy="178" rx="184" ry="102" fill="#A09DD2"/>
+      <ellipse cx="256" cy="178" rx="184" ry="102" fill="url(#showai-glass)" stroke="#FFFFFF" stroke-opacity="0.65" stroke-width="1.6"/>
+      <path d="M 72 196 A 184 102 0 0 0 440 196" fill="none" stroke="#FFFFFF" stroke-opacity="0.42" stroke-width="1.6"/>
     </g>
   </g>
 </svg>
