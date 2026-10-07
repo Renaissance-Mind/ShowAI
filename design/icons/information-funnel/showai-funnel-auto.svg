@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="showai-auto-title showai-auto-description">
   <title id="showai-auto-title">ShowAI information funnel — auto</title>
-  <desc id="showai-auto-description">A wide funnel with neutral sides and a continuous violet gradient that darkens downward through RGB(18, 10, 143). The curves form a broad waist at 71.5 percent of the height, then open into a larger lower section that meets the frame.</desc>
+  <desc id="showai-auto-description">An extra-wide funnel with smoothly rounded boundaries and neutral sides and a continuous violet gradient that darkens downward through RGB(18, 10, 143). The curves form a broad waist at 71.5 percent of the height, then open into a larger lower section that meets the frame.</desc>
   <defs>
     <style>
       :root{--side:#FFFFFF}
@@ -15,8 +15,8 @@
     <clipPath id="showai-auto-frame"><rect width="512" height="512" rx="88"/></clipPath>
   </defs>
   <g clip-path="url(#showai-auto-frame)">
-    <path id="showai-auto-center" d="M -64 0 H 576 C 468 0 352 96 316 226 C 292 302 284 330 284 366 C 284 421 311 478 342 512 H 170 C 201 478 228 421 228 366 C 228 330 220 302 196 226 C 160 96 44 0 -64 0 Z" fill="url(#showai-auto-region-1)"/>
-    <path id="showai-auto-left" d="M -64 0 C 44 0 160 96 196 226 C 220 302 228 330 228 366 C 228 421 201 478 170 512 H 0 V 0 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.5" style="fill:var(--side,#FFFFFF);stroke:var(--side,#FFFFFF)"/>
-    <path id="showai-auto-right" d="M 576 0 C 468 0 352 96 316 226 C 292 302 284 330 284 366 C 284 421 311 478 342 512 H 512 V 0 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.5" style="fill:var(--side,#FFFFFF);stroke:var(--side,#FFFFFF)"/>
+    <path id="showai-auto-center" d="M -80 32 V -32 H 592 V 32 C 496 32 284 124 284 366 C 284 434 306 475 342 512 H 170 C 206 475 228 434 228 366 C 228 124 16 32 -80 32 Z" fill="url(#showai-auto-region-1)"/>
+    <path id="showai-auto-left" d="M -80 32 C 16 32 228 124 228 366 C 228 434 206 475 170 512 H -80 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.5" style="fill:var(--side,#FFFFFF);stroke:var(--side,#FFFFFF)"/>
+    <path id="showai-auto-right" d="M 592 32 C 496 32 284 124 284 366 C 284 434 306 475 342 512 H 592 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.5" style="fill:var(--side,#FFFFFF);stroke:var(--side,#FFFFFF)"/>
   </g>
 </svg>
