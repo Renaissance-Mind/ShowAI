@@ -1,3 +1,4 @@
+import { installIconTooltips } from "../../ui/icon-tooltip.mjs";
 import {
   createContext,
   useContext,
@@ -226,7 +227,8 @@ function SandboxComponent({
       component.html.replace(
         COMPONENT_DATA_MARKER,
         `<script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current })}</script>`,
-      )
+      ) +
+      `<script>(${installIconTooltips.toString()})(document);</script>`
     );
   }, [component.html, channel]);
 
