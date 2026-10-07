@@ -1,4 +1,4 @@
-// Real development workbench, filesystem and component compiler; isolated library/profile.
+// Real navigation interactions in an isolated development library/profile.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -270,6 +270,107 @@ try {
   await modeIs("docked");
   result.checks.push(
     "Narrow/dark overlay renders; leaving the document restores docked navigation in project and component views",
+  );
+
+  await page.setViewportSize({ width: 1440, height: 960 });
+  const separator = sidebar.getByRole("separator", { name: "调整项目栏宽度" });
+  const navigationWidth = () =>
+    sidebar.evaluate((el) => el.getBoundingClientRect().width);
+  const waitWidth = (expected) =>
+    poll(
+      navigationWidth,
+      (value) => Math.abs(value - expected) < 1,
+      `navigation width ${expected}`,
+    );
+  const dragWidth = async (next, release = true) => {
+    const box = await separator.boundingBox();
+    const start = box.x + box.width / 2;
+    const delta = next - (await navigationWidth());
+    await page.mouse.move(start, 450);
+    await page.mouse.down();
+    await page.mouse.move(start + delta, 450, { steps: 12 });
+    if (release) await page.mouse.up();
+  };
+  await dragWidth(360);
+  await waitWidth(360);
+  await poll(
+    width,
+    (value) => value === 1080,
+    "docked resize changes document space",
+  );
+  await dragWidth(20);
+  await waitWidth(200);
+  await dragWidth(1300);
+  await waitWidth(480);
+  await dragWidth(360);
+  await page.reload();
+  await separator.waitFor();
+  await waitWidth(360);
+  await page.setViewportSize({ width: 600, height: 720 });
+  await waitWidth(240);
+  assert.equal(await separator.getAttribute("aria-valuemax"), "240");
+  await poll(
+    width,
+    (value) => value === 360,
+    "narrow window preserves document space",
+  );
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await waitWidth(360);
+  result.checks.push(
+    "Dragging resizes docked navigation between 200–480px; width persists after reload and temporarily clamps in narrow windows without losing the preference",
+  );
+
+  await separator.focus();
+  await page.keyboard.press("ArrowLeft");
+  await waitWidth(352);
+  await page.keyboard.press("Shift+ArrowRight");
+  await waitWidth(384);
+  await page.keyboard.press("Home");
+  await waitWidth(200);
+  await page.keyboard.press("End");
+  await waitWidth(480);
+  await separator.dblclick({ position: { x: 4, y: 400 } });
+  await waitWidth(240);
+  await dragWidth(360);
+  await dragWidth(420, false);
+  await waitWidth(420);
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  await waitWidth(360);
+  assert.equal(
+    await page.evaluate(() => localStorage.getItem("showai:sidebar-width")),
+    "360",
+  );
+  result.checks.push(
+    "Keyboard steps and range endpoints work; double-click restores default; Escape cancels an unfinished drag",
+  );
+
+  await sidebar.getByRole("button", { name: "导航验收", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await documentRow.locator(".studio-tree-main").click();
+  await moveOut();
+  await page.locator(".studio-main").click({ position: { x: 650, y: 160 } });
+  await modeIs("hidden");
+  await reveal();
+  const overlayDocumentWidth = await width();
+  await dragWidth(460, false);
+  await page.mouse.move(1300, 450, { steps: 12 });
+  await page.waitForTimeout(650);
+  await modeIs("overlay");
+  await waitWidth(480);
+  assert.equal(await width(), overlayDocumentWidth);
+  await page.mouse.up();
+  await modeIs("hidden");
+  await reveal();
+  await waitWidth(480);
+  await page.screenshot({ path: join(output, "resized-overlay.png") });
+  await sidebar
+    .getByRole("button", { name: "锁定项目栏", exact: true })
+    .click();
+  await modeIs("docked");
+  await poll(width, (value) => value === 960, "locking reserves resized width");
+  result.checks.push(
+    "Overlay resize stays open throughout captured drag outside the panel, preserves document width, hides after release and shares its saved width with the locked panel",
   );
   assert.deepEqual(result.errors, []);
   result.passed = true;
