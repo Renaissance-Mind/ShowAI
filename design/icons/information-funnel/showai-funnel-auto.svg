@@ -1,31 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="showai-auto-title showai-auto-description">
   <title id="showai-auto-title">ShowAI information funnel — auto</title>
-  <desc id="showai-auto-description">Two curved boundaries divide the entire square into three regions and converge at the bottom edge. Each region uses a continuous teal gradient.</desc>
+  <desc id="showai-auto-description">A wide funnel divides the square into three regions. Its curved boundaries cross near the bottom and flare gently to meet the frame. Continuous violet gradients use RGB(18, 10, 143) as the brand color.</desc>
   <defs>
     <style>
-      :root{--r0s0:#91D5CF;--r0s1:#53ACA9;--r0s2:#2B7D88;--r1s0:#DDF7EA;--r1s1:#8ADFC8;--r1s2:#299F9A;--r2s0:#58B1AD;--r2s1:#2A8592;--r2s2:#185B75}
-      @media (prefers-color-scheme:dark){:root{--r0s0:#234D58;--r0s1:#347D88;--r0s2:#68B4B3;--r1s0:#326F75;--r1s1:#71BDB1;--r1s2:#C3F2D9;--r2s0:#193D4D;--r2s1:#286575;--r2s2:#4A929D}}
+      :root{--r0s0:#8A7EDA;--r0s1:#4B3AB6;--r0s2:#23118E;--r1s0:#E0DBFF;--r1s1:#9B8DE5;--r1s2:#120A8F;--r1s3:#4933B5;--r2s0:#6351C5;--r2s1:#31209F;--r2s2:#120A8F}
+      @media (prefers-color-scheme:dark){:root{--r0s0:#120A8F;--r0s1:#3824A9;--r0s2:#7461D2;--r1s0:#3522A4;--r1s1:#8370DC;--r1s2:#CEC2FF;--r1s3:#A58DF0;--r2s0:#0D066A;--r2s1:#120A8F;--r2s2:#4E36B1}}
     </style>
     <linearGradient id="showai-auto-region-0" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
-      <stop offset="0%" stop-color="#91D5CF" style="stop-color:var(--r0s0,#91D5CF)"/>
-      <stop offset="50%" stop-color="#53ACA9" style="stop-color:var(--r0s1,#53ACA9)"/>
-      <stop offset="100%" stop-color="#2B7D88" style="stop-color:var(--r0s2,#2B7D88)"/>
+      <stop offset="0%" stop-color="#8A7EDA" style="stop-color:var(--r0s0,#8A7EDA)"/>
+      <stop offset="50%" stop-color="#4B3AB6" style="stop-color:var(--r0s1,#4B3AB6)"/>
+      <stop offset="100%" stop-color="#23118E" style="stop-color:var(--r0s2,#23118E)"/>
     </linearGradient>
     <linearGradient id="showai-auto-region-1" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
-      <stop offset="0%" stop-color="#DDF7EA" style="stop-color:var(--r1s0,#DDF7EA)"/>
-      <stop offset="50%" stop-color="#8ADFC8" style="stop-color:var(--r1s1,#8ADFC8)"/>
-      <stop offset="100%" stop-color="#299F9A" style="stop-color:var(--r1s2,#299F9A)"/>
+      <stop offset="0%" stop-color="#E0DBFF" style="stop-color:var(--r1s0,#E0DBFF)"/>
+      <stop offset="50%" stop-color="#9B8DE5" style="stop-color:var(--r1s1,#9B8DE5)"/>
+      <stop offset="83.203125%" stop-color="#120A8F" style="stop-color:var(--r1s2,#120A8F)"/>
+      <stop offset="100%" stop-color="#4933B5" style="stop-color:var(--r1s3,#4933B5)"/>
     </linearGradient>
     <linearGradient id="showai-auto-region-2" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
-      <stop offset="0%" stop-color="#58B1AD" style="stop-color:var(--r2s0,#58B1AD)"/>
-      <stop offset="50%" stop-color="#2A8592" style="stop-color:var(--r2s1,#2A8592)"/>
-      <stop offset="100%" stop-color="#185B75" style="stop-color:var(--r2s2,#185B75)"/>
+      <stop offset="0%" stop-color="#6351C5" style="stop-color:var(--r2s0,#6351C5)"/>
+      <stop offset="50%" stop-color="#31209F" style="stop-color:var(--r2s1,#31209F)"/>
+      <stop offset="100%" stop-color="#120A8F" style="stop-color:var(--r2s2,#120A8F)"/>
     </linearGradient>
     <clipPath id="showai-auto-frame"><rect width="512" height="512" rx="88"/></clipPath>
   </defs>
   <g clip-path="url(#showai-auto-frame)">
-    <path id="showai-auto-center" d="M 0 0 H 512 C 377 0 302 202 280 324 C 265 406 264 461 264 512 H 248 C 248 461 247 406 232 324 C 210 202 135 0 0 0 Z" fill="url(#showai-auto-region-1)"/>
-    <path id="showai-auto-left" d="M 0 0 C 135 0 210 202 232 324 C 247 406 248 461 248 512 L 0 512 Z" fill="url(#showai-auto-region-0)" stroke="url(#showai-auto-region-0)" stroke-width="0.5"/>
-    <path id="showai-auto-right" d="M 512 0 C 377 0 302 202 280 324 C 265 406 264 461 264 512 L 512 512 Z" fill="url(#showai-auto-region-2)" stroke="url(#showai-auto-region-2)" stroke-width="0.5"/>
+    <path id="showai-auto-center" d="M -64 0 H 576 C 468 0 352 96 310 246 C 277 352 267 384 256 426 C 245 470 227 497 208 512 H 304 C 285 497 267 470 256 426 C 245 384 235 352 202 246 C 160 96 44 0 -64 0 Z" fill="url(#showai-auto-region-1)" fill-rule="evenodd"/>
+    <path id="showai-auto-left" d="M -64 0 C 44 0 160 96 202 246 C 235 352 245 384 256 426 C 245 470 227 497 208 512 H 0 V 0 Z" fill="url(#showai-auto-region-0)" stroke="url(#showai-auto-region-0)" stroke-width="0.5"/>
+    <path id="showai-auto-right" d="M 576 0 C 468 0 352 96 310 246 C 277 352 267 384 256 426 C 267 470 285 497 304 512 H 512 V 0 Z" fill="url(#showai-auto-region-2)" stroke="url(#showai-auto-region-2)" stroke-width="0.5"/>
   </g>
 </svg>

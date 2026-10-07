@@ -1,27 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="showai-dark-title showai-dark-description">
   <title id="showai-dark-title">ShowAI information funnel — dark</title>
-  <desc id="showai-dark-description">Two curved boundaries divide the entire square into three regions and converge at the bottom edge. Each region uses a continuous teal gradient.</desc>
+  <desc id="showai-dark-description">A wide funnel divides the square into three regions. Its curved boundaries cross near the bottom and flare gently to meet the frame. Continuous violet gradients use RGB(18, 10, 143) as the brand color.</desc>
   <defs>
     <linearGradient id="showai-dark-region-0" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
-      <stop offset="0%" stop-color="#234D58"/>
-      <stop offset="50%" stop-color="#347D88"/>
-      <stop offset="100%" stop-color="#68B4B3"/>
+      <stop offset="0%" stop-color="#120A8F"/>
+      <stop offset="50%" stop-color="#3824A9"/>
+      <stop offset="100%" stop-color="#7461D2"/>
     </linearGradient>
     <linearGradient id="showai-dark-region-1" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
-      <stop offset="0%" stop-color="#326F75"/>
-      <stop offset="50%" stop-color="#71BDB1"/>
-      <stop offset="100%" stop-color="#C3F2D9"/>
+      <stop offset="0%" stop-color="#3522A4"/>
+      <stop offset="50%" stop-color="#8370DC"/>
+      <stop offset="83.203125%" stop-color="#CEC2FF"/>
+      <stop offset="100%" stop-color="#A58DF0"/>
     </linearGradient>
     <linearGradient id="showai-dark-region-2" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
-      <stop offset="0%" stop-color="#193D4D"/>
-      <stop offset="50%" stop-color="#286575"/>
-      <stop offset="100%" stop-color="#4A929D"/>
+      <stop offset="0%" stop-color="#0D066A"/>
+      <stop offset="50%" stop-color="#120A8F"/>
+      <stop offset="100%" stop-color="#4E36B1"/>
     </linearGradient>
     <clipPath id="showai-dark-frame"><rect width="512" height="512" rx="88"/></clipPath>
   </defs>
   <g clip-path="url(#showai-dark-frame)">
-    <path id="showai-dark-center" d="M 0 0 H 512 C 377 0 302 202 280 324 C 265 406 264 461 264 512 H 248 C 248 461 247 406 232 324 C 210 202 135 0 0 0 Z" fill="url(#showai-dark-region-1)"/>
-    <path id="showai-dark-left" d="M 0 0 C 135 0 210 202 232 324 C 247 406 248 461 248 512 L 0 512 Z" fill="url(#showai-dark-region-0)" stroke="url(#showai-dark-region-0)" stroke-width="0.5"/>
-    <path id="showai-dark-right" d="M 512 0 C 377 0 302 202 280 324 C 265 406 264 461 264 512 L 512 512 Z" fill="url(#showai-dark-region-2)" stroke="url(#showai-dark-region-2)" stroke-width="0.5"/>
+    <path id="showai-dark-center" d="M -64 0 H 576 C 468 0 352 96 310 246 C 277 352 267 384 256 426 C 245 470 227 497 208 512 H 304 C 285 497 267 470 256 426 C 245 384 235 352 202 246 C 160 96 44 0 -64 0 Z" fill="url(#showai-dark-region-1)" fill-rule="evenodd"/>
+    <path id="showai-dark-left" d="M -64 0 C 44 0 160 96 202 246 C 235 352 245 384 256 426 C 245 470 227 497 208 512 H 0 V 0 Z" fill="url(#showai-dark-region-0)" stroke="url(#showai-dark-region-0)" stroke-width="0.5"/>
+    <path id="showai-dark-right" d="M 576 0 C 468 0 352 96 310 246 C 277 352 267 384 256 426 C 267 470 285 497 304 512 H 512 V 0 Z" fill="url(#showai-dark-region-2)" stroke="url(#showai-dark-region-2)" stroke-width="0.5"/>
   </g>
 </svg>
