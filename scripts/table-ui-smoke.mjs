@@ -1,11 +1,12 @@
 // Real browser workbench, canonical files, reload and offline HTML export.
-// Build first: npm run build. Run: node scripts/table-ui-smoke.mjs.
+// Run against the desktop dev runtime: node scripts/table-ui-smoke.mjs --dev-desktop.
+// Or build first, then run: node scripts/table-ui-smoke.mjs.
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { chromium } from "playwright";
+import { chromium, _electron } from "playwright";
 
 const repository = resolve(import.meta.dirname, "..");
 await mkdir(join(repository, "output/playwright"), { recursive: true });
@@ -21,27 +22,57 @@ const paragraph = (value) => ({
   type: "paragraph",
   content: [{ type: "text", text: value }],
 });
-let app, page, serverProcess;
+let app, page, serverProcess, viewerBrowser;
+let cli = join(repository, "dist-agent/cli.mjs");
+let cliNode = process.execPath;
 try {
-  const server = spawn(
-    process.execPath,
-    [join(repository, "dist-agent/cli.mjs"), "serve", "--no-open", "--json"],
-    { cwd: repository, env, stdio: ["ignore", "pipe", "pipe"] },
-  );
-  serverProcess = server;
-  const startup = await new Promise((done, reject) => {
-    let text = "";
-    server.stdout.on("data", (chunk) => {
-      text += chunk;
-      if (text.includes("\n")) done(JSON.parse(text.split("\n")[0]).data);
+  if (process.argv.includes("--dev-desktop")) {
+    const status = JSON.parse(
+      execFileSync(
+        process.execPath,
+        [join(repository, "scripts/dev-open.mjs"), "--status"],
+        { encoding: "utf8" },
+      ),
+    );
+    assert.equal(status.ready, true);
+    assert.equal(status.root, repository);
+    assert.equal(status.branch, "main");
+    assert.equal(status.mode, "desktop");
+    assert.equal(status.home, "/Users/chunqiu/.showai");
+    cli = status.cli.args[0];
+    cliNode = status.cli.command;
+    app = await _electron.launch({
+      args: [join(repository, ".showai-dev/desktop-5173/desktop")],
+      cwd: repository,
+      env: {
+        ...env,
+        SHOWAI_DEV_URL: status.url,
+        SHOWAI_DEV_RUNTIME: resolve(cli, "../.."),
+        SHOWAI_VIEWER: join(resolve(cli, "../.."), "assets/viewer.html"),
+      },
     });
-    server.once("error", reject);
-    server.once("exit", (code) => reject(new Error(`Server exited ${code}`)));
-  });
-  app = await chromium.launch({ headless: true });
-  const context = await app.newContext();
-  page = await context.newPage();
-  await page.goto(startup.url);
+    page = await app.firstWindow();
+  } else {
+    const server = spawn(
+      process.execPath,
+      [join(repository, "dist-agent/cli.mjs"), "serve", "--no-open", "--json"],
+      { cwd: repository, env, stdio: ["ignore", "pipe", "pipe"] },
+    );
+    serverProcess = server;
+    const startup = await new Promise((done, reject) => {
+      let text = "";
+      server.stdout.on("data", (chunk) => {
+        text += chunk;
+        if (text.includes("\n")) done(JSON.parse(text.split("\n")[0]).data);
+      });
+      server.once("error", reject);
+      server.once("exit", (code) => reject(new Error(`Server exited ${code}`)));
+    });
+    app = await chromium.launch({ headless: true });
+    const context = await app.newContext();
+    page = await context.newPage();
+    await page.goto(startup.url);
+  }
   page.setDefaultTimeout(10000);
   page.on("pageerror", (error) => result.errors.push(error.message));
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -54,6 +85,7 @@ try {
       action,
       args,
     });
+  assert.equal((await api("app:info")).home, env.SHOWAI_HOME);
   const project = await api("projects:create", { name: "表格对齐验收" });
   const record = await api("pages:create", {
     projectId: project.id,
@@ -85,6 +117,19 @@ try {
                 })),
               })),
             ],
+          },
+          paragraph("合并验收：拖动或按住 Shift 选择区域。"),
+          {
+            type: "table",
+            attrs: { id: "merge-table" },
+            content: Array.from({ length: 4 }, (_, row) => ({
+              type: "tableRow",
+              content: Array.from({ length: 4 }, (_, col) => ({
+                type: row === 0 ? "tableHeader" : "tableCell",
+                attrs: { colwidth: [150] },
+                content: [paragraph(`${row + 1}-${col + 1}`)],
+              })),
+            })),
           },
           paragraph("组件库的基础表格同样支持对齐："),
           {
@@ -119,7 +164,12 @@ try {
     await page.locator(".container-page .tiptap").waitFor();
   };
   await open();
-  const native = page.locator(".document-content > .tableWrapper table");
+  const native = page
+    .locator(".document-content > .tableWrapper table")
+    .first();
+  const mergeTable = page
+    .locator(".document-content > .tableWrapper table")
+    .nth(1);
   const basic = page.locator(".document-widget .sb-table");
   const basicControls = page.locator(".table-hover-controls");
   const styles = (locator) =>
@@ -317,6 +367,115 @@ try {
     "Native table header hover, column alignment, corner controls, context menu and inherited alignment in new rows",
   );
 
+  const mergeControls = page.getByRole("group", {
+    name: "单元格合并",
+    exact: true,
+  });
+  const cell = (row, col) =>
+    mergeTable.locator("tr").nth(row).locator("td, th").nth(col);
+  const choose = async (name) => {
+    await cell(0, 0).hover();
+    await page.getByRole("button", { name: "表格操作", exact: true }).click();
+    await page.getByRole("menuitem", { name, exact: true }).click();
+  };
+  const merge = () =>
+    mergeControls
+      .getByRole("button", { name: "合并单元格", exact: true })
+      .click();
+  const clear = () =>
+    mergeControls
+      .getByRole("button", { name: "取消单元格选择", exact: true })
+      .click();
+  const undo = async () => {
+    await page.keyboard.press(
+      process.platform === "darwin" ? "Meta+z" : "Control+z",
+    );
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelectorAll(".document-content > .tableWrapper")[1]
+          ?.querySelectorAll("td, th").length === 16,
+    );
+  };
+  await cell(1, 1).click();
+  await choose("选择当前行");
+  assert.ok((await mergeControls.innerText()).includes("已选 1 行 × 4 列"));
+  await merge();
+  assert.equal(await cell(1, 0).getAttribute("colspan"), "4");
+  assert.equal(await cell(1, 0).innerText(), "2-1\n\n2-2\n\n2-3\n\n2-4");
+  await undo();
+  await clear();
+  await cell(1, 1).click();
+  await choose("选择当前列");
+  assert.ok((await mergeControls.innerText()).includes("已选 4 行 × 1 列"));
+  await merge();
+  assert.equal(await cell(0, 1).getAttribute("rowspan"), "4");
+  await undo();
+  await clear();
+  result.checks.push(
+    "Whole-row and whole-column selection, merging, content preservation and undo",
+  );
+
+  await cell(1, 0).click();
+  await choose("选择单元格区域");
+  assert.equal(
+    await mergeControls
+      .getByRole("button", { name: "合并单元格", exact: true })
+      .isDisabled(),
+    true,
+  );
+  await page.keyboard.press("Escape");
+  assert.equal(await mergeControls.count(), 0);
+  await choose("选择单元格区域");
+  await cell(2, 1).click({ modifiers: ["Shift"] });
+  assert.equal(await mergeTable.locator(".selectedCell").count(), 4);
+  assert.equal(
+    await page.locator(".editor-bubble").count(),
+    0,
+    "Cell selection uses the table toolbar without a floating text toolbar",
+  );
+  assert.ok((await mergeControls.innerText()).includes("已选 2 行 × 2 列"));
+  await page.mouse.move(100, 100);
+  await mergeControls.waitFor();
+  await merge();
+  assert.equal(await cell(1, 0).getAttribute("colspan"), "2");
+  assert.equal(await cell(1, 0).getAttribute("rowspan"), "2");
+  await mergeControls
+    .getByRole("button", { name: "拆分单元格", exact: true })
+    .click();
+  assert.equal(await mergeTable.locator("td, th").count(), 16);
+  assert.ok((await cell(1, 0).innerText()).includes("3-2"));
+  // Undo the split, leaving the rectangle merged for save/export verification.
+  await page.keyboard.press(
+    process.platform === "darwin" ? "Meta+z" : "Control+z",
+  );
+  assert.equal(
+    await mergeTable.locator('td[rowspan="2"][colspan="2"]').count(),
+    1,
+    "Undo split must restore the merged rectangle",
+  );
+  await clear();
+  await cell(0, 0).click();
+  await cell(0, 1).click({ modifiers: ["Shift"] });
+  await merge();
+  assert.equal(await cell(0, 0).getAttribute("colspan"), "2");
+  await clear();
+  // Body rows now contain only the uncovered columns; choose the third logical column.
+  const startCell = await cell(1, 1).boundingBox();
+  const endCell = await cell(2, 0).boundingBox();
+  await page.mouse.move(startCell.x + 20, startCell.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(endCell.x + 20, endCell.y + 20, { steps: 12 });
+  await page.mouse.up();
+  assert.equal(await mergeTable.locator(".selectedCell").count(), 2);
+  await merge();
+  assert.equal(await cell(1, 1).getAttribute("rowspan"), "2");
+  await page.screenshot({ path: join(output, "merged-cells.png") });
+  await clear();
+  result.checks.push(
+    "Shift-click and drag select rectangles, horizontal/vertical/rectangular merge, split and undo of split",
+  );
+
   await basic.locator("th").nth(1).hover();
   const headerInput = await basic.locator("th input").nth(1).boundingBox();
   const columnControl = await page
@@ -382,9 +541,22 @@ try {
       : node.content?.map((child) => findNode(child, type)).find(Boolean);
   const savedNative = findNode(saved.document.content, "table");
   const savedBasic = findNode(saved.document.content, "widget").attrs.data;
+  const savedMerged = saved.document.content.content.find(
+    (node) => node.attrs?.id === "merge-table",
+  );
+  assert.equal(savedMerged.content[0].content[0].attrs.colspan, 2);
+  assert.equal(savedMerged.content[1].content[0].attrs.colspan, 2);
+  assert.equal(savedMerged.content[1].content[0].attrs.rowspan, 2);
+  assert.equal(savedMerged.content[1].content[1].attrs.rowspan, 2);
+  assert.deepEqual(
+    savedMerged.content[1].content[0].attrs.colwidth,
+    [150, 150],
+  );
   assert.equal(savedNative.attrs.textAlign, "center");
   assert.deepEqual(savedBasic.columnAlignments, [null, "center", null]);
   await open();
+  assert.equal(await mergeTable.locator('[rowspan="2"]').count(), 2);
+  assert.equal(await mergeTable.locator('[colspan="2"]').count(), 2);
   assert.ok(
     (await styles(native.locator("th, td"))).every(
       (value) => value === "center",
@@ -402,9 +574,9 @@ try {
 
   const html = join(output, "table-alignment.html");
   execFileSync(
-    process.execPath,
+    cliNode,
     [
-      join(repository, "dist-agent/cli.mjs"),
+      cli,
       "export",
       "--project",
       project.id,
@@ -418,13 +590,16 @@ try {
     ],
     { env, cwd: repository },
   );
-  const viewer = await page.context().newPage();
+  viewerBrowser = await chromium.launch({ headless: true });
+  const viewer = await viewerBrowser.newPage({
+    viewport: { width: 1440, height: 1000 },
+  });
   await viewer.goto(pathToFileURL(html).href);
   await viewer.locator(".portable-content table").first().waitFor();
   assert.ok(
     (
       await styles(
-        viewer.locator(".portable-table-scroll th, .portable-table-scroll td"),
+        viewer.locator(".portable-table-scroll").first().locator("th, td"),
       )
     ).every((value) => value === "center"),
   );
@@ -446,6 +621,17 @@ try {
     ).every((size) => size === viewerFont),
   );
   assert.equal(await viewer.locator(".table-alignment-buttons").count(), 0);
+  assert.equal(
+    await viewer.locator(".document-table-selection-controls").count(),
+    0,
+  );
+  const exportedMerged = viewer.locator('table[data-block-id="merge-table"]');
+  assert.equal(await exportedMerged.locator('[rowspan="2"]').count(), 2);
+  assert.equal(await exportedMerged.locator('[colspan="2"]').count(), 2);
+  assert.ok((await exportedMerged.innerText()).includes("3-2"));
+  result.checks.push(
+    "Canonical JSON, column widths, reload and offline HTML retain all merged spans and content",
+  );
   await viewer.screenshot({ path: join(output, "export.png") });
   result.checks.push(
     "Offline HTML export renders saved alignments without editing controls",
@@ -454,10 +640,12 @@ try {
   result.passed = true;
 } catch (error) {
   result.error = error.stack;
-  if (page && !page.isClosed())
+  if (page && !page.isClosed()) {
     await page.screenshot({ path: join(output, "failure.png") });
+  }
   process.exitCode = 1;
 } finally {
+  if (viewerBrowser) await viewerBrowser.close();
   if (app) await app.close();
   if (serverProcess) serverProcess.kill("SIGTERM");
   await writeFile(

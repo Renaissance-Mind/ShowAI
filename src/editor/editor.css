@@ -1146,3 +1146,49 @@
 .document-table-menu > button.danger {
   color: #bf534d;
 }
+.document-table-menu-hint {
+  max-width: 210px;
+  margin: 4px 10px 6px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.document-table-selection-controls {
+  position: fixed;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  box-shadow: 0 8px 28px #00000018;
+  font-size: 12px;
+}
+.document-table-selection-controls > span {
+  padding: 0 6px;
+  color: var(--muted);
+}
+.document-table-selection-controls > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 6px 8px;
+  border-radius: 4px;
+  color: var(--text);
+  background: var(--hover);
+}
+.document-table-selection-controls > button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.document-table-selection-controls > button:hover:not(:disabled) {
+  background: var(--editor-hover);
+}
+@media print {
+  .document-table-selection-controls {
+    display: none;
+  }
+}

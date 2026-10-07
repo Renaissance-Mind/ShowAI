@@ -22,6 +22,11 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import type { Editor, JSONContent } from "@tiptap/core";
 import { NodeSelection, Selection } from "@tiptap/pm/state";
 import { clearWidgetSelection } from "./widget-selection";
+import { CellSelection } from "@tiptap/pm/tables";
+import {
+  documentTableActionMeta,
+  restoreDocumentTableCellSelection,
+} from "./table-selection";
 import {
   AlignCenter,
   AlignLeft,
@@ -70,7 +75,10 @@ import "./editor.css";
 
 export interface DocumentEditorProps {
   content: JSONContent;
-  onChange: (content: JSONContent) => void;
+  onChange: (
+    content: JSONContent,
+    options?: { separateHistory?: boolean },
+  ) => void;
   readOnly?: boolean;
   minimal?: boolean;
   onEditorReady?: (editor: Editor) => void;
@@ -294,8 +302,10 @@ export default function DocumentEditor({
         return true;
       },
     },
-    onUpdate: ({ editor: current }) =>
-      latestOnChange.current(current.getJSON()),
+    onUpdate: ({ editor: current, transaction }) =>
+      latestOnChange.current(current.getJSON(), {
+        separateHistory: Boolean(transaction.getMeta(documentTableActionMeta)),
+      }),
   });
 
   useEffect(() => {
@@ -328,6 +338,10 @@ export default function DocumentEditor({
         editor.state.selection.node.type.name === "widget"
           ? editor.state.selection.node.attrs.id
           : null;
+      const cellSelection =
+        editor.state.selection instanceof CellSelection
+          ? editor.state.selection
+          : null;
       editor.commands.setContent(content, { emitUpdate: false });
       if (selection) {
         const maximum = Math.max(1, editor.state.doc.content.size - 1);
@@ -338,6 +352,14 @@ export default function DocumentEditor({
           editor.state.doc.resolve(to).parent.inlineContent
         )
           editor.commands.setTextSelection({ from, to });
+      }
+      if (cellSelection) {
+        const restored = restoreDocumentTableCellSelection(
+          editor.state.doc,
+          cellSelection,
+        );
+        if (restored)
+          editor.view.dispatch(editor.state.tr.setSelection(restored));
       }
       if (widgetId) {
         let position: number | undefined;
@@ -492,6 +514,7 @@ export default function DocumentEditor({
       }
       if (
         !empty &&
+        !(selection instanceof CellSelection) &&
         editor.isFocused &&
         !editor.isActive("codeBlock") &&
         !editor.isActive("widget")

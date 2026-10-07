@@ -153,7 +153,8 @@ export default function SurfaceEditor({
                 commit(next);
               }
         }
-        onChange={(value) => {
+        onChange={(value, options) => {
+          const group = options?.separateHistory ? "" : `text:${parentId}`;
           if (kind === "children")
             commit(
               replaceChildren(
@@ -162,7 +163,7 @@ export default function SurfaceEditor({
                 ids,
                 value.content ?? [],
               ),
-              `text:${parentId}`,
+              group,
             );
           else
             commit(
@@ -185,7 +186,7 @@ export default function SurfaceEditor({
                   );
                 }
               }),
-              `text:${parentId}`,
+              group,
             );
         }}
       />
