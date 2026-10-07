@@ -17,6 +17,7 @@ import {
   MoreHorizontal,
   Pin,
 } from "../ui/icons";
+import "./library-row.css";
 
 export type LibraryTarget =
   | {
@@ -76,6 +77,7 @@ export function LibraryRow({
       className={`studio-tree-row${active ? " active" : ""}`}
       data-kind={target.kind}
       data-library-id={target.id}
+      data-pinned={target.pinned || undefined}
       onKeyDown={openKeyboardMenu}
       onContextMenu={(event) => {
         event.preventDefault();
@@ -109,12 +111,14 @@ export function LibraryRow({
         <Icon size={15} aria-hidden="true" />
         <span className="studio-tree-title">{title}</span>
         {target.pinned && (
-          <Pin
-            size={11}
-            className="studio-tree-pin"
-            aria-label="已置顶"
-            role="img"
-          />
+          <span className="studio-tree-pin-slot">
+            <Pin
+              size={11}
+              className="studio-tree-pin"
+              aria-label="已置顶"
+              role="img"
+            />
+          </span>
         )}
       </button>
       <button

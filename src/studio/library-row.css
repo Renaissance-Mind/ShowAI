@@ -1,0 +1,64 @@
+.studio-tree-row {
+  --row-menu-size: 28px;
+  --row-menu-inset: 4px;
+  position: relative;
+}
+.studio-tree-row > .studio-tree-main {
+  padding-right: calc(var(--row-menu-size) + 2 * var(--row-menu-inset));
+  transition: padding-right 180ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.studio-tree-row[data-pinned="true"] > .studio-tree-main {
+  padding-right: var(--row-menu-inset);
+}
+.studio-tree-pin-slot {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: var(--row-menu-size);
+  height: 18px;
+}
+.studio-tree-row > .studio-row-menu {
+  position: absolute;
+  top: 50%;
+  right: var(--row-menu-inset);
+  width: var(--row-menu-size);
+  margin: 0;
+  transform: translateY(-50%);
+  z-index: 1;
+  transition:
+    opacity 120ms ease,
+    background 100ms ease;
+}
+.studio-tree-row:is(
+    :hover,
+    :focus-within,
+    :has(> .studio-row-menu[aria-expanded="true"])
+  )
+  > .studio-row-menu {
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 40ms, 0ms;
+}
+.studio-tree-row[data-pinned="true"]:is(
+    :hover,
+    :focus-within,
+    :has(> .studio-row-menu[aria-expanded="true"])
+  )
+  > .studio-tree-main {
+  padding-right: calc(var(--row-menu-size) + 2 * var(--row-menu-inset));
+}
+@media (hover: none) {
+  .studio-tree-row[data-pinned="true"] > .studio-tree-main {
+    padding-right: calc(var(--row-menu-size) + 2 * var(--row-menu-inset));
+  }
+  .studio-tree-row > .studio-row-menu {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-tree-row > .studio-tree-main,
+  .studio-tree-row > .studio-row-menu {
+    transition: none;
+  }
+}
