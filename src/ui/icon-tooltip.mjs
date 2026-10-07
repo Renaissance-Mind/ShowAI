@@ -25,7 +25,6 @@ export function installIconTooltips(root) {
   mount.append(style, tip);
   let active = null;
   let nativeTitle = null;
-  let timer = 0;
   let hideTimer = 0;
   let focusTimer = 0;
   let pointerFocus = false;
@@ -66,7 +65,6 @@ export function installIconTooltips(root) {
     return null;
   };
   const hide = () => {
-    win.clearTimeout(timer);
     win.clearTimeout(hideTimer);
     if (active) {
       const ids = (active.getAttribute("aria-describedby") || "")
@@ -81,7 +79,7 @@ export function installIconTooltips(root) {
     active = null;
     nativeTitle = null;
   };
-  const show = (element, immediate = false) => {
+  const show = (element) => {
     win.clearTimeout(hideTimer);
     if (element === active) return;
     hide();
@@ -90,32 +88,26 @@ export function installIconTooltips(root) {
     nativeTitle = element.getAttribute("title");
     // Suppress the browser's second tooltip while this trigger is active.
     element.removeAttribute("title");
-    timer = win.setTimeout(
-      () => {
-        if (!element.isConnected || !element.getClientRects().length)
-          return hide();
-        tip.textContent = label(element);
-        tip.showPopover();
-        const rect = element.getBoundingClientRect();
-        const bounds = tip.getBoundingClientRect();
-        const width = doc.documentElement.clientWidth;
-        const height = doc.documentElement.clientHeight;
-        const below = rect.bottom + 6;
-        const top =
-          below + bounds.height <= height - 8
-            ? below
-            : rect.top - bounds.height - 6;
-        tip.style.left = `${Math.max(8, Math.min(rect.left + (rect.width - bounds.width) / 2, width - bounds.width - 8))}px`;
-        tip.style.top = `${Math.max(8, Math.min(top, height - bounds.height - 8))}px`;
-        const ids = (element.getAttribute("aria-describedby") || "")
-          .split(/\s+/)
-          .filter(Boolean);
-        element.setAttribute(
-          "aria-describedby",
-          [...new Set([...ids, tip.id])].join(" "),
-        );
-      },
-      immediate ? 0 : 350,
+    if (!element.isConnected || !element.getClientRects().length) return hide();
+    tip.textContent = label(element);
+    tip.showPopover();
+    const rect = element.getBoundingClientRect();
+    const bounds = tip.getBoundingClientRect();
+    const width = doc.documentElement.clientWidth;
+    const height = doc.documentElement.clientHeight;
+    const below = rect.bottom + 6;
+    const top =
+      below + bounds.height <= height - 8
+        ? below
+        : rect.top - bounds.height - 6;
+    tip.style.left = `${Math.max(8, Math.min(rect.left + (rect.width - bounds.width) / 2, width - bounds.width - 8))}px`;
+    tip.style.top = `${Math.max(8, Math.min(top, height - bounds.height - 8))}px`;
+    const ids = (element.getAttribute("aria-describedby") || "")
+      .split(/\s+/)
+      .filter(Boolean);
+    element.setAttribute(
+      "aria-describedby",
+      [...new Set([...ids, tip.id])].join(" "),
     );
   };
   const leave = () => {
@@ -142,7 +134,7 @@ export function installIconTooltips(root) {
   const focus = (event) => {
     if (pointerFocus) return;
     focused = target(event);
-    show(focused, true);
+    show(focused);
   };
   const blur = () => {
     focused = null;
