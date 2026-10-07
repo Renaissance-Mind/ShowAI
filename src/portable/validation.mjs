@@ -1,4 +1,5 @@
 import { isResource } from "../surface/containers.mjs";
+import { validatePageIcon } from "../lib/page-icon.mjs";
 import { artifactVersion, assignSurfaceIds } from "../surface/document.mjs";
 import { validateSurface } from "../surface/validation.mjs";
 import { validatePrimitiveData } from "../components/blocks/primitive-contract.mjs";
@@ -148,7 +149,7 @@ function validateJson(value, path, depth = 0) {
   }
 }
 
-function validateAttrs(attrs, path, permitted) {
+function validateAttrs(attrs, path, permitted, surfaceIcon = false) {
   object(attrs, path);
   for (const [key, value] of Object.entries(attrs)) {
     if (!permitted.has(key))
@@ -191,7 +192,11 @@ function validateAttrs(attrs, path, permitted) {
         "class",
       ].includes(key)
     )
-      string(value, `${path}.${key}`, 10000);
+      string(
+        value,
+        `${path}.${key}`,
+        key === "icon" && surfaceIcon ? 1_000_000 : 10000,
+      );
     if (
       ["width", "height"].includes(key) &&
       !(
@@ -449,7 +454,10 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
             "points",
           ])
         : nodeAttributes,
+      node.type === "surface",
     );
+  if (node.type === "surface" && node.attrs?.icon !== undefined)
+    validatePageIcon(node.attrs.icon, `${path}.attrs.icon`);
   if (node.attrs?.canvas != null) {
     if (depth !== 1 || node.type !== "callout")
       throw new Error(
@@ -695,7 +703,7 @@ export function validateDocument(value) {
     icon:
       document.icon === undefined
         ? "✦"
-        : string(document.icon, "document.icon", 64),
+        : validatePageIcon(document.icon, "document.icon"),
     cover:
       document.cover === undefined
         ? "none"

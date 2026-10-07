@@ -4,6 +4,7 @@ import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 import { embedDocumentImages, externalImageUrls } from "./assets.mjs";
 import { validateDocument } from "./validation.mjs";
+import { upgradeResource, createSurface } from "../surface/containers.mjs";
 
 // A real HTTP fixture serves a valid raster image so the network-to-file path is exercised.
 const png = Buffer.from(
@@ -35,6 +36,31 @@ afterAll(
 );
 
 describe("self-contained image export", () => {
+  it("embeds root and nested Page icons with one download and leaves Emoji unchanged", async () => {
+    const src = `${origin}/image.png`;
+    const document = upgradeResource(
+      validateDocument({
+        id: "icons",
+        title: "Icons",
+        icon: src,
+        content: { type: "doc", content: [] },
+      }),
+    );
+    document.content.content = [
+      createSurface("page", "Child"),
+      createSurface("page", "Emoji"),
+    ];
+    document.content.content[0].attrs!.icon = src;
+    document.content.content[1].attrs!.icon = "🧪";
+    const before = imageRequests;
+    const result = await embedDocumentImages(document);
+    expect(imageRequests - before).toBe(1);
+    expect(result.icon).toBe(`data:image/png;base64,${png.toString("base64")}`);
+    expect(result.content.content?.[0].attrs?.icon).toBe(result.icon);
+    expect(result.content.content?.[1].attrs?.icon).toBe("🧪");
+    expect(externalImageUrls(result)).toEqual([]);
+    expect(document.icon).toBe(src);
+  });
   it("embeds images in native text, image components, gallery, and bookmark and reuses one download", async () => {
     const src = `${origin}/image.png`;
     const document = validateDocument({

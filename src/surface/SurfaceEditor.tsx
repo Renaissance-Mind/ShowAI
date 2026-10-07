@@ -23,7 +23,12 @@ import { toPageEditor, fromPageEditor } from "./page-content";
 import { PageModuleContext, pageEditorNodes } from "./PageEditorNodes";
 
 const contentKey = (document: ShowDocument) =>
-  JSON.stringify([document.content, document.layout, document.surfaceViews]);
+  JSON.stringify([
+    document.content,
+    document.layout,
+    document.surfaceViews,
+    document.icon,
+  ]);
 export default function SurfaceEditor({
   document: input,
   onChange,
@@ -61,7 +66,8 @@ export default function SurfaceEditor({
     if (
       before.content !== document.content ||
       before.layout !== document.layout ||
-      before.surfaceViews !== document.surfaceViews
+      before.surfaceViews !== document.surfaceViews ||
+      before.icon !== document.icon
     ) {
       if (contentKey(before) === contentKey(document)) {
         current.current = document;
@@ -81,7 +87,8 @@ export default function SurfaceEditor({
       next === before ||
       (next.content === before.content &&
         next.layout === before.layout &&
-        next.surfaceViews === before.surfaceViews)
+        next.surfaceViews === before.surfaceViews &&
+        next.icon === before.icon)
     )
       return;
     const stack = history.current,
@@ -107,6 +114,7 @@ export default function SurfaceEditor({
     stack.group = "";
     const restored = {
       ...current.current,
+      icon: next.icon,
       content: next.content,
       layout: next.layout,
       surfaceViews: next.surfaceViews,

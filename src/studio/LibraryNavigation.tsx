@@ -18,6 +18,7 @@ import {
   Pin,
 } from "../ui/icons";
 import "./library-row.css";
+import PageIcon from "../components/PageIcon";
 import { useLibraryDrag } from "./LibraryDrag";
 
 export type LibraryTarget =
@@ -36,6 +37,7 @@ export type LibraryTarget =
       title: string;
       pinned: boolean;
       parentId: string | null;
+      icon?: string;
     };
 
 export interface LibraryMenuPoint {
@@ -124,7 +126,11 @@ export function LibraryRow({
         title={title}
         onClick={() => onOpen(target)}
       >
-        <Icon size={15} aria-hidden="true" />
+        {target.kind === "page" ? (
+          <PageIcon value={target.icon} size={15} />
+        ) : (
+          <Icon size={15} aria-hidden="true" />
+        )}
         <span className="studio-tree-title">{title}</span>
         {target.pinned && (
           <span className="studio-tree-pin-slot">

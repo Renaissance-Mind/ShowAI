@@ -55,6 +55,8 @@ import {
   wrapSurface,
 } from "./containers.mjs";
 import "./containers.css";
+import PageIcon from "../components/PageIcon";
+import PageIconDialog from "../studio/PageIconDialog";
 
 interface Runtime {
   document: ContainerDocument;
@@ -112,6 +114,7 @@ export function ContainerRuntime({
     [expanded, expand] = useState<string | null>(null),
     [active, activate] = useState(document.content.attrs!.id),
     [revealRequest, requestReveal] = useState<string | null>(null);
+  const [iconTarget, setIconTarget] = useState<string | null>(null);
   const [slash, setSlash] = useState<{
     parentId: string;
     left: number;
@@ -216,6 +219,31 @@ export function ContainerRuntime({
         }
       >
         <Context.Provider value={runtime}>
+          {iconTarget && !runtime.readOnly && (
+            <PageIconDialog
+              value={
+                iconTarget === document.content.attrs!.id
+                  ? document.icon
+                  : (findSurfaceNode(document, iconTarget)?.node.attrs?.icon ??
+                    "")
+              }
+              onClose={() => setIconTarget(null)}
+              onSave={async (icon) => {
+                const source = current.current;
+                if (iconTarget === source.content.attrs!.id)
+                  runtime.commit({ ...source, icon });
+                else {
+                  if (!findSurfaceNode(source, iconTarget))
+                    throw new Error("该 Page 已被移除。");
+                  runtime.commit(
+                    editNode(source, iconTarget, (node) => {
+                      node.attrs = { ...node.attrs, icon };
+                    }),
+                  );
+                }
+              }}
+            />
+          )}
           {slash && (
             <ComponentSlashMenu
               left={slash.left}
@@ -307,7 +335,14 @@ export function ContainerRuntime({
                         onClick={() => focusSurface(node.attrs!.id)}
                       >
                         {surfaceKind(node) === "page" ? (
-                          <FileText size={14} />
+                          <PageIcon
+                            value={
+                              node === document.content
+                                ? document.icon
+                                : node.attrs?.icon
+                            }
+                            size={14}
+                          />
                         ) : (
                           <LayoutDashboard size={14} />
                         )}
@@ -362,6 +397,18 @@ export function ContainerRuntime({
                       <div>
                         <button
                           type="button"
+                          onClick={(event) => {
+                            event.currentTarget
+                              .closest("details")
+                              ?.removeAttribute("open");
+                            setIconTarget(root.attrs!.id);
+                          }}
+                        >
+                          <FileText size={15} />
+                          设置图标…
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => {
                             const next = wrapSurface(
                               current.current,
@@ -408,7 +455,14 @@ export function ContainerRuntime({
                 node={root}
                 root
                 header={
-                  root === document.content ? header : <h1>{nodeName(root)}</h1>
+                  root === document.content ? (
+                    header
+                  ) : (
+                    <h1>
+                      <PageIcon value={root.attrs?.icon} size={32} />{" "}
+                      {nodeName(root)}
+                    </h1>
+                  )
                 }
                 reading={reading}
               />
@@ -450,6 +504,18 @@ export function ContainerRuntime({
                     }
                   />
                 </label>
+                {selectedEntry.node.type === "surface" && (
+                  <button
+                    type="button"
+                    onClick={() => setIconTarget(selectedEntry.node.attrs!.id)}
+                  >
+                    <PageIcon
+                      value={selectedEntry.node.attrs?.icon}
+                      size={18}
+                    />{" "}
+                    设置图标…
+                  </button>
+                )}
                 {selectedEntry.node.type === "region" && (
                   <label>
                     排列
@@ -739,6 +805,13 @@ function ContainerView({
           runtime.select(null);
         },
   };
+  const heading =
+    header ??
+    (!root ? (
+      <h2>
+        <PageIcon value={node.attrs?.icon} size={24} /> {nodeName(node)}
+      </h2>
+    ) : undefined);
   const renderSurface = (child: JSONContent) => <ContainerView node={child} />;
   if (kind === "page" || reading)
     return (
@@ -762,7 +835,7 @@ function ContainerView({
           }}
         >
           <div className="container-page-column">
-            {header && <div className="container-page-heading">{header}</div>}
+            {heading && <div className="container-page-heading">{heading}</div>}
             <SurfaceContent
               document={runtime.document}
               container={node}
@@ -801,7 +874,7 @@ function ContainerView({
           layoutKey={JSON.stringify(runtime.document.layout)}
           paths={nodePaths({ ...runtime.document, content: node })}
           views={surfaceViews(runtime.document, node)}
-          header={header}
+          header={heading}
           selected={runtime.selected}
           onSelect={runtime.select}
           onInspect={runtime.inspect}

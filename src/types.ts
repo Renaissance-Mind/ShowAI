@@ -6,6 +6,7 @@ import type { NodeLayout, PageViews } from "./surface/types";
 export interface ShowPage {
   id: string;
   title: string;
+  /** Text/Emoji, an HTTP(S) image URL, or embedded raster image data. */
   icon: string;
   cover: string;
   parentId: string | null;

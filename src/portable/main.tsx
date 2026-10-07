@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import PageIcon from "../components/PageIcon";
 import { installIconTooltips } from "../ui/icon-tooltip.mjs";
 import { createRoot } from "react-dom/client";
 import { Download, Moon, MoreHorizontal, Printer, Sun } from "../ui/icons";
@@ -205,6 +206,11 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
           partial={!!artifact.selection}
           heading={
             <>
+              {!artifact.selection && document.icon && (
+                <div className="portable-page-icon">
+                  <PageIcon value={document.icon} size={48} />
+                </div>
+              )}
               {!artifact.selection && document.title && (
                 <h1 className="portable-title">{document.title}</h1>
               )}

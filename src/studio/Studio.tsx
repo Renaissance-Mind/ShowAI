@@ -73,6 +73,8 @@ import {
   type LibraryTarget,
 } from "./LibraryNavigation";
 import Dialog from "./Dialog";
+import PageIcon from "../components/PageIcon";
+import PageIconDialog from "./PageIconDialog";
 import ExpandableSearch from "../components/ExpandableSearch";
 import ProjectSidebar from "./ProjectSidebar";
 import {
@@ -147,6 +149,12 @@ type DialogState =
       templates: TemplateMetadata[];
     }
   | { type: "folder"; projectId: string; parentId: string | null }
+  | {
+      type: "pageIcon";
+      target: LibraryTarget;
+      value: string;
+      record: LoadedPage;
+    }
   | { type: "rename"; target: LibraryTarget }
   | { type: "delete"; target: LibraryTarget }
   | {
@@ -775,6 +783,7 @@ export default function Studio() {
     projectId,
     id: item.id,
     title: item.title || "无标题",
+    icon: item.icon,
     pinned: !!item.favorite,
     parentId: item.parentId ?? null,
   });
@@ -785,6 +794,7 @@ export default function Studio() {
           projectId: page.projectId,
           id: page.draft.id,
           title: page.draft.title || "无标题",
+          icon: page.draft.icon,
           pinned: page.draft.favorite,
           parentId: page.draft.parentId,
         }
@@ -800,6 +810,19 @@ export default function Studio() {
         ? null
         : { target, anchor, point, pageTools },
     );
+  async function beginPageIcon(target: LibraryTarget) {
+    if (!(await page.flush())) return;
+    const record = await desktop.invoke<LoadedPage>("pages:get", {
+      projectId: target.projectId,
+      pageId: target.id,
+    });
+    setDialog({
+      type: "pageIcon",
+      target,
+      value: record.document.icon,
+      record,
+    });
+  }
   async function toggleProject(id: string) {
     if (!expandedProjects[id]) await loadProjectContents(id);
     setExpandedProjects((current) => ({ ...current, [id]: !current[id] }));
@@ -1439,6 +1462,7 @@ export default function Studio() {
                 {view === "page" && (
                   <>
                     <ChevronRight size={13} />
+                    <PageIcon value={page.draft?.icon} size={18} />
                     <input
                       className="studio-page-title-input"
                       aria-label="页面标题"
@@ -2016,7 +2040,12 @@ export default function Studio() {
                                 {target.kind === "folder" ? (
                                   <Folder size={19} />
                                 ) : (
-                                  <FileText size={19} />
+                                  <PageIcon
+                                    value={
+                                      target.kind === "page" ? target.icon : ""
+                                    }
+                                    size={19}
+                                  />
                                 )}
                               </span>
                               <strong>{target.title}</strong>
@@ -2287,6 +2316,15 @@ export default function Studio() {
                 onSelect: () =>
                   setDialog({ type: "rename", target: contextMenu.target }),
               },
+              ...(contextMenu.target.kind === "page"
+                ? [
+                    {
+                      label: "设置图标…",
+                      icon: <FileText size={15} />,
+                      onSelect: action(() => beginPageIcon(contextMenu.target)),
+                    },
+                  ]
+                : []),
               {
                 label: contextMenu.target.pinned ? "取消置顶" : "置顶",
                 icon: contextMenu.target.pinned ? (
@@ -2396,6 +2434,33 @@ export default function Studio() {
                   setDialog({ type: "delete", target: contextMenu.target }),
               },
             ]}
+          />
+        )}
+        {dialog?.type === "pageIcon" && (
+          <PageIconDialog
+            value={dialog.value}
+            onClose={closeDialog}
+            onSave={async (icon) => {
+              if (
+                page.draft?.id === dialog.target.id &&
+                page.projectId === dialog.target.projectId
+              ) {
+                page.edit({ icon });
+                if (!(await page.flush()))
+                  throw new Error(
+                    "图标保留在本机草稿中，请处理页面保存错误或冲突。",
+                  );
+              } else {
+                await desktop.invoke("pages:save", {
+                  projectId: dialog.target.projectId,
+                  pageId: dialog.target.id,
+                  baseHash: dialog.record.hash,
+                  baseRevision: dialog.record.revision,
+                  document: { ...dialog.record.document, icon },
+                });
+              }
+              await refresh();
+            }}
           />
         )}
         {dialog?.type === "history" && (

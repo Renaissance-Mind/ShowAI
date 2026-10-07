@@ -1,4 +1,5 @@
 import { marked } from "marked";
+import { isImageIcon } from "../lib/page-icon.mjs";
 import {
   isSafeUrl,
   MAX_ARTIFACT_BYTES,
@@ -8,7 +9,10 @@ import {
 /** Built-in blocks declare every resource that has to be embedded for offline viewing. */
 function imageSlots(document) {
   const slots = [];
+  if (isImageIcon(document.icon)) slots.push([document, "icon"]);
   const visit = (node) => {
+    if (node.type === "surface" && isImageIcon(node.attrs?.icon))
+      slots.push([node.attrs, "icon"]);
     if (node.type === "image" && node.attrs?.src)
       slots.push([node.attrs, "src"]);
     if (

@@ -34,6 +34,40 @@ describe("shared history/search/restore operations", () => {
     await rm(root, { recursive: true, force: true });
   });
 
+  it("persists image icons through summaries, copies, history and removal without losing page content", async () => {
+    const icon = "data:image/png;base64," + "a".repeat(20000);
+    const saved = await store.savePage(
+      projectId,
+      page.document.id,
+      { ...page.document, icon },
+      page.hash,
+      page.revision,
+    );
+    const reopened = new FileStore(root);
+    expect((await reopened.listPages(projectId))[0].icon).toBe(icon);
+    expect(
+      (await reopened.readPage(projectId, page.document.id)).document.icon,
+    ).toBe(icon);
+    const copy = await reopened.createPage(projectId, {
+      document: saved.document,
+    });
+    expect(copy.document.icon).toBe(icon);
+    const removed = await reopened.applyPage(projectId, page.document.id, {
+      baseHash: saved.hash,
+      baseRevision: saved.revision,
+      operations: [{ type: "page.set", fields: { icon: "" } }],
+    });
+    expect(removed.document.icon).toBe("");
+    const restored = await operations.restorePage({
+      projectId,
+      pageId: page.document.id,
+      revision: saved.revision!,
+      baseRevision: removed.revision!,
+    });
+    expect(restored.document.icon).toBe(icon);
+    expect(restored.document.content).toEqual(saved.document.content);
+  });
+
   it("reads history, searches and compares exact revisions while enforcing project scope", async () => {
     const changed = await withChangeContext(
       {

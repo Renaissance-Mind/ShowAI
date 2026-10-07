@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import PageIcon from "../components/PageIcon";
 import { FileText } from "../ui/icons";
 import type { PageSummary, ProjectSummary } from "../core/model";
 
@@ -101,7 +102,7 @@ export default function RecentPages({
             onClick={() => onOpen(page)}
           >
             <span className="studio-page-list-icon" aria-hidden="true">
-              {page.icon || <FileText size={19} />}
+              <PageIcon value={page.icon} size={19} />
             </span>
             <span className="studio-recent-page-details">
               <strong>{page.title || "无标题"}</strong>
