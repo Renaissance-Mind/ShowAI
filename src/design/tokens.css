@@ -18,9 +18,9 @@
   --muted: #6a6a6a;
   --subtle: #929292;
   --paper: #ffffff;
-  --surface: #f7f7f7;
+  --surface: #fafafa;
   --line: #dddddd;
-  --hover: #f2f2f2;
+  --hover: #f7f7f7;
   --accent: var(--action);
   --accent-soft: #eeedf9;
   --brand-accent: var(--brand);

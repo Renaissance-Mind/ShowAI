@@ -143,8 +143,7 @@
   inset: var(--studio-topbar-height) 0 0;
 }
 .studio-icon,
-.canvas-icon-button,
-.settings-icon-button {
+.canvas-icon-button {
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -170,14 +169,43 @@
   line-height: 1.6;
   margin-top: 8px;
 }
-.studio-button,
-.settings-button {
+.studio-button {
   border-radius: 8px;
   padding: 10px 16px;
   min-height: 40px;
   font-size: 14px;
   font-weight: 500;
   gap: 8px;
+}
+.settings-button {
+  min-height: 32px;
+  padding: 5px 11px;
+  border-radius: 8px;
+  background: var(--paper);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  gap: 7px;
+}
+.settings-button:hover:not(:disabled) {
+  background: var(--hover);
+}
+.settings-button-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+.settings-icon-button {
+  width: 28px;
+  height: 28px;
+  color: var(--muted);
+}
+.settings-select select {
+  min-height: 32px;
+  padding-block: 5px;
+  background: var(--paper);
+  font-size: 13px;
+  line-height: 20px;
 }
 .studio-button.primary {
   background: var(--action);
@@ -529,6 +557,9 @@
   padding: 12px 20px;
   border-radius: 12px;
   font-size: 14px;
+  background: var(--paper);
+  color: var(--text);
+  border: 1px solid var(--line);
 }
 .catalog-lineage {
   font-size: 12px;

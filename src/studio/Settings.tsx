@@ -160,22 +160,18 @@ export function SettingsPanel({
             </button>
           </div>
 
-          <div className="settings-row">
-            <div className="settings-row-text">
-              <h3>修改历史</h3>
-              <p>
-                {info?.libraryVersion === 2
-                  ? "已启用版本历史、全文搜索和恢复。"
-                  : "导入现有内容，保留原始文件并启用完整修改记录。"}
-              </p>
-            </div>
-            {info?.libraryVersion === 1 && (
+          {info?.libraryVersion === 1 && (
+            <div className="settings-row">
+              <div className="settings-row-text">
+                <h3>修改历史</h3>
+                <p>导入现有内容，保留原始文件并启用完整修改记录。</p>
+              </div>
               <button className="settings-button" onClick={onMigrate}>
                 启用版本历史
                 <ChevronRight size={14} />
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </section>
       )}
       {section === "general" && info?.libraryVersion === 2 && (
@@ -268,18 +264,6 @@ export function SettingsPanel({
                 </code>
               </pre>
             </details>
-          </section>
-          <section
-            className="settings-group"
-            aria-labelledby="settings-mcp-title"
-          >
-            <h2 id="settings-mcp-title">项目连接</h2>
-            <div className="settings-row">
-              <div className="settings-row-text">
-                <h3>MCP</h3>
-              </div>
-              <span className="settings-value">按项目配置</span>
-            </div>
           </section>
         </>
       )}
