@@ -1020,11 +1020,6 @@ export default function Studio() {
 
   const sidebarNavigation = (
     <SidebarNavigation
-      active={
-        view === "templates" || view === "components" || view === "settings"
-          ? view
-          : "recent"
-      }
       onSelect={(section) =>
         void navigate(section === "recent" ? "projects" : section).catch(report)
       }

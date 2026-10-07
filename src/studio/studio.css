@@ -90,17 +90,6 @@
   font-size: 14px;
   line-height: 20px;
 }
-.studio-main-nav button.active,
-.studio-sidebar-bottom > button.active {
-  background: var(--accent-soft);
-  color: var(--text);
-  font-weight: 500;
-}
-.studio-main-nav button > span {
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--muted);
-}
 .studio-sidebar-projects {
   flex: 1;
   min-height: 0;

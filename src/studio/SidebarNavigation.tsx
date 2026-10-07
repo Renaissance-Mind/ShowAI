@@ -9,10 +9,8 @@ const sections = [
 ] as const;
 
 export default function SidebarNavigation({
-  active,
   onSelect,
 }: {
-  active: SidebarSection;
   onSelect: (section: SidebarSection) => void;
 }) {
   return (
@@ -23,12 +21,11 @@ export default function SidebarNavigation({
       {sections.map(([section, label, Icon]) => (
         <button
           key={section}
-          className={active === section ? "active" : ""}
-          aria-current={active === section ? "page" : undefined}
+          aria-label={label}
+          title={label}
           onClick={() => onSelect(section)}
         >
           <Icon size={15} aria-hidden="true" />
-          {label}
         </button>
       ))}
     </nav>

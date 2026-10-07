@@ -91,7 +91,10 @@ const checkNav = async () => {
         const rect = button.getBoundingClientRect(),
           style = getComputedStyle(button);
         return {
+          label: button.getAttribute("aria-label"),
           text: button.textContent.trim(),
+          iconCount: button.querySelectorAll("svg").length,
+          selected: button.matches(".active, [aria-current], [aria-pressed]"),
           x: rect.x,
           y: rect.y,
           width: rect.width,
@@ -102,10 +105,13 @@ const checkNav = async () => {
       }),
     );
   assert.deepEqual(
-    layout.map((item) => item.text),
+    layout.map((item) => item.label),
     ["最近", "模板", "组件", "设置"],
   );
   for (const item of layout) {
+    assert.equal(item.text, "");
+    assert.equal(item.iconCount, 1);
+    assert.equal(item.selected, false);
     assert.equal(item.y, layout[3].y);
     assert.equal(item.height, 32);
     assert.equal(item.fontSize, "14px");
@@ -113,6 +119,24 @@ const checkNav = async () => {
     assert.equal(item.overflow, false);
   }
   assert.equal(await page.locator(".studio-main-nav").count(), 1);
+  // Move away after activation: neither the route nor pointer focus should leave a highlight.
+  await page.mouse.move(700, 350);
+  await poll(
+    () =>
+      nav()
+        .getByRole("button")
+        .evaluateAll((buttons) =>
+          buttons.map((button) => {
+            const style = getComputedStyle(button);
+            return [style.backgroundColor, style.color];
+          }),
+        ),
+    (styles) =>
+      styles.every(
+        (style) => JSON.stringify(style) === JSON.stringify(styles[0]),
+      ) && styles[0][0] === "rgba(0, 0, 0, 0)",
+    "navigation stays neutral after clicking",
+  );
   return layout;
 };
 try {
@@ -121,6 +145,28 @@ try {
     .getByRole("heading", { name: "暂无最近编辑的页面", exact: true })
     .waitFor();
   result.layout = await checkNav();
+  for (const label of ["最近", "模板", "组件", "设置"]) {
+    const button = nav().getByRole("button", { name: label, exact: true });
+    assert.equal(await button.getAttribute("title"), label);
+    await button.hover();
+    const tooltip = page.locator(".showai-icon-tooltip:popover-open");
+    if (await page.locator(".showai-icon-tooltip").count()) {
+      await poll(
+        () => tooltip.textContent(),
+        (text) => text === label,
+        `hover tooltip ${label}`,
+      );
+    }
+    await page.mouse.move(700, 350);
+    await poll(
+      () => button.getAttribute("title"),
+      (title) => title === label,
+      `hover ends ${label}`,
+    );
+  }
+  result.checks.push(
+    "Four icon-only navigation controls show their label on hover and never keep a selected state after activation",
+  );
   const a = await api("projects:create", { name: "视觉研究" });
   const b = await api("projects:create", { name: "产品设计" });
   const older = await api("pages:create", {
@@ -229,7 +275,7 @@ try {
     await nav()
       .getByRole("button", { name: "设置", exact: true })
       .getAttribute("aria-current"),
-    "page",
+    null,
   );
   await clickNav("最近");
   await rows().first().waitFor();
