@@ -2,7 +2,7 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "showai",
   "version": "0.8.0",
-  "description": "Skills for creating ShowAI pages, reusable components and templates through an independently installed ShowAI runtime.",
+  "description": "A unified ShowAI usage guide and focused skills for reading projects, presenting pages, building components and creating templates through an independently installed runtime.",
   "keywords": [
     "research",
     "interactive-pages",
@@ -14,8 +14,8 @@
     "com.openai": {
       "interface": {
         "displayName": "ShowAI",
-        "shortDescription": "Create and share interactive pages",
-        "longDescription": "Create pages, build reusable components and create templates directly or from existing pages with focused skills. Uses an independently installed ShowAI desktop application or CLI runtime.",
+        "shortDescription": "Read, create and present ShowAI pages",
+        "longDescription": "Start with the unified usage guide to connect ShowAI, find project content and choose a workflow. Focused skills create and present pages, build reusable components and create templates. Uses an independently installed ShowAI desktop application or CLI runtime.",
         "category": "Productivity",
         "defaultPrompt": [
           "Use ShowAI to present this research as an interactive page."

@@ -213,6 +213,7 @@ async function install() {
     files: Object.fromEntries(
       [
         "plugin.json",
+        "skills/use-showai/SKILL.md",
         "skills/show-document/SKILL.md",
         "skills/create-component/SKILL.md",
         "skills/create-template/SKILL.md",

@@ -2,19 +2,22 @@
 
 This package distributes workflows and reference documents. Install ShowAI desktop software or its external CLI runtime separately. The reader, component compiler and runtime dependencies belong to that software, not this plugin.
 
-| Skill              | When it applies                                                                  |
-| ------------------ | -------------------------------------------------------------------------------- |
-| `show-document`    | Create, revise or export a page, report or small site.                           |
+| Skill | When it applies |
+| --- | --- |
+| `use-showai` | Learn the foundations, connect the runtime, locate or read existing content, inspect history, and choose the appropriate workflow. |
+| `show-document` | Create, revise, present or export a specific page, report or small site; apply an existing template. |
 | `create-component` | Build or adapt a reusable component when reuse and composition leave a real gap. |
-| `create-template`  | Create or revise a reusable template, either directly or by abstracting a page.  |
+| `create-template` | Create or revise a reusable template, either directly or by abstracting a page. |
 
-The active skill resolves the external launch from the selected content directory's `agent-runtime.json`, validates `runtime info`, and loads only the relevant CLI guide and selected catalog views. Runtime locations and installed components are discovered dynamically.
+Begin with [use-showai](skills/use-showai/SKILL.md) when first using ShowAI or when the operation, runtime or object ownership is unclear. Its task table routes reading, searching, displaying, authoring, component development, template creation and history operations. A directly selected specialist skill links back to this guide only when foundational information is missing; known context can be reused.
+
+The unified guide explains the content model and when to obtain the [external runtime configuration](skills/use-showai/references/runtime.md). Once an executable is known, query `runtime info --json` to verify the actual library and needed capabilities. Load only the relevant CLI guide and selected catalog views. Skills do not install the executable or identify an unknown custom library automatically.
 
 `create-template` supports two workflows. With source material or a page to refine, create and iterate a concrete page, then abstract its reusable structure while preserving the original. With a clear recurring use case, offer natural-language usage prompts, save the selected template definition directly, then apply it to a preview page. Both workflows deliver a saved template, usage prompts in its examples, and an application preview; reusable feedback updates the template, while instance-specific edits stay in the page.
 
 `show-document` can display a complete page or selected page components/regions. Use `export --blocks ID,ID --format inline` for focused conversation updates, or `--format html` for a partial reader. Selection uses page node IDs and preserves the complete stored page. Query `guide export` on the active runtime to confirm block-selection support before using a newly updated skill with an older runtime.
 
-Use a user-specified ShowAI project when provided. Otherwise resolve or create the project for the host project directory with `projects current`; sessions in the same directory share one project. Ordinary reports use one Page with sections; multiple resource pages follow a requested site or separate documents. Creating, organizing or revising a ShowAI page includes inline conversation preview by default. The final reply uses the host's actual rendering reference, unless the user explicitly requests save-only, file-only, panel-only or background execution. Codex follows the current visualize fragment/path/output contract; oversized reports use selected inline previews plus the complete HTML. See [project selection](skills/show-document/references/runtime.md) and [conversation display](skills/show-document/references/conversation-display.md).
+Use a user-specified ShowAI project or page ownership when provided. Reading and searching use existing projects and explicit IDs. New content without an explicit project can resolve or create the project for a trusted host directory with `projects current`; sessions in the same directory share one project. Ordinary reports use one Page with sections; multiple resource pages follow a requested site or separate documents. Creating, organizing or revising a ShowAI page includes inline conversation preview by default. The final reply uses the host's actual rendering reference, unless the user explicitly requests save-only, file-only, panel-only or background execution. Codex follows the current visualize fragment/path/output contract; oversized reports use selected inline previews plus the complete HTML. See [project selection](skills/use-showai/SKILL.md) and [conversation display](skills/show-document/references/conversation-display.md).
 
 From the source repository, use `npm run plugin:install` or `npm run plugin:update`. These prepare the skills-only package, install through official Codex marketplace commands and verify the installed copy byte-for-byte. Start a new chat to load changed skills. Build external software with `npm run build`; register the standalone runtime with `npm run runtime:register`, or use the desktop application's Settings → Connect Agent launch configuration.
 

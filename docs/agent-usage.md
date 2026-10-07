@@ -6,9 +6,9 @@ The skills-only plugin resolves the installed software from `agent-runtime.json`
 
 In the examples below, `showai` means the verified external command prefix, for example `node /absolute/path/to/dist-runtime/scripts/cli.mjs`. Do not assume a global npm command exists. Standalone use requires Node.js 22.12+. The desktop application's **Settings → Connect Agent** panel provides its bundled executable, CLI path and environment for use without a separate Node installation.
 
-## Start small
+## Choose a usage path
 
-The installed skill supplies the project model and basic commands. Detailed instructions are available from the executable instead of loading every reference at startup:
+The [use-showai entry skill](../plugins/showai/skills/use-showai/SKILL.md) explains the content model, runtime discovery, object ownership and which specialist skill to read for each task. Read it on first use or when those foundations are unclear. `show-document` handles concrete page creation and presentation; component and template workflows have their own skills. The [runtime reference](../plugins/showai/skills/use-showai/references/runtime.md) explains how to invoke the registered command. Detailed operation instructions come from the executable:
 
 ```sh
 showai guide --json
