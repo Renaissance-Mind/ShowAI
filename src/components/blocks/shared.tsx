@@ -1,4 +1,4 @@
-import { Settings2, X } from "lucide-react";
+import { Settings2, X } from "../../ui/icons";
 import type { ReactNode } from "react";
 
 const genericTitles = new Set([

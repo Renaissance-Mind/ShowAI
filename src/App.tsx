@@ -1,10 +1,12 @@
-import { lazy, Suspense } from "react";
+import { installIconTooltips } from "./ui/icon-tooltip.mjs";
+import { lazy, Suspense, useLayoutEffect } from "react";
 const CanvasApp = lazy(() => import("./CanvasApp"));
 const Studio = lazy(() => import("./studio/Studio"));
 const ComponentPreviewPage = lazy(
   () => import("./studio/ComponentPreviewPage"),
 );
 export default function App() {
+  useLayoutEffect(() => installIconTooltips(document), []);
   const preview = new URLSearchParams(location.search).has("componentPreview");
   return (
     <Suspense

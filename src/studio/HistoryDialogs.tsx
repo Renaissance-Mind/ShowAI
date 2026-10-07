@@ -2,15 +2,14 @@ import { latestRequest } from "../lib/latest-request";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
-  History,
   Loader2,
-  Search,
   RotateCcw,
   Bot,
   User,
   FileText,
-} from "lucide-react";
+} from "../ui/icons";
 import Dialog from "./Dialog";
+import ExpandableSearch from "../components/ExpandableSearch";
 import { desktop, errorCode, errorMessage } from "./bridge";
 import type { HistoryEntry } from "../core/history-model";
 import type { PageChange } from "../core/model";
@@ -426,15 +425,11 @@ export function HistoryDialog({
         <button className="studio-button" onClick={onImportedSnapshots}>
           旧快照
         </button>
-        <label>
-          <Search size={15} />
-          <input
-            aria-label="搜索修改说明"
-            placeholder="搜索修改说明"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
+        <ExpandableSearch
+          label="搜索修改说明"
+          value={query}
+          onChange={setQuery}
+        />
         <input
           aria-label="按会话筛选历史"
           placeholder="Agent 会话 ID（可选）"
@@ -557,7 +552,6 @@ export function HistoryDialog({
               </div>
               {confirm && (
                 <div className="history-confirm" role="alert">
-                  <p>将此内容恢复为一个新版本，当前版本会保留在历史中。</p>
                   <button
                     className="studio-button primary"
                     disabled={busy}
@@ -668,12 +662,7 @@ export function HistoryDialog({
                 </>
               )}
             </>
-          ) : (
-            <div className="history-empty">
-              <History size={28} />
-              <p>选择一条记录，查看修改内容和来源。</p>
-            </div>
-          )}
+          ) : null}
         </main>
       </div>
     </Dialog>
@@ -889,26 +878,22 @@ export function ImportedSnapshotsDialog({
               <code>{selected.originalPath}</code>
             </details>
           )}
-          {!selected && !busy && (
-            <p className="history-empty">选择一份旧快照，查看其内容。</p>
-          )}
         </main>
       </div>
     </Dialog>
   );
 }
 
-export function SearchDialog({
+export function LibrarySearchResults({
   projectId,
-  onClose,
+  query,
   onOpen,
 }: {
   projectId?: string;
-  onClose: () => void;
+  query: string;
   onOpen: (result: SearchResult) => Promise<void>;
 }) {
-  const [query, setQuery] = useState(""),
-    [kind, setKind] = useState(""),
+  const [kind, setKind] = useState(""),
     [results, setResults] = useState<SearchResult[]>([]),
     [cursor, setCursor] = useState<string | null>(null),
     [total, setTotal] = useState(0),
@@ -971,22 +956,8 @@ export function SearchDialog({
     };
   }, [find]);
   return (
-    <Dialog
-      title={projectId ? "搜索项目内容" : "搜索内容库"}
-      onClose={onClose}
-      wide
-      className="history-search-dialog"
-    >
+    <section aria-label="内容库搜索结果">
       <div className="history-toolbar">
-        <label>
-          <Search size={17} />
-          <input
-            aria-label="搜索正文和组件"
-            placeholder="搜索正文、容器、组件或模板…"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
         <select
           aria-label="搜索内容类型"
           value={kind}
@@ -1052,7 +1023,7 @@ export function SearchDialog({
           </button>
         )}
       </div>
-    </Dialog>
+    </section>
   );
 }
 

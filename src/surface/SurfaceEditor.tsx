@@ -19,6 +19,8 @@ import {
   isReconciledSurface,
 } from "./document.mjs";
 import type { ContentRenderProps } from "./SurfaceContent";
+import { toPageEditor, fromPageEditor } from "./page-content";
+import { PageModuleContext, pageEditorNodes } from "./PageEditorNodes";
 
 const contentKey = (document: ShowDocument) =>
   JSON.stringify([document.content, document.layout, document.surfaceViews]);
@@ -113,7 +115,13 @@ export default function SurfaceEditor({
     latestChange.current(restored);
     refresh((value) => value + 1);
   };
-  const render = ({ content, parentId, ids, kind }: ContentRenderProps) => {
+  const render = ({
+    content,
+    parentId,
+    ids,
+    kind,
+    renderModule,
+  }: ContentRenderProps) => {
     const single = kind === "single" ? content.content?.[0] : undefined;
     if (single?.type === "widget")
       return (
@@ -140,9 +148,15 @@ export default function SurfaceEditor({
           draggable={false}
         />
       );
-    return (
+    const editor = (
       <DocumentEditor
-        content={content}
+        content={
+          renderModule
+            ? toPageEditor(content, current.current, parentId)
+            : content
+        }
+        additionalExtensions={renderModule ? pageEditorNodes : undefined}
+        trailingNode={!renderModule}
         readOnly={readOnly}
         onInsertNative={
           readOnly
@@ -151,7 +165,14 @@ export default function SurfaceEditor({
                 const inserted = insertComponentAtText(
                   current.current,
                   { parentId, ids, kind },
-                  point,
+                  renderModule
+                    ? {
+                        before: point.before.map((node) =>
+                          fromPageEditor(node),
+                        ),
+                        after: point.after.map((node) => fromPageEditor(node)),
+                      }
+                    : point,
                   componentKind,
                   data,
                 );
@@ -161,7 +182,7 @@ export default function SurfaceEditor({
         }
         minimal
         onDetachBlock={
-          readOnly
+          readOnly || renderModule
             ? undefined
             : (block) => {
                 const target = findSurfaceNode(current.current, parentId);
@@ -175,15 +196,19 @@ export default function SurfaceEditor({
               }
         }
         onChange={(value, options) => {
+          let source = current.current;
+          if (renderModule) {
+            source = {
+              ...source,
+              layout: { ...source.layout },
+              surfaceViews: { ...source.surfaceViews },
+            };
+            value = fromPageEditor(value, source);
+          }
           const group = options?.separateHistory ? "" : `text:${parentId}`;
           if (kind === "children")
             commit(
-              replaceChildren(
-                current.current,
-                parentId,
-                ids,
-                value.content ?? [],
-              ),
+              replaceChildren(source, parentId, ids, value.content ?? []),
               group,
             );
           else
@@ -211,6 +236,13 @@ export default function SurfaceEditor({
             );
         }}
       />
+    );
+    return renderModule ? (
+      <PageModuleContext.Provider value={renderModule}>
+        {editor}
+      </PageModuleContext.Provider>
+    ) : (
+      editor
     );
   };
   const renderer = useRef(render);

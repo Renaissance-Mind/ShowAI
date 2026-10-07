@@ -82,7 +82,9 @@ try {
     application = await _electron.launch({
       executablePath:
         process.env.SHOWAI_SMOKE_BINARY || (await import("electron")).default,
-      args: process.env.SHOWAI_SMOKE_BINARY ? [] : [root],
+      args: process.env.SHOWAI_SMOKE_BINARY
+        ? []
+        : [process.env.SHOWAI_CONTAINERS_APP || root],
       cwd: root,
       env,
     });
@@ -114,6 +116,43 @@ try {
   const created = await api("pages:create", {
     projectId: project.id,
     title: "递归内容工作页",
+    document: {
+      id: "continuous-page",
+      title: "递归内容工作页",
+      content: {
+        type: "surface",
+        attrs: { id: "continuous-root", kind: "page", name: "Page" },
+        content: [
+          {
+            type: "paragraph",
+            attrs: { id: "continuous-a" },
+            content: [{ type: "text", text: "连续第一段" }],
+          },
+          {
+            type: "region",
+            attrs: { id: "continuous-region", name: "内容区域" },
+            content: [
+              {
+                type: "paragraph",
+                attrs: { id: "continuous-b" },
+                content: [{ type: "text", text: "连续第二段" }],
+              },
+            ],
+          },
+          {
+            type: "richText",
+            attrs: { id: "continuous-text", name: "文本" },
+            content: [
+              {
+                type: "paragraph",
+                attrs: { id: "continuous-c" },
+                content: [{ type: "text", text: "连续第三段" }],
+              },
+            ],
+          },
+        ],
+      },
+    },
   });
   const pageId = created.document.id,
     rootId = created.document.content.attrs.id;
@@ -140,6 +179,40 @@ try {
     .getByRole("button", { name: /递归内容工作页/ })
     .first()
     .click();
+  const continuous = scene(rootId).locator(".tiptap");
+  await continuous.waitFor();
+  assert.equal(await continuous.count(), 1);
+  assert.equal(await scene(rootId).locator(".surface-object").count(), 0);
+  await continuous.locator('[data-block-id="continuous-a"]').click();
+  await page.keyboard.press(
+    process.platform === "darwin" ? "Meta+ArrowRight" : "End",
+  );
+  await page.keyboard.press("ArrowRight");
+  assert.equal(
+    await page.evaluate(() =>
+      window
+        .getSelection()
+        ?.anchorNode?.parentElement?.closest("[data-block-id]")
+        ?.getAttribute("data-block-id"),
+    ),
+    "continuous-b",
+  );
+  for (const _ of "连续第二段") await page.keyboard.press("Shift+ArrowRight");
+  assert.equal(
+    await page.evaluate(() => window.getSelection()?.toString()),
+    "连续第二段",
+  );
+  await page.keyboard.insertText("区域内继续写作");
+  await savedText("区域内继续写作");
+  await page.getByRole("button", { name: "撤销操作", exact: true }).click();
+  await savedText("连续第二段");
+  assert.equal(
+    find((await read()).document.content, "continuous-region").type,
+    "region",
+  );
+  result.checks.push(
+    "Page text and flowing regions share one caret, selection, undo history and frameless editor",
+  );
   await scene(rootId)
     .locator(".tiptap")
     .fill(
@@ -164,7 +237,7 @@ try {
     ) {
       const text = container
         .locator(
-          ":scope > .container-page-column > .surface-layout-flow > div > .document-editor .tiptap",
+          ":scope > .container-page-column > .surface-layout-flow > .document-editor > .editor-canvas > div > .tiptap",
         )
         .last();
       await text.click();
@@ -178,7 +251,11 @@ try {
       await board.focus();
       await board.press("/");
       await page
-        .getByRole("textbox", { name: "搜索内容块", exact: true })
+        .getByRole("dialog", { name: "插入内容", exact: true })
+        .getByRole("button", { name: "搜索内容块", exact: true })
+        .click();
+      await page
+        .getByRole("searchbox", { name: "搜索内容块", exact: true })
         .fill(label);
     }
     const menu = page.getByRole("dialog", { name: "插入内容", exact: true });
@@ -302,6 +379,7 @@ try {
     await page.locator(`[data-container-root="${nestedPageId}"]`).count(),
     1,
   );
+  await page.getByRole("button", { name: "展开项目导航", exact: true }).click();
   await page
     .getByRole("navigation", { name: "主要导航" })
     .getByRole("button", { name: "组件", exact: true })
@@ -364,8 +442,14 @@ try {
     .getByRole("button", { name: "展开 Board", exact: true })
     .click();
   await scene(sketchId)
-    .getByRole("button", { name: "解锁白板", exact: true })
-    .click();
+    .locator('.page-surface[data-viewport-locked="false"]')
+    .waitFor();
+  assert.equal(
+    await scene(sketchId)
+      .getByRole("button", { name: /^(解锁|锁定)白板$/ })
+      .count(),
+    0,
+  );
   await scene(sketchId)
     .getByRole("button", { name: "矩形", exact: true })
     .click();

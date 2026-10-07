@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { Check, FlaskConical, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Check, FlaskConical, Plus, RotateCcw, Trash2 } from "../../ui/icons";
 import { finite, text, uid } from "./helpers";
 import { BlockHeader, Field } from "./shared";
 import type { BlockProps } from "./types";
@@ -339,7 +339,6 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
             <div className="sb-empty">
               <FlaskConical size={26} />
               <strong>试着改变一个变量</strong>
-              <p>设置参数与计算方式，读者可以拖动滑块探索结果。</p>
               {editable && !editing && (
                 <button
                   type="button"

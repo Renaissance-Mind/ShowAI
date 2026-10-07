@@ -13,7 +13,7 @@ import {
   Plus,
   Trash2,
   Upload,
-} from "lucide-react";
+} from "../ui/icons";
 import type { ShowDocument } from "../types";
 import type {
   BuiltinComponentMetadata,
@@ -453,7 +453,6 @@ export function TemplateDialog({
               onChange={(event) => setRawTemplate(event.target.value)}
               spellCheck={false}
             />
-            <p>保存时使用新版本号与当前表单中的内容。</p>
           </details>
         )}
         {!!Object.keys(recoveryFiles).length && (
@@ -590,11 +589,6 @@ export function TemplateDialog({
         )}
         {tab === "layout" && (
           <>
-            <p className="studio-caption">
-              {parts.length
-                ? "选择要编辑的本地内容部分；引用的子模板保持固定版本。"
-                : "内容与布局是应用此模板时的起点。"}
-            </p>
             {!!parts.length && !!localParts.length && (
               <label className="studio-example-picker">
                 内容部分
@@ -864,9 +858,6 @@ export function TemplateDialog({
         )}
         {tab === "composition" && (
           <div className="catalog-composition">
-            <p className="studio-caption">
-              引用精确的模板版本。创建页面时按顺序展开，之后页面可以独立编辑。
-            </p>
             {parts.map((part, index) => (
               <div className="catalog-part" key={index}>
                 <div>
@@ -1023,11 +1014,6 @@ export function TemplateDialog({
           </p>
         )}
         <footer>
-          <span>
-            {projectId
-              ? "定制保存到当前项目，已有版本保持固定。"
-              : "选择项目后可以定制。"}
-          </span>
           {record.scope === "project" && !!record.integrity && (
             <button
               className="studio-button"
@@ -1269,7 +1255,6 @@ export function ComponentDialog({
               onChange={(event) => setManifestJson(event.target.value)}
               spellCheck={false}
             />
-            <p>保存时使用当前表单中的名称、新版本号与参数。</p>
           </details>
         )}
         {!!Object.keys(recoveryFiles).length && (
@@ -1299,7 +1284,6 @@ export function ComponentDialog({
                 </ReferenceSection>
                 {source && (
                   <ReferenceSection title="定制起点" icon="content">
-                    <p>从这份组件源码保存自己的版本，调整内容、外观与交互。</p>
                     <button
                       className="studio-text-button"
                       onClick={() => setTab("code")}
@@ -1490,7 +1474,6 @@ export function ComponentDialog({
           </p>
         )}
         <footer>
-          {source && !projectId && <span>选择项目后可定制。</span>}
           {!source && custom && (
             <span>此副本只有运行代码；编辑需要原始源码。</span>
           )}
@@ -1594,9 +1577,7 @@ export function PublishDialog({
             {refValue.id}@{refValue.version}
           </code>
         </p>
-        <p>
-          生成可部署的静态发布包，放到自己的静态网站后，验证清单地址并登记。登记成功后，网站导出可以引用这个固定版本。
-        </p>
+
         <button
           className="studio-button"
           disabled={busy}

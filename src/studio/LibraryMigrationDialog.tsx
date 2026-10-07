@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Check } from "lucide-react";
+import { Loader2, Check } from "../ui/icons";
 import Dialog from "./Dialog";
 import { desktop, errorMessage } from "./bridge";
 import type { LibraryImportReport } from "../core/library-import";

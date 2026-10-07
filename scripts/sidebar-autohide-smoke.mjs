@@ -127,6 +127,11 @@ try {
       (value) => Math.abs(value) < 1,
       "overlay finishes opening",
     );
+    await poll(
+      () => shell.evaluate((el) => el.getBoundingClientRect().width),
+      (value) => value < 0.1,
+      "document expansion finishes",
+    );
     await page.mouse.move(120, 120);
   };
   await moveOut();
@@ -151,6 +156,45 @@ try {
   );
   const expandedWidth = await width();
   assert.equal(await sidebar.evaluate((el) => el.inert), true);
+  await page.mouse.move(2, 400);
+  await modeIs("overlay");
+  await page.waitForTimeout(1100);
+  assert.equal(
+    await shell.getAttribute("data-sidebar-mode"),
+    "overlay",
+    "stationary pointer at the reveal edge keeps the panel open",
+  );
+  await page.mouse.move(120, 380);
+  await page.waitForTimeout(1100);
+  assert.equal(
+    await shell.getAttribute("data-sidebar-mode"),
+    "overlay",
+    "stationary pointer inside the panel keeps it open",
+  );
+  const brand = await sidebar.locator(".studio-brand").boundingBox();
+  await page.mouse.move(brand.x + 80, brand.y + 12);
+  await page.waitForTimeout(1100);
+  assert.equal(
+    await shell.getAttribute("data-sidebar-mode"),
+    "overlay",
+    "hovering the desktop drag region keeps navigation open",
+  );
+  await moveOut();
+  await modeIs("hidden");
+  await page.mouse.move(2, 400);
+  await modeIs("overlay");
+  await page.mouse.move(180, 450);
+  await page.waitForTimeout(1100);
+  assert.equal(
+    await shell.getAttribute("data-sidebar-mode"),
+    "overlay",
+    "entering during the opening animation keeps the panel open",
+  );
+  await moveOut();
+  await modeIs("hidden");
+  result.checks.push(
+    "Edge hover, stationary panel hover and entry during the opening animation remain open until the pointer actually leaves",
+  );
   await reveal();
   assert.equal(await width(), expandedWidth);
   await page.screenshot({ path: join(output, "overlay.png") });
@@ -256,10 +300,7 @@ try {
     208,
   );
   await page.screenshot({ path: join(output, "narrow-dark.png") });
-  await sidebar
-    .getByRole("navigation", { name: "主要导航" })
-    .getByRole("button", { name: "项目", exact: true })
-    .click();
+  await sidebar.getByRole("button", { name: "导航验收", exact: true }).click();
   await modeIs("docked");
   await moveOut();
   await page.waitForTimeout(650);
@@ -372,6 +413,114 @@ try {
   result.checks.push(
     "Overlay resize stays open throughout captured drag outside the panel, preserves document width, hides after release and shares its saved width with the locked panel",
   );
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await separator.focus();
+  await page.keyboard.press("Home");
+  await waitWidth(200);
+  await api("projects:pin", { projectId: project.id, pinned: true });
+  const pinRecord = await api("pages:get", {
+    projectId: project.id,
+    pageId: created.document.id,
+  });
+  await api("pages:pin", {
+    projectId: project.id,
+    pageId: created.document.id,
+    pinned: true,
+    baseHash: pinRecord.hash,
+    baseRevision: pinRecord.revision,
+  });
+  const projectRow = sidebar.locator(`[data-library-id="${project.id}"]`);
+  const rowGeometry = (row) =>
+    row.evaluate((element) => {
+      const pin = element
+        .querySelector(".studio-tree-pin")
+        .getBoundingClientRect();
+      const menu = element.querySelector(".studio-row-menu");
+      const button = menu.getBoundingClientRect();
+      const bounds = element.getBoundingClientRect();
+      return {
+        pinX: pin.x,
+        pinRight: pin.right,
+        pinCenter: pin.x + pin.width / 2,
+        menuX: button.x,
+        menuCenter: button.x + button.width / 2,
+        right: bounds.right,
+        height: bounds.height,
+        opacity: Number(getComputedStyle(menu).opacity),
+      };
+    });
+  const clearRow = async () => {
+    await moveOut();
+    await page.locator(".studio-main").click({ position: { x: 650, y: 500 } });
+    await page.waitForTimeout(250);
+  };
+  for (const row of [projectRow, documentRow]) {
+    await row.locator(".studio-tree-pin").waitFor();
+    await clearRow();
+    const resting = await rowGeometry(row);
+    assert.ok(
+      Math.abs(resting.pinCenter - resting.menuCenter) < 1,
+      JSON.stringify(resting),
+    );
+    assert.equal(resting.opacity, 0);
+    const box = await row.boundingBox();
+    await page.mouse.move(box.x + 60, box.y + box.height / 2);
+    const frames = await row.evaluate(async (element) => {
+      const samples = [];
+      for (let i = 0; i < 14; i++) {
+        await new Promise(requestAnimationFrame);
+        samples.push(
+          element.querySelector(".studio-tree-pin").getBoundingClientRect().x,
+        );
+      }
+      return samples;
+    });
+    const hovering = await rowGeometry(row);
+    assert.ok(
+      hovering.pinX < resting.pinX - 20,
+      JSON.stringify({ resting, hovering }),
+    );
+    assert.ok(hovering.pinRight < hovering.menuX, JSON.stringify(hovering));
+    assert.equal(hovering.opacity, 1);
+    assert.equal(hovering.height, resting.height);
+    assert.ok(
+      frames.some((x) => x > hovering.pinX + 1),
+      JSON.stringify(frames),
+    );
+  }
+  await page.screenshot({ path: join(output, "pin-hover.png") });
+  await documentRow.getByRole("button", { name: /的操作$/ }).click();
+  await page.getByRole("menu").waitFor();
+  await moveOut();
+  await page.waitForTimeout(250);
+  const openMenu = await rowGeometry(documentRow);
+  assert.equal(openMenu.opacity, 1);
+  assert.ok(openMenu.pinRight < openMenu.menuX);
+  await page.keyboard.press("Escape");
+  await clearRow();
+  await documentRow.locator(".studio-tree-main").focus();
+  await page.waitForTimeout(250);
+  const keyboardRow = await rowGeometry(documentRow);
+  assert.equal(keyboardRow.opacity, 1);
+  assert.ok(keyboardRow.pinRight < keyboardRow.menuX);
+  await page.keyboard.press("Shift+F10");
+  await page.getByRole("menu").waitFor();
+  await page.keyboard.press("Escape");
+  await clearRow();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await documentRow.hover();
+  const reduced = await rowGeometry(documentRow);
+  assert.equal(reduced.opacity, 1);
+  assert.ok(reduced.pinRight < reduced.menuX);
+  await clearRow();
+  await page.screenshot({ path: join(output, "pin-rest.png") });
+  await projectRow.hover();
+  await projectRow.getByRole("button", { name: /的操作$/ }).click();
+  await page.getByRole("menuitem", { name: "取消置顶", exact: true }).click();
+  await projectRow.locator(".studio-tree-pin").waitFor({ state: "detached" });
+  result.checks.push(
+    "Pinned project and page icons align at the right edge, animate left to reveal actions without overlap or row height changes; open menus, keyboard access, reduced motion and unpin remain usable at minimum sidebar width",
+  );
   assert.deepEqual(result.errors, []);
   result.passed = true;
 } catch (error) {
@@ -379,6 +528,25 @@ try {
   if (page) {
     await page.screenshot({ path: join(output, "failure.png") });
     result.ui = await page.locator("body").innerText();
+    result.rows = await page.locator(".studio-tree-row").evaluateAll((rows) =>
+      rows.map((row) => {
+        const menu = row.querySelector(".studio-row-menu");
+        const bounds = menu.getBoundingClientRect();
+        return {
+          text: row.textContent,
+          hover: row.matches(":hover"),
+          focus: row.matches(":focus-within"),
+          rect: bounds.toJSON(),
+          opacity: getComputedStyle(menu).opacity,
+          pointerEvents: getComputedStyle(menu).pointerEvents,
+          position: getComputedStyle(menu).position,
+          hit: document.elementFromPoint(
+            bounds.x + bounds.width / 2,
+            bounds.y + bounds.height / 2,
+          )?.className,
+        };
+      }),
+    );
   }
   process.exitCode = 1;
 } finally {

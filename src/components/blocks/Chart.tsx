@@ -5,7 +5,7 @@ import {
   Check,
   Database,
   Download,
-} from "lucide-react";
+} from "../../ui/icons";
 import {
   COLORS,
   downloadFile,
@@ -216,7 +216,6 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
             </p>
           )}
           <div className="sb-panel-footer">
-            <span>数据保存在文档内。支持最多 500 个数据点。</span>
             <button
               type="button"
               className="sb-button sb-primary"
@@ -232,7 +231,6 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
         <EmptyState
           icon={<ChartNoAxesCombined size={30} strokeWidth={1.4} />}
           title="让数据成为图表"
-          description="添加横轴标签与数据系列，支持交互式折线图和柱状图。"
           action={
             editable && !editing ? (
               <button type="button" className="sb-button" onClick={openEditor}>

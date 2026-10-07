@@ -1169,13 +1169,6 @@
 .document-table-menu > button.danger {
   color: #bf534d;
 }
-.document-table-menu-hint {
-  max-width: 210px;
-  margin: 4px 10px 6px;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.5;
-}
 .document-table-menu .editor-table-actions {
   display: contents;
 }

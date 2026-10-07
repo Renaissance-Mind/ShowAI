@@ -1,3 +1,9 @@
+import { installIconTooltips } from "../../ui/icon-tooltip.mjs";
+import { useAppearanceTheme } from "../../design/useAppearanceTheme";
+import {
+  appearanceTokens,
+  installSandboxTheme,
+} from "../../design/sandbox-theme";
 import {
   createContext,
   useContext,
@@ -7,7 +13,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Settings2 } from "lucide-react";
+import { Settings2 } from "../../ui/icons";
 import type { BlockProps } from "../blocks/types";
 import {
   viewportLockKey,
@@ -143,6 +149,8 @@ function SandboxComponent({
 }: BlockProps & { component: CompiledComponent }) {
   const parsed = readCustomBlockData(data);
   const iframe = useRef<HTMLIFrameElement>(null);
+  const theme = useAppearanceTheme();
+  const initialTheme = useRef(theme);
   const [channel] = useState(() => crypto.randomUUID());
   const [height, setHeight] = useState(180);
   const [error, setError] = useState("");
@@ -225,8 +233,9 @@ function SandboxComponent({
       policy +
       component.html.replace(
         COMPONENT_DATA_MARKER,
-        `<script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current })}</script>`,
-      )
+        `<style>body{color:var(--text)}</style><script>(${installSandboxTheme.toString()})(${safeJson(channel)},${safeJson(initialTheme.current)},${safeJson(appearanceTokens())});</script><script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current })}</script>`,
+      ) +
+      `<script>(${installIconTooltips.toString()})(document);</script>`
     );
   }, [component.html, channel]);
 
@@ -362,6 +371,17 @@ function SandboxComponent({
     };
   }, [channel]);
   useEffect(sendProps, [parsed.props, readOnly, onChange, channel]);
+  useEffect(() => {
+    const sendTheme = () =>
+      iframe.current?.contentWindow?.postMessage(
+        { channel, type: "showai:theme", theme, tokens: appearanceTokens() },
+        "*",
+      );
+    const frame = iframe.current;
+    frame?.addEventListener("load", sendTheme);
+    sendTheme();
+    return () => frame?.removeEventListener("load", sendTheme);
+  }, [theme, channel]);
 
   return (
     <section

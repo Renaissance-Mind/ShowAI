@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw } from "../ui/icons";
 import { desktop, errorMessage } from "./bridge";
 import type {
   LibraryStorage,
@@ -105,7 +105,6 @@ export default function LibrarySpace({ home }: { home: string }) {
       <div className="settings-row">
         <div className="settings-row-text">
           <h3>自动压缩</h3>
-          <p>空闲时合并存储包并共享重复内容，保留全部修改历史。</p>
         </div>
         <label className="library-space-toggle">
           <input
@@ -203,9 +202,6 @@ export default function LibrarySpace({ home }: { home: string }) {
       <div className="settings-row">
         <div className="settings-row-text">
           <h3>完整归档</h3>
-          <p>
-            保存内容、历史、阅读器、草稿及恢复数据，并核对文件指纹。归档后仍可作为内容库打开。
-          </p>
         </div>
       </div>
       <div className="library-space-archive">

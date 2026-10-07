@@ -22,9 +22,15 @@ import css from "../components/blocks/block.css?raw";
 import flowchart from "../components/blocks/Flowchart.tsx?raw";
 import flowchartCss from "../components/blocks/flowchart.css?raw";
 import flowchartContract from "../components/blocks/flowchart-contract.mjs?raw";
+import icons from "../ui/icons.ts?raw";
+import expandableSearch from "../components/ExpandableSearch.tsx?raw";
+import expandableSearchCss from "../components/expandable-search.css?raw";
 
-export const builtinSources: Record<string, string> = {
+const sources: Record<string, string> = {
   ...g2BuiltinSources,
+  "icons.ts": icons,
+  "ExpandableSearch.tsx": expandableSearch,
+  "expandable-search.css": expandableSearchCss,
   "primitive-contract.mjs": contract,
   "sdk.tsx": sdk,
   "GestureBoundary.tsx": gestureBoundary,
@@ -47,6 +53,19 @@ export const builtinSources: Record<string, string> = {
   "flowchart-contract.mjs": flowchartContract,
   "theme.css": `${themeTokens}\n${themeContent}`,
 };
+// Package the shared icon module inside the trusted SDK's virtual filesystem.
+// User component packages retain the existing package-local import boundary.
+export const builtinSources: Record<string, string> = Object.fromEntries(
+  Object.entries(sources).map(([name, source]) => [
+    name,
+    source
+      .replace(
+        /from\s+["']\.\.\/ExpandableSearch["']/g,
+        'from "./ExpandableSearch"',
+      )
+      .replace(/from\s+["'](?:\.\.\/){1,2}ui\/icons["']/g, 'from "./icons"'),
+  ]),
+);
 export const builtinExports: Record<string, string> = {
   ...g2Exports,
   text: "Markdown",

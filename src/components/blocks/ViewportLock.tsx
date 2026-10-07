@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { LockKeyhole, UnlockKeyhole } from "lucide-react";
+import { LockKeyhole, UnlockKeyhole } from "../../ui/icons";
 import "./viewport-lock.css";
 
 export function viewportLockKey(element: Element, scope: string) {

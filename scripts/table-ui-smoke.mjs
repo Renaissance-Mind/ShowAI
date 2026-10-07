@@ -163,7 +163,9 @@ try {
       .click();
     await page.locator(".container-page .tiptap").waitFor();
   };
+  await page.getByRole("button", { name: "锁定项目栏", exact: true }).click();
   await open();
+  await page.locator(".studio-save-state.saved").waitFor();
   const native = page
     .locator(".document-content > .tableWrapper table")
     .first();
@@ -268,6 +270,61 @@ try {
   );
   result.checks.push(
     "Stable slow hover into controls, compact headers, icon-only controls and body-sized table text",
+  );
+  const columnBelowHeader = async (table, columnMenu, globalMenu) => {
+    for (const header of await table.locator("th").all()) {
+      await header.hover();
+      await columnMenu.waitFor();
+      const cell = await header.boundingBox();
+      const column = await columnMenu.boundingBox();
+      const global = await globalMenu.boundingBox();
+      assert.ok(
+        column.y >= cell.y + cell.height + 3,
+        "Column controls must sit below the hovered header cell",
+      );
+      assert.ok(
+        Math.abs(column.x + column.width / 2 - cell.x - cell.width / 2) < 2,
+        "Column controls must be centered on their header cell",
+      );
+      assert.ok(
+        global.y + global.height <= column.y,
+        "Column and whole-table controls must not overlap",
+      );
+      await page.mouse.move(
+        column.x + column.width / 2,
+        cell.y + cell.height + 2,
+      );
+      await page.waitForTimeout(350);
+      assert.deepEqual(
+        await columnMenu.boundingBox(),
+        column,
+        "Pausing below the header must preserve that column's menu",
+      );
+      await page.mouse.move(
+        column.x + column.width / 2,
+        column.y + column.height / 2,
+        { steps: 12 },
+      );
+      await page.waitForTimeout(350);
+      assert.deepEqual(await columnMenu.boundingBox(), column);
+    }
+  };
+  for (const width of [1440, 700]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await columnBelowHeader(
+      native,
+      page.locator(".document-table-controls.table-column-alignment"),
+      page.locator(".document-table-controls.table-global-alignment"),
+    );
+    await columnBelowHeader(
+      basic.locator("table"),
+      page.locator(".table-hover-controls.sb-table-column-alignment"),
+      page.locator(".table-hover-controls.sb-table-global-alignment"),
+    );
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  result.checks.push(
+    "Every column menu is centered below its header, separate from global controls, and stable across the lower gap at wide and narrow widths",
   );
   await native.locator("tr").first().locator("th").nth(1).hover();
   await page
@@ -527,6 +584,11 @@ try {
   await merge();
   assert.equal(await cell(1, 1).getAttribute("rowspan"), "2");
   await page.setViewportSize({ width: 700, height: 780 });
+  await page.waitForFunction(() => {
+    const menu = document.querySelector(".editor-bubble");
+    const bounds = menu?.getBoundingClientRect();
+    return bounds && bounds.left >= 8 && bounds.right <= innerWidth - 8;
+  });
   const selectionBounds = await selectionMenu.boundingBox();
   assert.ok(
     selectionBounds.x >= 8 && selectionBounds.x + selectionBounds.width <= 692,
@@ -552,7 +614,7 @@ try {
     .locator(".table-hover-controls.sb-table-column-alignment")
     .boundingBox();
   assert.ok(
-    headerInput.y >= columnControl.y + columnControl.height,
+    columnControl.y >= headerInput.y + headerInput.height,
     "Column controls must not cover header text",
   );
   await basicControls

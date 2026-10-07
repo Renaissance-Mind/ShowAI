@@ -129,6 +129,9 @@
   line-height: 1.7;
 }
 .sb-tools-menu > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   cursor: pointer;
   list-style: none;
   padding: 4px 8px;

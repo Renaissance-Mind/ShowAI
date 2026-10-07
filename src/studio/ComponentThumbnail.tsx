@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { ImageOff, Loader2 } from "lucide-react";
+import { ImageOff, Loader2 } from "../ui/icons";
 import type { CatalogComponent } from "../core/component-categories";
 import { desktop, errorMessage } from "./bridge";
+import type { AppearanceTheme } from "../design/useAppearanceTheme";
 
 export function componentPreviewReference(item: CatalogComponent) {
   return "kind" in item
@@ -18,16 +19,18 @@ export function componentPreviewReference(item: CatalogComponent) {
 export default function ComponentThumbnail({
   item,
   browser,
+  theme,
 }: {
   item: CatalogComponent;
   browser: boolean;
+  theme: AppearanceTheme;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [image, setImage] = useState({ key: "", data: "" });
   const [error, setError] = useState("");
   const [scale, setScale] = useState(1);
-  const key = JSON.stringify(componentPreviewReference(item));
+  const key = JSON.stringify({ ...componentPreviewReference(item), theme });
   useEffect(() => {
     if (!container.current) return;
     const observer = new IntersectionObserver(

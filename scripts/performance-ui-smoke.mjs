@@ -100,8 +100,12 @@ const app = await _electron.launch({
 });
 const checks = [],
   measurements = {};
+let failed = false;
 try {
   const page = await app.firstWindow();
+  await page
+    .locator('[data-navigation-state="current"]')
+    .waitFor({ timeout: 30000 });
   const url = (id) => {
     const url = pathToFileURL(join(root, "dist-desktop/index.html"));
     url.search = new URLSearchParams({
@@ -189,6 +193,14 @@ try {
     join(output, "results.json"),
     JSON.stringify({ checks, measurements }, null, 2),
   );
+} catch (error) {
+  failed = true;
+  console.error(error);
+  throw error;
 } finally {
-  await app.close();
+  if (failed)
+    await app
+      .evaluate(({ app }) => app.exit(1))
+      .catch((error) => console.error("Failed fixture cleanup", error));
+  else await app.close();
 }

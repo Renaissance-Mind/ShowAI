@@ -350,7 +350,8 @@ describe("one-time file library import", () => {
       projectId,
       saved.document.id,
     );
-    expect(imported.document.content.attrs?.kind).toBe("board");
+    expect(imported.document.content.attrs?.kind).toBe("page");
+    expect(imported.document.content.content![1].attrs?.kind).toBe("board");
     expect(imported.document.layout?.["legacy-floating"]).toMatchObject({
       x: 1100,
       y: 120,

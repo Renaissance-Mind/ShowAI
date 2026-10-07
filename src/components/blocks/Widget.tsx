@@ -4,7 +4,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { FileJson, Puzzle } from "lucide-react";
+import { FileJson, Puzzle } from "../../ui/icons";
 import {
   getBlockDefinition,
   getRegistryRevision,

@@ -1,6 +1,14 @@
-import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  StrictMode,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { installIconTooltips } from "../ui/icon-tooltip.mjs";
 import { createRoot } from "react-dom/client";
-import { Download, Moon, MoreHorizontal, Printer, Sun } from "lucide-react";
+import { Download, Moon, MoreHorizontal, Printer, Sun } from "../ui/icons";
 import { parseArtifact, serializeArtifact } from "./validation.mjs";
 import type { ShowArtifact, ShowDocument } from "../types";
 import { loadRemoteComponents } from "./remote.mjs";
@@ -221,6 +229,7 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
 }
 
 function App() {
+  useLayoutEffect(() => installIconTooltips(window.document), []);
   const result = useMemo(() => {
     const raw = window.document.getElementById("showai-data")?.textContent;
     if (!raw || raw.trim() === "null") return { error: "页面内容为空。" };

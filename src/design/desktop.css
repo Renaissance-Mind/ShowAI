@@ -34,15 +34,9 @@
   font-size: 14px;
   font-weight: 500;
 }
-.studio-main-nav button.active,
-.studio-sidebar-bottom > button.active,
 .settings-nav button[aria-current="page"] {
   background: var(--selected);
   font-weight: 600;
-}
-.studio-main-nav button.active svg,
-.studio-sidebar-bottom > button.active svg {
-  color: var(--accent);
 }
 .studio-sidebar-bottom {
   flex-shrink: 0;
@@ -66,6 +60,7 @@
 .studio-project-section + .studio-project-section {
   margin-top: 12px;
 }
+.studio-section-title,
 .studio-section-toggle {
   display: flex;
   align-items: center;
@@ -80,6 +75,7 @@
   font-weight: inherit;
   border-radius: 6px;
 }
+.studio-section-title,
 .studio-section-toggle span {
   overflow: hidden;
   text-overflow: ellipsis;

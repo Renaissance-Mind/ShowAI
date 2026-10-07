@@ -78,7 +78,7 @@ try {
   await row(second.id).waitFor();
   await sidebar()
     .locator(".studio-main-nav")
-    .getByRole("button", { name: "项目", exact: true })
+    .getByRole("button", { name: "最近", exact: true })
     .focus();
   await page.locator(".studio-brand").hover();
   const add = section("projects").getByRole("button", {

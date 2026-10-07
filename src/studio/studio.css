@@ -70,32 +70,25 @@
 }
 .studio-main-nav {
   display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 2px;
+  flex-shrink: 0;
 }
 .studio-main-nav button,
 .studio-sidebar-bottom > button {
   display: flex;
   align-items: center;
-  gap: 9px;
+  justify-content: center;
   width: 100%;
+  min-width: 0;
   min-height: 32px;
-  padding: 5px 9px;
+  padding: 5px 0;
   border-radius: 5px;
-  text-align: left;
+  text-align: center;
+  white-space: nowrap;
   color: var(--muted);
   font-size: 14px;
   line-height: 20px;
-}
-.studio-main-nav button.active,
-.studio-sidebar-bottom > button.active {
-  background: var(--accent-soft);
-  color: var(--text);
-  font-weight: 500;
-}
-.studio-main-nav button > span {
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--muted);
 }
 .studio-sidebar-projects {
   flex: 1;
@@ -199,6 +192,7 @@ button.studio-tree-chevron:hover {
   background: var(--line);
 }
 .studio-sidebar-bottom {
+  margin-top: 8px;
   border-top: 1px solid var(--line);
   padding-top: 8px;
 }
@@ -209,6 +203,8 @@ button.studio-tree-chevron:hover {
   flex-direction: column;
 }
 .studio-topbar {
+  position: relative;
+  z-index: 20;
   height: 44px;
   flex-shrink: 0;
   display: flex;
@@ -218,6 +214,14 @@ button.studio-tree-chevron:hover {
   border-bottom: 1px solid var(--line);
   -webkit-app-region: drag;
   gap: 12px;
+}
+.studio-topbar .expandable-search {
+  position: static;
+}
+.studio-topbar .expandable-search-results {
+  top: calc(100% + 6px);
+  right: 12px;
+  width: min(540px, calc(100% - 24px));
 }
 .studio-topbar button,
 .studio-header-actions {
@@ -258,7 +262,77 @@ button.studio-tree-chevron:hover {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  flex-shrink: 1;
+}
+.studio-topbar-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.studio-topbar-view-actions:empty {
+  display: none;
+}
+.studio-topbar-view-actions {
+  gap: 6px;
   flex-shrink: 0;
+}
+.studio-search-scopes {
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.studio-search-scopes button {
+  padding: 5px 9px;
+  border-radius: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.studio-search-scopes button[aria-pressed="true"] {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.studio-topbar .component-project-picker select {
+  min-height: 30px;
+  max-width: 150px;
+  padding-block: 3px;
+}
+.studio-breadcrumb {
+  flex: 1;
+  overflow: hidden;
+}
+.studio-breadcrumb > svg,
+.studio-breadcrumb > button,
+.studio-breadcrumb-folder {
+  flex-shrink: 1;
+}
+.studio-page-title-input {
+  min-width: 50px;
+  width: 220px;
+  flex: 1 1 220px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  -webkit-app-region: no-drag;
+}
+.studio-page-title-input:hover {
+  background: var(--surface);
+}
+.studio-page-title-input:focus {
+  border-color: var(--accent);
+  outline: none;
+  background: var(--paper);
 }
 .studio-save-state {
   display: flex;
@@ -562,6 +636,21 @@ button.studio-tree-chevron:hover {
   color: var(--muted);
   margin-left: 6px;
   flex-shrink: 0;
+}
+.studio-recent-page-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.studio-recent-page-project {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+.studio-recent-pages .studio-page-list-open {
+  min-height: 60px;
 }
 .studio-editor-page {
   max-width: 1000px;
@@ -1184,4 +1273,35 @@ button.studio-tree-chevron:hover {
   color: var(--text-muted, #667085);
   margin-inline: 12px;
   white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .studio-topbar {
+    gap: 8px;
+    padding-inline: 12px;
+  }
+  .studio-header-actions {
+    gap: 4px;
+    --search-expanded-width: 160px;
+  }
+  .studio-breadcrumb {
+    min-width: 80px;
+  }
+  .studio-breadcrumb > button:not(:last-child),
+  .studio-breadcrumb > svg,
+  .studio-breadcrumb-folder:not(:last-child),
+  .studio-breadcrumb-folder > svg {
+    display: none;
+  }
+  .studio-topbar .component-project-picker {
+    font-size: 0;
+  }
+  .studio-topbar .component-project-picker select {
+    max-width: 100px;
+  }
+  .studio-save-state {
+    font-size: 0;
+    gap: 0;
+    margin: 0;
+  }
 }

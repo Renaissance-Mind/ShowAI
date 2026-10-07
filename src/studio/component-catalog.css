@@ -90,7 +90,7 @@
   width: 100%;
   aspect-ratio: 12 / 7;
   overflow: hidden;
-  background: #f3f4f7;
+  background: var(--surface);
   border-bottom: 1px solid var(--line);
   flex-shrink: 0;
 }
@@ -114,7 +114,7 @@
   position: absolute;
   left: calc(50% - 9px);
   top: calc(50% - 9px);
-  color: #a0a2b0;
+  color: var(--subtle);
 }
 .component-preview-error {
   display: flex;
@@ -123,7 +123,7 @@
   gap: 8px;
   height: 100%;
   font-size: 12px;
-  color: #757782;
+  color: var(--muted);
 }
 .component-card-copy {
   padding: 0 16px 14px;
@@ -165,11 +165,6 @@
   gap: 4px;
   font-size: 13px;
   color: var(--muted);
-}
-.component-project-hint {
-  margin: 0 0 16px;
-  color: var(--muted);
-  font-size: 13px;
 }
 .component-project-picker select {
   background: var(--paper);

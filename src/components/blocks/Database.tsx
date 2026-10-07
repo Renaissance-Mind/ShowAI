@@ -1,3 +1,4 @@
+import ExpandableSearch from "../ExpandableSearch";
 import { useMemo, useState } from "react";
 import {
   ArrowDown,
@@ -9,11 +10,9 @@ import {
   Filter,
   LayoutList,
   Plus,
-  Search,
   Table2,
   Trash2,
-  X,
-} from "lucide-react";
+} from "../../ui/icons";
 import {
   downloadFile,
   filterSortRows,
@@ -342,7 +341,10 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           <Download size={15} />
         </button>
         <details className="sb-tools-menu">
-          <summary aria-label="数据库视图与筛选">视图与筛选</summary>
+          <summary aria-label="数据库视图与筛选">
+            <Filter size={14} aria-hidden="true" />
+            视图与筛选
+          </summary>
           <div className="sb-database-toolbar">
             <div className="sb-view-tabs">
               <button
@@ -363,28 +365,14 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
               </button>
             </div>
             <div className="sb-database-tools">
-              <label className="sb-search">
-                <Search size={14} />
-                <input
-                  aria-label="搜索数据库"
-                  placeholder="搜索…"
-                  value={query}
-                  onChange={(event) => {
-                    setQuery(event.target.value);
-                    setPage(0);
-                  }}
-                />
-                {query && (
-                  <button
-                    type="button"
-                    className="sb-icon-button"
-                    aria-label="清除搜索"
-                    onClick={() => setQuery("")}
-                  >
-                    <X size={12} />
-                  </button>
-                )}
-              </label>
+              <ExpandableSearch
+                label="搜索数据库"
+                value={query}
+                onChange={(value) => {
+                  setQuery(value);
+                  setPage(0);
+                }}
+              />
               <button
                 type="button"
                 className={`sb-icon-button ${showFilter || filter.column ? "is-active" : ""}`}
@@ -635,21 +623,11 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
             <EmptyState
               icon={<LayoutList size={25} strokeWidth={1.4} />}
               title={rows.length ? "没有符合条件的记录" : "从第一条记录开始"}
-              description={
-                rows.length
-                  ? "尝试调整搜索或筛选条件。"
-                  : "添加记录，也可以在区块设置中定义属性。"
-              }
             />
           )}
         </>
       ) : (
         <>
-          {!groupColumn && (
-            <p className="sb-inline-hint">
-              添加一个「单选」属性，即可按选项分组。
-            </p>
-          )}
           <div className="sb-board">
             {groupNames.map((group, groupIndex) => {
               const groupRows = groupColumn

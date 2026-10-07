@@ -12,7 +12,7 @@ import {
   type Edge,
 } from "@xyflow/react";
 import { graphlib, layout } from "@dagrejs/dagre";
-import { Maximize2, Minus, Plus, X } from "lucide-react";
+import { Maximize2, Minus, Plus, X } from "../../ui/icons";
 import type { BlockProps, BlockData } from "./types";
 import { BlockHeader, EmptyState } from "./shared";
 import { useViewportLock, ViewportLockButton } from "./ViewportLock";
@@ -337,10 +337,7 @@ export function FlowchartBlock({
       />
       <ViewportLockButton {...lock} label="流程图" />
       {!flow ? (
-        <EmptyState
-          title="添加一条流程"
-          description="定义节点和连线后即可查看流程图。"
-        />
+        <EmptyState title="添加一条流程" />
       ) : (
         <>
           {data.flows.length > 1 && (

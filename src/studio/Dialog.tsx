@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { X } from "../ui/icons";
 
 export default function Dialog({
   title,
@@ -24,8 +24,9 @@ export default function Dialog({
   useEffect(() => {
     const previous = document.activeElement as HTMLElement;
     (
-      panel.current?.querySelector<HTMLElement>("input,textarea,select") ??
-      panel.current?.querySelector<HTMLElement>("button")
+      panel.current?.querySelector<HTMLElement>(
+        "input:not([disabled]),textarea:not([disabled]),select:not([disabled])",
+      ) ?? panel.current?.querySelector<HTMLElement>("button")
     )?.focus();
     const handle = (event: KeyboardEvent) => {
       // A local file picker can sit above a component or publication dialog.
@@ -38,7 +39,7 @@ export default function Dialog({
       if (event.key === "Tab") {
         const items = [
           ...(panel.current?.querySelectorAll<HTMLElement>(
-            "button:not([disabled]),input,textarea,select,a[href]",
+            "button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),a[href]",
           ) ?? []),
         ].filter((item) => item.offsetParent !== null);
         const first = items[0],

@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
 import { useTableHover, tableControlPositions } from "./table-hover";
-import { AlignCenter, AlignLeft, AlignRight } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight } from "../../ui/icons";
 
 export type TableAlignment = "left" | "center" | "right";
 

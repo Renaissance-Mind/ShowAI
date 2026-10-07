@@ -109,7 +109,7 @@ async function capture(
           height: 420,
           useContentSize: true,
           show: false,
-          backgroundColor: "#f3f4f7",
+          backgroundColor: reference.theme === "dark" ? "#222222" : "#f7f7f7",
           webPreferences: {
             preload: join(directory, "preload.cjs"),
             sandbox: true,
@@ -136,6 +136,9 @@ async function capture(
         closePreview();
     });
   }
+  preview.setBackgroundColor(
+    reference.theme === "dark" ? "#222222" : "#f7f7f7",
+  );
   previewData.set(preview.webContents.id, component);
   try {
     const query = {
@@ -197,6 +200,10 @@ ipcMain.handle(
       }
       if (!reference.id)
         throw new CoreError("INVALID_DATA", "Preview needs a component id.");
+      const theme = (args as Record<string, unknown>).theme ?? "light";
+      if (theme !== "light" && theme !== "dark")
+        throw new CoreError("INVALID_DATA", "Invalid preview theme.");
+      reference.theme = theme;
       const requestId =
         typeof (args as { requestId?: unknown }).requestId === "string"
           ? String((args as { requestId: string }).requestId)

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { useAppearanceTheme } from "../design/useAppearanceTheme";
 import {
   Blocks,
   PanelsTopLeft,
@@ -8,7 +9,7 @@ import {
   Table2,
   Type,
   Workflow,
-} from "lucide-react";
+} from "../ui/icons";
 import type { ComponentCategory } from "../components/custom/types";
 import type {
   CatalogComponent,
@@ -83,6 +84,7 @@ export function ComponentCatalog({
   showProjectNames?: boolean;
 }) {
   const catalog = useRef<HTMLDivElement>(null);
+  const theme = useAppearanceTheme();
   const [selected, setSelected] = useState<string | null>(null);
   const sections = useRef(new Map<ComponentCategory, HTMLElement>());
   const destination = useRef<{
@@ -264,7 +266,11 @@ export function ComponentCatalog({
                       onOpen(item);
                     }}
                   >
-                    <ComponentThumbnail item={item} browser={browser} />
+                    <ComponentThumbnail
+                      item={item}
+                      browser={browser}
+                      theme={theme}
+                    />
                     <div className="component-card-copy">
                       <div className="component-card-identity">
                         <span className="studio-component-symbol">
@@ -299,7 +305,6 @@ export function ComponentCatalog({
         <div className="studio-empty">
           <Blocks size={33} strokeWidth={1.3} />
           <h2>暂无组件</h2>
-          <p>导入本地组件包，或从一个可编辑的示例开始。</p>
         </div>
       )}
     </div>

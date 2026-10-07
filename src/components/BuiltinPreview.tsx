@@ -4,6 +4,7 @@ import { Widget } from "./blocks/Widget";
 import { nativeComponentDocument } from "../surface/component-insertion";
 import { remapSurfaceIds } from "../surface/document.mjs";
 import { SurfaceReader } from "../portable/SurfaceReader";
+import { useAppearanceTheme } from "../design/useAppearanceTheme";
 export function BuiltinPreview({
   component,
   data,
@@ -11,6 +12,20 @@ export function BuiltinPreview({
   component: BuiltinComponentMetadata;
   data: Record<string, unknown>;
 }) {
+  const theme = useAppearanceTheme();
+  const previewData = component.kind.startsWith("g2-")
+    ? {
+        ...data,
+        theme:
+          theme === "dark"
+            ? "dark"
+            : data.theme === "dark"
+              ? "indigo"
+              : data.theme,
+      }
+    : component.kind === "text" && data.color === "#222222"
+      ? { ...data, color: "var(--text)" }
+      : data;
   const document = useMemo(
     () =>
       component.insertion
@@ -33,6 +48,6 @@ export function BuiltinPreview({
       />
     </div>
   ) : (
-    <Widget kind={component.kind} data={data} readOnly />
+    <Widget kind={component.kind} data={previewData} readOnly />
   );
 }

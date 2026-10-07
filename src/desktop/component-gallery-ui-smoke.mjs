@@ -221,6 +221,67 @@ try {
     cacheBefore,
     "repeated preview uses disk cache",
   );
+  const darkPreview = await api("components:thumbnail", {
+    id: "text",
+    scope: "builtin",
+    theme: "dark",
+  });
+  assert.notEqual(
+    darkPreview,
+    preview,
+    "dark previews render different pixels",
+  );
+  assert.equal(
+    await api("components:thumbnail", {
+      id: "text",
+      scope: "builtin",
+      theme: "dark",
+    }),
+    darkPreview,
+    "dark previews reuse their own cache",
+  );
+  assert.equal(
+    (await readdir(join(output, "profile/component-previews"))).length,
+    cacheBefore + 1,
+    "light and dark previews have separate cache entries",
+  );
+  const darkImage = await app.evaluate(({ nativeImage }, data) => {
+    const image = nativeImage.createFromDataURL(data);
+    return [...image.toBitmap().subarray(0, 3)];
+  }, darkPreview);
+  assert.deepEqual(
+    darkImage,
+    [34, 34, 34],
+    "capture background uses the dark surface",
+  );
+  await page
+    .getByRole("navigation", { name: "主要导航" })
+    .getByRole("button", { name: "设置", exact: true })
+    .click();
+  await page.getByRole("button", { name: "外观", exact: true }).click();
+  await page.getByLabel("主题", { exact: true }).selectOption("dark");
+  await page
+    .getByRole("navigation", { name: "主要导航" })
+    .getByRole("button", { name: "组件", exact: true })
+    .click();
+  await page
+    .locator(".studio-component-card")
+    .filter({
+      has: page.getByRole("heading", { name: "Markdown 内置", exact: true }),
+    })
+    .click();
+  assert.equal(
+    await page
+      .locator(".catalog-preview-stage .sb-text")
+      .evaluate((el) => getComputedStyle(el).color),
+    "rgb(247, 247, 247)",
+    "Markdown examples use readable dark text tokens",
+  );
+  await page.screenshot({
+    path: join(output, "markdown-dark.png"),
+    animations: "disabled",
+  });
+  await page.getByRole("button", { name: "关闭弹窗", exact: true }).click();
   await page
     .locator(".studio-component-card")
     .filter({
@@ -228,6 +289,13 @@ try {
     })
     .click();
   let dialog = page.getByRole("dialog");
+  const sandbox = page.frameLocator(".catalog-preview-stage iframe");
+  await sandbox.locator('html[data-theme="dark"]').waitFor();
+  assert.equal(
+    await sandbox.locator("body").evaluate((el) => getComputedStyle(el).color),
+    "rgb(247, 247, 247)",
+    "custom preview receives host theme and tokens",
+  );
   await dialog.getByRole("button", { name: "定制组件", exact: true }).click();
   await dialog
     .getByLabel("组件说明", { exact: true })

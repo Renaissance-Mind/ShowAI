@@ -16,7 +16,8 @@ import {
   FolderOpen,
   MoreHorizontal,
   Pin,
-} from "lucide-react";
+} from "../ui/icons";
+import "./library-row.css";
 
 export type LibraryTarget =
   | {
@@ -36,13 +37,22 @@ export type LibraryTarget =
       parentId: string | null;
     };
 
+export interface LibraryMenuPoint {
+  x: number;
+  y: number;
+}
+
 export interface LibraryRowProps {
   target: LibraryTarget;
   active?: boolean;
   expanded?: boolean;
   onToggle?: () => void;
   onOpen: (target: LibraryTarget) => void;
-  onMenu: (target: LibraryTarget, anchor: HTMLElement) => void;
+  onMenu: (
+    target: LibraryTarget,
+    anchor: HTMLElement,
+    point?: LibraryMenuPoint,
+  ) => void;
 }
 
 export function LibraryRow({
@@ -76,11 +86,16 @@ export function LibraryRow({
       className={`studio-tree-row${active ? " active" : ""}`}
       data-kind={target.kind}
       data-library-id={target.id}
+      data-pinned={target.pinned || undefined}
       onKeyDown={openKeyboardMenu}
       onContextMenu={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        if (menuButton.current) onMenu(target, menuButton.current);
+        if (menuButton.current)
+          onMenu(target, menuButton.current, {
+            x: event.clientX,
+            y: event.clientY,
+          });
       }}
     >
       {onToggle ? (
@@ -109,12 +124,14 @@ export function LibraryRow({
         <Icon size={15} aria-hidden="true" />
         <span className="studio-tree-title">{title}</span>
         {target.pinned && (
-          <Pin
-            size={11}
-            className="studio-tree-pin"
-            aria-label="已置顶"
-            role="img"
-          />
+          <span className="studio-tree-pin-slot">
+            <Pin
+              size={11}
+              className="studio-tree-pin"
+              aria-label="已置顶"
+              role="img"
+            />
+          </span>
         )}
       </button>
       <button
@@ -138,7 +155,7 @@ export function LibraryRow({
 
 export interface LibraryContextMenuItem {
   label: string;
-  icon?: ReactNode;
+  icon: ReactNode;
   onSelect: () => void;
   danger?: boolean;
   disabled?: boolean;
@@ -147,6 +164,7 @@ export interface LibraryContextMenuItem {
 
 export interface LibraryContextMenuProps {
   anchor: HTMLElement;
+  point?: LibraryMenuPoint;
   label: string;
   items: LibraryContextMenuItem[];
   onClose: () => void;
@@ -168,6 +186,7 @@ function enabledItems(menu: HTMLElement): HTMLButtonElement[] {
 /** A single menu surface works for sidebar rows, cards and page actions. */
 export function LibraryContextMenu({
   anchor,
+  point,
   label,
   items,
   onClose,
@@ -214,11 +233,14 @@ export function LibraryContextMenu({
         return;
       }
       const margin = 8;
-      const gap = 5;
+      const gap = point ? 0 : 5;
+      const origin = point
+        ? { left: point.x, right: point.x, top: point.y, bottom: point.y }
+        : rect;
       const maxWidth = Math.max(0, width - margin * 2);
       const menuWidth = Math.min(menu.getBoundingClientRect().width, maxWidth);
-      const below = Math.max(0, height - rect.bottom - gap - margin);
-      const above = Math.max(0, rect.top - gap - margin);
+      const below = Math.max(0, height - origin.bottom - gap - margin);
+      const above = Math.max(0, origin.top - gap - margin);
       const naturalHeight = menu.scrollHeight;
       const flip = naturalHeight > below && above > below;
       const maxHeight = Math.max(
@@ -226,13 +248,13 @@ export function LibraryContextMenu({
         Math.min(height - margin * 2, flip ? above : below),
       );
       const visibleHeight = Math.min(naturalHeight, maxHeight);
-      let left = rect.left;
-      if (left + menuWidth > width - margin) left = rect.right - menuWidth;
+      let left = origin.left;
+      if (left + menuWidth > width - margin) left = origin.right - menuWidth;
       left = Math.max(margin, Math.min(left, width - margin - menuWidth));
       const top = Math.max(
         margin,
         Math.min(
-          flip ? rect.top - gap - visibleHeight : rect.bottom + gap,
+          flip ? origin.top - gap - visibleHeight : origin.bottom + gap,
           height - margin - visibleHeight,
         ),
       );
@@ -265,7 +287,8 @@ export function LibraryContextMenu({
     };
     const scroll = (event: Event) => {
       if (event.target instanceof Node && menu.contains(event.target)) return;
-      reposition();
+      if (point) latestClose.current();
+      else reposition();
     };
 
     reposition();
@@ -290,14 +313,14 @@ export function LibraryContextMenu({
       if (restoreFocus.current && anchor.isConnected)
         anchor.focus({ preventScroll: true });
     };
-  }, [anchor, id]);
+  }, [anchor, point, id]);
 
   useLayoutEffect(() => {
     const menu = menuRef.current;
     if (!position || !menu || focusedOnce.current) return;
     focusedOnce.current = true;
     (enabledItems(menu)[0] ?? menu).focus({ preventScroll: true });
-  }, [position, anchor]);
+  }, [position, anchor, point]);
 
   const handleKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
     const menu = menuRef.current;

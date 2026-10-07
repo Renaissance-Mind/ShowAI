@@ -6,7 +6,7 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { LockKeyhole, LockKeyholeOpen } from "lucide-react";
+import { LockKeyhole, LockKeyholeOpen } from "../ui/icons";
 import "./auto-hide-sidebar.css";
 
 const minimumWidth = 200;
@@ -30,6 +30,7 @@ export default function AutoHideSidebar({
     "docked",
   );
   const [hovered, setHovered] = useState(false);
+  const pointer = useRef<{ x: number; y: number } | null>(null);
   const [keyboardFocus, setKeyboardFocus] = useState(false);
   const [preferredWidth, setPreferredWidth] = useState<number | null>(() => {
     const saved = localStorage.getItem(widthPreference);
@@ -61,6 +62,43 @@ export default function AutoHideSidebar({
   const automatic = enabled && !locked;
   const mode = automatic ? position : "docked";
   const hidden = mode === "hidden";
+
+  const pointerIsInside = (point: { x: number; y: number }) => {
+    const bounds = sidebar.current?.parentElement?.getBoundingClientRect();
+    return (
+      !!bounds &&
+      point.x >= bounds.left &&
+      point.x <= bounds.left + width + 4 &&
+      point.y >= bounds.top &&
+      point.y <= bounds.bottom
+    );
+  };
+  const leave = (event: { clientX: number; clientY: number }) => {
+    pointer.current = { x: event.clientX, y: event.clientY };
+    // Hiding the edge trigger or moving the panel can cause a DOM leave event
+    // while the pointer is still inside the navigation's destination bounds.
+    setHovered(pointerIsInside(pointer.current));
+  };
+
+  useEffect(() => {
+    const move = (event: globalThis.PointerEvent) => {
+      if (event.pointerType === "touch") return;
+      pointer.current = { x: event.clientX, y: event.clientY };
+      if (automatic && !hidden) setHovered(pointerIsInside(pointer.current));
+    };
+    const exit = () => {
+      pointer.current = null;
+      setHovered(false);
+    };
+    document.addEventListener("pointermove", move, true);
+    document.addEventListener("pointerleave", leave);
+    window.addEventListener("blur", exit);
+    return () => {
+      document.removeEventListener("pointermove", move, true);
+      document.removeEventListener("pointerleave", leave);
+      window.removeEventListener("blur", exit);
+    };
+  }, [automatic, hidden, width]);
 
   useEffect(() => {
     setPosition("docked");
@@ -110,9 +148,23 @@ export default function AutoHideSidebar({
     )
       return;
     // A short grace period bridges the edge, menus and quick pointer crossings.
-    const timer = window.setTimeout(() => setPosition("hidden"), 300);
+    const timer = window.setTimeout(() => {
+      if (pointer.current && pointerIsInside(pointer.current)) {
+        setHovered(true);
+        return;
+      }
+      setPosition("hidden");
+    }, 300);
     return () => window.clearTimeout(timer);
-  }, [automatic, hovered, keyboardFocus, interactionHeld, hidden, resizing]);
+  }, [
+    automatic,
+    hovered,
+    keyboardFocus,
+    interactionHeld,
+    hidden,
+    resizing,
+    width,
+  ]);
 
   const saveWidth = (value: number) => {
     const next = clampWidth(value);
@@ -138,7 +190,8 @@ export default function AutoHideSidebar({
       event.currentTarget.releasePointerCapture(event.pointerId);
   };
 
-  const reveal = () => {
+  const reveal = (event: PointerEvent<HTMLElement>) => {
+    pointer.current = { x: event.clientX, y: event.clientY };
     setHovered(true);
     if (hidden) setPosition("overlay");
   };
@@ -164,7 +217,7 @@ export default function AutoHideSidebar({
         aria-label="项目导航"
         inert={hidden}
         onPointerEnter={reveal}
-        onPointerLeave={() => setHovered(false)}
+        onPointerLeave={leave}
         onFocusCapture={(event) => {
           if (event.target.matches(":focus-visible")) setKeyboardFocus(true);
         }}
@@ -265,7 +318,7 @@ export default function AutoHideSidebar({
           aria-expanded={!hidden}
           tabIndex={hidden ? 0 : -1}
           onPointerEnter={reveal}
-          onPointerLeave={() => setHovered(false)}
+          onPointerLeave={leave}
           onFocus={() => {
             setKeyboardFocus(true);
             setPosition("overlay");

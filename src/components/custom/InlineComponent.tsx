@@ -1,3 +1,4 @@
+import { installIconTooltips } from "../../ui/icon-tooltip.mjs";
 import * as ReactRuntime from "react";
 import * as DomRuntime from "react-dom";
 import * as ClientRuntime from "react-dom/client";
@@ -66,6 +67,7 @@ export function InlineComponent({
     const root = document.createElement("div");
     root.className = "component-root";
     shadow.replaceChildren(style, root);
+    const removeTooltips = installIconTooltips(shadow);
     const globals = globalThis as unknown as Record<string, unknown>;
     const previousHost = globals.__SHOWAI_COMPONENT_HOST__;
     const callbackKey = `__showai_mount_${crypto.randomUUID().replaceAll("-", "")}`;
@@ -96,6 +98,7 @@ export function InlineComponent({
       else globals.__SHOWAI_COMPONENT_HOST__ = previousHost;
     }
     return () => {
+      removeTooltips();
       const instance = mounted.current;
       mounted.current = null;
       queueMicrotask(() => instance?.destroy());
