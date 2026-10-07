@@ -523,6 +523,13 @@
   max-height: 240px;
   overflow: auto;
 }
+.library-project-space-content {
+  padding: 18px;
+  overflow: auto;
+  min-height: 0;
+  display: grid;
+  gap: 16px;
+}
 .library-project-space {
   display: grid;
   gap: 12px;

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, RefreshCw } from "../ui/icons";
 import { desktop, errorMessage } from "./bridge";
+import Dialog from "./Dialog";
 import type {
   LibraryStorage,
   CleanupPlan,
@@ -32,6 +33,7 @@ export default function LibrarySpace({ home }: { home: string }) {
   const [plan, setPlan] = useState<CleanupPlan | null>(null),
     [busy, setBusy] = useState(false),
     [analyzing, setAnalyzing] = useState(false),
+    [showProjects, setShowProjects] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
   const [archivePath, setArchivePath] = useState("");
@@ -68,6 +70,11 @@ export default function LibrarySpace({ home }: { home: string }) {
       setBusy(false);
     }
   }
+  function analyzeProjects() {
+    setShowProjects(true);
+    setAnalyzing(true);
+    void run(() => refresh(true), false).finally(() => setAnalyzing(false));
+  }
   return (
     <section
       className="settings-group library-space"
@@ -82,12 +89,7 @@ export default function LibrarySpace({ home }: { home: string }) {
             <button
               className="settings-button"
               disabled={busy || !storage}
-              onClick={() => {
-                setAnalyzing(true);
-                void run(() => refresh(true), false).finally(() =>
-                  setAnalyzing(false),
-                );
-              }}
+              onClick={analyzeProjects}
             >
               {analyzing && <Loader2 size={14} className="studio-spin" />}
               {analyzing ? "正在分析项目存储空间…" : "分析项目存储空间"}
@@ -124,59 +126,6 @@ export default function LibrarySpace({ home }: { home: string }) {
                 {storage.git.looseObjects.toLocaleString()} 个未打包对象
               </p>
             </div>
-          )}
-          {storage?.projects && (
-            <section
-              className="library-project-space"
-              aria-label="项目占用空间"
-            >
-              <p className="settings-help" role="status">
-                {storage.projects.items.length} 个项目，按文件大小从大到小排列。
-                统计项目目录中的内容、资源、导出与缓存，以及保留的原始文件。
-              </p>
-              {storage.projects.items.length ? (
-                <div className="library-project-space-table">
-                  <table>
-                    <caption className="settings-sr-only">
-                      每个项目的存储占用
-                    </caption>
-                    <thead>
-                      <tr>
-                        <th scope="col">项目</th>
-                        <th scope="col">文件大小</th>
-                        <th scope="col">磁盘分配</th>
-                        <th scope="col">文件数</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {storage.projects.items.map((project) => (
-                        <tr key={project.id}>
-                          <th scope="row">
-                            {project.name}
-                            {project.archived && <small>已归档</small>}
-                            {project.retained && <small>保留文件</small>}
-                          </th>
-                          <td>{bytes(project.bytes)}</td>
-                          <td>{bytes(project.allocatedBytes)}</td>
-                          <td>{project.files.toLocaleString("zh-CN")}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="settings-help">内容库中暂无项目。</p>
-              )}
-              <p className="settings-help">
-                共享历史与其他文件：{bytes(storage.projects.shared.bytes)}
-                ，磁盘分配 {bytes(storage.projects.shared.allocatedBytes)}。
-                历史仓库、共享资源、索引与本机草稿单独计入此项；
-                历史仓库的压缩数据由项目共用，无法准确分摊。
-              </p>
-              <p className="settings-help">
-                统计时间：{new Date(storage.measuredAt).toLocaleString("zh-CN")}
-              </p>
-            </section>
           )}
         </div>
       </section>
@@ -328,7 +277,97 @@ export default function LibrarySpace({ home }: { home: string }) {
           {notice}
         </p>
       )}
-      {error && (
+      {showProjects && (
+        <Dialog
+          title="项目存储空间"
+          wide
+          className="library-project-space-dialog"
+          onClose={() => setShowProjects(false)}
+        >
+          <div className="library-project-space-content" aria-busy={analyzing}>
+            <div className="library-space-actions">
+              <button
+                className="settings-button"
+                disabled={busy}
+                onClick={analyzeProjects}
+              >
+                {analyzing ? (
+                  <Loader2 size={14} className="studio-spin" />
+                ) : (
+                  <RefreshCw size={14} />
+                )}
+                {analyzing ? "正在分析…" : "重新分析"}
+              </button>
+              {analyzing && (
+                <p className="settings-help" role="status">
+                  正在核对各项目的文件占用…
+                </p>
+              )}
+            </div>
+            {storage?.projects && (
+              <section
+                className="library-project-space"
+                aria-label="项目占用空间"
+              >
+                <p className="settings-help" role="status">
+                  {storage.projects.items.length}{" "}
+                  个项目，按文件大小从大到小排列。
+                  统计项目目录中的内容、资源、导出与缓存，以及保留的原始文件。
+                </p>
+                {storage.projects.items.length ? (
+                  <div className="library-project-space-table">
+                    <table>
+                      <caption className="settings-sr-only">
+                        每个项目的存储占用
+                      </caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">项目</th>
+                          <th scope="col">文件大小</th>
+                          <th scope="col">磁盘分配</th>
+                          <th scope="col">文件数</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {storage.projects.items.map((project) => (
+                          <tr key={project.id}>
+                            <th scope="row">
+                              {project.name}
+                              {project.archived && <small>已归档</small>}
+                              {project.retained && <small>保留文件</small>}
+                            </th>
+                            <td>{bytes(project.bytes)}</td>
+                            <td>{bytes(project.allocatedBytes)}</td>
+                            <td>{project.files.toLocaleString("zh-CN")}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="settings-help">内容库中暂无项目。</p>
+                )}
+                <p className="settings-help">
+                  共享历史与其他文件：{bytes(storage.projects.shared.bytes)}
+                  ，磁盘分配 {bytes(storage.projects.shared.allocatedBytes)}。
+                  历史仓库、共享资源、索引与本机草稿单独计入此项；
+                  历史仓库的压缩数据由项目共用，无法准确分摊。
+                </p>
+                <p className="settings-help">
+                  统计时间：
+                  {new Date(storage.measuredAt).toLocaleString("zh-CN")}
+                </p>
+              </section>
+            )}
+            {error && (
+              <p className="studio-form-error" role="alert">
+                {error}
+              </p>
+            )}
+          </div>
+        </Dialog>
+      )}
+      {error && !showProjects && (
         <p className="studio-form-error" role="alert">
           {error}
         </p>
