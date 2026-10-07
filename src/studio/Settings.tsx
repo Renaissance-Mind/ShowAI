@@ -149,7 +149,6 @@ export function SettingsPanel({
   return (
     <div className="studio-settings" key={section}>
       <header className="settings-heading">
-        <h1>{current.label === "关于" ? "关于 ShowAI" : current.label}</h1>
         <p>{current.description}</p>
       </header>
 

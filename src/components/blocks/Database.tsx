@@ -1,3 +1,4 @@
+import ExpandableSearch from "../ExpandableSearch";
 import { useMemo, useState } from "react";
 import {
   ArrowDown,
@@ -9,10 +10,8 @@ import {
   Filter,
   LayoutList,
   Plus,
-  Search,
   Table2,
   Trash2,
-  X,
 } from "../../ui/icons";
 import {
   downloadFile,
@@ -366,28 +365,14 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
               </button>
             </div>
             <div className="sb-database-tools">
-              <label className="sb-search">
-                <Search size={14} />
-                <input
-                  aria-label="搜索数据库"
-                  placeholder="搜索…"
-                  value={query}
-                  onChange={(event) => {
-                    setQuery(event.target.value);
-                    setPage(0);
-                  }}
-                />
-                {query && (
-                  <button
-                    type="button"
-                    className="sb-icon-button"
-                    aria-label="清除搜索"
-                    onClick={() => setQuery("")}
-                  >
-                    <X size={12} />
-                  </button>
-                )}
-              </label>
+              <ExpandableSearch
+                label="搜索数据库"
+                value={query}
+                onChange={(value) => {
+                  setQuery(value);
+                  setPage(0);
+                }}
+              />
               <button
                 type="button"
                 className={`sb-icon-button ${showFilter || filter.column ? "is-active" : ""}`}

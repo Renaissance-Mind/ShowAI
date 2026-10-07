@@ -1,6 +1,7 @@
+import ExpandableSearch from "./ExpandableSearch";
 import { useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { PanelTop, Search } from "../ui/icons";
+import { PanelTop } from "../ui/icons";
 import {
   useComponentCatalog,
   RegisterComponentContext,
@@ -103,14 +104,13 @@ export function ComponentSlashMenu({
         }}
       >
         <div className="slash-search">
-          <Search size={15} />
-          <input
-            autoFocus
-            aria-label="搜索内容块"
+          <ExpandableSearch
+            label="搜索内容块"
             placeholder="搜索组件…"
+            defaultExpanded
             value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
+            onChange={(value) => {
+              setQuery(value);
               select(0);
             }}
           />

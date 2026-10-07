@@ -23,10 +23,14 @@ import flowchart from "../components/blocks/Flowchart.tsx?raw";
 import flowchartCss from "../components/blocks/flowchart.css?raw";
 import flowchartContract from "../components/blocks/flowchart-contract.mjs?raw";
 import icons from "../ui/icons.ts?raw";
+import expandableSearch from "../components/ExpandableSearch.tsx?raw";
+import expandableSearchCss from "../components/expandable-search.css?raw";
 
 const sources: Record<string, string> = {
   ...g2BuiltinSources,
   "icons.ts": icons,
+  "ExpandableSearch.tsx": expandableSearch,
+  "expandable-search.css": expandableSearchCss,
   "primitive-contract.mjs": contract,
   "sdk.tsx": sdk,
   "GestureBoundary.tsx": gestureBoundary,
@@ -54,10 +58,12 @@ const sources: Record<string, string> = {
 export const builtinSources: Record<string, string> = Object.fromEntries(
   Object.entries(sources).map(([name, source]) => [
     name,
-    source.replace(
-      /from\s+["'](?:\.\.\/){1,2}ui\/icons["']/g,
-      'from "./icons"',
-    ),
+    source
+      .replace(
+        /from\s+["']\.\.\/ExpandableSearch["']/g,
+        'from "./ExpandableSearch"',
+      )
+      .replace(/from\s+["'](?:\.\.\/){1,2}ui\/icons["']/g, 'from "./icons"'),
   ]),
 );
 export const builtinExports: Record<string, string> = {

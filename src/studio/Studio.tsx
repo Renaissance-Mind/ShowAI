@@ -34,7 +34,6 @@ import {
   Loader2,
   MoreHorizontal,
   Plus,
-  Search,
   History,
   Upload,
   X,
@@ -71,6 +70,7 @@ import {
   type LibraryTarget,
 } from "./LibraryNavigation";
 import Dialog from "./Dialog";
+import ExpandableSearch from "../components/ExpandableSearch";
 import ProjectSidebar from "./ProjectSidebar";
 import SidebarNavigation from "./SidebarNavigation";
 import RecentPages, { recentPages } from "./RecentPages";
@@ -91,7 +91,7 @@ import {
 import "./studio.css";
 import {
   HistoryDialog,
-  SearchDialog,
+  LibrarySearchResults,
   MergeDialog,
   ExternalConflictDialog,
   ImportedSnapshotsDialog,
@@ -120,7 +120,6 @@ type DialogState =
   | { type: "migration" }
   | { type: "importedSnapshots"; projectId: string; pageId?: string }
   | { type: "history"; projectId: string; pageId?: string }
-  | { type: "search" }
   | {
       type: "merge";
       projectId: string;
@@ -216,6 +215,12 @@ export default function Studio() {
   const catalogScopeRef = useRef(catalogScope);
   catalogScopeRef.current = catalogScope;
   const [query, setQuery] = useState("");
+  const [searchLibrary, setSearchLibrary] = useState(false);
+  const [searchRevision, setSearchRevision] = useState(0);
+  useEffect(() => {
+    setSearchLibrary(false);
+    setQuery("");
+  }, [view]);
   const [dialog, setDialog] = useState<DialogState>(null);
   const dialogRef = useRef(dialog);
   dialogRef.current = dialog;
@@ -260,7 +265,6 @@ export default function Studio() {
   );
   const page = usePage();
   const project = projects.find((item) => item.id === selectedProject);
-  const titleRef = useRef<HTMLTextAreaElement>(null);
   const selectedRef = useRef(selectedProject);
   selectedRef.current = selectedProject;
   const selectedFolderRef = useRef(selectedFolder);
@@ -431,12 +435,6 @@ export default function Studio() {
     const timer = setTimeout(() => setNotice(""), 3000);
     return () => clearTimeout(timer);
   }, [notice]);
-  useEffect(() => {
-    if (titleRef.current) {
-      titleRef.current.style.height = "auto";
-      titleRef.current.style.height = titleRef.current.scrollHeight + "px";
-    }
-  }, [page.draft?.title, view]);
   useEffect(() => {
     document.title =
       view === "page" && page.draft
@@ -1018,6 +1016,59 @@ export default function Studio() {
     void operation().catch(report);
   };
 
+  async function openSearchResult(result: SearchResult) {
+    const scope = result.projectId
+      ? "project"
+      : result.path.startsWith("packages/published/")
+        ? "published"
+        : "global";
+    const match = result.path.match(
+      /^projects\/([^/]+)\/pages\/([^/]+)\.json$/,
+    );
+    if (match) {
+      if (!(await openPage(match[2], match[1])))
+        throw new Error("请先保存或处理当前页面的草稿。");
+      setRevealNode(result.blockId);
+    } else if (result.kind === "project" && result.projectId) {
+      if (!(await openProject(result.projectId)))
+        throw new Error("请先保存或处理当前页面的草稿。");
+    } else if (result.kind === "component" || result.kind === "source") {
+      const packageMatch = result.path.match(
+        /(?:^|\/)components\/([^/]+)\/([^/]+)\//,
+      );
+      if (!packageMatch) throw new Error("这个结果没有可打开的组件版本。");
+      const custom = await desktop.invoke<CompiledComponent>("components:get", {
+        id: packageMatch[1],
+        version: packageMatch[2],
+        projectId: result.projectId ?? undefined,
+        scope,
+      });
+      await viewComponent({
+        ...custom,
+        projectId: result.projectId ?? undefined,
+      });
+    } else if (result.kind === "template") {
+      const packageMatch = result.path.match(
+        /(?:^|\/)templates\/([^/]+)\/([^/]+)\//,
+      );
+      if (!packageMatch) throw new Error("这个结果没有可打开的模板版本。");
+      const record = await desktop.invoke<LoadedTemplate>("templates:get", {
+        id: packageMatch[1],
+        version: packageMatch[2],
+        projectId: result.projectId ?? undefined,
+        scope,
+      });
+      setDialog({
+        type: "template",
+        record,
+        projectId: result.projectId ?? undefined,
+      });
+    }
+
+    setQuery("");
+    setSearchRevision((revision) => revision + 1);
+  }
+
   const sidebarNavigation = (
     <SidebarNavigation
       onSelect={(section) =>
@@ -1131,6 +1182,10 @@ export default function Studio() {
                   }
                 </span>
               </div>
+            ) : view === "projects" ||
+              view === "templates" ||
+              view === "components" ? (
+              <h1 className="studio-topbar-title">{heading}</h1>
             ) : (
               <div className="studio-breadcrumb">
                 {focusWindow ? (
@@ -1165,7 +1220,19 @@ export default function Studio() {
                 {view === "page" && (
                   <>
                     <ChevronRight size={13} />
-                    <span>{page.draft?.title || "无标题"}</span>
+                    <input
+                      className="studio-page-title-input"
+                      aria-label="页面标题"
+                      placeholder="无标题"
+                      value={page.draft?.title ?? ""}
+                      maxLength={1000}
+                      onChange={(event) =>
+                        page.edit({
+                          ...upgradeResource(page.draft!),
+                          title: event.target.value.replaceAll("\n", ""),
+                        })
+                      }
+                    />
                   </>
                 )}
               </div>
@@ -1180,14 +1247,6 @@ export default function Studio() {
                     onClick={() => setDialog({ type: "workspaceConflicts" })}
                   >
                     <FolderOpen size={16} />
-                  </button>
-                  <button
-                    className="studio-icon"
-                    aria-label="搜索内容库"
-                    title="搜索内容库"
-                    onClick={() => setDialog({ type: "search" })}
-                  >
-                    <Search size={16} />
                   </button>
                   {selectedProject && (
                     <button
@@ -1207,6 +1266,239 @@ export default function Studio() {
                   )}
                 </>
               )}
+              {(view === "projects" ||
+                view === "project" ||
+                info?.libraryVersion === 2) && (
+                <ExpandableSearch
+                  key={`${view}:${selectedProject}:${selectedFolder}:${searchRevision}`}
+                  label={
+                    !searchLibrary && view === "projects"
+                      ? "搜索最近页面"
+                      : !searchLibrary && view === "project"
+                        ? "搜索页面"
+                        : "搜索内容库"
+                  }
+                  value={query}
+                  onChange={setQuery}
+                >
+                  {info?.libraryVersion === 2 && (
+                    <>
+                      {(view === "projects" || view === "project") && (
+                        <nav
+                          className="studio-search-scopes"
+                          aria-label="搜索范围"
+                        >
+                          <button
+                            aria-pressed={!searchLibrary}
+                            onClick={() => setSearchLibrary(false)}
+                          >
+                            {view === "projects" ? "最近页面" : "当前项目页面"}
+                          </button>
+                          <button
+                            aria-pressed={searchLibrary}
+                            onClick={() => setSearchLibrary(true)}
+                          >
+                            整个内容库
+                          </button>
+                        </nav>
+                      )}
+                      {searchLibrary ||
+                      (view !== "projects" && view !== "project") ? (
+                        <LibrarySearchResults
+                          query={query}
+                          onOpen={openSearchResult}
+                        />
+                      ) : (
+                        <p className="studio-search-hint">
+                          {view === "projects"
+                            ? "按页面名称或所属项目筛选最近页面"
+                            : "按名称筛选当前项目的页面和文件夹"}
+                        </p>
+                      )}
+                    </>
+                  )}
+                </ExpandableSearch>
+              )}
+              <div className="studio-section-actions studio-topbar-view-actions">
+                {view === "projects" && (
+                  <button
+                    className="studio-icon"
+                    onClick={() => setDialog({ type: "project" })}
+                    aria-label="新建项目"
+                    title="新建项目"
+                  >
+                    <Plus size={15} />
+                  </button>
+                )}
+                {view === "project" && project && (
+                  <>
+                    <button
+                      className="studio-icon"
+                      aria-label="打开项目目录"
+                      title="打开项目目录"
+                      onClick={action(() =>
+                        desktop.invoke("fs:reveal", {
+                          projectId: selectedProject,
+                        }),
+                      )}
+                    >
+                      <FolderOpen size={16} />
+                    </button>
+                    <button
+                      className="studio-icon"
+                      onClick={action(importPage)}
+                      aria-label="导入"
+                      title="导入"
+                    >
+                      <Upload size={15} />
+                    </button>
+                    <button
+                      className="studio-icon"
+                      disabled={!pages.length || busy}
+                      aria-haspopup="menu"
+                      onClick={(event) => {
+                        const anchor = event.currentTarget;
+                        setExportMenu((current) =>
+                          current === anchor ? null : anchor,
+                        );
+                      }}
+                      aria-label="导出网站"
+                      title="导出网站"
+                    >
+                      <ArrowUpRight size={15} />
+                    </button>
+                    <button
+                      className="studio-icon"
+                      aria-label="当前目录操作"
+                      aria-haspopup="menu"
+                      onClick={(event) =>
+                        showMenu(
+                          currentFolder
+                            ? folderTarget(currentFolder, project.id)
+                            : projectTarget(project),
+                          event.currentTarget,
+                        )
+                      }
+                    >
+                      <MoreHorizontal size={18} />
+                    </button>
+                  </>
+                )}
+                {view === "templates" && (
+                  <button
+                    disabled={!selectedProject}
+                    className="studio-icon"
+                    onClick={() =>
+                      setDialog({
+                        type: "template",
+                        record: blankTemplate(),
+                        copy: true,
+                      })
+                    }
+                    aria-label="新建模板"
+                    title="新建模板"
+                  >
+                    <Plus size={15} />
+                  </button>
+                )}
+                {view === "components" && (
+                  <>
+                    <label className="component-project-picker">
+                      项目：
+                      <select
+                        aria-label="目录项目"
+                        aria-describedby={
+                          componentProject === "all"
+                            ? "component-project-help"
+                            : undefined
+                        }
+                        value={componentProject}
+                        onChange={(event) => {
+                          const id = event.target.value;
+                          void (async () => {
+                            if (!(await page.flush())) return;
+                            componentProjectRef.current = id;
+                            setComponentProject(id);
+                            if (id !== "all") {
+                              selectedRef.current = id;
+                              setSelectedProject(id);
+                              setSelectedFolder(null);
+                            }
+                          })().catch(report);
+                        }}
+                      >
+                        <option value="all">全部</option>
+                        {projects.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      className="studio-icon"
+                      disabled={componentProject === "all"}
+                      title={
+                        componentProject === "all"
+                          ? "请选择组件所属项目"
+                          : undefined
+                      }
+                      aria-describedby={
+                        componentProject === "all"
+                          ? "component-project-help"
+                          : undefined
+                      }
+                      onClick={action(async () => {
+                        const result =
+                          await desktop.invoke<CompiledComponent | null>(
+                            "components:import",
+                            componentProject !== "all"
+                              ? { projectId: componentProject }
+                              : {},
+                          );
+                        if (result) {
+                          await loadCatalog();
+                          setNotice("组件已安装");
+                        }
+                      })}
+                      aria-label="导入组件"
+                    >
+                      <Upload size={15} />
+                    </button>
+                    <button
+                      className="studio-icon"
+                      disabled={componentProject === "all"}
+                      title={
+                        componentProject === "all"
+                          ? "请选择组件所属项目"
+                          : undefined
+                      }
+                      aria-describedby={
+                        componentProject === "all"
+                          ? "component-project-help"
+                          : undefined
+                      }
+                      onClick={action(async () => {
+                        const result = await desktop.invoke<CompiledComponent>(
+                          "components:createExample",
+                          componentProject !== "all"
+                            ? { projectId: componentProject }
+                            : {},
+                        );
+                        await loadCatalog();
+                        await viewComponent({
+                          ...result,
+                          projectId: componentProject,
+                        });
+                      })}
+                      aria-label="新建组件"
+                    >
+                      <Plus size={15} />
+                    </button>
+                  </>
+                )}
+              </div>
+
               {view === "page" && page.draft && (
                 <>
                   <span className={`studio-save-state ${page.status}`}>
@@ -1239,12 +1531,13 @@ export default function Studio() {
                     <FolderOpen size={16} />
                   </button>
                   <button
-                    className="studio-button small primary"
+                    className="studio-icon"
+                    aria-label="导出"
+                    title="导出页面"
                     disabled={busy}
                     onClick={() => void exportPage("html")}
                   >
                     <ArrowUpRight size={14} />
-                    导出
                   </button>
                   <button
                     className="studio-icon"
@@ -1413,198 +1706,12 @@ export default function Studio() {
                   }}
                   onRevealHandled={() => setRevealNode(null)}
                   onChange={page.edit}
-                  header={
-                    <textarea
-                      ref={titleRef}
-                      className="surface-page-title"
-                      aria-label="页面标题"
-                      placeholder="无标题"
-                      value={page.draft.title}
-                      rows={1}
-                      maxLength={1000}
-                      onChange={(event) =>
-                        page.edit({
-                          ...upgradeResource(page.draft!),
-                          title: event.target.value.replaceAll("\n", ""),
-                        })
-                      }
-                    />
-                  }
                 />
               </CustomComponentsProvider>
             ) : (
               <div
                 className={`studio-library${view === "components" ? " studio-component-library" : ""}`}
               >
-                <div className="studio-section-heading">
-                  <div>
-                    <h1>{heading}</h1>
-                  </div>
-                  <div className="studio-section-actions">
-                    {view === "projects" && (
-                      <button
-                        className="studio-button primary"
-                        onClick={() => setDialog({ type: "project" })}
-                      >
-                        <Plus size={15} />
-                        新建项目
-                      </button>
-                    )}
-                    {view === "project" && project && (
-                      <>
-                        <button
-                          className="studio-button"
-                          onClick={action(importPage)}
-                        >
-                          <Upload size={15} />
-                          导入
-                        </button>
-                        <button
-                          className="studio-button"
-                          disabled={!pages.length || busy}
-                          aria-haspopup="menu"
-                          onClick={(event) => {
-                            const anchor = event.currentTarget;
-                            setExportMenu((current) =>
-                              current === anchor ? null : anchor,
-                            );
-                          }}
-                        >
-                          <ArrowUpRight size={15} />
-                          导出网站
-                        </button>
-                        <button
-                          className="studio-icon"
-                          aria-label="当前目录操作"
-                          aria-haspopup="menu"
-                          onClick={(event) =>
-                            showMenu(
-                              currentFolder
-                                ? folderTarget(currentFolder, project.id)
-                                : projectTarget(project),
-                              event.currentTarget,
-                            )
-                          }
-                        >
-                          <MoreHorizontal size={18} />
-                        </button>
-                      </>
-                    )}
-                    {view === "templates" && (
-                      <button
-                        disabled={!selectedProject}
-                        className="studio-button primary"
-                        onClick={() =>
-                          setDialog({
-                            type: "template",
-                            record: blankTemplate(),
-                            copy: true,
-                          })
-                        }
-                      >
-                        <Plus size={15} />
-                        新建模板
-                      </button>
-                    )}
-                    {view === "components" && (
-                      <>
-                        <label className="component-project-picker">
-                          项目：
-                          <select
-                            aria-label="目录项目"
-                            aria-describedby={
-                              componentProject === "all"
-                                ? "component-project-help"
-                                : undefined
-                            }
-                            value={componentProject}
-                            onChange={(event) => {
-                              const id = event.target.value;
-                              void (async () => {
-                                if (!(await page.flush())) return;
-                                componentProjectRef.current = id;
-                                setComponentProject(id);
-                                if (id !== "all") {
-                                  selectedRef.current = id;
-                                  setSelectedProject(id);
-                                  setSelectedFolder(null);
-                                }
-                              })().catch(report);
-                            }}
-                          >
-                            <option value="all">全部</option>
-                            {projects.map((item) => (
-                              <option key={item.id} value={item.id}>
-                                {item.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <button
-                          className="studio-button"
-                          disabled={componentProject === "all"}
-                          title={
-                            componentProject === "all"
-                              ? "请选择组件所属项目"
-                              : undefined
-                          }
-                          aria-describedby={
-                            componentProject === "all"
-                              ? "component-project-help"
-                              : undefined
-                          }
-                          onClick={action(async () => {
-                            const result =
-                              await desktop.invoke<CompiledComponent | null>(
-                                "components:import",
-                                componentProject !== "all"
-                                  ? { projectId: componentProject }
-                                  : {},
-                              );
-                            if (result) {
-                              await loadCatalog();
-                              setNotice("组件已安装");
-                            }
-                          })}
-                        >
-                          <Upload size={15} />
-                          导入组件
-                        </button>
-                        <button
-                          className="studio-button primary"
-                          disabled={componentProject === "all"}
-                          title={
-                            componentProject === "all"
-                              ? "请选择组件所属项目"
-                              : undefined
-                          }
-                          aria-describedby={
-                            componentProject === "all"
-                              ? "component-project-help"
-                              : undefined
-                          }
-                          onClick={action(async () => {
-                            const result =
-                              await desktop.invoke<CompiledComponent>(
-                                "components:createExample",
-                                componentProject !== "all"
-                                  ? { projectId: componentProject }
-                                  : {},
-                              );
-                            await loadCatalog();
-                            await viewComponent({
-                              ...result,
-                              projectId: componentProject,
-                            });
-                          })}
-                        >
-                          <Plus size={15} />
-                          新建组件
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
                 {view === "components" && componentProject === "all" && (
                   <p
                     id="component-project-help"
@@ -1697,53 +1804,17 @@ export default function Studio() {
                 )}
 
                 {view === "projects" && (
-                  <>
-                    <div className="studio-library-toolbar">
-                      <span />
-                      <label className="studio-search">
-                        <Search size={15} />
-                        <input
-                          aria-label="搜索最近页面"
-                          placeholder="搜索最近页面"
-                          value={query}
-                          onChange={(event) => setQuery(event.target.value)}
-                        />
-                      </label>
-                    </div>
-                    <RecentPages
-                      pages={recent}
-                      query={query}
-                      onOpen={(item) =>
-                        void openPage(item.id, item.projectId).catch(report)
-                      }
-                      onCreateProject={() => setDialog({ type: "project" })}
-                    />
-                  </>
+                  <RecentPages
+                    pages={recent}
+                    query={query}
+                    onOpen={(item) =>
+                      void openPage(item.id, item.projectId).catch(report)
+                    }
+                    onCreateProject={() => setDialog({ type: "project" })}
+                  />
                 )}
                 {view === "project" && (
                   <>
-                    <div className="studio-library-toolbar">
-                      <button
-                        className="studio-text-button"
-                        onClick={action(() =>
-                          desktop.invoke("fs:reveal", {
-                            projectId: selectedProject,
-                          }),
-                        )}
-                      >
-                        <FolderOpen size={14} />
-                        打开项目目录
-                      </button>
-                      <label className="studio-search">
-                        <Search size={15} />
-                        <input
-                          aria-label="搜索页面"
-                          placeholder="搜索页面"
-                          value={query}
-                          onChange={(event) => setQuery(event.target.value)}
-                        />
-                      </label>
-                    </div>
                     {visibleEntries.length ? (
                       <div className="studio-page-list">
                         {visibleEntries.map(({ target, updatedAt }) => (
@@ -2188,73 +2259,6 @@ export default function Studio() {
               await refresh();
               await loadCatalog();
               setNotice("版本历史已启用，原始文件和旧快照已保留");
-            }}
-          />
-        )}
-        {dialog?.type === "search" && (
-          <SearchDialog
-            onClose={closeDialog}
-            onOpen={async (result: SearchResult) => {
-              const scope = result.projectId
-                ? "project"
-                : result.path.startsWith("packages/published/")
-                  ? "published"
-                  : "global";
-              const match = result.path.match(
-                /^projects\/([^/]+)\/pages\/([^/]+)\.json$/,
-              );
-              if (match) {
-                if (!(await openPage(match[2], match[1])))
-                  throw new Error("请先保存或处理当前页面的草稿。");
-                setRevealNode(result.blockId);
-                closeDialog();
-              } else if (result.kind === "project" && result.projectId) {
-                if (!(await openProject(result.projectId)))
-                  throw new Error("请先保存或处理当前页面的草稿。");
-                closeDialog();
-              } else if (
-                result.kind === "component" ||
-                result.kind === "source"
-              ) {
-                const packageMatch = result.path.match(
-                  /(?:^|\/)components\/([^/]+)\/([^/]+)\//,
-                );
-                if (!packageMatch)
-                  throw new Error("这个结果没有可打开的组件版本。");
-                const custom = await desktop.invoke<CompiledComponent>(
-                  "components:get",
-                  {
-                    id: packageMatch[1],
-                    version: packageMatch[2],
-                    projectId: result.projectId ?? undefined,
-                    scope,
-                  },
-                );
-                await viewComponent({
-                  ...custom,
-                  projectId: result.projectId ?? undefined,
-                });
-              } else if (result.kind === "template") {
-                const packageMatch = result.path.match(
-                  /(?:^|\/)templates\/([^/]+)\/([^/]+)\//,
-                );
-                if (!packageMatch)
-                  throw new Error("这个结果没有可打开的模板版本。");
-                const record = await desktop.invoke<LoadedTemplate>(
-                  "templates:get",
-                  {
-                    id: packageMatch[1],
-                    version: packageMatch[2],
-                    projectId: result.projectId ?? undefined,
-                    scope,
-                  },
-                );
-                setDialog({
-                  type: "template",
-                  record,
-                  projectId: result.projectId ?? undefined,
-                });
-              }
             }}
           />
         )}

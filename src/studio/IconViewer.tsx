@@ -1,3 +1,4 @@
+import ExpandableSearch from "../components/ExpandableSearch";
 import { useMemo, useRef, useState } from "react";
 import * as icons from "../ui/icons";
 import {
@@ -6,7 +7,6 @@ import {
   Moon,
   RotateCcw,
   Search,
-  X,
   Sun,
   Shapes,
   Type,
@@ -119,20 +119,12 @@ export default function IconViewer() {
   return (
     <section className="icon-viewer" aria-label="应用图标浏览器">
       <div className="icon-viewer-tools">
-        <label className="icon-viewer-search">
-          <Search size={16} aria-hidden="true" />
-          <input
-            aria-label="搜索图标"
-            placeholder="搜索图标名称或分类…"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          {query && (
-            <button aria-label="清除图标搜索" onClick={() => setQuery("")}>
-              <X size={14} />
-            </button>
-          )}
-        </label>
+        <ExpandableSearch
+          label="搜索图标"
+          placeholder="搜索图标名称或分类…"
+          value={query}
+          onChange={setQuery}
+        />
         <span className="icon-viewer-count" aria-live="polite">
           {visible.length} / {catalog.length} 个图标
         </span>

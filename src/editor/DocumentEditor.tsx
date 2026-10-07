@@ -1,3 +1,4 @@
+import ExpandableSearch from "../components/ExpandableSearch";
 import {
   useComponentCatalog,
   RegisterComponentContext,
@@ -62,7 +63,6 @@ import {
   Plus,
   Quote,
   Redo2,
-  Search,
   Strikethrough,
   Table2,
   Trash2,
@@ -1582,17 +1582,14 @@ export default function DocumentEditor({
               style={{ left: slash.left, top: slash.top }}
             >
               <div className="slash-search">
-                <Search size={15} />
                 {slash.manual ? (
-                  <input
-                    ref={slashInputRef}
-                    autoFocus
+                  <ExpandableSearch
+                    label="搜索内容块"
                     placeholder="搜索内容…"
-                    aria-label="搜索内容块"
+                    defaultExpanded
+                    inputRef={slashInputRef}
                     value={slash.query}
-                    onChange={(event) =>
-                      setSlash({ ...slash, query: event.target.value })
-                    }
+                    onChange={(value) => setSlash({ ...slash, query: value })}
                     onKeyDown={(event) => {
                       if (event.key === "Escape") {
                         dismissSlash();
