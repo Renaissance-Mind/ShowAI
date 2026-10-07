@@ -352,7 +352,9 @@ export function createWorkbench(
   ): Promise<unknown> {
     switch (action) {
       case "library:storage":
-        return new LibraryMaintenance(store.root).storage();
+        return new LibraryMaintenance(store.root).storage({
+          projects: args.projects === true,
+        });
       case "library:compact":
         return new LibraryMaintenance(store.root).compact();
       case "library:cleanupPlan":

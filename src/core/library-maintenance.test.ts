@@ -1,5 +1,13 @@
 import { beforeEach, afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, mkdir, rm, writeFile, symlink } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  rm,
+  writeFile,
+  symlink,
+  lstat,
+  readdir,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GitLibrary } from "./git-library";
@@ -60,6 +68,89 @@ describe("library space, cleanup and archival", () => {
       ),
     ).toEqual(bytes);
     expect((await maintenance.state())?.state).toBe("complete");
+  });
+  it("accounts for current, archived and retained project folders without attributing shared history twice", async () => {
+    const archived = await store.createProject({ name: "Archived project" });
+    await store.updateProject(archived.id, { archived: true });
+    await store.updateProject(projectId, { name: "Renamed project" });
+    const legacy = join(root, "projects", projectId);
+    await mkdir(join(legacy, "exports", "reads"), { recursive: true });
+    await writeFile(
+      join(legacy, "exports", "reads", "preview.html"),
+      "preview",
+    );
+    await writeFile(join(legacy, "original.bin"), Buffer.alloc(128 * 1024));
+    const retainedId = "11111111-1111-1111-1111-111111111111";
+    await mkdir(join(root, "projects", retainedId));
+    await writeFile(
+      join(root, "projects", retainedId, "project.json"),
+      JSON.stringify({ id: retainedId, name: "Retained originals" }),
+    );
+    const head = await library.head();
+    expect((await maintenance.storage()).projects).toBeUndefined();
+    const result = await maintenance.storage({ projects: true });
+    const { items, shared } = result.projects!;
+    expect(items.map((item) => item.id)).toEqual([
+      projectId,
+      archived.id,
+      retainedId,
+    ]);
+    expect(items[0]).toMatchObject({
+      name: "Renamed project",
+      retained: false,
+      archived: false,
+    });
+    expect(items[1]).toMatchObject({
+      name: "Archived project",
+      archived: true,
+    });
+    expect(items[2]).toMatchObject({
+      name: "Retained originals",
+      retained: true,
+    });
+    async function measure(
+      path: string,
+    ): Promise<{ bytes: number; allocatedBytes: number; files: number }> {
+      const info = await lstat(path);
+      if (!info.isDirectory())
+        return {
+          bytes: info.size,
+          allocatedBytes: info.blocks * 512,
+          files: 1,
+        };
+      const totals = { bytes: 0, allocatedBytes: 0, files: 0 };
+      for (const name of await readdir(path)) {
+        const child = await measure(join(path, name));
+        totals.bytes += child.bytes;
+        totals.allocatedBytes += child.allocatedBytes;
+        totals.files += child.files;
+      }
+      return totals;
+    }
+    const current = await measure(store.projectPath(projectId));
+    const original = await measure(legacy);
+    expect(items[0]).toMatchObject({
+      bytes: current.bytes + original.bytes,
+      allocatedBytes: current.allocatedBytes + original.allocatedBytes,
+      files: current.files + original.files,
+    });
+    for (const field of ["bytes", "allocatedBytes", "files"] as const)
+      expect(
+        items.reduce((sum, item) => sum + item[field], shared[field]),
+      ).toBe(field === "bytes" ? result.totalBytes : result[field]);
+    expect(shared.bytes).toBeGreaterThanOrEqual(
+      result.categories.repository.bytes,
+    );
+    expect(await library.head()).toBe(head);
+  });
+  it("returns an empty project analysis for a library without projects", async () => {
+    const empty = join(directory, "empty-library");
+    await new GitLibrary(empty).initialize();
+    const result = await new LibraryMaintenance(empty).storage({
+      projects: true,
+    });
+    expect(result.projects?.items).toEqual([]);
+    expect(result.projects?.shared.bytes).toBe(result.totalBytes);
   });
   it("keeps live drafts, conflicts and history while collecting orphan assets and replaying cleaned receipts", async () => {
     const drafts = new EditorDrafts(root),

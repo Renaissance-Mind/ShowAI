@@ -27,6 +27,7 @@ import { dirname, join, resolve } from "node:path";
 import { startBrowserServer } from "./server";
 import { AgentService } from "../agent/service";
 import { GitLibrary } from "../core/git-library";
+import type { LibraryStorage } from "../core/library-maintenance";
 import type { DesktopInfo, DesktopResponse } from "../desktop/bridge";
 import type { LoadedPage } from "../studio/usePage";
 import { blankDocument } from "../core/catalog";
@@ -604,6 +605,31 @@ test("packaged serve command starts, prints its address, serves the full workben
     if (child.exitCode === null) child.kill();
   }
 }, 10000);
+
+test("storage bridge analyzes project folders on demand in an isolated versioned library", async () => {
+  const library = new GitLibrary(home);
+  await library.initialize();
+  const project = await invoke<{ id: string }>("projects:create", {
+    name: "Project space",
+  });
+  const head = await library.head();
+  expect(
+    (await invoke<LibraryStorage>("library:storage")).projects,
+  ).toBeUndefined();
+  const result = await invoke<LibraryStorage>("library:storage", {
+    projects: true,
+  });
+  expect(result.projects?.items).toHaveLength(1);
+  expect(result.projects?.items[0]).toMatchObject({
+    id: project.id,
+    name: "Project space",
+    retained: false,
+  });
+  expect(result.projects!.items[0].bytes + result.projects!.shared.bytes).toBe(
+    result.totalBytes,
+  );
+  expect(await library.head()).toBe(head);
+});
 
 test("versioned browser bridge attributes human edits and replays a saved request without duplicating content", async () => {
   const library = new GitLibrary(home);

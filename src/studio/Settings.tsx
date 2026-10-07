@@ -175,7 +175,7 @@ export function SettingsPanel({
         </section>
       )}
       {section === "general" && info?.libraryVersion === 2 && (
-        <LibrarySpace home={info.home} />
+        <LibrarySpace key={info.home} home={info.home} />
       )}
       {section === "appearance" && (
         <section

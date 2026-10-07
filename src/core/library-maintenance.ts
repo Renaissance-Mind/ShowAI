@@ -54,6 +54,19 @@ export interface LibraryStorage {
   >;
   git: Awaited<ReturnType<GitLibrary["objectStatistics"]>>;
   maintenance: MaintenanceState | null;
+  projects?: {
+    items: ProjectStorage[];
+    shared: { bytes: number; allocatedBytes: number; files: number };
+  };
+}
+export interface ProjectStorage {
+  id: string;
+  name: string;
+  archived: boolean;
+  retained: boolean;
+  bytes: number;
+  allocatedBytes: number;
+  files: number;
 }
 export interface CleanupPlan {
   format: "showai-cleanup-plan";
@@ -198,7 +211,8 @@ export class LibraryMaintenance {
     }
     return value;
   }
-  async storage(): Promise<LibraryStorage> {
+  async storage(input: { projects?: boolean } = {}): Promise<LibraryStorage> {
+    const revision = await this.library.head();
     const inventory = await files(this.root),
       categories = Object.fromEntries(
         [
@@ -223,7 +237,7 @@ export class LibraryMaintenance {
     }
     return {
       measuredAt: new Date().toISOString(),
-      revision: await this.library.head(),
+      revision,
       totalBytes: inventory.reduce((total, file) => total + file.bytes, 0),
       allocatedBytes: inventory.reduce(
         (total, file) => total + file.allocatedBytes,
@@ -233,6 +247,88 @@ export class LibraryMaintenance {
       categories,
       git: await this.library.objectStatistics(),
       maintenance: await this.state(),
+      ...(input.projects
+        ? { projects: await this.projectStorage(inventory, revision) }
+        : {}),
+    };
+  }
+  private async projectStorage(
+    inventory: FileSize[],
+    revision: string | null,
+  ): Promise<NonNullable<LibraryStorage["projects"]>> {
+    const metadataPaths = revision
+      ? (await this.library.tree(revision))
+          .filter((entry) =>
+            /^projects\/[^/]+\/project\.json$/.test(entry.path),
+          )
+          .map((entry) => entry.path)
+      : [];
+    const metadata = metadataPaths.length
+      ? await this.library.readFiles(metadataPaths, revision!)
+      : new Map<string, Buffer>();
+    const projects = new Map<string, ProjectStorage>();
+    for (const [path, bytes] of metadata) {
+      const id = path.split("/")[1];
+      const project = JSON.parse(bytes.toString("utf8"));
+      if (project.id !== id || typeof project.name !== "string")
+        throw new CoreError(
+          "INVALID_DATA",
+          `Invalid project metadata: ${path}`,
+        );
+      projects.set(id, {
+        id,
+        name: project.name,
+        archived: !!project.archived,
+        retained: false,
+        bytes: 0,
+        allocatedBytes: 0,
+        files: 0,
+      });
+    }
+    const shared = { bytes: 0, allocatedBytes: 0, files: 0 };
+    for (const file of inventory) {
+      const id = file.path.match(/^(?:workspace\/)?projects\/([^/]+)\//)?.[1];
+      let project = id ? projects.get(id) : undefined;
+      if (id && !project) {
+        project = {
+          id,
+          name: id,
+          archived: false,
+          retained: true,
+          bytes: 0,
+          allocatedBytes: 0,
+          files: 0,
+        };
+        projects.set(id, project);
+      }
+      const group = project ?? shared;
+      group.bytes += file.bytes;
+      group.allocatedBytes += file.allocatedBytes;
+      group.files++;
+    }
+    // Retained original folders may no longer have an entry in the current tree.
+    for (const project of projects.values()) {
+      if (!project.retained) continue;
+      const original = await readLibraryBytes(
+        this.root,
+        join(this.root, "projects", project.id, "project.json"),
+      );
+      if (!original) continue;
+      const value = JSON.parse(original.toString("utf8"));
+      if (value.id !== project.id || typeof value.name !== "string")
+        throw new CoreError(
+          "INVALID_DATA",
+          `Invalid project metadata: ${project.id}`,
+        );
+      project.name = value.name;
+      project.archived = !!value.archived;
+    }
+    return {
+      items: [...projects.values()].sort(
+        (left, right) =>
+          right.bytes - left.bytes || left.id.localeCompare(right.id),
+      ),
+      shared,
     };
   }
   private async job<T>(
