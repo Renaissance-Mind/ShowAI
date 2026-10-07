@@ -113,12 +113,45 @@ export function upgradeResource(source, { includeTitle = true } = {}) {
     while (ids.has(id)) id = `${base}-${++suffix}`;
     return id;
   })();
-  if (
-    page.content.type === "doc" &&
-    !(page.content.content ?? []).some((node) => node.attrs?.canvas)
-  ) {
+  if (page.content.type === "doc") {
     assignSurfaceIds(page, { repairLegacy: true });
-    const content = page.content.content ?? [];
+    const layout = {};
+    const ids = new Set();
+    visitNodes(page.content, (node) => {
+      if (node.attrs?.id) ids.add(node.attrs.id);
+    });
+    const content = (page.content.content ?? []).map((node) => {
+      if (!node.attrs?.canvas) return node;
+      const frame = node.attrs.canvas;
+      let boardId = `${node.attrs.id.slice(0, 170)}-board`;
+      while (ids.has(boardId)) boardId += "-copy";
+      ids.add(boardId);
+      const region = {
+        type: "region",
+        attrs: { id: node.attrs.id, name: "内容区域" },
+        content: node.content ?? [],
+      };
+      layout[region.attrs.id] = {
+        x: frame.x ?? 0,
+        y: frame.y ?? 0,
+        width: frame.width ?? 1000,
+        mode: "flow",
+        columns: 2,
+        gap: 24,
+      };
+      layout[boardId] = {
+        x: 0,
+        y: 0,
+        width: frame.width ?? 760,
+        height: frame.height ?? 460,
+        heightMode: "fixed",
+      };
+      return {
+        type: "surface",
+        attrs: { id: boardId, kind: "board", name: "Board" },
+        content: [region],
+      };
+    });
     page.content = {
       type: "surface",
       attrs: {
@@ -128,13 +161,51 @@ export function upgradeResource(source, { includeTitle = true } = {}) {
       },
       content,
     };
-    page.layout = {};
+    page.layout = layout;
     page.surfaceViews = {};
   } else {
     const board = upgradeDocument(page, { includeTitle });
     Object.assign(page, board);
-    page.content.attrs = { id: rootId, kind: "board", name: "Board" };
-    page.surfaceViews = { [rootId]: page.views };
+    const children = page.content.content ?? [];
+    // A single flowing region is a document, even when an earlier version stored it on a surface.
+    if (
+      children.length === 1 &&
+      children[0].type === "region" &&
+      (page.layout[children[0].attrs.id]?.mode ?? "flow") === "flow"
+    ) {
+      page.content.attrs = {
+        id: rootId,
+        kind: "page",
+        name: includeTitle && page.title ? page.title.slice(0, 200) : "Page",
+      };
+      page.surfaceViews = { [rootId]: page.views };
+      delete page.views;
+      return fillResource(page);
+    }
+    const ids = new Set();
+    visitNodes(page.content, (node) => {
+      if (node.attrs?.id) ids.add(node.attrs.id);
+    });
+    let boardId = `${rootId}-board`;
+    while (ids.has(boardId)) boardId += "-copy";
+    page.content.attrs = { id: boardId, kind: "board", name: "Board" };
+    page.surfaceViews = { [boardId]: page.views };
+    page.content = {
+      type: "surface",
+      attrs: {
+        id: rootId,
+        kind: "page",
+        name: includeTitle && page.title ? page.title.slice(0, 200) : "Page",
+      },
+      content: [page.content],
+    };
+    page.layout[boardId] = {
+      x: 0,
+      y: 0,
+      width: 920,
+      height: 520,
+      heightMode: "fixed",
+    };
   }
   delete page.views;
   return fillResource(page);

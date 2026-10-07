@@ -38,7 +38,12 @@ export const blockIdPluginKey = new PluginKey("showaiBlockIds");
 
 /** Attribute-only steps leave document positions, selection, and text untouched. */
 export function createBlockIdPlugin(isEditable: () => boolean): Plugin {
-  const types = new Set(blockIdNodeTypes);
+  const types = new Set([
+    ...blockIdNodeTypes,
+    "region",
+    "richText",
+    "pageModule",
+  ]);
   return new Plugin({
     key: blockIdPluginKey,
     appendTransaction(transactions, _previous, current) {
@@ -86,7 +91,7 @@ export const StableBlockIds = Extension.create<{ readOnly: boolean }>({
   addGlobalAttributes() {
     return [
       {
-        types: blockIdNodeTypes,
+        types: [...blockIdNodeTypes, "region", "richText", "pageModule"],
         attributes: {
           id: {
             default: null,
@@ -187,11 +192,16 @@ export const ToggleNode = Node.create({
 });
 
 export function createExtensions(
-  options: { readOnly?: boolean; placeholder?: string } = {},
+  options: {
+    readOnly?: boolean;
+    placeholder?: string;
+    trailingNode?: boolean;
+  } = {},
 ) {
   return [
     StableBlockIds.configure({ readOnly: options.readOnly ?? false }),
     StarterKit.configure({
+      trailingNode: options.trailingNode === false ? false : {},
       heading: { levels: [1, 2, 3] },
       link: {
         openOnClick: options.readOnly ?? false,

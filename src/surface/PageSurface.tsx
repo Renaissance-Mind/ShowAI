@@ -42,6 +42,7 @@ interface Props {
   ref?: Ref<SurfaceHandle>;
   pageId: string;
   enabled?: boolean;
+  embedded?: boolean;
   printing?: boolean;
   onExpand?: (id: string) => void;
   drawTool?: DrawingTool | null;
@@ -79,6 +80,7 @@ export default function PageSurface({
   onViews,
   extraActions,
   enabled = true,
+  embedded = true,
   printing = false,
   onExpand,
   drawTool,
@@ -94,11 +96,12 @@ export default function PageSurface({
     "board",
     `showai.viewport-lock.v1:board:${pageId.replace(/:(expanded|embedded)$/, "")}`,
   );
+  const locked = embedded && lock.locked;
   const { rootRef, scrollRef, worldRef, camera, controls, scale } =
     useSurfaceViewport(
       layoutKey,
       onMove ? `showai.viewport.v3:${pageId}` : undefined,
-      enabled && !lock.locked,
+      enabled && !locked,
     );
   const [revealAll, setRevealAll] = useState(false);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
@@ -265,7 +268,7 @@ export default function PageSurface({
         inspect: onInspect,
         expand: onExpand,
         remove: onRemove,
-        move: lock.locked ? undefined : onMove,
+        move: locked ? undefined : onMove,
         readOnly: !onMove,
         revealAll: revealAll || printing,
         revealed,
@@ -277,9 +280,9 @@ export default function PageSurface({
           lock.ref.current = element;
         }}
         className="page-surface"
-        data-input-surface={enabled && !lock.locked ? pageId : undefined}
-        data-viewport-lock-scope="board"
-        data-viewport-locked={lock.locked}
+        data-input-surface={enabled && !locked ? pageId : undefined}
+        data-viewport-lock-scope={embedded ? "board" : undefined}
+        data-viewport-locked={locked}
         data-board-id={pageId}
         onPointerDown={(event) => {
           if (
@@ -297,21 +300,22 @@ export default function PageSurface({
             (event.target as Element).closest("[data-input-surface]") ===
               event.currentTarget &&
             event.key === "Escape" &&
-            !(event.target as Element).closest(
-              'input,textarea,[contenteditable="true"]',
-            )
+            !(event.target as Element).closest("input,textarea") &&
+            (event.target as Element)
+              .closest("[contenteditable]")
+              ?.getAttribute("contenteditable") !== "true"
           ) {
             onSelect(null);
             if (navigation.current) navigation.current.open = false;
           }
         }}
         aria-description={
-          lock.locked
+          locked
             ? "视图已锁定。可以点击内容，滚动用于外层页面阅读；右上角解锁后可缩放和移动。"
             : "在白板上滚动或拖动空白处浏览。方向键浏览，0 总览；Escape 取消当前操作。"
         }
       >
-        <ViewportLockButton {...lock} label="白板" />
+        {embedded && <ViewportLockButton {...lock} label="白板" />}
         <div className="surface-metadata" data-surface-ui>
           {header}
         </div>
@@ -320,7 +324,7 @@ export default function PageSurface({
             {children}
           </div>
         </div>
-        {drawTool && enabled && !lock.locked && onDraw && (
+        {drawTool && enabled && !locked && onDraw && (
           <DrawingInput
             tool={drawTool}
             color={drawColor}
@@ -362,7 +366,7 @@ export default function PageSurface({
                 <div className="surface-navigation-row" key={node.id}>
                   <button
                     type="button"
-                    disabled={lock.locked}
+                    disabled={locked}
                     onClick={() => {
                       onSelect(node.id);
                       focusAfterMount([node.id], true);
@@ -400,7 +404,7 @@ export default function PageSurface({
                 <div className="surface-navigation-row" key={view.id}>
                   <button
                     type="button"
-                    disabled={lock.locked}
+                    disabled={locked}
                     onClick={() => {
                       focusAfterMount(view.targets);
                       navigation.current!.open = false;
@@ -476,7 +480,7 @@ export default function PageSurface({
           <button
             type="button"
             aria-label="总览"
-            disabled={lock.locked}
+            disabled={locked}
             title="总览全部内容（0）"
             onClick={() => focusAfterMount()}
           >
@@ -486,7 +490,7 @@ export default function PageSurface({
             type="button"
             aria-label="定位所选"
             title="定位所选内容"
-            disabled={lock.locked || !selected}
+            disabled={locked || !selected}
             onClick={() => selected && focusAfterMount([selected], true)}
           >
             <Focus size={15} />
@@ -495,7 +499,7 @@ export default function PageSurface({
           <button
             type="button"
             aria-label="缩小白板"
-            disabled={lock.locked || scale <= 0.25}
+            disabled={locked || scale <= 0.25}
             onClick={() => controls.current.zoom(scale / 1.2)}
           >
             <Minus size={15} />
@@ -504,7 +508,7 @@ export default function PageSurface({
             type="button"
             className="surface-zoom"
             aria-label="重置缩放"
-            disabled={lock.locked}
+            disabled={locked}
             onClick={() => controls.current.zoom(1)}
           >
             {Math.round(scale * 100)}%
@@ -512,12 +516,12 @@ export default function PageSurface({
           <button
             type="button"
             aria-label="放大白板"
-            disabled={lock.locked || scale >= 2}
+            disabled={locked || scale >= 2}
             onClick={() => controls.current.zoom(scale * 1.2)}
           >
             <Plus size={15} />
           </button>
-          <fieldset className="surface-extra-actions" disabled={lock.locked}>
+          <fieldset className="surface-extra-actions" disabled={locked}>
             {extraActions}
           </fieldset>
         </div>

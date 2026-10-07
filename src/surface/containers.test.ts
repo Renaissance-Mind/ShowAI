@@ -86,6 +86,48 @@ const fixture = () => {
   return doc;
 };
 describe("recursive Page and Board containers", () => {
+  it("keeps legacy prose in Page and turns only canvas blocks into embedded Boards", () => {
+    const source = blankDocument();
+    source.content.content = [
+      {
+        type: "paragraph",
+        attrs: { id: "before" },
+        content: [{ type: "text", text: "Before" }],
+      },
+      {
+        type: "blockquote",
+        attrs: {
+          id: "canvas",
+          canvas: { x: 100, y: 200, width: 800, height: 420 },
+        },
+        content: [
+          {
+            type: "paragraph",
+            attrs: { id: "inside" },
+            content: [{ type: "text", text: "Within canvas" }],
+          },
+        ],
+      },
+      {
+        type: "paragraph",
+        attrs: { id: "after" },
+        content: [{ type: "text", text: "After" }],
+      },
+    ];
+    const before = structuredClone(source);
+    const next = upgradeResource(source);
+    expect(source).toEqual(before);
+    expect(next.content.attrs!.kind).toBe("page");
+    expect(next.content.content![0]).toEqual(source.content.content![0]);
+    expect(next.content.content![2]).toEqual(source.content.content![2]);
+    expect(next.content.content![1].attrs!.kind).toBe("board");
+    expect(findSurfaceNode(next, "inside")!.node).toEqual(
+      source.content.content![1].content![0],
+    );
+    expect(() => validateDocument(next)).not.toThrow();
+    const explicit = createResource(blankDocument(), "board");
+    expect(upgradeResource(explicit).content.attrs!.kind).toBe("board");
+  });
   it("keeps previous container views and layouts immutable while editing one branch", () => {
     const document = fixture(),
       before = structuredClone(document);
@@ -258,7 +300,7 @@ describe("recursive Page and Board containers", () => {
     expect(changed.content.attrs!.kind).toBe("board");
     expect(() => validateDocument(changed)).not.toThrow();
   });
-  it("adapts v1 as Page, keeps v2 as Board and backs up exact v2 bytes on first save", async () => {
+  it("adapts legacy resources as Page with embedded v2 Board and backs up exact bytes on first save", async () => {
     const path = await mkdtemp(join(tmpdir(), "showai-containers-"));
     directories.push(path);
     const store = new FileStore(path),
@@ -284,8 +326,10 @@ describe("recursive Page and Board containers", () => {
     await writeFile(created.path, raw);
     const loaded = await store.readPage(project.id, created.document.id);
     const next = upgradeResource(loaded.document);
-    expect(next.content.attrs!.kind).toBe("board");
-    expect(next.layout).toEqual(v2.layout);
+    expect(next.content.attrs!.kind).toBe("page");
+    expect(next.content.content![0].type).toBe("region");
+    for (const [id, frame] of Object.entries(v2.layout!))
+      expect(next.layout[id]).toEqual(frame);
     const saved = await store.savePage(
       project.id,
       created.document.id,

@@ -95,6 +95,17 @@
 .container-page-heading {
   margin: 12px 0 24px;
 }
+.page-document-flow {
+  border: 0;
+  padding: 0;
+}
+.page-document-module {
+  margin: 20px 0;
+  font-size: 14px;
+}
+.page-document-module .document-content {
+  min-height: 80px;
+}
 .container-page-heading h1,
 .container-page-heading .surface-page-title {
   font-size: 32px;

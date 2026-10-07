@@ -359,13 +359,15 @@ try {
     .locator('[data-surface-id="board-one"]')
     .getByRole("button", { name: "展开 锁定白板", exact: true })
     .click();
-  await board.getByRole("button", { name: "解锁白板", exact: true }).waitFor();
-  await board.getByRole("button", { name: "解锁白板", exact: true }).click();
+  await board.locator('.page-surface[data-viewport-locked="false"]').waitFor();
+  assert.equal(
+    await board.getByRole("button", { name: /^(解锁|锁定)白板$/ }).count(),
+    0,
+  );
   await page.getByRole("button", { name: "返回上层", exact: true }).click();
-  await board.getByRole("button", { name: "锁定白板", exact: true }).waitFor();
-  await board.getByRole("button", { name: "锁定白板", exact: true }).click();
+  await board.getByRole("button", { name: "解锁白板", exact: true }).waitFor();
   result.checks.push(
-    "Board keeps click interaction, passes locked wheel to Page, unlocks pan, restores relocked state and shares its lock with the expanded view",
+    "embedded Board keeps click interaction, passes locked wheel to Page and restores its lock after an unlocked expanded view",
   );
   const sandboxHost = page.locator('[data-block-id="sandbox-flow"]');
   await sandboxHost.scrollIntoViewIfNeeded();

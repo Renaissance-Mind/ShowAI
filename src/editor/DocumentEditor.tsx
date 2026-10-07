@@ -21,7 +21,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { EditorContent, useEditor } from "@tiptap/react";
-import type { Editor, JSONContent } from "@tiptap/core";
+import type { Editor, JSONContent, Extensions } from "@tiptap/core";
 import { NodeSelection, Selection, TextSelection } from "@tiptap/pm/state";
 import { clearWidgetSelection } from "./widget-selection";
 import { CellSelection } from "@tiptap/pm/tables";
@@ -84,6 +84,8 @@ export interface DocumentEditorProps {
   ) => void;
   readOnly?: boolean;
   minimal?: boolean;
+  additionalExtensions?: Extensions;
+  trailingNode?: boolean;
   onEditorReady?: (editor: Editor) => void;
   onInsertNative?: (
     kind: string,
@@ -178,6 +180,8 @@ export default function DocumentEditor({
   onEditorReady,
   onInsertNative,
   onDetachBlock,
+  additionalExtensions,
+  trailingNode = true,
 }: DocumentEditorProps) {
   const latestOnChange = useRef(onChange);
   const selectionMenuId = useId();
@@ -245,8 +249,11 @@ export default function DocumentEditor({
   selectedRef.current = selectedIndex;
 
   const extensions = useMemo(
-    () => createExtensions({ placeholder: "输入 / 添加内容" }),
-    [],
+    () => [
+      ...createExtensions({ placeholder: "输入 / 添加内容", trailingNode }),
+      ...(additionalExtensions ?? []),
+    ],
+    [additionalExtensions, trailingNode],
   );
   const editor = useEditor({
     extensions,
@@ -520,7 +527,8 @@ export default function DocumentEditor({
         !empty &&
         editor.isFocused &&
         !editor.isActive("codeBlock") &&
-        !editor.isActive("widget")
+        !editor.isActive("widget") &&
+        !editor.isActive("pageModule")
       ) {
         const start = editor.view.coordsAtPos(from);
         const end = editor.view.coordsAtPos(to);
@@ -1266,6 +1274,11 @@ export default function DocumentEditor({
           }
           const wrapper = wrapperRef.current;
           if (!wrapper) return;
+          if (
+            (event.target as Element).closest(".document-editor") !==
+            wrapper.closest(".document-editor")
+          )
+            return;
           let next: HoverBlock | null = null;
           editor.state.doc.forEach((node, pos, index) => {
             const dom = editor.view.nodeDOM(pos);

@@ -248,8 +248,11 @@ export function ContainerRuntime({
                 !event.altKey &&
                 !runtime.readOnly &&
                 !(event.target as Element).closest(
-                  'input,textarea,select,[contenteditable="true"],[role="dialog"]',
-                )
+                  'input,textarea,select,[role="dialog"]',
+                ) &&
+                (event.target as Element)
+                  .closest("[contenteditable]")
+                  ?.getAttribute("contenteditable") !== "true"
               ) {
                 const element = (event.target as Element).closest<HTMLElement>(
                   "[data-component-container],[data-container-root]",
@@ -786,6 +789,7 @@ function ContainerView({
     >
       <div className="container-board-scene">
         <PageSurface
+          embedded={!root}
           ref={viewport}
           pageId={`${runtime.document.id}:${id}:${root ? "expanded" : "embedded"}`}
           enabled

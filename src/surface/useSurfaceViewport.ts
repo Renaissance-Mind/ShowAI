@@ -11,14 +11,15 @@ import {
 
 const editable = (target: EventTarget | null) =>
   target instanceof Element &&
-  !!target.closest(
-    'input, textarea, select, [contenteditable="true"], [role="textbox"]',
-  );
+  (!!target.closest('input, textarea, select, [role="textbox"]') ||
+    target.closest("[contenteditable]")?.getAttribute("contenteditable") ===
+      "true");
 const interactive = (target: EventTarget | null) =>
   target instanceof Element &&
-  !!target.closest(
-    'button, a, input, textarea, select, summary, [contenteditable="true"], [role="slider"], iframe, [data-surface-gesture="own"], .react-flow',
-  );
+  (editable(target) ||
+    !!target.closest(
+      'button, a, input, textarea, select, summary, [role="slider"], iframe, [data-surface-gesture="own"], .react-flow',
+    ));
 
 /** Embedded controls and scroll areas keep the whole gesture, including its tail. */
 function ownsWheel(

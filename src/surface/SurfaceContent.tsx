@@ -39,6 +39,7 @@ export interface ContentRenderProps {
   parentId: string;
   ids: string[];
   kind: "children" | "single";
+  renderModule?: (node: JSONContent) => ReactNode;
 }
 export type ContentRenderer = (props: ContentRenderProps) => ReactNode;
 
@@ -202,6 +203,16 @@ const ContentNode = memo(
         ids: [id],
         kind: "single",
       });
+    if (
+      !positioned &&
+      (node.type === "richText" ||
+        (node.type === "region" && (frame?.mode ?? "flow") === "flow"))
+    )
+      return (
+        <div className="page-document-flow" data-surface-id={id}>
+          {body}
+        </div>
+      );
     return (
       <SurfaceObject
         id={id}
@@ -270,6 +281,27 @@ export function SurfaceContent({
     container.type === "surface" &&
     surfaceKind(container) === "page"
   ) {
+    if (!actions.readOnly)
+      return (
+        <div className="surface-layout-flow page-continuous-content">
+          {renderContent({
+            content: { type: "doc", content: container.content ?? [] },
+            parentId: container.attrs!.id,
+            ids: (container.content ?? []).map((node) => node.attrs!.id),
+            kind: "children",
+            renderModule: (node) => (
+              <ContentNode
+                node={node}
+                document={document}
+                positioned={false}
+                spatial={spatial}
+                renderContent={renderContent}
+                renderSurface={renderSurface}
+              />
+            ),
+          })}
+        </div>
+      );
     const groups: (JSONContent[] | JSONContent)[] = [];
     for (const node of container.content ?? []) {
       if (
