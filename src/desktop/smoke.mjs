@@ -103,7 +103,7 @@ async function connect(port) {
       const timeout = setTimeout(() => {
         pending.delete(id);
         reject(new Error(`Electron timed out: ${method}`));
-      }, 15000);
+      }, 60000);
       pending.set(id, { resolve, reject, timeout });
       socket.send(JSON.stringify({ id, method, params }));
     });
