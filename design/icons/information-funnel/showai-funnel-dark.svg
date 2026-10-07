@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="showai-dark-title showai-dark-description">
+  <title id="showai-dark-title">ShowAI information funnel — dark</title>
+  <desc id="showai-dark-description">Two curved boundaries divide the entire square into three regions and converge at the bottom edge. Each region uses a continuous teal gradient.</desc>
+  <defs>
+    <linearGradient id="showai-dark-region-0" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
+      <stop offset="0%" stop-color="#234D58"/>
+      <stop offset="50%" stop-color="#347D88"/>
+      <stop offset="100%" stop-color="#68B4B3"/>
+    </linearGradient>
+    <linearGradient id="showai-dark-region-1" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
+      <stop offset="0%" stop-color="#326F75"/>
+      <stop offset="50%" stop-color="#71BDB1"/>
+      <stop offset="100%" stop-color="#C3F2D9"/>
+    </linearGradient>
+    <linearGradient id="showai-dark-region-2" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
+      <stop offset="0%" stop-color="#193D4D"/>
+      <stop offset="50%" stop-color="#286575"/>
+      <stop offset="100%" stop-color="#4A929D"/>
+    </linearGradient>
+    <clipPath id="showai-dark-frame"><rect width="512" height="512" rx="88"/></clipPath>
+  </defs>
+  <g clip-path="url(#showai-dark-frame)">
+    <path id="showai-dark-center" d="M 0 0 H 512 C 377 0 302 202 280 324 C 265 406 264 461 264 512 H 248 C 248 461 247 406 232 324 C 210 202 135 0 0 0 Z" fill="url(#showai-dark-region-1)"/>
+    <path id="showai-dark-left" d="M 0 0 C 135 0 210 202 232 324 C 247 406 248 461 248 512 L 0 512 Z" fill="url(#showai-dark-region-0)" stroke="url(#showai-dark-region-0)" stroke-width="0.5"/>
+    <path id="showai-dark-right" d="M 512 0 C 377 0 302 202 280 324 C 265 406 264 461 264 512 L 512 512 Z" fill="url(#showai-dark-region-2)" stroke="url(#showai-dark-region-2)" stroke-width="0.5"/>
+  </g>
+</svg>

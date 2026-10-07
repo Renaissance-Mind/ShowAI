@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="showai-auto-title showai-auto-description">
+  <title id="showai-auto-title">ShowAI information funnel — auto</title>
+  <desc id="showai-auto-description">Two curved boundaries divide the entire square into three regions and converge at the bottom edge. Each region uses a continuous teal gradient.</desc>
+  <defs>
+    <style>
+      :root{--r0s0:#91D5CF;--r0s1:#53ACA9;--r0s2:#2B7D88;--r1s0:#DDF7EA;--r1s1:#8ADFC8;--r1s2:#299F9A;--r2s0:#58B1AD;--r2s1:#2A8592;--r2s2:#185B75}
+      @media (prefers-color-scheme:dark){:root{--r0s0:#234D58;--r0s1:#347D88;--r0s2:#68B4B3;--r1s0:#326F75;--r1s1:#71BDB1;--r1s2:#C3F2D9;--r2s0:#193D4D;--r2s1:#286575;--r2s2:#4A929D}}
+    </style>
+    <linearGradient id="showai-auto-region-0" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
+      <stop offset="0%" stop-color="#91D5CF" style="stop-color:var(--r0s0,#91D5CF)"/>
+      <stop offset="50%" stop-color="#53ACA9" style="stop-color:var(--r0s1,#53ACA9)"/>
+      <stop offset="100%" stop-color="#2B7D88" style="stop-color:var(--r0s2,#2B7D88)"/>
+    </linearGradient>
+    <linearGradient id="showai-auto-region-1" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
+      <stop offset="0%" stop-color="#DDF7EA" style="stop-color:var(--r1s0,#DDF7EA)"/>
+      <stop offset="50%" stop-color="#8ADFC8" style="stop-color:var(--r1s1,#8ADFC8)"/>
+      <stop offset="100%" stop-color="#299F9A" style="stop-color:var(--r1s2,#299F9A)"/>
+    </linearGradient>
+    <linearGradient id="showai-auto-region-2" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
+      <stop offset="0%" stop-color="#58B1AD" style="stop-color:var(--r2s0,#58B1AD)"/>
+      <stop offset="50%" stop-color="#2A8592" style="stop-color:var(--r2s1,#2A8592)"/>
+      <stop offset="100%" stop-color="#185B75" style="stop-color:var(--r2s2,#185B75)"/>
+    </linearGradient>
+    <clipPath id="showai-auto-frame"><rect width="512" height="512" rx="88"/></clipPath>
+  </defs>
+  <g clip-path="url(#showai-auto-frame)">
+    <path id="showai-auto-center" d="M 0 0 H 512 C 377 0 302 202 280 324 C 265 406 264 461 264 512 H 248 C 248 461 247 406 232 324 C 210 202 135 0 0 0 Z" fill="url(#showai-auto-region-1)"/>
+    <path id="showai-auto-left" d="M 0 0 C 135 0 210 202 232 324 C 247 406 248 461 248 512 L 0 512 Z" fill="url(#showai-auto-region-0)" stroke="url(#showai-auto-region-0)" stroke-width="0.5"/>
+    <path id="showai-auto-right" d="M 512 0 C 377 0 302 202 280 324 C 265 406 264 461 264 512 L 512 512 Z" fill="url(#showai-auto-region-2)" stroke="url(#showai-auto-region-2)" stroke-width="0.5"/>
+  </g>
+</svg>
