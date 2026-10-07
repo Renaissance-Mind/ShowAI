@@ -59,6 +59,22 @@
   gap: 2px;
   flex-shrink: 0;
 }
+.studio-sidebar-back {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  min-height: 37px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: left;
+}
+.studio-sidebar-back:hover {
+  background: var(--hover);
+  color: var(--text);
+}
 .studio-main-nav button,
 .studio-sidebar-bottom > button {
   display: flex;

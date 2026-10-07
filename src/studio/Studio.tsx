@@ -13,6 +13,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  ArrowLeft,
   ArrowUpRight,
   AppWindow,
   Blocks,
@@ -87,6 +88,10 @@ import {
 import { orderSidebarItems } from "../core/sidebar-order";
 import { readSidebarExpansion, sidebarExpansionKey } from "./sidebar-state";
 import SidebarNavigation from "./SidebarNavigation";
+import TemplateNavigation, {
+  matchesTemplateType,
+  type TemplateType,
+} from "./TemplateNavigation";
 import RecentPages, { recentPages } from "./RecentPages";
 import appIcon from "../desktop/assets/icon.svg";
 import AutoHideSidebar from "./AutoHideSidebar";
@@ -237,6 +242,7 @@ export default function Studio() {
   const [settingsSection, setSettingsSection] =
     useState<SettingsSection>("general");
   const [templates, setTemplates] = useState<TemplateMetadata[]>([]);
+  const [templateType, setTemplateType] = useState<TemplateType>("all");
   const [catalog, setCatalog] = useState<Catalog>({ builtin: [], custom: [] });
   const [catalogScope, setCatalogScope] =
     useState<CatalogReadOptions["scope"]>("all");
@@ -1203,6 +1209,9 @@ export default function Studio() {
     () => recentPages(projects, contents),
     [projects, contents],
   );
+  const visibleTemplates = templates.filter((item) =>
+    matchesTemplateType(item, templateType),
+  );
   const folderIds = new Set(folders.map((item) => item.id));
   const currentFolder = folders.find((item) => item.id === selectedFolder);
   const filteredPages = pages.filter(
@@ -1323,10 +1332,29 @@ export default function Studio() {
 
   const sidebarContent = (
     <LibraryDragContext.Provider value={libraryDrag.bindings}>
+      {view !== "projects" && (
+        <button
+          className="studio-sidebar-back"
+          aria-label="返回最近"
+          onClick={action(() => navigate("projects"))}
+        >
+          <ArrowLeft size={17} strokeWidth={1.7} aria-hidden="true" />
+          <span>返回</span>
+        </button>
+      )}
       {view === "settings" ? (
         <SettingsNavigation
           section={settingsSection}
           onSelect={setSettingsSection}
+        />
+      ) : view === "templates" ? (
+        <TemplateNavigation
+          templates={templates}
+          active={templateType}
+          onSelect={(type) => {
+            setTemplateType(type);
+            catalogScrollRef.current?.scrollTo({ top: 0 });
+          }}
         />
       ) : view === "components" ? (
         <ComponentNavigation
@@ -2117,7 +2145,7 @@ export default function Studio() {
                   {view === "templates" && (
                     <>
                       <div className="studio-template-grid">
-                        {templates.map((item, index) => (
+                        {visibleTemplates.map((item, index) => (
                           <div
                             className="studio-template-card"
                             key={`${item.scope}:${item.id}:${item.version}`}
@@ -2205,6 +2233,12 @@ export default function Studio() {
                           </div>
                         ))}
                       </div>
+                      {!visibleTemplates.length && (
+                        <div className="studio-empty">
+                          <LayoutTemplate size={30} strokeWidth={1.2} />
+                          <h2>暂无这类模板</h2>
+                        </div>
+                      )}
                     </>
                   )}
                   {view === "components" && (

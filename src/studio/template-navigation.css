@@ -1,0 +1,12 @@
+.template-type-sidebar {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin-top: 28px;
+}
+.template-type-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
