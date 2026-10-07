@@ -1,18 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="showai-dark-title showai-dark-description">
   <title id="showai-dark-title">ShowAI information funnel — dark</title>
-  <desc id="showai-dark-description">An extra-wide funnel with smoothly rounded boundaries and neutral sides and a continuous violet gradient that darkens downward through RGB(18, 10, 143). The curves form a broad waist at 71.5 percent of the height, then open into a larger lower section that meets the frame.</desc>
+  <desc id="showai-dark-description">Two equal-radius semicircles intersect near the lower quarter of the square. A rounded violet connection preserves the waist thickness. Neutral sides surround a continuous gray lavender to deep indigo gradient, darkening downward through RGB(18, 10, 143).</desc>
   <defs>
     <linearGradient id="showai-dark-region-1" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
-      <stop offset="0%" stop-color="#C8C2F1"/>
-      <stop offset="50%" stop-color="#7465CD"/>
-      <stop offset="71.484375%" stop-color="#120A8F"/>
-      <stop offset="100%" stop-color="#090447"/>
+      <stop offset="0%" stop-color="#C2BDE6"/>
+      <stop offset="45%" stop-color="#8174BF"/>
+      <stop offset="71.576077%" stop-color="#120A8F"/>
+      <stop offset="100%" stop-color="#08033A"/>
     </linearGradient>
     <clipPath id="showai-dark-frame"><rect width="512" height="512" rx="88"/></clipPath>
   </defs>
   <g clip-path="url(#showai-dark-frame)">
-    <path id="showai-dark-center" d="M -80 32 V -32 H 592 V 32 C 496 32 284 124 284 366 C 284 434 306 475 342 512 H 170 C 206 475 228 434 228 366 C 228 124 16 32 -80 32 Z" fill="url(#showai-dark-region-1)"/>
-    <path id="showai-dark-left" d="M -80 32 C 16 32 228 124 228 366 C 228 434 206 475 170 512 H -80 Z" fill="#0A0A0A" stroke="#0A0A0A" stroke-width="0.5"/>
-    <path id="showai-dark-right" d="M 592 32 C 496 32 284 124 284 366 C 284 434 306 475 342 512 H 592 Z" fill="#0A0A0A" stroke="#0A0A0A" stroke-width="0.5"/>
+    <path id="showai-dark-left" d="M -300 -8 A 600 600 0 0 1 -300 1192 Z" fill="#0A0A0A"/>
+    <path id="showai-dark-right" d="M 812 -8 A 600 600 0 0 0 812 1192 Z" fill="#0A0A0A"/>
+    <path id="showai-dark-center" d="M -202.347555 0 H 714.347555 A 600 600 0 0 0 217.357250 512 H 294.642750 A 600 600 0 0 0 -202.347555 0 Z" fill="url(#showai-dark-region-1)" fill-rule="evenodd" stroke="url(#showai-dark-region-1)" stroke-width="52" stroke-linejoin="round"/>
   </g>
 </svg>
