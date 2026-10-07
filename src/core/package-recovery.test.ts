@@ -36,6 +36,66 @@ describe("external immutable package recovery", () => {
   afterEach(async () => {
     await rm(root, { recursive: true, force: true });
   });
+  it.each(["historical", "retained-source"])(
+    "recovers external edits in %s packages",
+    async (area) => {
+      const original = await importComponent(
+        root,
+        join(import.meta.dirname, "../../resources/catalog/value-slider"),
+        projectId,
+      );
+      const ordinary = `projects/${projectId}/packages/components/${original.id}/${original.version}/`;
+      let prefix: string;
+      if (area === "retained-source") {
+        const other = (
+          await new FileStore(root).createProject({ name: "Retained sources" })
+        ).id;
+        await importCompiledComponents(root, [original], other);
+        await importComponent(
+          root,
+          join(import.meta.dirname, "../../resources/catalog/value-slider"),
+          other,
+        );
+        projectId = other;
+        operations = new LibraryOperations(root, other);
+        prefix = `projects/${other}/packages/components/${original.id}/.sources/${original.integrity}/`;
+      } else {
+        prefix = `projects/${projectId}/packages/historical/components/${original.integrity}/`;
+        const files = await library.readFiles(
+          (await library.tree())
+            .filter((item) => item.path.startsWith(ordinary))
+            .map((item) => item.path),
+        );
+        const edits = new Map<string, Buffer | null>();
+        for (const [path, bytes] of files) {
+          edits.set(prefix + path.slice(ordinary.length), bytes);
+          edits.set(path, null);
+        }
+        await library.writeFiles(edits, {
+          actor: { kind: "human" },
+          channel: "system",
+          message: "Restore exact dependency",
+        });
+      }
+      const path = join(library.workspace, prefix, "index.tsx"),
+        before = await readFile(path, "utf8"),
+        changed = before + "\n// retained external edit\n";
+      await writeFile(path, changed);
+      const conflicts = await operations.conflicts(projectId);
+      expect(conflicts).toHaveLength(1);
+      const recovered = await operations.recoverPackage({
+        id: conflicts[0].id,
+        clientId: "retained-source-window",
+      });
+      const form = (await new EditorDrafts(root).read(recovered.draft.id))
+        .content as { code: string; version: string };
+      expect(form.code).toBe(changed);
+      expect(form.version).toBe("1.1.1");
+      expect(await readFile(path, "utf8")).toBe(before);
+      expect(await operations.conflicts(projectId)).toEqual([]);
+    },
+    15000,
+  );
   it("retains changed portable runtime bundles without inventing editable source", async () => {
     const original = await importComponent(
         root,

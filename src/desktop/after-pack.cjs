@@ -15,6 +15,8 @@ module.exports = async function afterPack(context) {
   const plugin = join(resources, "runtime");
   for (const file of [
     "scripts/cli.mjs",
+    "node_modules/dugite/git/bin/" +
+      (context.electronPlatformName === "win32" ? "git.exe" : "git"),
     "assets/viewer.html",
     "node_modules/esbuild/lib/main.js",
     "node_modules/react/package.json",

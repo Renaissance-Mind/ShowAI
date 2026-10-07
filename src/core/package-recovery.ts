@@ -23,6 +23,54 @@ import type {
 } from "../components/custom/types";
 const packagePath =
   /^(?:projects\/([^/]+)\/)?packages\/(?:published\/)?(components|templates)\/([a-z][a-z0-9-]*)\/([^/]+)\/(.+)$/;
+const retainedSourcePath =
+  /^(?:projects\/([^/]+)\/)?packages\/(?:published\/)?components\/([a-z][a-z0-9-]*)\/\.sources\/(sha256-[a-f0-9]{64})\/(.+)$/;
+const historicalPackagePath =
+  /^projects\/([^/]+)\/packages\/historical\/(components|templates)\/(sha256-[a-f0-9]{64})\/(.+)$/;
+const isPackagePath = (path: string) =>
+  packagePath.test(path) || historicalPackagePath.test(path);
+async function packageIdentity(library: GitLibrary, path: string) {
+  const historical = path.match(historicalPackagePath),
+    retained = path.match(retainedSourcePath);
+  if (historical || retained) {
+    const owner = historical?.[1] ?? retained?.[1],
+      kind = historical?.[2] ?? "components",
+      integrity = historical?.[3] ?? retained![3],
+      tail = historical?.[4] ?? retained![4],
+      prefix = path.slice(0, -tail.length),
+      metadata = JSON.parse(
+        (
+          await library.readFile(
+            prefix +
+              (historical
+                ? kind === "components"
+                  ? "compiled.json"
+                  : "template.json"
+                : "manifest.json"),
+          )
+        ).toString(),
+      );
+    return {
+      owner,
+      kind,
+      id: metadata.id as string,
+      version: metadata.version as string,
+      integrity,
+      prefix,
+    };
+  }
+  const match = path.match(packagePath);
+  return match
+    ? {
+        owner: match[1],
+        kind: match[2],
+        id: match[3],
+        version: match[4],
+        prefix: path.slice(0, -match[5].length),
+        integrity: undefined,
+      }
+    : undefined;
+}
 const textFiles = new Set([
   ".ts",
   ".tsx",
@@ -68,7 +116,7 @@ async function inspectWorkspaceResources(
       .map((entry) => entry.path)
       .filter(
         (path) =>
-          (packagePath.test(path) ||
+          (isPackagePath(path) ||
             /^projects\/[^/]+\/pages\/[^/]+\.json$/.test(path)) &&
           (!projectId || path.startsWith(`projects/${projectId}/`)),
       ),
@@ -100,7 +148,7 @@ async function inspectWorkspaceResources(
           continue;
         await visit(`${path}/${name}`);
       }
-    else if (info.isFile() && packagePath.test(path)) paths.add(path);
+    else if (info.isFile() && isPackagePath(path)) paths.add(path);
   }
   for (const root of roots) await visit(root);
   const protection = new WorkspaceProtection(library),
@@ -132,8 +180,11 @@ export async function recoverExternalPackage(
   const result = await withLibraryLock(library.root, async () => {
     const protection = new WorkspaceProtection(library),
       selected = await protection.input(input.id),
-      match = selected.conflict.path.match(packagePath);
-    if (!match || (input.boundProject && match[1] !== input.boundProject))
+      identity = await packageIdentity(library, selected.conflict.path);
+    if (
+      !identity ||
+      (input.boundProject && identity.owner !== input.boundProject)
+    )
       throw new CoreError(
         "INVALID_PATH",
         "This conflict is not a package in the bound project.",
@@ -143,11 +194,7 @@ export async function recoverExternalPackage(
         "CONFLICT",
         "This package modification has already been resolved.",
       );
-    const prefix = selected.conflict.path.slice(0, -match[5].length),
-      owner = match[1],
-      kind = match[2],
-      id = match[3],
-      version = match[4],
+    const { prefix, owner, kind, id, version, integrity } = identity,
       scope = owner
         ? "project"
         : prefix.startsWith("packages/published/")
@@ -203,11 +250,13 @@ export async function recoverExternalPackage(
     if (kind === "components") {
       const compiled = await getComponent(library.root, id, version, owner, {
         scope,
+        integrity,
       });
       let source: ComponentSource;
       try {
         source = await readComponentSource(library.root, id, version, owner, {
           scope,
+          integrity,
         });
       } catch (error) {
         if (
@@ -295,6 +344,7 @@ export async function recoverExternalPackage(
       const template = await getTemplate(library.root, id, owner, {
           scope,
           version,
+          integrity,
         }),
         rawTemplate = overlay.get("template.json")?.toString("utf8") ?? "",
         templateResult = parsed<TemplateRecord>(rawTemplate, template),

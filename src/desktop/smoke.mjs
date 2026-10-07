@@ -137,9 +137,9 @@ try {
     const info=await api.invoke('app:info');
     const project=await api.invoke('projects:create',{name:'Desktop smoke'});
     const page=await api.invoke('pages:create',{projectId:project.id,title:'Page'});
-    let saved=await api.invoke('pages:save',{projectId:project.id,pageId:page.document.id,baseHash:page.hash,document:{...page.document,title:'Saved'}});
+    let saved=await api.invoke('pages:save',{projectId:project.id,pageId:page.document.id,baseHash:page.hash,baseRevision:page.revision,document:{...page.document,title:'Saved'}});
     let conflict;
-    try {await api.invoke('pages:save',{projectId:project.id,pageId:page.document.id,baseHash:page.hash,document:page.document});}catch(error){conflict=error;}
+    try {await api.invoke('pages:save',{projectId:project.id,pageId:page.document.id,baseHash:page.hash,baseRevision:page.revision,document:page.document});}catch(error){conflict=error;}
     const duplicate=await api.invoke('pages:duplicate',{projectId:project.id,pageId:page.document.id});
     await api.invoke('pages:remove',{projectId:project.id,pageId:duplicate.document.id});
     await api.invoke('projects:pin',{projectId:project.id,pinned:true});
@@ -147,7 +147,7 @@ try {
     await api.invoke('folders:rename',{projectId:project.id,folderId:folder.id,name:'Renamed folder'});
     await api.invoke('folders:pin',{projectId:project.id,folderId:folder.id,pinned:true});
     const childFolder=await api.invoke('folders:create',{projectId:project.id,parentId:folder.id,name:'Nested'});
-    saved=await api.invoke('pages:move',{projectId:project.id,pageId:saved.document.id,parentId:childFolder.id,baseHash:saved.hash});
+    saved=await api.invoke('pages:move',{projectId:project.id,pageId:saved.document.id,parentId:childFolder.id,baseHash:saved.hash,baseRevision:saved.revision});
     const nestedCopy=await api.invoke('pages:duplicate',{projectId:project.id,pageId:saved.document.id});
     if(nestedCopy.document.parentId!==childFolder.id)throw new Error('Duplicate lost its folder');
     await api.invoke('pages:remove',{projectId:project.id,pageId:nestedCopy.document.id});
@@ -165,15 +165,15 @@ try {
     const importedExplicitRoot=await api.invoke('pages:import',{projectId:project.id,parentId:null,artifact:localArtifact});
     if(importedExplicitRoot.document.parentId!==null)throw new Error('Explicit root import was ignored');
     await api.invoke('pages:remove',{projectId:project.id,pageId:importedExplicitRoot.document.id});
-    saved=await api.invoke('pages:rename',{projectId:project.id,pageId:saved.document.id,title:'Renamed',baseHash:saved.hash});
-    saved=await api.invoke('pages:pin',{projectId:project.id,pageId:saved.document.id,pinned:true,baseHash:saved.hash});
+    saved=await api.invoke('pages:rename',{projectId:project.id,pageId:saved.document.id,title:'Renamed',baseHash:saved.hash,baseRevision:saved.revision});
+    saved=await api.invoke('pages:pin',{projectId:project.id,pageId:saved.document.id,pinned:true,baseHash:saved.hash,baseRevision:saved.revision});
     const templatePage=await api.invoke('pages:create',{projectId:project.id,parentId:childFolder.id,templateId:'research',title:'Folder template'});
     const organized=await api.invoke('pages:list',{projectId:project.id});
     await api.invoke('folders:remove',{projectId:project.id,folderId:folder.id});
     const hiddenPages=await api.invoke('pages:list',{projectId:project.id});
     const hiddenFolders=await api.invoke('folders:list',{projectId:project.id});
-    saved=await api.invoke('pages:move',{projectId:project.id,pageId:saved.document.id,parentId:null,baseHash:saved.hash});
-    saved=await api.invoke('pages:rename',{projectId:project.id,pageId:saved.document.id,title:'Saved',baseHash:saved.hash});
+    saved=await api.invoke('pages:move',{projectId:project.id,pageId:saved.document.id,parentId:null,baseHash:saved.hash,baseRevision:saved.revision});
+    saved=await api.invoke('pages:rename',{projectId:project.id,pageId:saved.document.id,title:'Saved',baseHash:saved.hash,baseRevision:saved.revision});
     const disposable=await api.invoke('projects:create',{name:'Removed project'});
     await api.invoke('projects:remove',{projectId:disposable.id});
     const projects=await api.invoke('projects:list');
@@ -185,18 +185,30 @@ try {
     const asset='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==';
     const nextComponent=await api.invoke('components:save',{projectId:project.id,manifest:{...source.manifest,version:'1.0.1'},schema:source.schema,source:source.source,files:source.files,assets:{'pixel.png':asset}});
     const nextSource=await api.invoke('components:source',{projectId:project.id,id:nextComponent.id,version:nextComponent.version});
-    const savedCustom=await api.invoke('pages:save',{projectId:project.id,pageId:saved.document.id,baseHash:saved.hash,document:{...saved.document,content:{...saved.document.content,content:[...saved.document.content.content,{type:'widget',attrs:{kind:'custom',data:{componentId:nextComponent.id,version:nextComponent.version,integrity:nextComponent.integrity,props:nextComponent.defaultData}}}]}}});
+    const savedCustom=await api.invoke('pages:save',{projectId:project.id,pageId:saved.document.id,baseHash:saved.hash,baseRevision:saved.revision,document:{...saved.document,content:{...saved.document.content,content:[...saved.document.content.content,{type:'widget',attrs:{kind:'custom',data:{componentId:nextComponent.id,version:nextComponent.version,integrity:nextComponent.integrity,props:nextComponent.defaultData}}}]}}});
     const frame=document.createElement('iframe');frame.setAttribute('sandbox','allow-scripts');frame.style.width='500px';
     const frameReady=new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(new Error('Component did not run under the desktop CSP.')),10000);window.addEventListener('message',function receive(event){if(event.source!==frame.contentWindow||event.data?.channel!=='desktop-smoke')return;if(event.data.type==='showai:error'){clearTimeout(timeout);window.removeEventListener('message',receive);reject(new Error(event.data.message));}else if(event.data.type==='showai:ready'){frame.contentWindow.postMessage({channel:'desktop-smoke',type:'showai:validate',requestId:'check',props:component.defaultData},'*');}else if(event.data.type==='showai:validation'&&event.data.requestId==='check'&&event.data.valid){clearTimeout(timeout);window.removeEventListener('message',receive);resolve(true);}})});
     frame.srcdoc=component.html.replace('<!--SHOWAI_COMPONENT_DATA-->','<script id="showai-component-data" type="application/json">'+JSON.stringify({channel:'desktop-smoke',props:component.defaultData,readOnly:false})+'</script>');document.body.append(frame);
     const componentReady=await frameReady;frame.remove();
+    const history=await api.invoke('history:list',{projectId:project.id,pageId:savedCustom.document.id});
+    const original=await api.invoke('history:page',{projectId:project.id,pageId:savedCustom.document.id,revision:page.revision});
+    const search=await api.invoke('library:search',{projectId:project.id,query:'Saved'});
     const csp=document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.content;
     const unknown=await api.invoke('arbitrary:read',{}).catch(error=>error.code);
-    return {home:info.home,packaged:info.packaged,projectId:project.id,pageId:savedCustom.document.id,cli:info.cli,pageCount:pages.length,title:pages[0].title,conflict,organization,templateCount:templates.length,componentBytes:component.html.length,componentSource:source.source.length,componentsOnSave:Array.isArray(saved.components),assetsPreserved:nextSource.assets?.['pixel.png']===asset,componentReady,csp,unknown};
+    return {history,originalTitle:original.document.title,search,revision:savedCustom.revision,home:info.home,packaged:info.packaged,projectId:project.id,pageId:savedCustom.document.id,cli:info.cli,pageCount:pages.length,title:pages[0].title,conflict,organization,templateCount:templates.length,componentBytes:component.html.length,componentSource:source.source.length,componentsOnSave:Array.isArray(saved.components),assetsPreserved:nextSource.assets?.['pixel.png']===asset,componentReady,csp,unknown};
   })()`);
   assert.equal(result.home, join(temporary, "home"));
   assert.equal(result.packaged, Boolean(packagedExecutable));
   assert.equal(result.pageCount, 1);
+  assert.match(result.revision, /^[a-f0-9]{40}$/);
+  assert.equal(result.originalTitle, "Page");
+  assert.ok(result.history.items.length >= 5);
+  assert.ok(
+    result.history.items.every((entry) => entry.actor.kind === "human"),
+  );
+  assert.ok(
+    result.search.items.some((item) => item.resourceId === result.pageId),
+  );
   assert.equal(result.title, "Saved");
   assert.ok(
     Object.values(result.organization).every(Boolean),
@@ -224,6 +236,16 @@ try {
     },
   );
   assert.equal(JSON.parse(cli.stdout).ok, true);
+  const verified = await promisify(execFile)(
+    result.cli.command,
+    [...result.cli.args, "library", "verify", "--json"],
+    {
+      cwd: temporary,
+      env: { ...environment, ...result.cli.env },
+      timeout: 20000,
+    },
+  );
+  assert.equal(JSON.parse(verified.stdout).data.verified, true);
   await renderer(
     "window.__closeCount=0;window.__release=window.showai.onBeforeClose(async()=>{window.__closeCount++;return false});'registered'",
   );
@@ -284,6 +306,9 @@ try {
         checks: [
           "desktop bridge",
           "file persistence",
+          "versioned history, original page and human attribution",
+          "search from committed content",
+          "Git integrity using bundled runtime",
           "nested folders, rename, pin, move, and soft removal",
           "duplicate/import destination and legacy folder compatibility",
           "conflict details",
