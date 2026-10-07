@@ -1,6 +1,4 @@
-import type { ReactNode } from "react";
 import {
-  ArrowLeft,
   Bot,
   ChevronDown,
   ChevronRight,
@@ -55,23 +53,13 @@ export type SettingsSection = (typeof sections)[number]["id"];
 
 export function SettingsNavigation({
   section,
-  info,
   onSelect,
-  onBack,
-  navigation,
 }: {
   section: SettingsSection;
-  info: DesktopInfo | null;
   onSelect: (section: SettingsSection) => void;
-  onBack: () => void;
-  navigation?: ReactNode;
 }) {
   return (
-    <aside className="studio-sidebar studio-settings-sidebar">
-      <button className="settings-back" onClick={onBack}>
-        <ArrowLeft size={16} aria-hidden="true" />
-        返回工作区
-      </button>
+    <div className="settings-category-sidebar">
       <div className="settings-nav-label">设置</div>
       <nav className="settings-nav" aria-label="设置分类">
         {sections.map(({ id, label, icon: Icon }) => (
@@ -85,15 +73,7 @@ export function SettingsNavigation({
           </button>
         ))}
       </nav>
-      <div className="settings-sidebar-footer">
-        <span className="settings-app-symbol" aria-hidden="true">
-          ✳
-        </span>
-        <span>ShowAI</span>
-        {info && <span className="settings-version">v{info.version}</span>}
-      </div>
-      {navigation}
-    </aside>
+    </div>
   );
 }
 
@@ -149,7 +129,7 @@ export function SettingsPanel({
   return (
     <div className="studio-settings" key={section}>
       <header className="settings-heading">
-        <p>{current.description}</p>
+        <h2>{current.label}</h2>
       </header>
 
       {section === "icons" && <IconViewer />}

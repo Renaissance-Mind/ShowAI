@@ -213,7 +213,6 @@ export default function Studio() {
   const [view, setView] = useState<View>("projects");
   const [settingsSection, setSettingsSection] =
     useState<SettingsSection>("general");
-  const settingsReturnView = useRef<View>("projects");
   const [templates, setTemplates] = useState<TemplateMetadata[]>([]);
   const [catalog, setCatalog] = useState<Catalog>({ builtin: [], custom: [] });
   const [catalogScope, setCatalogScope] =
@@ -489,8 +488,6 @@ export default function Studio() {
       setView("page");
       return;
     }
-    if (next === "settings" && view !== "settings")
-      settingsReturnView.current = view;
     setContextMenu(null);
     setQuery("");
     setView(next);
@@ -1107,113 +1104,90 @@ export default function Studio() {
   return (
     <ComponentLibraryContext.Provider value={pickerLibrary}>
       <div
-        className={`studio ${focusWindow ? "focus-window" : ""} ${view === "settings" ? "settings-view" : ""} ${view === "components" ? "components-view" : ""}`}
+        className={`studio ${focusWindow ? "focus-window" : ""} ${view === "components" ? "components-view" : ""}`}
         data-native-titlebar={
           info?.platform === "darwin" && info.mode !== "browser"
             ? "mac"
             : undefined
         }
       >
-        {!focusWindow &&
-          (view === "settings" ? (
-            <SettingsNavigation
-              section={settingsSection}
-              info={info}
-              onSelect={setSettingsSection}
-              onBack={action(() => navigate(settingsReturnView.current))}
-              navigation={sidebarNavigation}
-            />
-          ) : (
-            <AutoHideSidebar
-              enabled={view === "page" && !!page.draft}
-              interactionHeld={
-                !!dialog ||
-                !!projectsMenu ||
-                !!groupMenu ||
-                !!contextMenu?.anchor.closest(".studio-sidebar")
-              }
-            >
-              <div className="studio-brand">
-                <span>✳</span>
-                <strong>ShowAI</strong>
-              </div>
-              {view === "components" ? (
-                <ComponentNavigation
-                  groups={componentGroups}
-                  active={componentCategory}
-                  onSelect={(category) => {
-                    setComponentCategory(category);
-                    setCategoryRequest((current) => ({
-                      category,
-                      sequence: (current?.sequence ?? 0) + 1,
-                    }));
-                  }}
-                />
-              ) : (
-                <ProjectSidebar
-                  projects={projects}
-                  organization={organization}
-                  selectedProject={selectedProject}
-                  collapsed={collapsedSections}
-                  setCollapsed={setCollapsedSections}
-                  onCreate={(groupId) =>
-                    setDialog({ type: "project", groupId })
-                  }
-                  onMenu={(anchor) =>
-                    setProjectsMenu((current) =>
-                      current === anchor ? null : anchor,
-                    )
-                  }
-                  onGroupMenu={(group, anchor) =>
-                    setGroupMenu({ group, anchor })
-                  }
-                  renderProject={(item) => (
-                    <div key={item.id}>
-                      <LibraryRow
-                        target={projectTarget(item)}
-                        active={
-                          selectedProject === item.id &&
-                          view === "project" &&
-                          !selectedFolder
-                        }
-                        expanded={!!expandedProjects[item.id]}
-                        onToggle={action(() => toggleProject(item.id))}
-                        onOpen={action(() => openProject(item.id))}
-                        onMenu={showMenu}
-                      />
-                      {expandedProjects[item.id] && (
-                        <div className="studio-tree-children">
-                          {renderChildren(item.id)}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                />
-              )}
-              {sidebarNavigation}
-            </AutoHideSidebar>
-          ))}
+        {!focusWindow && (
+          <AutoHideSidebar
+            enabled={view === "page" && !!page.draft}
+            interactionHeld={
+              !!dialog ||
+              !!projectsMenu ||
+              !!groupMenu ||
+              !!contextMenu?.anchor.closest(".studio-sidebar")
+            }
+          >
+            <div className="studio-brand">
+              <span>✳</span>
+              <strong>ShowAI</strong>
+            </div>
+            {view === "settings" ? (
+              <SettingsNavigation
+                section={settingsSection}
+                onSelect={setSettingsSection}
+              />
+            ) : view === "components" ? (
+              <ComponentNavigation
+                groups={componentGroups}
+                active={componentCategory}
+                onSelect={(category) => {
+                  setComponentCategory(category);
+                  setCategoryRequest((current) => ({
+                    category,
+                    sequence: (current?.sequence ?? 0) + 1,
+                  }));
+                }}
+              />
+            ) : (
+              <ProjectSidebar
+                projects={projects}
+                organization={organization}
+                selectedProject={selectedProject}
+                collapsed={collapsedSections}
+                setCollapsed={setCollapsedSections}
+                onCreate={(groupId) => setDialog({ type: "project", groupId })}
+                onMenu={(anchor) =>
+                  setProjectsMenu((current) =>
+                    current === anchor ? null : anchor,
+                  )
+                }
+                onGroupMenu={(group, anchor) => setGroupMenu({ group, anchor })}
+                renderProject={(item) => (
+                  <div key={item.id}>
+                    <LibraryRow
+                      target={projectTarget(item)}
+                      active={
+                        selectedProject === item.id &&
+                        view === "project" &&
+                        !selectedFolder
+                      }
+                      expanded={!!expandedProjects[item.id]}
+                      onToggle={action(() => toggleProject(item.id))}
+                      onOpen={action(() => openProject(item.id))}
+                      onMenu={showMenu}
+                    />
+                    {expandedProjects[item.id] && (
+                      <div className="studio-tree-children">
+                        {renderChildren(item.id)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              />
+            )}
+            {sidebarNavigation}
+          </AutoHideSidebar>
+        )}
         <main className="studio-main">
           <header className="studio-topbar">
-            {view === "settings" ? (
-              <div className="settings-breadcrumb">
-                <span>设置</span>
-                <ChevronRight size={12} aria-hidden="true" />
-                <span>
-                  {
-                    {
-                      general: "通用",
-                      appearance: "外观",
-                      icons: "图标",
-                      agent: "Agent",
-                      about: "关于",
-                    }[settingsSection]
-                  }
-                </span>
-              </div>
-            ) : view === "projects" ||
-              view === "templates" ||
-              view === "components" ? (
+            {view === "settings" ||
+            view === "projects" ||
+            view === "templates" ||
+            view === "components" ? (
               <h1 className="studio-topbar-title">{heading}</h1>
             ) : (
               <div className="studio-breadcrumb">
@@ -1695,7 +1669,6 @@ export default function Studio() {
                   if (next) {
                     await page.clear();
                     setInfo(next);
-                    settingsReturnView.current = "projects";
                     setSelectedProject(null);
                     selectedRef.current = null;
                     setSelectedFolder(null);
