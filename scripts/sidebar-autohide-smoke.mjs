@@ -127,6 +127,11 @@ try {
       (value) => Math.abs(value) < 1,
       "overlay finishes opening",
     );
+    await poll(
+      () => shell.evaluate((el) => el.getBoundingClientRect().width),
+      (value) => value < 0.1,
+      "document expansion finishes",
+    );
     await page.mouse.move(120, 120);
   };
   await moveOut();
@@ -151,6 +156,45 @@ try {
   );
   const expandedWidth = await width();
   assert.equal(await sidebar.evaluate((el) => el.inert), true);
+  await page.mouse.move(2, 400);
+  await modeIs("overlay");
+  await page.waitForTimeout(1100);
+  assert.equal(
+    await shell.getAttribute("data-sidebar-mode"),
+    "overlay",
+    "stationary pointer at the reveal edge keeps the panel open",
+  );
+  await page.mouse.move(120, 380);
+  await page.waitForTimeout(1100);
+  assert.equal(
+    await shell.getAttribute("data-sidebar-mode"),
+    "overlay",
+    "stationary pointer inside the panel keeps it open",
+  );
+  const brand = await sidebar.locator(".studio-brand").boundingBox();
+  await page.mouse.move(brand.x + 80, brand.y + 12);
+  await page.waitForTimeout(1100);
+  assert.equal(
+    await shell.getAttribute("data-sidebar-mode"),
+    "overlay",
+    "hovering the desktop drag region keeps navigation open",
+  );
+  await moveOut();
+  await modeIs("hidden");
+  await page.mouse.move(2, 400);
+  await modeIs("overlay");
+  await page.mouse.move(180, 450);
+  await page.waitForTimeout(1100);
+  assert.equal(
+    await shell.getAttribute("data-sidebar-mode"),
+    "overlay",
+    "entering during the opening animation keeps the panel open",
+  );
+  await moveOut();
+  await modeIs("hidden");
+  result.checks.push(
+    "Edge hover, stationary panel hover and entry during the opening animation remain open until the pointer actually leaves",
+  );
   await reveal();
   assert.equal(await width(), expandedWidth);
   await page.screenshot({ path: join(output, "overlay.png") });
@@ -256,10 +300,7 @@ try {
     208,
   );
   await page.screenshot({ path: join(output, "narrow-dark.png") });
-  await sidebar
-    .getByRole("navigation", { name: "主要导航" })
-    .getByRole("button", { name: "项目", exact: true })
-    .click();
+  await sidebar.getByRole("button", { name: "导航验收", exact: true }).click();
   await modeIs("docked");
   await moveOut();
   await page.waitForTimeout(650);
