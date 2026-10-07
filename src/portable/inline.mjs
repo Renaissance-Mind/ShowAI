@@ -91,7 +91,35 @@ export function toInlineFragment(html, id = `showai-${randomUUID()}`) {
       return `<script type="module">${script}</script>`;
     })
     .join("\n");
-  let fragment = `<section id="${id}" data-showai-inline-root>${markup}</section>\n<style>\n@scope (#${id}) {\n${css}\n.portable-document { max-width: none; padding: 24px 0 12px; }\n.portable-title { padding-right: 96px; font-size: 28px; margin-bottom: 24px; }\n.portable-options { display: none; }\n.portable-app { min-height: 0; }\n}\n</style>\n${code}\n`;
+  // The conversation measures the fragment's outer height. A viewport-sized
+  // Page hides its content height behind an inner scrollbar, so let the active
+  // root Page grow naturally. Keep spatial Boards and embedded fixed frames
+  // bounded. Applying this at export time also adapts archived readers.
+  let fragment = `<section id="${id}" data-showai-inline-root>${markup}</section>
+<style>
+@scope (#${id}) {
+${css}
+.portable-document { max-width: none; padding: 24px 0 12px; }
+.portable-title { padding-right: 96px; font-size: 28px; margin-bottom: 24px; }
+.portable-options { display: none; }
+.portable-app { min-height: 0; }
+.portable-app:has(> .container-workspace > .container-main > .container-page.is-root),
+.portable-app > .container-workspace:has(> .container-main > .container-page.is-root) {
+  height: auto;
+}
+.portable-app > .container-workspace > .container-main:has(> .container-page.is-root) {
+  flex: none;
+}
+.portable-app > .container-workspace > .container-main > .container-page.is-root {
+  height: auto;
+  overflow: visible;
+  overscroll-behavior: auto;
+  scrollbar-gutter: auto;
+}
+}
+</style>
+${code}
+`;
   // Pack the complete transport, including repeated component HTML and CSS.
   // Restore the exact artifact before starting the reader: editable package
   // integrity and source downloads retain their original bytes and fields.
