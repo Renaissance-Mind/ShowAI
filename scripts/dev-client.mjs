@@ -11,7 +11,12 @@ if (!new URLSearchParams(location.search).has("componentPreview")) {
   function updateIdentity(current) {
     badge.title = `${current.root}\n当前源码：${current.branch} · ${current.commit}\n${location.origin}`;
     label = `开发版 · ${current.branch} · ${current.commit.slice(0, 7)} · ${current.mode === "desktop" ? "桌面" : "浏览器"}`;
-    badge.textContent = message ? `${label} · ${message}` : label;
+    badge.textContent =
+      current.mode === "desktop" && !window.showai
+        ? "请打开 Applications/ShowAI.app 使用桌面实时测试版"
+        : message
+          ? `${label} · ${message}`
+          : label;
   }
   updateIdentity(info);
   import.meta.hot.on("showai:identity", updateIdentity);

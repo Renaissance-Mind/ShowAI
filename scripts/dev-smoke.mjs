@@ -249,6 +249,10 @@ try {
     await tab.goto(original.url);
     await tab.locator("[data-showai-development]").waitFor();
     assert.equal(await tab.evaluate(() => typeof window.showai), "undefined");
+    await tab
+      .locator("[data-showai-development]")
+      .filter({ hasText: "请打开 Applications/ShowAI.app" })
+      .waitFor();
     checks.push(
       "a browser tab at the desktop URL cannot block desktop updates",
     );
