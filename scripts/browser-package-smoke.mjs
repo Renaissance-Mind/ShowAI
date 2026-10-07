@@ -86,6 +86,25 @@ try {
     "Bundled runtime",
   ]);
   assert.equal(page.document.content.type, "surface");
+  assert.equal(
+    JSON.parse(await readFile(join(home, "library.json"), "utf8")).version,
+    2,
+  );
+  assert.match(page.revision, /^[a-f0-9]{40}$/);
+  const history = await run([
+    "history",
+    "list",
+    "--project",
+    project.id,
+    "--page",
+    page.document.id,
+  ]);
+  assert.equal(history.items[0].revision, page.revision);
+  if (process.env.CODEX_THREAD_ID) {
+    assert.equal(history.items[0].actor.harness, "codex");
+    assert.equal(history.items[0].actor.sessionId, process.env.CODEX_THREAD_ID);
+  }
+  assert.equal((await run(["library", "verify"])).verified, true);
   await run([
     "catalog",
     "import",
@@ -148,6 +167,8 @@ try {
             "workbench-assets",
             "page-model-v3-and-frontend-fingerprints",
             "CLI-library",
+            "versioned-Git-history-and-actual-session-attribution",
+            "bundled-Git-integrity",
             "component-compiler",
             "HTML-export",
             "runtime-registration",
