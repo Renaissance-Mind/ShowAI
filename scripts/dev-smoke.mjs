@@ -40,6 +40,27 @@ await symlink(
   join(fixture, "node_modules"),
   process.platform === "win32" ? "junction" : "dir",
 );
+const execute = promisify(execFile);
+await execute("git", ["init", "--initial-branch=main", fixture]);
+await execute("git", ["-C", fixture, "add", "package.json"]);
+const commit = async (message) => {
+  await execute("git", [
+    "-C",
+    fixture,
+    "-c",
+    "user.name=Development Smoke",
+    "-c",
+    "user.email=smoke@localhost",
+    "commit",
+    "--allow-empty",
+    "-m",
+    message,
+  ]);
+  return (
+    await execute("git", ["-C", fixture, "rev-parse", "HEAD"])
+  ).stdout.trim();
+};
+await commit("test: initialize isolated development fixture");
 const delay = (ms) => new Promise((done) => setTimeout(done, ms));
 async function poll(read, condition, label, timeout = 40000) {
   const deadline = Date.now() + timeout;
@@ -65,30 +86,37 @@ assert.ok(["browser", "desktop"].includes(mode));
 const port = await freePort();
 const debugPort = await freePort();
 const home = join(output, "library");
-const child = spawn(
-  process.execPath,
-  [
-    join(fixture, "scripts/dev.mjs"),
-    mode,
-    "--port",
-    String(port),
-    "--home",
-    home,
-    "--no-open",
-  ],
-  {
-    cwd: fixture,
-    stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, SHOWAI_DEV_DEBUG_PORT: String(debugPort) },
-  },
-);
 let logs = "";
-child.stdout.on("data", (chunk) => {
-  logs += chunk;
-});
-child.stderr.on("data", (chunk) => {
-  logs += chunk;
-});
+function startDevelopment() {
+  const process = spawn(
+    globalThis.process.execPath,
+    [
+      join(fixture, "scripts/dev.mjs"),
+      mode,
+      "--port",
+      String(port),
+      "--home",
+      home,
+      "--no-open",
+    ],
+    {
+      cwd: fixture,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: {
+        ...globalThis.process.env,
+        SHOWAI_DEV_DEBUG_PORT: String(debugPort),
+      },
+    },
+  );
+  process.stdout.on("data", (chunk) => {
+    logs += chunk;
+  });
+  process.stderr.on("data", (chunk) => {
+    logs += chunk;
+  });
+  return process;
+}
+let child = startDevelopment();
 const receiptPath = join(
   fixture,
   ".showai-dev",
@@ -107,7 +135,7 @@ try {
     mode === "desktop"
       ? await chromium.connectOverCDP(`http://127.0.0.1:${debugPort}`)
       : await chromium.launch({ headless: true });
-  const page =
+  let page =
     mode === "desktop"
       ? browser.contexts()[0].pages()[0]
       : await browser.newPage();
@@ -164,6 +192,23 @@ try {
     "function",
   );
   checks.push("complete development workbench and guarded reload bridge load");
+  const revision = await commit("test: update development identity");
+  await page
+    .locator("[data-showai-development]")
+    .filter({ hasText: revision.slice(0, 7) })
+    .waitFor();
+  assert.equal((await receipt()).backendPid, original.backendPid);
+  assert.equal(
+    (
+      await fetch(original.url + "__showai-dev/status").then((response) =>
+        response.json(),
+      )
+    ).sourceCommit,
+    revision,
+  );
+  checks.push(
+    "commits update the source badge and session without reloading the workbench or backend",
+  );
   if (mode === "desktop") {
     const navigated = page.waitForEvent("framenavigated", {
       predicate: (frame) => frame === page.mainFrame(),
@@ -178,6 +223,25 @@ try {
     assert.equal(page.url(), original.url);
     assert.equal((await receipt()).backendPid, original.backendPid);
     checks.push("JavaScript reload stays inside the same desktop window");
+    const closed = page.waitForEvent("close");
+    await page.evaluate(() => window.close());
+    await closed;
+    const context = browser.contexts()[0];
+    const reopened = context.waitForEvent("page");
+    await fetch(original.url + "__showai-dev/focus", {
+      method: "POST",
+      headers: { Origin: new URL(original.url).origin },
+    });
+    page = await reopened;
+    debugPage = page;
+    await page
+      .getByRole("button", { name: "新建项目", exact: true })
+      .first()
+      .waitFor();
+    assert.equal((await receipt()).backendPid, original.backendPid);
+    checks.push(
+      "reopening after closing every desktop window reuses the running backend",
+    );
   }
   if (mode === "desktop") {
     observer = await chromium.launch({ headless: true });
@@ -556,7 +620,50 @@ try {
     path: join(output, `${mode}-updated.png`),
     fullPage: true,
   });
-  console.log(JSON.stringify({ mode, output, checks }, null, 2));
+  // A full quit/relaunch must reuse validated artifacts and still load real APIs.
+  const beforeRelaunch = await receipt();
+  await observer?.close();
+  observer = undefined;
+  if (mode === "desktop") await browser.close();
+  const exited = once(child, "exit");
+  child.kill("SIGTERM");
+  await exited;
+  child = startDevelopment();
+  const warm = await poll(
+    receipt,
+    (value) => value?.pid !== beforeRelaunch.pid && !!value?.startup,
+    "warm relaunch",
+  );
+  assert.equal(warm.startup.cacheHit, true);
+  if (mode === "desktop")
+    browser = await chromium.connectOverCDP(`http://127.0.0.1:${debugPort}`);
+  const warmPage =
+    mode === "desktop"
+      ? browser.contexts()[0].pages()[0]
+      : await browser.newPage();
+  debugPage = warmPage;
+  if (mode === "browser") await warmPage.goto(warm.url);
+  await warmPage.waitForFunction(() => !!window.showai);
+  await poll(
+    () => warmPage.evaluate(() => window.showai.invoke("projects:list")),
+    (value) => value.some((item) => item.id === project.id),
+    "warm relaunch API",
+  );
+  checks.push(
+    `validated warm relaunch uses cache: cold ${original.startup.totalMs} ms, warm ${warm.startup.totalMs} ms (preparation ${original.startup.preparationMs} → ${warm.startup.preparationMs} ms)`,
+  );
+  console.log(
+    JSON.stringify(
+      {
+        mode,
+        output,
+        checks,
+        startup: { cold: original.startup, warm: warm.startup },
+      },
+      null,
+      2,
+    ),
+  );
 } catch (error) {
   if (debugPage && !debugPage.isClosed()) {
     await debugPage.screenshot({

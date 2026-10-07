@@ -13,7 +13,9 @@ import { createServer } from "vite";
 import { rawSourcePlugin } from "./raw-source-plugin.mjs";
 import { developmentSessions } from "./dev-session.mjs";
 import { developmentControl } from "./dev-control.mjs";
+import { developmentCache } from "./dev-cache.mjs";
 
+const startupTime = performance.now();
 const root = fileURLToPath(new URL("../", import.meta.url));
 process.chdir(root);
 const { values, positionals } = parseArgs({
@@ -44,12 +46,18 @@ const origin = `http://127.0.0.1:${port}`;
 const token = randomBytes(32).toString("hex");
 const git = (args) =>
   execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
-const identity = {
+const readIdentity = () => ({
   root,
   mode,
   branch: git(["branch", "--show-current"]) || "detached",
   commit: git(["rev-parse", "HEAD"]),
-};
+});
+let identity = readIdentity();
+const cache = developmentCache(root, directory, mode);
+let startup;
+let launchedAt;
+let startedCommit;
+let sessionWrite = Promise.resolve();
 await mkdir(join(runtime, "scripts"), { recursive: true });
 await mkdir(join(runtime, "assets"), { recursive: true });
 await mkdir(staging, { recursive: true });
@@ -103,6 +111,7 @@ const frontendServer = createHttpServer();
 const vite = await createServer({
   root,
   cacheDir: join(directory, "vite-cache"),
+  optimizeDeps: { entries: ["index.html"] },
   plugins: [developmentPlugin],
   server: {
     host: "127.0.0.1",
@@ -152,8 +161,10 @@ frontendServer.on(
       mode,
       url: origin + "/",
       home: environment.SHOWAI_HOME,
-      branch: git(["branch", "--show-current"]),
-      sourceCommit: git(["rev-parse", "HEAD"]),
+      branch: identity.branch,
+      sourceCommit: identity.commit,
+      startedCommit,
+      startup,
       pid: process.pid,
       backendPid: child?.pid,
       ready: !!child && !!readyReceipt,
@@ -174,6 +185,7 @@ frontendServer.on(
 const sessions = developmentSessions(vite.ws);
 let child,
   watcher,
+  identityWatcher,
   stopping = false,
   rebuilding = false,
   requested = false,
@@ -240,6 +252,7 @@ const entrypoints = [
       ]),
 ];
 async function compile() {
+  const before = await cache.fingerprint();
   const outputs = await Promise.all(
     entrypoints.map(async (entry) => {
       const result = await bundle({
@@ -286,10 +299,10 @@ async function compile() {
     await import("./build-reader-source.mjs")
   ).buildReaderSource(root, join(staging, "reader/reader-source.json"));
   for (const path of readerSources) dependencies.add(path);
-  return outputs.flatMap((result) => result.outputFiles);
+  return { files: outputs.flatMap((result) => result.outputFiles), before };
 }
-async function publish(outputs) {
-  for (const output of outputs) {
+async function publish({ files, before }) {
+  for (const output of files) {
     await mkdir(resolve(output.path, ".."), { recursive: true });
     const temporary = output.path + ".tmp";
     await writeFile(temporary, output.contents);
@@ -314,6 +327,36 @@ async function publish(outputs) {
         main: "main.mjs",
       }),
     );
+  await cache.save(before, dependencies, [
+    ...files.map((output) => output.path),
+    reader,
+    inlineReader,
+    ...(mode === "desktop" ? [join(directory, "desktop/package.json")] : []),
+  ]);
+}
+function writeSession() {
+  const snapshot =
+    JSON.stringify(
+      {
+        ...identity,
+        startedCommit,
+        startup,
+        url: origin + "/",
+        pid: process.pid,
+        backendPid: child?.pid,
+        home: readyReceipt.home,
+        runtime,
+        startedAt: launchedAt,
+      },
+      null,
+      2,
+    ) + "\n";
+  sessionWrite = sessionWrite.then(async () => {
+    const path = join(directory, "session.json");
+    await writeFile(path + ".tmp", snapshot);
+    await rename(path + ".tmp", path);
+  });
+  return sessionWrite;
 }
 async function launch() {
   readyReceipt = undefined;
@@ -370,22 +413,9 @@ async function launch() {
     }
   });
   await ready;
-  await writeFile(
-    join(directory, "session.json"),
-    JSON.stringify(
-      {
-        ...identity,
-        url: origin + "/",
-        pid: process.pid,
-        backendPid: next.pid,
-        home: readyReceipt.home,
-        runtime,
-        startedAt: new Date().toISOString(),
-      },
-      null,
-      2,
-    ) + "\n",
-  );
+  launchedAt = new Date().toISOString();
+  startedCommit = identity.commit;
+  await writeSession();
 }
 async function stopChild() {
   const previous = child;
@@ -463,6 +493,7 @@ async function stop() {
   }
   vite.ws.send("showai:stopped", {});
   await watcher?.close();
+  await identityWatcher?.close();
   await vite.close();
   if (frontendServer.listening) {
     await new Promise((done, reject) => {
@@ -474,16 +505,54 @@ async function stop() {
 process.on("SIGINT", () => void stop());
 process.on("SIGTERM", () => void stop());
 vite.ws.on("showai:retry", () => void rebuild());
+vite.ws.on("showai:identity-request", (_data, client) =>
+  client.send("showai:identity", identity),
+);
 try {
   console.log(
     `ShowAI ${mode === "desktop" ? "桌面" : "浏览器"}开发版\n代码：${root}\n分支：${identity.branch}\n地址：${origin}\n首次启动正在准备本地运行环境，无需安装包。`,
   );
   frontendServer.listen(port, "127.0.0.1");
   await once(frontendServer, "listening");
-  await publish(await compile());
+  const cached = await cache.restore();
+  if (cached) {
+    dependencies = new Set(cached);
+    console.log("源码与运行产物校验通过，复用本地构建缓存。");
+  } else await publish(await compile());
+  const preparedAt = performance.now();
   await launch();
+  startup = {
+    cacheHit: !!cached,
+    preparationMs: Math.round(preparedAt - startupTime),
+    backendMs: Math.round(performance.now() - preparedAt),
+    totalMs: Math.round(performance.now() - startupTime),
+  };
+  await writeSession();
+  console.log(
+    `启动耗时：${startup.totalMs} ms（准备 ${startup.preparationMs} ms，本地服务与窗口 ${startup.backendMs} ms）。`,
+  );
   if (mode === "browser" && !values["no-open"])
     child.send("showai:development-open");
+  const gitPaths = ["HEAD", "refs/heads", "packed-refs"].map((path) =>
+    resolve(root, git(["rev-parse", "--git-path", path])),
+  );
+  identityWatcher = watch(gitPaths, { ignoreInitial: true });
+  identityWatcher.on("all", () => {
+    identity = readIdentity();
+    const module = vite.environments.client.moduleGraph.getModuleById(
+      "\0virtual:showai-development-info",
+    );
+    if (module) vite.environments.client.moduleGraph.invalidateModule(module);
+    vite.ws.send("showai:identity", identity);
+    if (readyReceipt)
+      void writeSession().catch((error) =>
+        console.error("无法更新开发版本记录", error),
+      );
+  });
+  identityWatcher.on("error", (error) => {
+    console.error(error);
+    void stop();
+  });
   watcher = watch(
     [
       join(root, "src"),

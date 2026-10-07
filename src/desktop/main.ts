@@ -413,9 +413,14 @@ else {
           );
         else {
           const window = [...windows][0];
-          window?.restore();
-          window?.show();
-          window?.focus();
+          if (window) {
+            window.restore();
+            window.show();
+            window.focus();
+          } else
+            void createWindow().catch((error) =>
+              dialog.showErrorBox("无法打开窗口", errorResult(error).message),
+            );
         }
       }
     });

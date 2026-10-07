@@ -6,9 +6,15 @@ if (!new URLSearchParams(location.search).has("componentPreview")) {
   badge.dataset.showaiDevelopment = "true";
   badge.style.cssText =
     "position:fixed;bottom:8px;right:12px;z-index:2147483647;padding:5px 10px;border:1px solid #bfc5d1;border-radius:6px;background:#fff;color:#273044;font:12px system-ui;box-shadow:0 1px 5px #0001;max-width:70vw";
-  badge.title = `${info.root}\n${info.branch} · ${info.commit}\n${location.origin}`;
-  const label = `开发版 · ${info.branch} · ${info.commit.slice(0, 7)} · ${info.mode === "desktop" ? "桌面" : "浏览器"}`;
-  badge.textContent = label;
+  let label,
+    message = "";
+  function updateIdentity(current) {
+    badge.title = `${current.root}\n当前源码：${current.branch} · ${current.commit}\n${location.origin}`;
+    label = `开发版 · ${current.branch} · ${current.commit.slice(0, 7)} · ${current.mode === "desktop" ? "桌面" : "浏览器"}`;
+    badge.textContent = message ? `${label} · ${message}` : label;
+  }
+  updateIdentity(info);
+  import.meta.hot.on("showai:identity", updateIdentity);
   document.body.append(badge);
   let frozen = false;
   function freeze(value) {
@@ -16,6 +22,7 @@ if (!new URLSearchParams(location.search).has("componentPreview")) {
     document.getElementById("root").inert = value;
   }
   const hello = () => {
+    import.meta.hot.send("showai:identity-request");
     if (window.showai?.prepareReload)
       import.meta.hot.send("showai:hello", { url: location.href });
   };
@@ -23,7 +30,8 @@ if (!new URLSearchParams(location.search).has("componentPreview")) {
     badge.textContent = "请打开 Applications/ShowAI.app 使用桌面实时测试版";
   hello();
   import.meta.hot.on("vite:ws:connect", hello);
-  import.meta.hot.on("showai:status", ({ message }) => {
+  import.meta.hot.on("showai:status", (status) => {
+    message = status.message;
     badge.textContent = `${label} · ${message}`;
   });
   import.meta.hot.on("showai:prepare-restart", async ({ id }) => {
@@ -39,7 +47,8 @@ if (!new URLSearchParams(location.search).has("componentPreview")) {
   });
   import.meta.hot.on("showai:restart-cancelled", () => {
     freeze(false);
-    badge.textContent = `${label} · 更新已暂停，请处理保存问题后点击重试`;
+    message = "更新已暂停，请处理保存问题后点击重试";
+    badge.textContent = `${label} · ${message}`;
   });
   badge.addEventListener("click", () => {
     if (!frozen) import.meta.hot.send("showai:retry");

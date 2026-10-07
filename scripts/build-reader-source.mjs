@@ -150,5 +150,8 @@ export async function buildReaderSource(root, destination) {
     .digest("hex");
   await mkdir(dirname(destination), { recursive: true });
   await writeFile(destination, JSON.stringify({ ...payload, integrity }));
-  return Object.keys(files).map((path) => resolve(root, path));
+  return [
+    ...Object.keys(graph.metafile.inputs).map((path) => resolve(root, path)),
+    corePath,
+  ];
 }
