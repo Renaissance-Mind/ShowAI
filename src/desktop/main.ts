@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { AgentService, errorResult } from "../agent/service";
 import { MaintenanceScheduler } from "../core/maintenance-scheduler";
+import { openLibrary } from "../core/open-library";
 import { registerRuntime } from "../agent/runtime";
 import { assertId, CoreError, FileStore } from "../core/store";
 import {
@@ -89,6 +90,7 @@ async function useHome(home?: string): Promise<void> {
   await maintenance?.stop();
   await watcher?.close();
   store = new FileStore(home);
+  await openLibrary(store.root);
   service = new AgentService({ root: store.root });
   await store.listProjects();
   await registerRuntime(store.root, info().cli);

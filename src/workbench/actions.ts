@@ -93,6 +93,7 @@ export const workbenchActions = new Set([
   "history:mergePreview",
   "history:mergeSave",
   "history:conflicts",
+  "history:recoverPackage",
   "history:conflict",
   "history:resolve",
   "library:search",
@@ -469,6 +470,12 @@ export function createWorkbench(
         );
       case "history:conflicts":
         return service.workspaceConflicts(text(args, "projectId", true));
+      case "history:recoverPackage":
+        return service.recoverPackageConflict({
+          id: required(args, "id"),
+          clientId: required(args, "clientId"),
+          targetProjectId: text(args, "targetProjectId", true),
+        });
       case "history:conflict":
         return service.workspaceConflict(required(args, "id"));
       case "history:resolve": {

@@ -6,7 +6,7 @@ import { atomicLibraryFile, readLibraryBytes } from "./library-files";
 import { withLibraryLock } from "./library-lock";
 import { CoreError } from "./model";
 import { GitLibrary } from "./git-library";
-import { documentHash } from "./diff";
+import { documentHash, canonicalJson } from "./diff";
 import type { ShowDocument } from "./model";
 import type { ChangeActor } from "./history-model";
 
@@ -170,6 +170,20 @@ export class EditorDrafts {
             (record.sequence ?? -1) > input.sequence
           )
             return record;
+          if (
+            input.sequence !== undefined &&
+            record.sequence === input.sequence
+          ) {
+            const retained = await this.readUnlocked(id);
+            if (
+              canonicalJson(retained.content) === canonicalJson(JSON.parse(raw))
+            )
+              return record;
+            throw new CoreError(
+              "CONFLICT",
+              "The same draft sequence was reused for different content; its prior version was retained.",
+            );
+          }
         }
         let content = JSON.parse(raw),
           path = `drafts/${id}.json`,

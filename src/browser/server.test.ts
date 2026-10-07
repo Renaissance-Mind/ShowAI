@@ -153,6 +153,7 @@ test("browser workbench, standalone CLI and a second client share real files and
     projectId: project.id,
     pageId: original.document.id,
     baseHash: original.hash,
+    baseRevision: original.revision,
     document: { ...original.document, title: "Browser saved" },
   });
   const agent = await runCli([
@@ -178,6 +179,8 @@ test("browser workbench, standalone CLI and a second client share real files and
     operations,
     "--base-hash",
     saved.hash,
+    "--base-revision",
+    saved.revision!,
   ]);
   const latest = await invoke<LoadedPage>("pages:get", {
     projectId: project.id,
@@ -190,6 +193,7 @@ test("browser workbench, standalone CLI and a second client share real files and
       projectId: project.id,
       pageId: original.document.id,
       baseHash: saved.hash,
+      baseRevision: saved.revision,
       document: saved.document,
     },
   });

@@ -730,6 +730,23 @@ export function createMcpServer(options: {
     () => call(() => service.workspaceConflicts(projectId)),
   );
   server.registerTool(
+    "workspace_recover_package",
+    {
+      description:
+        "Retain external package source, schema and assets as an editable local draft, restore the immutable version projection, then publish edits as a new version.",
+      inputSchema: { conflictId: z.string(), clientId: z.string() },
+      annotations: write,
+    },
+    ({ conflictId, clientId }) =>
+      call(() =>
+        service.recoverPackageConflict({
+          id: conflictId,
+          clientId,
+          targetProjectId: projectId,
+        }),
+      ),
+  );
+  server.registerTool(
     "workspace_conflict",
     {
       description:

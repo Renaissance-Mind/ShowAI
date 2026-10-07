@@ -19,6 +19,72 @@ import type { SearchResult } from "../core/library-index";
 import type { PageMergePreview } from "../core/page-merge";
 import type { ShowDocument } from "../types";
 import "./history.css";
+import type { WorkspaceConflict } from "../core/workspace-conflicts";
+import type { recoverExternalPackage } from "../core/package-recovery";
+export type PackageRecoveryResult = Awaited<
+  ReturnType<typeof recoverExternalPackage>
+>;
+export function WorkspaceConflictsDialog({
+  onClose,
+  onSelect,
+}: {
+  onClose: () => void;
+  onSelect: (id: string) => void;
+}) {
+  const [items, setItems] = useState<WorkspaceConflict[]>([]),
+    [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    void desktop.invoke<WorkspaceConflict[]>("history:conflicts").then(
+      (values) => {
+        if (active) setItems(values);
+      },
+      (reason) => {
+        if (active) setError(errorMessage(reason));
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, []);
+  return (
+    <Dialog title="外部文件修改" onClose={onClose} wide>
+      <div className="history-search-results">
+        <p>外部版本会保留。组件与模板先恢复为可编辑草稿，再保存为新版本。</p>
+        {error && (
+          <p className="history-error" role="alert">
+            {error}
+          </p>
+        )}
+        {items.map((item) => (
+          <button
+            key={item.id}
+            className="history-search-result"
+            onClick={() => onSelect(item.id)}
+          >
+            <FileText size={18} />
+            <span>
+              <strong>{item.path.split("/").at(-1)}</strong>
+              <small>{item.path}</small>
+              <p>
+                {time(item.observedAt)} ·{" "}
+                {
+                  { modified: "已修改", added: "新增文件", deleted: "已删除" }[
+                    item.kind
+                  ]
+                }
+              </p>
+            </span>
+            <ArrowRight size={16} />
+          </button>
+        ))}
+        {!items.length && !error && (
+          <p className="history-empty">正在检查或暂无外部修改。</p>
+        )}
+      </div>
+    </Dialog>
+  );
+}
 
 function time(value: string) {
   return new Intl.DateTimeFormat("zh-CN", {
@@ -1133,10 +1199,14 @@ export function ExternalConflictDialog({
   id,
   onClose,
   onResolved,
+  projectId,
+  onPackageRecovered,
 }: {
   id: string;
   onClose: () => void;
   onResolved: () => Promise<void>;
+  projectId?: string;
+  onPackageRecovered: (result: PackageRecoveryResult) => Promise<void>;
 }) {
   const [detail, setDetail] = useState<{
       path: string;
@@ -1156,6 +1226,11 @@ export function ExternalConflictDialog({
         (value) => {
           if (active && value) {
             setDetail(value);
+            if (
+              value.path.includes("/packages/") ||
+              value.path.startsWith("packages/")
+            )
+              return;
             const artifact = value.external
               ? JSON.parse(value.external)
               : value.current
@@ -1175,6 +1250,28 @@ export function ExternalConflictDialog({
       active = false;
     };
   }, [id]);
+  const packageConflict =
+    !!detail &&
+    (detail.path.includes("/packages/") || detail.path.startsWith("packages/"));
+  async function recoverPackage() {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await desktop.invoke<PackageRecoveryResult>(
+        "history:recoverPackage",
+        {
+          id,
+          clientId: `external:${crypto.randomUUID()}`,
+          targetProjectId: projectId,
+        },
+      );
+      await onPackageRecovered(result);
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
   async function choose(resolution: "discard" | "import" | "merge") {
     setBusy(true);
     setError("");
@@ -1219,6 +1316,7 @@ export function ExternalConflictDialog({
             <button
               aria-pressed={tab === "merge"}
               onClick={() => setTab("merge")}
+              disabled={packageConflict}
             >
               编辑合并结果
             </button>
@@ -1251,9 +1349,17 @@ export function ExternalConflictDialog({
             <button
               className="studio-button primary"
               disabled={busy}
-              onClick={() => void choose(tab === "merge" ? "merge" : "import")}
+              onClick={() =>
+                packageConflict
+                  ? void recoverPackage()
+                  : void choose(tab === "merge" ? "merge" : "import")
+              }
             >
-              {tab === "merge" ? "保存合并结果" : "导入外部修改"}
+              {packageConflict
+                ? "保留为编辑草稿"
+                : tab === "merge"
+                  ? "保存合并结果"
+                  : "导入外部修改"}
             </button>
             <button
               className="studio-button"

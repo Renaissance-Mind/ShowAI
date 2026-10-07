@@ -342,6 +342,10 @@ export function TemplateDialog({
   const [origin, setOrigin] = useState<PackageRevisionRef | undefined>(
     record.integrity ? revision("template", record, projectId) : undefined,
   );
+  const [rawTemplate, setRawTemplate] = useState("");
+  const [recoveryFiles, setRecoveryFiles] = useState<
+    Record<string, string | null>
+  >({});
   const form = {
     name,
     description,
@@ -353,6 +357,8 @@ export function TemplateDialog({
     examples,
     parts,
     origin,
+    rawTemplate,
+    recoveryFiles,
   };
   const localDraft = useCatalogDraft({
     kind: "template",
@@ -371,6 +377,8 @@ export function TemplateDialog({
       setExamples(value.examples);
       setParts(value.parts);
       setOrigin(value.origin);
+      setRawTemplate(value.rawTemplate ?? "");
+      setRecoveryFiles(value.recoveryFiles ?? {});
       setTab("edit");
     },
   });
@@ -410,6 +418,7 @@ export function TemplateDialog({
       throw new Error("先选择一个项目，定制版本会保存在该项目中。");
     const retained = await localDraft.persist(true);
     await desktop.invoke("templates:save", {
+      ...(rawTemplate ? JSON.parse(rawTemplate) : {}),
       projectId,
       id: record.id || undefined,
       version,
@@ -434,6 +443,29 @@ export function TemplateDialog({
     >
       <div className="studio-template-edit catalog-detail">
         <CatalogDraftRecovery draft={localDraft} />
+        {rawTemplate && (
+          <details className="catalog-recovery-source" open>
+            <summary>外部模板文件（可修复未完成的 JSON）</summary>
+            <textarea
+              aria-label="恢复的模板 JSON"
+              className="studio-code-editor"
+              value={rawTemplate}
+              onChange={(event) => setRawTemplate(event.target.value)}
+              spellCheck={false}
+            />
+            <p>保存时使用新版本号与当前表单中的内容。</p>
+          </details>
+        )}
+        {!!Object.keys(recoveryFiles).length && (
+          <details>
+            <summary>保留的外部文件</summary>
+            {Object.entries(recoveryFiles).map(([name, bytes]) => (
+              <p key={name}>
+                {name} · {bytes === null ? "外部删除" : "原始字节已保留"}
+              </p>
+            ))}
+          </details>
+        )}
         {!!record.id && <Lineage item={record} />}
         <div className="studio-detail-tabs">
           <button
@@ -1094,6 +1126,10 @@ export function ComponentDialog({
     custom?.id ?? `my-${builtin?.kind}`,
   );
   const [workingSource, setWorkingSource] = useState(source);
+  const [manifestJson, setManifestJson] = useState("");
+  const [recoveryFiles, setRecoveryFiles] = useState<
+    Record<string, string | null>
+  >({});
   const [origin, setOrigin] = useState<PackageRevisionRef | undefined>(
     custom ? revision("component", custom, projectId) : undefined,
   );
@@ -1111,6 +1147,8 @@ export function ComponentDialog({
     category,
     source: workingSource,
     origin,
+    manifestJson,
+    recoveryFiles,
   };
   const localDraft = useCatalogDraft({
     kind: "component",
@@ -1133,6 +1171,8 @@ export function ComponentDialog({
       setCategory(value.category);
       setWorkingSource(value.source);
       setOrigin(value.origin);
+      setManifestJson(value.manifestJson ?? "");
+      setRecoveryFiles(value.recoveryFiles ?? {});
       setTab("code");
     },
   });
@@ -1158,6 +1198,7 @@ export function ComponentDialog({
       projectId,
       manifest: {
         ...baseManifest,
+        ...(manifestJson ? JSON.parse(manifestJson) : {}),
         id: componentId,
         category,
         name,
@@ -1218,6 +1259,29 @@ export function ComponentDialog({
     >
       <div className="studio-component-detail catalog-detail">
         <CatalogDraftRecovery draft={localDraft} />
+        {manifestJson && (
+          <details className="catalog-recovery-source">
+            <summary>外部组件定义（可修复未完成的 JSON）</summary>
+            <textarea
+              aria-label="恢复的组件定义 JSON"
+              className="studio-code-editor"
+              value={manifestJson}
+              onChange={(event) => setManifestJson(event.target.value)}
+              spellCheck={false}
+            />
+            <p>保存时使用当前表单中的名称、新版本号与参数。</p>
+          </details>
+        )}
+        {!!Object.keys(recoveryFiles).length && (
+          <details>
+            <summary>保留的外部文件</summary>
+            {Object.entries(recoveryFiles).map(([name, bytes]) => (
+              <p key={name}>
+                {name} · {bytes === null ? "外部删除" : "原始字节已保留"}
+              </p>
+            ))}
+          </details>
+        )}
         {custom && <Lineage item={custom} />}
         {tab === "about" && (
           <>

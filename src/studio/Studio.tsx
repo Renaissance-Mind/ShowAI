@@ -88,6 +88,7 @@ import {
   MergeDialog,
   ExternalConflictDialog,
   ImportedSnapshotsDialog,
+  WorkspaceConflictsDialog,
 } from "./HistoryDialogs";
 import type { SearchResult } from "../core/library-index";
 import LibraryMigrationDialog from "./LibraryMigrationDialog";
@@ -108,6 +109,7 @@ type LoadedTemplate = TemplateRecord & {
   previewDocument?: ShowDocument;
 };
 type DialogState =
+  | { type: "workspaceConflicts" }
   | { type: "migration" }
   | { type: "importedSnapshots"; projectId: string; pageId?: string }
   | { type: "history"; projectId: string; pageId?: string }
@@ -1158,6 +1160,14 @@ export default function Studio() {
             <div className="studio-header-actions">
               {info?.libraryVersion === 2 && (
                 <>
+                  <button
+                    className="studio-icon"
+                    aria-label="查看外部文件修改"
+                    title="查看外部文件修改"
+                    onClick={() => setDialog({ type: "workspaceConflicts" })}
+                  >
+                    <FolderOpen size={16} />
+                  </button>
                   <button
                     className="studio-icon"
                     aria-label="搜索内容库"
@@ -2291,12 +2301,73 @@ export default function Studio() {
         {dialog?.type === "externalConflict" && (
           <ExternalConflictDialog
             id={dialog.id}
+            projectId={selectedProject ?? undefined}
+            onPackageRecovered={async (result) => {
+              await refresh();
+              const ref = result.package,
+                target = result.draft.projectId;
+              if (ref.kind === "component") {
+                const custom = await desktop.invoke<CompiledComponent>(
+                  "components:get",
+                  {
+                    id: ref.id,
+                    version: ref.version,
+                    scope: ref.scope,
+                    projectId: ref.projectId,
+                  },
+                );
+                let source: ComponentSource;
+                try {
+                  source = await desktop.invoke<ComponentSource>(
+                    "components:source",
+                    {
+                      id: ref.id,
+                      version: ref.version,
+                      scope: ref.scope,
+                      projectId: ref.projectId,
+                    },
+                  );
+                } catch (reason) {
+                  if (!errorMessage(reason).includes("no editable source"))
+                    throw reason;
+                  source = (
+                    await desktop.invoke<{
+                      content: { source: ComponentSource };
+                    }>("drafts:read", { id: result.draft.id })
+                  ).content.source;
+                }
+                setDialog({
+                  type: "component",
+                  custom,
+                  source,
+                  projectId: target,
+                });
+              } else {
+                const record = await desktop.invoke<LoadedTemplate>(
+                  "templates:get",
+                  {
+                    id: ref.id,
+                    version: ref.version,
+                    scope: ref.scope,
+                    projectId: ref.projectId,
+                  },
+                );
+                setDialog({ type: "template", record, projectId: target });
+              }
+              setNotice("外部文件已保留为草稿，选择恢复后可保存新版本");
+            }}
             onClose={closeDialog}
             onResolved={async () => {
               await page.acceptResolution();
               await refresh();
               setNotice("外部修改已处理，快照仍可保留查看");
             }}
+          />
+        )}
+        {dialog?.type === "workspaceConflicts" && (
+          <WorkspaceConflictsDialog
+            onClose={closeDialog}
+            onSelect={(id) => setDialog({ type: "externalConflict", id })}
           />
         )}
         {dialog?.type === "group" && (

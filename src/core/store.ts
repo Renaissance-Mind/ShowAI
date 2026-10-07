@@ -1,6 +1,7 @@
 import { artifactVersion } from "../surface/document.mjs";
 import { createResource, upgradeResource } from "../surface/containers.mjs";
 import { constants } from "node:fs";
+import { AsyncLocalStorage } from "node:async_hooks";
 import {
   lstat,
   mkdir,
@@ -30,7 +31,9 @@ import {
   normalizeDocument,
 } from "./diff";
 import { CoreError } from "./model";
-import { libraryMutations } from "./history-context";
+import { libraryMutations, legacyMutations } from "./history-context";
+import { withLibraryLock } from "./library-lock";
+const projectionReads = new AsyncLocalStorage<string>();
 import { WorkspaceProtection } from "./workspace-conflicts";
 import {
   workspaceRoot,
@@ -864,6 +867,16 @@ export class FileStore {
     projectId: string,
     pageId: string,
   ): Promise<PageRecord> {
+    if (
+      projectionReads.getStore() !== this.root &&
+      libraryMutations.getStore()?.root !== this.root &&
+      legacyMutations.getStore() !== this.root
+    )
+      return withLibraryLock(this.root, () =>
+        projectionReads.run(this.root, () =>
+          this.readRecord(projectId, pageId),
+        ),
+      );
     const path = this.pagePath(projectId, pageId);
     const value = await this.readJson(path);
     let document: ShowDocument;

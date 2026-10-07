@@ -6,6 +6,7 @@ import { withChangeContext } from "../core/history-context";
 import { mutateLibrary } from "../core/library-runtime";
 import { canonicalJson } from "../core/diff";
 import { GitLibrary } from "../core/git-library";
+import { openLibrary } from "../core/open-library";
 import { LibraryImport } from "../core/library-import";
 import {
   LibraryMaintenance,
@@ -552,6 +553,14 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
         requireCount(args, 2);
         return service.workspaceConflicts(option(args, "project"));
       }
+      if (action === "recover-package") {
+        requireCount(args, 3);
+        return service.recoverPackageConflict({
+          id: args.positional[2],
+          clientId: `cli:${commandContext(args).actor.sessionId ?? "local-recovery"}`,
+          targetProjectId: option(args, "project"),
+        });
+      }
       if (action === "conflict") {
         requireCount(args, 3);
         return service.workspaceConflict(id);
@@ -998,6 +1007,10 @@ export async function runCli(argv: string[]): Promise<unknown> {
   const args = parseArguments(argv);
   const context = commandContext(args);
   const [command, action, mode] = args.positional;
+  if (command !== "library" && !args.options.help)
+    await openLibrary(
+      new AgentService({ root: option(args, "home") }).store.root,
+    );
   const mutation =
     (command === "projects" &&
       ["current", "create", "bind"].includes(action)) ||

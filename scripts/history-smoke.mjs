@@ -44,8 +44,9 @@ await symlink(
 const bootstrap = join(output, "bootstrap.mjs");
 await build({
   stdin: {
-    contents:
-      'import {GitLibrary} from "./src/core/git-library.ts"; await new GitLibrary(process.argv[2]).initialize();',
+    contents: process.argv.includes("--legacy-import")
+      ? 'import {FileStore} from "./src/core/store.ts"; await new FileStore(process.argv[2]).createProject({name:"Legacy import seed"});'
+      : 'import {GitLibrary} from "./src/core/git-library.ts"; await new GitLibrary(process.argv[2]).initialize();',
     resolveDir: root,
   },
   outfile: bootstrap,
@@ -55,8 +56,7 @@ await build({
   format: "esm",
   plugins: [rawSourcePlugin],
 });
-if (!process.argv.includes("--legacy-import"))
-  await promisify(execFile)(process.execPath, [bootstrap, home]);
+await promisify(execFile)(process.execPath, [bootstrap, home]);
 async function freePort() {
   const server = createServer();
   server.listen(0, "127.0.0.1");
@@ -470,6 +470,90 @@ try {
   assert.equal(drafts.length, 0);
   checks.push(
     "component forms preserve incomplete JSON, restore chosen drafts, keep input focus and clear only committed generations",
+  );
+  const versions = await api("components:list", {
+      projectId: project.id,
+      scope: "project",
+    }),
+    latest = versions
+      .filter((item) => item.id === component.id)
+      .sort((a, b) => b.version.localeCompare(a.version))[0];
+  const packageDir = join(
+      home,
+      "workspace",
+      "projects",
+      project.id,
+      "packages",
+      "components",
+      latest.id,
+      latest.version,
+    ),
+    originalSource = await readFile(join(packageDir, "index.tsx"), "utf8"),
+    originalManifest = await readFile(
+      join(packageDir, "manifest.json"),
+      "utf8",
+    );
+  await writeFile(
+    join(packageDir, "index.tsx"),
+    originalSource + "\n// external workbench recovery\n",
+  );
+  await writeFile(join(packageDir, "props.schema.json"), '{"unfinished":');
+  await writeFile(join(packageDir, "manifest.json"), "{unfinished manifest");
+  await page
+    .getByRole("button", { name: "查看外部文件修改", exact: true })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /index\.tsx/ })
+    .first()
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "保留为编辑草稿", exact: true })
+    .click();
+  dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("button", { name: /^恢复草稿/ })
+    .first()
+    .click();
+  await dialog.getByRole("button", { name: "数据结构", exact: true }).click();
+  assert.equal(
+    await dialog
+      .getByRole("textbox", { name: "组件参数规则", exact: true })
+      .inputValue(),
+    '{"unfinished":',
+  );
+  await dialog
+    .getByRole("textbox", { name: "组件参数规则", exact: true })
+    .fill('{"type":"object"}');
+  await dialog
+    .getByText("外部组件定义（可修复未完成的 JSON）", { exact: true })
+    .click();
+  await dialog
+    .getByRole("textbox", { name: "恢复的组件定义 JSON", exact: true })
+    .fill(originalManifest);
+  await dialog
+    .getByRole("button", { name: "保存项目新版本", exact: true })
+    .click();
+  await poll(
+    () => api("components:list", { projectId: project.id, scope: "project" }),
+    (items) =>
+      items.some(
+        (item) =>
+          item.id === latest.id &&
+          item.version !== latest.version &&
+          item.version !== component.version,
+      ),
+    "external package published as a new version",
+  );
+  await dialog.getByRole("button", { name: "关闭弹窗", exact: true }).click();
+  await dialog.waitFor({ state: "hidden" });
+  assert.equal(
+    await readFile(join(packageDir, "index.tsx"), "utf8"),
+    originalSource,
+  );
+  checks.push(
+    "external package source and incomplete JSON recover through the actual workbench and publish a new immutable version",
   );
   const template = await api("templates:save", {
     projectId: project.id,

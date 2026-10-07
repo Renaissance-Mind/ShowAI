@@ -16,6 +16,7 @@ import { watch } from "chokidar";
 import { version } from "../../package.json";
 import { AgentService, errorResult } from "../agent/service";
 import { MaintenanceScheduler } from "../core/maintenance-scheduler";
+import { openLibrary } from "../core/open-library";
 import { registerRuntime } from "../agent/runtime";
 import { CoreError, FileStore, assertId } from "../core/store";
 import {
@@ -97,6 +98,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   async function useHome(home: string) {
     await maintenance?.stop();
     store = new FileStore(home);
+    await openLibrary(store.root);
     service = new AgentService({ root: store.root });
     await store.listProjects();
     await registerRuntime(store.root, info().cli);

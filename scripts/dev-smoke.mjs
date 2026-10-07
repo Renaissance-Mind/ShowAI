@@ -440,6 +440,25 @@ try {
     );
   }
   await page.getByRole("button", { name: "保留为副本", exact: true }).click();
+  // A versioned home preserves external files separately from its formal head.
+  // Explicitly import the retained original after the local draft was copied.
+  if (info.libraryVersion === 2) {
+    const conflicts = await page.evaluate(() =>
+      window.showai.invoke("history:conflicts"),
+    );
+    const retained = conflicts.find((item) =>
+      item.path.endsWith(`/pages/${created.document.id}.json`),
+    );
+    assert.ok(
+      retained,
+      "The external original must remain retained after copying the draft",
+    );
+    await page.evaluate(
+      (id) =>
+        window.showai.invoke("history:resolve", { id, resolution: "import" }),
+      retained.id,
+    );
+  }
   await page.locator(".studio-save-state.saved").waitFor();
   const saved = await cli("pages", "list", "--project", project.id);
   assert.equal(saved.length, 2);

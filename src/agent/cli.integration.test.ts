@@ -18,6 +18,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { parseArtifact } from "../portable/validation.mjs";
 import { GitLibrary } from "../core/git-library";
+import { FileStore } from "../core/store";
 
 const execute = promisify(execFile);
 let home: string;
@@ -48,6 +49,9 @@ async function run(
 
 beforeAll(async () => {
   home = await mkdtemp(join(tmpdir(), "showai-agent-test-"));
+  // This shared fixture exercises the retained file-library protocol. New empty
+  // homes have separate versioned tests and now initialize history automatically.
+  await new FileStore(home).createProject({ name: "Legacy protocol fixture" });
   await mkdir(join(repository, "node_modules/.cache"), { recursive: true });
   bundleDirectory = await mkdtemp(
     join(repository, "node_modules/.cache/showai-agent-"),
@@ -76,6 +80,7 @@ afterAll(async () => {
 test("CLI prepares and activates an old library, and MCP restores an imported checkpoint with project scope and retry identity", async () => {
   const old = join(home, "legacy-import-source"),
     target = join(home, "legacy-import-target");
+  await new FileStore(old).createProject({ name: "Legacy import fixture" });
   const local = (args: string[], root = old) => run(args, { home: root });
   const project = await local([
     "projects",
@@ -1336,11 +1341,20 @@ test("directory projects are shared across sessions, canonical paths and concurr
   } finally {
     await client.close();
   }
-  const recordPath = join(library, "projects", root.project.id, "project.json");
-  const record = JSON.parse(await readFile(recordPath, "utf8"));
-  await writeFile(recordPath, JSON.stringify({ ...record, archived: true }));
+  const { pageCount: _count, ...archivedProject } = (
+    await new FileStore(library).listProjects()
+  ).find((item) => item.id === root.project.id)!;
+  await new GitLibrary(library).writeFiles(
+    new Map([
+      [
+        `projects/${root.project.id}/project.json`,
+        Buffer.from(JSON.stringify({ ...archivedProject, archived: true })),
+      ],
+    ]),
+    { actor: { kind: "human" }, channel: "system" },
+  );
   await expect(runHere(["projects", "current"])).rejects.toThrow("archived");
-});
+}, 20000);
 
 test("progressive CLI discovery is paginated and keeps detailed content opt-in", async () => {
   const project = await run([

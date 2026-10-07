@@ -4,7 +4,13 @@ import { FileStore } from "../core/store";
 import { applyOperations, canonicalJson } from "../core/diff";
 import { createHash } from "node:crypto";
 import { mutateLibrary } from "../core/library-runtime";
-import { changeContext, withChangeContext } from "../core/history-context";
+import {
+  changeContext,
+  withChangeContext,
+  legacyMutations,
+  libraryMutations,
+} from "../core/history-context";
+import { openLibrary } from "../core/open-library";
 import {
   LibraryOperations,
   type HistoryQuery,
@@ -1065,6 +1071,14 @@ export class AgentService {
   workspaceConflict(id: string) {
     return this.versioned().conflict(id);
   }
+  recoverPackageConflict(input: {
+    id: string;
+    clientId: string;
+    targetProjectId?: string;
+  }) {
+    if (input.targetProjectId) this.requireProject(input.targetProjectId);
+    return this.versioned().recoverPackage(input);
+  }
   resolveWorkspaceConflict(input: {
     id: string;
     resolution: "discard" | "import" | "merge";
@@ -1073,11 +1087,16 @@ export class AgentService {
     return this.versioned().resolveConflict(input);
   }
 
-  private mutation<T>(
+  private async mutation<T>(
     name: string,
     args: unknown[],
     operation: () => Promise<T>,
   ): Promise<T> {
+    if (
+      legacyMutations.getStore() !== this.store.root &&
+      libraryMutations.getStore()?.root !== this.store.root
+    )
+      await openLibrary(this.store.root);
     const context = changeContext();
     const requestFingerprint =
       context.requestFingerprint ??

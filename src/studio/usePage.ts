@@ -486,6 +486,8 @@ export function usePage() {
     const projectId = projectRef.current,
       pageId = current.current.id,
       sequence = revision.current;
+    const sourceDraft = await persist(current.current, sequence, projectId),
+      sourceOrigin = recoveredFrom.current;
     const copied = await desktop.invoke<LoadedPage>("pages:create", {
       projectId,
       document: {
@@ -501,16 +503,29 @@ export function usePage() {
       return null;
     const latest = current.current,
       changedDuringCopy = revision.current !== sequence;
+    if (!changedDuringCopy) {
+      await desktop.invoke("drafts:remove", {
+        id: sourceDraft.id,
+        generation: sourceDraft.generation,
+      });
+      if (sourceOrigin)
+        await desktop.invoke("drafts:remove", {
+          id: sourceOrigin.id,
+          generation: sourceOrigin.generation,
+        });
+    }
     install(projectId, copied);
-    if (changedDuringCopy)
+    if (changedDuringCopy) {
+      recoveredFrom.current = sourceDraft;
       edit({
         ...latest,
         id: copied.document.id,
         title: `${latest.title || "无标题"} 副本`,
         createdAt: copied.document.createdAt,
       });
+    }
     return copied;
-  }, [install, edit]);
+  }, [install, edit, persist]);
 
   const retry = useCallback(async () => {
     blocked.current = false;

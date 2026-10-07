@@ -27,6 +27,10 @@ import type {
 } from "../components/custom/types";
 import type { LibraryImportReport } from "./library-import";
 import {
+  scanWorkspaceResources,
+  recoverExternalPackage,
+} from "./package-recovery";
+import {
   readArchivedReader,
   readerBindingPath,
   type ReaderBinding,
@@ -620,11 +624,23 @@ export class LibraryOperations {
   }
   async conflicts(projectId?: string) {
     const project = this.project(projectId);
+    await scanWorkspaceResources(this.library, project);
     return (await new WorkspaceProtection(this.library).list()).filter(
       (item) =>
         item.state === "unresolved" &&
         (!project || item.path.startsWith(`projects/${project}/`)),
     );
+  }
+  recoverPackage(input: {
+    id: string;
+    clientId: string;
+    targetProjectId?: string;
+  }) {
+    if (input.targetProjectId) this.project(input.targetProjectId);
+    return recoverExternalPackage(this.library, {
+      ...input,
+      boundProject: this.boundProject,
+    });
   }
   async conflict(id: string) {
     const item = await new WorkspaceProtection(this.library).input(id);
