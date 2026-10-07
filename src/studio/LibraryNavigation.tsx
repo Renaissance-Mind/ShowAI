@@ -18,6 +18,7 @@ import {
   Pin,
 } from "../ui/icons";
 import "./library-row.css";
+import { useLibraryDrag } from "./LibraryDrag";
 
 export type LibraryTarget =
   | {
@@ -64,6 +65,7 @@ export function LibraryRow({
   onMenu,
 }: LibraryRowProps) {
   const menuButton = useRef<HTMLButtonElement>(null);
+  const drag = useLibraryDrag();
   const title =
     target.title.trim() ||
     (target.kind === "page"
@@ -83,6 +85,7 @@ export function LibraryRow({
 
   return (
     <div
+      {...drag?.row(target, expanded, onToggle)}
       className={`studio-tree-row${active ? " active" : ""}`}
       data-kind={target.kind}
       data-library-id={target.id}

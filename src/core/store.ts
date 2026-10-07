@@ -35,6 +35,7 @@ import { libraryMutations, legacyMutations } from "./history-context";
 import { withLibraryLock } from "./library-lock";
 const projectionReads = new AsyncLocalStorage<string>();
 import { WorkspaceProtection } from "./workspace-conflicts";
+import { orderSidebarItems, placeSidebarItem } from "./sidebar-order";
 import {
   workspaceRoot,
   versionedLibrary,
@@ -54,6 +55,7 @@ import type {
   ProjectMetadata,
   ProjectSummary,
   SidebarOrganization,
+  SidebarEntryMove,
   ShowDocument,
 } from "./model";
 
@@ -442,7 +444,259 @@ export class FileStore {
       if (!ids.has(groupId))
         throw new CoreError("INVALID_DATA", "Project group is missing.");
     }
+    const validateOrder = (order: unknown) => {
+      if (
+        !Array.isArray(order) ||
+        order.length > 100000 ||
+        new Set(order).size !== order.length
+      )
+        throw new CoreError("INVALID_DATA", "Invalid sidebar order.");
+      order.forEach(assertId);
+    };
+    if (sidebar.projectOrder !== undefined) validateOrder(sidebar.projectOrder);
+    if (sidebar.entryOrder !== undefined) {
+      if (
+        !sidebar.entryOrder ||
+        typeof sidebar.entryOrder !== "object" ||
+        Array.isArray(sidebar.entryOrder)
+      )
+        throw new CoreError("INVALID_DATA", "Invalid sidebar entry order.");
+      for (const [id, order] of Object.entries(sidebar.entryOrder)) {
+        assertId(id);
+        validateOrder(order);
+      }
+    }
     return sidebar;
+  }
+
+  async arrangeProject(
+    projectId: string,
+    sectionId: string,
+    relativeId?: string,
+    placement: "before" | "after" = "before",
+  ): Promise<SidebarOrganization> {
+    return this.withLock("sidebar", async () => {
+      const sidebar = await this.readSidebar();
+      if (
+        !["projects", "pinned"].includes(sectionId) &&
+        !sidebar.groups.some((group) => group.id === sectionId)
+      )
+        throw new CoreError("NOT_FOUND", "Project group is missing.");
+      const projects = orderSidebarItems(
+        await this.listProjects(),
+        sidebar.projectOrder,
+      );
+      const project = projects.find((item) => item.id === projectId);
+      if (!project)
+        throw new CoreError("NOT_FOUND", "Project is missing or archived.");
+      const section = (item: ProjectSummary) =>
+        item.pinned ? "pinned" : (sidebar.projectGroups[item.id] ?? "projects");
+      if (
+        relativeId &&
+        (relativeId === projectId ||
+          !projects.some(
+            (item) => item.id === relativeId && section(item) === sectionId,
+          ))
+      )
+        throw new CoreError(
+          "INVALID_DATA",
+          "The destination project is not in this section.",
+        );
+      const siblings = projects
+        .filter((item) => section(item) === sectionId)
+        .map((item) => item.id);
+      const ordered = placeSidebarItem(
+        siblings,
+        projectId,
+        relativeId,
+        placement,
+      );
+      sidebar.projectOrder = [
+        ...projects
+          .map((item) => item.id)
+          .filter((id) => !ordered.includes(id)),
+        ...ordered,
+      ];
+      if (sectionId === "projects") delete sidebar.projectGroups[projectId];
+      else if (sectionId !== "pinned")
+        sidebar.projectGroups[projectId] = sectionId;
+      await this.updateProject(projectId, { pinned: sectionId === "pinned" });
+      await this.atomicWrite(
+        join(workspaceRoot(this.root), "sidebar.json"),
+        JSON.stringify(sidebar, null, 2),
+      );
+      return sidebar;
+    });
+  }
+
+  async arrangeEntry(
+    input: SidebarEntryMove,
+    prepareDocument: (document: ShowDocument) => Promise<ShowDocument> = async (
+      document,
+    ) => document,
+  ): Promise<SidebarOrganization> {
+    const {
+      projectId,
+      id,
+      destinationProjectId,
+      parentId,
+      relativeId,
+      placement = "before",
+    } = input;
+    assertId(id);
+    assertId(projectId);
+    assertId(destinationProjectId);
+    if (parentId !== null) assertId(parentId);
+    if (relativeId !== undefined) assertId(relativeId);
+    if (
+      !["page", "folder"].includes(input.kind) ||
+      !["before", "after"].includes(placement)
+    )
+      throw new CoreError("INVALID_DATA", "Invalid sidebar move.");
+    return this.withLock("sidebar", async () => {
+      const source = await this.readProject(projectId);
+      const destination = await this.readProject(destinationProjectId);
+      if (source.archived || destination.archived)
+        throw new CoreError(
+          "INVALID_DATA",
+          "Archived projects cannot be rearranged.",
+        );
+      requireActiveFolder(destination, parentId);
+      const sidebar = await this.readSidebar();
+      const pages = await this.listPages(destinationProjectId, {
+        includeArchived: false,
+      });
+      const folders = await this.listFolders(destinationProjectId);
+      const entries = orderSidebarItems(
+        [
+          ...folders.map((item) => ({
+            id: item.id,
+            parentId: item.parentId,
+            pinned: item.pinned,
+          })),
+          ...pages.map((item) => ({
+            id: item.id,
+            parentId: item.parentId,
+            pinned: item.favorite,
+          })),
+        ].sort((a, b) => Number(b.pinned) - Number(a.pinned)),
+        sidebar.entryOrder?.[destinationProjectId],
+      );
+      if (
+        relativeId &&
+        (relativeId === id ||
+          !entries.some(
+            (item) => item.id === relativeId && item.parentId === parentId,
+          ))
+      )
+        throw new CoreError(
+          "INVALID_DATA",
+          "The destination item is not in this folder.",
+        );
+      const siblings = entries
+        .filter((item) => item.parentId === parentId)
+        .map((item) => item.id);
+      const ordered = placeSidebarItem(siblings, id, relativeId, placement);
+      const nextOrder = [
+        ...entries
+          .map((item) => item.id)
+          .filter((key) => !ordered.includes(key)),
+        ...ordered,
+      ];
+      if (input.kind === "folder") {
+        if (projectId !== destinationProjectId)
+          throw new CoreError(
+            "INVALID_DATA",
+            "Folders can only move within their project.",
+          );
+        const folder = folders.find((item) => item.id === id);
+        if (!folder)
+          throw new CoreError("NOT_FOUND", "Folder is missing or archived.");
+        let ancestor = parentId;
+        while (ancestor) {
+          if (ancestor === id)
+            throw new CoreError(
+              "INVALID_DATA",
+              "A folder cannot contain itself.",
+            );
+          ancestor =
+            folders.find((item) => item.id === ancestor)?.parentId ?? null;
+        }
+        if (folder.parentId !== parentId)
+          await this.atomicWrite(
+            join(this.projectPath(projectId), "project.json"),
+            JSON.stringify(
+              {
+                ...source,
+                folders: source.folders!.map((item) =>
+                  item.id === id
+                    ? { ...item, parentId, updatedAt: new Date().toISOString() }
+                    : item,
+                ),
+              },
+              null,
+              2,
+            ),
+          );
+      } else {
+        const record = await this.readRecord(projectId, id);
+        this.checkPageRevision(record, input.baseRevision);
+        if (record.hash !== input.baseHash)
+          throw new CoreError(
+            "CONFLICT",
+            "The page changed before moving. Read it again.",
+            { currentHash: record.hash },
+          );
+        if (record.document.archived)
+          throw new CoreError(
+            "INVALID_DATA",
+            "Archived pages cannot be moved.",
+          );
+        if (projectId === destinationProjectId) {
+          if (record.document.parentId !== parentId)
+            await this.commit(projectId, id, record, {
+              ...record.document,
+              parentId,
+            });
+        } else {
+          if (
+            (await this.listPages(destinationProjectId)).some(
+              (item) => item.id === id,
+            )
+          )
+            throw new CoreError(
+              "CONFLICT",
+              "The destination already contains this page.",
+            );
+          const document = normalizeDocument({
+            ...(await prepareDocument(record.document)),
+            parentId,
+            updatedAt: new Date().toISOString(),
+          });
+          const destinationPath = this.pagePath(destinationProjectId, id);
+          await this.checkpoint(projectId, record);
+          await this.atomicWrite(destinationPath, serializeArtifact(document));
+          const sourcePath = logicalPath(this.root, record.path);
+          if (sourcePath)
+            await writeLibraryFiles(this.root, new Map([[sourcePath, null]]));
+          else {
+            await this.safePath(record.path);
+            await rm(record.path);
+          }
+        }
+      }
+      sidebar.entryOrder ??= {};
+      sidebar.entryOrder[destinationProjectId] = nextOrder;
+      if (projectId !== destinationProjectId && sidebar.entryOrder[projectId])
+        sidebar.entryOrder[projectId] = sidebar.entryOrder[projectId].filter(
+          (key) => key !== id,
+        );
+      await this.atomicWrite(
+        join(workspaceRoot(this.root), "sidebar.json"),
+        JSON.stringify(sidebar, null, 2),
+      );
+      return sidebar;
+    });
   }
 
   async createProjectGroup(name: string): Promise<SidebarOrganization> {
@@ -827,8 +1081,26 @@ export class FileStore {
           2,
         ),
       );
+      if (input.pinned !== undefined && input.pinned !== folder.pinned)
+        await this.repositionPinnedEntry(projectId, folderId, input.pinned);
       return updated;
     });
+  }
+
+  private async repositionPinnedEntry(
+    projectId: string,
+    id: string,
+    pinned: boolean,
+  ): Promise<void> {
+    const sidebar = await this.readSidebar();
+    const order = sidebar.entryOrder?.[projectId];
+    if (!order) return;
+    const others = order.filter((key) => key !== id);
+    sidebar.entryOrder![projectId] = pinned ? [id, ...others] : [...others, id];
+    await this.atomicWrite(
+      join(workspaceRoot(this.root), "sidebar.json"),
+      JSON.stringify(sidebar, null, 2),
+    );
   }
 
   async updatePageMetadata(
@@ -1142,6 +1414,8 @@ export class FileStore {
         );
     }
     await this.atomicWrite(record.path, serializeArtifact(document));
+    if (document.favorite !== current.document.favorite)
+      await this.repositionPinnedEntry(projectId, pageId, document.favorite);
     return record;
   }
 

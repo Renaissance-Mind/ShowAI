@@ -49,6 +49,20 @@ export interface ProjectGroup {
 export interface SidebarOrganization {
   groups: ProjectGroup[];
   projectGroups: Record<string, string>;
+  projectOrder?: string[];
+  entryOrder?: Record<string, string[]>;
+}
+
+export interface SidebarEntryMove {
+  kind: "page" | "folder";
+  projectId: string;
+  id: string;
+  destinationProjectId: string;
+  parentId: string | null;
+  relativeId?: string;
+  placement?: "before" | "after";
+  baseHash?: string;
+  baseRevision?: string;
 }
 
 export interface PageRecord {
