@@ -2,6 +2,7 @@
   "name": "showai",
   "version": "0.8.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "Offline desktop canvas with file-based projects and Agent tools.",
   "scripts": {

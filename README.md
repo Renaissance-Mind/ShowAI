@@ -1,242 +1,257 @@
 # ShowAI
 
-把调研、解释和数据组织成可交互、可分享的网页。
+**构建人与 Agent 之间的 Interface。**
 
-ShowAI 提供桌面工作台、React 组件与模板，以及供 Codex、Claude Code 和其他 Agent 使用的本地命令。人和 Agent 编辑同一份项目文件，完成的页面可以导出为单个 HTML、会话内展示片段或多页静态网站。
+ShowAI 让人与 Agent 通过可阅读、可交互、可编辑的内容共同思考。Agent 将信息与分析组织成页面、图表和交互模型，人通过阅读、探索、修改和反馈参与其中，双方在同一份内容上持续形成理解、作出判断并推进创作。
 
-工作台管理项目、页面、模板和组件；交付页面只呈现内容与必要交互。文字、图片、图表、对比表和参数控件可以组合在同一页中。
+这个 Interface 承载人机协作与共创，也让共同形成的内容成为可分享的 site，供更多人阅读、探索和继续使用。
 
-## 桌面使用
+**🤖 对 Agent：** 获得一个面向人的表达与协作界面，把信息和分析转化为人可以理解、操作与反馈的内容。
 
-构建后的安装包位于 `release/`。macOS arm64 使用 `ShowAI-版本-arm64.dmg`：打开后将 ShowAI 拖入「应用程序」，再启动应用。当前构建采用临时签名，尚未进行 Apple 公证；请通过系统提供的「仍要打开」流程打开你信任的本地构建。
+**🧑 对人：** 获得一个参与 AI 工作的认知界面，通过阅读、探索和修改，把自己的理解与判断带入共同创作。
 
-Windows x64 的 NSIS 安装配置已包含在仓库中，应在 Windows 构建并验收后分发。当前仓库没有公开发布的安装包或 npm/PyPI 安装入口。
+[![Check](https://github.com/Renaissance-Mind/ShowAI/actions/workflows/check.yml/badge.svg)](https://github.com/Renaissance-Mind/ShowAI/actions/workflows/check.yml)
+[![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A5%2022.12-339933)](https://nodejs.org/)
+[![Agent](https://img.shields.io/badge/Agent-Codex%20%7C%20Claude%20Code-536878)](plugins/showai/README.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-打开应用后，新建项目，在项目中创建页面或选择模板。页面会自动保存到本地内容库。模板可以预览、编辑和保存；组件库可以查看说明、预设和代码，也可以导入本地 React 组件包。
+![ShowAI 页面示例：图表与参数交互](docs/showai.png)
 
-新建内容默认使用 Page 顺序页面，也可选择 Board 白板。两者都能作为原生模块互相嵌套：在文章中加入可绘画的白板，在白板中放入可阅读的页面，展开后继续编辑同一份内容。父级控制外框，子容器独立处理排版、滚动与缩放。Page 和 Board 同样作为组件出现在组件库，编辑区统一通过 `/` 菜单搜索并直接插入，白板空白处也支持 `/`。详见 [Page 与 Board](docs/page-surface.md)。
+*文字、图表和参数控件共同构成一个可以阅读、探索和操作的界面。*
 
-项目、文件夹和页面的操作集中在悬停或键盘聚焦时出现的省略号菜单中，可新建页面或嵌套文件夹、重命名、删除和置顶。置顶项排在同级列表前面；删除文件夹时，其下内容会一并退出列表和整站导出，源文件仍保留在内容库中。
+## ✨ 从理解到共创
 
-默认内容库为 `~/.showai`，可在「设置 → 内容位置」中更改。项目文件、页面与变更快照保存在磁盘中；CLI 和桌面应用使用同一目录时，可以互相看到修改。
+### 让信息有合适的表达
 
-macOS arm64 本机开发时，可以另装 `~/Applications/ShowAI 稳定版.app` 用于日常工作。它自带固定的界面、服务和 Agent 运行时，代码保存或开发服务重启不会更新它。明确需要安装或更新稳定版时执行：
+把文字、图片、表格、图表、流程图和交互控件放在同一份内容中。研究发现可以对应到来源与数据，复杂关系可以展开为流程图，参数变化可以通过交互模型观察。
+
+组件库提供说明、参数结构和示例，帮助 Agent 根据表达需要选择组件。需要新的表达方式时，可以用 React 创建可复用组件。
+
+### 让人直接参与内容
+
+人在工作台中阅读、操作和编辑 Agent 创建的内容，Agent 也可以继续处理人的修改。双方共享页面结构、组件数据与版本历史，持续完善同一份成果。
+
+页面支持比较、恢复与结构化合并。并发修改发生冲突时，系统保留草稿和相关版本，供用户检查与处理。
+
+### 让成果继续流动
+
+完成的内容可以导出为独立 HTML、Agent 对话中的展示片段，或带导航的静态网站。
+
+独立 HTML 包含页面、数据和所用组件，读者无需安装 ShowAI，也可以离线阅读与操作。导出的 ShowAI HTML 和 JSON 可以重新导入工作台，继续编辑。
+
+## 🧩 页面、白板、组件与模板
+
+### Page 与 Board
+
+| 内容形式 | 适用场景 | 主要能力 |
+| --- | --- | --- |
+| **Page** | 文档、报告、讲解和网页 | 顺序排版、纵向阅读、富文本编辑 |
+| **Board** | 关系梳理、方案讨论和空间布局 | 自由摆放、平移、缩放和绘画 |
+
+Page 和 Board 可以互相嵌套：在报告中加入分析白板，在白板中放入详细说明页，再展开其中的内容继续编辑。
+
+编辑时输入 `/`，即可搜索并插入组件。详见 [Page 与 Board](docs/page-surface.md)。
+
+### 可复用的组件与模板
+
+组件承载具体的表达与交互，例如图表、流程图、对比表和参数控件；模板保存常用的内容结构，例如调研报告、项目说明或交互式讲解。
+
+你可以在项目中定制组件与模板，将它们注册到全局目录，供其他项目复用。页面锁定引用的组件版本，后续发布新版本时，已有页面保留原来的引用。
+
+详见[组件与模板说明](docs/catalog-lifecycle.md)。
+
+## 💡 使用场景
+
+- **调研与分析**：组织问题、来源、证据和比较结果，在同一页中形成判断。
+- **教学与讲解**：结合流程图、折叠内容和参数实验，帮助读者逐步理解。
+- **数据探索**：把图表、原始数据和分析文字放在一起，方便查看与核对。
+- **方案共创**：在人与 Agent 之间持续修改方案，记录变化并比较版本。
+- **知识分享**：将共同形成的内容整理为页面或 site，供他人阅读和探索。
+
+## 🚀 开始使用
+
+从源码运行需要 **Node.js 22.12+** 和 npm。
+
+### 本地浏览器工作台
 
 ```sh
-node scripts/update-stable-app.mjs
-# 固定使用某个已提交版本
-node scripts/update-stable-app.mjs --ref COMMIT
-```
-
-更新程序在临时目录中从 Git 提交构建，验证类型、单元测试和安装包签名后安装；工作目录中未提交的改动不进入稳定版。依赖必须与所选提交一致。更新前保存内容并退出稳定版，开发版可继续运行。新版验证通过后直接替换旧 App，安装记录位于 `artifacts/stable-install.json`。稳定版默认读取 `~/.showai`，也可在设置中选择内容库；使用同一内容库时，项目编辑会在两个 App 中同步显示，程序更新由手动安装控制。
-
-## 本地浏览器版
-
-macOS 可以选择桌面 App 或本地浏览器版；Linux 和 Windows 可以使用本地浏览器版。两种入口共用工作台、项目格式、组件编译器和 Agent CLI，指向同一内容库时直接读写同一份磁盘文件。
-
-浏览器发行包包含独立 Node 运行时，无需另装 Node 或 Electron。解压对应系统与架构的包后，macOS 双击 `start.command`，Linux 运行 `./start.sh`，Windows 双击 `start.cmd`。启动器打开本机工作台地址；使用期间保留终端窗口，按 Ctrl+C 停止服务。详见 [本地浏览器版使用说明](docs/local-browser.md)。
-
-本地浏览器工作台提供项目、文件夹、页面、模板、组件源码编辑、版本管理和导出。文件对话框直接浏览本机目录，导出结果写入所选磁盘位置。CLI 修改后工作台自动刷新，文件版本冲突沿用桌面版的检查与处理方式。
-
-从源码构建并运行：
-
-```sh
+git clone https://github.com/Renaissance-Mind/ShowAI.git
+cd ShowAI
 npm ci
 npm run build:browser
 npm run browser
 ```
 
-指定内容库与端口，或在没有图形桌面的环境下手动打开地址：
+启动后，浏览器会打开本机工作台。使用期间保持终端运行，按 `Ctrl+C` 停止服务。
+
+### 桌面工作台
+
+在仓库目录中安装依赖后，构建并启动 Electron 应用：
 
 ```sh
-node dist-runtime/scripts/cli.mjs serve --home /absolute/path/to/library --port 5175 --no-open
-```
-
-默认内容库为 `~/.showai`。没有指定 `--home` 或 `SHOWAI_HOME` 时，可在设置中切换内容位置；浏览器版会独立记住这个位置。指定同一个目录即可与 Mac App 并行使用。
-
-发行包提供 `showai`（macOS/Linux）和 `showai.cmd`（Windows）。Agent CLI 无需启动工作台服务：
-
-```sh
-./showai projects list --json
-./showai runtime register --json
-```
-
-运行工作台或登记运行时后，在「设置 → Agent」复制启动配置；它包含发行包自带 Node、CLI 和当前内容库路径。已有 Codex/Claude Code 技能和可选 stdio MCP 继续使用同一套命令。
-
-在目标系统上执行 `npm run package:browser`，会生成 `release/ShowAI-browser-版本-系统-架构/` 与压缩包。打包程序下载官方独立 Node 并校验摘要；构建依赖仍需要开发环境 Node.js 22.12+。GitHub 的「Browser distributions」工作流可手动构建和验证 Linux、Windows、macOS 包。
-
-## 从源码运行
-
-需要 Node.js 22.12+ 和 npm。仓库访问权限由 GitHub 管理。
-
-```sh
-git clone git@github.com:Renaissance-Mind/ShowAI.git
-cd ShowAI
-npm ci
 npm run build
 npm run desktop
 ```
 
-日常开发使用 `npm run dev:open` 打开桌面开发版。再次运行会连接同一个进程；`npm run dev:status` 返回实际代码目录、分支、内容库与 CLI 配置。前端保存后自动更新；本地服务、主进程与 CLI 的相关改动自动构建，并在打开的页面确认保存后重启。保存冲突会暂停更新，处理后点击右下角开发标记重试。
+### 创建第一份内容
 
-macOS 可执行 `npm run dev:install -- --home /absolute/library`，安装固定的 `~/Applications/ShowAI.app` 入口。打开它即可启动或显示实时开发版，无需生成安装包。启动器配置保存在本机 `.showai-dev/launcher.json`，后台日志位于 `.showai-dev/desktop-5173/development.log`。需要在后台连接时使用 `npm run dev:open -- --no-focus`。
+1. 新建项目，再创建一个 Page 或 Board。
+2. 输入 `/`，插入需要的组件；也可以选择已有模板。
+3. 编辑内容，或让连接的 Agent 一起创作。
+4. 完成后导出 HTML 或静态网站。
 
-默认地址为 `http://127.0.0.1:5173`，开发内容库为 `.showai-dev/library`。用 `-- --port 5174 --home /absolute/library` 指定端口和内容库，浏览器模式支持 `--no-open`。同一源码目录的多个会话共用一个开发服务；不同 worktree 使用不同端口与内容库。开发标记的提示显示代码目录和启动时分支、提交。
+默认内容库为 `~/.showai`，可在设置中更改。桌面应用、浏览器工作台与 CLI 指向同一内容库时，共同读写其中的项目。
 
-`npm run dev` 提供独立单页画布预览。`npm run desktop` 和 `npm run browser` 运行构建后的工作台；修改代码后需要重新构建。修改依赖、Vite 配置或开发启动器后重新启动开发入口。`npm run test:dev` 在隔离副本中验收浏览器更新行为；`npm run test:dev -- desktop` 验收真实 Electron 更新行为。
+本地浏览器版支持 macOS、Linux 和 Windows，也可以打包为自带 Node 运行时的发行包。启动器与平台要求见[本地浏览器版说明](docs/local-browser.md)。
 
-构建安装包：
+## 🤖 连接 Agent
 
-```sh
-# 在 macOS arm64 构建
-npm run package:mac
+ShowAI 提供 Codex 与 Claude Code 插件。安装插件并连接 ShowAI 运行时后，可以直接提出创作需求：
 
-# 在 Windows x64 构建
-npm run package:win
-```
+> 在当前项目中做一份模型调研报告，把来源、对比表和结论组织在同一页。
 
-组件编译器包含平台二进制，请在目标系统上安装依赖并构建插件与应用。上述命令只生成本地产物。
+> 修改这份讲解，加入可以调整参数的交互模型，让读者观察参数变化的影响。
 
-## 通过 Agent 创作
+> 把这页整理成可复用模板，并生成一个应用示例。
 
-ShowAI CLI 直接读写项目文件，每次命令执行完成后退出。使用 CLI 时无需启动桌面应用，也无需先运行 Core 服务。
+### 安装插件
 
-```sh
-node dist-runtime/scripts/cli.mjs projects create --name "模型调研" --json
-node dist-runtime/scripts/cli.mjs catalog list --kind template --json
-node dist-runtime/scripts/cli.mjs template apply research --project PROJECT_ID --title "调研结果" --json
-node dist-runtime/scripts/cli.mjs pages list --project PROJECT_ID --json
-```
-
-上例用于用户明确要求新建独立项目的任务。未指定项目时，`projects current --json` 按当前目录对应的 Git 仓库根目录定位，没有 Git 仓库时使用当前目录；宿主提供项目目录时传入 `--source-directory /absolute/project`，按该目录精确定位。第一次使用会自动创建目录项目，同一目录下的多个会话共用一个项目。页面、组件、模板和 MCP 操作省略 `--project` 时使用同样的规则；用户指定项目时传入 `--project PROJECT_ID` 优先采用。
-
-普通调研报告默认在已选项目中保存为一份 Page，用章节和区域组织内容，后续修改延续同一页面。网站或多份独立文档按用户要求拆分。
-
-新空内容库默认启用 Git 管理的版本历史。编辑前保留返回的 `hash`、`revision` 与稳定节点 ID；使用 `pages diff --since REVISION` 查看修改，保存时同时传 `--base-hash HASH --base-revision REVISION`。历史记录包含时间、修改内容和人工／Agent 会话来源，支持比较、合并、恢复、全文搜索及空间管理。已有旧库可在设置中导入并启用，原始文件和旧快照会保留。完整命令、操作格式和 Python 调用示例见 [Agent 使用说明](docs/agent-usage.md)。
-
-桌面安装包内也带有 CLI 和运行时。打开「设置 → 连接 Agent」，复制启动配置即可取得可执行文件、参数和内容库路径；使用这份配置的 Agent 不需要另装 Node.js。
-
-## 单页与网站交付
-
-```sh
-node dist-runtime/scripts/cli.mjs export --project PROJECT_ID --page PAGE_ID --format html --out ./report.html --json
-node dist-runtime/scripts/cli.mjs export --project PROJECT_ID --page PAGE_ID --format inline --out ./report-inline.html --json
-node dist-runtime/scripts/cli.mjs export --project PROJECT_ID --page PAGE_ID --blocks PROGRESS_BLOCK_ID --format inline --out ./progress-inline.html --overwrite --json
-node dist-runtime/scripts/cli.mjs export --project PROJECT_ID --format site --out ./site --json
-```
-
-| 产物         | 用途                                | 打开方式                                   |
-| ------------ | ----------------------------------- | ------------------------------------------ |
-| 单 HTML      | 发给他人、归档、离线阅读            | 用浏览器直接打开                           |
-| inline 片段  | 在支持 HTML 展示的 Agent 会话中呈现 | 交给宿主的展示通道                         |
-| 静态网站目录 | 多页面导航与网址分享                | 上传静态托管服务，或通过本地 HTTP 服务预览 |
-
-独立 HTML 包含阅读器、内容、数据和所用自定义组件，读者不需要安装 ShowAI。图表切换、数据筛选、折叠内容和本地参数计算可离线使用；外部来源链接需要联网。离线导出要求图片已内嵌，CLI 会拒绝仍依赖外链图片的页面。
-
-增加 `--presentation reading` 可导出按阅读顺序排列的响应式网页；默认 `spatial` 保留白板浏览。两种呈现保存相同的完整空间源文件。
-
-HTML 与 inline 导出同时保存 `.showai.json` 源文件；独立页面的菜单也可下载源文件。桌面工作台可以导入 ShowAI HTML 或 JSON，继续编辑。自定义组件的运行代码随交付物保存，重新导入后仍可呈现；要修改该组件的 React 源代码，需要其原始组件包。
-
-加上 `--blocks ID,ID` 可以只可视化一个或多个页面组件，也可以选中整个区域。ID 来自 `pages read` 返回节点的 `attrs.id`，表示页面中的组件实例。局部导出保留必要父容器、页面顺序和所需组件运行代码，默认使用 reading 布局并隐藏页面总标题；需要保留白板位置时显式使用 `--presentation spatial`。局部 HTML 和 inline 及其源 JSON 只包含选中部分，原页面保持完整。修改结果或自动化进度更新可以只在 Agent 聊天里展示对应组件；后续编辑仍读取完整页面并使用当前 hash。`--blocks` 适用于 html 和 inline，整站导出不接受该参数。
-
-整站导出只包含项目中未归档的页面，使用相对导航和共享阅读器资源。导出不会自动上传到网络。首次写入不会覆盖已有文件；需要更新已有交付物时显式使用 `--overwrite`。
-
-## Codex 与 Claude Code 插件
-
-插件只分发三个技能：`show-document` 创建和修改页面，`create-component` 定义可复用组件，`create-template` 新建、修改或提炼模板。模板创建支持先做页面再提炼，也支持直接保存模板、提供可选使用提示并生成应用预览。CLI、阅读器和组件编译器由独立安装的 ShowAI 软件提供；本地构建的运行包位于 `dist-runtime/`，桌面安装包把它放入 `Resources/runtime/`。
-
-桌面启动后会在所选内容目录登记 `agent-runtime.json`。使用独立运行包时执行 `npm run runtime:register`；技能读取启动配置并通过 `runtime info` 验证版本与内容目录。
-
-Codex：在仓库中运行安装命令，之后每次修改代码再运行更新命令：
+**Codex**：在仓库目录中执行：
 
 ```sh
 npm run plugin:install
-npm run plugin:update
 ```
 
-两条命令只检查技能包，通过官方 `codex plugin marketplace add` / `codex plugin add` 安装或刷新当前本地来源，并逐文件比对安装副本与构建结果，确认插件已启用。无需重建桌面安装包，也不会自动拉取 Git、修改其他插件来源或重启 Codex。需要 Node.js 22.12+ 和支持 `codex plugin add` 的 Codex CLI。
-
-更新结果保存在 `artifacts/codex-plugin-install.json`，包含实际安装路径和文件哈希。完成后新开 Codex 会话加载技能；本地更新可以保持同一开发版本号，是否成功以安装副本校验为准。如果同名 marketplace 指向其他目录，或缓存校验失败，命令会明确报错，保留现有插件供检查。详见 [插件说明](plugins/showai/README.md)。
-
-Claude Code：在 ShowAI 仓库中执行：
+**Claude Code**：在仓库目录中执行：
 
 ```sh
 claude plugin marketplace add ./
 claude plugin install showai@renaissance-mind
 ```
 
-开发时也可以用 `claude --plugin-dir ./plugins/showai` 加载技能。插件自身不携带运行程序；先安装 ShowAI 或构建并登记外部运行包。外部 Node 方式需要 Node.js 22.12+；桌面配置使用应用自带运行时。
+插件包含四个 Skill：
 
-MCP 是可选的工具入口，通过 `mcp --project PROJECT_ID` 启动并固定到一个项目。具体配置见 [Agent 使用说明](docs/agent-usage.md#optional-mcp)。插件不会设置跨会话共享的全局活动项目。
+| Skill | 用途 |
+| --- | --- |
+| `use-showai` | 基础用法、连接运行时、查找和阅读内容、查看历史 |
+| `show-document` | 创建、修改、展示和导出页面，应用已有模板 |
+| `create-component` | 创建或改造可复用的 React 组件 |
+| `create-template` | 创建、修改模板，或从已有页面提炼模板 |
 
-创建、整理或修改 ShowAI 页面后，Codex 默认在支持的对话可视化通道引用 inline 片段；超过 1 MB 的报告展示关键区域并附完整 HTML。预览面板用于检查，完整文件链接用于阅读或下载。普通终端或仅支持 MCP 工具的客户端返回 HTML 文件或预览地址，并说明展示位置。用户明确要求只保存、只交付文件、只在面板展示或后台执行时采用其指定方式。具体步骤见 [对话展示](plugins/showai/skills/show-document/references/conversation-display.md)。
-
-## 组件与模板
-
-流程图控件基于 [React Flow](https://reactflow.dev/) 与 Dagre，支持多条流程、节点详情、缩放和节点编辑。通过目录查询 `flowchart` 的 schema 与示例；自定义组件可从 `showai:components` 导入 `Flowchart`。技能的触发条件与披露顺序见 [技能组织](docs/skills.md)。
-
-组件和模板按「项目 → 全局 → 已发布」查找，内置预设作为兜底。定制默认属于选定项目；注册全局、登记发布都需要显式操作。版本使用 `id + version + integrity` 标识，已有页面锁定实际引用，不会随其他项目的修改或新版本发布而变化。
-
-组件说明包含分点的使用场景、可视化效果和示例。模板说明包含使用场景、内容处理方式、相关模板/组件 ID，以及描述需求、使用顺序与结构的示例。Agent 先查询摘要，再按需请求说明、参数或源码：
+插件提供创作流程与参考说明，运行程序由 ShowAI 应用或独立运行包提供。桌面用户可在「设置 → 连接 Agent」中取得启动配置；从源码构建的独立运行包可执行：
 
 ```sh
-node dist-runtime/scripts/cli.mjs guide catalog --json
-node dist-runtime/scripts/cli.mjs catalog list --kind component --query 面积 --project PROJECT_ID --limit 5 --json
-node dist-runtime/scripts/cli.mjs catalog describe playground --view examples --project PROJECT_ID --json
+npm run runtime:register
 ```
 
-项目里的组件可以注册为不可变的全局版本，其他项目再从它派生自己的版本。`parents` 保留来源关系，三方合并会显示冲突，并把解决结果保存为新的项目版本；全局、已发布和父版本均不会被覆盖。
+安装与接入步骤见[插件说明](plugins/showai/README.md)。
 
-模板支持有序组合与递归引用其他模板，并锁定子模板和实际组件依赖。应用模板时展开成独立页面，生成新的页面与区块 ID。分享成品只需要展开后的页面及用到的组件；无需携带模板定义。注册组合模板时会收集完整依赖，即使来源项目被移除，其他项目仍可使用注册版本。产品未额外预置组合模板。
+### CLI 与 MCP
 
-画布中的基础内容也进入组件目录：文本、图像、基础表格、提示框、折叠内容、分隔线与代码块，均可由 Agent 查询说明、数据结构与示例，并从起始源码定制项目版本。组件与模板的概览把说明和实时示例放在同一页，按窗口宽度采用左右或上下布局。
-
-组件可在代码中嵌套：从 `showai:components` 导入内置 React 实现；在 `manifest.dependencies` 中声明子组件的固定版本与指纹，再从 `showai:component/<id>` 导入。编译后的父组件包含子组件运行代码，注册与发布同时保存完整依赖源码。用法见 [Agent 组件组合](docs/agent-usage.md#basic-components-and-code-composition)。
-
-自定义组件包包含 `manifest.json`、`props.schema.json` 和 React 入口代码。参考 [数值滑块组件](resources/catalog/value-slider)：
+CLI 每次执行一个命令后退出，可以在工作台关闭时使用。完成构建后，在仓库目录中执行：
 
 ```sh
-node dist-runtime/scripts/cli.mjs catalog import --input ./resources/catalog/value-slider --project PROJECT_ID --json
+# 查看已有项目
+node dist-runtime/scripts/cli.mjs projects list --json
+
+# 查询可用组件
+node dist-runtime/scripts/cli.mjs catalog list \
+  --kind component --query 图表 --limit 5 --json
+
+# 查看页面创作指南
+node dist-runtime/scripts/cli.mjs guide authoring --json
 ```
 
-桌面与独立 HTML 中，组件在隔离 iframe 中运行，不能访问应用文件系统或直接连接外部网络。会话 inline 模式使用宿主提供的整页沙箱与 Shadow DOM 样式隔离，组件之间共享该页面的 JavaScript 环境。
+其他 Agent 客户端也可以通过可选的 stdio MCP 入口接入。完整命令、编辑协议与配置见 [Agent 使用说明](docs/agent-usage.md)。
 
-## 发布与远程引用
+## 📦 分享页面与 Site
 
-导出默认 `--components bundled`，把所需组件一起打包，保持离线能力。选择 `--components remote` 时，每个自定义组件都必须已有经过验证的固定发布地址；缺失依赖会明确列出并拒绝导出。阅读器下载时再次校验字节摘要与版本指纹，无法联网或校验失败时显示错误。会话 inline 交付始终打包组件。
+| 导出格式 | 适用场景 |
+| --- | --- |
+| **独立 HTML** | 分享、离线阅读和归档 |
+| **inline 片段** | 在支持 HTML 展示的 Agent 对话中呈现 |
+| **静态网站** | 多页面导航与静态托管 |
 
-发布流程是准备一个可自部署的静态目录，再验证已部署的清单网址并登记。准备文件不会自动上传，也不会直接变成「已发布」。同一套目录可放到用户自己的静态服务器；远程请求使用精确的内容地址，不会悄悄切换到最新版。
+独立 HTML 支持图表切换、折叠内容和本地参数计算等离线交互；外部来源链接需要联网。离线导出要求图片已内嵌。
+
+将下方的 `PROJECT_ID` 和 `PAGE_ID` 替换为实际 ID，即可导出页面：
 
 ```sh
-node dist-runtime/scripts/cli.mjs guide publish --json
-node dist-runtime/scripts/cli.mjs guide versions --json
+node dist-runtime/scripts/cli.mjs export \
+  --project PROJECT_ID \
+  --page PAGE_ID \
+  --format html \
+  --out ./report.html \
+  --json
 ```
 
-数据目录、解析规则、版本派生、依赖闭包和合并边界见 [目录生命周期](docs/catalog-lifecycle.md)，具体命令见 [Agent 使用说明](docs/agent-usage.md)。
+导出整个项目的静态网站：
 
-## 开发与验证
+```sh
+node dist-runtime/scripts/cli.mjs export \
+  --project PROJECT_ID \
+  --format site \
+  --out ./site \
+  --json
+```
+
+使用 `--blocks ID,ID` 可以导出选定的组件或区域。HTML 与 inline 导出同时保存 `.showai.json` 源文件，便于重新导入和继续编辑。
+
+静态网站目录可部署到自己的服务器或托管服务。导出格式与选项见 [Agent 使用说明](docs/agent-usage.md)。
+
+## 🔒 内容与历史
+
+项目内容保存在本机，支持备份与迁移。新建的空内容库默认启用版本历史，记录内容变化及可获得的人工或 Agent 来源信息。
+
+历史界面支持比较版本、查看变更和恢复内容；恢复会生成新的版本。组件、模板与页面依赖也纳入版本管理，便于追溯过去的内容。
+
+需要跨设备或与他人协作时，可以连接自部署的 ShowAI Server，按项目同步内容与历史，并通过管理员、编辑者和查看者角色管理访问权限。
+
+详见[内容库与历史](docs/versioned-library.md)及[项目服务器与同步](docs/project-sync.md)。
+
+## 📚 文档
+
+| 文档 | 内容 |
+| --- | --- |
+| [Page 与 Board](docs/page-surface.md) | 页面、白板、嵌套与交互 |
+| [Agent 使用说明](docs/agent-usage.md) | CLI、MCP、创作与导出 |
+| [插件说明](plugins/showai/README.md) | Skill 分工与安装 |
+| [数据图表](docs/g2-components.md) | 图表类型、数据接口与设置 |
+| [组件与模板](docs/catalog-lifecycle.md) | 目录、版本、依赖与复用 |
+| [内容库与历史](docs/versioned-library.md) | 存储、比较、合并与恢复 |
+| [项目服务器与同步](docs/project-sync.md) | 服务部署、项目权限与同步 |
+| [页面数据格式](docs/artifact-format.md) | 页面结构与数据约定 |
+
+## 🛠️ 开发与贡献
+
+ShowAI 使用 React、TypeScript、Electron 与 Vite。富文本编辑基于 Tiptap，流程图基于 React Flow，数据可视化使用 G2。
+
+启动支持热更新的完整桌面工作台：
+
+```sh
+npm run dev:open
+```
+
+查看当前开发服务：
+
+```sh
+npm run dev:status
+```
+
+浏览器开发版使用 `npm run dev:browser`。默认开发内容库位于 `.showai-dev/library`，可以通过启动参数指定其他目录。
+
+提交改动前执行：
 
 ```sh
 npm run check
 npm test
 npm run build
-npm audit
 ```
 
-`npm run test:containers` 检查真实本地浏览器中的递归 Page/Board，`npm run test:containers:desktop` 在 Electron 中运行同一模型与交互验收。
+涉及桌面行为时，可运行 `npm run test:desktop`；涉及 Page 与 Board 交互时，可运行 `npm run test:containers` 和 `npm run test:containers:desktop`。
 
-`npm test` 会先构建独立阅读器，再验证真实导出。`npm run test:desktop` 在本机启动独立数据目录的 Electron，检查文件接口、编辑冲突、退出保存、目录版本和组合模板。CI 执行类型检查、测试、构建和依赖审计；安装包仍需在目标系统运行验收。
+欢迎通过 [Issues](https://github.com/Renaissance-Mind/ShowAI/issues) 反馈问题、提出使用场景，或通过 Pull Request 贡献代码、组件、模板与文档。问题反馈请附上运行环境、复现步骤，以及预期与实际结果。
 
-| 目录                           | 职责                                           |
-| ------------------------------ | ---------------------------------------------- |
-| `src/core`                     | 项目文件、快照、差异、冲突保护、组件与模板目录 |
-| `src/studio`、`src/desktop`    | React 工作台与 Electron 本地文件接口           |
-| `src/editor`、`src/components` | 内容编辑器、内置区块、自定义组件               |
-| `src/portable`                 | 轻量只读页面与离线交付格式                     |
-| `src/agent`                    | CLI、MCP 和导出                                |
-| `plugins/showai`               | Codex/Claude 技能与按需参考资料                |
-| `dist-runtime`                 | 外部 CLI、阅读器与编译依赖                     |
+## 许可证
 
-开发工具链将 `app-builder-lib` 使用的 `@electron/get` 固定到 `5.1.0`，以移除旧 HTTP 缓存依赖；Node.js 最低版本与该下载器保持一致。
-
-许可证尚未指定。
+ShowAI 使用 [MIT 许可证](LICENSE)。
