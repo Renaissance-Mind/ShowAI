@@ -26,6 +26,7 @@ import { syncManager } from "../sync/manager";
 import { deepLinkInvitation } from "../sync/server-url";
 import { openLibrary } from "../core/open-library";
 import { registerRuntime } from "../agent/runtime";
+import { AgentHost, agentActions } from "../agent-host/host";
 import { assertId, CoreError, FileStore } from "../core/store";
 import {
   createWorkbench,
@@ -47,6 +48,7 @@ const windowAppearances = new WeakMap<BrowserWindow, DesktopAppearance>();
 const appearanceIcons = new Map<DesktopAppearance, NativeImage>();
 let store: FileStore;
 let service: AgentService;
+let agentHost: AgentHost;
 let watcher: FSWatcher | undefined;
 let maintenance: MaintenanceScheduler | undefined;
 let notification: ReturnType<typeof setTimeout> | undefined;
@@ -263,6 +265,7 @@ async function handle(
   window: BrowserWindow,
 ): Promise<unknown> {
   maintenance?.markActivity();
+  if (agentActions.has(action)) return agentHost!.action(action, args);
   return createWorkbench(store, service, {
     info,
     openDialog: (options) =>
@@ -554,6 +557,16 @@ else {
           process.platform === "win32" ? "esbuild.exe" : "bin/esbuild",
         );
       }
+      agentHost = new AgentHost({
+        root: join(app.getPath("userData"), "agent-host"),
+        workspaceRoot: join(app.getPath("documents"), "ShowAI", "Agent Workspaces"),
+        library: () => store,
+        cli: () => info().cli,
+        pluginRoot: () => process.env.SHOWAI_DEV_URL
+          ? join(process.cwd(), "plugins/showai")
+          : join(runtimePath(), "assets/agent-plugin"),
+        openUrl: (url) => shell.openExternal(url),
+      });
       if (app.isPackaged) app.setAsDefaultProtocolClient("showai");
       Menu.setApplicationMenu(
         Menu.buildFromTemplate([
@@ -619,7 +632,7 @@ else {
         ): Promise<DesktopResponse> => {
           try {
             const window = trustedSender(event);
-            if (typeof action !== "string" || !actions.has(action))
+            if (typeof action !== "string" || (!actions.has(action) && !agentActions.has(action)))
               throw new CoreError("INVALID_DATA", "Unknown desktop action.");
             if (!args || typeof args !== "object" || Array.isArray(args))
               throw new CoreError(
@@ -667,6 +680,7 @@ else {
         return;
       }
       allowedQuit = true;
+      agentHost?.close();
       clearTimeout(notification);
       await watcher?.close();
       await maintenance?.stop();

@@ -15,6 +15,11 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const runtime = join(root, "dist-runtime");
 await mkdir(join(runtime, "assets"), { recursive: true });
 await mkdir(join(runtime, "scripts"), { recursive: true });
+await rm(join(runtime, "assets/agent-plugin"), { recursive: true, force: true });
+await cp(join(root, "plugins/showai"), join(runtime, "assets/agent-plugin"), {
+  recursive: true,
+  verbatimSymlinks: true,
+});
 await rm(join(runtime, "web"), { recursive: true, force: true });
 await cp(join(root, "dist"), join(runtime, "web"), {
   recursive: true,

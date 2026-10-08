@@ -16,6 +16,7 @@ import "./settings.css";
 import LibrarySpace from "./LibrarySpace";
 import IconViewer from "./IconViewer";
 import SyncSettings from "./SyncSettings";
+import AgentSettings from "./AgentSettings";
 
 const sections = [
   {
@@ -239,6 +240,7 @@ export function SettingsPanel({
       )}
       {section === "agent" && (
         <>
+          <AgentSettings />
           <section
             className="settings-group"
             aria-labelledby="settings-agent-title"

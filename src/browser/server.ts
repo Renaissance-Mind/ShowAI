@@ -16,6 +16,7 @@ import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { watch } from "chokidar";
 import { version } from "../../package.json";
 import { AgentService, errorResult } from "../agent/service";
+import { AgentHost, agentActions } from "../agent-host/host";
 import { MaintenanceScheduler } from "../core/maintenance-scheduler";
 import { syncManager } from "../sync/manager";
 import { openLibrary } from "../core/open-library";
@@ -148,6 +149,14 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     await new Promise<void>((done) => watcher.once("ready", done));
   }
   await useHome(store.root);
+  const agentHost = new AgentHost({
+    root: join(dirname(options.settingsPath), "agent-host"),
+    library: () => store,
+    cli: () => info().cli,
+    pluginRoot: () => options.development
+      ? join(process.cwd(), "plugins/showai")
+      : resolve(dirname(options.cliEntry), "../assets/agent-plugin"),
+  });
   async function selectedPath(
     args: Record<string, unknown>,
     directory: boolean,
@@ -165,6 +174,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     return resolved;
   }
   async function invoke(action: string, args: Record<string, unknown>) {
+    if (agentActions.has(action)) return agentHost.action(action, args);
     maintenance?.markActivity();
     return createWorkbench(store, service, {
       info,
@@ -394,7 +404,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
           const { action, args } = input;
           if (
             typeof action !== "string" ||
-            !workbenchActions.has(action) ||
+            (!workbenchActions.has(action) && !agentActions.has(action)) ||
             !args ||
             typeof args !== "object" ||
             Array.isArray(args)
@@ -488,6 +498,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     throw error;
   }
   async function close() {
+    agentHost.close();
     await syncManager(store.root).stop();
     if (closed) return;
     closed = true;

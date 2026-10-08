@@ -516,7 +516,7 @@ try {
     }),
   );
   await rename(temporary, baseline.path);
-  await page.getByText("这个文件有新的修改", { exact: true }).waitFor();
+  await page.getByText("保存失败：文件有新的修改", { exact: true }).waitFor();
   await writeFile(backend, source + "\n// successful backend revision\n");
   await page
     .locator("[data-showai-development]")
@@ -544,26 +544,32 @@ try {
       "desktop shutdown with a conflict keeps the app and development service running",
     );
   }
-  await page.getByRole("button", { name: "保留为副本", exact: true }).click();
-  // A versioned home preserves external files separately from its formal head.
-  // Explicitly import the retained original after the local draft was copied.
   if (info.libraryVersion === 2) {
-    const conflicts = await page.evaluate(() =>
-      window.showai.invoke("history:conflicts"),
-    );
-    const retained = conflicts.find((item) =>
-      item.path.endsWith(`/pages/${created.document.id}.json`),
-    );
-    assert.ok(
-      retained,
-      "The external original must remain retained after copying the draft",
-    );
+    // Versioned conflicts now use the retained-file review dialog. Preserve the
+    // real durable editor draft as a new page, then accept the external original.
     await page.evaluate(
-      (id) =>
-        window.showai.invoke("history:resolve", { id, resolution: "import" }),
-      retained.id,
+      async ({ projectId, resourceId }) => {
+        const records = await window.showai.invoke("drafts:list", {
+          projectId,
+          resourceId,
+        });
+        if (!records.length)
+          throw new Error("The conflicting editor draft was not retained.");
+        const draft = await window.showai.invoke("drafts:read", {
+          id: records[0].id,
+        });
+        await window.showai.invoke("pages:create", {
+          projectId,
+          document: draft.content,
+        });
+      },
+      { projectId: project.id, resourceId: created.document.id },
     );
-  }
+    await page
+      .getByRole("button", { name: "放弃我的修改，采用文件版本", exact: true })
+      .click();
+  } else
+    await page.getByRole("button", { name: "保留为副本", exact: true }).click();
   await page.locator(".studio-save-state.saved").waitFor();
   const saved = await cli("pages", "list", "--project", project.id);
   assert.equal(saved.length, 2);
