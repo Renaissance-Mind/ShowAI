@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { withChangeContext } from "../core/history-context";
 import { mutateLibrary } from "../core/library-runtime";
@@ -40,11 +40,28 @@ import { assertExportDestination } from "./exporter";
 import type { ExportFormat } from "./exporter";
 import { runtimeInfo, registerRuntime } from "./runtime";
 import type { PageReadOptions } from "./page-reading";
+import {
+  describePublicResource,
+  publicCatalog,
+  renderPresentation,
+  writePresentation,
+} from "./presentation";
 
 export const CLI_HELP = `ShowAI — interactive pages shared by people and Agents.
 
 Local browser workbench (same files as the desktop app and CLI):
   serve [--home PATH] [--port PORT] [--no-open]
+
+Independent presentation (no personal project or synchronization required):
+  public list [--kind component|template] [--query TEXT]
+  public describe ID [--kind component|template] [--view guide|schema|examples|source]
+  render --input INPUT_JSON --out PAGE.html [--overwrite]
+  render --template TEMPLATE_ID --title TITLE --out PAGE.html
+
+MCP connections:
+  mcp --project PROJECT
+  mcp --public
+  mcp serve --state DIRECTORY --public-url HTTPS_ORIGIN [--sync-server SERVER_ORIGIN] [--port 8789]
 
 Start with one project:
   runtime info | runtime register
@@ -99,8 +116,21 @@ interface Arguments {
 function parseArguments(args: string[]): Arguments {
   const positional: string[] = [];
   const options: Record<string, string | boolean> = {};
-  const booleans = new Set(["json", "help", "overwrite", "no-open", "draft"]);
+  const booleans = new Set([
+    "json",
+    "help",
+    "overwrite",
+    "no-open",
+    "draft",
+    "public",
+  ]);
   const strings = new Set([
+    "state",
+    "public-url",
+    "sync-server",
+    "widget-domain",
+    "host",
+    "template",
     "home",
     "automatic",
     "older-than-days",
@@ -366,6 +396,52 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
       )[command],
     );
   switch (command) {
+    case "public": {
+      if (action === "list")
+        return publicCatalog({
+          kind: option(args, "kind") as "component" | "template" | undefined,
+          query: option(args, "query"),
+          limit: option(args, "limit")
+            ? Number(option(args, "limit"))
+            : undefined,
+        });
+      if (action === "describe" && id)
+        return describePublicResource(id, {
+          kind: option(args, "kind") as "component" | "template" | undefined,
+          view: option(args, "view") as
+            "guide" | "schema" | "examples" | "source" | undefined,
+          file: option(args, "file"),
+        });
+      throw new Error("Use public list or public describe ID.");
+    }
+    case "render": {
+      requireCount(args, 1);
+      const inputPath = option(args, "input"),
+        templateId = option(args, "template");
+      if (!!inputPath === !!templateId)
+        throw new Error("Provide --input or --template.");
+      const input = inputPath
+        ? objectInput(await readJson(inputPath))
+        : { templateId };
+      const presentation = await renderPresentation({
+        ...("format" in input
+          ? {
+              document: parseArtifact(input).document,
+              ...(Array.isArray(input.componentSources)
+                ? { componentSources: input.componentSources }
+                : {}),
+            }
+          : input),
+        ...(option(args, "title") ? { title: option(args, "title") } : {}),
+      });
+      const out = option(args, "out", true)!;
+      await assertExportDestination(
+        service.store.root,
+        "presentation",
+        resolve(out),
+      );
+      return writePresentation(presentation, out, !!args.options.overwrite);
+    }
     case "sync": {
       const manager = syncManager(service.store.root);
       const credential = async (fileOption: string, environment: string) => {
@@ -1038,6 +1114,52 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
       break;
     }
     case "mcp": {
+      if (action === "serve") {
+        requireCount(args, 2);
+        const { startMcpHttpServer } = await import("./mcp-http");
+        const running = await startMcpHttpServer({
+          stateDirectory: resolve(
+            option(args, "state") ??
+              join(service.store.root, "local", "agent-server"),
+          ),
+          publicUrl: option(args, "public-url"),
+          syncServers: option(args, "sync-server")?.split(",").filter(Boolean),
+          widgetDomain: option(args, "widget-domain"),
+          host: option(args, "host"),
+          port: option(args, "port") ? Number(option(args, "port")) : undefined,
+        });
+        process.stdout.write(
+          JSON.stringify({
+            ok: true,
+            data: {
+              protocol: "showai-agent-http-v1",
+              url: running.url + "/mcp",
+              publicPresentation: true,
+              privateProjects: !!option(args, "sync-server"),
+            },
+          }) + "\n",
+        );
+        const stop = () => {
+          void running.close().then(
+            () => process.exit(0),
+            (error) => {
+              console.error(error);
+              process.exit(1);
+            },
+          );
+        };
+        process.once("SIGTERM", stop);
+        process.once("SIGINT", stop);
+        return undefined;
+      }
+      if (args.options.public) {
+        requireCount(args, 1);
+        if (option(args, "project"))
+          throw new Error("Choose --public or --project.");
+        const { startPublicMcp } = await import("./mcp");
+        await startPublicMcp(service.store.root);
+        return undefined;
+      }
       requireCount(args, 1);
       const { startMcp } = await import("./mcp");
       await startMcp({ root: service.store.root, projectId: await project() });
@@ -1083,7 +1205,11 @@ export async function runCli(argv: string[]): Promise<unknown> {
   const args = parseArguments(argv);
   const context = commandContext(args);
   const [command, action, mode] = args.positional;
-  if (command !== "library" && !args.options.help)
+  if (
+    !["library", "render", "public"].includes(command) &&
+    !(command === "mcp" && (action === "serve" || args.options.public)) &&
+    !args.options.help
+  )
     await openLibrary(
       new AgentService({ root: option(args, "home") }).store.root,
     );

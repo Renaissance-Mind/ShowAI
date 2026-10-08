@@ -82,6 +82,83 @@ afterAll(async () => {
   await rm(bundleDirectory, { recursive: true, force: true });
 });
 
+test("public CLI and stdio render customized content without creating a personal project or sync connection", async () => {
+  const isolated = await mkdtemp(join(tmpdir(), "showai-public-cli-"));
+  const output = join(isolated, "output", "page.html");
+  const library = join(isolated, "library");
+  try {
+    const templates = await run(["public", "list", "--kind", "template"], {
+      home: library,
+    });
+    expect(
+      templates.items.some((item: { id: string }) => item.id === "explainer"),
+    ).toBe(true);
+    const rendered = await run(
+      [
+        "render",
+        "--template",
+        "explainer",
+        "--title",
+        "A standalone presentation",
+        "--out",
+        output,
+      ],
+      { home: library },
+    );
+    expect(rendered.persistence).toEqual({
+      savedToProject: false,
+      synchronized: false,
+    });
+    expect(await readFile(rendered.delivery.html, "utf8")).toContain(
+      "A standalone presentation",
+    );
+    expect(await readFile(rendered.delivery.inline, "utf8")).toContain(
+      "data-showai-inline-root",
+    );
+    expect(
+      await access(library).then(
+        () => true,
+        () => false,
+      ),
+    ).toBe(false);
+    const client = new Client({ name: "public-stdio-test", version: "1.0.0" });
+    try {
+      await client.connect(
+        new StdioClientTransport({
+          command: process.execPath,
+          args: [cli, "mcp", "--public", "--home", library],
+          env: environment() as Record<string, string>,
+        }),
+      );
+      const tools = await client.listTools();
+      expect(tools.tools.map((item) => item.name)).toContain("render_document");
+      expect(tools.tools.map((item) => item.name)).not.toContain("page_save");
+      const response = await client.callTool({
+        name: "render_document",
+        arguments: { templateId: "comparison", title: "Public MCP rendering" },
+      });
+      expect(response.isError).not.toBe(true);
+      const receipt = (
+        response.structuredContent as {
+          data: { delivery: { html: string }; persistence: unknown };
+        }
+      ).data;
+      expect(receipt.persistence).toEqual({
+        savedToProject: false,
+        synchronized: false,
+      });
+      expect(await readFile(receipt.delivery.html, "utf8")).toContain(
+        "Public MCP rendering",
+      );
+    } finally {
+      await client.close();
+    }
+    expect((await new FileStore(library).listProjects()).length).toBe(0);
+  } finally {
+    await rm(isolated, { recursive: true, force: true });
+  }
+}, 60_000);
+
 test("CLI prepares and activates an old library, and MCP restores an imported checkpoint with project scope and retry identity", async () => {
   const old = join(home, "legacy-import-source"),
     target = join(home, "legacy-import-target");

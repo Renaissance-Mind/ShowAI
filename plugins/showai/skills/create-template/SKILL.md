@@ -5,7 +5,7 @@ description: 为 ShowAI 新建、修改可复用模板，或从已有页面提�
 
 模板保存可复用的内容结构、组件组合和填写约定。用户要求创建模板时，交付可应用的模板、使用提示与验证页面。
 
-沿用已验证的外部 CLI、内容库与用户选定的项目；首次使用或缺少基础信息时读取 [统一使用指南](../use-showai/SKILL.md)，按需核实入口与对象归属。读取 `guide templates --json`，按用途查询 `catalog list --kind template --project PROJECT --query 用途 --limit 8 --json`，选中后读取 guide/examples；复用、修改或合成定义时才读取所选源码。已有模板可作为基础；说明新增结构或填写约定的用途。
+沿用已验证的 CLI 或 MCP；首次使用读取 [统一使用指南](../use-showai/SKILL.md) 与 [跨宿主接入](../use-showai/references/integration.md)。公共模板可通过 public_catalog_describe 取得 source 并定制，无需同步登录。只需独立定义时，交付模板定义文件并用 render_document 验证实例；登记到项目时，用真实项目 ID 调用 template_save/template_apply，或对应 CLI。无 inline 时交付文件或项目结果。读取 `guide templates --json`，按用途查询 `catalog list --kind template --project PROJECT --query 用途 --limit 8 --json`，选中后读取 guide/examples；复用、修改或合成定义时才读取所选源码。已有模板可作为基础；说明新增结构或填写约定的用途。
 
 ## 模板结构与填写材料
 
@@ -30,6 +30,6 @@ description: 为 ShowAI 新建、修改可复用模板，或从已有页面提�
 
 生成当前 CLI 支持的 document/composition 定义，将实例事实替换为填写提示或 schema 有效的空状态，保留布局、阅读顺序与精确组件引用。contentGuide 记录各区域的必需材料、组织方式、证据要求和可选条件；scenarios 说明适用场景，related 说明依赖用途，examples 保存命名的自然语言使用提示与操作顺序。提示由 Agent 根据材料执行。
 
-用 `template save --project PROJECT --input template-definition.json --json` 保存到当前项目；修改已有模板使用新版本。用 `template apply` 创建验证页面，按所选提示填入材料，再检查阅读效果、主要交互和导出。直接创建也要完成应用验证；从实例提炼时使用不同材料检查复用。材料不足时使用填写提示与空状态展示结构，说明内容验证仍待材料补齐。
+项目登记路径用 `template save --project PROJECT --input template-definition.json --json` 保存，或对应 MCP template_save；修改已有模板用新版本，再用 template apply/template_apply 验证实例。独立定义路径交付定义文件，用 render_document 验证应用的 document，无需追加项目保存。均按选定提示填入材料，检查阅读效果、主要交互和导出。直接创建也要完成应用验证；从实例提炼时使用不同材料检查复用。材料不足时使用填写提示与空状态展示结构，说明内容验证仍待材料补齐。
 
 交付模板名称、适用场景、精确版本与指纹、可复制的使用提示，以及预览或导出结果。原实例与验证页面分别保留。后续反馈延续同一模板并创建新版本；用户要求共享或发布时再读取对应指南。

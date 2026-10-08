@@ -1225,7 +1225,7 @@ export class SyncManager {
       syncedAt: new Date().toISOString(),
     });
   }
-  async enrollNewProjects() {
+  async enrollNewProjects(projectId?: string) {
     const config = await this.configuration();
     if (!config.defaultConnectionId || !config.defaultSince) return;
     const local = await new FileStore(this.home).listProjects({
@@ -1233,6 +1233,7 @@ export class SyncManager {
     });
     for (const project of local)
       if (
+        (!projectId || project.id === projectId) &&
         project.createdAt >= config.defaultSince &&
         !config.projects.some(
           (connection) => connection.projectId === project.id,
@@ -1264,7 +1265,7 @@ export class SyncManager {
       return this.run(projectId);
     }
     this.running = (async () => {
-      await this.enrollNewProjects();
+      await this.enrollNewProjects(projectId);
       const config = await this.configuration();
       for (const project of config.projects.filter(
         (item) => !projectId || item.projectId === projectId,

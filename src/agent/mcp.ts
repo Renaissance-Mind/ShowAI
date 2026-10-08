@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { changeContext, withChangeContext } from "../core/history-context";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ChangeContext } from "../core/history-model";
+import {
+  McpServer,
+  type RegisteredTool,
+} from "@modelcontextprotocol/sdk/server/mcp.js";
+import { registerPresentationTools } from "./presentation-tools";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import packageMetadata from "../../package.json";
@@ -18,6 +23,9 @@ import { CATALOG_VIEWS } from "./disclosure";
 import { GUIDE_TOPICS } from "./guides";
 import { pageReadSchema, type PageReadResult } from "./page-reading";
 import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { writePresentation } from "./presentation";
+import { syncManager } from "../sync/manager";
 
 const scopeSchema = z.enum([
   "builtin",
@@ -39,16 +47,27 @@ const jsonObject = z.record(z.string(), z.unknown());
 export function createMcpServer(options: {
   root?: string;
   projectId: string;
+  instructions?: string;
+  decorateTool?: (name: string, tool: RegisteredTool) => void;
+  presentation?: Parameters<typeof registerPresentationTools>[1];
+  sourceContext?: ChangeContext;
 }): McpServer {
   const service = new AgentService(options);
   const projectId = service.requireProject(options.projectId);
   const server = new McpServer(
     { name: "showai", version: packageMetadata.version },
     {
-      instructions: `ShowAI creates interactive pages in project ${projectId}. This connection is bound to that project. Page reading defaults to structured JSON/Markdown. Use image for visual checks and html for browser DOM and interaction checks; guide reading documents viewport, theme, partial scope, actions and temporary draft previews. Retain the source hash and revision before writing; versioned page writes require baseRevision. Use catalog summaries to choose resources and explicit views for details or source. Shared revisions are immutable; fork/merge into this project. Shared promotion or published registration needs an explicit CLI/desktop action.`,
+      instructions:
+        options.instructions ??
+        `ShowAI creates interactive pages in project ${projectId}. This connection is bound to that project. Page reading defaults to structured JSON/Markdown. Use image for visual checks and html for browser DOM and interaction checks; guide reading documents viewport, theme, partial scope, actions and temporary draft previews. Retain the source hash and revision before writing; versioned page writes require baseRevision. Use catalog summaries to choose resources and explicit views for details or source. Shared revisions are immutable; fork/merge into this project. Shared promotion or published registration needs an explicit CLI/desktop action.`,
     },
   );
-  const inherited = changeContext();
+  const register: McpServer["registerTool"] = (name, config, callback) => {
+    const tool = server.registerTool(name, config, callback);
+    options.decorateTool?.(name, tool);
+    return tool;
+  };
+  const inherited = options.sourceContext ?? changeContext();
   const changeSchema = {
     operationId: z.string().max(1000).optional(),
     message: z.string().max(4000).optional(),
@@ -101,7 +120,7 @@ export function createMcpServer(options: {
     openWorldHint: false,
   };
 
-  server.registerTool(
+  register(
     "guide",
     {
       description:
@@ -111,7 +130,7 @@ export function createMcpServer(options: {
     },
     ({ topic }) => call(async () => service.guide(topic)),
   );
-  server.registerTool(
+  register(
     "project_context",
     {
       description:
@@ -126,7 +145,7 @@ export function createMcpServer(options: {
         next: "guide workspace",
       })),
   );
-  server.registerTool(
+  register(
     "pages_list",
     {
       description:
@@ -136,7 +155,7 @@ export function createMcpServer(options: {
     },
     () => call(() => service.listPages(projectId)),
   );
-  server.registerTool(
+  register(
     "page_read",
     {
       description:
@@ -169,7 +188,7 @@ export function createMcpServer(options: {
         },
       ),
   );
-  server.registerTool(
+  register(
     "page_create",
     {
       description:
@@ -199,7 +218,7 @@ export function createMcpServer(options: {
         metadata,
       ),
   );
-  server.registerTool(
+  register(
     "page_save",
     {
       description:
@@ -239,7 +258,7 @@ export function createMcpServer(options: {
         metadata,
       ),
   );
-  server.registerTool(
+  register(
     "page_apply",
     {
       description:
@@ -264,7 +283,7 @@ export function createMcpServer(options: {
         metadata,
       ),
   );
-  server.registerTool(
+  register(
     "page_diff",
     {
       description:
@@ -275,7 +294,7 @@ export function createMcpServer(options: {
     ({ pageId, sinceHash }) =>
       call(() => service.diffPage(projectId, pageId, sinceHash)),
   );
-  server.registerTool(
+  register(
     "page_export",
     {
       description:
@@ -322,7 +341,7 @@ export function createMcpServer(options: {
       ),
   );
 
-  server.registerTool(
+  register(
     "catalog_list",
     {
       description:
@@ -338,7 +357,7 @@ export function createMcpServer(options: {
     },
     (input) => call(() => service.catalogList({ projectId, ...input })),
   );
-  server.registerTool(
+  register(
     "catalog_describe",
     {
       description:
@@ -357,7 +376,7 @@ export function createMcpServer(options: {
     ({ id, ...input }) =>
       call(() => service.catalogDescribe(id, { projectId, ...input })),
   );
-  server.registerTool(
+  register(
     "component_import",
     {
       description:
@@ -368,7 +387,7 @@ export function createMcpServer(options: {
     ({ directory, ...metadata }) =>
       call(() => service.importComponent(directory, projectId), metadata),
   );
-  server.registerTool(
+  register(
     "component_save",
     {
       description:
@@ -386,7 +405,7 @@ export function createMcpServer(options: {
         metadata,
       ),
   );
-  server.registerTool(
+  register(
     "template_apply",
     {
       description:
@@ -411,7 +430,7 @@ export function createMcpServer(options: {
         { operationId, message, groupId },
       ),
   );
-  server.registerTool(
+  register(
     "template_save",
     {
       description:
@@ -434,7 +453,7 @@ export function createMcpServer(options: {
         metadata,
       ),
   );
-  server.registerTool(
+  register(
     "catalog_fork",
     {
       description:
@@ -455,7 +474,7 @@ export function createMcpServer(options: {
         groupId,
       }),
   );
-  server.registerTool(
+  register(
     "catalog_merge_preview",
     {
       description:
@@ -488,7 +507,7 @@ export function createMcpServer(options: {
             };
       }),
   );
-  server.registerTool(
+  register(
     "catalog_merge_resolve",
     {
       description:
@@ -514,7 +533,7 @@ export function createMcpServer(options: {
         { operationId, message, groupId },
       ),
   );
-  server.registerTool(
+  register(
     "publication_prepare",
     {
       description:
@@ -524,7 +543,7 @@ export function createMcpServer(options: {
     },
     (input) => call(() => service.preparePublication(projectId, input)),
   );
-  server.registerTool(
+  register(
     "publication_list",
     {
       description:
@@ -537,7 +556,7 @@ export function createMcpServer(options: {
     },
     (input) => call(() => service.publications(input)),
   );
-  server.registerTool(
+  register(
     "history_list",
     {
       description:
@@ -554,7 +573,7 @@ export function createMcpServer(options: {
     },
     (input) => call(() => service.history({ ...input, projectId })),
   );
-  server.registerTool(
+  register(
     "library_search",
     {
       description:
@@ -571,7 +590,7 @@ export function createMcpServer(options: {
     },
     (input) => call(() => service.search({ ...input, projectId })),
   );
-  server.registerTool(
+  register(
     "history_compare",
     {
       description:
@@ -586,7 +605,7 @@ export function createMcpServer(options: {
     ({ before, after, pageId }) =>
       call(() => service.compareHistory(before, after, { projectId, pageId })),
   );
-  server.registerTool(
+  register(
     "history_page",
     {
       description:
@@ -597,7 +616,7 @@ export function createMcpServer(options: {
     ({ pageId, revision }) =>
       call(() => service.historicalPage(projectId, pageId, revision)),
   );
-  server.registerTool(
+  register(
     "history_restore",
     {
       description:
@@ -617,7 +636,7 @@ export function createMcpServer(options: {
         groupId,
       }),
   );
-  server.registerTool(
+  register(
     "history_html",
     {
       description:
@@ -628,7 +647,7 @@ export function createMcpServer(options: {
     ({ pageId, revision }) =>
       call(() => service.historicalHtml(projectId, pageId, revision)),
   );
-  server.registerTool(
+  register(
     "history_imported_snapshots",
     {
       description:
@@ -638,7 +657,7 @@ export function createMcpServer(options: {
     },
     ({ pageId }) => call(() => service.importedSnapshots(projectId, pageId)),
   );
-  server.registerTool(
+  register(
     "history_imported_page",
     {
       description:
@@ -653,7 +672,7 @@ export function createMcpServer(options: {
     ({ pageId, ...ref }) =>
       call(() => service.importedPage(projectId, pageId, ref)),
   );
-  server.registerTool(
+  register(
     "history_restore_imported_snapshot",
     {
       description:
@@ -674,7 +693,7 @@ export function createMcpServer(options: {
         groupId,
       }),
   );
-  server.registerTool(
+  register(
     "page_merge_preview",
     {
       description:
@@ -695,7 +714,7 @@ export function createMcpServer(options: {
         }),
       ),
   );
-  server.registerTool(
+  register(
     "page_merge_save",
     {
       description:
@@ -720,7 +739,7 @@ export function createMcpServer(options: {
         { operationId, message, groupId },
       ),
   );
-  server.registerTool(
+  register(
     "workspace_conflicts",
     {
       description: "List retained external file changes in this project.",
@@ -729,7 +748,7 @@ export function createMcpServer(options: {
     },
     () => call(() => service.workspaceConflicts(projectId)),
   );
-  server.registerTool(
+  register(
     "workspace_recover_package",
     {
       description:
@@ -746,7 +765,7 @@ export function createMcpServer(options: {
         }),
       ),
   );
-  server.registerTool(
+  register(
     "workspace_conflict",
     {
       description:
@@ -756,7 +775,7 @@ export function createMcpServer(options: {
     },
     ({ id }) => call(() => service.workspaceConflict(id)),
   );
-  server.registerTool(
+  register(
     "workspace_resolve",
     {
       description:
@@ -779,6 +798,72 @@ export function createMcpServer(options: {
         { operationId, message, groupId },
       ),
   );
+  if (options.presentation?.transport !== "http") {
+    const syncState = async () => {
+      const state = await syncManager(service.store.root).status();
+      const project = state.projects.find(
+        (item) => item.projectId === projectId,
+      );
+      return {
+        projectId,
+        connected: !!project,
+        ...(project ? { synchronization: project } : { mode: "local" }),
+      };
+    };
+    register(
+      "project_sync_status",
+      {
+        description:
+          "Inspect synchronization for this bound project only. No HTML display is required.",
+        inputSchema: {},
+        annotations: readOnly,
+      },
+      () => call(syncState),
+    );
+    register(
+      "project_sync",
+      {
+        description:
+          "Synchronize this already-connected project after local MCP writes, then inspect the returned status/error/remoteHead. Leaves local-only projects local. Does not connect a server or expose other projects.",
+        inputSchema: {},
+        annotations: write,
+      },
+      () =>
+        call(async () => {
+          const before = await syncState();
+          if (!before.connected) return before;
+          await syncManager(service.store.root).run(projectId);
+          const after = await syncState();
+          if (
+            "synchronization" in after &&
+            after.synchronization.status !== "synced"
+          )
+            throw new Error(
+              `Project synchronization is incomplete (${after.synchronization.status}): ${after.synchronization.error ?? "inspect project_sync_status"}. Local content is retained.`,
+            );
+          return after;
+        }),
+    );
+  }
+  registerPresentationTools(
+    server,
+    options.presentation ?? {
+      transport: "stdio",
+      storePresentation: async (value) =>
+        (
+          await writePresentation(
+            value,
+            join(
+              service.store.root,
+              "local",
+              "agent-previews",
+              randomUUID(),
+              "page.html",
+            ),
+          )
+        ).delivery,
+    },
+  );
   return server;
 }
 
@@ -792,4 +877,42 @@ export async function startMcp(options: {
   process.stderr.write(
     `ShowAI MCP connected to project ${options.projectId}.\n`,
   );
+}
+
+export async function startPublicMcp(root: string) {
+  const server = new McpServer(
+    { name: "showai", version: packageMetadata.version },
+    {
+      instructions:
+        "Create presentations without a personal project or synchronization. Discover public resources, customize their document/source, then render_document. Use the returned inline/HTML files or MCP Apps resource only when your harness supports that display. No project data is available on this connection.",
+    },
+  );
+  server.registerTool(
+    "guide",
+    {
+      description: "Read a focused ShowAI authoring or integration guide.",
+      inputSchema: { topic: z.enum(GUIDE_TOPICS).optional() },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ topic }) => ({
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(new AgentService({ root }).guide(topic)),
+        },
+      ],
+    }),
+  );
+  registerPresentationTools(server, {
+    transport: "stdio",
+    privateProjects: false,
+    storePresentation: async (value) =>
+      (
+        await writePresentation(
+          value,
+          join(root, "local", "agent-previews", randomUUID(), "page.html"),
+        )
+      ).delivery,
+  });
+  await server.connect(new StdioServerTransport());
 }

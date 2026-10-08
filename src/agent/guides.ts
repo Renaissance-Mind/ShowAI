@@ -1,4 +1,5 @@
 export const GUIDE_TOPICS = [
+  "integration",
   "workspace",
   "authoring",
   "reading",
@@ -27,6 +28,34 @@ const guides: Record<
     next?: string;
   }
 > = {
+  integration: {
+    purpose:
+      "Use common ShowAI capabilities across harnesses, choosing display and synchronization independently.",
+    rules: [
+      "Discover actual capabilities with runtime info (CLI) or showai_capabilities (MCP). Harness names do not prove inline, MCP Apps, shell or filesystem support.",
+      "Public components/templates and customization do not require a personal project or synchronization. public list/describe and render are the CLI equivalents of public_catalog_list/describe and render_document.",
+      "render input is {document?,templateId?,title?,componentSources?}; supply document or templateId. componentSources use the editable manifest/schema/source/files/assets contract from guide component. Rendering returns HTML, inline and source plus savedToProject=false/synchronized=false.",
+      "For persistent work use the selected local project or OAuth-authorized remote project. Remote tools require projectId from projects_list and never accept local filesystem paths. CLI and project-bound stdio use the actual local project.",
+      "Remote writes pull before operating and push afterward. Inspect isError, ok and synchronization.state/error/remoteHead. A retained local result with failed sync must not be reported as published. Cross-device conflicts retain both versions and may return a new page ID; same-device conflicts require explicit resolution.",
+      "Display is optional: MCP Apps uses render_document/page_present; other inline hosts use their actual rendering contract. Text-only hosts can write shared projects and return a receipt; the user sees synchronized results in ShowAI.",
+      "Local CLI, stdio and HTTP reuse content operations. Authentication and host rendering are adapters. Only claim a named harness has been tested when it actually has.",
+    ],
+    commands: [
+      "showai runtime info --json",
+      "showai public list --kind template --json",
+      "showai public describe explainer --view source --json",
+      "showai render --input presentation.json --out /OUTPUT/page.html --json",
+      "showai mcp --public",
+      "showai mcp --project PROJECT",
+      "showai mcp serve --state /PRIVATE_STATE --public-url https://YOUR_MCP_ORIGIN --sync-server https://YOUR_SHOWAI_SERVER --port 8789",
+    ],
+    input: {
+      document: "Complete Page/Board document",
+      componentSources: "Editable component packages, optional",
+      display: "Determined by the harness",
+      synchronization: "Determined by the project connection",
+    },
+  },
   sync: {
     purpose:
       "Connect project-scoped servers, inspect synchronization, join invitations and retain complete history across devices.",

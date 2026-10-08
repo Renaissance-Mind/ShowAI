@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "showai",
-  "version": "0.8.0",
-  "description": "A unified ShowAI usage guide and focused skills for reading projects, presenting pages, building components and creating templates through an independently installed runtime.",
+  "version": "0.9.0",
+  "description": "Shared ShowAI workflows for independent public presentations and local or synchronized projects through CLI and MCP.",
   "keywords": [
     "research",
     "interactive-pages",
@@ -15,7 +15,7 @@
       "interface": {
         "displayName": "ShowAI",
         "shortDescription": "Read, create and present ShowAI pages",
-        "longDescription": "Start with the unified usage guide to connect ShowAI, find project content and choose a workflow. Focused skills create and present pages, build reusable components and create templates. Uses an independently installed ShowAI desktop application or CLI runtime.",
+        "longDescription": "Create, customize and present content using public components and templates, or work on local and shared projects. Uses a connected ShowAI MCP service or an independently installed local runtime. Presentation and synchronization are independent.",
         "category": "Productivity",
         "defaultPrompt": [
           "Use ShowAI to present this research as an interactive page."
@@ -25,7 +25,8 @@
         "composerIconDark": "./assets/logo-dark.svg",
         "logo": "./assets/logo.svg",
         "logoDark": "./assets/logo-dark.svg"
-      }
+      },
+      "onboardingSkill": "./skills/use-showai/SKILL.md"
     }
   }
 }

@@ -53,6 +53,21 @@ export async function runtimeInfo(home: string) {
   return {
     version,
     protocol: 1,
+    capabilities: {
+      presentation: {
+        independentOfProject: true,
+        publicCatalog: true,
+        customization: true,
+        outputs: ["inline", "html", "source", "mcp-app"],
+      },
+      collaboration: {
+        localLibrary: true,
+        projectSynchronization: true,
+        displayRequired: false,
+      },
+      transports: ["cli", "stdio-mcp", "streamable-http-mcp"],
+      remoteAuthentication: "oauth2-project-grants",
+    },
     storage: library
       ? {
           mode: "versioned",
