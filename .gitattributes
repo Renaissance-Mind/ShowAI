@@ -1,0 +1,4 @@
+# Keep source and skill fingerprints consistent across Windows and Unix checkouts.
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf

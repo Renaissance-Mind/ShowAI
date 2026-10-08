@@ -9,6 +9,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { fileSymlink } from "../test/file-symlink";
 import {
   blankDocument,
   componentWidgetData,
@@ -199,6 +200,7 @@ describe("filesystem template catalog", () => {
     await symlink(
       outside,
       join(home, "projects", project(home), "packages/templates"),
+      process.platform === "win32" ? "junction" : "dir",
     );
     await expect(
       saveTemplate(
@@ -445,7 +447,7 @@ describe("compiled React packages", () => {
       ).rejects.toThrow(/allowed|leave/);
     }
   });
-  it("rejects package symlinks and detects modified compiled payloads", async () => {
+  it("rejects package file symlinks", async (context) => {
     const home = await temporary(),
       packageDir = await temporary();
     await writeFile(
@@ -456,13 +458,17 @@ describe("compiled React packages", () => {
       join(packageDir, "props.schema.json"),
       JSON.stringify(schema),
     );
-    await symlink(
+    await fileSymlink(
+      context,
       resolve("resources/catalog/value-slider/index.tsx"),
       join(packageDir, "index.tsx"),
     );
     await expect(
       importComponent(home, packageDir, project(home)),
     ).rejects.toThrow("symbolic");
+  });
+  it("detects modified compiled payloads", async () => {
+    const home = await temporary();
     await saveComponent(home, { manifest, schema, source }, project(home));
     const path = join(
       home,
@@ -634,7 +640,7 @@ describe("component composition and editable primitives", () => {
         expect(compiled.inline!.script.length).toBeLessThan(400000);
       expect(compiled.defaultData).toEqual(item.defaultData);
     }
-  }, 180000);
+  }, process.platform === "win32" ? 600000 : 180000);
 
   it("bundles nested exact revisions, preserves closure and validates every dependency", async () => {
     const home = await temporary();

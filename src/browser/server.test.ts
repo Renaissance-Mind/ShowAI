@@ -108,7 +108,7 @@ test("sidebar moves preserve project-local components and export after a cross-p
     selectedPath: output,
   });
   expect(await readFile(output, "utf8")).toContain("custom-widget");
-}, 15000);
+}, process.platform === "win32" ? 60000 : 15000);
 
 const execute = promisify(execFile);
 const repository = resolve(import.meta.dirname, "../..");

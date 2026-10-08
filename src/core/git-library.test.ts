@@ -258,13 +258,17 @@ describe("Git-backed content library", () => {
       library.writeFiles(new Map([["../outside.json", initial]]), human),
     ).rejects.toMatchObject({ code: "INVALID_PATH" });
     const projectDir = join(library.workspace, "projects");
-    await symlink(join(root, "source", "projects"), projectDir, "dir");
+    await symlink(
+      join(root, "source", "projects"),
+      projectDir,
+      process.platform === "win32" ? "junction" : "dir",
+    );
     const edits: FileChanges = new Map([[path, content("durable")]]);
     await expect(library.writeFiles(edits, agent)).rejects.toMatchObject({
       code: "INVALID_PATH",
     });
     expect(await library.head()).toBeNull();
-    await rm(projectDir);
+    await rm(projectDir, { recursive: true });
     await library.writeFiles(edits, agent);
     expect(
       JSON.parse(await readFile(join(library.workspace, path), "utf8")).document

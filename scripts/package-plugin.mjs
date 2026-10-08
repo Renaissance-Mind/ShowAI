@@ -1,4 +1,11 @@
-import { access, copyFile, mkdir, readFile, readdir, rm } from "node:fs/promises";
+import {
+  access,
+  copyFile,
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+} from "node:fs/promises";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -33,10 +40,9 @@ for (const [source, target] of [
 const skills = (await readdir(join(plugin, "skills"))).sort();
 for (const skill of skills) {
   await access(join(plugin, "skills", skill, "SKILL.md"));
-  const source = await readFile(
-    join(plugin, "skills", skill, "SKILL.md"),
-    "utf8",
-  );
+  const source = (
+    await readFile(join(plugin, "skills", skill, "SKILL.md"), "utf8")
+  ).replace(/\r\n/g, "\n");
   if (
     !source.startsWith("---\n") ||
     !/^name: /m.test(source) ||

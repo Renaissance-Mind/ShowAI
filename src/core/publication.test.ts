@@ -9,7 +9,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 import { createServer as createViteServer } from "vite";
@@ -120,7 +120,7 @@ async function serve(directory: string) {
       authorization: request.headers.authorization,
     });
     const target = resolve(directory, "." + decodeURIComponent(path));
-    if (!target.startsWith(resolve(directory) + "/")) {
+    if (!target.startsWith(resolve(directory) + sep)) {
       response.writeHead(403).end();
       return;
     }
@@ -429,7 +429,11 @@ describe("publication and component delivery", () => {
       ),
     ).rejects.toThrow("catalog");
     await mkdir(join(f.home, "publications/verified"), { recursive: true });
-    await symlink(join(f.home, "publications"), join(f.root, "alias"));
+    await symlink(
+      join(f.home, "publications"),
+      join(f.root, "alias"),
+      process.platform === "win32" ? "junction" : "dir",
+    );
     await expect(
       assertExportDestination(
         f.home,
@@ -467,7 +471,6 @@ describe("publication and component delivery", () => {
     });
     const browser = await chromium.launch({
       headless: true,
-      channel: "chrome",
     });
     try {
       const context = await browser.newContext();
@@ -577,7 +580,6 @@ describe("publication and component delivery", () => {
       throw new Error("Canvas server has no address.");
     const browser = await chromium.launch({
       headless: true,
-      channel: "chrome",
     });
     try {
       const context = await browser.newContext();

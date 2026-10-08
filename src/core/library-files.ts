@@ -1,8 +1,9 @@
 import { constants } from "node:fs";
-import { lstat, mkdir, open, rename, rm } from "node:fs/promises";
+import { lstat, mkdir, open, rm } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 import { CoreError } from "./model";
+import { atomicRename } from "./atomic-rename";
 
 export async function safeLibraryPath(
   root: string,
@@ -82,7 +83,7 @@ export async function atomicLibraryFile(
   }
   try {
     await safeLibraryPath(root, path);
-    await rename(temporary, path);
+    await atomicRename(temporary, path);
   } finally {
     await rm(temporary, { force: true });
   }

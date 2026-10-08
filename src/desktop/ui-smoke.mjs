@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import electron from "electron";
 import { _electron } from "playwright";
+import { stopTestProcess } from "../../scripts/stop-test-process.mjs";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const outputParent = resolve(
@@ -69,19 +70,6 @@ const contentText = (node) =>
     .join(" ")
     .replace(/\s+/g, " ")
     .trim();
-async function poll(read, condition, label, timeout = 15000) {
-  const deadline = Date.now() + timeout;
-  let value;
-  while (Date.now() < deadline) {
-    value = await read();
-    if (condition(value)) return value;
-    await delay(75);
-  }
-  throw new Error(
-    `Timed out waiting for ${label}. Last value: ${JSON.stringify(value)}`,
-  );
-}
-
 let application;
 let page;
 let closed = false;
@@ -173,6 +161,7 @@ try {
   result.projectId = project.id;
   result.originalPageId = baseline.document.id;
   result.baselineHash = baseline.hash;
+  result.baselineRevision = baseline.revision;
   result.checks.push("UI-created project and page persist to canonical files");
 
   const draftText = "Desktop draft must survive the concurrent file update.";
@@ -207,7 +196,15 @@ try {
     ) + "\n",
   );
   await rename(pendingPath, baseline.path);
-  await page.getByText("这个文件有新的修改", { exact: true }).waitFor();
+  const conflictDialog = page.getByRole("dialog", {
+    name: "保存失败：请处理外部修改冲突",
+    exact: true,
+  });
+  await conflictDialog.waitFor();
+  await conflictDialog.getByText(draftText, { exact: true }).waitFor();
+  await conflictDialog.getByText(externalText, { exact: true }).waitFor();
+  assert.ok((await conflictDialog.innerText()).includes(draftText));
+  assert.ok((await conflictDialog.innerText()).includes(externalText));
   assert.equal((await editor.innerText()).trim(), draftText);
   assert.equal(
     contentText((await readJson(baseline.path)).document.content),
@@ -218,50 +215,56 @@ try {
     "Real external file write produces the conflict panel without replacing the typed draft",
   );
 
-  await page.getByRole("button", { name: "保留为副本", exact: true }).click();
-  await page.getByText("草稿已保留为副本", { exact: true }).waitFor();
-  assert.equal(await title.inputValue(), "Concurrent edits 副本");
-  const copies = await poll(
-    async () => {
-      const directory = dirname(baseline.path);
-      return Promise.all(
-        (await readdir(directory))
-          .filter((name) => name.endsWith(".json"))
-          .map((name) => readJson(join(directory, name))),
-      );
-    },
-    (items) => items.length === 2,
-    "two saved page files",
+  await conflictDialog
+    .getByRole("button", { name: "修改后重新保存", exact: true })
+    .click();
+  await conflictDialog.waitFor({ state: "hidden" });
+  // Reviewing the draft must not overwrite the external version automatically.
+  assert.equal(
+    contentText((await readJson(baseline.path)).document.content),
+    externalText,
   );
-  const original = copies.find(
-    (item) => item.document.id === baseline.document.id,
+  assert.equal((await editor.innerText()).trim(), draftText);
+  await page.getByRole("button", { name: "重新保存", exact: true }).click();
+  await page.locator(".studio-save-state.saved").waitFor();
+  const resolved = await cli(
+    "pages",
+    "read",
+    baseline.document.id,
+    "--project",
+    project.id,
   );
-  const copy = copies.find((item) => item.document.id !== baseline.document.id);
-  assert.equal(contentText(original.document.content), externalText);
-  assert.equal(contentText(copy.document.content), draftText);
-  result.copyPageId = copy.document.id;
+  assert.equal(contentText(resolved.document.content), draftText);
+  const conflictDirectories = await readdir(join(home, "local/conflicts"));
+  const retainedVersions = await Promise.all(
+    conflictDirectories.map(async (id) => {
+      const detail = await cli("history", "conflict", id);
+      return detail.external;
+    }),
+  );
+  assert.ok(retainedVersions.some((value) => value?.includes(externalText)));
   result.checks.push(
-    "Keep copy writes two distinct pages with both writers' complete content",
+    "Reviewed local edits save only after explicit confirmation; the external snapshot remains available",
   );
 
   // Capture a CLI checkpoint while open, then type once more and immediately
   // close the actual app; its normal close/flush handshake must preserve it.
-  const copyBaseline = await cli(
+  const resolvedBaseline = await cli(
     "pages",
     "read",
-    copy.document.id,
+    baseline.document.id,
     "--project",
     project.id,
   );
   await page.screenshot({
-    path: join(output, "saved-copy.png"),
+    path: join(output, "saved-resolution.png"),
     fullPage: true,
   });
   const closingText = `${draftText} Final keystrokes are flushed when the app quits.`;
   await editor.fill(closingText);
   const pendingStatus = await page.locator(".studio-save-state").innerText();
   const pendingDiskText = contentText(
-    (await readJson(copyBaseline.path)).document.content,
+    (await readJson(resolvedBaseline.path)).document.content,
   );
   assert.equal(
     pendingStatus.trim(),
@@ -293,16 +296,16 @@ try {
     "--project",
     project.id,
     "--since",
-    baseline.hash,
+    baseline.revision,
   );
-  const copyDiff = await cli(
+  const closingDiff = await cli(
     "pages",
     "diff",
-    copy.document.id,
+    baseline.document.id,
     "--project",
     project.id,
     "--since",
-    copyBaseline.hash,
+    resolvedBaseline.revision,
   );
   const finalOriginal = await cli(
     "pages",
@@ -311,32 +314,23 @@ try {
     "--project",
     project.id,
   );
-  const finalCopy = await cli(
-    "pages",
-    "read",
-    copy.document.id,
-    "--project",
-    project.id,
-  );
   assert.equal(originalDiff.changed, true);
-  assert.equal(copyDiff.changed, true);
-  assert.match(JSON.stringify(originalDiff.changes), /External file revision/);
-  assert.match(JSON.stringify(copyDiff.changes), /Final keystrokes/);
-  assert.equal(contentText(finalOriginal.document.content), externalText);
-  assert.equal(contentText(finalCopy.document.content), closingText);
+  assert.equal(closingDiff.changed, true);
+  assert.match(JSON.stringify(originalDiff.changes), /Desktop draft/);
+  assert.match(JSON.stringify(closingDiff.changes), /Final keystrokes/);
+  assert.equal(contentText(finalOriginal.document.content), closingText);
   assert.equal(finalOriginal.document.title, "Concurrent edits");
-  assert.equal(finalCopy.document.title, "Concurrent edits 副本");
   assert.deepEqual(rendererErrors, []);
   await writeFile(
     join(output, "original-diff.json"),
     JSON.stringify(originalDiff, null, 2) + "\n",
   );
   await writeFile(
-    join(output, "copy-diff.json"),
-    JSON.stringify(copyDiff, null, 2) + "\n",
+    join(output, "closing-diff.json"),
+    JSON.stringify(closingDiff, null, 2) + "\n",
   );
   result.checks.push(
-    "Bundled CLI reads both pages and their checkpoint diffs after the UI process has exited",
+    "Bundled CLI reads the resolved page and its checkpoint diffs after the UI process has exited",
   );
   assert.deepEqual(
     await fingerprints(),
@@ -358,7 +352,7 @@ try {
   if (application && !closed && application.process().exitCode === null) {
     // Only this script's isolated child is terminated on a failed run. Its files
     // remain available for inspection, including any unflushed conflict evidence.
-    application.process().kill("SIGTERM");
+    await stopTestProcess(application.process());
   }
   result.rendererErrors = rendererErrors;
   await writeFile(join(output, "electron.log"), processOutput);

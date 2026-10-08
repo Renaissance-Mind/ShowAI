@@ -1258,7 +1258,7 @@ test("directory projects are shared across sessions, canonical paths and concurr
     root.project.id,
   );
   const alias = join(home, "directory-alias");
-  await symlink(workspace, alias, "dir");
+  await symlink(workspace, alias, process.platform === "win32" ? "junction" : "dir");
   expect(
     (await runHere(["projects", "current", "--source-directory", alias]))
       .project.id,
@@ -1359,7 +1359,7 @@ test("directory projects are shared across sessions, canonical paths and concurr
     { actor: { kind: "human" }, channel: "system" },
   );
   await expect(runHere(["projects", "current"])).rejects.toThrow("archived");
-}, 20000);
+}, process.platform === "win32" ? 60000 : 20000);
 
 test("progressive CLI discovery is paginated and keeps detailed content opt-in", async () => {
   const project = await run([

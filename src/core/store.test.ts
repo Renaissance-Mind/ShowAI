@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { FileStore } from "./store";
 import { documentHash } from "./diff";
 import type { PageRecord } from "./model";
+import { fileSymlink } from "../test/file-symlink";
 
 describe("file-first project store", () => {
   let directory: string;
@@ -294,17 +295,21 @@ describe("file-first project store", () => {
     ).rejects.toMatchObject({ code: "INVALID_DATA" });
   });
 
-  it("rejects traversal, malformed IDs, and symlinked pages", async () => {
-    const { projectId, record } = await page();
+  it("rejects traversal and malformed IDs", async () => {
+    const { projectId } = await page();
     expect(() => store.projectPath("../escape")).toThrow();
     expect(() => store.pagePath(projectId, "CON")).toThrow();
     await expect(
       store.readPage(projectId, "../../outside"),
     ).rejects.toMatchObject({ code: "INVALID_PATH" });
+  });
+
+  it("rejects symlinked pages", async (context) => {
+    const { projectId, record } = await page();
     const target = join(directory, "external.json");
     await writeFile(target, await readFile(record.path, "utf8"));
     await rm(record.path);
-    await symlink(target, record.path);
+    await fileSymlink(context, target, record.path);
     await expect(
       store.readPage(projectId, record.document.id),
     ).rejects.toMatchObject({ code: "INVALID_PATH" });
@@ -316,7 +321,11 @@ describe("file-first project store", () => {
   it("rejects symlinked project directories before writing outside the root", async () => {
     const project = await store.createProject({ name: "Project" });
     await rm(store.projectPath(project.id), { recursive: true });
-    await symlink(directory, store.projectPath(project.id));
+    await symlink(
+      directory,
+      store.projectPath(project.id),
+      process.platform === "win32" ? "junction" : "dir",
+    );
     await expect(store.createPage(project.id)).rejects.toMatchObject({
       code: "INVALID_PATH",
     });

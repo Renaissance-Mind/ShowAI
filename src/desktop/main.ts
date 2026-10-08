@@ -13,7 +13,8 @@ import {
 } from "electron";
 import type { IpcMainEvent, IpcMainInvokeEvent, NativeImage } from "electron";
 import { watch, type FSWatcher } from "chokidar";
-import { mkdir, readFile, writeFile, rename, realpath } from "node:fs/promises";
+import { mkdir, readFile, writeFile, realpath } from "node:fs/promises";
+import { atomicRename } from "../core/atomic-rename";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
@@ -194,7 +195,7 @@ async function saveSettings(home: string): Promise<void> {
     flag: "wx",
     mode: 0o600,
   });
-  await rename(temporary, path);
+  await atomicRename(temporary, path);
 }
 
 async function nativeAction(

@@ -109,10 +109,17 @@ async function actionTarget(
   const target = action.selector
     ? owner.locator(action.selector)
     : owner.getByRole(action.role!, { name: action.name!, exact: true });
-  if ((await target.count()) !== 1)
-    throw new Error(
-      `Action target is missing or ambiguous: ${action.selector ?? `${action.role} ${action.name}`}. Read the HTML view and specify its blockId.`,
-    );
+  const message = `Action target is missing or ambiguous: ${action.selector ?? `${action.role} ${action.name}`}. Read the HTML view and specify its blockId.`;
+  let matches = await target.count();
+  if (matches === 0) {
+    // A preceding action can mount its next control asynchronously. count()
+    // is only a snapshot and must not reject that control before it appears.
+    await target.waitFor({ state: "attached" }).catch((error) => {
+      throw new Error(message, { cause: error });
+    });
+    matches = await target.count();
+  }
+  if (matches !== 1) throw new Error(message);
   return target;
 }
 async function act(page: Page, action: ReadingAction) {
