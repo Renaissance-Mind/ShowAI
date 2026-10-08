@@ -24,7 +24,7 @@ ShowAI 让人与 Agent 通过可阅读、可交互、可编辑的内容共同思
 
 ## 🧩 设计逻辑
 
-![ShowAI 设计逻辑：从可由 Agent 动态添加的组件、内容组织，到 Agent 上下文与 ShowAI App 中的共创，以及使用与交付](docs/showai-design-logic.svg)
+![ShowAI 设计逻辑：从可由 Agent 动态添加的组件、内容（模板），到 Agent 上下文与 ShowAI App 中的共创，以及使用与交付](docs/showai-design-logic.svg)
 
 ### Page 与 Board
 

@@ -70,7 +70,7 @@
 <rect x="410" y="150" width="436" height="588" rx="14" fill="white" stroke="#CFE1ED" stroke-width="2"/>
 <circle cx="449" cy="195" r="25" fill="#06A5FA" stroke="none" stroke-width="2"/>
 <text x="449" y="205" font-size="29" font-weight="650" fill="white" text-anchor="middle">2</text>
-<text x="487" y="207" font-size="32" font-weight="650" fill="#172B3A" text-anchor="start">组织内容</text>
+<text x="487" y="207" font-size="32" font-weight="650" fill="#172B3A" text-anchor="start">内容（模板）</text>
 <g id="reusable-template">
 <rect x="540" y="259" width="148" height="72" rx="5" fill="#F5FAFE" stroke="#81B4D5" stroke-width="1.4"/>
 <rect x="547" y="253" width="148" height="72" rx="5" fill="#F5FAFE" stroke="#81B4D5" stroke-width="1.4"/>
