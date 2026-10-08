@@ -361,6 +361,14 @@ button.studio-tree-chevron:hover {
   padding: 30px 42px 64px;
   animation: studio-enter 0.15s ease-out;
 }
+.studio-library:has(> .studio-empty:only-child) {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100%;
+  padding-block: 30px;
+}
 .studio-section-heading {
   display: flex;
   justify-content: space-between;
