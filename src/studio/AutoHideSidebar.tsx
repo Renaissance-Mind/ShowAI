@@ -21,6 +21,7 @@ export default function AutoHideSidebar({
   interactionHeld,
   children,
   navigation,
+  history,
   topbar,
   focusWindow,
   switchingTab,
@@ -29,6 +30,7 @@ export default function AutoHideSidebar({
   interactionHeld: boolean;
   children: ReactNode;
   navigation: ReactNode;
+  history: ReactNode;
   topbar: ReactNode;
   focusWindow: boolean;
   switchingTab: boolean;
@@ -228,22 +230,26 @@ export default function AutoHideSidebar({
               <img src={appIcon} alt="" draggable={false} />
               <strong>ShowAI</strong>
             </span>
-            <button
-              type="button"
-              className="studio-sidebar-lock"
-              aria-label={lockLabel}
-              title={lockLabel}
-              aria-pressed={locked}
-              onClick={() => {
-                const next = !locked;
-                localStorage.setItem("showai:sidebar-locked", String(next));
-                setLocked(next);
-              }}
-            >
-              <PanelLeft size={19} strokeWidth={1.7} aria-hidden="true" />
-            </button>
+            <div className="studio-topbar-actions">
+              {history}
+              <button
+                type="button"
+                className="studio-sidebar-lock"
+                aria-label={lockLabel}
+                title={lockLabel}
+                aria-pressed={locked}
+                onClick={() => {
+                  const next = !locked;
+                  localStorage.setItem("showai:sidebar-locked", String(next));
+                  setLocked(next);
+                }}
+              >
+                <PanelLeft size={19} strokeWidth={1.7} aria-hidden="true" />
+              </button>
+            </div>
           </div>
         )}
+        {focusWindow && history}
         {topbar}
       </header>
       <div

@@ -101,7 +101,7 @@ import TemplateNavigation, {
 } from "./TemplateNavigation";
 import RecentPages, { recentPages } from "./RecentPages";
 import AutoHideSidebar from "./AutoHideSidebar";
-import WorkspaceTabs from "./WorkspaceTabs";
+import WorkspaceTabs, { WorkspaceHistory } from "./WorkspaceTabs";
 import { useWorkspaceTabs } from "./useWorkspaceTabs";
 import {
   clickDisposition,
@@ -2107,6 +2107,16 @@ export default function Studio() {
           focusWindow={focusWindow}
           switchingTab={workspace.switching || routing}
           navigation={sidebarContent}
+          history={
+            <WorkspaceHistory
+              busy={
+                workspace.switching || routing || !workspaceReady || !!dialog
+              }
+              canBack={workspace.canBack}
+              canForward={workspace.canForward}
+              onStep={(offset) => void workspace.step(offset).catch(report)}
+            />
+          }
           topbar={
             <WorkspaceTabs
               tabs={workspace.tabs}
@@ -2114,12 +2124,9 @@ export default function Studio() {
               busy={
                 workspace.switching || routing || !workspaceReady || !!dialog
               }
-              canBack={workspace.canBack}
-              canForward={workspace.canForward}
               onSelect={(id) => void workspace.select(id).catch(report)}
               onClose={(id) => void workspace.close(id).catch(report)}
               onAdd={() => void workspace.add().catch(report)}
-              onStep={(offset) => void workspace.step(offset).catch(report)}
             />
           }
         >

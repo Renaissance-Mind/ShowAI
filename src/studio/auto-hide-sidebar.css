@@ -92,12 +92,30 @@
   padding: 0 8px 0 19px;
   gap: 4px;
   user-select: none;
+  container: studio-topbar-brand / inline-size;
 }
 .studio-app-brand {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
+}
+.studio-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+@container studio-topbar-brand (max-width: 180px) {
+  .studio-app-brand strong {
+    display: none;
+  }
+}
+@container studio-topbar-brand (max-width: 116px) {
+  .studio-app-brand {
+    display: none;
+  }
 }
 .studio-app-brand img {
   width: 20px;

@@ -14,24 +14,53 @@ import PageIcon from "../components/PageIcon";
 import { currentEntry, type WorkspaceTabsState } from "./workspace-tabs";
 import "./workspace-tabs.css";
 
+export function WorkspaceHistory({
+  busy,
+  canBack,
+  canForward,
+  onStep,
+}: {
+  busy: boolean;
+  canBack: boolean;
+  canForward: boolean;
+  onStep: (offset: number) => void;
+}) {
+  return (
+    <div className="studio-tab-history" aria-label="标签页浏览历史">
+      <button
+        type="button"
+        aria-label="后退"
+        title="后退"
+        disabled={busy || !canBack}
+        onClick={() => onStep(-1)}
+      >
+        <ArrowLeft size={16} />
+      </button>
+      <button
+        type="button"
+        aria-label="前进"
+        title="前进"
+        disabled={busy || !canForward}
+        onClick={() => onStep(1)}
+      >
+        <ArrowRight size={16} />
+      </button>
+    </div>
+  );
+}
+
 export default function WorkspaceTabs({
   tabs,
   activeId,
   busy,
-  canBack,
-  canForward,
   onSelect,
   onClose,
   onAdd,
-  onStep,
 }: WorkspaceTabsState & {
   busy: boolean;
-  canBack: boolean;
-  canForward: boolean;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
   onAdd: () => void;
-  onStep: (offset: number) => void;
 }) {
   const list = useRef<HTMLDivElement>(null);
   const restoreFocus = useRef(false);
@@ -50,26 +79,6 @@ export default function WorkspaceTabs({
 
   return (
     <div className="studio-tabs-bar">
-      <div className="studio-tab-history" aria-label="标签页浏览历史">
-        <button
-          type="button"
-          aria-label="后退"
-          title="后退"
-          disabled={busy || !canBack}
-          onClick={() => onStep(-1)}
-        >
-          <ArrowLeft size={16} />
-        </button>
-        <button
-          type="button"
-          aria-label="前进"
-          title="前进"
-          disabled={busy || !canForward}
-          onClick={() => onStep(1)}
-        >
-          <ArrowRight size={16} />
-        </button>
-      </div>
       <div
         ref={list}
         className="studio-tabs"
