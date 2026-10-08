@@ -44,6 +44,11 @@ export default function Dialog({
         ].filter((item) => item.offsetParent !== null);
         const first = items[0],
           last = items.at(-1);
+        if (!panel.current?.contains(document.activeElement)) {
+          event.preventDefault();
+          (event.shiftKey ? last : first)?.focus();
+          return;
+        }
         if (event.shiftKey && document.activeElement === first) {
           event.preventDefault();
           last?.focus();

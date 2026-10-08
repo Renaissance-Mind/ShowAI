@@ -5,6 +5,7 @@ export {
   AlignLeft,
   AlignRight,
   AppWindow,
+  Archive,
   ArrowDown,
   ArrowDownRight,
   ArrowLeft,

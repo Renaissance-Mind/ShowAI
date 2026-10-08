@@ -109,6 +109,446 @@
   min-height: 0;
   padding: 18px;
 }
+.sync-dialog {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.sync-dialog > header {
+  padding: 16px 22px;
+}
+.sync-dialog > header h2 {
+  font-size: 17px;
+  font-weight: 600;
+}
+.sync-dialog .settings-button,
+.sync-dialog input:not([type="radio"]),
+.sync-dialog select {
+  min-height: 38px;
+  font-size: 13px;
+}
+.sync-dialog :is(button, input, select, summary):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.sync-dialog .sync-primary {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--paper);
+}
+.sync-dialog .sync-danger {
+  color: var(--danger);
+}
+.sync-dialog button:disabled,
+.sync-dialog select:disabled {
+  cursor: not-allowed;
+}
+.sync-dialog .sync-error,
+.sync-dialog .sync-message,
+.sync-dialog .settings-help {
+  font-size: 13px;
+}
+.sync-dashboard-dialog.wide {
+  width: min(940px, 100%);
+  height: min(700px, calc(100dvh - 48px));
+}
+.sync-dashboard-body {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.sync-dashboard-body > :is(.sync-error, .sync-message, .settings-help) {
+  margin: 0;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.sync-management {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+.sync-management-sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  padding: 24px 14px;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.sync-server-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 0 8px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.sync-server-identity svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--muted);
+}
+.sync-server-identity div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.sync-server-identity strong {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.sync-server-identity span,
+.sync-project-list-heading,
+.sync-section-description,
+.sync-project-overview p,
+.sync-permission-note,
+.sync-empty-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+.sync-project-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+}
+.sync-project-list-heading h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+}
+.sync-managed-projects {
+  display: grid;
+  gap: 4px;
+}
+.sync-mobile-project-select {
+  display: none;
+}
+.sync-managed-projects button {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  text-align: left;
+  padding: 11px 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  width: 100%;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.sync-managed-projects button svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--muted);
+}
+.sync-managed-projects button span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sync-managed-projects button small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 2px;
+}
+.sync-managed-projects button:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+.sync-managed-projects button[aria-current="page"] {
+  background: var(--paper);
+  border-color: var(--line);
+  font-weight: 600;
+  box-shadow: 0 1px 2px #00000005;
+}
+.sync-create-project {
+  margin-top: auto;
+  padding-top: 20px;
+}
+.sync-create-project > button,
+.sync-create-project form > button,
+.sync-create-project input {
+  width: 100%;
+}
+.sync-create-project form {
+  display: grid;
+  gap: 10px;
+}
+.sync-create-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+.sync-create-heading button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+}
+.sync-management-content {
+  padding: 26px 28px;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.sync-project-overview {
+  padding-bottom: 24px;
+}
+.sync-eyebrow {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.sync-project-overview h2 {
+  font-size: 23px;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+  overflow-wrap: anywhere;
+}
+.sync-project-overview p {
+  margin: 7px 0 0;
+}
+.sync-management-section {
+  padding: 22px 0;
+  border-top: 1px solid var(--line);
+}
+.sync-management-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.sync-management-section-heading h3,
+.sync-archive-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+.sync-management-section-heading > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.sync-badge {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 8px;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.5;
+}
+.sync-members-table {
+  border-collapse: collapse;
+  width: 100%;
+  text-align: left;
+}
+.sync-members-table th {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 400;
+  padding: 0 0 8px;
+}
+.sync-members-table td {
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.sync-members-table td:nth-child(2) {
+  width: 125px;
+}
+.sync-members-table td:last-child {
+  width: 62px;
+  text-align: right;
+}
+.sync-members-table select {
+  width: 115px;
+}
+.sync-member-identity {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding-right: 12px;
+}
+.sync-member-identity > svg {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.sync-member-identity strong {
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.sync-member-identity small {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.sync-text-button {
+  padding: 8px;
+  border-radius: 5px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.sync-text-button:hover:not(:disabled) {
+  background: var(--surface);
+}
+.sync-text-button:disabled {
+  color: var(--muted) !important;
+  opacity: 0.5;
+}
+.sync-permission-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+.sync-section-description {
+  margin: -4px 0 18px;
+}
+.sync-invite-controls {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.sync-invite-controls label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+.sync-invite-controls select {
+  min-width: 145px;
+}
+.sync-generated-invite {
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+}
+.sync-generated-invite > label {
+  font-size: 12px;
+  display: block;
+  margin-bottom: 8px;
+}
+.sync-generated-invite > div {
+  display: flex;
+  gap: 8px;
+}
+.sync-generated-invite input {
+  flex: 1;
+  width: 0;
+}
+.sync-generated-invite p {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 8px 0 0;
+}
+.sync-pending-invites {
+  margin-top: 18px;
+}
+.sync-pending-invites summary {
+  font-size: 13px;
+  cursor: pointer;
+}
+.sync-pending-invites summary span {
+  color: var(--muted);
+  margin-left: 5px;
+}
+.sync-invite-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.sync-invite-row strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.sync-invite-row span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.sync-archive-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-top: 1px solid var(--line);
+  padding: 22px 0 0;
+}
+.sync-archive-section h3 {
+  font-size: 13px;
+  font-weight: 500;
+}
+.sync-archive-section p {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 6px 0 0;
+}
+.sync-inline-confirm {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+}
+.sync-inline-confirm p {
+  margin: 0;
+  font-size: 13px;
+}
+.sync-inline-confirm p > span {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.sync-inline-confirm > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+.sync-management-empty {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  flex-direction: column;
+  min-height: 320px;
+  gap: 12px;
+}
+.sync-management-empty svg {
+  color: var(--muted);
+}
+.sync-management-empty h2 {
+  font-size: 21px;
+}
+.sync-management-empty p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.sync-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .sync-dialog .settings-group {
   margin: 0;
 }
@@ -142,6 +582,12 @@
   overflow-wrap: anywhere;
 }
 @media (max-width: 700px) {
+  .sync-management {
+    grid-template-columns: 170px minmax(0, 1fr);
+  }
+  .sync-management-content {
+    padding: 22px 18px;
+  }
   .sync-form,
   .sync-conflict-columns {
     grid-template-columns: 1fr;
@@ -153,5 +599,73 @@
   }
   .sync-project-heading {
     align-items: flex-start;
+  }
+}
+@media (max-width: 560px) {
+  .sync-dashboard-body {
+    overflow: auto;
+    display: block;
+  }
+  .sync-management {
+    display: block;
+  }
+  .sync-management-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 16px;
+    gap: 12px;
+    overflow: visible;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .sync-server-identity {
+    padding: 0;
+    border: 0;
+    grid-column: 1 / -1;
+  }
+  .sync-server-identity div {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .sync-project-list-heading {
+    display: none;
+  }
+  .sync-managed-projects {
+    display: none;
+  }
+  .sync-management-sidebar > input {
+    display: none;
+  }
+  .sync-mobile-project-select {
+    display: block;
+    width: 100%;
+    max-width: none !important;
+  }
+  .sync-create-project {
+    padding: 0;
+    margin: 0;
+  }
+  .sync-create-project.is-open {
+    grid-column: 1 / -1;
+  }
+  .sync-management-content {
+    overflow: visible;
+    padding: 22px 18px;
+  }
+  .sync-archive-section {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .sync-member-identity > svg {
+    display: none;
+  }
+  .sync-members-table td:nth-child(2) {
+    width: 106px;
+  }
+  .sync-members-table select {
+    width: 100px;
   }
 }

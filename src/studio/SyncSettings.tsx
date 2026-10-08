@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { desktop, errorMessage } from "./bridge";
 import Dialog from "./Dialog";
+import SyncDashboard, {
+  type SyncMember,
+  type SyncInvite,
+} from "./SyncDashboard";
 import { conflictPreview } from "./sync-conflict-preview";
 import type { ProjectSummary } from "../core/model";
 import type {
@@ -14,14 +18,6 @@ type Status = Omit<SyncConfiguration, "connections"> & {
   connections: Omit<SyncConfiguration["connections"][number], "token">[];
   running: boolean;
 };
-type Member = { id: string; name: string; role: ProjectRole };
-type Invite = {
-  digest: string;
-  role: ProjectRole;
-  expires_at: string;
-  accepted_by: string | null;
-  revoked: number;
-};
 const roles: Record<ProjectRole, string> = {
   admin: "管理员",
   editor: "编辑者",
@@ -34,11 +30,6 @@ const states = {
   conflict: "需要处理冲突",
   revoked: "需要重新登录或加入",
 };
-const roleOptions = Object.entries(roles).map(([value, label]) => (
-  <option key={value} value={value}>
-    {label}
-  </option>
-));
 export default function SyncSettings() {
   const [status, setStatus] = useState<Status | null>(null),
     [localProjects, setLocalProjects] = useState<ProjectSummary[]>([]);
@@ -59,13 +50,15 @@ export default function SyncSettings() {
     "projects" | "dashboard" | "conflict" | null
   >(null);
   const panelBody = useRef<HTMLDivElement>(null);
+  const actionFocus = useRef<HTMLElement | null>(null);
   const [remote, setRemote] = useState<SyncProject[]>([]),
     [dashboard, setDashboard] = useState<string | null>(null),
     [managedProject, setManagedProject] = useState("");
-  const [members, setMembers] = useState<Member[]>([]),
-    [invites, setInvites] = useState<Invite[]>([]),
+  const [members, setMembers] = useState<SyncMember[]>([]),
+    [invites, setInvites] = useState<SyncInvite[]>([]),
     [inviteRole, setInviteRole] = useState<ProjectRole>("editor"),
     [generatedInvite, setGeneratedInvite] = useState("");
+  const [generatedInviteExpiresAt, setGeneratedInviteExpiresAt] = useState("");
   const [inviteLink, setInviteLink] = useState(
       () => new URLSearchParams(location.search).get("invite") ?? "",
     ),
@@ -133,22 +126,36 @@ export default function SyncSettings() {
   }, [preview, status, server]);
   useEffect(() => {
     // Disabling a loading selector can move focus out of the dialog.
-    if (panel && !busy && !document.activeElement?.closest(".sync-dialog"))
-      panelBody.current
-        ?.querySelector<HTMLElement>(
-          "input:not([disabled]),select:not([disabled]),button:not([disabled])",
-        )
-        ?.focus();
+    if (panel && !busy && !document.activeElement?.closest(".sync-dialog")) {
+      const target = actionFocus.current;
+      (target?.isConnected &&
+      target.offsetParent !== null &&
+      !target.matches(":disabled")
+        ? target
+        : [
+            ...(panelBody.current?.querySelectorAll<HTMLElement>(
+              "input:not([disabled]),select:not([disabled]),button:not([disabled])",
+            ) ?? []),
+          ].find((element) => element.offsetParent !== null)
+      )?.focus();
+    }
   }, [panel, busy]);
   async function run(action: () => Promise<unknown>) {
+    const active = document.activeElement;
+    actionFocus.current =
+      active instanceof HTMLElement && active.closest(".sync-dialog")
+        ? active
+        : null;
     setBusy(true);
     setError("");
     setMessage("");
     try {
       await action();
       await refresh();
+      return true;
     } catch (error) {
       setError(errorMessage(error));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -166,29 +173,39 @@ export default function SyncSettings() {
       );
   }
   async function loadDashboard(connectionId: string, projectId?: string) {
+    const previousId = dashboard === connectionId ? managedProject : "";
     setPanel("dashboard");
     setDashboard(connectionId);
     setServer(connectionId);
-    setRemote([]);
-    setMembers([]);
-    setInvites([]);
-    setManagedProject("");
+    if (dashboard !== connectionId) {
+      setRemote([]);
+      setMembers([]);
+      setInvites([]);
+      setManagedProject("");
+    }
     setGeneratedInvite("");
+    setGeneratedInviteExpiresAt("");
     const projects = await desktop.invoke<SyncProject[]>("sync:projects", {
       connectionId,
     });
     setRemote(projects);
-    if (projectId) {
+    const selected =
+      projects.find(
+        (project) =>
+          project.id === (projectId ?? previousId) && project.role === "admin",
+      ) ?? projects.find((project) => project.role === "admin");
+    if (selected) {
       const data = await desktop.invoke<{
-        members: Member[];
-        invites: Invite[];
-      }>("sync:dashboard", { connectionId, projectId });
+        members: SyncMember[];
+        invites: SyncInvite[];
+      }>("sync:dashboard", { connectionId, projectId: selected.id });
       setMembers(data.members);
       setInvites(data.invites);
-      setManagedProject(projectId);
+      setManagedProject(selected.id);
     } else {
       setMembers([]);
       setInvites([]);
+      setManagedProject("");
     }
   }
   async function manage(operation: string, input: Record<string, unknown>) {
@@ -296,7 +313,7 @@ export default function SyncSettings() {
               disabled={busy}
               onClick={() => void run(() => loadDashboard(connection.id))}
             >
-              项目 Dashboard
+              项目管理
             </button>
             <button
               className="settings-button"
@@ -711,14 +728,18 @@ export default function SyncSettings() {
             panel === "projects"
               ? "服务器上的项目"
               : panel === "dashboard"
-                ? "项目 Dashboard"
+                ? "项目管理"
                 : "查看双方修改"
           }
           wide
           onClose={() => setPanel(null)}
-          className="sync-dialog"
+          className={`sync-dialog sync-${panel}-dialog`}
         >
-          <div ref={panelBody} className="sync-dialog-body" aria-busy={busy}>
+          <div
+            ref={panelBody}
+            className={`sync-dialog-body ${panel === "dashboard" ? "sync-dashboard-body" : ""}`}
+            aria-busy={busy}
+          >
             {error && (
               <p className="sync-error" role="alert">
                 {error}
@@ -731,7 +752,7 @@ export default function SyncSettings() {
             )}
             {busy && (
               <p className="settings-help" role="status">
-                正在加载…
+                正在处理…
               </p>
             )}
             {panel === "projects" && (
@@ -804,201 +825,78 @@ export default function SyncSettings() {
               </section>
             )}
             {panel === "dashboard" && dashboard && (
-              <section className="settings-group sync-dashboard">
-                <p className="settings-help">
-                  {
-                    status.connections.find(
-                      (connection) => connection.id === dashboard,
-                    )?.name
-                  }
-                </p>
-                <div className="sync-inline-form">
-                  <select
-                    aria-label="管理的项目"
-                    value={managedProject}
-                    disabled={busy}
-                    onChange={(event) =>
-                      void run(() =>
-                        loadDashboard(dashboard, event.target.value),
-                      )
-                    }
-                  >
-                    <option value="">选择管理的项目</option>
-                    {remote
-                      .filter((project) => project.role === "admin")
-                      .map((project) => (
-                        <option key={project.id} value={project.id}>
-                          {project.name}
-                        </option>
-                      ))}
-                  </select>
-                  <form
-                    className="sync-inline-form"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      const data = new FormData(event.currentTarget);
-                      void run(async () => {
-                        await desktop.invoke("sync:createProject", {
-                          connectionId: dashboard,
-                          name: data.get("name"),
-                        });
-                        await loadDashboard(dashboard);
-                      });
-                    }}
-                  >
-                    <input
-                      name="name"
-                      required
-                      aria-label="新项目名称"
-                      placeholder="新项目名称"
-                    />
-                    <button className="settings-button" disabled={busy}>
-                      创建项目
-                    </button>
-                  </form>
-                </div>
-                {!busy &&
-                  !error &&
-                  !remote.some((project) => project.role === "admin") && (
-                    <p className="settings-help">
-                      当前账号还没有可管理的项目，可以创建项目后管理成员与邀请。
-                    </p>
-                  )}
-                {managedProject && (
-                  <>
-                    <h3>项目成员</h3>
-                    {members.map((member) => (
-                      <div className="sync-connection" key={member.id}>
-                        <div className="settings-row-text">
-                          <h3>{member.name}</h3>
-                        </div>
-                        <select
-                          aria-label={`${member.name}的项目权限`}
-                          value={member.role}
-                          disabled={busy}
-                          onChange={(event) =>
-                            void run(() =>
-                              manage("member", {
-                                userId: member.id,
-                                role: event.target.value,
-                              }),
-                            )
-                          }
-                        >
-                          {roleOptions}
-                        </select>
-                        <button
-                          className="settings-button"
-                          disabled={busy}
-                          onClick={() =>
-                            void run(() =>
-                              manage("member", {
-                                userId: member.id,
-                                role: null,
-                              }),
-                            )
-                          }
-                        >
-                          移出项目
-                        </button>
-                      </div>
-                    ))}
-                    <h3>邀请新成员</h3>
-                    <div className="sync-inline-form">
-                      <select
-                        aria-label="邀请权限"
-                        value={inviteRole}
-                        onChange={(event) =>
-                          setInviteRole(event.target.value as ProjectRole)
-                        }
-                      >
-                        {roleOptions}
-                      </select>
-                      <button
-                        className="settings-button"
-                        disabled={busy}
-                        onClick={() =>
-                          void run(async () => {
-                            const invitation = (await manage("invite", {
-                              role: inviteRole,
-                            })) as { url: string };
-                            setGeneratedInvite(invitation.url);
-                          })
-                        }
-                      >
-                        生成邀请链接
-                      </button>
-                    </div>
-                    {generatedInvite && (
-                      <div className="sync-inline-form">
-                        <input
-                          aria-label="生成的邀请链接"
-                          readOnly
-                          value={generatedInvite}
-                        />
-                        <button
-                          className="settings-button"
-                          onClick={() =>
-                            void run(async () => {
-                              await desktop.invoke("clipboard:write", {
-                                text: generatedInvite,
-                              });
-                              setMessage("邀请链接已复制。");
-                            })
-                          }
-                        >
-                          复制链接
-                        </button>
-                      </div>
-                    )}
-                    {invites
-                      .filter(
-                        (invite) => !invite.accepted_by && !invite.revoked,
-                      )
-                      .map((invite) => (
-                        <div className="sync-connection" key={invite.digest}>
-                          <p className="settings-help">
-                            {roles[invite.role]} ·{" "}
-                            {new Date(invite.expires_at).toLocaleString()} 到期
-                          </p>
-                          <button
-                            className="settings-button"
-                            disabled={busy}
-                            onClick={() =>
-                              void run(() =>
-                                manage("revokeInvite", {
-                                  digest: invite.digest,
-                                }),
-                              )
-                            }
-                          >
-                            撤销邀请
-                          </button>
-                        </div>
-                      ))}
-                    <div className="sync-inline-form">
-                      <button
-                        className="settings-button"
-                        disabled={busy}
-                        onClick={() =>
-                          void run(() =>
-                            manage("project", {
-                              archived: !remote.find(
-                                (project) => project.id === managedProject,
-                              )?.archived,
-                            }),
-                          )
-                        }
-                      >
-                        {remote.find((project) => project.id === managedProject)
-                          ?.archived
-                          ? "恢复项目"
-                          : "归档项目"}
-                      </button>
-                    </div>
-                  </>
+              <SyncDashboard
+                connection={status.connections.find(
+                  (connection) => connection.id === dashboard,
                 )}
-              </section>
+                projects={remote}
+                selectedId={managedProject}
+                members={members}
+                invites={invites}
+                busy={busy}
+                inviteRole={inviteRole}
+                generatedInvite={generatedInvite}
+                generatedInviteExpiresAt={generatedInviteExpiresAt}
+                onSelect={(id) => {
+                  void run(() => loadDashboard(dashboard, id));
+                }}
+                onCreate={(name) =>
+                  run(async () => {
+                    const project = await desktop.invoke<{ id: string }>(
+                      "sync:createProject",
+                      { connectionId: dashboard, name },
+                    );
+                    await loadDashboard(dashboard, project.id);
+                    setMessage(`已创建项目“${name}”。`);
+                  })
+                }
+                onRole={(member, role) => {
+                  void run(async () => {
+                    await manage("member", { userId: member.id, role });
+                    setMessage(
+                      `已将 ${member.name} 的权限设为${roles[role]}。`,
+                    );
+                  });
+                }}
+                onRemove={(member) =>
+                  run(async () => {
+                    await manage("member", { userId: member.id, role: null });
+                    setMessage(`已将 ${member.name} 移出项目。`);
+                  })
+                }
+                onInviteRole={setInviteRole}
+                onInvite={() => {
+                  void run(async () => {
+                    const invitation = (await manage("invite", {
+                      role: inviteRole,
+                    })) as { url: string; expiresAt: string };
+                    setGeneratedInvite(invitation.url);
+                    setGeneratedInviteExpiresAt(invitation.expiresAt);
+                  });
+                }}
+                onCopy={() =>
+                  run(async () => {
+                    await desktop.invoke("clipboard:write", {
+                      text: generatedInvite,
+                    });
+                    setMessage("邀请链接已复制。");
+                  })
+                }
+                onRevoke={(digest) => {
+                  void run(async () => {
+                    await manage("revokeInvite", { digest });
+                    setMessage("邀请已撤销。");
+                  });
+                }}
+                onArchive={(archived) =>
+                  run(async () => {
+                    await manage("project", { archived });
+                    setMessage(
+                      archived ? "项目已归档，可以随时恢复。" : "项目已恢复。",
+                    );
+                  })
+                }
+              />
             )}
             {panel === "conflict" && !conflict && !busy && !error && (
               <p className="settings-help">
