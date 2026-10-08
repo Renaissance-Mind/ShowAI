@@ -28,7 +28,7 @@ node scripts/update-stable-app.mjs
 node scripts/update-stable-app.mjs --ref COMMIT
 ```
 
-更新程序在临时目录中从 Git 提交构建，验证类型、单元测试和安装包签名后安装；工作目录中未提交的改动不进入稳定版。依赖必须与所选提交一致。更新前保存内容并退出稳定版，开发版可继续运行。旧 App 保存在 `~/Library/Application Support/ShowAI/stable-backups/`，安装记录位于 `artifacts/stable-install.json`。稳定版默认读取 `~/.showai`，也可在设置中选择内容库；使用同一内容库时，项目编辑会在两个 App 中同步显示，程序更新由手动安装控制。
+更新程序在临时目录中从 Git 提交构建，验证类型、单元测试和安装包签名后安装；工作目录中未提交的改动不进入稳定版。依赖必须与所选提交一致。更新前保存内容并退出稳定版，开发版可继续运行。新版验证通过后直接替换旧 App，安装记录位于 `artifacts/stable-install.json`。稳定版默认读取 `~/.showai`，也可在设置中选择内容库；使用同一内容库时，项目编辑会在两个 App 中同步显示，程序更新由手动安装控制。
 
 ## 本地浏览器版
 

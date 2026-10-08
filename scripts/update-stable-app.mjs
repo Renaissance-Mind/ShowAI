@@ -1,7 +1,6 @@
 // Explicitly build and install a frozen macOS application from a Git commit.
 import { execFile, spawn } from "node:child_process";
 import {
-  access,
   cp,
   mkdir,
   mkdtemp,
@@ -138,34 +137,16 @@ if (build.sourceCommit !== sourceCommit || build.sourceDirty === true)
 await execute("/usr/bin/codesign", ["--verify", "--deep", "--strict", built]);
 await assertClosed();
 await mkdir(dirname(installed), { recursive: true });
-const timestamp = new Date().toISOString().replaceAll(/[:.]/g, "-");
-const staging = join(working, "ShowAI 稳定版.app");
+const installation = await mkdtemp(
+  join(dirname(installed), ".showai-stable-install-"),
+);
+const staging = join(installation, "ShowAI 稳定版.app");
 await cp(built, staging, { recursive: true, verbatimSymlinks: true });
 await execute("/usr/bin/codesign", ["--verify", "--deep", "--strict", staging]);
 await assertClosed();
-const previous = await access(installed).then(
-  () => true,
-  (error) => {
-    if (error.code === "ENOENT") return false;
-    throw error;
-  },
-);
-const backup = join(
-  homedir(),
-  "Library/Application Support/ShowAI/stable-backups",
-  timestamp,
-  "ShowAI 稳定版.app",
-);
-if (previous) {
-  await mkdir(dirname(backup), { recursive: true });
-  await rename(installed, backup);
-}
-try {
-  await rename(staging, installed);
-} catch (error) {
-  if (previous) await rename(backup, installed);
-  throw error;
-}
+await rm(installed, { recursive: true, force: true });
+await rename(staging, installed);
+await rm(installation, { recursive: true });
 await execute(
   "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
   ["-f", installed],
@@ -179,7 +160,8 @@ const receipt = {
   homeDefault: join(homedir(), ".showai"),
   source: "git archive",
   tests: "check, unit tests, build, bundle signature",
-  backup: previous ? backup : null,
+  backup: null,
+  backupPolicy: "none",
 };
 await mkdir(join(root, "artifacts"), { recursive: true });
 await writeFile(
