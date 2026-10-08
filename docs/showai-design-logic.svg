@@ -64,8 +64,7 @@
 <text x="277.5" y="637" font-size="20" font-weight="500" fill="#172B3A" text-anchor="middle">滑块</text>
 </g>
 <rect x="56" y="668" width="288" height="46" rx="10" fill="#E5F5FE" stroke="none" stroke-width="1.6"/>
-<text x="200" y="699" font-size="24" font-weight="600" fill="#172B3A" text-anchor="middle">内容 · 图表 · 交互</text>
-<text x="200" y="779" font-size="21" font-weight="500" fill="#617789" text-anchor="middle">Agent 可动态添加</text>
+<text x="200" y="699" font-size="24" font-weight="600" fill="#172B3A" text-anchor="middle">Agent 可动态添加</text>
 </g>
 <g id="content-organization">
 <rect x="410" y="150" width="436" height="588" rx="14" fill="white" stroke="#CFE1ED" stroke-width="2"/>
@@ -143,7 +142,6 @@
 <polygon points="760,609 764.44,600.5 771.11,608.25 775.17,604.25 777,609" fill="#91C7E7"/>
 <text x="724" y="682" font-size="20" font-weight="500" fill="#172B3A" text-anchor="middle">Board · 空间探索</text>
 </g>
-<path d="M565,554 H611" fill="none" stroke="#06A5FA" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
 <text x="588" y="531" font-size="14" font-weight="500" fill="#172B3A" text-anchor="middle">互相嵌套</text>
 </g>
 <g id="co-creation">
