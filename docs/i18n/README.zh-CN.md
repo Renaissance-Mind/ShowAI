@@ -24,11 +24,11 @@ ShowAI 让人与 Agent 通过可阅读、可交互、可编辑的内容共同思
 
 ## 🧩 设计逻辑
 
-![ShowAI 设计逻辑：从可由 Agent 动态添加的组件、内容（模板），到 Agent 上下文与 ShowAI App 中的共创，以及使用与交付](../showai-design-logic.svg)
+![ShowAI 设计逻辑：从可由 Agent 动态添加的组件、内容（模板），到 Agent 上下文与 ShowAI App 中的共创，以及使用与交付](showai-design-logic.zh-CN.svg)
 
 1. **组件：按需要表达信息。** 文本、图片、表格、图表、流程图和滑块提供不同的表达与交互方式。Agent 可以选择已有组件，也可以根据任务创建并加入新组件，例如让读者调整参数、观察计算结果的控件。
 
-2. **内容（模板）：组织内容，复用结构。** 组件组合成可阅读、可操作的内容。[Page](../page-surface.md) 按顺序组织文章与报告，Board 用空间布局组织关系与方案；两者可以互相嵌套。常用的内容结构和组件组合可以保存为模板：应用模板填入新材料，或从完成的内容中提炼模板，供后续创作复用。详见[组件与模板说明](../catalog-lifecycle.md)。
+2. **内容（模板）：组织内容，复用结构。** 组件组合成可阅读、可操作的内容。[Page](../page-surface.md) 按顺序组织文章与报告，Board 用空间布局组织关系与方案。常用的内容结构和组件组合可以保存为模板：应用模板填入新材料，或从完成的内容中提炼模板，供后续创作复用。详见[组件与模板说明](../catalog-lifecycle.md)。
 
 3. **共同创作：在聊天与 App 中参与。** 在支持页面展示的 Agent 会话中，内容直接呈现在聊天里。人可以查看图表、操作控件，再通过后续对话让 Agent 继续分析和修改。
 
@@ -189,7 +189,7 @@ node dist-runtime/scripts/cli.mjs export \
 
 | 文档 | 内容 |
 | --- | --- |
-| [Page 与 Board](../page-surface.md) | 页面、白板、嵌套与交互 |
+| [Page 与 Board](../page-surface.md) | 页面、白板与交互 |
 | [Agent 使用说明](../agent-usage.md) | CLI、MCP、创作与导出 |
 | [插件说明](../../plugins/showai/README.md) | Skill 分工与安装 |
 | [数据图表](../g2-components.md) | 图表类型、数据接口与设置 |

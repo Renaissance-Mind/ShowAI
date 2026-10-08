@@ -1,0 +1,51 @@
+{
+  "keys": ["组件", "文本", "图片", "表格", "图表", "流程图", "滑块", "Agent 可动态添加", "内容（模板）", "模板", "应用", "提炼", "Page · 顺序阅读", "Board · 空间探索", "共同创作", "Agent 上下文", "直接查看与使用", "帮我看看这组数据", "趋势与对比", "参数：7", "再比较另一组数据", "像笔记软件一样编辑与管理", "使用与交付", "源 JSON", "局部导出", "独立 HTML", "静态 Site", "阅读 · 交互 · 分享"],
+  "en": {
+    "title": "ShowAI design: from components to use",
+    "description": "Components form pages or boards. Templates can be applied and extracted. People and agents create together in agent conversations and the ShowAI App. Results can be shared as source JSON, partial exports, standalone HTML, or static sites.",
+    "font": "Arial, sans-serif", "cjk_font": "PingFang SC",
+    "labels": ["Components", "Text", "Image", "Table", "Chart", "Flowchart", "Slider", "Agents can add components", "Content & templates", "Template", "Apply", "Extract", "Page\nSequential reading", "Board\nSpatial exploration", "Co-creation", "Agent context", "View and use directly", "Help me explore these data", "Trends and comparisons", "Parameter: 7", "Compare another dataset", "Edit and manage like a notes app", "Use & delivery", "Source JSON", "Partial export", "Standalone\nHTML", "Static Site", "Read · Interact · Share"]
+  },
+  "zh-CN": {
+    "title": "ShowAI 设计逻辑：从构成到使用",
+    "description": "组件组成 Page 或 Board，Agent 可动态添加组件，模板可应用与提炼。人和 Agent 在聊天上下文与 ShowAI App 中共同创作。成果可交付源 JSON、局部内容、独立 HTML 和静态网站。",
+    "font": "Arial, PingFang SC, Noto Sans CJK SC, Microsoft YaHei, sans-serif", "cjk_font": "PingFang SC",
+    "labels": ["组件", "文本", "图片", "表格", "图表", "流程图", "滑块", "Agent 可动态添加", "内容（模板）", "模板", "应用", "提炼", "Page\n顺序阅读", "Board\n空间探索", "共同创作", "Agent 上下文", "直接查看与使用", "帮我看看这组数据", "趋势与对比", "参数：7", "再比较另一组数据", "像笔记软件一样编辑与管理", "使用与交付", "源 JSON", "局部导出", "独立 HTML", "静态 Site", "阅读 · 交互 · 分享"]
+  },
+  "zh-TW": {
+    "title": "ShowAI 設計邏輯：從構成到使用",
+    "description": "元件組成 Page 或 Board，Agent 可動態新增元件，模板可套用與提煉。人與 Agent 在聊天情境及 ShowAI App 中共同創作。成果可交付原始 JSON、局部內容、獨立 HTML 與靜態網站。",
+    "font": "Arial, PingFang TC, Noto Sans CJK TC, Microsoft JhengHei, sans-serif", "cjk_font": "PingFang TC",
+    "labels": ["元件", "文字", "圖片", "表格", "圖表", "流程圖", "滑桿", "Agent 可動態新增", "內容（模板）", "模板", "套用", "提煉", "Page\n依序閱讀", "Board\n空間探索", "共同創作", "Agent 情境", "直接檢視與使用", "幫我看看這組資料", "趨勢與比較", "參數：7", "再比較另一組資料", "像筆記軟體一樣編輯與管理", "使用與交付", "原始 JSON", "局部匯出", "獨立 HTML", "靜態 Site", "閱讀 · 互動 · 分享"]
+  },
+  "ja": {
+    "title": "ShowAI の設計：構成から利用まで",
+    "description": "コンポーネントから Page や Board を構成し、テンプレートの適用と抽出で再利用します。人と Agent がチャットと ShowAI App で共同制作し、JSON、部分書き出し、単独 HTML、静的サイトで共有できます。",
+    "font": "Arial, Hiragino Sans, Noto Sans CJK JP, Yu Gothic, sans-serif", "cjk_font": "Hiragino Sans",
+    "labels": ["コンポーネント", "テキスト", "画像", "表", "グラフ", "フロー図", "スライダー", "Agent が動的に追加", "コンテンツとテンプレート", "テンプレート", "適用", "抽出", "Page\n順序に読む", "Board\n空間で探索", "共同制作", "Agent のコンテキスト", "直接閲覧・操作", "このデータを見てください", "傾向と比較", "パラメータ:7", "別のデータとも比較して", "ノートアプリのように編集・管理", "利用と共有", "ソース JSON", "部分書き出し", "単独\nHTML", "静的 Site", "読む・操作・共有"]
+  },
+  "ko": {
+    "title": "ShowAI 설계: 구성에서 활용까지",
+    "description": "컴포넌트로 Page와 Board를 구성하고 템플릿을 적용하거나 추출해 재사용합니다. 사람과 Agent가 대화와 ShowAI App에서 함께 제작하며 JSON, 부분 내보내기, 독립 HTML, 정적 사이트로 결과를 공유합니다.",
+    "font": "Arial, Apple SD Gothic Neo, Noto Sans CJK KR, Malgun Gothic, sans-serif", "cjk_font": "Apple SD Gothic Neo",
+    "labels": ["컴포넌트", "텍스트", "이미지", "표", "차트", "흐름도", "슬라이더", "Agent가 동적으로 추가", "콘텐츠와 템플릿", "템플릿", "적용", "추출", "Page\n순서대로 읽기", "Board\n공간 탐색", "공동 제작", "Agent 컨텍스트", "직접 보고 사용", "이 데이터를 살펴봐 주세요", "추세와 비교", "매개변수:7", "다른 데이터와 비교", "노트 앱처럼 편집하고 관리", "활용과 공유", "원본 JSON", "부분\n내보내기", "독립\nHTML", "정적 Site", "읽기 · 조작 · 공유"]
+  },
+  "es": {
+    "title": "Diseño de ShowAI: de los componentes al uso",
+    "description": "Los componentes forman páginas y tableros. Las plantillas se aplican y extraen para reutilizarlas. Personas y agentes crean juntos en el chat y en ShowAI App, y comparten los resultados como JSON, exportaciones parciales, HTML independiente o sitios estáticos.",
+    "font": "Arial, sans-serif", "cjk_font": "PingFang SC",
+    "labels": ["Componentes", "Texto", "Imagen", "Tabla", "Gráfico", "Flujo", "Deslizador", "El agente puede añadir", "Contenido y plantillas", "Plantilla", "Aplicar", "Extraer", "Page\nLectura secuencial", "Board\nExploración espacial", "Creación conjunta", "Contexto del agente", "Consulta y uso directos", "Ayúdame a explorar estos datos", "Tendencias y comparación", "Parámetro:7", "Compara otros datos", "Edita y organiza como en una app de notas", "Uso y entrega", "JSON fuente", "Exportación\nparcial", "HTML\nindependiente", "Site estático", "Leer · Interactuar · Compartir"]
+  },
+  "tr": {
+    "title": "ShowAI tasarımı: bileşenlerden kullanıma",
+    "description": "Bileşenler Page ve Board oluşturur; şablonlar uygulanır ve çıkarılır. İnsanlarla ajanlar sohbetlerde ve ShowAI App içinde birlikte üretir. Sonuçlar JSON, kısmi aktarımlar, bağımsız HTML veya statik siteler olarak paylaşılabilir.",
+    "font": "Arial, sans-serif", "cjk_font": "PingFang SC",
+    "labels": ["Bileşenler", "Metin", "Görsel", "Tablo", "Grafik", "Akış şeması", "Kaydırıcı", "Agent dinamik ekler", "İçerik ve şablonlar", "Şablon", "Uygula", "Çıkar", "Page\nSıralı okuma", "Board\nMekânsal keşif", "Birlikte üretim", "Agent bağlamı", "Doğrudan görüntüle ve kullan", "Bu verileri inceleyelim", "Eğilim ve karşılaştırma", "Parametre:7", "Diğer verilerle karşılaştır", "Not uygulaması gibi düzenle ve yönet", "Kullanım ve\npaylaşım", "Kaynak JSON", "Kısmi\naktarım", "Bağımsız\nHTML", "Statik Site", "Oku · Etkileş · Paylaş"]
+  },
+  "ru": {
+    "title": "Устройство ShowAI: от компонентов к использованию",
+    "description": "Компоненты образуют страницы и доски. Шаблоны можно применять и извлекать. Люди и агенты работают вместе в чатах и ShowAI App. Результат можно передать как JSON, частичный экспорт, автономный HTML или статический сайт.",
+    "font": "Arial, sans-serif", "cjk_font": "PingFang SC",
+    "labels": ["Компоненты", "Текст", "Изображение", "Таблица", "График", "Блок-схема", "Ползунок", "Agent добавляет по задаче", "Контент и шаблоны", "Шаблон", "Применить", "Извлечь", "Page\nПо порядку", "Board\nИзучение в пространстве", "Совместное создание", "Контекст Agent", "Просмотр и работа прямо в чате", "Помоги изучить эти данные", "Тренды и сравнение", "Параметр:7", "Сравни другие данные", "Правьте и организуйте как заметки", "Использование\nи передача", "Исходный\nJSON", "Частичный\nэкспорт", "Автономный\nHTML", "Статический\nSite", "Читать · Изучать · Делиться"]
+  }
+}

@@ -24,11 +24,11 @@ Bu arayüz, insanlarla ajanların iş birliğini ve birlikte üretimini destekle
 
 ## 🧩 Tasarım
 
-![ShowAI tasarımı: ajanların eklediği bileşenler, içerik ve şablonlar, ajan bağlamı ve ShowAI App içinde ortak üretim, kullanım ve paylaşım](../showai-design-logic.svg)
+![ShowAI tasarımı: ajanların eklediği bileşenler, içerik ve şablonlar, ajan bağlamı ve ShowAI App içinde ortak üretim, kullanım ve paylaşım](showai-design-logic.tr.svg)
 
 1. **Bileşenler: bilgiyi ihtiyaca göre ifade edin.** Metinler, görseller, tablolar, grafikler, akış şemaları ve kaydırıcılar farklı ifade ve etkileşim biçimleri sunar. Ajanlar mevcut bileşenleri seçebilir veya okuyucuların parametreleri değiştirip hesaplama sonuçlarını inceleyebildiği kontroller gibi göreve uygun yeni bileşenler oluşturup ekleyebilir.
 
-2. **İçerik ve şablonlar: içeriği düzenleyin, yapıları yeniden kullanın.** Bileşenler okunabilir ve kullanılabilir içerik oluşturmak için birleştirilir. [Page](../page-surface.md), yazı ve raporları sırayla düzenler; Board, ilişkileri ve önerileri mekânsal olarak yerleştirir. Birbirlerinin içine yerleştirilebilirler. Sık kullanılan yapıları ve bileşen birleşimlerini şablon olarak kaydedin: bir şablonu yeni malzemeyle doldurun veya bitmiş içerikten gelecekte kullanmak üzere şablon çıkarın. [Bileşenler ve şablonlar](../catalog-lifecycle.md) belgesine bakın.
+2. **İçerik ve şablonlar: içeriği düzenleyin, yapıları yeniden kullanın.** Bileşenler okunabilir ve kullanılabilir içerik oluşturmak için birleştirilir. [Page](../page-surface.md), yazı ve raporları sırayla düzenler; Board, ilişkileri ve önerileri mekânsal olarak yerleştirir. Sık kullanılan yapıları ve bileşen birleşimlerini şablon olarak kaydedin: bir şablonu yeni malzemeyle doldurun veya bitmiş içerikten gelecekte kullanmak üzere şablon çıkarın. [Bileşenler ve şablonlar](../catalog-lifecycle.md) belgesine bakın.
 
 3. **Ortak üretim: sohbette ve uygulamada katılın.** Sayfa gösterimini destekleyen ajan sohbetlerinde içerik doğrudan sohbet içinde görünür. İnsanlar grafikleri inceleyip kontrolleri kullanabilir, ardından yeni mesajlarla ajandan analiz ve düzenlemeye devam etmesini isteyebilir.
 
@@ -189,7 +189,7 @@ Cihazlar arasında veya başka kişilerle iş birliği yapmak için kendi barın
 
 | Belge | İçerik |
 | --- | --- |
-| [Page ve Board](../page-surface.md) | Sayfalar, panolar, iç içe yerleştirme ve etkileşim |
+| [Page ve Board](../page-surface.md) | Sayfalar, panolar ve etkileşim |
 | [Ajan kılavuzu](../agent-usage.md) | CLI, MCP, içerik üretme ve dışa aktarma |
 | [Eklenti belgesi](../../plugins/showai/README.md) | Skill görevleri ve kurulum |
 | [Veri grafikleri](../g2-components.md) | Grafik türleri, veri arayüzleri ve ayarlar |

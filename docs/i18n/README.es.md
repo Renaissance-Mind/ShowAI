@@ -24,11 +24,11 @@ Esta interfaz permite la colaboración y la creación conjunta entre personas y 
 
 ## 🧩 Diseño
 
-![Diseño de ShowAI: componentes añadidos por agentes, contenido y plantillas, creación conjunta en el contexto del agente y en ShowAI App, uso y entrega](../showai-design-logic.svg)
+![Diseño de ShowAI: componentes añadidos por agentes, contenido y plantillas, creación conjunta en el contexto del agente y en ShowAI App, uso y entrega](showai-design-logic.es.svg)
 
 1. **Componentes: expresar la información según la necesidad.** Texto, imágenes, tablas, gráficos, diagramas de flujo y deslizadores ofrecen distintas formas de expresión e interacción. Los agentes pueden elegir componentes existentes o crear y añadir otros para una tarea, como controles que permitan ajustar parámetros y examinar los resultados del cálculo.
 
-2. **Contenido y plantillas: organizar y reutilizar estructuras.** Los componentes se combinan para crear contenido que se puede leer y utilizar. Una [Page](../page-surface.md) organiza artículos e informes en secuencia; un Board utiliza una disposición espacial para organizar relaciones y propuestas. Pueden anidarse entre sí. Guarda estructuras y combinaciones habituales como plantillas: completa una plantilla con material nuevo o extráela de un contenido terminado para reutilizarla. Consulta [Componentes y plantillas](../catalog-lifecycle.md).
+2. **Contenido y plantillas: organizar y reutilizar estructuras.** Los componentes se combinan para crear contenido que se puede leer y utilizar. Una [Page](../page-surface.md) organiza artículos e informes en secuencia; un Board utiliza una disposición espacial para organizar relaciones y propuestas. Guarda estructuras y combinaciones habituales como plantillas: completa una plantilla con material nuevo o extráela de un contenido terminado para reutilizarla. Consulta [Componentes y plantillas](../catalog-lifecycle.md).
 
 3. **Creación conjunta: participar en el chat y en la aplicación.** En las conversaciones con agentes que admiten la visualización de páginas, el contenido aparece directamente en el chat. Las personas pueden examinar gráficos y usar controles, y después pedir al agente que continúe analizando y editando mediante mensajes posteriores.
 
@@ -189,7 +189,7 @@ Consulta [Biblioteca de contenido e historial](../versioned-library.md) y [Servi
 
 | Documento | Contenido |
 | --- | --- |
-| [Page y Board](../page-surface.md) | Páginas, tableros, anidamiento e interacción |
+| [Page y Board](../page-surface.md) | Páginas, tableros e interacción |
 | [Guía para agentes](../agent-usage.md) | CLI, MCP, creación y exportación |
 | [Documentación del plugin](../../plugins/showai/README.md) | Responsabilidades de los Skills e instalación |
 | [Gráficos de datos](../g2-components.md) | Tipos de gráficos, interfaces de datos y ajustes |

@@ -28,7 +28,7 @@ This interface supports human–agent collaboration and co-creation. The resulti
 
 1. **Components: express information as needed.** Text, images, tables, charts, flow diagrams, and sliders provide different forms of expression and interaction. Agents can choose existing components or create and add new ones for a task, such as controls that let readers adjust parameters and inspect calculated results.
 
-2. **Content and templates: organize content and reuse structure.** Components combine into content people can read and use. A [Page](docs/page-surface.md) arranges articles and reports in sequence; a Board uses spatial layout to organize relationships and proposals. They can be nested within each other. Save common structures and component combinations as templates: fill an existing template with new material, or extract a template from finished content for future use. See [Components and templates](docs/catalog-lifecycle.md).
+2. **Content and templates: organize content and reuse structure.** Components combine into content people can read and use. A [Page](docs/page-surface.md) arranges articles and reports in sequence; a Board uses spatial layout to organize relationships and proposals. Save common structures and component combinations as templates: fill an existing template with new material, or extract a template from finished content for future use. See [Components and templates](docs/catalog-lifecycle.md).
 
 3. **Co-creation: participate in chat and the app.** In agent conversations that support page display, content appears directly in the chat. People can inspect charts and use controls, then ask the agent to continue analyzing and editing through follow-up messages.
 
@@ -189,7 +189,7 @@ See [Content library and history](docs/versioned-library.md) and [Project server
 
 | Document | Contents |
 | --- | --- |
-| [Page and Board](docs/page-surface.md) | Pages, boards, nesting, and interaction |
+| [Page and Board](docs/page-surface.md) | Pages, boards, and interaction |
 | [Agent guide](docs/agent-usage.md) | CLI, MCP, authoring, and export |
 | [Plugin documentation](plugins/showai/README.md) | Skill responsibilities and installation |
 | [Data charts](docs/g2-components.md) | Chart types, data interfaces, and settings |

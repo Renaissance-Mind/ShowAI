@@ -1,33 +1,33 @@
 <?xml version='1.0' encoding='utf-8'?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1748" height="608" viewBox="26 140 1748 608" role="img" aria-labelledby="title description" lang="en" xml:lang="en">
-  <title id="title">ShowAI design: from components to use</title>
-  <desc id="description">Components form pages or boards. Templates can be applied and extracted. People and agents create together in agent conversations and the ShowAI App. Results can be shared as source JSON, partial exports, standalone HTML, or static sites.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1748" height="608" viewBox="26 140 1748 608" role="img" aria-labelledby="title description" lang="zh-TW" xml:lang="zh-TW">
+  <title id="title">ShowAI 設計邏輯：從構成到使用</title>
+  <desc id="description">元件組成 Page 或 Board，Agent 可動態新增元件，模板可套用與提煉。人與 Agent 在聊天情境及 ShowAI App 中共同創作。成果可交付原始 JSON、局部內容、獨立 HTML 與靜態網站。</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
       <path d="M0,1 L10,5 L0,9 Z" fill="#06A5FA" />
     </marker>
   </defs>
-  <g font-family="Arial, sans-serif">
+  <g font-family="Arial, PingFang TC, Noto Sans CJK TC, Microsoft JhengHei, sans-serif">
     <rect x="0" y="0" width="1800" height="820" rx="0" fill="#FFFFFF" stroke="none" stroke-width="1.6" />
     <g id="expression-units">
       <rect x="36" y="150" width="328" height="588" rx="14" fill="white" stroke="#CFE1ED" stroke-width="2" />
       <circle cx="75" cy="195" r="25" fill="#06A5FA" stroke="none" stroke-width="2" />
       <text x="75" y="205" font-size="29" font-weight="650" fill="white" text-anchor="middle">1</text>
-      <text x="113" y="207" font-size="32" font-weight="650" fill="#172B3A" text-anchor="start" data-label="组件">Components</text>
+      <text x="113" y="207" font-size="32" font-weight="650" fill="#172B3A" text-anchor="start" data-label="组件">元件</text>
       <g id="unit-1">
         <rect x="56" y="246" width="133" height="116" rx="8" fill="#F5FAFE" stroke="#CFE1ED" stroke-width="1.2" />
         <rect x="76" y="268" width="94" height="6" rx="1" fill="#BCD2E2" stroke="none" stroke-width="1.6" />
         <rect x="76" y="281" width="83" height="6" rx="1" fill="#BCD2E2" stroke="none" stroke-width="1.6" />
         <rect x="76" y="294" width="91" height="6" rx="1" fill="#BCD2E2" stroke="none" stroke-width="1.6" />
         <rect x="76" y="307" width="68" height="6" rx="1" fill="#BCD2E2" stroke="none" stroke-width="1.6" />
-        <text x="122.5" y="351" font-size="20" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="文本">Text</text>
+        <text x="122.5" y="351" font-size="20" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="文本">文字</text>
       </g>
       <g id="unit-2">
         <rect x="211" y="246" width="133" height="116" rx="8" fill="#F5FAFE" stroke="#CFE1ED" stroke-width="1.2" />
         <rect x="235" y="264" width="85" height="64" rx="4" fill="#F5FAFE" stroke="#81B4D5" stroke-width="1.6" />
         <circle cx="299.6" cy="281.28" r="6.4" fill="#88BAD7" stroke="none" stroke-width="2" />
         <polygon points="241,322 265.6,290.88 285.15,310.72 297.05,300.48 314,322" fill="#91C7E7" />
-        <text x="277.5" y="351" font-size="20" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="图片">Image</text>
+        <text x="277.5" y="351" font-size="20" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="图片">圖片</text>
       </g>
       <g id="unit-3">
         <rect x="56" y="389" width="133" height="116" rx="8" fill="#F5FAFE" stroke="#CFE1ED" stroke-width="1.2" />
@@ -38,7 +38,7 @@
         <path d="M77,425 H169" fill="none" stroke="#8EB9D5" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
         <path d="M77,440 H169" fill="none" stroke="#8EB9D5" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
         <path d="M77,455 H169" fill="none" stroke="#8EB9D5" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
-        <text x="122.5" y="494" font-size="20" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="表格">Table</text>
+        <text x="122.5" y="494" font-size="20" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="表格">表格</text>
       </g>
       <g id="unit-4">
         <rect x="211" y="389" width="133" height="116" rx="8" fill="#F5FAFE" stroke="#CFE1ED" stroke-width="1.2" />
@@ -49,7 +49,7 @@
         <circle cx="277.2" cy="447.19" r="3.4" fill="#299D85" stroke="none" stroke-width="2" />
         <circle cx="298.8" cy="425.53" r="3.4" fill="#06A5FA" stroke="none" stroke-width="2" />
         <circle cx="320.4" cy="415.84" r="3.4" fill="#299D85" stroke="none" stroke-width="2" />
-        <text x="277.5" y="494" font-size="20" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="图表">Chart</text>
+        <text x="277.5" y="494" font-size="20" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="图表">圖表</text>
       </g>
       <g id="unit-5">
         <rect x="56" y="532" width="133" height="116" rx="8" fill="#F5FAFE" stroke="#CFE1ED" stroke-width="1.2" />
@@ -57,23 +57,23 @@
         <rect x="105" y="552" width="34" height="22" rx="5" fill="#06A5FA" stroke="none" stroke-width="1.6" />
         <rect x="71" y="595" width="34" height="22" rx="5" fill="#9FDACD" stroke="none" stroke-width="1.6" />
         <rect x="139" y="595" width="34" height="22" rx="5" fill="#F8C795" stroke="none" stroke-width="1.6" />
-        <text x="122.5" y="637" font-size="20" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="流程图">Flowchart</text>
+        <text x="122.5" y="637" font-size="20" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="流程图">流程圖</text>
       </g>
       <g id="unit-6">
         <rect x="211" y="532" width="133" height="116" rx="8" fill="#F5FAFE" stroke="#CFE1ED" stroke-width="1.2" />
         <path d="M231,585 H324" fill="none" stroke="#CADCE8" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
         <path d="M231,585 H286" fill="none" stroke="#06A5FA" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
         <circle cx="286" cy="585" r="10" fill="#EF984C" stroke="white" stroke-width="2" />
-        <text x="277.5" y="637" font-size="20" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="滑块">Slider</text>
+        <text x="277.5" y="637" font-size="20" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="滑块">滑桿</text>
       </g>
       <rect x="56" y="668" width="288" height="46" rx="10" fill="#E5F5FE" stroke="none" stroke-width="1.6" />
-      <text x="200" y="699" font-size="19.0" font-weight="600" fill="#172B3A" text-anchor="middle" data-label="Agent 可动态添加">Agents can add components</text>
+      <text x="200" y="699" font-size="24" font-weight="600" fill="#172B3A" text-anchor="middle" data-label="Agent 可动态添加">Agent 可動態新增</text>
     </g>
     <g id="content-organization">
       <rect x="410" y="150" width="436" height="588" rx="14" fill="white" stroke="#CFE1ED" stroke-width="2" />
       <circle cx="449" cy="195" r="25" fill="#06A5FA" stroke="none" stroke-width="2" />
       <text x="449" y="205" font-size="29" font-weight="650" fill="white" text-anchor="middle">2</text>
-      <text x="487" y="207" font-size="32" font-weight="650" fill="#172B3A" text-anchor="start" data-label="内容（模板）">Content &amp; templates</text>
+      <text x="487" y="207" font-size="32" font-weight="650" fill="#172B3A" text-anchor="start" data-label="内容（模板）">內容（模板）</text>
       <g id="reusable-template" transform="translate(0 12)">
         <rect x="540" y="259" width="148" height="72" rx="5" fill="#F5FAFE" stroke="#81B4D5" stroke-width="1.4" />
         <rect x="547" y="253" width="148" height="72" rx="5" fill="#F5FAFE" stroke="#81B4D5" stroke-width="1.4" />
@@ -84,12 +84,12 @@
         <rect x="646" y="264" width="42" height="37" rx="4" fill="#F5FAFE" stroke="#81B4D5" stroke-width="1.6" />
         <circle cx="677.92" cy="273.99" r="3.7" fill="#88BAD7" stroke="none" stroke-width="2" />
         <polygon points="652,295 661.12,279.54 670.78,291.01 676.66,285.09 682,295" fill="#91C7E7" />
-        <text x="628" y="350" font-size="23" font-weight="600" fill="#172B3A" text-anchor="middle" data-label="模板">Template</text>
+        <text x="628" y="350" font-size="23" font-weight="600" fill="#172B3A" text-anchor="middle" data-label="模板">模板</text>
         <path d="M493,449 V439 H724 V449" fill="none" stroke="#8EB9D5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
         <path d="M580,364 V437" fill="none" stroke="#06A5FA" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" />
         <path d="M678,437 V364" fill="none" stroke="#06A5FA" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" />
-        <text x="560" y="408" font-size="20" font-weight="500" fill="#172B3A" text-anchor="end" data-label="应用">Apply</text>
-        <text x="694" y="408" font-size="20" font-weight="500" fill="#172B3A" text-anchor="start" data-label="提炼">Extract</text>
+        <text x="560" y="408" font-size="20" font-weight="500" fill="#172B3A" text-anchor="end" data-label="应用">套用</text>
+        <text x="694" y="408" font-size="20" font-weight="500" fill="#172B3A" text-anchor="start" data-label="提炼">提煉</text>
       </g>
       <g id="page-container" transform="translate(0 30)">
         <rect x="431" y="437" width="124" height="208" rx="6" fill="#F5FAFE" stroke="#72ACD0" stroke-width="1.6" />
@@ -100,9 +100,9 @@
         <rect x="444" y="494" width="98" height="42" rx="4" fill="#F5FAFE" stroke="#81B4D5" stroke-width="1.6" />
         <circle cx="518.48" cy="505.34" r="4.2" fill="#88BAD7" stroke="none" stroke-width="2" />
         <polygon points="450,530 479.28,511.64 501.82,524.66 515.54,517.94 536,530" fill="#91C7E7" />
-        <text x="493" y="680" font-size="19.3" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="Page · 顺序阅读">
-          <tspan x="493" y="668.42">Page</tspan>
-          <tspan x="493" y="690.62">Sequential reading</tspan>
+        <text x="493" y="680" font-size="20" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="Page · 顺序阅读">
+          <tspan x="493" y="668.0">Page</tspan>
+          <tspan x="493" y="691.0">依序閱讀</tspan>
         </text>
         <rect x="444" y="549" width="98" height="79" rx="4" fill="#FFFFFF" stroke="#9CC5DF" stroke-width="1" />
         <rect x="445" y="550" width="96" height="18" rx="3" fill="#DFF2FD" />
@@ -145,7 +145,7 @@
         <polygon points="646,608 667.0,577.46 684.25,596.99 694.75,586.91 709,608" fill="#91C7E7" />
         <text x="724" y="680" font-size="20" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="Board · 空间探索">
           <tspan x="724" y="668.0">Board</tspan>
-          <tspan x="724" y="691.0">Spatial exploration</tspan>
+          <tspan x="724" y="691.0">空間探索</tspan>
         </text>
         <rect x="727" y="548" width="79" height="76" rx="5" fill="#FFFFFF" stroke="#CFE1ED" stroke-width="1" />
         <rect x="737" y="560" width="36" height="3" rx="1" fill="#BCD2E2" />
@@ -162,18 +162,18 @@
       <rect x="890" y="150" width="484" height="588" rx="14" fill="white" stroke="#CFE1ED" stroke-width="2" />
       <circle cx="929" cy="195" r="25" fill="#06A5FA" stroke="none" stroke-width="2" />
       <text x="929" y="205" font-size="29" font-weight="650" fill="white" text-anchor="middle">3</text>
-      <text x="967" y="207" font-size="32" font-weight="650" fill="#172B3A" text-anchor="start" data-label="共同创作">Co-creation</text>
+      <text x="967" y="207" font-size="32" font-weight="650" fill="#172B3A" text-anchor="start" data-label="共同创作">共同創作</text>
       <g id="agent-context-interface">
         <rect x="913" y="245" width="427" height="278" rx="10" fill="#F4FAFE" stroke="#CFE1ED" stroke-width="1.5" />
         <path d="M937,263 H961 Q967,263 967,269 V284 Q967,290 961,290 H950 L939,299 V290 H937 Q932,290 932,284 V269 Q932,263 937,263 Z" fill="white" stroke="#06A5FA" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
         <circle cx="941" cy="277" r="1.7" fill="#06A5FA" stroke="none" stroke-width="2" />
         <circle cx="949" cy="277" r="1.7" fill="#06A5FA" stroke="none" stroke-width="2" />
         <circle cx="957" cy="277" r="1.7" fill="#06A5FA" stroke="none" stroke-width="2" />
-        <text x="984" y="280" font-size="25" font-weight="600" fill="#172B3A" text-anchor="start" data-label="Agent 上下文">Agent context</text>
-        <text x="984" y="306" font-size="17" font-weight="400" fill="#617789" text-anchor="start" data-label="直接查看与使用">View and use directly</text>
+        <text x="984" y="280" font-size="25" font-weight="600" fill="#172B3A" text-anchor="start" data-label="Agent 上下文">Agent 情境</text>
+        <text x="984" y="306" font-size="17" font-weight="400" fill="#617789" text-anchor="start" data-label="直接查看与使用">直接檢視與使用</text>
         <g id="chat-user-request">
           <rect x="1043" y="323" width="254" height="36" rx="10" fill="#DFF3FE" stroke="none" stroke-width="1.6" />
-          <text x="1058" y="347" font-size="17" font-weight="400" fill="#172B3A" text-anchor="start" data-label="帮我看看这组数据">Help me explore these data</text>
+          <text x="1058" y="347" font-size="17" font-weight="400" fill="#172B3A" text-anchor="start" data-label="帮我看看这组数据">幫我看看這組資料</text>
           <g id="chat-human-avatar-request">
             <circle cx="1311" cy="341" r="12" fill="#DFF3FE" stroke="none" stroke-width="2" />
             <circle cx="1311" cy="338" r="3.3" fill="none" stroke="#078DD8" stroke-width="1.5" />
@@ -191,7 +191,7 @@
             <path d="M939,390 H943 M931,384 V389 M951,384 V389" fill="none" stroke="#299D85" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
           </g>
           <rect x="963" y="372" width="360" height="94" rx="9" fill="white" stroke="#CFE1ED" stroke-width="1" />
-          <text x="978" y="394" font-size="17" font-weight="500" fill="#172B3A" text-anchor="start" data-label="趋势与对比">Trends and comparisons</text>
+          <text x="978" y="394" font-size="17" font-weight="500" fill="#172B3A" text-anchor="start" data-label="趋势与对比">趨勢與比較</text>
           <path d="M982,408 V452 H1164" fill="none" stroke="#90B0C7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
           <path d="M994.74,444.08 L1032.96,428.24 L1069.36,437.48 L1113.04,420.76 L1156.72,413.28" fill="none" stroke="#06A5FA" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" />
           <circle cx="994.74" cy="444.08" r="3.4" fill="#299D85" stroke="none" stroke-width="2" />
@@ -202,12 +202,12 @@
           <path d="M1184,416 H1301" fill="none" stroke="#D2E3EE" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
           <path d="M1184,416 H1234" fill="none" stroke="#06A5FA" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
           <circle cx="1234" cy="416" r="7" fill="#EF984C" stroke="white" stroke-width="1.5" />
-          <text x="1184" y="446" font-size="14" font-weight="400" fill="#617789" text-anchor="start" data-label="参数：7">Parameter: 7</text>
+          <text x="1184" y="446" font-size="14" font-weight="400" fill="#617789" text-anchor="start" data-label="参数：7">參數：7</text>
           <text x="1290" y="448" font-size="23" font-weight="600" fill="#299D85" text-anchor="middle">35</text>
         </g>
         <g id="chat-user-followup">
           <rect x="1086" y="482" width="211" height="29" rx="9" fill="#DFF3FE" stroke="none" stroke-width="1.6" />
-          <text x="1102" y="503" font-size="15.3" font-weight="400" fill="#172B3A" text-anchor="start" data-label="再比较另一组数据">Compare another dataset</text>
+          <text x="1102" y="503" font-size="17" font-weight="400" fill="#172B3A" text-anchor="start" data-label="再比较另一组数据">再比較另一組資料</text>
           <g id="chat-human-avatar-followup">
             <circle cx="1311" cy="496.5" r="12" fill="#DFF3FE" stroke="none" stroke-width="2" />
             <circle cx="1311" cy="493.5" r="3.3" fill="none" stroke="#078DD8" stroke-width="1.5" />
@@ -223,7 +223,7 @@
         <rect x="947" y="573" width="9" height="1.6" rx="1" fill="#BCD2E2" stroke="none" stroke-width="1.6" />
         <rect x="947" y="578" width="7" height="1.6" rx="1" fill="#BCD2E2" stroke="none" stroke-width="1.6" />
         <text x="984" y="575" font-size="25" font-weight="600" fill="#172B3A" text-anchor="start">ShowAI App</text>
-        <text x="984" y="602" font-size="17" font-weight="400" fill="#617789" text-anchor="start" data-label="像笔记软件一样编辑与管理">Edit and manage like a notes app</text>
+        <text x="984" y="602" font-size="17" font-weight="400" fill="#617789" text-anchor="start" data-label="像笔记软件一样编辑与管理">像筆記軟體一樣編輯與管理</text>
         <rect x="930" y="614" width="393" height="90" rx="5" fill="white" stroke="#CFE1ED" stroke-width="1" />
         <rect x="931" y="615" width="82" height="88" rx="4" fill="#EAF5FD" stroke="none" stroke-width="1.6" />
         <rect x="942" y="628" width="56" height="4" rx="1" fill="#BCD2E2" stroke="none" stroke-width="1.6" />
@@ -251,13 +251,13 @@
       <rect x="1426" y="150" width="338" height="588" rx="14" fill="white" stroke="#CFE1ED" stroke-width="2" />
       <circle cx="1465" cy="195" r="25" fill="#06A5FA" stroke="none" stroke-width="2" />
       <text x="1465" y="205" font-size="29" font-weight="650" fill="white" text-anchor="middle">4</text>
-      <text x="1503" y="207" font-size="32" font-weight="650" fill="#172B3A" text-anchor="start" data-label="使用与交付">Use &amp; delivery</text>
+      <text x="1503" y="207" font-size="32" font-weight="650" fill="#172B3A" text-anchor="start" data-label="使用与交付">使用與交付</text>
       <g id="destination-1">
         <rect x="1446" y="256" width="136" height="170" rx="9" fill="#F5FAFE" stroke="#CFE1ED" stroke-width="1.2" />
         <path d="M1482,279 H1528 L1551,303 V369 H1482 Z" fill="white" stroke="#5B9AC2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
         <path d="M1528,279 V303 H1551" fill="none" stroke="#5B9AC2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
         <text x="1517" y="344" font-size="33" font-weight="500" fill="#06A5FA" text-anchor="middle">{ }</text>
-        <text x="1514" y="406" font-size="18.4" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="源 JSON">Source JSON</text>
+        <text x="1514" y="406" font-size="22" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="源 JSON">原始 JSON</text>
       </g>
       <g id="destination-2">
         <rect x="1608" y="256" width="136" height="170" rx="9" fill="#F5FAFE" stroke="#CFE1ED" stroke-width="1.2" />
@@ -274,7 +274,7 @@
         <circle cx="1676.76" cy="331.4" r="1.55" fill="#299D85" stroke="none" stroke-width="2" />
         <path d="M1696,332 H1718" fill="none" stroke="#06A5FA" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" />
         <path d="M1639,321 H1688 V359 H1639 Z" fill="none" stroke="#06A5FA" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" />
-        <text x="1676" y="406" font-size="19.1" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="局部导出">Partial export</text>
+        <text x="1676" y="406" font-size="22" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="局部导出">局部匯出</text>
       </g>
       <g id="destination-3">
         <rect x="1446" y="457" width="136" height="170" rx="9" fill="#F5FAFE" stroke="#CFE1ED" stroke-width="1.2" />
@@ -282,10 +282,7 @@
         <path d="M1528,480 V504 H1551" fill="none" stroke="#5B9AC2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
         <path d="M1501,520 L1491,531 L1501,542 M1532,520 L1542,531 L1532,542" fill="none" stroke="#06A5FA" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
         <path d="M1523,517 L1511,545" fill="none" stroke="#EF984C" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-        <text x="1514" y="607" font-size="22" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="独立 HTML">
-          <tspan x="1514" y="593.8">Standalone</tspan>
-          <tspan x="1514" y="619.1">HTML</tspan>
-        </text>
+        <text x="1514" y="607" font-size="22" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="独立 HTML">獨立 HTML</text>
       </g>
       <g id="destination-4">
         <rect x="1608" y="457" width="136" height="170" rx="9" fill="#F5FAFE" stroke="#CFE1ED" stroke-width="1.2" />
@@ -295,10 +292,10 @@
         <rect x="1637" y="510" width="80" height="48" rx="4" fill="#F5FAFE" stroke="#81B4D5" stroke-width="1.6" />
         <circle cx="1697.8" cy="522.96" r="4.800000000000001" fill="#88BAD7" stroke="none" stroke-width="2" />
         <polygon points="1643,552 1665.8,530.16 1684.2,545.04 1695.4,537.36 1711,552" fill="#91C7E7" />
-        <text x="1676" y="607" font-size="22" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="静态 Site">Static Site</text>
+        <text x="1676" y="607" font-size="22" font-weight="500" fill="#172B3A" text-anchor="middle" data-label="静态 Site">靜態 Site</text>
       </g>
       <rect x="1446" y="668" width="298" height="46" rx="10" fill="#E5F5FE" stroke="none" stroke-width="1.6" />
-      <text x="1595" y="699" font-size="24" font-weight="600" fill="#172B3A" text-anchor="middle" data-label="阅读 · 交互 · 分享">Read · Interact · Share</text>
+      <text x="1595" y="699" font-size="24" font-weight="600" fill="#172B3A" text-anchor="middle" data-label="阅读 · 交互 · 分享">閱讀 · 互動 · 分享</text>
     </g>
     <g id="main-flow">
       <path d="M374,445 H400" fill="none" stroke="#06A5FA" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)" />

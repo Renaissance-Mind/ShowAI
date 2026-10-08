@@ -24,11 +24,11 @@ ShowAI 讓人與 Agent 透過可閱讀、可互動、可編輯的內容共同思
 
 ## 🧩 設計邏輯
 
-![ShowAI 設計邏輯：從可由 Agent 動態新增的元件、內容（模板），到 Agent 上下文與 ShowAI App 中的共創，以及使用與交付](../showai-design-logic.svg)
+![ShowAI 設計邏輯：從可由 Agent 動態新增的元件、內容（模板），到 Agent 上下文與 ShowAI App 中的共創，以及使用與交付](showai-design-logic.zh-TW.svg)
 
 1. **元件：按需要表達資訊。** 文字、圖片、表格、圖表、流程圖和滑桿提供不同的表達與互動方式。Agent 可以選擇已有元件，也可以根據任務建立並加入新元件，例如讓讀者調整參數、觀察計算結果的控制元件。
 
-2. **內容（模板）：組織內容，重用結構。** 元件組合成可閱讀、可操作的內容。[Page](../page-surface.md) 按順序組織文章與報告，Board 用空間佈局組織關係與方案；兩者可以互相巢狀。常用的內容結構和元件組合可以儲存為模板：應用模板填入新材料，或從完成的內容中提煉模板，供後續創作重用。詳見[元件與模板說明](../catalog-lifecycle.md)。
+2. **內容（模板）：組織內容，重用結構。** 元件組合成可閱讀、可操作的內容。[Page](../page-surface.md) 按順序組織文章與報告，Board 用空間佈局組織關係與方案。常用的內容結構和元件組合可以儲存為模板：應用模板填入新材料，或從完成的內容中提煉模板，供後續創作重用。詳見[元件與模板說明](../catalog-lifecycle.md)。
 
 3. **共同創作：在聊天與 App 中參與。** 在支援頁面展示的 Agent 會話中，內容直接呈現在聊天裡。人可以檢視圖表、操作控制元件，再透過後續對話讓 Agent 繼續分析和修改。
 
@@ -189,7 +189,7 @@ node dist-runtime/scripts/cli.mjs export \
 
 | 文件 | 內容 |
 | --- | --- |
-| [Page 與 Board](../page-surface.md) | 頁面、白板、巢狀與互動 |
+| [Page 與 Board](../page-surface.md) | 頁面、白板與互動 |
 | [Agent 使用說明](../agent-usage.md) | CLI、MCP、創作與匯出 |
 | [外掛說明](../../plugins/showai/README.md) | Skill 分工與安裝 |
 | [資料圖表](../g2-components.md) | 圖表型別、資料介面與設定 |
