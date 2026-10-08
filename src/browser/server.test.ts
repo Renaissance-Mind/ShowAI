@@ -214,6 +214,52 @@ async function runCli(args: string[]) {
   return result.data;
 }
 
+test("new windows target real projects, folders and pages, and reject unavailable destinations", async () => {
+  const project = await invoke<{ id: string }>("projects:create", {
+    name: "Window destinations",
+  });
+  const folder = await invoke<{ id: string }>("folders:create", {
+    projectId: project.id,
+    name: "Nested destination",
+  });
+  const page = await invoke<LoadedPage>("pages:create", {
+    projectId: project.id,
+    parentId: folder.id,
+    document: { ...blankDocument(), title: "Window page" },
+  });
+  for (const args of [
+    { projectId: project.id },
+    { projectId: project.id, folderId: folder.id },
+    { projectId: project.id, pageId: page.document.id },
+  ]) {
+    const result = await invoke<{ url: string }>("app:openWindow", args);
+    const url = new URL(result.url);
+    expect(url.origin).toBe(new URL(server.url).origin);
+    expect(url.searchParams.get("project")).toBe(project.id);
+    expect(url.searchParams.get("folder")).toBe(
+      "folderId" in args ? args.folderId : null,
+    );
+    expect(url.searchParams.get("page")).toBe(
+      "pageId" in args ? args.pageId : null,
+    );
+  }
+  const legacy = await invoke<{ url: string }>("app:openPageWindow", {
+    projectId: project.id,
+    pageId: page.document.id,
+  });
+  expect(new URL(legacy.url).searchParams.get("page")).toBe(page.document.id);
+  for (const args of [
+    { projectId: project.id, folderId: "missing-folder" },
+    { projectId: project.id, pageId: "missing-page" },
+    { projectId: "missing-project" },
+    { projectId: project.id, folderId: folder.id, pageId: page.document.id },
+    { projectId: project.id, folderId: "../outside" },
+  ]) {
+    const result = await request("invoke", { action: "app:openWindow", args });
+    expect(result.ok).toBe(false);
+  }
+});
+
 test("workbench project creation accepts empty, emoji and embedded image icons and retains them across reads", async () => {
   const created = await invoke<{ id: string }>("projects:create", {
     name: "With icon",

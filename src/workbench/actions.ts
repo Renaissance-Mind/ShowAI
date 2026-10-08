@@ -175,6 +175,7 @@ export const workbenchActions = new Set([
   "settings:chooseHome",
   "clipboard:write",
   "app:openPageWindow",
+  "app:openWindow",
 ]);
 export function text(
   args: Record<string, unknown>,
@@ -1310,8 +1311,35 @@ export function createWorkbench(
       case "fs:reveal":
       case "settings:chooseHome":
       case "clipboard:write":
-      case "app:openPageWindow":
         return host.invoke(action, args);
+      case "app:openPageWindow":
+      case "app:openWindow": {
+        const id = projectId(args);
+        const page =
+          action === "app:openPageWindow"
+            ? pageId(args)
+            : text(args, "pageId", true);
+        const folder = text(args, "folderId", true);
+        if (page && folder)
+          throw new CoreError("INVALID_DATA", "Choose a page or a folder.");
+        const project = await store.readProject(id);
+        if (project.archived)
+          throw new CoreError("NOT_FOUND", "This project is archived.");
+        if (page)
+          await store.readPage(id, assertId(page), { checkpoint: false });
+        if (
+          folder &&
+          !(await store.listFolders(id)).some(
+            (item) => item.id === assertId(folder),
+          )
+        )
+          throw new CoreError("NOT_FOUND", "This folder is unavailable.");
+        return host.invoke(action, {
+          projectId: id,
+          ...(page ? { pageId: page } : {}),
+          ...(folder ? { folderId: folder } : {}),
+        });
+      }
       default:
         throw new CoreError(
           "INVALID_DATA",

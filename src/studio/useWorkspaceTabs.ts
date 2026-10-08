@@ -59,12 +59,14 @@ export function useWorkspaceTabs({
   };
 
   const activate = async (next: WorkspaceTabsState) => {
-    if (pending.current || !ready) return;
+    if (pending.current || !ready) return false;
     pending.current = true;
     setSwitching(true);
     try {
       const target = next.tabs.find((tab) => tab.id === next.activeId)!;
-      if (await latest.current.restore(currentEntry(target))) publish(next);
+      if (!(await latest.current.restore(currentEntry(target)))) return false;
+      publish(next);
+      return true;
     } finally {
       pending.current = false;
       setSwitching(false);
@@ -87,7 +89,7 @@ export function useWorkspaceTabs({
       const params = new URLSearchParams(location.search);
       // An explicit page/invitation launch takes priority over a previous session.
       const explicit =
-        firstLibrary && (params.has("page") || params.has("invite"));
+        firstLibrary && (params.has("project") || params.has("invite"));
       if (saved && !explicit && !restored.current) {
         restored.current = true;
         void activate(saved).catch(latest.current.onError);
@@ -123,6 +125,14 @@ export function useWorkspaceTabs({
     rememberScroll();
     await activate(addWorkspaceTab(current.current));
   };
+  const open = async (entry: WorkspaceEntry, foreground = true) => {
+    if (pending.current || !ready) return false;
+    rememberScroll();
+    const next = addWorkspaceTab(current.current, entry, foreground);
+    if (foreground) return activate(next);
+    publish(next);
+    return true;
+  };
   const close = async (id = current.current.activeId) => {
     if (pending.current) return;
     rememberScroll();
@@ -150,6 +160,7 @@ export function useWorkspaceTabs({
     switching,
     select,
     add,
+    open,
     close,
     step,
     rememberScroll,

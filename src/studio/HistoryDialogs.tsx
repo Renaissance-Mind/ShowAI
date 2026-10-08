@@ -1,5 +1,12 @@
 import { latestRequest } from "../lib/latest-request";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+} from "react";
+import type { LibraryMenuPoint } from "./LibraryNavigation";
 import {
   ArrowRight,
   Loader2,
@@ -889,10 +896,19 @@ export function LibrarySearchResults({
   projectId,
   query,
   onOpen,
+  onMenu,
 }: {
   projectId?: string;
   query: string;
-  onOpen: (result: SearchResult) => Promise<void>;
+  onOpen: (
+    result: SearchResult,
+    event: MouseEvent<HTMLButtonElement>,
+  ) => Promise<void>;
+  onMenu: (
+    result: SearchResult,
+    anchor: HTMLElement,
+    point?: LibraryMenuPoint,
+  ) => void;
 }) {
   const [kind, setKind] = useState(""),
     [results, setResults] = useState<SearchResult[]>([]),
@@ -956,6 +972,16 @@ export function LibrarySearchResults({
       request.current++;
     };
   }, [find]);
+  async function openResult(
+    result: SearchResult,
+    event: MouseEvent<HTMLButtonElement>,
+  ) {
+    try {
+      await onOpen(result, event);
+    } catch (reason) {
+      setError(errorMessage(reason));
+    }
+  }
   return (
     <section aria-label="内容库搜索结果">
       <div className="history-toolbar">
@@ -993,12 +1019,29 @@ export function LibrarySearchResults({
             <button
               key={result.id}
               className="history-search-result"
-              onClick={async () => {
-                try {
-                  await onOpen(result);
-                } catch (reason) {
-                  setError(errorMessage(reason));
-                }
+              onClick={(event) => void openResult(result, event)}
+              onAuxClick={(event) => {
+                if (event.button !== 1) return;
+                event.preventDefault();
+                void openResult(result, event);
+              }}
+              onContextMenu={(event) => {
+                if (!page && result.kind !== "project") return;
+                event.preventDefault();
+                onMenu(result, event.currentTarget, {
+                  x: event.clientX,
+                  y: event.clientY,
+                });
+              }}
+              onKeyDown={(event) => {
+                if (
+                  (!page && result.kind !== "project") ||
+                  (event.key !== "ContextMenu" &&
+                    !(event.shiftKey && event.key === "F10"))
+                )
+                  return;
+                event.preventDefault();
+                onMenu(result, event.currentTarget);
               }}
             >
               <FileText size={18} />

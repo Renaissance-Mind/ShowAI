@@ -72,9 +72,16 @@ export function visitWorkspace(
   };
 }
 
-export function addWorkspaceTab(state: WorkspaceTabsState) {
-  const next = createWorkspace();
-  return { tabs: [...state.tabs, ...next.tabs], activeId: next.activeId };
+export function addWorkspaceTab(
+  state: WorkspaceTabsState,
+  entry = recentEntry(),
+  foreground = true,
+) {
+  const next = createWorkspace(entry);
+  return {
+    tabs: [...state.tabs, ...next.tabs],
+    activeId: foreground ? next.activeId : state.activeId,
+  };
 }
 
 export function closeWorkspaceTab(state: WorkspaceTabsState, id: string) {

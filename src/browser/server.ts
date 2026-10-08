@@ -25,12 +25,12 @@ import {
   createWorkbench,
   workbenchActions,
   projectId,
-  pageId,
   required,
   text,
 } from "../workbench/actions";
 import type { DesktopChange, DesktopInfo } from "../desktop/bridge";
 import { openLocalPath } from "./system";
+import { windowQuery } from "../workbench/window-target";
 
 export interface BrowserServerOptions {
   home?: string;
@@ -226,12 +226,10 @@ export async function startBrowserServer(options: BrowserServerOptions) {
             notify("home");
             return info();
           }
-          case "app:openPageWindow": {
-            const id = projectId(args),
-              page = pageId(args);
-            await store.readPage(id, page);
+          case "app:openPageWindow":
+          case "app:openWindow": {
             return {
-              url: `${origin}/?project=${encodeURIComponent(id)}&page=${encodeURIComponent(page)}`,
+              url: `${origin}/?${new URLSearchParams(windowQuery(args))}`,
             };
           }
           default:

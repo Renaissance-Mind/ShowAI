@@ -5,6 +5,7 @@ import {
   useState,
   type CSSProperties,
   type KeyboardEvent,
+  type MouseEvent,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
@@ -51,7 +52,7 @@ export interface LibraryRowProps {
   active?: boolean;
   expanded?: boolean;
   onToggle?: () => void;
-  onOpen: (target: LibraryTarget) => void;
+  onOpen: (target: LibraryTarget, event: MouseEvent<HTMLButtonElement>) => void;
   onMenu: (
     target: LibraryTarget,
     anchor: HTMLElement,
@@ -125,7 +126,13 @@ export function LibraryRow({
         className="studio-tree-main"
         aria-current={active ? "page" : undefined}
         title={title}
-        onClick={() => onOpen(target)}
+        onClick={(event) => onOpen(target, event)}
+        onAuxClick={(event) => {
+          if (event.button === 1) {
+            event.preventDefault();
+            onOpen(target, event);
+          }
+        }}
       >
         {target.kind === "page" ||
         (target.kind === "project" && target.icon) ? (
@@ -171,10 +178,12 @@ export interface LibraryContextMenuItem {
   danger?: boolean;
   disabled?: boolean;
   separatorBefore?: boolean;
+  shortcut?: string;
 }
 
 export interface LibraryContextMenuProps {
   anchor: HTMLElement;
+  portalRoot?: HTMLElement;
   point?: LibraryMenuPoint;
   label: string;
   items: LibraryContextMenuItem[];
@@ -197,6 +206,7 @@ function enabledItems(menu: HTMLElement): HTMLButtonElement[] {
 /** A single menu surface works for sidebar rows, cards and page actions. */
 export function LibraryContextMenu({
   anchor,
+  portalRoot,
   point,
   label,
   items,
@@ -472,10 +482,15 @@ export function LibraryContextMenu({
               </span>
             )}
             <span>{item.label}</span>
+            {item.shortcut && (
+              <span className="studio-context-menu-shortcut" aria-hidden="true">
+                {item.shortcut}
+              </span>
+            )}
           </button>
         </div>
       ))}
     </div>,
-    anchor.ownerDocument.body,
+    portalRoot ?? anchor.ownerDocument.body,
   );
 }

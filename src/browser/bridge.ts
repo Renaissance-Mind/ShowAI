@@ -38,6 +38,34 @@ export function installBrowserBridge() {
     if (!result.ok) throw result.error;
     return result.data;
   }
+  async function openWindow<T>(
+    action: string,
+    args: Record<string, unknown>,
+    prepare?: () => Promise<boolean>,
+  ): Promise<T | null> {
+    // Reserve the window during the click, before saving or validating the target.
+    const opened = window.open(
+      "about:blank",
+      "_blank",
+      "popup,width=1120,height=880",
+    );
+    if (!opened)
+      throw new Error("新窗口被浏览器拦截，请允许此站点打开弹出式窗口后重试。");
+    opened.opener = null;
+    try {
+      if (prepare && !(await prepare())) {
+        opened.close();
+        return null;
+      }
+      const result = await request<T>("invoke", { action, args });
+      if (opened.closed) throw new Error("新窗口已关闭，请重新打开。");
+      opened.location.replace((result as { url: string }).url);
+      return result;
+    } catch (error) {
+      opened.close();
+      throw error;
+    }
+  }
   async function invoke<T>(
     action: string,
     args: Record<string, unknown> = {},
@@ -48,12 +76,8 @@ export function installBrowserBridge() {
       await navigator.clipboard.writeText(args.text);
       return null as T;
     }
-    // Open synchronously to preserve the browser's user-gesture permission.
-    const pageWindow =
-      action === "app:openPageWindow"
-        ? window.open("about:blank", "_blank")
-        : null;
-    if (pageWindow) pageWindow.opener = null;
+    if (action === "app:openPageWindow" || action === "app:openWindow")
+      return (await openWindow<T>(action, args)) as T;
     const dialogs: Record<string, FileDialogOptions> = {
       "dialog:openPage": {
         title: "导入 ShowAI 页面",
@@ -97,18 +121,7 @@ export function installBrowserBridge() {
       if (!path) return null as T;
       args = { ...args, selectedPath: path };
     }
-    try {
-      const result = await request<T>("invoke", { action, args });
-      if (action === "app:openPageWindow") {
-        const url = (result as { url: string }).url;
-        if (pageWindow) pageWindow.location.replace(url);
-        else window.location.assign(url);
-      }
-      return result;
-    } catch (error) {
-      pageWindow?.close();
-      throw error;
-    }
+    return request<T>("invoke", { action, args });
   }
   // Thumbnail frames only read their component; a persistent connection per
   // frame would exhaust the browser's connections to this loopback host.
@@ -140,6 +153,9 @@ export function installBrowserBridge() {
   });
   window.addEventListener("pagehide", flush);
   window.showai = {
+    async openWindow(args, prepare) {
+      return (await openWindow("app:openWindow", args, prepare)) !== null;
+    },
     invoke,
     onChange(listener) {
       listeners.add(listener);

@@ -37,6 +37,10 @@ export interface DesktopWindowState {
 export type DesktopAppearance = "light" | "dark";
 
 export interface ShowAIBridge {
+  openWindow?(
+    args: Record<string, unknown>,
+    prepare: () => Promise<boolean>,
+  ): Promise<boolean>;
   setAppearance?(appearance: DesktopAppearance): Promise<void>;
   getWindowState?(): Promise<DesktopWindowState>;
   onWindowStateChange?(

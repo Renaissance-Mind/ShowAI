@@ -18,6 +18,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { tabShortcut } from "../workbench/tab-shortcuts";
+import { windowQuery, type WindowTarget } from "../workbench/window-target";
 import { AgentService, errorResult } from "../agent/service";
 import { MaintenanceScheduler } from "../core/maintenance-scheduler";
 import { syncManager } from "../sync/manager";
@@ -28,7 +29,6 @@ import {
   createWorkbench,
   workbenchActions as actions,
   projectId,
-  pageId,
   text,
 } from "../workbench/actions";
 import type {
@@ -246,11 +246,9 @@ async function nativeAction(
       clipboard.writeText(args.text);
       return null;
     }
-    case "app:openPageWindow": {
-      const id = projectId(args),
-        page = pageId(args);
-      await store.readPage(id, page);
-      await createWindow({ projectId: id, pageId: page });
+    case "app:openPageWindow":
+    case "app:openWindow": {
+      await createWindow(args);
       return null;
     }
     default:
@@ -345,11 +343,7 @@ function requestClose(window: BrowserWindow): Promise<boolean> {
   return promise;
 }
 
-async function createWindow(page?: {
-  projectId?: string;
-  pageId?: string;
-  invite?: string;
-}): Promise<BrowserWindow> {
+async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
   const window = new BrowserWindow({
     width: page ? 1120 : 1320,
     height: 880,
@@ -416,9 +410,16 @@ async function createWindow(page?: {
     if (isWorkbenchLocation(url)) {
       const params = new URL(url).searchParams;
       const projectId = params.get("project"),
-        pageId = params.get("page");
+        pageId = params.get("page"),
+        folderId = params.get("folder");
       void createWindow(
-        projectId && pageId ? { projectId, pageId } : undefined,
+        projectId
+          ? {
+              projectId,
+              pageId: pageId ?? undefined,
+              folderId: folderId ?? undefined,
+            }
+          : undefined,
       ).catch((error) =>
         dialog.showErrorBox("无法打开页面", errorResult(error).message),
       );
@@ -440,12 +441,7 @@ async function createWindow(page?: {
       event.preventDefault();
   });
   window.once("ready-to-show", () => window.show());
-  const query: Record<string, string> =
-    page?.projectId && page.pageId
-      ? { project: page.projectId, page: page.pageId, focus: "1" }
-      : page?.invite
-        ? { invite: page.invite }
-        : {};
+  const query = windowQuery(page);
   if (process.env.SHOWAI_DEV_URL) {
     const url = new URL(process.env.SHOWAI_DEV_URL);
     for (const [key, value] of Object.entries(query))

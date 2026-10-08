@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import PageIcon from "../components/PageIcon";
 import { FileText } from "../ui/icons";
 import type { PageSummary, ProjectSummary } from "../core/model";
+import type { LibraryMenuPoint } from "./LibraryNavigation";
 
 const absoluteTime = new Intl.DateTimeFormat("zh-CN", {
   year: "numeric",
@@ -57,11 +58,17 @@ export default function RecentPages({
   pages,
   query,
   onOpen,
+  onMenu,
   onCreateProject,
 }: {
   pages: RecentPage[];
   query: string;
-  onOpen: (page: RecentPage) => void;
+  onOpen: (page: RecentPage, event: MouseEvent<HTMLButtonElement>) => void;
+  onMenu: (
+    page: RecentPage,
+    anchor: HTMLElement,
+    point?: LibraryMenuPoint,
+  ) => void;
   onCreateProject: () => void;
 }) {
   const [now, setNow] = useState(Date.now);
@@ -99,7 +106,29 @@ export default function RecentPages({
         >
           <button
             className="studio-page-list-open"
-            onClick={() => onOpen(page)}
+            onClick={(event) => onOpen(page, event)}
+            onAuxClick={(event) => {
+              if (event.button === 1) {
+                event.preventDefault();
+                onOpen(page, event);
+              }
+            }}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              onMenu(page, event.currentTarget, {
+                x: event.clientX,
+                y: event.clientY,
+              });
+            }}
+            onKeyDown={(event) => {
+              if (
+                event.key === "ContextMenu" ||
+                (event.shiftKey && event.key === "F10")
+              ) {
+                event.preventDefault();
+                onMenu(page, event.currentTarget);
+              }
+            }}
           >
             <span className="studio-page-list-icon" aria-hidden="true">
               <PageIcon value={page.icon} size={19} />

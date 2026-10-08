@@ -5,6 +5,10 @@ import type {
 } from "../desktop/bridge";
 import type { TabCommand } from "../workbench/tab-shortcuts";
 export interface DesktopBridge {
+  openWindow?(
+    args: Record<string, unknown>,
+    prepare: () => Promise<boolean>,
+  ): Promise<boolean>;
   setAppearance?(appearance: DesktopAppearance): Promise<void>;
   getWindowState?(): Promise<DesktopWindowState>;
   onWindowStateChange?(
@@ -29,6 +33,17 @@ declare global {
 }
 
 export const desktop = {
+  async openWindow(
+    args: Record<string, unknown>,
+    prepare: () => Promise<boolean>,
+  ): Promise<boolean> {
+    if (!window.showai) throw new Error("Desktop integration is unavailable.");
+    if (window.showai.openWindow)
+      return window.showai.openWindow(args, prepare);
+    if (!(await prepare())) return false;
+    await window.showai.invoke("app:openWindow", args);
+    return true;
+  },
   invoke<T = unknown>(
     action: string,
     args?: Record<string, unknown>,

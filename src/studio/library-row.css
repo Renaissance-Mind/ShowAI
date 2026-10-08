@@ -3,6 +3,13 @@
   --row-menu-inset: 4px;
   position: relative;
 }
+.studio-context-menu-shortcut {
+  margin-left: auto;
+  padding-left: 16px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
 .studio-tree-row[data-library-draggable="true"] .studio-tree-main {
   cursor: grab;
 }

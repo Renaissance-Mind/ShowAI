@@ -10,6 +10,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
 import {
@@ -23,6 +24,7 @@ import {
   FolderMinus,
   Globe,
   Package,
+  PanelsTopLeft,
   Check,
   ChevronRight,
   Copy,
@@ -101,6 +103,11 @@ import RecentPages, { recentPages } from "./RecentPages";
 import AutoHideSidebar from "./AutoHideSidebar";
 import WorkspaceTabs from "./WorkspaceTabs";
 import { useWorkspaceTabs } from "./useWorkspaceTabs";
+import {
+  clickDisposition,
+  libraryEntry,
+  type OpenDisposition,
+} from "./open-target";
 import type { WorkspaceEntry, WorkspaceView } from "./workspace-tabs";
 import { tabShortcut, type TabCommand } from "../workbench/tab-shortcuts";
 import { useWindowFullscreen } from "./useWindowFullscreen";
@@ -550,19 +557,29 @@ export default function Studio() {
       const verification = refresh();
       const params = new URLSearchParams(location.search);
       const projectId = params.get("project"),
-        pageId = params.get("page");
-      if (projectId && pageId) {
+        pageId = params.get("page"),
+        folderId = params.get("folder");
+      if (projectId) {
         selectedRef.current = projectId;
         setSelectedProject(projectId);
         setExpandedProjects((current) => ({ ...current, [projectId]: true }));
-        if (await page.open(projectId, pageId)) {
-          setView("page");
-          void loadCatalog().catch(report);
-        }
         const loaded = await loadProjectContents(projectId);
-        setSelectedFolder(
-          loaded.pages.find((item) => item.id === pageId)?.parentId ?? null,
-        );
+        if (pageId) {
+          if (await page.open(projectId, pageId)) {
+            setView("page");
+            void loadCatalog().catch(report);
+          }
+          const parentId =
+            loaded.pages.find((item) => item.id === pageId)?.parentId ?? null;
+          setSelectedFolder(parentId);
+          expandFolderPath(loaded.folders, parentId);
+        } else {
+          if (folderId && !loaded.folders.some((item) => item.id === folderId))
+            throw new Error("这个文件夹已不存在。");
+          setSelectedFolder(folderId);
+          expandFolderPath(loaded.folders, folderId);
+          setView("project");
+        }
       }
       await verification;
       setWorkspaceReady(true);
@@ -741,6 +758,44 @@ export default function Studio() {
       routingRef.current = false;
       setRouting(false);
     }
+  }
+  async function openTarget(
+    target: LibraryTarget,
+    disposition: OpenDisposition = "current",
+  ) {
+    if (!workspaceReady || routingRef.current || workspace.switching)
+      return false;
+    if (disposition === "window") {
+      return desktop.openWindow(
+        {
+          projectId: target.projectId,
+          ...(target.kind === "page" ? { pageId: target.id } : {}),
+          ...(target.kind === "folder" ? { folderId: target.id } : {}),
+        },
+        page.flush,
+      );
+    }
+    if (disposition !== "current")
+      return workspace.open(
+        libraryEntry(target),
+        disposition === "foreground-tab",
+      );
+    return target.kind === "page"
+      ? openPage(target.id, target.projectId)
+      : openProject(
+          target.projectId,
+          target.kind === "folder" ? target.id : null,
+        );
+  }
+  function openTargetClick(
+    target: LibraryTarget,
+    event: ReactMouseEvent<HTMLButtonElement>,
+  ) {
+    event.preventDefault();
+    void openTarget(
+      target,
+      clickDisposition(event, info?.platform === "darwin"),
+    ).catch(report);
   }
   async function beginNewPage(projectId: string, parentId: string | null) {
     const choices = await desktop.invoke<TemplateMetadata[]>("templates:list", {
@@ -1192,15 +1247,7 @@ export default function Studio() {
                   }))
               : undefined
           }
-          onOpen={() => {
-            if (target.kind === "folder") {
-              setExpandedFolders((current) => ({
-                ...current,
-                [target.id]: true,
-              }));
-              void openProject(projectId, target.id).catch(report);
-            } else void openPage(target.id, projectId).catch(report);
-          }}
+          onOpen={openTargetClick}
           onMenu={showMenu}
         />
         {target.kind === "folder" && expandedFolders[target.id] && (
@@ -1483,7 +1530,34 @@ export default function Studio() {
     void operation().catch(report);
   };
 
-  async function openSearchResult(result: SearchResult) {
+  function searchTarget(result: SearchResult): LibraryTarget | undefined {
+    const match = result.path.match(
+      /^projects\/([^/]+)\/pages\/([^/]+)\.json$/,
+    );
+    if (match) {
+      const item = contents[match[1]]?.pages.find(
+        (item) => item.id === match[2],
+      );
+      return item ? pageTarget(item, match[1]) : undefined;
+    }
+    if (result.kind === "project") {
+      const item = projects.find((item) => item.id === result.projectId);
+      return item ? projectTarget(item) : undefined;
+    }
+  }
+  async function openSearchResult(
+    result: SearchResult,
+    event: ReactMouseEvent<HTMLButtonElement>,
+  ) {
+    const target = searchTarget(result);
+    const disposition = clickDisposition(event, info?.platform === "darwin");
+    if (target && disposition !== "current") {
+      event.preventDefault();
+      if (!(await openTarget(target, disposition)))
+        throw new Error("请先保存或处理当前页面的草稿。");
+      if (disposition === "foreground-tab") setRevealNode(result.blockId);
+      return;
+    }
     const scope = result.projectId
       ? "project"
       : result.path.startsWith("packages/published/")
@@ -1607,7 +1681,7 @@ export default function Studio() {
                 }
                 expanded={!!expandedProjects[item.id]}
                 onToggle={action(() => toggleProject(item.id))}
-                onOpen={action(() => openProject(item.id))}
+                onOpen={openTargetClick}
                 onMenu={showMenu}
               />
               {expandedProjects[item.id] && (
@@ -1660,7 +1734,11 @@ export default function Studio() {
       ) : (
         <div className="studio-breadcrumb">
           {selectedProject && (
-            <button onClick={action(() => openProject(selectedProject))}>
+            <button
+              onClick={(event) =>
+                project && openTargetClick(projectTarget(project), event)
+              }
+            >
               <PageIcon
                 value={project?.icon}
                 size={17}
@@ -1673,7 +1751,9 @@ export default function Studio() {
             <span className="studio-breadcrumb-folder" key={item.id}>
               <ChevronRight size={13} />
               <button
-                onClick={action(() => openProject(selectedProject!, item.id))}
+                onClick={(event) =>
+                  openTargetClick(folderTarget(item, selectedProject!), event)
+                }
               >
                 <Folder size={16} aria-hidden="true" />
                 <span>{item.name}</span>
@@ -1769,6 +1849,10 @@ export default function Studio() {
                   <LibrarySearchResults
                     query={query}
                     onOpen={openSearchResult}
+                    onMenu={(result, anchor, point) => {
+                      const target = searchTarget(result);
+                      if (target) showMenu(target, anchor, point);
+                    }}
                   />
                 ) : null}
               </>
@@ -2291,8 +2375,15 @@ export default function Studio() {
                     <RecentPages
                       pages={recent}
                       query={query}
-                      onOpen={(item) =>
-                        void openPage(item.id, item.projectId).catch(report)
+                      onOpen={(item, event) =>
+                        openTargetClick(pageTarget(item, item.projectId), event)
+                      }
+                      onMenu={(item, anchor, point) =>
+                        showMenu(
+                          pageTarget(item, item.projectId),
+                          anchor,
+                          point,
+                        )
                       }
                       onCreateProject={() => setDialog({ type: "project" })}
                     />
@@ -2305,14 +2396,41 @@ export default function Studio() {
                             <div
                               key={target.id}
                               className="studio-page-list-row"
+                              onContextMenu={(event) => {
+                                event.preventDefault();
+                                const anchor =
+                                  event.currentTarget.querySelector<HTMLElement>(
+                                    ".studio-row-menu",
+                                  );
+                                if (anchor)
+                                  showMenu(target, anchor, {
+                                    x: event.clientX,
+                                    y: event.clientY,
+                                  });
+                              }}
+                              onKeyDown={(event) => {
+                                if (
+                                  event.key !== "ContextMenu" &&
+                                  !(event.shiftKey && event.key === "F10")
+                                )
+                                  return;
+                                event.preventDefault();
+                                const anchor =
+                                  event.currentTarget.querySelector<HTMLElement>(
+                                    ".studio-row-menu",
+                                  );
+                                if (anchor) showMenu(target, anchor);
+                              }}
                             >
                               <button
                                 className="studio-page-list-open"
-                                onClick={action(() =>
-                                  target.kind === "folder"
-                                    ? openProject(target.projectId, target.id)
-                                    : openPage(target.id, target.projectId),
-                                )}
+                                onClick={(event) =>
+                                  openTargetClick(target, event)
+                                }
+                                onAuxClick={(event) => {
+                                  if (event.button === 1)
+                                    openTargetClick(target, event);
+                                }}
                               >
                                 <span className="studio-page-list-icon">
                                   {target.kind === "folder" ? (
@@ -2568,12 +2686,33 @@ export default function Studio() {
         {contextMenu && (
           <LibraryContextMenu
             anchor={contextMenu.anchor}
+            portalRoot={
+              contextMenu.anchor.closest<HTMLElement>(".expandable-search") ??
+              undefined
+            }
             point={contextMenu.point}
             label={`${contextMenu.target.title}的操作`}
             onClose={() => setContextMenu(null)}
             items={[
               {
+                label: "在新标签页打开",
+                icon: <PanelsTopLeft size={15} />,
+                shortcut: info?.platform === "darwin" ? "⌘ 点击" : "Ctrl 点击",
+                disabled: !workspaceReady || routing || workspace.switching,
+                onSelect: action(() => openTarget(contextMenu.target, "tab")),
+              },
+              {
+                label: "在新窗口打开",
+                icon: <AppWindow size={15} />,
+                shortcut: "⇧ 点击",
+                disabled: !workspaceReady || routing || workspace.switching,
+                onSelect: action(() =>
+                  openTarget(contextMenu.target, "window"),
+                ),
+              },
+              {
                 label: "添加新页面",
+                separatorBefore: true,
                 icon: <FilePlus2 size={15} />,
                 onSelect: action(() =>
                   beginNewPage(
@@ -2724,16 +2863,6 @@ export default function Studio() {
                       icon: <ArrowUpRight size={15} />,
                       onSelect: () =>
                         void exportPage("html", "bundled", "reading"),
-                    },
-                    {
-                      label: "在独立窗口打开",
-                      icon: <AppWindow size={15} />,
-                      onSelect: action(() =>
-                        desktop.invoke("app:openPageWindow", {
-                          projectId: contextMenu.target.projectId,
-                          pageId: contextMenu.target.id,
-                        }),
-                      ),
                     },
                   ]
                 : []),
