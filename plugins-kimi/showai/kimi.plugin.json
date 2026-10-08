@@ -1,0 +1,39 @@
+{
+  "$schema": "https://catalog.msh.team/misc/kimi.plugin.schema.json",
+  "name": "showai",
+  "version": "0.1.0",
+  "description": "在 Kimi Work 中使用 ShowAI 创作、修改交互页面，并导出 inline HTML 以对话内小组件（Widget）展示。适用于：把调研/报告做成 ShowAI 页面、展示或更新已有页面、导出整页或局部 HTML。",
+  "keywords": [
+    "showai",
+    "interactive-pages",
+    "html",
+    "widget",
+    "页面展示"
+  ],
+  "author": "ShowAI",
+  "license": "MIT",
+  "skillInstructions": "",
+  "interface": {
+    "displayName": "ShowAI",
+    "shortDescription": "创作 ShowAI 页面并在 Kimi 对话内展示",
+    "longDescription": "连接本机 ShowAI 运行时（桌面开发版或 CLI），按 guide 读取项目与页面、创作或修改 Page，导出 inline HTML，并通过 Kimi Work 的 Widget 机制把交互预览投射到对话中；不支持 Widget 时降级为完整 HTML 文件交付。",
+    "developerName": "Local developer",
+    "websiteURL": "",
+    "iconUrl": "",
+    "category": "PRODUCTIVITY",
+    "defaultLocale": "zh-CN",
+    "locales": "./locales/",
+    "tryPrompts": [
+      "把这份调研做成 ShowAI 页面并展示在对话里",
+      "展示我的 ShowAI 项目里已有的页面",
+      "把这个 ShowAI 页面导出成 HTML 文件"
+    ],
+    "skillOverrides": {
+      "showai": {
+        "displayName": "ShowAI",
+        "description": "创作 ShowAI 页面并在 Kimi 对话内展示"
+      }
+    }
+  },
+  "skills": "./skills/"
+}

@@ -1,0 +1,17 @@
+{
+  "displayName": "ShowAI",
+  "shortDescription": "Create ShowAI pages and present them inline in Kimi conversations",
+  "longDescription": "Connect to the local ShowAI runtime (desktop dev build or CLI), read projects and pages via guides, create or edit Pages, export HTML, and project the interactive preview into the conversation through Kimi Work's Widget mechanism; falls back to delivering the full HTML file when Widgets are unavailable.",
+  "developerName": "ShowAI",
+  "tryPrompts": [
+    "Turn this research into a ShowAI page and show it in our conversation",
+    "Show me a page from my ShowAI project",
+    "Export this ShowAI page as an HTML file"
+  ],
+  "skillOverrides": {
+    "showai": {
+      "displayName": "ShowAI",
+      "description": "Create ShowAI pages and present them inline in Kimi conversations"
+    }
+  }
+}
