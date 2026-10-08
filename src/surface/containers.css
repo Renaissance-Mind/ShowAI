@@ -92,6 +92,12 @@
   padding: 28px 40px 96px;
   min-width: 0;
 }
+.container-page[data-width-mode="wide"] > .container-page-column {
+  max-width: 1500px;
+}
+.container-page[data-width-mode="full"] > .container-page-column {
+  max-width: none;
+}
 .container-page-heading {
   margin: 12px 0 24px;
 }

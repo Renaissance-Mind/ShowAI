@@ -5,7 +5,10 @@ import {
   MoreHorizontal,
   Undo2,
   Redo2,
+  Columns3,
 } from "../ui/icons";
+import type { PageWidthMode } from "./types";
+import { PageWidthSwitch } from "./PageWidthSwitch";
 import {
   LibraryContextMenu,
   type LibraryContextMenuItem,
@@ -23,6 +26,8 @@ export interface EditorControls {
   redo: () => void;
   setIcon: () => void;
   wrap: (kind: "page" | "board") => void;
+  pageWidthMode: PageWidthMode;
+  setPageWidthMode: (mode: PageWidthMode) => void;
 }
 
 export function EditorHistoryButtons({
@@ -92,9 +97,25 @@ export function containerMenuItems(
           },
         ]
       : []),
+    ...(controls.kind === "page"
+      ? [
+          {
+            label: "页面宽度",
+            icon: <Columns3 size={15} />,
+            separatorBefore: true,
+            control: (
+              <PageWidthSwitch
+                value={controls.pageWidthMode}
+                onChange={controls.setPageWidthMode}
+              />
+            ),
+          },
+        ]
+      : []),
     {
       label: target ? `将${target}放入 Board` : "放入 Board",
       icon: <LayoutDashboard size={15} />,
+      separatorBefore: controls.kind === "page",
       onSelect: () => controls.wrap("board"),
     },
     {

@@ -291,6 +291,7 @@ export default function SurfaceEditor({
     >
       <ContainerRuntime
         document={document}
+        pageWidthModes
         onActiveSurfaceChange={onActiveSurfaceChange}
         onChange={readOnly ? undefined : change}
         header={header}

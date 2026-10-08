@@ -2809,7 +2809,9 @@ export default function Studio() {
                 ? containerMenuItems(editorControls, editorControls.nested).map(
                     (item, index) => ({
                       ...item,
-                      separatorBefore: editorControls.nested && index === 0,
+                      separatorBefore:
+                        item.separatorBefore ||
+                        (editorControls.nested && index === 0),
                     }),
                   )
                 : []),

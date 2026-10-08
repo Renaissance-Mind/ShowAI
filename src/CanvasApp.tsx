@@ -12,6 +12,7 @@ import {
   X,
 } from "./ui/icons";
 import SurfaceEditor from "./surface/SurfaceEditor";
+import { LibraryMenuControl } from "./studio/LibraryNavigation";
 import {
   EditorHistoryButtons,
   containerMenuItems,
@@ -340,19 +341,23 @@ export default function App() {
               }}
             >
               {editorControls?.documentId === page.id &&
-                containerMenuItems(editorControls).map((item) => (
-                  <button
-                    key={item.label}
-                    role="menuitem"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      item.onSelect();
-                    }}
-                  >
-                    {item.icon}
-                    {item.label}
-                  </button>
-                ))}
+                containerMenuItems(editorControls).map((item) =>
+                  item.control ? (
+                    <LibraryMenuControl key={item.label} item={item} />
+                  ) : (
+                    <button
+                      key={item.label}
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        item.onSelect?.();
+                      }}
+                    >
+                      {item.icon}
+                      {item.label}
+                    </button>
+                  ),
+                )}
               <button
                 role="menuitem"
                 onClick={() => {

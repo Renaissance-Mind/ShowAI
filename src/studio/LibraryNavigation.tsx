@@ -171,14 +171,30 @@ export function LibraryRow({
   );
 }
 
-export interface LibraryContextMenuItem {
+interface LibraryMenuItemBase {
   label: string;
   icon: ReactNode;
-  onSelect: () => void;
   danger?: boolean;
   disabled?: boolean;
   separatorBefore?: boolean;
   shortcut?: string;
+}
+export type LibraryContextMenuItem = LibraryMenuItemBase &
+  (
+    | { onSelect: () => void; control?: never }
+    | { control: ReactNode; onSelect?: never }
+  );
+
+export function LibraryMenuControl({ item }: { item: LibraryContextMenuItem }) {
+  return (
+    <div className="studio-context-menu-control" role="none">
+      <div className="studio-context-menu-control-label">
+        {item.icon}
+        <span>{item.label}</span>
+      </div>
+      {item.control}
+    </div>
+  );
 }
 
 export interface LibraryContextMenuProps {
@@ -197,9 +213,13 @@ interface MenuPosition {
   maxHeight: number;
 }
 
-function enabledItems(menu: HTMLElement): HTMLButtonElement[] {
+function enabledItems(
+  menu: HTMLElement,
+): (HTMLButtonElement | HTMLInputElement)[] {
   return [
-    ...menu.querySelectorAll<HTMLButtonElement>('button[role="menuitem"]'),
+    ...menu.querySelectorAll<HTMLButtonElement | HTMLInputElement>(
+      'button[role="menuitem"],input[type="range"]',
+    ),
   ].filter((item) => !item.disabled);
 }
 
@@ -465,29 +485,36 @@ export function LibraryContextMenu({
           {item.separatorBefore && index > 0 && (
             <div role="separator" className="studio-context-menu-separator" />
           )}
-          <button
-            type="button"
-            role="menuitem"
-            tabIndex={-1}
-            className={`studio-context-menu-item${item.danger ? " danger" : ""}`}
-            disabled={item.disabled}
-            onClick={() => {
-              latestClose.current();
-              item.onSelect();
-            }}
-          >
-            {item.icon && (
-              <span className="studio-context-menu-icon" aria-hidden="true">
-                {item.icon}
-              </span>
-            )}
-            <span>{item.label}</span>
-            {item.shortcut && (
-              <span className="studio-context-menu-shortcut" aria-hidden="true">
-                {item.shortcut}
-              </span>
-            )}
-          </button>
+          {item.control ? (
+            <LibraryMenuControl item={item} />
+          ) : (
+            <button
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              className={`studio-context-menu-item${item.danger ? " danger" : ""}`}
+              disabled={item.disabled}
+              onClick={() => {
+                latestClose.current();
+                item.onSelect?.();
+              }}
+            >
+              {item.icon && (
+                <span className="studio-context-menu-icon" aria-hidden="true">
+                  {item.icon}
+                </span>
+              )}
+              <span>{item.label}</span>
+              {item.shortcut && (
+                <span
+                  className="studio-context-menu-shortcut"
+                  aria-hidden="true"
+                >
+                  {item.shortcut}
+                </span>
+              )}
+            </button>
+          )}
         </div>
       ))}
     </div>,

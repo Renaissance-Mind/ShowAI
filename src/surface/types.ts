@@ -1,4 +1,5 @@
 export type SurfaceKind = "page" | "board";
+export type PageWidthMode = "standard" | "wide" | "full";
 export type DrawingTool = "pen" | "rectangle" | "ellipse" | "arrow";
 export type LayoutMode = "flow" | "grid" | "free";
 export interface NodeLayout {

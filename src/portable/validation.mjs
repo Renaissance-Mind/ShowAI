@@ -458,7 +458,9 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
             "extent",
             "points",
           ])
-        : nodeAttributes,
+        : node.type === "surface"
+          ? new Set([...nodeAttributes, "widthMode"])
+          : nodeAttributes,
       node.type === "surface",
     );
   if (node.type === "surface" && node.attrs?.icon !== undefined)

@@ -162,6 +162,12 @@ function validateResource(document) {
     if (node.type === "surface") {
       if (!["page", "board"].includes(node.attrs.kind))
         throw new Error("Surface kind must be page or board.");
+      if (
+        node.attrs.widthMode !== undefined &&
+        (node.attrs.kind !== "page" ||
+          !["standard", "wide", "full"].includes(node.attrs.widthMode))
+      )
+        throw new Error("Page width mode must be standard, wide or full.");
       if (parent && !["surface", "region"].includes(parent.type))
         throw new Error("A surface requires a container parent.");
       owner = node;

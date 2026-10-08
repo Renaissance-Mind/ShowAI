@@ -30,7 +30,7 @@ import {
   X,
 } from "../ui/icons";
 import type { ContainerDocument, ShowDocument } from "../types";
-import type { DrawingTool, NodeLayout } from "./types";
+import type { DrawingTool, NodeLayout, PageWidthMode } from "./types";
 import {
   SurfaceContent,
   nodeName,
@@ -54,6 +54,7 @@ import {
 import "./containers.css";
 import PageIcon from "../components/PageIcon";
 import PageIconDialog from "../studio/PageIconDialog";
+import { PageWidthSwitch } from "./PageWidthSwitch";
 
 interface Runtime {
   document: ContainerDocument;
@@ -61,6 +62,7 @@ interface Runtime {
   commit: (next: ShowDocument) => void;
   readOnly: boolean;
   printing: boolean;
+  pageWidthModes: boolean;
   selected: string | null;
   select: (id: string | null) => void;
   inspect: (id: string) => void;
@@ -87,6 +89,7 @@ export function ContainerRuntime({
   canRedo = false,
   reading = false,
   hideTitle = false,
+  pageWidthModes = false,
   onActiveSurfaceChange,
   onControlsChange,
 }: {
@@ -103,6 +106,8 @@ export function ContainerRuntime({
   canRedo?: boolean;
   reading?: boolean;
   hideTitle?: boolean;
+  /** App editors opt in; exported readers retain their existing width. */
+  pageWidthModes?: boolean;
   onActiveSurfaceChange?: (id: string) => void;
   onControlsChange?: (controls: EditorControls | null) => void;
 }) {
@@ -165,6 +170,16 @@ export function ContainerRuntime({
     () => setIconTarget(surfaceId),
     [surfaceId],
   );
+  const setPageWidthMode = useCallback(
+    (mode: PageWidthMode) => {
+      const next = editNode(current.current, surfaceId, (node) => {
+        node.attrs = { ...node.attrs, widthMode: mode };
+      });
+      current.current = next as ContainerDocument;
+      onChange?.(next);
+    },
+    [surfaceId, onChange],
+  );
   const wrap = useCallback(
     (kind: "page" | "board") => {
       const next = wrapSurface(current.current, surfaceId, kind);
@@ -197,6 +212,8 @@ export function ContainerRuntime({
             redo,
             setIcon: setSurfaceIcon,
             wrap,
+            pageWidthMode: root.attrs?.widthMode ?? "standard",
+            setPageWidthMode,
           }
         : null,
     [
@@ -211,6 +228,8 @@ export function ContainerRuntime({
       redo,
       setSurfaceIcon,
       wrap,
+      root.attrs?.widthMode,
+      setPageWidthMode,
       onChange,
     ],
   );
@@ -255,6 +274,7 @@ export function ContainerRuntime({
     },
     readOnly: !onChange,
     printing,
+    pageWidthModes,
     selected,
     select,
     inspect,
@@ -501,6 +521,28 @@ export function ContainerRuntime({
                     设置图标…
                   </button>
                 )}
+                {pageWidthModes &&
+                  selectedEntry.node.type === "surface" &&
+                  surfaceKind(selectedEntry.node) === "page" && (
+                    <label>
+                      页面宽度
+                      <PageWidthSwitch
+                        value={
+                          selectedEntry.node.attrs?.widthMode ?? "standard"
+                        }
+                        onChange={(mode) =>
+                          runtime.commit(
+                            editNode(current.current, inspecting!, (node) => {
+                              node.attrs = {
+                                ...node.attrs,
+                                widthMode: mode,
+                              };
+                            }),
+                          )
+                        }
+                      />
+                    </label>
+                  )}
                 {selectedEntry.node.type === "region" && (
                   <label>
                     排列
@@ -805,6 +847,11 @@ function ContainerView({
           ref={page}
           className={`container-page${root ? " is-root" : ""}${reading ? " is-reading-projection" : ""}`}
           data-container-root={id}
+          data-width-mode={
+            runtime.pageWidthModes && kind === "page"
+              ? (node.attrs?.widthMode ?? "standard")
+              : undefined
+          }
           data-input-surface={id}
           aria-label={`Page ${nodeName(node)}`}
           onScroll={(event) => {

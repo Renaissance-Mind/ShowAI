@@ -122,3 +122,19 @@
     transition: none;
   }
 }
+.studio-context-menu-control {
+  padding: 8px;
+  min-width: 0;
+}
+.studio-context-menu-control-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 20px;
+}
+.studio-context-menu-control-label > svg {
+  color: var(--muted);
+  flex-shrink: 0;
+}
