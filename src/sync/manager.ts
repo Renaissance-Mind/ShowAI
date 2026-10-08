@@ -360,13 +360,19 @@ export class SyncManager {
       { digest },
     );
   }
-  async previewInvite(link: string) {
+  async previewInvite(link: string, connectionId?: string) {
     const url = new URL(link),
-      invite = new URLSearchParams(url.hash.slice(1)).get("invite");
+      parameters = new URLSearchParams(url.hash.slice(1)),
+      invite = parameters.get("invite");
     if (!invite || !/^[a-f0-9]{64}$/.test(invite))
       throw new CoreError("INVALID_DATA", "邀请链接无效。");
-    const base = serverUrl(url.origin);
-    return {
+    const connection = connectionId
+      ? await this.connection(connectionId)
+      : (await this.configuration()).connections.find(
+          (item) => item.serverId === parameters.get("server"),
+        );
+    const base = connection?.url ?? serverUrl(url.origin);
+    const result = {
       url: base,
       invite,
       ...(await this.request<{
@@ -377,14 +383,17 @@ export class SyncManager {
         serverName: string;
       }>({ url: base, token: "" }, "/api/invites/preview", "POST", { invite })),
     };
+    if (
+      (connection && result.serverId !== connection.serverId) ||
+      (parameters.has("server") && parameters.get("server") !== result.serverId)
+    )
+      throw new CoreError("INVALID_DATA", "请选择邀请所属服务器上的账号。");
+    return result;
   }
   async join(connectionId: string, link: string) {
-    const invitation = await this.previewInvite(link),
+    const invitation = await this.previewInvite(link, connectionId),
       connection = await this.connection(connectionId);
-    if (
-      invitation.serverId !== connection.serverId ||
-      invitation.url !== connection.url
-    )
+    if (invitation.serverId !== connection.serverId)
       throw new CoreError("INVALID_DATA", "请选择邀请所属服务器上的账号。");
     const project = await this.request<SyncProject>(
       connection,

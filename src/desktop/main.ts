@@ -466,6 +466,8 @@ async function openDeepLink(source: string): Promise<void> {
       throw new CoreError("INVALID_PATH", "项目邀请链接无效。");
     const link = new URL("/join", server.origin);
     link.hash = `invite=${invite}`;
+    const serverId = url.searchParams.get("serverId");
+    if (serverId) link.hash += `&server=${encodeURIComponent(serverId)}`;
     await createWindow({ invite: link.toString() });
     return;
   }

@@ -70,6 +70,42 @@ async function fixture() {
   return { directory, server, alice, bob, project, page };
 }
 describe("project synchronization between independent real content libraries", () => {
+  it("uses a saved server address for invitations created through another device's address", async () => {
+    const { alice, bob, project } = await fixture();
+    const invitation = (await alice.manager.manage(
+      alice.connection.id,
+      project.id,
+      "invite",
+      { role: "editor" },
+    )) as { url: string };
+    const link = new URL(invitation.url);
+    // This origin is unavailable to the recipient, as with an SSH tunnel on another machine.
+    link.port = "1";
+    expect((await bob.manager.previewInvite(link.toString())).url).toBe(
+      bob.connection.url,
+    );
+    const originalHash = link.hash;
+    const parameters = new URLSearchParams(link.hash.slice(1));
+    parameters.set("server", "another-server");
+    link.hash = parameters.toString();
+    await expect(
+      bob.manager.join(bob.connection.id, link.toString()),
+    ).rejects.toThrow("请选择邀请所属服务器上的账号。");
+    link.hash = originalHash;
+    await bob.manager.join(bob.connection.id, link.toString());
+    await bob.manager.stop();
+    expect((await bob.manager.status()).projects[0].status).toBe("synced");
+    // Older invitations lack server identity; an explicitly selected connection still works.
+    const legacy = (await alice.manager.manage(
+      alice.connection.id,
+      project.id,
+      "invite",
+      { role: "editor" },
+    )) as { invite: string };
+    link.hash = `invite=${legacy.invite}`;
+    await bob.manager.join(bob.connection.id, link.toString());
+    await bob.manager.stop();
+  });
   it("downloads full history, original actors/times, and the exact archived reader", async () => {
     const { alice, bob, project, page } = await fixture();
     expect(
