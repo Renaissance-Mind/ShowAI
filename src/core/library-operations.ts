@@ -208,13 +208,13 @@ export class LibraryOperations {
       visited.add(key);
       const kind = ref.kind === "component" ? "components" : "templates",
         filename = ref.kind === "component" ? "compiled.json" : "template.json";
+      const historical = `projects/${projectId}/packages/historical/${kind}/${ref.integrity}`;
       const roots = [
-        `projects/${ref.projectId ?? projectId}/packages/${kind}/${ref.id}/${ref.version}`,
+        historical,
+        `projects/${projectId}/packages/${kind}/${ref.id}/${ref.version}`,
         `packages/${kind}/${ref.id}/${ref.version}`,
         `packages/published/${kind}/${ref.id}/${ref.version}`,
       ];
-      const historical = `projects/${projectId}/packages/historical/${kind}/${ref.integrity}`;
-      roots.push(historical);
       let found:
         | { root: string; record: CompiledComponent | TemplateRecord }
         | undefined;

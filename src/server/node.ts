@@ -1,10 +1,14 @@
 import { createServer, type Server } from "node:http";
 import { DatabaseSync } from "node:sqlite";
-import { mkdir, readFile, open } from "node:fs/promises";
+import { mkdir, readFile, open, stat, rm } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { createHash } from "node:crypto";
+import { Readable } from "node:stream";
+import { once } from "node:events";
 import { atomicRename } from "../core/atomic-rename";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { syncProtocol } from "../sync/protocol";
+import { syncProtocol, SyncError } from "../sync/protocol";
 import { serverBaseUrl } from "../sync/server-url";
 import { createSyncServer, type ServerOptions } from "./app";
 import {
@@ -16,6 +20,8 @@ import {
 } from "./storage";
 export { schema };
 export { migrations } from "./migrations";
+export { prepareMetadata } from "./migrations";
+export { Revisions } from "./revisions";
 
 export class SQLiteMetadata implements MetadataStore {
   readonly db: DatabaseSync;
@@ -55,15 +61,102 @@ export class SQLiteMetadata implements MetadataStore {
 export class DiskObjects implements ObjectStore {
   constructor(readonly root: string) {}
   private path(key: string) {
-    if (!/^projects\/[A-Za-z0-9_-]+\/objects\/[a-f0-9]{64}$/.test(key))
+    if (
+      !/^projects\/[A-Za-z0-9_-]+\/(?:objects|manifests)\/[a-f0-9]{64}$/.test(
+        key,
+      )
+    )
       throw new Error("Invalid object storage key.");
     return join(this.root, key);
   }
-  async get(key: string) {
+  async get(key: string, maximum = 16 * 1024 * 1024) {
+    const info = await this.open(key);
+    if (!info) return null;
+    if (info.bytes > maximum) {
+      await info.body.cancel();
+      throw new SyncError(413, "TOO_LARGE", "Metadata object exceeds 16 MiB.");
+    }
+    await info.body.cancel();
     return readFile(this.path(key)).catch((error: NodeJS.ErrnoException) => {
       if (error.code === "ENOENT") return null;
       throw error;
     });
+  }
+  digest() {
+    const hash = createHash("sha256");
+    return {
+      async update(bytes: Uint8Array) {
+        hash.update(bytes);
+      },
+      async finish() {
+        return hash.digest("hex");
+      },
+    };
+  }
+  async open(key: string) {
+    const path = this.path(key);
+    const info = await stat(path).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return null;
+      throw error;
+    });
+    if (!info) return null;
+    return {
+      bytes: info.size,
+      body: Readable.toWeb(
+        createReadStream(path, { highWaterMark: 64 * 1024 }),
+      ) as ReadableStream<Uint8Array>,
+    };
+  }
+  async putVerified(
+    key: string,
+    body: ReadableStream<Uint8Array>,
+    expected: string,
+    maximum: number,
+  ) {
+    const path = this.path(key),
+      folder = dirname(path),
+      temporary = `${path}.${crypto.randomUUID()}.tmp`;
+    await mkdir(folder, { recursive: true });
+    const file = await open(temporary, "wx", 0o600),
+      hash = createHash("sha256");
+    const reader = body.getReader();
+    let length = 0,
+      verified = false;
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        length += value.byteLength;
+        if (length > maximum) {
+          await reader.cancel();
+          throw new SyncError(413, "TOO_LARGE", "Object exceeds 64 MiB.");
+        }
+        hash.update(value);
+        await file.writeFile(value);
+      }
+      if (hash.digest("hex") !== expected)
+        throw new SyncError(
+          400,
+          "DIGEST_MISMATCH",
+          "Content does not match its digest.",
+        );
+      await file.sync();
+      verified = true;
+    } finally {
+      reader.releaseLock();
+      await file.close();
+      if (!verified) await rm(temporary, { force: true });
+    }
+    await atomicRename(temporary, path);
+    if (process.platform !== "win32") {
+      const directory = await open(folder, "r");
+      try {
+        await directory.sync();
+      } finally {
+        await directory.close();
+      }
+    }
+    return length;
   }
   async put(key: string, bytes: Uint8Array) {
     const path = this.path(key),
@@ -107,17 +200,6 @@ export async function startSyncServer(
   await app.initialize();
   const server = createServer(async (incoming, outgoing) => {
     try {
-      const chunks: Buffer[] = [];
-      let length = 0;
-      for await (const chunk of incoming) {
-        length += chunk.length;
-        if (length > 64 * 1024 * 1024) {
-          outgoing.writeHead(413);
-          outgoing.end("Request is too large.");
-          return;
-        }
-        chunks.push(chunk);
-      }
       const headers = new Headers();
       for (const [name, value] of Object.entries(incoming.headers))
         if (value)
@@ -130,7 +212,10 @@ export async function startSyncServer(
             method,
             headers,
             ...(method !== "GET" && method !== "HEAD"
-              ? { body: Uint8Array.from(Buffer.concat(chunks)) }
+              ? {
+                  body: Readable.toWeb(incoming) as ReadableStream<Uint8Array>,
+                  duplex: "half" as const,
+                }
               : {}),
           },
         ),
@@ -139,7 +224,7 @@ export async function startSyncServer(
       outgoing.writeHead(response.status, Object.fromEntries(response.headers));
       if (response.body)
         for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>)
-          outgoing.write(chunk);
+          if (!outgoing.write(chunk)) await once(outgoing, "drain");
       outgoing.end();
     } catch (error) {
       console.error("ShowAI Server HTTP failure", error);

@@ -10,6 +10,7 @@ import { FileStore, CoreError, assertId } from "../core/store";
 import { LibraryOperations } from "../core/library-operations";
 import { WorkspaceProtection } from "../core/workspace-conflicts";
 import { serverBaseUrl, serverEndpoint, invitationBaseUrl } from "./server-url";
+import { cacheDownload } from "./object-cache";
 import {
   retainSyncConflicts,
   type RetainedConflict,
@@ -701,11 +702,8 @@ export class SyncManager {
             error.error?.message ?? "下载资源失败。",
           );
         }
-        const bytes = Buffer.from(await response.arrayBuffer());
-        if (hash(bytes) !== digest)
-          throw new CoreError("INVALID_DATA", "下载内容摘要不匹配。");
-        await atomicLibraryFile(this.home, path, bytes);
-        return bytes;
+        await cacheDownload(this.home, path, response, digest);
+        return readFile(path);
       },
       project.remoteProjectId,
     );
@@ -757,10 +755,30 @@ export class SyncManager {
           `${connection.url}/api/projects/${project.remoteProjectId}/objects/${digest}`,
           {
             method: "PUT",
-            body: Uint8Array.from(bytes),
+            body: (() => {
+              let offset = 0;
+              return new ReadableStream<Uint8Array>({
+                pull(controller) {
+                  if (offset === bytes.length) {
+                    controller.close();
+                    return;
+                  }
+                  const count = Math.min(64 * 1024, bytes.length - offset);
+                  controller.enqueue(
+                    new Uint8Array(
+                      bytes.buffer,
+                      bytes.byteOffset + offset,
+                      count,
+                    ),
+                  );
+                  offset += count;
+                },
+              });
+            })(),
+            duplex: "half",
             headers: { authorization: `Bearer ${connection.token}` },
             signal: AbortSignal.timeout(60_000),
-          },
+          } as RequestInit,
         );
         if (!response.ok) {
           const value = await response.json();
@@ -1123,13 +1141,19 @@ export class SyncManager {
       let after = project.remoteHead;
       while (true) {
         const page = await this.request<{
-          entries: (SnapshotRecord & { published: boolean })[];
+          entries: (
+            (SnapshotRecord & { published: boolean }) | { revision: string }
+          )[];
           next: string | null;
         }>(
           connection,
-          `/api/projects/${project.remoteProjectId}/revisions${after ? `?after=${after}` : ""}`,
+          `/api/projects/${project.remoteProjectId}/revisions?${new URLSearchParams({ ...(after ? { after } : {}), ...(connection.capabilities?.includes("history-summary-v1") ? { summary: "1" } : {}) })}`,
         );
-        for (const record of page.entries) {
+        for (const item of page.entries) {
+          const record =
+            "snapshot" in item
+              ? item
+              : await this.record(connection, project, item.revision);
           await this.cacheRecord(connection, project, record);
           await this.files(connection, project, record);
           incoming.push(record.revision);

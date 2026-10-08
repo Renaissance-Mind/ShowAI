@@ -1,6 +1,6 @@
 import { schema, type MetadataStore } from "./storage";
 
-export const schemaVersion = 2;
+export const schemaVersion = 3;
 export const migrations = [
   {
     version: 1,
@@ -24,6 +24,19 @@ export const migrations = [
       "ALTER TABLE users ADD COLUMN auth_version INTEGER NOT NULL DEFAULT 0",
       "ALTER TABLE sessions ADD COLUMN auth_version INTEGER NOT NULL DEFAULT 0",
       "INSERT INTO settings(key,value) VALUES('schema_version','2') ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+    ],
+  },
+  {
+    version: 3,
+    name: "object_manifests",
+    statements: [
+      "ALTER TABLE revisions ADD COLUMN manifest_key TEXT",
+      "ALTER TABLE revisions ADD COLUMN manifest_digest TEXT",
+      "ALTER TABLE revisions ADD COLUMN manifest_bytes INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE revisions ADD COLUMN sequence INTEGER",
+      "UPDATE revisions SET sequence=rowid,manifest_bytes=length(CAST(manifest AS BLOB))",
+      "CREATE UNIQUE INDEX revisions_sequence ON revisions(project_id,sequence)",
+      "INSERT INTO settings(key,value) VALUES('schema_version','3') ON CONFLICT(key) DO UPDATE SET value=excluded.value",
     ],
   },
 ];

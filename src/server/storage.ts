@@ -12,8 +12,22 @@ export interface MetadataStore {
   batch(statements: SqlStatement[]): Promise<SqlResult[]>;
 }
 export interface ObjectStore {
-  get(key: string): Promise<Uint8Array | null>;
+  get(key: string, maximum?: number): Promise<Uint8Array | null>;
   put(key: string, bytes: Uint8Array): Promise<void>;
+  open(
+    key: string,
+  ): Promise<{ body: ReadableStream<Uint8Array>; bytes: number } | null>;
+  putVerified(
+    key: string,
+    body: ReadableStream<Uint8Array>,
+    expected: string,
+    maximum: number,
+  ): Promise<number>;
+  digest(): StreamDigest;
+}
+export interface StreamDigest {
+  update(bytes: Uint8Array): Promise<void>;
+  finish(): Promise<string>;
 }
 export const schema = [
   `CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,

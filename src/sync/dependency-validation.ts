@@ -106,3 +106,78 @@ export async function validateReaderClosure(
       );
   }
 }
+
+/** Publication rejects package graphs that escape their received project depot. */
+export async function validatePackageClosure(
+  paths: Iterable<string>,
+  projectId: string,
+  read: Read,
+) {
+  const packages = new Map<string, Record<string, unknown>>();
+  const identity = (ref: Record<string, unknown>) =>
+    `${ref.kind}:${ref.id}@${ref.version}:${ref.integrity}`;
+  for (const path of paths) {
+    if (
+      !path.startsWith(`projects/${projectId}/packages/`) ||
+      !/\/(compiled|template)\.json$/.test(path)
+    )
+      continue;
+    if (packages.size >= 1000)
+      throw new SyncError(
+        400,
+        "INVALID_DEPENDENCY",
+        "Package closure exceeds 1000 records.",
+      );
+    const encoded = JSON.parse(decoder.decode(await read(path))),
+      record =
+        encoded.format === "showai-stored-json" ? encoded.value : encoded;
+    const kind = path.endsWith("/compiled.json") ? "component" : "template";
+    if (
+      !record ||
+      typeof record.id !== "string" ||
+      typeof record.version !== "string" ||
+      typeof record.integrity !== "string" ||
+      !/^sha256-[a-f0-9]{64}$/.test(record.integrity)
+    )
+      throw new SyncError(
+        400,
+        "INVALID_DEPENDENCY",
+        "Invalid owned package identity.",
+      );
+    packages.set(identity({ ...record, kind }), record);
+  }
+  const walk = (key: string, active: Set<string>, visited: Set<string>) => {
+    if (active.has(key) || active.size > 16)
+      throw new SyncError(
+        400,
+        "INVALID_DEPENDENCY",
+        "Package graph is cyclic or too deep.",
+      );
+    if (visited.has(key)) return;
+    const record = packages.get(key);
+    if (!record)
+      throw new SyncError(
+        400,
+        "INVALID_DEPENDENCY",
+        "A package dependency is absent from the owned project depot.",
+      );
+    visited.add(key);
+    const next = new Set(active).add(key);
+    const refs = [
+      ...(Array.isArray(record.dependencies) ? record.dependencies : []),
+      ...(Array.isArray(record.parts)
+        ? record.parts.filter((part) => part.ref).map((part) => part.ref)
+        : []),
+    ];
+    for (const ref of refs) {
+      if (ref.projectId !== undefined && ref.projectId !== projectId)
+        throw new SyncError(
+          400,
+          "INVALID_DEPENDENCY",
+          "Package locators cannot address another project.",
+        );
+      walk(identity(ref), next, visited);
+    }
+  };
+  for (const key of packages.keys()) walk(key, new Set(), new Set());
+}

@@ -402,3 +402,49 @@ test("an imported project cannot alias another project's existing directory by c
     privateBytes,
   );
 });
+
+test("a package's foreign project locator cannot pull private source files into synchronization", async () => {
+  const f = await fixture();
+  const component = await importComponent(
+    f.home,
+    join(import.meta.dirname, "../../resources/catalog/value-slider"),
+    f.two.id,
+  );
+  const current = await f.library.head();
+  const path = `projects/${f.two.id}/packages/components/${component.id}/${component.version}/compiled.json`;
+  const record = JSON.parse(
+    (await f.library.readFile(path, current!)).toString(),
+  );
+  const poisoned = {
+    ...record,
+    dependencies: [
+      {
+        kind: "component",
+        id: component.id,
+        version: component.version,
+        integrity: component.integrity,
+        projectId: f.two.id,
+      },
+    ],
+  };
+  await f.library.writeFiles(
+    new Map([
+      [
+        `projects/${f.one.id}/packages/components/hostile/1.0.0/compiled.json`,
+        Buffer.from(JSON.stringify(poisoned)),
+      ],
+    ]),
+    {
+      actor: { kind: "external" },
+      channel: "external",
+      operationId: "foreign-dependency-probe",
+    },
+  );
+  const head = await f.library.head();
+  await expect(
+    new LibraryOperations(f.home, f.one.id).projectFiles(f.one.id, head!),
+  ).rejects.toThrow("missing");
+  expect(await f.library.readFile(path)).toEqual(
+    await f.library.readFile(path, current!),
+  );
+});

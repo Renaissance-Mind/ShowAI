@@ -1,5 +1,4 @@
 import {
-  canonical,
   digestId,
   hash,
   identifier,
@@ -15,6 +14,8 @@ import {
 } from "../sync/protocol";
 import { type MetadataStore, type ObjectStore } from "./storage";
 import { prepareMetadata } from "./migrations";
+import { Revisions, type RevisionRow } from "./revisions";
+import { verifiedStream } from "./streams";
 import {
   createInvitation,
   acceptInvitation,
@@ -36,7 +37,10 @@ import {
   type AccountOptions,
   type AuthUser,
 } from "./accounts";
-import { validateReaderClosure } from "../sync/dependency-validation";
+import {
+  validateReaderClosure,
+  validatePackageClosure,
+} from "../sync/dependency-validation";
 import {
   serverBaseUrl,
   serverEndpoint,
@@ -125,6 +129,9 @@ export function createSyncServer(options: ServerOptions) {
   const allowedOrigins = options.allowedOrigins ?? [];
   const db = options.metadata,
     objects = options.objects;
+  const revisions = new Revisions(db, objects);
+  let activeManifests = 0;
+  const manifestWaiters: (() => void)[] = [];
   let initialization: Promise<string> | undefined;
   async function initialize() {
     await prepareMetadata(db, options.autoMigrate !== false);
@@ -305,7 +312,12 @@ export function createSyncServer(options: ServerOptions) {
         registration: options.registrationMode ?? "controlled",
         passwordMinimum: 12,
         sessionDays: 30,
-        capabilities: ["account-security-v1", "invite-controls-v1"],
+        capabilities: [
+          "account-security-v1",
+          "invite-controls-v1",
+          "history-summary-v1",
+          "object-manifests-v1",
+        ],
       });
     if (path === "/api/auth/register" && method === "POST") {
       await publicLimits(
@@ -490,13 +502,14 @@ export function createSyncServer(options: ServerOptions) {
               ? 1
               : 0;
       if (project.head) {
-        const current = (
-          await db.all<{ manifest: string }>(
-            "SELECT manifest FROM revisions WHERE project_id=? AND revision=?",
-            [projectId, project.head],
-          )
-        )[0];
-        const snapshot = JSON.parse(current.manifest) as ProjectSnapshot;
+        const current = await revisions.row(projectId, project.head);
+        if (!current)
+          throw new SyncError(
+            500,
+            "MISSING_REVISION",
+            "Project head is missing.",
+          );
+        const snapshot = await revisions.snapshot(projectId, current);
         const metadataPath = `projects/${projectId}/project.json`;
         const bytes = await objects.get(
           objectKey(projectId, snapshot.files[metadataPath]),
@@ -720,46 +733,53 @@ export function createSyncServer(options: ServerOptions) {
           "MISSING_OBJECT",
           "Content object is missing.",
         );
-      const bytes = await objects.get(objectKey(projectId, object[1]));
-      if (!bytes)
+      const stored = await objects.open(objectKey(projectId, object[1]));
+      if (!stored)
         throw new SyncError(
           404,
           "MISSING_OBJECT",
           "Content object is missing.",
         );
-      if ((await hash(bytes)) !== object[1])
-        throw new SyncError(
-          500,
-          "CORRUPT_OBJECT",
-          "Content object failed integrity verification.",
-        );
-      return new Response(Uint8Array.from(bytes), {
-        headers: {
-          "content-type": "application/octet-stream",
-          "cache-control": "private, no-store",
+      return new Response(
+        verifiedStream(
+          stored.body,
+          objects.digest(),
+          object[1],
+          64 * 1024 * 1024,
+          stored.bytes,
+        ),
+        {
+          headers: {
+            "content-type": "application/octet-stream",
+            "cache-control": "private, no-store",
+            "content-length": String(stored.bytes),
+          },
         },
-      });
+      );
     }
     if (object && method === "PUT") {
       await projectFor(user.id, projectId, "editor");
-      const bytes = new Uint8Array(await request.arrayBuffer());
-      if (bytes.length > 64 * 1024 * 1024)
-        throw new SyncError(
-          413,
-          "TOO_LARGE",
-          "Split content objects larger than 64 MB.",
-        );
-      if ((await hash(bytes)) !== object[1])
-        throw new SyncError(
-          400,
-          "DIGEST_MISMATCH",
-          "Content does not match its digest.",
-        );
-      await objects.put(objectKey(projectId, object[1]), bytes);
+      const declared = request.headers.get("content-length");
+      if (
+        declared &&
+        (!/^\d+$/.test(declared) || Number(declared) > 64 * 1024 * 1024)
+      )
+        throw new SyncError(413, "TOO_LARGE", "Object exceeds 64 MiB.");
+      const length = await objects.putVerified(
+        objectKey(projectId, object[1]),
+        request.body ??
+          new ReadableStream({
+            start(controller) {
+              controller.close();
+            },
+          }),
+        object[1],
+        64 * 1024 * 1024,
+      );
       const gate = writeGate(user, projectId);
       await db.run(
         `INSERT OR IGNORE INTO objects(project_id,digest,bytes) SELECT ?,?,? WHERE EXISTS(${gate.sql})`,
-        [projectId, object[1], bytes.length, ...gate.values],
+        [projectId, object[1], length, ...gate.values],
       );
       await authenticate(request);
       await projectFor(user.id, projectId, "editor");
@@ -768,17 +788,18 @@ export function createSyncServer(options: ServerOptions) {
     if (resource === "revisions" && method === "GET") {
       const after = url.searchParams.get("after"),
         before = url.searchParams.get("before"),
-        limit = Math.min(
-          200,
-          Math.max(1, Number(url.searchParams.get("limit") ?? 100)),
-        );
+        summary = url.searchParams.get("summary") === "1";
+      const limit = Math.min(
+        200,
+        Math.max(1, Number(url.searchParams.get("limit") ?? 100)),
+      );
       if (!Number.isInteger(limit))
         throw new SyncError(400, "INVALID_LIMIT", "Invalid history limit.");
       const cursor = before ?? after;
       const row = cursor
         ? (
-            await db.all<{ rowid: number }>(
-              "SELECT rowid FROM revisions WHERE project_id=? AND revision=?",
+            await db.all<{ sequence: number }>(
+              "SELECT sequence FROM revisions WHERE project_id=? AND revision=?",
               [projectId, digestId(cursor)],
             )
           )[0]
@@ -789,58 +810,52 @@ export function createSyncServer(options: ServerOptions) {
           "MISSING_BASELINE",
           "The history baseline is not present on this server.",
         );
-      const entries = await db.all<{
-        revision: string;
-        manifest: string;
-        published: number;
-        source_user_id: string;
-        source_user_name: string;
-        received_at: string;
-      }>(
-        `SELECT r.revision,r.manifest,r.published,u.id AS source_user_id,u.name AS source_user_name,r.created_at AS received_at FROM revisions r JOIN users u ON u.id=r.user_id WHERE r.project_id=?${row ? ` AND r.rowid${before ? "<" : ">"}?` : ""} ORDER BY r.rowid ${before ? "DESC" : "ASC"} LIMIT ?`,
-        row ? [projectId, row.rowid, limit] : [projectId, limit],
+      // Do not select embedded legacy manifests for summary pages.
+      const candidates = await db.all<RevisionRow>(
+        `SELECT r.revision,r.sequence,r.manifest_bytes,r.published,u.id AS source_user_id,u.name AS source_user_name,r.created_at AS received_at FROM revisions r JOIN users u ON u.id=r.user_id WHERE r.project_id=?${row ? ` AND r.sequence${before ? "<" : ">"}?` : ""} ORDER BY r.sequence ${before ? "DESC" : "ASC"} LIMIT ?`,
+        row ? [projectId, row.sequence, limit] : [projectId, limit],
       );
+      const entries: unknown[] = [];
+      let bytes = 0;
+      let last: string | null = null;
+      for (const candidate of candidates) {
+        if (
+          !summary &&
+          entries.length &&
+          bytes + candidate.manifest_bytes > 1024 * 1024
+        )
+          break;
+        const entry = summary
+          ? revisions.summary(candidate)
+          : await revisions.record(
+              projectId,
+              (await revisions.row(projectId, candidate.revision))!,
+            );
+        const size = new TextEncoder().encode(JSON.stringify(entry)).byteLength;
+        if (entries.length && bytes + size > 1024 * 1024) break;
+        entries.push(entry);
+        bytes += size;
+        last = candidate.revision;
+      }
       return json({
         head: project.head,
-        entries: entries.map((entry) => ({
-          revision: entry.revision,
-          snapshot: JSON.parse(entry.manifest),
-          published: !!entry.published,
-          source: {
-            user: { id: entry.source_user_id, name: entry.source_user_name },
-            receivedAt: entry.received_at,
-          },
-        })),
-        next: entries.length === limit ? entries.at(-1)!.revision : null,
+        entries,
+        next:
+          entries.length < candidates.length || candidates.length === limit
+            ? last
+            : null,
       });
     }
     const revision = resource.match(/^revisions\/([a-f0-9]{64})$/);
     if (revision && method === "GET") {
-      const entry = (
-        await db.all<{
-          manifest: string;
-          source_user_id: string;
-          source_user_name: string;
-          received_at: string;
-        }>(
-          "SELECT r.manifest,u.id AS source_user_id,u.name AS source_user_name,r.created_at AS received_at FROM revisions r JOIN users u ON u.id=r.user_id WHERE r.project_id=? AND r.revision=?",
-          [projectId, revision[1]],
-        )
-      )[0];
+      const entry = await revisions.row(projectId, revision[1]);
       if (!entry)
         throw new SyncError(
           404,
           "MISSING_REVISION",
           "Project revision is missing.",
         );
-      return json({
-        revision: revision[1],
-        snapshot: JSON.parse(entry.manifest),
-        source: {
-          user: { id: entry.source_user_id, name: entry.source_user_name },
-          receivedAt: entry.received_at,
-        },
-      });
+      return json(await revisions.record(projectId, entry));
     }
     if (resource === "revisions" && method === "POST") {
       await projectFor(user.id, projectId, "editor");
@@ -863,6 +878,7 @@ export function createSyncServer(options: ServerOptions) {
           projectId,
           snapshot.files[`projects/${projectId}/project.json`],
         ),
+        64 * 1024,
       );
       let projectMetadata: { name: string; archived?: boolean } | undefined;
       if (projectBytes) {
@@ -940,15 +956,36 @@ export function createSyncServer(options: ServerOptions) {
           return bytes;
         },
       );
+      await validatePackageClosure(
+        Object.keys(snapshot.files),
+        projectId,
+        async (path) => {
+          const bytes = await objects.get(
+            objectKey(projectId, snapshot.files[path]),
+            8 * 1024 * 1024,
+          );
+          if (!bytes || (await hash(bytes)) !== snapshot.files[path])
+            throw new SyncError(
+              400,
+              "INVALID_DEPENDENCY",
+              "A package object is absent or corrupt.",
+            );
+          return bytes;
+        },
+      );
+      const stored = await revisions.store(projectId, snapshot);
       const gate = writeGate(user, projectId);
       await db.run(
-        `INSERT OR IGNORE INTO revisions(project_id,revision,manifest,user_id,created_at) SELECT ?,?,?,?,? WHERE EXISTS(${gate.sql})`,
+        `INSERT OR IGNORE INTO revisions(project_id,revision,manifest,user_id,created_at,manifest_key,manifest_digest,manifest_bytes,sequence) SELECT ?,?,'',?,?,?,?,?,COALESCE((SELECT MAX(sequence)+1 FROM revisions WHERE project_id=?),1) WHERE EXISTS(${gate.sql})`,
         [
           projectId,
           revision,
-          canonical(snapshot),
           user.id,
           new Date().toISOString(),
+          stored.key,
+          stored.digest,
+          stored.bytes,
+          projectId,
           ...gate.values,
         ],
       );
@@ -1016,6 +1053,30 @@ export function createSyncServer(options: ServerOptions) {
           allowedOrigins,
           publicOrigin ?? new URL(request.url).origin,
         );
+      const requestPath = new URL(request.url).pathname;
+      const heavy =
+        /\/revisions(?:\/|$)/.test(requestPath) ||
+        (request.method === "PATCH" &&
+          /\/api\/projects\/[^/]+\/?$/.test(requestPath));
+      if (heavy) {
+        if (activeManifests >= 1) {
+          if (manifestWaiters.length >= 8) {
+            const response = json(
+              {
+                error: {
+                  code: "BUSY",
+                  message: "Project history is busy; retry shortly.",
+                  details: { retryAfter: 1 },
+                },
+              },
+              429,
+            );
+            response.headers.set("retry-after", "1");
+            return secure(response);
+          }
+          await new Promise<void>((resolve) => manifestWaiters.push(resolve));
+        } else activeManifests++;
+      }
       try {
         return secure(await handle(request, context?.source));
       } catch (error) {
@@ -1032,6 +1093,13 @@ export function createSyncServer(options: ServerOptions) {
           );
           if (error instanceof RateLimitError)
             response.headers.set("retry-after", String(error.retryAfter));
+          else if (error.status === 429)
+            response.headers.set(
+              "retry-after",
+              String(
+                (error.details as { retryAfter?: number })?.retryAfter ?? 1,
+              ),
+            );
           return secure(response);
         }
         if (error instanceof SyntaxError)
@@ -1058,6 +1126,12 @@ export function createSyncServer(options: ServerOptions) {
             500,
           ),
         );
+      } finally {
+        if (heavy) {
+          const next = manifestWaiters.shift();
+          if (next) next();
+          else activeManifests--;
+        }
       }
     },
   };

@@ -277,6 +277,14 @@ describe("portable project server with real SQLite and disk storage", () => {
       await hash(invitation.invite),
     ]);
     // Reconstruct the real pre-version schema while preserving its account/session rows.
+    await metadata.run("DROP INDEX revisions_sequence");
+    for (const column of [
+      "manifest_key",
+      "manifest_digest",
+      "manifest_bytes",
+      "sequence",
+    ])
+      await metadata.run(`ALTER TABLE revisions DROP COLUMN ${column}`);
     await metadata.run("DROP TABLE request_limits");
     await metadata.run("DROP TABLE audit_events");
     await metadata.run("ALTER TABLE users DROP COLUMN auth_version");

@@ -169,7 +169,80 @@ export async function decodeSnapshot(
   await validateReaderClosure(files.keys(), expectedProjectId, async (path) =>
     files.get(path)!,
   );
-  return relocateLegacyPackages(files, expectedProjectId);
+  const owned = relocateLegacyPackages(files, expectedProjectId);
+  validateProjectPackageClosure(owned, expectedProjectId);
+  return owned;
+}
+
+/** Resolve received package references solely against this snapshot's owned depot. */
+function validateProjectPackageClosure(
+  files: Map<string, Buffer>,
+  projectId: string,
+) {
+  type Package = {
+    kind: "component" | "template";
+    record: Record<string, unknown>;
+  };
+  const packages = new Map<string, Package>();
+  const identity = (value: Record<string, unknown>) =>
+    `${value.kind}:${value.id}@${value.version}:${value.integrity}`;
+  for (const [path, bytes] of files) {
+    if (
+      !path.startsWith(`projects/${projectId}/packages/`) ||
+      !/\/(?:compiled|template)\.json$/.test(path)
+    )
+      continue;
+    const record = JSON.parse(bytes.toString()),
+      kind = path.endsWith("/compiled.json") ? "component" : "template";
+    packages.set(identity({ ...record, kind }), { kind, record });
+  }
+  for (const [rootKey, root] of packages) {
+    const visited = new Map<string, Package>();
+    const visit = (key: string, active: Set<string>) => {
+      if (active.has(key) || active.size > 16 || visited.size > 1000)
+        throw new CoreError(
+          "INVALID_DATA",
+          "Invalid synchronized package dependency graph.",
+        );
+      if (visited.has(key)) return;
+      const entry = packages.get(key);
+      if (!entry)
+        throw new CoreError(
+          "INVALID_DATA",
+          "A synchronized package dependency is missing from the owned depot.",
+        );
+      visited.set(key, entry);
+      const next = new Set(active).add(key);
+      const references = [
+        ...(Array.isArray(entry.record.dependencies)
+          ? entry.record.dependencies
+          : []),
+        ...(Array.isArray(entry.record.parts)
+          ? entry.record.parts
+              .filter((part) => part.ref)
+              .map((part) => part.ref)
+          : []),
+      ];
+      for (const ref of references) visit(identity(ref), next);
+    };
+    visit(rootKey, new Set());
+    validatePackageBundle({
+      format: "showai-catalog-bundle",
+      version: 1,
+      root: {
+        kind: root.kind,
+        id: root.record.id,
+        version: root.record.version,
+        integrity: root.record.integrity,
+      },
+      components: [...visited.values()]
+        .filter((entry) => entry.kind === "component")
+        .map((entry) => ({ component: entry.record })),
+      templates: [...visited.values()]
+        .filter((entry) => entry.kind === "template")
+        .map((entry) => entry.record),
+    });
+  }
 }
 
 /** Old shared packages are read into an owned immutable depot, never installed globally. */
