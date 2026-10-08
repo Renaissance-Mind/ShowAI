@@ -1,0 +1,405 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2172" height="724" viewBox="0 0 2172 724" role="img" aria-labelledby="title description">
+  <title id="title">ShowAI — 构建人与 Agent 之间的 Interface。</title>
+  <desc id="description">Editable vector reconstruction of the ShowAI banner. Project logo, text, chart paths, sliders, cards and arrows are native SVG elements. Chart positions are approximated from the illustration, not measured data.</desc>
+  <defs>
+    <linearGradient id="page-fill" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="1" />
+      <stop offset="1" stop-color="#FDFEFF" stop-opacity="1" />
+    </linearGradient>
+    <linearGradient id="panel-fill" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="1" />
+      <stop offset="1" stop-color="#FCFDFE" stop-opacity="1" />
+    </linearGradient>
+    <linearGradient id="rear-fill" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0" stop-color="#F4FAFF" stop-opacity="1" />
+      <stop offset="1" stop-color="#F8FBFF" stop-opacity="1" />
+    </linearGradient>
+    <linearGradient id="chart-fill" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0" stop-color="#327B59" stop-opacity="0.13" />
+      <stop offset="1" stop-color="#327B59" stop-opacity="0.015" />
+    </linearGradient>
+    <linearGradient id="green-tile" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0" stop-color="#ECFAEF" stop-opacity="1" />
+      <stop offset="1" stop-color="#E2F4E7" stop-opacity="1" />
+    </linearGradient>
+    <linearGradient id="blue-tile" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0" stop-color="#EAF8FF" stop-opacity="1" />
+      <stop offset="1" stop-color="#DDF2FF" stop-opacity="1" />
+    </linearGradient>
+    <linearGradient id="orange-tile" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0" stop-color="#FFF3E8" stop-opacity="1" />
+      <stop offset="1" stop-color="#FFE9D7" stop-opacity="1" />
+    </linearGradient>
+    <filter id="panel-shadow" x="-10%" y="-10%" width="125%" height="135%">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#66798A" flood-opacity="0.08" />
+    </filter>
+  </defs>
+  <g id="banner" transform="scale(1.060546875)">
+    <rect x="0" y="0" width="2048" height="682.6666666666666" rx="0" fill="url(#page-fill)" stroke-width="1" id="background" />
+    <g id="dots-left">
+      <circle cx="64" cy="533" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="64" cy="554" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="64" cy="575" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="64" cy="596" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="64" cy="617" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="64" cy="638" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="84" cy="533" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="84" cy="554" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="84" cy="575" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="84" cy="596" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="84" cy="617" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="84" cy="638" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="104" cy="533" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="104" cy="554" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="104" cy="575" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="104" cy="596" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="104" cy="617" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="104" cy="638" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="124" cy="533" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="124" cy="554" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="124" cy="575" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="124" cy="596" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="124" cy="617" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="124" cy="638" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="144" cy="533" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="144" cy="554" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="144" cy="575" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="144" cy="596" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="144" cy="617" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="144" cy="638" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="164" cy="533" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="164" cy="554" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="164" cy="575" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="164" cy="596" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="164" cy="617" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="164" cy="638" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="184" cy="533" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="184" cy="554" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="184" cy="575" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="184" cy="596" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="184" cy="617" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="184" cy="638" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="204" cy="533" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="204" cy="554" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="204" cy="575" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="204" cy="596" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="204" cy="617" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="204" cy="638" r="1.5" fill="#E6EBEE" stroke-width="1" />
+    </g>
+    <g id="dots-middle-top">
+      <circle cx="792" cy="125" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="792" cy="146" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="792" cy="167" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="792" cy="188" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="792" cy="209" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="792" cy="230" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="812" cy="125" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="812" cy="146" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="812" cy="167" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="812" cy="188" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="812" cy="209" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="812" cy="230" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="832" cy="125" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="832" cy="146" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="832" cy="167" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="832" cy="188" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="832" cy="209" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="832" cy="230" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="852" cy="125" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="852" cy="146" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="852" cy="167" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="852" cy="188" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="852" cy="209" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="852" cy="230" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="872" cy="125" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="872" cy="146" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="872" cy="167" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="872" cy="188" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="872" cy="209" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="872" cy="230" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="892" cy="125" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="892" cy="146" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="892" cy="167" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="892" cy="188" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="892" cy="209" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="892" cy="230" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="912" cy="125" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="912" cy="146" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="912" cy="167" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="912" cy="188" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="912" cy="209" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="912" cy="230" r="1.5" fill="#E6EBEE" stroke-width="1" />
+    </g>
+    <g id="dots-middle-bottom">
+      <circle cx="774" cy="512" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="774" cy="533" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="774" cy="554" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="774" cy="575" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="774" cy="596" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="794" cy="512" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="794" cy="533" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="794" cy="554" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="794" cy="575" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="794" cy="596" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="814" cy="512" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="814" cy="533" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="814" cy="554" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="814" cy="575" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="814" cy="596" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="834" cy="512" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="834" cy="533" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="834" cy="554" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="834" cy="575" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="834" cy="596" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="854" cy="512" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="854" cy="533" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="854" cy="554" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="854" cy="575" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="854" cy="596" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="874" cy="512" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="874" cy="533" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="874" cy="554" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="874" cy="575" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="874" cy="596" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="894" cy="512" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="894" cy="533" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="894" cy="554" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="894" cy="575" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="894" cy="596" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="914" cy="512" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="914" cy="533" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="914" cy="554" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="914" cy="575" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="914" cy="596" r="1.5" fill="#E6EBEE" stroke-width="1" />
+    </g>
+    <g id="dots-right">
+      <circle cx="1905" cy="85" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1905" cy="106" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1905" cy="127" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1905" cy="148" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1905" cy="169" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1905" cy="190" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1925" cy="85" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1925" cy="106" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1925" cy="127" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1925" cy="148" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1925" cy="169" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1925" cy="190" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1945" cy="85" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1945" cy="106" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1945" cy="127" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1945" cy="148" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1945" cy="169" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1945" cy="190" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1965" cy="85" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1965" cy="106" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1965" cy="127" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1965" cy="148" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1965" cy="169" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1965" cy="190" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1985" cy="85" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1985" cy="106" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1985" cy="127" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1985" cy="148" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1985" cy="169" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="1985" cy="190" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="2005" cy="85" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="2005" cy="106" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="2005" cy="127" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="2005" cy="148" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="2005" cy="169" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="2005" cy="190" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="2025" cy="85" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="2025" cy="106" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="2025" cy="127" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="2025" cy="148" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="2025" cy="169" r="1.5" fill="#E6EBEE" stroke-width="1" />
+      <circle cx="2025" cy="190" r="1.5" fill="#E6EBEE" stroke-width="1" />
+    </g>
+    <g id="brand">
+      <g id="showai-logo" transform="translate(66 206) scale(0.36)">
+        <rect x="2" y="2" width="508" height="508" rx="88" fill="#000000" />
+        <rect id="back" x="226" y="88" width="180" height="240" rx="18" fill="#FFFFFF" />
+        <rect x="166" y="136" width="180" height="240" rx="18" fill="none" stroke="#000000" stroke-width="20" />
+        <rect id="middle" x="166" y="136" width="180" height="240" rx="18" fill="#06A5FA" />
+        <rect x="106" y="184" width="180" height="240" rx="18" fill="none" stroke="#000000" stroke-width="20" />
+        <rect id="front" x="106" y="184" width="180" height="240" rx="18" fill="#FFFFFF" />
+        <rect x="2" y="2" width="508" height="508" rx="88" fill="none" stroke="#3F3F46" stroke-width="3" />
+      </g>
+      <text x="282" y="356" fill="#090F12" font-family="Arial" font-size="138" font-weight="900" text-anchor="start" letter-spacing="-8" id="brand-name">ShowAI</text>
+      <text x="67" y="463" fill="#090F12" font-family="Arial, PingFang SC" font-size="43" font-weight="600" text-anchor="start" id="tagline">构建人与 Agent 之间的 Interface。</text>
+    </g>
+    <g id="human">
+      <circle cx="840" cy="303" r="43" fill="#FFFFFF" stroke="#DDE3E7" stroke-width="1.5" />
+      <circle cx="840" cy="294" r="9" fill="none" stroke="#090F12" stroke-width="2.5" />
+      <path d="M824,322 C824,300 856,300 856,322" stroke="#090F12" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+      <g id="human-pointer" transform="translate(852 313) scale(1)">
+        <path d="M0,0 L8,37 L16,26 L26,39 L32,34 L22,21 L36,17 Z" stroke="#FFFFFF" stroke-width="3" fill="#00ACF5" stroke-linecap="round" stroke-linejoin="round" />
+      </g>
+      <text x="840" y="384" fill="#090F12" font-family="Arial" font-size="24" font-weight="500" text-anchor="middle">Human</text>
+    </g>
+    <g id="human-interface-links">
+      <line x1="899" y1="289" x2="943" y2="289" stroke="#00ACF5" stroke-width="3" stroke-linecap="round" />
+      <path d="M936,282 L943,289 L936,296" stroke="#00ACF5" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+      <line x1="943" y1="315" x2="899" y2="315" stroke="#00ACF5" stroke-width="3" stroke-linecap="round" />
+      <path d="M906,308 L899,315 L906,322" stroke="#00ACF5" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+    </g>
+    <g id="interface">
+      <g id="rear-cards">
+        <path d="M1007,73 L1728,46 Q1749,46 1749,69 L1749,490 Q1749,511 1728,512 L1007,535 Q988,535 988,514 L988,93 Q988,73 1007,73 Z" stroke="#D8E7F5" stroke-width="1.5" fill="url(#rear-fill)" stroke-linecap="round" stroke-linejoin="round" />
+        <rect x="1003" y="102" width="808" height="425" rx="20" fill="url(#rear-fill)" stroke="#D9E7F4" stroke-width="1.5" />
+        <rect x="980" y="81" width="809" height="477" rx="20" fill="url(#rear-fill)" stroke="#D9E5F0" stroke-width="1.5" />
+        <rect x="991" y="74" width="794" height="479" rx="20" fill="url(#rear-fill)" stroke="#D9E5F0" stroke-width="1.5" />
+      </g>
+      <rect x="957" y="96" width="808" height="490" rx="20" fill="url(#panel-fill)" stroke="#C8D2DC" stroke-width="1.6" filter="url(#panel-shadow)" id="interface-panel" />
+      <g id="header">
+        <text x="986" y="145" fill="#090F12" font-family="Arial" font-size="28" font-weight="700" text-anchor="start">Interface</text>
+        <circle cx="1683" cy="130" r="5.8" fill="#D8DDE1" stroke-width="1" />
+        <circle cx="1706" cy="130" r="5.8" fill="#D8DDE1" stroke-width="1" />
+        <circle cx="1729" cy="130" r="5.8" fill="#D8DDE1" stroke-width="1" />
+      </g>
+      <g id="chart">
+        <text x="1005" y="182" fill="#090F12" font-family="Arial" font-size="16" font-weight="400" text-anchor="start">y</text>
+        <circle cx="1053" cy="177" r="4.7" fill="#327B59" stroke-width="1" />
+        <text x="1065" y="182" fill="#8F999F" font-family="Arial" font-size="15" font-weight="400" text-anchor="start">y = x²</text>
+        <circle cx="1146" cy="177" r="4.7" fill="#E77813" stroke-width="1" />
+        <text x="1158" y="182" fill="#8F999F" font-family="Arial" font-size="15" font-weight="400" text-anchor="start">y = x</text>
+        <line x1="1030" y1="209.0" x2="1672" y2="209.0" stroke="#E2E7EB" stroke-width="1.1" stroke-linecap="round" stroke-dasharray="4 6" />
+        <text x="1013" y="214.0" fill="#8F999F" font-family="Arial" font-size="15" font-weight="400" text-anchor="end">28</text>
+        <line x1="1030" y1="244.5" x2="1672" y2="244.5" stroke="#E2E7EB" stroke-width="1.1" stroke-linecap="round" stroke-dasharray="4 6" />
+        <text x="1013" y="249.5" fill="#8F999F" font-family="Arial" font-size="15" font-weight="400" text-anchor="end">21</text>
+        <line x1="1030" y1="280.0" x2="1672" y2="280.0" stroke="#E2E7EB" stroke-width="1.1" stroke-linecap="round" stroke-dasharray="4 6" />
+        <text x="1013" y="285.0" fill="#8F999F" font-family="Arial" font-size="15" font-weight="400" text-anchor="end">14</text>
+        <line x1="1030" y1="315.5" x2="1672" y2="315.5" stroke="#E2E7EB" stroke-width="1.1" stroke-linecap="round" stroke-dasharray="4 6" />
+        <text x="1013" y="320.5" fill="#8F999F" font-family="Arial" font-size="15" font-weight="400" text-anchor="end">7</text>
+        <line x1="1030" y1="351.0" x2="1672" y2="351.0" stroke="#E2E7EB" stroke-width="1.1" stroke-linecap="round" />
+        <text x="1013" y="356.0" fill="#8F999F" font-family="Arial" font-size="15" font-weight="400" text-anchor="end">0</text>
+        <line x1="1030" y1="209" x2="1030" y2="351" stroke="#DCE2E7" stroke-width="1" stroke-linecap="round" />
+        <path d="M1030,351 L1158,344.5 L1285,327 L1411,300 L1539,262 L1672,209 L1672,351 Z" stroke-width="1" fill="url(#chart-fill)" stroke-linecap="round" stroke-linejoin="round" id="quadratic-area" />
+        <g id="quadratic">
+          <path d="M1030,351 L1158,344.5 L1285,327 L1411,300 L1539,262 L1672,209" stroke="#327B59" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" id="quadratic-line" />
+          <circle cx="1030" cy="351" r="4.5" fill="#327B59" stroke="#FFFFFF" stroke-width="2.4" id="quadratic-point-0" />
+          <circle cx="1158" cy="344.5" r="4.5" fill="#327B59" stroke="#FFFFFF" stroke-width="2.4" id="quadratic-point-1" />
+          <circle cx="1285" cy="327" r="4.5" fill="#327B59" stroke="#FFFFFF" stroke-width="2.4" id="quadratic-point-2" />
+          <circle cx="1411" cy="300" r="4.5" fill="#327B59" stroke="#FFFFFF" stroke-width="2.4" id="quadratic-point-3" />
+          <circle cx="1539" cy="262" r="4.5" fill="#327B59" stroke="#FFFFFF" stroke-width="2.4" id="quadratic-point-4" />
+          <circle cx="1672" cy="209" r="4.5" fill="#327B59" stroke="#FFFFFF" stroke-width="2.4" id="quadratic-point-5" />
+        </g>
+        <g id="linear">
+          <path d="M1030,351 L1158,344.5 L1285,339 L1411,333 L1539,327 L1670,319.5" stroke="#E77813" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" id="linear-line" />
+          <circle cx="1030" cy="351" r="4.5" fill="#E77813" stroke="#FFFFFF" stroke-width="2.4" id="linear-point-0" />
+          <circle cx="1158" cy="344.5" r="4.5" fill="#E77813" stroke="#FFFFFF" stroke-width="2.4" id="linear-point-1" />
+          <circle cx="1285" cy="339" r="4.5" fill="#E77813" stroke="#FFFFFF" stroke-width="2.4" id="linear-point-2" />
+          <circle cx="1411" cy="333" r="4.5" fill="#E77813" stroke="#FFFFFF" stroke-width="2.4" id="linear-point-3" />
+          <circle cx="1539" cy="327" r="4.5" fill="#E77813" stroke="#FFFFFF" stroke-width="2.4" id="linear-point-4" />
+          <circle cx="1670" cy="319.5" r="4.5" fill="#E77813" stroke="#FFFFFF" stroke-width="2.4" id="linear-point-5" />
+        </g>
+        <line x1="1030.0" y1="351" x2="1030.0" y2="355" stroke="#DCE2E7" stroke-width="1" stroke-linecap="round" />
+        <text x="1030.0" y="378" fill="#8F999F" font-family="Arial" font-size="15" font-weight="400" text-anchor="middle">0</text>
+        <line x1="1158.4" y1="351" x2="1158.4" y2="355" stroke="#DCE2E7" stroke-width="1" stroke-linecap="round" />
+        <text x="1158.4" y="378" fill="#8F999F" font-family="Arial" font-size="15" font-weight="400" text-anchor="middle">1</text>
+        <line x1="1286.8" y1="351" x2="1286.8" y2="355" stroke="#DCE2E7" stroke-width="1" stroke-linecap="round" />
+        <text x="1286.8" y="378" fill="#8F999F" font-family="Arial" font-size="15" font-weight="400" text-anchor="middle">2</text>
+        <line x1="1415.2" y1="351" x2="1415.2" y2="355" stroke="#DCE2E7" stroke-width="1" stroke-linecap="round" />
+        <text x="1415.2" y="378" fill="#8F999F" font-family="Arial" font-size="15" font-weight="400" text-anchor="middle">3</text>
+        <line x1="1543.6" y1="351" x2="1543.6" y2="355" stroke="#DCE2E7" stroke-width="1" stroke-linecap="round" />
+        <text x="1543.6" y="378" fill="#8F999F" font-family="Arial" font-size="15" font-weight="400" text-anchor="middle">4</text>
+        <line x1="1672.0" y1="351" x2="1672.0" y2="355" stroke="#DCE2E7" stroke-width="1" stroke-linecap="round" />
+        <text x="1672.0" y="378" fill="#8F999F" font-family="Arial" font-size="15" font-weight="400" text-anchor="middle">5</text>
+        <text x="1699" y="371" fill="#090F12" font-family="Arial" font-size="16" font-weight="400" text-anchor="start">x</text>
+      </g>
+      <g id="workflow">
+        <rect x="984" y="417" width="62" height="61" rx="12" fill="url(#green-tile)" stroke="#BFE9CB" stroke-width="1.4" />
+        <rect x="1083" y="417" width="62" height="61" rx="12" fill="url(#blue-tile)" stroke="#A8DFFF" stroke-width="1.4" />
+        <rect x="1191" y="417" width="62" height="61" rx="12" fill="url(#orange-tile)" stroke="#FFC6A0" stroke-width="1.4" />
+        <line x1="1047" y1="448" x2="1078" y2="448" stroke="#67B988" stroke-width="2.4" stroke-linecap="round" />
+        <path d="M1072.5,442.5 L1078,448 L1072.5,453.5" stroke="#67B988" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+        <line x1="1147" y1="448" x2="1184" y2="448" stroke="#517B95" stroke-width="2.4" stroke-linecap="round" />
+        <path d="M1178.5,442.5 L1184,448 L1178.5,453.5" stroke="#517B95" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+        <g id="document-icon">
+          <path d="M1006,436 L1019,436 L1025,442 L1025,460 L1006,460 Z" stroke="#327B59" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M1019,436 L1019,442 L1025,442" stroke="#327B59" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+          <line x1="1010" y1="448" x2="1020" y2="448" stroke="#327B59" stroke-width="1.8" stroke-linecap="round" />
+          <line x1="1010" y1="453" x2="1018" y2="453" stroke="#327B59" stroke-width="1.8" stroke-linecap="round" />
+        </g>
+        <g id="share-icon">
+          <line x1="1106" y1="448" x2="1121" y2="439" stroke="#00ACF5" stroke-width="2" stroke-linecap="round" />
+          <line x1="1106" y1="448" x2="1121" y2="458" stroke="#00ACF5" stroke-width="2" stroke-linecap="round" />
+          <circle cx="1106" cy="448" r="5.4" fill="#00ACF5" stroke-width="1" />
+          <circle cx="1121" cy="439" r="5.4" fill="#00ACF5" stroke-width="1" />
+          <circle cx="1121" cy="458" r="5.4" fill="#00ACF5" stroke-width="1" />
+        </g>
+        <g id="bar-icon">
+          <rect x="1209" y="452" width="4" height="7" rx="0.8" fill="none" stroke="#E77813" stroke-width="1.8" />
+          <rect x="1216" y="444" width="4" height="15" rx="0.8" fill="none" stroke="#E77813" stroke-width="1.8" />
+          <rect x="1224" y="436" width="4" height="23" rx="0.8" fill="none" stroke="#E77813" stroke-width="1.8" />
+          <line x1="1208" y1="459" x2="1233" y2="459" stroke="#E77813" stroke-width="1.8" stroke-linecap="round" />
+        </g>
+        <g id="share-pointer" transform="translate(1125 457) scale(0.9)">
+          <path d="M0,0 L8,37 L16,26 L26,39 L32,34 L22,21 L36,17 Z" stroke="#FFFFFF" stroke-width="3" fill="#00ACF5" stroke-linecap="round" stroke-linejoin="round" />
+        </g>
+        <rect x="985" y="504.3" width="246" height="8.4" rx="4.2" fill="#D9DCDF" stroke-width="1" />
+        <rect x="985" y="523.8" width="204" height="8.4" rx="4.2" fill="#D9DCDF" stroke-width="1" />
+        <rect x="985" y="543.3" width="158" height="8.4" rx="4.2" fill="#D9DCDF" stroke-width="1" />
+      </g>
+      <g id="calculation-controls">
+        <rect x="1280" y="400" width="475" height="164" rx="15" fill="#FFFFFF" stroke="#EDF0F3" stroke-width="1.1" />
+        <g id="slider-a">
+          <text x="1302" y="436" fill="#090F12" font-family="Arial" font-size="15" font-weight="400" text-anchor="start">a</text>
+          <line x1="1306" y1="450" x2="1538" y2="450" stroke="#DDE1E3" stroke-width="5.5" stroke-linecap="round" />
+          <line x1="1306" y1="450" x2="1475" y2="450" stroke="#327B59" stroke-width="5.5" stroke-linecap="round" />
+          <circle cx="1475" cy="450" r="6.2" fill="#FFFFFF" stroke="#327B59" stroke-width="2.5" />
+          <rect x="1558" y="418.5" width="49" height="34" rx="6" fill="#FFFFFF" stroke="#E3E7EB" stroke-width="1.4" />
+          <text x="1582.5" y="441.5" fill="#737F85" font-family="Arial" font-size="17" font-weight="400" text-anchor="middle">7</text>
+          <text x="1302" y="476" fill="#8F999F" font-family="Arial" font-size="13" font-weight="400" text-anchor="start">0</text>
+          <text x="1533" y="476" fill="#8F999F" font-family="Arial" font-size="13" font-weight="400" text-anchor="middle">10</text>
+        </g>
+        <g id="slider-b">
+          <text x="1302" y="505" fill="#090F12" font-family="Arial" font-size="15" font-weight="400" text-anchor="start">b</text>
+          <line x1="1306" y1="519" x2="1538" y2="519" stroke="#DDE1E3" stroke-width="5.5" stroke-linecap="round" />
+          <line x1="1306" y1="519" x2="1427" y2="519" stroke="#E77813" stroke-width="5.5" stroke-linecap="round" />
+          <circle cx="1427" cy="519" r="8.4" fill="#FFFFFF" stroke="#E77813" stroke-width="2.5" />
+          <rect x="1558" y="487.5" width="49" height="34" rx="6" fill="#FFFFFF" stroke="#E3E7EB" stroke-width="1.4" />
+          <text x="1582.5" y="510.5" fill="#737F85" font-family="Arial" font-size="17" font-weight="400" text-anchor="middle">5</text>
+          <text x="1302" y="545" fill="#8F999F" font-family="Arial" font-size="13" font-weight="400" text-anchor="start">0</text>
+          <text x="1533" y="545" fill="#8F999F" font-family="Arial" font-size="13" font-weight="400" text-anchor="middle">10</text>
+        </g>
+        <g id="slider-pointer" transform="translate(1436 524) scale(0.9)">
+          <path d="M0,0 L8,37 L16,26 L26,39 L32,34 L22,21 L36,17 Z" stroke="#FFFFFF" stroke-width="3" fill="#E77813" stroke-linecap="round" stroke-linejoin="round" />
+        </g>
+        <g id="calculation-result">
+          <rect x="1627" y="417" width="115" height="147" rx="12" fill="url(#panel-fill)" stroke="#E2E7EB" stroke-width="1.4" />
+          <text x="1673" y="462" fill="#8F999F" font-family="Arial" font-size="16" font-weight="400" text-anchor="middle">a × b</text>
+          <text x="1676" y="516" fill="#327B59" font-family="Arial" font-size="46" font-weight="700" text-anchor="middle">35</text>
+        </g>
+      </g>
+    </g>
+    <g id="agent">
+      <rect x="1886" y="252" width="106" height="99" rx="20" fill="#FFFFFF" stroke="#D1D8DE" stroke-width="1.7" />
+      <path d="M1914,287 L1934,301 L1914,316" stroke="#090F12" stroke-width="4.3" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+      <line x1="1941" y1="316" x2="1963" y2="316" stroke="#090F12" stroke-width="4.3" stroke-linecap="round" />
+      <text x="1939" y="387" fill="#090F12" font-family="Arial" font-size="24" font-weight="500" text-anchor="middle">Agent</text>
+    </g>
+    <g id="interface-agent-links">
+      <line x1="1798" y1="289" x2="1867" y2="289" stroke="#00ACF5" stroke-width="3" stroke-linecap="round" />
+      <path d="M1860,282 L1867,289 L1860,296" stroke="#00ACF5" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+      <line x1="1867" y1="315" x2="1798" y2="315" stroke="#00ACF5" stroke-width="3" stroke-linecap="round" />
+      <path d="M1805,308 L1798,315 L1805,322" stroke="#00ACF5" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+    </g>
+    <g id="exported-page">
+      <path d="M1792,477 L1850,477 Q1861,477 1861,488 L1861,539 Q1861,550 1872,550 L1900,550" stroke="#C1C9CF" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M1893,543 L1901,550 L1893,557" stroke="#98A4AC" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+      <rect x="1913" y="509" width="90" height="83" rx="9" fill="#FFFFFF" stroke="#C4CCD3" stroke-width="1.7" />
+      <line x1="1913" y1="528" x2="2003" y2="528" stroke="#B8C1C9" stroke-width="1.4" stroke-linecap="round" />
+      <circle cx="1925" cy="519" r="3.1" fill="#AAB4BB" stroke-width="1" />
+      <circle cx="1936" cy="519" r="3.1" fill="#AAB4BB" stroke-width="1" />
+      <circle cx="1948" cy="519" r="3.1" fill="#AAB4BB" stroke-width="1" />
+      <line x1="1947" y1="561" x2="1966" y2="549" stroke="#929DA4" stroke-width="1.8" stroke-linecap="round" />
+      <line x1="1947" y1="561" x2="1966" y2="573" stroke="#929DA4" stroke-width="1.8" stroke-linecap="round" />
+      <circle cx="1947" cy="561" r="6.2" fill="#929DA4" stroke-width="1" />
+      <circle cx="1966" cy="549" r="6.2" fill="#929DA4" stroke-width="1" />
+      <circle cx="1966" cy="573" r="6.2" fill="#929DA4" stroke-width="1" />
+    </g>
+  </g>
+</svg>
