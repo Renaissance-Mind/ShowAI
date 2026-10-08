@@ -8,15 +8,6 @@ ShowAI 让人与 Agent 通过可阅读、可交互、可编辑的内容共同思
 
 **🧑 对人：** 获得一个参与 AI 工作的认知界面，通过阅读、探索和修改，把自己的理解与判断带入共同创作。
 
-[![Check](https://github.com/Renaissance-Mind/ShowAI/actions/workflows/check.yml/badge.svg)](https://github.com/Renaissance-Mind/ShowAI/actions/workflows/check.yml)
-[![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A5%2022.12-339933)](https://nodejs.org/)
-[![Agent](https://img.shields.io/badge/Agent-Codex%20%7C%20Claude%20Code-536878)](plugins/showai/README.md)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-
-![ShowAI 页面示例：图表与参数交互](docs/showai.png)
-
-*文字、图表和参数控件共同构成一个可以阅读、探索和操作的界面。*
-
 ## ✨ 从理解到共创
 
 ### 让信息有合适的表达
