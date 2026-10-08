@@ -14,6 +14,8 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 import zipfile
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from svg_logo import logo_elements
 
 NS = "http://www.w3.org/2000/svg"
 ET.register_namespace("", NS)
@@ -95,19 +97,7 @@ def dots(parent, name, x, y, cols, rows, dx=20, dy=21):
 def logo(parent, source):
     """Expand the project's paint-order into editable, equivalent layers."""
     g = group(parent, "showai-logo", transform="translate(66 206) scale(0.36)")
-    for node in ET.parse(source).getroot():
-        if node.tag != f"{{{NS}}}rect":
-            continue
-        attrs = dict(node.attrib)
-        if attrs.pop("paint-order", None) == "stroke fill":
-            underlay = copy.deepcopy(node)
-            underlay.attrib.pop("paint-order", None)
-            underlay.attrib.pop("id", None)
-            underlay.set("fill", "none")
-            g.append(underlay)
-            attrs.pop("stroke", None)
-            attrs.pop("stroke-width", None)
-        g.append(ET.Element(f"{{{NS}}}rect", attrs))
+    g.extend(logo_elements(source))
 
 
 def create_svg(logo_source, language="zh-CN"):

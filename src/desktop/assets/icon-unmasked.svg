@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">ShowAI · 亮色界面 · 无遮罩母版</title>
+  <rect width="512" height="512" fill="#000000"/>
+  <rect id="back" x="241" y="76" width="180" height="240" rx="37" fill="#FFFFFF"/>
+  <rect id="middle" x="166" y="136" width="180" height="240" rx="37" fill="#06A5FA" stroke="#000000" stroke-width="32" paint-order="stroke fill"/>
+  <rect id="front" x="91" y="196" width="180" height="240" rx="37" fill="#FFFFFF" stroke="#000000" stroke-width="32" paint-order="stroke fill"/>
+</svg>

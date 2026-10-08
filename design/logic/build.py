@@ -6,11 +6,14 @@ from functools import lru_cache
 import json
 from pathlib import Path
 import subprocess
+import sys
 import xml.etree.ElementTree as ET
 
 from PIL import ImageFont
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT.parent))
+from svg_logo import logo_elements
 NS = "http://www.w3.org/2000/svg"
 ET.register_namespace("", NS)
 DATA = json.loads((ROOT / "locales.json").read_text())
@@ -50,6 +53,10 @@ def build(language):
     assert len(locale["labels"]) == len(DATA["keys"])
     labels = dict(zip(DATA["keys"], locale["labels"]))
     root = copy.deepcopy(ET.parse(ROOT / "source.svg").getroot())
+    logo = root.find(f".//{{{NS}}}g[@id='showai-app-logo']")
+    if logo is None:
+        raise ValueError("The design layout must contain showai-app-logo.")
+    logo[:] = logo_elements(ROOT.parents[1] / "src/desktop/assets/icon.svg", "showai-app-logo")
     root.set("lang", language)
     root.set("{http://www.w3.org/XML/1998/namespace}lang", language)
     root.find(f"{{{NS}}}title").text = locale["title"]

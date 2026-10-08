@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { iconSvg } from "./icon-design.mjs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
@@ -19,8 +20,19 @@ try {
   ]) {
     const iconset = join(temporary, `${name}.iconset`);
     const png = join(directory, `${name}.png`);
+    await writeFile(join(directory, `${name}.svg`), iconSvg(mode));
+    await writeFile(
+      join(directory, `${name}-unmasked.svg`),
+      iconSvg(mode, { masked: false }),
+    );
     await mkdir(iconset);
     await run("swift", [join(directory, "create-icon.swift"), png, mode]);
+    await run("swift", [
+      join(directory, "create-icon.swift"),
+      join(directory, `${name}-unmasked.png`),
+      mode,
+      "unmasked",
+    ]);
     for (const size of [16, 32, 128, 256, 512]) {
       for (const scale of [1, 2])
         await run("sips", [
@@ -41,7 +53,7 @@ try {
     ]);
   }
   console.log(
-    "Generated both ShowAI icon appearances as PNG and ICNS from native vector geometry.",
+    "Generated ShowAI masked display assets and full-square SVG/PNG masters for both appearances.",
   );
 } finally {
   await rm(temporary, { recursive: true, force: true });

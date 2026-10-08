@@ -1,0 +1,22 @@
+{
+  "canvasSize": 512,
+  "blue": "#06A5FA",
+  "cardWidth": 180,
+  "cardHeight": 240,
+  "cornerRadius": 37,
+  "offsetX": 75,
+  "offsetY": 60,
+  "gap": 16,
+  "appearances": {
+    "dark": {
+      "background": "#000000",
+      "foreground": "#FFFFFF",
+      "border": "#3F3F46"
+    },
+    "light": {
+      "background": "#FFFFFF",
+      "foreground": "#000000",
+      "border": "#D3D6DE"
+    }
+  }
+}

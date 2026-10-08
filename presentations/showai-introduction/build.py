@@ -26,6 +26,13 @@ MUTED, BORDER, DARK_LINE = "#67766B", "#D7DCD2", "#668775"
 CN, EN = "Microsoft YaHei", "Arial"
 
 
+BRAND_ASSETS = ROOT.parents[1] / "src/desktop/assets"
+if not (BRAND_ASSETS / "icon-design.json").is_file():
+    BRAND_ASSETS = ROOT / "assets"
+BRAND = json.loads((BRAND_ASSETS / "icon-design.json").read_text())
+BRAND_MASK = json.loads((BRAND_ASSETS / "apple-icon-mask.json").read_text())
+
+
 class Slide:
     def __init__(self, number: int, title: str, dark: bool = False, notes: str = ""):
         self.number, self.dark, self.objects = number, dark, []
@@ -99,17 +106,31 @@ class Slide:
         self.path([(x2-head*math.cos(angle-0.6), y2-head*math.sin(angle-0.6)), (x2,y2),
                    (x2-head*math.cos(angle+0.6), y2-head*math.sin(angle+0.6))], color, width)
 
-    def brand(self, x, y, size=20, color=None):
-        c = color or self.color
-        self.line(x, y+size/2, x+size, y+size/2, c, 2.4)
-        self.line(x+size/2, y, x+size/2, y+size, c, 2.4)
-        d = size*0.15
-        self.line(x+d, y+d, x+size-d, y+size-d, c, 2.4)
-        self.line(x+d, y+size-d, x+size-d, y+d, c, 2.4)
+    def brand(self, x, y, size=20):
+        scale = size / BRAND["canvasSize"]
+        palette = BRAND["appearances"]["light" if self.dark else "dark"]
+        outline = [(x+(2+px*508/512)*scale, y+(2+py*508/512)*scale) for px,py in BRAND_MASK["points"]]
+        first = len(self.objects)
+        self.path(outline, palette["background"], 0, closed=True, fill=palette["background"])
+        cx=(BRAND["canvasSize"]-BRAND["cardWidth"])/2
+        cy=(BRAND["canvasSize"]-BRAND["cardHeight"])/2
+        positions=[(cx+BRAND["offsetX"],cy-BRAND["offsetY"]),(cx,cy),(cx-BRAND["offsetX"],cy+BRAND["offsetY"])]
+        adjustment=round(BRAND["cornerRadius"]/min(BRAND["cardWidth"],BRAND["cardHeight"])*100000)
+        for index,(left,top) in enumerate(positions):
+            if index:
+                self.rect(x+left*scale,y+top*scale,BRAND["cardWidth"]*scale,BRAND["cardHeight"]*scale,
+                          stroke=palette["background"],width=BRAND["gap"]*2*scale,rounded=True)
+                self.objects[-1]["properties"]["shape.geometry.adjustments"]=[{"name":"adj","formula":f"val {adjustment}"}]
+            self.rect(x+left*scale,y+top*scale,BRAND["cardWidth"]*scale,BRAND["cardHeight"]*scale,
+                      fill=BRAND["blue"] if index==1 else palette["foreground"],rounded=True)
+            self.objects[-1]["properties"]["shape.geometry.adjustments"]=[{"name":"adj","formula":f"val {adjustment}"}]
+        self.path(outline, palette["border"], 3*scale, closed=True)
+        for index,obj in enumerate(self.objects[first:]):
+            obj["id"]=f"s{self.number}-showai-brand-{index}"
 
     def chrome(self, label, headline=None, sub=None):
         self.text(f"{self.number:02d} / {label}", 44, 24, 450, 20, 11, self.muted)
-        self.brand(837, 26, 15)
+        self.brand(837, 24, 20)
         self.text("ShowAI", 862, 22, 60, 24, 13, bold=True)
         self.line(44, 61, 77, 61, ORANGE, 3)
         if headline:
@@ -349,6 +370,9 @@ def main():
     out=args.output.resolve()
     if out.exists() and any(out.iterdir()): raise ValueError("Choose a new output version directory")
     out.mkdir(parents=True,exist_ok=True)
+    for name in ("icon-design.json", "apple-icon-mask.json"):
+        if BRAND_ASSETS != ROOT/"assets":
+            shutil.copy2(BRAND_ASSETS/name, ROOT/"assets"/name)
     shutil.copytree(ROOT/"assets",out/"assets")
     doc=create_deck()
     check_geometry(doc)
