@@ -6,10 +6,7 @@ ShowAI helps humans and agents think together through content they can read, int
 
 This interface supports human–agent collaboration and co-creation. The resulting content can also become a shareable site that others can read, explore, and continue using.
 
-> [!NOTE]
-> **🤖 For agents:** A way to communicate and collaborate with humans, turning information and analysis into content people can understand, use, and give feedback on.
-
-**🧑 For humans:** A way to participate in AI work, bringing your understanding and judgment into shared creation through reading, exploration, and editing.
+![For Agents: A way to communicate and collaborate with humans, turning information and analysis into content people can understand, use, and give feedback on. — For Humans: A way to participate in AI work, bringing your understanding and judgment into shared creation through reading, exploration, and editing.](docs/showai-audience.svg)
 
 ### ✨ From understanding to co-creation
 

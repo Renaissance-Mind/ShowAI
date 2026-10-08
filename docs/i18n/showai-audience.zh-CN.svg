@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="208" viewBox="0 0 1200 208" role="img" aria-labelledby="title description">
+<title id="title">对 Agent · 对人</title>
+<desc id="description">获得一个面向人的表达与协作界面，把信息和分析转化为人可以理解、操作与反馈的内容。 获得一个参与 AI 工作的认知界面，通过阅读、探索和修改，把自己的理解与判断带入共同创作。</desc>
+<g font-family="PingFang SC, Arial, Noto Sans CJK SC, sans-serif">
+<g id="agent-highlight">
+<rect x="1" y="1" width="1198" height="95" rx="10" fill="#EFF8FE" stroke="#CBE7F8"/>
+<rect x="1" y="12" width="4" height="73" rx="2" fill="#06A5FA"/>
+<g id="agent-icon" fill="none" stroke="#06A5FA" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+<path d="M38,22 V26"/><circle cx="38" cy="21" r="1.8" fill="#06A5FA" stroke="none"/>
+<rect x="26" y="26" width="24" height="19" rx="4"/>
+<path d="M22,31 V39 M54,31 V39 M34,41 H42"/>
+<circle cx="33" cy="34" r="1.8" fill="#06A5FA" stroke="none"/><circle cx="43" cy="34" r="1.8" fill="#06A5FA" stroke="none"/>
+</g>
+<text x="72" y="42" font-size="25" font-weight="600" fill="#087DB8">对 Agent</text>
+<text x="72" font-size="22" font-weight="400" fill="#243B4A">
+<tspan x="72" y="73">获得一个面向人的表达与协作界面，把信息和分析转化为人可以理解、操作与反馈的内容。</tspan>
+</text></g>
+<g id="human-highlight">
+<rect x="1" y="112" width="1198" height="95" rx="10" fill="#F0FAF6" stroke="#CDEBDD"/>
+<rect x="1" y="123" width="4" height="73" rx="2" fill="#299D85"/>
+<g id="human-icon" fill="none" stroke="#299D85" stroke-width="1.8" stroke-linecap="round">
+<circle cx="38" cy="139" r="6"/>
+<path d="M26,157 V154 C26,144 50,144 50,154 V157"/>
+</g>
+<text x="72" y="153" font-size="25" font-weight="600" fill="#217F6B">对人</text>
+<text x="72" font-size="22" font-weight="400" fill="#243B4A">
+<tspan x="72" y="184">获得一个参与 AI 工作的认知界面，通过阅读、探索和修改，把自己的理解与判断带入共同创作。</tspan>
+</text></g>
+</g></svg>

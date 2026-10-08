@@ -6,10 +6,7 @@ ShowAI ayuda a las personas y a los agentes a pensar juntos mediante contenido q
 
 Esta interfaz permite la colaboración y la creación conjunta entre personas y agentes. El contenido resultante también puede convertirse en un sitio compartible que otras personas puedan leer, explorar y seguir utilizando.
 
-> [!NOTE]
-> **🤖 Para los agentes:** Una interfaz para expresarse y colaborar con las personas, transformando información y análisis en contenido que puedan comprender, utilizar y comentar.
-
-**🧑 Para las personas:** Una interfaz para participar en el trabajo de la IA y aportar su comprensión y criterio mediante la lectura, la exploración y la edición.
+![Para los agentes: Una interfaz para expresarse y colaborar con las personas, transformando información y análisis en contenido que puedan comprender, utilizar y comentar. — Para las personas: Una interfaz para participar en el trabajo de la IA y aportar su comprensión y criterio mediante la lectura, la exploración y la edición.](showai-audience.es.svg)
 
 ### ✨ De la comprensión a la creación conjunta
 

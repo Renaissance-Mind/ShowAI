@@ -6,10 +6,7 @@ ShowAI, insanların ve ajanların okunabilir, etkileşimli ve düzenlenebilir i�
 
 Bu arayüz, insanlarla ajanların iş birliğini ve birlikte üretimini destekler. Ortaya çıkan içerik, başkalarının okuyabileceği, keşfedebileceği ve kullanmaya devam edebileceği paylaşılabilir bir siteye de dönüştürülebilir.
 
-> [!NOTE]
-> **🤖 Ajanlar için:** Bilgi ve analizleri insanların anlayabileceği, kullanabileceği ve geri bildirim verebileceği içeriğe dönüştüren bir ifade ve iş birliği arayüzü.
-
-**🧑 İnsanlar için:** Okuyarak, keşfederek ve düzenleyerek kendi anlayışınızı ve değerlendirmenizi ortak üretime katabileceğiniz, yapay zekânın çalışmasına katılma arayüzü.
+![Ajanlar için: Bilgi ve analizleri insanların anlayabileceği, kullanabileceği ve geri bildirim verebileceği içeriğe dönüştüren bir ifade ve iş birliği arayüzü. — İnsanlar için: Okuyarak, keşfederek ve düzenleyerek kendi anlayışınızı ve değerlendirmenizi ortak üretime katabileceğiniz, yapay zekânın çalışmasına katılma arayüzü.](showai-audience.tr.svg)
 
 ### ✨ Anlamaktan birlikte üretmeye
 

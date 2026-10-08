@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="238" viewBox="0 0 1200 238" role="img" aria-labelledby="title description">
+<title id="title">Agent에게 · 사람에게</title>
+<desc id="description">사람에게 정보를 표현하고 협업하는 인터페이스입니다. 정보와 분석을 사람이 이해하고, 조작하고, 피드백할 수 있는 콘텐츠로 바꿀 수 있습니다. AI의 작업에 참여하는 인터페이스입니다. 읽기, 탐색, 편집을 통해 자신의 이해와 판단을 공동 제작에 반영할 수 있습니다.</desc>
+<g font-family="Apple SD Gothic Neo, Arial, Noto Sans CJK SC, sans-serif">
+<g id="agent-highlight">
+<rect x="1" y="1" width="1198" height="125" rx="10" fill="#EFF8FE" stroke="#CBE7F8"/>
+<rect x="1" y="12" width="4" height="103" rx="2" fill="#06A5FA"/>
+<g id="agent-icon" fill="none" stroke="#06A5FA" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+<path d="M38,22 V26"/><circle cx="38" cy="21" r="1.8" fill="#06A5FA" stroke="none"/>
+<rect x="26" y="26" width="24" height="19" rx="4"/>
+<path d="M22,31 V39 M54,31 V39 M34,41 H42"/>
+<circle cx="33" cy="34" r="1.8" fill="#06A5FA" stroke="none"/><circle cx="43" cy="34" r="1.8" fill="#06A5FA" stroke="none"/>
+</g>
+<text x="72" y="42" font-size="25" font-weight="600" fill="#087DB8">Agent에게</text>
+<text x="72" font-size="22" font-weight="400" fill="#243B4A">
+<tspan x="72" y="73">사람에게 정보를 표현하고 협업하는 인터페이스입니다. 정보와 분석을 사람이 이해하고, 조작하고, 피드백할 수 있는 콘텐츠로</tspan>
+<tspan x="72" y="103">바꿀 수 있습니다.</tspan>
+</text></g>
+<g id="human-highlight">
+<rect x="1" y="142" width="1198" height="95" rx="10" fill="#F0FAF6" stroke="#CDEBDD"/>
+<rect x="1" y="153" width="4" height="73" rx="2" fill="#299D85"/>
+<g id="human-icon" fill="none" stroke="#299D85" stroke-width="1.8" stroke-linecap="round">
+<circle cx="38" cy="169" r="6"/>
+<path d="M26,187 V184 C26,174 50,174 50,184 V187"/>
+</g>
+<text x="72" y="183" font-size="25" font-weight="600" fill="#217F6B">사람에게</text>
+<text x="72" font-size="22" font-weight="400" fill="#243B4A">
+<tspan x="72" y="214">AI의 작업에 참여하는 인터페이스입니다. 읽기, 탐색, 편집을 통해 자신의 이해와 판단을 공동 제작에 반영할 수 있습니다.</tspan>
+</text></g>
+</g></svg>
