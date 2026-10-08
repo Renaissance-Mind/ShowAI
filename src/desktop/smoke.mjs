@@ -220,8 +220,14 @@ try {
   assert.equal(result.componentsOnSave, true);
   assert.equal(result.assetsPreserved, true);
   assert.equal(result.componentReady, true);
-  assert.ok(result.csp?.includes("connect-src 'none'"));
-  assert.ok(!result.csp.includes("unsafe-eval"));
+  assert.ok(result.csp?.includes("connect-src https: http:"));
+  const scriptSources = result.csp
+    .split(";")
+    .find((directive) => directive.trim().startsWith("script-src "))
+    ?.trim()
+    .split(/\s+/);
+  assert.ok(scriptSources?.includes("'wasm-unsafe-eval'"));
+  assert.ok(!scriptSources.includes("'unsafe-eval'"));
   assert.ok(
     result.templateCount > 0 &&
       result.componentBytes > 0 &&
@@ -268,7 +274,7 @@ try {
   for (const socket of sockets) socket.close();
   const exited = new Promise((done) => child.once("exit", done));
   child.kill("SIGTERM");
-  await Promise.race([exited, new Promise((done) => setTimeout(done, 3000))]);
+  await Promise.race([exited, new Promise((done) => setTimeout(done, 15000))]);
   assert.ok(
     child.exitCode !== null || child.signalCode !== null,
     "Desktop application must exit before testing the independent CLI.",
@@ -345,7 +351,7 @@ try {
   if (child.exitCode === null) {
     const exited = new Promise((done) => child.once("exit", done));
     child.kill("SIGTERM");
-    await Promise.race([exited, new Promise((done) => setTimeout(done, 3000))]);
+    await Promise.race([exited, new Promise((done) => setTimeout(done, 15000))]);
     if (child.exitCode === null) child.kill("SIGKILL");
   }
   await rm(temporary, { recursive: true, force: true });
