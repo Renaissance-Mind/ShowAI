@@ -1,11 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="820" viewBox="0 0 1800 820" role="img" aria-labelledby="title description">
+<svg xmlns="http://www.w3.org/2000/svg" width="1748" height="608" viewBox="26 140 1748 608" role="img" aria-labelledby="title description">
 <title id="title">ShowAI 设计逻辑：从构成到使用</title>
 <desc id="description">文本、图片、表格、图表、流程图和滑块等组件组成 Page 或 Board，Agent 可动态添加组件。Page 与 Board 可互相嵌套，模板可应用与提炼。共同创作有两个入口：在 Agent 聊天上下文中直接查看与使用，或在 ShowAI App 中像笔记软件一样编辑与管理。成果可交付源 JSON、局部内容、独立 HTML 和静态网站。</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 Z" fill="#06A5FA"/></marker></defs>
 <g font-family="PingFang SC, Noto Sans CJK SC, Microsoft YaHei, sans-serif">
 <rect x="0" y="0" width="1800" height="820" rx="0" fill="#FFFFFF" stroke="none" stroke-width="1.6"/>
-<text x="38" y="86" font-size="48" font-weight="650" fill="#172B3A" text-anchor="start">从构成到使用</text>
-<text x="1760" y="84" font-size="22" font-weight="500" fill="#617789" text-anchor="end">ShowAI · 设计逻辑</text>
 <g id="expression-units">
 <rect x="36" y="150" width="328" height="588" rx="14" fill="white" stroke="#CFE1ED" stroke-width="2"/>
 <circle cx="75" cy="195" r="25" fill="#06A5FA" stroke="none" stroke-width="2"/>
@@ -160,12 +158,22 @@
 <g id="chat-user-request">
 <rect x="1043" y="323" width="254" height="36" rx="10" fill="#DFF3FE" stroke="none" stroke-width="1.6"/>
 <text x="1058" y="347" font-size="17" font-weight="400" fill="#172B3A" text-anchor="start">帮我看看这组数据</text>
-<circle cx="1311" cy="341" r="11" fill="#B6DFF5" stroke="none" stroke-width="2"/>
-<text x="1311" y="345" font-size="12" font-weight="500" fill="#172B3A" text-anchor="middle">你</text>
+<g id="chat-human-avatar-request">
+<circle cx="1311" cy="341" r="12" fill="#DFF3FE" stroke="none" stroke-width="2"/>
+<circle cx="1311" cy="338" r="3.3" fill="none" stroke="#078DD8" stroke-width="1.5"/>
+<path d="M1305,348 V346 C1305,342 1317,342 1317,346 V348" fill="none" stroke="#078DD8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
 </g>
 <g id="chat-agent-response">
-<circle cx="941" cy="386" r="12" fill="#299D85" stroke="none" stroke-width="2"/>
-<text x="941" y="390" font-size="12" font-weight="600" fill="white" text-anchor="middle">A</text>
+<g id="chat-robot-avatar">
+<circle cx="941" cy="386" r="13" fill="#E3F5F0" stroke="none" stroke-width="2"/>
+<path d="M941,377 V381" fill="none" stroke="#299D85" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="941" cy="377" r="1.1" fill="#299D85" stroke="none" stroke-width="2"/>
+<rect x="933.5" y="381" width="15" height="12" rx="3" fill="white" stroke="#299D85" stroke-width="1.4"/>
+<circle cx="938" cy="386" r="1.2" fill="#299D85" stroke="none" stroke-width="2"/>
+<circle cx="944" cy="386" r="1.2" fill="#299D85" stroke="none" stroke-width="2"/>
+<path d="M939,390 H943 M931,384 V389 M951,384 V389" fill="none" stroke="#299D85" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
 <rect x="963" y="372" width="360" height="94" rx="9" fill="white" stroke="#CFE1ED" stroke-width="1"/>
 <text x="978" y="394" font-size="17" font-weight="500" fill="#172B3A" text-anchor="start">趋势与对比</text>
 <path d="M982,408 V452 H1164" fill="none" stroke="#90B0C7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -184,8 +192,11 @@
 <g id="chat-user-followup">
 <rect x="1086" y="482" width="211" height="29" rx="9" fill="#DFF3FE" stroke="none" stroke-width="1.6"/>
 <text x="1102" y="503" font-size="17" font-weight="400" fill="#172B3A" text-anchor="start">再比较另一组数据</text>
-<circle cx="1311" cy="496.5" r="11" fill="#B6DFF5" stroke="none" stroke-width="2"/>
-<text x="1311" y="500.5" font-size="12" font-weight="500" fill="#172B3A" text-anchor="middle">你</text>
+<g id="chat-human-avatar-followup">
+<circle cx="1311" cy="496.5" r="12" fill="#DFF3FE" stroke="none" stroke-width="2"/>
+<circle cx="1311" cy="493.5" r="3.3" fill="none" stroke="#078DD8" stroke-width="1.5"/>
+<path d="M1305,503.5 V501.5 C1305,497.5 1317,497.5 1317,501.5 V503.5" fill="none" stroke="#078DD8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
 </g>
 </g>
 <g id="showai-app-interface">
