@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
-<svg xmlns="http://www.w3.org/2000/svg" width="2172" height="724" viewBox="0 0 2172 724" role="img" aria-labelledby="title description" lang="en" xml:lang="en">
-  <title id="title">ShowAI — An interface between humans and agents.</title>
+<svg xmlns="http://www.w3.org/2000/svg" width="2172" height="724" viewBox="0 0 2172 724" role="img" aria-labelledby="title description" lang="zh-TW" xml:lang="zh-TW">
+  <title id="title">ShowAI — 構建人與 Agent 之間的 Interface。</title>
   <desc id="description">Editable vector reconstruction of the ShowAI banner. Project logo, text, chart paths, sliders, cards and arrows are native SVG elements. Chart positions are approximated from the illustration, not measured data.</desc>
   <defs>
     <linearGradient id="page-fill" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -228,7 +228,7 @@
         <rect x="2" y="2" width="508" height="508" rx="88" fill="none" stroke="#3F3F46" stroke-width="3" />
       </g>
       <text x="282" y="356" fill="#090F12" font-family="Arial" font-size="138" font-weight="900" text-anchor="start" letter-spacing="-8" id="brand-name">ShowAI</text>
-      <text x="67" y="463" fill="#090F12" font-family="Arial" font-size="36" font-weight="600" text-anchor="start" id="tagline">An interface between humans and agents.</text>
+      <text x="67" y="463" fill="#090F12" font-family="Arial, PingFang TC, Microsoft JhengHei" font-size="43" font-weight="600" text-anchor="start" id="tagline">構建人與 Agent 之間的 Interface。</text>
     </g>
     <g id="human">
       <circle cx="840" cy="303" r="43" fill="#FFFFFF" stroke="#DDE3E7" stroke-width="1.5" />

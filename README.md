@@ -1,55 +1,57 @@
-![ShowAI — 构建人与 Agent 之间的 Interface。](docs/showai-banner.svg)
+![ShowAI — An interface between humans and agents.](docs/showai-banner.svg)
 
-ShowAI 让人与 Agent 通过可阅读、可交互、可编辑的内容共同思考。Agent 将信息与分析组织成页面、图表和交互模型，人通过阅读、探索、修改和反馈参与其中，双方在同一份内容上持续形成理解、作出判断并推进创作。
+**Language:** English | [简体中文](docs/i18n/README.zh-CN.md) | [繁體中文](docs/i18n/README.zh-TW.md) | [日本語](docs/i18n/README.ja.md) | [한국어](docs/i18n/README.ko.md) | [Español](docs/i18n/README.es.md) | [Türkçe](docs/i18n/README.tr.md) | [Русский](docs/i18n/README.ru.md)
 
-这个 Interface 承载人机协作与共创，也让共同形成的内容成为可分享的 site，供更多人阅读、探索和继续使用。
+ShowAI helps humans and agents think together through content they can read, interact with, and edit. Agents organize information and analysis into pages, charts, and interactive models. Humans contribute through reading, exploration, edits, and feedback, building understanding, making decisions, and advancing their work in the same shared content.
+
+This interface supports human–agent collaboration and co-creation. The resulting content can also become a shareable site that others can read, explore, and continue using.
 
 > [!NOTE]
-> **🤖 对 Agent：** 获得一个面向人的表达与协作界面，把信息和分析转化为人可以理解、操作与反馈的内容。
+> **🤖 For agents:** A way to communicate and collaborate with humans, turning information and analysis into content people can understand, use, and give feedback on.
 
-**🧑 对人：** 获得一个参与 AI 工作的认知界面，通过阅读、探索和修改，把自己的理解与判断带入共同创作。
+**🧑 For humans:** A way to participate in AI work, bringing your understanding and judgment into shared creation through reading, exploration, and editing.
 
-### ✨ 从理解到共创
+### ✨ From understanding to co-creation
 
-- **让信息有合适的表达**：把文字、图片、表格、图表、流程图和交互控件放在同一份内容中。研究发现可以对应到来源与数据，复杂关系可以展开为流程图，参数变化可以通过交互模型观察。
+- **Give information the right form**: Combine text, images, tables, charts, flow diagrams, and interactive controls in one piece of content. Connect research findings to sources and data, explain complex relationships with diagrams, and explore parameter changes with interactive models.
 
-  组件库提供说明、参数结构和示例，帮助 Agent 根据表达需要选择组件。需要新的表达方式时，可以用 React 创建可复用组件。
+  The component catalog provides descriptions, parameter schemas, and examples to help agents choose components for the task. When a new form of expression is needed, create a reusable component with React.
 
-- **让人直接参与内容**：人在 Agent 上下文中直接查看和使用内容，也可以在 ShowAI App 中像使用笔记软件一样编辑和管理内容。Agent 可以继续处理人的修改，双方共享页面结构、组件数据与版本历史，持续完善同一份成果。
+- **Let humans participate directly**: Read and use content within the agent's context, or edit and manage it in the ShowAI App as you would in a note-taking app. Agents can build on human edits. Both share page structure, component data, and version history to keep improving the same work.
 
-  页面支持比较、恢复与结构化合并。并发修改发生冲突时，系统保留草稿和相关版本，供用户检查与处理。
+  Pages support comparison, restoration, and structured merging. When concurrent changes conflict, the system preserves drafts and relevant versions for users to inspect and resolve.
 
-- **让成果继续流动**：完成的内容可以导出为独立 HTML、Agent 对话中的展示片段，或带导航的静态网站。
+- **Let the results travel**: Export finished content as standalone HTML, a fragment displayed in an agent conversation, or a static site with navigation.
 
-  独立 HTML 包含页面、数据和所用组件，读者无需安装 ShowAI，也可以离线阅读与操作。导出的 ShowAI HTML 和 JSON 可以重新导入工作台，继续编辑。
+  Standalone HTML includes the page, data, and components it uses. Readers can read and interact offline without installing ShowAI. Exported ShowAI HTML and JSON can be imported into the workbench for further editing.
 
-## 🧩 设计逻辑
+## 🧩 Design
 
-![ShowAI 设计逻辑：从可由 Agent 动态添加的组件、内容（模板），到 Agent 上下文与 ShowAI App 中的共创，以及使用与交付](docs/showai-design-logic.svg)
+![ShowAI design: dynamically added components, content and templates, co-creation in agent context and the ShowAI App, then use and delivery](docs/showai-design-logic.svg)
 
-1. **组件：按需要表达信息。** 文本、图片、表格、图表、流程图和滑块提供不同的表达与交互方式。Agent 可以选择已有组件，也可以根据任务创建并加入新组件，例如让读者调整参数、观察计算结果的控件。
+1. **Components: express information as needed.** Text, images, tables, charts, flow diagrams, and sliders provide different forms of expression and interaction. Agents can choose existing components or create and add new ones for a task, such as controls that let readers adjust parameters and inspect calculated results.
 
-2. **内容（模板）：组织内容，复用结构。** 组件组合成可阅读、可操作的内容。[Page](docs/page-surface.md) 按顺序组织文章与报告，Board 用空间布局组织关系与方案；两者可以互相嵌套。常用的内容结构和组件组合可以保存为模板：应用模板填入新材料，或从完成的内容中提炼模板，供后续创作复用。详见[组件与模板说明](docs/catalog-lifecycle.md)。
+2. **Content and templates: organize content and reuse structure.** Components combine into content people can read and use. A [Page](docs/page-surface.md) arranges articles and reports in sequence; a Board uses spatial layout to organize relationships and proposals. They can be nested within each other. Save common structures and component combinations as templates: fill an existing template with new material, or extract a template from finished content for future use. See [Components and templates](docs/catalog-lifecycle.md).
 
-3. **共同创作：在聊天与 App 中参与。** 在支持页面展示的 Agent 会话中，内容直接呈现在聊天里。人可以查看图表、操作控件，再通过后续对话让 Agent 继续分析和修改。
+3. **Co-creation: participate in chat and the app.** In agent conversations that support page display, content appears directly in the chat. People can inspect charts and use controls, then ask the agent to continue analyzing and editing through follow-up messages.
 
-   ShowAI App 提供类似笔记软件的工作台，用于管理项目与页面、直接编辑内容和复用组件。讨论可以在 Agent 上下文中展开，内容也可以在 App 中持续整理和完善。
+   The ShowAI App provides a workbench similar to a note-taking app for managing projects and pages, editing content directly, and reusing components. Discussion can happen in the agent's context while content continues to be organized and refined in the app.
 
-4. **使用与交付：让内容被使用和分享。** 独立 HTML 保留页面的阅读与交互，读者无需安装 ShowAI；静态 Site 组织多页内容，适合通过网址分享。局部导出可以只分享某个组件或区域，源 JSON 则用于导入并继续编辑，让成果能够持续使用。
+4. **Use and delivery: make content usable and shareable.** Standalone HTML preserves reading and interaction without requiring ShowAI. A static Site organizes multiple pages for sharing through a URL. Partial exports can share a component or region; source JSON supports importing and further editing so the results can keep being used.
 
-## 💡 使用场景
+## 💡 Use cases
 
-- **调研与分析**：组织问题、来源、证据和比较结果，在同一页中形成判断。
-- **教学与讲解**：结合流程图、折叠内容和参数实验，帮助读者逐步理解。
-- **数据探索**：把图表、原始数据和分析文字放在一起，方便查看与核对。
-- **方案共创**：在人与 Agent 之间持续修改方案，记录变化并比较版本。
-- **知识分享**：将共同形成的内容整理为页面或 site，供他人阅读和探索。
+- **Research and analysis**: Organize questions, sources, evidence, and comparisons to reach a judgment on one page.
+- **Teaching and explanation**: Combine diagrams, collapsible content, and parameter experiments to support gradual understanding.
+- **Data exploration**: Keep charts, raw data, and analysis together for inspection and verification.
+- **Collaborative planning**: Refine proposals between humans and agents, record changes, and compare versions.
+- **Knowledge sharing**: Turn shared work into pages or sites that others can read and explore.
 
-## 🚀 开始使用
+## 🚀 Getting started
 
-从源码运行需要 **Node.js 22.12+** 和 npm。
+Running from source requires **Node.js 22.12+** and npm.
 
-### 本地浏览器工作台
+### Local browser workbench
 
 ```sh
 git clone https://github.com/Renaissance-Mind/ShowAI.git
@@ -59,99 +61,99 @@ npm run build:browser
 npm run browser
 ```
 
-启动后，浏览器会打开本机工作台。使用期间保持终端运行，按 `Ctrl+C` 停止服务。
+The browser opens the local workbench after startup. Keep the terminal running while you use it; press `Ctrl+C` to stop the service.
 
-### 桌面工作台
+### Desktop workbench
 
-在仓库目录中安装依赖后，构建并启动 Electron 应用：
+After installing dependencies in the repository directory, build and launch the Electron app:
 
 ```sh
 npm run build
 npm run desktop
 ```
 
-### 创建第一份内容
+### Create your first content
 
-1. 新建项目，再创建一个 Page 或 Board。
-2. 输入 `/`，插入需要的组件；也可以选择已有模板。
-3. 编辑内容，或让连接的 Agent 一起创作。
-4. 完成后导出 HTML 或静态网站。
+1. Create a project, then a Page or Board.
+2. Type `/` to insert components, or choose an existing template.
+3. Edit the content, or create it together with a connected agent.
+4. Export HTML or a static site when finished.
 
-默认内容库为 `~/.showai`，可在设置中更改。桌面应用、浏览器工作台与 CLI 指向同一内容库时，共同读写其中的项目。
+The default content library is `~/.showai`; you can change it in settings. The desktop app, browser workbench, and CLI read and write the same projects when they point to the same library.
 
-本地浏览器版支持 macOS、Linux 和 Windows，也可以打包为自带 Node 运行时的发行包。启动器与平台要求见[本地浏览器版说明](docs/local-browser.md)。
+The local browser edition supports macOS, Linux, and Windows. It can also be packaged with a bundled Node runtime. See [Local browser edition](docs/local-browser.md) for the launcher and platform requirements.
 
-## 🤖 连接 Agent
+## 🤖 Connect an agent
 
-ShowAI 提供 Codex 与 Claude Code 插件。安装插件并连接 ShowAI 运行时后，可以直接提出创作需求：
+ShowAI provides plugins for Codex and Claude Code. After installing a plugin and connecting to the ShowAI runtime, you can ask for content directly:
 
-> 在当前项目中做一份模型调研报告，把来源、对比表和结论组织在同一页。
+> Create a model research report in the current project, with sources, a comparison table, and conclusions on the same page.
 
-> 修改这份讲解，加入可以调整参数的交互模型，让读者观察参数变化的影响。
+> Revise this explanation by adding an interactive model with adjustable parameters so readers can observe the effects of changes.
 
-> 把这页整理成可复用模板，并生成一个应用示例。
+> Turn this page into a reusable template and create an example that uses it.
 
-### 安装插件
+### Install a plugin
 
-**Codex**：在仓库目录中执行：
+**Codex**: Run in the repository directory:
 
 ```sh
 npm run plugin:install
 ```
 
-**Claude Code**：在仓库目录中执行：
+**Claude Code**: Run in the repository directory:
 
 ```sh
 claude plugin marketplace add ./
 claude plugin install showai@renaissance-mind
 ```
 
-插件包含四个 Skill：
+The plugin includes four skills:
 
-| Skill | 用途 |
+| Skill | Purpose |
 | --- | --- |
-| `use-showai` | 基础用法、连接运行时、查找和阅读内容、查看历史 |
-| `show-document` | 创建、修改、展示和导出页面，应用已有模板 |
-| `create-component` | 创建或改造可复用的 React 组件 |
-| `create-template` | 创建、修改模板，或从已有页面提炼模板 |
+| `use-showai` | Basic usage, runtime connection, finding and reading content, viewing history |
+| `show-document` | Create, edit, display, and export pages; apply existing templates |
+| `create-component` | Create or adapt reusable React components |
+| `create-template` | Create and edit templates, or extract them from existing pages |
 
-插件提供创作流程与参考说明，运行程序由 ShowAI 应用或独立运行包提供。桌面用户可在「设置 → 连接 Agent」中取得启动配置；从源码构建的独立运行包可执行：
+The plugin supplies authoring workflows and reference material. The ShowAI app or a standalone runtime package supplies the executable runtime. Desktop users can find startup configuration in Settings → Connect Agent (「设置 → 连接 Agent」). For a standalone runtime built from source, run:
 
 ```sh
 npm run runtime:register
 ```
 
-安装与接入步骤见[插件说明](plugins/showai/README.md)。
+See [Plugin documentation](plugins/showai/README.md) for installation and connection steps.
 
-### CLI 与 MCP
+### CLI and MCP
 
-CLI 每次执行一个命令后退出，可以在工作台关闭时使用。完成构建后，在仓库目录中执行：
+The CLI exits after each command and can be used while the workbench is closed. After building, run these commands in the repository directory:
 
 ```sh
-# 查看已有项目
+# List existing projects
 node dist-runtime/scripts/cli.mjs projects list --json
 
-# 查询可用组件
+# Find available components
 node dist-runtime/scripts/cli.mjs catalog list \
   --kind component --query 图表 --limit 5 --json
 
-# 查看页面创作指南
+# Read the page authoring guide
 node dist-runtime/scripts/cli.mjs guide authoring --json
 ```
 
-其他 Agent 客户端也可以通过可选的 stdio MCP 入口接入。完整命令、编辑协议与配置见 [Agent 使用说明](docs/agent-usage.md)。
+Other agent clients can connect through the optional stdio MCP entry point. See [Agent guide](docs/agent-usage.md) for the complete commands, editing protocol, and configuration.
 
-## 📦 分享页面与 Site
+## 📦 Share pages and sites
 
-| 导出格式 | 适用场景 |
+| Export format | Use |
 | --- | --- |
-| **独立 HTML** | 分享、离线阅读和归档 |
-| **inline 片段** | 在支持 HTML 展示的 Agent 对话中呈现 |
-| **静态网站** | 多页面导航与静态托管 |
+| **Standalone HTML** | Sharing, offline reading, and archiving |
+| **inline fragment** | Display in agent conversations that support HTML |
+| **Static site** | Multiple-page navigation and static hosting |
 
-独立 HTML 支持图表切换、折叠内容和本地参数计算等离线交互；外部来源链接需要联网。离线导出要求图片已内嵌。
+Standalone HTML supports offline interactions such as switching charts, collapsing content, and calculating local parameters. External source links require a network connection. Images must be embedded for offline exports.
 
-将下方的 `PROJECT_ID` 和 `PAGE_ID` 替换为实际 ID，即可导出页面：
+Replace `PROJECT_ID` and `PAGE_ID` below with actual IDs to export a page:
 
 ```sh
 node dist-runtime/scripts/cli.mjs export \
@@ -162,7 +164,7 @@ node dist-runtime/scripts/cli.mjs export \
   --json
 ```
 
-导出整个项目的静态网站：
+Export the entire project as a static site:
 
 ```sh
 node dist-runtime/scripts/cli.mjs export \
@@ -172,52 +174,52 @@ node dist-runtime/scripts/cli.mjs export \
   --json
 ```
 
-使用 `--blocks ID,ID` 可以导出选定的组件或区域。HTML 与 inline 导出同时保存 `.showai.json` 源文件，便于重新导入和继续编辑。
+Use `--blocks ID,ID` to export selected components or regions. HTML and inline exports also save a `.showai.json` source file for importing and further editing.
 
-静态网站目录可部署到自己的服务器或托管服务。导出格式与选项见 [Agent 使用说明](docs/agent-usage.md)。
+The static site directory can be deployed to your own server or a hosting service. See [Agent guide](docs/agent-usage.md) for export formats and options.
 
-## 🔒 内容与历史
+## 🔒 Content and history
 
-项目内容保存在本机，支持备份与迁移。新建的空内容库默认启用版本历史，记录内容变化及可获得的人工或 Agent 来源信息。
+Project content is stored locally and can be backed up or migrated. New empty libraries enable version history by default, recording content changes and available human or agent provenance.
 
-历史界面支持比较版本、查看变更和恢复内容；恢复会生成新的版本。组件、模板与页面依赖也纳入版本管理，便于追溯过去的内容。
+The history interface supports comparing versions, inspecting changes, and restoring content. Restoration creates a new version. Components, templates, and page dependencies are also versioned so earlier content can be traced.
 
-需要跨设备或与他人协作时，可以连接自部署的 ShowAI Server，按项目同步内容与历史，并通过管理员、编辑者和查看者角色管理访问权限。
+For collaboration across devices or with other people, connect to a self-hosted ShowAI Server to synchronize content and history by project. Administrator, editor, and viewer roles control access.
 
-详见[内容库与历史](docs/versioned-library.md)及[项目服务器与同步](docs/project-sync.md)。
+See [Content library and history](docs/versioned-library.md) and [Project server and synchronization](docs/project-sync.md).
 
-## 📚 文档
+## 📚 Documentation
 
-| 文档 | 内容 |
+| Document | Contents |
 | --- | --- |
-| [Page 与 Board](docs/page-surface.md) | 页面、白板、嵌套与交互 |
-| [Agent 使用说明](docs/agent-usage.md) | CLI、MCP、创作与导出 |
-| [插件说明](plugins/showai/README.md) | Skill 分工与安装 |
-| [数据图表](docs/g2-components.md) | 图表类型、数据接口与设置 |
-| [组件与模板](docs/catalog-lifecycle.md) | 目录、版本、依赖与复用 |
-| [内容库与历史](docs/versioned-library.md) | 存储、比较、合并与恢复 |
-| [项目服务器与同步](docs/project-sync.md) | 服务部署、项目权限与同步 |
-| [页面数据格式](docs/artifact-format.md) | 页面结构与数据约定 |
+| [Page and Board](docs/page-surface.md) | Pages, boards, nesting, and interaction |
+| [Agent guide](docs/agent-usage.md) | CLI, MCP, authoring, and export |
+| [Plugin documentation](plugins/showai/README.md) | Skill responsibilities and installation |
+| [Data charts](docs/g2-components.md) | Chart types, data interfaces, and settings |
+| [Components and templates](docs/catalog-lifecycle.md) | Catalogs, versions, dependencies, and reuse |
+| [Content library and history](docs/versioned-library.md) | Storage, comparison, merging, and restoration |
+| [Project server and synchronization](docs/project-sync.md) | Server deployment, project permissions, and synchronization |
+| [Page data format](docs/artifact-format.md) | Page structure and data conventions |
 
-## 🛠️ 开发与贡献
+## 🛠️ Development and contributions
 
-ShowAI 使用 React、TypeScript、Electron 与 Vite。富文本编辑基于 Tiptap，流程图基于 React Flow，数据可视化使用 G2。
+ShowAI uses React, TypeScript, Electron, and Vite. Rich text editing uses Tiptap, flow diagrams use React Flow, and data visualization uses G2.
 
-启动支持热更新的完整桌面工作台：
+Start the full desktop workbench with hot reload:
 
 ```sh
 npm run dev:open
 ```
 
-查看当前开发服务：
+Check the current development service:
 
 ```sh
 npm run dev:status
 ```
 
-浏览器开发版使用 `npm run dev:browser`。默认开发内容库位于 `.showai-dev/library`，可以通过启动参数指定其他目录。
+Use `npm run dev:browser` for browser development. The default development library is `.showai-dev/library`; startup arguments can select another directory.
 
-提交改动前执行：
+Before submitting changes, run:
 
 ```sh
 npm run check
@@ -225,10 +227,10 @@ npm test
 npm run build
 ```
 
-涉及桌面行为时，可运行 `npm run test:desktop`；涉及 Page 与 Board 交互时，可运行 `npm run test:containers` 和 `npm run test:containers:desktop`。
+For desktop behavior, run `npm run test:desktop`. For Page and Board interactions, run `npm run test:containers` and `npm run test:containers:desktop`.
 
-欢迎通过 [Issues](https://github.com/Renaissance-Mind/ShowAI/issues) 反馈问题、提出使用场景，或通过 Pull Request 贡献代码、组件、模板与文档。问题反馈请附上运行环境、复现步骤，以及预期与实际结果。
+Use [Issues](https://github.com/Renaissance-Mind/ShowAI/issues) to report problems or suggest use cases, or contribute code, components, templates, and documentation through a pull request. Include your environment, reproduction steps, and expected and actual results when reporting a problem.
 
-## 许可证
+## License
 
-ShowAI 使用 [MIT 许可证](LICENSE)。
+ShowAI is licensed under the [MIT License](LICENSE).

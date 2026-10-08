@@ -21,6 +21,16 @@ INK, BLUE, GREEN, ORANGE = "#090F12", "#00ACF5", "#327B59", "#E77813"
 MUTED, BORDER = "#8F999F", "#D4DBE0"
 W, H = 2172, 724
 CANVAS_W, CANVAS_H = 2048, 2048 / 3
+LANGUAGES = {
+    "en": {"slogan": "An interface between humans and agents.", "size": 36, "font": "Arial"},
+    "zh-CN": {"slogan": "构建人与 Agent 之间的 Interface。", "size": 43, "font": "Arial, PingFang SC, Microsoft YaHei"},
+    "zh-TW": {"slogan": "構建人與 Agent 之間的 Interface。", "size": 43, "font": "Arial, PingFang TC, Microsoft JhengHei"},
+    "ja": {"slogan": "人と Agent をつなぐ Interface。", "size": 41, "font": "Arial, Hiragino Sans, Yu Gothic"},
+    "ko": {"slogan": "사람과 Agent를 잇는 Interface.", "size": 39, "font": "Arial, Apple SD Gothic Neo, Malgun Gothic"},
+    "es": {"slogan": "Una interfaz entre personas y agentes.", "size": 36, "font": "Arial"},
+    "tr": {"slogan": "İnsanlar ve ajanlar için bir arayüz.", "size": 38, "font": "Arial"},
+    "ru": {"slogan": "Интерфейс между людьми и агентами.", "size": 36, "font": "Arial"},
+}
 
 
 def element(parent, tag, **attrs):
@@ -100,12 +110,14 @@ def logo(parent, source):
         g.append(ET.Element(f"{{{NS}}}rect", attrs))
 
 
-def create_svg(logo_source):
+def create_svg(logo_source, language="zh-CN"):
+    locale = LANGUAGES[language]
     root = ET.Element(f"{{{NS}}}svg", {
         "width": str(W), "height": str(H), "viewBox": f"0 0 {W} {H}",
         "role": "img", "aria-labelledby": "title description",
+        "lang": language, "{http://www.w3.org/XML/1998/namespace}lang": language,
     })
-    element(root, "title", id="title").text = "ShowAI — 构建人与 Agent 之间的 Interface。"
+    element(root, "title", id="title").text = f"ShowAI — {locale['slogan']}"
     element(root, "desc", id="description").text = (
         "Editable vector reconstruction of the ShowAI banner. Project logo, "
         "text, chart paths, sliders, cards and arrows are native SVG elements. "
@@ -136,8 +148,8 @@ def create_svg(logo_source):
     brand = group(canvas, "brand")
     logo(brand, logo_source)
     text(brand, "ShowAI", 282, 356, 138, weight=900, letter_spacing=-8, id="brand-name")
-    text(brand, "构建人与 Agent 之间的 Interface。", 67, 463, 43,
-         weight=600, font="Arial, PingFang SC", id="tagline")
+    text(brand, locale["slogan"], 67, 463, locale["size"],
+         weight=600, font=locale["font"], id="tagline")
 
     human = group(canvas, "human")
     circle(human, 840, 303, 43, "#FFFFFF", "#DDE3E7", 1.5)
@@ -313,12 +325,13 @@ def main():
     parser.add_argument("--logo",type=Path,default=default_logo)
     parser.add_argument("--skill-dir",type=Path)
     parser.add_argument("--pptx",action="store_true")
+    parser.add_argument("--language",choices=LANGUAGES,default="zh-CN")
     args = parser.parse_args()
     out = args.output.resolve()
     out.mkdir(parents=True,exist_ok=True)
     (out/"assets").mkdir(exist_ok=True)
     shutil.copy2(args.logo,out/"assets/logo.svg")
-    root = create_svg(out/"assets/logo.svg")
+    root = create_svg(out/"assets/logo.svg",args.language)
     ET.indent(root)
     svg = out/"result.svg"
     ET.ElementTree(root).write(svg,encoding="utf-8",xml_declaration=True)
@@ -329,13 +342,15 @@ def main():
         "logo 使用 src/desktop/assets/icon.svg，并保留项目 logo 的矢量矩形与层叠顺序。\n\n"
         "标题、标语、标签、数字均为文字；卡片、连线、图标、鼠标指针、曲线与滑杆"
         "均为原生矢量图形，并按品牌、Human、Interface、Agent 和子图分组。"
-        "不含原图截图或位图素材。文字使用 Arial 与 PingFang SC。\n\n"
+        "不含原图截图或位图素材。文字使用对应语言的字体配置。\n\n"
         "这是原图的结构化重建，字体、阴影和微小间距存在近似。图表点位来自"
         "原图可见位置，缺少原始数据；曲线是可编辑路径，不能据此恢复精确实验数据。"
         "PowerPoint 中滑杆与按钮是可编辑的示意图形。\n\n"
         "修改 result.svg 可编辑文本与图形；build.py 可重新生成。PPTX 中可以进入或"
         "取消分组后分别修改原生文字与形状。实际 PPTX 预览位于 pptx-preview/。\n"
     )
+    notes += (f"\nBanner language: {args.language}. Slogan: {LANGUAGES[args.language]['slogan']}\n"
+              f"Fonts: {LANGUAGES[args.language]['font']}\n")
     (out/"notes.md").write_text(notes)
     if args.pptx:
         skill = args.skill_dir
@@ -364,7 +379,10 @@ def main():
                         obj.properties["object.frame"]["left"] += size*.1
                     for run in runs:
                         props = run["properties"]
-                        props["text.run.font.east_asian"] = "PingFang SC"
+                        props["text.run.font.east_asian"] = {
+                            "zh-CN": "PingFang SC", "zh-TW": "PingFang TC",
+                            "ja": "Hiragino Sans", "ko": "Apple SD Gothic Neo",
+                        }.get(args.language,"PingFang SC")
                         if value == "ShowAI":
                             props["text.run.letter_spacing"] = -8*(W/CANVAS_W)*.75
                 if obj.children:
@@ -389,6 +407,7 @@ def main():
                   "native_groups":kinds["grpSp"],"picture_objects":kinds["pic"],
                   "text_runs":editable_text,"media_parts":media},
                   "size_pixels":[W,H],"reference":"Original ShowAI README banner retained in Git history",
+                  "language":args.language,"slogan":LANGUAGES[args.language]["slogan"],
                   "logo":"src/desktop/assets/icon.svg",
                   "limitations":["Approximate font metrics and shadow","Chart positions reconstructed from illustration"]}
         (out/"report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2,default=str))
