@@ -8,6 +8,7 @@ import { GitLibrary } from "../core/git-library";
 import { FileStore, CoreError, assertId } from "../core/store";
 import { LibraryOperations } from "../core/library-operations";
 import { WorkspaceProtection } from "../core/workspace-conflicts";
+import { serverBaseUrl, serverEndpoint, invitationBaseUrl } from "./server-url";
 import {
   retainSyncConflicts,
   type RetainedConflict,
@@ -28,6 +29,7 @@ import {
   SyncError,
   syncProtocol,
   identifier,
+  validateSnapshot,
   type ProjectConnection,
   type ServerConnection,
   type SnapshotRecord,
@@ -66,22 +68,6 @@ export function syncManager(home: string) {
     instances.set(root, manager);
   }
   return manager;
-}
-function serverUrl(input: string) {
-  const url = new URL(input);
-  if (
-    !["http:", "https:"].includes(url.protocol) ||
-    url.username ||
-    url.password ||
-    url.search ||
-    url.hash ||
-    url.pathname !== "/"
-  )
-    throw new CoreError(
-      "INVALID_DATA",
-      "填写服务器根地址，例如 https://showai.example.com。",
-    );
-  return url.origin;
 }
 async function readJson<T>(path: string): Promise<T | undefined> {
   return readFile(path, "utf8").then(
@@ -138,7 +124,12 @@ export class SyncManager {
     );
   }
   private cacheKey(connection: ServerConnection, project: ProjectConnection) {
-    return `${connection.serverId}-${project.remoteProjectId}`;
+    return hash(
+      JSON.stringify([
+        identifier(connection.serverId),
+        identifier(project.remoteProjectId),
+      ]),
+    );
   }
   private snapshotPath(
     connection: ServerConnection,
@@ -154,10 +145,14 @@ export class SyncManager {
       `${revision}.json`,
     );
   }
-  private objectPath(digest: string) {
+  private objectPath(digest: string, namespace?: string) {
     if (!/^[a-f0-9]{64}$/.test(digest))
       throw new CoreError("INVALID_DATA", "Invalid object digest.");
-    return join(this.root, "objects", digest);
+    // Legacy unscoped bytes remain readable only by local recovery plans.
+    // Network snapshots cannot reuse objects learned from another project/server.
+    return namespace
+      ? join(this.root, "objects", namespace, digest)
+      : join(this.root, "objects", digest);
   }
   private async request<T>(
     connection: Pick<ServerConnection, "url" | "token">,
@@ -165,7 +160,7 @@ export class SyncManager {
     method = "GET",
     data?: unknown,
   ): Promise<T> {
-    const response = await fetch(connection.url + path, {
+    const response = await fetch(serverEndpoint(connection.url, path), {
       method,
       headers: {
         ...(connection.token
@@ -206,7 +201,7 @@ export class SyncManager {
     register?: boolean;
     invite?: string;
   }) {
-    const url = serverUrl(input.url),
+    const url = serverBaseUrl(input.url),
       config = await this.configuration();
     const info = await this.request<{
       protocol: string;
@@ -215,6 +210,7 @@ export class SyncManager {
     }>({ url, token: "" }, "/api/info");
     if (info.protocol !== syncProtocol)
       throw new CoreError("INVALID_DATA", "该地址不是兼容的 ShowAI Server。");
+    identifier(info.serverId);
     const result = input.token
       ? {
           ...(await this.request<{
@@ -377,7 +373,7 @@ export class SyncManager {
       : (await this.configuration()).connections.find(
           (item) => item.serverId === parameters.get("server"),
         );
-    const base = connection?.url ?? serverUrl(url.origin);
+    const base = connection?.url ?? invitationBaseUrl(link);
     const result = {
       url: base,
       invite,
@@ -549,6 +545,9 @@ export class SyncManager {
     project: ProjectConnection,
     record: SnapshotRecord,
   ) {
+    validateSnapshot(record.snapshot, project.remoteProjectId);
+    if (!(await validSnapshotRecord(record)))
+      throw new CoreError("INVALID_DATA", "服务器快照身份或摘要不匹配。");
     await atomicLibraryFile(
       this.home,
       this.snapshotPath(connection, project, record.revision),
@@ -562,11 +561,19 @@ export class SyncManager {
   ) {
     const path = this.snapshotPath(connection, project, revision),
       cached = await readJson<SnapshotRecord>(path);
-    if (cached && (await validSnapshotRecord(cached))) return cached;
+    if (cached) validateSnapshot(cached.snapshot, project.remoteProjectId);
+    if (
+      cached &&
+      cached.revision === revision &&
+      (await validSnapshotRecord(cached))
+    )
+      return cached;
     const record = await this.request<SnapshotRecord>(
       connection,
       `/api/projects/${project.remoteProjectId}/revisions/${revision}`,
     );
+    if (record.revision !== revision)
+      throw new CoreError("INVALID_DATA", "服务器返回了错误的快照版本。");
     await this.cacheRecord(connection, project, record);
     return record;
   }
@@ -575,43 +582,50 @@ export class SyncManager {
     project: ProjectConnection,
     record: SnapshotRecord,
   ) {
-    const files = await decodeSnapshot(record, async (digest) => {
-      const path = this.objectPath(digest);
-      const cached = await readFile(path).catch(
-        (error: NodeJS.ErrnoException) => {
-          if (error.code === "ENOENT") return null;
-          throw error;
-        },
-      );
-      if (cached) {
-        if (hash(cached) !== digest)
-          throw new CoreError(
-            "INVALID_DATA",
-            "本地同步缓存损坏，原始内容仍保留。",
-          );
-        return cached;
-      }
-      const response = await fetch(
-        `${connection.url}/api/projects/${project.remoteProjectId}/objects/${digest}`,
-        {
-          headers: { authorization: `Bearer ${connection.token}` },
-          signal: AbortSignal.timeout(30_000),
-        },
-      );
-      if (!response.ok) {
-        const error = await response.json();
-        throw new SyncError(
-          response.status,
-          error.error?.code ?? "MISSING_OBJECT",
-          error.error?.message ?? "下载资源失败。",
+    const files = await decodeSnapshot(
+      record,
+      async (digest) => {
+        const path = this.objectPath(
+          digest,
+          this.cacheKey(connection, project),
         );
-      }
-      const bytes = Buffer.from(await response.arrayBuffer());
-      if (hash(bytes) !== digest)
-        throw new CoreError("INVALID_DATA", "下载内容摘要不匹配。");
-      await atomicLibraryFile(this.home, path, bytes);
-      return bytes;
-    });
+        const cached = await readFile(path).catch(
+          (error: NodeJS.ErrnoException) => {
+            if (error.code === "ENOENT") return null;
+            throw error;
+          },
+        );
+        if (cached) {
+          if (hash(cached) !== digest)
+            throw new CoreError(
+              "INVALID_DATA",
+              "本地同步缓存损坏，原始内容仍保留。",
+            );
+          return cached;
+        }
+        const response = await fetch(
+          `${connection.url}/api/projects/${project.remoteProjectId}/objects/${digest}`,
+          {
+            headers: { authorization: `Bearer ${connection.token}` },
+            signal: AbortSignal.timeout(30_000),
+          },
+        );
+        if (!response.ok) {
+          const error = await response.json();
+          throw new SyncError(
+            response.status,
+            error.error?.code ?? "MISSING_OBJECT",
+            error.error?.message ?? "下载资源失败。",
+          );
+        }
+        const bytes = Buffer.from(await response.arrayBuffer());
+        if (hash(bytes) !== digest)
+          throw new CoreError("INVALID_DATA", "下载内容摘要不匹配。");
+        await atomicLibraryFile(this.home, path, bytes);
+        return bytes;
+      },
+      project.remoteProjectId,
+    );
     return remapProjectFiles(files, project.remoteProjectId, project.projectId);
   }
   private async upload(
@@ -673,7 +687,11 @@ export class SyncManager {
             value.error?.message ?? "上传资源失败。",
           );
         }
-        await atomicLibraryFile(this.home, this.objectPath(digest), bytes);
+        await atomicLibraryFile(
+          this.home,
+          this.objectPath(digest, this.cacheKey(connection, project)),
+          bytes,
+        );
       }
     }
     await this.cacheRecord(connection, project, captured);
@@ -1099,6 +1117,7 @@ export class SyncManager {
         history(),
         merge.files,
         localHead,
+        project.remoteProjectId,
       );
       const mergedHead = await library.head();
       pending.appliedHead = mergedHead;

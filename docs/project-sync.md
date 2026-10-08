@@ -15,6 +15,8 @@ SHOWAI_SERVER_HOME=/absolute/private/data SHOWAI_SERVER_PORT=8788 node dist-serv
 
 Linux 环境变量：`SHOWAI_SERVER_HOST`（默认 `127.0.0.1`）、`SHOWAI_SERVER_PORT`（默认 `8788`）、`SHOWAI_SERVER_HOME`、`SHOWAI_SERVER_NAME`、`SHOWAI_SERVER_URL`、`SHOWAI_REGISTRATION_KEY`。URL 未配置时，邀请使用请求的服务器地址。注册密钥可选，持有有效邀请的新成员可以通过邀请注册。服务数据目录应仅供服务进程读写。
 
+`SHOWAI_SERVER_URL` 和客户端连接地址支持根地址与子路径基址，例如 `https://example.com/cloud`。基址不包含 `/api`，末尾斜杠统一移除；请求、邀请和桌面加入链接保留该前缀。配置前缀后，服务仅处理该前缀内的路径。反向代理应保留完整前缀转发，外部邀请使用配置地址。
+
 `deployments/server/Dockerfile` 和 `compose.yml` 使用相同构建结果。挂载数据目录的 UID 需要允许容器内 UID 1000 写入。用户级 systemd 模板在 `deployments/server/showai-project-sync.service`，示例安装目录是 `~/services/showai-project-server`，运行时放在其中的 `runtime/`，服务配置放在权限为 0600 的 `server.env`。独立运行时不会替换系统 Node.js。
 
 Cloudflare 部署：
@@ -60,3 +62,5 @@ npx wrangler@4.148.0 deploy --config deployments/cloudflare/wrangler.jsonc
 恢复历史通过现有恢复动作创建新本地提交，再同步到服务器。目录路径与 Agent 目录绑定只保存在设备上。不同服务器中相同的项目 ID 可以映射为不同的本地 ID；同一服务器项目切换账号复用本地项目。
 
 项目同步包括正式提交内容和项目自己的旧格式导入检查点；旧检查点保留原始字节、已捕获的阅读器及未知的时间、作者和顺序，迁移描述只包含该项目。尚未提交的编辑器草稿仍保存在所属设备。当前单对象上传上限为 64 MB，超限明确报错并保留本地内容。同步数据不包含全局侧栏组织、其他项目、设备登录凭证或本机运行配置。
+
+导入会校验连接指定的远端项目身份，并在回放前预检整段历史。外来组件包使用项目自己的历史依赖目录，旧快照中的共享包经完整包校验后迁入该目录。全局包目录不能作为新版本的发布目标。共享阅读器必须由当前项目引用且通过完整指纹校验，同一键不能覆盖不同内容；设备绑定、其他项目路径、内部同步路径及目标文件系统中的路径别名会被拒绝。预检临时文件保存在设备本地同步目录，完成或拒绝后清除。

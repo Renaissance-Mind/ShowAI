@@ -1,5 +1,7 @@
 import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { GitLibrary } from "../core/git-library";
 import { LibraryOperations } from "../core/library-operations";
 import { encodeFile, decodeFile } from "../core/history-codec";
@@ -12,11 +14,14 @@ import { CoreError } from "../core/model";
 import { canonicalJson } from "../core/diff";
 import { previewPageMerge } from "../core/page-merge";
 import { parseArtifact, serializeArtifact } from "../portable/validation.mjs";
+import { validatePackageBundle } from "../core/catalog";
+import { validateReaderClosure } from "./dependency-validation";
 import {
   syncProtocol,
   legacySyncProtocol,
   snapshotRevision,
   validateSnapshot,
+  scopedPath,
   type ProjectSnapshot,
   type SnapshotRecord,
 } from "./protocol";
@@ -134,8 +139,9 @@ export async function captureProject(
 export async function decodeSnapshot(
   record: SnapshotRecord,
   readObject: (id: string) => Promise<Buffer>,
+  expectedProjectId = record.snapshot.projectId,
 ): Promise<Map<string, Buffer>> {
-  validateSnapshot(record.snapshot, record.snapshot.projectId);
+  validateSnapshot(record.snapshot, expectedProjectId);
   if (!(await validSnapshotRecord(record)))
     throw new CoreError(
       "INVALID_DATA",
@@ -159,7 +165,70 @@ export async function decodeSnapshot(
       continue;
     files.set(path, await decodeFile(path, read));
   }
-  return files;
+  await validateReaderClosure(files.keys(), expectedProjectId, async (path) =>
+    files.get(path)!,
+  );
+  return relocateLegacyPackages(files, expectedProjectId);
+}
+
+/** Old shared packages are read into an owned immutable depot, never installed globally. */
+function relocateLegacyPackages(files: Map<string, Buffer>, projectId: string) {
+  const roots = new Map<
+    string,
+    { kind: string; record: Record<string, unknown> }
+  >();
+  for (const [path, bytes] of files) {
+    const match = path.match(
+      /^(packages\/(?:published\/)?(components|templates)\/[^/]+\/[^/]+)\/(compiled|template)\.json$/,
+    );
+    if (match)
+      roots.set(match[1], {
+        kind: match[2],
+        record: JSON.parse(bytes.toString()),
+      });
+  }
+  if (
+    !roots.size &&
+    ![...files.keys()].some((path) => path.startsWith("packages/"))
+  )
+    return files;
+  for (const { kind, record } of roots.values()) {
+    validatePackageBundle({
+      format: "showai-catalog-bundle",
+      version: 1,
+      root: {
+        kind: kind === "components" ? "component" : "template",
+        id: record.id,
+        version: record.version,
+        integrity: record.integrity,
+      },
+      components: [...roots.values()]
+        .filter((item) => item.kind === "components")
+        .map((item) => ({ component: item.record })),
+      templates: [...roots.values()]
+        .filter((item) => item.kind === "templates")
+        .map((item) => item.record),
+    });
+  }
+  const result = new Map<string, Buffer>();
+  for (const [path, bytes] of files) {
+    if (!path.startsWith("packages/")) {
+      result.set(path, bytes);
+      continue;
+    }
+    const root = [...roots.keys()].find((root) => path.startsWith(root + "/"));
+    if (!root)
+      throw new CoreError(
+        "INVALID_DATA",
+        "A legacy package has no verified manifest.",
+      );
+    const ref = roots.get(root)!;
+    const target = `projects/${projectId}/packages/historical/${ref.kind}/${ref.record.integrity}/${path.slice(root.length + 1)}`;
+    if (result.has(target) && !result.get(target)!.equals(bytes))
+      throw new CoreError("INVALID_DATA", "Legacy dependency paths collide.");
+    result.set(target, bytes);
+  }
+  return result;
 }
 export async function validSnapshotRecord(record: SnapshotRecord) {
   if ((await snapshotRevision(record.snapshot)) === record.revision)
@@ -289,6 +358,138 @@ export async function projectHistory(
 }
 /** Original times/actors and remote graph identities survive replay into a shared local library. */
 export async function importProjectHistory(
+  home: string,
+  projectId: string,
+  serverId: string,
+  entries:
+    | Iterable<{ record: SnapshotRecord; files: Map<string, Buffer> }>
+    | AsyncIterable<{ record: SnapshotRecord; files: Map<string, Buffer> }>,
+  finalFiles: Map<string, Buffer>,
+  expectedHead: string | null,
+  remoteProjectId = projectId,
+) {
+  const library = new GitLibrary(home);
+  const tree = await library.tree(expectedHead ?? undefined);
+  const sharedPaths = new Set(
+    tree
+      .map((entry) => entry.path)
+      .filter((path) => path.startsWith("runtimes/readers/")),
+  );
+  const immutable = new Map<string, string>();
+  const identity = (path: string, bytes: Buffer) =>
+    digest(
+      path.endsWith("manifest.json")
+        ? Buffer.from(JSON.stringify(JSON.parse(bytes.toString())))
+        : bytes,
+    );
+  const validate = async (files: Map<string, Buffer>) => {
+    const names = new Set<string>();
+    for (const [path, bytes] of files) {
+      scopedPath(path, projectId);
+      if (path.startsWith("packages/"))
+        throw new CoreError(
+          "INVALID_DATA",
+          "Imported packages must belong to this project.",
+        );
+      const key = path.normalize("NFC").toLowerCase();
+      if (names.has(key))
+        throw new CoreError(
+          "INVALID_DATA",
+          "Imported paths collide on this filesystem.",
+        );
+      names.add(key);
+      if (!path.startsWith("runtimes/readers/")) continue;
+      const expected =
+        immutable.get(path) ??
+        (sharedPaths.has(path)
+          ? identity(
+              path,
+              await library.readFile(path, expectedHead ?? undefined),
+            )
+          : undefined);
+      const actual = identity(path, bytes);
+      if (expected && expected !== actual)
+        throw new CoreError(
+          "INVALID_DATA",
+          "A shared immutable reader cannot be overwritten.",
+        );
+      immutable.set(path, actual);
+    }
+    const metadata = JSON.parse(
+      files.get(`projects/${projectId}/project.json`)!.toString(),
+    );
+    if (
+      metadata.id !== projectId ||
+      ["sourceDirectory", "binding", "bindings"].some((key) =>
+        Object.hasOwn(metadata, key),
+      )
+    )
+      throw new CoreError(
+        "INVALID_DATA",
+        "Imported project identity or device bindings are invalid.",
+      );
+    await validateReaderClosure(files.keys(), projectId, async (path) =>
+      files.get(path)!,
+    );
+  };
+  // Validate the complete sequence before replay; spool bytes so history size does not
+  // multiply memory use. A rejected later record must not leave earlier writes behind.
+  const parent = join(home, "local", "sync");
+  await mkdir(parent, { recursive: true });
+  const spool = await mkdtemp(join(parent, "validated-import-"));
+  let count = 0;
+  try {
+    for await (const { record, files } of entries) {
+      validateSnapshot(record.snapshot, remoteProjectId);
+      if (!(await validSnapshotRecord(record)))
+        throw new CoreError(
+          "INVALID_DATA",
+          "Imported snapshot integrity is invalid.",
+        );
+      await validate(files);
+      const folder = join(spool, String(count++));
+      await mkdir(folder);
+      const paths = [...files.keys()];
+      for (let index = 0; index < paths.length; index++)
+        await writeFile(join(folder, String(index)), files.get(paths[index])!, {
+          mode: 0o600,
+        });
+      await writeFile(
+        join(folder, "entry.json"),
+        JSON.stringify({ record, paths }),
+        { mode: 0o600 },
+      );
+    }
+    await validate(finalFiles);
+    async function* validated() {
+      for (let index = 0; index < count; index++) {
+        const folder = join(spool, String(index));
+        const { record, paths } = JSON.parse(
+          await readFile(join(folder, "entry.json"), "utf8"),
+        ) as { record: SnapshotRecord; paths: string[] };
+        const files = new Map<string, Buffer>();
+        for (let offset = 0; offset < paths.length; offset++)
+          files.set(
+            paths[offset],
+            await readFile(join(folder, String(offset))),
+          );
+        yield { record, files };
+      }
+    }
+    return await replayProjectHistory(
+      home,
+      projectId,
+      serverId,
+      validated(),
+      finalFiles,
+      expectedHead,
+    );
+  } finally {
+    await rm(spool, { recursive: true, force: true });
+  }
+}
+
+async function replayProjectHistory(
   home: string,
   projectId: string,
   serverId: string,

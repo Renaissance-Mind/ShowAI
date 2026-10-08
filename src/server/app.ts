@@ -15,6 +15,12 @@ import {
   type ProjectSnapshot,
 } from "../sync/protocol";
 import { schema, type MetadataStore, type ObjectStore } from "./storage";
+import { validateReaderClosure } from "../sync/dependency-validation";
+import {
+  serverBaseUrl,
+  serverEndpoint,
+  invitationUrl,
+} from "../sync/server-url";
 
 export interface ServerOptions {
   metadata: MetadataStore;
@@ -88,6 +94,12 @@ async function body(request: Request): Promise<Record<string, unknown>> {
 
 /** Identical request handler for Workers and the Linux HTTP host. */
 export function createSyncServer(options: ServerOptions) {
+  const publicBase = options.publicUrl
+    ? serverBaseUrl(options.publicUrl)
+    : undefined;
+  const basePath = publicBase
+    ? new URL(publicBase).pathname.replace(/\/$/, "")
+    : "";
   const db = options.metadata,
     objects = options.objects;
   let initialization: Promise<string> | undefined;
@@ -177,10 +189,16 @@ export function createSyncServer(options: ServerOptions) {
     );
   }
   async function handle(request: Request): Promise<Response> {
-    await serverId();
-    const url = new URL(request.url),
-      path = url.pathname.replace(/\/$/, ""),
+    const url = new URL(request.url);
+    if (
+      basePath &&
+      url.pathname !== basePath &&
+      !url.pathname.startsWith(basePath + "/")
+    )
+      throw new SyncError(404, "NOT_FOUND", "Unknown server path.");
+    const path = url.pathname.slice(basePath.length).replace(/\/$/, ""),
       method = request.method;
+    await serverId();
     if (path === "/health" || path === "/api/info")
       return json({
         protocol: syncProtocol,
@@ -268,7 +286,7 @@ export function createSyncServer(options: ServerOptions) {
     }
     if (path === "/join" && method === "GET") {
       return new Response(
-        `<!doctype html><html lang="zh"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>加入 ShowAI 项目</title><body style="font-family:system-ui;max-width:560px;margin:15vh auto;padding:24px"><h1>加入 ShowAI 项目</h1><p>打开 ShowAI，确认项目与权限后，使用你在此服务器上的账号加入。</p><a id="open" style="display:inline-block;padding:12px 18px;background:#343b36;color:white;border-radius:8px;text-decoration:none">在 ShowAI 中打开</a><p>也可以在「设置 → 服务器与同步」中粘贴当前邀请链接。</p><script>const invite=new URLSearchParams(location.hash.slice(1)).get('invite');if(invite&&/^[a-f0-9]{64}$/.test(invite)){const target=new URL('showai://join');target.searchParams.set('server',location.origin);target.searchParams.set('invite',invite);const serverId=new URLSearchParams(location.hash.slice(1)).get('server');if(serverId)target.searchParams.set('serverId',serverId);document.getElementById('open').href=target.href;}else{document.getElementById('open').textContent='邀请链接无效';}</script></body></html>`,
+        `<!doctype html><html lang="zh"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>加入 ShowAI 项目</title><body style="font-family:system-ui;max-width:560px;margin:15vh auto;padding:24px"><h1>加入 ShowAI 项目</h1><p>打开 ShowAI，确认项目与权限后，使用你在此服务器上的账号加入。</p><a id="open" style="display:inline-block;padding:12px 18px;background:#343b36;color:white;border-radius:8px;text-decoration:none">在 ShowAI 中打开</a><p>也可以在「设置 → 服务器与同步」中粘贴当前邀请链接。</p><script>const invite=new URLSearchParams(location.hash.slice(1)).get('invite');if(invite&&/^[a-f0-9]{64}$/.test(invite)){const target=new URL('showai://join');target.searchParams.set('server',${JSON.stringify(publicBase)}??location.origin);target.searchParams.set('invite',invite);const serverId=new URLSearchParams(location.hash.slice(1)).get('server');if(serverId)target.searchParams.set('serverId',serverId);document.getElementById('open').href=target.href;}else{document.getElementById('open').textContent='邀请链接无效';}</script></body></html>`,
         {
           headers: {
             "content-type": "text/html; charset=utf-8",
@@ -467,14 +485,20 @@ export function createSyncServer(options: ServerOptions) {
           },
         };
         const response = await handle(
-          new Request(`${url.origin}/api/projects/${projectId}/revisions`, {
-            method: "POST",
-            headers: {
-              authorization: request.headers.get("authorization")!,
-              "content-type": "application/json",
+          new Request(
+            serverEndpoint(
+              publicBase ?? url.origin,
+              `/api/projects/${projectId}/revisions`,
+            ),
+            {
+              method: "POST",
+              headers: {
+                authorization: request.headers.get("authorization")!,
+                "content-type": "application/json",
+              },
+              body: JSON.stringify({ snapshot: next, expected: project.head }),
             },
-            body: JSON.stringify({ snapshot: next, expected: project.head }),
-          }),
+          ),
         );
         if (!response.ok) return response;
       }
@@ -529,11 +553,11 @@ export function createSyncServer(options: ServerOptions) {
         "INSERT INTO invites(digest,project_id,role,created_by,expires_at) VALUES(?,?,?,?,?)",
         [await hash(invite), projectId, role(input.role), user.id, expiresAt],
       );
-      const link = new URL("/join", options.publicUrl ?? url.origin);
-      link.hash = new URLSearchParams({
+      const link = invitationUrl(
+        publicBase ?? url.origin,
         invite,
-        server: await serverId(),
-      }).toString();
+        await serverId(),
+      );
       return json(
         { invite, url: link.toString(), role: input.role, expiresAt },
         201,
@@ -698,6 +722,17 @@ export function createSyncServer(options: ServerOptions) {
       const input = await body(request),
         snapshot: ProjectSnapshot = validateSnapshot(input.snapshot, projectId),
         revision = await snapshotRevision(snapshot);
+      if (
+        Object.keys(snapshot.files).some((path) =>
+          path.startsWith("packages/"),
+        ) ||
+        snapshot.change.paths.some((path) => path.startsWith("packages/"))
+      )
+        throw new SyncError(
+          400,
+          "INVALID_DEPENDENCY",
+          "Publish packages in the project's dependency directory.",
+        );
       const projectBytes = await objects.get(
         objectKey(
           projectId,
@@ -709,7 +744,13 @@ export function createSyncServer(options: ServerOptions) {
         const metadata = JSON.parse(new TextDecoder().decode(projectBytes));
         const value =
           metadata.format === "showai-stored-json" ? metadata.value : metadata;
-        if (value.id !== projectId || typeof value.name !== "string")
+        if (
+          value.id !== projectId ||
+          typeof value.name !== "string" ||
+          ["sourceDirectory", "binding", "bindings"].some((key) =>
+            Object.hasOwn(value, key),
+          )
+        )
           throw new SyncError(
             400,
             "INVALID_PROJECT",
@@ -747,6 +788,22 @@ export function createSyncServer(options: ServerOptions) {
             "Upload every referenced content object before publishing.",
           );
       }
+      await validateReaderClosure(
+        Object.keys(snapshot.files),
+        projectId,
+        async (path) => {
+          const bytes = await objects.get(
+            objectKey(projectId, snapshot.files[path]),
+          );
+          if (!bytes || (await hash(bytes)) !== snapshot.files[path])
+            throw new SyncError(
+              400,
+              "INVALID_DEPENDENCY",
+              "A reader object is missing or corrupt.",
+            );
+          return bytes;
+        },
+      );
       await db.run(
         "INSERT OR IGNORE INTO revisions(project_id,revision,manifest,user_id,created_at) VALUES(?,?,?,?,?)",
         [

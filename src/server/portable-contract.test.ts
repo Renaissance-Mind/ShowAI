@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { startSyncServer } from "./node";
 import { hash } from "../sync/protocol";
+import { invitationBaseUrl, serverBaseUrl } from "../sync/server-url";
 
 test("the actual deployment shares invitations and cannot restore removed membership", async () => {
   const directory = await mkdtemp(join(tmpdir(), "showai-portable-contract-"));
@@ -61,8 +62,8 @@ test("the actual deployment shares invitations and cannot restore removed member
     ).value;
     expect(invitation.url).toMatch(/^https?:\/\//);
     if (process.env.SHOWAI_SYNC_TEST_PUBLIC_URL)
-      expect(new URL(invitation.url).origin).toBe(
-        process.env.SHOWAI_SYNC_TEST_PUBLIC_URL,
+      expect(invitationBaseUrl(invitation.url)).toBe(
+        serverBaseUrl(process.env.SHOWAI_SYNC_TEST_PUBLIC_URL),
       );
     const acceptance = await Promise.all(
       [member, other].map((user) =>

@@ -121,8 +121,19 @@ export function scopedPath(path: string, projectId: string): string {
     !path ||
     path.length > 2000 ||
     path.includes("\\") ||
+    /[<>:"|?*]/.test(path) ||
     /[\x00-\x1f]/.test(path) ||
-    path.split("/").some((part) => !part || part === "." || part === "..") ||
+    path
+      .split("/")
+      .some(
+        (part) =>
+          !part ||
+          part === "." ||
+          part === ".." ||
+          /[. ]$/.test(part) ||
+          /^(?:\.git|\.sync)$/i.test(part) ||
+          /^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i.test(part),
+      ) ||
     !(
       path.startsWith(`projects/${identifier(projectId)}/`) ||
       /^assets\/[a-f0-9]{64}$/.test(path) ||
@@ -175,6 +186,15 @@ export function validateSnapshot(
     scopedPath(path, projectId);
     digestId(input.files[path]);
   }
+  const portablePaths = paths.map((path) =>
+    path.normalize("NFC").toLowerCase(),
+  );
+  if (new Set(portablePaths).size !== paths.length)
+    throw new SyncError(
+      400,
+      "INVALID_PATH",
+      "Snapshot paths collide on a case-insensitive filesystem.",
+    );
   const change = input.change;
   if (
     !Number.isFinite(Date.parse(change.at)) ||

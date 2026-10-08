@@ -5,6 +5,7 @@ import { atomicRename } from "../core/atomic-rename";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { syncProtocol } from "../sync/protocol";
+import { serverBaseUrl } from "../sync/server-url";
 import { createSyncServer, type ServerOptions } from "./app";
 import {
   schema,
@@ -153,7 +154,7 @@ export async function startSyncServer(
     throw new Error("No server address.");
   return {
     server,
-    url: `http://${options.host === "0.0.0.0" ? "127.0.0.1" : (options.host ?? "127.0.0.1")}:${address.port}`,
+    url: `http://${options.host === "0.0.0.0" ? "127.0.0.1" : (options.host ?? "127.0.0.1")}:${address.port}${options.publicUrl ? new URL(serverBaseUrl(options.publicUrl)).pathname.replace(/\/$/, "") : ""}`,
     async close() {
       server.closeAllConnections();
       await new Promise<void>((done, reject) =>

@@ -23,6 +23,7 @@ import { windowQuery, type WindowTarget } from "../workbench/window-target";
 import { AgentService, errorResult } from "../agent/service";
 import { MaintenanceScheduler } from "../core/maintenance-scheduler";
 import { syncManager } from "../sync/manager";
+import { deepLinkInvitation } from "../sync/server-url";
 import { openLibrary } from "../core/open-library";
 import { registerRuntime } from "../agent/runtime";
 import { assertId, CoreError, FileStore } from "../core/store";
@@ -455,20 +456,7 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
 async function openDeepLink(source: string): Promise<void> {
   const url = new URL(source);
   if (url.protocol === "showai:" && url.hostname === "join") {
-    const server = new URL(url.searchParams.get("server") ?? ""),
-      invite = url.searchParams.get("invite");
-    if (
-      !["http:", "https:"].includes(server.protocol) ||
-      server.username ||
-      server.password ||
-      !invite ||
-      !/^[a-f0-9]{64}$/.test(invite)
-    )
-      throw new CoreError("INVALID_PATH", "项目邀请链接无效。");
-    const link = new URL("/join", server.origin);
-    link.hash = `invite=${invite}`;
-    const serverId = url.searchParams.get("serverId");
-    if (serverId) link.hash += `&server=${encodeURIComponent(serverId)}`;
+    const link = deepLinkInvitation(source);
     await createWindow({ invite: link.toString() });
     return;
   }
