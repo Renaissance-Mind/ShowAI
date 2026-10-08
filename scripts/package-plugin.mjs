@@ -1,4 +1,4 @@
-import { access, readFile, readdir, rm } from "node:fs/promises";
+import { access, copyFile, mkdir, readFile, readdir, rm } from "node:fs/promises";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -20,6 +20,16 @@ const manifest = JSON.parse(
 );
 if (manifest.mcpServers || manifest.apps)
   throw new Error("The ShowAI plugin distributes skills only.");
+// Keep plugin branding identical to the application's theme-specific icons.
+await mkdir(join(plugin, "assets"), { recursive: true });
+for (const [source, target] of [
+  ["icon.svg", "logo.svg"],
+  ["icon-light.svg", "logo-dark.svg"],
+])
+  await copyFile(
+    join(root, "src/desktop/assets", source),
+    join(plugin, "assets", target),
+  );
 const skills = (await readdir(join(plugin, "skills"))).sort();
 for (const skill of skills) {
   await access(join(plugin, "skills", skill, "SKILL.md"));

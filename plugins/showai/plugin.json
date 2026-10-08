@@ -20,7 +20,11 @@
         "defaultPrompt": [
           "Use ShowAI to present this research as an interactive page."
         ],
-        "brandColor": "#34644E"
+        "brandColor": "#06A5FA",
+        "composerIcon": "./assets/logo.svg",
+        "composerIconDark": "./assets/logo-dark.svg",
+        "logo": "./assets/logo.svg",
+        "logoDark": "./assets/logo-dark.svg"
       }
     }
   }
