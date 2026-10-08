@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "blue": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$",
+      "description": "中间矩形的颜色，六位十六进制色值。"
+    },
+    "cornerDiameter": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 180,
+      "description": "内部矩形的圆角直径；SVG 半径是该值的一半。"
+    },
+    "spacing": {
+      "type": "integer",
+      "minimum": 60,
+      "maximum": 160,
+      "description": "矩形错位相对于原图的百分比，100 对应横向 60、纵向 48。"
+    },
+    "gap": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 24,
+      "description": "层间可见留白宽度，按 512 × 512 坐标计。"
+    }
+  },
+  "required": ["blue", "cornerDiameter", "spacing", "gap"],
+  "additionalProperties": false
+}

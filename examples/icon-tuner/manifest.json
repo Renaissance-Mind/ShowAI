@@ -1,0 +1,46 @@
+{
+  "id": "stacked-icon-tuner",
+  "name": "图标调节器",
+  "version": "1.1.0",
+  "description": "用滑块调整三层矩形图标的圆角、错位和留白，并修改中间的蓝色，同时比较亮暗界面的图标。",
+  "category": "image",
+  "scenarios": [
+    "调整三层矩形图标的圆角、颜色和间距。",
+    "比较相同参数在亮暗界面的表现，并取得 SVG 源码。"
+  ],
+  "effects": [
+    "参数变化立即更新两套 SVG 预览。",
+    "工作台中的有效修改通过宿主保存；阅读器保留临时探索。",
+    "提供亮暗两版的可选择 SVG 源码。"
+  ],
+  "entry": "index.tsx",
+  "reader": "readData",
+  "defaultData": {
+    "blue": "#06A5FA",
+    "cornerDiameter": 74,
+    "spacing": 125,
+    "gap": 16
+  },
+  "examples": [
+    {
+      "name": "当前选定版本",
+      "request": "使用最新选定的内部圆角、间距和留白。",
+      "data": {
+        "blue": "#06A5FA",
+        "cornerDiameter": 74,
+        "spacing": 125,
+        "gap": 16
+      }
+    },
+    {
+      "name": "原始比例",
+      "request": "以最初的内部形状与间距继续调整。",
+      "data": {
+        "blue": "#06A5FA",
+        "cornerDiameter": 36,
+        "spacing": 100,
+        "gap": 10
+      }
+    }
+  ]
+}
