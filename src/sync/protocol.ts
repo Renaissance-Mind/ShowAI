@@ -148,6 +148,9 @@ export function scopedPath(path: string, projectId: string): string {
     );
   return path;
 }
+export function portablePathKey(path: string): string {
+  return path.normalize("NFC").toUpperCase().normalize("NFC");
+}
 export function validateSnapshot(
   value: unknown,
   projectId: string,
@@ -186,9 +189,7 @@ export function validateSnapshot(
     scopedPath(path, projectId);
     digestId(input.files[path]);
   }
-  const portablePaths = paths.map((path) =>
-    path.normalize("NFC").toLowerCase(),
-  );
+  const portablePaths = paths.map(portablePathKey);
   if (new Set(portablePaths).size !== paths.length)
     throw new SyncError(
       400,
@@ -254,6 +255,7 @@ export interface ServerConnection {
   url: string;
   user: SyncUser;
   token: string;
+  capabilities?: string[];
 }
 export interface ProjectConnection {
   projectId: string;

@@ -22,6 +22,9 @@ interface WorkerEnvironment {
   SHOWAI_SERVER_NAME?: string;
   SHOWAI_SERVER_URL?: string;
   SHOWAI_REGISTRATION_KEY?: string;
+  SHOWAI_REGISTRATION_LIMIT?: string;
+  SHOWAI_ACCOUNT_LIMIT?: string;
+  SHOWAI_ALLOWED_ORIGINS?: string;
 }
 export function workerMetadata(env: WorkerEnvironment): MetadataStore {
   const statement = (sql: string, values: SqlValue[] = []) =>
@@ -68,9 +71,20 @@ export default {
         publicUrl: env.SHOWAI_SERVER_URL,
         registrationKey: env.SHOWAI_REGISTRATION_KEY,
         autoMigrate: false,
+        registrationMode: "controlled",
+        accountLimit: env.SHOWAI_ACCOUNT_LIMIT
+          ? Number(env.SHOWAI_ACCOUNT_LIMIT)
+          : undefined,
+        registrationLimit: env.SHOWAI_REGISTRATION_LIMIT
+          ? Number(env.SHOWAI_REGISTRATION_LIMIT)
+          : undefined,
+        allowedOrigins: env.SHOWAI_ALLOWED_ORIGINS?.split(",").filter(Boolean),
+        requirePublicOrigin: true,
       });
       instances.set(env, app);
     }
-    return app.fetch(request);
+    return app.fetch(request, {
+      source: request.headers.get("cf-connecting-ip") ?? "unknown",
+    });
   },
 };

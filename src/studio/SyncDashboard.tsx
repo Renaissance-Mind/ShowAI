@@ -24,6 +24,8 @@ export type SyncInvite = {
   accepted_by: string | null;
   accepted_count?: number;
   revoked: number;
+  max_uses?: number | null;
+  target_name?: string | null;
 };
 const roles: Record<ProjectRole, string> = {
   admin: "管理员",
@@ -51,6 +53,7 @@ export default function SyncDashboard({
   inviteRole,
   generatedInvite,
   generatedInviteExpiresAt,
+  generatedInvitePolicy,
   onSelect,
   onCreate,
   onRole,
@@ -70,12 +73,13 @@ export default function SyncDashboard({
   inviteRole: ProjectRole;
   generatedInvite: string;
   generatedInviteExpiresAt: string;
+  generatedInvitePolicy: string;
   onSelect: (id: string) => void;
   onCreate: (name: string) => Promise<boolean>;
   onRole: (member: SyncMember, role: ProjectRole) => void;
-  onRemove: (member: SyncMember) => Promise<boolean>;
+  onRemove: (member: SyncMember, revokeInvites: boolean) => Promise<boolean>;
   onInviteRole: (role: ProjectRole) => void;
-  onInvite: () => void;
+  onInvite: (options: { maxUses: number | null; targetName?: string }) => void;
   onCopy: () => Promise<boolean>;
   onRevoke: (digest: string) => void;
   onArchive: (archived: boolean) => Promise<boolean>;
@@ -83,6 +87,11 @@ export default function SyncDashboard({
   const [showCreate, setShowCreate] = useState(false),
     [name, setName] = useState("");
   const [query, setQuery] = useState("");
+  const [inviteUses, setInviteUses] = useState("25"),
+    [inviteTarget, setInviteTarget] = useState("");
+  const [revokeRelated, setRevokeRelated] = useState(true);
+  const controlledInvites =
+    !!connection?.capabilities?.includes("invite-controls-v1");
   const [remove, setRemove] = useState<SyncMember | null>(null),
     [archive, setArchive] = useState(false),
     [copied, setCopied] = useState(false);
@@ -316,6 +325,7 @@ export default function SyncDashboard({
                               confirmationTrigger.current = event.currentTarget;
                               setArchive(false);
                               setRemove(member);
+                              setRevokeRelated(true);
                             }}
                           >
                             移出
@@ -340,8 +350,23 @@ export default function SyncDashboard({
                 >
                   <p>
                     移出 <strong>{remove.name}</strong>？
-                    <span>该成员将无法访问此项目。</span>
+                    <span>
+                      该成员将无法继续访问云端内容；已下载副本仍由其设备持有。
+                    </span>
                   </p>
+                  {controlledInvites && (
+                    <label className="sync-revoke-choice">
+                      <input
+                        type="checkbox"
+                        checked={revokeRelated}
+                        disabled={busy}
+                        onChange={(event) =>
+                          setRevokeRelated(event.target.checked)
+                        }
+                      />
+                      同时撤销该成员创建或领取过的仍有效邀请
+                    </label>
+                  )}
                   <div>
                     <button
                       className="settings-button"
@@ -355,7 +380,10 @@ export default function SyncDashboard({
                       disabled={busy}
                       onClick={() => {
                         confirmationTrigger.current?.focus();
-                        void onRemove(remove).then((ok) => {
+                        void onRemove(
+                          remove,
+                          controlledInvites && revokeRelated,
+                        ).then((ok) => {
                           if (ok) setRemove(null);
                         });
                       }}
@@ -377,7 +405,9 @@ export default function SyncDashboard({
                 </h3>
               </div>
               <p className="sync-section-description">
-                同一链接可供多人注册或加入项目，人数不限。
+                {controlledInvites
+                  ? "同一链接可供多人注册或加入，可限制领取账号数或指定已注册账号。"
+                  : "同一链接可供多人注册或加入项目，人数不限。"}
               </p>
               <div className="sync-invite-controls">
                 <label>
@@ -393,10 +423,50 @@ export default function SyncDashboard({
                     {roleOptions}
                   </select>
                 </label>
+                {controlledInvites && (
+                  <>
+                    <label>
+                      <span>领取账号数</span>
+                      <select
+                        aria-label="邀请领取上限"
+                        value={inviteUses}
+                        disabled={busy}
+                        onChange={(event) => setInviteUses(event.target.value)}
+                      >
+                        <option value="1">1 个账号</option>
+                        <option value="5">5 个账号</option>
+                        <option value="25">25 个账号</option>
+                        <option value="100">100 个账号</option>
+                        <option value="unlimited">不限账号数</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>指定账号（可选）</span>
+                      <input
+                        aria-label="指定已注册账号"
+                        placeholder="已注册的账号名"
+                        maxLength={100}
+                        value={inviteTarget}
+                        disabled={busy}
+                        onChange={(event) =>
+                          setInviteTarget(event.target.value)
+                        }
+                      />
+                    </label>
+                  </>
+                )}
                 <button
                   className="settings-button sync-primary"
                   disabled={busy}
-                  onClick={onInvite}
+                  onClick={() =>
+                    onInvite({
+                      maxUses:
+                        inviteUses === "unlimited" ? null : Number(inviteUses),
+                      ...(inviteTarget.trim()
+                        ? { targetName: inviteTarget.trim() }
+                        : {}),
+                    })
+                  }
                 >
                   生成邀请链接
                 </button>
@@ -431,7 +501,7 @@ export default function SyncDashboard({
                     </button>
                   </div>
                   <p>
-                    加入人数不限
+                    {generatedInvitePolicy || "加入人数不限"}
                     {generatedInviteExpiresAt &&
                       ` · ${new Date(generatedInviteExpiresAt).toLocaleString("zh-CN", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })} 到期`}
                   </p>
@@ -453,7 +523,14 @@ export default function SyncDashboard({
                             已有{" "}
                             {invite.accepted_count ??
                               (invite.accepted_by ? 1 : 0)}{" "}
-                            人加入 ·{" "}
+                            人加入
+                            {invite.max_uses != null
+                              ? ` / 上限 ${invite.max_uses} 个账号`
+                              : " / 不限账号数"}
+                            {invite.target_name
+                              ? ` · 指定 ${invite.target_name}`
+                              : ""}{" "}
+                            ·{" "}
                             {expired
                               ? "已过期"
                               : `${new Date(invite.expires_at).toLocaleString("zh-CN", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })} 到期`}

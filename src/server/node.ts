@@ -134,6 +134,7 @@ export async function startSyncServer(
               : {}),
           },
         ),
+        { source: incoming.socket.remoteAddress ?? "unknown" },
       );
       outgoing.writeHead(response.status, Object.fromEntries(response.headers));
       if (response.body)
@@ -176,6 +177,16 @@ if (
     name: process.env.SHOWAI_SERVER_NAME,
     publicUrl: process.env.SHOWAI_SERVER_URL,
     registrationKey: process.env.SHOWAI_REGISTRATION_KEY,
+    registrationMode: process.env
+      .SHOWAI_REGISTRATION_MODE as ServerOptions["registrationMode"],
+    registrationLimit: process.env.SHOWAI_REGISTRATION_LIMIT
+      ? Number(process.env.SHOWAI_REGISTRATION_LIMIT)
+      : undefined,
+    accountLimit: process.env.SHOWAI_ACCOUNT_LIMIT
+      ? Number(process.env.SHOWAI_ACCOUNT_LIMIT)
+      : undefined,
+    allowedOrigins:
+      process.env.SHOWAI_ALLOWED_ORIGINS?.split(",").filter(Boolean),
   });
   console.log(
     JSON.stringify({

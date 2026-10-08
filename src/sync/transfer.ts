@@ -22,6 +22,7 @@ import {
   snapshotRevision,
   validateSnapshot,
   scopedPath,
+  portablePathKey,
   type ProjectSnapshot,
   type SnapshotRecord,
 } from "./protocol";
@@ -370,6 +371,11 @@ export async function importProjectHistory(
 ) {
   const library = new GitLibrary(home);
   const tree = await library.tree(expectedHead ?? undefined);
+  const existingAliases = new Map<string, string[]>();
+  for (const entry of tree) {
+    const key = portablePathKey(entry.path);
+    existingAliases.set(key, [...(existingAliases.get(key) ?? []), entry.path]);
+  }
   const sharedPaths = new Set(
     tree
       .map((entry) => entry.path)
@@ -391,7 +397,18 @@ export async function importProjectHistory(
           "INVALID_DATA",
           "Imported packages must belong to this project.",
         );
-      const key = path.normalize("NFC").toLowerCase();
+      const key = portablePathKey(path);
+      const outsideAlias = existingAliases
+        .get(key)
+        ?.some(
+          (alias) =>
+            alias !== path && !alias.startsWith(`projects/${projectId}/`),
+        );
+      if (outsideAlias)
+        throw new CoreError(
+          "INVALID_DATA",
+          "Imported paths alias an existing resource outside this project.",
+        );
       if (names.has(key))
         throw new CoreError(
           "INVALID_DATA",

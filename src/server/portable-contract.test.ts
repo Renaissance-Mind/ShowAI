@@ -10,7 +10,11 @@ test("the actual deployment shares invitations and cannot restore removed member
   const directory = await mkdtemp(join(tmpdir(), "showai-portable-contract-"));
   const local = process.env.SHOWAI_SYNC_TEST_URL
     ? undefined
-    : await startSyncServer({ home: directory, port: 0 });
+    : await startSyncServer({
+        home: directory,
+        port: 0,
+        registrationMode: "open",
+      });
   const url = process.env.SHOWAI_SYNC_TEST_URL ?? local!.url;
   const request = async (
     path: string,

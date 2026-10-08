@@ -36,7 +36,11 @@ async function fixture() {
   );
   const server = process.env.SHOWAI_SYNC_TEST_URL
     ? { url: process.env.SHOWAI_SYNC_TEST_URL }
-    : await startSyncServer({ home: join(directory, "server"), port: 0 });
+    : await startSyncServer({
+        home: join(directory, "server"),
+        port: 0,
+        registrationMode: "open",
+      });
   if ("close" in server) actions.push(() => server.close());
   const clients = [];
   for (const name of ["Alice", "Bob"]) {
@@ -49,7 +53,7 @@ async function fixture() {
     const connection = await manager.connect({
       url: server.url,
       account: `${name}-${crypto.randomUUID()}`,
-      password: "test",
+      password: "test-password",
       register: true,
       registrationKey: process.env.SHOWAI_SYNC_TEST_KEY,
     });
@@ -478,7 +482,7 @@ describe("project synchronization between independent real content libraries", (
     const connection = await sender.connect({
       url: alice.connection.url,
       account: `Legacy-${crypto.randomUUID()}`,
-      password: "test",
+      password: "test-password",
       register: true,
       registrationKey: process.env.SHOWAI_SYNC_TEST_KEY,
     });
@@ -579,12 +583,13 @@ describe("project synchronization between independent real content libraries", (
     const server = await startSyncServer({
       home: join(directory, "second-server"),
       port: 0,
+      registrationMode: "open",
     });
     actions.push(() => server.close());
     const other = await alice.manager.connect({
       url: server.url,
       account: "Other",
-      password: "test",
+      password: "test-password",
       register: true,
     });
     await alice.manager.stop();
@@ -594,7 +599,7 @@ describe("project synchronization between independent real content libraries", (
     const connection = await bob.manager.connect({
       url: server.url,
       account: "Bob-two",
-      password: "test",
+      password: "test-password",
       register: true,
     });
     await bob.manager.stop();

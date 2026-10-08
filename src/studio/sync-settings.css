@@ -429,6 +429,17 @@
 .sync-invite-controls select {
   min-width: 145px;
 }
+.sync-invite-controls input {
+  min-width: 180px;
+  max-width: 100%;
+}
+.sync-revoke-choice {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 10px 0;
+  font-size: 13px;
+}
 .sync-generated-invite {
   margin-top: 18px;
   padding: 14px;

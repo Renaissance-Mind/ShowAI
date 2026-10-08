@@ -1,6 +1,7 @@
 import { readFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createHash } from "node:crypto";
+import { hostname } from "node:os";
 import { Buffer } from "node:buffer";
 import { atomicLibraryFile } from "../core/library-files";
 import { withLibraryLock } from "../core/library-lock";
@@ -30,6 +31,7 @@ import {
   syncProtocol,
   identifier,
   validateSnapshot,
+  portablePathKey,
   type ProjectConnection,
   type ServerConnection,
   type SnapshotRecord,
@@ -207,10 +209,18 @@ export class SyncManager {
       protocol: string;
       serverId: string;
       name: string;
+      capabilities?: string[];
     }>({ url, token: "" }, "/api/info");
     if (info.protocol !== syncProtocol)
       throw new CoreError("INVALID_DATA", "该地址不是兼容的 ShowAI Server。");
     identifier(info.serverId);
+    if (
+      info.capabilities !== undefined &&
+      (!Array.isArray(info.capabilities) ||
+        info.capabilities.length > 50 ||
+        info.capabilities.some((item) => typeof item !== "string"))
+    )
+      throw new CoreError("INVALID_DATA", "服务器能力说明无效。");
     const result = input.token
       ? {
           ...(await this.request<{
@@ -232,7 +242,7 @@ export class SyncManager {
             password: input.password,
             registrationKey: input.registrationKey,
             invite: input.invite,
-            device: config.deviceId,
+            device: `ShowAI · ${hostname().slice(0, 180)}`,
           },
         );
     if (result.serverId !== info.serverId)
@@ -249,6 +259,7 @@ export class SyncManager {
       url,
       user: result.user,
       token: result.token,
+      capabilities: info.capabilities,
     };
     await this.update((next) => {
       next.deviceId = config.deviceId;
@@ -297,6 +308,7 @@ export class SyncManager {
     return connection;
   }
   async remoteProjects(connectionId: string) {
+    await this.refreshCapabilities(connectionId);
     return this.request<SyncProject[]>(
       await this.connection(connectionId),
       "/api/projects",
@@ -352,7 +364,33 @@ export class SyncManager {
     );
   }
   async sessions(connectionId: string) {
+    await this.refreshCapabilities(connectionId);
     return this.request(await this.connection(connectionId), "/api/sessions");
+  }
+  private async refreshCapabilities(connectionId: string) {
+    const connection = await this.connection(connectionId);
+    const info = await this.request<{
+      serverId: string;
+      capabilities?: string[];
+    }>(connection, "/api/info");
+    if (
+      info.serverId !== connection.serverId ||
+      (info.capabilities !== undefined &&
+        (!Array.isArray(info.capabilities) ||
+          info.capabilities.length > 50 ||
+          info.capabilities.some((item) => typeof item !== "string")))
+    )
+      throw new CoreError("INVALID_DATA", "服务器身份或能力说明无效。");
+    if (
+      JSON.stringify(connection.capabilities) !==
+      JSON.stringify(info.capabilities)
+    )
+      await this.update((config) => {
+        const saved = config.connections.find(
+          (item) => item.id === connectionId,
+        );
+        if (saved) saved.capabilities = info.capabilities;
+      });
   }
   async revokeToken(connectionId: string, digest: string) {
     return this.request(
@@ -361,6 +399,42 @@ export class SyncManager {
       "POST",
       { digest },
     );
+  }
+  async revokeAllTokens(connectionId: string) {
+    return this.request(
+      await this.connection(connectionId),
+      "/api/sessions/revoke-all",
+      "POST",
+    );
+  }
+  async changePassword(
+    connectionId: string,
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    const connection = await this.connection(connectionId);
+    const result = await this.request<{
+      token: string;
+      serverId: string;
+      user: ServerConnection["user"];
+    }>(connection, "/api/auth/password", "POST", {
+      currentPassword,
+      newPassword,
+    });
+    if (
+      result.serverId !== connection.serverId ||
+      result.user.id !== connection.user.id
+    )
+      throw new CoreError(
+        "INVALID_DATA",
+        "修改密码后的服务器或账号身份不匹配。",
+      );
+    await this.update((config) => {
+      const saved = config.connections.find((item) => item.id === connectionId);
+      if (!saved) throw new CoreError("NOT_FOUND", "服务器账号连接不存在。");
+      saved.token = result.token;
+    });
+    return { ok: true };
   }
   async previewInvite(link: string, connectionId?: string) {
     const url = new URL(link),
@@ -383,7 +457,12 @@ export class SyncManager {
         name: string;
         serverId: string;
         serverName: string;
-      }>({ url: base, token: "" }, "/api/invites/preview", "POST", { invite })),
+      }>(
+        { url: base, token: connection?.token ?? "" },
+        "/api/invites/preview",
+        "POST",
+        { invite },
+      )),
     };
     if (
       (connection && result.serverId !== connection.serverId) ||
@@ -475,7 +554,11 @@ export class SyncManager {
     const projectId =
       config.projects.some(
         (project) => project.projectId === remoteProjectId,
-      ) || current.some((project) => project.id === remoteProjectId)
+      ) ||
+      current.some(
+        (project) =>
+          portablePathKey(project.id) === portablePathKey(remoteProjectId),
+      )
         ? crypto.randomUUID()
         : remoteProjectId;
     await this.update((next) => {
@@ -1280,15 +1363,19 @@ export class SyncManager {
           const status =
             error instanceof CoreError && error.conflictId
               ? "save-failed"
-              : error instanceof SyncError &&
-                  (error.status === 401 || error.status === 403)
+              : error instanceof SyncError && error.status === 403
                 ? "revoked"
                 : error instanceof SyncError && error.code === "CONFLICT"
                   ? "pending"
                   : "offline";
           await this.state(project.projectId, {
             status,
-            error: error instanceof Error ? error.message : String(error),
+            error:
+              error instanceof SyncError && error.status === 401
+                ? "服务器登录已到期或撤销，请重新登录。本地修改会保留。"
+                : error instanceof Error
+                  ? error.message
+                  : String(error),
           });
         }
       }

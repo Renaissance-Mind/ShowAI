@@ -17,6 +17,7 @@ test("prefixed Linux service supports real clients, invitation aliases and synch
   const server = await startSyncServer({
     home: join(root, "server"),
     port: 0,
+    registrationMode: "open",
     publicUrl: "https://example.com/cloud/",
   });
   cleanup.push(() => server.close());

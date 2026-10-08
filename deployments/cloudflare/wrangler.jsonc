@@ -41,6 +41,7 @@
       "vars": {
         "SHOWAI_SERVER_NAME": "ShowAI Cloud Staging",
         "SHOWAI_SERVER_URL": "https://showai.renaissancemind.ai/cloud-staging",
+        "SHOWAI_REGISTRATION_LIMIT": "120",
       },
       "routes": [
         {

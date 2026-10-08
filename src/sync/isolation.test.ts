@@ -16,6 +16,7 @@ import {
   captureProject,
   decodeSnapshot,
   importProjectHistory,
+  remapProjectFiles,
 } from "./transfer";
 import { hash, snapshotRevision, validateSnapshot } from "./protocol";
 import { startSyncServer } from "../server/node";
@@ -158,6 +159,7 @@ test("new server publications cannot install global dependencies", async () => {
   const server = await startSyncServer({
     home: join(f.home, "server"),
     port: 0,
+    registrationMode: "open",
   });
   cleanup.push(() => server.close());
   const account = await (
@@ -308,6 +310,7 @@ test("a network snapshot cannot reuse another project's legacy private object ca
   const server = await startSyncServer({
     home: join(f.home, "server"),
     port: 0,
+    registrationMode: "open",
   });
   cleanup.push(() => server.close());
   const manager = new SyncManager(f.home);
@@ -369,6 +372,33 @@ test("a network snapshot cannot reuse another project's legacy private object ca
     { status: 404 },
   );
   expect(await readFile(join(f.home, "local/sync/objects", id))).toEqual(
+    privateBytes,
+  );
+});
+
+test("an imported project cannot alias another project's existing directory by case", async () => {
+  const f = await fixture();
+  const head = await f.library.head(),
+    alias = f.two.id.toUpperCase();
+  expect(alias).not.toBe(f.two.id);
+  const projected = remapProjectFiles(f.files, f.one.id, alias);
+  const privateBytes = await f.library.readFile(
+    `projects/${f.two.id}/project.json`,
+    head!,
+  );
+  await expect(
+    importProjectHistory(
+      f.home,
+      alias,
+      "other-server",
+      [{ record: f.captured, files: projected }],
+      projected,
+      head,
+      f.one.id,
+    ),
+  ).rejects.toThrow("alias");
+  expect(await f.library.head()).toBe(head);
+  expect(await f.library.readFile(`projects/${f.two.id}/project.json`)).toEqual(
     privateBytes,
   );
 });

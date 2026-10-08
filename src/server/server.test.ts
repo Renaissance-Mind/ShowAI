@@ -276,7 +276,13 @@ describe("portable project server with real SQLite and disk storage", () => {
       original.user.id,
       await hash(invitation.invite),
     ]);
-    // Legacy databases predate the explicit schema-version checkpoint.
+    // Reconstruct the real pre-version schema while preserving its account/session rows.
+    await metadata.run("DROP TABLE request_limits");
+    await metadata.run("DROP TABLE audit_events");
+    await metadata.run("ALTER TABLE users DROP COLUMN auth_version");
+    await metadata.run("ALTER TABLE sessions DROP COLUMN auth_version");
+    await metadata.run("ALTER TABLE invites DROP COLUMN max_uses");
+    await metadata.run("ALTER TABLE invites DROP COLUMN target_name");
     await metadata.run("DELETE FROM settings WHERE key='schema_version'");
     metadata.close();
     const upgraded = await startSyncServer({

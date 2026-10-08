@@ -90,6 +90,8 @@ export const workbenchActions = new Set([
   "sync:resolve",
   "sync:sessions",
   "sync:revokeToken",
+  "sync:revokeAllTokens",
+  "sync:changePassword",
   "sync:createProject",
   "sync:changeAccount",
   "app:info",
@@ -468,6 +470,14 @@ export function createWorkbench(
           return sync.revokeToken(
             required(args, "connectionId"),
             required(args, "digest"),
+          );
+        case "sync:revokeAllTokens":
+          return sync.revokeAllTokens(required(args, "connectionId"));
+        case "sync:changePassword":
+          return sync.changePassword(
+            required(args, "connectionId"),
+            required(args, "currentPassword"),
+            required(args, "newPassword"),
           );
         case "sync:createProject": {
           const project = await store.createProject({

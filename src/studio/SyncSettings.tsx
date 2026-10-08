@@ -60,6 +60,10 @@ export default function SyncSettings() {
     [inviteRole, setInviteRole] = useState<ProjectRole>("editor"),
     [generatedInvite, setGeneratedInvite] = useState("");
   const [generatedInviteExpiresAt, setGeneratedInviteExpiresAt] = useState("");
+  const [generatedInvitePolicy, setGeneratedInvitePolicy] = useState("");
+  const [sessionConnectionId, setSessionConnectionId] = useState("");
+  const [passwords, setPasswords] = useState({ current: "", next: "" });
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [inviteLink, setInviteLink] = useState(
       () => new URLSearchParams(location.search).get("invite") ?? "",
     ),
@@ -70,6 +74,7 @@ export default function SyncSettings() {
       name: string;
       role: ProjectRole;
       serverId: string;
+      target_name?: string | null;
       serverName: string;
     } | null>(null);
   const [conflict, setConflict] = useState<SyncConflict | null>(null),
@@ -82,7 +87,14 @@ export default function SyncSettings() {
     [conflict],
   );
   const [sessions, setSessions] = useState<
-    | { digest: string; device: string; created_at: string; revoked: number }[]
+    | {
+        digest: string;
+        device: string;
+        created_at: string;
+        expires_at: string;
+        revoked: number;
+        current?: number;
+      }[]
     | null
   >(null);
   const refresh = useCallback(async () => {
@@ -112,7 +124,8 @@ export default function SyncSettings() {
         setForm((current) => ({
           ...current,
           url: result.url,
-          mode: "register",
+          mode: result.target_name ? "login" : "register",
+          account: result.target_name ?? current.account,
         }));
       })
       .catch((error) => setError(errorMessage(error)));
@@ -322,6 +335,9 @@ export default function SyncSettings() {
               onClick={() =>
                 void run(async () => {
                   setServer(connection.id);
+                  setSessionConnectionId(connection.id);
+                  setPasswords({ current: "", next: "" });
+                  setConfirmSignOut(false);
                   setSessions(
                     await desktop.invoke("sync:sessions", {
                       connectionId: connection.id,
@@ -330,7 +346,7 @@ export default function SyncSettings() {
                 })
               }
             >
-              设备 Token
+              账号与设备
             </button>
             <button
               className="settings-button"
@@ -425,7 +441,11 @@ export default function SyncSettings() {
                   密码
                   <input
                     required
-                    minLength={4}
+                    minLength={form.mode === "register" ? 12 : 1}
+                    maxLength={1024}
+                    placeholder={
+                      form.mode === "register" ? "至少 12 个字符" : undefined
+                    }
                     type="password"
                     autoComplete={
                       form.mode === "register"
@@ -463,30 +483,172 @@ export default function SyncSettings() {
         )}
         {sessions && (
           <div className="sync-dashboard-list">
-            <h3>我的设备 Token</h3>
+            <h3>
+              {
+                status.connections.find(
+                  (connection) => connection.id === sessionConnectionId,
+                )?.user.name
+              }{" "}
+              的设备会话
+            </h3>
+            <p>会话到期后请重新登录。撤销设备不会删除其已下载的本地内容。</p>
+            {status.connections
+              .find((connection) => connection.id === sessionConnectionId)
+              ?.capabilities?.includes("account-security-v1") && (
+              <>
+                <details>
+                  <summary>修改密码</summary>
+                  <p>修改后其他设备会退出，本设备保持登录。</p>
+                  <form
+                    className="sync-connect-form"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void run(async () => {
+                        await desktop.invoke("sync:changePassword", {
+                          connectionId: sessionConnectionId,
+                          currentPassword: passwords.current,
+                          newPassword: passwords.next,
+                        });
+                        setPasswords({ current: "", next: "" });
+                        setSessions(
+                          await desktop.invoke("sync:sessions", {
+                            connectionId: sessionConnectionId,
+                          }),
+                        );
+                        setMessage(
+                          "密码已修改，其他设备会话已撤销。本设备保持登录。",
+                        );
+                      });
+                    }}
+                  >
+                    <label>
+                      当前密码
+                      <input
+                        type="password"
+                        required
+                        autoComplete="current-password"
+                        value={passwords.current}
+                        onChange={(event) =>
+                          setPasswords({
+                            ...passwords,
+                            current: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                    <label>
+                      新密码
+                      <input
+                        type="password"
+                        required
+                        minLength={12}
+                        maxLength={1024}
+                        placeholder="至少 12 个字符"
+                        autoComplete="new-password"
+                        value={passwords.next}
+                        onChange={(event) =>
+                          setPasswords({
+                            ...passwords,
+                            next: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                    <button
+                      className="settings-button"
+                      disabled={busy}
+                      type="submit"
+                    >
+                      保存新密码
+                    </button>
+                  </form>
+                </details>
+                <button
+                  className="settings-button"
+                  disabled={busy}
+                  onClick={() => setConfirmSignOut(true)}
+                >
+                  退出所有设备
+                </button>
+                {confirmSignOut && (
+                  <div role="group" aria-label="确认退出所有设备">
+                    <p>所有设备包括本设备都会退出登录。项目与本地内容保留。</p>
+                    <button
+                      className="settings-button"
+                      disabled={busy}
+                      onClick={() => setConfirmSignOut(false)}
+                    >
+                      取消
+                    </button>
+                    <button
+                      className="settings-button"
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () => {
+                          await desktop.invoke("sync:revokeAllTokens", {
+                            connectionId: sessionConnectionId,
+                          });
+                          setSessions(null);
+                          setConfirmSignOut(false);
+                          const connection = status.connections.find(
+                            (item) => item.id === sessionConnectionId,
+                          )!;
+                          setForm({
+                            ...form,
+                            url: connection.url,
+                            account: connection.user.name,
+                            password: "",
+                            token: "",
+                            registrationKey: "",
+                            mode: "login",
+                          });
+                          setShowConnect(true);
+                          setMessage("所有设备已退出，请重新登录。");
+                        })
+                      }
+                    >
+                      确认退出所有设备
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
             {sessions.map((session) => (
               <div className="sync-connection" key={session.digest}>
                 <div className="settings-row-text">
                   <h3>{session.device}</h3>
                   <p>
                     {new Date(session.created_at).toLocaleString()} ·{" "}
-                    {session.revoked ? "已撤销" : "有效"}
+                    {session.revoked
+                      ? "已撤销"
+                      : new Date(session.expires_at).getTime() <= Date.now()
+                        ? "已到期"
+                        : `有效至 ${new Date(session.expires_at).toLocaleString()}`}
+                    {session.current ? " · 本设备" : ""}
                   </p>
                 </div>
                 <button
                   className="settings-button"
-                  disabled={busy || !!session.revoked}
+                  disabled={
+                    busy ||
+                    !!session.revoked ||
+                    new Date(session.expires_at).getTime() <= Date.now()
+                  }
                   onClick={() =>
                     void run(async () => {
                       await desktop.invoke("sync:revokeToken", {
-                        connectionId: server,
+                        connectionId: sessionConnectionId,
                         digest: session.digest,
                       });
-                      setSessions(
-                        await desktop.invoke("sync:sessions", {
-                          connectionId: server,
-                        }),
-                      );
+                      if (session.current) {
+                        setSessions(null);
+                        setMessage("本设备会话已撤销，请重新登录。");
+                      } else
+                        setSessions(
+                          await desktop.invoke("sync:sessions", {
+                            connectionId: sessionConnectionId,
+                          }),
+                        );
                     })
                   }
                 >
@@ -838,6 +1000,7 @@ export default function SyncSettings() {
                 inviteRole={inviteRole}
                 generatedInvite={generatedInvite}
                 generatedInviteExpiresAt={generatedInviteExpiresAt}
+                generatedInvitePolicy={generatedInvitePolicy}
                 onSelect={(id) => {
                   void run(() => loadDashboard(dashboard, id));
                 }}
@@ -859,20 +1022,37 @@ export default function SyncSettings() {
                     );
                   });
                 }}
-                onRemove={(member) =>
+                onRemove={(member, revokeInvites) =>
                   run(async () => {
-                    await manage("member", { userId: member.id, role: null });
+                    await manage("member", {
+                      userId: member.id,
+                      role: null,
+                      revokeInvites,
+                    });
                     setMessage(`已将 ${member.name} 移出项目。`);
                   })
                 }
                 onInviteRole={setInviteRole}
-                onInvite={() => {
+                onInvite={(options) => {
                   void run(async () => {
                     const invitation = (await manage("invite", {
                       role: inviteRole,
-                    })) as { url: string; expiresAt: string };
+                      ...options,
+                    })) as {
+                      url: string;
+                      expiresAt: string;
+                      maxUses?: number | null;
+                      targetName?: string | null;
+                    };
                     setGeneratedInvite(invitation.url);
                     setGeneratedInviteExpiresAt(invitation.expiresAt);
+                    setGeneratedInvitePolicy(
+                      invitation.targetName
+                        ? `仅限账号 ${invitation.targetName}`
+                        : invitation.maxUses != null
+                          ? `最多 ${invitation.maxUses} 个账号`
+                          : "不限账号数",
+                    );
                   });
                 }}
                 onCopy={() =>

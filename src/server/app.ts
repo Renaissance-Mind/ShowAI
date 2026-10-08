@@ -11,11 +11,31 @@ import {
   validateSnapshot,
   SyncError,
   type ProjectRole,
-  type SyncUser,
   type ProjectSnapshot,
 } from "../sync/protocol";
 import { type MetadataStore, type ObjectStore } from "./storage";
 import { prepareMetadata } from "./migrations";
+import {
+  createInvitation,
+  acceptInvitation,
+  revokeInvitation,
+} from "./invitations";
+import {
+  audit,
+  RateLimitError,
+  rateLimit,
+  readBounded,
+  secureResponse,
+  liveSession,
+} from "./security";
+import {
+  registerAccount,
+  loginAccount,
+  changePassword,
+  publicLimits,
+  type AccountOptions,
+  type AuthUser,
+} from "./accounts";
 import { validateReaderClosure } from "../sync/dependency-validation";
 import {
   serverBaseUrl,
@@ -23,20 +43,21 @@ import {
   invitationUrl,
 } from "../sync/server-url";
 
-export interface ServerOptions {
+export interface ServerOptions extends AccountOptions {
   metadata: MetadataStore;
   objects: ObjectStore;
   name?: string;
-  registrationKey?: string;
   publicUrl?: string;
   autoMigrate?: boolean;
+  allowedOrigins?: string[];
+  requirePublicOrigin?: boolean;
 }
 interface Member {
   id: string;
   name: string;
   role: ProjectRole;
 }
-interface SessionRow extends SyncUser {
+interface SessionRow extends AuthUser {
   session_digest: string;
 }
 interface ProjectRow {
@@ -55,39 +76,15 @@ const json = (value: unknown, status = 200) =>
     },
   });
 const encoder = new TextEncoder();
-async function passwordHash(password: string, salt: string) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
-  const bytes = new Uint8Array(
-    await crypto.subtle.deriveBits(
-      {
-        name: "PBKDF2",
-        hash: "SHA-256",
-        salt: encoder.encode(salt),
-        iterations: 100_000,
-      },
-      key,
-      256,
-    ),
-  );
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
-    "",
-  );
-}
 function objectKey(projectId: string, digest: string) {
   return `projects/${identifier(projectId)}/objects/${digestId(digest)}`;
 }
 async function body(request: Request): Promise<Record<string, unknown>> {
-  if (Number(request.headers.get("content-length") ?? 0) > 16 * 1024 * 1024)
-    throw new SyncError(413, "TOO_LARGE", "Request is too large.");
-  const bytes = await request.arrayBuffer();
-  if (bytes.byteLength > 16 * 1024 * 1024)
-    throw new SyncError(413, "TOO_LARGE", "Request is too large.");
+  const path = new URL(request.url).pathname.replace(/\/$/, "");
+  const bytes = await readBounded(
+    request,
+    path.endsWith("/revisions") ? 16 * 1024 * 1024 : 64 * 1024,
+  );
   const value = JSON.parse(new TextDecoder().decode(bytes));
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new SyncError(400, "INVALID_BODY", "A JSON object is required.");
@@ -96,12 +93,36 @@ async function body(request: Request): Promise<Record<string, unknown>> {
 
 /** Identical request handler for Workers and the Linux HTTP host. */
 export function createSyncServer(options: ServerOptions) {
+  if (
+    options.accountLimit !== undefined &&
+    (!Number.isInteger(options.accountLimit) ||
+      options.accountLimit < 1 ||
+      options.accountLimit > 1_000_000)
+  )
+    throw new Error("Invalid account capacity.");
+  if (
+    options.registrationMode &&
+    !["controlled", "open"].includes(options.registrationMode)
+  )
+    throw new Error("Invalid registration mode.");
+  if (
+    options.registrationLimit !== undefined &&
+    (!Number.isInteger(options.registrationLimit) ||
+      options.registrationLimit < 1 ||
+      options.registrationLimit > 1000)
+  )
+    throw new Error("Invalid registration source limit.");
+  for (const origin of options.allowedOrigins ?? [])
+    if (new URL(origin).origin !== origin)
+      throw new Error("Allowed origins must be exact HTTP origins.");
   const publicBase = options.publicUrl
     ? serverBaseUrl(options.publicUrl)
     : undefined;
   const basePath = publicBase
     ? new URL(publicBase).pathname.replace(/\/$/, "")
     : "";
+  const publicOrigin = publicBase ? new URL(publicBase).origin : undefined;
+  const allowedOrigins = options.allowedOrigins ?? [];
   const db = options.metadata,
     objects = options.objects;
   let initialization: Promise<string> | undefined;
@@ -122,7 +143,7 @@ export function createSyncServer(options: ServerOptions) {
       throw new SyncError(401, "UNAUTHORIZED", "Sign in to this server.");
     const digest = await hash(credential);
     const rows = await db.all<SessionRow>(
-      "SELECT u.id,u.name,s.digest AS session_digest FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.digest=? AND s.revoked=0 AND s.expires_at>?",
+      "SELECT u.id,u.name,u.auth_version,s.digest AS session_digest FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.digest=? AND s.revoked=0 AND s.auth_version=u.auth_version AND s.expires_at>?",
       [digest, new Date().toISOString()],
     );
     if (!rows[0])
@@ -160,24 +181,65 @@ export function createSyncServer(options: ServerOptions) {
       );
     return project;
   }
-  async function session(user: SyncUser, device: unknown) {
+  function writeGate(
+    user: SessionRow,
+    projectId: string,
+    minimum: "admin" | "editor" = "editor",
+  ) {
+    return {
+      sql: `SELECT 1 FROM members m JOIN sessions s ON s.user_id=m.user_id JOIN users u ON u.id=m.user_id WHERE m.project_id=? AND m.user_id=? AND ${minimum === "admin" ? "m.role='admin'" : "m.role IN('admin','editor')"} AND s.digest=? AND s.revoked=0 AND s.expires_at>? AND s.auth_version=u.auth_version`,
+      values: [
+        projectId,
+        user.id,
+        user.session_digest,
+        new Date().toISOString(),
+      ],
+    };
+  }
+  async function session(user: AuthUser, device: unknown) {
     const credential = token(),
       at = new Date().toISOString();
-    await db.run(
-      "INSERT INTO sessions(digest,user_id,device,created_at,expires_at) VALUES(?,?,?,?,?)",
-      [
-        await hash(credential),
+    const expiresAt = new Date(Date.now() + 30 * 86400_000).toISOString();
+    const credentialDigest = await hash(credential);
+    const result = await db.batch([
+      {
+        sql: "INSERT INTO sessions(digest,user_id,device,created_at,expires_at,auth_version) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND auth_version=?) AND (SELECT COUNT(*) FROM sessions WHERE user_id=? AND revoked=0 AND expires_at>?)<100",
+        values: [
+          credentialDigest,
+          user.id,
+          typeof device === "string" ? plainText(device, 200) : "ShowAI",
+          at,
+          expiresAt,
+          user.auth_version,
+          user.id,
+          user.auth_version,
+          user.id,
+          at,
+        ],
+      },
+      audit(
+        "session.create",
         user.id,
-        typeof device === "string" ? plainText(device, 200) : "ShowAI",
-        at,
-        new Date(Date.now() + 180 * 86400_000).toISOString(),
-      ],
-    );
+        null,
+        {},
+        {
+          sql: "SELECT 1 FROM sessions WHERE digest=?",
+          values: [credentialDigest],
+        },
+      ),
+    ]);
+    if (!result[0].changes)
+      throw new SyncError(
+        409,
+        "SESSION_UNAVAILABLE",
+        "账号凭据已更新或设备会话已达上限，请重新登录或撤销旧设备。",
+      );
     return {
       protocol: syncProtocol,
       serverId: await serverId(),
-      user,
+      user: { id: user.id, name: user.name },
       token: credential,
+      expiresAt,
     };
   }
   async function members(projectId: string) {
@@ -186,8 +248,43 @@ export function createSyncServer(options: ServerOptions) {
       [projectId],
     );
   }
-  async function handle(request: Request): Promise<Response> {
+  async function publicLimitsAccount(
+    kind: "login" | "register",
+    name: unknown,
+  ) {
+    await rateLimit(db, {
+      scope: `${kind}:account`,
+      identity: plainText(name, 100),
+      maximum: kind === "login" ? 12 : 6,
+      windowMs: kind === "login" ? 60_000 : 3600_000,
+    });
+  }
+  async function handle(
+    request: Request,
+    source = "unknown",
+  ): Promise<Response> {
     const url = new URL(request.url);
+    if (
+      options.requirePublicOrigin &&
+      publicOrigin &&
+      url.origin !== publicOrigin
+    )
+      throw new SyncError(
+        421,
+        "INVALID_HOST",
+        "Use the configured server address.",
+      );
+    const origin = request.headers.get("origin");
+    if (
+      origin &&
+      origin !== (publicOrigin ?? url.origin) &&
+      !allowedOrigins.includes(origin)
+    )
+      throw new SyncError(
+        403,
+        "INVALID_ORIGIN",
+        "This request origin is not allowed.",
+      );
     if (
       basePath &&
       url.pathname !== basePath &&
@@ -197,6 +294,7 @@ export function createSyncServer(options: ServerOptions) {
     const path = url.pathname.slice(basePath.length).replace(/\/$/, ""),
       method = request.method;
     await serverId();
+    if (method === "OPTIONS") return new Response(null, { status: 204 });
     if (path === "/health" || path === "/api/info")
       return json({
         protocol: syncProtocol,
@@ -204,83 +302,31 @@ export function createSyncServer(options: ServerOptions) {
         name: options.name ?? "ShowAI Server",
         roles: ["admin", "editor", "viewer"],
         auth: ["password", "token"],
+        registration: options.registrationMode ?? "controlled",
+        passwordMinimum: 12,
+        sessionDays: 30,
+        capabilities: ["account-security-v1", "invite-controls-v1"],
       });
     if (path === "/api/auth/register" && method === "POST") {
-      const input = await body(request),
-        name = plainText(input.name, 100),
-        password = plainText(input.password, 1000);
-      if (/[<>\r\n]/.test(name))
-        throw new SyncError(
-          400,
-          "INVALID_ACCOUNT",
-          "Account names cannot contain angle brackets or line breaks.",
-        );
-      if (password.length < 4)
-        throw new SyncError(
-          400,
-          "INVALID_PASSWORD",
-          "Use at least four characters.",
-        );
-      if (
-        options.registrationKey &&
-        input.registrationKey !== options.registrationKey
-      ) {
-        const invitation =
-          typeof input.invite === "string"
-            ? await db.all<{ digest: string }>(
-                "SELECT digest FROM invites WHERE digest=? AND revoked=0 AND expires_at>?",
-                [await hash(input.invite), new Date().toISOString()],
-              )
-            : [];
-        if (!invitation.length)
-          throw new SyncError(
-            403,
-            "REGISTRATION_KEY_REQUIRED",
-            "Enter the registration key or join with an invitation.",
-          );
-      }
-      if ((await db.all("SELECT id FROM users WHERE name=?", [name])).length)
-        throw new SyncError(
-          409,
-          "ACCOUNT_EXISTS",
-          "This account name already exists. Sign in instead.",
-        );
-      const id = crypto.randomUUID(),
-        salt = token();
-      await db.run(
-        "INSERT INTO users(id,name,password_salt,password_hash,created_at) VALUES(?,?,?,?,?)",
-        [
-          id,
-          name,
-          salt,
-          await passwordHash(password, salt),
-          new Date().toISOString(),
-        ],
+      await publicLimits(
+        db,
+        "register",
+        source,
+        undefined,
+        options.registrationLimit,
       );
-      return json(await session({ id, name }, input.device), 201);
+      const input = await body(request);
+      await publicLimitsAccount("register", input.name);
+      return json(
+        await session(await registerAccount(db, input, options), input.device),
+        201,
+      );
     }
     if (path === "/api/auth/login" && method === "POST") {
-      const input = await body(request),
-        name = plainText(input.name, 100),
-        password = plainText(input.password, 1000);
-      const user = (
-        await db.all<
-          SyncUser & { password_salt: string; password_hash: string }
-        >("SELECT * FROM users WHERE name=?", [name])
-      )[0];
-      if (
-        !user ||
-        (await passwordHash(password, user.password_salt)) !==
-          user.password_hash
-      )
-        throw new SyncError(
-          401,
-          "INVALID_LOGIN",
-          "Account name or password is incorrect.",
-        );
-      return json(
-        await session({ id: user.id, name: user.name }, input.device),
-      );
+      await publicLimits(db, "login", source);
+      const input = await body(request);
+      await publicLimitsAccount("login", input.name);
+      return json(await session(await loginAccount(db, input), input.device));
     }
     if (path === "/join" && method === "GET") {
       return new Response(
@@ -294,7 +340,11 @@ export function createSyncServer(options: ServerOptions) {
       );
     }
     if (path === "/api/invites/preview" && method === "POST") {
+      await publicLimits(db, "preview", source);
       const input = await body(request);
+      const previewUser = request.headers.has("authorization")
+        ? await authenticate(request)
+        : undefined;
       const invitation = (
         await db.all<{
           project_id: string;
@@ -302,8 +352,12 @@ export function createSyncServer(options: ServerOptions) {
           expires_at: string;
           name: string;
         }>(
-          "SELECT i.project_id,i.role,i.expires_at,p.name FROM invites i JOIN projects p ON p.id=i.project_id WHERE i.digest=? AND i.revoked=0 AND i.expires_at>?",
-          [await hash(plainText(input.invite, 200)), new Date().toISOString()],
+          "SELECT i.project_id,i.role,i.expires_at,i.max_uses,i.target_name,p.name FROM invites i JOIN projects p ON p.id=i.project_id WHERE i.digest=? AND i.revoked=0 AND i.expires_at>? AND (i.max_uses IS NULL OR (SELECT COUNT(*) FROM invite_acceptances a WHERE a.digest=i.digest)<i.max_uses OR EXISTS(SELECT 1 FROM invite_acceptances a JOIN members m ON m.project_id=i.project_id AND m.user_id=a.user_id WHERE a.digest=i.digest AND a.user_id=?))",
+          [
+            await hash(plainText(input.invite, 200)),
+            new Date().toISOString(),
+            previewUser?.id ?? "",
+          ],
         )
       )[0];
       if (!invitation)
@@ -319,6 +373,33 @@ export function createSyncServer(options: ServerOptions) {
       });
     }
     const user = await authenticate(request);
+    if (path === "/api/auth/password" && method === "POST") {
+      await publicLimits(db, "password", source, user.id);
+      const changed = await changePassword(db, user, await body(request));
+      return json(await session(changed, "ShowAI password change"));
+    }
+    if (path === "/api/sessions/revoke-all" && method === "POST") {
+      const permission = liveSession(user),
+        entry = audit("session.revoke-all", user.id, null, {}, permission);
+      const results = await db.batch([
+        entry,
+        {
+          sql: `UPDATE users SET auth_version=auth_version+1 WHERE id=? AND EXISTS(${permission.sql})`,
+          values: [user.id, ...permission.values!],
+        },
+        {
+          sql: "UPDATE sessions SET revoked=1 WHERE user_id=? AND EXISTS(SELECT 1 FROM audit_events WHERE id=?)",
+          values: [user.id, entry.values![0]],
+        },
+      ]);
+      if (!results[1].changes)
+        throw new SyncError(
+          401,
+          "UNAUTHORIZED",
+          "The token has expired or was revoked.",
+        );
+      return json({ ok: true });
+    }
     if (path === "/api/me")
       return json({
         user: { id: user.id, name: user.name },
@@ -327,21 +408,28 @@ export function createSyncServer(options: ServerOptions) {
     if (path === "/api/sessions" && method === "GET")
       return json(
         await db.all(
-          "SELECT digest,device,created_at,expires_at,revoked FROM sessions WHERE user_id=? ORDER BY created_at DESC",
-          [user.id],
+          "SELECT digest,device,created_at,expires_at,revoked,digest=? AS current FROM sessions WHERE user_id=? ORDER BY created_at DESC LIMIT 1000",
+          [user.session_digest, user.id],
         ),
       );
     if (path === "/api/sessions/revoke" && method === "POST") {
       const input = await body(request);
-      await db.run(
-        "UPDATE sessions SET revoked=1 WHERE digest=? AND user_id=?",
-        [digestId(input.digest), user.id],
-      );
+      await db.batch([
+        {
+          sql: "UPDATE sessions SET revoked=1 WHERE digest=? AND user_id=?",
+          values: [digestId(input.digest), user.id],
+        },
+        audit("session.revoke", user.id, null),
+      ]);
       return json({ ok: true });
     }
     if (path === "/api/auth/logout" && method === "POST") {
-      await db.run("UPDATE sessions SET revoked=1 WHERE digest=?", [
-        user.session_digest,
+      await db.batch([
+        {
+          sql: "UPDATE sessions SET revoked=1 WHERE digest=?",
+          values: [user.session_digest],
+        },
+        audit("session.logout", user.id, null),
       ]);
       return json({ ok: true });
     }
@@ -378,38 +466,9 @@ export function createSyncServer(options: ServerOptions) {
       );
     }
     if (path === "/api/invites/accept" && method === "POST") {
-      const input = await body(request),
-        digest = await hash(plainText(input.invite, 200));
-      const invitation = (
-        await db.all<{
-          project_id: string;
-          role: ProjectRole;
-          revoked: number;
-          expires_at: string;
-        }>("SELECT * FROM invites WHERE digest=?", [digest])
-      )[0];
-      if (
-        !invitation ||
-        invitation.revoked ||
-        invitation.expires_at <= new Date().toISOString()
-      )
-        throw new SyncError(
-          410,
-          "INVITE_UNAVAILABLE",
-          "This invitation is unavailable.",
-        );
-      const at = new Date().toISOString();
-      await db.batch([
-        {
-          sql: "INSERT OR IGNORE INTO members(project_id,user_id,role) SELECT project_id,?,role FROM invites WHERE digest=? AND revoked=0 AND expires_at>? AND NOT EXISTS (SELECT 1 FROM invite_acceptances WHERE digest=? AND user_id=?)",
-          values: [user.id, digest, at, digest, user.id],
-        },
-        {
-          sql: "INSERT OR IGNORE INTO invite_acceptances(digest,user_id) SELECT i.digest,? FROM invites i JOIN members m ON m.project_id=i.project_id AND m.user_id=? WHERE i.digest=? AND i.revoked=0 AND i.expires_at>?",
-          values: [user.id, user.id, digest, at],
-        },
-      ]);
-      return json(await projectFor(user.id, invitation.project_id));
+      await publicLimits(db, "accept", source, user.id);
+      const projectId = await acceptInvitation(db, user, await body(request));
+      return json(await projectFor(user.id, projectId));
     }
     const match = path.match(/^\/api\/projects\/([^/]+)(?:\/(.*))?$/);
     if (!match)
@@ -499,12 +558,31 @@ export function createSyncServer(options: ServerOptions) {
           ),
         );
         if (!response.ok) return response;
+        return json(await projectFor(user.id, projectId));
       }
-      await db.run("UPDATE projects SET name=?,archived=? WHERE id=?", [
-        name,
-        archived,
-        projectId,
+      const gate = writeGate(user, projectId, "admin");
+      const updated = await db.batch([
+        {
+          sql: `UPDATE projects SET name=?,archived=? WHERE id=? AND head IS NULL AND EXISTS(${gate.sql})`,
+          values: [name, archived, projectId, ...gate.values],
+        },
+        audit(
+          "project.settings",
+          user.id,
+          projectId,
+          { archived: !!archived },
+          gate,
+        ),
       ]);
+      if (!updated[0].changes) {
+        await authenticate(request);
+        await projectFor(user.id, projectId, "admin");
+        throw new SyncError(
+          409,
+          "CONFLICT",
+          "Project settings changed while updating.",
+        );
+      }
       return json(await projectFor(user.id, projectId));
     }
     if (resource === "members" && method === "GET")
@@ -514,60 +592,93 @@ export function createSyncServer(options: ServerOptions) {
       const input = await body(request),
         target = identifier(input.userId),
         next = input.role === null ? null : role(input.role);
-      // SQL guards the last administrator even when two administrators act concurrently.
-      const result =
+      if (
+        input.revokeInvites !== undefined &&
+        typeof input.revokeInvites !== "boolean"
+      )
+        throw new SyncError(
+          400,
+          "INVALID_BODY",
+          "Invalid invitation revocation choice.",
+        );
+      const permission = writeGate(user, projectId, "admin");
+      const guard = `EXISTS(${permission.sql})`;
+      const lastAdmin =
+        "(role!='admin' OR ?='admin' OR (SELECT COUNT(*) FROM members WHERE project_id=? AND role='admin')>1)";
+      const condition = {
+        sql: `SELECT 1 FROM members WHERE project_id=? AND user_id=? AND ${guard} AND ${lastAdmin}`,
+        values: [
+          projectId,
+          target,
+          ...permission.values,
+          next ?? "removed",
+          projectId,
+        ],
+      };
+      const entry = audit(
+        next === null ? "member.remove" : "member.role",
+        user.id,
+        projectId,
+        { target, role: next, revokeInvites: input.revokeInvites === true },
+        condition,
+      );
+      const statements = [
+        entry,
         next === null
-          ? await db.run(
-              "DELETE FROM members WHERE project_id=? AND user_id=? AND (role!='admin' OR (SELECT COUNT(*) FROM members WHERE project_id=? AND role='admin')>1)",
-              [projectId, target, projectId],
-            )
-          : await db.run(
-              "UPDATE members SET role=? WHERE project_id=? AND user_id=? AND (role!='admin' OR ?='admin' OR (SELECT COUNT(*) FROM members WHERE project_id=? AND role='admin')>1)",
-              [next, projectId, target, next, projectId],
-            );
-      if (!result.changes)
+          ? {
+              sql: `DELETE FROM members WHERE project_id=? AND user_id=? AND ${guard} AND ${lastAdmin}`,
+              values: condition.values,
+            }
+          : {
+              sql: `UPDATE members SET role=? WHERE project_id=? AND user_id=? AND ${guard} AND ${lastAdmin}`,
+              values: [next, ...condition.values],
+            },
+      ];
+      if (next === null && input.revokeInvites === true)
+        statements.push({
+          sql: "UPDATE invites SET revoked=1 WHERE project_id=? AND (created_by=? OR digest IN(SELECT digest FROM invite_acceptances WHERE user_id=?)) AND EXISTS(SELECT 1 FROM audit_events WHERE id=?)",
+          values: [projectId, target, target, entry.values![0] as string],
+        });
+      const results = await db.batch(statements);
+      if (!results[1].changes) {
+        await projectFor(user.id, projectId, "admin");
         throw new SyncError(
           409,
           "LAST_ADMIN",
           "The project must retain at least one administrator, and the member must exist.",
         );
+      }
       return json(await members(projectId));
     }
     if (resource === "invites" && method === "GET") {
       await projectFor(user.id, projectId, "admin");
       return json(
         await db.all(
-          "SELECT i.digest,i.role,i.expires_at,i.accepted_by,i.revoked,(SELECT COUNT(*) FROM invite_acceptances a WHERE a.digest=i.digest) AS accepted_count FROM invites i WHERE i.project_id=? ORDER BY i.expires_at DESC",
+          "SELECT i.digest,i.role,i.expires_at,i.max_uses,i.target_name,i.accepted_by,i.revoked,(SELECT COUNT(*) FROM invite_acceptances a WHERE a.digest=i.digest) AS accepted_count FROM invites i WHERE i.project_id=? ORDER BY i.expires_at DESC",
           [projectId],
         ),
       );
     }
     if (resource === "invites" && method === "POST") {
       await projectFor(user.id, projectId, "admin");
-      const input = await body(request),
-        invite = token(),
-        expiresAt = new Date(Date.now() + 7 * 86400_000).toISOString();
-      await db.run(
-        "INSERT INTO invites(digest,project_id,role,created_by,expires_at) VALUES(?,?,?,?,?)",
-        [await hash(invite), projectId, role(input.role), user.id, expiresAt],
+      const invitation = await createInvitation(
+        db,
+        user,
+        projectId,
+        await body(request),
       );
       const link = invitationUrl(
         publicBase ?? url.origin,
-        invite,
+        invitation.invite,
         await serverId(),
       );
-      return json(
-        { invite, url: link.toString(), role: input.role, expiresAt },
-        201,
-      );
+      return json({ ...invitation, url: link.toString() }, 201);
     }
     if (resource === "invites/revoke" && method === "POST") {
       await projectFor(user.id, projectId, "admin");
       const input = await body(request);
-      await db.run(
-        "UPDATE invites SET revoked=1 WHERE project_id=? AND digest=?",
-        [projectId, digestId(input.digest)],
-      );
+      await revokeInvitation(db, user, projectId, input.digest);
+      await projectFor(user.id, projectId, "admin");
       return json({ ok: true });
     }
     if (resource === "objects/check" && method === "POST") {
@@ -596,6 +707,19 @@ export function createSyncServer(options: ServerOptions) {
     }
     const object = resource.match(/^objects\/([a-f0-9]{64})$/);
     if (object && method === "GET") {
+      if (
+        !(
+          await db.all(
+            "SELECT 1 FROM objects WHERE project_id=? AND digest=?",
+            [projectId, object[1]],
+          )
+        ).length
+      )
+        throw new SyncError(
+          404,
+          "MISSING_OBJECT",
+          "Content object is missing.",
+        );
       const bytes = await objects.get(objectKey(projectId, object[1]));
       if (!bytes)
         throw new SyncError(
@@ -632,10 +756,13 @@ export function createSyncServer(options: ServerOptions) {
           "Content does not match its digest.",
         );
       await objects.put(objectKey(projectId, object[1]), bytes);
+      const gate = writeGate(user, projectId);
       await db.run(
-        "INSERT OR IGNORE INTO objects(project_id,digest,bytes) VALUES(?,?,?)",
-        [projectId, object[1], bytes.length],
+        `INSERT OR IGNORE INTO objects(project_id,digest,bytes) SELECT ?,?,? WHERE EXISTS(${gate.sql})`,
+        [projectId, object[1], bytes.length, ...gate.values],
       );
+      await authenticate(request);
+      await projectFor(user.id, projectId, "editor");
       return json({ ok: true });
     }
     if (resource === "revisions" && method === "GET") {
@@ -745,6 +872,8 @@ export function createSyncServer(options: ServerOptions) {
         if (
           value.id !== projectId ||
           typeof value.name !== "string" ||
+          (value.archived !== undefined &&
+            typeof value.archived !== "boolean") ||
           ["sourceDirectory", "binding", "bindings"].some((key) =>
             Object.hasOwn(value, key),
           )
@@ -755,6 +884,15 @@ export function createSyncServer(options: ServerOptions) {
             "Project metadata identity does not match.",
           );
         projectMetadata = value;
+        if (
+          project.role !== "admin" &&
+          Number(!!value.archived) !== project.archived
+        )
+          throw new SyncError(
+            403,
+            "FORBIDDEN",
+            "Only project administrators can archive or restore a project.",
+          );
       }
       for (const parent of snapshot.parents)
         if (
@@ -802,21 +940,25 @@ export function createSyncServer(options: ServerOptions) {
           return bytes;
         },
       );
+      const gate = writeGate(user, projectId);
       await db.run(
-        "INSERT OR IGNORE INTO revisions(project_id,revision,manifest,user_id,created_at) VALUES(?,?,?,?,?)",
+        `INSERT OR IGNORE INTO revisions(project_id,revision,manifest,user_id,created_at) SELECT ?,?,?,?,? WHERE EXISTS(${gate.sql})`,
         [
           projectId,
           revision,
           canonical(snapshot),
           user.id,
           new Date().toISOString(),
+          ...gate.values,
         ],
       );
+      await authenticate(request);
+      const currentProject = await projectFor(user.id, projectId, "editor");
       if (input.publish === false)
         return json({ revision, head: project.head, published: false });
       const expected =
         input.expected === null ? null : digestId(input.expected);
-      if (project.head === revision)
+      if (currentProject.head === revision)
         return json({ revision, head: revision, published: true });
       if (
         (expected !== null && !snapshot.parents.includes(expected)) ||
@@ -829,13 +971,15 @@ export function createSyncServer(options: ServerOptions) {
         );
       const results = await db.batch([
         {
-          sql: "UPDATE projects SET head=?,name=?,archived=? WHERE id=? AND head IS ? AND EXISTS(SELECT 1 FROM members WHERE project_id=? AND user_id=? AND role IN ('admin','editor'))",
+          sql: `UPDATE projects SET head=?,name=?,archived=? WHERE id=? AND head IS ? AND EXISTS(${gate.sql}) AND (archived=? OR EXISTS(SELECT 1 FROM members WHERE project_id=? AND user_id=? AND role='admin'))`,
           values: [
             revision,
             projectMetadata?.name ?? project.name,
             projectMetadata?.archived ? 1 : 0,
             projectId,
             expected,
+            ...gate.values,
+            projectMetadata?.archived ? 1 : 0,
             projectId,
             user.id,
           ],
@@ -846,6 +990,7 @@ export function createSyncServer(options: ServerOptions) {
         },
       ]);
       if (!results[0].changes) {
+        await authenticate(request);
         const current = await projectFor(user.id, projectId, "editor");
         throw new SyncError(
           409,
@@ -860,12 +1005,22 @@ export function createSyncServer(options: ServerOptions) {
   }
   return {
     initialize: serverId,
-    async fetch(request: Request): Promise<Response> {
+    async fetch(
+      request: Request,
+      context?: { source?: string },
+    ): Promise<Response> {
+      const secure = (response: Response) =>
+        secureResponse(
+          response,
+          request,
+          allowedOrigins,
+          publicOrigin ?? new URL(request.url).origin,
+        );
       try {
-        return await handle(request);
+        return secure(await handle(request, context?.source));
       } catch (error) {
-        if (error instanceof SyncError)
-          return json(
+        if (error instanceof SyncError) {
+          const response = json(
             {
               error: {
                 code: error.code,
@@ -875,22 +1030,33 @@ export function createSyncServer(options: ServerOptions) {
             },
             error.status,
           );
+          if (error instanceof RateLimitError)
+            response.headers.set("retry-after", String(error.retryAfter));
+          return secure(response);
+        }
         if (error instanceof SyntaxError)
-          return json(
-            {
-              error: { code: "INVALID_JSON", message: "Invalid JSON request." },
-            },
-            400,
+          return secure(
+            json(
+              {
+                error: {
+                  code: "INVALID_JSON",
+                  message: "Invalid JSON request.",
+                },
+              },
+              400,
+            ),
           );
         console.error("ShowAI Server request failed", error);
-        return json(
-          {
-            error: {
-              code: "SERVER_ERROR",
-              message: "The server could not complete the request.",
+        return secure(
+          json(
+            {
+              error: {
+                code: "SERVER_ERROR",
+                message: "The server could not complete the request.",
+              },
             },
-          },
-          500,
+            500,
+          ),
         );
       }
     },
