@@ -7,9 +7,11 @@ import {
   dialog,
   ipcMain,
   Menu,
+  nativeImage,
+  nativeTheme,
   shell,
 } from "electron";
-import type { IpcMainEvent, IpcMainInvokeEvent } from "electron";
+import type { IpcMainEvent, IpcMainInvokeEvent, NativeImage } from "electron";
 import { watch, type FSWatcher } from "chokidar";
 import { mkdir, readFile, writeFile, rename, realpath } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
@@ -29,11 +31,18 @@ import {
   pageId,
   text,
 } from "../workbench/actions";
-import type { DesktopChange, DesktopInfo, DesktopResponse } from "./bridge";
+import type {
+  DesktopAppearance,
+  DesktopChange,
+  DesktopInfo,
+  DesktopResponse,
+} from "./bridge";
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const repository = resolve(directory, "..");
 const windows = new Set<BrowserWindow>();
+const windowAppearances = new WeakMap<BrowserWindow, DesktopAppearance>();
+const appearanceIcons = new Map<DesktopAppearance, NativeImage>();
 let store: FileStore;
 let service: AgentService;
 let watcher: FSWatcher | undefined;
@@ -57,6 +66,32 @@ let allowedQuit = false;
 app.setName("ShowAI");
 if (process.env.SHOWAI_USER_DATA)
   app.setPath("userData", resolve(process.env.SHOWAI_USER_DATA));
+
+function iconForAppearance(appearance: DesktopAppearance): NativeImage {
+  const cached = appearanceIcons.get(appearance);
+  if (cached) return cached;
+  const root = process.env.SHOWAI_DEV_URL ? process.cwd() : repository;
+  const path = join(
+    root,
+    "src/desktop/assets",
+    appearance === "dark" ? "icon-light.png" : "icon.png",
+  );
+  const icon = nativeImage.createFromPath(path);
+  if (icon.isEmpty()) throw new Error(`Cannot load application icon: ${path}`);
+  appearanceIcons.set(appearance, icon);
+  return icon;
+}
+
+function applyWindowAppearance(
+  window: BrowserWindow,
+  appearance: DesktopAppearance,
+): void {
+  windowAppearances.set(window, appearance);
+  const icon = iconForAppearance(appearance);
+  if (process.platform !== "darwin") window.setIcon(icon);
+  if (window.isFocused() || !BrowserWindow.getFocusedWindow())
+    app.dock?.setIcon(icon);
+}
 
 function runtimePath(): string {
   if (!app.isPackaged && process.env.SHOWAI_DEV_RUNTIME)
@@ -336,6 +371,13 @@ async function createWindow(page?: {
     },
   });
   windows.add(window);
+  applyWindowAppearance(
+    window,
+    nativeTheme.shouldUseDarkColors ? "dark" : "light",
+  );
+  window.on("focus", () => {
+    app.dock?.setIcon(iconForAppearance(windowAppearances.get(window)!));
+  });
   window.webContents.on("before-input-event", (event, input) => {
     if (input.type !== "keyDown") return;
     const command = tabShortcut({
@@ -558,6 +600,12 @@ else {
       ipcMain.handle("showai:window-state", (event) => ({
         fullScreen: trustedSender(event).isFullScreen(),
       }));
+      ipcMain.handle("showai:set-appearance", (event, appearance: unknown) => {
+        const window = trustedSender(event);
+        if (appearance !== "light" && appearance !== "dark")
+          throw new CoreError("INVALID_DATA", "Unknown appearance.");
+        applyWindowAppearance(window, appearance);
+      });
       ipcMain.on("showai:close-result", (event, payload: unknown) => {
         let window: BrowserWindow;
         try {

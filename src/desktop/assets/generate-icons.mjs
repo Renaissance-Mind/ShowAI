@@ -11,34 +11,37 @@ if (process.platform !== "darwin")
   );
 const directory = dirname(fileURLToPath(import.meta.url));
 const temporary = await mkdtemp(join(tmpdir(), "showai-icon-"));
-const iconset = join(temporary, "icon.iconset");
 const run = promisify(execFile);
 try {
-  await mkdir(iconset);
-  await run("swift", [
-    join(directory, "create-icon.swift"),
-    join(directory, "icon.png"),
-  ]);
-  for (const size of [16, 32, 128, 256, 512]) {
-    for (const scale of [1, 2])
-      await run("sips", [
-        "-z",
-        String(size * scale),
-        String(size * scale),
-        join(directory, "icon.png"),
-        "--out",
-        join(iconset, `icon_${size}x${size}${scale === 2 ? "@2x" : ""}.png`),
-      ]);
+  for (const [name, mode] of [
+    ["icon", "dark"],
+    ["icon-light", "light"],
+  ]) {
+    const iconset = join(temporary, `${name}.iconset`);
+    const png = join(directory, `${name}.png`);
+    await mkdir(iconset);
+    await run("swift", [join(directory, "create-icon.swift"), png, mode]);
+    for (const size of [16, 32, 128, 256, 512]) {
+      for (const scale of [1, 2])
+        await run("sips", [
+          "-z",
+          String(size * scale),
+          String(size * scale),
+          png,
+          "--out",
+          join(iconset, `icon_${size}x${size}${scale === 2 ? "@2x" : ""}.png`),
+        ]);
+    }
+    await run("iconutil", [
+      "-c",
+      "icns",
+      iconset,
+      "-o",
+      join(directory, `${name}.icns`),
+    ]);
   }
-  await run("iconutil", [
-    "-c",
-    "icns",
-    iconset,
-    "-o",
-    join(directory, "icon.icns"),
-  ]);
   console.log(
-    "Generated ShowAI icon.png and icon.icns from native vector geometry.",
+    "Generated both ShowAI icon appearances as PNG and ICNS from native vector geometry.",
   );
 } finally {
   await rm(temporary, { recursive: true, force: true });

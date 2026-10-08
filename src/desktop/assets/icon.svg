@@ -1,8 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
   <title id="title">ShowAI</title>
-  <desc id="description">Three rounded rectangles staggered from the upper right to the lower left on white, with white gaps between them. The back two are black and the front is RGB(18, 10, 143).</desc>
-  <rect width="512" height="512" fill="#FFFFFF"/>
-  <rect id="back" x="226" y="88" width="180" height="240" rx="18" fill="#000000"/>
-  <rect id="middle" x="166" y="136" width="180" height="240" rx="18" fill="#000000" stroke="#FFFFFF" stroke-width="20" paint-order="stroke fill"/>
-  <rect id="front" x="106" y="184" width="180" height="240" rx="18" fill="#120A8F" stroke="#FFFFFF" stroke-width="20" paint-order="stroke fill"/>
+  <desc id="description">Black rounded background with a blue middle rectangle (#06A5FA) between two white rectangles. Used with the light interface.</desc>
+  <rect x="2" y="2" width="508" height="508" rx="88" fill="#000000"/>
+  <rect id="back" x="226" y="88" width="180" height="240" rx="18" fill="#FFFFFF"/>
+  <rect id="middle" x="166" y="136" width="180" height="240" rx="18" fill="#06A5FA" stroke="#000000" stroke-width="20" paint-order="stroke fill"/>
+  <rect id="front" x="106" y="184" width="180" height="240" rx="18" fill="#FFFFFF" stroke="#000000" stroke-width="20" paint-order="stroke fill"/>
+  <rect x="2" y="2" width="508" height="508" rx="88" fill="none" stroke="#3F3F46" stroke-width="3"/>
 </svg>

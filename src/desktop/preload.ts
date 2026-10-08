@@ -21,6 +21,9 @@ if (process.isMainFrame) {
     ipcRenderer.send("showai:close-result", { requestId, allow });
   });
   const bridge: ShowAIBridge = {
+    setAppearance(appearance) {
+      return ipcRenderer.invoke("showai:set-appearance", appearance);
+    },
     getWindowState() {
       return ipcRenderer.invoke("showai:window-state");
     },

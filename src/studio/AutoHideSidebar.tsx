@@ -7,7 +7,8 @@ import {
   type ReactNode,
 } from "react";
 import { PanelLeft } from "../ui/icons";
-import appIcon from "../desktop/assets/icon.svg";
+import { appIconForTheme } from "../design/app-icon";
+import { useAppearanceTheme } from "../design/useAppearanceTheme";
 import "./auto-hide-sidebar.css";
 
 const minimumWidth = 200;
@@ -32,6 +33,7 @@ export default function AutoHideSidebar({
   focusWindow: boolean;
   switchingTab: boolean;
 }) {
+  const appIcon = appIconForTheme(useAppearanceTheme());
   const [locked, setLocked] = useState(
     () => localStorage.getItem("showai:sidebar-locked") === "true",
   );

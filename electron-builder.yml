@@ -8,6 +8,8 @@ directories:
 files:
   - dist/**
   - dist-desktop/**
+  - src/desktop/assets/icon.png
+  - src/desktop/assets/icon-light.png
   - package.json
   - "!**/*.map"
   - "!**/node_modules/**"

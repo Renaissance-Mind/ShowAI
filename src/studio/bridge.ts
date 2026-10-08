@@ -1,6 +1,11 @@
-import type { DesktopChange, DesktopWindowState } from "../desktop/bridge";
+import type {
+  DesktopAppearance,
+  DesktopChange,
+  DesktopWindowState,
+} from "../desktop/bridge";
 import type { TabCommand } from "../workbench/tab-shortcuts";
 export interface DesktopBridge {
+  setAppearance?(appearance: DesktopAppearance): Promise<void>;
   getWindowState?(): Promise<DesktopWindowState>;
   onWindowStateChange?(
     listener: (state: DesktopWindowState) => void,

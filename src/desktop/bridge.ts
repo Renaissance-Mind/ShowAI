@@ -34,7 +34,10 @@ export interface DesktopWindowState {
   fullScreen: boolean;
 }
 
+export type DesktopAppearance = "light" | "dark";
+
 export interface ShowAIBridge {
+  setAppearance?(appearance: DesktopAppearance): Promise<void>;
   getWindowState?(): Promise<DesktopWindowState>;
   onWindowStateChange?(
     listener: (state: DesktopWindowState) => void,
