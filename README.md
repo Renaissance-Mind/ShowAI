@@ -22,7 +22,9 @@ ShowAI 让人与 Agent 通过可阅读、可交互、可编辑的内容共同思
 
   独立 HTML 包含页面、数据和所用组件，读者无需安装 ShowAI，也可以离线阅读与操作。导出的 ShowAI HTML 和 JSON 可以重新导入工作台，继续编辑。
 
-## 🧩 页面、白板、组件与模板
+## 🧩 设计逻辑
+
+![ShowAI 设计逻辑：从表达单元、内容组织与人机共创，到使用与交付](docs/showai-design-logic.png)
 
 ### Page 与 Board
 
