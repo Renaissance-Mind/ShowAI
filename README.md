@@ -219,10 +219,13 @@ Use `npm run dev:browser` for browser development. The default development libra
 Before submitting changes, run:
 
 ```sh
+npx playwright install chromium
 npm run check
 npm test
 npm run build
 ```
+
+Install Chromium once for the browser-based tests. On Windows, directory-link tests use junctions; file-symlink tests report a skip when Developer Mode or symlink privileges are unavailable. Other path and integrity checks still run.
 
 For desktop behavior, run `npm run test:desktop`. For Page and Board interactions, run `npm run test:containers` and `npm run test:containers:desktop`.
 

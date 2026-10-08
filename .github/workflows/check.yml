@@ -17,9 +17,31 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
+      - run: npx playwright install --with-deps chromium
       - run: npm run check
       - run: npm test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
       - run: npm run test:whiteboard
       - run: npm audit --audit-level=high
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium
+      - run: npm run check
+      - run: npm run build:portable
+      - run: npx vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000
+      - run: npm run build
+      - run: node src/desktop/smoke.mjs
+      - run: node src/desktop/ui-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ShowAI-windows-desktop-check
+          path: output/playwright/desktop-ui-*/
+          if-no-files-found: ignore

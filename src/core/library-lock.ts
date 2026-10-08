@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { CoreError } from "./model";
 import { atomicLibraryFile, safeLibraryPath } from "./library-files";
+import { withWindowsSharingRetry } from "./atomic-rename";
 
 interface LeaseOwner {
   pid: number;
@@ -22,33 +23,35 @@ async function ownerAt(
   root: string,
   path: string,
 ): Promise<LeaseOwner | undefined> {
-  await safeLibraryPath(root, path);
-  const info = await lstat(path).catch((error: NodeJS.ErrnoException) => {
-    if (error.code === "ENOENT") return undefined;
-    throw error;
+  return withWindowsSharingRetry(async () => {
+    await safeLibraryPath(root, path);
+    const info = await lstat(path).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined;
+      throw error;
+    });
+    if (!info) return undefined;
+    // Earlier development revisions used an owner file inside a lock directory.
+    const source = await readFile(
+      info.isDirectory() ? join(path, "owner.json") : path,
+      "utf8",
+    ).catch((error: NodeJS.ErrnoException) => {
+      // A cooperating owner may release the lease between stat and read.
+      if (error.code === "ENOENT") return undefined;
+      throw error;
+    });
+    if (source === undefined) return undefined;
+    const value = JSON.parse(source) as LeaseOwner;
+    if (
+      !Number.isInteger(value.pid) ||
+      value.pid < 1 ||
+      !/^[\w-]{1,200}$/.test(value.token)
+    )
+      throw new CoreError(
+        "INVALID_DATA",
+        "The library lock has invalid ownership information.",
+      );
+    return value;
   });
-  if (!info) return undefined;
-  // Earlier development revisions used an owner file inside a lock directory.
-  const source = await readFile(
-    info.isDirectory() ? join(path, "owner.json") : path,
-    "utf8",
-  ).catch((error: NodeJS.ErrnoException) => {
-    // A cooperating owner may release the lease between stat and read.
-    if (error.code === "ENOENT") return undefined;
-    throw error;
-  });
-  if (source === undefined) return undefined;
-  const value = JSON.parse(source) as LeaseOwner;
-  if (
-    !Number.isInteger(value.pid) ||
-    value.pid < 1 ||
-    !/^[\w-]{1,200}$/.test(value.token)
-  )
-    throw new CoreError(
-      "INVALID_DATA",
-      "The library lock has invalid ownership information.",
-    );
-  return value;
 }
 
 /** Publish a fully persisted owner with an atomic hard link: no empty-owner crash window. */

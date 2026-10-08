@@ -18,6 +18,7 @@ import { watch } from "node:fs";
 import { mkdir, readdir } from "node:fs/promises";
 import { build } from "esbuild";
 import { rawSourcePlugin } from "../../scripts/raw-source-plugin.mjs";
+import { stopTestProcess } from "../../scripts/stop-test-process.mjs";
 const actions: (() => Promise<unknown>)[] = [];
 vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
 afterEach(async () => {
@@ -25,7 +26,14 @@ afterEach(async () => {
 });
 async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), "showai-project-sync-"));
-  actions.push(() => rm(directory, { recursive: true, force: true }));
+  actions.push(() =>
+    rm(directory, {
+      recursive: true,
+      force: true,
+      maxRetries: process.platform === "win32" ? 10 : 0,
+      retryDelay: 50,
+    }),
+  );
   const server = process.env.SHOWAI_SYNC_TEST_URL
     ? { url: process.env.SHOWAI_SYNC_TEST_URL }
     : await startSyncServer({ home: join(directory, "server"), port: 0 });
@@ -693,6 +701,7 @@ describe("project synchronization between independent real content libraries", (
         ).length;
       let killed = false,
         output = "";
+      let stopping: Promise<void> | undefined;
       const configDirectory = join(bob.home, "local", "sync");
       const observer = watch(
         phase.startsWith("during history replay") ? markers : configDirectory,
@@ -719,6 +728,8 @@ describe("project synchronization between independent real content libraries", (
           void ready.then((found) => {
             if (!killed && found) {
               killed = true;
+              // Kill immediately at the observed checkpoint. Starting taskkill
+              // here can let the client publish and remove its pending marker.
               child.kill("SIGKILL");
             }
           });
@@ -741,13 +752,19 @@ describe("project synchronization between independent real content libraries", (
       );
       child.stdout.on("data", (bytes) => (output += bytes.toString()));
       child.stderr.on("data", (bytes) => (output += bytes.toString()));
-      const deadline = setTimeout(() => child.kill("SIGKILL"), 25_000);
+      const deadline = setTimeout(
+        () => {
+          stopping = stopTestProcess(child);
+        },
+        process.platform === "win32" ? 45_000 : 25_000,
+      );
       await new Promise<void>((done, reject) => {
         child.once("error", reject);
         child.once("exit", () => done());
       });
       clearTimeout(deadline);
       observer.close();
+      await stopping;
       expect(killed, output).toBe(true);
       expect(
         JSON.parse(
@@ -823,6 +840,6 @@ describe("project synchronization between independent real content libraries", (
         ),
       ).rejects.toMatchObject({ code: "ENOENT" });
     },
-    60_000,
+    process.platform === "win32" ? 120_000 : 60_000,
   );
 });

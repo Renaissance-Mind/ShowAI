@@ -34,6 +34,10 @@ async function run(args: string[]) {
   const output = await execute(process.execPath, [cli, ...args, "--json"], {
     env: environment(),
     maxBuffer: 12 * 1024 * 1024,
+  }).catch((error) => {
+    throw new Error(error.stdout || error.stderr || error.message, {
+      cause: error,
+    });
   });
   const result = JSON.parse(output.stdout);
   if (!result.ok) throw new Error(JSON.stringify(result));

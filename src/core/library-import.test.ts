@@ -6,11 +6,11 @@ import {
   writeFile,
   readdir,
   rename,
-  symlink,
   mkdir,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileSymlink } from "../test/file-symlink";
 import { FileStore } from "./store";
 import { LibraryImport } from "./library-import";
 import { GitLibrary } from "./git-library";
@@ -290,16 +290,19 @@ describe("one-time file library import", () => {
     expect(await retained.head()).toBe(first.revision);
     expect((await readFile(page.path)).toString()).toContain("更新后的源内容");
   }, 20000);
-  it("refuses symbolic links and nested destinations", async () => {
+  it("refuses nested destinations", async () => {
     const importer = new LibraryImport(join(source, "packages", "nested"));
     await expect(importer.prepare(source)).rejects.toMatchObject({
       code: "INVALID_PATH",
     });
+  });
+  it("refuses file symbolic links", async (context) => {
     const canonical = await readdir(
       join(source, "projects", projectId, "pages"),
     );
     await mkdir(join(source, "packages"), { recursive: true });
-    await symlink(
+    await fileSymlink(
+      context,
       join(source, "projects", projectId, "pages", canonical[0]),
       join(source, "packages", "linked"),
     );

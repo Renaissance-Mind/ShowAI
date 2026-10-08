@@ -8,6 +8,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import electron from "electron";
+import { stopTestProcess } from "../../scripts/stop-test-process.mjs";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const temporary = await mkdtemp(join(tmpdir(), "showai-desktop-smoke-"));
@@ -63,7 +64,15 @@ async function connect(port) {
     const response = await fetch(`http://127.0.0.1:${port}/json/list`).catch(
       () => null,
     );
-    if (response?.ok) target = (await response.json())[0];
+    if (response?.ok) {
+      const targets = await response.json();
+      target =
+        port === rendererPort
+          ? targets.find(
+              (item) => item.type === "page" && item.url.startsWith("file:"),
+            )
+          : targets[0];
+    }
     if (target) break;
     await new Promise((done) => setTimeout(done, 100));
   }
@@ -84,6 +93,11 @@ async function connect(port) {
       message.method === "Runtime.exceptionThrown"
     )
       output += JSON.stringify(message) + "\n";
+    if (
+      message.method === "Runtime.consoleAPICalled" &&
+      message.params.args[0]?.value === "desktop-smoke"
+    )
+      output += `Desktop action: ${message.params.args[1]?.value}\n`;
     if (!request) return;
     pending.delete(message.id);
     clearTimeout(request.timeout);
@@ -102,7 +116,11 @@ async function connect(port) {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         pending.delete(id);
-        reject(new Error(`Electron timed out: ${method}`));
+        reject(
+          new Error(
+            `Electron timed out: ${method} (${params?.expression?.slice(0, 160) ?? ""})`,
+          ),
+        );
       }, 60000);
       pending.set(id, { resolve, reject, timeout });
       socket.send(JSON.stringify({ id, method, params }));
@@ -128,12 +146,21 @@ try {
   const main = await connect(mainPort),
     renderer = await connect(rendererPort);
   inspectMain = main;
+  // Wait for the actual workbench navigation before running a long evaluation.
+  // The initial about:blank context can disappear while Windows is loading it.
+  for (let attempt = 0; ; attempt++) {
+    if (await renderer("!!window.showai && document.readyState === 'complete'"))
+      break;
+    if (attempt === 100)
+      throw new Error("Desktop workbench did not finish loading.");
+    await new Promise((done) => setTimeout(done, 100));
+  }
   const native =
     "process.getBuiltinModule('module').createRequire(process.cwd()+'/package.json')('electron')";
   const result = await renderer(`(async()=>{
     for(let i=0;i<100&&!window.showai;i++) await new Promise(resolve=>setTimeout(resolve,20));
-    const api=window.showai;
-    if(!api) throw new Error('Desktop preload is missing.');
+    if(!window.showai) throw new Error('Desktop preload is missing.');
+    const api={invoke:(action,...args)=>{console.info('desktop-smoke',action);return window.showai.invoke(action,...args);}};
     const info=await api.invoke('app:info');
     const project=await api.invoke('projects:create',{name:'Desktop smoke'});
     const page=await api.invoke('pages:create',{projectId:project.id,title:'Page'});
@@ -268,13 +295,24 @@ try {
     { count: 2, bridge: true },
   );
   await renderer("window.__release();'released'");
-  await main(`${native}.BrowserWindow.getAllWindows()[0].close(); 'requested'`);
-  await new Promise((done) => setTimeout(done, 300));
-  assert.equal(await main(`${native}.BrowserWindow.getAllWindows().length`), 0);
+  // Reply before closing the last window. Windows quits the event loop at that
+  // point, so another inspector evaluation can wait forever for a response.
+  await main(
+    `setTimeout(()=>{const window=${native}.BrowserWindow.getAllWindows()[0];window.once('closed',()=>${native}.app.quit());window.close();},50); 'requested'`,
+  );
+  const exited = new Promise((resolve, reject) => {
+    const timeout = setTimeout(
+      () =>
+        reject(new Error("Desktop did not quit after its last window closed.")),
+      15000,
+    );
+    child.once("exit", () => {
+      clearTimeout(timeout);
+      resolve();
+    });
+  });
   for (const socket of sockets) socket.close();
-  const exited = new Promise((done) => child.once("exit", done));
-  child.kill("SIGTERM");
-  await Promise.race([exited, new Promise((done) => setTimeout(done, 15000))]);
+  await exited;
   assert.ok(
     child.exitCode !== null || child.signalCode !== null,
     "Desktop application must exit before testing the independent CLI.",
@@ -348,11 +386,6 @@ try {
   process.exitCode = 1;
 } finally {
   for (const socket of sockets) socket.close();
-  if (child.exitCode === null) {
-    const exited = new Promise((done) => child.once("exit", done));
-    child.kill("SIGTERM");
-    await Promise.race([exited, new Promise((done) => setTimeout(done, 15000))]);
-    if (child.exitCode === null) child.kill("SIGKILL");
-  }
+  await stopTestProcess(child);
   await rm(temporary, { recursive: true, force: true });
 }

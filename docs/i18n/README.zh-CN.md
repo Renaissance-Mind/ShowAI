@@ -219,10 +219,13 @@ npm run dev:status
 提交改动前执行：
 
 ```sh
+npx playwright install chromium
 npm run check
 npm test
 npm run build
 ```
+
+浏览器测试需要先安装一次 Chromium。Windows 的目录链接测试使用 junction；缺少开发者模式或符号链接权限时，文件符号链接测试会明确标记为跳过，其余路径与完整性检查仍会执行。
 
 涉及桌面行为时，可运行 `npm run test:desktop`；涉及 Page 与 Board 交互时，可运行 `npm run test:containers` 和 `npm run test:containers:desktop`。
 

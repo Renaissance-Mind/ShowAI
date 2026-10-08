@@ -3,15 +3,7 @@ import { artifactVersion } from "../surface/document.mjs";
 import { createResource, upgradeResource } from "../surface/containers.mjs";
 import { constants } from "node:fs";
 import { AsyncLocalStorage } from "node:async_hooks";
-import {
-  lstat,
-  mkdir,
-  open,
-  readFile,
-  readdir,
-  rename,
-  rm,
-} from "node:fs/promises";
+import { lstat, mkdir, open, readFile, readdir, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import {
   basename,
@@ -32,6 +24,7 @@ import {
   normalizeDocument,
 } from "./diff";
 import { CoreError } from "./model";
+import { atomicRename } from "./atomic-rename";
 import { libraryMutations, legacyMutations } from "./history-context";
 import { withLibraryLock } from "./library-lock";
 const projectionReads = new AsyncLocalStorage<string>();
@@ -355,7 +348,7 @@ export class FileStore {
     }
     try {
       await this.safePath(path);
-      await rename(temporary, path);
+      await atomicRename(temporary, path);
       if (process.platform !== "win32") {
         const parent = await open(dirname(path), "r");
         try {
@@ -922,7 +915,7 @@ export class FileStore {
       await this.ensureDirectory(join(staging, "pages"));
       await syncDirectory(staging);
       await this.safePath(destination);
-      await rename(staging, destination);
+      await atomicRename(staging, destination);
       await syncDirectory(dirname(destination));
       return { ...project, pageCount: 0 };
     } finally {

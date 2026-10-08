@@ -1,7 +1,8 @@
 import { createServer, type Server } from "node:http";
 import { DatabaseSync } from "node:sqlite";
-import { mkdir, readFile, rename, open } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { mkdir, readFile, open } from "node:fs/promises";
+import { atomicRename } from "../core/atomic-rename";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { syncProtocol } from "../sync/protocol";
 import { createSyncServer, type ServerOptions } from "./app";
@@ -64,7 +65,7 @@ export class DiskObjects implements ObjectStore {
   }
   async put(key: string, bytes: Uint8Array) {
     const path = this.path(key),
-      folder = path.slice(0, path.lastIndexOf("/"));
+      folder = dirname(path);
     await mkdir(folder, { recursive: true });
     const temporary = `${path}.${crypto.randomUUID()}.tmp`;
     const file = await open(temporary, "wx", 0o600);
@@ -74,12 +75,15 @@ export class DiskObjects implements ObjectStore {
     } finally {
       await file.close();
     }
-    await rename(temporary, path);
-    const directory = await open(folder, "r");
-    try {
-      await directory.sync();
-    } finally {
-      await directory.close();
+    await atomicRename(temporary, path);
+    // Windows cannot fsync a directory handle; the object itself is flushed above.
+    if (process.platform !== "win32") {
+      const directory = await open(folder, "r");
+      try {
+        await directory.sync();
+      } finally {
+        await directory.close();
+      }
     }
   }
 }
