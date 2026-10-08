@@ -212,7 +212,7 @@ export function createSyncServer(options: ServerOptions) {
         const invitation =
           typeof input.invite === "string"
             ? await db.all<{ digest: string }>(
-                "SELECT digest FROM invites WHERE digest=? AND revoked=0 AND accepted_by IS NULL AND expires_at>?",
+                "SELECT digest FROM invites WHERE digest=? AND revoked=0 AND expires_at>?",
                 [await hash(input.invite), new Date().toISOString()],
               )
             : [];
@@ -286,7 +286,7 @@ export function createSyncServer(options: ServerOptions) {
           expires_at: string;
           name: string;
         }>(
-          "SELECT i.project_id,i.role,i.expires_at,p.name FROM invites i JOIN projects p ON p.id=i.project_id WHERE i.digest=? AND i.revoked=0 AND i.accepted_by IS NULL AND i.expires_at>?",
+          "SELECT i.project_id,i.role,i.expires_at,p.name FROM invites i JOIN projects p ON p.id=i.project_id WHERE i.digest=? AND i.revoked=0 AND i.expires_at>?",
           [await hash(plainText(input.invite, 200)), new Date().toISOString()],
         )
       )[0];
@@ -294,7 +294,7 @@ export function createSyncServer(options: ServerOptions) {
         throw new SyncError(
           410,
           "INVITE_UNAVAILABLE",
-          "The invitation has expired, was revoked or was already used.",
+          "The invitation has expired or was revoked.",
         );
       return json({
         ...invitation,
@@ -368,7 +368,6 @@ export function createSyncServer(options: ServerOptions) {
         await db.all<{
           project_id: string;
           role: ProjectRole;
-          accepted_by: string | null;
           revoked: number;
           expires_at: string;
         }>("SELECT * FROM invites WHERE digest=?", [digest])
@@ -376,40 +375,24 @@ export function createSyncServer(options: ServerOptions) {
       if (
         !invitation ||
         invitation.revoked ||
-        invitation.expires_at <= new Date().toISOString() ||
-        (invitation.accepted_by && invitation.accepted_by !== user.id)
+        invitation.expires_at <= new Date().toISOString()
       )
         throw new SyncError(
           410,
           "INVITE_UNAVAILABLE",
           "This invitation is unavailable.",
         );
-      if (invitation.accepted_by === user.id)
-        return json(await projectFor(user.id, invitation.project_id));
-      const claimed = await db.batch([
+      const at = new Date().toISOString();
+      await db.batch([
         {
-          sql: "UPDATE invites SET accepted_by=? WHERE digest=? AND accepted_by IS NULL AND revoked=0 AND expires_at>?",
-          values: [user.id, digest, new Date().toISOString()],
+          sql: "INSERT OR IGNORE INTO members(project_id,user_id,role) SELECT project_id,?,role FROM invites WHERE digest=? AND revoked=0 AND expires_at>? AND NOT EXISTS (SELECT 1 FROM invite_acceptances WHERE digest=? AND user_id=?)",
+          values: [user.id, digest, at, digest, user.id],
         },
         {
-          sql: "INSERT OR IGNORE INTO members(project_id,user_id,role) SELECT project_id,?,role FROM invites WHERE digest=? AND accepted_by=? AND revoked=0 AND changes()=1",
-          values: [user.id, digest, user.id],
+          sql: "INSERT OR IGNORE INTO invite_acceptances(digest,user_id) SELECT i.digest,? FROM invites i JOIN members m ON m.project_id=i.project_id AND m.user_id=? WHERE i.digest=? AND i.revoked=0 AND i.expires_at>?",
+          values: [user.id, user.id, digest, at],
         },
       ]);
-      if (!claimed[0].changes) {
-        const winner = (
-          await db.all<{ accepted_by: string | null }>(
-            "SELECT accepted_by FROM invites WHERE digest=?",
-            [digest],
-          )
-        )[0];
-        if (winner?.accepted_by !== user.id)
-          throw new SyncError(
-            410,
-            "INVITE_UNAVAILABLE",
-            "This invitation was already claimed.",
-          );
-      }
       return json(await projectFor(user.id, invitation.project_id));
     }
     const match = path.match(/^\/api\/projects\/([^/]+)(?:\/(.*))?$/);
@@ -532,7 +515,7 @@ export function createSyncServer(options: ServerOptions) {
       await projectFor(user.id, projectId, "admin");
       return json(
         await db.all(
-          "SELECT digest,role,expires_at,accepted_by,revoked FROM invites WHERE project_id=? ORDER BY expires_at DESC",
+          "SELECT i.digest,i.role,i.expires_at,i.accepted_by,i.revoked,(SELECT COUNT(*) FROM invite_acceptances a WHERE a.digest=i.digest) AS accepted_count FROM invites i WHERE i.project_id=? ORDER BY i.expires_at DESC",
           [projectId],
         ),
       );

@@ -24,6 +24,8 @@ export const schema = [
   `CREATE TABLE IF NOT EXISTS members (project_id TEXT NOT NULL REFERENCES projects(id), user_id TEXT NOT NULL REFERENCES users(id), role TEXT NOT NULL CHECK(role IN ('admin','editor','viewer')), PRIMARY KEY(project_id,user_id))`,
   `CREATE INDEX IF NOT EXISTS members_user ON members(user_id)`,
   `CREATE TABLE IF NOT EXISTS invites (digest TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id), role TEXT NOT NULL CHECK(role IN ('admin','editor','viewer')), created_by TEXT NOT NULL, expires_at TEXT NOT NULL, accepted_by TEXT, revoked INTEGER NOT NULL DEFAULT 0)`,
+  `CREATE TABLE IF NOT EXISTS invite_acceptances (digest TEXT NOT NULL REFERENCES invites(digest), user_id TEXT NOT NULL REFERENCES users(id), PRIMARY KEY(digest,user_id))`,
+  `INSERT OR IGNORE INTO invite_acceptances(digest,user_id) SELECT digest,accepted_by FROM invites WHERE accepted_by IS NOT NULL`,
   `CREATE TABLE IF NOT EXISTS objects (project_id TEXT NOT NULL REFERENCES projects(id), digest TEXT NOT NULL, bytes INTEGER NOT NULL, PRIMARY KEY(project_id,digest))`,
   `CREATE TABLE IF NOT EXISTS revisions (project_id TEXT NOT NULL REFERENCES projects(id), revision TEXT NOT NULL, manifest TEXT NOT NULL, user_id TEXT NOT NULL, created_at TEXT NOT NULL, published INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(project_id,revision))`,
 ];

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { startSyncServer } from "./node";
+import { SQLiteMetadata, startSyncServer } from "./node";
 import { hash, syncProtocol, type ProjectSnapshot } from "../sync/protocol";
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -51,7 +51,7 @@ async function fixture() {
   return { ...running, home, request, register, admin };
 }
 describe("portable project server with real SQLite and disk storage", () => {
-  it("creates three project roles, joins once, and reuses an existing account", async () => {
+  it("shares an invitation across accounts and preserves removed membership", async () => {
     const f = await fixture(),
       editor = await f.register("editor"),
       viewer = await f.register("viewer");
@@ -90,7 +90,7 @@ describe("portable project server with real SQLite and disk storage", () => {
           viewer.token,
         )
       ).status,
-    ).toBe(410);
+    ).toBe(200);
     expect(
       (
         await f.request(
@@ -131,7 +131,7 @@ describe("portable project server with real SQLite and disk storage", () => {
       ).status,
     ).toBe(403);
   });
-  it("atomically allows only one account to claim an invitation", async () => {
+  it("allows different accounts to accept an invitation concurrently", async () => {
     const f = await fixture(),
       one = await f.register("one"),
       two = await f.register("two");
@@ -154,7 +154,7 @@ describe("portable project server with real SQLite and disk storage", () => {
       ),
     );
     expect(responses.map((response) => response.status).sort()).toEqual([
-      200, 410,
+      200, 200,
     ]);
     expect(
       (
@@ -165,7 +165,154 @@ describe("portable project server with real SQLite and disk storage", () => {
           f.admin.token,
         )
       ).value,
-    ).toHaveLength(2);
+    ).toHaveLength(3);
+  });
+  it("keeps one link available for repeated registration and preserves existing roles", async () => {
+    const f = await fixture();
+    const invitation = (
+      await f.request(
+        "/api/projects/project-one/invites",
+        "POST",
+        { role: "editor" },
+        f.admin.token,
+      )
+    ).value;
+    const joined = [];
+    for (const name of ["first", "second", "third"]) {
+      expect(
+        (
+          await f.request("/api/invites/preview", "POST", {
+            invite: invitation.invite,
+          })
+        ).status,
+      ).toBe(200);
+      const registration = await f.request("/api/auth/register", "POST", {
+        name,
+        password: "test-password",
+        invite: invitation.invite,
+      });
+      expect(registration.status).toBe(201);
+      const user = registration.value;
+      joined.push(user);
+      const accepted = await f.request(
+        "/api/invites/accept",
+        "POST",
+        { invite: invitation.invite },
+        user.token,
+      );
+      expect(accepted.status).toBe(200);
+      expect(accepted.value.role).toBe("editor");
+    }
+    await f.request(
+      "/api/projects/project-one/members",
+      "PATCH",
+      { userId: joined[0].user.id, role: "viewer" },
+      f.admin.token,
+    );
+    expect(
+      (
+        await f.request(
+          "/api/invites/accept",
+          "POST",
+          { invite: invitation.invite },
+          joined[0].token,
+        )
+      ).value.role,
+    ).toBe("viewer");
+    const invitations = await f.request(
+      "/api/projects/project-one/invites",
+      "GET",
+      undefined,
+      f.admin.token,
+    );
+    expect(invitations.value[0].accepted_count).toBe(3);
+    await f.request(
+      "/api/projects/project-one/invites/revoke",
+      "POST",
+      { digest: await hash(invitation.invite) },
+      f.admin.token,
+    );
+    expect(
+      (
+        await f.request("/api/invites/preview", "POST", {
+          invite: invitation.invite,
+        })
+      ).status,
+    ).toBe(410);
+    expect(
+      (
+        await f.request("/api/auth/register", "POST", {
+          name: "after-revocation",
+          password: "test-password",
+          invite: invitation.invite,
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await f.request(
+          "/api/invites/accept",
+          "POST",
+          { invite: invitation.invite },
+          joined[1].token,
+        )
+      ).status,
+    ).toBe(410);
+  });
+  it("migrates legacy claims so old links admit more members without restoring removed users", async () => {
+    const f = await fixture(),
+      original = await f.register("original"),
+      newcomer = await f.register("newcomer");
+    const invitation = (
+      await f.request(
+        "/api/projects/project-one/invites",
+        "POST",
+        { role: "viewer" },
+        f.admin.token,
+      )
+    ).value;
+    const metadata = new SQLiteMetadata(join(f.home, "metadata.sqlite"));
+    await metadata.run("UPDATE invites SET accepted_by=? WHERE digest=?", [
+      original.user.id,
+      await hash(invitation.invite),
+    ]);
+    metadata.close();
+    const upgraded = await startSyncServer({
+      home: f.home,
+      port: 0,
+      registrationKey: "testing-key",
+    });
+    cleanup.push(() => upgraded.close());
+    expect(
+      (
+        await f.request(
+          "/api/invites/accept",
+          "POST",
+          { invite: invitation.invite },
+          original.token,
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await f.request(
+          "/api/invites/accept",
+          "POST",
+          { invite: invitation.invite },
+          newcomer.token,
+        )
+      ).value.role,
+    ).toBe("viewer");
+    expect(
+      (
+        await f.request(
+          "/api/projects/project-one/invites",
+          "GET",
+          undefined,
+          f.admin.token,
+        )
+      ).value[0].accepted_count,
+    ).toBe(2);
   });
   it("keeps at least one administrator and checks live membership on every request", async () => {
     const f = await fixture(),

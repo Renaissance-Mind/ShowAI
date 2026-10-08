@@ -22,6 +22,7 @@ export type SyncInvite = {
   role: ProjectRole;
   expires_at: string;
   accepted_by: string | null;
+  accepted_count?: number;
   revoked: number;
 };
 const roles: Record<ProjectRole, string> = {
@@ -91,9 +92,7 @@ export default function SyncDashboard({
   const confirmationTrigger = useRef<HTMLButtonElement | null>(null);
   const project = projects.find((item) => item.id === selectedId);
   const managed = projects.filter((item) => item.role === "admin");
-  const pendingInvites = invites.filter(
-    (item) => !item.accepted_by && !item.revoked,
-  );
+  const pendingInvites = invites.filter((item) => !item.revoked);
   const admins = members.filter((member) => member.role === "admin").length;
   useEffect(() => {
     setRemove(null);
@@ -378,7 +377,7 @@ export default function SyncDashboard({
                 </h3>
               </div>
               <p className="sync-section-description">
-                生成链接，分享给需要加入此项目的人。
+                同一链接可供多人注册或加入项目，人数不限。
               </p>
               <div className="sync-invite-controls">
                 <label>
@@ -432,7 +431,7 @@ export default function SyncDashboard({
                     </button>
                   </div>
                   <p>
-                    每条链接可供一位成员使用
+                    加入人数不限
                     {generatedInviteExpiresAt &&
                       ` · ${new Date(generatedInviteExpiresAt).toLocaleString("zh-CN", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })} 到期`}
                   </p>
@@ -451,6 +450,10 @@ export default function SyncDashboard({
                         <div>
                           <strong>{roles[invite.role]}</strong>
                           <span>
+                            已有{" "}
+                            {invite.accepted_count ??
+                              (invite.accepted_by ? 1 : 0)}{" "}
+                            人加入 ·{" "}
                             {expired
                               ? "已过期"
                               : `${new Date(invite.expires_at).toLocaleString("zh-CN", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })} 到期`}
