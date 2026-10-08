@@ -116,7 +116,7 @@ async function run(command, args) {
 }
 await run("npm", ["run", "check"]);
 await run("npm", ["run", "build"]);
-await run("npm", ["test", "--", "--maxWorkers=2"]);
+await run("npm", ["test"]);
 await run(join(root, "node_modules/.bin/electron-builder"), [
   "--mac",
   "--arm64",
