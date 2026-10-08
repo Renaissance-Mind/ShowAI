@@ -19,8 +19,14 @@ await build({
   target: "es2022",
   format: "esm",
 });
-const { schema } = await import(
+const { schema, migrations } = await import(
   pathToFileURL(resolve("dist-server/server.mjs")).href
 );
 await writeFile("dist-server/schema.sql", schema.join(";\n") + ";\n");
+await mkdir("dist-server/migrations", { recursive: true });
+for (const migration of migrations)
+  await writeFile(
+    `dist-server/migrations/${String(migration.version).padStart(4, "0")}_${migration.name}.sql`,
+    migration.statements.join(";\n") + ";\n",
+  );
 console.log("Built Linux and Cloudflare ShowAI Server from the shared core.");

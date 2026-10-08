@@ -15,6 +15,7 @@ import {
   type SqlValue,
 } from "./storage";
 export { schema };
+export { migrations } from "./migrations";
 
 export class SQLiteMetadata implements MetadataStore {
   readonly db: DatabaseSync;

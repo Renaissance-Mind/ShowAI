@@ -14,7 +14,8 @@ import {
   type SyncUser,
   type ProjectSnapshot,
 } from "../sync/protocol";
-import { schema, type MetadataStore, type ObjectStore } from "./storage";
+import { type MetadataStore, type ObjectStore } from "./storage";
+import { prepareMetadata } from "./migrations";
 import { validateReaderClosure } from "../sync/dependency-validation";
 import {
   serverBaseUrl,
@@ -28,6 +29,7 @@ export interface ServerOptions {
   name?: string;
   registrationKey?: string;
   publicUrl?: string;
+  autoMigrate?: boolean;
 }
 interface Member {
   id: string;
@@ -104,11 +106,7 @@ export function createSyncServer(options: ServerOptions) {
     objects = options.objects;
   let initialization: Promise<string> | undefined;
   async function initialize() {
-    for (const sql of schema) await db.run(sql);
-    await db.run(
-      "INSERT OR IGNORE INTO settings(key,value) VALUES('server_id',?)",
-      [crypto.randomUUID()],
-    );
+    await prepareMetadata(db, options.autoMigrate !== false);
     return (
       await db.all<{ value: string }>(
         "SELECT value FROM settings WHERE key='server_id'",

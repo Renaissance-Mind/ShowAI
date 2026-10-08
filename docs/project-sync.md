@@ -22,14 +22,15 @@ Linux 环境变量：`SHOWAI_SERVER_HOST`（默认 `127.0.0.1`）、`SHOWAI_SERV
 Cloudflare 部署：
 
 ```sh
-npx wrangler@4.148.0 d1 create showai-server
-npx wrangler@4.148.0 r2 bucket create showai-server-content
+npx wrangler@4.148.0 d1 create showai-cloud
+npx wrangler@4.148.0 r2 bucket create showai-cloud-content
 # 将返回的数据库 ID 写入 deployments/cloudflare/wrangler.jsonc。
+npx wrangler@4.148.0 d1 migrations apply DB --remote --config deployments/cloudflare/wrangler.jsonc
 npx wrangler@4.148.0 secret put SHOWAI_REGISTRATION_KEY --config deployments/cloudflare/wrangler.jsonc
 npx wrangler@4.148.0 deploy --config deployments/cloudflare/wrangler.jsonc
 ```
 
-数据库表在首次请求时创建。若预先初始化，可使用构建生成的 `dist-server/schema.sql`。本地 Cloudflare 验收运行 `wrangler dev --local`，使用真实 D1/R2 本地实现，不替代 Linux 验收。当前代码没有进行真实 Cloudflare 账户下的远端部署。
+Linux 启动时按版本执行尚未应用的事务迁移，保留旧服务的身份与会话。Worker 仅核对数据库版本；先构建服务生成 `dist-server/migrations/`，再使用 Wrangler 显式应用迁移。配置中的 `staging` 环境绑定独立的测试 D1/R2，相关命令追加 `--env staging`。本地 Cloudflare 验收先执行 `d1 migrations apply DB --local`，再运行 `wrangler dev --local`，使用真实 D1/R2 本地实现。
 
 ## 账户与项目权限
 

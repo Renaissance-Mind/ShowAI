@@ -276,6 +276,8 @@ describe("portable project server with real SQLite and disk storage", () => {
       original.user.id,
       await hash(invitation.invite),
     ]);
+    // Legacy databases predate the explicit schema-version checkpoint.
+    await metadata.run("DELETE FROM settings WHERE key='schema_version'");
     metadata.close();
     const upgraded = await startSyncServer({
       home: f.home,

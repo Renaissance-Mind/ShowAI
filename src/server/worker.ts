@@ -67,6 +67,7 @@ export default {
         name: env.SHOWAI_SERVER_NAME,
         publicUrl: env.SHOWAI_SERVER_URL,
         registrationKey: env.SHOWAI_REGISTRATION_KEY,
+        autoMigrate: false,
       });
       instances.set(env, app);
     }

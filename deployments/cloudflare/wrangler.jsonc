@@ -1,16 +1,68 @@
 {
-  "name": "showai-server",
+  "name": "showai-cloud",
   "main": "../../dist-server/worker.mjs",
-  "compatibility_date": "2025-06-01",
-  "vars": { "SHOWAI_SERVER_NAME": "ShowAI Server" },
+  "compatibility_date": "2026-10-08",
+  "workers_dev": false,
+  "preview_urls": false,
+  "limits": { "cpu_ms": 1000 },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1,
+    "logs": { "enabled": true, "invocation_logs": false },
+  },
+  "vars": {
+    "SHOWAI_SERVER_NAME": "ShowAI Cloud",
+    "SHOWAI_SERVER_URL": "https://showai.renaissancemind.ai/cloud",
+  },
+  "routes": [
+    {
+      "pattern": "https://showai.renaissancemind.ai/cloud",
+      "zone_name": "renaissancemind.ai",
+    },
+    {
+      "pattern": "https://showai.renaissancemind.ai/cloud/*",
+      "zone_name": "renaissancemind.ai",
+    },
+  ],
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "showai-server",
+      "database_name": "showai-cloud",
       "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "../../dist-server/migrations",
     },
   ],
   "r2_buckets": [
-    { "binding": "CONTENT", "bucket_name": "showai-server-content" },
+    { "binding": "CONTENT", "bucket_name": "showai-cloud-content" },
   ],
+  "env": {
+    "staging": {
+      "name": "showai-cloud-staging",
+      "vars": {
+        "SHOWAI_SERVER_NAME": "ShowAI Cloud Staging",
+        "SHOWAI_SERVER_URL": "https://showai.renaissancemind.ai/cloud-staging",
+      },
+      "routes": [
+        {
+          "pattern": "https://showai.renaissancemind.ai/cloud-staging",
+          "zone_name": "renaissancemind.ai",
+        },
+        {
+          "pattern": "https://showai.renaissancemind.ai/cloud-staging/*",
+          "zone_name": "renaissancemind.ai",
+        },
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "showai-cloud-staging",
+          "database_id": "ffcb7872-fd46-460d-891e-0c6792a6183d",
+          "migrations_dir": "../../dist-server/migrations",
+        },
+      ],
+      "r2_buckets": [
+        { "binding": "CONTENT", "bucket_name": "showai-cloud-staging-content" },
+      ],
+    },
+  },
 }
