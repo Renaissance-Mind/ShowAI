@@ -1,16 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="900" viewBox="0 0 1800 900" role="img" aria-labelledby="title description">
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="820" viewBox="0 0 1800 820" role="img" aria-labelledby="title description">
 <title id="title">ShowAI 设计逻辑：从构成到使用</title>
-<desc id="description">内容、图表与交互组成 Page 或 Board；容器可互相嵌套，模板可应用与提炼。共同创作有两个入口：在 Agent 聊天上下文中直接查看与使用，或在 ShowAI App 中像笔记软件一样编辑与管理。成果可交付源 JSON、局部内容、独立 HTML 和静态网站。内容库、版本历史与固定组件依赖提供支持，HTML 与 JSON 可重新导入 App 继续编辑。</desc>
+<desc id="description">文本、图片、表格、图表、流程图和滑块等组件组成 Page 或 Board，Agent 可动态添加组件。Page 与 Board 可互相嵌套，模板可应用与提炼。共同创作有两个入口：在 Agent 聊天上下文中直接查看与使用，或在 ShowAI App 中像笔记软件一样编辑与管理。成果可交付源 JSON、局部内容、独立 HTML 和静态网站。</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 Z" fill="#06A5FA"/></marker></defs>
 <g font-family="PingFang SC, Noto Sans CJK SC, Microsoft YaHei, sans-serif">
-<rect x="0" y="0" width="1800" height="900" rx="0" fill="#FFFFFF" stroke="none" stroke-width="1.6"/>
+<rect x="0" y="0" width="1800" height="820" rx="0" fill="#FFFFFF" stroke="none" stroke-width="1.6"/>
 <text x="38" y="86" font-size="48" font-weight="650" fill="#172B3A" text-anchor="start">从构成到使用</text>
 <text x="1760" y="84" font-size="22" font-weight="500" fill="#617789" text-anchor="end">ShowAI · 设计逻辑</text>
 <g id="expression-units">
 <rect x="36" y="150" width="328" height="588" rx="14" fill="white" stroke="#CFE1ED" stroke-width="2"/>
 <circle cx="75" cy="195" r="25" fill="#06A5FA" stroke="none" stroke-width="2"/>
 <text x="75" y="205" font-size="29" font-weight="650" fill="white" text-anchor="middle">1</text>
-<text x="113" y="207" font-size="32" font-weight="650" fill="#172B3A" text-anchor="start">表达单元</text>
+<text x="113" y="207" font-size="32" font-weight="650" fill="#172B3A" text-anchor="start">组件</text>
 <g id="unit-1">
 <rect x="56" y="246" width="133" height="116" rx="8" fill="#F5FAFE" stroke="#CFE1ED" stroke-width="1.2"/>
 <rect x="76" y="268" width="94" height="6" rx="1" fill="#BCD2E2" stroke="none" stroke-width="1.6"/>
@@ -65,7 +65,7 @@
 </g>
 <rect x="56" y="668" width="288" height="46" rx="10" fill="#E5F5FE" stroke="none" stroke-width="1.6"/>
 <text x="200" y="699" font-size="24" font-weight="600" fill="#172B3A" text-anchor="middle">内容 · 图表 · 交互</text>
-<text x="200" y="779" font-size="21" font-weight="500" fill="#617789" text-anchor="middle">可复用组件</text>
+<text x="200" y="779" font-size="21" font-weight="500" fill="#617789" text-anchor="middle">Agent 可动态添加</text>
 </g>
 <g id="content-organization">
 <rect x="410" y="150" width="436" height="588" rx="14" fill="white" stroke="#CFE1ED" stroke-width="2"/>
@@ -276,29 +276,5 @@
 <path d="M374,445 H400" fill="none" stroke="#06A5FA" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
 <path d="M856,445 H880" fill="none" stroke="#06A5FA" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
 <path d="M1384,445 H1416" fill="none" stroke="#06A5FA" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
-</g>
-<g id="library-foundation">
-<rect x="410" y="758" width="964" height="67" rx="12" fill="#F5FAFE" stroke="#CFE1ED" stroke-width="1.6"/>
-<g id="local-library">
-<ellipse cx="457" cy="779" rx="15" ry="6" fill="white" stroke="#5592B8" stroke-width="2"/>
-<path d="M442,779 V802 C442,810 472,810 472,802 V779" fill="none" stroke="#5592B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M442,790 C442,798 472,798 472,790" fill="none" stroke="#5592B8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="485" y="799" font-size="23" font-weight="500" fill="#172B3A" text-anchor="start">本地内容库</text>
-</g>
-<text x="680" y="799" font-size="23" font-weight="500" fill="#617789" text-anchor="start">·</text>
-<g id="version-history">
-<circle cx="729" cy="791" r="17" fill="none" stroke="#5592B8" stroke-width="2"/>
-<path d="M729,779 V791 H740" fill="none" stroke="#5592B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="759" y="799" font-size="23" font-weight="500" fill="#172B3A" text-anchor="start">版本历史</text>
-</g>
-<text x="938" y="799" font-size="23" font-weight="500" fill="#617789" text-anchor="start">·</text>
-<g id="fixed-dependencies">
-<path d="M984,773 L1000,782 V801 L984,810 L968,801 V782 Z M968,782 L984,791 L1000,782 M984,791 V810" fill="none" stroke="#5592B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="1015" y="799" font-size="23" font-weight="500" fill="#172B3A" text-anchor="start">固定组件依赖</text>
-</g>
-</g>
-<g id="reimport-loop">
-<path d="M1446,550 H1410 V738 Q1410,748 1400,748 H1366 Q1356,748 1356,738 V655 Q1356,645 1346,645 H1342" fill="none" stroke="#06A5FA" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
-<text x="1438" y="779" font-size="18" font-weight="500" fill="#617789" text-anchor="start">HTML / JSON 导入继续编辑</text>
 </g>
 </g></svg>
