@@ -26,6 +26,7 @@ export interface SyncChange {
   message?: string;
   operationId: string;
   sourceRevision?: string;
+  deviceId?: string;
   restoredFrom?: string;
   mergedFrom?: string;
   paths: string[];
@@ -40,6 +41,7 @@ export interface ProjectSnapshot {
 export interface SnapshotRecord {
   revision: string;
   snapshot: ProjectSnapshot;
+  source?: { user: SyncUser; receivedAt: string };
 }
 export class SyncError extends Error {
   constructor(
@@ -212,6 +214,7 @@ export function validateSnapshot(
       );
   }
   if (change.message) plainText(change.message, 10000);
+  if (change.deviceId) identifier(change.deviceId);
   return input;
 }
 export async function snapshotRevision(
@@ -239,7 +242,8 @@ export interface ProjectConnection {
   role: ProjectRole;
   remoteHead: string | null;
   localRevision: string | null;
-  status: "pending" | "synced" | "offline" | "conflict" | "revoked";
+  status:
+    "pending" | "synced" | "offline" | "conflict" | "revoked" | "save-failed";
   error?: string;
   syncedAt?: string;
   pendingCreation?: boolean;

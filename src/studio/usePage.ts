@@ -11,6 +11,7 @@ export interface LoadedPage extends PageRecord {
   components: CompiledComponent[];
   reuseComponents?: boolean;
   readOnly?: boolean;
+  incomingCrossDevice?: boolean;
 }
 export type SaveStatus = "saved" | "saving" | "changed" | "conflict" | "error";
 
@@ -41,6 +42,13 @@ export function usePage() {
   const [error, setError] = useState("");
   const [conflictId, setConflictId] = useState<string | undefined>();
   const [mergeBase, setMergeBase] = useState<string | undefined>();
+  const [reviewingConflict, setReviewingConflict] = useState(false);
+  const [saveFailureAttempt, setSaveFailureAttempt] = useState(0);
+  const resolution = useRef<{
+    baseRevision?: string;
+    currentRevision?: string;
+    externalConflictId?: string;
+  } | null>(null);
   const projectRef = useRef<string | null>(null);
   const current = useRef<ShowDocument | null>(null);
   const base = useRef("");
@@ -145,26 +153,48 @@ export function usePage() {
             existingDraft.baseRevision === draftBase.current
               ? existingDraft
               : await persist(source, sequence, projectRef.current);
-          const response = await desktop.invoke<LoadedPage>("pages:save", {
-            projectId: projectRef.current,
-            pageId: source.id,
-            document: source,
-            baseHash: base.current,
-            baseRevision: baseRevision.current,
-            knownComponents: recordRef.current?.components.map(
-              ({ id, version, integrity, scope }) => ({
-                id,
-                version,
-                integrity,
-                scope,
-              }),
-            ),
-            historyContext: {
-              operationId: operation.id,
-              groupId: operation.groupId,
-              message: "编辑页面",
-            },
-          });
+          const response = resolution.current?.externalConflictId
+            ? await desktop.invoke<LoadedPage>("history:resolve", {
+                projectId: projectRef.current,
+                id: resolution.current.externalConflictId,
+                resolution: "merge",
+                document: source,
+                historyContext: {
+                  operationId: operation.id,
+                  message: "解决本机保存冲突",
+                },
+              })
+            : resolution.current
+              ? await desktop.invoke<LoadedPage>("history:mergeSave", {
+                  projectId: projectRef.current,
+                  pageId: source.id,
+                  document: source,
+                  ...resolution.current,
+                  historyContext: {
+                    operationId: operation.id,
+                    message: "解决本机保存冲突",
+                  },
+                })
+              : await desktop.invoke<LoadedPage>("pages:save", {
+                  projectId: projectRef.current,
+                  pageId: source.id,
+                  document: source,
+                  baseHash: base.current,
+                  baseRevision: baseRevision.current,
+                  knownComponents: recordRef.current?.components.map(
+                    ({ id, version, integrity, scope }) => ({
+                      id,
+                      version,
+                      integrity,
+                      scope,
+                    }),
+                  ),
+                  historyContext: {
+                    operationId: operation.id,
+                    groupId: operation.groupId,
+                    message: "编辑页面",
+                  },
+                });
           const saved = {
             ...response,
             components: response.reuseComponents
@@ -221,10 +251,14 @@ export function usePage() {
             }
           }
           setStatus("saved");
+          resolution.current = null;
+          setReviewingConflict(false);
           setError("");
           setConflictId(undefined);
           setDraftNotice("");
         } catch (reason) {
+          setReviewingConflict(false);
+          setSaveFailureAttempt((value) => value + 1);
           if (reason && typeof reason === "object" && "conflictId" in reason)
             setConflictId(String(reason.conflictId));
           blocked.current = true;
@@ -245,6 +279,9 @@ export function usePage() {
   }, [persist]);
 
   const install = useCallback((projectId: string, page: LoadedPage) => {
+    setSaveFailureAttempt(0);
+    resolution.current = null;
+    setReviewingConflict(false);
     projectRef.current = projectId;
     current.current = page.document;
     base.current = page.hash;
@@ -495,6 +532,7 @@ export function usePage() {
             base.current !== knownBase ||
             (loaded.hash === knownBase &&
               loaded.revision === baseRevision.current &&
+              loaded.readOnly === recordRef.current?.readOnly &&
               !loaded.workspaceConflicts?.length)
           )
             return;
@@ -502,6 +540,14 @@ export function usePage() {
             revision.current > savedRevision.current ||
             loaded.workspaceConflicts?.length
           ) {
+            if (
+              loaded.incomingCrossDevice &&
+              !loaded.workspaceConflicts?.length &&
+              !blocked.current
+            ) {
+              await flush();
+              return;
+            }
             setConflictId(loaded.workspaceConflicts?.[0]?.id);
             blocked.current = true;
             setStatus("conflict");
@@ -521,7 +567,7 @@ export function usePage() {
           setStatus("error");
         }
       }),
-    [install],
+    [install, flush],
   );
 
   useEffect(() => {
@@ -634,6 +680,42 @@ export function usePage() {
     return saved;
   }, [flush]);
 
+  const prepareResolution = useCallback(
+    (document: ShowDocument, currentRevision: string, currentHash: string) => {
+      if (!mergeBase || !current.current || current.current.id !== document.id)
+        throw new Error("保存冲突的基础版本已失效，请重新查看。 ");
+      resolution.current = { baseRevision: mergeBase, currentRevision };
+      base.current = currentHash;
+      baseRevision.current = currentRevision;
+      current.current = structuredClone(document);
+      revision.current++;
+      blocked.current = true;
+      setDraft(current.current);
+      setStatus("conflict");
+      setError("保存失败：请修改当前合并草稿，然后重新保存，或放弃修改。");
+      setReviewingConflict(true);
+      setRenderVersion((value) => value + 1);
+    },
+    [mergeBase],
+  );
+
+  const prepareExternalResolution = useCallback(
+    (document: ShowDocument, id: string) => {
+      if (!current.current || current.current.id !== document.id)
+        throw new Error("冲突不属于当前页面。");
+      resolution.current = { externalConflictId: id };
+      current.current = structuredClone(document);
+      revision.current++;
+      blocked.current = true;
+      setDraft(current.current);
+      setStatus("conflict");
+      setError("保存失败：请修改当前合并草稿，然后重新保存，或放弃修改。");
+      setReviewingConflict(true);
+      setRenderVersion((value) => value + 1);
+    },
+    [],
+  );
+
   // A reviewed merge or external resolution supersedes this draft. Archive its
   // exact generation; another window's newer draft must remain recoverable.
   const acceptResolution = useCallback(async () => {
@@ -686,12 +768,12 @@ export function usePage() {
     const key = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        void flush();
+        void (resolution.current ? retry() : flush());
       }
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [flush]);
+  }, [flush, retry]);
 
   return {
     draft,
@@ -702,6 +784,10 @@ export function usePage() {
     draftNotice,
     conflictId,
     mergeBase,
+    reviewingConflict,
+    saveFailureAttempt,
+    prepareResolution,
+    prepareExternalResolution,
     projectId: projectRef.current,
     open,
     edit,

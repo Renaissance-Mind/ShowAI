@@ -16,6 +16,7 @@ import {
   FileText,
 } from "../ui/icons";
 import Dialog from "./Dialog";
+import ConflictPagePreview from "./ConflictPagePreview";
 import ExpandableSearch from "../components/ExpandableSearch";
 import { desktop, errorCode, errorMessage } from "./bridge";
 import type { HistoryEntry } from "../core/history-model";
@@ -1078,6 +1079,9 @@ export function MergeDialog({
   document,
   onClose,
   onMerged,
+  saveFailure = false,
+  onEdit,
+  onDiscard,
 }: {
   projectId: string;
   pageId: string;
@@ -1085,10 +1089,18 @@ export function MergeDialog({
   document: ShowDocument;
   onClose: () => void;
   onMerged: () => Promise<void>;
+  saveFailure?: boolean;
+  onEdit?: (
+    document: ShowDocument,
+    currentRevision: string,
+    currentHash: string,
+  ) => void;
+  onDiscard?: () => Promise<void>;
 }) {
   const [reviewed, setReviewed] = useState(false);
   const [preview, setPreview] = useState<
-      (PageMergePreview & { currentRevision: string }) | null
+      | (PageMergePreview & { currentRevision: string; currentHash: string })
+      | null
     >(null),
     [resolved, setResolved] = useState(""),
     [error, setError] = useState(""),
@@ -1096,10 +1108,9 @@ export function MergeDialog({
   useEffect(() => {
     let active = true;
     void desktop
-      .invoke<PageMergePreview & { currentRevision: string }>(
-        "history:mergePreview",
-        { projectId, pageId, baseRevision, document },
-      )
+      .invoke<
+        PageMergePreview & { currentRevision: string; currentHash: string }
+      >("history:mergePreview", { projectId, pageId, baseRevision, document })
       .then(
         (value) => {
           if (active) {
@@ -1137,7 +1148,8 @@ export function MergeDialog({
   }
   return (
     <Dialog
-      title="比较并合并草稿"
+      title={saveFailure ? "保存失败：请处理冲突" : "比较并合并草稿"}
+      dismissible={!saveFailure}
       onClose={onClose}
       wide
       className="history-merge-dialog"
@@ -1151,7 +1163,7 @@ export function MergeDialog({
         <>
           <p className="history-merge-summary">
             {preview.conflicts.length
-              ? `${preview.conflicts.length} 处修改需要选择，草稿已经保留。`
+              ? `${preview.conflicts.length} 处修改需要处理，当前草稿尚未保存。`
               : "修改可以自动合并，请检查结果后保存。"}
           </p>
           <ChangeList changes={preview.changes} />
@@ -1181,7 +1193,7 @@ export function MergeDialog({
               </div>
             </section>
           ))}
-          <details open={preview.conflicts.length > 0}>
+          <details open={!saveFailure && preview.conflicts.length > 0}>
             <summary>检查并编辑合并后的页面数据</summary>
             <textarea
               className="history-resolution"
@@ -1202,6 +1214,35 @@ export function MergeDialog({
             </label>
           )}
           <footer className="history-footer">
+            {saveFailure && onEdit && (
+              <button
+                className="studio-button primary"
+                disabled={busy}
+                onClick={() => {
+                  onEdit(
+                    JSON.parse(resolved),
+                    preview.currentRevision,
+                    preview.currentHash,
+                  );
+                  onClose();
+                }}
+              >
+                修改后重新保存
+              </button>
+            )}
+            {saveFailure && onDiscard && (
+              <button
+                className="studio-button"
+                disabled={busy}
+                onClick={() =>
+                  void onDiscard()
+                    .then(onClose)
+                    .catch((reason) => setError(errorMessage(reason)))
+                }
+              >
+                放弃修改，载入当前文件
+              </button>
+            )}
             <button
               className="studio-button primary"
               disabled={busy || (!!preview.conflicts.length && !reviewed)}
@@ -1209,11 +1250,25 @@ export function MergeDialog({
             >
               保存合并版本
             </button>
-            <button className="studio-button" onClick={onClose}>
-              保留草稿并返回
-            </button>
+            {!saveFailure && (
+              <button className="studio-button" onClick={onClose}>
+                保留草稿并返回
+              </button>
+            )}
           </footer>
         </>
+      ) : error && saveFailure && onDiscard ? (
+        <button
+          className="studio-button"
+          disabled={busy}
+          onClick={() =>
+            void onDiscard()
+              .then(onClose)
+              .catch((reason) => setError(errorMessage(reason)))
+          }
+        >
+          放弃修改，载入当前文件
+        </button>
       ) : (
         <Loader2 className="studio-spin" />
       )}
@@ -1227,12 +1282,18 @@ export function ExternalConflictDialog({
   onResolved,
   projectId,
   onPackageRecovered,
+  saveFailure = false,
+  draftDocument,
+  onEdit,
 }: {
   id: string;
   onClose: () => void;
   onResolved: () => Promise<void>;
   projectId?: string;
   onPackageRecovered: (result: PackageRecoveryResult) => Promise<void>;
+  saveFailure?: boolean;
+  draftDocument?: ShowDocument;
+  onEdit?: (document: ShowDocument) => void;
 }) {
   const [detail, setDetail] = useState<{
       path: string;
@@ -1257,12 +1318,20 @@ export function ExternalConflictDialog({
               value.path.startsWith("packages/")
             )
               return;
-            const artifact = value.external
-              ? JSON.parse(value.external)
-              : value.current
-                ? JSON.parse(value.current)
-                : {};
-            setResolved(JSON.stringify(artifact.document ?? artifact, null, 2));
+            const artifact =
+              draftDocument ??
+              (value.external
+                ? JSON.parse(value.external)
+                : value.current
+                  ? JSON.parse(value.current)
+                  : {});
+            setResolved(
+              JSON.stringify(
+                draftDocument ?? artifact.document ?? artifact,
+                null,
+                2,
+              ),
+            );
           }
         },
         (reason) => {
@@ -1275,7 +1344,7 @@ export function ExternalConflictDialog({
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, draftDocument]);
   const packageConflict =
     !!detail &&
     (detail.path.includes("/packages/") || detail.path.startsWith("packages/"));
@@ -1317,7 +1386,8 @@ export function ExternalConflictDialog({
   }
   return (
     <Dialog
-      title="处理外部文件修改"
+      title={saveFailure ? "保存失败：请处理外部修改冲突" : "处理外部文件修改"}
+      dismissible={!saveFailure}
       onClose={onClose}
       wide
       className="history-external-dialog"
@@ -1347,8 +1417,25 @@ export function ExternalConflictDialog({
               编辑合并结果
             </button>
           </nav>
-          {tab === "compare" ? (
+          {tab === "compare" && saveFailure && draftDocument ? (
             <div className="history-conflict-values">
+              <div>
+                <h3>我的未保存修改</h3>
+                <ConflictPagePreview value={draftDocument} />
+              </div>
+              <div>
+                <h3>当前文件版本</h3>
+                <ConflictPagePreview value={detail.external} />
+              </div>
+            </div>
+          ) : tab === "compare" ? (
+            <div className="history-conflict-values">
+              {draftDocument && (
+                <div>
+                  <h3>尚未保存的 App 草稿</h3>
+                  <Value value={draftDocument} />
+                </div>
+              )}
               <div>
                 <h3>原始基础</h3>
                 <Value value={detail.baseline} />
@@ -1372,6 +1459,18 @@ export function ExternalConflictDialog({
             />
           )}
           <footer className="history-footer">
+            {saveFailure && draftDocument && onEdit && (
+              <button
+                className="studio-button primary"
+                disabled={busy || packageConflict}
+                onClick={() => {
+                  onEdit(JSON.parse(resolved));
+                  onClose();
+                }}
+              >
+                修改后重新保存
+              </button>
+            )}
             <button
               className="studio-button primary"
               disabled={busy}
@@ -1385,7 +1484,9 @@ export function ExternalConflictDialog({
                 ? "保留为编辑草稿"
                 : tab === "merge"
                   ? "保存合并结果"
-                  : "导入外部修改"}
+                  : saveFailure
+                    ? "放弃我的修改，采用文件版本"
+                    : "导入外部修改"}
             </button>
             <button
               className="studio-button"
@@ -1394,9 +1495,11 @@ export function ExternalConflictDialog({
             >
               使用正式版本
             </button>
-            <button className="studio-text-button" onClick={onClose}>
-              稍后处理
-            </button>
+            {!saveFailure && (
+              <button className="studio-text-button" onClick={onClose}>
+                稍后处理
+              </button>
+            )}
           </footer>
         </>
       )}

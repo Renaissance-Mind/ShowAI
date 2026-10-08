@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { SyncManager } from "./manager";
+import { AgentService, errorResult } from "../agent/service";
 import { startSyncServer } from "../server/node";
 import { GitLibrary } from "../core/git-library";
 import { FileStore } from "../core/store";
@@ -70,6 +71,110 @@ async function fixture() {
   return { directory, server, alice, bob, project, page };
 }
 describe("project synchronization between independent real content libraries", () => {
+  it("does not publish an unresolved same-device file save conflict", async () => {
+    const { alice, bob, project, page } = await fixture();
+    const before = (await alice.manager.status()).projects[0].remoteHead;
+    const file = join(
+      alice.home,
+      "workspace",
+      "projects",
+      project.id,
+      "pages",
+      `${page.document.id}.json`,
+    );
+    const artifact = JSON.parse(await readFile(file, "utf8"));
+    artifact.document.title = "External same-device edit";
+    await writeFile(file, JSON.stringify(artifact));
+    await alice.store.readPage(project.id, page.document.id);
+    await alice.manager.run();
+    const blocked = (await alice.manager.status()).projects[0];
+    expect(blocked.status).toBe("save-failed");
+    expect(blocked.remoteHead).toBe(before);
+    const service = new AgentService({ root: alice.home });
+    const conflicts = await service.workspaceConflicts(project.id);
+    await service.resolveWorkspaceConflict({
+      id: conflicts[0].id,
+      resolution: "import",
+    });
+    await alice.manager.run();
+    await bob.manager.run();
+    expect(
+      (await bob.store.readPage(project.id, page.document.id)).document.title,
+    ).toBe("External same-device edit");
+    expect((await alice.manager.status()).projects[0].status).toBe("synced");
+  });
+  it("reports same-device stale Agent saves as failure with actionable recovery and no duplicate page", async () => {
+    const { alice, project, page } = await fixture();
+    const service = new AgentService({ root: alice.home });
+    const before = await alice.store.readPage(project.id, page.document.id);
+    await service.savePage(
+      project.id,
+      page.document.id,
+      { ...before.document, title: "New local edit" },
+      before.hash,
+      undefined,
+      undefined,
+      before.revision,
+    );
+    let failure: unknown;
+    try {
+      await service.applyPage(project.id, page.document.id, {
+        baseHash: before.hash,
+        baseRevision: before.revision,
+        operations: [
+          { type: "page.set", fields: { title: "Stale Agent edit" } },
+        ],
+      });
+    } catch (error) {
+      failure = error;
+    }
+    expect(errorResult(failure)).toMatchObject({
+      code: "CONFLICT",
+      saveFailed: true,
+      recovery: {
+        action: "read-compare-save",
+        projectId: project.id,
+        pageId: page.document.id,
+      },
+    });
+    expect(
+      (await alice.store.readPage(project.id, page.document.id)).document.title,
+    ).toBe("New local edit");
+    expect(await alice.store.listPages(project.id)).toHaveLength(1);
+    expect(await alice.manager.retainedConflicts(project.id)).toHaveLength(0);
+  });
+  it("keeps a dirty Agent draft as a labeled copy when a foreign device has already synchronized a conflicting version", async () => {
+    const { alice, bob, project, page } = await fixture();
+    const baseline = await alice.store.readPage(project.id, page.document.id);
+    const remote = await bob.store.readPage(project.id, page.document.id);
+    await bob.store.savePage(
+      project.id,
+      page.document.id,
+      { ...remote.document, title: "Foreign device title" },
+      remote.hash,
+      remote.revision,
+    );
+    await bob.manager.run();
+    await alice.manager.run();
+    const saved = await new AgentService({ root: alice.home }).savePage(
+      project.id,
+      page.document.id,
+      { ...baseline.document, title: "Unsaved local draft title" },
+      baseline.hash,
+      undefined,
+      undefined,
+      baseline.revision,
+    );
+    expect(saved.document.id).not.toBe(page.document.id);
+    expect(saved.document.title).toContain(
+      "Unsaved local draft title（来源：Alice-",
+    );
+    expect(await alice.store.listPages(project.id)).toHaveLength(2);
+    await alice.manager.run();
+    await bob.manager.run();
+    expect(await bob.store.listPages(project.id)).toHaveLength(2);
+    expect((await bob.manager.status()).projects[0].status).toBe("synced");
+  });
   it("uses a saved server address for invitations created through another device's address", async () => {
     const { alice, bob, project } = await fixture();
     const invitation = (await alice.manager.manage(
@@ -170,7 +275,7 @@ describe("project synchronization between independent real content libraries", (
       (await alice.library.history({ projectId: project.id })).length,
     ).toBeGreaterThan(3);
   });
-  it("retains overlapping edits until explicitly resolved and propagates the resolution", async () => {
+  it("automatically keeps overlapping edits as two ordinary pages with shared origin records", async () => {
     const { alice, bob, project, page } = await fixture();
     for (const [client, title] of [
       [alice, "Alice title"],
@@ -187,20 +292,30 @@ describe("project synchronization between independent real content libraries", (
     }
     await alice.manager.run();
     await bob.manager.run();
-    expect((await bob.manager.status()).projects[0].status).toBe("conflict");
-    expect(
-      (await bob.store.readPage(project.id, page.document.id)).document.title,
-    ).toBe("Bob title");
-    const conflict = (await bob.manager.conflict(project.id))!;
-    expect(conflict.files.length).toBeGreaterThan(0);
-    await bob.manager.resolveConflict(
-      project.id,
-      Object.fromEntries(conflict.files.map((file) => [file.path, "local"])),
-    );
+    expect((await bob.manager.status()).projects[0].status).toBe("synced");
     await alice.manager.run();
+    const a = await alice.store.listPages(project.id),
+      b = await bob.store.listPages(project.id);
+    expect(a).toHaveLength(2);
+    expect(a.map((item) => item.title).sort()).toEqual(
+      b.map((item) => item.title).sort(),
+    );
     expect(
-      (await alice.store.readPage(project.id, page.document.id)).document.title,
-    ).toBe("Bob title");
+      a.some((item) => item.title.startsWith("Alice title（来源：Alice-")),
+    ).toBe(true);
+    expect(
+      a.some((item) => item.title.startsWith("Bob title（来源：Bob-")),
+    ).toBe(true);
+    const retained = await bob.manager.retainedConflicts(project.id);
+    expect(retained).toHaveLength(1);
+    expect(retained[0].variants).toHaveLength(2);
+    expect(retained[0].variants.every((item) => !!item.source.revision)).toBe(
+      true,
+    );
+    await bob.manager.run();
+    await alice.manager.run();
+    expect(await alice.store.listPages(project.id)).toHaveLength(2);
+    expect(await alice.manager.retainedConflicts(project.id)).toHaveLength(1);
     expect(await bob.manager.conflict(project.id)).toBeNull();
   });
   it("preserves unrelated projects, separates server credentials, and resumes offline uploads", async () => {
@@ -505,7 +620,12 @@ describe("project synchronization between independent real content libraries", (
     const info = await (await fetch(server.url + "/api/info")).json();
     expect(info.protocol).toBe(syncProtocol);
   });
-  it.each(["during history replay", "before merge publication"])(
+  it.each([
+    "during history replay",
+    "before merge publication",
+    "before merge publication with later edits",
+    "during history replay with later conflicting edits",
+  ])(
     "recovers a genuinely killed client %s without losing offline edits",
     async (phase) => {
       const { alice, bob, project, page } = await fixture();
@@ -575,28 +695,27 @@ describe("project synchronization between independent real content libraries", (
         output = "";
       const configDirectory = join(bob.home, "local", "sync");
       const observer = watch(
-        phase === "during history replay" ? markers : configDirectory,
+        phase.startsWith("during history replay") ? markers : configDirectory,
         () => {
-          const ready =
-            phase === "during history replay"
-              ? readdir(markers).then(
-                  (names) =>
-                    names.filter((name) => name.endsWith(".json")).length >
-                    before,
-                )
-              : readFile(join(configDirectory, "config.json"), "utf8").then(
-                  (value) =>
-                    JSON.parse(value).projects.some(
-                      (entry: {
-                        projectId: string;
-                        remoteHead: string | null;
-                        status: string;
-                      }) =>
-                        entry.projectId === project.id &&
-                        entry.remoteHead === expectedRemote &&
-                        entry.status === "pending",
-                    ),
-                );
+          const ready = phase.startsWith("during history replay")
+            ? readdir(markers).then(
+                (names) =>
+                  names.filter((name) => name.endsWith(".json")).length >
+                  before,
+              )
+            : readFile(join(configDirectory, "config.json"), "utf8").then(
+                (value) =>
+                  JSON.parse(value).projects.some(
+                    (entry: {
+                      projectId: string;
+                      remoteHead: string | null;
+                      status: string;
+                    }) =>
+                      entry.projectId === project.id &&
+                      entry.remoteHead === expectedRemote &&
+                      entry.status === "pending",
+                  ),
+              );
           void ready.then((found) => {
             if (!killed && found) {
               killed = true;
@@ -638,13 +757,61 @@ describe("project synchronization between independent real content libraries", (
           ),
         ).needsPublish,
       ).toBe(true);
+      const lateConflict = phase.endsWith("with later conflicting edits");
+      if (lateConflict) {
+        const current = await bob.store.readPage(project.id, page.document.id);
+        await bob.store.savePage(
+          project.id,
+          page.document.id,
+          applyOperations(current.document, [
+            {
+              type: "block.text.set",
+              blockId: paragraph,
+              text: "Late local body after process death",
+            },
+          ]),
+          current.hash,
+          current.revision,
+        );
+      }
+      if (phase.endsWith("with later edits")) {
+        const current = await bob.store.readPage(project.id, page.document.id);
+        await bob.store.savePage(
+          project.id,
+          page.document.id,
+          { ...current.document, title: "Local title after process death" },
+          current.hash,
+          current.revision,
+        );
+      }
       const restarted = new SyncManager(bob.home);
       await restarted.run();
       const result = await bob.store.readPage(project.id, page.document.id);
-      expect(result.document.title).toBe("Remote title survives process death");
-      expect(result.document.content.content![0].content![0].text).toBe(
-        "Offline content survives process death",
-      );
+      if (lateConflict) {
+        const record = (await restarted.retainedConflicts(project.id)).find(
+          (item) => item.originalPageId === page.document.id,
+        )!;
+        expect(record).toBeDefined();
+        const documents = await Promise.all(
+          record.variants.map((item) =>
+            bob.store.readPage(project.id, item.pageId),
+          ),
+        );
+        const texts = documents.map(
+          (item) => item.document.content.content![0].content![0].text,
+        );
+        expect(texts).toContain("Late local body after process death");
+        expect(texts).toContain("Offline content survives process death");
+      } else {
+        expect(result.document.title).toBe(
+          phase.endsWith("with later edits")
+            ? "Local title after process death"
+            : "Remote title survives process death",
+        );
+        expect(result.document.content.content![0].content![0].text).toBe(
+          "Offline content survives process death",
+        );
+      }
       expect((await restarted.status()).projects[0].status).toBe("synced");
       await alice.manager.run();
       expect(

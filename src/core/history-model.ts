@@ -27,6 +27,8 @@ export interface ChangeContext {
     parents: string[];
     at: string;
     sourceRevision?: string;
+    deviceId?: string;
+    sourceUser?: { id: string; name: string };
     restoredFrom?: string;
     mergedFrom?: string;
   };

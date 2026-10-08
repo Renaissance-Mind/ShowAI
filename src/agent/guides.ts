@@ -36,7 +36,7 @@ const guides: Record<
       "Use real connection/project IDs returned by status/projects. Credentials come from password-file/token-file/registration-key-file or SHOWAI_SERVER_PASSWORD/SHOWAI_SERVER_TOKEN/SHOWAI_REGISTRATION_KEY. Outputs omit connection tokens. view register creates a password account; configured deployment currently supports password and token authentication.",
       "The running desktop/browser workbench synchronizes in the background. A standalone Agent can explicitly invoke sync run after local writes; disconnected edits and revisions remain on disk. A local save is not proof of successful remote publication: inspect project status/error and remoteHead.",
       "Project transfer includes formal history, source/compiled dependencies and archived readers. Shared local library Git IDs differ from remote snapshot IDs; syncOrigin preserves original time/actor/source revision/remote parents. Device paths and directory bindings remain local. Never upload the whole content library to share one project.",
-      "Viewer/revoked connections cannot commit project edits. Same-content A→B→A versions remain distinct. Concurrent independent fields merge; ambiguous changes retain base/local/remote files until explicitly resolved. Restoring an old page creates a new commit and syncs normally.",
+      "Viewer/revoked connections cannot commit project edits. Same-content A→B→A versions remain distinct. Concurrent independent fields merge. Failed cross-device merges automatically keep both inputs as ordinary source-labeled pages with shared origin records; use sync retained to inspect them. Same-device stale writes fail with saveFailed=true and recovery/nextStep: re-read, compare and deliberately resolve, or abandon the attempted edit. Restoring an old page creates a new commit and syncs normally.",
       "Invitations expire, are revocable and single-use; signing into an existing server account reuses that identity. Removing a local connection retains content and does not delete the server project. Account switching is restricted to the project's same server; other-server same-ID projects receive separate local IDs.",
     ],
     commands: [
@@ -50,14 +50,12 @@ const guides: Record<
       "showai sync subscribe REMOTE_PROJECT --connection CONNECTION_ID --json",
       "showai sync account LOCAL_PROJECT --connection CONNECTION_ID --json",
       "showai sync run --project LOCAL_PROJECT --json",
-      "showai sync conflict LOCAL_PROJECT --json",
-      "showai sync resolve LOCAL_PROJECT --input CHOICES_JSON --json",
+      "showai sync retained LOCAL_PROJECT --json",
       "showai sync dashboard --connection CONNECTION_ID --project REMOTE_PROJECT --json",
     ],
     input: {
-      conflictChoices: {
-        "projects/LOCAL_PROJECT/pages/PAGE.json": "local or remote",
-      },
+      retained:
+        "Shared origin records contain originalPath, both source accounts/devices/revisions and visible page IDs. Cross-device conflicts continue synchronizing after preserving both inputs.",
     },
   },
   history: {
@@ -66,6 +64,7 @@ const guides: Record<
     rules: [
       "New empty libraries use versioned storage. Existing libraries require reviewed import; preserve original files and mark old checkpoint times/actors/order unknown.",
       "Retain the full page hash, resource revision and stable node IDs. Save/apply requires both base-hash and base-revision. Reuse operation-id only for an identical request.",
+      "Abandoning App changes archives the current window's active unsaved draft generation and loads the current saved file. Other windows' newer draft generations, other devices' content and formal history remain. Adopting external disk edits must pass validation; an import failure leaves the conflict unresolved.",
       "History preview/export uses the captured reader and exact component dependencies. Restore creates a new attributed commit; simultaneous changes require another review.",
       "External package files recover into local editable drafts before saving a new immutable version. Space cleanup preserves formal history, unresolved conflicts and live drafts.",
     ],
@@ -142,7 +141,7 @@ const guides: Record<
     rules: [
       "Read the page and retain its hash, revision and stable block IDs. Versioned diffs use the preceding revision; legacy snapshots use the preceding hash.",
       "Default to structured reading. Use guide reading for image checks and browser interaction checks; use the full source Page/current hash for writes.",
-      "Save/apply requires --base-hash and, when reading returns revision, --base-revision. On CONFLICT, read and merge deliberately. Reuse --operation-id only for the same request; --message and --group describe its purpose and editing group.",
+      "Save/apply requires --base-hash and, when reading returns revision, --base-revision. Same-device CONFLICT with saveFailed=true means the save failed: follow recovery/nextStep, compare the latest version with your original baseRevision, resolve and save or abandon your attempted edit. Never just refresh the hash and overwrite with the unchanged document. Cross-device conflicts may return a source-labeled copy with a new document.id and retainedSyncConflicts; use that returned ID afterwards. Reuse --operation-id only for the same request; --message and --group describe its purpose and editing group.",
       "New resources default to a Page surface. Page and Board containers nest recursively in artifact v3. Use guide containers for structure; query component schemas when adding components.",
       "Keep an ordinary report in one resource page, with sections, navigation and optional nested containers. Continue revisions in that same page; create multiple resource pages only for a user-requested website or separate documents.",
     ],

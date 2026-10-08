@@ -24,7 +24,7 @@ ShowAI 将内容组织成可阅读、可探索的页面。工作台与 Agent 使
 
 Page 和 Board 本身也是组件目录条目，可查询 guide、schema 和 examples，用 component.insert 插入。原生容器通过内容、布局和模板定制；保持 surface 结构，不要把它们编码成普通 widget。
 
-先按用途搜索组件或模板摘要，限制结果数；选中后取 `--view guide`，准备填入数据时取 `schema`，需要参考用法时取 `examples`。普通页面创作无需读取组件源码或整个目录。修改已有页面前读取当前版本、查看差异，并保留 hash、revision 和稳定节点 ID。写入版本化内容库时，同时传当前 --base-hash 与 --base-revision；冲突时先比较，再合并或恢复草稿。
+先按用途搜索组件或模板摘要，限制结果数；选中后取 `--view guide`，准备填入数据时取 `schema`，需要参考用法时取 `examples`。普通页面创作无需读取组件源码或整个目录。修改已有页面前读取当前版本、查看差异，并保留 hash、revision 和稳定节点 ID。写入版本化内容库时，同时传当前 --base-hash 与 --base-revision。同设备冲突返回 `error.saveFailed: true` 时，本次保存失败；依据 recovery/nextStep 读取当前版本并比较，解决后重新保存，或按用户要求放弃修改。禁止只更新 hash/revision 后原样覆盖。跨设备合并失败会保留带来源的两份内容；保存可能返回新的 document.id，后续使用实际返回 ID，来源记录通过 `sync retained PROJECT --json` 查询。
 
 读取 Page 默认使用结构化 JSON；正文阅读可选择 Markdown。长页面先用 `--detail outline` 取得组件与区域 ID，再按 `--blocks` 读取局部。配色、布局、遮挡和选中状态等视觉问题使用 image，悬停、拖动、展开和表单行为使用 html。按需要读取 [Page 三种读取视图](references/page-reading.md) 与 `guide reading`。三种视图记录同一页面 hash、组件版本及渲染状态；修改视觉后查看图像，修改交互后实际操作 HTML。正式编辑使用完整页面的当前 hash 与 revision。
 

@@ -661,8 +661,11 @@ export function createSyncServer(options: ServerOptions) {
         revision: string;
         manifest: string;
         published: number;
+        source_user_id: string;
+        source_user_name: string;
+        received_at: string;
       }>(
-        `SELECT revision,manifest,published FROM revisions WHERE project_id=?${row ? ` AND rowid${before ? "<" : ">"}?` : ""} ORDER BY rowid ${before ? "DESC" : "ASC"} LIMIT ?`,
+        `SELECT r.revision,r.manifest,r.published,u.id AS source_user_id,u.name AS source_user_name,r.created_at AS received_at FROM revisions r JOIN users u ON u.id=r.user_id WHERE r.project_id=?${row ? ` AND r.rowid${before ? "<" : ">"}?` : ""} ORDER BY r.rowid ${before ? "DESC" : "ASC"} LIMIT ?`,
         row ? [projectId, row.rowid, limit] : [projectId, limit],
       );
       return json({
@@ -671,6 +674,10 @@ export function createSyncServer(options: ServerOptions) {
           revision: entry.revision,
           snapshot: JSON.parse(entry.manifest),
           published: !!entry.published,
+          source: {
+            user: { id: entry.source_user_id, name: entry.source_user_name },
+            receivedAt: entry.received_at,
+          },
         })),
         next: entries.length === limit ? entries.at(-1)!.revision : null,
       });
@@ -678,8 +685,13 @@ export function createSyncServer(options: ServerOptions) {
     const revision = resource.match(/^revisions\/([a-f0-9]{64})$/);
     if (revision && method === "GET") {
       const entry = (
-        await db.all<{ manifest: string }>(
-          "SELECT manifest FROM revisions WHERE project_id=? AND revision=?",
+        await db.all<{
+          manifest: string;
+          source_user_id: string;
+          source_user_name: string;
+          received_at: string;
+        }>(
+          "SELECT r.manifest,u.id AS source_user_id,u.name AS source_user_name,r.created_at AS received_at FROM revisions r JOIN users u ON u.id=r.user_id WHERE r.project_id=? AND r.revision=?",
           [projectId, revision[1]],
         )
       )[0];
@@ -692,6 +704,10 @@ export function createSyncServer(options: ServerOptions) {
       return json({
         revision: revision[1],
         snapshot: JSON.parse(entry.manifest),
+        source: {
+          user: { id: entry.source_user_id, name: entry.source_user_name },
+          receivedAt: entry.received_at,
+        },
       });
     }
     if (resource === "revisions" && method === "POST") {

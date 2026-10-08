@@ -1,5 +1,6 @@
 import { validatePageIcon } from "../lib/page-icon.mjs";
 import { syncManager } from "../sync/manager";
+import { remoteSaveOrigin } from "../core/remote-save-conflict";
 import {
   upgradeResource,
   createResource,
@@ -80,6 +81,7 @@ export const workbenchActions = new Set([
   "sync:subscribe",
   "sync:detach",
   "sync:previewInvite",
+  "sync:retained",
   "sync:join",
   "sync:dashboard",
   "sync:manage",
@@ -344,6 +346,16 @@ export function createWorkbench(
       );
     return {
       ...record,
+      incomingCrossDevice: !!(await remoteSaveOrigin(store.root, id, record)),
+      retainedSyncConflicts: (
+        await syncManager(store.root).retainedConflicts(id)
+      ).filter(
+        (item) =>
+          item.originalPageId === record.document.id ||
+          item.variants.some(
+            (variant) => variant.pageId === record.document.id,
+          ),
+      ),
       readOnly:
         projectConnection?.role === "viewer" ||
         projectConnection?.status === "revoked",
@@ -411,6 +423,8 @@ export function createWorkbench(
           );
         case "sync:previewInvite":
           return sync.previewInvite(required(args, "link"));
+        case "sync:retained":
+          return sync.retainedConflicts(projectId(args));
         case "sync:join":
           return sync.join(
             required(args, "connectionId"),
@@ -626,11 +640,16 @@ export function createWorkbench(
         const resolution = required(args, "resolution");
         if (!["discard", "import", "merge"].includes(resolution))
           throw new CoreError("INVALID_DATA", "Invalid conflict resolution.");
-        return service.resolveWorkspaceConflict({
+        const resolved = await service.resolveWorkspaceConflict({
           id: required(args, "id"),
           resolution: resolution as "discard" | "import" | "merge",
           document: args.document ? validateDocument(args.document) : undefined,
         });
+        if ("document" in resolved) {
+          const match = resolved.path.match(/\/projects\/([^/]+)\/pages\//);
+          if (match) return enrichPage(match[1], resolved);
+        }
+        return resolved;
       }
       case "drafts:list":
         return new EditorDrafts(store.root).list({

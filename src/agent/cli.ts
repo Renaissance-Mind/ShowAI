@@ -375,6 +375,8 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
           : process.env[environment];
       };
       if (action === "status") return manager.status();
+      if (action === "retained")
+        return manager.retainedConflicts(id ?? (await project()));
       if (action === "connect")
         return manager.connect({
           url: option(args, "url", true)!,

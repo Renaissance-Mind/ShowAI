@@ -9,6 +9,7 @@ export default function Dialog({
   className = "",
   titleAccessory,
   headerContent,
+  dismissible = true,
 }: {
   title: string;
   children: ReactNode;
@@ -17,10 +18,11 @@ export default function Dialog({
   className?: string;
   titleAccessory?: ReactNode;
   headerContent?: ReactNode;
+  dismissible?: boolean;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
-  close.current = onClose;
+  close.current = dismissible ? onClose : () => {};
   useEffect(() => {
     const previous = document.activeElement as HTMLElement;
     (
@@ -69,7 +71,7 @@ export default function Dialog({
     <div
       className="studio-modal-shade"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (dismissible && event.target === event.currentTarget) onClose();
       }}
     >
       <div
@@ -89,13 +91,15 @@ export default function Dialog({
             <h2>{title}</h2>
           )}
           {headerContent}
-          <button
-            className="studio-icon"
-            aria-label="关闭弹窗"
-            onClick={onClose}
-          >
-            <X size={18} />
-          </button>
+          {dismissible && (
+            <button
+              className="studio-icon"
+              aria-label="关闭弹窗"
+              onClick={onClose}
+            >
+              <X size={18} />
+            </button>
+          )}
         </header>
         {children}
       </div>

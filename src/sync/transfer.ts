@@ -58,6 +58,20 @@ export function remapProjectFiles(
         }),
       );
       result.set(target, Buffer.from(JSON.stringify(descriptor, null, 2)));
+    } else if (
+      path.startsWith(`${prefix}conflicts/`) &&
+      path.endsWith("/record.json")
+    ) {
+      const record = JSON.parse(bytes.toString());
+      record.originalPath = record.originalPath.replace(
+        prefix,
+        `projects/${to}/`,
+      );
+      record.variants = record.variants.map((variant: { path: string }) => ({
+        ...variant,
+        path: variant.path.replace(prefix, `projects/${to}/`),
+      }));
+      result.set(target, Buffer.from(JSON.stringify(record, null, 2)));
     } else result.set(target, bytes);
   }
   return result;
@@ -68,6 +82,7 @@ export async function captureProject(
   entry: HistoryEntry,
   parents: string[],
   remoteProjectId = projectId,
+  deviceId?: string,
 ): Promise<CapturedSnapshot> {
   const logical = remapProjectFiles(
     await new LibraryOperations(home, projectId).projectFiles(
@@ -98,6 +113,7 @@ export async function captureProject(
       channel: entry.channel,
       operationId: entry.operationId,
       sourceRevision: entry.syncOrigin?.sourceRevision ?? entry.revision,
+      deviceId: entry.syncOrigin?.deviceId ?? deviceId,
       ...(entry.message ? { message: entry.message } : {}),
       ...(entry.restoredFrom ? { restoredFrom: entry.restoredFrom } : {}),
       ...(entry.mergedFrom ? { mergedFrom: entry.mergedFrom } : {}),
@@ -354,6 +370,8 @@ export async function importProjectHistory(
             parents: record.snapshot.parents,
             at: change.at,
             sourceRevision: change.sourceRevision,
+            deviceId: change.deviceId,
+            sourceUser: record.source?.user,
             restoredFrom: change.restoredFrom,
             mergedFrom: change.mergedFrom,
           },

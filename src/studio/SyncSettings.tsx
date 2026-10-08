@@ -26,6 +26,7 @@ const roles: Record<ProjectRole, string> = {
 const states = {
   pending: "等待同步",
   synced: "已同步",
+  "save-failed": "本机保存失败，请处理冲突",
   offline: "连接中断",
   conflict: "需要处理冲突",
   revoked: "需要重新登录或加入",

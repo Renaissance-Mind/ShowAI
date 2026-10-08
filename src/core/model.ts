@@ -67,6 +67,7 @@ export interface SidebarEntryMove {
 }
 
 export interface PageRecord {
+  retainedSyncConflicts?: import("../sync/conflict-retention").RetainedConflict[];
   revision?: string;
   workspaceConflicts?: import("./workspace-conflicts").WorkspaceConflict[];
   document: ShowDocument;
@@ -206,6 +207,13 @@ export class CoreError extends Error {
   readonly currentHash?: string;
   readonly currentRevision?: string;
   readonly conflictId?: string;
+  saveFailed?: boolean;
+  recovery?: {
+    action: "read-compare-save";
+    projectId?: string;
+    pageId?: string;
+    baseRevision?: string;
+  };
 
   constructor(
     code: CoreErrorCode,

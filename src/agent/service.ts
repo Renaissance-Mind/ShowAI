@@ -17,6 +17,7 @@ import {
 } from "../core/library-operations";
 import type { SearchOptions } from "../core/library-index";
 import { CoreError } from "../core/model";
+import { preserveRemoteSave } from "../core/remote-save-conflict";
 import { projectDirectory } from "../core/project-directory";
 import type {
   ApplyPageInput,
@@ -880,12 +881,6 @@ export class AgentService {
   ) {
     const project = this.requireProject(projectId);
     const current = await this.store.readPage(project, pageId);
-    if (current.hash !== baseHash)
-      throw new CoreError(
-        "CONFLICT",
-        "The page has newer changes. Read the diff before saving.",
-        { currentHash: current.hash },
-      );
     const imported = [
       ...(components ?? []),
       ...(remoteComponents?.length
@@ -899,6 +894,25 @@ export class AgentService {
       rebindImportedComponents(document, imported),
       project,
     );
+    if (
+      current.hash !== baseHash ||
+      (baseRevision && current.revision !== baseRevision)
+    ) {
+      const preserved = await preserveRemoteSave(
+        this.store.root,
+        project,
+        current,
+        document,
+        baseHash,
+        baseRevision,
+      );
+      if (preserved) return preserved;
+      throw new CoreError(
+        "CONFLICT",
+        "保存失败：同一设备上的页面已有新修改。请比较并处理后重新保存，或放弃修改。",
+        { currentHash: current.hash, currentRevision: current.revision },
+      );
+    }
     return this.store.savePage(
       this.requireProject(projectId),
       pageId,
@@ -914,12 +928,34 @@ export class AgentService {
   ) {
     const project = this.requireProject(projectId);
     const current = await this.store.readPage(project, pageId);
-    if (current.hash !== input.baseHash)
+    if (current.hash !== input.baseHash) {
+      if (input.baseRevision) {
+        const baseline = await this.versioned().pageAt(
+          project,
+          pageId,
+          input.baseRevision,
+        );
+        const document = await lockDocumentComponents(
+          this.store.root,
+          applyOperations(baseline.document, input.operations),
+          project,
+        );
+        const preserved = await preserveRemoteSave(
+          this.store.root,
+          project,
+          current,
+          document,
+          input.baseHash,
+          input.baseRevision,
+        );
+        if (preserved) return preserved;
+      }
       throw new CoreError(
         "CONFLICT",
-        "The page has newer changes. Read the diff before applying edits.",
-        { currentHash: current.hash },
+        "保存失败：同一设备上的页面已有新修改。请比较并处理后重新保存，或放弃修改。",
+        { currentHash: current.hash, currentRevision: current.revision },
       );
+    }
     const document = await lockDocumentComponents(
       this.store.root,
       applyOperations(current.document, input.operations),
@@ -1118,11 +1154,35 @@ export class AgentService {
           }),
         )
         .digest("hex");
-    return mutateLibrary(this.store.root, operation, {
-      ...context,
-      requestFingerprint,
-      message: context.message ?? name,
-    });
+    try {
+      return await mutateLibrary(this.store.root, operation, {
+        ...context,
+        requestFingerprint,
+        message: context.message ?? name,
+      });
+    } catch (error) {
+      if (error instanceof CoreError && error.code === "CONFLICT") {
+        error.saveFailed = true;
+        error.recovery = { action: "read-compare-save" };
+        if (["Edit page", "Apply page changes"].includes(name)) {
+          error.recovery.projectId =
+            typeof args[0] === "string" ? args[0] : undefined;
+          error.recovery.pageId =
+            typeof args[1] === "string" ? args[1] : undefined;
+          const input = args[2];
+          error.recovery.baseRevision =
+            input &&
+            typeof input === "object" &&
+            "baseRevision" in input &&
+            typeof input.baseRevision === "string"
+              ? input.baseRevision
+              : typeof args[6] === "string"
+                ? args[6]
+                : undefined;
+        }
+      }
+      throw error;
+    }
   }
   async currentProject(
     ...args: Parameters<AgentService["currentProjectImpl"]>
@@ -1226,6 +1286,14 @@ export function errorResult(error: unknown) {
   return {
     code,
     message,
+    ...(error instanceof CoreError && error.saveFailed
+      ? {
+          saveFailed: true,
+          recovery: error.recovery,
+          nextStep:
+            "保存失败。重新读取当前资源并比较修改，解决冲突后用新的 baseHash/baseRevision 保存；或放弃本次修改。不得原样重复覆盖。",
+        }
+      : {}),
     ...(error instanceof CoreError && error.conflictId
       ? { conflictId: error.conflictId }
       : {}),

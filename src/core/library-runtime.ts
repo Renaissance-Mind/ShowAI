@@ -95,6 +95,19 @@ export async function mutateLibrary<T>(
     return action();
   }
   const result = await library.transaction(context, action);
+  if (result.entry?.workspaceConflicts?.length) {
+    const error = new CoreError(
+      "CONFLICT",
+      "保存失败：外部文件在保存期间发生变化。修改及外部版本均已保留，请立即处理冲突。",
+      {
+        conflictId: result.entry.workspaceConflicts[0].id,
+        currentRevision: result.entry.revision,
+      },
+    );
+    error.saveFailed = true;
+    error.recovery = { action: "read-compare-save" };
+    throw error;
+  }
   if (
     result.entry &&
     result.value &&

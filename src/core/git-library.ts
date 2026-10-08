@@ -1079,9 +1079,25 @@ export class GitLibrary {
     const head = await this.head();
     for (const name of transactions) {
       const directory = join(root, name);
-      const journal = JSON.parse(
-        await readFile(join(directory, "journal.json"), "utf8"),
-      ) as Journal;
+      const journalBytes = await readFile(
+        join(directory, "journal.json"),
+        "utf8",
+      ).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return null;
+        throw error;
+      });
+      if (journalBytes === null) {
+        // The journal is durable before inputs or refs are touched. A killed
+        // preparation may leave its directory or a temporary journal behind.
+        const drafts = join(this.root, "local", "drafts");
+        await mkdir(drafts, { recursive: true });
+        await rename(
+          directory,
+          join(drafts, `interrupted-preparation-${name}`),
+        );
+        continue;
+      }
+      const journal = JSON.parse(journalBytes) as Journal;
       if (
         journal.id !== name ||
         !Array.isArray(journal.paths) ||

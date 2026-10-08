@@ -160,8 +160,9 @@ type DialogState =
       projectId: string;
       document: ShowDocument;
       baseRevision: string;
+      saveFailure?: boolean;
     }
-  | { type: "externalConflict"; id: string }
+  | { type: "externalConflict"; id: string; saveFailure?: boolean }
   | { type: "project"; project?: ProjectSummary; groupId?: string }
   | { type: "group"; group?: ProjectGroup; projectId?: string }
   | { type: "moveProject"; projectId: string }
@@ -353,6 +354,51 @@ export default function Studio() {
     () => new URLSearchParams(location.search).get("focus") === "1",
   );
   const page = usePage();
+  const shownSaveFailure = useRef("");
+  useEffect(() => {
+    if (
+      view !== "page" ||
+      page.status !== "conflict" ||
+      page.reviewingConflict ||
+      !page.draft ||
+      !selectedProject
+    )
+      return;
+    const key = JSON.stringify([
+      selectedProject,
+      page.draft.id,
+      page.conflictId,
+      page.mergeBase,
+      page.error,
+      page.saveFailureAttempt,
+    ]);
+    if (shownSaveFailure.current === key) return;
+    shownSaveFailure.current = key;
+    if (page.conflictId)
+      setDialog({
+        type: "externalConflict",
+        id: page.conflictId,
+        saveFailure: true,
+      });
+    else if (page.mergeBase)
+      setDialog({
+        type: "merge",
+        projectId: selectedProject,
+        document: structuredClone(page.draft),
+        baseRevision: page.mergeBase,
+        saveFailure: true,
+      });
+  }, [
+    view,
+    selectedProject,
+    page.status,
+    page.reviewingConflict,
+    page.draft,
+    page.conflictId,
+    page.mergeBase,
+    page.error,
+    page.saveFailureAttempt,
+  ]);
   const project = projects.find((item) => item.id === selectedProject);
   const selectedRef = useRef(selectedProject);
   selectedRef.current = selectedProject;
@@ -2038,7 +2084,7 @@ export default function Studio() {
                   saved: "已保存",
                   saving: "保存中",
                   changed: "待保存",
-                  conflict: "文件已更新",
+                  conflict: "保存失败",
                   error: "保存失败",
                 }[page.status]
               }
@@ -2154,29 +2200,52 @@ export default function Studio() {
                 <p>{page.draftNotice}</p>
               </div>
             )}
+            {view === "page" &&
+              !!page.record?.retainedSyncConflicts?.length && (
+                <div className="studio-conflict" role="status">
+                  <p>跨设备修改未能合并，两份内容及来源记录均已保留。</p>
+                  {page.record.retainedSyncConflicts
+                    .flatMap((item) => item.variants)
+                    .filter((variant) => variant.pageId !== page.draft?.id)
+                    .map((variant) => (
+                      <button
+                        key={variant.pageId}
+                        onClick={action(() => openPage(variant.pageId))}
+                      >
+                        查看另一份 · {variant.source.account} · 设备{" "}
+                        {variant.source.deviceId.slice(0, 8)}
+                      </button>
+                    ))}
+                </div>
+              )}
             {view === "page" && page.error && (
               <div className="studio-conflict" role="alert">
                 <div>
                   <strong>
                     {page.status === "conflict"
-                      ? "这个文件有新的修改"
+                      ? "保存失败：文件有新的修改"
                       : "保存遇到问题"}
                   </strong>
                   <p>{page.error}</p>
                 </div>
-                <button
-                  onClick={action(async () => {
-                    const copy = await page.keepCopy();
-                    if (copy) {
-                      await refresh();
-                      setNotice("草稿已保留为副本");
-                    }
-                  })}
-                >
-                  保留为副本
-                </button>
+                {page.status !== "conflict" && (
+                  <button
+                    onClick={action(async () => {
+                      const copy = await page.keepCopy();
+                      if (copy) {
+                        await refresh();
+                        setNotice("草稿已保留为副本");
+                      }
+                    })}
+                  >
+                    保留为副本
+                  </button>
+                )}
                 {page.status === "conflict" ? (
                   <>
+                    {page.reviewingConflict && (
+                      <button onClick={action(page.retry)}>重新保存</button>
+                    )}
                     {page.conflictId ? (
                       <button
                         onClick={action(async () => {
@@ -2204,7 +2273,9 @@ export default function Studio() {
                         比较并合并
                       </button>
                     ) : null}
-                    <button onClick={action(page.reload)}>载入文件版本</button>
+                    <button onClick={action(page.acceptResolution)}>
+                      放弃修改，载入当前文件
+                    </button>
                   </>
                 ) : (
                   <button onClick={action(page.retry)}>重试保存</button>
@@ -2963,6 +3034,8 @@ export default function Studio() {
             {...dialog}
             pageId={dialog.document.id}
             onClose={closeDialog}
+            onEdit={page.prepareResolution}
+            onDiscard={page.acceptResolution}
             onMerged={async () => {
               await page.acceptResolution();
               await refresh();
@@ -2973,6 +3046,13 @@ export default function Studio() {
         {dialog?.type === "externalConflict" && (
           <ExternalConflictDialog
             id={dialog.id}
+            saveFailure={dialog.saveFailure}
+            draftDocument={
+              dialog.saveFailure ? (page.draft ?? undefined) : undefined
+            }
+            onEdit={(document) =>
+              page.prepareExternalResolution(document, dialog.id)
+            }
             projectId={selectedProject ?? undefined}
             onPackageRecovered={async (result) => {
               await refresh();
