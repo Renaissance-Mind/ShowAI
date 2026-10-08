@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { desktop, errorMessage } from "./bridge";
+import Dialog from "./Dialog";
+import { conflictPreview } from "./sync-conflict-preview";
 import type { ProjectSummary } from "../core/model";
 import type {
   SyncConfiguration,
@@ -37,11 +39,6 @@ const roleOptions = Object.entries(roles).map(([value, label]) => (
     {label}
   </option>
 ));
-function readable(bytes: string | null) {
-  if (bytes === null) return "已删除";
-  const data = Uint8Array.from(atob(bytes), (char) => char.charCodeAt(0));
-  return new TextDecoder().decode(data).slice(0, 8000);
-}
 export default function SyncSettings() {
   const [status, setStatus] = useState<Status | null>(null),
     [localProjects, setLocalProjects] = useState<ProjectSummary[]>([]);
@@ -58,6 +55,10 @@ export default function SyncSettings() {
   });
   const [showConnect, setShowConnect] = useState(false),
     [server, setServer] = useState("");
+  const [panel, setPanel] = useState<
+    "projects" | "dashboard" | "conflict" | null
+  >(null);
+  const panelBody = useRef<HTMLDivElement>(null);
   const [remote, setRemote] = useState<SyncProject[]>([]),
     [dashboard, setDashboard] = useState<string | null>(null),
     [managedProject, setManagedProject] = useState("");
@@ -79,6 +80,13 @@ export default function SyncSettings() {
     } | null>(null);
   const [conflict, setConflict] = useState<SyncConflict | null>(null),
     [choices, setChoices] = useState<Record<string, "local" | "remote">>({});
+  const conflictPreviews = useMemo(
+    () =>
+      new Map(
+        conflict?.files.map((file) => [file.path, conflictPreview(file)]),
+      ),
+    [conflict],
+  );
   const [sessions, setSessions] = useState<
     | { digest: string; device: string; created_at: string; revoked: number }[]
     | null
@@ -123,6 +131,15 @@ export default function SyncSettings() {
     if (existing) setServer(existing.id);
     else setShowConnect(true);
   }, [preview, status, server]);
+  useEffect(() => {
+    // Disabling a loading selector can move focus out of the dialog.
+    if (panel && !busy && !document.activeElement?.closest(".sync-dialog"))
+      panelBody.current
+        ?.querySelector<HTMLElement>(
+          "input:not([disabled]),select:not([disabled]),button:not([disabled])",
+        )
+        ?.focus();
+  }, [panel, busy]);
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
     setError("");
@@ -137,6 +154,9 @@ export default function SyncSettings() {
     }
   }
   async function loadServer(connectionId: string) {
+    setPanel(connectionId ? "projects" : null);
+    setDashboard(null);
+    setManagedProject("");
     setServer(connectionId);
     setRemote([]);
     setSessions(null);
@@ -146,14 +166,18 @@ export default function SyncSettings() {
       );
   }
   async function loadDashboard(connectionId: string, projectId?: string) {
+    setPanel("dashboard");
     setDashboard(connectionId);
-    setManagedProject(projectId ?? "");
+    setServer(connectionId);
+    setRemote([]);
+    setMembers([]);
+    setInvites([]);
+    setManagedProject("");
     setGeneratedInvite("");
     const projects = await desktop.invoke<SyncProject[]>("sync:projects", {
       connectionId,
     });
     setRemote(projects);
-    setServer(connectionId);
     if (projectId) {
       const data = await desktop.invoke<{
         members: Member[];
@@ -161,6 +185,7 @@ export default function SyncSettings() {
       }>("sync:dashboard", { connectionId, projectId });
       setMembers(data.members);
       setInvites(data.invites);
+      setManagedProject(projectId);
     } else {
       setMembers([]);
       setInvites([]);
@@ -220,12 +245,12 @@ export default function SyncSettings() {
   if (!status) return <p className="settings-help">正在读取服务器连接…</p>;
   return (
     <div className="sync-settings" aria-busy={busy}>
-      {error && (
+      {error && !panel && (
         <p className="sync-error" role="alert">
           {error}
         </p>
       )}
-      {message && (
+      {message && !panel && (
         <p className="sync-message" role="status">
           {message}
         </p>
@@ -266,21 +291,13 @@ export default function SyncSettings() {
             >
               查看项目
             </button>
-            {(status.projects.some(
-              (project) =>
-                project.connectionId === connection.id &&
-                project.role === "admin",
-            ) ||
-              (server === connection.id &&
-                remote.some((project) => project.role === "admin"))) && (
-              <button
-                className="settings-button"
-                disabled={busy}
-                onClick={() => void run(() => loadDashboard(connection.id))}
-              >
-                项目 Dashboard
-              </button>
-            )}
+            <button
+              className="settings-button"
+              disabled={busy}
+              onClick={() => void run(() => loadDashboard(connection.id))}
+            >
+              项目 Dashboard
+            </button>
             <button
               className="settings-button"
               disabled={busy}
@@ -664,12 +681,14 @@ export default function SyncSettings() {
                   disabled={busy}
                   onClick={() =>
                     void run(async () => {
+                      setPanel("conflict");
+                      setConflict(null);
+                      setChoices({});
                       setConflict(
                         await desktop.invoke("sync:conflict", {
                           projectId: project.id,
                         }),
                       );
-                      setChoices({});
                     })
                   }
                 >
@@ -685,294 +704,374 @@ export default function SyncSettings() {
           </p>
         )}
       </section>
-      {server && !dashboard && remote.length > 0 && (
-        <section className="settings-group">
-          <h2>服务器上的项目</h2>
-          {remote.map((project) => (
-            <div className="sync-connection" key={project.id}>
-              <div className="settings-row-text">
-                <h3>{project.name}</h3>
-                <p>
-                  {roles[project.role]}
-                  {project.archived ? " · 已归档" : ""}
+      {panel && (
+        <Dialog
+          key={panel}
+          title={
+            panel === "projects"
+              ? "服务器上的项目"
+              : panel === "dashboard"
+                ? "项目 Dashboard"
+                : "查看双方修改"
+          }
+          wide
+          onClose={() => setPanel(null)}
+          className="sync-dialog"
+        >
+          <div ref={panelBody} className="sync-dialog-body" aria-busy={busy}>
+            {error && (
+              <p className="sync-error" role="alert">
+                {error}
+              </p>
+            )}
+            {message && (
+              <p className="sync-message" role="status">
+                {message}
+              </p>
+            )}
+            {busy && (
+              <p className="settings-help" role="status">
+                正在加载…
+              </p>
+            )}
+            {panel === "projects" && (
+              <section className="settings-group">
+                <p className="settings-help">
+                  {
+                    status.connections.find(
+                      (connection) => connection.id === server,
+                    )?.name
+                  }{" "}
+                  ·{" "}
+                  {
+                    status.connections.find(
+                      (connection) => connection.id === server,
+                    )?.user.name
+                  }
                 </p>
-              </div>
-              <button
-                className="settings-button"
-                disabled={
-                  busy ||
-                  status.projects.some(
-                    (binding) =>
-                      binding.connectionId === server &&
-                      binding.remoteProjectId === project.id,
-                  )
-                }
-                onClick={() =>
-                  void run(() =>
-                    desktop.invoke("sync:subscribe", {
-                      connectionId: server,
-                      remoteProjectId: project.id,
-                    }),
-                  )
-                }
-              >
-                加入本地
-              </button>
-            </div>
-          ))}
-        </section>
-      )}
-      {dashboard && (
-        <section className="settings-group sync-dashboard">
-          <div className="sync-section-heading">
-            <h2>
-              项目 Dashboard ·{" "}
-              {
-                status.connections.find(
-                  (connection) => connection.id === dashboard,
-                )?.name
-              }
-            </h2>
-            <button
-              className="settings-button"
-              onClick={() => {
-                setDashboard(null);
-                setManagedProject("");
-              }}
-            >
-              关闭 Dashboard
-            </button>
-          </div>
-          <div className="sync-inline-form">
-            <select
-              aria-label="管理的项目"
-              value={managedProject}
-              onChange={(event) =>
-                void run(() => loadDashboard(dashboard, event.target.value))
-              }
-            >
-              <option value="">选择管理的项目</option>
-              {remote
-                .filter((project) => project.role === "admin")
-                .map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-            </select>
-            <form
-              className="sync-inline-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const data = new FormData(event.currentTarget);
-                void run(async () => {
-                  await desktop.invoke("sync:createProject", {
-                    connectionId: dashboard,
-                    name: data.get("name"),
-                  });
-                  await loadDashboard(dashboard);
-                });
-              }}
-            >
-              <input
-                name="name"
-                required
-                aria-label="新项目名称"
-                placeholder="新项目名称"
-              />
-              <button className="settings-button" disabled={busy}>
-                创建项目
-              </button>
-            </form>
-          </div>
-          {managedProject && (
-            <>
-              <h3>项目成员</h3>
-              {members.map((member) => (
-                <div className="sync-connection" key={member.id}>
-                  <div className="settings-row-text">
-                    <h3>{member.name}</h3>
-                  </div>
-                  <select
-                    aria-label={`${member.name}的项目权限`}
-                    value={member.role}
-                    disabled={busy}
-                    onChange={(event) =>
-                      void run(() =>
-                        manage("member", {
-                          userId: member.id,
-                          role: event.target.value,
-                        }),
-                      )
-                    }
-                  >
-                    {roleOptions}
-                  </select>
-                  <button
-                    className="settings-button"
-                    disabled={busy}
-                    onClick={() =>
-                      void run(() =>
-                        manage("member", { userId: member.id, role: null }),
-                      )
-                    }
-                  >
-                    移出项目
-                  </button>
-                </div>
-              ))}
-              <h3>邀请新成员</h3>
-              <div className="sync-inline-form">
-                <select
-                  aria-label="邀请权限"
-                  value={inviteRole}
-                  onChange={(event) =>
-                    setInviteRole(event.target.value as ProjectRole)
-                  }
-                >
-                  {roleOptions}
-                </select>
-                <button
-                  className="settings-button"
-                  disabled={busy}
-                  onClick={() =>
-                    void run(async () => {
-                      const invitation = (await manage("invite", {
-                        role: inviteRole,
-                      })) as { url: string };
-                      setGeneratedInvite(invitation.url);
-                    })
-                  }
-                >
-                  生成邀请链接
-                </button>
-              </div>
-              {generatedInvite && (
-                <div className="sync-inline-form">
-                  <input
-                    aria-label="生成的邀请链接"
-                    readOnly
-                    value={generatedInvite}
-                  />
-                  <button
-                    className="settings-button"
-                    onClick={() =>
-                      void run(async () => {
-                        await desktop.invoke("clipboard:write", {
-                          text: generatedInvite,
-                        });
-                        setMessage("邀请链接已复制。");
-                      })
-                    }
-                  >
-                    复制链接
-                  </button>
-                </div>
-              )}
-              {invites
-                .filter((invite) => !invite.accepted_by && !invite.revoked)
-                .map((invite) => (
-                  <div className="sync-connection" key={invite.digest}>
-                    <p className="settings-help">
-                      {roles[invite.role]} ·{" "}
-                      {new Date(invite.expires_at).toLocaleString()} 到期
-                    </p>
+                {!busy && !error && !remote.length && (
+                  <p className="settings-help">该账号在服务器上还没有项目。</p>
+                )}
+                {remote.map((project) => (
+                  <div className="sync-connection" key={project.id}>
+                    <div className="settings-row-text">
+                      <h3>{project.name}</h3>
+                      <p>
+                        {roles[project.role]}
+                        {project.archived ? " · 已归档" : ""}
+                      </p>
+                    </div>
                     <button
                       className="settings-button"
-                      disabled={busy}
+                      disabled={
+                        busy ||
+                        status.projects.some(
+                          (binding) =>
+                            binding.connectionId === server &&
+                            binding.remoteProjectId === project.id,
+                        )
+                      }
                       onClick={() =>
                         void run(() =>
-                          manage("revokeInvite", { digest: invite.digest }),
+                          desktop.invoke("sync:subscribe", {
+                            connectionId: server,
+                            remoteProjectId: project.id,
+                          }),
                         )
                       }
                     >
-                      撤销邀请
+                      {status.projects.some(
+                        (binding) =>
+                          binding.connectionId === server &&
+                          binding.remoteProjectId === project.id,
+                      )
+                        ? "已加入本地"
+                        : "加入本地"}
                     </button>
+                    {project.role === "admin" && (
+                      <button
+                        className="settings-button"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(() => loadDashboard(server, project.id))
+                        }
+                      >
+                        管理成员
+                      </button>
+                    )}
                   </div>
                 ))}
-              <div className="sync-inline-form">
-                <button
-                  className="settings-button"
-                  disabled={busy}
-                  onClick={() =>
-                    void run(() =>
-                      manage("project", {
-                        archived: !remote.find(
-                          (project) => project.id === managedProject,
-                        )?.archived,
-                      }),
-                    )
+              </section>
+            )}
+            {panel === "dashboard" && dashboard && (
+              <section className="settings-group sync-dashboard">
+                <p className="settings-help">
+                  {
+                    status.connections.find(
+                      (connection) => connection.id === dashboard,
+                    )?.name
                   }
-                >
-                  {remote.find((project) => project.id === managedProject)
-                    ?.archived
-                    ? "恢复项目"
-                    : "归档项目"}
-                </button>
-              </div>
-            </>
-          )}
-        </section>
-      )}
-      {conflict && (
-        <section className="settings-group sync-conflict">
-          <h2>处理同步冲突</h2>
-          <p className="settings-help">
-            双方版本和历史都已保留。为每个冲突选择保留的内容，然后发布合并版本。
-          </p>
-          {conflict.files.map((file) => (
-            <div key={file.path}>
-              <h3>{file.path}</h3>
-              <div className="sync-conflict-columns">
-                {(["local", "remote"] as const).map((side) => (
-                  <label key={side}>
-                    <span>
-                      <input
-                        type="radio"
-                        name={file.path}
-                        checked={choices[file.path] === side}
-                        onChange={() =>
-                          setChoices({ ...choices, [file.path]: side })
+                </p>
+                <div className="sync-inline-form">
+                  <select
+                    aria-label="管理的项目"
+                    value={managedProject}
+                    disabled={busy}
+                    onChange={(event) =>
+                      void run(() =>
+                        loadDashboard(dashboard, event.target.value),
+                      )
+                    }
+                  >
+                    <option value="">选择管理的项目</option>
+                    {remote
+                      .filter((project) => project.role === "admin")
+                      .map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {project.name}
+                        </option>
+                      ))}
+                  </select>
+                  <form
+                    className="sync-inline-form"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      const data = new FormData(event.currentTarget);
+                      void run(async () => {
+                        await desktop.invoke("sync:createProject", {
+                          connectionId: dashboard,
+                          name: data.get("name"),
+                        });
+                        await loadDashboard(dashboard);
+                      });
+                    }}
+                  >
+                    <input
+                      name="name"
+                      required
+                      aria-label="新项目名称"
+                      placeholder="新项目名称"
+                    />
+                    <button className="settings-button" disabled={busy}>
+                      创建项目
+                    </button>
+                  </form>
+                </div>
+                {!busy &&
+                  !error &&
+                  !remote.some((project) => project.role === "admin") && (
+                    <p className="settings-help">
+                      当前账号还没有可管理的项目，可以创建项目后管理成员与邀请。
+                    </p>
+                  )}
+                {managedProject && (
+                  <>
+                    <h3>项目成员</h3>
+                    {members.map((member) => (
+                      <div className="sync-connection" key={member.id}>
+                        <div className="settings-row-text">
+                          <h3>{member.name}</h3>
+                        </div>
+                        <select
+                          aria-label={`${member.name}的项目权限`}
+                          value={member.role}
+                          disabled={busy}
+                          onChange={(event) =>
+                            void run(() =>
+                              manage("member", {
+                                userId: member.id,
+                                role: event.target.value,
+                              }),
+                            )
+                          }
+                        >
+                          {roleOptions}
+                        </select>
+                        <button
+                          className="settings-button"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(() =>
+                              manage("member", {
+                                userId: member.id,
+                                role: null,
+                              }),
+                            )
+                          }
+                        >
+                          移出项目
+                        </button>
+                      </div>
+                    ))}
+                    <h3>邀请新成员</h3>
+                    <div className="sync-inline-form">
+                      <select
+                        aria-label="邀请权限"
+                        value={inviteRole}
+                        onChange={(event) =>
+                          setInviteRole(event.target.value as ProjectRole)
                         }
-                      />
-                      {side === "local"
-                        ? "保留本地"
-                        : conflict.recovery
-                          ? "使用保留的合并草稿"
-                          : "使用服务器版本"}
-                    </span>
-                    <pre>{readable(file[side])}</pre>
-                  </label>
+                      >
+                        {roleOptions}
+                      </select>
+                      <button
+                        className="settings-button"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            const invitation = (await manage("invite", {
+                              role: inviteRole,
+                            })) as { url: string };
+                            setGeneratedInvite(invitation.url);
+                          })
+                        }
+                      >
+                        生成邀请链接
+                      </button>
+                    </div>
+                    {generatedInvite && (
+                      <div className="sync-inline-form">
+                        <input
+                          aria-label="生成的邀请链接"
+                          readOnly
+                          value={generatedInvite}
+                        />
+                        <button
+                          className="settings-button"
+                          onClick={() =>
+                            void run(async () => {
+                              await desktop.invoke("clipboard:write", {
+                                text: generatedInvite,
+                              });
+                              setMessage("邀请链接已复制。");
+                            })
+                          }
+                        >
+                          复制链接
+                        </button>
+                      </div>
+                    )}
+                    {invites
+                      .filter(
+                        (invite) => !invite.accepted_by && !invite.revoked,
+                      )
+                      .map((invite) => (
+                        <div className="sync-connection" key={invite.digest}>
+                          <p className="settings-help">
+                            {roles[invite.role]} ·{" "}
+                            {new Date(invite.expires_at).toLocaleString()} 到期
+                          </p>
+                          <button
+                            className="settings-button"
+                            disabled={busy}
+                            onClick={() =>
+                              void run(() =>
+                                manage("revokeInvite", {
+                                  digest: invite.digest,
+                                }),
+                              )
+                            }
+                          >
+                            撤销邀请
+                          </button>
+                        </div>
+                      ))}
+                    <div className="sync-inline-form">
+                      <button
+                        className="settings-button"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(() =>
+                            manage("project", {
+                              archived: !remote.find(
+                                (project) => project.id === managedProject,
+                              )?.archived,
+                            }),
+                          )
+                        }
+                      >
+                        {remote.find((project) => project.id === managedProject)
+                          ?.archived
+                          ? "恢复项目"
+                          : "归档项目"}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </section>
+            )}
+            {panel === "conflict" && !conflict && !busy && !error && (
+              <p className="settings-help">
+                当前项目已经没有待处理的同步冲突。
+              </p>
+            )}
+            {panel === "conflict" && conflict && (
+              <section className="settings-group sync-conflict">
+                <h2>处理同步冲突</h2>
+                <p className="settings-help">
+                  双方版本和历史都已保留。为每个冲突选择保留的内容，然后发布合并版本。
+                </p>
+                {conflict.files.map((file) => (
+                  <div key={file.path}>
+                    <h3>{file.path}</h3>
+                    <p className="settings-help">
+                      {conflictPreviews.get(file.path)?.description}
+                    </p>
+                    <div className="sync-conflict-columns">
+                      {(["local", "remote"] as const).map((side) => (
+                        <div key={side}>
+                          <label>
+                            <input
+                              type="radio"
+                              disabled={busy}
+                              name={file.path}
+                              checked={choices[file.path] === side}
+                              onChange={() =>
+                                setChoices({ ...choices, [file.path]: side })
+                              }
+                            />
+                            {side === "local"
+                              ? "保留本地"
+                              : conflict.recovery
+                                ? "使用保留的合并草稿"
+                                : "使用服务器版本"}
+                          </label>
+                          <pre>{conflictPreviews.get(file.path)?.[side]}</pre>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 ))}
-              </div>
-            </div>
-          ))}
-          <div className="sync-inline-form">
-            <button
-              className="settings-button"
-              disabled={
-                busy || conflict.files.some((file) => !choices[file.path])
-              }
-              onClick={() =>
-                void run(async () => {
-                  await desktop.invoke("sync:resolve", {
-                    projectId: conflict.projectId,
-                    choices,
-                  });
-                  setConflict(null);
-                })
-              }
-            >
-              保存合并并同步
-            </button>
-            <button
-              className="settings-button"
-              onClick={() => setConflict(null)}
-            >
-              稍后处理
-            </button>
+                <div className="sync-inline-form">
+                  <button
+                    className="settings-button"
+                    disabled={
+                      busy || conflict.files.some((file) => !choices[file.path])
+                    }
+                    onClick={() =>
+                      void run(async () => {
+                        await desktop.invoke("sync:resolve", {
+                          projectId: conflict.projectId,
+                          choices,
+                        });
+                        setConflict(null);
+                        setPanel(null);
+                      })
+                    }
+                  >
+                    保存合并并同步
+                  </button>
+                  <button
+                    className="settings-button"
+                    onClick={() => setPanel(null)}
+                  >
+                    稍后处理
+                  </button>
+                </div>
+              </section>
+            )}
           </div>
-        </section>
+        </Dialog>
       )}
     </div>
   );
