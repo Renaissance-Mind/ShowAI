@@ -1,4 +1,4 @@
-![ShowAI — 构建人与 Agent 之间的 Interface。](docs/showai-banner.png)
+![ShowAI — 构建人与 Agent 之间的 Interface。](docs/showai-banner.svg)
 
 ShowAI 让人与 Agent 通过可阅读、可交互、可编辑的内容共同思考。Agent 将信息与分析组织成页面、图表和交互模型，人通过阅读、探索、修改和反馈参与其中，双方在同一份内容上持续形成理解、作出判断并推进创作。
 

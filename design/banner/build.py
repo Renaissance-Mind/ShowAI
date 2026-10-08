@@ -325,7 +325,7 @@ def main():
     subprocess.run(["rsvg-convert",str(svg),"--output",str(out/"preview.png")],check=True)
     notes = (
         "# ShowAI Banner 可编辑重建\n\n"
-        "尺寸为 2172 × 724，比例 3:1。对照仓库 docs/showai-banner.png 重建，"
+        "尺寸为 2172 × 724，比例 3:1。根据 README 原始 banner 重建，"
         "logo 使用 src/desktop/assets/icon.svg，并保留项目 logo 的矢量矩形与层叠顺序。\n\n"
         "标题、标语、标签、数字均为文字；卡片、连线、图标、鼠标指针、曲线与滑杆"
         "均为原生矢量图形，并按品牌、Human、Interface、Agent 和子图分组。"
@@ -388,7 +388,7 @@ def main():
                   "rendering":rendering,"editability":{"native_shapes":kinds["sp"],
                   "native_groups":kinds["grpSp"],"picture_objects":kinds["pic"],
                   "text_runs":editable_text,"media_parts":media},
-                  "size_pixels":[W,H],"reference":"docs/showai-banner.png",
+                  "size_pixels":[W,H],"reference":"Original ShowAI README banner retained in Git history",
                   "logo":"src/desktop/assets/icon.svg",
                   "limitations":["Approximate font metrics and shadow","Chart positions reconstructed from illustration"]}
         (out/"report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2,default=str))
