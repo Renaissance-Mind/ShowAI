@@ -20,6 +20,7 @@ import type {
 } from "../agent-host/types";
 import { sourcePresets } from "../agent-host/types";
 import type { PageSummary, ProjectSummary } from "../core/model";
+import AgentBrandIcon from "./AgentBrandIcon";
 import "./agent-settings.css";
 
 function messageLinks(
@@ -166,6 +167,14 @@ export default function AgentSettings({
     settingsRef = useRef<Configuration | null>(null);
   const taskRef = useRef("");
   taskRef.current = taskId;
+  const choiceFocusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (busy) return;
+    const choice = choiceFocusRef.current;
+    choiceFocusRef.current = null;
+    if (choice?.isConnected && document.activeElement === document.body)
+      choice.focus();
+  }, [busy]);
   const update = useCallback((next: AgentHostStatus) => {
     if (!mounted.current) return;
     settingsRef.current = next.settings;
@@ -306,7 +315,10 @@ export default function AgentSettings({
               role="radio"
               aria-checked={status.settings.mode === mode.id}
               disabled={busy}
-              onClick={action(() => change({ mode: mode.id }))}
+              onClick={(event) => {
+                choiceFocusRef.current = event.currentTarget;
+                void action(() => change({ mode: mode.id }))();
+              }}
               onKeyDown={(event) => {
                 if (
                   ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(
@@ -315,12 +327,14 @@ export default function AgentSettings({
                 ) {
                   event.preventDefault();
                   const next = mode.id === "local" ? "api" : "local";
-                  void action(() => change({ mode: next }))();
                   const buttons =
                     event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
                       "button[role=radio]",
                     );
-                  buttons?.[next === "local" ? 0 : 1]?.focus();
+                  const choice = buttons?.[next === "local" ? 0 : 1];
+                  choiceFocusRef.current = choice ?? null;
+                  void action(() => change({ mode: next }))();
+                  choice?.focus();
                 }
               }}
             >
@@ -352,44 +366,62 @@ export default function AgentSettings({
               重新探测
             </button>
           </div>
-          <div className="agent-list">
+          <div className="agent-list" role="group" aria-label="选择本机 Agent">
             {status.agents.map((agent) => (
-              <div className="agent-list-row" key={agent.id}>
+              <article
+                className="agent-card"
+                key={agent.id}
+                data-selected={status.settings.localAgent === agent.id}
+                data-unavailable={!agent.path}
+              >
                 <label>
-                  <input
-                    type="radio"
-                    name="local-agent"
-                    checked={status.settings.localAgent === agent.id}
-                    disabled={!agent.path || busy}
-                    onChange={action(() => change({ localAgent: agent.id }))}
-                  />
-                  <span>
+                  <AgentBrandIcon brand={agent.id} />
+                  <span className="agent-card-name">
                     <strong>{agent.name}</strong>
                     <small>{agent.version || "未安装"}</small>
                   </span>
+                  {status.settings.localAgent === agent.id && (
+                    <span className="agent-current">当前</span>
+                  )}
+                  <input
+                    type="radio"
+                    name="local-agent"
+                    aria-label={agent.name}
+                    aria-describedby={`agent-detail-${agent.id}`}
+                    checked={status.settings.localAgent === agent.id}
+                    disabled={!agent.path || busy}
+                    onChange={(event) => {
+                      if (document.activeElement === event.currentTarget)
+                        choiceFocusRef.current = event.currentTarget;
+                      void action(() => change({ localAgent: agent.id }))();
+                    }}
+                  />
                 </label>
-                <span
-                  className={`agent-availability ${agent.callable === true ? "verified" : ""}`}
-                >
-                  {agent.callable === true
-                    ? "调用通过"
-                    : agent.callable === false
-                      ? "调用失败"
-                      : agent.auth === "ready"
-                        ? "已有登录／来源"
-                        : agent.path
-                          ? "待测试"
-                          : "未找到"}
-                </span>
-                <button
-                  className="settings-button"
-                  disabled={!agent.path || busy || hasRunning}
-                  onClick={action(() => test(agent.id))}
-                >
-                  测试 {agent.name}
-                </button>
-                <p>{agent.detail}</p>
-              </div>
+                <p id={`agent-detail-${agent.id}`}>{agent.detail}</p>
+                <div className="agent-card-footer">
+                  <span
+                    className={`agent-availability ${agent.callable === true ? "verified" : ""}`}
+                  >
+                    {agent.callable === true
+                      ? "调用通过"
+                      : agent.callable === false
+                        ? "调用失败"
+                        : agent.auth === "ready"
+                          ? "已有登录／来源"
+                          : agent.path
+                            ? "待测试"
+                            : "未找到"}
+                  </span>
+                  <button
+                    className="settings-button"
+                    aria-label={`测试 ${agent.name}`}
+                    disabled={!agent.path || busy || hasRunning}
+                    onClick={action(() => test(agent.id))}
+                  >
+                    测试连接
+                  </button>
+                </div>
+              </article>
             ))}
           </div>
         </section>
@@ -427,7 +459,8 @@ export default function AgentSettings({
             </div>
             {selected && (
               <div className="agent-source-summary">
-                <div>
+                <AgentBrandIcon brand={selected.provider} />
+                <div className="agent-source-identity">
                   <strong>{selected.name}</strong>
                   <small>
                     {selected.model || "尚未选择模型"}
@@ -459,13 +492,23 @@ export default function AgentSettings({
             <div className="agent-presets" aria-label="添加模型来源">
               {sourcePresets.map((preset) => (
                 <button
-                  className="settings-button"
+                  className="agent-preset"
                   key={preset.provider}
                   disabled={busy}
                   onClick={() => add(preset.provider)}
                 >
-                  <Plus size={12} />
-                  {preset.name}
+                  <AgentBrandIcon brand={preset.provider} />
+                  <span>
+                    <strong>{preset.name}</strong>
+                    <small>
+                      {preset.credential === "chatgpt"
+                        ? "账号授权"
+                        : preset.provider === "custom"
+                          ? "连接自己的模型服务"
+                          : "使用 API Key 连接"}
+                    </small>
+                  </span>
+                  <Plus size={14} aria-hidden="true" />
                 </button>
               ))}
             </div>
@@ -477,13 +520,23 @@ export default function AgentSettings({
                   void action(saveSource)();
                 }}
               >
-                <h3>
-                  {status.settings.sources.some(
-                    (source) => source.id === editing.id,
-                  )
-                    ? "管理来源"
-                    : "添加来源"}
-                </h3>
+                <div className="agent-source-form-heading">
+                  <AgentBrandIcon brand={editing.provider} />
+                  <div>
+                    <h3>
+                      {status.settings.sources.some(
+                        (source) => source.id === editing.id,
+                      )
+                        ? "管理来源"
+                        : "添加来源"}
+                    </h3>
+                    <p>
+                      {sourcePresets.find(
+                        (preset) => preset.provider === editing.provider,
+                      )?.name ?? editing.name}
+                    </p>
+                  </div>
+                </div>
                 <label>
                   名称
                   <input

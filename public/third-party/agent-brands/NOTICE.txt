@@ -1,0 +1,13 @@
+Agent brand icons
+
+These assets use the same brand artwork as the DrawAI Workbench settings.
+
+codex.svg, claude-code.svg, gemini-cli.svg, opencode.svg, openai.svg,
+openrouter.svg and deepseek.svg are from LobeHub Icons:
+https://github.com/lobehub/lobe-icons
+They are distributed under the MIT license in LICENSE.lobe-icons.txt.
+
+kimi.png is the official Kimi logo. See NOTICE.kimi-logo.txt for its source.
+The same artwork identifies Moonshot model sources, as in DrawAI.
+
+Brand names and marks belong to their respective owners.
