@@ -1,12 +1,12 @@
 # CLI reference for scripts and operators
 
-Agent document workflows use MCP; see [Agent integration](agent-integration.md). This reference retains CLI commands for scripts, service configuration, diagnostics and compatibility.
+**Agent document workflows use MCP**; see [Agent integration](agent-integration.md). This reference retains CLI commands for scripts, service configuration, diagnostics and compatibility.
 
 ShowAI's Node.js CLI and optional MCP server operate on the same project files as the desktop workbench. The CLI runs one command and exits; the desktop window can be closed and no Core daemon is required. It is built from `src/agent/cli.ts` and packaged at `dist-runtime/scripts/cli.mjs`, and included in the desktop application under `Resources/runtime/`. A Python Agent can invoke it with `subprocess` or an MCP client.
 
 The skills-only plugin resolves the installed software from `agent-runtime.json` in the selected content directory, then verifies it with `runtime info --json`. Desktop startup records its bundled launch; standalone runtime users run `runtime register --json`.
 
-In the examples below, `showai` means the verified external command prefix, for example `node /absolute/path/to/dist-runtime/scripts/cli.mjs`. Do not assume a global npm command exists. Standalone use requires Node.js 22.12+. The desktop application's **Settings → Agent → Local connection** panel provides its bundled executable, CLI path and environment for use without a separate Node installation.
+In the examples below, `showai` means the **verified external command prefix**, for example `node /absolute/path/to/dist-runtime/scripts/cli.mjs`. Do not assume a global npm command exists. Standalone use requires Node.js 22.12+. The desktop application's **Settings → Agent → Local connection** panel provides its bundled executable, CLI path and environment for use without a separate Node installation.
 
 For independent public rendering, HTTP MCP, OAuth and host-specific display, see [cross-host Agent integration](agent-integration.md). These capabilities share the same content model and authoring service; synchronization does not depend on inline display.
 
@@ -45,11 +45,11 @@ showai projects current --project PROJECT --json
 showai pages create --title "A research report" --json
 ```
 
-A user-specified project takes priority. Otherwise `projects current` resolves or creates the ShowAI project for the host project directory. An explicit `--source-directory` is used exactly; without it, the CLI finds the nearest Git root above cwd, or uses cwd outside Git. Directories resolve to real absolute paths, so symbolic-link aliases share the same project. Different sessions in the same directory share one project, and concurrent first use creates only one. The response includes `home`, `project`, `sourceDirectory`, `resolution` and `created`.
+**A user-specified project takes priority**. Otherwise `projects current` resolves or creates the ShowAI project for the host project directory. An explicit `--source-directory` is used exactly; without it, the CLI finds the nearest Git root above cwd, or uses cwd outside Git. Directories resolve to real absolute paths, so symbolic-link aliases share the same project. Different sessions in the same directory share one project, and concurrent first use creates only one. The response includes `home`, `project`, `sourceDirectory`, `resolution` and `created`.
 
 Page, component, template and MCP commands use the same directory resolution when `--project` is omitted. Explicit `projects create` remains available for a requested independent project; subsequent commands select it with `--project`. Session bindings remain metadata and do not choose the default destination. An archived directory project produces a conflict instead of creating a replacement.
 
-Ordinary research, comparison and report tasks default to one resource Page. Organize its chapters with regions, navigation, collapsible content and nested containers, and continue revisions in the same page. Create multiple resource pages for a requested website or separate documents. Displaying multiple excerpts does not create multiple stored pages.
+Ordinary research, comparison and report tasks default to **one resource Page**. Organize its chapters with regions, navigation, collapsible content and nested containers, and continue revisions in the same page. Create multiple resource pages for a requested website or separate documents. Displaying multiple excerpts does not create multiple stored pages.
 
 ## Discover resources, then request one view
 
@@ -63,7 +63,11 @@ showai catalog describe chart --kind component --view schema --project PROJECT -
 showai catalog describe chart --kind component --view examples --project PROJECT --json
 ```
 
+### Catalog results
+
 A list returns `{ items, total, limit, nextCursor, next }`. By default it returns all matching names, descriptions and scenarios, plus IDs, scopes and available revision identities for detail lookup. Omit query, limit and cursor for the complete accessible catalog. Public catalog listing has the same full-list default. Explicit limits from 1 to 50 opt into pagination; pass the returned cursor with the same limit, query and scope to continue. If the catalog changes, restart without a cursor. Catalog content enters Agent context when the tool is called, not automatically at session startup.
+
+### Scope and exact versions
 
 Lookup uses the selected project, then global and published libraries, with built-ins as fallback. Use `--scope project|global|published|builtin` and an exact `--version`/`--integrity` when selecting a particular revision. Discovery does not include default data, schemas, code, runtime HTML, or full template documents.
 
@@ -217,13 +221,17 @@ After creating, organizing or revising a ShowAI page, save the complete page usi
 
 Bundled is the default. The reader, content and exact custom runtimes travel together; raster images must be embedded for offline delivery. HTML and inline exports also save editable source JSON. A static site includes relative navigation, source files and shared reader assets, and is intended for HTTP/static hosting. Whole-project export omits archived pages.
 
+### Reader compilation and inline limits
+
 HTML and inline export compile the selected page's native components and dependency closure from the software's fingerprinted reader archive. G2 exports include selected drawing functions and their required libraries; site export uses the union across pages and shares the reader. `runtime info.readerCompilation.mode` reports `page-dependencies` when this capability is installed; `prebuilt` means a legacy/template reader is in use. Explicit viewer templates remain supported.
 
 Inline is a UTF-8 fragment for a host-supported visualization surface and its final emitted size must remain under 1 MB. It requires bundled components and compresses oversized reader code, styles and artifact losslessly before checking the limit. Full HTML file size does not determine inline size. Component packages and the companion source retain their full contents and identities. A terminal or generic MCP client does not acquire HTML display simply by connecting ShowAI. Desktop/ordinary HTML use component iframes; conversation inline mode uses the host's whole-page sandbox with per-component Shadow DOM styles.
 
 When a full report exceeds the inline limit, show meaningful selected blocks or a few ordered excerpts and link the full HTML report. Keep one complete source page. If the host lacks conversation HTML rendering, deliver an available preview/file and state where the result is shown. Omit the default conversation preview only for an explicit save-only, file-only, panel-only or background request.
 
-Remote delivery uses previously verified exact component locators and requires network access when reading. The HTML does not silently choose a newer version. Prepare and register published files explicitly:
+### Remote component delivery
+
+Remote delivery uses previously verified **exact component locators** and requires network access when reading. The HTML does not silently choose a newer version. Prepare and register published files explicitly:
 
 ```sh
 showai publish prepare --project PROJECT --input publication-refs.json --out ./publication --json

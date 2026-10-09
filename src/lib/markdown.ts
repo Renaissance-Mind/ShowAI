@@ -2,11 +2,14 @@ import { generateJSON, type JSONContent } from "@tiptap/core";
 import { marked } from "marked";
 import { mathMarkdown } from "../components/blocks/markdown-math.mjs";
 import { createExtensions } from "../editor/extensions";
+import { renderMarkdownCode } from "./markdown-code";
 
 /** Convert GFM tasks and serialized widgets into the editor's native node format. */
 export function parseMarkdown(source: string): JSONContent {
   // Keep math-bearing blocks as editable Markdown widgets. This preserves TeX source
   // through imports, saving and exports instead of flattening it into plain text.
+  const renderer = new marked.Renderer();
+  renderer.code = renderMarkdownCode;
   const tokens = mathMarkdown.lexer(source);
   const definitions = Object.entries(tokens.links)
     .map(
@@ -21,7 +24,7 @@ export function parseMarkdown(source: string): JSONContent {
         if (entry.type === "mathBlock" || entry.type === "mathInline")
           hasMath = true;
       });
-      if (!hasMath) return marked.parser([token], { async: false });
+      if (!hasMath) return marked.parser([token], { async: false, renderer });
       const attrs = JSON.stringify({
         content: token.raw + (definitions ? "\n\n" + definitions : ""),
         format: "markdown",

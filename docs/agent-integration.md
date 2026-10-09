@@ -1,10 +1,10 @@
 # One ShowAI workflow across Agent hosts
 
-Agent document operations use MCP in every host. Local plugins include a stdio launcher; remote packages provide an HTTP endpoint. CLI examples below configure services or support scripts and operators. They are not an alternate Agent authoring workflow.
+**Agent document operations use MCP** in every host. Local plugins include a stdio launcher; remote packages provide an HTTP endpoint. CLI examples below configure services or support scripts and operators. They are not an alternate Agent authoring workflow.
 
-Local library MCP uses explicit projectId per operation. Use projects_list for read-only discovery, project_resolve with a trusted absolute sourceDirectory for new formal content, or a project-bound connection. New formal work is saved before page_present; render_document is for explicitly standalone deliverables. Connection failure does not change the destination or persistence mode.
+Local library MCP uses explicit `projectId` per operation. Use `projects_list` for read-only discovery, `project_resolve` with a trusted absolute `sourceDirectory` for new formal content, or a project-bound connection. New formal work is **saved before** `page_present`; `render_document` is for explicitly standalone deliverables. **Connection failure** does not change the destination or persistence mode.
 
-ShowAI 0.9 provides independent presentations and shared-project work. Display and synchronization are separate choices:
+ShowAI 0.9 provides independent presentations and shared-project work. **Display and synchronization are separate choices**:
 
 | Host display | No synchronization | Shared project |
 | --- | --- | --- |
@@ -28,7 +28,7 @@ showai mcp --project PROJECT_ID
 
 Public rendering does not initialize or modify a personal project. Input is `{document?, templateId?, title?, componentSources?, blockIds?}`; choose document or templateId. Components use the existing editable package contract: manifest, schema, source and optional files/assets. The renderer compiles in an isolated temporary workspace and removes that workspace afterward. Its receipt reports `savedToProject: false` and `synchronized: false`. Exported HTML, inline and source remain at the requested destination. Custom nodes use `attrs.kind="custom"` with `attrs.data={componentId,version,props}`; unregistered widget kinds fail with a corrective error. Public source output retains the original componentSources for customization. If inline exceeds the host limit, complete HTML/source are still returned; use blockIds for a smaller inline selection while retaining the full source.
 
-Library stdio (`showai mcp`) adds projects_list, project_resolve and project_create. Project-bound stdio keeps the existing project tool names and also exposes public resources/rendering. `mcp --public` exposes only public resources, guides and rendering. Local rendering results include paths in the selected library's `local/agent-previews/`, outside synchronized project content.
+Library stdio (`showai mcp`) adds `projects_list`, `project_resolve` and `project_create`. Project-bound stdio keeps the existing project tool names and also exposes public resources/rendering. `mcp --public` exposes only public resources, guides and rendering. Local rendering results include paths in the selected library's `local/agent-previews/`, outside synchronized project content.
 
 For local project work, keep the usual read → modify with hash/revision → save → sync workflow. Scripts can run `sync run --project PROJECT --json`; MCP Agents use `project_sync` and `project_sync_status`. No HTML display is required to complete a project operation. An explicitly scoped synchronization enrolls and processes only that project; the full background run continues following the library's default policy.
 
@@ -48,11 +48,17 @@ Use a stable HTTPS reverse proxy for the public URL. The MCP URL is `https://age
 
 `--state` contains the private OAuth database and per-grant project replicas. Restrict it to the service account. Its tokens and replicas must not be published or copied into the plugin. Reverse proxies must preserve the public Host. `--widget-domain` can declare the dedicated UI origin required for public plugin submission. Local development permits a loopback HTTP public URL; published connections require HTTPS.
 
+### Public and authorized tools
+
 Public tools are `showai_capabilities`, `guide`, `public_catalog_list`, `public_catalog_describe`, `render_document` and `presentation_source`. The last tool retrieves the editable public render input in text chunks when a host cannot download the HTTP URL; it does not expose private project exports. The catalog includes built-in components and editable starter templates. All public rendering inputs come from the caller; no anonymous operation reads the user's content library.
 
-Private tools retain the existing authoring names, add an explicit projectId, and use OAuth. `projects_list` returns only the project authorized in that grant and checks current server membership. `page_present` supplies the same reader as public rendering. Local path-based import, whole-site publication and local recovery tools stay local; remote component customization uses `component_save` with source. Remote exports use service-owned temporary paths and return downloadable artifacts instead of server filesystem paths.
+Private tools retain the existing authoring names, add an explicit `projectId`, and use OAuth. `projects_list` returns only the project authorized in that grant and checks current server membership. `page_present` supplies the same reader as public rendering. Local path-based import, whole-site publication and local recovery tools stay local; remote component customization uses `component_save` with source. Remote exports use service-owned temporary paths and return downloadable artifacts instead of server filesystem paths.
+
+### Permissions and synchronization
 
 Each private call checks its token, consented project, scopes and current server role. The gateway serializes pull → operation → push in the grant's replica. Remote history records the entry as an external MCP client; it does not inherit the gateway launcher's Codex session. The response includes `synchronization.state`, `error` when present, and `remoteHead`. If a replica write succeeds but publication fails, the result is marked unsuccessful and the replica is retained. Cross-device conflicts keep both inputs as source-labeled pages; callers must use the returned page ID. Same-device stale writes continue to require deliberate conflict handling.
+
+### Authorization
 
 OAuth supports discovery, dynamic client registration, authorization code with S256 PKCE, resource binding, access-token expiry, rotating refresh tokens, consent and revocation. It authenticates existing ShowAI Server accounts; it does not create users during linking. The login password is forwarded only to the explicitly configured server and is not stored. Upstream session credentials are held in private state to perform the consented project operations.
 
@@ -72,8 +78,12 @@ The output replaces the local `mcp.json` to the same manifest, skills and assets
 
 ## Saved-page presentation contract
 
-Local and HTTP MCP share page_present({projectId,pageId,blockIds?}). It captures one source revision, returns identity/hash/revision, and leaves the Page unchanged. Complete HTML/source contain the whole Page; blockIds only selects the inline preview. Source and build intermediates use one snapshot, and temporary build directories are cleaned on failure. Local delivery uses the host-configured SHOWAI_PRESENTATION_DIR or the runtime preview directory; HTTP delivery uses expiring artifact URLs. Private source is not exposed by the anonymous presentation_source tool.
+Local and HTTP MCP share `page_present({projectId,pageId,blockIds?})`. It captures **one source revision**, returns identity/hash/revision, and **leaves the Page unchanged**. **Complete HTML/source contain the whole Page**; blockIds only selects the inline preview. Source and build intermediates use one snapshot, and temporary build directories are cleaned on failure.
 
-Local presentation reports synchronization.state=not_checked and does not start synchronization. HTTP project responses replace that with the verified synchronization receipt. A preview never creates another source Page. Low-level page_export retains its existing explicit-file semantics: selecting blocks makes that export and source partial.
+Local delivery uses the host-configured `SHOWAI_PRESENTATION_DIR` or the runtime preview directory; HTTP delivery uses expiring artifact URLs.
+
+Private source is not exposed by the anonymous presentation_source tool.
+
+Local presentation reports synchronization.state=not_checked and does not start synchronization. HTTP project responses replace that with the verified synchronization receipt. A preview never creates another **source Page**. Low-level page_export retains its existing explicit-file semantics: selecting blocks makes that export and source partial.
 
 The local plugin launcher resolves only its configured library, probes the registered runtime for capabilities.agentOperations.protocol=showai-mcp-v1, and launches MCP. It never falls back to another runtime after a failed probe. The embedded AgentHost supplies a bound MCP and removes the library launcher from its private skill copy.

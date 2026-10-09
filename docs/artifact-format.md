@@ -1,6 +1,6 @@
 # ShowAI artifact format, version 3
 
-Version 3 stores recursively nested Page and Board surfaces. A Page is ordered content; a Board is a local spatial workspace. Both may be the root or an embedded module. New resources default to Page. Versions 1 (doc) and 2 (legacy whiteboard) remain readable.
+Version 3 stores recursively nested Page and Board surfaces. A Page is ordered content; a Board is a local spatial workspace. Both may be the root or an embedded module. **New resources default to Page**. Versions 1 (doc) and 2 (legacy whiteboard) remain readable.
 
 ## Envelope and containers
 
@@ -39,7 +39,7 @@ Version 3 stores recursively nested Page and Board surfaces. A Page is ordered c
 }
 ```
 
-All non-text nodes, including surfaces, have unique stable `attrs.id`. Surface kind is `page` or `board`; nested surfaces require a surface or region parent. `region` remains a flow/grid/free layout group and `richText` holds ordinary editor blocks. The resource ID identifies the file; the root container ID identifies its content node.
+All non-text nodes, including surfaces, have **unique stable `attrs.id`**. Surface kind is `page` or `board`; nested surfaces require a surface or region parent. `region` remains a flow/grid/free layout group and `richText` holds ordinary editor blocks. The resource ID identifies the file; the root container ID identifies its content node.
 
 `layout[nodeId]` describes the parent-owned frame: x, y, width, optional height and heightMode (`fixed` or `auto`). Auto height is supported for Page modules; Board modules keep a bounded viewport. Board and free-group children use local coordinates. Page and flow/grid children follow tree order. Region-only fields are mode, columns and gap. See [Page and Board](page-surface.md) for limits and interactions.
 
@@ -107,7 +107,7 @@ Every interactive block uses the same wrapper:
 }
 ```
 
-The built-in data shapes below are plain JSON. Optional fields are marked with `?`; the notation describes a schema and is not literal JSON.
+The built-in data shapes below are **plain JSON**. Optional fields are marked with `?`; the notation describes a schema and is not literal JSON.
 
 ### Basic content
 
@@ -115,15 +115,17 @@ Basic components use the same widget envelope, with these kinds and data fields:
 
 | Kind      | Data                                                                     |
 | --------- | ------------------------------------------------------------------------ |
-| `text`    | `content: string`, `format?: "markdown"                                  | "plain"` |
-| `image`   | `src: string`, `alt?`, `caption?`, `width?`, `height?`, `fit?: "contain" | "cover"` |
-| `table`   | `title?`, `columns: string[]`, `rows: (string                            | number   | boolean)[][]` |
+| `text`    | `content: string`, `format?: "markdown" \| "plain"` |
+| `image`   | `src: string`, `alt?`, `caption?`, `width?`, `height?`, `fit?: "contain" \| "cover"` |
+| `table`   | `title?`, `columns: string[]`, `rows: (string \| number \| boolean)[][]` |
 | `callout` | `title?`, `content: string` (Markdown)                                   |
 | `toggle`  | `summary: string`, `content: string` (Markdown), `open?: boolean`        |
 | `divider` | `color?: string`                                                         |
 | `code`    | `content: string`, `language?: string`                                   |
 
 Appearance fields include `color`, `backgroundColor`, `fontSize`, `align`, `padding`, and `radius`. Tables have 1–100 columns and up to 1,000 rectangular rows. Image URLs and Markdown images must be embedded for offline delivery. Browser export embeds image component URLs and inline/reference Markdown images. Builtins are discoverable by Agent and expose a source wrapper for creating a project variant. Existing editor-native nodes remain readable in the same artifact format.
+
+### Reusing built-in components
 
 Custom components can import named builtins from `showai:components`, and exact custom children from `showai:component/ID` after declaring `manifest.dependencies`. The parent runtime bundles child implementations for offline and inline delivery. Catalog registration/publication additionally preserves the dependency source closure; see [component lifecycle](catalog-lifecycle.md).
 
@@ -134,7 +136,7 @@ Custom components can import named builtins from `showai:components`, and exact 
   series: { name, values: number[], color?: "#RRGGBB" }[], unit? }
 ```
 
-Series values must be finite numbers and match the label count. Supports up to 500 labels and 20 series. Legends toggle series visibility; points/bars reveal values. Use verified numbers or clearly identified mathematical/scenario values.
+Series values must be **finite numbers** and match the label count. Supports up to 500 labels and 20 series. Legends toggle series visibility; points/bars reveal values. Use verified numbers or clearly identified mathematical/scenario values.
 
 ### Database
 
@@ -152,7 +154,7 @@ Column and row IDs must be unique within their list. Limits: 50 columns, 5,000 r
 { title, items: { label, value: string | number, unit?, detail?, trend?: number }[] }
 ```
 
-The optional numeric trend is displayed as a percentage. Maximum 100 items. Omit unknown measurements instead of inventing numbers.
+The optional numeric trend is displayed as a percentage. Maximum 100 items. **Omit unknown measurements instead of inventing numbers**.
 
 ### Playground
 
@@ -201,9 +203,11 @@ The page node stores a reference and props:
 }
 ```
 
-`componentId` uses lowercase letters, numbers and hyphens. `version` is an exact semantic version. An optional `integrity` records the expected compiled package hash. `props` must satisfy that version's JSON Schema. Component ids and props are data; putting arbitrary JavaScript in a node does not define a renderer.
+`componentId` uses lowercase letters, numbers and hyphens. `version` is an **exact semantic version**. An optional `integrity` records the expected compiled package hash. `props` must satisfy that version's JSON Schema. Component ids and props are data; putting arbitrary JavaScript in a node does not define a renderer.
 
-The React entry exports a default component receiving `{ data, onChange?, readOnly }`. Use `onChange(nextData)` for authoring updates. In reading mode, persistent updates are disabled; local React state can still support temporary exploration. Installed package versions are immutable, so a source edit requires a new version.
+#### Authoring and reading behavior
+
+The React entry exports a default component receiving `{ data, onChange?, readOnly }`. Use `onChange(nextData)` for authoring updates. In reading mode, persistent updates are disabled; local React state can still support temporary exploration. Installed package versions are **immutable**, so a source edit requires a new version.
 
 The compiler supports React and package-local imports. Desktop and ordinary HTML render each component in an iframe with `sandbox="allow-scripts"`; the component cannot use the desktop bridge, filesystem or external network. The catalog keeps original package files for editing, while each exported artifact includes a deduplicated `components` array:
 
@@ -223,11 +227,15 @@ Some conversation surfaces disallow nested iframes. For those surfaces, `--forma
 
 The reader does not extract or evaluate scripts from arbitrary component HTML. Packages created before the inline mount bundle was available still work in the ordinary HTML reader; conversation mode reports that their original source must be imported under a new version.
 
+#### Reader compilation
+
 Software builds ship a fingerprinted reader source archive. HTML and inline export collect the page's native component kinds recursively, retain only those registrations and metadata, and compile their dependency graph into one self-contained reader. G2 exports include only selected chart drawing functions and their core, statistical, geographic, graph or extension library requirements. Common React/runtime dependencies are bundled once. Custom packages retain their pinned compiled dependency closure. Site exports compile the union across active pages and share one reader. User-supplied templates and older runtimes without an archive retain their prebuilt reader; `runtime info` exposes the actual strategy in `readerCompilation`.
+
+#### Size and compression
 
 For inline fragments of 128 KB or more, the exporter losslessly gzip-compresses its reader modules, scoped styles and artifact together when this reduces the emitted size. A small local bootstrap restores the exact JSON and styles before starting the reader; custom component HTML, inline code and integrity remain intact. The companion `.showai.json` remains complete editable source. No network request is required to unpack or render. Reader templates are cached by source fingerprint and sorted component kinds; page data is inserted afterwards, so cached readers never contain another page's contents.
 
-The 1 MB limit applies to the final emitted UTF-8 fragment, after compression. A standalone HTML file larger than 1 MB can still fit in conversation. If the compressed fragment remains too large, export meaningful selected blocks and link the full HTML; the error reports the actual compressed byte count. Large media and incompressible data can still exceed the host limit.
+The 1 MB limit applies to the **final emitted UTF-8 fragment**, after compression. A standalone HTML file larger than 1 MB can still fit in conversation. If the compressed fragment remains too large, export meaningful selected blocks and link the full HTML; the error reports the actual compressed byte count. Large media and incompressible data can still exceed the host limit.
 
 ### Application-level block registration
 
@@ -263,13 +271,13 @@ The standalone renderer also accepts `--inline`. Its output is an HTML fragment 
 
 ## Validation and limits
 
-Source JSON is limited to 10 MB, 12,000 document nodes, and 48 levels of JSON nesting. Built-in widgets also have the limits described above. Invalid trees, unsupported node types, malformed marks, unsafe URLs, nonfinite numbers, and prototype-pollution keys are rejected before creating the editor. Unknown widget kinds preserve plain JSON data.
+Source JSON is limited to 10 MB, 12,000 document nodes, and 48 levels of JSON nesting. Built-in widgets also have the limits described above. Invalid trees, unsupported node types, malformed marks, unsafe URLs, non**finite numbers**, and prototype-pollution keys are rejected before creating the editor. Unknown widget kinds preserve **plain JSON** data.
 
 The generated file escapes embedded JSON and the HTML title. Paragraph text and data remain escaped. Custom components are executable code supplied through the explicit component-package mechanism and run in the rendering boundary described above. The reader has no telemetry, background API, or account connection. Image embedding makes network requests only during browser export; ordinary source links navigate when activated.
 
 ## Catalog revision identity and remote delivery
 
-Custom widget references use `componentId`, exact `version`, `integrity` and `props`, with an optional scope hint. Writes through the Agent and desktop services lock these references. Components with the same id/version but different fingerprints are distinct; a pinned reference must resolve its own fingerprint. Old sources without a fingerprint are normalized on their next authoring write. Existing immutable package content is never replaced by this normalization.
+Custom widget references use `componentId`, exact `version`, `integrity` and `props`, with an optional scope hint. Writes through the Agent and desktop services lock these references. Components with the same id/version but different fingerprints are distinct; a pinned reference must resolve its own fingerprint. Old sources without a fingerprint are normalized on their next authoring write. Existing **immutable** package content is never replaced by this normalization.
 
 A remote artifact adds `remoteComponents` at the envelope level. Each locator has:
 
@@ -281,4 +289,4 @@ A remote artifact adds `remoteComponents` at the envelope level. Each locator ha
 
 Use locators returned by publication verification, rather than inventing them. `sha256` protects the exact downloaded bundle bytes; `ref.integrity` selects and validates the component revision inside it. The reader checks both before mounting any custom code. HTTPS is required except for localhost/loopback HTTP used for self-hosting and tests. Cross-origin static hosting must permit CORS. Remote files require network access; inline exports require bundled components because the host blocks these network requests.
 
-Importing a remote source verifies its locators and materializes the components into the selected project, preserving the version identity. A failed download or integrity check must leave the existing page untouched. Source templates are expanded before a page is saved; they are not required in the delivered page. See [catalog lifecycle](catalog-lifecycle.md) for versioned template definitions and immutable library registration.
+Importing a remote source verifies its locators and materializes the components into the selected project, preserving the version identity. A **failed download or integrity check must leave the existing page untouched**. Source templates are expanded before a page is saved; they are not required in the delivered page. See [catalog lifecycle](catalog-lifecycle.md) for versioned template definitions and **immutable** library registration.
