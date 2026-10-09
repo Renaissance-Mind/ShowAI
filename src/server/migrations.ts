@@ -1,6 +1,6 @@
-import { schema, type MetadataStore } from "./storage";
+import { schema, dataTables, type MetadataStore } from "./storage";
 
-export const schemaVersion = 5;
+export const schemaVersion = 6;
 export const migrations = [
   {
     version: 1,
@@ -62,6 +62,22 @@ export const migrations = [
       "CREATE TABLE object_uploads(id TEXT PRIMARY KEY,project_id TEXT NOT NULL,user_id TEXT NOT NULL,digest TEXT NOT NULL,bytes INTEGER NOT NULL,reservation_id TEXT NOT NULL,created_at TEXT NOT NULL,completed INTEGER NOT NULL DEFAULT 0,UNIQUE(project_id,user_id,digest))",
       "CREATE TABLE object_upload_parts(upload_id TEXT NOT NULL,part_index INTEGER NOT NULL,digest TEXT NOT NULL,bytes INTEGER NOT NULL,PRIMARY KEY(upload_id,part_index))",
       "INSERT INTO settings(key,value) VALUES('schema_version','5') ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+    ],
+  },
+  {
+    version: 6,
+    name: "consistent_operations",
+    statements: [
+      "CREATE TABLE server_operations(id INTEGER PRIMARY KEY CHECK(id=1),state TEXT NOT NULL CHECK(state IN ('running','frozen')),epoch TEXT NOT NULL,frozen_at TEXT)",
+      "INSERT INTO server_operations VALUES(1,'running','',NULL)",
+      "CREATE TABLE server_write_leases(id TEXT PRIMARY KEY,started_at TEXT NOT NULL)",
+      ...dataTables.flatMap((table) =>
+        ["INSERT", "UPDATE", "DELETE"].map(
+          (operation) =>
+            `CREATE TRIGGER freeze_${table}_${operation.toLowerCase()} BEFORE ${operation} ON ${table} WHEN (SELECT state FROM server_operations WHERE id=1)='frozen' BEGIN SELECT RAISE(ABORT,'SHOWAI_READ_ONLY'); END`,
+        ),
+      ),
+      "INSERT INTO settings(key,value) VALUES('schema_version','6') ON CONFLICT(key) DO UPDATE SET value=excluded.value",
     ],
   },
 ];

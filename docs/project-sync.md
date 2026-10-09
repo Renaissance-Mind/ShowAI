@@ -76,7 +76,7 @@ node scripts/migrate-server-manifests.mjs --home /absolute/server/data --batch 5
 node scripts/migrate-server-manifests.mjs --home /absolute/server/data --project PROJECT_ID --rollback
 ```
 
-回退仅针对仍保留内嵌正文的旧版本；新清单使用对象存储。完整停写备份与 Cloudflare 到 Linux 的恢复工具另行验收，清单迁移不能代替完整恢复演练。
+回退仅针对仍保留内嵌正文的旧版本；新清单使用对象存储。[停写备份和恢复工具](server-operations.md)保存完整账号、会话、权限、上传任务、历史和对象集合，恢复后保留服务器身份。内嵌清单迁移与整份服务恢复分别核验。
 
 对象上传和下载使用流式传输与增量摘要校验。Linux 在发布前刷新临时文件，Worker 使用有界 R2 分片、私有请求临时键和原生流式摘要。失败的当前请求临时键会回滚清理，已经发布的历史和旧孤立对象不在这一清理范围内。客户端下载先写入临时文件并校验，再替换缓存，单对象支持 64 MiB。
 

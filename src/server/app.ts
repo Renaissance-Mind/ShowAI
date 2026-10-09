@@ -16,9 +16,10 @@ import {
 import { type MetadataStore, type ObjectStore } from "./storage";
 import { prepareMetadata } from "./migrations";
 import { Revisions, type RevisionRow } from "./revisions";
-import { verifiedStream } from "./streams";
+import { verifiedStream, deadlineBody } from "./streams";
 import { Quotas, type StoragePolicy } from "./quotas";
 import { Uploads } from "./uploads";
+import { ServerMaintenance } from "./maintenance";
 import {
   createInvitation,
   acceptInvitation,
@@ -51,6 +52,7 @@ import {
 } from "../sync/server-url";
 
 export interface ServerOptions extends AccountOptions {
+  operationsKey?: string;
   metadata: MetadataStore;
   objects: ObjectStore;
   name?: string;
@@ -136,6 +138,7 @@ export function createSyncServer(options: ServerOptions) {
   const revisions = new Revisions(db, objects);
   const quotas = new Quotas(db, options.storagePolicy);
   const uploads = new Uploads(db, objects, quotas);
+  const maintenance = new ServerMaintenance(db, objects, options.operationsKey);
   let activeManifests = 0;
   const manifestWaiters: (() => void)[] = [];
   let initialization: Promise<string> | undefined;
@@ -308,6 +311,7 @@ export function createSyncServer(options: ServerOptions) {
       method = request.method;
     await serverId();
     if (method === "OPTIONS") return new Response(null, { status: 204 });
+    if (path.startsWith("/api/ops/")) return maintenance.handle(request, path);
     if (path === "/health" || path === "/api/info")
       return json({
         protocol: syncProtocol,
@@ -1283,6 +1287,7 @@ export function createSyncServer(options: ServerOptions) {
         );
       const requestPath = new URL(request.url).pathname;
       const heavy =
+        requestPath.endsWith("/api/ops/export/metadata") ||
         /\/revisions(?:\/|$)/.test(requestPath) ||
         (request.method === "PATCH" &&
           /\/api\/projects\/[^/]+\/?$/.test(requestPath));
@@ -1305,9 +1310,56 @@ export function createSyncServer(options: ServerOptions) {
           await new Promise<void>((resolve) => manifestWaiters.push(resolve));
         } else activeManifests++;
       }
+      let writeLease: string | undefined;
+      let transfer: ReturnType<typeof deadlineBody> | undefined;
       try {
+        await serverId();
+        const logicalPath = requestPath
+          .slice(basePath.length)
+          .replace(/\/$/, "");
+        const writes =
+          !["GET", "HEAD", "OPTIONS"].includes(request.method) &&
+          !logicalPath.startsWith("/api/ops/") &&
+          !(
+            request.method === "POST" &&
+            (logicalPath === "/api/projects/heads" ||
+              /^\/api\/projects\/[^/]+\/objects\/check$/.test(logicalPath))
+          );
+        const writesObjects =
+          (request.method === "PUT" &&
+            /^\/api\/projects\/[^/]+\/objects\//.test(logicalPath)) ||
+          (request.method === "POST" &&
+            /^\/api\/projects\/[^/]+\/(?:revisions|objects\/uploads\/[^/]+\/complete)$/.test(
+              logicalPath,
+            )) ||
+          (request.method === "PATCH" &&
+            /^\/api\/projects\/[^/]+$/.test(logicalPath));
+        if (writesObjects) writeLease = await maintenance.enterWrite();
+        if (writes && request.body) {
+          transfer = deadlineBody(request.body);
+          request = new Request(request, {
+            body: transfer.body,
+            duplex: "half",
+          } as RequestInit);
+        }
         return secure(await handle(request, context?.source));
       } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message.includes("SHOWAI_READ_ONLY")
+        )
+          return secure(
+            json(
+              {
+                error: {
+                  code: "SERVER_READ_ONLY",
+                  message:
+                    "The server is frozen for a consistent backup. Local changes are retained.",
+                },
+              },
+              503,
+            ),
+          );
         if (error instanceof SyncError) {
           const response = json(
             {
@@ -1355,10 +1407,18 @@ export function createSyncServer(options: ServerOptions) {
           ),
         );
       } finally {
-        if (heavy) {
-          const next = manifestWaiters.shift();
-          if (next) next();
-          else activeManifests--;
+        try {
+          if (transfer) await transfer.dispose();
+        } finally {
+          try {
+            if (writeLease) await maintenance.leaveWrite(writeLease);
+          } finally {
+            if (heavy) {
+              const next = manifestWaiters.shift();
+              if (next) next();
+              else activeManifests--;
+            }
+          }
         }
       }
     },

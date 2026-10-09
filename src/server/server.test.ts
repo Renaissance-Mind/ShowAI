@@ -277,6 +277,13 @@ describe("portable project server with real SQLite and disk storage", () => {
       await hash(invitation.invite),
     ]);
     // Reconstruct the real pre-version schema while preserving its account/session rows.
+    const triggers = await metadata.all<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'freeze_%'",
+    );
+    for (const trigger of triggers)
+      await metadata.run(`DROP TRIGGER ${trigger.name}`);
+    await metadata.run("DROP TABLE server_write_leases");
+    await metadata.run("DROP TABLE server_operations");
     await metadata.run("DROP INDEX revisions_sequence");
     for (const column of [
       "manifest_key",

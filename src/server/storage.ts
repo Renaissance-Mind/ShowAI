@@ -12,6 +12,13 @@ export interface MetadataStore {
   batch(statements: SqlStatement[]): Promise<SqlResult[]>;
 }
 export interface ObjectStore {
+  list(
+    cursor?: string,
+    maximum?: number,
+  ): Promise<{
+    objects: { key: string; bytes: number; uploadedAt: string }[];
+    next?: string;
+  }>;
   get(key: string, maximum?: number): Promise<Uint8Array | null>;
   put(key: string, bytes: Uint8Array): Promise<void>;
   open(
@@ -26,6 +33,28 @@ export interface ObjectStore {
   digest(): StreamDigest;
   remove(key: string): Promise<void>;
 }
+export const dataTables = [
+  "settings",
+  "users",
+  "sessions",
+  "projects",
+  "members",
+  "invites",
+  "invite_acceptances",
+  "objects",
+  "revisions",
+  "request_limits",
+  "audit_events",
+  "storage_reservations",
+  "upload_budgets",
+  "object_uploads",
+  "object_upload_parts",
+] as const;
+export const backupTables = [
+  ...dataTables,
+  "server_operations",
+  "server_write_leases",
+] as const;
 export interface StreamDigest {
   update(bytes: Uint8Array): Promise<void>;
   finish(): Promise<string>;

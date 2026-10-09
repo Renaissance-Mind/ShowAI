@@ -18,6 +18,11 @@ interface WorkerEnvironment {
     batch(statements: Statement[]): Promise<{ meta: { changes: number } }[]>;
   };
   CONTENT: {
+    list(options: { cursor?: string; limit: number }): Promise<{
+      objects: { key: string; size: number; uploaded: Date }[];
+      truncated: boolean;
+      cursor?: string;
+    }>;
     get(key: string): Promise<{
       arrayBuffer(): Promise<ArrayBuffer>;
       body: ReadableStream<Uint8Array>;
@@ -44,6 +49,7 @@ interface WorkerEnvironment {
   SHOWAI_ACCOUNT_LIMIT?: string;
   SHOWAI_STORAGE_POLICY?: string;
   SHOWAI_ALLOWED_ORIGINS?: string;
+  SHOWAI_OPERATIONS_KEY?: string;
 }
 export function workerMetadata(env: WorkerEnvironment): MetadataStore {
   const statement = (sql: string, values: SqlValue[] = []) =>
@@ -88,6 +94,21 @@ function workerDigest(): StreamDigest {
 let activeUploads = 0;
 export function workerObjects(env: WorkerEnvironment): ObjectStore {
   return {
+    async list(cursor, maximum = 100) {
+      const page = await env.CONTENT.list({ cursor, limit: maximum });
+      if (page.truncated && !page.cursor)
+        throw new Error(
+          "Object inventory is truncated without a continuation cursor.",
+        );
+      return {
+        objects: page.objects.map((item) => ({
+          key: item.key,
+          bytes: item.size,
+          uploadedAt: item.uploaded.toISOString(),
+        })),
+        ...(page.truncated ? { next: page.cursor } : {}),
+      };
+    },
     digest: workerDigest,
     async remove(key) {
       await env.CONTENT.delete(key);
@@ -218,6 +239,7 @@ export default {
           : undefined,
         allowedOrigins: env.SHOWAI_ALLOWED_ORIGINS?.split(",").filter(Boolean),
         requirePublicOrigin: true,
+        operationsKey: env.SHOWAI_OPERATIONS_KEY,
       });
       instances.set(env, app);
     }
