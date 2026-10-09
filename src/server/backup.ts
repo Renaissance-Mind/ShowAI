@@ -124,7 +124,9 @@ export async function operationsRequest(
         ...(input === undefined ? {} : { "content-type": "application/json" }),
       },
       body: input === undefined ? undefined : JSON.stringify(input),
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.timeout(
+        path.startsWith("/api/ops/export/object?") ? 600_000 : 120_000,
+      ),
       redirect: "error",
     });
     if (response.ok) return response;
