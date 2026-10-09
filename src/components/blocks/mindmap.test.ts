@@ -117,7 +117,7 @@ describe("mind map document contract", () => {
     ).toBe(false);
     expect(layoutMindmap(data, new Set(["r"])).nodes).toHaveLength(1);
   });
-  it("uses four directions without overlap and connects each branch from the correct face", () => {
+  it("balances natural branches without overlap and connects from the correct face", () => {
     let data = map();
     for (let i = 0; i < 6; i++) data = addMindmapNode(data, "r", `branch${i}`);
     for (let i = 0; i < 48; i++) {
@@ -132,9 +132,7 @@ describe("mind map document contract", () => {
         .filter((node) => node.parentId === "r")
         .map((node) => `${node.axis}:${node.side}`),
     );
-    expect(directions).toEqual(
-      new Set(["horizontal:1", "horizontal:-1", "vertical:1", "vertical:-1"]),
-    );
+    expect(directions).toEqual(new Set(["horizontal:1", "horizontal:-1"]));
     for (const a of graph.nodes)
       for (const b of graph.nodes) {
         if (a === b) continue;
@@ -148,26 +146,44 @@ describe("mind map document contract", () => {
     const root = graph.nodes[0];
     for (const node of graph.nodes.filter((node) => node.parentId === "r")) {
       const path = mindmapConnectionPath(root, node);
-      const endpoint =
-        node.axis === "vertical"
-          ? `${node.x + node.width / 2} ${node.y + (node.side > 0 ? 0 : node.height)}`
-          : `${node.x + (node.side > 0 ? 0 : node.width)} ${node.y + node.height / 2}`;
+      const endpoint = `${node.x + (node.side > 0 ? 0 : node.width)} ${node.y + node.height / 2}`;
       expect(path.endsWith(endpoint)).toBe(true);
-      if (node.axis === "vertical") {
-        const lane = path.match(/L ([\d.-]+) ([\d.-]+)/)!;
-        const horizontal = graph.nodes.filter(
-          (item) => item.axis === "horizontal",
-        );
-        expect(Number(lane[1])).toBe(root.x + root.width / 2);
-        expect(
-          node.side > 0
-            ? Number(lane[2]) >
-                Math.max(...horizontal.map((item) => item.y + item.height))
-            : Number(lane[2]) < Math.min(...horizontal.map((item) => item.y)),
-        ).toBe(true);
-      }
       expect(node.depth).toBe(1);
     }
+  });
+  it("matches the original natural layout and balances by subtree size", () => {
+    const graph = layoutMindmap(map());
+    expect({ width: graph.width, height: graph.height }).toEqual({
+      width: 980,
+      height: 110,
+    });
+    expect(
+      graph.nodes.map(({ id, x, y, side }) => ({ id, x, y, side })),
+    ).toEqual([
+      { id: "r", x: 276, y: 32, side: 0 },
+      { id: "a", x: 520, y: 32, side: 1 },
+      { id: "a1", x: 764, y: 32, side: 1 },
+      { id: "b", x: 32, y: 32, side: -1 },
+    ]);
+    let data: MindmapData = {
+      nodes: [
+        { id: "r", parentId: null, label: "中心" },
+        { id: "heavy", parentId: "r", label: "较大分支" },
+      ],
+    };
+    for (let i = 0; i < 4; i++)
+      data = addMindmapNode(data, "heavy", `detail${i}`);
+    for (let i = 0; i < 3; i++) data = addMindmapNode(data, "r", `light${i}`);
+    const branches = layoutMindmap({ ...data, layout: "radial" }).nodes.filter(
+      (node) => node.parentId === "r",
+    );
+    expect(branches.map((node) => [node.id, node.side])).toEqual([
+      ["heavy", 1],
+      ["light0", -1],
+      ["light1", -1],
+      ["light2", -1],
+    ]);
+    expect(branches.every((node) => node.axis === "horizontal")).toBe(true);
   });
   it("lays out every descendant to the right or left while preserving content and branch colors", () => {
     const data = addMindmapNode(addMindmapNode(map(), "r", "c"), "c", "c1");

@@ -18,7 +18,7 @@ export interface PositionedMindmapNode extends MindmapNode {
   width: number;
   height: number;
   side: number;
-  axis: "horizontal" | "vertical";
+  axis: "horizontal";
   depth: number;
   color: number;
 }

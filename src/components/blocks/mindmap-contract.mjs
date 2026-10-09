@@ -128,14 +128,13 @@ export function promoteMindmapNode(data, id) {
   });
   return validateMindmapData({ ...data, nodes });
 }
-/** Keep branch rectangles disjoint in all four directions, including long titles. */
+/** Two balanced branch banks; every descendant keeps its first branch's color and side. */
 export function layoutMindmap(data, collapsed = new Set()) {
   const root = data.nodes.find((node) => node.parentId === null);
   const children = new Map(
     data.nodes.map((node) => [node.id, mindmapChildren(data, node.id)]),
   );
-  const heights = new Map(),
-    widths = new Map();
+  const heights = new Map();
   const ownHeight = (node) =>
     Math.max(
       46,
@@ -152,35 +151,33 @@ export function layoutMindmap(data, collapsed = new Set()) {
     collapsed.has(node.id) ? [] : children.get(node.id);
   const measure = (node) => {
     const list = visibleChildren(node);
-    list.forEach(measure);
-    heights.set(
-      node.id,
-      Math.max(
-        ownHeight(node),
-        list.reduce((sum, child) => sum + heights.get(child.id), 0) +
-          Math.max(0, list.length - 1) * 18,
-      ),
+    const height = Math.max(
+      ownHeight(node),
+      list.reduce((sum, child) => sum + measure(child), 0) +
+        Math.max(0, list.length - 1) * 18,
     );
-    widths.set(
-      node.id,
-      Math.max(
-        184,
-        list.reduce((sum, child) => sum + widths.get(child.id), 0) +
-          Math.max(0, list.length - 1) * 24,
-      ),
-    );
+    heights.set(node.id, height);
+    return height;
   };
   measure(root);
   const single = data.layout === "tree";
-  const banks = [[], [], [], []];
+  const banks = [[], []];
+  const totals = [0, 0];
   visibleChildren(root).forEach((node, index) => {
-    banks[single ? 0 : index % 4].push({ node, color: index % 6 });
+    const bank = single ? 0 : totals[0] <= totals[1] ? 0 : 1;
+    banks[bank].push({ node, color: index % 6 });
+    totals[bank] += heights.get(node.id) + 18;
   });
+  const height =
+    Math.max(
+      ownHeight(root),
+      ...totals.map((value) => Math.max(0, value - 18)),
+    ) + 64;
   const placed = [
     {
       ...root,
       x: 0,
-      y: -ownHeight(root) / 2,
+      y: height / 2 - ownHeight(root) / 2,
       width: 184,
       height: ownHeight(root),
       side: 0,
@@ -189,7 +186,7 @@ export function layoutMindmap(data, collapsed = new Set()) {
       color: -1,
     },
   ];
-  const walkHorizontal = (node, depth, top, side, color) => {
+  const walk = (node, depth, top, side, color) => {
     placed.push({
       ...node,
       x: side * depth * 244,
@@ -207,91 +204,34 @@ export function layoutMindmap(data, collapsed = new Set()) {
       Math.max(0, list.length - 1) * 18;
     let cursor = top + (heights.get(node.id) - total) / 2;
     list.forEach((child) => {
-      walkHorizontal(child, depth + 1, cursor, side, color);
+      walk(child, depth + 1, cursor, side, color);
       cursor += heights.get(child.id) + 18;
     });
   };
-  banks.slice(0, 2).forEach((bank, index) => {
-    const total =
-      bank.reduce((sum, { node }) => sum + heights.get(node.id), 0) +
-      Math.max(0, bank.length - 1) * 18;
-    let cursor = -total / 2;
-    const side = single
-      ? data.direction === "left"
-        ? -1
-        : 1
-      : index === 0
-        ? 1
-        : -1;
+  banks.forEach((bank, index) => {
+    let cursor = (height - Math.max(0, totals[index] - 18)) / 2;
     bank.forEach(({ node, color }) => {
-      walkHorizontal(node, 1, cursor, side, color);
+      const side = single
+        ? data.direction === "left"
+          ? -1
+          : 1
+        : index === 0
+          ? 1
+          : -1;
+      walk(node, 1, cursor, side, color);
       cursor += heights.get(node.id) + 18;
     });
   });
-  const lower = Math.max(...placed.map((node) => node.y + node.height)) + 60;
-  const upper = Math.min(...placed.map((node) => node.y)) - 60;
-  const rank = Math.max(...data.nodes.map(ownHeight)) + 60;
-  const walkVertical = (node, depth, left, side, color) => {
-    placed.push({
-      ...node,
-      x: left + (widths.get(node.id) - 184) / 2,
-      y:
-        side > 0
-          ? lower + (depth - 1) * rank
-          : upper - ownHeight(node) - (depth - 1) * rank,
-      width: 184,
-      height: ownHeight(node),
-      side,
-      axis: "vertical",
-      depth,
-      color,
-    });
-    const list = visibleChildren(node);
-    const total =
-      list.reduce((sum, child) => sum + widths.get(child.id), 0) +
-      Math.max(0, list.length - 1) * 24;
-    let cursor = left + (widths.get(node.id) - total) / 2;
-    list.forEach((child) => {
-      walkVertical(child, depth + 1, cursor, side, color);
-      cursor += widths.get(child.id) + 24;
-    });
-  };
-  banks.slice(2).forEach((bank, index) => {
-    const total =
-      bank.reduce((sum, { node }) => sum + widths.get(node.id), 0) +
-      Math.max(0, bank.length - 1) * 24;
-    let cursor = 92 - total / 2;
-    bank.forEach(({ node, color }) => {
-      walkVertical(node, 1, cursor, index === 0 ? 1 : -1, color);
-      cursor += widths.get(node.id) + 24;
-    });
-  });
-  const minX = Math.min(...placed.map((node) => node.x)),
-    minY = Math.min(...placed.map((node) => node.y));
+  const minX = Math.min(...placed.map((node) => node.x));
+  const width =
+    Math.max(...placed.map((node) => node.x + node.width)) - minX + 64;
   return {
-    nodes: placed.map((node) => ({
-      ...node,
-      x: node.x - minX + 32,
-      y: node.y - minY + 32,
-    })),
-    width: Math.max(...placed.map((node) => node.x + node.width)) - minX + 64,
-    height: Math.max(...placed.map((node) => node.y + node.height)) - minY + 64,
+    nodes: placed.map((node) => ({ ...node, x: node.x - minX + 32 })),
+    width,
+    height,
   };
 }
 export function mindmapConnectionPath(parent, node) {
-  if (node.axis === "vertical") {
-    const x1 = parent.x + parent.width / 2,
-      x2 = node.x + node.width / 2;
-    const y1 = parent.y + (node.side > 0 ? parent.height : 0),
-      y2 = node.y + (node.side > 0 ? 0 : node.height);
-    if (parent.depth === 0) {
-      // Leave the horizontal branch banks through the center corridor first.
-      const lane = y2 + (node.side > 0 ? -30 : 30);
-      return `M ${x1} ${y1} L ${x1} ${lane} C ${x1} ${lane}, ${x2} ${lane}, ${x2} ${y2}`;
-    }
-    const middle = (y1 + y2) / 2;
-    return `M ${x1} ${y1} C ${x1} ${middle}, ${x2} ${middle}, ${x2} ${y2}`;
-  }
   const x1 = parent.x + (node.side > 0 ? parent.width : 0),
     x2 = node.x + (node.side > 0 ? 0 : node.width);
   const y1 = parent.y + parent.height / 2,
