@@ -9,7 +9,7 @@ description: 通过 ShowAI MCP 创作、修改、展示或导出页面、报告�
 
 ## 正式页面
 
-先调用 `guide({topic:"authoring"})`；构造容器时读 containers，内部正文时读 document。首次选择组件用 `catalog_list({kind:"component",projectId})` 获取全量名字、摘要、场景，省略 query/limit/cursor；选中后取 guide/schema/examples。已有组件或组合足够时直接复用；存在明确的表达或交互缺口时进入 [create-component](../create-component/SKILL.md)。需要可复用模板时进入 [create-template](../create-template/SKILL.md)；应用已有模板则直接用 template_apply。
+先调用 `guide({topic:"authoring"})`；构造容器时读 containers，内部正文时读 document。首次选择组件用 `catalog_list({kind:"component",projectId})` 获取全部内置组件与当前项目组件的名字、摘要、场景，省略 scope/query/limit/cursor；选中后沿用返回的 scope/version/integrity 取 guide/schema/examples，准确区分同名组件。已有组件或组合足够时直接复用；存在明确的表达或交互缺口时进入 [create-component](../create-component/SKILL.md)。需要可复用模板时进入 [create-template](../create-template/SKILL.md)；应用已有模板则直接用 template_apply。
 
 普通报告保留一份 Page，用章节、区域和嵌套容器组织。用户要求网站或多个独立文档时才拆分页面。后续修改继续使用原 pageId。新页面用 page_create；修改前 page_read完整源数据，保留 hash、revision与稳定节点 ID，再用 page_apply或page_save。
 

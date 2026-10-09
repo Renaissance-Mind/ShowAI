@@ -65,7 +65,7 @@ showai catalog describe chart --kind component --view examples --project PROJECT
 
 ### Catalog results
 
-A list returns `{ items, total, limit, nextCursor, next }`. By default it returns all matching names, descriptions and scenarios, plus IDs, scopes and available revision identities for detail lookup. Omit query, limit and cursor for the complete accessible catalog. Public catalog listing has the same full-list default. Explicit limits from 1 to 50 opt into pagination; pass the returned cursor with the same limit, query and scope to continue. If the catalog changes, restart without a cursor. Catalog content enters Agent context when the tool is called, not automatically at session startup.
+A list returns `{ items, total, limit, nextCursor, next }`. By default it returns all matching names, descriptions and scenarios, plus IDs, scopes and available revision identities for detail lookup. Omit query, limit and cursor for the complete accessible catalog. Component discovery with no scope returns all built-ins plus the selected project’s components (built-ins only when no project is selected). Use an explicit global, published or all scope to include shared components; template discovery retains its all-scope default. Preserve the returned scope/version/integrity when describing an entry so same-ID components remain unambiguous. Public catalog listing returns all public entries by default. Explicit limits from 1 to 50 opt into pagination; pass the returned cursor with the same limit, query and scope to continue. If the catalog changes, restart without a cursor. Catalog content enters Agent context when the tool is called, not automatically at session startup.
 
 ### Scope and exact versions
 

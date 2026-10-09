@@ -9,6 +9,7 @@ import { createMcpServer } from "./mcp";
 import { openLibrary } from "../core/open-library";
 import { syncManager } from "../sync/manager";
 import { listBuiltinComponents } from "../core/catalog";
+import { AgentService } from "./service";
 
 let root: string;
 const connections: {
@@ -256,4 +257,97 @@ test("catalog discovery returns all compact entries, with optional pagination be
     view: "schema",
   });
   expect(details.schema.properties.series).toBeDefined();
+});
+
+test("default component discovery combines built-ins and only the selected project", async () => {
+  const client = await connect(createLibraryMcpServer({ root }));
+  const project = await call(client, "project_create", {
+    name: "Selected catalog",
+  });
+  const other = await call(client, "project_create", { name: "Other catalog" });
+  const { source } = await call(client, "catalog_describe", {
+    projectId: project.id,
+    id: "text",
+    scope: "builtin",
+    view: "source",
+    file: "*",
+  });
+  const own = await call(client, "component_save", {
+    projectId: project.id,
+    source: { ...source, manifest: { ...source.manifest, version: "9.0.0" } },
+  });
+  const shared = await call(client, "component_save", {
+    projectId: other.id,
+    source: {
+      ...source,
+      manifest: { ...source.manifest, id: "shared-catalog-note" },
+    },
+  });
+  await new AgentService({ root }).promote(other.id, shared.ref, "global");
+  const args = { projectId: project.id, kind: "component" };
+  const listing = await call(client, "catalog_list", args);
+  expect(listing.total).toBe(listBuiltinComponents().length + 1);
+  expect(listing.nextCursor).toBeNull();
+  expect(listing.items.filter((item: any) => item.scope === "project")).toEqual(
+    [
+      expect.objectContaining({
+        id: "text",
+        version: "9.0.0",
+        integrity: own.integrity,
+      }),
+    ],
+  );
+  expect(listing.items.filter((item: any) => item.id === "text")).toHaveLength(
+    2,
+  );
+  expect(
+    listing.items.every((item: any) =>
+      ["builtin", "project"].includes(item.scope),
+    ),
+  ).toBe(true);
+  expect(
+    (
+      await call(client, "catalog_list", {
+        ...args,
+        query: "shared-catalog-note",
+      })
+    ).items,
+  ).toEqual([]);
+  const first = await call(client, "catalog_list", { ...args, limit: 50 });
+  const service = new AgentService({ root });
+  const cliPage = await service.catalogList({
+    projectId: project.id,
+    kind: "component",
+    limit: 50,
+  });
+  expect(cliPage.next).not.toContain("--scope all");
+  const last = await call(client, "catalog_list", {
+    ...args,
+    limit: 50,
+    cursor: first.nextCursor,
+  });
+  expect([...first.items, ...last.items]).toEqual(listing.items);
+  const explicit = await call(client, "catalog_list", {
+    ...args,
+    scope: "all",
+  });
+  expect(explicit.items).toContainEqual(
+    expect.objectContaining({ id: "shared-catalog-note", scope: "global" }),
+  );
+  expect(
+    explicit.items.filter((item: any) => item.scope === "project"),
+  ).toHaveLength(1);
+  expect(
+    (
+      await new AgentService({ root }).catalogList({ kind: "component" })
+    ).items.every((item) => item.scope === "builtin"),
+  ).toBe(true);
+  const detail = await call(client, "catalog_describe", {
+    projectId: project.id,
+    id: "text",
+    scope: "project",
+    version: own.version,
+    integrity: own.integrity,
+  });
+  expect(detail.integrity).toBe(own.integrity);
 });

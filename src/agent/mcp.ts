@@ -384,7 +384,7 @@ export function createMcpServer(options: {
     "catalog_list",
     {
       description:
-        "Return all accessible component/template names, descriptions and scenarios by default, with identities for detail lookup. Omit query/limit/cursor for the full catalog; explicit limit/cursor opts into pagination. Schemas, examples and source require catalog_describe.",
+        "Return all component/template names, descriptions and scenarios, with identities for detail lookup. Components default to built-ins plus the selected project's components; explicitly set scope to query global/published/all. Omit query/limit/cursor for the full result; explicit limit/cursor opts into pagination. Schemas, examples and source require catalog_describe.",
       inputSchema: {
         kind: z.enum(["component", "template"]).optional(),
         scope: scopeSchema.optional(),

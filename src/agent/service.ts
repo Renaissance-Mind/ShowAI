@@ -261,6 +261,7 @@ export class AgentService {
   ) {
     const projectId = this.catalogProject(input.projectId);
     const scope = input.scope ?? "all";
+    const componentScope = input.scope ?? (projectId ? "project" : "builtin");
     const query = input.query?.trim().toLocaleLowerCase();
     const matches = (item: object) =>
       !query || catalogSearchText(item).includes(query);
@@ -273,7 +274,11 @@ export class AgentService {
     const components =
       input.kind === "template"
         ? []
-        : (await listComponents(this.store.root, projectId, { scope }))
+        : (
+            await listComponents(this.store.root, projectId, {
+              scope: componentScope,
+            })
+          )
             .filter(matches)
             .map((item) => summarizeCatalog("component", item, projectId));
     const templates =
@@ -302,7 +307,12 @@ export class AgentService {
     const result = catalogPage(all.map(catalogEntry), {
       limit: input.limit,
       cursor: input.cursor,
-      key: { projectId, kind: input.kind, scope, query },
+      key: {
+        projectId,
+        kind: input.kind,
+        scope: input.scope ?? "default",
+        query,
+      },
     });
     return {
       ...result,
@@ -311,8 +321,7 @@ export class AgentService {
             "showai catalog list",
             ...(projectId ? ["--project", shellToken(projectId)] : []),
             ...(input.kind ? ["--kind", input.kind] : []),
-            "--scope",
-            scope,
+            ...(input.scope ? ["--scope", input.scope] : []),
             ...(input.query ? ["--query", shellToken(input.query)] : []),
             "--limit",
             String(result.limit),
