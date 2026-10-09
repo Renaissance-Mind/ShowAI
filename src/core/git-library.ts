@@ -503,6 +503,38 @@ export class GitLibrary {
   async readFile(path: string, revision?: string): Promise<Buffer> {
     return (await this.readFiles([path], revision)).get(path)!;
   }
+  /** One-time migration reads immutable encoded objects without reserializing them. */
+  async encodedFiles(
+    paths: string[],
+    revision: string,
+  ): Promise<Map<string, Buffer>> {
+    const tree = new Map(
+      (await this.tree(revision)).map((entry) => [entry.path, entry.oid]),
+    );
+    const ids = paths.map((path) => {
+      const id = tree.get(assertPath(path));
+      if (!id)
+        throw new CoreError(
+          "NOT_FOUND",
+          `Migration content is absent: ${path}`,
+        );
+      return id;
+    });
+    const objects = await this.blobs([...new Set(ids)]);
+    return new Map(paths.map((path) => [path, objects.get(tree.get(path)!)!]));
+  }
+  async migrationRevisions(revision: string): Promise<string[]> {
+    if (!oid(revision))
+      throw new CoreError("INVALID_DATA", "Invalid migration head.");
+    const values = (await this.command(["rev-list", "--reverse", revision]))
+      .toString("utf8")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (values.some((value) => !oid(value)))
+      throw new CoreError("INVALID_DATA", "Invalid migration revision list.");
+    return values;
+  }
 
   async resourceRevision(
     path: string,

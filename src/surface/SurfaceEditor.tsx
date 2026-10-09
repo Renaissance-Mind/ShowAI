@@ -23,6 +23,7 @@ import {
 import type { ContentRenderProps } from "./SurfaceContent";
 import { toPageEditor, fromPageEditor } from "./page-content";
 import { PageModuleContext, pageEditorNodes } from "./PageEditorNodes";
+import { mergePageContent } from "../core/page-merge-model";
 
 const contentKey = (document: ShowDocument) =>
   JSON.stringify([
@@ -87,7 +88,21 @@ export default function SurfaceEditor({
         return;
       }
       geometrySettlement.current.generation++;
-      history.current = { past: [], future: [], group: "", at: 0 };
+      if (before.id !== document.id)
+        history.current = { past: [], future: [], group: "", at: 0 };
+      else {
+        const rebase = (snapshot: ContainerDocument) =>
+          mergePageContent(before, document, snapshot, "history")
+            .document as ContainerDocument;
+        history.current.past = history.current.past
+          .map(rebase)
+          .filter((snapshot) => contentKey(snapshot) !== contentKey(document));
+        history.current.future = history.current.future
+          .map(rebase)
+          .filter((snapshot) => contentKey(snapshot) !== contentKey(document));
+        history.current.group = "";
+        history.current.at = 0;
+      }
       refresh((value) => value + 1);
     }
     current.current = document;

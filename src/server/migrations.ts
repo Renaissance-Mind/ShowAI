@@ -1,6 +1,11 @@
-import { schema, dataTables, type MetadataStore } from "./storage";
+import {
+  schema,
+  legacyDataTables,
+  accountTables,
+  type MetadataStore,
+} from "./storage";
 
-export const schemaVersion = 7;
+export const schemaVersion = 8;
 export const migrations = [
   {
     version: 1,
@@ -71,7 +76,7 @@ export const migrations = [
       "CREATE TABLE server_operations(id INTEGER PRIMARY KEY CHECK(id=1),state TEXT NOT NULL CHECK(state IN ('running','frozen')),epoch TEXT NOT NULL,frozen_at TEXT)",
       "INSERT INTO server_operations VALUES(1,'running','',NULL)",
       "CREATE TABLE server_write_leases(id TEXT PRIMARY KEY,started_at TEXT NOT NULL)",
-      ...dataTables.flatMap((table) =>
+      ...legacyDataTables.flatMap((table) =>
         ["INSERT", "UPDATE", "DELETE"].map(
           (operation) =>
             `CREATE TRIGGER freeze_${table}_${operation.toLowerCase()} BEFORE ${operation} ON ${table} WHEN (SELECT state FROM server_operations WHERE id=1)='frozen' BEGIN SELECT RAISE(ABORT,'SHOWAI_READ_ONLY'); END`,
@@ -86,7 +91,7 @@ export const migrations = [
     statements: [
       "ALTER TABLE server_operations ADD COLUMN maintenance_owner TEXT",
       "ALTER TABLE server_write_leases ADD COLUMN kind TEXT NOT NULL DEFAULT 'object'",
-      ...dataTables.flatMap((table) =>
+      ...legacyDataTables.flatMap((table) =>
         ["INSERT", "UPDATE", "DELETE"].flatMap((operation) => [
           `DROP TRIGGER freeze_${table}_${operation.toLowerCase()}`,
           `CREATE TRIGGER freeze_${table}_${operation.toLowerCase()} BEFORE ${operation} ON ${table} WHEN COALESCE((SELECT state FROM server_operations WHERE id=1),'frozen')='frozen' AND (SELECT maintenance_owner FROM server_operations WHERE id=1) IS NULL BEGIN SELECT RAISE(ABORT,'SHOWAI_READ_ONLY'); END`,
@@ -94,6 +99,35 @@ export const migrations = [
       ),
       "UPDATE server_operations SET maintenance_owner='schema-upgrade' WHERE state='frozen'",
       "INSERT INTO settings(key,value) VALUES('schema_version','7') ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+      "UPDATE server_operations SET maintenance_owner=NULL WHERE maintenance_owner='schema-upgrade'",
+    ],
+  },
+  {
+    version: 8,
+    name: "federated_accounts",
+    statements: [
+      "ALTER TABLE sessions ADD COLUMN credential_kind TEXT NOT NULL DEFAULT 'session'",
+      "ALTER TABLE sessions ADD COLUMN origin_server TEXT",
+      "ALTER TABLE sessions ADD COLUMN origin_user TEXT",
+      "ALTER TABLE sessions ADD COLUMN origin_generation TEXT",
+      "CREATE INDEX sessions_origin ON sessions(user_id,origin_server,origin_user)",
+      "CREATE TABLE account_identities(user_id TEXT PRIMARY KEY REFERENCES users(id),generation TEXT NOT NULL,public_key TEXT NOT NULL,private_key TEXT NOT NULL)",
+      "CREATE TABLE account_peers(user_id TEXT NOT NULL REFERENCES users(id),peer_server_id TEXT NOT NULL,peer_user_id TEXT NOT NULL,descriptor TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN('active','removed')),updated_at INTEGER NOT NULL,change_id TEXT NOT NULL,PRIMARY KEY(user_id,peer_server_id))",
+      "CREATE TABLE account_grant_nonces(digest TEXT PRIMARY KEY,expires_at INTEGER NOT NULL)",
+      "CREATE INDEX account_grant_nonces_expiry ON account_grant_nonces(expires_at)",
+      "CREATE TABLE account_resources(user_id TEXT NOT NULL REFERENCES users(id),id TEXT NOT NULL,config TEXT NOT NULL,secret TEXT,version TEXT NOT NULL,updated_at TEXT NOT NULL,refresh_lease TEXT,refresh_started_at INTEGER,publication_id TEXT,request_hash TEXT,PRIMARY KEY(user_id,id))",
+      "CREATE TABLE login_identities(provider TEXT NOT NULL,subject TEXT NOT NULL,user_id TEXT NOT NULL REFERENCES users(id),email TEXT,created_at TEXT NOT NULL,PRIMARY KEY(provider,subject))",
+      "CREATE INDEX login_identities_user ON login_identities(user_id)",
+      "CREATE TABLE login_flows(id TEXT PRIMARY KEY,provider TEXT NOT NULL,state_digest TEXT NOT NULL UNIQUE,poll_digest TEXT NOT NULL,expires_at INTEGER NOT NULL,status TEXT NOT NULL,secret TEXT NOT NULL,claimed INTEGER NOT NULL DEFAULT 0)",
+      "CREATE INDEX login_flows_expiry ON login_flows(expires_at)",
+      "UPDATE server_operations SET maintenance_owner='schema-upgrade' WHERE state='frozen'",
+      ...accountTables.flatMap((table) =>
+        ["INSERT", "UPDATE", "DELETE"].map(
+          (operation) =>
+            `CREATE TRIGGER freeze_${table}_${operation.toLowerCase()} BEFORE ${operation} ON ${table} WHEN COALESCE((SELECT state FROM server_operations WHERE id=1),'frozen')='frozen' AND (SELECT maintenance_owner FROM server_operations WHERE id=1) IS NULL BEGIN SELECT RAISE(ABORT,'SHOWAI_READ_ONLY'); END`,
+        ),
+      ),
+      "INSERT INTO settings(key,value) VALUES('schema_version','8') ON CONFLICT(key) DO UPDATE SET value=excluded.value",
       "UPDATE server_operations SET maintenance_owner=NULL WHERE maintenance_owner='schema-upgrade'",
     ],
   },

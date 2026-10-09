@@ -15,7 +15,7 @@ import { createInterface } from "node:readline";
 import { Readable } from "node:stream";
 import { SQLiteMetadata, DiskObjects } from "./node-storage";
 import { prepareMetadata, schemaVersion } from "./migrations";
-import { backupTables, type SqlValue, type SqlStatement } from "./storage";
+import { backupTablesFor, type SqlValue, type SqlStatement } from "./storage";
 import {
   ServerMaintenance,
   operationObjectKey,
@@ -220,7 +220,7 @@ export async function exportServerBackup(input: {
     await pause(1000);
   }
   const epoch = encodeURIComponent(progress.frozen.epoch);
-  for (const table of backupTables) {
+  for (const table of backupTablesFor(progress.schemaVersion ?? 6)) {
     const saved = progress.tables[table];
     if (saved) {
       const actual = await fileHash(join(destination, saved.file));
@@ -398,12 +398,14 @@ export async function readBackupDescriptor(
   ) as BackupDescriptor;
   if (
     descriptor.format !== "showai-server-backup-v1" ||
-    ![6, schemaVersion].includes(descriptor.schemaVersion) ||
+    !Number.isInteger(descriptor.schemaVersion) ||
+    descriptor.schemaVersion < 6 ||
+    descriptor.schemaVersion > schemaVersion ||
     descriptor.frozen?.state !== "frozen" ||
     descriptor.frozen.activeWrites !== 0
   )
     throw new Error("Unsupported or incomplete server backup.");
-  for (const table of backupTables) {
+  for (const table of backupTablesFor(descriptor.schemaVersion)) {
     const receipt = descriptor.tables[table];
     if (
       receipt?.file !== `${table}.ndjson` ||
@@ -434,12 +436,12 @@ export async function loadBackupMetadata(
 ) {
   await prepareMetadata(db, true, descriptor.schemaVersion);
   await db.batch(
-    [...backupTables]
+    [...backupTablesFor(descriptor.schemaVersion)]
       .reverse()
       .filter((table) => table !== "server_operations")
       .map((table) => ({ sql: `DELETE FROM ${table}` })),
   );
-  for (const table of backupTables) {
+  for (const table of backupTablesFor(descriptor.schemaVersion)) {
     if (table === "server_operations")
       await db.run("DELETE FROM server_operations");
     const columns = (

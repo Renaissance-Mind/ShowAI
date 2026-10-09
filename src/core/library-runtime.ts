@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { GitLibrary } from "./git-library";
+import { ContentLibrary as GitLibrary } from "./content-library";
 import {
   changeContext,
   libraryMutations,

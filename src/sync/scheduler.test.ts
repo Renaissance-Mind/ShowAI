@@ -5,7 +5,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SyncManager } from "./manager";
-import { GitLibrary } from "../core/git-library";
+import { ContentLibrary as GitLibrary } from "../core/content-library";
 import { FileStore } from "../core/store";
 import { startSyncServer } from "../server/node";
 import { eventCapability } from "./events";

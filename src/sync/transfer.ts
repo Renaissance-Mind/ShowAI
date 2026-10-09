@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { GitLibrary } from "../core/git-library";
+import { ContentLibrary as GitLibrary } from "../core/content-library";
 import { LibraryOperations } from "../core/library-operations";
 import { encodeFile, decodeFile } from "../core/history-codec";
 import type {
@@ -441,6 +441,7 @@ export async function importProjectHistory(
   finalFiles: Map<string, Buffer>,
   expectedHead: string | null,
   remoteProjectId = projectId,
+  singleRevision = false,
 ) {
   const library = new GitLibrary(home);
   const tree = await library.tree(expectedHead ?? undefined);
@@ -525,6 +526,33 @@ export async function importProjectHistory(
   // Validate the complete sequence before replay; spool bytes so history size does not
   // multiply memory use. A rejected later record must not leave earlier writes behind.
   const parent = join(home, "local", "sync");
+  if (singleRevision) {
+    const one: { record: SnapshotRecord; files: Map<string, Buffer> }[] = [];
+    for await (const entry of entries) {
+      if (one.length)
+        throw new CoreError(
+          "INVALID_DATA",
+          "A single-revision import contains an unexpected later record.",
+        );
+      validateSnapshot(entry.record.snapshot, remoteProjectId);
+      if (!(await validSnapshotRecord(entry.record)))
+        throw new CoreError(
+          "INVALID_DATA",
+          "Imported snapshot integrity is invalid.",
+        );
+      await validate(entry.files);
+      one.push(entry);
+    }
+    await validate(finalFiles);
+    return replayProjectHistory(
+      home,
+      projectId,
+      serverId,
+      one,
+      finalFiles,
+      expectedHead,
+    );
+  }
   await mkdir(parent, { recursive: true });
   const spool = await mkdtemp(join(parent, "validated-import-"));
   let count = 0;

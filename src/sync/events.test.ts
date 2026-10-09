@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SyncManager } from "./manager";
-import { GitLibrary } from "../core/git-library";
+import { ContentLibrary as GitLibrary } from "../core/content-library";
 import { FileStore } from "../core/store";
 import { startSyncServer } from "../server/node";
 import { hash } from "./protocol";
@@ -24,6 +24,12 @@ async function until(check: () => Promise<boolean>, maximum = 15_000) {
   }
 }
 async function fixture() {
+  const diagnostics: {
+    client: string;
+    stage: string;
+    at: number;
+    durationMs?: number;
+  }[] = [];
   const root = await mkdtemp(join(tmpdir(), "showai-realtime-"));
   cleanup.push(() => rm(root, { recursive: true, force: true }));
   const external = process.env.SHOWAI_SYNC_TEST_URL;
@@ -46,7 +52,17 @@ async function fixture() {
     const home = join(root, name);
     await new GitLibrary(home).initialize();
     const store = new FileStore(home),
-      manager = new SyncManager(home);
+      manager = new SyncManager(
+        home,
+        process.env.SHOWAI_REALTIME_TRACE
+          ? {
+              trace: (event) => {
+                if (diagnostics.length < 10000)
+                  diagnostics.push({ client: name, ...event });
+              },
+            }
+          : {},
+      );
     cleanup.push(() => manager.stop());
     const connection = await manager.connect({
       url,
@@ -112,22 +128,43 @@ async function fixture() {
       (status) => status.scheduler.pushReady === 1,
     ),
   );
-  return { root, url, clients, owner, editor, viewer, project, pageId };
+  return {
+    root,
+    url,
+    clients,
+    owner,
+    editor,
+    viewer,
+    project,
+    pageId,
+    diagnostics,
+  };
 }
 
 test("existing saved connections negotiate the new push capability on startup", async () => {
   const { editor } = await fixture();
   await editor.manager.stop();
   const configuration = await editor.manager.configuration();
-  configuration.connections[0].capabilities = configuration.connections[0].capabilities?.filter((value) => value !== eventCapability);
-  await writeFile(join(editor.home, "local/sync/config.json"), JSON.stringify(configuration));
+  configuration.connections[0].capabilities =
+    configuration.connections[0].capabilities?.filter(
+      (value) => value !== eventCapability,
+    );
+  await writeFile(
+    join(editor.home, "local/sync/config.json"),
+    JSON.stringify(configuration),
+  );
   editor.manager.start();
-  await until(async () => (await editor.manager.status()).scheduler.pushReady === 1);
-  expect((await editor.manager.configuration()).connections[0].capabilities).toContain(eventCapability);
+  await until(
+    async () => (await editor.manager.status()).scheduler.pushReady === 1,
+  );
+  expect(
+    (await editor.manager.configuration()).connections[0].capabilities,
+  ).toContain(eventCapability);
 }, 180_000);
 
 test("published edits reach complete independent libraries over the actual push channel", async () => {
-  const { owner, editor, viewer, project, pageId } = await fixture();
+  const { owner, editor, viewer, project, pageId, diagnostics } =
+    await fixture();
   const timings: number[] = [];
   for (let index = 0; index < 20; index++) {
     const record = await owner.store.readPage(project.id, pageId),
@@ -171,6 +208,11 @@ test("published edits reach complete independent libraries over the actual push 
       JSON.stringify(receipt, null, 2),
     );
   }
+  if (process.env.SHOWAI_REALTIME_TRACE)
+    await writeFile(
+      process.env.SHOWAI_REALTIME_TRACE,
+      JSON.stringify(diagnostics, null, 2),
+    );
   expect(receipt.p95Ms).toBeLessThanOrEqual(
     Number(process.env.SHOWAI_REALTIME_MAX_MS ?? 1500),
   );
@@ -334,9 +376,18 @@ test("open sockets hide private projects and revoke project access and device se
   expect(
     (await editor.store.readPage(project.id, pageId)).document.title,
   ).not.toBe("Only authorized peers");
-  const restoredInvite = await owner.manager.manage(owner.connection.id, project.id, "invite", { role: "editor" }) as { url: string };
+  const restoredInvite = (await owner.manager.manage(
+    owner.connection.id,
+    project.id,
+    "invite",
+    { role: "editor" },
+  )) as { url: string };
   await editor.manager.join(editor.connection.id, restoredInvite.url);
-  await until(async () => (await editor.store.readPage(project.id, pageId)).document.title === "Only authorized peers");
+  await until(
+    async () =>
+      (await editor.store.readPage(project.id, pageId)).document.title ===
+      "Only authorized peers",
+  );
   const closed = new Promise<number>((done) =>
     socket.addEventListener("close", (event) => done(event.code), {
       once: true,

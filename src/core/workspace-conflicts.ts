@@ -8,7 +8,7 @@ import {
   readLibraryBytes,
   safeLibraryPath,
 } from "./library-files";
-import type { GitLibrary } from "./git-library";
+import type { ContentLibrary as GitLibrary } from "./content-library";
 
 export interface WorkspaceConflict {
   format: "showai-workspace-conflict";
@@ -44,7 +44,12 @@ export function workspaceHash(
 
 /** External content stays in place and is independently retained before resolution. */
 export class WorkspaceProtection {
-  constructor(readonly library: GitLibrary) {}
+  constructor(
+    readonly library: Pick<
+      GitLibrary,
+      "root" | "workspace" | "tree" | "readFiles"
+    >,
+  ) {}
 
   async list(path?: string): Promise<WorkspaceConflict[]> {
     const root = join(this.library.root, "local", "conflicts");

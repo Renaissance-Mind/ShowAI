@@ -22,7 +22,12 @@ import { Uploads } from "./uploads";
 import { ServerMaintenance } from "./maintenance";
 import { schemaVersion } from "./migrations";
 import { ProjectEvents, type EventPeer } from "./events";
-import { eventCapability } from "../sync/events";
+import { eventCapability, inlineRevisionCapability } from "../sync/events";
+import { accountCapability } from "../sync/accounts";
+import { AccountHub } from "./account-hub";
+import { Sessions } from "./sessions";
+import { AccountResources } from "./account-resources";
+import { ExternalLogins, type ExternalLoginOptions } from "./external-logins";
 import { RequestBudgets, type RequestPolicy } from "./request-budget";
 import {
   createInvitation,
@@ -42,7 +47,6 @@ import {
   loginAccount,
   changePassword,
   publicLimits,
-  type AccountOptions,
   type AuthUser,
 } from "./accounts";
 import {
@@ -55,7 +59,8 @@ import {
   invitationUrl,
 } from "../sync/server-url";
 
-export interface ServerOptions extends AccountOptions {
+export interface ServerOptions extends ExternalLoginOptions {
+  vaultKey?: string;
   requestPolicy?: Partial<RequestPolicy>;
   operationsKey?: string;
   metadata: MetadataStore;
@@ -164,6 +169,10 @@ export function createSyncServer(options: ServerOptions) {
     )[0].value;
   }
   const serverId = () => (initialization ??= initialize());
+  const sessions = new Sessions(db, serverId);
+  const accounts = new AccountHub(db, sessions, serverId, options);
+  const resources = new AccountResources(db, serverId, options);
+  const logins = new ExternalLogins(db, sessions, options);
   const events = options.eventPeers
     ? new ProjectEvents(
         db,
@@ -231,50 +240,7 @@ export function createSyncServer(options: ServerOptions) {
     };
   }
   async function session(user: AuthUser, device: unknown) {
-    const credential = token(),
-      at = new Date().toISOString();
-    const expiresAt = new Date(Date.now() + 30 * 86400_000).toISOString();
-    const credentialDigest = await hash(credential);
-    const result = await db.batch([
-      {
-        sql: "INSERT INTO sessions(digest,user_id,device,created_at,expires_at,auth_version) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM users WHERE id=? AND auth_version=?) AND (SELECT COUNT(*) FROM sessions WHERE user_id=? AND revoked=0 AND expires_at>?)<100",
-        values: [
-          credentialDigest,
-          user.id,
-          typeof device === "string" ? plainText(device, 200) : "ShowAI",
-          at,
-          expiresAt,
-          user.auth_version,
-          user.id,
-          user.auth_version,
-          user.id,
-          at,
-        ],
-      },
-      audit(
-        "session.create",
-        user.id,
-        null,
-        {},
-        {
-          sql: "SELECT 1 FROM sessions WHERE digest=?",
-          values: [credentialDigest],
-        },
-      ),
-    ]);
-    if (!result[0].changes)
-      throw new SyncError(
-        409,
-        "SESSION_UNAVAILABLE",
-        "账号凭据已更新或设备会话已达上限，请重新登录或撤销旧设备。",
-      );
-    return {
-      protocol: syncProtocol,
-      serverId: await serverId(),
-      user: { id: user.id, name: user.name },
-      token: credential,
-      expiresAt,
-    };
+    return sessions.create(user, device);
   }
   async function members(projectId: string) {
     return db.all<Member>(
@@ -338,7 +304,7 @@ export function createSyncServer(options: ServerOptions) {
         serverId: await serverId(),
         name: options.name ?? "ShowAI Server",
         roles: ["admin", "editor", "viewer"],
-        auth: ["password", "token"],
+        auth: ["password", "token", ...logins.available],
         registration: options.registrationMode ?? "controlled",
         passwordMinimum: 12,
         sessionDays: 30,
@@ -350,7 +316,12 @@ export function createSyncServer(options: ServerOptions) {
           "storage-quotas-v1",
           "resumable-objects-v1",
           "batch-heads-v1",
+          ...(accounts.cipher.enabled ? [accountCapability] : []),
           ...(events ? [eventCapability] : []),
+          ...(options.metadataDriver === "sqlite" ||
+          options.metadataDriver === "durable-sqlite"
+            ? [inlineRevisionCapability]
+            : []),
         ],
       });
     if (path.startsWith("/api/")) await requestBudgets.consume();
@@ -365,7 +336,17 @@ export function createSyncServer(options: ServerOptions) {
       const input = await body(request);
       await publicLimitsAccount("register", input.name);
       return json(
-        await session(await registerAccount(db, input, options), input.device),
+        await sessions.create(
+          await registerAccount(
+            db,
+            input.personalToken === true
+              ? { ...input, password: input.password ?? token() }
+              : input,
+            options,
+          ),
+          input.device,
+          { kind: input.personalToken === true ? "personal" : "session" },
+        ),
         201,
       );
     }
@@ -375,6 +356,28 @@ export function createSyncServer(options: ServerOptions) {
       await publicLimitsAccount("login", input.name);
       return json(await session(await loginAccount(db, input), input.device));
     }
+    if (path === "/api/auth/exchange" && method === "POST")
+      return json(await accounts.exchange(await body(request), source));
+    if (path === "/api/auth/start" && method === "POST")
+      return json(
+        await logins.begin(
+          await body(request),
+          publicBase ?? url.origin + basePath,
+          source,
+          request.headers.has("authorization")
+            ? await authenticate(request)
+            : undefined,
+        ),
+      );
+    if (path === "/api/auth/finish" && method === "POST")
+      return json(await logins.finish(await body(request), source));
+    if (path === "/api/auth/confirm-link" && method === "POST")
+      return json(await logins.confirmLink(await body(request)));
+    const loginCallback = path.match(
+      /^\/api\/auth\/callback\/(github|google)$/,
+    );
+    if (loginCallback && method === "GET")
+      return logins.callback(loginCallback[1], url);
     if (path === "/join" && method === "GET") {
       return new Response(
         `<!doctype html><html lang="zh"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>加入 ShowAI 项目</title><body style="font-family:system-ui;max-width:560px;margin:15vh auto;padding:24px"><h1>加入 ShowAI 项目</h1><p>打开 ShowAI，确认项目与权限后，使用你在此服务器上的账号加入。</p><a id="open" style="display:inline-block;padding:12px 18px;background:#343b36;color:white;border-radius:8px;text-decoration:none">在 ShowAI 中打开</a><p>也可以在「设置 → 服务器与同步」中粘贴当前邀请链接。</p><script>const invite=new URLSearchParams(location.hash.slice(1)).get('invite');if(invite&&/^[a-f0-9]{64}$/.test(invite)){const target=new URL('showai://join');target.searchParams.set('server',${JSON.stringify(publicBase)}??location.origin);target.searchParams.set('invite',invite);const serverId=new URLSearchParams(location.hash.slice(1)).get('server');if(serverId)target.searchParams.set('serverId',serverId);document.getElementById('open').href=target.href;}else{document.getElementById('open').textContent='邀请链接无效';}</script></body></html>`,
@@ -421,6 +424,47 @@ export function createSyncServer(options: ServerOptions) {
     }
     const user = await authenticate(request);
     await requestBudgets.consume(user.id);
+    if (path === "/api/account/identity" && method === "POST")
+      return json(await accounts.identity(user, url.origin + basePath, true));
+    if (path === "/api/account/federation" && method === "GET")
+      return json(await accounts.profile(user, url.origin + basePath));
+    if (path === "/api/account/bindings" && method === "PUT")
+      return json(await accounts.merge(user, (await body(request)).bindings));
+    if (path === "/api/account/bindings" && method === "POST")
+      return json(await accounts.bind(user, (await body(request)).descriptor));
+    if (path === "/api/account/bindings" && method === "DELETE")
+      return json(
+        await accounts.bind(user, (await body(request)).descriptor, "removed"),
+      );
+    if (path === "/api/account/grants" && method === "POST")
+      return json(await accounts.grant(user, await body(request)));
+    if (path === "/api/account/tokens" && method === "POST")
+      return json(
+        await sessions.create(user, (await body(request)).device, {
+          kind: "personal",
+          condition: liveSession(user),
+        }),
+        201,
+      );
+    if (path === "/api/account/resources" && method === "GET")
+      return json(await resources.list(user, url.origin + basePath));
+    if (path === "/api/account/resources" && method === "PUT")
+      return json(
+        await resources.save(user, await body(request), url.origin + basePath),
+      );
+    const resourcePath = path.match(
+      /^\/api\/account\/resources\/([^/]+)(\/access)?$/,
+    );
+    if (resourcePath && method === "DELETE" && !resourcePath[2])
+      return json(await resources.remove(user, resourcePath[1]));
+    if (resourcePath?.[2] && method === "POST")
+      return json(
+        await resources.access(
+          user,
+          resourcePath[1],
+          (await body(request)).forceRefresh === true,
+        ),
+      );
     if (path === "/api/auth/password" && method === "POST") {
       await publicLimits(db, "password", source, user.id);
       const changed = await changePassword(db, user, await body(request));
@@ -456,7 +500,7 @@ export function createSyncServer(options: ServerOptions) {
     if (path === "/api/sessions" && method === "GET")
       return json(
         await db.all(
-          "SELECT digest,device,created_at,expires_at,revoked,digest=? AS current FROM sessions WHERE user_id=? ORDER BY created_at DESC LIMIT 1000",
+          "SELECT digest,device,created_at,expires_at,credential_kind,origin_server,origin_user,revoked,digest=? AS current FROM sessions WHERE user_id=? ORDER BY created_at DESC LIMIT 1000",
           [user.session_digest, user.id],
         ),
       );
@@ -1109,6 +1153,66 @@ export function createSyncServer(options: ServerOptions) {
           "INVALID_DEPENDENCY",
           "Publish packages in the project's dependency directory.",
         );
+      if (input.objects !== undefined) {
+        if (
+          !input.objects ||
+          typeof input.objects !== "object" ||
+          Array.isArray(input.objects) ||
+          Object.keys(input.objects).length > 64
+        )
+          throw new SyncError(
+            400,
+            "INVALID_OBJECTS",
+            "Inline revisions accept at most 64 small objects.",
+          );
+        let total = 0;
+        const referenced = new Set(Object.values(snapshot.files));
+        for (const [digest, encoded] of Object.entries(input.objects)) {
+          digestId(digest);
+          if (
+            !referenced.has(digest) ||
+            typeof encoded !== "string" ||
+            encoded.length > 90_000 ||
+            !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+              encoded,
+            )
+          )
+            throw new SyncError(
+              400,
+              "INVALID_OBJECTS",
+              "Inline objects must belong to this snapshot.",
+            );
+          const decoded = atob(encoded);
+          if (
+            btoa(decoded) !== encoded ||
+            decoded.length > 64 * 1024 ||
+            (total += decoded.length) > 192 * 1024
+          )
+            throw new SyncError(
+              413,
+              "TOO_LARGE",
+              "Inline revision objects exceed their bounded budget.",
+            );
+          const bytes = Uint8Array.from(decoded, (character) =>
+            character.charCodeAt(0),
+          );
+          // Reuse the exact whole-object admission, integrity, quota, expiry and
+          // publication checks under this request's existing durable write lease.
+          const headers = new Headers(request.headers);
+          headers.set("content-length", String(bytes.length));
+          headers.set("content-type", "application/octet-stream");
+          await handle(
+            new Request(
+              new URL(
+                `${basePath}/api/projects/${projectId}/objects/${digest}`,
+                request.url,
+              ),
+              { method: "PUT", headers, body: bytes },
+            ),
+            source,
+          );
+        }
+      }
       const projectBytes = await objects.get(
         objectKey(
           projectId,
@@ -1355,7 +1459,9 @@ export function createSyncServer(options: ServerOptions) {
           .slice(basePath.length)
           .replace(/\/$/, "");
         const writes =
-          !["GET", "HEAD", "OPTIONS"].includes(request.method) &&
+          (!["GET", "HEAD", "OPTIONS"].includes(request.method) ||
+            (request.method === "GET" &&
+              /^\/api\/auth\/callback\/(github|google)$/.test(logicalPath))) &&
           !logicalPath.startsWith("/api/ops/") &&
           !(
             request.method === "POST" &&
@@ -1393,6 +1499,8 @@ export function createSyncServer(options: ServerOptions) {
             (request.method === "POST" &&
               (/^\/api\/auth\/(?:password|logout)$/.test(logicalPath) ||
                 /^\/api\/sessions\/revoke(?:-all)?$/.test(logicalPath))) ||
+            (request.method === "DELETE" &&
+              logicalPath === "/api/account/bindings") ||
             (request.method === "POST" &&
               logicalPath === "/api/invites/accept"))
         )

@@ -21,6 +21,7 @@ import type {
 import { sourcePresets } from "../agent-host/types";
 import type { PageSummary, ProjectSummary } from "../core/model";
 import AgentBrandIcon from "./AgentBrandIcon";
+import ServerResources from "./ServerResources";
 import "./agent-settings.css";
 
 function messageLinks(
@@ -467,6 +468,7 @@ export default function AgentSettings({
                     {selected.account ? ` · ${selected.account}` : ""}
                   </small>
                   <small>
+                    {selected.hosted ? `${selected.hosted.serverName} · ` : ""}
                     {selected.credential === "chatgpt"
                       ? selected.planEnabled
                         ? "已授权使用 ChatGPT 套餐"
@@ -512,6 +514,11 @@ export default function AgentSettings({
                 </button>
               ))}
             </div>
+            <ServerResources
+              selected={selected}
+              disabled={busy || !!hasRunning}
+              update={update}
+            />
             {editing && (
               <form
                 className="agent-source-form"
@@ -547,7 +554,7 @@ export default function AgentSettings({
                     }
                   />
                 </label>
-                {editing.credential === "api-key" && (
+                {editing.credential === "api-key" && !editing.hosted && (
                   <>
                     <label>
                       API 地址
@@ -663,7 +670,7 @@ export default function AgentSettings({
             )}
             {selected && (
               <div className="agent-form-actions">
-                {selected.credential === "chatgpt" && (
+                {selected.credential === "chatgpt" && !selected.hosted && (
                   <>
                     <button
                       className="settings-button"

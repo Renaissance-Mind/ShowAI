@@ -9,7 +9,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { GitLibrary } from "./git-library";
+import { ContentLibrary as GitLibrary } from "./content-library";
 import { FileStore } from "./store";
 import { WorkspaceProtection, workspaceHash } from "./workspace-conflicts";
 import type { ChangeContext } from "./history-model";

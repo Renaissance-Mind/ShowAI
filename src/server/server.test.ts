@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SQLiteMetadata, startSyncServer } from "./node";
 import { hash, syncProtocol, type ProjectSnapshot } from "../sync/protocol";
+import { accountTables } from "./storage";
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
   for (const action of cleanup.splice(0).reverse()) await action();
@@ -282,6 +283,16 @@ describe("portable project server with real SQLite and disk storage", () => {
     );
     for (const trigger of triggers)
       await metadata.run(`DROP TRIGGER ${trigger.name}`);
+    for (const table of accountTables)
+      await metadata.run(`DROP TABLE ${table}`);
+    await metadata.run("DROP INDEX sessions_origin");
+    for (const column of [
+      "credential_kind",
+      "origin_server",
+      "origin_user",
+      "origin_generation",
+    ])
+      await metadata.run(`ALTER TABLE sessions DROP COLUMN ${column}`);
     await metadata.run("DROP TABLE server_write_leases");
     await metadata.run("DROP TABLE server_operations");
     await metadata.run("DROP INDEX revisions_sequence");

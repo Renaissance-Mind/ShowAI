@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FileStore } from "./store";
-import { GitLibrary } from "./git-library";
+import { ContentLibrary as GitLibrary } from "./content-library";
 import { orderSidebarItems } from "./sidebar-order";
 import { blankDocument } from "./catalog";
 

@@ -24,7 +24,7 @@ import {
   operationsRequest,
 } from "./backup";
 import { SyncManager } from "../sync/manager";
-import { GitLibrary } from "../core/git-library";
+import { ContentLibrary as GitLibrary } from "../core/content-library";
 import { FileStore } from "../core/store";
 
 const cleanup: (() => Promise<unknown>)[] = [];

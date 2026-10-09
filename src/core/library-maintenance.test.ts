@@ -10,7 +10,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { GitLibrary } from "./git-library";
+import { ContentLibrary as GitLibrary } from "./content-library";
 import { FileStore } from "./store";
 import { EditorDrafts } from "./editor-drafts";
 import {
@@ -212,7 +212,7 @@ describe("library space, cleanup and archival", () => {
     expect(await library.head()).toBe(head);
     expect((await drafts.read(one.id)).content).toEqual({ image });
     expect((await drafts.list()).length).toBe(1);
-    await rm(join(root, "local", "operation-index.sqlite"));
+    await rm(join(root, "local", "operation-index.sqlite"), { force: true });
     const replay = await library.transaction(context, async () => {
       throw new Error("A retried committed request must not run again");
     });

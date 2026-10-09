@@ -256,6 +256,7 @@ export interface ServerConnection {
   user: SyncUser;
   token: string;
   capabilities?: string[];
+  expiresAt?: string;
 }
 export interface ProjectConnection {
   projectId: string;
@@ -277,4 +278,6 @@ export interface SyncConfiguration {
   projects: ProjectConnection[];
   defaultConnectionId: string | null;
   defaultSince?: string;
+  /** Display choices belong to this device and are never part of project sync. */
+  hiddenProjectIds?: string[];
 }

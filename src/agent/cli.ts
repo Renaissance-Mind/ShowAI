@@ -5,8 +5,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { withChangeContext } from "../core/history-context";
 import { mutateLibrary } from "../core/library-runtime";
 import { canonicalJson } from "../core/diff";
-import { GitLibrary } from "../core/git-library";
-import { syncManager } from "../sync/manager";
+import { ContentLibrary as GitLibrary } from "../core/content-library";
+import { syncManager, stopSyncManagers } from "../sync/manager";
 import { openLibrary } from "../core/open-library";
 import { LibraryImport } from "../core/library-import";
 import {
@@ -1168,7 +1168,10 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
         : undefined;
       if (!option(args, "project")) {
         const { startLibraryMcp } = await import("./mcp-library");
-        await startLibraryMcp({ root: service.store.root, presentationDirectory });
+        await startLibraryMcp({
+          root: service.store.root,
+          presentationDirectory,
+        });
       } else {
         const { startMcp } = await import("./mcp");
         await startMcp({
@@ -1296,7 +1299,11 @@ function printHuman(value: unknown) {
 }
 
 const json = process.argv.includes("--json");
+let continuous = false;
 try {
+  continuous = ["serve", "mcp"].includes(
+    parseArguments(process.argv.slice(2)).positional[0],
+  );
   const result = await runCli(process.argv.slice(2));
   if (result !== undefined) {
     if (json)
@@ -1309,4 +1316,6 @@ try {
     process.stdout.write(JSON.stringify({ ok: false, error: result }) + "\n");
   else process.stderr.write(`ShowAI: ${result.message}\n`);
   process.exitCode = result.code === "CONFLICT" ? 3 : 1;
+} finally {
+  if (!continuous) await stopSyncManagers();
 }

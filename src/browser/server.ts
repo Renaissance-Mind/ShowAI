@@ -1,4 +1,5 @@
 import { changedResources } from "../core/change-notification";
+import { ModelResourceClient } from "../sync/model-resources";
 import { createServer, type ServerResponse } from "node:http";
 import {
   access,
@@ -126,6 +127,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
                 "tmp",
                 "node_modules",
                 "repository.git",
+                "history",
                 "local",
                 "cache",
                 "index.sqlite",
@@ -157,6 +159,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   }
   await useHome(store.root);
   const agentHost = new AgentHost({
+    resources: new ModelResourceClient(() => store.root),
     root: join(dirname(options.settingsPath), "agent-host"),
     library: () => store,
     cli: () => info().cli,
@@ -185,6 +188,14 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     if (agentActions.has(action)) return agentHost.action(action, args);
     maintenance?.markActivity();
     return createWorkbench(store, service, {
+      preferencesChanged: () =>
+        notify("files", {
+          type: "files",
+          home: store.root,
+          projectIds: [],
+          pageIds: [],
+          projects: true,
+        }),
       info,
       openDialog: async (dialog) => ({
         canceled: false,

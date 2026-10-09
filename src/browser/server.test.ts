@@ -26,7 +26,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { startBrowserServer } from "./server";
 import { AgentService } from "../agent/service";
-import { GitLibrary } from "../core/git-library";
+import { ContentLibrary as GitLibrary } from "../core/content-library";
 import type { LibraryStorage } from "../core/library-maintenance";
 import type { DesktopInfo, DesktopResponse } from "../desktop/bridge";
 import type { LoadedPage } from "../studio/usePage";

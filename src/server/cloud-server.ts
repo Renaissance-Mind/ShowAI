@@ -10,6 +10,7 @@ import { eventProtocol, type EventIdentity } from "../sync/events";
 import type { EventPeer } from "./events";
 import { hash, SyncError } from "../sync/protocol";
 import { schemaVersion } from "./migrations";
+import { configuredLogins } from "./external-logins";
 
 interface EventSocket extends WebSocket {
   serializeAttachment(value: EventIdentity): void;
@@ -53,6 +54,7 @@ export class ShowAIServer {
     this.metadata = new DurableMetadata(ctx.storage);
     this.objects = new DurableObjects(ctx.storage, workerObjects(env));
     this.app = createSyncServer({
+      ...configuredLogins(env),
       metadata: this.metadata,
       objects: this.objects,
       metadataDriver: "durable-sqlite",

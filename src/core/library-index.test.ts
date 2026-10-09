@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FileStore } from "./store";
-import { GitLibrary } from "./git-library";
+import { ContentLibrary as GitLibrary } from "./content-library";
 import { LibraryIndex } from "./library-index";
 import { applyOperations } from "./diff";
 import type { ChangeContext } from "./history-model";

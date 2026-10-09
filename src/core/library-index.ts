@@ -2,7 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { isUtf8 } from "node:buffer";
-import { GitLibrary } from "./git-library";
+import { ContentLibrary as GitLibrary } from "./content-library";
 import { resourceForPath, type HistoryEntry } from "./history-model";
 import { withLibraryLock } from "./library-lock";
 import { CoreError } from "./model";

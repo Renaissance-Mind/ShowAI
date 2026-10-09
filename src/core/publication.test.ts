@@ -14,7 +14,7 @@ import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 import { createServer as createViteServer } from "vite";
 import { FileStore } from "./store";
-import { GitLibrary } from "./git-library";
+import { ContentLibrary as GitLibrary } from "./content-library";
 import {
   blankDocument,
   componentWidgetData,

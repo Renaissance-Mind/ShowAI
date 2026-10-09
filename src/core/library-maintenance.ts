@@ -10,7 +10,7 @@ import {
   rm,
 } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { GitLibrary } from "./git-library";
+import { ContentLibrary as GitLibrary } from "./content-library";
 import { versionedLibrary } from "./library-runtime";
 import { CoreError } from "./model";
 import { withLibraryLock } from "./library-lock";
@@ -103,7 +103,8 @@ const sha = (bytes: Buffer | string) =>
   createHash("sha256").update(bytes).digest("hex");
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 function category(path: string): StorageCategory {
-  if (path.startsWith("repository.git/")) return "repository";
+  if (path.startsWith("repository.git/") || path.startsWith("history/"))
+    return "repository";
   if (/^(index\.sqlite|local\/operation-index\.sqlite)(?:-|$)/.test(path))
     return "indexes";
   if (/^(?:workspace\/)?projects\/[^/]+\/exports\/reads\//.test(path))

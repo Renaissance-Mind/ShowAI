@@ -1,7 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { versionedLibrary } from "./library-runtime";
-import { GitLibrary } from "./git-library";
+import { ContentLibrary as GitLibrary } from "./content-library";
 import { CoreError } from "./model";
 import { safeLibraryPath, readLibraryBytes } from "./library-files";
 const entries = (path: string) =>
@@ -25,7 +25,10 @@ async function empty(root: string) {
 export async function openLibrary(home: string) {
   const root = resolve(home),
     existing = versionedLibrary(root);
-  if (existing) return { mode: "versioned" as const, initialized: false };
+  if (existing) {
+    await existing.initialize();
+    return { mode: "versioned" as const, initialized: false };
+  }
   await safeLibraryPath(root, root);
   if (
     await readLibraryBytes(root, join(root, "local", "library-bootstrap.json"))

@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
-import { lstat, mkdir, readdir, rename } from "node:fs/promises";
+import { lstat, mkdir, readdir, rename, readFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { gzipSync, gunzipSync } from "node:zlib";
-import { GitLibrary } from "./git-library";
+import { ContentLibrary as GitLibrary } from "./content-library";
 import { FileStore, assertId } from "./store";
 import { CoreError } from "./model";
 import { documentHash, normalizeDocument, canonicalJson } from "./diff";
@@ -314,7 +314,7 @@ export class LibraryImport {
           "CONFLICT",
           "The incomplete installation has newer content; all repositories were retained.",
         );
-      for (const name of ["repository.git", "workspace"]) {
+      for (const name of ["history", "repository.git", "workspace"]) {
         const source = join(this.root, name),
           destination = join(retained, name);
         await safeLibraryPath(this.root, source);
@@ -732,7 +732,13 @@ export class LibraryImport {
       await this.retainInactiveInstallation(id);
       plan.state = "installing";
       await this.save(plan);
-      for (const name of ["repository.git", "workspace"]) {
+      const preparedManifest = JSON.parse(
+        await readFile(join(stage, "library.json"), "utf8"),
+      ) as LibraryManifest;
+      for (const name of [
+        preparedManifest.storage === "sqlite" ? "history" : "repository.git",
+        "workspace",
+      ]) {
         const source = join(stage, name),
           destination = join(this.root, name);
         await safeLibraryPath(this.root, source);

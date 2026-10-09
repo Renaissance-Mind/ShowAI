@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { SyncManager } from "./manager";
 import { AgentService, errorResult } from "../agent/service";
 import { startSyncServer } from "../server/node";
-import { GitLibrary } from "../core/git-library";
+import { ContentLibrary as GitLibrary } from "../core/content-library";
 import { FileStore } from "../core/store";
 import { LibraryOperations } from "../core/library-operations";
 import { withChangeContext } from "../core/history-context";

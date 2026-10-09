@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { CoreError, type PageRecord, type ShowDocument } from "./model";
 import { FileStore, assertId } from "./store";
-import { GitLibrary } from "./git-library";
+import { ContentLibrary as GitLibrary } from "./content-library";
 import { type SearchOptions } from "./library-index";
 import {
   versionedLibrary,

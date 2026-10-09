@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { fileSymlink } from "../test/file-symlink";
 import { FileStore } from "./store";
 import { LibraryImport } from "./library-import";
-import { GitLibrary } from "./git-library";
+import { ContentLibrary as GitLibrary } from "./content-library";
 import { versionedLibrary } from "./library-runtime";
 import {
   importComponent,
@@ -244,8 +244,8 @@ describe("one-time file library import", () => {
     plan.state = "installing";
     await writeFile(planPath, JSON.stringify(plan));
     await rename(
-      join(source, "local", "imports", report.id, "library", "repository.git"),
-      join(source, "repository.git"),
+      join(source, "local", "imports", report.id, "library", "history"),
+      join(source, "history"),
     );
     const original = await readFile(page.path);
     await importer.activate(report.id);
@@ -267,8 +267,8 @@ describe("one-time file library import", () => {
     plan.state = "installing";
     await writeFile(planPath, JSON.stringify(plan));
     await rename(
-      join(source, "local", "imports", first.id, "library", "repository.git"),
-      join(source, "repository.git"),
+      join(source, "local", "imports", first.id, "library", "history"),
+      join(source, "history"),
     );
     const newer = await store.savePage(
       projectId,

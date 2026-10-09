@@ -95,6 +95,16 @@ export const workbenchActions = new Set([
   "sync:changePassword",
   "sync:createProject",
   "sync:changeAccount",
+  "sync:bindAccounts",
+  "sync:unbindAccount",
+  "sync:accountProfile",
+  "sync:restoreAccounts",
+  "sync:resources",
+  "sync:projectVisibility",
+  "sync:serverInfo",
+  "sync:beginLogin",
+  "sync:finishLogin",
+  "sync:createToken",
   "app:info",
   "library:storage",
   "library:compact",
@@ -269,6 +279,7 @@ export interface SaveDialogOptions {
   filters: { name: string; extensions: string[] }[];
 }
 export interface WorkbenchHost {
+  preferencesChanged?(): void;
   info(): DesktopInfo;
   openDialog(
     options: OpenDialogOptions,
@@ -398,6 +409,44 @@ export function createWorkbench(
       switch (action) {
         case "sync:status":
           return sync.status();
+        case "sync:serverInfo":
+          return sync.serverInfo(required(args, "url"));
+        case "sync:beginLogin":
+          return sync.beginLogin(
+            args as unknown as Parameters<typeof sync.beginLogin>[0],
+          );
+        case "sync:finishLogin":
+          return sync.finishLogin(
+            args as unknown as Parameters<typeof sync.finishLogin>[0],
+          );
+        case "sync:createToken":
+          return sync.createPersonalToken(required(args, "connectionId"));
+        case "sync:bindAccounts":
+          return sync.accounts.bind(
+            required(args, "connectionId"),
+            required(args, "targetConnectionId"),
+          );
+        case "sync:unbindAccount":
+          return sync.accounts.unbind(
+            required(args, "connectionId"),
+            required(args, "serverId"),
+          );
+        case "sync:accountProfile":
+          return sync.accounts.profile(required(args, "connectionId"));
+        case "sync:restoreAccounts":
+          return sync.accounts.restore(required(args, "connectionId"));
+        case "sync:resources":
+          return sync.accounts.resources();
+        case "sync:projectVisibility": {
+          if (typeof args.visible !== "boolean")
+            throw new CoreError("INVALID_DATA", "请选择项目是否在本设备显示。");
+          const result = await sync.setProjectVisibility(
+            projectId(args),
+            args.visible,
+          );
+          host.preferencesChanged?.();
+          return result;
+        }
         case "sync:connect":
           return sync.connect(
             args as unknown as Parameters<typeof sync.connect>[0],
@@ -697,10 +746,17 @@ export function createWorkbench(
           required(args, "generation"),
           required(args, "revision"),
         );
-      case "projects:list":
-        return store.listProjects({
+      case "projects:list": {
+        const projects = await store.listProjects({
           includeArchived: args.includeArchived === true,
         });
+        if (args.includeHidden === true) return projects;
+        const hidden = new Set(
+          (await syncManager(store.root).configuration()).hiddenProjectIds ??
+            [],
+        );
+        return projects.filter((project) => !hidden.has(project.id));
+      }
       case "sidebar:get":
         return store.readSidebar();
       case "sidebar:moveProject": {

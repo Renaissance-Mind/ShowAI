@@ -14,7 +14,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 import { FileStore } from "./store";
-import { GitLibrary } from "./git-library";
+import { ContentLibrary as GitLibrary } from "./content-library";
 import { LibraryOperations } from "./library-operations";
 import { readArchivedReader, readerBindingPath } from "./archived-reader";
 import { exportPage } from "../agent/exporter";

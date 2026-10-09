@@ -3,7 +3,7 @@ import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openLibrary } from "./open-library";
-import { GitLibrary } from "./git-library";
+import { ContentLibrary as GitLibrary } from "./content-library";
 import { FileStore } from "./store";
 import { AgentService } from "../agent/service";
 describe("default versioned libraries", () => {

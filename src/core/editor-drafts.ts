@@ -5,7 +5,7 @@ import { encodeFile, decodeFile, nodePrefix } from "./history-codec";
 import { atomicLibraryFile, readLibraryBytes } from "./library-files";
 import { withLibraryLock } from "./library-lock";
 import { CoreError } from "./model";
-import { GitLibrary } from "./git-library";
+import { ContentLibrary as GitLibrary } from "./content-library";
 import { documentHash, canonicalJson } from "./diff";
 import type { ShowDocument } from "./model";
 import type { ChangeActor } from "./history-model";

@@ -1,4 +1,5 @@
 import { createSyncServer } from "./app";
+import { configuredLogins, type LoginEnvironment } from "./external-logins";
 import { SyncError } from "../sync/protocol";
 import type { StreamDigest } from "./storage";
 import type {
@@ -18,7 +19,7 @@ interface D1Usage {
   rows_written?: number;
   duration?: number;
 }
-export interface WorkerEnvironment {
+export interface WorkerEnvironment extends LoginEnvironment {
   DB: {
     prepare(sql: string): Statement;
     batch(statements: Statement[]): Promise<{ meta: D1Usage }[]>;
@@ -50,6 +51,7 @@ export interface WorkerEnvironment {
     }>;
   };
   SHOWAI_SERVER_NAME?: string;
+  SHOWAI_VAULT_KEY?: string;
   SHOWAI_SERVER_URL?: string;
   SHOWAI_REGISTRATION_KEY?: string;
   SHOWAI_REGISTRATION_LIMIT?: string;
@@ -369,6 +371,7 @@ export default {
     let app = instances.get(env);
     if (!app) {
       app = createSyncServer({
+        ...configuredLogins(env),
         metadata: workerMetadata(env),
         metadataDriver: "d1",
         objects: workerObjects(env),

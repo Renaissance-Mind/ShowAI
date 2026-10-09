@@ -1,4 +1,4 @@
-import { canonicalJson } from "./diff";
+import { canonicalJson } from "./canonical";
 import type { MergeConflict } from "../components/custom/types";
 
 const equal = (left: unknown, right: unknown) =>
@@ -14,6 +14,29 @@ interface Hunk {
 }
 
 function hunks(base: string[], next: string[]): Hunk[] {
+  let prefix = 0,
+    suffix = 0;
+  while (
+    prefix < base.length &&
+    prefix < next.length &&
+    base[prefix] === next[prefix]
+  )
+    prefix++;
+  while (
+    suffix < base.length - prefix &&
+    suffix < next.length - prefix &&
+    base[base.length - suffix - 1] === next[next.length - suffix - 1]
+  )
+    suffix++;
+  if (prefix || suffix)
+    return hunks(
+      base.slice(prefix, base.length - suffix),
+      next.slice(prefix, next.length - suffix),
+    ).map((change) => ({
+      ...change,
+      start: change.start + prefix,
+      end: change.end + prefix,
+    }));
   // Bound memory for large source files; conservative conflicts are preferable
   // to an approximate merge that silently overwrites a change.
   if ((base.length + 1) * (next.length + 1) > 2_000_000) {
@@ -95,11 +118,13 @@ export function mergeText(
         continue;
       }
       const overlaps =
-        current.start === current.end
-          ? current.start >= candidate.start && current.start <= candidate.end
-          : candidate.start === candidate.end
-            ? candidate.start >= current.start && candidate.start <= current.end
-            : current.start < candidate.end && candidate.start < current.end;
+        current.start === current.end && candidate.start === candidate.end
+          ? current.start === candidate.start
+          : current.start === current.end
+            ? current.start > candidate.start && current.start < candidate.end
+            : candidate.start === candidate.end
+              ? candidate.start > current.start && candidate.start < current.end
+              : current.start < candidate.end && candidate.start < current.end;
       if (overlaps) return undefined;
     }
     if (!duplicate) changes.push(candidate);
@@ -110,6 +135,53 @@ export function mergeText(
   ))
     result.splice(change.start, change.end - change.start, ...change.lines);
   return result.join("");
+}
+/** Transform an old local undo snapshot through later remote text edits.
+ * Characters inserted by the remote side have no base identity and are never
+ * removed by the local inverse. This also preserves insertions inside a local
+ * span being undone, rather than treating them as an overlapping replacement. */
+export function rebaseHistoryText(
+  base: string,
+  snapshot: string,
+  remote: string,
+): string {
+  const original = Array.from(base),
+    target = Array.from(snapshot),
+    incoming = Array.from(remote);
+  const cells: { value: string; original: number | null }[] = original.map(
+    (value, index) => ({ value, original: index }),
+  );
+  for (const change of hunks(original, incoming).sort(
+    (a, b) => b.start - a.start,
+  ))
+    cells.splice(
+      change.start,
+      change.end - change.start,
+      ...change.lines.map((value) => ({ value, original: null })),
+    );
+  for (const change of hunks(original, target).sort(
+    (a, b) => b.start - a.start,
+  )) {
+    for (let index = cells.length - 1; index >= 0; index--) {
+      const identity = cells[index].original;
+      if (
+        identity !== null &&
+        identity >= change.start &&
+        identity < change.end
+      )
+        cells.splice(index, 1);
+    }
+    let index = cells.findIndex(
+      (cell) => cell.original !== null && cell.original >= change.end,
+    );
+    if (index < 0) index = cells.length;
+    cells.splice(
+      index,
+      0,
+      ...change.lines.map((value) => ({ value, original: null })),
+    );
+  }
+  return cells.map((cell) => cell.value).join("");
 }
 
 /** Missing keys, deletions, and array changes remain distinct from null. */

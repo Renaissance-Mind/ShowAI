@@ -1,16 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  chmod,
-  mkdtemp,
-  readFile,
-  readdir,
-  rm,
-  symlink,
-  writeFile,
-} from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { GitLibrary } from "./git-library";
+import { DatabaseSync } from "node:sqlite";
+import { ContentLibrary as GitLibrary } from "./content-library";
 import { FileStore } from "./store";
 import type { ChangeContext, FileChanges } from "./history-model";
 
@@ -25,7 +18,7 @@ const agent: ChangeContext = {
   message: "Update conclusion",
 };
 
-describe("Git-backed content library", () => {
+describe("transactional content library", () => {
   let root: string;
   let library: GitLibrary;
   let path: string;
@@ -241,21 +234,33 @@ describe("Git-backed content library", () => {
     );
     const projection = await readFile(join(library.workspace, path)),
       formal = await library.readFile(path, saved!.revision);
-    const object = join(
-      library.repository,
-      "objects",
-      saved!.revision.slice(0, 2),
-      saved!.revision.slice(2),
+    const object = (await library.tree(saved!.revision)).find(
+      (entry) => entry.path === path,
+    )!.oid;
+    const db = new DatabaseSync(join(library.repository, "content.sqlite"));
+    const original = db
+      .prepare("SELECT data,codec FROM blobs WHERE oid=?")
+      .get(object)!;
+    const damaged = Buffer.from("damaged content object");
+    db.prepare("UPDATE blobs SET data=?,codec=0 WHERE oid=?").run(
+      damaged,
+      object,
     );
-    const original = await readFile(object),
-      damaged = Buffer.from("damaged Git object");
-    await chmod(object, 0o600);
-    await writeFile(object, damaged);
     await expect(library.verify()).rejects.toThrow();
     await expect(library.readFile(path, saved!.revision)).rejects.toThrow();
-    expect(await readFile(object)).toEqual(damaged);
+    expect(
+      Buffer.from(
+        db.prepare("SELECT data FROM blobs WHERE oid=?").get(object)!
+          .data as Uint8Array,
+      ),
+    ).toEqual(damaged);
     expect(await readFile(join(library.workspace, path))).toEqual(projection);
-    await writeFile(object, original);
+    db.prepare("UPDATE blobs SET data=?,codec=? WHERE oid=?").run(
+      original.data as Uint8Array,
+      original.codec,
+      object,
+    );
+    db.close();
     await library.verify();
     expect(await library.readFile(path, saved!.revision)).toEqual(formal);
   });

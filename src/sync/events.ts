@@ -2,6 +2,7 @@ import type { SnapshotRecord, SyncProject } from "./protocol";
 
 export const eventProtocol = "showai-project-events-v1";
 export const eventCapability = "project-events-v1";
+export const inlineRevisionCapability = "inline-revisions-v1";
 export const maximumEventBytes = 512 * 1024;
 export const maximumEventInput = 64 * 1024;
 export const maximumEventProjects = 1000;

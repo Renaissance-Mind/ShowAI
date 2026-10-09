@@ -34,7 +34,7 @@ export interface ObjectStore {
   digest(): StreamDigest;
   remove(key: string): Promise<void>;
 }
-export const dataTables = [
+export const legacyDataTables = [
   "settings",
   "users",
   "sessions",
@@ -51,11 +51,27 @@ export const dataTables = [
   "object_uploads",
   "object_upload_parts",
 ] as const;
+export const accountTables = [
+  "account_identities",
+  "account_peers",
+  "account_grant_nonces",
+  "account_resources",
+  "login_identities",
+  "login_flows",
+] as const;
+export const dataTables = [...legacyDataTables, ...accountTables] as const;
 export const backupTables = [
   ...dataTables,
   "server_operations",
   "server_write_leases",
 ] as const;
+export function backupTablesFor(
+  version: number,
+): readonly (typeof backupTables)[number][] {
+  return version >= 8
+    ? backupTables
+    : [...legacyDataTables, "server_operations", "server_write_leases"];
+}
 export interface StreamDigest {
   update(bytes: Uint8Array): Promise<void>;
   finish(): Promise<string>;

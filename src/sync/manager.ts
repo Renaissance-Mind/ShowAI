@@ -4,8 +4,9 @@ import { createHash } from "node:crypto";
 import { hostname } from "node:os";
 import { Buffer } from "node:buffer";
 import { atomicLibraryFile } from "../core/library-files";
+import { readLibraryBytes } from "../core/library-files";
 import { withLibraryLock } from "../core/library-lock";
-import { GitLibrary } from "../core/git-library";
+import { ContentLibrary as GitLibrary } from "../core/content-library";
 import { FileStore, CoreError, assertId } from "../core/store";
 import { LibraryOperations } from "../core/library-operations";
 import { WorkspaceProtection } from "../core/workspace-conflicts";
@@ -14,8 +15,11 @@ import { cacheDownload } from "./object-cache";
 import { resumableUpload } from "./resumable-upload";
 import { retryUpload } from "./upload-retry";
 import { ProjectEventStream } from "./event-stream";
+import { AccountManager } from "./account-manager";
+import { accountCapability } from "./accounts";
 import {
   eventCapability,
+  inlineRevisionCapability,
   maximumEventProjects,
   type ProjectEvent,
 } from "./events";
@@ -80,6 +84,9 @@ export function syncManager(home: string) {
   }
   return manager;
 }
+export async function stopSyncManagers() {
+  await Promise.all([...instances.values()].map((manager) => manager.stop()));
+}
 async function readJson<T>(path: string): Promise<T | undefined> {
   return readFile(path, "utf8").then(
     (value) => JSON.parse(value) as T,
@@ -90,6 +97,7 @@ async function readJson<T>(path: string): Promise<T | undefined> {
   );
 }
 export class SyncManager {
+  readonly accounts = new AccountManager(this);
   private running: Promise<unknown> | undefined;
   private timer?: ReturnType<typeof setTimeout>;
   private started = false;
@@ -122,8 +130,22 @@ export class SyncManager {
   }
   constructor(
     readonly home: string,
-    readonly options: { events?: boolean } = {},
+    readonly options: {
+      events?: boolean;
+      trace?: (event: {
+        stage: string;
+        at: number;
+        durationMs?: number;
+      }) => void;
+    } = {},
   ) {}
+  private trace(stage: string, start?: number) {
+    this.options.trace?.({
+      stage,
+      at: Date.now(),
+      ...(start === undefined ? {} : { durationMs: Date.now() - start }),
+    });
+  }
   private get root() {
     return join(this.home, "local", "sync");
   }
@@ -224,6 +246,7 @@ export class SyncManager {
     connection: ServerConnection,
     event: ProjectEvent,
   ) {
+    this.trace("push-received");
     if (!this.started) return;
     if (
       (event.type !== "heads" && event.type !== "revision") ||
@@ -391,6 +414,7 @@ export class SyncManager {
         ({ token: _token, ...connection }) => connection,
       ),
       running: !!this.running,
+      federation: await this.accounts.status(),
       scheduler: {
         ...this.metrics,
         activeUntil: this.activeUntil,
@@ -409,6 +433,8 @@ export class SyncManager {
     token?: string;
     register?: boolean;
     invite?: string;
+    restoreBindings?: boolean;
+    personalToken?: boolean;
   }) {
     const url = serverBaseUrl(input.url),
       config = await this.configuration();
@@ -449,6 +475,7 @@ export class SyncManager {
             password: input.password,
             registrationKey: input.registrationKey,
             invite: input.invite,
+            personalToken: input.personalToken,
             device: `ShowAI · ${hostname().slice(0, 180)}`,
           },
         );
@@ -470,13 +497,102 @@ export class SyncManager {
     };
     await this.update((next) => {
       next.deviceId = config.deviceId;
+      const live = next.connections.find(
+        (item) =>
+          item.serverId === connection.serverId &&
+          item.user.id === connection.user.id,
+      );
+      if (live) connection.id = live.id;
       next.connections = next.connections.filter(
-        (item) => item.id !== connection.id,
+        (item) =>
+          item.id !== connection.id &&
+          !(
+            item.serverId === connection.serverId &&
+            item.user.id === connection.user.id
+          ),
       );
       next.connections.push(connection);
     });
     this.start();
-    return { ...connection, token: undefined };
+    if (
+      input.restoreBindings !== false &&
+      info.capabilities?.includes(accountCapability)
+    )
+      await this.accounts.restore(connection.id);
+    return {
+      ...connection,
+      token: undefined,
+      issuedPersonalToken: input.personalToken ? result.token : undefined,
+    };
+  }
+  async serverInfo(url: string) {
+    return this.request<{ auth: string[]; name: string; registration: string }>(
+      { url: serverBaseUrl(url), token: "" },
+      "/api/info",
+    );
+  }
+  async beginLogin(input: {
+    url: string;
+    provider: string;
+    email?: string;
+    registrationKey?: string;
+    connectionId?: string;
+  }) {
+    const connection = input.connectionId
+      ? await this.connection(input.connectionId)
+      : { url: serverBaseUrl(input.url), token: "" };
+    return {
+      ...(await this.request<{
+        id: string;
+        pollSecret: string;
+        url?: string;
+        provider: string;
+        expiresAt: number;
+      }>(connection, "/api/auth/start", "POST", {
+        provider: input.provider,
+        email: input.email,
+        registrationKey: input.registrationKey,
+        device: `ShowAI · ${hostname().slice(0, 180)}`,
+      })),
+      serverUrl: connection.url,
+    };
+  }
+  async finishLogin(input: {
+    url: string;
+    id: string;
+    pollSecret: string;
+    code?: string;
+  }) {
+    const result = await this.request<{ status: string; token?: string }>(
+      { url: serverBaseUrl(input.url), token: "" },
+      "/api/auth/finish",
+      "POST",
+      input,
+    );
+    if (result.status !== "completed" || !result.token)
+      return { status: "pending" };
+    return {
+      status: "completed",
+      connection: await this.connect({ url: input.url, token: result.token }),
+    };
+  }
+  async createPersonalToken(connectionId: string) {
+    return this.request(
+      await this.connection(connectionId),
+      "/api/account/tokens",
+      "POST",
+      { device: "ShowAI personal token" },
+    );
+  }
+  async setProjectVisibility(projectId: string, visible: boolean) {
+    identifier(projectId);
+    await this.update((config) => {
+      const hidden = new Set(config.hiddenProjectIds ?? []);
+      if (visible) hidden.delete(projectId);
+      else hidden.add(projectId);
+      config.hiddenProjectIds = [...hidden];
+    });
+    return this.status();
   }
   async setDefault(connectionId: string | null) {
     await this.update((config) => {
@@ -948,6 +1064,56 @@ export class SyncManager {
           );
       });
     const ids = [...captured.objects.keys()];
+    if (connection.capabilities?.includes(inlineRevisionCapability)) {
+      const baseline = expected
+        ? await this.record(connection, project, expected)
+        : undefined;
+      const known = new Set(Object.values(baseline?.snapshot.files ?? {}));
+      const changed = ids.filter((digest) => !known.has(digest));
+      const total = changed.reduce(
+        (sum, digest) => sum + captured.objects.get(digest)!.length,
+        0,
+      );
+      if (
+        changed.length <= 64 &&
+        total <= 192 * 1024 &&
+        changed.every(
+          (digest) => captured.objects.get(digest)!.length <= 64 * 1024,
+        )
+      ) {
+        const objects = Object.fromEntries(
+          changed.map((digest) => [
+            digest,
+            captured.objects.get(digest)!.toString("base64"),
+          ]),
+        );
+        const input = {
+          snapshot: captured.snapshot,
+          expected,
+          publish,
+          objects,
+        };
+        if (Buffer.byteLength(JSON.stringify(input)) <= 512 * 1024) {
+          for (const digest of changed)
+            await atomicLibraryFile(
+              this.home,
+              this.objectPath(digest, this.cacheKey(connection, project)),
+              captured.objects.get(digest)!,
+            );
+          await this.cacheRecord(connection, project, captured);
+          return this.request<{
+            revision: string;
+            head: string;
+            published: boolean;
+          }>(
+            connection,
+            `/api/projects/${project.remoteProjectId}/revisions`,
+            "POST",
+            input,
+          );
+        }
+      }
+    }
     for (let offset = 0; offset < ids.length; offset += 500) {
       const { missing } = await this.request<{ missing: string[] }>(
         connection,
@@ -1065,7 +1231,11 @@ export class SyncManager {
     for (const [path, bytes] of files) {
       const digest = hash(bytes);
       references[path] = digest;
-      await atomicLibraryFile(this.home, this.objectPath(digest), bytes);
+      const cached = await readLibraryBytes(this.home, this.objectPath(digest));
+      if (cached && hash(cached) !== digest)
+        throw new CoreError("INVALID_DATA", "保留的同步缓存未通过完整性检查。");
+      if (!cached)
+        await atomicLibraryFile(this.home, this.objectPath(digest), bytes);
     }
     const saved = { ...pending, files: references };
     await atomicLibraryFile(
@@ -1082,7 +1252,7 @@ export class SyncManager {
       if (hash(bytes) !== digest)
         throw new CoreError(
           "INVALID_DATA",
-          "保留的同步合并草稿未通过完整性检查，原始 Git 历史仍然保留。",
+          "保留的同步合并草稿未通过完整性检查，原始修改历史仍然保留。",
         );
       files.set(path, bytes);
     }
@@ -1179,6 +1349,8 @@ export class SyncManager {
     suppliedRemote?: SyncProject,
     suppliedDeviceId?: string,
   ) {
+    const phaseStarted = Date.now();
+    this.trace("synchronize-start");
     const deviceId = suppliedDeviceId ?? (await this.configuration()).deviceId;
     if (project.pendingCreation) {
       const metadata = await new FileStore(this.home).readProject(
@@ -1222,6 +1394,7 @@ export class SyncManager {
             project.projectId,
           ).projectFiles(project.projectId, localHead)
         : new Map<string, Buffer>();
+    this.trace("local-files-read", phaseStarted);
     const unfinishedSave = (await new WorkspaceProtection(library).list()).find(
       (item) =>
         item.state === "unresolved" &&
@@ -1570,6 +1743,7 @@ export class SyncManager {
         merge.files,
         localHead,
         project.remoteProjectId,
+        pinned.length === 1,
       );
       const mergedHead = await library.head();
       pending.appliedHead = mergedHead;
@@ -1648,6 +1822,7 @@ export class SyncManager {
         project.remoteHead === null,
       );
       for (const entry of history) {
+        const captureStarted = Date.now();
         const captured = await captureProject(
           this.home,
           project.projectId,
@@ -1656,12 +1831,15 @@ export class SyncManager {
           project.remoteProjectId,
           deviceId,
         );
+        this.trace("capture-complete", captureStarted);
+        const uploadStarted = Date.now();
         const result = await this.upload(
           connection,
           project,
           captured,
           project.remoteHead,
         );
+        this.trace("publish-complete", uploadStarted);
         project.remoteHead = result.head;
         project.localRevision = entry.revision;
         await this.state(project.projectId, {
@@ -1676,6 +1854,7 @@ export class SyncManager {
       error: undefined,
       syncedAt: new Date().toISOString(),
     });
+    this.trace("synchronize-complete", phaseStarted);
   }
   async enrollNewProjects(projectId?: string) {
     const config = await this.configuration();
@@ -1893,6 +2072,7 @@ export class SyncManager {
   /** Existing filesystem watchers supply dirty projects; foreground/network wakes
    * only refresh heads and activate polling, without forcing every project scan. */
   wake(projectIds?: string[], invalidateAll = false) {
+    this.trace("wake");
     this.activeUntil = Date.now() + 60_000;
     this.idleRounds = 0;
     this.failedRounds = 0;
@@ -1940,6 +2120,7 @@ export class SyncManager {
     this.timer.unref();
   }
   start() {
+    this.accounts.start();
     if (this.started) return;
     this.started = true;
     this.activeUntil = Date.now() + 60_000;
@@ -1966,6 +2147,7 @@ export class SyncManager {
     this.schedule();
   }
   async stop() {
+    await this.accounts.stop();
     this.started = false;
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;

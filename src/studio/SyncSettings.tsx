@@ -5,6 +5,8 @@ import SyncDashboard, {
   type SyncMember,
   type SyncInvite,
 } from "./SyncDashboard";
+import AccountBindings from "./AccountBindings";
+import ServiceLogin from "./ServiceLogin";
 import { conflictPreview } from "./sync-conflict-preview";
 import type { ProjectSummary } from "../core/model";
 import type {
@@ -47,6 +49,7 @@ export default function SyncSettings() {
   });
   const [showConnect, setShowConnect] = useState(false),
     [server, setServer] = useState("");
+  const [issuedToken, setIssuedToken] = useState("");
   const [panel, setPanel] = useState<
     "projects" | "dashboard" | "conflict" | null
   >(null);
@@ -102,6 +105,7 @@ export default function SyncSettings() {
       desktop.invoke<Status>("sync:status"),
       desktop.invoke<ProjectSummary[]>("projects:list", {
         includeArchived: true,
+        includeHidden: true,
       }),
     ]);
     setStatus(next);
@@ -233,16 +237,21 @@ export default function SyncSettings() {
     return result;
   }
   async function connect() {
-    const connection = await desktop.invoke<{ id: string }>("sync:connect", {
+    const connection = await desktop.invoke<{
+      id: string;
+      issuedPersonalToken?: string;
+    }>("sync:connect", {
       url: form.url,
       account: form.account,
-      password: form.password,
+      password: form.mode === "personal" ? undefined : form.password,
       registrationKey: form.registrationKey,
       token: form.mode === "token" ? form.token : undefined,
-      register: form.mode === "register",
+      register: form.mode === "register" || form.mode === "personal",
+      personalToken: form.mode === "personal",
       invite: preview?.invite,
     });
     setShowConnect(false);
+    setIssuedToken(connection.issuedPersonalToken ?? "");
     setForm({ ...form, password: "", token: "", registrationKey: "" });
     if (preview) {
       await desktop.invoke("sync:join", {
@@ -408,6 +417,7 @@ export default function SyncSettings() {
               >
                 <option value="login">账号密码登录</option>
                 <option value="register">注册账号</option>
+                <option value="personal">注册并生成个人 Token</option>
                 <option value="token">使用已有 Token</option>
               </select>
             </label>
@@ -437,28 +447,30 @@ export default function SyncSettings() {
                     }
                   />
                 </label>
-                <label>
-                  密码
-                  <input
-                    required
-                    minLength={form.mode === "register" ? 12 : 1}
-                    maxLength={1024}
-                    placeholder={
-                      form.mode === "register" ? "至少 12 个字符" : undefined
-                    }
-                    type="password"
-                    autoComplete={
-                      form.mode === "register"
-                        ? "new-password"
-                        : "current-password"
-                    }
-                    value={form.password}
-                    onChange={(event) =>
-                      setForm({ ...form, password: event.target.value })
-                    }
-                  />
-                </label>
-                {form.mode === "register" && !preview && (
+                {form.mode !== "personal" && (
+                  <label>
+                    密码
+                    <input
+                      required
+                      minLength={form.mode === "register" ? 12 : 1}
+                      maxLength={1024}
+                      placeholder={
+                        form.mode === "register" ? "至少 12 个字符" : undefined
+                      }
+                      type="password"
+                      autoComplete={
+                        form.mode === "register"
+                          ? "new-password"
+                          : "current-password"
+                      }
+                      value={form.password}
+                      onChange={(event) =>
+                        setForm({ ...form, password: event.target.value })
+                      }
+                    />
+                  </label>
+                )}
+                {["register", "personal"].includes(form.mode) && !preview && (
                   <label>
                     注册密钥（服务器要求时填写）
                     <input
@@ -480,6 +492,46 @@ export default function SyncSettings() {
               连接服务器{preview ? "并加入项目" : ""}
             </button>
           </form>
+        )}
+        {showConnect && (
+          <ServiceLogin
+            url={form.url}
+            registrationKey={form.registrationKey}
+            onConnected={async (id) => {
+              setShowConnect(false);
+              await loadServer(id);
+              await refresh();
+            }}
+          />
+        )}
+        {issuedToken && (
+          <div className="sync-form">
+            <label>
+              新生成的个人 Token
+              <input
+                type="password"
+                readOnly
+                autoComplete="off"
+                value={issuedToken}
+              />
+            </label>
+            <button
+              className="settings-button"
+              onClick={() =>
+                void run(() =>
+                  desktop.invoke("clipboard:write", { text: issuedToken }),
+                )
+              }
+            >
+              复制个人 Token
+            </button>
+            <button
+              className="settings-button"
+              onClick={() => setIssuedToken("")}
+            >
+              已保存
+            </button>
+          </div>
         )}
         {sessions && (
           <div className="sync-dashboard-list">
@@ -659,6 +711,12 @@ export default function SyncSettings() {
           </div>
         )}
       </section>
+      <AccountBindings
+        connections={status.connections}
+        projects={localProjects}
+        hidden={status.hiddenProjectIds ?? []}
+        refresh={refresh}
+      />
       <section className="settings-group">
         <h2>加入共享项目</h2>
         <form

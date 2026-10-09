@@ -27,6 +27,9 @@ import {
 import { SdkInstaller } from "./installer";
 import { ChatGptConnection } from "./chatgpt";
 import { startModelGateway } from "./gateway";
+import type { ModelResources } from "../sync/model-resources";
+import type { ResolvedResource } from "../sync/accounts";
+import { withLibraryLock } from "../core/library-lock";
 import type {
   AgentHostStatus,
   AgentId,
@@ -51,6 +54,17 @@ const sourceSchema = z.object({
   model: z.string().trim().max(200),
   protocol: z.enum(["responses", "chat"]),
   credential: z.enum(["api-key", "chatgpt"]),
+  hosted: z
+    .object({
+      connectionId: z.string().uuid(),
+      resourceId: z
+        .string()
+        .regex(/^[\w-]+$/)
+        .max(200),
+      serverName: z.string().max(100),
+      url: z.string().url(),
+    })
+    .optional(),
 });
 const settingsSchema = z.object({
   mode: z.enum(["local", "api"]),
@@ -82,6 +96,7 @@ export interface AgentHostOptions {
   cli: () => { command: string; args: string[]; env: Record<string, string> };
   pluginRoot: () => string;
   broker?: HostedCredentialBroker;
+  resources?: ModelResources;
   openUrl?: (url: string) => Promise<void>;
 }
 export function isolatedEnvironment(
@@ -133,7 +148,10 @@ export class AgentHost {
   private loaded?: Promise<void>;
   constructor(readonly options: AgentHostOptions) {
     this.installer = new SdkInstaller(join(options.root, "runtime"));
-    this.chatgpt = new ChatGptConnection(options.root, options.broker);
+    this.chatgpt = new ChatGptConnection(
+      options.root,
+      options.broker ?? options.resources,
+    );
     this.workspaceRoot =
       options.workspaceRoot ??
       join(homedir(), "Documents", "ShowAI", "Agent Workspaces");
@@ -150,6 +168,14 @@ export class AgentHost {
     await this.loadTasks();
     const settings = await this.settings();
     for (const source of settings.sources) {
+      if (source.hosted) {
+        source.connected = true;
+        source.apiKeyPresent = source.credential === "api-key";
+        source.planEnabled = source.credential === "chatgpt";
+        source.refreshOwner = "server";
+        source.account = (await this.chatgpt.credentials(source.id))?.email;
+        continue;
+      }
       if (source.credential === "chatgpt") {
         const auth = await this.chatgpt.credentials(source.id);
         source.connected = !!auth;
@@ -222,6 +248,8 @@ export class AgentHost {
   async saveSource(input: unknown, apiKey?: unknown) {
     const source = sourceSchema.parse(input),
       settings = await this.settings();
+    if (source.hosted && apiKey !== undefined)
+      throw new Error("这份凭据由来源服务器管理，请在来源服务器更新。");
     if (
       apiKey !== undefined &&
       (source.credential !== "api-key" ||
@@ -265,7 +293,8 @@ export class AgentHost {
       throw new Error("请先停止正在使用模型来源的任务。");
     const settings = await this.settings(),
       source = settings.sources.find((item) => item.id === id);
-    if (source?.credential === "chatgpt") await this.chatgpt.disconnect(id);
+    if (source?.credential === "chatgpt" && !source.hosted)
+      await this.chatgpt.disconnect(id);
     else
       await rm(join(this.options.root, "credentials", id + ".json"), {
         force: true,
@@ -342,6 +371,11 @@ export class AgentHost {
     return source;
   }
   async token(source: ModelSource, force = false) {
+    if (source.hosted) {
+      if (!this.options.resources) throw new Error("服务器资源管理尚未连接。");
+      return (await this.options.resources.token(source.hosted, source, force))
+        .token;
+    }
     if (source.credential === "chatgpt")
       return this.chatgpt.accessToken(source.id, force);
     const saved = await readOptional<{ apiKey: string }>(
@@ -382,11 +416,147 @@ export class AgentHost {
   }
   async authorize(id: string) {
     const source = await this.source(id);
+    if (source.hosted)
+      throw new Error("请在资源来源设备重新授权，再保存到来源服务器。");
     if (source.credential !== "chatgpt")
       throw new Error("此来源使用 API Key。");
     const result = await this.chatgpt.start(id);
     await this.options.openUrl?.(result.url);
     return this.options.openUrl ? { pending: true } : result;
+  }
+  async addServerResource(id: string) {
+    if (!this.options.resources) throw new Error("服务器资源管理尚未连接。");
+    const resource: ResolvedResource | undefined = (
+      await this.options.resources.list()
+    ).find((item) => item.id === id);
+    if (!resource?.available || !resource.connected)
+      throw new Error("这份服务器资源尚不可用，请刷新来源列表。");
+    const existing = (await this.settings()).sources.find(
+      (item) =>
+        item.hosted?.connectionId === resource.connectionId &&
+        item.hosted.resourceId === resource.resourceId,
+    );
+    const source: ModelSource = {
+      id: existing?.id ?? randomUUID(),
+      name: resource.name,
+      provider: resource.provider,
+      baseUrl: resource.baseUrl,
+      model: resource.model,
+      protocol: resource.protocol,
+      credential: resource.credential,
+      hosted: {
+        connectionId: resource.connectionId,
+        resourceId: resource.resourceId,
+        serverName: resource.source.serverName,
+        url: resource.source.url,
+      },
+    };
+    if (source.credential === "chatgpt")
+      await writeProtected(
+        join(this.options.root, "credentials", source.id + ".json"),
+        {
+          refreshOwner: "server",
+          connectionId: `${resource.connectionId}/${resource.resourceId}`,
+          email: resource.account ?? "ChatGPT",
+        },
+      );
+    return this.saveSource(source);
+  }
+  async publishSource(id: string, connectionId: string) {
+    if (!this.options.resources) throw new Error("服务器资源管理尚未连接。");
+    if (
+      this.chatgpt.state.state === "pending" ||
+      this.tasks.some(
+        (task) => task.state === "running" && task.sourceId === id,
+      )
+    )
+      throw new Error("请先完成账号授权或停止使用这份来源的任务。");
+    const transferPath = join(
+      this.options.root,
+      "credentials",
+      `transfer-${id}.json`,
+    );
+    return withLibraryLock(
+      this.options.root,
+      async () => {
+        const current = await this.source(id);
+        let pending = await readOptional<{
+          source: ModelSource;
+          connectionId: string;
+          publicationId: string;
+          secret: Record<string, unknown>;
+        }>(transferPath);
+        if (current.hosted && !pending)
+          throw new Error("这份来源已经由服务器管理。");
+        if (pending && pending.connectionId !== connectionId)
+          throw new Error(
+            "这份授权仍在保存到另一台服务器，请先完成原来的保存。",
+          );
+        if (!pending) {
+          const saved =
+            current.credential === "chatgpt"
+              ? await this.chatgpt.credentials(id)
+              : await readOptional<{ apiKey: string }>(
+                  join(this.options.root, "credentials", id + ".json"),
+                );
+          if (
+            !saved ||
+            ("refreshOwner" in saved && saved.refreshOwner !== "local")
+          )
+            throw new Error("请先在本设备完成来源授权。");
+          if (
+            "refreshOwner" in saved &&
+            (saved.refreshOwner !== "local" ||
+              !saved.scopes.includes("chatgpt.tokens.use.direct"))
+          )
+            throw new Error("请先授权使用 ChatGPT 套餐，再保存到服务器。");
+          pending = {
+            source: current,
+            connectionId,
+            publicationId: randomUUID(),
+            secret: { ...saved, kind: current.credential },
+          };
+          await writeProtected(transferPath, pending);
+        }
+        if (pending.source.credential === "chatgpt") {
+          const latest = await this.chatgpt.credentials(id);
+          if (latest?.refreshOwner === "local") {
+            pending.secret = { ...latest, kind: "chatgpt" };
+            await writeProtected(transferPath, pending);
+          }
+          // Suspend the local refresh owner before contacting the hosted vault.
+          // An unknown HTTP outcome keeps this durable transfer for a retry.
+          await writeProtected(
+            join(this.options.root, "credentials", id + ".json"),
+            {
+              refreshOwner: "server",
+              connectionId: `${connectionId}/${id}`,
+              email: pending.secret.email,
+            },
+          );
+        }
+        const resource = await this.options.resources!.publish(connectionId, {
+          ...pending.source,
+          id,
+          secret: pending.secret,
+          publicationId: pending.publicationId,
+        });
+        await this.saveSource({
+          ...pending.source,
+          hosted: {
+            connectionId,
+            resourceId: resource.id,
+            serverName: resource.source.serverName,
+            url: resource.source.url,
+          },
+        });
+        if (pending.source.credential === "api-key")
+          await rm(join(this.options.root, "credentials", id + ".json"));
+        await rm(transferPath);
+        return this.status();
+      },
+      "publish-model-resource",
+    );
   }
   private async prepareIsolation() {
     const paths = await this.installer.paths();
@@ -1102,6 +1272,17 @@ export class AgentHost {
         return this.save(args.settings);
       case "agent:source":
         return this.saveSource(args.source, args.apiKey);
+      case "agent:serverResources":
+        if (!this.options.resources)
+          throw new Error("服务器资源管理尚未连接。");
+        return this.options.resources.list();
+      case "agent:addServerResource":
+        return this.addServerResource(z.string().parse(args.id));
+      case "agent:publishSource":
+        return this.publishSource(
+          z.string().uuid().parse(args.id),
+          z.string().uuid().parse(args.connectionId),
+        );
       case "agent:removeSource":
         return this.removeSource(z.string().uuid().parse(args.id));
       case "agent:install":
@@ -1158,6 +1339,9 @@ export class AgentHost {
   }
 }
 export const agentActions = new Set([
+  "agent:serverResources",
+  "agent:addServerResource",
+  "agent:publishSource",
   "agent:status",
   "agent:scan",
   "agent:settings",

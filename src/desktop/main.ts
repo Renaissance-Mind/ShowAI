@@ -1,4 +1,5 @@
 import { changedResources } from "../core/change-notification";
+import { ModelResourceClient } from "../sync/model-resources";
 import "./component-thumbnails";
 import {
   app,
@@ -155,6 +156,7 @@ async function useHome(home?: string): Promise<void> {
               "tmp",
               "node_modules",
               "repository.git",
+              "history",
               "local",
               "cache",
               "index.sqlite",
@@ -274,6 +276,14 @@ async function handle(
   maintenance?.markActivity();
   if (agentActions.has(action)) return agentHost!.action(action, args);
   return createWorkbench(store, service, {
+    preferencesChanged: () =>
+      broadcast("files", {
+        type: "files",
+        home: store.root,
+        projectIds: [],
+        pageIds: [],
+        projects: true,
+      }),
     info,
     openDialog: (options) =>
       dialog.showOpenDialog(window, options as Electron.OpenDialogOptions),
@@ -565,6 +575,7 @@ else {
         );
       }
       agentHost = new AgentHost({
+        resources: new ModelResourceClient(() => store.root),
         root: join(app.getPath("userData"), "agent-host"),
         workspaceRoot: join(
           app.getPath("documents"),

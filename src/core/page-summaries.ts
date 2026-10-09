@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { GitLibrary } from "./git-library";
+import { ContentLibrary as GitLibrary } from "./content-library";
 import { atomicLibraryFile, readLibraryBytes } from "./library-files";
 import { parseArtifact } from "../portable/validation.mjs";
 import { documentHash, indexBlocks, normalizeDocument } from "./diff";

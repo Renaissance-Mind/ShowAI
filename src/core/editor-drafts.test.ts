@@ -5,7 +5,7 @@ import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { EditorDrafts } from "./editor-drafts";
-import { GitLibrary } from "./git-library";
+import { ContentLibrary as GitLibrary } from "./content-library";
 import { FileStore } from "./store";
 import type { EditorDraftInput } from "./editor-drafts";
 describe("persistent local editor drafts", () => {

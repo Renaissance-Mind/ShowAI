@@ -1,6 +1,6 @@
 import { extname, join } from "node:path";
 import { lstat, readdir, rm } from "node:fs/promises";
-import { GitLibrary } from "./git-library";
+import { ContentLibrary as GitLibrary } from "./content-library";
 import { WorkspaceProtection, workspaceHash } from "./workspace-conflicts";
 import { withLibraryLock } from "./library-lock";
 import {

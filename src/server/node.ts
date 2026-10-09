@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile, writeFile, chmod, lstat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { once } from "node:events";
 import { join, resolve } from "node:path";
@@ -9,7 +9,7 @@ import {
   maximumEventInput,
   type EventIdentity,
 } from "../sync/events";
-import { SyncError } from "../sync/protocol";
+import { SyncError, token } from "../sync/protocol";
 import type { EventPeer } from "./events";
 import { serverBaseUrl } from "../sync/server-url";
 import { createSyncServer, type ServerOptions } from "./app";
@@ -35,10 +35,59 @@ export async function startSyncServer(
 ): Promise<{ server: Server; url: string; close(): Promise<void> }> {
   const home = resolve(options.home);
   await mkdir(home, { recursive: true });
+  const keyPath = join(home, "vault.key");
+  let vaultKey = options.vaultKey;
+  if (!vaultKey) {
+    vaultKey = await readFile(keyPath, "utf8").catch(
+      async (error: NodeJS.ErrnoException) => {
+        if (error.code !== "ENOENT") throw error;
+        const existing = await lstat(join(home, "metadata.sqlite")).catch(
+          (error: NodeJS.ErrnoException) => {
+            if (error.code === "ENOENT") return undefined;
+            throw error;
+          },
+        );
+        if (existing) {
+          const probe = new SQLiteMetadata(join(home, "metadata.sqlite"));
+          try {
+            for (const table of [
+              "account_identities",
+              "account_resources",
+              "login_flows",
+            ]) {
+              if (
+                (
+                  await probe.all(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                    [table],
+                  )
+                ).length &&
+                (await probe.all(`SELECT 1 FROM ${table} LIMIT 1`)).length
+              )
+                throw new Error(
+                  "This restored server contains encrypted credentials. Restore its original vault.key or supply SHOWAI_VAULT_KEY before starting.",
+                );
+            }
+          } finally {
+            probe.close();
+          }
+        }
+        const key = token();
+        await writeFile(keyPath, key, { mode: 0o600, flag: "wx" }).catch(
+          (error: NodeJS.ErrnoException) => {
+            if (error.code !== "EEXIST") throw error;
+          },
+        );
+        return readFile(keyPath, "utf8");
+      },
+    );
+    await chmod(keyPath, 0o600);
+  }
   const metadata = new SQLiteMetadata(join(home, "metadata.sqlite"));
   const peers = new Set<EventPeer>();
   const app = createSyncServer({
     ...options,
+    vaultKey,
     metadata,
     objects: new DiskObjects(join(home, "objects")),
     eventPeers: options.realtime === false ? undefined : () => peers,

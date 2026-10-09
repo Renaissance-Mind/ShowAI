@@ -13,6 +13,12 @@ export interface ModelSource {
   connected?: boolean;
   planEnabled?: boolean;
   refreshOwner?: "local" | "server";
+  hosted?: {
+    connectionId: string;
+    resourceId: string;
+    serverName: string;
+    url: string;
+  };
 }
 export interface AgentSettings {
   mode: AgentMode;

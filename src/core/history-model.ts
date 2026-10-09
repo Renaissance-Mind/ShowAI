@@ -63,6 +63,7 @@ export interface LibraryManifest {
   version: 2;
   id: string;
   createdAt: string;
+  storage?: "sqlite";
 }
 
 export type FileChanges = Map<string, Buffer | null>;

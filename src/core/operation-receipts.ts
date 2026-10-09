@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { CoreError } from "./model";
 import { safeLibraryPath } from "./library-files";
-import type { GitLibrary } from "./git-library";
+import type { ContentLibrary as GitLibrary } from "./content-library";
 import type { HistoryEntry } from "./history-model";
 const key = (operationId: string) =>
   createHash("sha256").update(operationId).digest("hex");
@@ -11,7 +11,12 @@ const key = (operationId: string) =>
 /** Rebuildable operation lookup; the committed change remains the source of truth. */
 export class OperationReceipts {
   readonly path: string;
-  constructor(readonly library: GitLibrary) {
+  constructor(
+    readonly library: Pick<
+      GitLibrary,
+      "root" | "head" | "history" | "isAncestor" | "entryAt"
+    >,
+  ) {
     this.path = join(library.root, "local", "operation-index.sqlite");
   }
   private async database() {
