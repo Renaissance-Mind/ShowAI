@@ -602,7 +602,20 @@ export class FileStore {
           .filter((key) => !ordered.includes(key)),
         ...ordered,
       ];
-      if (input.kind === "folder") {
+      if (input.reorderOnly) {
+        const item = (input.kind === "folder" ? folders : pages).find(
+          (item) => item.id === id,
+        );
+        if (
+          projectId !== destinationProjectId ||
+          !item ||
+          item.parentId !== parentId
+        )
+          throw new CoreError(
+            "CONFLICT",
+            "The item changed folders before reordering. Refresh and try again.",
+          );
+      } else if (input.kind === "folder") {
         if (projectId !== destinationProjectId)
           throw new CoreError(
             "INVALID_DATA",

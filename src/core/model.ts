@@ -55,6 +55,8 @@ export interface SidebarOrganization {
 }
 
 export interface SidebarEntryMove {
+  /** Change only sibling order, without updating page content or requiring its revision. */
+  reorderOnly?: boolean;
   kind: "page" | "folder";
   projectId: string;
   id: string;

@@ -93,6 +93,7 @@ import {
   type LibraryDrop,
 } from "./LibraryDrag";
 import { orderSidebarItems } from "../core/sidebar-order";
+import { applySidebarReorder, type SidebarReorder } from "./sidebar-reorder";
 import { readSidebarExpansion, sidebarExpansionKey } from "./sidebar-state";
 import SidebarNavigation from "./SidebarNavigation";
 import TemplateNavigation, {
@@ -243,10 +244,31 @@ export default function Studio() {
   const windowFullscreen = useWindowFullscreen();
   const [info, setInfo] = useState<DesktopInfo | null>(null);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
-  const [organization, setOrganization] = useState<SidebarOrganization>({
+  const [savedOrganization, setOrganization] = useState<SidebarOrganization>({
     groups: [],
     projectGroups: {},
   });
+  const [pendingReorders, setPendingReorders] = useState<
+    (SidebarReorder & { token: number; home: string })[]
+  >([]);
+  const reorderQueue = useRef(Promise.resolve());
+  const sidebarRevision = useRef(0);
+  const reorderCount = useRef(0);
+  const organization = useMemo(
+    () =>
+      pendingReorders
+        .filter((move) => move.home === info?.home)
+        .reduce(applySidebarReorder, savedOrganization),
+    [pendingReorders, savedOrganization, info?.home],
+  );
+  useEffect(
+    () =>
+      desktop.onBeforeClose(async () => {
+        await reorderQueue.current;
+        return true;
+      }),
+    [],
+  );
   const [groupMenu, setGroupMenu] = useState<{
     group: ProjectGroup;
     anchor: HTMLElement;
@@ -462,6 +484,7 @@ export default function Studio() {
   const refresh = useMemo(
     () =>
       coalescedTask(async () => {
+        const revision = sidebarRevision.current;
         const appInfo = await desktop.invoke<DesktopInfo>("app:info");
         const scope = { expectedHome: appInfo.home };
         const [next, sidebar] = await Promise.all([
@@ -470,7 +493,8 @@ export default function Studio() {
         ]);
         const verifiedInfo = await desktop.invoke<DesktopInfo>("app:info");
         if (verifiedInfo.home !== appInfo.home) return;
-        if (sidebarHome.current !== appInfo.home) {
+        const changedHome = sidebarHome.current !== appInfo.home;
+        if (changedHome) {
           const saved = readSidebarExpansion(appInfo.home);
           sidebarHome.current = appInfo.home;
           expandedRef.current = saved.projects;
@@ -480,7 +504,11 @@ export default function Studio() {
         }
         setInfo(appInfo);
         setProjects(next);
-        setOrganization(sidebar);
+        if (
+          changedHome ||
+          (revision === sidebarRevision.current && !reorderCount.current)
+        )
+          setOrganization(sidebar);
         setNavigationUpdating(false);
         performance.clearMarks("showai:navigation-current");
         performance.mark("showai:navigation-current");
@@ -1059,8 +1087,77 @@ export default function Studio() {
     await refresh();
   }
   const movingLibrary = useRef(false);
+  function reorderLibraryItem(drop: LibraryDrop) {
+    const source = drop.source;
+    const current = contents[source.projectId];
+    const home = info?.home;
+    if (!current || !home) return;
+    const siblings = [
+      ...current.folders.map((item) => ({ ...item, pinned: !!item.pinned })),
+      ...current.pages.map((item) => ({ ...item, pinned: !!item.favorite })),
+    ]
+      .filter((item) => item.parentId === source.parentId)
+      .sort((a, b) => Number(b.pinned) - Number(a.pinned))
+      .map((item) => item.id);
+    const token = ++sidebarRevision.current;
+    reorderCount.current++;
+    setPendingReorders((pending) => [
+      ...pending,
+      {
+        token,
+        home,
+        projectId: source.projectId,
+        id: source.id,
+        siblings,
+        relativeId: drop.relativeId,
+        placement: drop.placement,
+      },
+    ]);
+    reorderQueue.current = reorderQueue.current.then(async () => {
+      let failed = false;
+      try {
+        const saved = await desktop.invoke<SidebarOrganization>(
+          "sidebar:moveEntry",
+          {
+            expectedHome: home,
+            reorderOnly: true,
+            kind: source.kind,
+            projectId: source.projectId,
+            destinationProjectId: source.projectId,
+            id: source.id,
+            parentId: source.parentId,
+            relativeId: drop.relativeId,
+            placement: drop.placement,
+          },
+        );
+        if (sidebarHome.current === home) {
+          setOrganization(saved);
+          setNotice("已调整位置");
+        }
+      } catch (error) {
+        failed = true;
+        report(error);
+      } finally {
+        sidebarRevision.current++;
+        reorderCount.current--;
+        setPendingReorders((pending) =>
+          pending.filter((move) => move.token !== token),
+        );
+        if (failed && sidebarHome.current === home)
+          void refresh().catch(report);
+      }
+    });
+  }
   async function dropLibraryItem(drop: LibraryDrop) {
     if (movingLibrary.current) return;
+    if (
+      drop.source.kind !== "project" &&
+      drop.source.projectId === drop.projectId &&
+      drop.source.parentId === drop.parentId
+    ) {
+      reorderLibraryItem(drop);
+      return;
+    }
     movingLibrary.current = true;
     const source = drop.source;
     const reopen =
@@ -1070,6 +1167,7 @@ export default function Studio() {
     let moved = false;
     let cleared = false;
     try {
+      await reorderQueue.current;
       if (!(await page.flush())) {
         setView("page");
         return;

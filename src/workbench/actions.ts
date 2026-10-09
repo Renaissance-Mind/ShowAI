@@ -782,6 +782,7 @@ export function createWorkbench(
           destination = assertId(required(args, "destinationProjectId"));
         return store.arrangeEntry(
           {
+            reorderOnly: args.reorderOnly === true,
             kind,
             projectId: source,
             id: assertId(required(args, "id")),

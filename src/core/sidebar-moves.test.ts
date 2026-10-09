@@ -154,6 +154,67 @@ describe.each([false, true])("sidebar moves (versioned: %s)", (versioned) => {
     if (versioned) await new GitLibrary(home).verify();
   });
 
+  it("reorders without a page revision and keeps the editor's save base valid", async () => {
+    const project = await store.createProject({ name: "Reorder" });
+    const a = await store.createPage(project.id, { title: "A" });
+    const b = await store.createPage(project.id, { title: "B" });
+    const move = {
+      reorderOnly: true,
+      kind: "page" as const,
+      projectId: project.id,
+      destinationProjectId: project.id,
+      id: a.document.id,
+      parentId: null,
+      relativeId: b.document.id,
+    };
+    await store.arrangeEntry(move);
+    const reordered = await store.readPage(project.id, a.document.id);
+    expect(reordered.hash).toBe(a.hash);
+    expect(reordered.revision).toBe(a.revision);
+    expect(reordered.document).toEqual(a.document);
+    const edited = await store.updatePageMetadata(
+      project.id,
+      a.document.id,
+      { title: "Edited while sorting" },
+      a.hash,
+      a.revision,
+    );
+    await store.arrangeEntry({ ...move, placement: "after" });
+    const reopened = new FileStore(home);
+    expect((await reopened.readPage(project.id, a.document.id)).hash).toBe(
+      edited.hash,
+    );
+    expect((await reopened.readSidebar()).entryOrder![project.id]).toEqual([
+      b.document.id,
+      a.document.id,
+    ]);
+  });
+
+  it("rejects reorder-only requests that would move an item or use a stale parent", async () => {
+    const project = await store.createProject({ name: "Reorder" });
+    const other = await store.createProject({ name: "Other" });
+    const folder = await store.createFolder(project.id, { name: "Folder" });
+    const page = await store.createPage(project.id, { parentId: folder.id });
+    const sidebar = await store.readSidebar();
+    for (const destinationProjectId of [project.id, other.id]) {
+      await expect(
+        store.arrangeEntry({
+          reorderOnly: true,
+          kind: "page",
+          projectId: project.id,
+          destinationProjectId,
+          id: page.document.id,
+          parentId: null,
+        }),
+      ).rejects.toMatchObject({ code: "CONFLICT" });
+    }
+    expect(await store.readSidebar()).toEqual(sidebar);
+    expect((await store.readPage(project.id, page.document.id)).hash).toBe(
+      page.hash,
+    );
+    if (versioned) await new GitLibrary(home).verify();
+  });
+
   it("rejects stale pages, invalid destinations and cyclic folder moves without changing organization", async () => {
     const project = await store.createProject({ name: "Research" });
     const folder = await store.createFolder(project.id, { name: "Folder" });
