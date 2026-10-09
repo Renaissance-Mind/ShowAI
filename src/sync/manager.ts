@@ -12,6 +12,7 @@ import { WorkspaceProtection } from "../core/workspace-conflicts";
 import { serverBaseUrl, serverEndpoint, invitationBaseUrl } from "./server-url";
 import { cacheDownload } from "./object-cache";
 import { resumableUpload } from "./resumable-upload";
+import { retryUpload } from "./upload-retry";
 import {
   retainSyncConflicts,
   type RetainedConflict,
@@ -84,7 +85,20 @@ async function readJson<T>(path: string): Promise<T | undefined> {
 }
 export class SyncManager {
   private running: Promise<unknown> | undefined;
-  private timer?: ReturnType<typeof setInterval>;
+  private timer?: ReturnType<typeof setTimeout>;
+  private started = false;
+  private queuedAll = false;
+  private queued = new Set<string>();
+  private forceQueued = false;
+  private dirty = new Set<string>();
+  private activeUntil = 0;
+  private idleRounds = 0;
+  private failedRounds = 0;
+  private metrics = { cycles: 0, scanned: 0, skipped: 0, nextPollAt: 0 };
+  private observed = new Map<
+    string,
+    { global: string | null; resource: string | null; identity: string }
+  >();
   constructor(readonly home: string) {}
   private get root() {
     return join(this.home, "local", "sync");
@@ -193,6 +207,7 @@ export class SyncManager {
         ({ token: _token, ...connection }) => connection,
       ),
       running: !!this.running,
+      scheduler: { ...this.metrics, activeUntil: this.activeUntil },
     };
   }
   async connect(input: {
@@ -750,71 +765,92 @@ export class SyncManager {
         "POST",
         { digests: ids.slice(offset, offset + 500) },
       );
-      for (const digest of missing) {
-        const bytes = captured.objects.get(digest)!;
-        if (
-          connection.capabilities?.includes("resumable-objects-v1") &&
-          bytes.length >= 5 * 1024 * 1024
-        ) {
-          await resumableUpload(
-            `${connection.url}/api/projects/${project.remoteProjectId}/objects`,
-            connection.token,
-            digest,
-            bytes,
-          );
+      let next = 0;
+      const send = async () => {
+        while (next < missing.length) {
+          const digest = missing[next++];
+          if (!captured.objects.has(digest))
+            throw new CoreError("INVALID_DATA", "服务器请求了快照以外的资源。");
+          const bytes = captured.objects.get(digest)!;
+          if (
+            connection.capabilities?.includes("resumable-objects-v1") &&
+            bytes.length >= 5 * 1024 * 1024
+          ) {
+            await resumableUpload(
+              `${connection.url}/api/projects/${project.remoteProjectId}/objects`,
+              connection.token,
+              digest,
+              bytes,
+            );
+            await atomicLibraryFile(
+              this.home,
+              this.objectPath(digest, this.cacheKey(connection, project)),
+              bytes,
+            );
+            continue;
+          }
+          await retryUpload(async () => {
+            const response = await fetch(
+              `${connection.url}/api/projects/${project.remoteProjectId}/objects/${digest}`,
+              {
+                method: "PUT",
+                body: (() => {
+                  let offset = 0;
+                  return new ReadableStream<Uint8Array>({
+                    pull(controller) {
+                      if (offset === bytes.length) {
+                        controller.close();
+                        return;
+                      }
+                      const count = Math.min(64 * 1024, bytes.length - offset);
+                      controller.enqueue(
+                        new Uint8Array(
+                          bytes.buffer,
+                          bytes.byteOffset + offset,
+                          count,
+                        ),
+                      );
+                      offset += count;
+                    },
+                  });
+                })(),
+                duplex: "half",
+                headers: {
+                  authorization: `Bearer ${connection.token}`,
+                  "content-length": String(bytes.length),
+                },
+                signal: AbortSignal.timeout(60_000),
+              } as RequestInit,
+            );
+            if ([502, 503, 504].includes(response.status)) {
+              await response.body?.cancel();
+              throw new SyncError(
+                response.status,
+                "UPLOAD_UNAVAILABLE",
+                "上传服务暂时不可用。",
+              );
+            }
+            if (!response.ok) {
+              const value = await response.json();
+              throw new SyncError(
+                response.status,
+                value.error?.code ?? "UPLOAD_FAILED",
+                value.error?.message ?? "上传资源失败。",
+              );
+            }
+          });
           await atomicLibraryFile(
             this.home,
             this.objectPath(digest, this.cacheKey(connection, project)),
             bytes,
           );
-          continue;
         }
-        const response = await fetch(
-          `${connection.url}/api/projects/${project.remoteProjectId}/objects/${digest}`,
-          {
-            method: "PUT",
-            body: (() => {
-              let offset = 0;
-              return new ReadableStream<Uint8Array>({
-                pull(controller) {
-                  if (offset === bytes.length) {
-                    controller.close();
-                    return;
-                  }
-                  const count = Math.min(64 * 1024, bytes.length - offset);
-                  controller.enqueue(
-                    new Uint8Array(
-                      bytes.buffer,
-                      bytes.byteOffset + offset,
-                      count,
-                    ),
-                  );
-                  offset += count;
-                },
-              });
-            })(),
-            duplex: "half",
-            headers: {
-              authorization: `Bearer ${connection.token}`,
-              "content-length": String(bytes.length),
-            },
-            signal: AbortSignal.timeout(60_000),
-          } as RequestInit,
-        );
-        if (!response.ok) {
-          const value = await response.json();
-          throw new SyncError(
-            response.status,
-            value.error?.code ?? "UPLOAD_FAILED",
-            value.error?.message ?? "上传资源失败。",
-          );
-        }
-        await atomicLibraryFile(
-          this.home,
-          this.objectPath(digest, this.cacheKey(connection, project)),
-          bytes,
-        );
-      }
+      };
+      const completed = await Promise.allSettled(
+        Array.from({ length: Math.min(2, missing.length) }, send),
+      );
+      const failure = completed.find((item) => item.status === "rejected");
+      if (failure?.status === "rejected") throw failure.reason;
     }
     await this.cacheRecord(connection, project, captured);
     return this.request<{ revision: string; head: string; published: boolean }>(
@@ -912,8 +948,10 @@ export class SyncManager {
   private async synchronize(
     project: ProjectConnection,
     connection: ServerConnection,
+    suppliedRemote?: SyncProject,
+    suppliedDeviceId?: string,
   ) {
-    const deviceId = (await this.configuration()).deviceId;
+    const deviceId = suppliedDeviceId ?? (await this.configuration()).deviceId;
     if (project.pendingCreation) {
       const metadata = await new FileStore(this.home).readProject(
         project.projectId,
@@ -934,11 +972,14 @@ export class SyncManager {
         role: created.role,
       });
     }
-    const remote = await this.request<SyncProject>(
-      connection,
-      `/api/projects/${project.remoteProjectId}`,
-    );
-    await this.state(project.projectId, { role: remote.role });
+    const remote =
+      suppliedRemote ??
+      (await this.request<SyncProject>(
+        connection,
+        `/api/projects/${project.remoteProjectId}`,
+      ));
+    if (project.role !== remote.role)
+      await this.state(project.projectId, { role: remote.role });
     project.role = remote.role;
     const library = new GitLibrary(this.home);
     await library.recover();
@@ -1385,26 +1426,125 @@ export class SyncManager {
         });
       }
   }
-  async run(
-    projectId?: string,
-  ): Promise<Awaited<ReturnType<SyncManager["status"]>>> {
-    if (this.running) {
-      await this.running;
-      return this.run(projectId);
-    }
-    this.running = (async () => {
-      await this.enrollNewProjects(projectId);
-      const config = await this.configuration();
-      for (const project of config.projects.filter(
-        (item) => !projectId || item.projectId === projectId,
-      )) {
-        const connection = config.connections.find(
-          (item) => item.id === project.connectionId,
-        );
-        if (!connection) continue;
+  private async cycle(projectIds: Set<string> | undefined, force: boolean) {
+    this.metrics.cycles++;
+    await this.enrollNewProjects(
+      projectIds?.size === 1 ? [...projectIds][0] : undefined,
+    );
+    const config = await this.configuration();
+    const selected = config.projects.filter(
+      (item) => !projectIds || projectIds.has(item.projectId),
+    );
+    const library = new GitLibrary(this.home);
+    const global = await library.head();
+    let changed = false,
+      failed = false;
+    for (const connection of config.connections) {
+      const projects = selected.filter(
+        (item) => item.connectionId === connection.id,
+      );
+      if (!projects.length) continue;
+      const heads = new Map<string, SyncProject>();
+      let batchError: unknown;
+      const batched = connection.capabilities?.includes("batch-heads-v1");
+      if (batched) {
+        const ids = [
+          ...new Set(
+            projects
+              .filter((item) => !item.pendingCreation)
+              .map((item) => item.remoteProjectId),
+          ),
+        ];
         try {
-          await this.synchronize(project, connection);
+          for (let offset = 0; offset < ids.length; offset += 400) {
+            const response = await this.request<{
+              serverId: string;
+              projects: SyncProject[];
+            }>(connection, "/api/projects/heads", "POST", {
+              ids: ids.slice(offset, offset + 400),
+            });
+            if (response.serverId !== connection.serverId)
+              throw new CoreError(
+                "INVALID_DATA",
+                "服务器身份已改变，请重新连接。原有内容仍保留。",
+              );
+            for (const remote of response.projects)
+              heads.set(remote.id, remote);
+          }
         } catch (error) {
+          batchError = error;
+        }
+      }
+      for (const project of projects) {
+        try {
+          if (batchError) throw batchError;
+          const remote =
+            batched || project.pendingCreation
+              ? heads.get(project.remoteProjectId)
+              : await this.request<SyncProject>(
+                  connection,
+                  `/api/projects/${project.remoteProjectId}`,
+                );
+          if (batched && !project.pendingCreation && !remote)
+            throw new SyncError(
+              403,
+              "FORBIDDEN",
+              "项目不存在或访问权限已撤销。",
+            );
+          const identity = JSON.stringify([
+            connection.serverId,
+            connection.user.id,
+            project.remoteProjectId,
+          ]);
+          const memo = this.observed.get(project.projectId);
+          const resource =
+            memo?.global === global
+              ? memo.resource
+              : global
+                ? await library.resourceRevision(
+                    `projects/${project.projectId}`,
+                    global,
+                  )
+                : null;
+          if (
+            !force &&
+            !this.dirty.has(project.projectId) &&
+            remote &&
+            project.status === "synced" &&
+            !project.pendingCreation &&
+            remote.head === project.remoteHead &&
+            remote.role === project.role &&
+            memo?.identity === identity &&
+            memo.resource === resource
+          ) {
+            memo.global = global;
+            this.metrics.skipped++;
+            continue;
+          }
+          this.dirty.delete(project.projectId);
+          const before = project.remoteHead;
+          this.metrics.scanned++;
+          await this.synchronize(project, connection, remote, config.deviceId);
+          const saved = (await this.configuration()).projects.find(
+            (item) => item.projectId === project.projectId,
+          );
+          // Anchor the memo at the last synchronized revision. A concurrent new commit
+          // must remain visible on the next cycle, even if it arrived during upload.
+          const revision = saved?.localRevision ?? null;
+          this.observed.set(project.projectId, {
+            global: revision,
+            resource: revision
+              ? await library.resourceRevision(
+                  `projects/${project.projectId}`,
+                  revision,
+                )
+              : null,
+            identity,
+          });
+          changed ||= before !== saved?.remoteHead;
+        } catch (error) {
+          failed = true;
+          this.observed.delete(project.projectId);
           const status =
             error instanceof CoreError && error.conflictId
               ? "save-failed"
@@ -1424,26 +1564,94 @@ export class SyncManager {
           });
         }
       }
-    })();
-    try {
-      await this.running;
-    } finally {
-      this.running = undefined;
     }
+    if (changed) this.activeUntil = Date.now() + 60_000;
+    this.idleRounds = changed ? 0 : this.idleRounds + 1;
+    this.failedRounds = failed ? this.failedRounds + 1 : 0;
+  }
+  private dispatch(
+    projectIds?: Iterable<string>,
+    force = false,
+  ): Promise<unknown> {
+    if (projectIds) for (const id of projectIds) this.queued.add(id);
+    else this.queuedAll = true;
+    this.forceQueued ||= force;
+    if (this.running) return this.running;
+    this.running = (async () => {
+      while (this.queuedAll || this.queued.size) {
+        const selected = this.queuedAll ? undefined : new Set(this.queued);
+        const complete = this.forceQueued;
+        this.queuedAll = false;
+        this.queued.clear();
+        this.forceQueued = false;
+        await this.cycle(selected, complete);
+      }
+    })().finally(() => {
+      this.running = undefined;
+      this.schedule();
+    });
+    return this.running;
+  }
+  async run(
+    projectId?: string,
+  ): Promise<Awaited<ReturnType<SyncManager["status"]>>> {
+    await this.dispatch(projectId ? [projectId] : undefined, true);
     return this.status();
   }
-  start() {
-    if (this.timer) return;
-    this.timer = setInterval(() => {
-      void this.run().catch((error) =>
+  /** Existing filesystem watchers supply dirty projects; foreground/network wakes
+   * only refresh heads and activate polling, without forcing every project scan. */
+  wake(projectIds?: string[], invalidateAll = false) {
+    this.activeUntil = Date.now() + 60_000;
+    this.idleRounds = 0;
+    this.failedRounds = 0;
+    for (const id of projectIds ?? []) this.dirty.add(id);
+    if (invalidateAll)
+      for (const id of this.observed.keys()) this.dirty.add(id);
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = undefined;
+    this.metrics.nextPollAt = 0;
+    if (this.running) {
+      void this.dispatch().catch((error) =>
+        console.error("Project sync wake failed", error),
+      );
+    } else if (this.started) {
+      this.timer = setTimeout(() => {
+        this.timer = undefined;
+        void this.dispatch().catch((error) =>
+          console.error("Project sync wake failed", error),
+        );
+      }, 200);
+      this.timer.unref();
+    }
+  }
+  private schedule() {
+    if (!this.started || this.timer) return;
+    const base = this.failedRounds
+      ? Math.min(300_000, 5000 * 2 ** Math.min(this.failedRounds, 6))
+      : Date.now() < this.activeUntil
+        ? 2000
+        : Math.min(60_000, 10_000 * 2 ** Math.min(this.idleRounds, 3));
+    const delay = Math.round(base * (0.9 + Math.random() * 0.2));
+    this.metrics.nextPollAt = Date.now() + delay;
+    this.timer = setTimeout(() => {
+      this.timer = undefined;
+      void this.dispatch().catch((error) =>
         console.error("Project sync failed", error),
       );
-    }, 5000);
+    }, delay);
     this.timer.unref();
   }
+  start() {
+    if (this.started) return;
+    this.started = true;
+    this.activeUntil = Date.now() + 60_000;
+    this.schedule();
+  }
   async stop() {
-    if (this.timer) clearInterval(this.timer);
+    this.started = false;
+    if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
+    this.metrics.nextPollAt = 0;
     await this.running;
   }
   async assertEditable(projectId: string) {

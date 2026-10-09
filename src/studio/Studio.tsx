@@ -219,6 +219,22 @@ function Scope({ value }: { value: string }) {
 }
 
 export default function Studio() {
+  useEffect(() => {
+    const wake = () => {
+      if (document.visibilityState === "visible" && navigator.onLine)
+        void desktop
+          .invoke("sync:wake")
+          .catch((error) => console.error("Sync wake failed", error));
+    };
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("focus", wake);
+    window.addEventListener("online", wake);
+    return () => {
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("focus", wake);
+      window.removeEventListener("online", wake);
+    };
+  }, []);
   const [navigationUpdating, setNavigationUpdating] = useState(true);
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [routing, setRouting] = useState(false);

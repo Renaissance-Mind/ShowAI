@@ -86,6 +86,7 @@ export const workbenchActions = new Set([
   "sync:dashboard",
   "sync:manage",
   "sync:run",
+  "sync:wake",
   "sync:conflict",
   "sync:resolve",
   "sync:sessions",
@@ -457,6 +458,9 @@ export function createWorkbench(
         }
         case "sync:run":
           return sync.run(text(args, "projectId", true));
+        case "sync:wake":
+          sync.wake();
+          return { scheduled: true };
         case "sync:conflict":
           return sync.conflict(projectId(args));
         case "sync:resolve":

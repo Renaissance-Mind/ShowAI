@@ -139,7 +139,13 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       paths.add(path);
       clearTimeout(timer);
       timer = setTimeout(() => {
-        notify("files", changedResources(store.root, paths));
+        const change = changedResources(store.root, paths);
+        notify("files", change);
+        if (change.projectIds?.length || change.catalog || change.all)
+          syncManager(store.root).wake(
+            change.catalog || change.all ? undefined : change.projectIds,
+            !!(change.catalog || change.all),
+          );
         paths.clear();
       }, 180);
     });

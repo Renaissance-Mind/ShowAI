@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { SyncError } from "./protocol";
+import { retryUpload } from "./upload-retry";
 
 interface UploadStatus {
   id: string | null;
@@ -19,7 +20,7 @@ export async function resumableUpload(
     body?: BodyInit,
     contentType?: string,
   ): Promise<T> => {
-    for (let attempt = 0; ; attempt++) {
+    return retryUpload(async () => {
       const response = await fetch(url + path, {
         method,
         headers: {
@@ -29,33 +30,23 @@ export async function resumableUpload(
         body,
         signal: AbortSignal.timeout(120_000),
       });
+      if ([502, 503, 504].includes(response.status)) {
+        await response.body?.cancel();
+        throw new SyncError(
+          response.status,
+          "UPLOAD_UNAVAILABLE",
+          "上传服务暂时不可用。",
+        );
+      }
       const value = await response.json();
       if (response.ok) return value as T;
-      if (
-        attempt < 4 &&
-        ((response.status === 429 && value.error?.code === "BUSY") ||
-          (response.status === 409 &&
-            value.error?.code === "UPLOAD_IN_PROGRESS"))
-      ) {
-        await new Promise((resolve) =>
-          setTimeout(
-            resolve,
-            Math.min(
-              5000,
-              Number(response.headers.get("retry-after") ?? 1) * 1000,
-            ) *
-              (0.8 + Math.random() * 0.4),
-          ),
-        );
-        continue;
-      }
       throw new SyncError(
         response.status,
         value.error?.code ?? "UPLOAD_FAILED",
         value.error?.message ?? "上传失败。",
         value.error?.details,
       );
-    }
+    });
   };
   const initial = await request<UploadStatus>(
     "/uploads",
@@ -101,7 +92,11 @@ export async function resumableUpload(
     await request(
       `/uploads/${initial.id}/parts/${index}?digest=${name}`,
       "PUT",
-      new Uint8Array(block.buffer as ArrayBuffer, block.byteOffset, block.length),
+      new Uint8Array(
+        block.buffer as ArrayBuffer,
+        block.byteOffset,
+        block.length,
+      ),
     );
   }
   await request(`/uploads/${initial.id}/complete`, "POST");

@@ -11,6 +11,7 @@ import {
   SyncError,
   type ProjectRole,
   type ProjectSnapshot,
+  type SyncProject,
 } from "../sync/protocol";
 import { type MetadataStore, type ObjectStore } from "./storage";
 import { prepareMetadata } from "./migrations";
@@ -324,6 +325,7 @@ export function createSyncServer(options: ServerOptions) {
           "object-manifests-v1",
           "storage-quotas-v1",
           "resumable-objects-v1",
+          "batch-heads-v1",
         ],
       });
     if (path === "/api/auth/register" && method === "POST") {
@@ -461,6 +463,28 @@ export function createSyncServer(options: ServerOptions) {
           )
         ).map((project) => ({ ...project, archived: !!project.archived })),
       );
+    if (path === "/api/projects/heads" && method === "POST") {
+      const input = await body(request);
+      if (!Array.isArray(input.ids) || input.ids.length > 400)
+        throw new SyncError(
+          400,
+          "INVALID_PROJECTS",
+          "Check at most 400 project heads per request.",
+        );
+      const ids = [...new Set(input.ids.map(identifier))],
+        projects: SyncProject[] = [];
+      for (let offset = 0; offset < ids.length; offset += 80) {
+        const chunk = ids.slice(offset, offset + 80);
+        const rows = await db.all<ProjectRow>(
+          `SELECT p.*,m.role FROM projects p JOIN members m ON m.project_id=p.id WHERE m.user_id=? AND p.id IN(${chunk.map(() => "?").join(",")})`,
+          [user.id, ...chunk],
+        );
+        projects.push(
+          ...rows.map((row) => ({ ...row, archived: !!row.archived })),
+        );
+      }
+      return json({ serverId: await serverId(), projects });
+    }
     if (path === "/api/projects" && method === "POST") {
       const input = await body(request),
         id = identifier(input.id ?? crypto.randomUUID()),
