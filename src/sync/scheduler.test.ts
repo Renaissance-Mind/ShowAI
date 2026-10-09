@@ -8,6 +8,7 @@ import { SyncManager } from "./manager";
 import { GitLibrary } from "../core/git-library";
 import { FileStore } from "../core/store";
 import { startSyncServer } from "../server/node";
+import { eventCapability } from "./events";
 
 const cleanup: (() => Promise<unknown>)[] = [];
 afterEach(async () => {
@@ -92,7 +93,7 @@ async function fixture(dropFirstUpload = false) {
       library = new GitLibrary(home);
     await library.initialize();
     const store = new FileStore(home),
-      manager = new SyncManager(home);
+      manager = new SyncManager(home, { events: false });
     cleanup.push(() => manager.stop());
     const connection = await manager.connect({
       url: base,
@@ -102,6 +103,17 @@ async function fixture(dropFirstUpload = false) {
       registrationKey: process.env.SHOWAI_SYNC_TEST_KEY,
     });
     await manager.stop();
+    // This suite measures the real HTTP polling fallback. Dedicated event-stream
+    // tests exercise direct WebSocket connections on both deployment adapters.
+    const saved = await manager.configuration();
+    saved.connections[0].capabilities =
+      saved.connections[0].capabilities?.filter(
+        (item) => item !== eventCapability,
+      );
+    await writeFile(
+      join(home, "local", "sync", "config.json"),
+      JSON.stringify(saved),
+    );
     clients.push({ home, library, store, manager, connection });
   }
   return { root, base, calls, clients, maxUploading: () => maxUploading };

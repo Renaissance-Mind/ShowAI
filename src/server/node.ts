@@ -3,8 +3,14 @@ import { mkdir } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { once } from "node:events";
 import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
-import { syncProtocol } from "../sync/protocol";
+import { WebSocketServer, WebSocket } from "ws";
+import {
+  eventProtocol,
+  maximumEventInput,
+  type EventIdentity,
+} from "../sync/events";
+import { SyncError } from "../sync/protocol";
+import type { EventPeer } from "./events";
 import { serverBaseUrl } from "../sync/server-url";
 import { createSyncServer, type ServerOptions } from "./app";
 import { SQLiteMetadata, DiskObjects } from "./node-storage";
@@ -24,15 +30,19 @@ export async function startSyncServer(
     home: string;
     host?: string;
     port?: number;
+    realtime?: boolean;
   },
 ): Promise<{ server: Server; url: string; close(): Promise<void> }> {
   const home = resolve(options.home);
   await mkdir(home, { recursive: true });
   const metadata = new SQLiteMetadata(join(home, "metadata.sqlite"));
+  const peers = new Set<EventPeer>();
   const app = createSyncServer({
     ...options,
     metadata,
     objects: new DiskObjects(join(home, "objects")),
+    eventPeers: options.realtime === false ? undefined : () => peers,
+    metadataDriver: "sqlite",
   });
   await app.initialize();
   const server = createServer(async (incoming, outgoing) => {
@@ -71,6 +81,112 @@ export async function startSyncServer(
     }
   });
   server.requestTimeout = 120_000;
+  const sockets = new WebSocketServer({
+    noServer: true,
+    maxPayload: maximumEventInput,
+    handleProtocols: (protocols) =>
+      protocols.has(eventProtocol) ? eventProtocol : false,
+  });
+  const socketWork = new Set<Promise<unknown>>();
+  server.on("upgrade", (incoming, socket, head) => {
+    const accept = async () => {
+      const headers = new Headers();
+      for (const [name, value] of Object.entries(incoming.headers))
+        if (value)
+          headers.set(name, Array.isArray(value) ? value.join(",") : value);
+      const request = new Request(
+        `http://${incoming.headers.host}${incoming.url}`,
+        { headers },
+      );
+      const basePath = options.publicUrl
+        ? new URL(serverBaseUrl(options.publicUrl)).pathname.replace(/\/$/, "")
+        : "";
+      if (
+        !app.events ||
+        new URL(request.url).pathname !== `${basePath}/api/events` ||
+        peers.size >= 1024
+      )
+        throw new SyncError(404, "NOT_FOUND", "Unknown event endpoint.");
+      const origin = headers.get("origin");
+      if (
+        origin &&
+        origin !==
+          (options.publicUrl
+            ? new URL(options.publicUrl).origin
+            : new URL(request.url).origin) &&
+        !options.allowedOrigins?.includes(origin)
+      )
+        throw new SyncError(403, "FORBIDDEN", "Untrusted event origin.");
+      let identity: EventIdentity = await app.events.authenticate(request);
+      sockets.handleUpgrade(incoming, socket, head, (connection) => {
+        const peer: EventPeer = {
+          identity: () => identity,
+          remember: (value) => {
+            identity = value;
+          },
+          send: (value) => {
+            if (connection.readyState === WebSocket.OPEN)
+              connection.send(value);
+          },
+          close: (code, reason) => connection.close(code, reason),
+          get bufferedAmount() {
+            return connection.bufferedAmount;
+          },
+        };
+        peers.add(peer);
+        let pending = Promise.resolve();
+        connection.on("message", (bytes, binary) => {
+          const work = pending
+            .then(async () => {
+              if (binary) {
+                connection.close(1003, "Project event requests use JSON.");
+                return;
+              }
+              await app.events!.receive(peer, bytes.toString());
+            })
+            .catch((error: unknown) => {
+              const code =
+                error instanceof SyncError
+                  ? error.code
+                  : error instanceof SyntaxError
+                    ? "INVALID_JSON"
+                    : "SERVER_ERROR";
+              if (code === "SERVER_ERROR")
+                console.error("ShowAI event delivery failed", error);
+              peer.send(
+                JSON.stringify({
+                  type: "error",
+                  code,
+                  message:
+                    error instanceof SyncError
+                      ? error.message
+                      : "The project event request failed.",
+                }),
+              );
+              peer.close(
+                code === "UNAUTHORIZED" ? 4001 : 1008,
+                "Reconnect after checking server status.",
+              );
+            });
+          pending = work;
+          socketWork.add(work);
+          void work.finally(() => socketWork.delete(work));
+        });
+        connection.on("close", () => peers.delete(peer));
+        connection.on("error", (error) => {
+          console.error("ShowAI event socket failed", error.message);
+          peers.delete(peer);
+        });
+      });
+    };
+    void accept().catch((error: unknown) => {
+      const status = error instanceof SyncError ? error.status : 500;
+      if (status === 500) console.error("ShowAI event handshake failed", error);
+      socket.end(
+        `HTTP/1.1 ${status} Event handshake failed\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`,
+      );
+    });
+  });
   await new Promise<void>((done, reject) => {
     server.once("error", reject);
     server.listen(options.port ?? 8788, options.host ?? "127.0.0.1", done);
@@ -82,6 +198,9 @@ export async function startSyncServer(
     server,
     url: `http://${options.host === "0.0.0.0" ? "127.0.0.1" : (options.host ?? "127.0.0.1")}:${address.port}${options.publicUrl ? new URL(serverBaseUrl(options.publicUrl)).pathname.replace(/\/$/, "") : ""}`,
     async close() {
+      for (const connection of sockets.clients) connection.terminate();
+      await new Promise<void>((done) => sockets.close(() => done()));
+      await Promise.allSettled(socketWork);
       server.closeAllConnections();
       await new Promise<void>((done, reject) =>
         server.close((error) => (error ? reject(error) : done())),
@@ -89,52 +208,4 @@ export async function startSyncServer(
       metadata.close();
     },
   };
-}
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
-) {
-  const running = await startSyncServer({
-    home: process.env.SHOWAI_SERVER_HOME ?? "./showai-server-data",
-    host: process.env.SHOWAI_SERVER_HOST ?? "127.0.0.1",
-    port: Number(process.env.SHOWAI_SERVER_PORT ?? 8788),
-    name: process.env.SHOWAI_SERVER_NAME,
-    publicUrl: process.env.SHOWAI_SERVER_URL,
-    registrationKey: process.env.SHOWAI_REGISTRATION_KEY,
-    registrationMode: process.env
-      .SHOWAI_REGISTRATION_MODE as ServerOptions["registrationMode"],
-    registrationLimit: process.env.SHOWAI_REGISTRATION_LIMIT
-      ? Number(process.env.SHOWAI_REGISTRATION_LIMIT)
-      : undefined,
-    accountLimit: process.env.SHOWAI_ACCOUNT_LIMIT
-      ? Number(process.env.SHOWAI_ACCOUNT_LIMIT)
-      : undefined,
-    storagePolicy: process.env.SHOWAI_STORAGE_POLICY
-      ? JSON.parse(process.env.SHOWAI_STORAGE_POLICY)
-      : undefined,
-    requestPolicy: process.env.SHOWAI_REQUEST_POLICY
-      ? JSON.parse(process.env.SHOWAI_REQUEST_POLICY)
-      : undefined,
-    allowedOrigins:
-      process.env.SHOWAI_ALLOWED_ORIGINS?.split(",").filter(Boolean),
-    operationsKey: process.env.SHOWAI_OPERATIONS_KEY,
-  });
-  console.log(
-    JSON.stringify({
-      protocol: syncProtocol,
-      url: running.url,
-      home: resolve(process.env.SHOWAI_SERVER_HOME ?? "./showai-server-data"),
-    }),
-  );
-  const shutdown = () => {
-    void running.close().then(
-      () => process.exit(0),
-      (error) => {
-        console.error(error);
-        process.exit(1);
-      },
-    );
-  };
-  process.once("SIGINT", shutdown);
-  process.once("SIGTERM", shutdown);
 }

@@ -4,12 +4,15 @@ import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 await mkdir("dist-server", { recursive: true });
 await build({
-  entryPoints: ["src/server/node.ts"],
+  entryPoints: ["src/server/main.ts"],
   outfile: "dist-server/server.mjs",
   bundle: true,
   platform: "node",
   target: "node24",
   format: "esm",
+  banner: {
+    js: 'import { createRequire as __showaiCreateRequire } from "node:module"; const require = __showaiCreateRequire(import.meta.url);',
+  },
 });
 await build({
   entryPoints: ["src/server/worker.ts"],

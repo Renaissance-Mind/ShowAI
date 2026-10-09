@@ -13,6 +13,12 @@ import { serverBaseUrl, serverEndpoint, invitationBaseUrl } from "./server-url";
 import { cacheDownload } from "./object-cache";
 import { resumableUpload } from "./resumable-upload";
 import { retryUpload } from "./upload-retry";
+import { ProjectEventStream } from "./event-stream";
+import {
+  eventCapability,
+  maximumEventProjects,
+  type ProjectEvent,
+} from "./events";
 import {
   retainSyncConflicts,
   type RetainedConflict,
@@ -99,7 +105,25 @@ export class SyncManager {
     string,
     { global: string | null; resource: string | null; identity: string }
   >();
-  constructor(readonly home: string) {}
+  private streams = new Map<string, ProjectEventStream>();
+  private pushed = new Map<string, Map<string, SyncProject>>();
+  private pushEligible = false;
+  private capabilityRefresh?: Promise<void>;
+  private announced = new Map<
+    string,
+    { previous: string | null; record: SnapshotRecord }
+  >();
+  private announcedKey(
+    connection: ServerConnection,
+    projectId: string,
+    revision: string,
+  ) {
+    return `${connection.id}:${projectId}:${revision}`;
+  }
+  constructor(
+    readonly home: string,
+    readonly options: { events?: boolean } = {},
+  ) {}
   private get root() {
     return join(this.home, "local", "sync");
   }
@@ -126,7 +150,7 @@ export class SyncManager {
     };
   }
   private async update(action: (config: SyncConfiguration) => void) {
-    return withLibraryLock(
+    const updated = await withLibraryLock(
       this.home,
       async () => {
         const config = await this.configuration();
@@ -140,6 +164,166 @@ export class SyncManager {
       },
       "sync-settings",
     );
+    if (this.started) this.configureStreams(updated);
+    return updated;
+  }
+  private configureStreams(config: SyncConfiguration) {
+    if (this.options.events === false) {
+      this.pushEligible = false;
+      return;
+    }
+    const enabled = new Set<string>();
+    this.pushEligible = true;
+    for (const connection of config.connections) {
+      const projects = config.projects.filter(
+        (project) =>
+          project.connectionId === connection.id && !project.pendingCreation,
+      );
+      if (!projects.length) continue;
+      if (!connection.capabilities?.includes(eventCapability)) {
+        this.pushEligible = false;
+        continue;
+      }
+      if (projects.length > maximumEventProjects) this.pushEligible = false;
+      enabled.add(connection.id);
+      let stream = this.streams.get(connection.id);
+      if (
+        stream &&
+        (stream.token !== connection.token || stream.url !== connection.url)
+      ) {
+        void stream.stop();
+        this.streams.delete(connection.id);
+        this.pushed.delete(connection.id);
+        stream = undefined;
+      }
+      if (!stream) {
+        const created = new ProjectEventStream(
+          connection.url,
+          connection.token,
+          (event) => this.receiveEvent(connection, event),
+          () => {
+            if (this.streams.get(connection.id) !== created) return;
+            this.pushed.delete(connection.id);
+            if (this.started) this.wake();
+          },
+        );
+        stream = created;
+        this.streams.set(connection.id, stream);
+      }
+      stream.subscribe(projects.map((project) => project.remoteProjectId));
+      stream.start();
+    }
+    for (const [id, stream] of this.streams)
+      if (!enabled.has(id)) {
+        this.streams.delete(id);
+        this.pushed.delete(id);
+        void stream.stop();
+      }
+  }
+  private async receiveEvent(
+    connection: ServerConnection,
+    event: ProjectEvent,
+  ) {
+    if (!this.started) return;
+    if (
+      (event.type !== "heads" && event.type !== "revision") ||
+      event.serverId !== connection.serverId
+    )
+      throw new CoreError("INVALID_DATA", "服务器更新事件身份不匹配。");
+    const config = await this.configuration();
+    if (
+      !config.connections.some(
+        (item) => item.id === connection.id && item.token === connection.token,
+      )
+    )
+      return;
+    const bindings = config.projects.filter(
+      (item) => item.connectionId === connection.id,
+    );
+    const allowed = new Set(bindings.map((item) => item.remoteProjectId));
+    const incoming = event.type === "heads" ? event.projects : [event.project];
+    if (!Array.isArray(incoming) || incoming.length > maximumEventProjects)
+      throw new CoreError("INVALID_DATA", "服务器更新项目数量无效。");
+    for (const project of incoming)
+      if (
+        !allowed.has(identifier(project.id)) ||
+        !["admin", "editor", "viewer"].includes(project.role) ||
+        typeof project.archived !== "boolean" ||
+        (project.head !== null && !/^[a-f0-9]{64}$/.test(project.head))
+      )
+        throw new CoreError("INVALID_DATA", "服务器更新项目无效。");
+    if (event.type === "revision" && event.record) {
+      if (event.record.revision !== event.project.head)
+        throw new CoreError("INVALID_DATA", "服务器更新版本不匹配。");
+      for (const binding of bindings.filter(
+        (item) => item.remoteProjectId === event.project.id,
+      )) {
+        await this.cacheRecord(connection, binding, event.record);
+        const ids = new Set(Object.values(event.record.snapshot.files));
+        for (const [digest, value] of Object.entries(event.objects ?? {})) {
+          if (!ids.has(digest) || typeof value !== "string")
+            throw new CoreError(
+              "INVALID_DATA",
+              "服务器更新包含项目以外的对象。",
+            );
+          const bytes = Buffer.from(value, "base64");
+          if (
+            bytes.length > 64 * 1024 ||
+            bytes.toString("base64") !== value ||
+            hash(bytes) !== digest
+          )
+            throw new CoreError("INVALID_DATA", "服务器更新对象摘要无效。");
+          await atomicLibraryFile(
+            this.home,
+            this.objectPath(digest, this.cacheKey(connection, binding)),
+            bytes,
+          );
+        }
+      }
+      if (
+        Number.isSafeInteger(event.sequence) &&
+        Number.isSafeInteger(event.previousSequence) &&
+        event.sequence! === event.previousSequence! + 1 &&
+        ((event.previousHead === null &&
+          event.record.snapshot.parents.length === 0) ||
+          (typeof event.previousHead === "string" &&
+            /^[a-f0-9]{64}$/.test(event.previousHead) &&
+            event.record.snapshot.parents.includes(event.previousHead)))
+      ) {
+        this.announced.set(
+          this.announcedKey(
+            connection,
+            event.project.id,
+            event.record.revision,
+          ),
+          { previous: event.previousHead, record: event.record },
+        );
+        while (this.announced.size > 200)
+          this.announced.delete(this.announced.keys().next().value!);
+      }
+    }
+    const heads =
+      event.type === "heads"
+        ? new Map<string, SyncProject>()
+        : (this.pushed.get(connection.id) ?? new Map<string, SyncProject>());
+    for (const project of incoming) heads.set(project.id, project);
+    this.pushed.set(connection.id, heads);
+    const changed = bindings.filter((binding) => {
+      const head = heads.get(binding.remoteProjectId);
+      return (
+        this.streams.get(connection.id)?.covers(binding.remoteProjectId) &&
+        !binding.pendingCreation &&
+        (!head ||
+          head.head !== binding.remoteHead ||
+          head.role !== binding.role)
+      );
+    });
+    if (changed.length) {
+      this.activeUntil = Date.now() + 60_000;
+      void this.dispatch(changed.map((item) => item.projectId)).catch((error) =>
+        console.error("Pushed project synchronization failed", error),
+      );
+    }
   }
   private cacheKey(connection: ServerConnection, project: ProjectConnection) {
     return hash(
@@ -207,7 +391,13 @@ export class SyncManager {
         ({ token: _token, ...connection }) => connection,
       ),
       running: !!this.running,
-      scheduler: { ...this.metrics, activeUntil: this.activeUntil },
+      scheduler: {
+        ...this.metrics,
+        activeUntil: this.activeUntil,
+        pushConnections: this.streams.size,
+        pushReady: [...this.streams.values()].filter((stream) => stream.ready)
+          .length,
+      },
     };
   }
   async connect(input: {
@@ -1272,29 +1462,50 @@ export class SyncManager {
           localBranch = captured.revision;
         }
       const incoming: string[] = [];
-      let after = project.remoteHead;
-      while (true) {
-        const page = await this.request<{
-          entries: (
-            (SnapshotRecord & { published: boolean }) | { revision: string }
-          )[];
-          next: string | null;
-        }>(
-          connection,
-          `/api/projects/${project.remoteProjectId}/revisions?${new URLSearchParams({ ...(after ? { after } : {}), ...(connection.capabilities?.includes("history-summary-v1") ? { summary: "1" } : {}) })}`,
+      const pushedHistory: string[] = [];
+      let cursor: string | null = remote.head;
+      while (
+        cursor &&
+        cursor !== project.remoteHead &&
+        pushedHistory.length < 200
+      ) {
+        const entry = this.announced.get(
+          this.announcedKey(connection, project.remoteProjectId, cursor),
         );
-        for (const item of page.entries) {
-          const record =
-            "snapshot" in item
-              ? item
-              : await this.record(connection, project, item.revision);
-          await this.cacheRecord(connection, project, record);
-          await this.files(connection, project, record);
-          incoming.push(record.revision);
-        }
-        if (!page.next) break;
-        after = page.next;
+        if (!entry) break;
+        pushedHistory.push(cursor);
+        cursor = entry.previous;
       }
+      let after = project.remoteHead;
+      if (cursor === project.remoteHead && pushedHistory.length) {
+        for (const revision of pushedHistory.reverse()) {
+          const record = await this.record(connection, project, revision);
+          await this.files(connection, project, record);
+          incoming.push(revision);
+        }
+      } else
+        while (true) {
+          const page = await this.request<{
+            entries: (
+              (SnapshotRecord & { published: boolean }) | { revision: string }
+            )[];
+            next: string | null;
+          }>(
+            connection,
+            `/api/projects/${project.remoteProjectId}/revisions?${new URLSearchParams({ ...(after ? { after } : {}), ...(connection.capabilities?.includes("history-summary-v1") ? { summary: "1" } : {}) })}`,
+          );
+          for (const item of page.entries) {
+            const record =
+              "snapshot" in item
+                ? item
+                : await this.record(connection, project, item.revision);
+            await this.cacheRecord(connection, project, record);
+            await this.files(connection, project, record);
+            incoming.push(record.revision);
+          }
+          if (!page.next) break;
+          after = page.next;
+        }
       const remoteRecord = await this.record(connection, project, remote.head),
         remoteFiles = await this.files(connection, project, remoteRecord);
       const merge =
@@ -1504,6 +1715,7 @@ export class SyncManager {
       projectIds?.size === 1 ? [...projectIds][0] : undefined,
     );
     const config = await this.configuration();
+    if (this.started) this.configureStreams(config);
     const selected = config.projects.filter(
       (item) => !projectIds || projectIds.has(item.projectId),
     );
@@ -1519,6 +1731,10 @@ export class SyncManager {
       const heads = new Map<string, SyncProject>();
       let batchError: unknown;
       const batched = connection.capabilities?.includes("batch-heads-v1");
+      const pushed =
+        !force && this.streams.get(connection.id)?.ready
+          ? this.pushed.get(connection.id)
+          : undefined;
       if (batched) {
         const ids = [
           ...new Set(
@@ -1527,13 +1743,17 @@ export class SyncManager {
               .map((item) => item.remoteProjectId),
           ),
         ];
+        if (pushed) for (const [id, project] of pushed) heads.set(id, project);
+        const pullIds = pushed
+          ? ids.filter((id) => !this.streams.get(connection.id)?.covers(id))
+          : ids;
         try {
-          for (let offset = 0; offset < ids.length; offset += 400) {
+          for (let offset = 0; offset < pullIds.length; offset += 400) {
             const response = await this.request<{
               serverId: string;
               projects: SyncProject[];
             }>(connection, "/api/projects/heads", "POST", {
-              ids: ids.slice(offset, offset + 400),
+              ids: pullIds.slice(offset, offset + 400),
             });
             if (response.serverId !== connection.serverId)
               throw new CoreError(
@@ -1692,17 +1912,23 @@ export class SyncManager {
         void this.dispatch().catch((error) =>
           console.error("Project sync wake failed", error),
         );
-      }, 200);
+      }, 40);
       this.timer.unref();
     }
   }
   private schedule() {
     if (!this.started || this.timer) return;
+    const pushed =
+      this.pushEligible &&
+      this.streams.size > 0 &&
+      [...this.streams.values()].every((stream) => stream.ready);
     const base = this.failedRounds
       ? Math.min(300_000, 5000 * 2 ** Math.min(this.failedRounds, 6))
-      : Date.now() < this.activeUntil
-        ? 1000
-        : Math.min(60_000, 10_000 * 2 ** Math.min(this.idleRounds, 3));
+      : pushed
+        ? 60_000
+        : Date.now() < this.activeUntil
+          ? 1000
+          : Math.min(60_000, 10_000 * 2 ** Math.min(this.idleRounds, 3));
     const delay = Math.round(base * (0.9 + Math.random() * 0.2));
     this.metrics.nextPollAt = Date.now() + delay;
     this.timer = setTimeout(() => {
@@ -1717,6 +1943,26 @@ export class SyncManager {
     if (this.started) return;
     this.started = true;
     this.activeUntil = Date.now() + 60_000;
+    this.capabilityRefresh = this.configuration().then(async (config) => {
+      if (this.options.events !== false)
+        for (const connection of config.connections) {
+          if (
+            !config.projects.some(
+              (project) => project.connectionId === connection.id,
+            )
+          )
+            continue;
+          try {
+            await this.refreshCapabilities(connection.id);
+          } catch (error) {
+            console.error(
+              "Server synchronization capability refresh failed",
+              error,
+            );
+          }
+        }
+      if (this.started) this.configureStreams(await this.configuration());
+    });
     this.schedule();
   }
   async stop() {
@@ -1724,6 +1970,12 @@ export class SyncManager {
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
     this.metrics.nextPollAt = 0;
+    await this.capabilityRefresh;
+    const streams = [...this.streams.values()];
+    this.streams.clear();
+    this.pushed.clear();
+    this.announced.clear();
+    await Promise.all(streams.map((stream) => stream.stop()));
     await this.running;
   }
   async assertEditable(projectId: string) {

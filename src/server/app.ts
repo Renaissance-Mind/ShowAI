@@ -21,6 +21,8 @@ import { Quotas, type StoragePolicy } from "./quotas";
 import { Uploads } from "./uploads";
 import { ServerMaintenance } from "./maintenance";
 import { schemaVersion } from "./migrations";
+import { ProjectEvents, type EventPeer } from "./events";
+import { eventCapability } from "../sync/events";
 import { RequestBudgets, type RequestPolicy } from "./request-budget";
 import {
   createInvitation,
@@ -64,6 +66,8 @@ export interface ServerOptions extends AccountOptions {
   allowedOrigins?: string[];
   requirePublicOrigin?: boolean;
   storagePolicy?: Partial<StoragePolicy>;
+  eventPeers?: () => Iterable<EventPeer>;
+  metadataDriver?: "sqlite" | "d1" | "durable-sqlite";
 }
 interface Member {
   id: string;
@@ -160,6 +164,16 @@ export function createSyncServer(options: ServerOptions) {
     )[0].value;
   }
   const serverId = () => (initialization ??= initialize());
+  const events = options.eventPeers
+    ? new ProjectEvents(
+        db,
+        objects,
+        revisions,
+        requestBudgets,
+        serverId,
+        options.eventPeers,
+      )
+    : undefined;
   async function authenticate(request: Request): Promise<SessionRow> {
     const credential = request.headers
       .get("authorization")
@@ -320,6 +334,7 @@ export function createSyncServer(options: ServerOptions) {
       return json({
         protocol: syncProtocol,
         schemaVersion,
+        metadataDriver: options.metadataDriver,
         serverId: await serverId(),
         name: options.name ?? "ShowAI Server",
         roles: ["admin", "editor", "viewer"],
@@ -335,6 +350,7 @@ export function createSyncServer(options: ServerOptions) {
           "storage-quotas-v1",
           "resumable-objects-v1",
           "batch-heads-v1",
+          ...(events ? [eventCapability] : []),
         ],
       });
     if (path.startsWith("/api/")) await requestBudgets.consume();
@@ -1284,12 +1300,15 @@ export function createSyncServer(options: ServerOptions) {
           { head: current.head, revision },
         );
       }
+      await events?.published(projectId, expected);
       return json({ revision, head: revision, published: true });
     }
     throw new SyncError(404, "NOT_FOUND", "Unknown project endpoint.");
   }
   return {
     initialize: serverId,
+    reloadIdentity: () => (initialization = initialize()),
+    events,
     async fetch(
       request: Request,
       context?: { source?: string },
@@ -1366,7 +1385,19 @@ export function createSyncServer(options: ServerOptions) {
             duplex: "half",
           } as RequestInit);
         }
-        return secure(await handle(request, context?.source));
+        const response = await handle(request, context?.source);
+        if (
+          response.ok &&
+          events &&
+          ((request.method === "PATCH" && logicalPath.endsWith("/members")) ||
+            (request.method === "POST" &&
+              (/^\/api\/auth\/(?:password|logout)$/.test(logicalPath) ||
+                /^\/api\/sessions\/revoke(?:-all)?$/.test(logicalPath))) ||
+            (request.method === "POST" &&
+              logicalPath === "/api/invites/accept"))
+        )
+          await events.recheck();
+        return secure(response);
       } catch (error) {
         if (
           error instanceof Error &&

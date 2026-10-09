@@ -77,6 +77,12 @@ export function usePage() {
   );
   const [draftNotice, setDraftNotice] = useState("");
   const draftWrites = useRef(new Map<string, Promise<EditorDraftRecord>>());
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const draftTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
   const persist = useCallback(
     async (
       source: ShowDocument,
@@ -483,22 +489,33 @@ export function usePage() {
   );
 
   useEffect(() => {
-    if (status !== "changed") return;
-    const timer = setTimeout(() => void flush(), 450);
-    return () => clearTimeout(timer);
+    if (status !== "changed" || autoSaveTimer.current) return;
+    autoSaveTimer.current = setTimeout(() => {
+      autoSaveTimer.current = undefined;
+      void flush();
+    }, 150);
   }, [draft, status, flush]);
 
   useEffect(() => {
     if (
       !draft ||
       !projectRef.current ||
-      revision.current <= savedRevision.current
+      revision.current <= savedRevision.current ||
+      draftTimer.current
     )
       return;
     const owner = projectRef.current,
-      sequence = revision.current;
-    const timer = setTimeout(() => {
-      const source = structuredClone(draft);
+      resource = draft.id;
+    draftTimer.current = setTimeout(() => {
+      draftTimer.current = undefined;
+      if (
+        projectRef.current !== owner ||
+        current.current?.id !== resource ||
+        revision.current <= savedRevision.current
+      )
+        return;
+      const source = structuredClone(current.current),
+        sequence = revision.current;
       void persist(source, sequence, owner).catch((reason) => {
         if (projectRef.current !== owner || current.current?.id !== source.id)
           return;
@@ -507,8 +524,14 @@ export function usePage() {
         blocked.current = true;
       });
     }, 150);
-    return () => clearTimeout(timer);
   }, [draft, persist]);
+  useEffect(
+    () => () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+      if (draftTimer.current) clearTimeout(draftTimer.current);
+    },
+    [],
+  );
 
   const refresh = useMemo(
     () =>
@@ -571,7 +594,7 @@ export function usePage() {
   );
 
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const unsubscribe = desktop.onChange((change) => {
       if (
         change.type !== "home" &&
@@ -584,8 +607,11 @@ export function usePage() {
         !change.pageIds.includes(current.current?.id ?? "")
       )
         return;
-      clearTimeout(timer);
-      timer = setTimeout(() => void refresh(), 300);
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = undefined;
+        void refresh();
+      }, 40);
     });
     const focused = () => {
       void refresh();

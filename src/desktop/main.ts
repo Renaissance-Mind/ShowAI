@@ -166,8 +166,9 @@ async function useHome(home?: string): Promise<void> {
   const paths = new Set<string>();
   watcher.on("all", (_event, path) => {
     paths.add(path);
-    clearTimeout(notification);
+    if (notification) return;
     notification = setTimeout(() => {
+      notification = undefined;
       const change = changedResources(store.root, paths);
       broadcast("files", change);
       if (change.projectIds?.length || change.catalog || change.all)
@@ -565,12 +566,17 @@ else {
       }
       agentHost = new AgentHost({
         root: join(app.getPath("userData"), "agent-host"),
-        workspaceRoot: join(app.getPath("documents"), "ShowAI", "Agent Workspaces"),
+        workspaceRoot: join(
+          app.getPath("documents"),
+          "ShowAI",
+          "Agent Workspaces",
+        ),
         library: () => store,
         cli: () => info().cli,
-        pluginRoot: () => process.env.SHOWAI_DEV_URL
-          ? join(process.cwd(), "plugins/showai")
-          : join(runtimePath(), "assets/agent-plugin"),
+        pluginRoot: () =>
+          process.env.SHOWAI_DEV_URL
+            ? join(process.cwd(), "plugins/showai")
+            : join(runtimePath(), "assets/agent-plugin"),
         openUrl: (url) => shell.openExternal(url),
       });
       if (app.isPackaged) app.setAsDefaultProtocolClient("showai");
@@ -638,7 +644,10 @@ else {
         ): Promise<DesktopResponse> => {
           try {
             const window = trustedSender(event);
-            if (typeof action !== "string" || (!actions.has(action) && !agentActions.has(action)))
+            if (
+              typeof action !== "string" ||
+              (!actions.has(action) && !agentActions.has(action))
+            )
               throw new CoreError("INVALID_DATA", "Unknown desktop action.");
             if (!args || typeof args !== "object" || Array.isArray(args))
               throw new CoreError(

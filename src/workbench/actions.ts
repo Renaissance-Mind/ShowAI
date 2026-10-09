@@ -1483,6 +1483,12 @@ export function createWorkbench(
       dialogActions.has(action)
         ? handle(action, args)
         : mutateLibrary(store.root, () => handle(action, args), context),
-    );
+    ).then((result) => {
+      syncManager(store.root).wake(
+        typeof args.projectId === "string" ? [args.projectId] : undefined,
+        typeof args.projectId !== "string",
+      );
+      return result;
+    });
   };
 }

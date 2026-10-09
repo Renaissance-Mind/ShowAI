@@ -18,7 +18,7 @@ interface D1Usage {
   rows_written?: number;
   duration?: number;
 }
-interface WorkerEnvironment {
+export interface WorkerEnvironment {
   DB: {
     prepare(sql: string): Statement;
     batch(statements: Statement[]): Promise<{ meta: D1Usage }[]>;
@@ -65,7 +65,17 @@ interface WorkerEnvironment {
   };
   SHOWAI_ALLOWED_ORIGINS?: string;
   SHOWAI_OPERATIONS_KEY?: string;
+  SHOWAI_METADATA_DRIVER?: string;
+  SHOWAI_METADATA_IMPORT_REQUIRED?: string;
+  SERVER?: {
+    idFromName(name: string): unknown;
+    get(
+      id: unknown,
+      options?: { locationHint: string },
+    ): { fetch(request: Request): Promise<Response> };
+  };
 }
+export { ShowAIServer } from "./cloud-server";
 function metric(env: WorkerEnvironment, value: Record<string, unknown>) {
   if (env.SHOWAI_OBSERVE === "1")
     console.log(JSON.stringify({ showaiMetric: true, ...value }));
@@ -346,10 +356,21 @@ export default {
           },
         );
     }
+    const bootstrap = new URL(request.url).pathname.endsWith(
+      "/api/ops/metadata-bootstrap",
+    );
+    if (env.SHOWAI_METADATA_DRIVER === "durable" || bootstrap) {
+      if (!env.SERVER)
+        throw new Error("Configure the ShowAI Server Durable Object binding.");
+      return env.SERVER.get(env.SERVER.idFromName("showai-server-v1"), {
+        locationHint: "apac",
+      }).fetch(request);
+    }
     let app = instances.get(env);
     if (!app) {
       app = createSyncServer({
         metadata: workerMetadata(env),
+        metadataDriver: "d1",
         objects: workerObjects(env),
         name: env.SHOWAI_SERVER_NAME,
         publicUrl: env.SHOWAI_SERVER_URL,

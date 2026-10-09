@@ -24,6 +24,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import type { Editor, JSONContent, Extensions } from "@tiptap/core";
 import { NodeSelection, Selection, TextSelection } from "@tiptap/pm/state";
 import { clearWidgetSelection } from "./widget-selection";
+import { externalContentTransaction } from "./external-content";
 import { CellSelection } from "@tiptap/pm/tables";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { TableSelectionActions } from "./TableSelectionActions";
@@ -338,11 +339,16 @@ export default function DocumentEditor({
     }
   }, [editor, readOnly]);
   useEffect(() => {
-    if (editor && !editor.state.doc.eq(editor.schema.nodeFromJSON(content))) {
-      const selection =
-        editor.isFocused && editor.state.selection.toJSON().type === "text"
-          ? editor.state.selection
-          : null;
+    if (!editor) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const apply = () => {
+      if (editor.isDestroyed) return;
+      if (editor.view.composing) {
+        timer = setTimeout(apply, 25);
+        return;
+      }
+      const transaction = externalContentTransaction(editor.state, content);
+      if (!transaction) return;
       const widgetId =
         editor.state.selection instanceof NodeSelection &&
         editor.state.selection.node.type.name === "widget"
@@ -352,17 +358,7 @@ export default function DocumentEditor({
         editor.state.selection instanceof CellSelection
           ? editor.state.selection
           : null;
-      editor.commands.setContent(content, { emitUpdate: false });
-      if (selection) {
-        const maximum = Math.max(1, editor.state.doc.content.size - 1);
-        const from = Math.min(selection.from, maximum),
-          to = Math.min(selection.to, maximum);
-        if (
-          editor.state.doc.resolve(from).parent.inlineContent &&
-          editor.state.doc.resolve(to).parent.inlineContent
-        )
-          editor.commands.setTextSelection({ from, to });
-      }
+      editor.view.dispatch(transaction);
       if (cellSelection) {
         const restored = restoreDocumentTableCellSelection(
           editor.state.doc,
@@ -382,14 +378,18 @@ export default function DocumentEditor({
           const transaction = clearWidgetSelection(editor.state);
           if (transaction) editor.view.dispatch(transaction);
         }
-      } else if (!selection) {
-        const transaction = clearWidgetSelection(editor.state);
-        if (transaction) editor.view.dispatch(transaction);
       }
-      setSlash(null);
-      setHover(null);
-      setBlockMenu(false);
-    }
+    };
+    const afterComposition = () => {
+      timer = setTimeout(apply, 25);
+    };
+    if (editor.view.composing)
+      editor.view.dom.addEventListener("compositionend", afterComposition);
+    else apply();
+    return () => {
+      if (timer) clearTimeout(timer);
+      editor.view.dom.removeEventListener("compositionend", afterComposition);
+    };
   }, [content, editor]);
 
   useEffect(() => {

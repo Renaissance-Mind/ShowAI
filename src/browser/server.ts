@@ -137,8 +137,9 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     const paths = new Set<string>();
     watcher.on("all", (_event, path) => {
       paths.add(path);
-      clearTimeout(timer);
+      if (timer) return;
       timer = setTimeout(() => {
+        timer = undefined;
         const change = changedResources(store.root, paths);
         notify("files", change);
         if (change.projectIds?.length || change.catalog || change.all)
@@ -159,9 +160,10 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     root: join(dirname(options.settingsPath), "agent-host"),
     library: () => store,
     cli: () => info().cli,
-    pluginRoot: () => options.development
-      ? join(process.cwd(), "plugins/showai")
-      : resolve(dirname(options.cliEntry), "../assets/agent-plugin"),
+    pluginRoot: () =>
+      options.development
+        ? join(process.cwd(), "plugins/showai")
+        : resolve(dirname(options.cliEntry), "../assets/agent-plugin"),
   });
   async function selectedPath(
     args: Record<string, unknown>,
