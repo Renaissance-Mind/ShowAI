@@ -15,6 +15,7 @@ import {
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { chromium } from "playwright";
+import { releaseTestFixtures } from "./test-fixtures.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const parent = join(root, "output/playwright");
@@ -816,8 +817,9 @@ try {
   child.kill("SIGTERM");
   await exited;
   await writeFile(join(output, "development.log"), logs);
+  const fixturesRetained = await releaseTestFixtures(output, [fixture, home]);
   await writeFile(
     join(output, "result.json"),
-    JSON.stringify({ mode, checks }, null, 2),
+    JSON.stringify({ mode, checks, fixturesRetained }, null, 2),
   );
 }

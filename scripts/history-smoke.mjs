@@ -16,6 +16,7 @@ import { promisify } from "node:util";
 import { build } from "esbuild";
 import { chromium } from "playwright";
 import { rawSourcePlugin } from "./raw-source-plugin.mjs";
+import { releaseTestFixtures } from "./test-fixtures.mjs";
 const root = resolve(import.meta.dirname, ".."),
   mode = process.argv.includes("--desktop") ? "desktop" : "browser";
 await mkdir(join(root, "output/playwright"), { recursive: true });
@@ -723,7 +724,6 @@ try {
   result.failure = error.stack;
   throw error;
 } finally {
-  await writeFile(join(output, "result.json"), JSON.stringify(result, null, 2));
   await writeFile(join(output, "service.log"), logs);
   if (!result.passed && page && !page.isClosed())
     await page
@@ -732,5 +732,12 @@ try {
   await browser?.close();
   child.kill("SIGTERM");
   if (child.exitCode === null) await once(child, "exit");
+  result.fixturesRetained = await releaseTestFixtures(output, [
+    fixture,
+    home,
+    bootstrap,
+    join(output, "complete.showai-archive"),
+  ]);
+  await writeFile(join(output, "result.json"), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));
 }
