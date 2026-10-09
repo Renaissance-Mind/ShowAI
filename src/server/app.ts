@@ -1047,6 +1047,8 @@ export function createSyncServer(options: ServerOptions) {
           bytes + candidate.manifest_bytes > 1024 * 1024
         )
           break;
+        if (!summary)
+          await requestBudgets.consumeRead(user.id, candidate.manifest_bytes);
         const entry = summary
           ? revisions.summary(candidate)
           : await revisions.record(

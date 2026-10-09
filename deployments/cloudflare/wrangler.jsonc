@@ -4,6 +4,7 @@
   "compatibility_date": "2026-10-08",
   "workers_dev": false,
   "preview_urls": false,
+  "placement": { "region": "aws:ap-southeast-1" },
   "limits": { "cpu_ms": 5000 },
   "observability": {
     "enabled": true,
@@ -41,7 +42,7 @@
     {
       "binding": "DB",
       "database_name": "showai-cloud",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "database_id": "b9657b08-2c3d-4bb3-97db-5c352a9e93eb",
       "migrations_dir": "../../dist-server/migrations",
     },
   ],

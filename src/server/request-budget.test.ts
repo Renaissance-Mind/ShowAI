@@ -4,6 +4,104 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { startSyncServer } from "./node";
 import { createHash } from "node:crypto";
+import { canonical, hash, syncProtocol } from "../sync/protocol";
+
+test("legacy full history and individual manifests share the download budget while summaries remain readable", async () => {
+  const root = await mkdtemp(join(tmpdir(), "showai-history-budget-"));
+  const projectId = crypto.randomUUID();
+  const metadata = Buffer.from(
+    JSON.stringify({ id: projectId, name: "History budget" }),
+  );
+  const digest = await hash(metadata);
+  const snapshot = {
+    format: syncProtocol,
+    projectId,
+    parents: [],
+    files: { [`projects/${projectId}/project.json`]: digest },
+    change: {
+      at: new Date().toISOString(),
+      actor: { kind: "system" as const },
+      channel: "cli" as const,
+      operationId: "history-budget",
+      paths: [`projects/${projectId}/project.json`],
+    },
+  };
+  const manifestBytes = Buffer.byteLength(canonical(snapshot));
+  const server = await startSyncServer({
+    home: root,
+    port: 0,
+    registrationMode: "open",
+    requestPolicy: {
+      accountDailyReadBytes: manifestBytes * 2,
+      serviceDailyReadBytes: manifestBytes * 10,
+    },
+  });
+  try {
+    const account = await (
+      await fetch(server.url + "/api/auth/register", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: "history-budget-user",
+          password: "history-budget-password-2026",
+        }),
+      })
+    ).json();
+    const headers = { authorization: `Bearer ${account.token}` };
+    const project = await fetch(server.url + "/api/projects", {
+      method: "POST",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify({ id: projectId, name: "History budget" }),
+    });
+    expect(project.status).toBe(201);
+    await project.arrayBuffer();
+    const object = await fetch(
+      server.url + `/api/projects/${projectId}/objects/${digest}`,
+      { method: "PUT", headers, body: metadata },
+    );
+    expect(object.status).toBe(200);
+    await object.arrayBuffer();
+    const published = await fetch(
+      server.url + `/api/projects/${projectId}/revisions`,
+      {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify({ snapshot, expected: null }),
+      },
+    );
+    expect(published.status).toBe(200);
+    const { revision } = await published.json();
+    const full = await fetch(
+      server.url + `/api/projects/${projectId}/revisions`,
+      { headers },
+    );
+    expect(full.status).toBe(200);
+    expect((await full.json()).entries[0].snapshot).toEqual(snapshot);
+    const single = await fetch(
+      server.url + `/api/projects/${projectId}/revisions/${revision}`,
+      { headers },
+    );
+    expect(single.status).toBe(200);
+    await single.arrayBuffer();
+    const denied = await fetch(
+      server.url + `/api/projects/${projectId}/revisions`,
+      { headers },
+    );
+    expect(denied.status).toBe(429);
+    expect((await denied.json()).error.code).toBe("READ_BUDGET_EXCEEDED");
+    const summary = await fetch(
+      server.url + `/api/projects/${projectId}/revisions?summary=1`,
+      { headers },
+    );
+    expect(summary.status).toBe(200);
+    const entries = (await summary.json()).entries;
+    expect(entries).toHaveLength(1);
+    expect(entries[0].snapshot).toBeUndefined();
+  } finally {
+    await server.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test("request credits enforce per-account and global daily budgets across two real instances", async () => {
   const root = await mkdtemp(join(tmpdir(), "showai-request-budget-"));

@@ -75,35 +75,42 @@ export function workerMetadata(env: WorkerEnvironment): MetadataStore {
     env.DB.prepare(sql).bind(...values);
   return {
     async all<T>(sql: string, values?: SqlValue[]) {
+      const started = Date.now();
       const result = await statement(sql, values).all<T>();
       metric(env, {
         kind: "d1",
         rowsRead: result.meta?.rows_read,
         rowsWritten: result.meta?.rows_written,
         durationMs: result.meta?.duration,
+        roundTripMs: Date.now() - started,
       });
       return result.results;
     },
     async run(sql: string, values?: SqlValue[]) {
+      const started = Date.now();
       const result = await statement(sql, values).run();
       metric(env, {
         kind: "d1",
         rowsRead: result.meta.rows_read,
         rowsWritten: result.meta.rows_written,
         durationMs: result.meta.duration,
+        roundTripMs: Date.now() - started,
       });
       return { changes: result.meta.changes };
     },
     async batch(statements: SqlStatement[]) {
+      const started = Date.now();
       const results = await env.DB.batch(
         statements.map((item) => statement(item.sql, item.values)),
       );
-      for (const result of results)
+      const roundTripMs = Date.now() - started;
+      for (const [index, result] of results.entries())
         metric(env, {
           kind: "d1",
           rowsRead: result.meta.rows_read,
           rowsWritten: result.meta.rows_written,
           durationMs: result.meta.duration,
+          ...(index === 0 ? { roundTripMs } : {}),
         });
       return results.map((result) => ({ changes: result.meta.changes }));
     },
@@ -388,6 +395,11 @@ export default {
       method: request.method,
       status: response.status,
       headersLatencyMs: performance.now() - begun,
+      placement: /^(?:local|remote)-[A-Z]{3}$/.test(
+        request.headers.get("cf-placement") ?? "",
+      )
+        ? request.headers.get("cf-placement")
+        : undefined,
     });
     return response;
   },

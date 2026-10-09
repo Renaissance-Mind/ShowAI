@@ -1629,7 +1629,7 @@ export class SyncManager {
     const base = this.failedRounds
       ? Math.min(300_000, 5000 * 2 ** Math.min(this.failedRounds, 6))
       : Date.now() < this.activeUntil
-        ? 2000
+        ? 1000
         : Math.min(60_000, 10_000 * 2 ** Math.min(this.idleRounds, 3));
     const delay = Math.round(base * (0.9 + Math.random() * 0.2));
     this.metrics.nextPollAt = Date.now() + delay;
