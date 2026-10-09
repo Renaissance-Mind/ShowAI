@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "vitest";
 import { createServer, request as forwardRequest } from "node:http";
+import { request as forwardSecureRequest } from "node:https";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -55,7 +56,9 @@ async function fixture(dropFirstUpload = false) {
     }
     const upload = incoming.method === "PUT";
     if (upload) maxUploading = Math.max(maxUploading, ++uploading);
-    const forwarded = forwardRequest(
+    const forwarded = (
+      target.protocol === "https:" ? forwardSecureRequest : forwardRequest
+    )(
       new URL(incoming.url ?? "/", target.origin),
       {
         method: incoming.method,

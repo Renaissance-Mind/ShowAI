@@ -123,13 +123,8 @@ export function liveSession(user: {
   auth_version: number;
 }): SqlStatement {
   return {
-    sql: "SELECT 1 FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.digest=? AND s.user_id=? AND s.revoked=0 AND s.expires_at>? AND s.auth_version=u.auth_version AND u.auth_version=?",
-    values: [
-      user.session_digest,
-      user.id,
-      new Date().toISOString(),
-      user.auth_version,
-    ],
+    sql: "SELECT 1 FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.digest=? AND s.user_id=? AND s.revoked=0 AND s.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') AND s.auth_version=u.auth_version AND u.auth_version=?",
+    values: [user.session_digest, user.id, user.auth_version],
   };
 }
 

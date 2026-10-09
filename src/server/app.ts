@@ -168,8 +168,8 @@ export function createSyncServer(options: ServerOptions) {
       throw new SyncError(401, "UNAUTHORIZED", "Sign in to this server.");
     const digest = await hash(credential);
     const rows = await db.all<SessionRow>(
-      "SELECT u.id,u.name,u.auth_version,s.digest AS session_digest FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.digest=? AND s.revoked=0 AND s.auth_version=u.auth_version AND s.expires_at>?",
-      [digest, new Date().toISOString()],
+      "SELECT u.id,u.name,u.auth_version,s.digest AS session_digest FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.digest=? AND s.revoked=0 AND s.auth_version=u.auth_version AND s.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')",
+      [digest],
     );
     if (!rows[0])
       throw new SyncError(
@@ -212,13 +212,8 @@ export function createSyncServer(options: ServerOptions) {
     minimum: "admin" | "editor" = "editor",
   ) {
     return {
-      sql: `SELECT 1 FROM members m JOIN sessions s ON s.user_id=m.user_id JOIN users u ON u.id=m.user_id WHERE m.project_id=? AND m.user_id=? AND ${minimum === "admin" ? "m.role='admin'" : "m.role IN('admin','editor')"} AND s.digest=? AND s.revoked=0 AND s.expires_at>? AND s.auth_version=u.auth_version`,
-      values: [
-        projectId,
-        user.id,
-        user.session_digest,
-        new Date().toISOString(),
-      ],
+      sql: `SELECT 1 FROM members m JOIN sessions s ON s.user_id=m.user_id JOIN users u ON u.id=m.user_id WHERE m.project_id=? AND m.user_id=? AND ${minimum === "admin" ? "m.role='admin'" : "m.role IN('admin','editor')"} AND s.digest=? AND s.revoked=0 AND s.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') AND s.auth_version=u.auth_version`,
+      values: [projectId, user.id, user.session_digest],
     };
   }
   async function session(user: AuthUser, device: unknown) {

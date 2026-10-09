@@ -7,6 +7,94 @@ import { hash } from "../sync/protocol";
 import { resumableUpload } from "../sync/resumable-upload";
 import { uploadPartBytes } from "./uploads";
 import type { StoragePolicy } from "./quotas";
+
+test("a device expiring during a real streamed upload cannot publish a readable object", async () => {
+  const f = await fixture();
+  const editor = await f.register("expiring-editor");
+  const invite = await f.request(
+    "/api/projects/project/invites",
+    "POST",
+    { role: "editor" },
+    f.owner.token,
+  );
+  expect(
+    (
+      await f.request(
+        "/api/invites/accept",
+        "POST",
+        { invite: invite.value.invite },
+        editor.token,
+      )
+    ).status,
+  ).toBe(200);
+  const bytes = Buffer.from("expiry-boundary"),
+    digest = await hash(bytes);
+  let finish!: () => void;
+  let finished = false;
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(bytes.subarray(0, 1));
+      finish = () => {
+        if (finished) return;
+        finished = true;
+        controller.enqueue(bytes.subarray(1));
+        controller.close();
+      };
+    },
+  });
+  const pending = fetch(f.url() + `/api/projects/project/objects/${digest}`, {
+    method: "PUT",
+    headers: {
+      authorization: `Bearer ${editor.token}`,
+      "content-length": String(bytes.length),
+    },
+    body,
+    duplex: "half",
+  } as RequestInit);
+  const db = new SQLiteMetadata(join(f.home, "metadata.sqlite"));
+  try {
+    const deadline = Date.now() + 5000;
+    while (
+      !(
+        await db.all(
+          "SELECT 1 FROM storage_reservations WHERE project_id=? AND digest=?",
+          ["project", digest],
+        )
+      ).length
+    ) {
+      if (Date.now() > deadline)
+        throw new Error("The real upload was not admitted.");
+      await new Promise((done) => setTimeout(done, 10));
+    }
+    await db.run("UPDATE sessions SET expires_at=? WHERE digest=?", [
+      new Date(Date.now() + 25).toISOString(),
+      await hash(editor.token),
+    ]);
+    await new Promise((done) => setTimeout(done, 60));
+    finish();
+    const uploaded = await pending;
+    expect(uploaded.status).toBe(401);
+    await uploaded.arrayBuffer();
+    const visible = await fetch(
+      f.url() + `/api/projects/project/objects/${digest}`,
+      { headers: { authorization: `Bearer ${f.owner.token}` } },
+    );
+    expect(visible.status).toBe(404);
+    await visible.arrayBuffer();
+    expect(
+      (
+        await db.all(
+          "SELECT 1 FROM storage_reservations WHERE project_id=? AND digest=?",
+          ["project", digest],
+        )
+      ).length,
+    ).toBe(1);
+  } finally {
+    finish();
+    await pending.catch(() => undefined);
+    db.close();
+  }
+});
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => {
   for (const action of cleanups.splice(0).reverse()) await action();
