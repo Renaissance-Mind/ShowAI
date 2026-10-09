@@ -7,8 +7,12 @@ export function SelectionToolbar({
   anchor,
   children,
   onEscape,
+  label = "选中文字格式",
+  keyboardScope,
 }: {
   id: string;
+  label?: string;
+  keyboardScope?: string;
   anchor: { left: number; top: number };
   children: ReactNode;
   onEscape: () => void;
@@ -42,8 +46,9 @@ export function SelectionToolbar({
       id={id}
       className="editor-bubble"
       data-editor-menu-trigger="selection"
+      data-editor-keyboard-scope={keyboardScope}
       role="toolbar"
-      aria-label="选中文字格式"
+      aria-label={label}
       style={position}
       onMouseDown={(event) => {
         if (!(event.target as Element).closest("input,select,textarea"))

@@ -25,6 +25,10 @@ const FlowchartBlock = /* @__PURE__ */ lazy(() =>
   import("./Flowchart").then((module) => ({ default: module.FlowchartBlock })),
 );
 import { validateFlowchartData } from "./flowchart-contract.mjs";
+import { validateMindmapData } from "./mindmap-contract.mjs";
+const MindmapBlock = /* @__PURE__ */ lazy(() =>
+  import("./Mindmap").then((module) => ({ default: module.MindmapBlock })),
+);
 import { parseChartData } from "./helpers";
 import g2Metadata from "../../../resources/catalog/g2.json";
 const G2ChartBlock = /* @__PURE__ */ lazy(() =>
@@ -184,6 +188,16 @@ for (const item of primitiveMetadata) {
   });
 }
 
+registerBlock({
+  kind: "mindmap",
+  title: "思维导图",
+  description: "自动排布的主题分支，支持快捷键创建与编辑节点",
+  icon: "⑂",
+  defaultData: componentMetadata.find((item) => item.kind === "mindmap")!
+    .defaultData as BlockData,
+  renderer: MindmapBlock,
+  validate: validateMindmapData,
+});
 registerBlock({
   kind: "flowchart",
   title: "交互流程图",

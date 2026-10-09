@@ -510,6 +510,121 @@
     ]
   },
   {
+    "kind": "mindmap",
+    "name": "思维导图",
+    "description": "从中心主题展开分支，自动排布节点；Tab 创建子节点，Enter 创建同级节点，支持编辑、折叠和撤销。",
+    "scenarios": [
+      "梳理主题、研究问题与子问题之间的层级关系。",
+      "通过键盘快速组织想法、写作提纲与项目计划。"
+    ],
+    "defaultData": {
+      "title": "思维导图",
+      "height": 460,
+      "nodes": [
+        {
+          "id": "root",
+          "parentId": null,
+          "label": "中心主题"
+        },
+        {
+          "id": "branch-1",
+          "parentId": "root",
+          "label": "主题一"
+        },
+        {
+          "id": "branch-2",
+          "parentId": "root",
+          "label": "主题二"
+        },
+        {
+          "id": "branch-3",
+          "parentId": "branch-1",
+          "label": "子主题"
+        }
+      ]
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "height": {
+          "type": "number",
+          "minimum": 240,
+          "maximum": 1200
+        },
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 500,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "parentId": {
+                "type": ["string", "null"]
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "collapsed": {
+                "type": "boolean"
+              }
+            },
+            "required": ["id", "parentId", "label"]
+          }
+        }
+      },
+      "required": ["nodes"]
+    },
+    "examples": [
+      {
+        "name": "写作提纲",
+        "request": "用思维导图整理文章提纲：研究背景、方法与讨论。",
+        "data": {
+          "title": "文章提纲",
+          "nodes": [
+            {
+              "id": "root",
+              "parentId": null,
+              "label": "文章提纲"
+            },
+            {
+              "id": "background",
+              "parentId": "root",
+              "label": "研究背景"
+            },
+            {
+              "id": "method",
+              "parentId": "root",
+              "label": "方法"
+            },
+            {
+              "id": "discussion",
+              "parentId": "root",
+              "label": "讨论"
+            }
+          ]
+        }
+      }
+    ],
+    "version": "1.0.0",
+    "effects": [
+      "自动排布左右分支，展示中心主题与层级关系。",
+      "用快捷键添加子节点和同级节点，支持分支折叠与缩放。"
+    ]
+  },
+  {
     "kind": "flowchart",
     "name": "交互流程图",
     "description": "基于 React Flow 的可缩放流程图，支持节点详情、分支关系、多条流程和编辑节点。",

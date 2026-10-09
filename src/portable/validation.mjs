@@ -3,6 +3,7 @@ import { validatePageIcon } from "../lib/page-icon.mjs";
 import { artifactVersion, assignSurfaceIds } from "../surface/document.mjs";
 import { validateSurface } from "../surface/validation.mjs";
 import { validatePrimitiveData } from "../components/blocks/primitive-contract.mjs";
+import { validateMindmapData } from "../components/blocks/mindmap-contract.mjs";
 import { validateFlowchartData } from "../components/blocks/flowchart-contract.mjs";
 import { validateG2Data } from "../components/blocks/g2/contract.mjs";
 import { validateResearchData } from "../components/blocks/research-contract.mjs";
@@ -238,6 +239,10 @@ function validateWidgetData(kind, data, path) {
   }
   if (kind.startsWith("g2-")) {
     validateG2Data(data);
+    return;
+  }
+  if (kind === "mindmap") {
+    validateMindmapData(data);
     return;
   }
   if (kind === "flowchart") {

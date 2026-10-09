@@ -30,6 +30,7 @@ const builtinCategories: Record<string, ComponentCategory> = {
   metrics: "data",
   playground: "data",
   flowchart: "flow",
+  mindmap: "flow",
   page: "surface",
   board: "surface",
 };

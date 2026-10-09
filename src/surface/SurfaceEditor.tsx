@@ -317,7 +317,7 @@ export default function SurfaceEditor({
           !(event.metaKey || event.ctrlKey) ||
           event.altKey ||
           (event.target as Element).closest(
-            'input,textarea,select,[role="dialog"]',
+            'input,textarea,select,[role="dialog"],[data-editor-keyboard-scope]',
           )
         )
           return;
