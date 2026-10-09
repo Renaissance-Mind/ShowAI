@@ -24,6 +24,7 @@ export interface ObjectStore {
     maximum: number,
   ): Promise<number>;
   digest(): StreamDigest;
+  remove(key: string): Promise<void>;
 }
 export interface StreamDigest {
   update(bytes: Uint8Array): Promise<void>;

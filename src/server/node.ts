@@ -62,7 +62,7 @@ export class DiskObjects implements ObjectStore {
   constructor(readonly root: string) {}
   private path(key: string) {
     if (
-      !/^projects\/[A-Za-z0-9_-]+\/(?:objects|manifests)\/[a-f0-9]{64}$/.test(
+      !/^projects\/[A-Za-z0-9_-]+\/(?:(?:objects|manifests)\/[a-f0-9]{64}|uploads\/[A-Za-z0-9_-]+\/parts\/[a-f0-9]{64})$/.test(
         key,
       )
     )
@@ -92,6 +92,9 @@ export class DiskObjects implements ObjectStore {
         return hash.digest("hex");
       },
     };
+  }
+  async remove(key: string) {
+    await rm(this.path(key), { force: true });
   }
   async open(key: string) {
     const path = this.path(key);
@@ -269,6 +272,9 @@ if (
       : undefined,
     accountLimit: process.env.SHOWAI_ACCOUNT_LIMIT
       ? Number(process.env.SHOWAI_ACCOUNT_LIMIT)
+      : undefined,
+    storagePolicy: process.env.SHOWAI_STORAGE_POLICY
+      ? JSON.parse(process.env.SHOWAI_STORAGE_POLICY)
       : undefined,
     allowedOrigins:
       process.env.SHOWAI_ALLOWED_ORIGINS?.split(",").filter(Boolean),

@@ -33,7 +33,7 @@ export class Revisions {
     readonly db: MetadataStore,
     readonly objects: ObjectStore,
   ) {}
-  async store(projectId: string, snapshot: ProjectSnapshot) {
+  async prepare(projectId: string, snapshot: ProjectSnapshot) {
     const serialized = canonical(snapshot),
       bytes = encoder.encode(serialized);
     if (bytes.byteLength > manifestMaximum)
@@ -44,8 +44,12 @@ export class Revisions {
       );
     const digest = await hash(bytes),
       key = manifestKey(projectId, digest);
-    await this.objects.put(key, bytes);
-    return { key, digest, bytes: bytes.byteLength };
+    return { key, digest, bytes: bytes.byteLength, content: bytes };
+  }
+  async store(projectId: string, snapshot: ProjectSnapshot) {
+    const prepared = await this.prepare(projectId, snapshot);
+    await this.objects.put(prepared.key, prepared.content);
+    return prepared;
   }
   async row(
     projectId: string,

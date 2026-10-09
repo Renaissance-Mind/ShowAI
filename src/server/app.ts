@@ -16,6 +16,8 @@ import { type MetadataStore, type ObjectStore } from "./storage";
 import { prepareMetadata } from "./migrations";
 import { Revisions, type RevisionRow } from "./revisions";
 import { verifiedStream } from "./streams";
+import { Quotas, type StoragePolicy } from "./quotas";
+import { Uploads } from "./uploads";
 import {
   createInvitation,
   acceptInvitation,
@@ -55,6 +57,7 @@ export interface ServerOptions extends AccountOptions {
   autoMigrate?: boolean;
   allowedOrigins?: string[];
   requirePublicOrigin?: boolean;
+  storagePolicy?: Partial<StoragePolicy>;
 }
 interface Member {
   id: string;
@@ -130,6 +133,8 @@ export function createSyncServer(options: ServerOptions) {
   const db = options.metadata,
     objects = options.objects;
   const revisions = new Revisions(db, objects);
+  const quotas = new Quotas(db, options.storagePolicy);
+  const uploads = new Uploads(db, objects, quotas);
   let activeManifests = 0;
   const manifestWaiters: (() => void)[] = [];
   let initialization: Promise<string> | undefined;
@@ -317,6 +322,8 @@ export function createSyncServer(options: ServerOptions) {
           "invite-controls-v1",
           "history-summary-v1",
           "object-manifests-v1",
+          "storage-quotas-v1",
+          "resumable-objects-v1",
         ],
       });
     if (path === "/api/auth/register" && method === "POST") {
@@ -464,14 +471,31 @@ export function createSyncServer(options: ServerOptions) {
       if (existing) return json(await projectFor(user.id, id));
       await db.batch([
         {
-          sql: "INSERT INTO projects(id,name,created_at) VALUES(?,?,?)",
-          values: [id, name, new Date().toISOString()],
+          sql: "INSERT INTO projects(id,name,created_at,created_by) SELECT ?,?,?,? WHERE (SELECT COUNT(*) FROM projects WHERE created_by=?)<? AND (SELECT COUNT(*) FROM projects)<?",
+          values: [
+            id,
+            name,
+            new Date().toISOString(),
+            user.id,
+            user.id,
+            quotas.policy.accountProjects,
+            quotas.policy.serviceProjects,
+          ],
         },
         {
-          sql: "INSERT INTO members(project_id,user_id,role) VALUES(?,?,'admin')",
-          values: [id, user.id],
+          sql: "INSERT INTO members(project_id,user_id,role) SELECT ?,?,'admin' WHERE EXISTS(SELECT 1 FROM projects WHERE id=?)",
+          values: [id, user.id, id],
         },
       ]);
+      if (
+        !(
+          await db.all(
+            "SELECT 1 FROM members WHERE project_id=? AND user_id=?",
+            [id, user.id],
+          )
+        ).length
+      )
+        throw new SyncError(507, "PROJECT_CAPACITY", "项目数量已达容量上限。");
       return json(
         { id, name, head: null, role: "admin", archived: false },
         201,
@@ -488,6 +512,11 @@ export function createSyncServer(options: ServerOptions) {
     const projectId = identifier(match[1]),
       resource = match[2] ?? "";
     const project = await projectFor(user.id, projectId);
+    if (resource === "storage" && method === "GET")
+      return json({
+        usage: await quotas.usage(projectId),
+        policy: quotas.policy,
+      });
     if (!resource && method === "GET")
       return json({ ...project, archived: !!project.archived });
     if (!resource && method === "PATCH") {
@@ -535,11 +564,36 @@ export function createSyncServer(options: ServerOptions) {
         envelope.value.updatedAt = new Date().toISOString();
         const metadata = encoder.encode(JSON.stringify(envelope)),
           digest = await hash(metadata);
-        await objects.put(objectKey(projectId, digest), metadata);
-        await db.run(
-          "INSERT OR IGNORE INTO objects(project_id,digest,bytes) VALUES(?,?,?)",
-          [projectId, digest, metadata.length],
-        );
+        const metadataGate = writeGate(user, projectId, "admin"),
+          metadataReservation = await quotas.reserve(
+            projectId,
+            user.id,
+            "object",
+            digest,
+            metadata.length,
+            metadataGate,
+          );
+        if (metadataReservation) {
+          await objects.put(objectKey(projectId, digest), metadata);
+          await db.batch([
+            {
+              sql: `INSERT OR IGNORE INTO objects(project_id,digest,bytes,uploaded_by,uploaded_at) SELECT ?,?,?,?,? WHERE EXISTS(${metadataGate.sql}) AND EXISTS(SELECT 1 FROM storage_reservations WHERE id=?)`,
+              values: [
+                projectId,
+                digest,
+                metadata.length,
+                user.id,
+                new Date().toISOString(),
+                ...metadataGate.values,
+                metadataReservation.id,
+              ],
+            },
+            {
+              sql: "DELETE FROM storage_reservations WHERE id=? AND EXISTS(SELECT 1 FROM objects WHERE project_id=? AND digest=?)",
+              values: [metadataReservation.id, projectId, digest],
+            },
+          ]);
+        }
         const next: ProjectSnapshot = {
           ...snapshot,
           format: syncProtocol,
@@ -718,6 +772,46 @@ export function createSyncServer(options: ServerOptions) {
       }
       return json({ missing });
     }
+    if (resource === "objects/uploads" && method === "POST") {
+      await projectFor(user.id, projectId, "editor");
+      const input = await body(request);
+      return json(
+        await uploads.begin(
+          projectId,
+          user.id,
+          input.digest,
+          input.bytes,
+          writeGate(user, projectId),
+        ),
+      );
+    }
+    const uploadRoute = resource.match(
+      /^objects\/uploads\/([A-Za-z0-9_-]+)(?:\/(parts\/(\d+)|complete))?$/,
+    );
+    if (uploadRoute) {
+      await projectFor(user.id, projectId, "editor");
+      const upload = await uploads.find(projectId, user.id, uploadRoute[1]);
+      if (!uploadRoute[2] && method === "GET")
+        return json(await uploads.status(upload));
+      if (uploadRoute[3] && method === "PUT")
+        return json(
+          await uploads.putPart(
+            upload,
+            Number(uploadRoute[3]),
+            url.searchParams.get("digest"),
+            request.body ??
+              new ReadableStream({
+                start(controller) {
+                  controller.close();
+                },
+              }),
+            writeGate(user, projectId),
+          ),
+        );
+      if (uploadRoute[2] === "complete" && method === "POST")
+        return json(await uploads.complete(upload, writeGate(user, projectId)));
+      throw new SyncError(404, "NOT_FOUND", "Unknown upload endpoint.");
+    }
     const object = resource.match(/^objects\/([a-f0-9]{64})$/);
     if (object && method === "GET") {
       if (
@@ -765,24 +859,106 @@ export function createSyncServer(options: ServerOptions) {
         (!/^\d+$/.test(declared) || Number(declared) > 64 * 1024 * 1024)
       )
         throw new SyncError(413, "TOO_LARGE", "Object exceeds 64 MiB.");
-      const length = await objects.putVerified(
-        objectKey(projectId, object[1]),
-        request.body ??
-          new ReadableStream({
-            start(controller) {
-              controller.close();
-            },
-          }),
+      const gate = writeGate(user, projectId),
+        reservedBytes = declared
+          ? Number(declared)
+          : url.searchParams.has("bytes")
+            ? Number(url.searchParams.get("bytes"))
+            : 64 * 1024 * 1024;
+      if (
+        !Number.isSafeInteger(reservedBytes) ||
+        reservedBytes < 0 ||
+        reservedBytes > 64 * 1024 * 1024
+      )
+        throw new SyncError(413, "TOO_LARGE", "Object exceeds 64 MiB.");
+      const reservation = await quotas.reserve(
+        projectId,
+        user.id,
+        "object",
         object[1],
-        64 * 1024 * 1024,
+        reservedBytes,
+        gate,
       );
-      const gate = writeGate(user, projectId);
-      await db.run(
-        `INSERT OR IGNORE INTO objects(project_id,digest,bytes) SELECT ?,?,? WHERE EXISTS(${gate.sql})`,
-        [projectId, object[1], length, ...gate.values],
-      );
+      const input =
+        request.body ??
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.close();
+          },
+        });
+      if (!reservation) {
+        const verified = verifiedStream(
+          input,
+          objects.digest(),
+          object[1],
+          64 * 1024 * 1024,
+          declared ? reservedBytes : undefined,
+        );
+        const reader = verified.getReader();
+        try {
+          while (!(await reader.read()).done) {}
+        } finally {
+          reader.releaseLock();
+        }
+        await authenticate(request);
+        await projectFor(user.id, projectId, "editor");
+        return json({ ok: true, alreadyPresent: true });
+      }
+      let length: number;
+      try {
+        length = await objects.putVerified(
+          objectKey(projectId, object[1]),
+          input,
+          object[1],
+          reservedBytes,
+        );
+      } catch (error) {
+        const possible = await objects.open(objectKey(projectId, object[1]));
+        if (possible) await possible.body.cancel();
+        else await quotas.release(reservation);
+        throw error;
+      }
+      if (declared && length !== reservedBytes)
+        throw new SyncError(
+          400,
+          "INVALID_SIZE",
+          "Upload length does not match its declared size.",
+        );
+      await db.batch([
+        {
+          sql: `INSERT OR IGNORE INTO objects(project_id,digest,bytes,uploaded_by,uploaded_at) SELECT ?,?,?,?,? WHERE EXISTS(${gate.sql}) AND EXISTS(SELECT 1 FROM storage_reservations WHERE id=? AND bytes>=?)`,
+          values: [
+            projectId,
+            object[1],
+            length,
+            user.id,
+            new Date().toISOString(),
+            ...gate.values,
+            reservation.id,
+            length,
+          ],
+        },
+        {
+          sql: "DELETE FROM storage_reservations WHERE id=? AND EXISTS(SELECT 1 FROM objects WHERE project_id=? AND digest=?)",
+          values: [reservation.id, projectId, object[1]],
+        },
+        quotas.unusedBudgetStatement(reservation, length),
+      ]);
       await authenticate(request);
       await projectFor(user.id, projectId, "editor");
+      if (
+        !(
+          await db.all(
+            "SELECT 1 FROM objects WHERE project_id=? AND digest=?",
+            [projectId, object[1]],
+          )
+        ).length
+      )
+        throw new SyncError(
+          409,
+          "UPLOAD_INTERRUPTED",
+          "Upload reservation changed before publication; retry.",
+        );
       return json({ ok: true });
     }
     if (resource === "revisions" && method === "GET") {
@@ -973,22 +1149,50 @@ export function createSyncServer(options: ServerOptions) {
           return bytes;
         },
       );
-      const stored = await revisions.store(projectId, snapshot);
-      const gate = writeGate(user, projectId);
-      await db.run(
-        `INSERT OR IGNORE INTO revisions(project_id,revision,manifest,user_id,created_at,manifest_key,manifest_digest,manifest_bytes,sequence) SELECT ?,?,'',?,?,?,?,?,COALESCE((SELECT MAX(sequence)+1 FROM revisions WHERE project_id=?),1) WHERE EXISTS(${gate.sql})`,
-        [
-          projectId,
-          revision,
-          user.id,
-          new Date().toISOString(),
-          stored.key,
-          stored.digest,
-          stored.bytes,
-          projectId,
-          ...gate.values,
-        ],
+      const stored = await revisions.prepare(projectId, snapshot),
+        gate = writeGate(user, projectId);
+      const reservation = await quotas.reserve(
+        projectId,
+        user.id,
+        "manifest",
+        stored.digest,
+        stored.bytes,
+        gate,
       );
+      if (reservation) {
+        try {
+          await objects.put(stored.key, stored.content);
+        } catch (error) {
+          const possible = await objects.open(stored.key);
+          if (possible) await possible.body.cancel();
+          else await quotas.release(reservation);
+          throw error;
+        }
+      }
+      await db.batch([
+        {
+          sql: `INSERT OR IGNORE INTO revisions(project_id,revision,manifest,user_id,created_at,manifest_key,manifest_digest,manifest_bytes,sequence) SELECT ?,?,'',?,?,?,?,?,COALESCE((SELECT MAX(sequence)+1 FROM revisions WHERE project_id=?),1) WHERE EXISTS(${gate.sql})`,
+          values: [
+            projectId,
+            revision,
+            user.id,
+            new Date().toISOString(),
+            stored.key,
+            stored.digest,
+            stored.bytes,
+            projectId,
+            ...gate.values,
+          ],
+        },
+        ...(reservation
+          ? [
+              {
+                sql: "DELETE FROM storage_reservations WHERE id=? AND EXISTS(SELECT 1 FROM revisions WHERE project_id=? AND revision=?)",
+                values: [reservation.id, projectId, revision],
+              },
+            ]
+          : []),
+      ]);
       await authenticate(request);
       const currentProject = await projectFor(user.id, projectId, "editor");
       if (input.publish === false)

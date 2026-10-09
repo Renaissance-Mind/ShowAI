@@ -286,6 +286,22 @@ describe("portable project server with real SQLite and disk storage", () => {
     ])
       await metadata.run(`ALTER TABLE revisions DROP COLUMN ${column}`);
     await metadata.run("DROP TABLE request_limits");
+    for (const index of [
+      "projects_creator",
+      "objects_uploader",
+      "revisions_author",
+    ])
+      await metadata.run(`DROP INDEX ${index}`);
+    for (const table of [
+      "storage_reservations",
+      "upload_budgets",
+      "object_uploads",
+      "object_upload_parts",
+    ])
+      await metadata.run(`DROP TABLE ${table}`);
+    await metadata.run("ALTER TABLE projects DROP COLUMN created_by");
+    await metadata.run("ALTER TABLE objects DROP COLUMN uploaded_by");
+    await metadata.run("ALTER TABLE objects DROP COLUMN uploaded_at");
     await metadata.run("DROP TABLE audit_events");
     await metadata.run("ALTER TABLE users DROP COLUMN auth_version");
     await metadata.run("ALTER TABLE sessions DROP COLUMN auth_version");

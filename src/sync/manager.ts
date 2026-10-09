@@ -11,6 +11,7 @@ import { LibraryOperations } from "../core/library-operations";
 import { WorkspaceProtection } from "../core/workspace-conflicts";
 import { serverBaseUrl, serverEndpoint, invitationBaseUrl } from "./server-url";
 import { cacheDownload } from "./object-cache";
+import { resumableUpload } from "./resumable-upload";
 import {
   retainSyncConflicts,
   type RetainedConflict,
@@ -751,6 +752,23 @@ export class SyncManager {
       );
       for (const digest of missing) {
         const bytes = captured.objects.get(digest)!;
+        if (
+          connection.capabilities?.includes("resumable-objects-v1") &&
+          bytes.length >= 5 * 1024 * 1024
+        ) {
+          await resumableUpload(
+            `${connection.url}/api/projects/${project.remoteProjectId}/objects`,
+            connection.token,
+            digest,
+            bytes,
+          );
+          await atomicLibraryFile(
+            this.home,
+            this.objectPath(digest, this.cacheKey(connection, project)),
+            bytes,
+          );
+          continue;
+        }
         const response = await fetch(
           `${connection.url}/api/projects/${project.remoteProjectId}/objects/${digest}`,
           {
@@ -776,7 +794,10 @@ export class SyncManager {
               });
             })(),
             duplex: "half",
-            headers: { authorization: `Bearer ${connection.token}` },
+            headers: {
+              authorization: `Bearer ${connection.token}`,
+              "content-length": String(bytes.length),
+            },
             signal: AbortSignal.timeout(60_000),
           } as RequestInit,
         );

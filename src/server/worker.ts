@@ -42,6 +42,7 @@ interface WorkerEnvironment {
   SHOWAI_REGISTRATION_KEY?: string;
   SHOWAI_REGISTRATION_LIMIT?: string;
   SHOWAI_ACCOUNT_LIMIT?: string;
+  SHOWAI_STORAGE_POLICY?: string;
   SHOWAI_ALLOWED_ORIGINS?: string;
 }
 export function workerMetadata(env: WorkerEnvironment): MetadataStore {
@@ -88,6 +89,9 @@ let activeUploads = 0;
 export function workerObjects(env: WorkerEnvironment): ObjectStore {
   return {
     digest: workerDigest,
+    async remove(key) {
+      await env.CONTENT.delete(key);
+    },
     async open(key) {
       const object = await env.CONTENT.get(key);
       return object ? { body: object.body, bytes: object.size } : null;
@@ -116,10 +120,7 @@ export function workerObjects(env: WorkerEnvironment): ObjectStore {
           { retryAfter: 1 },
         );
       activeUploads++;
-      const temporary = key.replace(
-        /\/(objects|manifests)\/[^/]+$/,
-        `/uploads/${crypto.randomUUID()}`,
-      );
+      const temporary = `${key}.staging-${crypto.randomUUID()}`;
       const digest = workerDigest(),
         reader = body.getReader();
       const partBytes = 5 * 1024 * 1024;
@@ -206,6 +207,9 @@ export default {
         registrationKey: env.SHOWAI_REGISTRATION_KEY,
         autoMigrate: false,
         registrationMode: "controlled",
+        storagePolicy: env.SHOWAI_STORAGE_POLICY
+          ? JSON.parse(env.SHOWAI_STORAGE_POLICY)
+          : undefined,
         accountLimit: env.SHOWAI_ACCOUNT_LIMIT
           ? Number(env.SHOWAI_ACCOUNT_LIMIT)
           : undefined,
