@@ -512,7 +512,7 @@
   {
     "kind": "mindmap",
     "name": "思维导图",
-    "description": "从中心主题展开分支，自动排布节点；Tab 创建子节点，Enter 创建同级节点，支持编辑、折叠和撤销。",
+    "description": "中心主题向四周或单向展开，自动排布节点，支持键盘编辑、折叠和撤销。",
     "scenarios": [
       "梳理主题、研究问题与子问题之间的层级关系。",
       "通过键盘快速组织想法、写作提纲与项目计划。"
@@ -541,7 +541,9 @@
           "parentId": "branch-1",
           "label": "子主题"
         }
-      ]
+      ],
+      "layout": "radial",
+      "direction": "right"
     },
     "propsSchema": {
       "type": "object",
@@ -583,6 +585,12 @@
             },
             "required": ["id", "parentId", "label"]
           }
+        },
+        "layout": {
+          "enum": ["radial", "tree"]
+        },
+        "direction": {
+          "enum": ["right", "left"]
         }
       },
       "required": ["nodes"]
@@ -620,7 +628,7 @@
     ],
     "version": "1.0.0",
     "effects": [
-      "自动排布左右分支，展示中心主题与层级关系。",
+      "在区域右上角悬停显示布局图标，可切换四周展开或单向展开。",
       "用快捷键添加子节点和同级节点，支持分支折叠与缩放。"
     ]
   },

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   addMindmapNode,
   layoutMindmap,
+  mindmapConnectionPath,
   promoteMindmapNode,
   removeMindmapNode,
   validateMindmapData,
@@ -115,5 +116,114 @@ describe("mind map document contract", () => {
       ),
     ).toBe(false);
     expect(layoutMindmap(data, new Set(["r"])).nodes).toHaveLength(1);
+  });
+  it("uses four directions without overlap and connects each branch from the correct face", () => {
+    let data = map();
+    for (let i = 0; i < 6; i++) data = addMindmapNode(data, "r", `branch${i}`);
+    for (let i = 0; i < 48; i++) {
+      const parent = i % 2 === 0 ? `branch${i % 6}` : `detail${i - 1}`;
+      data = addMindmapNode(data, parent, `detail${i}`);
+    }
+    data.nodes.find((node) => node.id === "branch2")!.label =
+      "长主题名称".repeat(24);
+    const graph = layoutMindmap({ ...data, layout: "radial" });
+    const directions = new Set(
+      graph.nodes
+        .filter((node) => node.parentId === "r")
+        .map((node) => `${node.axis}:${node.side}`),
+    );
+    expect(directions).toEqual(
+      new Set(["horizontal:1", "horizontal:-1", "vertical:1", "vertical:-1"]),
+    );
+    for (const a of graph.nodes)
+      for (const b of graph.nodes) {
+        if (a === b) continue;
+        expect(
+          a.x + a.width <= b.x ||
+            b.x + b.width <= a.x ||
+            a.y + a.height <= b.y ||
+            b.y + b.height <= a.y,
+        ).toBe(true);
+      }
+    const root = graph.nodes[0];
+    for (const node of graph.nodes.filter((node) => node.parentId === "r")) {
+      const path = mindmapConnectionPath(root, node);
+      const endpoint =
+        node.axis === "vertical"
+          ? `${node.x + node.width / 2} ${node.y + (node.side > 0 ? 0 : node.height)}`
+          : `${node.x + (node.side > 0 ? 0 : node.width)} ${node.y + node.height / 2}`;
+      expect(path.endsWith(endpoint)).toBe(true);
+      if (node.axis === "vertical") {
+        const lane = path.match(/L ([\d.-]+) ([\d.-]+)/)!;
+        const horizontal = graph.nodes.filter(
+          (item) => item.axis === "horizontal",
+        );
+        expect(Number(lane[1])).toBe(root.x + root.width / 2);
+        expect(
+          node.side > 0
+            ? Number(lane[2]) >
+                Math.max(...horizontal.map((item) => item.y + item.height))
+            : Number(lane[2]) < Math.min(...horizontal.map((item) => item.y)),
+        ).toBe(true);
+      }
+      expect(node.depth).toBe(1);
+    }
+  });
+  it("lays out every descendant to the right or left while preserving content and branch colors", () => {
+    const data = addMindmapNode(addMindmapNode(map(), "r", "c"), "c", "c1");
+    const before = JSON.stringify(data);
+    const radial = layoutMindmap({ ...data, layout: "radial" });
+    for (const direction of ["right", "left"] as const) {
+      const graph = layoutMindmap({ ...data, layout: "tree", direction });
+      for (const node of graph.nodes.filter((node) => node.parentId)) {
+        const parent = graph.nodes.find((item) => item.id === node.parentId)!;
+        expect(node.axis).toBe("horizontal");
+        expect(
+          direction === "right"
+            ? node.x > parent.x + parent.width
+            : node.x + node.width < parent.x,
+        ).toBe(true);
+        expect(node.color).toBe(
+          radial.nodes.find((item) => item.id === node.id)!.color,
+        );
+        expect(node.depth).toBe(parent.depth + 1);
+      }
+      expect(
+        layoutMindmap(
+          { ...data, layout: "tree", direction },
+          new Set(["c"]),
+        ).nodes.some((node) => node.id === "c1"),
+      ).toBe(false);
+    }
+    expect(JSON.stringify(data)).toBe(before);
+  });
+  it("preserves layout settings on Page/Board round trips and rejects invalid settings", () => {
+    for (const kind of ["page", "board"] as const) {
+      const source = validateDocument({
+        id: crypto.randomUUID(),
+        title: "Layout",
+        content: createSurface(kind),
+      });
+      const data = {
+        ...map(),
+        layout: "tree" as const,
+        direction: "left" as const,
+      };
+      const inserted = insertComponent(source, null, "mindmap", data);
+      const saved = validateDocument(
+        JSON.parse(JSON.stringify(inserted.document)),
+      );
+      expect(
+        saved.content.content!.find(
+          (node) => node.attrs?.id === inserted.nodeId,
+        )!.attrs!.data,
+      ).toEqual(data);
+    }
+    expect(() => validateMindmapData({ ...map(), layout: "diagonal" })).toThrow(
+      /layout/,
+    );
+    expect(() => validateMindmapData({ ...map(), direction: "up" })).toThrow(
+      /direction/,
+    );
   });
 });

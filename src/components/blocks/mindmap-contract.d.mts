@@ -8,6 +8,8 @@ export interface MindmapData extends Record<string, unknown> {
   title?: string;
   description?: string;
   height?: number;
+  layout?: "radial" | "tree";
+  direction?: "right" | "left";
   nodes: MindmapNode[];
 }
 export interface PositionedMindmapNode extends MindmapNode {
@@ -16,6 +18,8 @@ export interface PositionedMindmapNode extends MindmapNode {
   width: number;
   height: number;
   side: number;
+  axis: "horizontal" | "vertical";
+  depth: number;
   color: number;
 }
 export const MAX_MINDMAP_NODES: number;
@@ -34,3 +38,8 @@ export function layoutMindmap(
   data: MindmapData,
   collapsed?: Set<string>,
 ): { nodes: PositionedMindmapNode[]; width: number; height: number };
+
+export function mindmapConnectionPath(
+  parent: PositionedMindmapNode,
+  node: PositionedMindmapNode,
+): string;

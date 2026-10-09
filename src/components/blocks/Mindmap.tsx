@@ -13,6 +13,8 @@ import {
   Plus,
   Minus,
   Maximize2,
+  Network,
+  ListTree,
   Type,
   Trash2,
   ChevronRight,
@@ -24,6 +26,7 @@ import type { BlockProps } from "./types";
 import {
   addMindmapNode,
   layoutMindmap,
+  mindmapConnectionPath,
   MAX_MINDMAP_NODES,
   mindmapChildren,
   promoteMindmapNode,
@@ -51,12 +54,19 @@ export function MindmapBlock({
   const [readingCollapsed, setReadingCollapsed] = useState<Set<string> | null>(
     null,
   );
+  const [readingView, setReadingView] = useState<{
+    layout: "radial" | "tree";
+    direction: "right" | "left";
+  } | null>(null);
+  const layout = (!editable && readingView?.layout) || data.layout || "radial";
+  const direction =
+    (!editable && readingView?.direction) || data.direction || "right";
   const collapsed =
     readingCollapsed ??
     new Set(data.nodes.filter((node) => node.collapsed).map((node) => node.id));
   const graph = useMemo(
-    () => layoutMindmap(data, collapsed),
-    [data, [...collapsed].join("\0")],
+    () => layoutMindmap({ ...data, layout, direction }, collapsed),
+    [data, layout, direction, JSON.stringify([...collapsed])],
   );
   const [scale, setScale] = useState(1);
   const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(
@@ -89,7 +99,7 @@ export function MindmapBlock({
         ),
       );
   };
-  useLayoutEffect(fit, []);
+  useLayoutEffect(fit, [layout, direction]);
   useEffect(() => {
     const signature = JSON.stringify(data);
     if (
@@ -173,6 +183,17 @@ export function MindmapBlock({
     history.current.expected = JSON.stringify(next);
     setNotice("");
     onChange?.(next);
+  };
+  const switchLayout = (next: "radial" | "tree") => {
+    const nextDirection =
+      next === "tree" && layout === "tree"
+        ? direction === "right"
+          ? "left"
+          : "right"
+        : direction;
+    if (next === layout && nextDirection === direction) return;
+    if (editable) change({ ...data, layout: next, direction: nextDirection });
+    else setReadingView({ layout: next, direction: nextDirection });
   };
   const undo = (redo = false) => {
     const from = redo ? history.current.future : history.current.past;
@@ -260,7 +281,14 @@ export function MindmapBlock({
     const command = event.metaKey || event.ctrlKey;
     const menu =
       (event.target as Element).closest(".editor-bubble")?.id === menuId;
-    if (menu ? !command : !(event.target as Element).closest(".sm-node"))
+    const layoutControl = (event.target as Element).closest(
+      ".sb-header .sb-actions",
+    );
+    if (
+      menu || layoutControl
+        ? !command
+        : !(event.target as Element).closest(".sm-node")
+    )
       return;
     let handled = true;
     if (command && event.key.toLowerCase() === "z" && editable)
@@ -309,9 +337,14 @@ export function MindmapBlock({
       aria-label={data.title || "思维导图"}
       contentEditable={false}
       data-editor-keyboard-scope="mindmap"
+      data-mindmap-layout={layout}
+      data-mindmap-direction={direction}
       onClick={(event) => event.stopPropagation()}
       onKeyDown={keyDown}
-      onFocus={() => setActive(true)}
+      onFocus={(event) => {
+        if ((event.target as Element).closest(".sm-node, .sm-node-input"))
+          setActive(true);
+      }}
       onBlur={(event) => {
         if (
           !section.current?.contains(event.relatedTarget as Node) &&
@@ -327,7 +360,37 @@ export function MindmapBlock({
         title={data.title}
         defaultTitle="思维导图"
         description={data.description}
-      />
+      >
+        <button
+          type="button"
+          className="sb-icon-button"
+          aria-label="四周展开"
+          title="四周展开"
+          aria-pressed={layout === "radial"}
+          data-surface-ui
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => switchLayout("radial")}
+        >
+          <Network size={16} />
+        </button>
+        <button
+          type="button"
+          className="sb-icon-button"
+          aria-label="单向展开"
+          title={`单向展开，当前向${direction === "right" ? "右" : "左"}${layout === "tree" ? `；再次点击切换向${direction === "right" ? "左" : "右"}` : ""}`}
+          aria-pressed={layout === "tree"}
+          data-surface-ui
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => switchLayout("tree")}
+        >
+          <ListTree
+            size={16}
+            style={{
+              transform: direction === "left" ? "scaleX(-1)" : undefined,
+            }}
+          />
+        </button>
+      </BlockHeader>
       <div
         ref={viewport}
         className="sm-viewport"
@@ -366,16 +429,11 @@ export function MindmapBlock({
                   const parent = graph.nodes.find(
                     (candidate) => candidate.id === item.parentId,
                   )!;
-                  const start = parent.x + (item.side > 0 ? parent.width : 0),
-                    end = item.x + (item.side > 0 ? 0 : item.width);
-                  const y1 = parent.y + parent.height / 2,
-                    y2 = item.y + item.height / 2,
-                    middle = (start + end) / 2;
                   return (
                     <path
                       key={item.id}
                       className={`sm-branch-${item.color}`}
-                      d={`M ${start} ${y1} C ${middle} ${y1}, ${middle} ${y2}, ${end} ${y2}`}
+                      d={mindmapConnectionPath(parent, item)}
                     />
                   );
                 })}
@@ -434,10 +492,7 @@ export function MindmapBlock({
                       }}
                       className={`sm-node${active && selected === item.id ? " is-selected" : ""}`}
                       role="treeitem"
-                      aria-level={
-                        1 +
-                        Math.round(Math.abs(item.x - graph.nodes[0].x) / 244)
-                      }
+                      aria-level={item.depth + 1}
                       aria-selected={selected === item.id}
                       aria-expanded={
                         count ? !collapsed.has(item.id) : undefined
