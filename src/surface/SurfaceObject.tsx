@@ -1,4 +1,4 @@
-import { resizeFrame, frameHeight } from "./geometry.mjs";
+import { resizeFrame, frameHeight, frameBounds } from "./geometry.mjs";
 import type { SurfaceGeometryStore } from "./geometry-store";
 import type { BoardInteraction, BoardGesture } from "./useBoardInteraction";
 import {
@@ -68,6 +68,7 @@ export function SurfaceObject({
   children: ReactNode;
 }) {
   const actions = useContext(ObjectContext);
+  const board = positioned ? actions.board : undefined;
   const element = useRef<HTMLElement>(null),
     handle = useRef<HTMLElement | null>(null);
   const [visible, setVisible] = useState(false),
@@ -81,6 +82,7 @@ export function SurfaceObject({
     start: NodeLayout;
     next: NodeLayout;
     resize: boolean;
+    kind: BoardGesture;
     delegated: boolean;
     scale: number;
   } | null>(null);
@@ -124,11 +126,15 @@ export function SurfaceObject({
         ? `min(100%, ${value.width}px)`
         : `${value.width}px`;
     if (fixedHeight && value.height) node.style.height = `${value.height}px`;
+    if (positioned)
+      node.style.transform = value.rotation
+        ? `rotate(${value.rotation}deg)`
+        : "";
   };
   const cancel = () => {
     const drag = pending.current;
     if (!drag) return;
-    if (drag.delegated) actions.board?.cancel();
+    if (drag.delegated) board?.cancel();
     pending.current = null;
     setMoving(false);
     if (latest.current.frame) apply(latest.current.frame);
@@ -161,7 +167,7 @@ export function SurfaceObject({
       actions.select(id, true);
       return;
     }
-    const delegated = !!actions.board?.start(id, kind, event);
+    const delegated = !!board?.start(id, kind, event);
     if (!delegated) actions.select(id);
     event.currentTarget.focus({ preventScroll: true });
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -173,10 +179,15 @@ export function SurfaceObject({
       start: frame,
       next: frame,
       resize,
+      kind,
       delegated,
       scale:
-        element.current!.getBoundingClientRect().width / frame.width ||
-        actions.scale,
+        element.current!.getBoundingClientRect().width /
+          frameBounds({
+            ...frame,
+            contentSize: undefined,
+            height: element.current!.offsetHeight,
+          }).width || actions.scale,
     };
     setMoving(true);
   };
@@ -184,7 +195,27 @@ export function SurfaceObject({
     const drag = pending.current;
     if (!drag || drag.id !== event.pointerId) return;
     if (drag.delegated) {
-      actions.board?.update(event);
+      board?.update(event);
+      return;
+    }
+    if (drag.kind === "rotate") {
+      if (
+        Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 3 &&
+        drag.next === drag.start
+      )
+        return;
+      const rect = element.current!.getBoundingClientRect(),
+        cx = rect.left + rect.width / 2,
+        cy = rect.top + rect.height / 2;
+      let rotation =
+        (drag.start.rotation ?? 0) +
+        ((Math.atan2(event.clientY - cy, event.clientX - cx) -
+          Math.atan2(drag.y - cy, drag.x - cx)) *
+          180) /
+          Math.PI;
+      if (event.shiftKey) rotation = Math.round(rotation / 15) * 15;
+      drag.next = { ...drag.start, rotation: ((rotation + 540) % 360) - 180 };
+      apply(drag.next);
       return;
     }
     const dx = (event.clientX - drag.x) / drag.scale,
@@ -216,21 +247,23 @@ export function SurfaceObject({
     const drag = pending.current;
     if (!drag || drag.id !== event.pointerId) return;
     if (drag.delegated) {
-      actions.board?.update(event);
-      actions.board?.finish();
+      board?.update(event);
+      board?.finish();
       pending.current = null;
       setMoving(false);
       if (event.currentTarget.hasPointerCapture(event.pointerId))
         event.currentTarget.releasePointerCapture(event.pointerId);
       return;
     }
+    move(event);
     const actual = latest.current.frame;
     const unchanged =
       actual &&
       actual.x === drag.start.x &&
       actual.y === drag.start.y &&
       actual.width === drag.start.width &&
-      actual.height === drag.start.height;
+      actual.height === drag.start.height &&
+      actual.rotation === drag.start.rotation;
     pending.current = null;
     setMoving(false);
     if (event.currentTarget.hasPointerCapture(event.pointerId))
@@ -240,7 +273,8 @@ export function SurfaceObject({
       (drag.next.x !== drag.start.x ||
         drag.next.y !== drag.start.y ||
         drag.next.width !== drag.start.width ||
-        drag.next.height !== drag.start.height)
+        drag.next.height !== drag.start.height ||
+        drag.next.rotation !== drag.start.rotation)
     )
       latest.current.move?.(id, drag.next);
     else if (actual) apply(actual);
@@ -281,16 +315,14 @@ export function SurfaceObject({
     visible ||
     actions.revealAll ||
     actions.revealed.has(id) ||
-    (actions.board?.ids.has(id) ?? actions.selected === id);
+    (board?.ids.has(id) ?? actions.selected === id);
   const chrome =
-    visible ||
-    moving ||
-    (actions.board?.ids.has(id) ?? actions.selected === id);
+    visible || moving || (board?.ids.has(id) ?? actions.selected === id);
   return (
     <section
       ref={element}
       style={style}
-      className={`surface-object${region ? " is-region" : ""}${container ? " is-container" : ""}${drawing ? " is-drawing" : ""}${moving ? " is-moving" : ""}${(actions.board?.ids.has(id) ?? actions.selected === id) ? " is-selected" : ""}`}
+      className={`surface-object${region ? " is-region" : ""}${container ? " is-container" : ""}${drawing ? " is-drawing" : ""}${moving ? " is-moving" : ""}${(board?.ids.has(id) ?? actions.selected === id) ? " is-selected" : ""}`}
       data-surface-id={id}
       data-surface-mounted={mount}
       data-board-fixed-height={fixedHeight}
@@ -319,7 +351,7 @@ export function SurfaceObject({
       {rotatable &&
         positioned &&
         !actions.readOnly &&
-        (actions.board?.ids.has(id) ?? actions.selected === id) && (
+        (board?.ids.has(id) ?? actions.selected === id) && (
           <button
             type="button"
             className="surface-object-rotate"
@@ -422,7 +454,7 @@ export function SurfaceObject({
         chrome &&
         !actions.readOnly &&
         positioned &&
-        actions.board &&
+        board &&
         (fixedHeight
           ? ["nw", "n", "ne", "e", "se", "s", "sw", "w"]
           : ["e", "w"]
@@ -473,7 +505,7 @@ export function SurfaceObject({
         chrome &&
         !actions.readOnly &&
         (positioned || fixedHeight) &&
-        !actions.board && (
+        !board && (
           <button
             type="button"
             className="surface-object-resize"

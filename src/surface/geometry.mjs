@@ -404,3 +404,29 @@ export function selectionMinimum(bounds, objects) {
     height: Math.max(1, (bounds.height || 1) * heightRatio),
   };
 }
+
+/** Bindings require a parent whose children have explicit local coordinates. */
+export function bindingParent(parent, layout) {
+  return (
+    (parent?.type === "surface" && parent.attrs?.kind === "board") ||
+    (parent?.type === "region" && layout?.[parent.attrs?.id]?.mode === "free")
+  );
+}
+
+/** Clamp a selection as one translation, preserving member offsets at coordinate limits. */
+export function translationDelta(frames, delta) {
+  let minX = -Infinity,
+    maxX = Infinity,
+    minY = -Infinity,
+    maxY = Infinity;
+  for (const frame of frames) {
+    minX = Math.max(minX, -1000000 - frame.x);
+    maxX = Math.min(maxX, 1000000 - frame.x);
+    minY = Math.max(minY, -1000000 - frame.y);
+    maxY = Math.min(maxY, 1000000 - frame.y);
+  }
+  return {
+    x: Math.max(minX, Math.min(maxX, delta.x)),
+    y: Math.max(minY, Math.min(maxY, delta.y)),
+  };
+}

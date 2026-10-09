@@ -1,4 +1,4 @@
-import { canCommitBoardGesture } from "./board-commands";
+import { canCommitBoardGesture, boardSelectionScope } from "./board-commands";
 import type { SurfaceGeometryStore } from "./geometry-store";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { ShowDocument } from "../types";
@@ -10,6 +10,8 @@ import {
   selectionMinimum,
   frameBounds,
   frameHeight,
+  screenToSurface,
+  translationDelta,
   pointsBounds,
   snapFrame,
   snapResizeFrame,
@@ -65,8 +67,18 @@ export function useBoardInteraction({
     () => (document ? indexSurfaceTree(document.content) : new Map()),
     [document?.content],
   );
+  const selectionParent = selected
+    ? boardSelectionScope(
+        selectionIndex,
+        document?.layout,
+        containerId,
+        selected,
+      )
+    : containerId;
   const local = (id: string) =>
-    selectionIndex.get(id)?.parent?.attrs?.id === containerId;
+    !!selectionParent &&
+    boardSelectionScope(selectionIndex, document?.layout, containerId, id) ===
+      selectionParent;
   const ids = new Set(
     [
       ...(selected && selection.has(selected)
@@ -82,6 +94,8 @@ export function useBoardInteraction({
     id: string;
     kind: BoardGesture;
     start: Point;
+    origin: Point;
+    layer: HTMLElement;
     scale: number;
     frames: Record<string, NodeLayout>;
     measured: Record<string, NodeLayout>;
@@ -159,8 +173,20 @@ export function useBoardInteraction({
     )
       return;
     drag.moved = true;
-    const dx = (input.clientX - drag.start.x) / drag.scale,
-      dy = (input.clientY - drag.start.y) / drag.scale;
+    if (!drag.layer.isConnected) {
+      restore();
+      return;
+    }
+    const layerBox = drag.layer.getBoundingClientRect(),
+      transform = { x: 0, y: 0, scale: drag.scale };
+    const startPoint = screenToSurface(drag.start, drag.origin, transform),
+      point = screenToSurface(
+        { x: input.clientX, y: input.clientY },
+        { x: layerBox.left, y: layerBox.top },
+        transform,
+      );
+    const dx = point.x - startPoint.x,
+      dy = point.y - startPoint.y;
     const resizing = drag.kind.startsWith("resize");
     const resizeHandle = drag.kind === "resize" ? "se" : drag.kind.slice(7);
     const selectedIds = Object.keys(drag.frames),
@@ -213,6 +239,20 @@ export function useBoardInteraction({
             )
           : snapFrame(candidate, drag.snap, drag.scale);
     candidate = snap.frame;
+    if (drag.kind === "move") {
+      const delta = translationDelta(Object.values(drag.frames), {
+        x: candidate.x - drag.bounds.x,
+        y: candidate.y - drag.bounds.y,
+      });
+      const x = drag.bounds.x + delta.x,
+        y = drag.bounds.y + delta.y;
+      snap.guides = snap.guides.filter((guide) =>
+        guide.axis === "x"
+          ? Math.abs(x - candidate.x) < 0.001
+          : Math.abs(y - candidate.y) < 0.001,
+      );
+      candidate = { ...candidate, x, y };
+    }
     drag.guides.replaceChildren();
     for (const guide of snap.guides) {
       const line = window.document.createElementNS(
@@ -319,7 +359,9 @@ export function useBoardInteraction({
     selectAll() {
       const source = current.current.document;
       const parent =
-        source && indexSurfaceTree(source.content).get(containerId!)?.node;
+        source &&
+        indexSurfaceTree(source.content).get(selectionParent ?? containerId!)
+          ?.node;
       const next = new Set<string>(
         (parent?.content ?? [])
           .map((node) => node.attrs?.id)
@@ -332,17 +374,21 @@ export function useBoardInteraction({
     nudge(x, y) {
       const source = current.current.document;
       if (!source || !current.current.onTransform) return;
-      const frames: Record<string, NodeLayout> = {};
-      for (const id of currentIds.current) {
-        const frame = source.layout?.[id];
-        if (frame)
-          frames[id] = {
-            ...frame,
-            x: Math.max(-1000000, Math.min(1000000, frame.x + x)),
-            y: Math.max(-1000000, Math.min(1000000, frame.y + y)),
-          };
-      }
-      if (Object.keys(frames).length) current.current.onTransform(frames);
+      const frames = Object.fromEntries(
+        [...currentIds.current]
+          .filter((id) => source.layout?.[id])
+          .map((id) => [id, source.layout![id]]),
+      );
+      const delta = translationDelta(Object.values(frames), { x, y });
+      if (!Object.keys(frames).length || (!delta.x && !delta.y)) return;
+      current.current.onTransform(
+        Object.fromEntries(
+          Object.entries(frames).map(([id, frame]) => [
+            id,
+            { ...frame, x: frame.x + delta.x, y: frame.y + delta.y },
+          ]),
+        ),
+      );
     },
     start(id, kind, point) {
       const original = current.current.document,
@@ -352,20 +398,36 @@ export function useBoardInteraction({
       restore();
       const index = indexSurfaceTree(source.content),
         parent = index.get(id)?.parent;
-      if (!parent || parent.attrs?.id !== containerId) return false;
+      if (
+        !parent ||
+        !boardSelectionScope(index, source.layout, containerId, id)
+      )
+        return false;
+      const objectElement = root.querySelector<HTMLElement>(
+        `[data-surface-id="${CSS.escape(id)}"]`,
+      );
+      const layer = objectElement?.parentElement;
+      if (
+        !layer ||
+        objectElement.closest(".page-surface") !== root.closest(".page-surface")
+      )
+        return false;
       const chosen =
         kind === "rotate"
           ? new Set([id])
           : currentIds.current.has(id)
             ? currentIds.current
             : new Set([id]);
-      if (!chosen.has(current.current.selected!)) {
+      if (
+        !chosen.has(current.current.selected!) ||
+        chosen.size !== currentIds.current.size
+      ) {
         setSelection(chosen);
         currentIds.current = chosen;
         onSelect(id);
       }
       const elements = new Map<string, HTMLElement>();
-      for (const child of root.children)
+      for (const child of layer.children)
         if (child instanceof HTMLElement && child.dataset.surfaceId)
           elements.set(child.dataset.surfaceId, child);
       const frames: Record<string, NodeLayout> = {},
@@ -392,10 +454,13 @@ export function useBoardInteraction({
       );
       guides.classList.add("board-snap-guides");
       guides.setAttribute("aria-hidden", "true");
-      root.append(guides);
+      layer.append(guides);
       geometry?.beginGesture();
+      const layerBox = layer.getBoundingClientRect();
       pending.current = {
         source,
+        origin: { x: layerBox.left, y: layerBox.top },
+        layer,
         original,
         id,
         kind,

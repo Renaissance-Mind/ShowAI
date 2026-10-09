@@ -90,3 +90,8 @@ export function selectionMinimum(
     resizeHeight: boolean;
   }[],
 ): { width: number; height: number };
+export function bindingParent(
+  parent: JSONContent | null | undefined,
+  layout: Record<string, NodeLayout> | undefined,
+): boolean;
+export function translationDelta(frames: NodeLayout[], delta: Point): Point;

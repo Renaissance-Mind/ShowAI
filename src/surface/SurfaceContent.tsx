@@ -60,16 +60,24 @@ function FreeLayout({
       setHeight(
         Math.max(
           minHeight,
-          ...[...root.children].map(
-            (child) =>
-              (child as HTMLElement).offsetTop +
-              (child as HTMLElement).offsetHeight +
-              24,
-          ),
+          ...[...root.children]
+            .filter(
+              (child) =>
+                child instanceof HTMLElement &&
+                child.hasAttribute("data-surface-id"),
+            )
+            .map(
+              (child) =>
+                (child as HTMLElement).offsetTop +
+                (child as HTMLElement).offsetHeight +
+                24,
+            ),
         ),
       );
     const observer = new ResizeObserver(measure);
-    for (const child of root.children) observer.observe(child);
+    for (const child of root.children)
+      if (child instanceof HTMLElement && child.hasAttribute("data-surface-id"))
+        observer.observe(child);
     measure();
     return () => observer.disconnect();
   }, [children, minHeight]);

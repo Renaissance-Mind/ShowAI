@@ -6,6 +6,7 @@ import { createResource, createSurface } from "./containers.mjs";
 import { addNode, moveNode, removeNode } from "./editing";
 import {
   canCommitBoardGesture,
+  boardSelectionScope,
   transformObjects,
   duplicateObjects,
   removeObjects,
@@ -15,7 +16,11 @@ import {
   indexSurfaceTree,
   reconcileConnections,
 } from "./connections.mjs";
-import { findSurfaceNode, remapSurfaceIds } from "./document.mjs";
+import {
+  findSurfaceNode,
+  remapSurfaceIds,
+  reconcileSurface,
+} from "./document.mjs";
 import {
   validateDocument,
   serializeArtifact,
@@ -24,6 +29,7 @@ import {
 import {
   resizeFrame,
   selectionMinimum,
+  translationDelta,
   frameAnchor,
   frameBounds,
   normalizedAnchor,
@@ -90,6 +96,17 @@ const ends = (doc: ReturnType<typeof fixture>) =>
   arrowEndpoints(arrow(doc), doc.layout.arrow);
 
 describe("native Board geometry", () => {
+  it("keeps group offsets at coordinate limits", () => {
+    const frames = [
+      { x: 999995, y: -999998, width: 120 },
+      { x: 999900, y: 0, width: 120 },
+    ];
+    expect(translationDelta(frames, { x: 10, y: -10 })).toEqual({
+      x: 5,
+      y: -2,
+    });
+  });
+
   it("limits a mixed group before a member's minimum would break relative geometry", () => {
     const bounds = { x: 0, y: 0, width: 660, height: 200 };
     const minimum = selectionMinimum(bounds, [
@@ -244,6 +261,93 @@ describe("native Board geometry", () => {
 });
 
 describe("native connections and structural commands", () => {
+  it("detaches bindings when a free group becomes flow and rejects unpositioned bindings", () => {
+    const original = fixture(),
+      root = original.content.attrs!.id;
+    const nested = createSurface("board", "Nested", "nested-board");
+    const innerImage = structuredClone(
+      findSurfaceNode(original, "image")!.node,
+    );
+    innerImage.attrs!.id = "nested-image";
+    const innerArrow = structuredClone(
+      findSurfaceNode(original, "arrow")!.node,
+    );
+    innerArrow.attrs!.id = "nested-arrow";
+    innerArrow.attrs!.bindings = {
+      start: { targetId: "nested-image", anchor: { x: 0, y: 0.5 } },
+      end: { targetId: "nested-image", anchor: { x: 1, y: 0.5 } },
+    };
+    nested.content = [innerImage, innerArrow];
+    original.content.content!.push(nested);
+    original.layout["nested-board"] = {
+      x: 0,
+      y: 500,
+      width: 640,
+      height: 400,
+      heightMode: "fixed",
+    };
+    original.layout["nested-image"] = {
+      x: 20,
+      y: 20,
+      width: 200,
+      height: 200,
+      rotation: 45,
+    };
+    original.layout["nested-arrow"] = { ...original.layout.arrow };
+    const grouped = {
+      ...original,
+      content: {
+        ...original.content,
+        content: [
+          {
+            type: "region",
+            attrs: { id: "group" },
+            content: original.content.content,
+          },
+        ],
+      },
+      layout: {
+        ...original.layout,
+        group: { x: 0, y: 0, width: 1000, mode: "free" as const },
+      },
+    };
+    const free = validateDocument(reconcileSurface(grouped));
+    free.layout!.image.rotation = 45;
+    const index = indexSurfaceTree(free.content);
+    expect(boardSelectionScope(index, free.layout, root, "page")).toBe("group");
+    expect(
+      boardSelectionScope(index, free.layout, "another-board", "page"),
+    ).toBeNull();
+    const movedParent = structuredClone(free);
+    movedParent.layout!.group.x += 10;
+    expect(canCommitBoardGesture(free, movedParent, ["page"])).toBe(false);
+    free.layout!.page.heightMode = "auto";
+    const geometry = new SurfaceGeometryStore();
+    geometry.measure("page", 300, 540);
+    const resolved = geometry.resolveArrow(
+      findSurfaceNode(free, "arrow")!.node,
+      free.layout!.arrow,
+      free,
+    );
+    expect(arrowEndpoints(resolved.node, resolved.frame)[0].y).toBe(370);
+    const flowing = applyOperations(free, [
+      { type: "surface.layout.set", nodeId: "group", layout: { mode: "flow" } },
+    ]);
+    expect(
+      findSurfaceNode(flowing, "arrow")!.node.attrs!.bindings,
+    ).toBeUndefined();
+    expect(flowing.layout!.image.rotation).toBeUndefined();
+    expect(flowing.layout!["nested-image"].rotation).toBe(45);
+    expect(
+      findSurfaceNode(flowing, "nested-arrow")!.node.attrs!.bindings.start
+        .targetId,
+    ).toBe("nested-image");
+    const invalid = structuredClone(free);
+    invalid.layout!.group.mode = "flow";
+    expect(() => validateDocument(invalid)).toThrow(/framed siblings/);
+    expect(free.content.attrs!.id).toBe(root);
+  });
+
   it("accepts equivalent file reloads while rejecting edits made during a gesture", () => {
     const original = fixture(),
       reloaded = structuredClone(original);
@@ -286,6 +390,20 @@ describe("native connections and structural commands", () => {
     ) as typeof before;
     expect(arrow(group).attrs!.bindings.start.targetId).toBe("page");
     expect(ends(group)).toEqual(ends(alone));
+    const frame = {
+      ...before.layout.arrow,
+      width: before.layout.arrow.width * 2,
+    };
+    const ui = transformObjects(before, { arrow: frame });
+    const api = applyOperations(before, [
+      {
+        type: "surface.layout.set",
+        nodeId: "arrow",
+        layout: { width: frame.width },
+      },
+    ]);
+    expect(ui.layout.arrow).toEqual(api.layout!.arrow);
+    expect(ui.layout.arrow.width).toBe(frame.width);
     expect(
       arrow(
         applyOperations(before, [

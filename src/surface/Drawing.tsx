@@ -183,7 +183,31 @@ export function Drawing({
                   event.preventDefault();
                   event.stopPropagation();
                   cancel();
+                  return;
                 }
+                const step = (
+                  {
+                    ArrowLeft: [-1, 0],
+                    ArrowRight: [1, 0],
+                    ArrowUp: [0, -1],
+                    ArrowDown: [0, 1],
+                  } as Record<string, number[]>
+                )[event.key];
+                if (!step) return;
+                event.preventDefault();
+                event.stopPropagation();
+                cancel();
+                const amount = event.shiftKey ? 10 : 1;
+                actions.connect?.(node.attrs!.id, key, {
+                  x:
+                    frame.x +
+                    (endpoint.x / extent[0]) * frame.width +
+                    step[0] * amount,
+                  y:
+                    frame.y +
+                    (endpoint.y / extent[1]) * (frame.height ?? extent[1]) +
+                    step[1] * amount,
+                });
               }}
             />
           );

@@ -96,6 +96,10 @@ export class SurfaceGeometryStore {
   }
   resolveArrow(node: JSONContent, frame: NodeLayout, document: ShowDocument) {
     const layout: Record<string, NodeLayout> = {};
+    const index = this.entries(document),
+      parent = index.get(node.attrs!.id)?.parent;
+    if (parent?.attrs?.id && document.layout?.[parent.attrs.id])
+      layout[parent.attrs.id] = document.layout[parent.attrs.id];
     for (const binding of Object.values(node.attrs?.bindings ?? {}) as {
       targetId: string;
     }[]) {
@@ -106,7 +110,7 @@ export class SurfaceGeometryStore {
     return arrowFromEndpoints(
       node,
       frame,
-      boundEndpoints(node, frame, this.entries(document), layout),
+      boundEndpoints(node, frame, index, layout),
     );
   }
   materialize<T extends ShowDocument>(document: T): T {

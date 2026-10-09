@@ -1,5 +1,6 @@
 import {
   frameAnchor,
+  bindingParent,
   normalizedAnchor,
   hitFrame,
   objectCapabilities,
@@ -31,6 +32,7 @@ export function boundEndpoints(node, frame, index, layout) {
     const targetFrame = binding && layout[binding.targetId];
     if (
       target &&
+      bindingParent(parent, layout) &&
       target.parent === parent &&
       targetFrame &&
       objectCapabilities(target.node).bindTarget
@@ -81,6 +83,7 @@ export function reconcileConnections(document) {
         target = binding && index.get(binding.targetId);
       if (
         target &&
+        bindingParent(parent, layout) &&
         target.parent === parent &&
         layout[binding.targetId] &&
         objectCapabilities(target.node).bindTarget
@@ -126,6 +129,7 @@ export function bindingAtPoint(
 ) {
   const index = indexSurfaceTree(document.content),
     parent = index.get(parentId)?.node;
+  if (!bindingParent(parent, document.layout)) return null;
   for (const node of [...(parent?.content ?? [])].reverse()) {
     const id = node.attrs?.id,
       frame = document.layout?.[id];

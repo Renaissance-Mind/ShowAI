@@ -3,8 +3,6 @@ import type { ShowDocument } from "../types";
 import type { NodeLayout } from "./types";
 import {
   indexSurfaceTree,
-  arrowEndpoints,
-  arrowFromEndpoints,
   type ArrowBindings,
   transformedBindings,
 } from "./connections.mjs";
@@ -33,10 +31,10 @@ export function transformObjects<T extends ShowDocument>(
       node.attrs.bindings,
       new Set(Object.keys(frames)),
     );
-    const endpoints = arrowEndpoints(node, frames[id]);
-    const next = arrowFromEndpoints(node, frames[id], endpoints, bindings);
-    replace.set(id, next.node);
-    frames = { ...frames, [id]: next.frame };
+    const attrs = { ...node.attrs };
+    if (Object.keys(bindings).length) attrs.bindings = bindings;
+    else delete attrs.bindings;
+    replace.set(id, { ...node, attrs });
   }
   const walk = (node: JSONContent): JSONContent => {
     if (replace.has(node.attrs?.id)) return replace.get(node.attrs!.id)!;
@@ -171,11 +169,43 @@ export function canCommitBoardGesture(
   if (!latest) return false;
   const same = (a: unknown, b: unknown) =>
     a === b || JSON.stringify(a) === JSON.stringify(b);
-  return (
-    same(original.content, latest.content) &&
-    ids.every(
-      (id) =>
-        !!latest.layout?.[id] && same(original.layout?.[id], latest.layout[id]),
-    )
+  if (!same(original.content, latest.content)) return false;
+  const index = indexSurfaceTree(original.content),
+    frames = new Set<string>();
+  for (const id of ids) {
+    if (!latest.layout?.[id]) return false;
+    let entry = index.get(id);
+    while (entry) {
+      const key = entry.node.attrs?.id;
+      if (key && (original.layout?.[key] || latest.layout?.[key]))
+        frames.add(key);
+      entry = entry.parent?.attrs?.id
+        ? index.get(entry.parent.attrs.id)
+        : undefined;
+    }
+  }
+  return [...frames].every((id) =>
+    same(original.layout?.[id], latest.layout?.[id]),
   );
+}
+
+/** Selection stays among siblings in the active Board's explicit coordinate layers. */
+export function boardSelectionScope(
+  index: ReturnType<typeof indexSurfaceTree>,
+  layout: ShowDocument["layout"],
+  surfaceId: string | undefined,
+  id: string,
+) {
+  const parent = index.get(id)?.parent;
+  if (!parent || !surfaceId) return null;
+  if (parent.type === "surface")
+    return parent.attrs?.id === surfaceId && parent.attrs?.kind === "board"
+      ? surfaceId
+      : null;
+  if (parent.type !== "region" || layout?.[parent.attrs!.id]?.mode !== "free")
+    return null;
+  let owner: JSONContent | null = parent;
+  while (owner && owner.type !== "surface")
+    owner = index.get(owner.attrs?.id)?.parent ?? null;
+  return owner?.attrs?.id === surfaceId ? (parent.attrs!.id as string) : null;
 }

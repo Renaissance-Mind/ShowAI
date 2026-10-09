@@ -324,9 +324,8 @@ export function ContainerRuntime({
   const frame = inspecting ? document.layout[inspecting] : undefined;
   const updateFrame = (value: NodeLayout) =>
     runtime.commit(
-      reconcileSurface({
-        ...current.current,
-        layout: { ...current.current.layout, [inspecting!]: value },
+      transformObjects(runtime.geometry.materialize(current.current), {
+        [inspecting!]: value,
       }),
     );
   return (
@@ -615,65 +614,75 @@ export function ContainerRuntime({
                     />
                   </label>
                 )}
-                {frame && (
-                  <>
-                    <label>
-                      宽度
-                      <input
-                        aria-label="模块宽度"
-                        type="number"
-                        min={120}
-                        max={10000}
-                        value={Math.round(frame.width)}
-                        onChange={(event) => {
-                          const width = Number(event.target.value);
-                          if (width >= 120 && width <= 10000)
-                            updateFrame({ ...frame, width });
-                        }}
-                      />
-                    </label>
-                    {selectedEntry.node.type === "surface" && (
-                      <>
-                        <label>
-                          高度方式
-                          <select
-                            aria-label="模块高度方式"
-                            value={frame.heightMode ?? "fixed"}
-                            onChange={(event) =>
-                              updateFrame({
-                                ...frame,
-                                heightMode: event.target.value as
-                                  "fixed" | "auto",
-                              })
-                            }
-                          >
-                            <option value="fixed">固定窗口</option>
-                            {surfaceKind(selectedEntry.node) === "page" && (
-                              <option value="auto">随内容增长</option>
-                            )}
-                          </select>
-                        </label>
-                        {frame.heightMode !== "auto" && (
+                {frame &&
+                  !(
+                    selectedEntry.node.type === "drawing" &&
+                    selectedEntry.node.attrs?.tool === "arrow"
+                  ) && (
+                    <>
+                      <label>
+                        宽度
+                        <input
+                          aria-label="模块宽度"
+                          type="number"
+                          min={selectedEntry.node.type === "drawing" ? 1 : 120}
+                          max={10000}
+                          value={Math.round(frame.width)}
+                          onChange={(event) => {
+                            const width = Number(event.target.value);
+                            if (
+                              width >=
+                                (selectedEntry.node.type === "drawing"
+                                  ? 1
+                                  : 120) &&
+                              width <= 10000
+                            )
+                              updateFrame({ ...frame, width });
+                          }}
+                        />
+                      </label>
+                      {selectedEntry.node.type === "surface" && (
+                        <>
                           <label>
-                            高度
-                            <input
-                              aria-label="模块高度"
-                              type="number"
-                              min={180}
-                              max={5000}
-                              value={frame.height ?? 460}
-                              onChange={(event) => {
-                                const height = Number(event.target.value);
-                                if (height >= 180 && height <= 5000)
-                                  updateFrame({ ...frame, height });
-                              }}
-                            />
+                            高度方式
+                            <select
+                              aria-label="模块高度方式"
+                              value={frame.heightMode ?? "fixed"}
+                              onChange={(event) =>
+                                updateFrame({
+                                  ...frame,
+                                  heightMode: event.target.value as
+                                    "fixed" | "auto",
+                                })
+                              }
+                            >
+                              <option value="fixed">固定窗口</option>
+                              {surfaceKind(selectedEntry.node) === "page" && (
+                                <option value="auto">随内容增长</option>
+                              )}
+                            </select>
                           </label>
-                        )}
-                      </>
-                    )}
-                  </>
-                )}
+                          {frame.heightMode !== "auto" && (
+                            <label>
+                              高度
+                              <input
+                                aria-label="模块高度"
+                                type="number"
+                                min={180}
+                                max={5000}
+                                value={frame.height ?? 460}
+                                onChange={(event) => {
+                                  const height = Number(event.target.value);
+                                  if (height >= 180 && height <= 5000)
+                                    updateFrame({ ...frame, height });
+                                }}
+                              />
+                            </label>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
                 <label>
                   所属容器
                   <select

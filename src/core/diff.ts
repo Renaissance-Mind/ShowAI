@@ -605,15 +605,18 @@ export function applyOperations(
     }
   }
   // Validate caller-supplied references before intentional structural cleanup.
-  const structural = operations.some((operation) =>
-    [
-      "block.remove",
-      "block.replace",
-      "block.move",
-      "block.insert",
-      "surface.create",
-      "surface.wrap",
-    ].includes(operation.type),
+  const structural = operations.some(
+    (operation) =>
+      (operation.type === "surface.layout.set" &&
+        Object.hasOwn(operation.layout, "mode")) ||
+      [
+        "block.remove",
+        "block.replace",
+        "block.move",
+        "block.insert",
+        "surface.create",
+        "surface.wrap",
+      ].includes(operation.type),
   );
   if (isSurface(draft) && structural) draft = reconcileSurface(draft);
   const index = indexSurfaceTree(draft.content);

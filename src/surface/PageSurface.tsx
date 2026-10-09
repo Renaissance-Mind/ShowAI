@@ -482,6 +482,7 @@ export default function PageSurface({
           if (
             inner &&
             inner.closest(".page-surface") === event.currentTarget &&
+            target.closest(".surface-object") === inner.parentElement &&
             !inner.parentElement?.classList.contains("is-drawing")
           )
             return;
@@ -528,7 +529,7 @@ export default function PageSurface({
             step &&
             board.ids.size &&
             !target.closest(
-              "[data-resize-direction],.surface-object-rotate,input,select",
+              "[data-resize-direction],.surface-object-rotate,.board-arrow-endpoint,input,select",
             )
           ) {
             event.preventDefault();

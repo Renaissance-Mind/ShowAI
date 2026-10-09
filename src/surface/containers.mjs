@@ -1,3 +1,4 @@
+import { bindingParent } from "./geometry.mjs";
 import { reconcileConnections } from "./connections.mjs";
 import {
   assignSurfaceIds,
@@ -213,9 +214,13 @@ export function upgradeResource(source, { includeTitle = true } = {}) {
 }
 export function reconcileResource(document) {
   fillResource(document);
-  const nodes = new Map();
-  visitNodes(document.content, (node) => {
-    if (node.attrs?.id) nodes.set(node.attrs.id, node);
+  const nodes = new Map(),
+    parents = new Map();
+  visitNodes(document.content, (node, parent) => {
+    if (node.attrs?.id) {
+      nodes.set(node.attrs.id, node);
+      parents.set(node.attrs.id, parent);
+    }
   });
   for (const [id, frame] of Object.entries(document.layout)) {
     const node = nodes.get(id);
@@ -224,6 +229,7 @@ export function reconcileResource(document) {
       continue;
     }
     const next = { ...frame };
+    if (!bindingParent(parents.get(id), document.layout)) delete next.rotation;
     if (node.type !== "region") {
       delete next.mode;
       delete next.columns;

@@ -1,4 +1,4 @@
-import { objectCapabilities } from "./geometry.mjs";
+import { objectCapabilities, bindingParent } from "./geometry.mjs";
 import { isResource, fillResource, surfaceKind } from "./containers.mjs";
 import { fillSurfaceLayout, visitNodes } from "./document.mjs";
 const reserved = new Set(["__proto__", "constructor", "prototype"]);
@@ -244,6 +244,18 @@ function validateResource(document) {
   if (document.surfaceViews !== undefined)
     object(document.surfaceViews, "surfaceViews");
   fillResource(document);
+  for (const [id, node] of nodes) {
+    const bindings = Object.values(node.attrs?.bindings ?? {});
+    if (!bindings.length) continue;
+    if (
+      !bindingParent(parents.get(id), document.layout) ||
+      !document.layout[id] ||
+      bindings.some((binding) => !document.layout[binding.targetId])
+    )
+      throw new Error(
+        "Arrow bindings require framed siblings in a Board or free-layout region.",
+      );
+  }
   for (const [id, frame] of Object.entries(document.layout)) {
     const node = nodes.get(id),
       parent = parents.get(id);
@@ -286,7 +298,10 @@ function validateResource(document) {
     }
     if (frame.rotation !== undefined) {
       const target = nodes.get(id);
-      if (!objectCapabilities(target).rotate)
+      if (
+        !objectCapabilities(target).rotate ||
+        (frame.rotation !== 0 && !bindingParent(parent, document.layout))
+      )
         throw new Error(`Rotation is not supported for ${id}.`);
       finite(frame.rotation, -360, 360, `layout.${id}.rotation`);
     }
