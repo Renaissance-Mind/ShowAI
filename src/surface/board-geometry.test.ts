@@ -5,6 +5,7 @@ import { applyOperations } from "../core/diff";
 import { createResource, createSurface } from "./containers.mjs";
 import { addNode, moveNode, removeNode } from "./editing";
 import {
+  canCommitBoardGesture,
   transformObjects,
   duplicateObjects,
   removeObjects,
@@ -218,6 +219,24 @@ describe("native Board geometry", () => {
 });
 
 describe("native connections and structural commands", () => {
+  it("accepts equivalent file reloads while rejecting edits made during a gesture", () => {
+    const original = fixture(),
+      reloaded = structuredClone(original);
+    reloaded.updatedAt = new Date().toISOString();
+    expect(canCommitBoardGesture(original, reloaded, ["page"])).toBe(true);
+    const changed = structuredClone(reloaded);
+    changed.layout.page.x++;
+    expect(canCommitBoardGesture(original, changed, ["page"])).toBe(false);
+    const edited = structuredClone(reloaded);
+    findSurfaceNode(edited, "page")!.node.attrs!.name = "Changed elsewhere";
+    expect(canCommitBoardGesture(original, edited, ["page"])).toBe(false);
+    expect(
+      canCommitBoardGesture(original, removeObjects(reloaded, ["page"]), [
+        "page",
+      ]),
+    ).toBe(false);
+  });
+
   it("Agent transforms match UI arrow-only and grouped binding rules", () => {
     const before = fixture();
     const alone = applyOperations(before, [

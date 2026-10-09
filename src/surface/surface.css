@@ -644,3 +644,11 @@
   display: block;
   opacity: 0.5;
 }
+.page-surface.has-object-menu
+  > .surface-scroll
+  > .surface-world
+  > .surface-object
+  > :is(.surface-object-header, .board-resize-handle, .surface-object-rotate) {
+  visibility: hidden;
+  pointer-events: none;
+}

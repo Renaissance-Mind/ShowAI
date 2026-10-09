@@ -1,3 +1,4 @@
+import { LibraryContextMenu } from "../studio/LibraryNavigation";
 import type { SurfaceGeometryStore } from "./geometry-store";
 import type { ShowDocument } from "../types";
 import { useBoardInteraction } from "./useBoardInteraction";
@@ -25,6 +26,8 @@ import {
   BookmarkPlus,
   Star,
   Trash2,
+  Copy,
+  Settings2,
 } from "../ui/icons";
 import { useSurfaceViewport } from "./useSurfaceViewport";
 import {
@@ -46,7 +49,7 @@ interface Props {
   geometry?: SurfaceGeometryStore;
   containerId?: string;
   onTransform?: (frames: Record<string, NodeLayout>) => void;
-  onDuplicate?: (ids: string[]) => void;
+  onDuplicate?: (ids: string[]) => string[] | void;
   onDeleteSelection?: (ids: string[]) => void;
   ref?: Ref<SurfaceHandle>;
   pageId: string;
@@ -130,6 +133,52 @@ export default function PageSurface({
     onSelect,
     selected,
   });
+  const duplicateSelection = (ids: string[]) => {
+    const copied = onDuplicate?.(ids);
+    if (copied?.length) {
+      board.selectIds(copied);
+      requestAnimationFrame(() =>
+        rootRef.current?.focus({ preventScroll: true }),
+      );
+    }
+  };
+  const [objectMenu, setObjectMenu] = useState<{
+    anchor: HTMLElement;
+    point: { x: number; y: number };
+    id: string;
+    ids: string[];
+    container: boolean;
+  } | null>(null);
+  const openObjectMenu = (target: Element, point: { x: number; y: number }) => {
+    if (
+      !onTransform ||
+      locked ||
+      target.closest(
+        'input,textarea,select,iframe,video,audio,[contenteditable=true],[data-editor-keyboard-scope],[data-surface-gesture="own"],.react-flow',
+      )
+    )
+      return false;
+    const element = target.closest<HTMLElement>(".surface-object");
+    if (!element || element.closest(".page-surface") !== rootRef.current)
+      return false;
+    if (
+      !element.classList.contains("is-drawing") &&
+      target !== element &&
+      !target.closest(".surface-object-header")
+    )
+      return false;
+    const id = element.dataset.surfaceId!;
+    const ids = board.ids.has(id) ? [...board.ids] : [id];
+    if (!board.ids.has(id)) board.select(id);
+    setObjectMenu({
+      anchor: element,
+      point,
+      id,
+      ids,
+      container: element.classList.contains("is-container"),
+    });
+    return true;
+  };
   const spaceHeld = useRef(false);
   const marquee = useRef<{
     id: number;
@@ -333,12 +382,31 @@ export default function PageSurface({
           rootRef.current = element;
           lock.ref.current = element;
         }}
-        className="page-surface"
+        className={`page-surface${objectMenu ? " has-object-menu" : ""}`}
         data-input-surface={enabled && !locked ? pageId : undefined}
         data-viewport-lock-scope={embedded ? "board" : undefined}
         data-viewport-locked={locked}
         data-board-id={pageId}
+        onContextMenu={(event) => {
+          if (
+            openObjectMenu(event.target as Element, {
+              x: event.clientX,
+              y: event.clientY,
+            })
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }}
         onPointerDownCapture={(event) => {
+          const target = event.target as Element;
+          if (
+            target.closest(".page-surface") === event.currentTarget &&
+            target.closest("[data-surface-handle],[data-board-drawing-input]")
+          ) {
+            cancelMarquee();
+            controls.current.cancel();
+          }
           if (
             !onTransform ||
             locked ||
@@ -403,9 +471,36 @@ export default function PageSurface({
         onLostPointerCapture={cancelMarquee}
         onKeyDownCapture={(event) => {
           const target = event.target as Element;
-          if (target.closest("input,textarea,select,[contenteditable=true]"))
+          if (
+            target.closest(
+              'input,textarea,select,iframe,video,audio,[contenteditable=true],[data-editor-keyboard-scope],[data-surface-gesture="own"],.react-flow',
+            )
+          )
             return;
           if (target.closest(".page-surface") !== event.currentTarget) return;
+          const inner = target.closest(".surface-object-content");
+          if (
+            inner &&
+            inner.closest(".page-surface") === event.currentTarget &&
+            !inner.parentElement?.classList.contains("is-drawing")
+          )
+            return;
+          if (
+            event.key === "ContextMenu" ||
+            (event.shiftKey && event.key === "F10")
+          ) {
+            const rect = target.getBoundingClientRect();
+            if (
+              openObjectMenu(target, {
+                x: rect.left + Math.min(24, rect.width / 2),
+                y: rect.top + Math.min(24, rect.height / 2),
+              })
+            ) {
+              event.preventDefault();
+              event.stopPropagation();
+              return;
+            }
+          }
           if (event.code === "Space") spaceHeld.current = true;
           if (event.key === "Escape") {
             cancelMarquee();
@@ -451,7 +546,7 @@ export default function PageSurface({
           ) {
             event.preventDefault();
             event.stopPropagation();
-            onDuplicate?.([...board.ids]);
+            duplicateSelection([...board.ids]);
           }
           if (
             (event.key === "Delete" || event.key === "Backspace") &&
@@ -497,6 +592,51 @@ export default function PageSurface({
             : "在白板上滚动或拖动空白处浏览。方向键浏览，0 总览；Escape 取消当前操作。"
         }
       >
+        {objectMenu && (
+          <LibraryContextMenu
+            anchor={objectMenu.anchor}
+            point={objectMenu.point}
+            label="对象操作"
+            onClose={() => setObjectMenu(null)}
+            items={[
+              {
+                label:
+                  objectMenu.ids.length > 1
+                    ? `复制 ${objectMenu.ids.length} 个对象`
+                    : "复制对象",
+                icon: <Copy size={14} />,
+                onSelect: () => duplicateSelection(objectMenu.ids),
+              },
+              {
+                label: "对象设置",
+                icon: <Settings2 size={14} />,
+                onSelect: () => onInspect?.(objectMenu.id),
+              },
+              ...(objectMenu.container
+                ? [
+                    {
+                      label: "展开容器",
+                      icon: <Maximize2 size={14} />,
+                      onSelect: () => onExpand?.(objectMenu.id),
+                    },
+                  ]
+                : []),
+              {
+                label:
+                  objectMenu.ids.length > 1
+                    ? `删除 ${objectMenu.ids.length} 个对象`
+                    : "删除对象",
+                icon: <Trash2 size={14} />,
+                danger: true,
+                separatorBefore: true,
+                onSelect: () => {
+                  onDeleteSelection?.(objectMenu.ids);
+                  board.select(null);
+                },
+              },
+            ]}
+          />
+        )}
         {embedded && <ViewportLockButton {...lock} label="白板" />}
         <div className="surface-metadata" data-surface-ui>
           {header}
@@ -527,16 +667,16 @@ export default function PageSurface({
           role="group"
           aria-label="白板工具"
         >
-          {onTransform && board.ids.size > 1 && (
+          {onTransform && !objectMenu && board.ids.size > 1 && (
             <span className="board-selection-count" role="status">
               已选 {board.ids.size} 项
             </span>
           )}
-          {onTransform && board.ids.size > 0 && (
+          {onTransform && !objectMenu && board.ids.size > 0 && (
             <>
               <button
                 type="button"
-                onClick={() => onDuplicate?.([...board.ids])}
+                onClick={() => duplicateSelection([...board.ids])}
                 aria-label="复制选中对象"
                 title="复制选中对象（⌘/Ctrl D）"
               >

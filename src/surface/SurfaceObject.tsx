@@ -136,9 +136,10 @@ export function SurfaceObject({
       handle.current.releasePointerCapture(drag.id);
   };
   useEffect(() => {
+    if (!moving) return;
     window.addEventListener("blur", cancel);
     return () => window.removeEventListener("blur", cancel);
-  }, []);
+  }, [moving]);
   useEffect(() => {
     if (!actions.move) cancel();
   }, [actions.move]);
@@ -281,12 +282,17 @@ export function SurfaceObject({
     actions.revealAll ||
     actions.revealed.has(id) ||
     (actions.board?.ids.has(id) ?? actions.selected === id);
+  const chrome =
+    visible ||
+    moving ||
+    (actions.board?.ids.has(id) ?? actions.selected === id);
   return (
     <section
       ref={element}
       style={style}
       className={`surface-object${region ? " is-region" : ""}${container ? " is-container" : ""}${drawing ? " is-drawing" : ""}${moving ? " is-moving" : ""}${(actions.board?.ids.has(id) ?? actions.selected === id) ? " is-selected" : ""}`}
       data-surface-id={id}
+      data-surface-mounted={mount}
       data-board-fixed-height={fixedHeight}
       data-surface-name={name}
       data-surface-content
@@ -327,7 +333,8 @@ export function SurfaceObject({
             ↻
           </button>
         )}
-      {(!actions.readOnly || container) && (
+      {((!actions.readOnly && chrome) ||
+        (actions.readOnly && container && mount)) && (
         <div className="surface-object-header" data-surface-ui>
           {actions.readOnly ? (
             <span className="surface-object-grip">{name}</span>
@@ -412,6 +419,7 @@ export function SurfaceObject({
         )}
       </div>
       {resizable &&
+        chrome &&
         !actions.readOnly &&
         positioned &&
         actions.board &&
@@ -426,7 +434,7 @@ export function SurfaceObject({
             data-surface-ui
             data-surface-handle
             data-resize-direction={direction}
-            aria-label={`调整 ${name} ${direction}`}
+            aria-label={`调整 ${name} ${{ nw: "左上角", n: "上边缘", ne: "右上角", e: "右边缘", se: "右下角", s: "下边缘", sw: "左下角", w: "左边缘" }[direction]}`}
             onKeyDown={(event) => {
               const step = (
                 {
@@ -462,6 +470,7 @@ export function SurfaceObject({
           />
         ))}
       {resizable &&
+        chrome &&
         !actions.readOnly &&
         (positioned || fixedHeight) &&
         !actions.board && (

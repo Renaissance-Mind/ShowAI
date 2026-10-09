@@ -161,3 +161,21 @@ export function removeObjects<T extends ShowDocument>(
     { clone: false },
   );
 }
+
+/** Reloading identical JSON must not invalidate a gesture; actual edits must. */
+export function canCommitBoardGesture(
+  original: ShowDocument,
+  latest: ShowDocument | undefined,
+  ids: string[],
+) {
+  if (!latest) return false;
+  const same = (a: unknown, b: unknown) =>
+    a === b || JSON.stringify(a) === JSON.stringify(b);
+  return (
+    same(original.content, latest.content) &&
+    ids.every(
+      (id) =>
+        !!latest.layout?.[id] && same(original.layout?.[id], latest.layout[id]),
+    )
+  );
+}

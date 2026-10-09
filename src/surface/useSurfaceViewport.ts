@@ -11,7 +11,9 @@ import {
 
 const editable = (target: EventTarget | null) =>
   target instanceof Element &&
-  (!!target.closest('input, textarea, select, [role="textbox"]') ||
+  (!!target.closest(
+    'input, textarea, select, [role="textbox"], [data-editor-keyboard-scope]',
+  ) ||
     target.closest("[contenteditable]")?.getAttribute("contenteditable") ===
       "true");
 const interactive = (target: EventTarget | null) =>
@@ -546,7 +548,7 @@ export function useSurfaceViewport(
       const target = event.target as Element;
       if (target.closest("[data-surface-handle]")) {
         if (event.button === 0) {
-          interrupt();
+          controls.current.cancel();
           objectGesture = true;
         }
         return;
@@ -601,6 +603,7 @@ export function useSurfaceViewport(
       if (!touch) root.classList.add("is-panning");
     };
     const move = (event: PointerEvent) => {
+      if (objectGesture) return;
       if (touches.has(event.pointerId))
         touches.set(event.pointerId, localPoint(event));
       if (pinch && touches.size >= 2) {

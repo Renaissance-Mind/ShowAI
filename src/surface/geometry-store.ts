@@ -17,6 +17,7 @@ export class SurfaceGeometryStore {
   private index: SurfaceIndex = new Map();
   private revision = 0;
   private gestures = 0;
+  private scheduled = 0;
   private changed = new Set<string>();
   getSnapshot = () => this.revision;
   subscribe(ids: string[], listener: () => void) {
@@ -60,6 +61,18 @@ export class SurfaceGeometryStore {
     this.publish();
   }
   private publish() {
+    if (this.gestures || !this.changed.size) return;
+    // React subscribers can change a connector's size. Deliver outside the
+    // ResizeObserver phase so that change cannot trigger a same-frame loop.
+    if (typeof requestAnimationFrame === "function") {
+      if (!this.scheduled)
+        this.scheduled = requestAnimationFrame(() => {
+          this.scheduled = 0;
+          this.flush();
+        });
+    } else this.flush();
+  }
+  private flush() {
     if (this.gestures || !this.changed.size) return;
     const notify = new Set<() => void>();
     for (const id of this.changed)

@@ -18,6 +18,7 @@ export function Drawing({
   frame?: NodeLayout;
 }) {
   const actions = useContext(ObjectContext);
+  const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<{
     key: "start" | "end";
     point: Point;
@@ -36,12 +37,14 @@ export function Drawing({
   latest.current = { node, frame, connect: actions.connect };
   const cancel = () => {
     drag.current = null;
+    setDragging(false);
     setPreview(null);
   };
   useEffect(() => {
+    if (!dragging) return;
     window.addEventListener("blur", cancel);
     return () => window.removeEventListener("blur", cancel);
-  }, []);
+  }, [dragging]);
   const { tool, points, color, strokeWidth, extent } = node.attrs! as {
     tool: DrawingTool;
     points: Point[];
@@ -123,6 +126,7 @@ export function Drawing({
                 const rect = event.currentTarget
                   .closest("[data-surface-id]")!
                   .getBoundingClientRect();
+                setDragging(true);
                 drag.current = {
                   key,
                   x: event.clientX,

@@ -1,3 +1,4 @@
+import { canCommitBoardGesture } from "./board-commands";
 import type { SurfaceGeometryStore } from "./geometry-store";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { ShowDocument } from "../types";
@@ -7,6 +8,7 @@ import {
   createSnapIndex,
   resizeFrame,
   frameBounds,
+  frameHeight,
   pointsBounds,
   snapFrame,
   snapResizeFrame,
@@ -27,6 +29,7 @@ export interface BoardInteraction {
   ids: Set<string>;
   select: (id: string | null, additive?: boolean) => void;
   selectAll: () => void;
+  selectIds: (ids: string[]) => void;
   nudge: (x: number, y: number) => void;
   start: (id: string, kind: BoardGesture, point: BoardGestureInput) => boolean;
   update: (point: BoardGestureInput) => void;
@@ -87,6 +90,7 @@ export function useBoardInteraction({
     bounds: NodeLayout;
     guides: SVGSVGElement;
     arrows: ReturnType<typeof indexSurfaceTree>;
+    affectedArrows: string[];
     raf: number;
     input: BoardGestureInput | null;
     moved: boolean;
@@ -101,6 +105,14 @@ export function useBoardInteraction({
     setSelection(next);
     onSelect(next.has(id!) ? id : ([...next].at(-1) ?? null));
   };
+  const measureFrame = (frame: NodeLayout, el: HTMLElement): NodeLayout => ({
+    ...frame,
+    contentSize: undefined,
+    height:
+      el.dataset.surfaceMounted === "false"
+        ? frameHeight(frame) || el.offsetHeight
+        : el.offsetHeight,
+  });
   const apply = (el: HTMLElement, frame: NodeLayout) => {
     el.style.left = `${frame.x}px`;
     el.style.top = `${frame.y}px`;
@@ -118,7 +130,11 @@ export function useBoardInteraction({
       current.current.document &&
       (geometry?.materialize(current.current.document) ??
         current.current.document);
-    for (const [id, el] of drag.elements) {
+    for (const id of new Set([
+      ...Object.keys(drag.frames),
+      ...drag.affectedArrows,
+    ])) {
+      const el = drag.elements.get(id)!;
       const frame = latest?.layout?.[id];
       if (frame) apply(el, frame);
       if (drag.arrows.get(id)?.node.attrs?.tool === "arrow") {
@@ -246,22 +262,11 @@ export function useBoardInteraction({
       drag.next[id] = next;
       apply(drag.elements.get(id)!, next);
     }
-    // Preview only affected connections, without rerendering rich component trees.
+    // Only connections touching the gesture participate in the per-frame preview.
+    if (!drag.affectedArrows.length) return;
     const layout = { ...drag.source.layout, ...drag.next };
-    for (const [id, entry] of index) {
-      if (
-        entry.node.type !== "drawing" ||
-        entry.node.attrs?.tool !== "arrow" ||
-        !entry.node.attrs.bindings ||
-        !drag.elements.has(id)
-      )
-        continue;
-      if (
-        !Object.values(entry.node.attrs.bindings).some(
-          (b) => drag.frames[(b as { targetId: string }).targetId],
-        )
-      )
-        continue;
+    for (const id of drag.affectedArrows) {
+      const entry = index.get(id)!;
       const el = drag.elements.get(id)!,
         svg = el.querySelector(".board-drawing"),
         path = svg?.querySelector("path");
@@ -290,6 +295,12 @@ export function useBoardInteraction({
   return {
     ids,
     select,
+    selectIds(ids) {
+      const next = new Set(ids);
+      setSelection(next);
+      currentIds.current = next;
+      onSelect([...next].at(-1) ?? null);
+    },
     selectAll() {
       const source = current.current.document;
       const parent =
@@ -347,11 +358,7 @@ export function useBoardInteraction({
       for (const [nodeId, el] of elements) {
         const frame = source.layout?.[nodeId];
         if (!frame) continue;
-        measured[nodeId] = {
-          ...frame,
-          contentSize: undefined,
-          height: el.offsetHeight,
-        };
+        measured[nodeId] = measureFrame(frame, el);
         if (chosen.has(nodeId)) frames[nodeId] = frame;
       }
       if (!frames[id]) return false;
@@ -388,6 +395,17 @@ export function useBoardInteraction({
         bounds,
         guides,
         arrows: index,
+        affectedArrows: [...index]
+          .filter(
+            ([id, entry]) =>
+              entry.node.type === "drawing" &&
+              entry.node.attrs?.tool === "arrow" &&
+              elements.has(id) &&
+              Object.values(entry.node.attrs.bindings ?? {}).some(
+                (binding) => frames[(binding as { targetId: string }).targetId],
+              ),
+          )
+          .map(([id]) => id),
         raf: 0,
         input: null,
         moved: false,
@@ -418,11 +436,11 @@ export function useBoardInteraction({
       if (!drag) return;
       paint();
       const latest = current.current.document;
-      const valid =
-        latest?.content === drag.original.content &&
-        Object.keys(drag.frames).every(
-          (id) => latest?.layout?.[id] === drag.original.layout?.[id],
-        );
+      const valid = canCommitBoardGesture(
+        drag.original,
+        latest,
+        Object.keys(drag.frames),
+      );
       const changed = Object.keys(drag.frames).some(
         (id) =>
           JSON.stringify(drag.next[id]) !== JSON.stringify(drag.frames[id]),
@@ -438,11 +456,7 @@ export function useBoardInteraction({
         if (!(child instanceof HTMLElement)) continue;
         const id = child.dataset.surfaceId,
           frame = id && current.current.document?.layout?.[id];
-        if (
-          id &&
-          frame &&
-          intersectsFrame({ ...frame, height: child.offsetHeight }, rect)
-        )
+        if (id && frame && intersectsFrame(measureFrame(frame, child), rect))
           next.add(id);
       }
       setSelection(next);

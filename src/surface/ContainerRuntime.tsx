@@ -887,7 +887,10 @@ function ContainerView({
         <PageIcon value={node.attrs?.icon} size={24} /> {nodeName(node)}
       </h2>
     ) : undefined);
-  const renderSurface = (child: JSONContent) => <ContainerView node={child} />;
+  const renderSurface = useCallback(
+    (child: JSONContent) => <ContainerView node={child} />,
+    [],
+  );
   if (kind === "page" || reading)
     return (
       <ObjectContext.Provider value={actions}>
@@ -967,6 +970,7 @@ function ContainerView({
                   );
                   runtime.commit(copied.document);
                   runtime.select(copied.ids[0] ?? null);
+                  return copied.ids;
                 }
           }
           onDeleteSelection={
@@ -991,7 +995,7 @@ function ContainerView({
           layoutKey={JSON.stringify(runtime.document.layout)}
           paths={nodePaths({ ...runtime.document, content: node })}
           views={surfaceViews(runtime.document, node)}
-          header={heading}
+          header={root ? heading : undefined}
           selected={runtime.selected}
           onSelect={runtime.select}
           onInspect={runtime.inspect}
