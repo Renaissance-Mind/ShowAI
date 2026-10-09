@@ -511,6 +511,7 @@ export function MindmapBlock({
         <SelectionToolbar
           id={menuId}
           anchor={anchor}
+          anchorElement={buttons.current.get(selected)}
           label="思维导图节点操作"
           keyboardScope="mindmap"
           onEscape={() => {
@@ -519,6 +520,7 @@ export function MindmapBlock({
           }}
         >
           <button
+            className="editor-tool"
             type="button"
             aria-label="编辑节点 F2"
             title="编辑节点 F2"
@@ -528,6 +530,7 @@ export function MindmapBlock({
           </button>
           <span className="toolbar-divider" />
           <button
+            className="editor-tool sm-labeled-action"
             type="button"
             aria-label="新建子节点 Tab"
             title="新建子节点 Tab"
@@ -535,9 +538,10 @@ export function MindmapBlock({
             onClick={() => add("child")}
           >
             <Plus size={16} />
-            子节点
+            <span>子节点</span>
           </button>
           <button
+            className="editor-tool sm-labeled-action"
             type="button"
             aria-label="新建同级节点 Enter"
             title="新建同级节点 Enter"
@@ -547,9 +551,10 @@ export function MindmapBlock({
             onClick={() => add("sibling")}
           >
             <Plus size={16} />
-            同级
+            <span>同级</span>
           </button>
           <button
+            className="editor-tool"
             type="button"
             aria-label={collapsed.has(selected) ? "展开分支" : "折叠分支"}
             title="折叠 / 展开 空格"
@@ -559,6 +564,7 @@ export function MindmapBlock({
             <ChevronRight size={16} />
           </button>
           <button
+            className="editor-tool"
             type="button"
             aria-label="撤销导图操作"
             title="撤销 ⌘/Ctrl+Z"
@@ -568,6 +574,7 @@ export function MindmapBlock({
             <Undo2 size={16} />
           </button>
           <button
+            className="editor-tool"
             type="button"
             aria-label="重做导图操作"
             title="重做 Shift+⌘/Ctrl+Z"
@@ -577,6 +584,7 @@ export function MindmapBlock({
             <Redo2 size={16} />
           </button>
           <button
+            className="editor-tool"
             type="button"
             aria-label="删除节点及其子节点"
             title="删除分支 Delete"

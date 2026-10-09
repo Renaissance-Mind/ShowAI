@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 export function SelectionToolbar({
   id,
   anchor,
+  anchorElement,
   children,
   onEscape,
   label = "选中文字格式",
@@ -14,6 +15,7 @@ export function SelectionToolbar({
   label?: string;
   keyboardScope?: string;
   anchor: { left: number; top: number };
+  anchorElement?: HTMLElement | null;
   children: ReactNode;
   onEscape: () => void;
 }) {
@@ -23,23 +25,44 @@ export function SelectionToolbar({
     const element = menu.current!;
     const place = () => {
       const { width, height } = element.getBoundingClientRect();
-      setPosition({
+      const bounds = anchorElement?.isConnected
+        ? anchorElement.getBoundingClientRect()
+        : null;
+      const point = bounds
+        ? { left: (bounds.left + bounds.right) / 2, top: bounds.top }
+        : anchor;
+      const next = {
         left: Math.max(
           8,
-          Math.min(anchor.left - width / 2, window.innerWidth - width - 8),
+          Math.min(point.left - width / 2, window.innerWidth - width - 8),
         ),
-        top: Math.max(8, anchor.top - height - 8),
-      });
+        top: Math.max(8, point.top - height - 8),
+      };
+      setPosition((previous) =>
+        previous.left === next.left && previous.top === next.top
+          ? previous
+          : next,
+      );
     };
     place();
     const observer = new ResizeObserver(place);
     observer.observe(element);
+    // Ancestors can move the anchor while the anchor's own size stays unchanged.
+    if (anchorElement)
+      for (
+        let ancestor: HTMLElement | null = anchorElement;
+        ancestor;
+        ancestor = ancestor.parentElement
+      )
+        observer.observe(ancestor);
     window.addEventListener("resize", place);
+    if (anchorElement) window.addEventListener("scroll", place, true);
     return () => {
       observer.disconnect();
       window.removeEventListener("resize", place);
+      if (anchorElement) window.removeEventListener("scroll", place, true);
     };
-  }, [anchor.left, anchor.top]);
+  }, [anchor.left, anchor.top, anchorElement]);
   return createPortal(
     <div
       ref={menu}

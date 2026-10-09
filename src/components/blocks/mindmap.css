@@ -163,3 +163,34 @@
   background: var(--sb-accent);
   color: var(--sb-surface);
 }
+
+/* The shared selection menu is portalled outside the block's typography. */
+.editor-bubble[data-editor-keyboard-scope="mindmap"] {
+  --editor-line: var(--line);
+  --editor-soft: var(--accent-soft);
+  font-family: var(
+    --font-sans,
+    -apple-system,
+    BlinkMacSystemFont,
+    "PingFang SC",
+    sans-serif
+  );
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0;
+}
+.editor-bubble[data-editor-keyboard-scope="mindmap"] .editor-tool {
+  font: inherit;
+}
+.editor-bubble[data-editor-keyboard-scope="mindmap"] .sm-labeled-action {
+  width: auto;
+  padding: 0 7px;
+  gap: 4px;
+  color: var(--text);
+  white-space: nowrap;
+}
+.editor-bubble[data-editor-keyboard-scope="mindmap"] .editor-tool svg {
+  display: block;
+  flex: none;
+}
