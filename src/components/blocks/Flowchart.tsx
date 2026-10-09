@@ -65,11 +65,14 @@ const kinds: Record<Kind, string> = {
   query: "CLI 查询",
   result: "结果",
 };
+const nodeWidth = 176;
+const nodeHeight = 72;
 function DiagramCard({ data, selected }: NodeProps<DiagramNode>) {
   const horizontal = data.direction === "LR";
   return (
     <div
       className={`sf-node sf-${data.kind ?? "query"}${selected ? " is-selected" : ""}`}
+      style={{ width: nodeWidth, minHeight: nodeHeight }}
     >
       <Handle
         type="target"
@@ -81,7 +84,6 @@ function DiagramCard({ data, selected }: NodeProps<DiagramNode>) {
               : Position.Top
         }
       />
-      {data.kind && <span className="sf-node-kind">{kinds[data.kind]}</span>}
       <strong>{data.label}</strong>
       {data.subtitle && (
         <span className="sf-node-subtitle">{data.subtitle}</span>
@@ -243,7 +245,7 @@ export function layoutFlow(flow: Flow): DiagramNode[] {
   });
   graph.setDefaultEdgeLabel(() => ({}));
   flow.nodes.forEach((node) =>
-    graph.setNode(node.id, { width: 218, height: 106 }),
+    graph.setNode(node.id, { width: nodeWidth, height: nodeHeight }),
   );
   flow.edges.forEach((edge) => graph.setEdge(edge.source, edge.target));
   layout(graph);
@@ -253,7 +255,10 @@ export function layoutFlow(flow: Flow): DiagramNode[] {
       id: node.id,
       type: "showai",
       data: { ...node, direction },
-      position: node.position ?? { x: point.x - 109, y: point.y - 53 },
+      position: node.position ?? {
+        x: point.x - nodeWidth / 2,
+        y: point.y - nodeHeight / 2,
+      },
     };
   });
 }

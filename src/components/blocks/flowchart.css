@@ -43,50 +43,41 @@
   overflow: visible;
 }
 .sf-node {
-  width: 218px;
-  min-height: 106px;
-  padding: 13px 17px;
-  border: 1px solid var(--sb-line);
-  border-radius: 9px;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--sb-accent) 24%, var(--sb-line));
+  border-radius: 5px;
   background: var(--sb-surface);
   color: var(--sb-text);
-  box-shadow: 0 3px 10px #16332108;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 4px;
-  text-align: left;
+  text-align: center;
 }
 .sf-node strong {
-  font-size: 15px;
-  font-weight: 600;
+  width: 100%;
+  font-size: 16px;
+  font-weight: 500;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
-.sf-node-kind {
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  color: var(--sb-muted);
-}
 .sf-node-subtitle {
+  width: 100%;
   font-size: 12px;
   color: var(--sb-text);
 }
-.sf-node.sf-skill {
-  background: var(--sb-accent-soft);
-  border-color: color-mix(in srgb, var(--sb-accent) 25%, var(--sb-line));
-}
-.sf-node.sf-request,
-.sf-node.sf-result {
-  border-top: 3px solid var(--sb-accent);
-}
-.sf-node.sf-decision {
-  border-style: dashed;
+.sf-node.is-selected {
+  border-color: var(--sb-accent);
+  background: color-mix(in srgb, var(--sb-accent) 4%, var(--sb-surface));
 }
 .sf-block .react-flow__handle {
   width: 6px;
   height: 6px;
   border: 0;
   background: var(--sb-accent);
+  opacity: 0;
 }
 .sf-block .react-flow__edge-path,
 .sf-block .react-flow__connection-path {
