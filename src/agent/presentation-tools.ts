@@ -165,11 +165,12 @@ export function registerPresentationTools(
     "public_catalog_list",
     {
       description:
-        "Find public components and editable templates, without login, a personal project, or synchronization.",
+        "Return all public component/template names, descriptions and scenarios by default, without login or synchronization. Omit query/limit/cursor for the full catalog; explicit limit/cursor opts into pagination. Read details with public_catalog_describe.",
       inputSchema: {
         kind: z.enum(["component", "template"]).optional(),
         query: z.string().optional(),
         limit: z.number().int().min(1).max(50).optional(),
+        cursor: z.string().optional(),
       },
       annotations: readOnly,
       _meta: { securitySchemes: noAuth },

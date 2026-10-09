@@ -65,6 +65,8 @@ import {
 import {
   describeCommand,
   catalogSearchText,
+  catalogEntry,
+  catalogPage,
   pageOf,
   shellToken,
   summarizeCatalog,
@@ -297,17 +299,13 @@ export class AgentService {
           numeric: true,
         }),
     );
-    const result = pageOf(all, {
+    const result = catalogPage(all.map(catalogEntry), {
       limit: input.limit,
       cursor: input.cursor,
       key: { projectId, kind: input.kind, scope, query },
     });
     return {
       ...result,
-      items: result.items.map((item) => ({
-        ...item,
-        describe: describeCommand(item, projectId),
-      })),
       next: result.nextCursor
         ? [
             "showai catalog list",

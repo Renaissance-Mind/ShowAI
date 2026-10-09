@@ -5,7 +5,7 @@ description: 通过 ShowAI MCP 创建或改造可复用 React 组件。先查目
 
 沿用已核实MCP连接、项目和页面；缺少时读 [use-showai](../use-showai/SKILL.md)。正式资源保存到目标项目；用户明确独立交付时可把相同源码对象交给render_document，不自动创建个人项目。
 
-先明确内容输入、读者操作及可见结果。catalog_list查摘要，catalog_describe按需取guide/schema/examples；调整数据或组合即可达到目标时复用。需要新实现时读取 [组件设计](references/component-authoring.md)及guide({topic:"component"})。修改现有组件前只取选中组件的source。
+先明确内容输入、读者操作及可见结果。先用catalog_list({kind:"component",projectId})获取全量名字、摘要和场景，省略query/limit/cursor；catalog_describe按需取guide/schema/examples；调整数据或组合即可达到目标时复用。需要新实现时读取 [组件设计](references/component-authoring.md)及guide({topic:"component"})。修改现有组件前只取选中组件的source。
 
 本机与远程均调用component_save，参数source包含manifest、schema、source及可选files/assets。manifest含id、name、version、description、scenarios、entry、defaultData、examples；默认数据和例子都需满足schema。源码接收data、onChange、readOnly。正式编辑通过onChange返回有效数据；阅读探索使用本地状态。
 

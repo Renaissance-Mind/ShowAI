@@ -33,11 +33,13 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 | 阅读数据、长页局部 | 默认 structured；先 `detail:"outline"` 获取节点 ID，再用 `blockIds` 取局部；纯源读取用 `rendered:false` |
 | 查看布局或操作效果 | `page_read` 的 image / html；读取 [阅读视图](../show-document/references/page-reading.md)，遵循宿主实际 UI 操控规则 |
 | 创建、修改、展示、导出或应用模板 | [show-document](../show-document/SKILL.md) |
-| 查询组件或模板 | `catalog_list` 摘要 → `catalog_describe` 的 guide / schema / examples；公开目录用 `public_catalog_list/describe` |
+| 查询组件或模板 | `catalog_list` 默认返回当前可访问目录的全部名字、摘要、场景与查询身份 → `catalog_describe` 按需取 guide / schema / examples；公开目录用 `public_catalog_list/describe`，同样默认全量 |
 | 创建可复用组件 | [create-component](../create-component/SKILL.md) |
 | 创建或提炼模板 | [create-template](../create-template/SKILL.md) |
 | 比较或恢复历史 | `history_list` / `history_page` / `history_compare`；有恢复授权再 `history_restore`；按需 `guide({topic:"history"})` |
 | 同步状态 | 本机 `project_sync_status`，明确需要同步时 `project_sync`；远程检查操作返回的 synchronization |
+
+初次选择组件时调用 `catalog_list({kind:"component",projectId})`，省略 query、limit、cursor，先获得全量目录。目录内容在工具调用后进入上下文，不在会话开始时自动注入。按需 query 筛选；显式 limit/cursor 仍可分页。列表不含参数、示例或源码。
 
 指南通过 MCP `guide({topic})` 读取，工具的实时 inputSchema 决定参数。共享资源的提升、公开发布及服务器账号配置属于明确的宿主管理操作，不因缺少相应 MCP 工具就转用原始文件或越权命令。
 

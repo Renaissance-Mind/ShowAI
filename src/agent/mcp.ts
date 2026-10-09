@@ -384,7 +384,7 @@ export function createMcpServer(options: {
     "catalog_list",
     {
       description:
-        "Find paginated component/template summaries. Does not return schemas, default data, source or complete template documents.",
+        "Return all accessible component/template names, descriptions and scenarios by default, with identities for detail lookup. Omit query/limit/cursor for the full catalog; explicit limit/cursor opts into pagination. Schemas, examples and source require catalog_describe.",
       inputSchema: {
         kind: z.enum(["component", "template"]).optional(),
         scope: scopeSchema.optional(),

@@ -53,17 +53,17 @@ Ordinary research, comparison and report tasks default to one resource Page. Org
 
 ## Discover resources, then request one view
 
-Search with a query and a small limit before inspecting individual resources:
+Read the full accessible catalog of names, descriptions and scenarios before inspecting individual resources:
 
 ```sh
-showai catalog list --kind component --query chart --project PROJECT --limit 5 --json
+showai catalog list --kind component --project PROJECT --json
 showai catalog list --kind template --query research --project PROJECT --limit 5 --json
 showai catalog describe chart --kind component --view guide --project PROJECT --json
 showai catalog describe chart --kind component --view schema --project PROJECT --json
 showai catalog describe chart --kind component --view examples --project PROJECT --json
 ```
 
-A list returns `{ items, total, limit, nextCursor, next }`; the default limit is 20 and the maximum is 50. Pass the returned cursor with the same query and scope to continue. If the catalog changes, restart without a cursor.
+A list returns `{ items, total, limit, nextCursor, next }`. By default it returns all matching names, descriptions and scenarios, plus IDs, scopes and available revision identities for detail lookup. Omit query, limit and cursor for the complete accessible catalog. Public catalog listing has the same full-list default. Explicit limits from 1 to 50 opt into pagination; pass the returned cursor with the same limit, query and scope to continue. If the catalog changes, restart without a cursor. Catalog content enters Agent context when the tool is called, not automatically at session startup.
 
 Lookup uses the selected project, then global and published libraries, with built-ins as fallback. Use `--scope project|global|published|builtin` and an exact `--version`/`--integrity` when selecting a particular revision. Discovery does not include default data, schemas, code, runtime HTML, or full template documents.
 

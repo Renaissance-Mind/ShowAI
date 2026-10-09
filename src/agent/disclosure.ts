@@ -95,13 +95,12 @@ export function summarizeCatalog(
     kind,
     id,
     name: String(item.name ?? id),
+    description: typeof item.description === "string" ? item.description : "",
     scope,
     ...(version ? { version } : {}),
     ...(integrity ? { integrity } : {}),
     ...(kind === "component"
       ? {
-          description:
-            typeof item.description === "string" ? item.description : "",
           effects: Array.isArray(item.effects)
             ? item.effects.filter(
                 (value): value is string => typeof value === "string",
@@ -142,6 +141,32 @@ export function describeCommand(
     ...(view !== "summary" ? ["--view", view] : []),
     "--json",
   ].join(" ");
+}
+
+/** Full discovery stays compact; detailed metadata belongs to describe. */
+export function catalogEntry(item: CatalogSummary) {
+  const { kind, id, name, scope, version, integrity, description, scenarios } =
+    item;
+  return {
+    kind,
+    id,
+    name,
+    description: description ?? "",
+    scenarios,
+    scope,
+    ...(version ? { version } : {}),
+    ...(integrity ? { integrity } : {}),
+  };
+}
+
+/** Catalogs disclose all matches unless a caller explicitly requests paging. */
+export function catalogPage<T>(
+  items: T[],
+  input: { limit?: number; cursor?: string; key?: unknown } = {},
+) {
+  return input.limit !== undefined || input.cursor !== undefined
+    ? pageOf(items, input)
+    : { items, total: items.length, limit: items.length, nextCursor: null };
 }
 
 export function pageOf<T>(

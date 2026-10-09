@@ -310,9 +310,9 @@ const guides: Record<
     purpose:
       "Discover suitable components or templates with small summaries; request only the detail needed for the next operation.",
     rules: [
-      "catalog list returns items, total, limit and nextCursor. Default limit is 20, maximum 50. Restart without a cursor if the catalog changed.",
+      "catalog list and public catalog list return every matching name, description and scenario by default, with IDs, scopes and available revision identities for detail lookup. Omit query, limit and cursor to discover the full accessible catalog. Explicit limit (1–50) opts into pagination with nextCursor; retain the same limit/query/scope for subsequent pages. Restart without a cursor if the catalog changed.",
       "Scopes are builtin, global, published and project. Shared scopes are immutable; author changes in an explicitly selected project.",
-      "describe defaults to summary. Component summaries contain purpose, scenarios and effects; template summaries contain scenarios. No schema, default data, page body or code is included.",
+      "List entries contain names, descriptions and scenarios plus lookup identities; effects and repeated per-item commands are excluded. describe defaults to summary, where component effects are also available. Neither list nor summary includes schema, default data, page body or code.",
       "Views: guide for usage, schema for props, examples for presets, dependencies for exact references, source for original code/template definition, full for all descriptive metadata. full still excludes source and executable runtimes.",
       "Use the Markdown component (kind text) for headings, paragraphs, lists, quotations, code blocks, dividers and LaTeX formulas together in one content string. Inline math accepts $...$ or \\( ... \\); display math accepts $$...$$ or \\[ ... \\]. Code remains literal. Image and table remain independent components with dedicated editing and appearance features. Toggle and other interactive/custom components use their own kinds and data; request schema/examples before authoring.",
       "Builtins expose an editable starting source. Read --view source, choose a new manifest id/version, then save it in the selected project.",
@@ -321,7 +321,7 @@ const guides: Record<
       "Component source shows the entry file and a file index. Add --file PATH for a particular file or --file '*' for the complete original package.",
     ],
     commands: [
-      "showai catalog list --kind component --project PROJECT --limit 10 --json",
+      "showai catalog list --kind component --project PROJECT --json",
       "showai catalog list --kind template --scope global --query report --json",
       "showai catalog describe ID --kind component --project PROJECT --view guide --json",
       "showai catalog describe ID --kind component --project PROJECT --view schema --json",
@@ -344,7 +344,7 @@ const guides: Record<
       "Import into the selected project, use it in a real page and check the main interaction in desktop and exported HTML. New versions are immutable; shared promotion is explicit.",
     ],
     commands: [
-      "showai catalog list --kind component --project PROJECT --query PURPOSE --limit 8 --json",
+      "showai catalog list --kind component --project PROJECT --json",
       "showai catalog describe ID --kind component --project PROJECT --view source --file index.tsx --json",
       "showai catalog import --project PROJECT --input ./component-package --json",
       "showai catalog save --project PROJECT --input component-source.json --json",

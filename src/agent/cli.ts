@@ -73,7 +73,7 @@ Start with one project:
 
 Discover only what you need:
   guide [workspace|reading|authoring|containers|document|catalog|component|templates|versions|history|sync|export|publish]
-  catalog list [--kind component|template] [--scope SCOPE] [--limit 20]
+  catalog list [--kind component|template] [--scope SCOPE] [--limit N --cursor CURSOR]
   catalog describe ID [--kind component|template] [--view VIEW]
 
 Display a full page or selected blocks:
@@ -402,6 +402,7 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
         return publicCatalog({
           kind: option(args, "kind") as "component" | "template" | undefined,
           query: option(args, "query"),
+          cursor: option(args, "cursor"),
           limit: option(args, "limit")
             ? Number(option(args, "limit"))
             : undefined,

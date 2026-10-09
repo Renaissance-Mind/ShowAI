@@ -8,6 +8,7 @@ import { createLibraryMcpServer } from "./mcp-library";
 import { createMcpServer } from "./mcp";
 import { openLibrary } from "../core/open-library";
 import { syncManager } from "../sync/manager";
+import { listBuiltinComponents } from "../core/catalog";
 
 let root: string;
 const connections: {
@@ -196,4 +197,63 @@ test("saved-page presentation keeps full source, selects preview and never mutat
   });
   expect(missing.isError).toBe(true);
   expect(await readdir(join(root, "local", "presentation-builds"))).toEqual([]);
+});
+
+test("catalog discovery returns all compact entries, with optional pagination beyond 50", async () => {
+  const client = await connect(createLibraryMcpServer({ root }));
+  const project = await call(client, "project_create", {
+    name: "Catalog discovery",
+  });
+  const expected = listBuiltinComponents()
+    .map((item) => item.kind)
+    .sort();
+  expect(expected.length).toBeGreaterThan(50);
+  for (const name of ["catalog_list", "public_catalog_list"]) {
+    const args =
+      name === "catalog_list"
+        ? { kind: "component", scope: "builtin", projectId: project.id }
+        : { kind: "component" };
+    const all = await call(client, name, args);
+    expect(all.items.map((item: any) => item.id).sort()).toEqual(expected);
+    expect(all.total).toBe(expected.length);
+    expect(all.nextCursor).toBeNull();
+    for (const item of all.items) {
+      expect(typeof item.name).toBe("string");
+      expect(item.description.length).toBeGreaterThan(0);
+      expect(item.scenarios.length).toBeGreaterThan(0);
+      expect(Object.keys(item).sort()).toEqual(
+        [
+          "kind",
+          "id",
+          "name",
+          "description",
+          "scenarios",
+          "scope",
+          "version",
+        ].sort(),
+      );
+    }
+    const first = await call(client, name, { ...args, limit: 50 });
+    const second = await call(client, name, {
+      ...args,
+      limit: 50,
+      cursor: first.nextCursor,
+    });
+    expect(
+      [...first.items, ...second.items].map((item: any) => item.id).sort(),
+    ).toEqual(expected);
+    expect(second.nextCursor).toBeNull();
+    const filtered = await call(client, name, { ...args, query: "chart" });
+    expect(filtered.items.length).toBeGreaterThan(0);
+    expect(filtered.items.length).toBeLessThan(all.items.length);
+    expect(filtered.total).toBe(filtered.items.length);
+    expect(filtered.nextCursor).toBeNull();
+  }
+  const details = await call(client, "catalog_describe", {
+    projectId: project.id,
+    id: "chart",
+    scope: "builtin",
+    view: "schema",
+  });
+  expect(details.schema.properties.series).toBeDefined();
 });

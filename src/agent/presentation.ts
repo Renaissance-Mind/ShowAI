@@ -4,6 +4,7 @@ import { join, resolve, dirname, extname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { AgentService } from "./service";
+import { catalogPage } from "./disclosure";
 import { FileStore } from "../core/store";
 import { buildPageHtml } from "./exporter";
 import {
@@ -114,6 +115,7 @@ export async function publicCatalog(
     kind?: "component" | "template";
     query?: string;
     limit?: number;
+    cursor?: string;
   } = {},
 ) {
   const components =
@@ -126,7 +128,6 @@ export async function publicCatalog(
             kind: "component",
             scope: "builtin",
             query: input.query,
-            limit: 50,
           })
         ).items;
   const query = input.query?.toLocaleLowerCase();
@@ -146,13 +147,17 @@ export async function publicCatalog(
             id,
             name,
             description,
+            scenarios: [description],
             scope: "public",
             version: "1.0.0",
           }));
   const items = [...components, ...templates];
   return {
-    items: items.slice(0, input.limit ?? 30),
-    total: items.length,
+    ...catalogPage(items, {
+      limit: input.limit,
+      cursor: input.cursor,
+      key: { kind: input.kind, query: input.query },
+    }),
     requiresLogin: false,
     synchronizationRequired: false,
   };
