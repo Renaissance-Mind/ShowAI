@@ -55,7 +55,9 @@ describe("plugin packaging", () => {
           "Body.",
         ].join(eol),
       );
-      expect(result.stdout).toContain("Prepared skills-only ShowAI plugin");
+      expect(result.stdout).toContain(
+        "Prepared shared ShowAI skills 0.8.0: example",
+      );
     },
   );
 

@@ -184,8 +184,7 @@ try {
     .first()
     .click();
   await page
-    .getByRole("button", { name: /递归内容工作页/ })
-    .first()
+    .getByRole("button", { name: "递归内容工作页", exact: true })
     .click();
   const continuous = scene(rootId).locator(".tiptap");
   await continuous.waitFor();
@@ -584,8 +583,7 @@ try {
     .first()
     .click();
   await page
-    .getByRole("button", { name: /递归内容工作页/ })
-    .first()
+    .getByRole("button", { name: "递归内容工作页", exact: true })
     .click();
   await object(boardId).waitFor();
   await object(nestedPageId).locator(".tiptap").first().waitFor();
