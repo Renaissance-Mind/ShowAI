@@ -1,6 +1,6 @@
 # Board 对象编辑
 
-Page、Board、富组件、文字和绘画共享原生内容树。先读取完整页面的当前 hash、revision 和节点 ID，再查询运行时 `guide containers`。选择已经存在的对象与父容器，使用现有 `pages apply` / `pages save` 受控写入。保持组件原始数据、精确版本和 Page 正文身份。
+Page、Board、富组件、文字和绘画共享原生内容树。先读取完整页面的当前 hash、revision 和节点 ID，再查询运行时 `guide({topic:"containers"})`。选择已经存在的对象与父容器，使用现有 `page_apply` / `page_save` 受控写入。保持组件原始数据、精确版本和 Page 正文身份。
 
 对象外框保存在 `document.layout[nodeId]`，坐标相对于直接父容器。移动整个 Page/Board 只改变它的外框，子节点局部坐标保留。`surface.layout.set` 修改外框；`block.move` 改变父容器，若需要新的局部位置，在同一批操作中显式设置外框。不能把容器移入自身或后代。
 

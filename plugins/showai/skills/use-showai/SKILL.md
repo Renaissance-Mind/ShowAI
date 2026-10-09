@@ -1,105 +1,50 @@
 ---
 name: use-showai
-description: ShowAI 的统一使用指南。首次使用、跨 Agent 接入、公开组件与模板查询、查找或阅读项目页面、查看历史、连接服务器与同步项目时使用。分别选择展示方式与内容归属，支持 CLI、MCP、无 inline 宿主及无需登录的独立展示；页面创作交给 show-document。
+description: 通过 ShowAI MCP 连接、查找与阅读项目页面、查询组件模板及查看历史。先核实连接和项目归属；页面创作、组件开发、模板创建分别进入专门技能。
 ---
 
 # 使用 ShowAI
 
-ShowAI 提供可编辑页面、组件与模板，以及本地或共享项目。Agent 通过 CLI 或 MCP 操作内容，用户通过工作台阅读与修改。公开资源和独立展示无需个人项目或同步登录；私有项目按权限授权。插件提供共用工作流，本地路径使用独立运行时，远程路径使用已连接的 MCP 服务。
+Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心；CLI 保留服务启动、诊断与脚本用途，不作为 Agent 的另一套文档创作流程。用户只问用法时正常解释，不因本技能自动创建页面。
 
-首次接入或运行安装后的设置引导时，先读 [跨宿主接入](references/integration.md)，检查当前工具与显示能力。已有 ShowAI MCP 时先查 showai_capabilities；有本地 CLI 时核对 runtime info。分别确定“在哪里展示”和“保存到哪里、是否同步”。没有 HTML 展示能力仍可读写项目；仅使用远程 MCP 时跳过本机入口查找。
+## 核对连接和归属
 
-首次实际使用 ShowAI，先读本指南建立基础关系，再按当前任务选择专门 Skill。已理解这些关系且保留了可信运行入口与对象身份时，直接继续对应任务。用户直接调用专门 Skill 时，可以从其链接进入本指南补齐缺失信息，无需依次读取所有 Skills。仅解释 ShowAI 用法时，先依据本指南回答；询问本机安装状态或实际内容时再查询软件。
+首次实际操作调用当前 ShowAI 连接的 `showai_capabilities`。工具可能带宿主前缀，使用实际暴露的名称。检查 `agentProtocol`、`transport`、`projects.access`、`projects.available` 和展示能力；调用 `project_context` 或 `projects_list` 核对目标。不能仅凭“Codex”“ChatGPT”判断连接或显示能力。
 
-## 内容与运行的基础关系
+- **library 本机连接**：`project_context` 返回固定内容库。纯查询用 `projects_list`、`pages_list`、`library_search`，不创建项目。新正式内容未指定项目时，`project_resolve({sourceDirectory})` 使用宿主提供的绝对项目目录；首次映射可创建项目。不要使用插件、预览或临时输出目录。没有可信目录时询问归属。用户要求独立命名项目时才用 `project_create`。
+- **project 绑定连接**：`project_context` 返回固定项目。沿用它，不能用另一个 projectId 越过绑定。
+- **authorized 远程连接**：`projects_list` 返回授权项目与当前权限。所有私有操作使用返回的 projectId；不要查询本机内容库或向远程传本机路径。
 
-| 对象 | 含义与用途 |
+项目操作显式传 `projectId`。页面身份来自真实结果中的 `document.id` 或页面列表；会话 ID 用于来源记录，不代替项目或页面身份。远程与本机 ID 不可自行互换。
+
+连接错误、项目不匹配或工具缺失时，先报告缺项并按 [连接配置](references/runtime.md) 核实宿主配置。禁止默默换连接、换内容库、改用创作 CLI 或把正式任务降为未保存 HTML。库切换由宿主重新连接明确的 home，不通过文档工具修改全局库配置。已有可信连接、项目和页面身份时直接继续，不重复发现。
+
+## 内容模型
+
+源 Page 包含结构化内容树、稳定节点 ID、布局与组件数据。Page 按顺序阅读，Board 表达空间关系，两者可以嵌套。组件负责把数据渲染成图形与交互；模板提供复用结构。页面引用精确组件版本与指纹。
+
+内容库与代码目录不同。本机默认库是 `~/.showai`，以实际连接为准。HTML 是阅读交付物；HTML 所在目录不证明有无源 Page。正式文档默认在已选项目中保存为一份 Page，再按需要展示。只有用户明确要独立文件、独立展示或不入库时才用 `render_document`；其中 `savedToProject=false` 必须如实说明。
+
+## 根据任务继续
+
+| 任务 | 操作与指南 |
 | --- | --- |
-| 内容库 home | 软件实际读写的目录，包含项目和相关资源。默认是 `~/.showai`；用户选择其他库时，以启动配置和实际查询结果为准。代码仓库目录与内容库是两个不同位置。 |
-| 项目 Project | 页面及项目资源的归属。同一宿主项目目录可以对应一个 ShowAI 项目，不同会话可共用它。项目 ID 来自查询结果。 |
-| 页面资源 | 保留内容身份和版本的编辑对象。Page 适合顺序阅读，Board 适合空间布局，两种容器可在同一资源内嵌套。普通报告默认一份 Page。 |
-| 页面节点 | 页面内的文字、组件、区域和嵌套容器，具有稳定 ID。局部读取、编辑与展示使用这些 ID；组件实例 ID 与组件目录条目 ID 用途不同。 |
-| 组件 Component | 根据输入数据表达内容或提供交互的可复用实现。页面引用具体组件版本；改变数据通常无需开发新组件。 |
-| 模板 Template | 可复用的内容结构、组件组合和填写约定。应用模板创建页面属于页面任务，建立模板本身属于模板任务。 |
-| 阅读与导出结果 | 同一源页面的 JSON、Markdown、图像或 HTML 视图。预览里的临时操作不会自动保存为正式内容；导出文件也不会自动上传或出现在用户对话中。 |
+| 找项目、页面、正文或已有材料 | `projects_list` / `project_context` → `pages_list` / `library_search` → `page_read`；按需 `guide({topic:"reading"})` |
+| 阅读数据、长页局部 | 默认 structured；先 `detail:"outline"` 获取节点 ID，再用 `blockIds` 取局部；纯源读取用 `rendered:false` |
+| 查看布局或操作效果 | `page_read` 的 image / html；读取 [阅读视图](../show-document/references/page-reading.md)，遵循宿主实际 UI 操控规则 |
+| 创建、修改、展示、导出或应用模板 | [show-document](../show-document/SKILL.md) |
+| 查询组件或模板 | `catalog_list` 摘要 → `catalog_describe` 的 guide / schema / examples；公开目录用 `public_catalog_list/describe` |
+| 创建可复用组件 | [create-component](../create-component/SKILL.md) |
+| 创建或提炼模板 | [create-template](../create-template/SKILL.md) |
+| 比较或恢复历史 | `history_list` / `history_page` / `history_compare`；有恢复授权再 `history_restore`；按需 `guide({topic:"history"})` |
+| 同步状态 | 本机 `project_sync_status`，明确需要同步时 `project_sync`；远程检查操作返回的 synchronization |
 
-宿主提供用户请求、工作目录、工具和展示能力。Skills 说明如何决策，CLI 返回实际内容与能力。页面身份、内容库路径、组件版本、hash 和 revision 应来自用户明确提供的信息或软件结果，不能由会话名称或文档示例推断。
+指南通过 MCP `guide({topic})` 读取，工具的实时 inputSchema 决定参数。共享资源的提升、公开发布及服务器账号配置属于明确的宿主管理操作，不因缺少相应 MCP 工具就转用原始文件或越权命令。
 
-## 按任务选择 Skill 与指南
+## 编辑与验证
 
-下表的指南由当前软件返回：MCP 调用 guide，CLI 使用 `guide TOPIC`。`showai` 表示已核实的外部命令前缀；命令与 MCP 映射见跨宿主接入。大写参数替换为实际值。
+修改前读完整 Page，保留 `hash`、`revision` 和节点 ID。`page_save` / `page_apply` 同时传 `baseHash` 与 `baseRevision`。`operationId` 只用于重试同一请求；message、groupId 标记修改目的与批次。
 
-| 当前任务 | 读取哪些 Skill 或参考 | 接下来做什么，完成到哪里 |
-| --- | --- | --- |
-| 了解 ShowAI，判断是否适合当前任务 | 本指南 | 说明内容模型、可用路径和使用前提。用户只要解释或普通文字回答时，按其要求交付；需要 ShowAI 持久页面、已有内容或可复用资源时进入相应路径。 |
-| 找项目、找页面、搜索已有材料并分析 | 本指南；`guide workspace`、`guide reading`；全文搜索按需读 `guide history` | 查询现有项目与页面，读取相关内容并回答。对象定位和读取步骤见下文；用户只要求阅读时，到阅读结果结束。 |
-| 阅读正文、提取表格或组件数据 | 本指南；[读取视图](../show-document/references/page-reading.md)、`guide reading` | 默认结构化 JSON 或 Markdown；长页先 outline，再按节点 ID 取局部。需要组件计算数据时检查返回的 computed；只需源结构时可用 `--rendered false`。 |
-| 查看已有页面的颜色、布局、溢出或交互 | 本指南；[读取视图](../show-document/references/page-reading.md)、`guide reading` | 布局读 image，操作读 html/actions；保留检查版本和状态。若还要把页面呈现给用户，再读 show-document 的展示流程。 |
-| 创建报告、交互页面、网站；修改原页面；应用已有模板 | [show-document](../show-document/SKILL.md) | 按材料组织页面、复用组件、受控写入，再验收并展示。创建结构按需读 containers/document；应用模板按需读 templates 和所选模板 guide。 |
-| 展示、导出整页或选定区域；交付 HTML 或项目网站 | [show-document](../show-document/SKILL.md)；其[对话展示](../show-document/references/conversation-display.md)；`guide export` | 选择源页面及节点，生成所需格式，执行宿主实际呈现流程。已有页面可直接导出；展示任务无需重建页面。 |
-| 查询有哪些组件或模板、了解怎样填写 | 本指南；`guide catalog` | `catalog list` 查摘要，选中对象后查 guide；准备输入时查 schema，需要例子时查 examples。查询完成即可回答，应用到页面时进入 show-document。 |
-| 创建或改造可复用组件 | [create-component](../create-component/SKILL.md)；`guide component` | 先评估已有组件、数据调整和组合。确需新实现时编写、导入、编译并在真实页面中验证；需要页面交付时回到 show-document。 |
-| 新建、修改模板，或从成熟页面提炼模板 | [create-template](../create-template/SKILL.md)；`guide templates` | 有材料时先做实例再提炼，结构明确时可直接建模板。交付模板、填写提示和应用验证页面；需要新组件时按需进入 create-component。 |
-| 查看谁改了什么、比较版本、处理冲突或恢复页面 | 本指南；`guide history`，涉及编辑再读 `guide authoring` | 查询与比较使用真实 revision；恢复会创建新记录，按用户要求执行。重新读当前页面后再写入，保留草稿和已有修改。 |
-| 连接服务器、设置默认存储、加入共享项目、管理项目成员或同步冲突 | 本指南；`guide sync`，历史恢复同时读 `guide history` | 在设置中操作连接与项目 Dashboard，或使用实际 connection ID 调用 sync。同步按项目隔离，角色只有管理员、编辑者、查看者；本地保存后核对同步状态与错误。 |
-| 将组件或模板复用到其他项目、合并资源版本或发布 | 当前对象对应的专门 Skill；`guide versions` / `guide publish` | 在用户要求的范围内处理版本、提升或发布。项目内保存和 HTML 导出本身不触发共享或发布。 |
-| 排查 ShowAI 编辑器、桌面窗口或原生行为 | 本指南；相关开发与测试规则 | 检查用户指定的实际软件界面。页面正文阅读、页面布局检查和阅读器交互验证分别使用上面的读取路径。 |
+同设备 CONFLICT / saveFailed 表示保存失败：比较旧基线、当前内容和尝试稿，明确合并或放弃。不能只换成新版本参数原样覆盖。跨设备同步合并失败可能返回带来源的可见副本，后续沿用实际 document.id。恢复历史创建新记录，保留原有历史。阅读探索与临时预览不自动保存正文。
 
-## 何时取得运行入口
-
-决定使用本地运行时后，检查是否已知命令、参数、环境和内容库；缺少时读取 [运行入口与内容库](references/runtime.md)。已有远程 MCP 则直接查询能力与对象。独立展示先查公共目录，项目任务再定位项目。
-
-初次取得入口后执行 `runtime info --json`，确认软件能运行、实际 home 正确、所需指南和能力存在，保存返回信息。后续复用已核实入口；软件入口或内容库变更、调用失败、或操作依赖尚未核实的能力时，重新核对相应信息。插件说明更新不会更新软件。
-
-CLI 单次执行后退出；通常无需启动工作台窗口或常驻服务。若入口不存在，说明实际缺项，并使用宿主或用户提供的连接配置；不要通过桌面寻找页面来替代未建立的软件连接。
-
-## 定位项目与页面
-
-先采用用户指定的项目或页面归属。已有可信 `home + projectId + pageId` 时，直接读取对象核对；只有名称或关键词时，通过列表或搜索取得 ID：
-
-```sh
-showai projects list --json
-showai pages list --project PROJECT --json
-showai search --query "关键词" --project PROJECT --kind page --limit 8 --json
-```
-
-`projects list` 返回项目摘要，可核对名称、ID 与目录信息；`pages list` 返回该项目页面；search 返回匹配项，再按对应页面 ID 读取。全文搜索要求版本化内容库，先核对 storage 与 `guide history`。多个对象符合请求且不能据上下文确定时，询问缺少的归属信息。纯阅读查找使用现有对象，并显式传入项目 ID。
-
-创作任务未指定 ShowAI 项目时，根据可信宿主工作目录定位：
-
-```sh
-showai projects current --source-directory /absolute/host-project --json
-```
-
-宿主未提供独立项目目录、当前工作目录确实是任务目录时，可执行 `projects current --json`。它从 cwd 查找 Git 根目录，没有 Git 则使用 cwd；首次映射会自动创建项目。返回 `home`、`project.id`、`sourceDirectory`、`resolution`、`created`。先核对归属，再沿用返回的项目 ID。查询示例不能照搬插件目录、软件源码目录或输出目录作为用户项目目录。
-
-用户要求独立项目时才显式 `projects create --name "项目名" --json`。同目录不同会话共用项目；session ID 用于来源记录，不决定默认目标，也不能唯一确定页面。
-
-## 读取、修改与结果核实
-
-已取得页面 ID 后，根据任务读取：
-
-```sh
-showai guide reading --json
-showai pages read PAGE --project PROJECT --detail outline --json
-showai pages read PAGE --project PROJECT --blocks NODE_ID --format markdown
-showai pages read PAGE --project PROJECT --json
-```
-
-outline 用于找到节点，局部读取用于减少无关内容，完整读取用于取得正式编辑的源数据与当前版本。JSON 成功结果封装在 `{ "ok": true, "data": ... }`；失败结果包含 error 且进程退出码非零。先检查执行结果再使用 data。局部视图、图像、HTML 和组件计算值各有用途，正式修改使用完整源页面的 hash、revision 和稳定节点 ID。
-
-页面写入、组件开发与模板建立按对应 Skill 完成。版本化内容库的页面写入同时传当前 `--base-hash` 和 `--base-revision`；冲突时重新读取、比较并合并。命令成功证明本次操作完成；正文修改需要核对内容，视觉修改需要检查图像，交互修改需要实际操作阅读器。读取视图中的 draft 修改仍需正式写入。
-
-## 交付与后续任务
-
-服务器连接和默认存储在「设置 → 服务器与同步」中管理。每个项目绑定一个服务器项目和账号连接；新项目自动使用默认连接，已有项目需要明确关联。项目管理员在同一设置界面的 Dashboard 管理成员和邀请。同一邀请链接可供不限数量的账号注册或加入，七天到期，管理员可撤销；重复加入保留已有权限，被移出的成员不能复用自己已经使用过的链接。邀请接收者确认项目与权限，复用已有账号或注册账号后加入。凭据属于服务器账号与设备，访问权限由项目成员关系决定。
-
-将已有连接改为公网域名或其他地址时，用同一账号在新地址重新连接。软件核对服务器身份并复用原连接 ID，保留项目绑定和默认连接；已有 Token 可以通过 `sync connect --url SERVER_URL --token-file PRIVATE_FILE --json` 验证新地址。完成后检查 `sync status` 的地址、项目连接和同步状态。
-
-同步保留正式内容、版本历史、精确组件依赖和历史阅读器；本机路径、目录绑定和登录 Token 不随项目传输。工作台运行时后台同步，独立 CLI 写入后可以执行 `sync run`。服务器连接中断时先保留本地内容；`sync status --json` 中的状态、错误和 remoteHead 才能证明远程同步结果。跨设备合并失败会自动生成带账号和设备来源的两份可见内容，同步继续；用 `sync retained PROJECT --json` 查看原文件、来源版本和副本 ID。同设备保存冲突会返回非零退出码及 `error.saveFailed: true`、`recovery`、`nextStep`，本次保存失败。Agent 必须重新读取、比较并处理后保存，或明确放弃修改；不能只换 hash/revision 原样覆盖。App 会即时打开保存失败处理界面，支持返回页面修改后重新保存，或放弃修改。当前服务器使用账号密码或 Token 登录，GitHub/Google 登录尚未提供。
-
-App 的「放弃修改」会归档当前窗口正在使用的未保存稿，载入当前已保存的文件版本；保留其他窗口较新的草稿、其他设备的内容和全部正式历史。外部工具直接改过磁盘文件时，采用文件版本须先通过现有导入校验；失败则继续提示未解决，不声称已保存或已完成放弃。
-
-阅读与分析任务交付答案及必要来源；页面创建、修改和展示按 show-document 执行保存、导出与宿主呈现。用户只保存、只要文件或后台执行时采用其指定方式。专门技能完成后继续完成已授权的整体任务，例如创建组件后应用到用户页面。
-
-在当前会话保留实际 home、启动入口、projectId、pageId、完整页面 hash/revision，以及本轮修改或展示的节点 ID；版本可变化，下一次编辑重新读当前状态。新会话通过用户提供的页面身份或项目内查找恢复目标。多个候选页面时核对选择，不把会话绑定当页面身份。真实宿主来源可用时记录它，无法取得时明确为未知。
+正式内容保存后核对结果；需要展示时调用 `page_present`，沿 [对话展示](../show-document/references/conversation-display.md) 使用真实 delivery。工具成功不等于已经显示。远程同步另看 synchronization.state/error/remoteHead；本机保存不证明远端已收到。

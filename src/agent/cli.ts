@@ -59,7 +59,7 @@ Independent presentation (no personal project or synchronization required):
   render --template TEMPLATE_ID --title TITLE --out PAGE.html
 
 MCP connections:
-  mcp --project PROJECT
+  mcp [--project PROJECT] [--presentation-directory PATH]
   mcp --public
   mcp serve --state DIRECTORY --public-url HTTPS_ORIGIN [--sync-server SERVER_ORIGIN] [--port 8789]
 
@@ -129,6 +129,7 @@ function parseArguments(args: string[]): Arguments {
     "public-url",
     "sync-server",
     "widget-domain",
+    "presentation-directory",
     "host",
     "template",
     "home",
@@ -1161,8 +1162,20 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
         return undefined;
       }
       requireCount(args, 1);
-      const { startMcp } = await import("./mcp");
-      await startMcp({ root: service.store.root, projectId: await project() });
+      const presentationDirectory = option(args, "presentation-directory")
+        ? resolve(option(args, "presentation-directory")!)
+        : undefined;
+      if (!option(args, "project")) {
+        const { startLibraryMcp } = await import("./mcp-library");
+        await startLibraryMcp({ root: service.store.root, presentationDirectory });
+      } else {
+        const { startMcp } = await import("./mcp");
+        await startMcp({
+          root: service.store.root,
+          projectId: await project(),
+          presentationDirectory,
+        });
+      }
       return undefined;
     }
     default:

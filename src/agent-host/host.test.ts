@@ -10,7 +10,7 @@ import {
 import { join, resolve } from "node:path";
 import { tmpdir, homedir } from "node:os";
 import { createHash, generateKeyPairSync, sign, randomUUID } from "node:crypto";
-import { AgentHost, isolatedEnvironment } from "./host";
+import { AgentHost, isolatedEnvironment, copyEmbeddedPlugin } from "./host";
 import { verifyArchive } from "./installer";
 import { verifyIdToken } from "./chatgpt";
 import { chatRequest, chatResponse } from "./gateway";
@@ -433,3 +433,23 @@ test.skipIf(!live)(
   },
   240000,
 );
+
+test("embedded plugin keeps workflows without adding a library-wide MCP connection", async () => {
+  const source = join(repository, "plugins/showai");
+  const destination = join(directory, "embedded-plugin");
+  const original = await readFile(join(source, "mcp.json"), "utf8");
+  await copyEmbeddedPlugin(source, destination);
+  await expect(stat(join(destination, "mcp.json"))).rejects.toMatchObject({
+    code: "ENOENT",
+  });
+  expect(await readFile(join(source, "mcp.json"), "utf8")).toBe(original);
+  for (const name of [
+    "use-showai",
+    "show-document",
+    "create-component",
+    "create-template",
+  ])
+    expect(
+      (await stat(join(destination, "skills", name, "SKILL.md"))).isFile(),
+    ).toBe(true);
+});

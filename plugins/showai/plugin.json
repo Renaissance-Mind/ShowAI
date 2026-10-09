@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "showai",
-  "version": "0.9.0",
-  "description": "Shared ShowAI workflows for independent public presentations and local or synchronized projects through CLI and MCP.",
+  "version": "0.10.0",
+  "description": "Unified MCP workflows for ShowAI projects, components, templates and presentation. Local and remote connections share document operations.",
   "keywords": [
     "research",
     "interactive-pages",
@@ -15,7 +15,7 @@
       "interface": {
         "displayName": "ShowAI",
         "shortDescription": "Read, create and present ShowAI pages",
-        "longDescription": "Create, customize and present content using public components and templates, or work on local and shared projects. Uses a connected ShowAI MCP service or an independently installed local runtime. Presentation and synchronization are independent.",
+        "longDescription": "Operate ShowAI through MCP. Local installation connects the selected ShowAI runtime; remote packages use their authorized endpoint. Formal work is saved to a project before presentation.",
         "category": "Productivity",
         "defaultPrompt": [
           "Use ShowAI to present this research as an interactive page."

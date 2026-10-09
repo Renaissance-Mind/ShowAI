@@ -1,0 +1,199 @@
+import { afterAll, beforeAll, expect, test } from "vitest";
+import { mkdtemp, mkdir, readFile, rm, readdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { createLibraryMcpServer } from "./mcp-library";
+import { createMcpServer } from "./mcp";
+import { openLibrary } from "../core/open-library";
+import { syncManager } from "../sync/manager";
+
+let root: string;
+const connections: {
+  client: Client;
+  server: ReturnType<typeof createMcpServer>;
+}[] = [];
+async function connect(server: ReturnType<typeof createMcpServer>) {
+  const [left, right] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "mcp-library-test", version: "1" });
+  await server.connect(right);
+  await client.connect(left);
+  connections.push({ client, server });
+  return client;
+}
+async function call(
+  client: Client,
+  name: string,
+  args: Record<string, unknown> = {},
+) {
+  const value = await client.callTool({ name, arguments: args });
+  expect(value.isError, JSON.stringify(value.content)).not.toBe(true);
+  return (value.structuredContent as any).data;
+}
+beforeAll(async () => {
+  root = await mkdtemp(join(tmpdir(), "showai-mcp-library-"));
+  await openLibrary(root);
+});
+afterAll(async () => {
+  for (const c of connections) {
+    await c.client.close();
+    await c.server.close();
+  }
+  await syncManager(root).stop();
+  await rm(root, { recursive: true, force: true });
+});
+
+test("library discovery is read-only; parallel project calls retain explicit identity", async () => {
+  const c = await connect(createLibraryMcpServer({ root }));
+  expect((await call(c, "showai_capabilities")).agentProtocol).toBe(
+    "showai-mcp-v1",
+  );
+  expect((await call(c, "project_context")).scope).toBe("library");
+  const guide = await call(c, "guide", { topic: "authoring" });
+  expect(guide.commands).toBeUndefined();
+  expect(guide.tools).toContain("page_save");
+  expect(await call(c, "projects_list")).toEqual([]);
+  const paths = [join(root, "host-a"), join(root, "host-b")];
+  await Promise.all(paths.map((p) => mkdir(p)));
+  const projects = await Promise.all(
+    paths.map((sourceDirectory) =>
+      call(c, "project_resolve", { sourceDirectory }),
+    ),
+  );
+  const ids = projects.map((p) => p.project.id);
+  expect(new Set(ids).size).toBe(2);
+  const pages = await Promise.all(
+    ids.map((projectId, i) =>
+      call(c, "page_create", { projectId, title: `Project ${i}` }),
+    ),
+  );
+  for (let i = 0; i < 2; i++) {
+    expect(
+      (await call(c, "pages_list", { projectId: ids[i] })).map(
+        (p: any) => p.id,
+      ),
+    ).toEqual([pages[i].document.id]);
+  }
+  expect(
+    (await c.callTool({ name: "pages_list", arguments: {} })).isError,
+  ).toBe(true);
+  const bound = await connect(createMcpServer({ root, projectId: ids[0] }));
+  expect(
+    (
+      await bound.callTool({
+        name: "pages_list",
+        arguments: { projectId: ids[1] },
+      })
+    ).isError,
+  ).toBe(true);
+  expect((await call(bound, "pages_list")).length).toBe(1);
+  const read = await call(c, "page_read", {
+    projectId: ids[0],
+    pageId: pages[0].document.id,
+    rendered: false,
+  });
+  const document = { ...read.document, title: "Changed through MCP" };
+  const saved = await call(c, "page_save", {
+    projectId: ids[0],
+    pageId: document.id,
+    document,
+    baseHash: read.hash,
+    baseRevision: read.revision,
+  });
+  expect(saved.document.title).toBe(document.title);
+  const stale = await c.callTool({
+    name: "page_save",
+    arguments: {
+      projectId: ids[0],
+      pageId: document.id,
+      document: { ...document, title: "Stale" },
+      baseHash: read.hash,
+      baseRevision: read.revision,
+    },
+  });
+  expect(stale.isError).toBe(true);
+  expect((stale.structuredContent as any).error.code).toBe("CONFLICT");
+  expect(
+    (
+      await call(c, "page_read", {
+        projectId: ids[0],
+        pageId: document.id,
+        rendered: false,
+      })
+    ).hash,
+  ).toBe(saved.hash);
+});
+
+test("saved-page presentation keeps full source, selects preview and never mutates source", async () => {
+  const output = join(root, "host-output");
+  const c = await connect(
+    createLibraryMcpServer({ root, presentationDirectory: output }),
+  );
+  const p = await call(c, "project_create", { name: "Presentation checks" }),
+    projectId = p.id;
+  const page = await call(c, "page_create", {
+    projectId,
+    title: "Complete source",
+  });
+  const d = page.document;
+  d.surfaceViews = {};
+  d.layout = {};
+  delete d.views;
+  d.content.content = [
+    {
+      type: "widget",
+      attrs: {
+        id: "visible",
+        kind: "text",
+        data: { content: "Visible section", format: "markdown" },
+      },
+    },
+    {
+      type: "widget",
+      attrs: {
+        id: "remaining",
+        kind: "text",
+        data: { content: "Other section retained", format: "markdown" },
+      },
+    },
+  ];
+  const saved = await call(c, "page_save", {
+    projectId,
+    pageId: d.id,
+    document: d,
+    baseHash: page.hash,
+    baseRevision: page.revision,
+  });
+  const result = await c.callTool({
+    name: "page_present",
+    arguments: { projectId, pageId: d.id, blockIds: ["visible"] },
+  });
+  expect(result.isError, JSON.stringify(result.content)).not.toBe(true);
+  const shown = (result.structuredContent as any).data;
+  expect(shown.delivery.html.startsWith(output)).toBe(true);
+  expect(shown.delivery.inline.startsWith(output)).toBe(true);
+  expect(shown.hash).toBe(saved.hash);
+  expect(shown.display.blockIds).toEqual(["visible"]);
+  expect(shown.persistence.savedToProject).toBe(true);
+  expect(shown.synchronization.state).toBe("not_checked");
+  const source = JSON.parse(await readFile(shown.delivery.source, "utf8"));
+  expect(source.document.content.content.map((n: any) => n.attrs.id)).toEqual([
+    "visible",
+    "remaining",
+  ]);
+  expect((result._meta as any).showai.inline).toContain(
+    "data-showai-inline-root",
+  );
+  expect(
+    (await call(c, "page_read", { projectId, pageId: d.id, rendered: false }))
+      .hash,
+  ).toBe(saved.hash);
+  expect(await readdir(join(root, "local", "presentation-builds"))).toEqual([]);
+  const missing = await c.callTool({
+    name: "page_present",
+    arguments: { projectId, pageId: d.id, blockIds: ["missing"] },
+  });
+  expect(missing.isError).toBe(true);
+  expect(await readdir(join(root, "local", "presentation-builds"))).toEqual([]);
+});

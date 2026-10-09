@@ -1,4 +1,6 @@
-# Use ShowAI from an Agent
+# CLI reference for scripts and operators
+
+Agent document workflows use MCP; see [Agent integration](agent-integration.md). This reference retains CLI commands for scripts, service configuration, diagnostics and compatibility.
 
 ShowAI's Node.js CLI and optional MCP server operate on the same project files as the desktop workbench. The CLI runs one command and exits; the desktop window can be closed and no Core daemon is required. It is built from `src/agent/cli.ts` and packaged at `dist-runtime/scripts/cli.mjs`, and included in the desktop application under `Resources/runtime/`. A Python Agent can invoke it with `subprocess` or an MCP client.
 

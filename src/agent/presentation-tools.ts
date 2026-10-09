@@ -25,7 +25,36 @@ export const readerToolMeta = {
   "openai/toolInvocation/invoking": "正在生成 ShowAI 页面",
   "openai/toolInvocation/invoked": "ShowAI 页面已就绪",
 };
-export function mcpSuccess(data: unknown) {
+/** Legacy service receipts include CLI navigation hints. They are not Agent commands. */
+export function mcpData(data: unknown): unknown {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return data;
+  const value = { ...(data as Record<string, unknown>) };
+  const shellHint = (entry: unknown) =>
+    typeof entry === "string" && /^(showai |guide )/.test(entry);
+  if (
+    shellHint(value.next) ||
+    (value.next &&
+      typeof value.next === "object" &&
+      Object.values(value.next).some(shellHint))
+  )
+    delete value.next;
+  if (Array.isArray(value.items))
+    value.items = value.items.map((item) => {
+      if (
+        !item ||
+        typeof item !== "object" ||
+        !["component", "template"].includes(item.kind) ||
+        !shellHint(item.describe)
+      )
+        return item;
+      const { describe: _describe, ...summary } = item;
+      return summary;
+    });
+  return value;
+}
+
+export function mcpSuccess(input: unknown) {
+  const data = mcpData(input);
   return {
     content: [
       { type: "text" as const, text: JSON.stringify({ ok: true, data }) },
@@ -34,12 +63,14 @@ export function mcpSuccess(data: unknown) {
   };
 }
 export function mcpFailure(error: unknown) {
+  const result = { ok: false, error: errorResult(error) };
   return {
     isError: true,
+    structuredContent: result,
     content: [
       {
         type: "text" as const,
-        text: JSON.stringify({ ok: false, error: errorResult(error) }),
+        text: JSON.stringify(result),
       },
     ],
   };
@@ -53,6 +84,8 @@ export function registerPresentationTools(
     ) => Promise<PresentationDelivery>;
     widgetDomain?: string;
     privateProjects?: boolean;
+    projectAccess?: "library" | "project";
+    boundProjectId?: string;
   },
 ) {
   const safe = (handler: () => Promise<unknown>) =>
@@ -98,6 +131,7 @@ export function registerPresentationTools(
     async () =>
       mcpSuccess({
         version,
+        agentProtocol: "showai-mcp-v1",
         transport: options.transport,
         presentation: {
           publicResources: true,
@@ -110,12 +144,21 @@ export function registerPresentationTools(
         },
         projects: {
           available: options.privateProjects ?? true,
+          access:
+            options.transport === "http"
+              ? "authorized"
+              : (options.projectAccess ?? "project"),
+          ...(options.boundProjectId
+            ? { boundProjectId: options.boundProjectId }
+            : {}),
           authentication:
             options.transport === "http" ? "oauth2" : "local-runtime",
           sharedSynchronization: true,
           htmlDisplayRequired: false,
         },
-        next: `For new presentation: public_catalog_list → public_catalog_describe → render_document. ${options.privateProjects === false ? "This connection has no private project entry; use a project connection when persistence is requested." : `For project work: ${options.transport === "http" ? "projects_list" : "project_context"} → page_read/create/apply/save. Display is optional; check synchronization separately.`}`,
+        workflow:
+          "Use MCP for all Agent document operations. Formal content: resolve project, read/create, edit, save, then page_present. Only explicitly standalone content uses render_document. Do not switch connection, library or persistence mode after a failure.",
+        next: `For explicitly standalone presentation: public_catalog_list → public_catalog_describe → render_document. ${options.privateProjects === false ? "This connection has no private project entry; use a project connection when persistence is requested." : `For project work: ${options.transport === "http" ? "projects_list" : "project_context"} → page_read/create/apply/save. Display is optional; check synchronization separately.`}`,
       }),
   );
   server.registerTool(
@@ -155,7 +198,7 @@ export function registerPresentationTools(
     "render_document",
     {
       description:
-        "Render supplied ShowAI content as an interactive page using public components/templates or supplied custom component sources. Anonymous, independent of shared projects. Does not save into a personal project. Hosts without inline still receive usable HTML/source delivery. Read the relevant component schema first.",
+        "Render explicitly standalone ShowAI content using public components/templates or supplied custom sources. Formal work uses page_create/save then page_present. Anonymous, independent of shared projects. Does not save into a personal project. Hosts without inline still receive usable HTML/source delivery. Read the relevant component schema first.",
       inputSchema: presentationSchema,
       annotations: readOnly,
       _meta: { securitySchemes: noAuth, ...readerToolMeta },
@@ -179,7 +222,7 @@ export function registerPresentationTools(
               : {}),
             delivery: delivery ?? {
               mode: "mcp-resource",
-              note: "Use the attached MCP Apps reader; a local CLI can write standalone HTML/inline/source.",
+              note: "Use the attached MCP Apps reader; use the delivery returned by the configured host adapter.",
             },
           }),
           _meta: {

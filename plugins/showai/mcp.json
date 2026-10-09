@@ -1,0 +1,11 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "showai": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["./mcp/launch.mjs"],
+      "cwd": "./"
+    }
+  }
+}

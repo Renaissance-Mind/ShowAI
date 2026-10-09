@@ -66,6 +66,12 @@ export async function runtimeInfo(home: string) {
         displayRequired: false,
       },
       transports: ["cli", "stdio-mcp", "streamable-http-mcp"],
+      agentOperations: {
+        protocol: "showai-mcp-v1",
+        entry: "mcp",
+        libraryProjects: true,
+        pagePresent: true,
+      },
       remoteAuthentication: "oauth2-project-grants",
     },
     storage: library

@@ -91,7 +91,7 @@ async function install() {
       throw new Error(`Unknown option ${flag}.`);
   if (flags.has("--help")) {
     log(
-      "Usage: node scripts/install-codex-plugin.mjs [--update] [--json]\nValidates the skills-only plugin, then uses official Codex commands to install or refresh it. The ShowAI software runtime is installed separately. Verifies installed bytes and enabled status.",
+      "Usage: node scripts/install-codex-plugin.mjs [--update] [--json]\nValidates the MCP plugin, then uses official Codex commands to install or refresh it. The ShowAI software runtime is installed separately. Verifies installed bytes and enabled status.",
     );
     return;
   }

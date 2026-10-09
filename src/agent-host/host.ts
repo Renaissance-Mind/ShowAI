@@ -114,6 +114,12 @@ export function isolatedEnvironment(
     if (process.env[name]) env[name] = process.env[name]!;
   return env;
 }
+/** Embedded tasks receive a separately configured project-bound MCP. */
+export async function copyEmbeddedPlugin(source: string, destination: string) {
+  await cp(source, destination, { recursive: true, force: true });
+  await rm(join(destination, "mcp.json"), { force: true });
+}
+
 export class AgentHost {
   readonly installer: SdkInstaller;
   readonly chatgpt: ChatGptConnection;
@@ -407,10 +413,10 @@ export class AgentHost {
       await mkdir(directory, { recursive: true, mode: 0o700 });
     const marketplace = join(root, "showai-marketplace");
     await mkdir(join(marketplace, ".agents/plugins"), { recursive: true });
-    await cp(this.options.pluginRoot(), join(marketplace, "plugins/showai"), {
-      recursive: true,
-      force: true,
-    });
+    await copyEmbeddedPlugin(
+      this.options.pluginRoot(),
+      join(marketplace, "plugins/showai"),
+    );
     await writeProtected(
       join(marketplace, ".agents/plugins/marketplace.json"),
       {
@@ -632,7 +638,7 @@ export class AgentHost {
     const cli = this.options.cli();
     const instructions = test
       ? prompt
-      : `You are working inside ShowAI. The host has supplied these verified selections: projectId=${projectId}${pageId ? `, pageId=${pageId}` : ""}. Operate only that project and focused page. Use project_context to confirm the MCP binding, then read the chosen page. Use the connected ShowAI tools for all library reads and writes. Read current hash/revision before saving; preserve conflicting drafts. Do not edit raw library files. Work files belong in ${workspace}. This host displays text and file links, without inline HTML rendering. If the user requests a partial preview, export the requested stable block IDs into the task workspace and provide that file path; do not claim it is displayed in the conversation. Read the ShowAI authoring guide before editing. For status-only requests query project_sync_status; do not run project_sync unless the user requests synchronization. The user explicitly requests:\n${prompt}`;
+      : `You are working inside ShowAI. The host has supplied these verified selections: projectId=${projectId}${pageId ? `, pageId=${pageId}` : ""}. Operate only that project and focused page. Use project_context to confirm the MCP binding, then read the chosen page. Use the connected ShowAI MCP tools for all library reads and writes. Do not invoke authoring CLI commands or switch connections if MCP fails. Read current hash/revision before saving; preserve conflicting drafts. Do not edit raw library files. Work files belong in ${workspace}. This host displays text and file links, without inline HTML rendering. For a requested preview, use page_present with the requested stable block IDs and return its delivery file link; do not claim it is displayed in the conversation. Read the ShowAI authoring guide before editing. For status-only requests query project_sync_status; do not run project_sync unless the user requests synchronization. The user explicitly requests:\n${prompt}`;
     const resume = args.taskId
       ? this.tasks.find(
           (item) =>

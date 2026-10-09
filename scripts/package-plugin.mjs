@@ -62,7 +62,7 @@ for (const skill of skills) {
     throw new Error(`Invalid skill: ${skill}`);
 }
 console.log(
-  `Prepared shared ShowAI skills ${manifest.version}: ${skills.join(", ")}`,
+  `Prepared ShowAI MCP plugin ${manifest.version}: ${skills.join(", ")}`,
 );
 if (settings["--mcp-url"] || settings["--out"]) {
   if (!settings["--mcp-url"] || !settings["--out"])
@@ -99,7 +99,7 @@ if (settings["--mcp-url"] || settings["--out"]) {
       null,
       2,
     ) + "\n",
-    { flag: "wx" },
+    { flag: "w" },
   );
   console.log(`Prepared remote plugin from the same skills: ${destination}`);
 }

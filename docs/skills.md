@@ -1,6 +1,6 @@
 # ShowAI 技能与使用路径
 
-ShowAI 插件提供一个统一指南和三个专门 Skill。统一指南建立内容模型、连接与对象归属，再按任务选择具体路径。独立软件提供 CLI、阅读器、组件编译器及实际资源；宿主提供任务上下文、执行工具与结果呈现能力。
+ShowAI 插件提供一个统一指南和三个专门 Skill。统一指南建立内容模型、连接与对象归属，再按任务选择具体路径。独立软件提供 MCP 文档操作、阅读器、组件编译器及实际资源；宿主提供连接、项目上下文与结果呈现能力。CLI 用于启动、诊断和脚本。
 
 | Skill | 何时读取 | 负责的结果 |
 | --- | --- | --- |
@@ -36,7 +36,7 @@ Agent 选择技能之前先看到名称与 description，因此主入口的 desc
 
 ## 运行入口与对象身份
 
-决定执行 ShowAI 操作后，缺少可执行入口或内容库信息时读取 [运行入口与内容库](../plugins/showai/skills/use-showai/references/runtime.md)。按已明确的用户或宿主配置、SHOWAI_HOME 库内登记文件、默认库登记文件取得连接；配置中的 command、args 和 env 构成实际调用。初次取得入口后用 runtime info 核对实际目录与所需能力，后续复用可信信息，变化或失败时重新核对。
+Agent通过已连接的MCP操作ShowAI。首次调用showai_capabilities，并通过project_context或projects_list核对连接、内容库与项目身份。新正式内容在本机library连接中使用project_resolve解析可信宿主目录；远程使用授权项目。缺少连接时读取 [连接配置](../plugins/showai/skills/use-showai/references/runtime.md)，由宿主启动或重连，不能切换为创作CLI或未保存HTML。启动器会核对软件能力；插件更新不会升级软件。
 
 项目不明确时走对象定位；这与入口是否已知是两个独立判断。读取任务使用现有项目和页面。创作未指定项目时，可按可信宿主目录执行 projects current，它首次可能创建目录项目。同目录的不同 session 共用项目，session 来源记录不能唯一定位页面。后续编辑保留 home、projectId、pageId 和节点身份，并重新读取当前 hash/revision。
 
@@ -48,4 +48,4 @@ Agent 选择技能之前先看到名称与 description，因此主入口的 desc
 
 内容核对使用结构化读取，布局检查使用图像，交互检查使用实际阅读器操作，编辑器与原生行为使用对应软件界面。编译成功、写入成功、导出成功与宿主展示完成分别证明各自环节。
 
-页面创作、修改与展示的默认交付由 show-document 定义。保存完整页面后，可导出整页或稳定节点选区，执行 [对话展示](../plugins/showai/skills/show-document/references/conversation-display.md) 中的宿主流程。只阅读时交付答案与来源；用户指定只保存、只要文件、面板或后台执行时采用其指定方式。插件更新后通过官方安装入口验证安装副本，并在新会话加载更新后的 Skills。
+页面创作、修改与展示的默认交付由 show-document 定义。保存完整页面后，通过page_present生成整页交付与可选节点预览，执行 [对话展示](../plugins/showai/skills/show-document/references/conversation-display.md) 中的宿主流程。只阅读时交付答案与来源；用户指定只保存、只要文件、面板或后台执行时采用其指定方式。插件更新后通过官方安装入口验证安装副本，并在新会话加载更新后的 Skills。

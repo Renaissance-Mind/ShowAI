@@ -5,11 +5,11 @@ description: 为 ShowAI 新建、修改可复用模板，或从已有页面提�
 
 模板保存可复用的内容结构、组件组合和填写约定。用户要求创建模板时，交付可应用的模板、使用提示与验证页面。
 
-沿用已验证的 CLI 或 MCP；首次使用读取 [统一使用指南](../use-showai/SKILL.md) 与 [跨宿主接入](../use-showai/references/integration.md)。公共模板可通过 public_catalog_describe 取得 source 并定制，无需同步登录。只需独立定义时，交付模板定义文件并用 render_document 验证实例；登记到项目时，用真实项目 ID 调用 template_save/template_apply，或对应 CLI。无 inline 时交付文件或项目结果。读取 `guide templates --json`，按用途查询 `catalog list --kind template --project PROJECT --query 用途 --limit 8 --json`，选中后读取 guide/examples；复用、修改或合成定义时才读取所选源码。已有模板可作为基础；说明新增结构或填写约定的用途。
+沿用已验证的 MCP；首次使用读取 [统一使用指南](../use-showai/SKILL.md) 与 [跨宿主接入](../use-showai/references/integration.md)。公共模板可通过 public_catalog_describe 取得 source 并定制，无需同步登录。只需独立定义时，交付模板定义文件并用 render_document 验证实例；登记到项目时，用真实项目 ID 调用 template_save/template_apply。无 inline 时交付文件或项目结果。读取 `guide({topic:"templates"})`，按用途查询 `catalog_list({kind:"template",projectId,query,limit:8})`，选中后读取 guide/examples；复用、修改或合成定义时才读取所选源码。已有模板可作为基础；说明新增结构或填写约定的用途。
 
 ## 模板结构与填写材料
 
-模板的 `document` 使用页面的数据结构。新建定义采用版本 3 的 Page/Board 容器，保留所需容器类型；`layout` 保存父级外框，`surfaceViews[surfaceId]` 保存各容器的命名视图、初始视图和阅读顺序。构造这些字段前读取 `guide containers`。旧版本 2 白板使用 `views`，旧版本 1 文档没有容器视图字段；从已有页面提炼或修改旧模板时，先核对实际模型并保留其有效结构。需要升级时按容器指南转换内容、布局与视图，不直接重命名视图字段。
+模板的 `document` 使用页面的数据结构。新建定义采用版本 3 的 Page/Board 容器，保留所需容器类型；`layout` 保存父级外框，`surfaceViews[surfaceId]` 保存各容器的命名视图、初始视图和阅读顺序。构造这些字段前读取 `guide({topic:"containers"})`。旧版本 2 白板使用 `views`，旧版本 1 文档没有容器视图字段；从已有页面提炼或修改旧模板时，先核对实际模型并保留其有效结构。需要升级时按容器指南转换内容、布局与视图，不直接重命名视图字段。
 
 可复用定义中的实例事实替换为填写提示或符合组件 schema 的空状态。组件不接受空数据时，先以文本说明待填写材料。缺少真实材料时，验证页面展示结构与空状态，说明内容和跨材料验证的未覆盖范围。用户明确要求演示数据时才生成，并在页面标明为演示；演示数值不作为实际项目状态或验证真实内容的证据。`examples.request` 与 `examples.steps` 保存使用提示和步骤，不要求编造业务数据。
 
@@ -28,8 +28,8 @@ description: 为 ShowAI 新建、修改可复用模板，或从已有页面提�
 
 ## 保存与交付
 
-生成当前 CLI 支持的 document/composition 定义，将实例事实替换为填写提示或 schema 有效的空状态，保留布局、阅读顺序与精确组件引用。contentGuide 记录各区域的必需材料、组织方式、证据要求和可选条件；scenarios 说明适用场景，related 说明依赖用途，examples 保存命名的自然语言使用提示与操作顺序。提示由 Agent 根据材料执行。
+生成当前 MCP 支持的 document/composition 定义，将实例事实替换为填写提示或 schema 有效的空状态，保留布局、阅读顺序与精确组件引用。contentGuide 记录各区域的必需材料、组织方式、证据要求和可选条件；scenarios 说明适用场景，related 说明依赖用途，examples 保存命名的自然语言使用提示与操作顺序。提示由 Agent 根据材料执行。
 
-项目登记路径用 `template save --project PROJECT --input template-definition.json --json` 保存，或对应 MCP template_save；修改已有模板用新版本，再用 template apply/template_apply 验证实例。独立定义路径交付定义文件，用 render_document 验证应用的 document，无需追加项目保存。均按选定提示填入材料，检查阅读效果、主要交互和导出。直接创建也要完成应用验证；从实例提炼时使用不同材料检查复用。材料不足时使用填写提示与空状态展示结构，说明内容验证仍待材料补齐。
+项目登记路径调用 `template_save({projectId,input})` 保存；修改已有模板用新版本，再用 template_apply 验证实例。独立定义路径交付定义文件，用 render_document 验证应用的 document，无需追加项目保存。均按选定提示填入材料，检查阅读效果、主要交互和导出。直接创建也要完成应用验证；从实例提炼时使用不同材料检查复用。材料不足时使用填写提示与空状态展示结构，说明内容验证仍待材料补齐。
 
 交付模板名称、适用场景、精确版本与指纹、可复制的使用提示，以及预览或导出结果。原实例与验证页面分别保留。后续反馈延续同一模板并创建新版本；用户要求共享或发布时再读取对应指南。

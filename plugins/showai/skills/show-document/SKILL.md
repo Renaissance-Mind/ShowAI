@@ -1,52 +1,38 @@
 ---
 name: show-document
-description: 用 ShowAI 创作、修改、展示或导出页面、报告和小型网站，或应用模板。可用公开资源独立展示，也可保存到本地或共享项目；支持 inline 时呈现预览，无 inline 时交付文件或项目结果。连接、项目查找与纯阅读由 use-showai 处理。
+description: 通过 ShowAI MCP 创作、修改、展示或导出页面、报告与小型网站，或应用模板。正式内容先保存 Page，再按宿主能力展示；明确的独立交付可不入库。
 ---
 
-ShowAI 将内容组织成可阅读、可探索的页面。工作台与 Agent 使用同一份项目文件；组件负责表达，模板负责内容组织。先明确读者需要理解什么，再选择布局与交互，使用用户材料或可核实的数据。
+# 创作与展示文档
 
-首次使用 ShowAI 或不清楚内容模型、运行入口与对象归属时，先读取 [统一使用指南](../use-showai/SKILL.md)，按信息缺口取得入口或定位对象。已有可信 CLI、内容库与项目身份时直接复用。下文 `showai` 代表已核实的外部命令前缀。
+先明确读者需要理解什么，依据用户材料与可核实来源组织内容。首次接入或归属不清时读取 [use-showai](../use-showai/SKILL.md)；已有可信 MCP连接与页面身份就继续。正式页面默认保存到所选项目，明确只要独立交付时才使用 `render_document`。保存失败、工具缺失或显示超限不是改为独立文件的理由。
 
-先按 [跨宿主接入](../use-showai/references/integration.md) 区分独立展示与项目任务。只展示本轮内容且未要求写入项目时，可查询公共目录，定制 document/组件源码，再调用 render_document 或 CLI render，无需同步登录。已有远程 MCP 时使用其工具与真实项目 ID，不查本机目录；无 inline 时交付文件或项目保存与同步结果。
+## 正式页面
 
-用户指定的项目或页面归属优先。新建内容未指定项目时，按统一指南用可信宿主目录解析项目；修改或展示已有页面时采用其项目和页面 ID。仅展示已有内容时，读取当前页面后进入导出与对话展示流程。
+先调用 `guide({topic:"authoring"})`；构造容器时读 containers，内部正文时读 document。查询组件摘要 `catalog_list`，选中后取 guide/schema/examples。已有组件或组合足够时直接复用；存在明确的表达或交互缺口时进入 [create-component](../create-component/SKILL.md)。需要可复用模板时进入 [create-template](../create-template/SKILL.md)；应用已有模板则直接用 template_apply。
 
-普通调研、对比或报告默认保存为项目内的一份 Page。用区域、标题、目录、折叠内容和嵌套容器组织章节；章节数量与内容长度由页面布局处理。用户明确要求网站、多份独立文档或多个页面时再拆分资源；完整项目站点导出用于这些任务。后续补充和修改继续使用同一页面，先 `pages list/read` 定位已有内容，保留其身份。
+普通报告保留一份 Page，用章节、区域和嵌套容器组织。用户要求网站或多个独立文档时才拆分页面。后续修改继续使用原 pageId。新页面用 page_create；修改前 page_read完整源数据，保留 hash、revision与稳定节点 ID，再用 page_apply或page_save。
 
-按本次操作读取 CLI 指南，普通创作先使用 `guide authoring`；构造 Page 结构时读取 `guide containers`，区域内部的富文本区块再读 `guide document`。
-
-- `guide workspace`：项目目录定位与显式项目选择。
-- `guide reading`：同一 Page 的结构化、图像与 HTML 读取。
-- `guide authoring`：读取、差异、编辑和冲突处理。
-- `guide containers`：Page/Board 嵌套、外框、视图与旧页迁移。
-- `guide catalog`：摘要搜索，再按需查看用途、输入、示例或源码。
-- `guide export`：整页或局部组件的 HTML、会话展示和网站。
-
-新资源默认使用版本 3 的 Page 顺序页面，Board 是独立空间容器。两者可以原生嵌套与展开。内容树记录归属，layout 保存父级外框，surfaceViews 保存各层视图。绘画保存在 Board 内。需要创建或修改图形连接、旋转和跨容器关系时，读取 [Board 对象编辑](references/board-authoring.md) 与当前运行时的 `guide containers`。模板保留容器类型，可用于新建或作为模块插入；局部导出包含所选子树及必要祖先。
-
-Page 和 Board 本身也是组件目录条目，可查询 guide、schema 和 examples，用 component.insert 插入。原生容器通过内容、布局和模板定制；保持 surface 结构，不要把它们编码成普通 widget。
-
-先按用途搜索组件或模板摘要，限制结果数；选中后取 `--view guide`，准备填入数据时取 `schema`，需要参考用法时取 `examples`。普通页面创作无需读取组件源码或整个目录。修改已有页面前读取当前版本、查看差异，并保留 hash、revision 和稳定节点 ID。写入版本化内容库时，同时传当前 --base-hash 与 --base-revision。同设备冲突返回 `error.saveFailed: true` 时，本次保存失败；依据 recovery/nextStep 读取当前版本并比较，解决后重新保存，或按用户要求放弃修改。禁止只更新 hash/revision 后原样覆盖。跨设备合并失败会保留带来源的两份内容；保存可能返回新的 document.id，后续使用实际返回 ID，来源记录通过 `sync retained PROJECT --json` 查询。
-
-读取 Page 默认使用结构化 JSON；正文阅读可选择 Markdown。长页面先用 `--detail outline` 取得组件与区域 ID，再按 `--blocks` 读取局部。配色、布局、遮挡和选中状态等视觉问题使用 image，悬停、拖动、展开和表单行为使用 html。按需要读取 [Page 三种读取视图](references/page-reading.md) 与 `guide reading`。三种视图记录同一页面 hash、组件版本及渲染状态；修改视觉后查看图像，修改交互后实际操作 HTML。正式编辑使用完整页面的当前 hash 与 revision。
-
-已有组件能够表达内容时直接复用。通过调整数据或组合已有组件能实现需求时采用组合；需要可复用的新交互、图形或布局时，进入 [create-component](../create-component/SKILL.md)，完成后回到页面创作。选库失败本身并不意味着必须写组件，先判断普通文本、表格和既有组件的组合是否足够。
-
-Markdown（kind text）支持 `$…$`、`\(…\)` 行内公式和 `$$…$$`、`\[…\]` 行间公式，这些是原始 Markdown 写法，写入 JSON 字符串时需转义反斜线。代码块与行内代码保留原文。视频、音频、PDF 和参考文献已有内置组件，先查询对应 guide/schema/examples。文件组件使用 src 保存在线文件地址或对应 MIME 的 base64 data URI；本地上传单文件最多 6 MB，整页最多 10 MB。在线地址需要网络，PDF 地址还需允许跨域读取；离线导出必须嵌入文件与视频封面。参考文献保存稳定的条目 id，正文 `[1](#ref-条目ID)` 可跳转；编号跟随列表顺序变化，调整文献顺序后同步核对正文引用数字。
-
-用户要求新建或修改可复用模板，或把页面提炼成模板时，进入 [create-template](../create-template/SKILL.md)。该技能可先按本技能完成实例再提炼，也可直接保存模板再生成应用预览；完成实例后返回模板创建流程。应用已有模板创建普通页面仍属于本技能，使用 `guide templates` 与所选模板的 `guide`；普通页面完成不会自动触发模板创建。
-
-创建或修改页面后，在宿主支持时交付对话内预览。独立展示使用渲染回执，项目任务先确认保存。读取 [对话展示](references/conversation-display.md)，导出 inline 并执行当前宿主的实际呈现流程。Codex 支持对话可视化时，在最终回复发送 inline 文件的可视化引用。通过读取图像或操作导出阅读器检查结果，完整 HTML 链接作为补充交付。工作台编辑器与原生行为的验收使用对应软件界面。展示范围可以是完整页面、一个组件、多个组件或整个区域。用户只要局部修改结果，或自动化只更新监控进度时，保存完整页面后只展示相关部分。沿用对应节点的稳定 ID，让后续更新能重复选择同一组件。
-
-局部展示先从 `pages read` 的 `document.content` 找到节点 `attrs.id`，再读取 `guide export` 确认当前运行时支持 `--blocks`。旧运行时缺少该参数时先更新 ShowAI 软件：
-
-```sh
-showai export --project PROJECT --page PAGE --blocks PROGRESS_BLOCK_ID --format inline --out ./progress-inline.html --overwrite --json
-showai export --project PROJECT --page PAGE --blocks CHART_BLOCK_ID,METRICS_BLOCK_ID --format html --out ./selected.html --json
+```json
+{"projectId":"已核实项目ID","pageId":"已读取页面ID","baseHash":"读取结果的hash","baseRevision":"读取结果的revision","operations":[{"type":"block.text.set","blockId":"稳定节点ID","text":"修改后的正文"}]}
 ```
 
-`--blocks` 使用页面节点的 `attrs.id`，包括组件实例、原生 Page/Board、区域和绘画节点；选中容器会包含其全部子内容。多个 ID 用逗号分隔，按页面顺序展示。自定义组件代码内部的子组件需要成为独立页面节点才能单独选择。局部导出默认使用 reading 布局并隐藏页面总标题，保留必要父容器，只打包相关组件；显式 `--presentation spatial` 可保留白板布局。旁边的 `.showai.json` 也是局部源文件；页面编辑继续读取完整页面、使用当前 hash、revision 和稳定节点 ID。
+这是 page_apply 的参数形状，具体操作查询当前 guide/inputSchema。不要用局部读取或选区导出覆盖完整页面。CONFLICT时比较原始基线、当前内容与尝试稿后处理，不能只换 hash/revision覆盖。跨设备冲突可能返回新的 document.id，后续使用实际返回值。
 
-整页展示可省略 `--blocks`。inline 内容超过宿主上限时，用 `--blocks` 导出可独立理解的关键区域，或按阅读顺序分成少量片段，在对话里展示并附完整 HTML 链接；继续保留单份完整源页面。宿主无对话 HTML 能力时，独立展示交付文件，项目操作交付保存与同步结果；用户要求外部预览时再打开可用入口。交付前检查导出文件与主要交互；支持对话呈现时，最终回复必须包含本轮生成或更新的 inline 引用和简短说明。用户明确要求只保存、只交付文件或后台执行时，采用其指定方式。完整工作台管理界面不进入读者收到的页面。
+## 结构与内容
 
-新空库默认启用独立版本历史。`showai history list/read/compare` 查看版本与来源，`history merge` 预览草稿合并，`history restore` 恢复为新记录。`showai search --query TEXT` 搜索正文、容器、组件和模板；详情见 `guide history`。`--operation-id` 仅用于重试同一请求，`--message` 说明修改目的，`--group` 关联连续编辑。来源优先取实际宿主会话，无法取得时明确为未知。
+新资源使用 v3：根和嵌套容器为 `surface`，kind为 page或board。Page按树顺序阅读，Board表达局部空间。`layout`保存父级给子对象的外框，`surfaceViews`保存命名视图与阅读顺序；当前选中、滚动与展开属于个人状态。原生容器保持surface结构，不编码成普通widget。绘画保存在Board中；连接、旋转和变换按需读 [Board 编辑](references/board-authoring.md)。
+
+组件节点使用稳定 attrs.id。自定义组件用 kind=custom，data包含componentId、version、integrity与props。不得把组件包 ID当成内置kind。正文 Markdown支持行内与块级公式，代码块保持原文。视频、音频、PDF与参考文献优先复用内置组件，先查schema。离线交付所需资源必须嵌入；在线资源的网络要求要如实说明。教学示例明确标记，不能冒充实测数据。
+
+## 独立交付
+
+用户明确要求不入库或只要独立文件时，可用公开目录与 `render_document({document或templateId,title?,componentSources?,blockIds?})`。document与templateId二选一；自定义源码对象沿用component_save.source结构。读取persistence回执：独立渲染不创建个人项目，也不进行同步。需要后续正式保存时，再把完整文档与组件保存到明确项目。
+
+## 验证与交付
+
+源内容用page_read核对；布局用image，交互按 [阅读视图](references/page-reading.md)检查，并遵循宿主实际UI操控规则。正式编辑不能由临时预览代替。工具回执、视觉检查和实际操作分别记录；未验证的部分不得称为通过。
+
+正式保存后使用 `page_present({projectId,pageId,blockIds?})`。它返回完整HTML/source与可选inline预览；宿主/运行时决定输出路径。按 [对话展示](references/conversation-display.md)实际显示。支持聊天预览时交付本轮引用；完整文件链接为补充。用户要求只保存、只要文件、面板展示或后台执行时遵循指定形式。
+
+局部展示从完整Page取得真实节点ID；选中容器包含子树。page_present的完整HTML与source保留全页，blockIds只限制inline；不能通过自定义组件内部DOM ID选择页面节点。超限时选择可独立理解的节点重新展示，保留完整源Page。明确请求文件或网站导出时用可用的page_export，核对它的格式、选区与路径约束。宿主不支持显示时交付页面身份、保存/同步结果和可用文件，不自行改写内容归属。

@@ -4,8 +4,18 @@ import type { ChangeContext } from "../core/history-model";
 import {
   McpServer,
   type RegisteredTool,
+  type ToolCallback,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { registerPresentationTools } from "./presentation-tools";
+import {
+  registerPresentationTools,
+  mcpSuccess,
+  mcpData,
+  mcpFailure,
+  readerToolMeta,
+  type Presentation,
+} from "./presentation-tools";
+import { presentPage } from "./page-presentation";
+import { getObjectShape } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import packageMetadata from "../../package.json";
@@ -21,6 +31,7 @@ import type { PageOperation } from "../core/model";
 import type { PublishedComponentLocator } from "../core/publication";
 import { CATALOG_VIEWS } from "./disclosure";
 import { GUIDE_TOPICS } from "./guides";
+import { getMcpGuide } from "./mcp-guides";
 import { pageReadSchema, type PageReadResult } from "./page-reading";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -51,6 +62,11 @@ export function createMcpServer(options: {
   decorateTool?: (name: string, tool: RegisteredTool) => void;
   presentation?: Parameters<typeof registerPresentationTools>[1];
   sourceContext?: ChangeContext;
+  presentationDirectory?: string;
+  projectAccess?: "library" | "project";
+  storeProjectPresentation?: (
+    value: Presentation,
+  ) => Promise<import("./presentation-tools").PresentationDelivery>;
 }): McpServer {
   const service = new AgentService(options);
   const projectId = service.requireProject(options.projectId);
@@ -63,7 +79,24 @@ export function createMcpServer(options: {
     },
   );
   const register: McpServer["registerTool"] = (name, config, callback) => {
+    // All project operations accept an explicit identity, including bound connections.
+    // Existing clients may omit it; an explicit mismatch must never be stripped silently.
     const tool = server.registerTool(name, config, callback);
+    if (name !== "guide") {
+      const shape = getObjectShape(tool.inputSchema);
+      if (!shape) throw new Error(`Missing input schema: ${name}`);
+      const original = tool.handler as ToolCallback<z.ZodRawShape>;
+      tool.update({
+        paramsSchema: { ...shape, projectId: z.string().min(1).optional() },
+        callback: ({ projectId: selected, ...args }, extra) => {
+          if (selected !== undefined && selected !== projectId)
+            return mcpFailure(
+              new Error("This MCP connection is bound to another project."),
+            );
+          return original(args, extra);
+        },
+      });
+    }
     options.decorateTool?.(name, tool);
     return tool;
   };
@@ -92,12 +125,18 @@ export function createMcpServer(options: {
         ),
       )
       .then(
-        (data) => ({
-          content: [
-            { type: "text" as const, text: JSON.stringify({ ok: true, data }) },
-          ],
-          structuredContent: { ok: true, data },
-        }),
+        (input) => {
+          const data = mcpData(input);
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify({ ok: true, data }),
+              },
+            ],
+            structuredContent: { ok: true, data },
+          };
+        },
         (error: unknown) => ({
           isError: true,
           content: [
@@ -128,7 +167,7 @@ export function createMcpServer(options: {
       inputSchema: { topic: z.enum(GUIDE_TOPICS).optional() },
       annotations: readOnly,
     },
-    ({ topic }) => call(async () => service.guide(topic)),
+    ({ topic }) => call(async () => getMcpGuide(topic)),
   );
   register(
     "project_context",
@@ -845,18 +884,85 @@ export function createMcpServer(options: {
         }),
     );
   }
+  register(
+    "page_present",
+    {
+      description:
+        "Present a saved Page or selected block preview. Complete HTML/source always retain the whole Page. Does not save or synchronize. Use returned delivery and display contract; do not guess an output directory.",
+      inputSchema: {
+        pageId: z.string().min(1),
+        blockIds: z.array(z.string().min(1)).min(1).optional(),
+      },
+      annotations: readOnly,
+      _meta: readerToolMeta,
+    },
+    async ({ pageId, blockIds }) => {
+      try {
+        const value = await presentPage({
+          root: service.store.root,
+          projectId,
+          pageId,
+          blockIds,
+        });
+        const delivery = options.storeProjectPresentation
+          ? await options.storeProjectPresentation(value)
+          : (
+              await writePresentation(
+                value,
+                join(
+                  options.presentationDirectory ??
+                    join(service.store.root, "local", "agent-previews"),
+                  randomUUID(),
+                  "page.html",
+                ),
+              )
+            ).delivery;
+        return {
+          ...mcpSuccess({
+            title: value.title,
+            pageId: value.pageId,
+            projectId,
+            hash: value.hash,
+            revision: value.revision,
+            delivery,
+            bytes: value.bytes,
+            persistence: value.persistence,
+            synchronization: { state: "not_checked" },
+            display: {
+              resourceAttached: true,
+              inlineAvailable: !!value.inline,
+              fullPageAvailable: true,
+              ...(blockIds ? { blockIds } : {}),
+            },
+            ...(value.inlineError ? { inlineError: value.inlineError } : {}),
+          }),
+          _meta: {
+            showai: {
+              inline: value.inline,
+              inlineError: value.inlineError,
+              delivery,
+            },
+          },
+        };
+      } catch (error) {
+        return mcpFailure(error);
+      }
+    },
+  );
   registerPresentationTools(
     server,
     options.presentation ?? {
       transport: "stdio",
+      projectAccess: options.projectAccess ?? "project",
+      boundProjectId:
+        options.projectAccess === "library" ? undefined : projectId,
       storePresentation: async (value) =>
         (
           await writePresentation(
             value,
             join(
-              service.store.root,
-              "local",
-              "agent-previews",
+              options.presentationDirectory ??
+                join(service.store.root, "local", "agent-previews"),
               randomUUID(),
               "page.html",
             ),
@@ -870,6 +976,7 @@ export function createMcpServer(options: {
 export async function startMcp(options: {
   root?: string;
   projectId: string;
+  presentationDirectory?: string;
 }): Promise<void> {
   const service = new AgentService(options);
   await service.listPages(service.requireProject(options.projectId));
@@ -898,7 +1005,7 @@ export async function startPublicMcp(root: string) {
       content: [
         {
           type: "text",
-          text: JSON.stringify(new AgentService({ root }).guide(topic)),
+          text: JSON.stringify(getMcpGuide(topic)),
         },
       ],
     }),

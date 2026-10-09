@@ -16,11 +16,11 @@
 
 ## 定义可重复填写的结构
 
-依据选择设置稳定的内容区域、布局、阅读顺序与交互，标明必填材料和可选条件。先查组件目录并评估组合，需要新组件时进入 [create-component](../../create-component/SKILL.md)。组合已有模板时按 `guide templates` 使用 composition，并固定依赖。
+依据选择设置稳定的内容区域、布局、阅读顺序与交互，标明必填材料和可选条件。先查组件目录并评估组合，需要新组件时进入 [create-component](../../create-component/SKILL.md)。组合已有模板时按 `guide({topic:"templates"})` 使用 composition，并固定依赖。
 
 用 contentGuide 表达每个区域怎么填、材料缺失如何展示、什么情况下删减可选区域。将应用提示存入 examples 的 `request`，名称存入 `name`，操作顺序存入 `steps`；完整形状从所选模板的 examples/source 获取。scenarios 描述使用情境，related 记录组件或子模板用途。使用现有字段保存提示，不增加未经运行时支持的 prompt 字段或变量绑定语法。
 
-按本技能的[模板结构与填写材料](../SKILL.md#模板结构与填写材料)建立 document。新建定义使用版本 3 的 Page/Board 容器、layout 和 surfaceViews，按 `guide containers` 构造；基于已有模板修改时先核对其实际模型。内容写填写说明，图表或组件使用符合 schema 的空状态。无法以空数据表达的部分先采用文本输入说明，收到真实材料后再完善。模板中的说明应提示用户填什么，不预设每个项目都成立的事实或结论。
+按本技能的[模板结构与填写材料](../SKILL.md#模板结构与填写材料)建立 document。新建定义使用版本 3 的 Page/Board 容器、layout 和 surfaceViews，按 `guide({topic:"containers"})` 构造；基于已有模板修改时先核对其实际模型。内容写填写说明，图表或组件使用符合 schema 的空状态。无法以空数据表达的部分先采用文本输入说明，收到真实材料后再完善。模板中的说明应提示用户填什么，不预设每个项目都成立的事实或结论。
 
 ## 保存、应用与修改
 

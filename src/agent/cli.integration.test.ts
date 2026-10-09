@@ -2523,3 +2523,62 @@ test("versioned history/search/merge/restore are reachable from CLI and project-
     await client.close();
   }
 });
+
+test("plugin launcher starts library MCP with explicit host delivery and refuses a mismatched library", async () => {
+  const isolated = await mkdtemp(join(tmpdir(), "showai-plugin-mcp-"));
+  const client = new Client({ name: "plugin-launch-acceptance", version: "1" });
+  const call = async (name: string, args: Record<string, unknown> = {}) => {
+    const result = await client.callTool({ name, arguments: args });
+    expect(result.isError, JSON.stringify(result.content)).not.toBe(true);
+    return (result.structuredContent as any).data;
+  };
+  try {
+    await run(["runtime", "register"], { home: isolated });
+    const output = join(isolated, "host-output");
+    await client.connect(
+      new StdioClientTransport({
+        command: process.execPath,
+        args: [join(repository, "plugins/showai/mcp/launch.mjs")],
+        env: {
+          ...environment(),
+          SHOWAI_HOME: isolated,
+          SHOWAI_PRESENTATION_DIR: output,
+        } as Record<string, string>,
+      }),
+    );
+    expect((await call("project_context")).root).toBe(isolated);
+    expect(await call("projects_list")).toEqual([]);
+    const project = await call("project_create", {
+      name: "Launched through installed protocol",
+    });
+    const page = await call("page_create", {
+      projectId: project.id,
+      title: "Launch verified",
+    });
+    const presentation = await call("page_present", {
+      projectId: project.id,
+      pageId: page.document.id,
+    });
+    expect(presentation.delivery.inline.startsWith(output)).toBe(true);
+    expect(await readFile(presentation.delivery.html, "utf8")).toContain(
+      "Launch verified",
+    );
+    await expect(
+      execute(
+        process.execPath,
+        [join(repository, "plugins/showai/mcp/launch.mjs")],
+        {
+          env: {
+            ...environment(),
+            SHOWAI_HOME: join(isolated, "different"),
+            SHOWAI_RUNTIME_CONFIG: join(isolated, "agent-runtime.json"),
+          },
+          timeout: 10000,
+        },
+      ),
+    ).rejects.toThrow();
+  } finally {
+    await client.close();
+    await rm(isolated, { recursive: true, force: true });
+  }
+}, 60000);

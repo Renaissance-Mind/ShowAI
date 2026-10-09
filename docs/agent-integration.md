@@ -1,5 +1,9 @@
 # One ShowAI workflow across Agent hosts
 
+Agent document operations use MCP in every host. Local plugins include a stdio launcher; remote packages provide an HTTP endpoint. CLI examples below configure services or support scripts and operators. They are not an alternate Agent authoring workflow.
+
+Local library MCP uses explicit projectId per operation. Use projects_list for read-only discovery, project_resolve with a trusted absolute sourceDirectory for new formal content, or a project-bound connection. New formal work is saved before page_present; render_document is for explicitly standalone deliverables. Connection failure does not change the destination or persistence mode.
+
 ShowAI 0.9 provides independent presentations and shared-project work. Display and synchronization are separate choices:
 
 | Host display | No synchronization | Shared project |
@@ -24,9 +28,9 @@ showai mcp --project PROJECT_ID
 
 Public rendering does not initialize or modify a personal project. Input is `{document?, templateId?, title?, componentSources?, blockIds?}`; choose document or templateId. Components use the existing editable package contract: manifest, schema, source and optional files/assets. The renderer compiles in an isolated temporary workspace and removes that workspace afterward. Its receipt reports `savedToProject: false` and `synchronized: false`. Exported HTML, inline and source remain at the requested destination. Custom nodes use `attrs.kind="custom"` with `attrs.data={componentId,version,props}`; unregistered widget kinds fail with a corrective error. Public source output retains the original componentSources for customization. If inline exceeds the host limit, complete HTML/source are still returned; use blockIds for a smaller inline selection while retaining the full source.
 
-Project-bound stdio keeps the existing project tool names and also exposes public resources/rendering. `mcp --public` exposes only public resources, guides and rendering. Local rendering results include paths in the selected library's `local/agent-previews/`, outside synchronized project content.
+Library stdio (`showai mcp`) adds projects_list, project_resolve and project_create. Project-bound stdio keeps the existing project tool names and also exposes public resources/rendering. `mcp --public` exposes only public resources, guides and rendering. Local rendering results include paths in the selected library's `local/agent-previews/`, outside synchronized project content.
 
-For local project work, keep the usual read → modify with hash/revision → save → sync workflow. CLI-only Agents can run `sync run --project PROJECT --json`; project-bound stdio clients use `project_sync` and `project_sync_status`. No HTML display is required to complete a project operation. An explicitly scoped synchronization enrolls and processes only that project; the full background run continues following the library's default policy.
+For local project work, keep the usual read → modify with hash/revision → save → sync workflow. Scripts can run `sync run --project PROJECT --json`; MCP Agents use `project_sync` and `project_sync_status`. No HTML display is required to complete a project operation. An explicitly scoped synchronization enrolls and processes only that project; the full background run continues following the library's default policy.
 
 ## Remote MCP
 
@@ -64,4 +68,12 @@ The same skill source supports local and remote connections. For a remote packag
 npm run package:plugin -- --mcp-url https://agent.example.com/mcp --out /absolute/new/showai-plugin
 ```
 
-The output adds `mcp.json` to the same manifest, skills and assets. Archive that directory for the target host's plugin upload or public submission. Local installation continues using `npm run plugin:update -- --json`; it does not force every local Agent through a remote service. Public publication, organization verification and review are separate from local or personal-plugin testing.
+The output replaces the local `mcp.json` to the same manifest, skills and assets. Archive that directory for the target host's plugin upload or public submission. Local installation continues using `npm run plugin:update -- --json`; it does not force every local Agent through a remote service. Public publication, organization verification and review are separate from local or personal-plugin testing.
+
+## Saved-page presentation contract
+
+Local and HTTP MCP share page_present({projectId,pageId,blockIds?}). It captures one source revision, returns identity/hash/revision, and leaves the Page unchanged. Complete HTML/source contain the whole Page; blockIds only selects the inline preview. Source and build intermediates use one snapshot, and temporary build directories are cleaned on failure. Local delivery uses the host-configured SHOWAI_PRESENTATION_DIR or the runtime preview directory; HTTP delivery uses expiring artifact URLs. Private source is not exposed by the anonymous presentation_source tool.
+
+Local presentation reports synchronization.state=not_checked and does not start synchronization. HTTP project responses replace that with the verified synchronization receipt. A preview never creates another source Page. Low-level page_export retains its existing explicit-file semantics: selecting blocks makes that export and source partial.
+
+The local plugin launcher resolves only its configured library, probes the registered runtime for capabilities.agentOperations.protocol=showai-mcp-v1, and launches MCP. It never falls back to another runtime after a failed probe. The embedded AgentHost supplies a bound MCP and removes the library launcher from its private skill copy.

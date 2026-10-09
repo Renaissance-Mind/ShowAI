@@ -10,7 +10,6 @@ import {
 import { getObjectShape } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import { z } from "zod";
 import { createMcpServer } from "./mcp";
-import { AgentService } from "./service";
 import {
   McpAuthorization,
   AuthorizationError,
@@ -20,7 +19,6 @@ import { RemoteWorkspaces } from "./mcp-workspace";
 import {
   mcpSuccess,
   mcpFailure,
-  readerToolMeta,
   type Presentation,
 } from "./presentation-tools";
 import { inlinePresentation } from "./presentation";
@@ -156,12 +154,13 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
     const server = createMcpServer({
       root: context?.root ?? join(state, "public"),
       projectId: context?.projectId ?? "unselected",
+      storeProjectPresentation: (value) => storePresentation(value, false),
       sourceContext: {
         actor: { kind: "external", label: "MCP client" },
         channel: "mcp",
       },
       instructions:
-        "ShowAI presentation and shared projects are independent. Use public_catalog_list/describe and render_document without login or synchronization. Private project tools require OAuth and an explicit projectId from projects_list. Read the current page/hash/revision before modifying it. A successful shared write includes synchronization state. HTML display is optional; tools work in text-only harnesses. Use page_present only when the user wants a preview.",
+        "Use ShowAI MCP for Agent document operations. Formal content is saved in an authorized project before page_present; render_document is only for explicitly standalone output. Connection failure must not change the project or persistence mode. Public catalogs and standalone rendering require no login. Private project tools require OAuth and an explicit projectId from projects_list. Read the current page/hash/revision before modifying it. A successful shared write includes synchronization state. HTML display is optional; tools work in text-only harnesses. Use page_present only when the user wants a preview.",
       presentation: {
         transport: "http",
         storePresentation: (value) => storePresentation(value, true),
@@ -192,7 +191,10 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         if ("out" in paramsSchema) delete paramsSchema.out;
         tool.update({
           paramsSchema,
-          _meta: { securitySchemes: oauth(writeTools.has(name)) },
+          _meta: {
+            ...tool._meta,
+            securitySchemes: oauth(writeTools.has(name)),
+          },
           callback: async (input, extra) => {
             const { projectId: _projectId, ...rest } = input;
             const args: Record<string, unknown> = rest;
@@ -227,7 +229,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                 if (args.format === "site")
                   return mcpFailure(
                     new Error(
-                      "Use local CLI for whole-site export; remote export supports one page or selected blocks.",
+                      "This remote MCP connection supports page exports only. Whole-site export requires a host connection advertising that capability; do not silently switch connections.",
                     ),
                   );
                 outputDirectory = join(state, "exports", randomUUID());
@@ -247,6 +249,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                 const data = {
                   ...(result.structuredContent.data as Record<string, unknown>),
                 };
+                if ("projectId" in data) data.projectId = _projectId;
                 if (
                   outputDirectory &&
                   typeof data.path === "string" &&
@@ -386,73 +389,6 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         grant
           ? mcpSuccess(await workspaces.projects(grant))
           : mcpFailure(new Error("Sign in to ShowAI.")),
-    );
-    server.registerTool(
-      "page_present",
-      {
-        description:
-          "Present an existing authorized page or selected blocks in the MCP Apps reader, with downloadable HTML/source. Presentation does not change synchronization or save a new page. Text-only harnesses can use the downloads or simply rely on page_save receipts.",
-        inputSchema: {
-          projectId: z.string(),
-          pageId: z.string(),
-          blockIds: z.array(z.string()).optional(),
-        },
-        annotations: {
-          readOnlyHint: true,
-          destructiveHint: false,
-          openWorldHint: false,
-        },
-        _meta: { securitySchemes: oauth(false), ...readerToolMeta },
-      },
-      async ({ pageId, blockIds }) => {
-        if (!context)
-          return mcpFailure(new Error("Select an authorized project."));
-        const directory = join(state, "exports", randomUUID());
-        await mkdir(directory, { recursive: true, mode: 0o700 });
-        try {
-          const service = new AgentService(context);
-          const result = await service.export({
-            projectId: context.projectId,
-            pageId,
-            blockIds,
-            format: "html",
-            presentation: "reading",
-            out: join(directory, "page.html"),
-          });
-          const html = await readFile(result.path, "utf8"),
-            preview = inlinePresentation(html),
-            source = await readFile(result.sourcePaths[0], "utf8");
-          const parsed = JSON.parse(source),
-            title = parsed.document.title;
-          const delivery = await storePresentation({
-            title,
-            document: parsed.document,
-            html,
-            ...preview,
-            source,
-            persistence: { savedToProject: true, synchronized: true },
-            bytes: {
-              html: Buffer.byteLength(html),
-              inline: preview.inline ? Buffer.byteLength(preview.inline) : null,
-            },
-          });
-          return {
-            ...mcpSuccess({
-              title,
-              pageId,
-              projectId: grant?.projectIds[0],
-              delivery,
-              ...(preview.inlineError
-                ? { inlineError: preview.inlineError }
-                : {}),
-              persistence: { savedToProject: true, synchronized: true },
-            }),
-            _meta: { showai: { ...preview, delivery } },
-          };
-        } finally {
-          await rm(directory, { recursive: true, force: true });
-        }
-      },
     );
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
@@ -610,6 +546,12 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
               ...(result.result.structuredContent ?? {}),
               synchronization,
             };
+            const data = result.result.structuredContent.data;
+            if (data && typeof data === "object" && data.persistence) {
+              data.synchronization = synchronization;
+              data.persistence.synchronized =
+                synchronization.state === "synced";
+            }
             result.result.content = (result.result.content ?? []).map(
               (item: { type: string; text?: string }) =>
                 item.type === "text"
