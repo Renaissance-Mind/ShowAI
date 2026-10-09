@@ -83,6 +83,64 @@ async function fixture() {
   return { directory, server, alice, bob, project, page };
 }
 describe("project synchronization between independent real content libraries", () => {
+  it("acknowledges its own published ancestor after a lost local checkpoint without copying later edits", async () => {
+    const { alice, bob, project, page } = await fixture();
+    const configPath = join(alice.home, "local/sync/config.json");
+    const checkpoint = await readFile(configPath);
+    const original = await alice.store.readPage(project.id, page.document.id);
+    const published = await alice.store.savePage(
+      project.id,
+      page.document.id,
+      { ...original.document, title: "First local edit" },
+      original.hash,
+      original.revision,
+    );
+    await alice.manager.run();
+    await alice.store.savePage(
+      project.id,
+      page.document.id,
+      { ...published.document, title: "Later local edit" },
+      published.hash,
+      published.revision,
+    );
+    // The real server accepted publication, but the client retained its earlier
+    // checkpoint, as when a process dies before persisting the acknowledgement.
+    await writeFile(configPath, checkpoint);
+    await new SyncManager(alice.home).run();
+    await bob.manager.run();
+    expect(await alice.store.listPages(project.id)).toHaveLength(1);
+    expect(await bob.store.listPages(project.id)).toHaveLength(1);
+    expect(await alice.manager.retainedConflicts(project.id)).toHaveLength(0);
+    expect(
+      (await bob.store.readPage(project.id, page.document.id)).document.title,
+    ).toBe("Later local edit");
+    expect((await alice.manager.status()).projects[0].status).toBe("synced");
+  });
+
+  it("coordinates separate managers sharing one real library during continuous edits", async () => {
+    const { alice, bob, project, page } = await fixture();
+    const second = new SyncManager(alice.home);
+    actions.push(() => second.stop());
+    for (let index = 0; index < 6; index++) {
+      const current = await alice.store.readPage(project.id, page.document.id);
+      await alice.store.savePage(
+        project.id,
+        page.document.id,
+        { ...current.document, title: `Shared-home edit ${index}` },
+        current.hash,
+        current.revision,
+      );
+      await Promise.all([alice.manager.run(), second.run()]);
+    }
+    await bob.manager.run();
+    expect(await alice.store.listPages(project.id)).toHaveLength(1);
+    expect(await alice.manager.retainedConflicts(project.id)).toHaveLength(0);
+    expect((await alice.manager.status()).projects[0].status).toBe("synced");
+    expect(
+      (await bob.store.readPage(project.id, page.document.id)).document.title,
+    ).toBe("Shared-home edit 5");
+  });
+
   it("does not publish an unresolved same-device file save conflict", async () => {
     const { alice, bob, project, page } = await fixture();
     const before = (await alice.manager.status()).projects[0].remoteHead;

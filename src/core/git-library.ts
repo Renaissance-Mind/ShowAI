@@ -1369,6 +1369,21 @@ export class GitLibrary {
     };
   }
 
+  async hasRevision(revision: string): Promise<boolean> {
+    if (!oid(revision)) return false;
+    const result = await gitExec(
+      ["--git-dir", this.repository, "cat-file", "-e", `${revision}^{commit}`],
+      this.root,
+      { env: this.environment() },
+    );
+    if (result.exitCode === 0) return true;
+    if (result.exitCode === 1 || result.exitCode === 128) return false;
+    throw new CoreError(
+      "INVALID_DATA",
+      `History lookup failed: ${result.stderr}`,
+    );
+  }
+
   async isAncestor(ancestor: string, revision: string): Promise<boolean> {
     if (!oid(ancestor) || !oid(revision))
       throw new CoreError("INVALID_DATA", "Invalid history ancestry query.");

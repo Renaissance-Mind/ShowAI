@@ -58,6 +58,12 @@ describe("Git-backed content library", () => {
       human,
     );
     expect(new Set([a!.revision, b!.revision, again!.revision]).size).toBe(3);
+    expect(await library.hasRevision(a!.revision)).toBe(true);
+    expect(await library.hasRevision("0".repeat(40))).toBe(false);
+    expect(await library.hasRevision("not-a-revision")).toBe(false);
+    expect(
+      await library.hasRevision((await library.tree(a!.revision))[0].oid),
+    ).toBe(false);
     const history = await library.history({ path });
     expect(history.map((entry) => entry.revision)).toEqual([
       again!.revision,

@@ -949,6 +949,44 @@ export class SyncManager {
     project: ProjectConnection,
     connection: ServerConnection,
     suppliedRemote?: SyncProject,
+  ) {
+    // App windows, the development App and CLI processes share checkpoints and
+    // recovery plans. Serialize the whole project cycle, not just config writes.
+    const lease =
+      "sync-project-" +
+      hash(project.projectId).replace(/[0-9a-f]/g, (digit) =>
+        String.fromCharCode(97 + parseInt(digit, 16)),
+      );
+    return withLibraryLock(
+      this.home,
+      async () => {
+        const config = await this.configuration();
+        const latest = config.projects.find(
+          (item) => item.projectId === project.projectId,
+        );
+        if (!latest) return;
+        const currentConnection = config.connections.find(
+          (item) => item.id === latest.connectionId,
+        );
+        if (!currentConnection)
+          throw new CoreError("NOT_FOUND", "项目同步账号不存在。");
+        const unchanged =
+          JSON.stringify(latest) === JSON.stringify(project) &&
+          JSON.stringify(currentConnection) === JSON.stringify(connection);
+        return this.synchronizeUnlocked(
+          latest,
+          currentConnection,
+          unchanged ? suppliedRemote : undefined,
+          config.deviceId,
+        );
+      },
+      lease,
+    );
+  }
+  private async synchronizeUnlocked(
+    project: ProjectConnection,
+    connection: ServerConnection,
+    suppliedRemote?: SyncProject,
     suppliedDeviceId?: string,
   ) {
     const deviceId = suppliedDeviceId ?? (await this.configuration()).deviceId;
@@ -1162,6 +1200,40 @@ export class SyncManager {
             Buffer.from(JSON.stringify(pending)),
           );
           await rm(this.conflictPath(project.projectId), { force: true });
+        }
+      }
+    }
+    if (
+      !pending &&
+      localHead &&
+      remote.head &&
+      remote.head !== project.remoteHead
+    ) {
+      const published = await this.record(connection, project, remote.head);
+      const source = published.snapshot.change.sourceRevision;
+      // Publication may have succeeded before another local process or a killed
+      // client saved its acknowledgement. Verify the actual ancestor contents;
+      // a device label alone does not establish that this is our own upload.
+      if (
+        published.snapshot.change.deviceId === deviceId &&
+        source &&
+        (await library.hasRevision(source)) &&
+        (await library.isAncestor(source, localHead))
+      ) {
+        const original = await new LibraryOperations(
+          this.home,
+          project.projectId,
+        ).projectFiles(project.projectId, source);
+        const uploaded = await this.files(connection, project, published);
+        if (sameFiles(original, uploaded)) {
+          project.remoteHead = remote.head;
+          project.localRevision = source;
+          await this.state(project.projectId, {
+            remoteHead: remote.head,
+            localRevision: source,
+            status: "pending",
+            error: undefined,
+          });
         }
       }
     }
@@ -1524,7 +1596,7 @@ export class SyncManager {
           this.dirty.delete(project.projectId);
           const before = project.remoteHead;
           this.metrics.scanned++;
-          await this.synchronize(project, connection, remote, config.deviceId);
+          await this.synchronize(project, connection, remote);
           const saved = (await this.configuration()).projects.find(
             (item) => item.projectId === project.projectId,
           );
