@@ -68,29 +68,47 @@
 .surface-object:has(> .surface-object-content > .sb-pdf) {
   border: 0;
 }
-.surface-object:has(> .surface-object-content > .sb-media) > .surface-object-content,
-.surface-object:has(> .surface-object-content > .sb-pdf) > .surface-object-content {
+.surface-object:has(> .surface-object-content > .sb-media)
+  > .surface-object-content,
+.surface-object:has(> .surface-object-content > .sb-pdf)
+  > .surface-object-content {
   padding: 0;
 }
 .surface-object-content > .sb-media,
-.surface-object-content > .sb-pdf { margin: 0; }
-.surface-object:has(> .surface-object-content > .sb-media) > .surface-object-header,
-.surface-object:has(> .surface-object-content > .sb-pdf) > .surface-object-header {
+.surface-object-content > .sb-pdf {
+  margin: 0;
+}
+.surface-object:has(> .surface-object-content > .sb-media)
+  > .surface-object-header,
+.surface-object:has(> .surface-object-content > .sb-pdf)
+  > .surface-object-header {
   position: absolute;
   left: 0;
   bottom: 100%;
   opacity: 0;
   pointer-events: none;
 }
-.surface-object:has(> .surface-object-content > .sb-media).is-selected > .surface-object-header,
-.surface-object:has(> .surface-object-content > .sb-pdf).is-selected > .surface-object-header,
-.surface-object:has(> .surface-object-content > .sb-media) > .surface-object-header:focus-within,
-.surface-object:has(> .surface-object-content > .sb-pdf) > .surface-object-header:focus-within {
+.surface-object:has(> .surface-object-content > .sb-media).is-selected
+  > .surface-object-header,
+.surface-object:has(> .surface-object-content > .sb-pdf).is-selected
+  > .surface-object-header,
+.surface-object:has(> .surface-object-content > .sb-media)
+  > .surface-object-header:focus-within,
+.surface-object:has(> .surface-object-content > .sb-pdf)
+  > .surface-object-header:focus-within {
   opacity: 1;
   pointer-events: auto;
 }
-.surface-object:has(> .surface-object-content > .sb-media) > .surface-object-header .surface-object-grip > span,
-.surface-object:has(> .surface-object-content > .sb-pdf) > .surface-object-header .surface-object-grip > span { display: none; }
+.surface-object:has(> .surface-object-content > .sb-media)
+  > .surface-object-header
+  .surface-object-grip
+  > span,
+.surface-object:has(> .surface-object-content > .sb-pdf)
+  > .surface-object-header
+  .surface-object-grip
+  > span {
+  display: none;
+}
 .surface-object:focus-within,
 .surface-object.is-moving {
   z-index: 2;
@@ -496,5 +514,124 @@
     margin: 0;
     width: min(280px, calc(100% - 20px));
     max-height: 55%;
+  }
+}
+
+.board-snap-guides {
+  position: absolute;
+  inset: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 30;
+  stroke: #e06b52;
+  stroke-width: 1;
+}
+.board-marquee {
+  position: absolute;
+  pointer-events: none;
+  border: 1px solid #467de3;
+  background: #467de31a;
+  z-index: 30;
+}
+.surface-object-rotate {
+  position: absolute;
+  left: calc(50% - 12px);
+  top: -54px;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border, #ccc);
+  border-radius: 50%;
+  background: var(--panel, white);
+  color: var(--text, #252629);
+  cursor: grab;
+  z-index: 12;
+  touch-action: none;
+}
+.board-selection-count {
+  padding: 0 6px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+@media print {
+  .surface-object-rotate,
+  .board-snap-guides,
+  .board-marquee {
+    display: none !important;
+  }
+}
+.board-arrow-endpoint {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 13px;
+  height: 13px;
+  padding: 0;
+  border: 2px solid #467de3;
+  border-radius: 50%;
+  background: white;
+  cursor: crosshair;
+  touch-action: none;
+  z-index: 14;
+}
+@media print {
+  .board-arrow-endpoint {
+    display: none !important;
+  }
+}
+.board-resize-handle {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: 1px solid #467de3;
+  background: white;
+  z-index: 15;
+  touch-action: none;
+  transform: translate(-50%, -50%);
+}
+.board-resize-handle.handle-nw {
+  left: 0;
+  top: 0;
+  cursor: nwse-resize;
+}
+.board-resize-handle.handle-n {
+  left: 50%;
+  top: 0;
+  cursor: ns-resize;
+}
+.board-resize-handle.handle-ne {
+  left: 100%;
+  top: 0;
+  cursor: nesw-resize;
+}
+.board-resize-handle.handle-e {
+  left: 100%;
+  top: 50%;
+  cursor: ew-resize;
+}
+.board-resize-handle.handle-se {
+  left: 100%;
+  top: 100%;
+  cursor: nwse-resize;
+}
+.board-resize-handle.handle-s {
+  left: 50%;
+  top: 100%;
+  cursor: ns-resize;
+}
+.board-resize-handle.handle-sw {
+  left: 0;
+  top: 100%;
+  cursor: nesw-resize;
+}
+.board-resize-handle.handle-w {
+  left: 0;
+  top: 50%;
+  cursor: ew-resize;
+}
+@media print {
+  .board-resize-handle {
+    display: none !important;
   }
 }

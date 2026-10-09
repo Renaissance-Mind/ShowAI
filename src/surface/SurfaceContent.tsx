@@ -1,3 +1,4 @@
+import { objectCapabilities } from "./geometry.mjs";
 import { Drawing } from "./Drawing";
 import { isResource, resourceNodes, surfaceKind } from "./containers.mjs";
 import {
@@ -105,7 +106,8 @@ const ContentNode = memo(
       frame = document.layout?.[id];
     let body: ReactNode;
     if (node.type === "surface") body = renderSurface?.(node);
-    else if (node.type === "drawing") body = <Drawing node={node} />;
+    else if (node.type === "drawing")
+      body = <Drawing node={node} frame={frame} />;
     else if (node.type === "region") {
       const mode = frame?.mode ?? "flow",
         children = node.content ?? [];
@@ -216,6 +218,8 @@ const ContentNode = memo(
     return (
       <SurfaceObject
         id={id}
+        rotatable={objectCapabilities(node).rotate}
+        resizable={!(node.type === "drawing" && node.attrs?.tool === "arrow")}
         name={nodeName(node)}
         positioned={positioned}
         region={node.type === "region"}

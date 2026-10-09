@@ -1,3 +1,4 @@
+import { objectCapabilities } from "./geometry.mjs";
 import { isResource, fillResource, surfaceKind } from "./containers.mjs";
 import { fillSurfaceLayout, visitNodes } from "./document.mjs";
 const reserved = new Set(["__proto__", "constructor", "prototype"]);
@@ -51,6 +52,12 @@ export function validateSurface(document) {
       )
     )
       throw new Error(`Unsupported layout field for ${id}.`);
+    if (frame.rotation !== undefined) {
+      const target = nodes.get(id);
+      if (!objectCapabilities(target).rotate)
+        throw new Error(`Rotation is not supported for ${id}.`);
+      finite(frame.rotation, -360, 360, `layout.${id}.rotation`);
+    }
     finite(frame.x, -1000000, 1000000, `layout.${id}.x`);
     finite(frame.y, -1000000, 1000000, `layout.${id}.y`);
     finite(frame.width, 120, 10000, `layout.${id}.width`);
@@ -200,6 +207,37 @@ function validateResource(document) {
     for (const child of node.content ?? []) walk(child, node, owner);
   };
   walk(document.content, null, null);
+  for (const [id, node] of nodes) {
+    if (node.attrs?.bindings === undefined) continue;
+    if (node.type !== "drawing" || node.attrs.tool !== "arrow")
+      throw new Error("Only arrows can define endpoint bindings.");
+    object(node.attrs.bindings, "bindings");
+    for (const [key, binding] of Object.entries(node.attrs.bindings)) {
+      if (!["start", "end"].includes(key))
+        throw new Error("Unknown arrow endpoint.");
+      object(binding, "binding");
+      if (
+        Object.keys(binding).some(
+          (field) => !["targetId", "anchor"].includes(field),
+        )
+      )
+        throw new Error("Unsupported binding field.");
+      const target = nodes.get(binding.targetId);
+      if (
+        !target ||
+        parents.get(id) !== parents.get(binding.targetId) ||
+        !objectCapabilities(target).bindTarget
+      )
+        throw new Error("Arrow bindings require a non-arrow sibling target.");
+      object(binding.anchor, "binding.anchor");
+      if (
+        Object.keys(binding.anchor).some((field) => !["x", "y"].includes(field))
+      )
+        throw new Error("Unsupported anchor field.");
+      finite(binding.anchor.x, 0, 1, "binding.anchor.x");
+      finite(binding.anchor.y, 0, 1, "binding.anchor.y");
+    }
+  }
   if (document.views !== undefined)
     throw new Error("Version 3 stores views per surface in surfaceViews.");
   if (document.layout !== undefined) object(document.layout, "layout");
@@ -221,6 +259,7 @@ function validateResource(document) {
             "width",
             "height",
             "heightMode",
+            "rotation",
             "mode",
             "columns",
             "gap",
@@ -228,6 +267,12 @@ function validateResource(document) {
       )
     )
       throw new Error("Unsupported layout field.");
+    if (frame.rotation !== undefined) {
+      const target = nodes.get(id);
+      if (!objectCapabilities(target).rotate)
+        throw new Error(`Rotation is not supported for ${id}.`);
+      finite(frame.rotation, -360, 360, `layout.${id}.rotation`);
+    }
     finite(frame.x, -1000000, 1000000, `layout.${id}.x`);
     finite(frame.y, -1000000, 1000000, `layout.${id}.y`);
     finite(

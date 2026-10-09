@@ -1,3 +1,4 @@
+import type { BoardInteraction, BoardGesture } from "./useBoardInteraction";
 import {
   createContext,
   useContext,
@@ -14,7 +15,13 @@ import type { NodeLayout } from "./types";
 export interface ObjectActions {
   scale: number;
   selected: string | null;
-  select: (id: string | null) => void;
+  board?: BoardInteraction;
+  connect?: (
+    id: string,
+    endpoint: "start" | "end",
+    point: { x: number; y: number },
+  ) => void;
+  select: (id: string | null, additive?: boolean) => void;
   inspect?: (id: string) => void;
   expand?: (id: string) => void;
   remove?: (id: string) => void;
@@ -41,6 +48,8 @@ export function SurfaceObject({
   container = false,
   drawing = false,
   fixedHeight = false,
+  rotatable = false,
+  resizable = true,
   children,
 }: {
   id: string;
@@ -51,11 +60,13 @@ export function SurfaceObject({
   container?: boolean;
   drawing?: boolean;
   fixedHeight?: boolean;
+  rotatable?: boolean;
+  resizable?: boolean;
   children: ReactNode;
 }) {
   const actions = useContext(ObjectContext);
   const element = useRef<HTMLElement>(null),
-    handle = useRef<HTMLButtonElement | null>(null);
+    handle = useRef<HTMLElement | null>(null);
   const [visible, setVisible] = useState(false),
     [moving, setMoving] = useState(false);
   const latest = useRef({ frame, move: actions.move });
@@ -67,6 +78,7 @@ export function SurfaceObject({
     start: NodeLayout;
     next: NodeLayout;
     resize: boolean;
+    delegated: boolean;
     scale: number;
   } | null>(null);
   useEffect(() => {
@@ -98,6 +110,7 @@ export function SurfaceObject({
   const cancel = () => {
     const drag = pending.current;
     if (!drag) return;
+    if (drag.delegated) actions.board?.cancel();
     pending.current = null;
     setMoving(false);
     if (latest.current.frame) apply(latest.current.frame);
@@ -112,8 +125,9 @@ export function SurfaceObject({
     if (!actions.move) cancel();
   }, [actions.move]);
   const start = (
-    event: ReactPointerEvent<HTMLButtonElement>,
+    event: ReactPointerEvent<HTMLElement>,
     resize = false,
+    kind: BoardGesture = resize ? "resize" : "move",
   ) => {
     if (
       event.button !== 0 ||
@@ -124,7 +138,12 @@ export function SurfaceObject({
       return;
     event.preventDefault();
     event.stopPropagation();
-    actions.select(id);
+    if (event.shiftKey && !resize && kind === "move") {
+      actions.select(id, true);
+      return;
+    }
+    const delegated = !!actions.board?.start(id, kind, event);
+    if (!delegated) actions.select(id);
     event.currentTarget.focus({ preventScroll: true });
     event.currentTarget.setPointerCapture(event.pointerId);
     handle.current = event.currentTarget;
@@ -135,15 +154,20 @@ export function SurfaceObject({
       start: frame,
       next: frame,
       resize,
+      delegated,
       scale:
         element.current!.getBoundingClientRect().width / frame.width ||
         actions.scale,
     };
     setMoving(true);
   };
-  const move = (event: ReactPointerEvent<HTMLButtonElement>) => {
+  const move = (event: ReactPointerEvent<HTMLElement>) => {
     const drag = pending.current;
     if (!drag || drag.id !== event.pointerId) return;
+    if (drag.delegated) {
+      actions.board?.update(event);
+      return;
+    }
     const dx = (event.clientX - drag.x) / drag.scale,
       dy = (event.clientY - drag.y) / drag.scale;
     drag.next = drag.resize
@@ -169,9 +193,18 @@ export function SurfaceObject({
         };
     apply(drag.next);
   };
-  const finish = (event: ReactPointerEvent<HTMLButtonElement>) => {
+  const finish = (event: ReactPointerEvent<HTMLElement>) => {
     const drag = pending.current;
     if (!drag || drag.id !== event.pointerId) return;
+    if (drag.delegated) {
+      actions.board?.update(event);
+      actions.board?.finish();
+      pending.current = null;
+      setMoving(false);
+      if (event.currentTarget.hasPointerCapture(event.pointerId))
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      return;
+    }
     const actual = latest.current.frame;
     const unchanged =
       actual &&
@@ -207,6 +240,9 @@ export function SurfaceObject({
           top: frame.y,
           width: frame.width,
           minHeight: frame.height,
+          transform: frame.rotation
+            ? `rotate(${frame.rotation}deg)`
+            : undefined,
         }
       : { position: "relative", minWidth: 0 };
   if (container && !positioned && frame)
@@ -226,23 +262,28 @@ export function SurfaceObject({
     visible ||
     actions.revealAll ||
     actions.revealed.has(id) ||
-    actions.selected === id;
+    (actions.board?.ids.has(id) ?? actions.selected === id);
   return (
     <section
       ref={element}
       style={style}
-      className={`surface-object${region ? " is-region" : ""}${container ? " is-container" : ""}${drawing ? " is-drawing" : ""}${moving ? " is-moving" : ""}${actions.selected === id ? " is-selected" : ""}`}
+      className={`surface-object${region ? " is-region" : ""}${container ? " is-container" : ""}${drawing ? " is-drawing" : ""}${moving ? " is-moving" : ""}${(actions.board?.ids.has(id) ?? actions.selected === id) ? " is-selected" : ""}`}
       data-surface-id={id}
+      data-board-fixed-height={fixedHeight}
       data-surface-name={name}
       data-surface-content
       aria-label={name}
+      tabIndex={-1}
       onPointerDown={(event) => {
         if (
           (event.target as Element).closest("[data-surface-id]") ===
           event.currentTarget
         )
-          actions.select(id);
+          drawing && positioned && !actions.readOnly
+            ? start(event)
+            : actions.select(id, event.shiftKey);
       }}
+      {...(drawing ? handlers : {})}
       onKeyDownCapture={(event) => {
         if (event.key === "Escape" && pending.current) {
           event.preventDefault();
@@ -251,6 +292,23 @@ export function SurfaceObject({
         }
       }}
     >
+      {rotatable &&
+        positioned &&
+        !actions.readOnly &&
+        (actions.board?.ids.has(id) ?? actions.selected === id) && (
+          <button
+            type="button"
+            className="surface-object-rotate"
+            data-surface-ui
+            data-surface-handle
+            aria-label={`旋转 ${name}`}
+            title="拖动旋转；Shift 按 15° 对齐"
+            onPointerDown={(event) => start(event, false, "rotate")}
+            {...handlers}
+          >
+            ↻
+          </button>
+        )}
       {(!actions.readOnly || container) && (
         <div className="surface-object-header" data-surface-ui>
           {actions.readOnly ? (
@@ -335,40 +393,62 @@ export function SurfaceObject({
           />
         )}
       </div>
-      {!actions.readOnly && (positioned || fixedHeight) && (
-        <button
-          type="button"
-          className="surface-object-resize"
-          disabled={!actions.move}
-          data-surface-handle
-          aria-label={`调整 ${name} ${fixedHeight ? "尺寸" : "宽度"}`}
-          title="拖动调宽；左右方向键微调"
-          onPointerDown={(event) => start(event, true)}
-          {...handlers}
-          onKeyDown={(event) => {
-            if (
-              !frame ||
-              !actions.move ||
-              !["ArrowLeft", "ArrowRight"].includes(event.key)
-            )
-              return;
-            event.preventDefault();
-            event.stopPropagation();
-            actions.move(id, {
-              ...frame,
-              width: Math.max(
-                120,
-                Math.min(
-                  10000,
-                  frame.width + (event.key === "ArrowLeft" ? -20 : 20),
+      {resizable &&
+        !actions.readOnly &&
+        positioned &&
+        actions.board?.ids.has(id) &&
+        (fixedHeight
+          ? ["nw", "n", "ne", "e", "se", "s", "sw", "w"]
+          : ["e", "w"]
+        ).map((direction) => (
+          <button
+            key={direction}
+            type="button"
+            className={`board-resize-handle handle-${direction}`}
+            data-surface-ui
+            data-surface-handle
+            aria-label={`调整 ${name} ${direction}`}
+            onPointerDown={(event) => start(event, true, `resize-${direction}`)}
+            {...handlers}
+          />
+        ))}
+      {resizable &&
+        !actions.readOnly &&
+        (positioned || fixedHeight) &&
+        !actions.board?.ids.has(id) && (
+          <button
+            type="button"
+            className="surface-object-resize"
+            disabled={!actions.move}
+            data-surface-handle
+            aria-label={`调整 ${name} ${fixedHeight ? "尺寸" : "宽度"}`}
+            title="拖动调宽；左右方向键微调"
+            onPointerDown={(event) => start(event, true)}
+            {...handlers}
+            onKeyDown={(event) => {
+              if (
+                !frame ||
+                !actions.move ||
+                !["ArrowLeft", "ArrowRight"].includes(event.key)
+              )
+                return;
+              event.preventDefault();
+              event.stopPropagation();
+              actions.move(id, {
+                ...frame,
+                width: Math.max(
+                  120,
+                  Math.min(
+                    10000,
+                    frame.width + (event.key === "ArrowLeft" ? -20 : 20),
+                  ),
                 ),
-              ),
-            });
-          }}
-        >
-          ↔
-        </button>
-      )}
+              });
+            }}
+          >
+            ↔
+          </button>
+        )}
     </section>
   );
 }

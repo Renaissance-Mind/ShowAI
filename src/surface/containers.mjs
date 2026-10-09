@@ -1,3 +1,4 @@
+import { reconcileConnections } from "./connections.mjs";
 import {
   assignSurfaceIds,
   findSurfaceNode,
@@ -266,7 +267,7 @@ export function reconcileResource(document) {
       ],
     };
   }
-  return document;
+  return reconcileConnections(document);
 }
 export function setSurfaceViews(source, id, views) {
   const document = upgradeResource(source);

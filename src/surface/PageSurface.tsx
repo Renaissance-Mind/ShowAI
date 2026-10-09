@@ -1,3 +1,5 @@
+import type { ShowDocument } from "../types";
+import { useBoardInteraction } from "./useBoardInteraction";
 import { DrawingInput } from "./Drawing";
 import type { JSONContent } from "@tiptap/core";
 import type { DrawingTool } from "./types";
@@ -39,6 +41,11 @@ export interface SurfaceHandle {
 }
 interface Props {
   children: ReactNode;
+  boardDocument?: ShowDocument;
+  containerId?: string;
+  onTransform?: (frames: Record<string, NodeLayout>) => void;
+  onDuplicate?: (ids: string[]) => void;
+  onDeleteSelection?: (ids: string[]) => void;
   ref?: Ref<SurfaceHandle>;
   pageId: string;
   enabled?: boolean;
@@ -57,6 +64,7 @@ interface Props {
   selected?: string | null;
   onSelect?: (id: string | null) => void;
   onMove?: ObjectActions["move"];
+  onConnect?: ObjectActions["connect"];
   onRemove?: (id: string) => void;
   onInspect?: (id: string) => void;
   onViews?: (views: PageViews) => void;
@@ -65,6 +73,11 @@ interface Props {
 
 export default function PageSurface({
   children,
+  boardDocument,
+  containerId,
+  onTransform,
+  onDuplicate,
+  onDeleteSelection,
   ref,
   pageId,
   nodes,
@@ -75,6 +88,7 @@ export default function PageSurface({
   selected: controlledSelection,
   onSelect: selectControlled,
   onMove,
+  onConnect,
   onRemove,
   onInspect,
   onViews,
@@ -103,6 +117,39 @@ export default function PageSurface({
       onMove ? `showai.viewport.v3:${pageId}` : undefined,
       enabled && !locked,
     );
+  const board = useBoardInteraction({
+    document: boardDocument,
+    containerId,
+    world: worldRef,
+    camera,
+    onTransform: locked ? undefined : onTransform,
+    onSelect,
+    selected,
+  });
+  const spaceHeld = useRef(false);
+  const marquee = useRef<{
+    id: number;
+    start: { x: number; y: number };
+    next: NodeLayout;
+    element: HTMLDivElement;
+    additive: boolean;
+  } | null>(null);
+  const cancelMarquee = () => {
+    marquee.current?.element.remove();
+    marquee.current = null;
+  };
+  useEffect(() => {
+    const cancel = () => {
+      spaceHeld.current = false;
+      cancelMarquee();
+      board.cancel();
+    };
+    window.addEventListener("blur", cancel);
+    return () => {
+      window.removeEventListener("blur", cancel);
+      cancel();
+    };
+  }, []);
   const [revealAll, setRevealAll] = useState(false);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [viewName, setViewName] = useState("");
@@ -264,11 +311,13 @@ export default function PageSurface({
       value={{
         scale,
         selected,
-        select: onSelect,
+        select: onTransform ? board.select : onSelect,
+        board: onTransform && !locked ? board : undefined,
         inspect: onInspect,
         expand: onExpand,
         remove: onRemove,
         move: locked ? undefined : onMove,
+        connect: locked ? undefined : onConnect,
         readOnly: !onMove,
         revealAll: revealAll || printing,
         revealed,
@@ -284,13 +333,109 @@ export default function PageSurface({
         data-viewport-lock-scope={embedded ? "board" : undefined}
         data-viewport-locked={locked}
         data-board-id={pageId}
+        onPointerDownCapture={(event) => {
+          if (
+            !onTransform ||
+            locked ||
+            drawTool ||
+            event.button !== 0 ||
+            event.pointerType === "touch" ||
+            spaceHeld.current ||
+            (event.target as Element).closest(
+              "[data-surface-content], [data-surface-ui], [data-board-drawing-input]",
+            ) ||
+            (event.target as Element).closest(".page-surface") !==
+              event.currentTarget
+          )
+            return;
+          event.preventDefault();
+          event.stopPropagation();
+          event.currentTarget.focus({ preventScroll: true });
+          event.currentTarget.setPointerCapture(event.pointerId);
+          const start = controls.current.point(event.clientX, event.clientY),
+            element = document.createElement("div");
+          element.className = "board-marquee";
+          element.setAttribute("data-surface-ui", "");
+          worldRef.current!.append(element);
+          marquee.current = {
+            id: event.pointerId,
+            start,
+            next: { ...start, width: 0, height: 0 },
+            element,
+            additive: event.shiftKey,
+          };
+        }}
+        onPointerMoveCapture={(event) => {
+          const drag = marquee.current;
+          if (!drag || drag.id !== event.pointerId) return;
+          event.preventDefault();
+          event.stopPropagation();
+          const end = controls.current.point(event.clientX, event.clientY);
+          drag.next = {
+            x: Math.min(drag.start.x, end.x),
+            y: Math.min(drag.start.y, end.y),
+            width: Math.abs(end.x - drag.start.x),
+            height: Math.abs(end.y - drag.start.y),
+          };
+          Object.assign(drag.element.style, {
+            left: `${drag.next.x}px`,
+            top: `${drag.next.y}px`,
+            width: `${drag.next.width}px`,
+            height: `${drag.next.height}px`,
+          });
+        }}
+        onPointerUpCapture={(event) => {
+          const drag = marquee.current;
+          if (!drag || drag.id !== event.pointerId) return;
+          event.preventDefault();
+          event.stopPropagation();
+          board.marquee(drag.next, drag.additive);
+          cancelMarquee();
+          if (event.currentTarget.hasPointerCapture(event.pointerId))
+            event.currentTarget.releasePointerCapture(event.pointerId);
+        }}
+        onPointerCancelCapture={cancelMarquee}
+        onLostPointerCapture={cancelMarquee}
+        onKeyDownCapture={(event) => {
+          const target = event.target as Element;
+          if (target.closest("input,textarea,select,[contenteditable=true]"))
+            return;
+          if (target.closest(".page-surface") !== event.currentTarget) return;
+          if (event.code === "Space") spaceHeld.current = true;
+          if (event.key === "Escape") {
+            cancelMarquee();
+            board.cancel();
+          }
+          if (!onTransform || locked) return;
+          if (
+            (event.metaKey || event.ctrlKey) &&
+            event.key.toLowerCase() === "d" &&
+            board.ids.size
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            onDuplicate?.([...board.ids]);
+          }
+          if (
+            (event.key === "Delete" || event.key === "Backspace") &&
+            board.ids.size
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            onDeleteSelection?.([...board.ids]);
+            board.select(null);
+          }
+        }}
+        onKeyUpCapture={(event) => {
+          if (event.code === "Space") spaceHeld.current = false;
+        }}
         onPointerDown={(event) => {
           if (
             !(event.target as Element).closest(
               "[data-surface-content], [data-surface-ui]",
             )
           )
-            onSelect(null);
+            board.select(null);
         }}
         role="region"
         aria-label="白板"
@@ -305,7 +450,7 @@ export default function PageSurface({
               .closest("[contenteditable]")
               ?.getAttribute("contenteditable") !== "true"
           ) {
-            onSelect(null);
+            board.select(null);
             if (navigation.current) navigation.current.open = false;
           }
         }}
@@ -345,6 +490,33 @@ export default function PageSurface({
           role="group"
           aria-label="白板工具"
         >
+          {onTransform && board.ids.size > 1 && (
+            <span className="board-selection-count" role="status">
+              已选 {board.ids.size} 项
+            </span>
+          )}
+          {onTransform && board.ids.size > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => onDuplicate?.([...board.ids])}
+                aria-label="复制选中对象"
+                title="复制选中对象（⌘/Ctrl D）"
+              >
+                复制
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteSelection?.([...board.ids]);
+                  board.select(null);
+                }}
+                aria-label="删除选中对象"
+              >
+                <Trash2 size={15} />
+              </button>
+            </>
+          )}
           <details
             ref={navigation}
             className="surface-popover-anchor"

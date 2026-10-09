@@ -251,6 +251,17 @@ export function remapSurfaceIds(source, nextId = () => crypto.randomUUID()) {
     if (old) mapping.set(old, id);
     node.attrs = { ...node.attrs, id };
   });
+  visitNodes(document.content, (node) => {
+    if (!node.attrs?.bindings) return;
+    const bindings = {};
+    for (const key of ["start", "end"]) {
+      const binding = node.attrs.bindings[key],
+        targetId = binding && mapping.get(binding.targetId);
+      if (targetId) bindings[key] = { ...binding, targetId };
+    }
+    if (Object.keys(bindings).length) node.attrs.bindings = bindings;
+    else delete node.attrs.bindings;
+  });
   if (isSurface(document)) {
     document.layout = Object.fromEntries(
       Object.entries(document.layout ?? {}).map(([id, value]) => [

@@ -1,9 +1,47 @@
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { ObjectContext } from "./SurfaceObject";
+import {
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent,
+} from "react";
 import type { JSONContent } from "@tiptap/core";
 import type { DrawingTool, NodeLayout } from "./types";
 import type { Camera } from "./model";
 type Point = { x: number; y: number };
-export function Drawing({ node }: { node: JSONContent }) {
+export function Drawing({
+  node,
+  frame,
+}: {
+  node: JSONContent;
+  frame?: NodeLayout;
+}) {
+  const actions = useContext(ObjectContext);
+  const [preview, setPreview] = useState<{
+    key: "start" | "end";
+    point: Point;
+  } | null>(null);
+  const drag = useRef<{
+    key: "start" | "end";
+    x: number;
+    y: number;
+    scale: number;
+    original: Point;
+    next: Point;
+    source: JSONContent;
+    frame: NodeLayout;
+  } | null>(null);
+  const latest = useRef({ node, frame, connect: actions.connect });
+  latest.current = { node, frame, connect: actions.connect };
+  const cancel = () => {
+    drag.current = null;
+    setPreview(null);
+  };
+  useEffect(() => {
+    window.addEventListener("blur", cancel);
+    return () => window.removeEventListener("blur", cancel);
+  }, []);
   const { tool, points, color, strokeWidth, extent } = node.attrs! as {
     tool: DrawingTool;
     points: Point[];
@@ -11,8 +49,8 @@ export function Drawing({ node }: { node: JSONContent }) {
     strokeWidth: number;
     extent: [number, number];
   };
-  const first = points[0],
-    last = points.at(-1)!;
+  const first = preview?.key === "start" ? preview.point : points[0],
+    last = preview?.key === "end" ? preview.point : points.at(-1)!;
   let path = points
     .map((point, index) => `${index ? "L" : "M"} ${point.x} ${point.y}`)
     .join(" ");
@@ -22,39 +60,131 @@ export function Drawing({ node }: { node: JSONContent }) {
     path = `M ${first.x} ${first.y} L ${last.x} ${last.y} M ${last.x - head * Math.cos(angle - 0.5)} ${last.y - head * Math.sin(angle - 0.5)} L ${last.x} ${last.y} L ${last.x - head * Math.cos(angle + 0.5)} ${last.y - head * Math.sin(angle + 0.5)}`;
   }
   return (
-    <svg
-      className="board-drawing"
-      viewBox={`0 0 ${extent[0]} ${extent[1]}`}
-      preserveAspectRatio="none"
-      role="img"
-      aria-label={node.attrs!.name || tool}
-    >
-      <g
-        fill="none"
-        stroke={color}
-        strokeWidth={strokeWidth}
-        strokeLinecap="round"
-        strokeLinejoin="round"
+    <>
+      <svg
+        className="board-drawing"
+        viewBox={`0 0 ${extent[0]} ${extent[1]}`}
+        preserveAspectRatio="none"
+        role="img"
+        aria-label={node.attrs!.name || tool}
       >
-        {tool === "rectangle" ? (
-          <rect
-            x={Math.min(first.x, last.x)}
-            y={Math.min(first.y, last.y)}
-            width={Math.abs(last.x - first.x)}
-            height={Math.abs(last.y - first.y)}
-          />
-        ) : tool === "ellipse" ? (
-          <ellipse
-            cx={(first.x + last.x) / 2}
-            cy={(first.y + last.y) / 2}
-            rx={Math.abs(last.x - first.x) / 2}
-            ry={Math.abs(last.y - first.y) / 2}
-          />
-        ) : (
-          <path d={path} />
-        )}
-      </g>
-    </svg>
+        <g
+          fill="none"
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          {tool === "rectangle" ? (
+            <rect
+              x={Math.min(first.x, last.x)}
+              y={Math.min(first.y, last.y)}
+              width={Math.abs(last.x - first.x)}
+              height={Math.abs(last.y - first.y)}
+            />
+          ) : tool === "ellipse" ? (
+            <ellipse
+              cx={(first.x + last.x) / 2}
+              cy={(first.y + last.y) / 2}
+              rx={Math.abs(last.x - first.x) / 2}
+              ry={Math.abs(last.y - first.y) / 2}
+            />
+          ) : (
+            <path d={path} />
+          )}
+        </g>
+      </svg>
+      {tool === "arrow" &&
+        frame &&
+        !actions.readOnly &&
+        actions.connect &&
+        (actions.board?.ids.has(node.attrs!.id) ??
+          actions.selected === node.attrs!.id) &&
+        (["start", "end"] as const).map((key) => {
+          const endpoint = key === "start" ? first : last;
+          return (
+            <button
+              key={key}
+              type="button"
+              className="board-arrow-endpoint"
+              data-surface-ui
+              data-surface-handle
+              aria-label={key === "start" ? "调整箭头起点" : "调整箭头终点"}
+              style={{
+                left: `${(endpoint.x / extent[0]) * 100}%`,
+                top: `${(endpoint.y / extent[1]) * 100}%`,
+              }}
+              onPointerDown={(event) => {
+                if (event.button !== 0) return;
+                event.preventDefault();
+                event.stopPropagation();
+                event.currentTarget.focus({ preventScroll: true });
+                event.currentTarget.setPointerCapture(event.pointerId);
+                const rect = event.currentTarget
+                  .closest("[data-surface-id]")!
+                  .getBoundingClientRect();
+                drag.current = {
+                  key,
+                  x: event.clientX,
+                  y: event.clientY,
+                  scale: rect.width / frame.width,
+                  original: endpoint,
+                  next: endpoint,
+                  source: node,
+                  frame,
+                };
+              }}
+              onPointerMove={(event) => {
+                const d = drag.current;
+                if (!d) return;
+                event.stopPropagation();
+                d.next = {
+                  x:
+                    d.original.x +
+                    ((event.clientX - d.x) / d.scale / frame.width) * extent[0],
+                  y:
+                    d.original.y +
+                    ((event.clientY - d.y) /
+                      d.scale /
+                      (frame.height ?? extent[1])) *
+                      extent[1],
+                };
+                setPreview({ key, point: d.next });
+              }}
+              onPointerUp={(event) => {
+                const d = drag.current;
+                if (!d) return;
+                event.stopPropagation();
+                const valid =
+                  latest.current.node === d.source &&
+                  latest.current.frame === d.frame;
+                cancel();
+                if (event.currentTarget.hasPointerCapture(event.pointerId))
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                if (
+                  valid &&
+                  (d.next.x !== d.original.x || d.next.y !== d.original.y)
+                )
+                  latest.current.connect?.(node.attrs!.id, key, {
+                    x: frame.x + (d.next.x / extent[0]) * frame.width,
+                    y:
+                      frame.y +
+                      (d.next.y / extent[1]) * (frame.height ?? extent[1]),
+                  });
+              }}
+              onPointerCancel={cancel}
+              onLostPointerCapture={cancel}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  cancel();
+                }
+              }}
+            />
+          );
+        })}
+    </>
   );
 }
 export function DrawingInput({

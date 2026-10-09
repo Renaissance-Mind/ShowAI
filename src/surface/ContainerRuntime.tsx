@@ -1,3 +1,14 @@
+import {
+  transformObjects,
+  duplicateObjects,
+  removeObjects,
+} from "./board-commands";
+import {
+  reconcileConnections,
+  arrowEndpoints,
+  arrowFromEndpoints,
+  bindingAtPoint,
+} from "./connections.mjs";
 import type { EditorControls } from "./EditorControls";
 import { AdditionalComponentsProvider } from "../components/custom/CustomBlock";
 import type { CompiledComponent } from "../components/custom/types";
@@ -76,7 +87,7 @@ interface Runtime {
 }
 const Context = createContext<Runtime>(null!);
 export function ContainerRuntime({
-  document,
+  document: sourceDocument,
   onChange,
   renderContent,
   header,
@@ -111,6 +122,10 @@ export function ContainerRuntime({
   onActiveSurfaceChange?: (id: string) => void;
   onControlsChange?: (controls: EditorControls | null) => void;
 }) {
+  const document = useMemo(
+    () => reconcileConnections({ ...sourceDocument }),
+    [sourceDocument],
+  );
   const current = useRef(document);
   current.current = document;
   const [selected, select] = useState<string | null>(null),
@@ -820,10 +835,7 @@ function ContainerView({
       ? undefined
       : (nodeId, frame) =>
           runtime.commit(
-            reconcileSurface({
-              ...runtime.current.current,
-              layout: { ...runtime.current.current.layout, [nodeId]: frame },
-            }),
+            transformObjects(runtime.current.current, { [nodeId]: frame }),
           ),
     remove: readOnly
       ? undefined
@@ -895,6 +907,31 @@ function ContainerView({
       <div className="container-board-scene">
         <PageSurface
           embedded={!root}
+          boardDocument={runtime.document}
+          containerId={id}
+          onTransform={
+            readOnly
+              ? undefined
+              : (frames) =>
+                  runtime.commit(
+                    transformObjects(runtime.current.current, frames),
+                  )
+          }
+          onDuplicate={
+            readOnly
+              ? undefined
+              : (ids) => {
+                  const copied = duplicateObjects(runtime.current.current, ids);
+                  runtime.commit(copied.document);
+                  runtime.select(copied.ids[0] ?? null);
+                }
+          }
+          onDeleteSelection={
+            readOnly
+              ? undefined
+              : (ids) =>
+                  runtime.commit(removeObjects(runtime.current.current, ids))
+          }
           ref={viewport}
           pageId={`${runtime.document.id}:${id}:${root ? "expanded" : "embedded"}`}
           enabled
@@ -912,6 +949,47 @@ function ContainerView({
           onInspect={runtime.inspect}
           onExpand={runtime.expand}
           onMove={actions.move}
+          onConnect={
+            readOnly
+              ? undefined
+              : (nodeId, endpoint, point) => {
+                  const source = runtime.current.current,
+                    entry = findSurfaceNode(source, nodeId);
+                  if (!entry || !source.layout[nodeId]) return;
+                  const endpoints = arrowEndpoints(
+                    entry.node,
+                    source.layout[nodeId],
+                  );
+                  endpoints[endpoint === "start" ? 0 : 1] = point;
+                  const bindings = { ...entry.node.attrs?.bindings };
+                  const binding = bindingAtPoint(
+                    source,
+                    entry.parent!.attrs!.id,
+                    point,
+                    8,
+                  );
+                  if (binding) bindings[endpoint] = binding;
+                  else delete bindings[endpoint];
+                  const resolved = arrowFromEndpoints(
+                    entry.node,
+                    source.layout[nodeId],
+                    endpoints,
+                    bindings,
+                  );
+                  runtime.commit(
+                    editNode(
+                      {
+                        ...source,
+                        layout: { ...source.layout, [nodeId]: resolved.frame },
+                      },
+                      nodeId,
+                      (node) => {
+                        node.attrs = resolved.node.attrs;
+                      },
+                    ),
+                  );
+                }
+          }
           onRemove={actions.remove}
           onViews={
             readOnly
@@ -931,10 +1009,29 @@ function ContainerView({
           onDraw={
             readOnly
               ? undefined
-              : (drawing, frame) =>
+              : (drawing, frame) => {
+                  if (drawing.attrs?.tool === "arrow") {
+                    const endpoints = arrowEndpoints(drawing, frame);
+                    const start = bindingAtPoint(
+                      runtime.current.current,
+                      id,
+                      endpoints[0],
+                    );
+                    const end = bindingAtPoint(
+                      runtime.current.current,
+                      id,
+                      endpoints[1],
+                    );
+                    if (start || end)
+                      drawing.attrs.bindings = {
+                        ...(start ? { start } : {}),
+                        ...(end ? { end } : {}),
+                      };
+                  }
                   runtime.commit(
                     addNode(runtime.current.current, drawing, frame, id),
-                  )
+                  );
+                }
           }
           extraActions={
             <>

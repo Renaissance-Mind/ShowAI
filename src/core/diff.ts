@@ -1,3 +1,4 @@
+import { reconcileConnections } from "../surface/connections.mjs";
 import { insertComponent } from "../surface/component-insertion";
 import {
   isResource,
@@ -102,7 +103,11 @@ export function normalizeDocument(
     node.content?.forEach((child, index) => visit(child, `${path}/${index}`));
   };
   visit(document.content, "");
-  return document;
+  const contentBeforeConnections = document.content;
+  reconcileConnections(document);
+  return document.content === contentBeforeConnections
+    ? document
+    : validateDocument(document);
 }
 
 interface NodeEntry {

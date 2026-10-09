@@ -7,6 +7,7 @@ export interface NodeLayout {
   y: number;
   width: number;
   height?: number;
+  rotation?: number;
   heightMode?: "fixed" | "auto";
   mode?: LayoutMode;
   columns?: number;
