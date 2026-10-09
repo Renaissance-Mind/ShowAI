@@ -482,7 +482,7 @@
 .surface-object[data-board-drawing="true"] > .surface-object-content {
   pointer-events: none;
 }
-.surface-object[data-board-drawing="true"] > [data-surface-ui] {
+.surface-object[data-board-drawing="true"] [data-surface-ui] {
   pointer-events: auto;
 }
 .surface-object.is-drawing:focus-within {
