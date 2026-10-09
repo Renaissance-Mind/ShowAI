@@ -20,7 +20,7 @@ import {
   readViewportLock,
   writeViewportLock,
 } from "../blocks/ViewportLock";
-import { COMPONENT_DATA_MARKER, readCustomBlockData } from "./contract";
+import { injectComponentBootstrap, readCustomBlockData } from "./contract";
 import type { CompiledComponent } from "./types";
 import { InlineComponent } from "./InlineComponent";
 import { findComponent, indexComponents } from "./component-index";
@@ -223,16 +223,14 @@ function SandboxComponent({
     );
   };
   const html = useMemo(() => {
-    if (!component.html.includes(COMPONENT_DATA_MARKER))
-      throw new Error("组件缺少运行入口。");
     // A portable package is executable user content. Enforce the policy before
     // parsing any of its markup, even if its own document omits or changes CSP.
     const policy =
       "<!doctype html><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data:; media-src data:; font-src data:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'\">";
     return (
       policy +
-      component.html.replace(
-        COMPONENT_DATA_MARKER,
+      injectComponentBootstrap(
+        component.html,
         `<style>body{color:var(--text)}</style><script>(${installSandboxTheme.toString()})(${safeJson(channel)},${safeJson(initialTheme.current)},${safeJson(appearanceTokens())});</script><script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current })}</script>`,
       ) +
       `<script>(${installIconTooltips.toString()})(document);</script>`

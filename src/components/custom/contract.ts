@@ -10,6 +10,16 @@ export const COMPONENT_VERSION =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[a-zA-Z0-9.-]+)?$/;
 export const COMPONENT_DATA_MARKER = "<!--SHOWAI_COMPONENT_DATA-->";
 
+/** Insert serialized user content literally, including JavaScript replacement tokens. */
+export function injectComponentBootstrap(
+  html: string,
+  bootstrap: string,
+): string {
+  if (!html.includes(COMPONENT_DATA_MARKER))
+    throw new Error("组件缺少运行入口。");
+  return html.replace(COMPONENT_DATA_MARKER, () => bootstrap);
+}
+
 /** Browser-safe JSON validation; schema compilation stays in the component runtime. */
 export function assertJsonValue(value: unknown, depth = 0): void {
   if (depth > 40) throw new Error("Component data is nested too deeply.");
