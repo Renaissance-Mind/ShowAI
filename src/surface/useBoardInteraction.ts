@@ -1,3 +1,4 @@
+import type { SurfaceGeometryStore } from "./geometry-store";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { ShowDocument } from "../types";
 import type { NodeLayout } from "./types";
@@ -8,6 +9,7 @@ import {
   frameBounds,
   pointsBounds,
   snapFrame,
+  snapResizeFrame,
   intersectsFrame,
   type SnapIndex,
   type Point,
@@ -24,6 +26,8 @@ export interface BoardGestureInput {
 export interface BoardInteraction {
   ids: Set<string>;
   select: (id: string | null, additive?: boolean) => void;
+  selectAll: () => void;
+  nudge: (x: number, y: number) => void;
   start: (id: string, kind: BoardGesture, point: BoardGestureInput) => boolean;
   update: (point: BoardGestureInput) => void;
   finish: () => void;
@@ -31,6 +35,7 @@ export interface BoardInteraction {
 }
 export function useBoardInteraction({
   document,
+  geometry,
   containerId,
   world,
   camera,
@@ -39,6 +44,7 @@ export function useBoardInteraction({
   selected,
 }: {
   document?: ShowDocument;
+  geometry?: SurfaceGeometryStore;
   containerId?: string;
   world: RefObject<HTMLDivElement | null>;
   camera: RefObject<Camera>;
@@ -68,6 +74,7 @@ export function useBoardInteraction({
   currentIds.current = ids;
   const pending = useRef<{
     source: ShowDocument;
+    original: ShowDocument;
     id: string;
     kind: BoardGesture;
     start: Point;
@@ -107,7 +114,10 @@ export function useBoardInteraction({
     if (!drag) return;
     cancelAnimationFrame(drag.raf);
     drag.guides.remove();
-    const latest = current.current.document;
+    const latest =
+      current.current.document &&
+      (geometry?.materialize(current.current.document) ??
+        current.current.document);
     for (const [id, el] of drag.elements) {
       const frame = latest?.layout?.[id];
       if (frame) apply(el, frame);
@@ -119,6 +129,7 @@ export function useBoardInteraction({
       }
     }
     pending.current = null;
+    geometry?.endGesture();
   };
   useEffect(() => () => restore(), []);
   const paint = () => {
@@ -135,21 +146,41 @@ export function useBoardInteraction({
       dy = (input.clientY - drag.start.y) / drag.scale;
     const resizing = drag.kind.startsWith("resize");
     const resizeHandle = drag.kind === "resize" ? "se" : drag.kind.slice(7);
+    const selectedIds = Object.keys(drag.frames),
+      single = selectedIds.length === 1;
+    const singleNode = single
+      ? drag.arrows.get(selectedIds[0])!.node
+      : undefined;
+    const minimum = {
+      width: singleNode?.type === "drawing" ? 1 : 120,
+      height: singleNode?.type === "surface" ? 180 : 1,
+    };
+    const resizeOrigin = single ? drag.measured[selectedIds[0]] : drag.bounds;
+    const keepAspect =
+      input.shiftKey ||
+      (!single && selectedIds.some((id) => !!drag.frames[id].rotation));
     let candidate = resizing
       ? resizeFrame(
-          drag.bounds,
+          resizeOrigin,
           { x: dx, y: dy },
           resizeHandle,
-          undefined,
-          input.shiftKey,
+          minimum,
+          keepAspect,
         )
       : { ...drag.bounds, x: drag.bounds.x + dx, y: drag.bounds.y + dy };
     const snap =
-      input.altKey ||
-      drag.kind === "rotate" ||
-      (resizing && resizeHandle !== "se")
+      input.altKey || drag.kind === "rotate"
         ? { frame: candidate, guides: [] }
-        : snapFrame(candidate, drag.snap, drag.scale, resizing);
+        : resizing
+          ? snapResizeFrame(
+              candidate,
+              drag.snap,
+              drag.scale,
+              resizeHandle,
+              minimum,
+              keepAspect,
+            )
+          : snapFrame(candidate, drag.snap, drag.scale);
     candidate = snap.frame;
     drag.guides.replaceChildren();
     for (const guide of snap.guides) {
@@ -199,27 +230,9 @@ export function useBoardInteraction({
               }
             : {}),
         };
-        if (Object.keys(drag.frames).length === 1) {
-          const fixed =
-            drag.elements.get(id)?.dataset.boardFixedHeight === "true";
-          const delta =
-            resizeHandle === "se" && !frame.rotation
-              ? {
-                  x: candidate.width - drag.bounds.width,
-                  y: (candidate.height ?? 0) - (drag.bounds.height ?? 0),
-                }
-              : { x: dx, y: dy };
-          next = resizeFrame(
-            drag.measured[id],
-            delta,
-            resizeHandle,
-            {
-              width: drawing ? 1 : 120,
-              height: node.type === "surface" ? 180 : 1,
-            },
-            input.shiftKey,
-          );
-          if (!fixed) {
+        if (single) {
+          next = { ...candidate };
+          if (drag.elements.get(id)?.dataset.boardFixedHeight !== "true") {
             next.height = frame.height;
             next.y = frame.y;
           }
@@ -277,10 +290,39 @@ export function useBoardInteraction({
   return {
     ids,
     select,
+    selectAll() {
+      const source = current.current.document;
+      const parent =
+        source && indexSurfaceTree(source.content).get(containerId!)?.node;
+      const next = new Set<string>(
+        (parent?.content ?? [])
+          .map((node) => node.attrs?.id)
+          .filter((id) => !!source?.layout?.[id]),
+      );
+      setSelection(next);
+      currentIds.current = next;
+      onSelect([...next].at(-1) ?? null);
+    },
+    nudge(x, y) {
+      const source = current.current.document;
+      if (!source || !current.current.onTransform) return;
+      const frames: Record<string, NodeLayout> = {};
+      for (const id of currentIds.current) {
+        const frame = source.layout?.[id];
+        if (frame)
+          frames[id] = {
+            ...frame,
+            x: Math.max(-1000000, Math.min(1000000, frame.x + x)),
+            y: Math.max(-1000000, Math.min(1000000, frame.y + y)),
+          };
+      }
+      if (Object.keys(frames).length) current.current.onTransform(frames);
+    },
     start(id, kind, point) {
-      const source = current.current.document,
+      const original = current.current.document,
         root = world.current;
-      if (!source || !root || !current.current.onTransform) return false;
+      if (!original || !root || !current.current.onTransform) return false;
+      const source = geometry?.materialize(original) ?? original;
       restore();
       const index = indexSurfaceTree(source.content),
         parent = index.get(id)?.parent;
@@ -305,7 +347,11 @@ export function useBoardInteraction({
       for (const [nodeId, el] of elements) {
         const frame = source.layout?.[nodeId];
         if (!frame) continue;
-        measured[nodeId] = { ...frame, height: el.offsetHeight };
+        measured[nodeId] = {
+          ...frame,
+          contentSize: undefined,
+          height: el.offsetHeight,
+        };
         if (chosen.has(nodeId)) frames[nodeId] = frame;
       }
       if (!frames[id]) return false;
@@ -325,8 +371,10 @@ export function useBoardInteraction({
       guides.classList.add("board-snap-guides");
       guides.setAttribute("aria-hidden", "true");
       root.append(guides);
+      geometry?.beginGesture();
       pending.current = {
         source,
+        original,
         id,
         kind,
         start: { x: point.clientX, y: point.clientY },
@@ -371,9 +419,9 @@ export function useBoardInteraction({
       paint();
       const latest = current.current.document;
       const valid =
-        latest?.content === drag.source.content &&
+        latest?.content === drag.original.content &&
         Object.keys(drag.frames).every(
-          (id) => latest?.layout?.[id] === drag.frames[id],
+          (id) => latest?.layout?.[id] === drag.original.layout?.[id],
         );
       const changed = Object.keys(drag.frames).some(
         (id) =>

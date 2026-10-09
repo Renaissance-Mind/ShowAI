@@ -1,3 +1,4 @@
+import type { SurfaceGeometryStore } from "./geometry-store";
 import type { ShowDocument } from "../types";
 import { useBoardInteraction } from "./useBoardInteraction";
 import { DrawingInput } from "./Drawing";
@@ -42,6 +43,7 @@ export interface SurfaceHandle {
 interface Props {
   children: ReactNode;
   boardDocument?: ShowDocument;
+  geometry?: SurfaceGeometryStore;
   containerId?: string;
   onTransform?: (frames: Record<string, NodeLayout>) => void;
   onDuplicate?: (ids: string[]) => void;
@@ -74,6 +76,7 @@ interface Props {
 export default function PageSurface({
   children,
   boardDocument,
+  geometry,
   containerId,
   onTransform,
   onDuplicate,
@@ -118,6 +121,7 @@ export default function PageSurface({
       enabled && !locked,
     );
   const board = useBoardInteraction({
+    geometry,
     document: boardDocument,
     containerId,
     world: worldRef,
@@ -310,6 +314,7 @@ export default function PageSurface({
     <ObjectContext.Provider
       value={{
         scale,
+        geometry,
         selected,
         select: onTransform ? board.select : onSelect,
         board: onTransform && !locked ? board : undefined,
@@ -407,6 +412,38 @@ export default function PageSurface({
             board.cancel();
           }
           if (!onTransform || locked) return;
+          if (
+            (event.metaKey || event.ctrlKey) &&
+            event.key.toLowerCase() === "a"
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            board.selectAll();
+            return;
+          }
+          const step = (
+            {
+              ArrowLeft: [-1, 0],
+              ArrowRight: [1, 0],
+              ArrowUp: [0, -1],
+              ArrowDown: [0, 1],
+            } as Record<string, number[]>
+          )[event.key];
+          if (
+            step &&
+            board.ids.size &&
+            !target.closest(
+              "[data-resize-direction],.surface-object-rotate,input,select",
+            )
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            board.nudge(
+              step[0] * (event.shiftKey ? 10 : 1),
+              step[1] * (event.shiftKey ? 10 : 1),
+            );
+            return;
+          }
           if (
             (event.metaKey || event.ctrlKey) &&
             event.key.toLowerCase() === "d" &&

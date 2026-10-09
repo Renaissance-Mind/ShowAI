@@ -1,3 +1,4 @@
+import { SurfaceGeometryStore } from "./geometry-store";
 import { describe, expect, it } from "vitest";
 import { blankDocument } from "../core/catalog";
 import { applyOperations } from "../core/diff";
@@ -30,6 +31,7 @@ import {
   surfaceToScreen,
   createSnapIndex,
   snapFrame,
+  snapResizeFrame,
 } from "./geometry.mjs";
 
 const fixture = () => {
@@ -86,6 +88,62 @@ const ends = (doc: ReturnType<typeof fixture>) =>
   arrowEndpoints(arrow(doc), doc.layout.arrow);
 
 describe("native Board geometry", () => {
+  it("snaps each moving resize edge while retaining its opposite edge", () => {
+    const index = createSnapIndex([
+      { id: "target", frame: { x: 100, y: 100, width: 100, height: 100 } },
+    ]);
+    const minimum = { width: 1, height: 1 };
+    const west = snapResizeFrame(
+      { x: 103, y: 300, width: 297, height: 100 },
+      index,
+      1,
+      "w",
+      minimum,
+    ).frame;
+    expect(west.x).toBe(100);
+    expect(west.x + west.width).toBe(400);
+    const north = snapResizeFrame(
+      { x: 300, y: 103, width: 100, height: 297 },
+      index,
+      1,
+      "n",
+      minimum,
+    ).frame;
+    expect(north.y).toBe(100);
+    expect(north.y + north.height!).toBe(400);
+    expect(
+      snapResizeFrame(
+        { x: 0, y: 300, width: 197, height: 100 },
+        index,
+        1,
+        "e",
+        minimum,
+      ).frame.width,
+    ).toBe(200);
+    expect(
+      snapResizeFrame(
+        { x: 300, y: 0, width: 100, height: 197 },
+        index,
+        1,
+        "s",
+        minimum,
+      ).frame.height,
+    ).toBe(200);
+  });
+  it("snaps a rotated edge only along its permitted resize axis", () => {
+    const frame = { x: 0, y: 0, width: 100, height: 80, rotation: 90 };
+    const index = createSnapIndex([
+      { id: "target", frame: { x: 300, y: 92, width: 100, height: 100 } },
+    ]);
+    const fixed = frameAnchor(frame, { x: 0, y: 0.5 });
+    const result = snapResizeFrame(frame, index, 1, "e", {
+      width: 1,
+      height: 1,
+    });
+    expect(frameAnchor(result.frame, { x: 1, y: 0.5 }).y).toBeCloseTo(92);
+    expect(frameAnchor(result.frame, { x: 0, y: 0.5 }).y).toBeCloseTo(fixed.y);
+    expect(result.guides.map((g) => g.axis)).toEqual(["y"]);
+  });
   it("resizes rotated local axes while preserving the opposite anchor", () => {
     const frame = { x: 10, y: 20, width: 200, height: 100, rotation: 90 };
     const fixed = frameAnchor(frame, { x: 0, y: 0.5 });
@@ -160,6 +218,43 @@ describe("native Board geometry", () => {
 });
 
 describe("native connections and structural commands", () => {
+  it("Agent transforms match UI arrow-only and grouped binding rules", () => {
+    const before = fixture();
+    const alone = applyOperations(before, [
+      {
+        type: "surface.layout.set",
+        nodeId: "arrow",
+        layout: { y: before.layout.arrow.y + 30 },
+      },
+    ]) as typeof before;
+    expect(arrow(alone).attrs!.bindings).toBeUndefined();
+    expect(ends(alone)).toEqual([
+      { x: 400, y: 230 },
+      { x: 600, y: 230 },
+    ]);
+    const group = applyOperations(
+      before,
+      ["page", "image", "arrow"].map((nodeId) => ({
+        type: "surface.layout.set" as const,
+        nodeId,
+        layout: { y: before.layout[nodeId].y + 30 },
+      })),
+    ) as typeof before;
+    expect(arrow(group).attrs!.bindings.start.targetId).toBe("page");
+    expect(ends(group)).toEqual(ends(alone));
+    expect(
+      arrow(
+        applyOperations(before, [
+          {
+            type: "surface.layout.set",
+            nodeId: "arrow",
+            layout: { y: before.layout.arrow.y },
+          },
+        ]) as typeof before,
+      ).attrs!.bindings,
+    ).toBeTruthy();
+  });
+
   it("resolves anchors and updates a target move/resize in one transform", () => {
     const before = fixture();
     expect(ends(before)).toEqual([
@@ -297,5 +392,59 @@ describe("native connections and structural commands", () => {
     reconcileConnections(doc);
     expect(doc.content).toBe(content);
     expect(arrow(doc)).toBe(node);
+  });
+});
+
+describe("content-sized object geometry", () => {
+  it("notifies only the measured target's connections and batches gesture changes", () => {
+    const store = new SurfaceGeometryStore();
+    let a = 0,
+      b = 0;
+    const off = store.subscribe(["a"], () => a++);
+    store.subscribe(["b"], () => b++);
+    store.measure("a", 300, 200);
+    expect([a, b]).toEqual([1, 0]);
+    store.measure("a", 300, 200);
+    expect(a).toBe(1);
+    store.beginGesture();
+    store.measure("a", 300, 300);
+    store.measure("a", 300, 400);
+    expect(a).toBe(1);
+    store.endGesture();
+    expect(a).toBe(2);
+    off();
+    store.measure("a", 300, 500);
+    expect(a).toBe(2);
+  });
+  it("renders live height without mutating the source and materializes on a command", () => {
+    const doc = fixture();
+    doc.layout.page.heightMode = "auto";
+    const bytes = JSON.stringify(doc),
+      store = new SurfaceGeometryStore();
+    store.measure("page", 300, 540);
+    const resolved = store.resolveArrow(arrow(doc), doc.layout.arrow, doc);
+    expect(arrowEndpoints(resolved.node, resolved.frame)[0]).toEqual({
+      x: 400,
+      y: 370,
+    });
+    expect(JSON.stringify(doc)).toBe(bytes);
+    const saved = store.materialize(doc);
+    expect(saved.layout.page.height).toBe(200);
+    expect(saved.layout.page.contentSize).toEqual({ width: 300, height: 540 });
+    expect(ends(saved)[0]).toEqual({ x: 400, y: 370 });
+    expect(validateDocument(saved)).toBeTruthy();
+    expect(ends(removeObjects(saved, ["page"]))[0]).toEqual({ x: 400, y: 370 });
+  });
+  it("does not reuse dimensions measured for a different width", () => {
+    const doc = fixture();
+    doc.layout.page.heightMode = "auto";
+    const store = new SurfaceGeometryStore();
+    store.measure("page", 200, 540);
+    expect(store.materialize(doc).layout.page.contentSize).toBeUndefined();
+    const next = {
+      ...doc,
+      layout: { ...doc.layout, page: { ...doc.layout.page, width: 200 } },
+    };
+    expect(store.materialize(next).layout.page.contentSize?.height).toBe(540);
   });
 });

@@ -230,6 +230,11 @@ export function reconcileResource(document) {
       delete next.gap;
     }
     if (node.type !== "surface") delete next.heightMode;
+    if (
+      node.type === "drawing" ||
+      (node.type === "surface" && next.heightMode !== "auto")
+    )
+      delete next.contentSize;
     if (JSON.stringify(frame) !== JSON.stringify(next))
       document.layout[id] = next;
   }

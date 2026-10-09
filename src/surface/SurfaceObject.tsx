@@ -1,3 +1,5 @@
+import { resizeFrame, frameHeight } from "./geometry.mjs";
+import type { SurfaceGeometryStore } from "./geometry-store";
 import type { BoardInteraction, BoardGesture } from "./useBoardInteraction";
 import {
   createContext,
@@ -14,6 +16,7 @@ import type { NodeLayout } from "./types";
 
 export interface ObjectActions {
   scale: number;
+  geometry?: SurfaceGeometryStore;
   selected: string | null;
   board?: BoardInteraction;
   connect?: (
@@ -97,6 +100,21 @@ export function SurfaceObject({
     observer.observe(element.current!);
     return () => observer.disconnect();
   }, []);
+  useEffect(() => {
+    const node = element.current,
+      geometry = actions.geometry;
+    if (!node || !geometry || !visible || !positioned || drawing || fixedHeight)
+      return;
+    const measure = () =>
+      geometry.measure(id, node.offsetWidth, node.offsetHeight);
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    measure();
+    return () => {
+      observer.disconnect();
+      geometry.forget(id);
+    };
+  }, [actions.geometry, id, visible, positioned, drawing, fixedHeight]);
   const apply = (value: NodeLayout) => {
     const node = element.current!;
     node.style.left = `${value.x}px`;
@@ -396,7 +414,7 @@ export function SurfaceObject({
       {resizable &&
         !actions.readOnly &&
         positioned &&
-        actions.board?.ids.has(id) &&
+        actions.board &&
         (fixedHeight
           ? ["nw", "n", "ne", "e", "se", "s", "sw", "w"]
           : ["e", "w"]
@@ -407,7 +425,38 @@ export function SurfaceObject({
             className={`board-resize-handle handle-${direction}`}
             data-surface-ui
             data-surface-handle
+            data-resize-direction={direction}
             aria-label={`调整 ${name} ${direction}`}
+            onKeyDown={(event) => {
+              const step = (
+                {
+                  ArrowLeft: [-1, 0],
+                  ArrowRight: [1, 0],
+                  ArrowUp: [0, -1],
+                  ArrowDown: [0, 1],
+                } as Record<string, number[]>
+              )[event.key];
+              if (!step || !frame || !actions.move) return;
+              event.preventDefault();
+              event.stopPropagation();
+              const amount = event.shiftKey ? 10 : 1;
+              const measured = {
+                ...frame,
+                contentSize: undefined,
+                height: element.current?.offsetHeight ?? frameHeight(frame),
+              };
+              const next = resizeFrame(
+                measured,
+                { x: step[0] * amount, y: step[1] * amount },
+                direction,
+                { width: drawing ? 1 : 120, height: container ? 180 : 1 },
+              );
+              if (!fixedHeight) {
+                next.height = frame.height;
+                next.y = frame.y;
+              }
+              actions.move(id, next);
+            }}
             onPointerDown={(event) => start(event, true, `resize-${direction}`)}
             {...handlers}
           />
@@ -415,7 +464,7 @@ export function SurfaceObject({
       {resizable &&
         !actions.readOnly &&
         (positioned || fixedHeight) &&
-        !actions.board?.ids.has(id) && (
+        !actions.board && (
           <button
             type="button"
             className="surface-object-resize"

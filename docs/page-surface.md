@@ -118,6 +118,12 @@ G2 图表根据实际绘制配置决定是否显示阅读锁：开启框选筛�
 
 绘画节点使用 `drawing`，属性包含 `tool`、六位十六进制 `color`、`strokeWidth`、`extent: [width,height]` 和本地 `points: [{x,y}]`。其位置和显示尺寸仍在 `layout` 中，放大缩小父级不会改写笔画点位。
 
+`layout.rotation` 以角度表示绕对象中心的旋转，范围 −360 到 360。图像和非箭头绘画支持旋转；Page、Board 和交互组件保持正向。内容自动决定高度的对象可以带 `contentSize: {width,height}`，它记录上一次编辑时的实测尺寸，只在对应宽度下参与几何计算，不设置 CSS 高度。阅读器会重新测量当前内容并更新连接显示，纯阅读不会保存这些测量值。
+
+箭头可增加 `attrs.bindings.start` 和 `attrs.bindings.end`，各自为 `{targetId,anchor:{x,y}}`。锚点坐标为目标未旋转外框中的 0–1 比例；目标必须与箭头同级，且不能是另一条箭头。目标移动、改变尺寸或旋转时，连接端点随之更新。删除目标或把目标移入另一父容器会把对应端点保留为自由端点；撤销恢复原关系。移动整个 Page/Board 不改变它内部节点的局部坐标与绑定。
+
+单独对箭头执行 `surface.layout.set` 会解除绑定；同一批操作中同时变换箭头与目标时，保留它们之间的绑定。相同数值的更新不解除绑定。完整文档写入以显式提供的绑定为准，清除绑定才能把端点变为自由点。模板复制同步映射内部目标 ID；局部导出把指向未导出对象的端点保留为自由点。编辑中的一次拖动、尺寸调整或旋转对应一次撤销，尺寸测量回写归入同一次编辑。
+
 ## Agent、模板与导出
 
 `showai guide containers --json` 提供完整约定。新建可用 `pages create --kind page|board`。插入组件使用 `component.insert`，Page/Board 与普通组件共用同一入口；原生容器仍保存为 surface 节点。`surface.create` 在指定父级加入容器；`surface.wrap` 包裹当前根或某个容器；通用区块操作保留内容身份。视图操作通过 `surfaceId` 定位所有者，省略时作用于根。受控修改始终要求当前 base hash。

@@ -635,3 +635,12 @@
     display: none !important;
   }
 }
+.surface-object:not(.is-selected) > .board-resize-handle {
+  display: none;
+}
+.surface-object:not(.is-selected) > .board-resize-handle.handle-se,
+.surface-object[data-board-fixed-height="false"]:not(.is-selected)
+  > .board-resize-handle.handle-e {
+  display: block;
+  opacity: 0.5;
+}

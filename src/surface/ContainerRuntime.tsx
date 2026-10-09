@@ -1,3 +1,4 @@
+import { SurfaceGeometryStore } from "./geometry-store";
 import {
   transformObjects,
   duplicateObjects,
@@ -68,6 +69,7 @@ import PageIconDialog from "../studio/PageIconDialog";
 import { PageWidthSwitch } from "./PageWidthSwitch";
 
 interface Runtime {
+  geometry: SurfaceGeometryStore;
   document: ContainerDocument;
   current: RefObject<ContainerDocument>;
   commit: (next: ShowDocument) => void;
@@ -88,6 +90,7 @@ interface Runtime {
 const Context = createContext<Runtime>(null!);
 export function ContainerRuntime({
   document: sourceDocument,
+  geometry: suppliedGeometry,
   onChange,
   renderContent,
   header,
@@ -105,6 +108,7 @@ export function ContainerRuntime({
   onControlsChange,
 }: {
   document: ContainerDocument;
+  geometry?: SurfaceGeometryStore;
   onChange?: (next: ShowDocument) => void;
   renderContent: ContentRenderer;
   header?: ReactNode;
@@ -126,6 +130,11 @@ export function ContainerRuntime({
     () => reconcileConnections({ ...sourceDocument }),
     [sourceDocument],
   );
+  const localGeometry = useMemo(
+    () => new SurfaceGeometryStore(),
+    [document.id],
+  );
+  const geometry = suppliedGeometry ?? localGeometry;
   const current = useRef(document);
   current.current = document;
   const [selected, select] = useState<string | null>(null),
@@ -281,11 +290,19 @@ export function ContainerRuntime({
     }
   }, [revealInPlace]);
   const runtime: Runtime = {
+    geometry,
     document,
     current,
     commit: (next) => {
-      current.current = next as ContainerDocument;
-      onChange?.(next);
+      const measured = reconcileSurface(
+        {
+          ...geometry.materialize(next),
+          surfaceViews: { ...next.surfaceViews },
+        },
+        { clone: false },
+      );
+      current.current = measured as ContainerDocument;
+      onChange?.(measured);
     },
     readOnly: !onChange,
     printing,
@@ -665,11 +682,16 @@ export function ContainerRuntime({
                     onChange={(event) => {
                       const parentId = event.target.value;
                       runtime.commit(
-                        moveNode(current.current, inspecting!, parentId, {
-                          ...(frame ?? { width: 640 }),
-                          x: 0,
-                          y: 0,
-                        }),
+                        moveNode(
+                          runtime.geometry.materialize(current.current),
+                          inspecting!,
+                          parentId,
+                          {
+                            ...(frame ?? { width: 640 }),
+                            x: 0,
+                            y: 0,
+                          },
+                        ),
                       );
                       inspect(null);
                       focusSurface(parentId);
@@ -725,7 +747,12 @@ export function ContainerRuntime({
                 <button
                   type="button"
                   onClick={() => {
-                    runtime.commit(removeNode(current.current, inspecting!));
+                    runtime.commit(
+                      removeNode(
+                        runtime.geometry.materialize(current.current),
+                        inspecting!,
+                      ),
+                    );
                     inspect(null);
                     select(null);
                   }}
@@ -823,6 +850,7 @@ function ContainerView({
     runtime.requestReveal(null);
   }, [runtime.revealRequest]);
   const actions: ObjectActions = {
+    geometry: runtime.geometry,
     scale: 1,
     selected: runtime.selected,
     select: runtime.select,
@@ -835,12 +863,20 @@ function ContainerView({
       ? undefined
       : (nodeId, frame) =>
           runtime.commit(
-            transformObjects(runtime.current.current, { [nodeId]: frame }),
+            transformObjects(
+              runtime.geometry.materialize(runtime.current.current),
+              { [nodeId]: frame },
+            ),
           ),
     remove: readOnly
       ? undefined
       : (nodeId) => {
-          runtime.commit(removeNode(runtime.current.current, nodeId));
+          runtime.commit(
+            removeNode(
+              runtime.geometry.materialize(runtime.current.current),
+              nodeId,
+            ),
+          );
           runtime.select(null);
         },
   };
@@ -907,6 +943,7 @@ function ContainerView({
       <div className="container-board-scene">
         <PageSurface
           embedded={!root}
+          geometry={runtime.geometry}
           boardDocument={runtime.document}
           containerId={id}
           onTransform={
@@ -914,14 +951,20 @@ function ContainerView({
               ? undefined
               : (frames) =>
                   runtime.commit(
-                    transformObjects(runtime.current.current, frames),
+                    transformObjects(
+                      runtime.geometry.materialize(runtime.current.current),
+                      frames,
+                    ),
                   )
           }
           onDuplicate={
             readOnly
               ? undefined
               : (ids) => {
-                  const copied = duplicateObjects(runtime.current.current, ids);
+                  const copied = duplicateObjects(
+                    runtime.geometry.materialize(runtime.current.current),
+                    ids,
+                  );
                   runtime.commit(copied.document);
                   runtime.select(copied.ids[0] ?? null);
                 }
@@ -930,7 +973,12 @@ function ContainerView({
             readOnly
               ? undefined
               : (ids) =>
-                  runtime.commit(removeObjects(runtime.current.current, ids))
+                  runtime.commit(
+                    removeObjects(
+                      runtime.geometry.materialize(runtime.current.current),
+                      ids,
+                    ),
+                  )
           }
           ref={viewport}
           pageId={`${runtime.document.id}:${id}:${root ? "expanded" : "embedded"}`}
@@ -953,7 +1001,9 @@ function ContainerView({
             readOnly
               ? undefined
               : (nodeId, endpoint, point) => {
-                  const source = runtime.current.current,
+                  const source = runtime.geometry.materialize(
+                      runtime.current.current,
+                    ),
                     entry = findSurfaceNode(source, nodeId);
                   if (!entry || !source.layout[nodeId]) return;
                   const endpoints = arrowEndpoints(
@@ -1013,12 +1063,12 @@ function ContainerView({
                   if (drawing.attrs?.tool === "arrow") {
                     const endpoints = arrowEndpoints(drawing, frame);
                     const start = bindingAtPoint(
-                      runtime.current.current,
+                      runtime.geometry.materialize(runtime.current.current),
                       id,
                       endpoints[0],
                     );
                     const end = bindingAtPoint(
-                      runtime.current.current,
+                      runtime.geometry.materialize(runtime.current.current),
                       id,
                       endpoints[1],
                     );

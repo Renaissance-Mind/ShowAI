@@ -260,6 +260,7 @@ function validateResource(document) {
             "height",
             "heightMode",
             "rotation",
+            "contentSize",
             "mode",
             "columns",
             "gap",
@@ -267,6 +268,22 @@ function validateResource(document) {
       )
     )
       throw new Error("Unsupported layout field.");
+    if (frame.contentSize !== undefined) {
+      object(frame.contentSize, "layout.contentSize");
+      if (
+        node.type === "drawing" ||
+        (node.type === "surface" && frame.heightMode !== "auto")
+      )
+        throw new Error("Content size hints require content-sized objects.");
+      if (
+        Object.keys(frame.contentSize).some(
+          (key) => !["width", "height"].includes(key),
+        )
+      )
+        throw new Error("Unsupported content size hint.");
+      finite(frame.contentSize.width, 1, 10000, "contentSize.width");
+      finite(frame.contentSize.height, 1, 1000000, "contentSize.height");
+    }
     if (frame.rotation !== undefined) {
       const target = nodes.get(id);
       if (!objectCapabilities(target).rotate)

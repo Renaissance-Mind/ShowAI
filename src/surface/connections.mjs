@@ -136,3 +136,12 @@ export function bindingAtPoint(
   }
   return null;
 }
+
+/** A transform retains only relationships whose targets participate in the same command. */
+export function transformedBindings(bindings, transformedIds) {
+  return Object.fromEntries(
+    Object.entries(bindings ?? {}).filter(([, binding]) =>
+      transformedIds.has(binding.targetId),
+    ),
+  );
+}

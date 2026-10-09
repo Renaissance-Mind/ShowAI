@@ -6,6 +6,7 @@ import {
   arrowEndpoints,
   arrowFromEndpoints,
   type ArrowBindings,
+  transformedBindings,
 } from "./connections.mjs";
 import { reconcileSurface, visitNodes } from "./document.mjs";
 
@@ -28,11 +29,10 @@ export function transformObjects<T extends ShowDocument>(
       !node.attrs.bindings
     )
       continue;
-    const bindings: ArrowBindings = { ...node.attrs.bindings };
-    // Moving an arrow alone detaches it. A group transform keeps bindings to moved targets.
-    for (const key of ["start", "end"] as const)
-      if (bindings[key] && !frames[bindings[key]!.targetId])
-        delete bindings[key];
+    const bindings = transformedBindings(
+      node.attrs.bindings,
+      new Set(Object.keys(frames)),
+    );
     const endpoints = arrowEndpoints(node, frames[id]);
     const next = arrowFromEndpoints(node, frames[id], endpoints, bindings);
     replace.set(id, next.node);

@@ -1,4 +1,8 @@
-import { reconcileConnections } from "../surface/connections.mjs";
+import {
+  reconcileConnections,
+  transformedBindings,
+  indexSurfaceTree,
+} from "../surface/connections.mjs";
 import { insertComponent } from "../surface/component-insertion";
 import {
   isResource,
@@ -283,6 +287,7 @@ export function applyOperations(
       "Expected at most 1000 page operations.",
     );
   let draft = structuredClone(document);
+  const transformedIds = new Set<string>();
   const locate = (
     id: string,
   ): { parent: JSONContent; index: number; node: JSONContent } => {
@@ -405,10 +410,20 @@ export function applyOperations(
             "Only regions can define mode, columns and gap.",
           );
         fillSurfaceLayout(draft);
+        const beforeFrame = draft.layout![operation.nodeId];
         draft.layout![operation.nodeId] = {
-          ...(draft.layout![operation.nodeId] ?? { x: 0, y: 0, width: 360 }),
+          ...(beforeFrame ?? { x: 0, y: 0, width: 360 }),
           ...operation.layout,
         };
+        if (
+          ["x", "y", "width", "height", "rotation"].some(
+            (key) =>
+              Object.hasOwn(operation.layout, key) &&
+              operation.layout[key as keyof typeof operation.layout] !==
+                beforeFrame?.[key as keyof typeof beforeFrame],
+          )
+        )
+          transformedIds.add(operation.nodeId);
         break;
       }
       case "surface.view.save": {
@@ -600,8 +615,27 @@ export function applyOperations(
       "surface.wrap",
     ].includes(operation.type),
   );
-  return normalizeDocument(
-    isSurface(draft) && structural ? reconcileSurface(draft) : draft,
-    document,
-  );
+  if (isSurface(draft) && structural) draft = reconcileSurface(draft);
+  const index = indexSurfaceTree(draft.content);
+  const arrows = [...transformedIds]
+    .map((id) => index.get(id)?.node)
+    .filter(
+      (node) =>
+        node?.type === "drawing" &&
+        node.attrs?.tool === "arrow" &&
+        node.attrs.bindings,
+    );
+  if (arrows.length) {
+    // Reject invalid caller data before intentionally detaching valid relationships.
+    validateDocument(draft);
+    for (const node of arrows) {
+      const bindings = transformedBindings(
+        node!.attrs!.bindings,
+        transformedIds,
+      );
+      if (Object.keys(bindings).length) node!.attrs!.bindings = bindings;
+      else delete node!.attrs!.bindings;
+    }
+  }
+  return normalizeDocument(draft, document);
 }

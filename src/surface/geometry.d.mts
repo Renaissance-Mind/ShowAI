@@ -71,3 +71,13 @@ export function resizeFrame(
   minimum?: { width: number; height: number },
   keepAspect?: boolean,
 ): NodeLayout;
+
+export function frameHeight(frame: NodeLayout): number;
+export function snapResizeFrame(
+  frame: NodeLayout,
+  index: SnapIndex,
+  scale: number,
+  handle: string,
+  minimum: { width: number; height: number },
+  keepAspect?: boolean,
+): { frame: NodeLayout; guides: SnapGuide[] };

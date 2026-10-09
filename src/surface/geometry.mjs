@@ -8,8 +8,12 @@ export function rotatePoint(point, center, degrees = 0) {
     y = point.y - center.y;
   return { x: center.x + x * c - y * s, y: center.y + x * s + y * c };
 }
+export const frameHeight = (frame) =>
+  frame.contentSize && Math.abs(frame.contentSize.width - frame.width) <= 0.5
+    ? frame.contentSize.height
+    : (frame.height ?? 0);
 export function frameAnchor(frame, anchor) {
-  const height = frame.height ?? 0;
+  const height = frameHeight(frame);
   return rotatePoint(
     { x: frame.x + frame.width * anchor.x, y: frame.y + height * anchor.y },
     { x: frame.x + frame.width / 2, y: frame.y + height / 2 },
@@ -17,7 +21,7 @@ export function frameAnchor(frame, anchor) {
   );
 }
 export function normalizedAnchor(frame, point) {
-  const height = frame.height ?? 0;
+  const height = frameHeight(frame);
   const p = rotatePoint(
     point,
     { x: frame.x + frame.width / 2, y: frame.y + height / 2 },
@@ -54,7 +58,7 @@ export function frameBounds(frame) {
   return pointsBounds(frameCorners(frame));
 }
 export function hitFrame(frame, point, tolerance = 0) {
-  const height = frame.height ?? 0;
+  const height = frameHeight(frame);
   const p = rotatePoint(
     point,
     { x: frame.x + frame.width / 2, y: frame.y + height / 2 },
@@ -241,12 +245,21 @@ export function resizeFrame(
     minimum.height,
     Math.min(1000000, oldHeight + local.y * sy),
   );
-  if (keepAspect && sx && sy) {
-    const ratio = Math.max(
-      width / frame.width,
-      height / oldHeight,
-      minimum.width / frame.width,
-      minimum.height / oldHeight,
+  if (keepAspect && (sx || sy)) {
+    const desired =
+      sx && sy
+        ? Math.max(width / frame.width, height / oldHeight)
+        : sx
+          ? width / frame.width
+          : height / oldHeight;
+    const ratio = Math.min(
+      10000 / frame.width,
+      1000000 / oldHeight,
+      Math.max(
+        desired,
+        minimum.width / frame.width,
+        minimum.height / oldHeight,
+      ),
     );
     width = frame.width * ratio;
     height = oldHeight * ratio;
@@ -263,4 +276,113 @@ export function resizeFrame(
     width,
     height,
   };
+}
+
+/** Snap the moving handle; fixed edges never attract their own stationary coordinate. */
+export function snapResizeFrame(
+  frame,
+  index,
+  scale,
+  handle,
+  minimum,
+  keepAspect = false,
+) {
+  const horizontal = /[ew]/.test(handle),
+    vertical = /[ns]/.test(handle);
+  const anchor = {
+    x: handle.includes("w") ? 0 : handle.includes("e") ? 1 : 0.5,
+    y: handle.includes("n") ? 0 : handle.includes("s") ? 1 : 0.5,
+  };
+  const point = frameAnchor(frame, anchor),
+    tolerance = 6 / Math.max(0.01, scale);
+  const candidates = [];
+  for (const axis of ["x", "y"]) {
+    const entries = index[axis];
+    for (
+      let i = lowerBound(entries, point[axis] - tolerance);
+      i < entries.length && entries[i].value <= point[axis] + tolerance;
+      i++
+    )
+      candidates.push({
+        axis,
+        entry: entries[i],
+        distance: entries[i].value - point[axis],
+      });
+  }
+  let next = frame;
+  if (horizontal && vertical && !keepAspect) {
+    const delta = { x: 0, y: 0 };
+    for (const axis of ["x", "y"]) {
+      const best = candidates
+        .filter((c) => c.axis === axis)
+        .sort((a, b) => Math.abs(a.distance) - Math.abs(b.distance))[0];
+      if (best) delta[axis] = best.distance;
+    }
+    next = resizeFrame(frame, delta, handle, minimum);
+  } else {
+    const direction = keepAspect
+      ? rotatePoint(
+          {
+            x: horizontal ? frame.width * (anchor.x === 0 ? -1 : 1) : 0,
+            y: vertical ? (frame.height ?? 0) * (anchor.y === 0 ? -1 : 1) : 0,
+          },
+          { x: 0, y: 0 },
+          frame.rotation,
+        )
+      : rotatePoint(
+          horizontal
+            ? { x: anchor.x === 0 ? -1 : 1, y: 0 }
+            : { x: 0, y: anchor.y === 0 ? -1 : 1 },
+          { x: 0, y: 0 },
+          frame.rotation,
+        );
+    const viable = candidates
+      .filter((c) => Math.abs(direction[c.axis]) > 1e-8)
+      .map((c) => ({ ...c, amount: c.distance / direction[c.axis] }))
+      .filter(
+        (c) =>
+          Math.hypot(direction.x * c.amount, direction.y * c.amount) <=
+          tolerance,
+      )
+      .sort((a, b) => Math.abs(a.amount) - Math.abs(b.amount));
+    if (viable[0])
+      next = resizeFrame(
+        frame,
+        {
+          x: direction.x * viable[0].amount,
+          y: direction.y * viable[0].amount,
+        },
+        handle,
+        minimum,
+        keepAspect,
+      );
+  }
+  const actual = frameAnchor(next, anchor),
+    box = frameBounds(next),
+    guides = [];
+  for (const axis of ["x", "y"]) {
+    const matched = candidates.find(
+      (c) => c.axis === axis && Math.abs(c.entry.value - actual[axis]) < 0.001,
+    );
+    if (!matched) continue;
+    // An unchanged orthogonal coordinate is not a resize snap.
+    if (
+      Math.abs(actual[axis] - point[axis]) < 0.001 &&
+      !((axis === "x" && horizontal) || (axis === "y" && vertical))
+    )
+      continue;
+    const other = axis === "x" ? "y" : "x",
+      size = axis === "x" ? "height" : "width";
+    guides.push({
+      axis,
+      value: matched.entry.value,
+      from: Math.min(box[other], matched.entry.box[other]),
+      to: Math.max(
+        box[other] + box[size],
+        matched.entry.box[other] + matched.entry.box[size],
+      ),
+      kind: "align",
+    });
+  }
+  return { frame: next, guides };
 }

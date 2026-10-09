@@ -22,7 +22,7 @@ ShowAI 将内容组织成可阅读、可探索的页面。工作台与 Agent 使
 - `guide catalog`：摘要搜索，再按需查看用途、输入、示例或源码。
 - `guide export`：整页或局部组件的 HTML、会话展示和网站。
 
-新资源默认使用版本 3 的 Page 顺序页面，Board 是独立空间容器。两者可以原生嵌套与展开。内容树记录归属，layout 保存父级外框，surfaceViews 保存各层视图。绘画保存在 Board 内。模板保留容器类型，可用于新建或作为模块插入；局部导出包含所选子树及必要祖先。
+新资源默认使用版本 3 的 Page 顺序页面，Board 是独立空间容器。两者可以原生嵌套与展开。内容树记录归属，layout 保存父级外框，surfaceViews 保存各层视图。绘画保存在 Board 内。需要创建或修改图形连接、旋转和跨容器关系时，读取 [Board 对象编辑](references/board-authoring.md) 与当前运行时的 `guide containers`。模板保留容器类型，可用于新建或作为模块插入；局部导出包含所选子树及必要祖先。
 
 Page 和 Board 本身也是组件目录条目，可查询 guide、schema 和 examples，用 component.insert 插入。原生容器通过内容、布局和模板定制；保持 surface 结构，不要把它们编码成普通 widget。
 
@@ -45,7 +45,7 @@ showai export --project PROJECT --page PAGE --blocks PROGRESS_BLOCK_ID --format 
 showai export --project PROJECT --page PAGE --blocks CHART_BLOCK_ID,METRICS_BLOCK_ID --format html --out ./selected.html --json
 ```
 
-`--blocks` 使用页面中的组件实例或区域 ID；选中区域会包含其全部子内容。多个 ID 用逗号分隔，按页面顺序展示。自定义组件代码内部的子组件需要成为独立页面节点才能单独选择。局部导出默认使用 reading 布局并隐藏页面总标题，保留必要父容器，只打包相关组件；显式 `--presentation spatial` 可保留白板布局。旁边的 `.showai.json` 也是局部源文件；页面编辑继续读取完整页面、使用当前 hash、revision 和稳定节点 ID。
+`--blocks` 使用页面节点的 `attrs.id`，包括组件实例、原生 Page/Board、区域和绘画节点；选中容器会包含其全部子内容。多个 ID 用逗号分隔，按页面顺序展示。自定义组件代码内部的子组件需要成为独立页面节点才能单独选择。局部导出默认使用 reading 布局并隐藏页面总标题，保留必要父容器，只打包相关组件；显式 `--presentation spatial` 可保留白板布局。旁边的 `.showai.json` 也是局部源文件；页面编辑继续读取完整页面、使用当前 hash、revision 和稳定节点 ID。
 
 整页展示可省略 `--blocks`。inline 内容超过宿主上限时，用 `--blocks` 导出可独立理解的关键区域，或按阅读顺序分成少量片段，在对话里展示并附完整 HTML 链接；继续保留单份完整源页面。宿主无对话 HTML 能力时，独立展示交付文件，项目操作交付保存与同步结果；用户要求外部预览时再打开可用入口。交付前检查导出文件与主要交互；支持对话呈现时，最终回复必须包含本轮生成或更新的 inline 引用和简短说明。用户明确要求只保存、只交付文件或后台执行时，采用其指定方式。完整工作台管理界面不进入读者收到的页面。
 

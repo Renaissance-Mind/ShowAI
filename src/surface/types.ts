@@ -8,6 +8,8 @@ export interface NodeLayout {
   width: number;
   height?: number;
   rotation?: number;
+  /** Last measured content dimensions; never imposes a CSS height. */
+  contentSize?: { width: number; height: number };
   heightMode?: "fixed" | "auto";
   mode?: LayoutMode;
   columns?: number;

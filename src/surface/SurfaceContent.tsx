@@ -1,3 +1,4 @@
+import { useConnectionGeometry } from "./useConnectionGeometry";
 import { objectCapabilities } from "./geometry.mjs";
 import { Drawing } from "./Drawing";
 import { isResource, resourceNodes, surfaceKind } from "./containers.mjs";
@@ -87,7 +88,7 @@ function FreeLayout({
 
 const ContentNode = memo(
   function RenderNode({
-    node,
+    node: sourceNode,
     document,
     positioned,
     renderContent,
@@ -102,8 +103,12 @@ const ContentNode = memo(
     renderSurface?: (node: JSONContent) => ReactNode;
   }) {
     const actions = useContext(ObjectContext);
-    const id = node.attrs!.id,
-      frame = document.layout?.[id];
+    const { node, frame } = useConnectionGeometry(
+      sourceNode,
+      document,
+      actions.geometry,
+    );
+    const id = node.attrs!.id;
     let body: ReactNode;
     if (node.type === "surface") body = renderSurface?.(node);
     else if (node.type === "drawing")

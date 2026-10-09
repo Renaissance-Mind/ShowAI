@@ -36,3 +36,7 @@ export function bindingAtPoint(
   tolerance?: number,
   excluded?: Set<string>,
 ): EndpointBinding | null;
+export function transformedBindings(
+  bindings: ArrowBindings,
+  transformedIds: Set<string>,
+): ArrowBindings;

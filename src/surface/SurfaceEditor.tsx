@@ -1,3 +1,4 @@
+import { SurfaceGeometryStore } from "./geometry-store";
 import type { EditorControls } from "./EditorControls";
 import { insertComponentAtText } from "./component-insertion";
 import {
@@ -53,7 +54,16 @@ export default function SurfaceEditor({
     () => (isResource(input) ? input : upgradeResource(input)),
     [input],
   );
+  const geometry = useMemo(() => new SurfaceGeometryStore(), [document.id]);
   const current = useRef<ContainerDocument>(document);
+  const geometrySettlement = useRef({ generation: 0, first: 0, second: 0 });
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(geometrySettlement.current.first);
+      cancelAnimationFrame(geometrySettlement.current.second);
+    },
+    [],
+  );
   const history = useRef<{
     past: ContainerDocument[];
     future: ContainerDocument[];
@@ -76,56 +86,88 @@ export default function SurfaceEditor({
         current.current = document;
         return;
       }
+      geometrySettlement.current.generation++;
       history.current = { past: [], future: [], group: "", at: 0 };
       refresh((value) => value + 1);
     }
     current.current = document;
   }, [document]);
-  const commit = useCallback((value: ShowDocument, group = "") => {
-    const next = (
-      isReconciledSurface(value) ? value : reconcileSurface(value)
-    ) as ContainerDocument;
-    const before = current.current;
-    if (
-      next === before ||
-      (next.content === before.content &&
-        next.layout === before.layout &&
-        next.surfaceViews === before.surfaceViews &&
-        next.icon === before.icon)
-    )
-      return;
-    const stack = history.current,
-      now = Date.now();
-    if (!group || group !== stack.group || now - stack.at > 800) {
-      stack.past.push(before);
-      if (stack.past.length > 80) stack.past.shift();
-    }
-    stack.future = [];
-    stack.group = group;
-    stack.at = now;
-    current.current = next;
-    latestChange.current(next);
-    refresh((value) => value + 1);
-  }, []);
-  const travel = useCallback((redo = false) => {
-    const stack = history.current,
-      source = redo ? stack.future : stack.past,
-      target = redo ? stack.past : stack.future,
-      next = source.pop();
-    if (!next) return;
-    target.push(current.current);
-    stack.group = "";
-    const restored = {
-      ...current.current,
-      icon: next.icon,
-      content: next.content,
-      layout: next.layout,
-      surfaceViews: next.surfaceViews,
-    };
-    current.current = restored;
-    latestChange.current(restored);
-    refresh((value) => value + 1);
-  }, []);
+  const settleGeometry = useCallback(() => {
+    // Let content layout and ResizeObserver settle, then complete this same undo transaction.
+    // Opening/reading a document never schedules this authoring-only step.
+    const settlement = geometrySettlement.current,
+      generation = ++settlement.generation;
+    cancelAnimationFrame(settlement.first);
+    cancelAnimationFrame(settlement.second);
+    settlement.first = requestAnimationFrame(() => {
+      settlement.second = requestAnimationFrame(() => {
+        if (settlement.generation !== generation) return;
+        const before = current.current,
+          measured = geometry.materialize(before);
+        if (contentKey(before) === contentKey(measured)) return;
+        const settled = reconcileSurface(
+          { ...measured, surfaceViews: { ...measured.surfaceViews } },
+          { clone: false },
+        ) as ContainerDocument;
+        current.current = settled;
+        latestChange.current(settled);
+      });
+    });
+  }, [geometry]);
+  const commit = useCallback(
+    (value: ShowDocument, group = "") => {
+      const next = (
+        isReconciledSurface(value) ? value : reconcileSurface(value)
+      ) as ContainerDocument;
+      const before = current.current;
+      if (
+        next === before ||
+        (next.content === before.content &&
+          next.layout === before.layout &&
+          next.surfaceViews === before.surfaceViews &&
+          next.icon === before.icon)
+      )
+        return;
+      const stack = history.current,
+        now = Date.now();
+      if (!group || group !== stack.group || now - stack.at > 800) {
+        stack.past.push(before);
+        if (stack.past.length > 80) stack.past.shift();
+      }
+      stack.future = [];
+      stack.group = group;
+      stack.at = now;
+      current.current = next;
+      latestChange.current(next);
+      refresh((value) => value + 1);
+      settleGeometry();
+    },
+    [settleGeometry],
+  );
+  const travel = useCallback(
+    (redo = false) => {
+      geometrySettlement.current.generation++;
+      const stack = history.current,
+        source = redo ? stack.future : stack.past,
+        target = redo ? stack.past : stack.future,
+        next = source.pop();
+      if (!next) return;
+      target.push(current.current);
+      stack.group = "";
+      const restored = {
+        ...current.current,
+        icon: next.icon,
+        content: next.content,
+        layout: next.layout,
+        surfaceViews: next.surfaceViews,
+      };
+      current.current = restored;
+      latestChange.current(restored);
+      refresh((value) => value + 1);
+      settleGeometry();
+    },
+    [settleGeometry],
+  );
   const undo = useCallback(() => travel(), [travel]);
   const redo = useCallback(() => travel(true), [travel]);
   const change = useCallback((next: ShowDocument) => commit(next), [commit]);
@@ -291,6 +333,7 @@ export default function SurfaceEditor({
     >
       <ContainerRuntime
         document={document}
+        geometry={geometry}
         pageWidthModes
         onActiveSurfaceChange={onActiveSurfaceChange}
         onChange={readOnly ? undefined : change}
