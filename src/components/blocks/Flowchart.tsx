@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useId } from "react";
+import { useEffect, useMemo, useState, useId, useRef } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -7,6 +7,9 @@ import {
   MarkerType,
   useReactFlow,
   useNodesState,
+  useNodes,
+  useNodesInitialized,
+  useStore,
   type Node,
   type NodeProps,
   type Edge,
@@ -97,6 +100,95 @@ function DiagramCard({ data, selected }: NodeProps<DiagramNode>) {
   );
 }
 const nodeTypes = { showai: DiagramCard };
+
+function FitFlowViewport({ locked }: { locked: boolean }) {
+  const { fitView, viewportInitialized } = useReactFlow();
+  const initialized = useNodesInitialized();
+  const nodes = useNodes();
+  const domNode = useStore((state) => state.domNode);
+  const width = useStore((state) => state.width);
+  const height = useStore((state) => state.height);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  const previous = useRef<{
+    width: number;
+    height: number;
+    geometry: string;
+  } | null>(null);
+  const geometry = JSON.stringify(
+    nodes.map((node) => [
+      node.id,
+      node.position.x,
+      node.position.y,
+      node.measured?.width,
+      node.measured?.height,
+    ]),
+  );
+
+  useEffect(() => {
+    if (!domNode) return;
+    const measure = () => {
+      const next = { width: domNode.offsetWidth, height: domNode.offsetHeight };
+      setSize((current) =>
+        current.width === next.width && current.height === next.height
+          ? current
+          : next,
+      );
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(domNode);
+    measure();
+    return () => observer.disconnect();
+  }, [domNode]);
+
+  useEffect(() => {
+    // Hidden tabs have no usable dimensions. React Flow may keep its previous
+    // store size, so wait for both the real element and measured nodes.
+    if (
+      !domNode ||
+      !viewportInitialized ||
+      !initialized ||
+      !size.width ||
+      !size.height ||
+      width !== size.width ||
+      height !== size.height
+    )
+      return;
+    const next = { ...size, geometry },
+      last = previous.current;
+    if (
+      last &&
+      (!locked ||
+        (last.width === next.width &&
+          last.height === next.height &&
+          last.geometry === geometry))
+    ) {
+      previous.current = next;
+      return;
+    }
+    const frame = requestAnimationFrame(() => {
+      if (
+        domNode.offsetWidth !== size.width ||
+        domNode.offsetHeight !== size.height
+      )
+        return;
+      previous.current = next;
+      void fitView({ padding: 0.08 });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [
+    domNode,
+    fitView,
+    viewportInitialized,
+    initialized,
+    size,
+    width,
+    height,
+    geometry,
+    locked,
+  ]);
+  return null;
+}
+
 function NodeEditor({
   node,
   onSave,
@@ -251,8 +343,6 @@ function FlowCanvas({
         edges={edges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
-        fitView
-        fitViewOptions={{ padding: 0.08 }}
         minZoom={0.25}
         maxZoom={2}
         nodesDraggable={!readOnly && !locked}
@@ -268,10 +358,8 @@ function FlowCanvas({
         deleteKeyCode={null}
         onNodeClick={(_, node) => onSelect(node.id)}
         onNodeDragStop={(_, node) => onPosition(node.id, node.position)}
-        onInit={(instance) => {
-          instance.fitView({ padding: 0.08 });
-        }}
       >
+        <FitFlowViewport locked={locked} />
         <FlowControls locked={locked} />
       </ReactFlow>
       <details className="sf-node-picker">
