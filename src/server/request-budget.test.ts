@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { startSyncServer } from "./node";
+import { createHash } from "node:crypto";
 
 test("request credits enforce per-account and global daily budgets across two real instances", async () => {
   const root = await mkdtemp(join(tmpdir(), "showai-request-budget-"));
@@ -100,5 +101,68 @@ test("request credits enforce per-account and global daily budgets across two re
   } finally {
     for (const server of servers) await server.close();
     await rm(globalRoot, { recursive: true, force: true });
+  }
+});
+
+test("download byte budgets charge verified object sizes and reject without overcharging service credits", async () => {
+  const root = await mkdtemp(join(tmpdir(), "showai-read-budget-"));
+  const server = await startSyncServer({
+    home: root,
+    port: 0,
+    registrationMode: "open",
+    requestPolicy: { accountDailyReadBytes: 4, serviceDailyReadBytes: 6 },
+  });
+  try {
+    const users = [];
+    const bytes = Buffer.from("abc"),
+      digest = createHash("sha256").update(bytes).digest("hex");
+    for (let index = 0; index < 2; index++) {
+      const user = await (
+        await fetch(server.url + "/api/auth/register", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            name: "read-user-" + index,
+            password: "read-budget-password-2026",
+          }),
+        })
+      ).json();
+      const id = crypto.randomUUID();
+      const created = await fetch(server.url + "/api/projects", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${user.token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ id, name: "Byte budget" }),
+      });
+      await created.body?.cancel();
+      const put = await fetch(
+        server.url + `/api/projects/${id}/objects/${digest}`,
+        {
+          method: "PUT",
+          headers: { authorization: `Bearer ${user.token}` },
+          body: bytes,
+        },
+      );
+      expect(put.status).toBe(200);
+      await put.body?.cancel();
+      users.push({ token: user.token, id });
+    }
+    const download = async (user: { token: string; id: string }) => {
+      const response = await fetch(
+        server.url + `/api/projects/${user.id}/objects/${digest}`,
+        { headers: { authorization: `Bearer ${user.token}` } },
+      );
+      const body = await response.arrayBuffer();
+      return { status: response.status, bytes: body.byteLength };
+    };
+    expect(await download(users[0])).toEqual({ status: 200, bytes: 3 });
+    expect((await download(users[0])).status).toBe(429);
+    expect(await download(users[1])).toEqual({ status: 200, bytes: 3 });
+    expect((await download(users[1])).status).toBe(429);
+  } finally {
+    await server.close();
+    await rm(root, { recursive: true, force: true });
   }
 });

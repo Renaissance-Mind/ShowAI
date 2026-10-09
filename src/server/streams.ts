@@ -73,6 +73,8 @@ export function verifiedStream(
   expectedBytes?: number,
 ) {
   let length = 0;
+  let buffer = new Uint8Array(64 * 1024),
+    filled = 0;
   return body.pipeThrough(
     new TransformStream<Uint8Array, Uint8Array>({
       async transform(bytes, controller) {
@@ -83,10 +85,24 @@ export function verifiedStream(
             "TOO_LARGE",
             "Object exceeds its size limit.",
           );
-        await digest.update(bytes);
-        controller.enqueue(bytes);
+        for (let offset = 0; offset < bytes.byteLength;) {
+          const count = Math.min(
+            buffer.length - filled,
+            bytes.byteLength - offset,
+          );
+          buffer.set(bytes.subarray(offset, offset + count), filled);
+          filled += count;
+          offset += count;
+          if (filled === buffer.length) {
+            await digest.update(buffer);
+            controller.enqueue(buffer);
+            buffer = new Uint8Array(64 * 1024);
+            filled = 0;
+          }
+        }
       },
-      async flush() {
+      async flush(controller) {
+        if (filled) await digest.update(buffer.subarray(0, filled));
         if (
           (expectedBytes !== undefined && length !== expectedBytes) ||
           (await digest.finish()) !== expected
@@ -96,6 +112,7 @@ export function verifiedStream(
             "DIGEST_MISMATCH",
             "Content does not match its verified digest or length.",
           );
+        if (filled) controller.enqueue(buffer.subarray(0, filled));
       },
     }),
   );

@@ -874,6 +874,12 @@ export function createSyncServer(options: ServerOptions) {
           "MISSING_OBJECT",
           "Content object is missing.",
         );
+      try {
+        await requestBudgets.consumeRead(user.id, stored.bytes);
+      } catch (error) {
+        await stored.body.cancel();
+        throw error;
+      }
       return new Response(
         verifiedStream(
           stored.body,
@@ -1071,6 +1077,7 @@ export function createSyncServer(options: ServerOptions) {
           "MISSING_REVISION",
           "Project revision is missing.",
         );
+      await requestBudgets.consumeRead(user.id, entry.manifest_bytes);
       return json(await revisions.record(projectId, entry));
     }
     if (resource === "revisions" && method === "POST") {

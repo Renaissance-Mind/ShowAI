@@ -4,7 +4,7 @@
   "compatibility_date": "2026-10-08",
   "workers_dev": false,
   "preview_urls": false,
-  "limits": { "cpu_ms": 1000 },
+  "limits": { "cpu_ms": 5000 },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 0.1,

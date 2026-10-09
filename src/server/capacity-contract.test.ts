@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SQLiteMetadata, startSyncServer } from "./node";
@@ -190,92 +190,131 @@ test("large manifests live in object storage and bounded summary/legacy historie
   }
 });
 
-test("64 MiB objects stream through real HTTP with incremental integrity checks", async () => {
-  const home = await mkdtemp(join(tmpdir(), "showai-streaming-"));
-  const server = process.env.SHOWAI_SYNC_TEST_URL
-    ? undefined
-    : await startSyncServer({
-        home,
-        port: 0,
-        registrationKey: "capacity-key",
-        registrationLimit: 120,
-      });
-  const url = process.env.SHOWAI_SYNC_TEST_URL ?? server!.url;
-  try {
-    const registered = await fetch(url + "/api/auth/register", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        name: `stream-${crypto.randomUUID()}`,
-        password: "capacity-password-2026",
-        registrationKey: process.env.SHOWAI_SYNC_TEST_KEY ?? "capacity-key",
-      }),
-    });
-    expect(registered.status).toBe(201);
-    const token = (await registered.json()).token,
-      id = crypto.randomUUID(),
-      headers = { authorization: `Bearer ${token}` };
-    await fetch(url + "/api/projects", {
-      method: "POST",
-      headers: { ...headers, "content-type": "application/json" },
-      body: JSON.stringify({ id, name: "Streaming capacity" }),
-    });
-    const { createHash } = await import("node:crypto"),
-      block = new Uint8Array(64 * 1024).fill(42),
-      digest = createHash("sha256");
-    for (let index = 0; index < 1024; index++) digest.update(block);
-    const name = digest.digest("hex"),
-      path = `/api/projects/${id}/objects/${name}`;
-    const input = (count: number) => {
-      let left = count;
-      return new ReadableStream<Uint8Array>({
-        pull(controller) {
-          if (!left--) controller.close();
-          else controller.enqueue(block);
-        },
-      });
+test(
+  "64 MiB objects stream through real HTTP with incremental integrity checks",
+  async () => {
+    const started = Date.now(),
+      phases: { phase: string; elapsedMs: number; status?: number }[] = [];
+    const mark = async (phase: string, status?: number) => {
+      phases.push({ phase, elapsedMs: Date.now() - started, status });
+      if (process.env.SHOWAI_CAPACITY_RECEIPT)
+        await writeFile(
+          process.env.SHOWAI_CAPACITY_RECEIPT,
+          JSON.stringify(
+            { backend: process.env.SHOWAI_SYNC_TEST_URL ?? "node", phases },
+            null,
+            2,
+          ),
+        );
     };
-    const uploaded = await fetch(url + path, {
-      method: "PUT",
-      headers,
-      body: input(1024),
-      duplex: "half",
-    } as RequestInit);
-    expect(uploaded.status).toBe(200);
-    const downloaded = await fetch(url + path, { headers }),
-      verify = createHash("sha256");
-    let bytes = 0;
-    expect(downloaded.status).toBe(200);
-    for await (const chunk of downloaded.body as unknown as AsyncIterable<Uint8Array>) {
-      bytes += chunk.byteLength;
-      verify.update(chunk);
-    }
-    expect(bytes).toBe(64 * 1024 * 1024);
-    expect(verify.digest("hex")).toBe(name);
-    const wrong = await fetch(
-      url + `/api/projects/${id}/objects/${"a".repeat(64)}`,
-      { method: "PUT", headers, body: input(1), duplex: "half" } as RequestInit,
-    );
-    expect(wrong.status).toBe(400);
-    const large = await fetch(
-      url + `/api/projects/${id}/objects/${"b".repeat(64)}`,
-      {
+    const home = await mkdtemp(join(tmpdir(), "showai-streaming-"));
+    const server = process.env.SHOWAI_SYNC_TEST_URL
+      ? undefined
+      : await startSyncServer({
+          home,
+          port: 0,
+          registrationKey: "capacity-key",
+          registrationLimit: 120,
+        });
+    const url = process.env.SHOWAI_SYNC_TEST_URL ?? server!.url;
+    try {
+      const registered = await fetch(url + "/api/auth/register", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: `stream-${crypto.randomUUID()}`,
+          password: "capacity-password-2026",
+          registrationKey: process.env.SHOWAI_SYNC_TEST_KEY ?? "capacity-key",
+        }),
+      });
+      expect(registered.status).toBe(201);
+      const token = (await registered.json()).token,
+        id = crypto.randomUUID(),
+        headers = { authorization: `Bearer ${token}` };
+      await fetch(url + "/api/projects", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify({ id, name: "Streaming capacity" }),
+      });
+      const { createHash } = await import("node:crypto"),
+        block = new Uint8Array(64 * 1024).fill(42),
+        digest = createHash("sha256");
+      for (let index = 0; index < 1024; index++) digest.update(block);
+      const name = digest.digest("hex"),
+        path = `/api/projects/${id}/objects/${name}`;
+      const input = (count: number) => {
+        let left = count;
+        return new ReadableStream<Uint8Array>({
+          pull(controller) {
+            if (!left--) controller.close();
+            else controller.enqueue(block);
+          },
+        });
+      };
+      await mark("upload-start");
+      const uploaded = await fetch(url + path, {
         method: "PUT",
         headers,
-        body: input(1025),
+        body: input(1024),
         duplex: "half",
-      } as RequestInit,
-    );
-    expect(large.status).toBe(413);
-    expect(
-      (
-        await fetch(url + `/api/projects/${id}/objects/${"b".repeat(64)}`, {
+        signal: AbortSignal.timeout(
+          process.env.SHOWAI_SYNC_TEST_URL?.startsWith("https:")
+            ? 600_000
+            : 150_000,
+        ),
+      } as RequestInit);
+      await mark("upload-finished", uploaded.status);
+      expect(uploaded.status).toBe(200);
+      const downloaded = await fetch(url + path, { headers }),
+        verify = createHash("sha256");
+      let bytes = 0;
+      expect(downloaded.status).toBe(200);
+      for await (const chunk of downloaded.body as unknown as AsyncIterable<Uint8Array>) {
+        bytes += chunk.byteLength;
+        verify.update(chunk);
+      }
+      expect(bytes).toBe(64 * 1024 * 1024);
+      expect(verify.digest("hex")).toBe(name);
+      await mark("download-verified", downloaded.status);
+      const wrong = await fetch(
+        url + `/api/projects/${id}/objects/${"a".repeat(64)}`,
+        {
+          method: "PUT",
           headers,
-        })
-      ).status,
-    ).toBe(404);
-  } finally {
-    if (server) await server.close();
-    await rm(home, { recursive: true });
-  }
-}, 120_000);
+          body: input(1),
+          duplex: "half",
+        } as RequestInit,
+      );
+      expect(wrong.status).toBe(400);
+      await mark("wrong-digest-rejected", wrong.status);
+      const large = await fetch(
+        url + `/api/projects/${id}/objects/${"b".repeat(64)}`,
+        {
+          method: "PUT",
+          headers,
+          body: input(1025),
+          duplex: "half",
+          signal: AbortSignal.timeout(
+            process.env.SHOWAI_SYNC_TEST_URL?.startsWith("https:")
+              ? 600_000
+              : 150_000,
+          ),
+        } as RequestInit,
+      );
+      expect(large.status).toBe(413);
+      await mark("oversize-rejected", large.status);
+      expect(
+        (
+          await fetch(url + `/api/projects/${id}/objects/${"b".repeat(64)}`, {
+            headers,
+          })
+        ).status,
+      ).toBe(404);
+      await mark("complete");
+    } finally {
+      if (server) await server.close();
+      await rm(home, { recursive: true });
+    }
+  },
+  process.env.SHOWAI_SYNC_TEST_URL?.startsWith("https:") ? 1_200_000 : 120_000,
+);

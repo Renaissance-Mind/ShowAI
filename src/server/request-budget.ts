@@ -6,11 +6,15 @@ export interface RequestPolicy {
   serviceDailyRequests: number;
   accountDailyRequests: number;
   grantRequests: number;
+  accountDailyReadBytes: number;
+  serviceDailyReadBytes: number;
 }
 const defaults: RequestPolicy = {
   serviceDailyRequests: 2_000_000,
   accountDailyRequests: 50_000,
   grantRequests: 32,
+  accountDailyReadBytes: 2 * 1024 ** 3,
+  serviceDailyReadBytes: 64 * 1024 ** 3,
 };
 interface Credits {
   remaining: number;
@@ -41,6 +45,53 @@ export class RequestBudgets {
   }
   private async key(unit: string, day: number) {
     return hash(`showai-request-budget:${day}:${unit}`);
+  }
+  async consumeRead(account: string, bytes: number) {
+    if (!bytes) return;
+    let lease: string;
+    try {
+      lease = await this.maintenance.enterWrite("metadata");
+    } catch (error) {
+      if (error instanceof SyncError && error.code === "SERVER_READ_ONLY")
+        return;
+      throw error;
+    }
+    try {
+      const day = Math.floor(Date.now() / 86400_000),
+        expires = (day + 1) * 86400_000,
+        service = await this.key("read-service", day),
+        user = await this.key(`read-account:${account}`, day),
+        marker = await hash(crypto.randomUUID());
+      const result = await this.db.batch([
+        {
+          sql: "INSERT INTO request_limits(key,expires_at,hits) SELECT ?,?,1 WHERE COALESCE((SELECT hits FROM request_limits WHERE key=?),0)+?<=? AND COALESCE((SELECT hits FROM request_limits WHERE key=?),0)+?<=?",
+          values: [
+            marker,
+            expires,
+            service,
+            bytes,
+            this.policy.serviceDailyReadBytes,
+            user,
+            bytes,
+            this.policy.accountDailyReadBytes,
+          ],
+        },
+        ...[service, user].map((key) => ({
+          sql: "INSERT INTO request_limits(key,expires_at,hits) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM request_limits WHERE key=?) ON CONFLICT(key) DO UPDATE SET hits=hits+excluded.hits",
+          values: [key, expires, bytes, marker],
+        })),
+        { sql: "DELETE FROM request_limits WHERE key=?", values: [marker] },
+      ]);
+      if (!result[0].changes)
+        throw new SyncError(
+          429,
+          "READ_BUDGET_EXCEEDED",
+          "今日下载预算已达上限，本地内容保留。",
+          { retryAfter: Math.max(1, Math.ceil((expires - Date.now()) / 1000)) },
+        );
+    } finally {
+      await this.maintenance.leaveWrite(lease);
+    }
   }
   async consume(account?: string) {
     const now = Date.now(),
