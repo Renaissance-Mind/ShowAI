@@ -951,6 +951,8 @@ export default function DocumentEditor({
     if (sourcePosition !== null) {
       event.preventDefault();
       event.stopPropagation();
+      dragPosition.current = null;
+      setHover(null);
       const node = editor.state.doc.nodeAt(sourcePosition);
       if (!node) return;
       let destination = editor.state.doc.content.size;
@@ -980,8 +982,6 @@ export default function DocumentEditor({
         );
         editor.view.dispatch(transaction);
       }
-      dragPosition.current = null;
-      setHover(null);
       return;
     }
     const images = [...event.dataTransfer.files].filter((file) =>

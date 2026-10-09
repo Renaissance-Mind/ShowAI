@@ -10,6 +10,7 @@ import TaskItem from "@tiptap/extension-task-item";
 import Highlight from "@tiptap/extension-highlight";
 import TextAlign from "@tiptap/extension-text-align";
 import { TableAlignmentAttributes } from "./table-alignment";
+import { DropCursorCleanup } from "./drop-cursor-cleanup";
 import { CalloutView, ToggleView, WidgetView } from "./NodeViews";
 
 export const blockIdNodeTypes = [
@@ -200,6 +201,7 @@ export function createExtensions(
 ) {
   return [
     StableBlockIds.configure({ readOnly: options.readOnly ?? false }),
+    DropCursorCleanup,
     StarterKit.configure({
       trailingNode: options.trailingNode === false ? false : {},
       heading: { levels: [1, 2, 3] },
