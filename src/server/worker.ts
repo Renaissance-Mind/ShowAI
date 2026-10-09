@@ -214,8 +214,6 @@ export function workerObjects(env: WorkerEnvironment): ObjectStore {
         | undefined;
       const parts: { partNumber: number; etag: string }[] = [];
       try {
-        note("createMultipartUpload");
-        upload = await env.CONTENT.createMultipartUpload(temporary);
         while (true) {
           const { value, done } = await reader.read();
           if (done) break;
@@ -226,6 +224,16 @@ export function workerObjects(env: WorkerEnvironment): ObjectStore {
           }
           await digest.update(value);
           for (let offset = 0; offset < value.byteLength;) {
+            if (filled === partBytes) {
+              if (!upload) {
+                note("createMultipartUpload");
+                upload = await env.CONTENT.createMultipartUpload(temporary);
+              }
+              note("uploadPart", buffer.byteLength);
+              parts.push(await upload.uploadPart(parts.length + 1, buffer));
+              buffer = new Uint8Array(partBytes);
+              filled = 0;
+            }
             const count = Math.min(
               partBytes - filled,
               value.byteLength - offset,
@@ -233,12 +241,6 @@ export function workerObjects(env: WorkerEnvironment): ObjectStore {
             buffer.set(value.subarray(offset, offset + count), filled);
             filled += count;
             offset += count;
-            if (filled === partBytes) {
-              note("uploadPart", buffer.byteLength);
-              parts.push(await upload.uploadPart(parts.length + 1, buffer));
-              buffer = new Uint8Array(partBytes);
-              filled = 0;
-            }
           }
         }
         if ((await digest.finish()) !== expected)
@@ -247,6 +249,13 @@ export function workerObjects(env: WorkerEnvironment): ObjectStore {
             "DIGEST_MISMATCH",
             "Content does not match its digest.",
           );
+        if (!upload) {
+          // Small verified objects publish once. Larger bodies retain bounded
+          // multipart streaming without exposing an unverified final key.
+          note("put", filled);
+          await env.CONTENT.put(key, buffer.subarray(0, filled));
+          return length;
+        }
         if (filled || !parts.length) {
           note("uploadPart", filled);
           parts.push(
