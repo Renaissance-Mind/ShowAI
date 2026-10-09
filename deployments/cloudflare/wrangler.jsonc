@@ -13,6 +13,7 @@
   "vars": {
     "SHOWAI_SERVER_NAME": "ShowAI Cloud",
     "SHOWAI_SERVER_URL": "https://showai.renaissancemind.ai/cloud",
+    "SHOWAI_OBSERVE": "1",
   },
   "routes": [
     {
@@ -22,6 +23,18 @@
     {
       "pattern": "https://showai.renaissancemind.ai/cloud/*",
       "zone_name": "renaissancemind.ai",
+    },
+  ],
+  "ratelimits": [
+    {
+      "name": "REQUEST_RATE",
+      "namespace_id": "10231",
+      "simple": { "limit": 6000, "period": 60 },
+    },
+    {
+      "name": "SOURCE_RATE",
+      "namespace_id": "10232",
+      "simple": { "limit": 12000, "period": 60 },
     },
   ],
   "d1_databases": [
@@ -42,6 +55,7 @@
         "SHOWAI_SERVER_NAME": "ShowAI Cloud Staging",
         "SHOWAI_SERVER_URL": "https://showai.renaissancemind.ai/cloud-staging",
         "SHOWAI_REGISTRATION_LIMIT": "120",
+        "SHOWAI_OBSERVE": "1",
       },
       "routes": [
         {
@@ -51,6 +65,18 @@
         {
           "pattern": "https://showai.renaissancemind.ai/cloud-staging/*",
           "zone_name": "renaissancemind.ai",
+        },
+      ],
+      "ratelimits": [
+        {
+          "name": "REQUEST_RATE",
+          "namespace_id": "20231",
+          "simple": { "limit": 6000, "period": 60 },
+        },
+        {
+          "name": "SOURCE_RATE",
+          "namespace_id": "20232",
+          "simple": { "limit": 12000, "period": 60 },
         },
       ],
       "d1_databases": [

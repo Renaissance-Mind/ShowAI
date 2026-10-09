@@ -111,6 +111,7 @@ export async function operationsRequest(
   credential: string,
   path: string,
   method = "GET",
+  input?: unknown,
 ) {
   if (!hexadecimal.test(credential))
     throw new Error("Invalid operations key file.");
@@ -118,7 +119,11 @@ export async function operationsRequest(
   for (let attempt = 0; ; attempt++) {
     const response = await fetch(url, {
       method,
-      headers: { authorization: `Bearer ${credential}` },
+      headers: {
+        authorization: `Bearer ${credential}`,
+        ...(input === undefined ? {} : { "content-type": "application/json" }),
+      },
+      body: input === undefined ? undefined : JSON.stringify(input),
       signal: AbortSignal.timeout(120_000),
       redirect: "error",
     });
@@ -154,6 +159,7 @@ export async function exportServerBackup(input: {
     mode: 0o700,
   });
   let progress: {
+    schemaVersion?: number;
     serverId: string;
     frozen: MaintenanceState;
     tables: Record<string, FileReceipt>;
@@ -175,9 +181,24 @@ export async function exportServerBackup(input: {
     const frozen = (await (
       await request("/api/ops/freeze", "POST")
     ).json()) as MaintenanceState;
-    progress = { serverId: info.serverId, frozen, tables: {} };
+    progress = {
+      schemaVersion: info.schemaVersion ?? 6,
+      serverId: info.serverId,
+      frozen,
+      tables: {},
+    };
     await atomicJson(join(destination, "progress", "state.json"), progress);
   }
+  const currentInfo = await (
+    await fetch(serverEndpoint(operatorUrl(input.url), "/api/info"), {
+      signal: AbortSignal.timeout(30_000),
+      redirect: "error",
+    })
+  ).json();
+  if ((currentInfo.schemaVersion ?? 6) !== (progress.schemaVersion ?? 6))
+    throw new Error(
+      "The source metadata schema changed; create a new backup generation.",
+    );
   const deadline = Date.now() + 180_000;
   while (true) {
     const state = (await (
@@ -352,7 +373,7 @@ export async function exportServerBackup(input: {
     throw new Error("The source changed during backup.");
   const descriptor: BackupDescriptor = {
     format: "showai-server-backup-v1",
-    schemaVersion,
+    schemaVersion: progress.schemaVersion ?? 6,
     serverId: progress.serverId,
     frozen: final,
     tables: progress.tables,
@@ -375,7 +396,7 @@ export async function readBackupDescriptor(
   ) as BackupDescriptor;
   if (
     descriptor.format !== "showai-server-backup-v1" ||
-    descriptor.schemaVersion !== schemaVersion ||
+    ![6, schemaVersion].includes(descriptor.schemaVersion) ||
     descriptor.frozen?.state !== "frozen" ||
     descriptor.frozen.activeWrites !== 0
   )
@@ -409,13 +430,16 @@ export async function loadBackupMetadata(
   db: SQLiteMetadata,
   descriptor: BackupDescriptor,
 ) {
-  await prepareMetadata(db, true);
+  await prepareMetadata(db, true, descriptor.schemaVersion);
   await db.batch(
     [...backupTables]
       .reverse()
+      .filter((table) => table !== "server_operations")
       .map((table) => ({ sql: `DELETE FROM ${table}` })),
   );
   for (const table of backupTables) {
+    if (table === "server_operations")
+      await db.run("DELETE FROM server_operations");
     const columns = (
       await db.all<{ name: string }>(`PRAGMA table_info(${table})`)
     ).map((item) => item.name);
@@ -618,7 +642,13 @@ async function verifyContent(
   await db.run("DROP TABLE backup_inventory");
   return {
     serverId: descriptor.serverId,
-    schemaVersion,
+    schemaVersion: Number(
+      (
+        await db.all<{ value: string }>(
+          "SELECT value FROM settings WHERE key='schema_version'",
+        )
+      )[0].value,
+    ),
     objects,
     bytes,
     revisions: history,
@@ -665,6 +695,7 @@ export async function restoreServerBackup(input: {
     store = new DiskObjects(join(staging, "objects"));
   try {
     await loadBackupMetadata(input.backup, db, descriptor);
+    await prepareMetadata(db, true);
     for await (const entry of jsonLines(
       join(input.backup, "inventory.ndjson"),
     )) {

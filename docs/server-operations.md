@@ -26,7 +26,7 @@ An interrupted export can reuse the original generation and verified files:
 node scripts/server-backup.mjs export --url https://showai.renaissancemind.ai/cloud-staging --key-file /private/staging-operations.key --destination /private/backups/showai-staging-2026-10-09 --resume
 ```
 
-Resume fails when the source was reopened or the frozen generation changed. Active admission records are never silently expired. If export still reports draining after its deadline, inspect the isolated runtime and retained records before recovering it; a timeout alone does not prove that an object write stopped. Public request bodies have a two-minute transfer deadline. Login and other metadata-only writes remain fenced by the database rather than consuming object-write admission slots.
+Resume fails when the source was reopened, its schema changed or the frozen generation changed. Active admission records are never silently expired. If export still reports draining after its deadline, inspect the isolated runtime and retained records before recovering it; a timeout alone does not prove that an object write stopped. Public request bodies have a two-minute transfer deadline. Object writes have 64 admission slots and metadata mutations have 256; both drain before exclusive maintenance. Read-only budget credit grants also participate in the metadata fence. Version 6 backups remain verifiable and restore with an explicit offline upgrade to the current schema.
 
 ## Restore and switch
 
@@ -57,4 +57,30 @@ A dry-run can report old, unreferenced objects from a verified frozen backup:
 node scripts/server-backup.mjs plan-cleanup --backup /private/backups/showai-staging-2026-10-09 --destination /private/backups/cleanup-plan.ndjson --retention-days 30
 ```
 
-The report identifies its backup digest and frozen generation. It protects files from every revision, including unpublished and archived history, all manifest pointers, quota reservations and upload tasks/parts. Objects without a usable age remain protected; the minimum retention is 30 days. The command deletes zero objects. Live deletion and verified reconciliation of interrupted quota reservations require a separate controlled maintenance operation; they are not implemented by this reporting command.
+The report identifies its backup digest and frozen generation. It protects files from every revision, including unpublished and archived history, all manifest pointers, quota reservations and upload tasks/parts. Objects without a usable age remain protected; the minimum retention is 30 days. The reporting command deletes zero objects.
+
+Live cleanup defaults to another dry-run. Add `--apply` to remove eligible object/manifest candidates, at most twenty per operation:
+
+```sh
+node scripts/server-backup.mjs cleanup --url https://target.example/cloud --key-file /private/target-operations.key --backup /private/backups/showai-staging-2026-10-09 --plan /private/backups/cleanup-plan.ndjson --epoch CURRENT_FROZEN_GENERATION
+```
+
+The server independently checks age, exact recorded metadata, complete digest and live references. All project history is inspected, including unpublished versions. Online proof is bounded to 100 revisions and 16 MiB of total manifests per project; candidates exceeding that budget remain protected. Upload task parts remain outside this deletion command. Applying any maintenance operation rotates the frozen generation, so a previous plan cannot be replayed after changes. Regenerate the backup/report for subsequent batches. Ordinary metadata requests and competing exports cannot enter an exclusive maintenance operation.
+
+## Interrupted upload reconciliation
+
+After the source is frozen and admitted writes have drained, inspect retained reservations:
+
+```sh
+node scripts/server-backup.mjs reconcile --url https://target.example/cloud --key-file /private/target-operations.key --epoch CURRENT_FROZEN_GENERATION
+```
+
+Use `--reservation ID` to select up to ten records and `--apply` to perform verified recovery. Complete verified objects become ready without replacing their original uploader. Complete manifests must pass identity, parent, file, reader and package closure checks; they become retained unpublished revisions and do not advance a project head. Incomplete resumable tasks retain their parts and quota reservation. Missing objects without a task release their storage reservation while retaining the attempted daily upload charge. Corrupt or changed data is retained for investigation. The result includes the new frozen generation and `headsChanged: 0`; query `state` after a failed operation before proceeding.
+
+## Request budgets and observations
+
+`SHOWAI_REQUEST_POLICY` configures `serviceDailyRequests` (default 2,000,000), `accountDailyRequests` (50,000) and `grantRequests` (32, maximum 64). Credits are reserved atomically in the shared rate-counter table and consumed locally; unused credits are conservatively charged. The day resets at UTC midnight. Multiple instances cannot exceed the configured reserved budget. `/api/ops/budget` reports current service credits and policy to infrastructure operators. Frozen reads do not mutate exported counters.
+
+Cloudflare additionally limits a credential to 6,000 requests/minute and a source to 12,000 requests/minute before database access. Production and staging have separate namespaces. The source ceiling accommodates shared networks; credential quotas and durable daily budgets provide the more specific controls. These [rate-limit bindings](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) are per Cloudflare location and do not replace the shared daily budget. Rejected incoming Worker invocations can still be billed; application budgets restrict downstream work rather than imposing a provider invoice cap.
+
+Set `SHOWAI_OBSERVE=1` for secret-free console observations: D1 rows read/written and duration, R2 operation attempts and bytes, and request category/status/header latency. The observations omit SQL text, parameters, account identities, project paths, credentials and request bodies. R2 attempts are diagnostic counts rather than an invoice measurement. Native Worker CPU and wall-time and provider usage must be collected during remote load acceptance. Do not create notification integrations without the user's authorization.

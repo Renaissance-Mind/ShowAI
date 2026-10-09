@@ -20,6 +20,8 @@ import { verifiedStream, deadlineBody } from "./streams";
 import { Quotas, type StoragePolicy } from "./quotas";
 import { Uploads } from "./uploads";
 import { ServerMaintenance } from "./maintenance";
+import { schemaVersion } from "./migrations";
+import { RequestBudgets, type RequestPolicy } from "./request-budget";
 import {
   createInvitation,
   acceptInvitation,
@@ -52,6 +54,7 @@ import {
 } from "../sync/server-url";
 
 export interface ServerOptions extends AccountOptions {
+  requestPolicy?: Partial<RequestPolicy>;
   operationsKey?: string;
   metadata: MetadataStore;
   objects: ObjectStore;
@@ -139,6 +142,12 @@ export function createSyncServer(options: ServerOptions) {
   const quotas = new Quotas(db, options.storagePolicy);
   const uploads = new Uploads(db, objects, quotas);
   const maintenance = new ServerMaintenance(db, objects, options.operationsKey);
+  const requestBudgets = new RequestBudgets(
+    db,
+    maintenance,
+    options.requestPolicy,
+  );
+  maintenance.budgetSummary = () => requestBudgets.usage();
   let activeManifests = 0;
   const manifestWaiters: (() => void)[] = [];
   let initialization: Promise<string> | undefined;
@@ -315,6 +324,7 @@ export function createSyncServer(options: ServerOptions) {
     if (path === "/health" || path === "/api/info")
       return json({
         protocol: syncProtocol,
+        schemaVersion,
         serverId: await serverId(),
         name: options.name ?? "ShowAI Server",
         roles: ["admin", "editor", "viewer"],
@@ -332,6 +342,7 @@ export function createSyncServer(options: ServerOptions) {
           "batch-heads-v1",
         ],
       });
+    if (path.startsWith("/api/")) await requestBudgets.consume();
     if (path === "/api/auth/register" && method === "POST") {
       await publicLimits(
         db,
@@ -398,6 +409,7 @@ export function createSyncServer(options: ServerOptions) {
       });
     }
     const user = await authenticate(request);
+    await requestBudgets.consume(user.id);
     if (path === "/api/auth/password" && method === "POST") {
       await publicLimits(db, "password", source, user.id);
       const changed = await changePassword(db, user, await body(request));
@@ -1287,6 +1299,8 @@ export function createSyncServer(options: ServerOptions) {
         );
       const requestPath = new URL(request.url).pathname;
       const heavy =
+        requestPath.endsWith("/api/ops/reconcile") ||
+        requestPath.endsWith("/api/ops/cleanup") ||
         requestPath.endsWith("/api/ops/export/metadata") ||
         /\/revisions(?:\/|$)/.test(requestPath) ||
         (request.method === "PATCH" &&
@@ -1334,7 +1348,13 @@ export function createSyncServer(options: ServerOptions) {
             )) ||
           (request.method === "PATCH" &&
             /^\/api\/projects\/[^/]+$/.test(logicalPath));
-        if (writesObjects) writeLease = await maintenance.enterWrite();
+        const writesPreviewLimits =
+          request.method === "GET" &&
+          /^\/api\/invites\/[a-f0-9]{64}$/.test(logicalPath);
+        if (writes || writesPreviewLimits)
+          writeLease = await maintenance.enterWrite(
+            writesObjects ? "object" : "metadata",
+          );
         if (writes && request.body) {
           transfer = deadlineBody(request.body);
           request = new Request(request, {

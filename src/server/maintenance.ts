@@ -1,11 +1,15 @@
 import { hash, SyncError } from "../sync/protocol";
 import { backupTables, type MetadataStore, type ObjectStore } from "./storage";
+import { ReservationReconciliation } from "./reconciliation";
+import { readBounded } from "./security";
+import { GarbageCollection, type CleanupCandidate } from "./garbage-collection";
 
 export interface MaintenanceState {
   state: "running" | "frozen";
   epoch: string;
   frozen_at: string | null;
   activeWrites: number;
+  maintenance_owner?: string | null;
 }
 const json = (value: unknown) =>
   new Response(JSON.stringify(value), {
@@ -21,6 +25,7 @@ const unavailable = () =>
     "The server is frozen for a consistent backup. Local changes are retained.",
   );
 export class ServerMaintenance {
+  budgetSummary?: () => Promise<unknown>;
   private expected: Promise<string> | undefined;
   constructor(
     readonly db: MetadataStore,
@@ -34,16 +39,16 @@ export class ServerMaintenance {
   }
   async state(): Promise<MaintenanceState> {
     const rows = await this.db.all<MaintenanceState>(
-      "SELECT state,epoch,frozen_at,(SELECT COUNT(*) FROM server_write_leases) AS activeWrites FROM server_operations WHERE id=1",
+      "SELECT o.*,(SELECT COUNT(*) FROM server_write_leases) AS activeWrites FROM server_operations o WHERE id=1",
     );
     if (!rows[0]) throw new Error("Missing operations migration.");
     return rows[0];
   }
-  async enterWrite() {
+  async enterWrite(kind: "object" | "metadata" = "object") {
     const id = crypto.randomUUID();
     const result = await this.db.run(
-      "INSERT INTO server_write_leases(id,started_at) SELECT ?,? WHERE (SELECT state FROM server_operations WHERE id=1)='running' AND (SELECT COUNT(*) FROM server_write_leases)<64",
-      [id, new Date().toISOString()],
+      "INSERT INTO server_write_leases(id,started_at,kind) SELECT ?,?,? WHERE (SELECT state FROM server_operations WHERE id=1)='running' AND (SELECT COUNT(*) FROM server_write_leases WHERE kind=?)<?",
+      [id, new Date().toISOString(), kind, kind, kind === "object" ? 64 : 256],
     );
     if (!result.changes) {
       if ((await this.state()).state === "frozen") throw unavailable();
@@ -67,6 +72,12 @@ export class ServerMaintenance {
         "BACKUP_CHANGED",
         "The frozen backup generation changed.",
       );
+    if (state.maintenance_owner)
+      throw new SyncError(
+        409,
+        "MAINTENANCE_BUSY",
+        "An exclusive maintenance operation is active.",
+      );
     if (state.activeWrites)
       throw new SyncError(
         409,
@@ -75,6 +86,32 @@ export class ServerMaintenance {
         { activeWrites: state.activeWrites },
       );
     return state;
+  }
+  async exclusive<T>(
+    epoch: string,
+    operation: () => Promise<T>,
+  ): Promise<{ result: T; epoch: string }> {
+    await this.frozen(epoch);
+    const owner = crypto.randomUUID(),
+      next = crypto.randomUUID();
+    const lock = await this.db.run(
+      "UPDATE server_operations SET maintenance_owner=?,epoch=? WHERE id=1 AND state='frozen' AND epoch=? AND maintenance_owner IS NULL AND (SELECT COUNT(*) FROM server_write_leases)=0",
+      [owner, next, epoch],
+    );
+    if (!lock.changes)
+      throw new SyncError(
+        409,
+        "MAINTENANCE_BUSY",
+        "The maintenance generation changed or is busy.",
+      );
+    try {
+      return { result: await operation(), epoch: next };
+    } finally {
+      await this.db.run(
+        "UPDATE server_operations SET maintenance_owner=NULL WHERE id=1 AND maintenance_owner=?",
+        [owner],
+      );
+    }
   }
   private async authorize(request: Request) {
     if (!this.credential)
@@ -100,6 +137,8 @@ export class ServerMaintenance {
   async handle(request: Request, path: string) {
     await this.authorize(request);
     const url = new URL(request.url);
+    if (path === "/api/ops/budget" && request.method === "GET")
+      return json((await this.budgetSummary?.()) ?? {});
     if (path === "/api/ops/state" && request.method === "GET")
       return json(await this.state());
     if (path === "/api/ops/freeze" && request.method === "POST") {
@@ -112,7 +151,7 @@ export class ServerMaintenance {
     const epoch = url.searchParams.get("epoch") ?? "";
     if (path === "/api/ops/resume" && request.method === "POST") {
       const result = await this.db.run(
-        "UPDATE server_operations SET state='running',epoch='',frozen_at=NULL WHERE id=1 AND state='frozen' AND epoch=?",
+        "UPDATE server_operations SET state='running',epoch='',frozen_at=NULL WHERE id=1 AND state='frozen' AND epoch=? AND maintenance_owner IS NULL",
         [epoch],
       );
       if (!result.changes)
@@ -124,6 +163,60 @@ export class ServerMaintenance {
       return json(await this.state());
     }
     await this.frozen(epoch);
+    if (path === "/api/ops/cleanup" && request.method === "POST") {
+      const input = JSON.parse(
+        new TextDecoder().decode(await readBounded(request, 64 * 1024)),
+      );
+      if (
+        !Array.isArray(input.candidates) ||
+        input.candidates.length > 20 ||
+        !Number.isInteger(input.retentionDays ?? 30) ||
+        (input.retentionDays ?? 30) < 30 ||
+        (input.retentionDays ?? 30) > 3650
+      )
+        throw new SyncError(
+          400,
+          "INVALID_CLEANUP",
+          "Select at most twenty verified candidates with at least thirty days retention.",
+        );
+      const collect = new GarbageCollection(this.db, this.objects);
+      const operation = () =>
+        collect.run(
+          input.candidates as CleanupCandidate[],
+          input.retentionDays ?? 30,
+          input.apply === true,
+        );
+      return json(
+        input.apply === true
+          ? await this.exclusive(epoch, operation)
+          : await operation(),
+      );
+    }
+    if (path === "/api/ops/reconcile" && request.method === "POST") {
+      const input = JSON.parse(
+        new TextDecoder().decode(await readBounded(request, 64 * 1024)),
+      );
+      const ids = input.ids ?? [];
+      if (
+        !Array.isArray(ids) ||
+        ids.length > 10 ||
+        ids.some(
+          (id: unknown) =>
+            typeof id !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(id),
+        )
+      )
+        throw new SyncError(
+          400,
+          "INVALID_RESERVATIONS",
+          "Select at most ten reservation IDs.",
+        );
+      const reconcile = new ReservationReconciliation(this.db, this.objects);
+      if (input.apply === true)
+        return json(
+          await this.exclusive(epoch, () => reconcile.run(ids, true)),
+        );
+      return json(await reconcile.run(ids, false));
+    }
     if (path === "/api/ops/export/metadata" && request.method === "GET") {
       const table = url.searchParams.get("table") ?? "";
       if (!backupTables.includes(table as (typeof backupTables)[number]))

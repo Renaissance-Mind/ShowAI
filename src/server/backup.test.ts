@@ -15,6 +15,8 @@ import { build } from "esbuild";
 import { request as httpRequest } from "node:http";
 import { startSyncServer, SQLiteMetadata } from "./node";
 import { planServerCleanup } from "./cleanup-plan";
+import { ServerMaintenance } from "./maintenance";
+import { DiskObjects } from "./node-storage";
 import {
   exportServerBackup,
   verifyServerBackup,
@@ -140,6 +142,79 @@ async function fixture() {
 }
 
 test.skipIf(!!process.env.SHOWAI_SYNC_TEST_URL)(
+  "exclusive maintenance rejects public metadata writes and concurrent exports",
+  async () => {
+    const {
+      root,
+      url,
+      credential,
+      clients: [alice],
+      request,
+    } = await fixture();
+    const owner = (await alice.manager.configuration()).connections[0];
+    const frozen = await (
+      await operationsRequest(url, credential, "/api/ops/freeze", "POST")
+    ).json();
+    const db = new SQLiteMetadata(join(root, "original", "metadata.sqlite"));
+    const maintenance = new ServerMaintenance(
+      db,
+      new DiskObjects(join(root, "original", "objects")),
+      credential,
+    );
+    let release!: () => void, entered!: () => void;
+    const admitted = new Promise<void>((done) => (entered = done)),
+      hold = new Promise<void>((done) => (release = done));
+    const work = maintenance.exclusive(frozen.epoch, async () => {
+      entered();
+      await hold;
+      return { done: true };
+    });
+    try {
+      await admitted;
+      expect(
+        (
+          await request(
+            "/api/projects",
+            "POST",
+            { id: crypto.randomUUID(), name: "Must not enter maintenance" },
+            owner.token,
+          )
+        ).status,
+      ).toBe(503);
+      const state = await (
+        await operationsRequest(url, credential, "/api/ops/state")
+      ).json();
+      expect(state.maintenance_owner).toBeTruthy();
+      expect(state.activeWrites).toBe(0);
+      expect(
+        (
+          await request(
+            `/api/ops/export/metadata?table=users&epoch=${state.epoch}`,
+            "GET",
+            undefined,
+            credential,
+          )
+        ).value.error.code,
+      ).toBe("MAINTENANCE_BUSY");
+      expect(
+        (
+          await request(
+            `/api/ops/resume?epoch=${state.epoch}`,
+            "POST",
+            undefined,
+            credential,
+          )
+        ).status,
+      ).toBe(409);
+    } finally {
+      release();
+      await work;
+      db.close();
+    }
+  },
+);
+
+test.skipIf(!!process.env.SHOWAI_SYNC_TEST_URL)(
   "cleanup dry-run preserves old reachable history and active parts and only reports old orphans",
   async () => {
     const {
@@ -260,6 +335,59 @@ test.skipIf(!!process.env.SHOWAI_SYNC_TEST_URL)(
         retentionDays: 1,
       }),
     ).rejects.toThrow("Retention");
+    const inventory = (await readFile(join(backup, "inventory.ndjson"), "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    const selected = [digest(old), historical, digest(fresh)].map((name) =>
+      inventory.find(
+        (item) => item.key === `projects/${project.id}/objects/${name}`,
+      ),
+    );
+    const epoch = lines[0].epoch;
+    const dry = await (
+      await operationsRequest(
+        url,
+        credential,
+        `/api/ops/cleanup?epoch=${epoch}`,
+        "POST",
+        { candidates: selected, retentionDays: 30 },
+      )
+    ).json();
+    expect(dry.deleted).toBe(0);
+    expect(dry.decisions[0].action).toBe("candidate");
+    const applied = await (
+      await operationsRequest(
+        url,
+        credential,
+        `/api/ops/cleanup?epoch=${epoch}`,
+        "POST",
+        { candidates: selected, retentionDays: 30, apply: true },
+      )
+    ).json();
+    expect(applied.result.deleted).toBe(1);
+    expect(applied.result.headsChanged).toBe(0);
+    expect(applied.result.decisions[1].reason).toBe("historical-file");
+    expect(applied.result.decisions[2].reason).toBe("changed-or-recent");
+    const removed = await fetch(
+      url + `/api/projects/${project.id}/objects/${digest(old)}`,
+      { headers: { authorization: `Bearer ${owner.token}` } },
+    );
+    expect(removed.status).toBe(404);
+    await removed.body?.cancel();
+    const retained = await fetch(
+      url + `/api/projects/${project.id}/objects/${historical}`,
+      { headers: { authorization: `Bearer ${owner.token}` } },
+    );
+    expect(retained.status).toBe(200);
+    await retained.body?.cancel();
+    const stale = await request(
+      `/api/ops/cleanup?epoch=${epoch}`,
+      "POST",
+      { candidates: selected, apply: true },
+      credential,
+    );
+    expect(stale.status).toBe(409);
   },
   60_000,
 );
@@ -672,10 +800,68 @@ test("freeze drains a real in-flight upload and database triggers stop direct wr
       db.close();
     }
   }
+  const pending = (
+    await request(
+      `/api/ops/export/metadata?table=storage_reservations&epoch=${frozen.epoch}`,
+      "GET",
+      undefined,
+      credential,
+    )
+  ).value.rows.find(
+    (row: { project_id: string }) => row.project_id === project.value.id,
+  );
+  expect(pending).toBeDefined();
+  const planned = await operationsRequest(
+    url,
+    credential,
+    `/api/ops/reconcile?epoch=${frozen.epoch}`,
+    "POST",
+    { ids: [pending.id] },
+  );
+  expect((await planned.json()).decisions[0].action).toBe("finalize-object");
+  const applied = await (
+    await operationsRequest(
+      url,
+      credential,
+      `/api/ops/reconcile?epoch=${frozen.epoch}`,
+      "POST",
+      { ids: [pending.id], apply: true },
+    )
+  ).json();
+  expect(applied.result.headsChanged).toBe(0);
+  expect(applied.result.decisions[0].action).toBe("finalize-object");
+  expect(
+    (
+      await request(
+        `/api/ops/resume?epoch=${frozen.epoch}`,
+        "POST",
+        undefined,
+        credential,
+      )
+    ).status,
+  ).toBe(409);
+  const recovered = await fetch(
+    url + `/api/projects/${project.value.id}/objects/${digest(bytes)}`,
+    { headers: { authorization: `Bearer ${owner.token}` } },
+  );
+  expect(recovered.status).toBe(200);
+  expect(digest(new Uint8Array(await recovered.arrayBuffer()))).toBe(
+    digest(bytes),
+  );
+  expect(
+    (
+      await request(
+        `/api/projects/${project.value.id}`,
+        "GET",
+        undefined,
+        owner.token,
+      )
+    ).value.head,
+  ).toBeNull();
   await operationsRequest(
     url,
     credential,
-    `/api/ops/resume?epoch=${frozen.epoch}`,
+    `/api/ops/resume?epoch=${applied.epoch}`,
     "POST",
   );
 }, 30_000);

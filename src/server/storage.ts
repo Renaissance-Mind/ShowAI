@@ -12,6 +12,7 @@ export interface MetadataStore {
   batch(statements: SqlStatement[]): Promise<SqlResult[]>;
 }
 export interface ObjectStore {
+  stat(key: string): Promise<{ bytes: number; uploadedAt: string } | null>;
   list(
     cursor?: string,
     maximum?: number,

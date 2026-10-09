@@ -1,6 +1,6 @@
 import { schema, dataTables, type MetadataStore } from "./storage";
 
-export const schemaVersion = 6;
+export const schemaVersion = 7;
 export const migrations = [
   {
     version: 1,
@@ -80,10 +80,37 @@ export const migrations = [
       "INSERT INTO settings(key,value) VALUES('schema_version','6') ON CONFLICT(key) DO UPDATE SET value=excluded.value",
     ],
   },
+  {
+    version: 7,
+    name: "exclusive_maintenance",
+    statements: [
+      "ALTER TABLE server_operations ADD COLUMN maintenance_owner TEXT",
+      "ALTER TABLE server_write_leases ADD COLUMN kind TEXT NOT NULL DEFAULT 'object'",
+      ...dataTables.flatMap((table) =>
+        ["INSERT", "UPDATE", "DELETE"].flatMap((operation) => [
+          `DROP TRIGGER freeze_${table}_${operation.toLowerCase()}`,
+          `CREATE TRIGGER freeze_${table}_${operation.toLowerCase()} BEFORE ${operation} ON ${table} WHEN COALESCE((SELECT state FROM server_operations WHERE id=1),'frozen')='frozen' AND (SELECT maintenance_owner FROM server_operations WHERE id=1) IS NULL BEGIN SELECT RAISE(ABORT,'SHOWAI_READ_ONLY'); END`,
+        ]),
+      ),
+      "UPDATE server_operations SET maintenance_owner='schema-upgrade' WHERE state='frozen'",
+      "INSERT INTO settings(key,value) VALUES('schema_version','7') ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+      "UPDATE server_operations SET maintenance_owner=NULL WHERE maintenance_owner='schema-upgrade'",
+    ],
+  },
 ];
 
 /** Linux upgrades transactionally; Workers require deployment-time D1 migrations. */
-export async function prepareMetadata(db: MetadataStore, autoMigrate: boolean) {
+export async function prepareMetadata(
+  db: MetadataStore,
+  autoMigrate: boolean,
+  targetVersion = schemaVersion,
+) {
+  if (
+    !Number.isInteger(targetVersion) ||
+    targetVersion < 1 ||
+    targetVersion > schemaVersion
+  )
+    throw new Error("Unsupported target metadata schema.");
   if (autoMigrate) await db.run(schema[0]);
   let version = Number(
     (
@@ -96,12 +123,13 @@ export async function prepareMetadata(db: MetadataStore, autoMigrate: boolean) {
     throw new Error("Unsupported ShowAI Server metadata schema version.");
   if (autoMigrate) {
     for (const migration of migrations) {
-      if (migration.version <= version) continue;
+      if (migration.version <= version || migration.version > targetVersion)
+        continue;
       await db.batch(migration.statements.map((sql) => ({ sql })));
       version = migration.version;
     }
   }
-  if (version !== schemaVersion)
+  if (version !== targetVersion)
     throw new Error(
       "Apply ShowAI Server database migrations before serving requests.",
     );

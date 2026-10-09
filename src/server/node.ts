@@ -112,6 +112,9 @@ if (
     storagePolicy: process.env.SHOWAI_STORAGE_POLICY
       ? JSON.parse(process.env.SHOWAI_STORAGE_POLICY)
       : undefined,
+    requestPolicy: process.env.SHOWAI_REQUEST_POLICY
+      ? JSON.parse(process.env.SHOWAI_REQUEST_POLICY)
+      : undefined,
     allowedOrigins:
       process.env.SHOWAI_ALLOWED_ORIGINS?.split(",").filter(Boolean),
     operationsKey: process.env.SHOWAI_OPERATIONS_KEY,

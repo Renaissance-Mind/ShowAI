@@ -1,5 +1,6 @@
 import { parseArgs } from "node:util";
 import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 const { values, positionals } = parseArgs({
@@ -13,6 +14,9 @@ const { values, positionals } = parseArgs({
     resume: { type: "boolean" },
     epoch: { type: "string" },
     "retention-days": { type: "string" },
+    apply: { type: "boolean", default: false },
+    reservation: { type: "string", multiple: true },
+    plan: { type: "string" },
   },
 });
 const operation = positionals[0];
@@ -46,7 +50,11 @@ if (operation === "plan-cleanup") {
     backup: values.backup,
     home: values.home,
   });
-} else if (["export", "state", "freeze", "unfreeze"].includes(operation)) {
+} else if (
+  ["export", "state", "freeze", "unfreeze", "reconcile", "cleanup"].includes(
+    operation,
+  )
+) {
   if (!values.url || !values["key-file"])
     throw new Error("Operations require --url and --key-file.");
   const credential = (await readFile(values["key-file"], "utf8")).trim();
@@ -63,18 +71,66 @@ if (operation === "plan-cleanup") {
       onProgress: (message) => console.error(message),
     });
   } else {
-    if (operation === "unfreeze" && !values.epoch)
+    if (
+      ["unfreeze", "reconcile", "cleanup"].includes(operation) &&
+      !values.epoch
+    )
       throw new Error("unfreeze requires the current --epoch.");
+    let cleanupInput;
+    if (operation === "cleanup") {
+      if (!values.plan || !values.backup)
+        throw new Error(
+          "cleanup requires the verified --backup and --plan report.",
+        );
+      await verifyServerBackup(values.backup);
+      const descriptorBytes = await readFile(values.backup + "/backup.json");
+      const descriptor = JSON.parse(descriptorBytes);
+      const [header, ...items] = (await readFile(values.plan, "utf8"))
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line));
+      if (
+        header.format !== "showai-cleanup-dry-run-v1" ||
+        header.epoch !== values.epoch ||
+        header.serverId !== descriptor.serverId ||
+        header.backupSha256 !==
+          createHash("sha256").update(descriptorBytes).digest("hex")
+      )
+        throw new Error(
+          "Cleanup report does not match this frozen backup generation.",
+        );
+      const candidates = items
+        .filter((item) => /\/\b(?:objects|manifests)\//.test(item.candidate))
+        .slice(0, 20)
+        .map((item) => ({
+          key: item.candidate,
+          bytes: item.bytes,
+          sha256: item.sha256,
+          uploadedAt: item.uploadedAt,
+        }));
+      cleanupInput = {
+        candidates,
+        retentionDays: header.retentionDays,
+        apply: values.apply,
+      };
+    }
     const path =
       operation === "unfreeze"
         ? `/api/ops/resume?epoch=${encodeURIComponent(values.epoch)}`
-        : `/api/ops/${operation}`;
+        : operation === "reconcile"
+          ? `/api/ops/reconcile?epoch=${encodeURIComponent(values.epoch)}`
+          : operation === "cleanup"
+            ? `/api/ops/cleanup?epoch=${encodeURIComponent(values.epoch)}`
+            : `/api/ops/${operation}`;
     result = await (
       await operationsRequest(
         values.url,
         credential,
         path,
         operation === "state" ? "GET" : "POST",
+        operation === "reconcile"
+          ? { ids: values.reservation ?? [], apply: values.apply }
+          : cleanupInput,
       )
     ).json();
   }

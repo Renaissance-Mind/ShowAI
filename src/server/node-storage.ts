@@ -1,5 +1,13 @@
 import { DatabaseSync } from "node:sqlite";
-import { mkdir, readFile, open, stat, rm, readdir } from "node:fs/promises";
+import {
+  mkdir,
+  readFile,
+  open,
+  stat,
+  rm,
+  readdir,
+  lstat,
+} from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
@@ -50,6 +58,18 @@ export class SQLiteMetadata implements MetadataStore {
 }
 export class DiskObjects implements ObjectStore {
   constructor(readonly root: string) {}
+  async stat(key: string) {
+    const info = await lstat(this.path(key)).catch(
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return null;
+        throw error;
+      },
+    );
+    if (!info) return null;
+    if (!info.isFile())
+      throw new Error("Stored objects must be regular files.");
+    return { bytes: info.size, uploadedAt: info.mtime.toISOString() };
+  }
   private path(key: string) {
     if (!operationObjectKey(key))
       throw new Error("Invalid object storage key.");
