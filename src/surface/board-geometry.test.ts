@@ -23,6 +23,7 @@ import {
 } from "../portable/validation.mjs";
 import {
   resizeFrame,
+  selectionMinimum,
   frameAnchor,
   frameBounds,
   normalizedAnchor,
@@ -89,6 +90,30 @@ const ends = (doc: ReturnType<typeof fixture>) =>
   arrowEndpoints(arrow(doc), doc.layout.arrow);
 
 describe("native Board geometry", () => {
+  it("limits a mixed group before a member's minimum would break relative geometry", () => {
+    const bounds = { x: 0, y: 0, width: 660, height: 200 };
+    const minimum = selectionMinimum(bounds, [
+      {
+        frame: { x: 0, y: 0, width: 360, height: 200 },
+        minWidth: 120,
+        minHeight: 180,
+        resizeHeight: true,
+      },
+      {
+        frame: { x: 500, y: 0, width: 160, height: 100 },
+        minWidth: 1,
+        minHeight: 1,
+        resizeHeight: true,
+      },
+    ]);
+    expect(minimum).toEqual({ width: 220, height: 180 });
+    const next = resizeFrame(bounds, { x: -650, y: 0 }, "e", minimum);
+    expect(next.width).toBe(220);
+    const ratio = next.width / bounds.width;
+    expect(360 * ratio).toBe(120);
+    expect(500 * ratio).toBeGreaterThan(360 * ratio);
+  });
+
   it("snaps each moving resize edge while retaining its opposite edge", () => {
     const index = createSnapIndex([
       { id: "target", frame: { x: 100, y: 100, width: 100, height: 100 } },

@@ -81,3 +81,12 @@ export function snapResizeFrame(
   minimum: { width: number; height: number },
   keepAspect?: boolean,
 ): { frame: NodeLayout; guides: SnapGuide[] };
+export function selectionMinimum(
+  bounds: NodeLayout,
+  objects: {
+    frame: NodeLayout;
+    minWidth: number;
+    minHeight: number;
+    resizeHeight: boolean;
+  }[],
+): { width: number; height: number };

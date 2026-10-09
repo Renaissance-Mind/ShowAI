@@ -386,3 +386,21 @@ export function snapResizeFrame(
   }
   return { frame: next, guides };
 }
+
+/** Preserve relative geometry when the smallest member reaches its size limit. */
+export function selectionMinimum(bounds, objects) {
+  let widthRatio = 0,
+    heightRatio = 0;
+  for (const object of objects) {
+    widthRatio = Math.max(widthRatio, object.minWidth / object.frame.width);
+    if (object.resizeHeight)
+      heightRatio = Math.max(
+        heightRatio,
+        object.minHeight / (object.frame.height || 1),
+      );
+  }
+  return {
+    width: Math.max(1, bounds.width * widthRatio),
+    height: Math.max(1, (bounds.height || 1) * heightRatio),
+  };
+}

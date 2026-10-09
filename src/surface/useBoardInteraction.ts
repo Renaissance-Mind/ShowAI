@@ -7,6 +7,7 @@ import type { Camera } from "./model";
 import {
   createSnapIndex,
   resizeFrame,
+  selectionMinimum,
   frameBounds,
   frameHeight,
   pointsBounds,
@@ -167,14 +168,28 @@ export function useBoardInteraction({
     const singleNode = single
       ? drag.arrows.get(selectedIds[0])!.node
       : undefined;
-    const minimum = {
-      width: singleNode?.type === "drawing" ? 1 : 120,
-      height: singleNode?.type === "surface" ? 180 : 1,
-    };
+    const minimum = single
+      ? {
+          width: singleNode?.type === "drawing" ? 1 : 120,
+          height: singleNode?.type === "surface" ? 180 : 1,
+        }
+      : !resizing
+        ? { width: 1, height: 1 }
+        : selectionMinimum(
+            drag.bounds,
+            selectedIds.map((id) => ({
+              frame: drag.measured[id],
+              minWidth: drag.arrows.get(id)!.node.type === "drawing" ? 1 : 120,
+              minHeight: drag.arrows.get(id)!.node.type === "surface" ? 180 : 1,
+              resizeHeight:
+                drag.elements.get(id)?.dataset.boardFixedHeight === "true",
+            })),
+          );
     const resizeOrigin = single ? drag.measured[selectedIds[0]] : drag.bounds;
     const keepAspect =
-      input.shiftKey ||
-      (!single && selectedIds.some((id) => !!drag.frames[id].rotation));
+      resizing &&
+      (input.shiftKey ||
+        (!single && selectedIds.some((id) => !!drag.frames[id].rotation)));
     let candidate = resizing
       ? resizeFrame(
           resizeOrigin,
