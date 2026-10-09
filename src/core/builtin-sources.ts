@@ -29,6 +29,11 @@ import katexCss from "../components/blocks/katex.css?raw";
 import shared from "../components/blocks/shared.tsx?raw";
 import helpers from "../components/blocks/helpers.ts?raw";
 import css from "../components/blocks/block.css?raw";
+import mindmap from "../components/blocks/Mindmap.tsx?raw";
+import mindmapCss from "../components/blocks/mindmap.css?raw";
+import mindmapContract from "../components/blocks/mindmap-contract.mjs?raw";
+import selectionToolbar from "../editor/SelectionToolbar.tsx?raw";
+import selectionToolbarCss from "../editor/selection-toolbar.css?raw";
 import flowchart from "../components/blocks/Flowchart.tsx?raw";
 import flowchartCss from "../components/blocks/flowchart.css?raw";
 import flowchartContract from "../components/blocks/flowchart-contract.mjs?raw";
@@ -68,6 +73,11 @@ const sources: Record<string, string> = {
   "shared.tsx": shared,
   "helpers.ts": helpers,
   "block.css": css,
+  "Mindmap.tsx": mindmap,
+  "mindmap.css": mindmapCss,
+  "mindmap-contract.mjs": mindmapContract,
+  "SelectionToolbar.tsx": selectionToolbar,
+  "selection-toolbar.css": selectionToolbarCss,
   "Flowchart.tsx": flowchart,
   "flowchart.css": flowchartCss,
   "flowchart-contract.mjs": flowchartContract,
@@ -79,6 +89,10 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
   Object.entries(sources).map(([name, source]) => [
     name,
     source
+      .replace(
+        /from\s+["']\.\.\/\.\.\/editor\/SelectionToolbar["']/g,
+        'from "./SelectionToolbar"',
+      )
       .replace(
         /from\s+["']\.\.\/ExpandableSearch["']/g,
         'from "./ExpandableSearch"',
@@ -96,6 +110,7 @@ export const builtinExports: Record<string, string> = {
   divider: "Divider",
   code: "Code",
   chart: "Chart",
+  mindmap: "Mindmap",
   flowchart: "Flowchart",
   database: "Database",
   metrics: "Metrics",

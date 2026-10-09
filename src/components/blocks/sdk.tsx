@@ -9,6 +9,7 @@ export {
 } from "./Primitives";
 export { ChartBlock as Chart } from "./Chart";
 export * from "./g2/exports";
+export { MindmapBlock as Mindmap } from "./Mindmap";
 export { FlowchartBlock as Flowchart } from "./Flowchart";
 export { DatabaseBlock as Database } from "./Database";
 export { MetricsBlock as Metrics } from "./Metrics";

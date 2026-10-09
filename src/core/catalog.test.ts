@@ -285,6 +285,7 @@ describe("compiled React packages", () => {
       "playground",
       "gallery",
       "bookmark",
+      "mindmap",
       "flowchart",
       "video",
       "audio",
@@ -615,32 +616,36 @@ describe("compiled React packages", () => {
 });
 
 describe("component composition and editable primitives", () => {
-  it("compiles editable builtin sources and identifies native container components", async () => {
-    const home = await temporary();
-    for (const item of listBuiltinComponents({ includeLegacy: true })) {
-      if (item.insertion) {
-        expect(() => readBuiltinComponentSource(item.kind)).toThrow(
-          /native container editing/,
+  it(
+    "compiles editable builtin sources and identifies native container components",
+    async () => {
+      const home = await temporary();
+      for (const item of listBuiltinComponents({ includeLegacy: true })) {
+        if (item.insertion) {
+          expect(() => readBuiltinComponentSource(item.kind)).toThrow(
+            /native container editing/,
+          );
+          continue;
+        }
+        const original = readBuiltinComponentSource(item.kind);
+        const compiled = await saveComponent(
+          home,
+          {
+            ...original,
+            manifest: { ...original.manifest, id: `my-${item.kind}` },
+          },
+          project(home),
         );
-        continue;
+        expect(compiled.html).toContain("Content-Security-Policy");
+        expect(compiled.inline?.script).toBeTruthy();
+        if (item.kind === "text")
+          // Markdown now includes the offline KaTeX renderer (but no graph/PDF engine).
+          expect(compiled.inline!.script.length).toBeLessThan(400000);
+        expect(compiled.defaultData).toEqual(item.defaultData);
       }
-      const original = readBuiltinComponentSource(item.kind);
-      const compiled = await saveComponent(
-        home,
-        {
-          ...original,
-          manifest: { ...original.manifest, id: `my-${item.kind}` },
-        },
-        project(home),
-      );
-      expect(compiled.html).toContain("Content-Security-Policy");
-      expect(compiled.inline?.script).toBeTruthy();
-      if (item.kind === "text")
-        // Markdown now includes the offline KaTeX renderer (but no graph/PDF engine).
-        expect(compiled.inline!.script.length).toBeLessThan(400000);
-      expect(compiled.defaultData).toEqual(item.defaultData);
-    }
-  }, process.platform === "win32" ? 600000 : 180000);
+    },
+    process.platform === "win32" ? 600000 : 180000,
+  );
 
   it("bundles nested exact revisions, preserves closure and validates every dependency", async () => {
     const home = await temporary();
