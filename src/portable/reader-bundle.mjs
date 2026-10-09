@@ -1,4 +1,5 @@
 import { build, version as compilerVersion } from "esbuild";
+import { rmSync } from "node:fs";
 import {
   readFile,
   mkdir,
@@ -18,11 +19,19 @@ const cache = new Map();
 const archives = new Map();
 
 let defaultCacheDirectory;
+async function temporaryReaderCache() {
+  const directory = await mkdtemp(join(tmpdir(), "showai-readers-"));
+  // Exit handlers must be synchronous, including when a test throws uncaught.
+  process.once("exit", () =>
+    rmSync(directory, { recursive: true, force: true }),
+  );
+  return directory;
+}
 const cacheDirectory = async () => {
   if (process.env.SHOWAI_READER_CACHE) return process.env.SHOWAI_READER_CACHE;
   defaultCacheDirectory ??=
     process.env.NODE_ENV === "test"
-      ? mkdtemp(join(tmpdir(), "showai-readers-"))
+      ? temporaryReaderCache()
       : Promise.resolve(join(homedir(), ".cache", "showai", "readers"));
   return defaultCacheDirectory;
 };
