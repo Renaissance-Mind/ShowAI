@@ -39,6 +39,7 @@ import {
   Square,
   Circle,
   ArrowUpRight,
+  LockKeyhole,
   X,
 } from "../ui/icons";
 import type { ContainerDocument, ShowDocument } from "../types";
@@ -817,6 +818,7 @@ function ContainerView({
     readOnly = runtime.readOnly;
   const viewport = useRef<SurfaceHandle>(null),
     page = useRef<HTMLDivElement>(null);
+  const [toolLocked, setToolLocked] = useState(false);
   const [tool, setTool] = useState<DrawingTool | null>(null),
     [color, setColor] = useState("#252629");
   const enabled = root || runtime.active === id;
@@ -1029,7 +1031,7 @@ function ContainerView({
                     source,
                     entry.parent!.attrs!.id,
                     point,
-                    8,
+                    8 / (viewport.current?.scale() ?? 1),
                   );
                   if (binding) bindings[endpoint] = binding;
                   else delete bindings[endpoint];
@@ -1069,6 +1071,7 @@ function ContainerView({
           drawTool={tool}
           drawColor={color}
           onDrawExit={() => setTool(null)}
+          onToolChange={setTool}
           onDraw={
             readOnly
               ? undefined
@@ -1079,11 +1082,13 @@ function ContainerView({
                       runtime.geometry.materialize(runtime.current.current),
                       id,
                       endpoints[0],
+                      8 / (viewport.current?.scale() ?? 1),
                     );
                     const end = bindingAtPoint(
                       runtime.geometry.materialize(runtime.current.current),
                       id,
                       endpoints[1],
+                      8 / (viewport.current?.scale() ?? 1),
                     );
                     if (start || end)
                       drawing.attrs.bindings = {
@@ -1094,6 +1099,10 @@ function ContainerView({
                   runtime.commit(
                     addNode(runtime.current.current, drawing, frame, id),
                   );
+                  runtime.select(drawing.attrs!.id);
+                  if (tool !== "pen" && !toolLocked) {
+                    setTool(null);
+                  }
                 }
           }
           extraActions={
@@ -1121,6 +1130,7 @@ function ContainerView({
                       type="button"
                       key={value}
                       aria-label={label}
+                      title={`${label}（${{ pen: "P", rectangle: "R", ellipse: "E", arrow: "A" }[value]}）${value === "pen" ? "" : "；Shift 约束形状，Alt 从中心绘制"}`}
                       aria-pressed={tool === value}
                       onClick={() => {
                         runtime.activate(id);
@@ -1130,6 +1140,15 @@ function ContainerView({
                       <Icon size={15} />
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    aria-label="连续绘制"
+                    aria-pressed={toolLocked}
+                    title="连续绘制：完成图形后保留当前工具"
+                    onClick={() => setToolLocked((value) => !value)}
+                  >
+                    <LockKeyhole size={15} />
+                  </button>
                   <input
                     className="board-pen-color"
                     type="color"

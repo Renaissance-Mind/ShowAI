@@ -1,3 +1,9 @@
+import {
+  geometryFrame,
+  frameFromGeometry,
+  pickShape,
+  shapeIntersects,
+} from "./drawing-geometry.mjs";
 import { canCommitBoardGesture, boardSelectionScope } from "./board-commands";
 import type { SurfaceGeometryStore } from "./geometry-store";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
@@ -15,7 +21,6 @@ import {
   pointsBounds,
   snapFrame,
   snapResizeFrame,
-  intersectsFrame,
   type SnapIndex,
   type Point,
 } from "./geometry.mjs";
@@ -30,6 +35,16 @@ export interface BoardGestureInput {
 }
 export interface BoardInteraction {
   ids: Set<string>;
+  drawingSnapIndex: () => SnapIndex;
+  hitTest: (
+    x: number,
+    y: number,
+    inside?: boolean,
+  ) => {
+    id: string;
+    node: import("@tiptap/core").JSONContent;
+    element: HTMLElement;
+  } | null;
   select: (id: string | null, additive?: boolean) => void;
   selectAll: () => void;
   selectIds: (ids: string[]) => void;
@@ -58,7 +73,12 @@ export function useBoardInteraction({
   onSelect: (id: string | null) => void;
   selected: string | null;
 }): BoardInteraction & {
-  marquee: (rect: NodeLayout, additive: boolean) => void;
+  marquee: (
+    rect: NodeLayout,
+    additive: boolean,
+    base?: string[],
+    wrap?: boolean,
+  ) => void;
 } {
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const current = useRef({ document, onTransform, onSelect, selected });
@@ -272,16 +292,19 @@ export function useBoardInteraction({
     for (const [id, frame] of Object.entries(drag.frames)) {
       let next: NodeLayout;
       if (drag.kind === "rotate") {
-        const el = drag.elements.get(id)!,
-          box = el.getBoundingClientRect();
-        const cx = box.left + box.width / 2,
-          cy = box.top + box.height / 2;
+        const visual = drag.measured[id];
+        const cx = layerBox.left + (visual.x + visual.width / 2) * drag.scale,
+          cy =
+            layerBox.top + (visual.y + (visual.height ?? 0) / 2) * drag.scale;
         const angle =
           Math.atan2(input.clientY - cy, input.clientX - cx) -
           Math.atan2(drag.start.y - cy, drag.start.x - cx);
         let rotation = (frame.rotation ?? 0) + (angle * 180) / Math.PI;
         if (input.shiftKey) rotation = Math.round(rotation / 15) * 15;
-        next = { ...frame, rotation: ((rotation + 540) % 360) - 180 };
+        next = frameFromGeometry(index.get(id)!.node, frame, {
+          ...drag.measured[id],
+          rotation: ((rotation + 540) % 360) - 180,
+        });
       } else if (resizing) {
         const node = index.get(id)!.node,
           drawing = node.type === "drawing";
@@ -289,9 +312,12 @@ export function useBoardInteraction({
           sy = (candidate.height ?? 1) / (drag.bounds.height || 1);
         next = {
           ...frame,
-          x: candidate.x + (frame.x - drag.bounds.x) * sx,
-          y: candidate.y + (frame.y - drag.bounds.y) * sy,
-          width: Math.max(drawing ? 1 : 120, Math.min(10000, frame.width * sx)),
+          x: candidate.x + (drag.measured[id].x - drag.bounds.x) * sx,
+          y: candidate.y + (drag.measured[id].y - drag.bounds.y) * sy,
+          width: Math.max(
+            drawing ? 1 : 120,
+            Math.min(10000, drag.measured[id].width * sx),
+          ),
           ...(drag.elements.get(id)?.dataset.boardFixedHeight === "true"
             ? {
                 height: Math.max(
@@ -308,6 +334,7 @@ export function useBoardInteraction({
             next.y = frame.y;
           }
         }
+        if (drawing) next = frameFromGeometry(node, frame, next);
       } else
         next = {
           ...frame,
@@ -349,6 +376,77 @@ export function useBoardInteraction({
   };
   return {
     ids,
+    drawingSnapIndex() {
+      const source = current.current.document;
+      const objects = [];
+      for (const element of world.current?.children ?? []) {
+        if (!(element instanceof HTMLElement)) continue;
+        const id = element.dataset.surfaceId,
+          frame = id && source?.layout?.[id],
+          node = id && selectionIndex.get(id)?.node;
+        if (id && frame && node && node.attrs?.tool !== "arrow")
+          objects.push({
+            id,
+            frame: geometryFrame(node, measureFrame(frame, element)),
+          });
+      }
+      return createSnapIndex(objects);
+    },
+    hitTest(x, y, inside = true) {
+      const root = world.current,
+        source = current.current.document;
+      if (!root || !source) return null;
+      const boxes = new Map<
+        HTMLElement,
+        { left: number; top: number; scale: number }
+      >();
+      const candidates = [];
+      const viewport = root.closest(".page-surface")!.getBoundingClientRect();
+      for (const element of root.querySelectorAll<HTMLElement>(
+        ".surface-object[data-surface-id]",
+      )) {
+        if (element.closest(".page-surface") !== root.closest(".page-surface"))
+          continue;
+        const id = element.dataset.surfaceId!,
+          entry = selectionIndex.get(id),
+          frame = source.layout?.[id];
+        if (
+          !entry ||
+          !frame ||
+          !boardSelectionScope(selectionIndex, source.layout, containerId, id)
+        )
+          continue;
+        const layer = element.parentElement!;
+        if (!boxes.has(layer)) {
+          const rect = layer.getBoundingClientRect();
+          boxes.set(layer, {
+            left: rect.left,
+            top: rect.top,
+            scale: rect.width / layer.offsetWidth || camera.current.scale,
+          });
+        }
+        const box = boxes.get(layer)!;
+        candidates.push({
+          id,
+          node: entry.node,
+          element,
+          frame: measureFrame(frame, element),
+          point: {
+            x: (x - box.left) / box.scale,
+            y: (y - box.top) / box.scale,
+          },
+          tolerance: 6 / box.scale,
+          scale: box.scale,
+          viewport: {
+            x: (viewport.left - box.left) / box.scale,
+            y: (viewport.top - box.top) / box.scale,
+            width: viewport.width / box.scale,
+            height: viewport.height / box.scale,
+          },
+        });
+      }
+      return pickShape(candidates, inside);
+    },
     select,
     selectIds(ids) {
       const next = new Set(ids);
@@ -435,7 +533,10 @@ export function useBoardInteraction({
       for (const [nodeId, el] of elements) {
         const frame = source.layout?.[nodeId];
         if (!frame) continue;
-        measured[nodeId] = measureFrame(frame, el);
+        measured[nodeId] = geometryFrame(
+          index.get(nodeId)!.node,
+          measureFrame(frame, el),
+        );
         if (chosen.has(nodeId)) frames[nodeId] = frame;
       }
       if (!frames[id]) return false;
@@ -467,7 +568,8 @@ export function useBoardInteraction({
         start: { x: point.clientX, y: point.clientY },
         scale:
           elements.get(id)!.getBoundingClientRect().width /
-            frameBounds(measured[id]).width || camera.current.scale,
+            frameBounds(measureFrame(frames[id], elements.get(id)!)).width ||
+          camera.current.scale,
         frames,
         measured,
         next: { ...frames },
@@ -530,15 +632,31 @@ export function useBoardInteraction({
       if (valid && changed) current.current.onTransform?.(frames);
     },
     cancel: restore,
-    marquee(rect, additive) {
-      const next = additive ? new Set(currentIds.current) : new Set<string>();
+    marquee(rect, additive, base, wrap = false) {
+      const next = additive
+        ? new Set(base ?? currentIds.current)
+        : new Set<string>();
       for (const child of world.current?.children ?? []) {
         if (!(child instanceof HTMLElement)) continue;
         const id = child.dataset.surfaceId,
           frame = id && current.current.document?.layout?.[id];
-        if (id && frame && intersectsFrame(measureFrame(frame, child), rect))
+        if (
+          id &&
+          frame &&
+          shapeIntersects(
+            selectionIndex.get(id)!.node,
+            measureFrame(frame, child),
+            rect,
+            wrap,
+          )
+        )
           next.add(id);
       }
+      if (
+        next.size === currentIds.current.size &&
+        [...next].every((id) => currentIds.current.has(id))
+      )
+        return;
       setSelection(next);
       currentIds.current = next;
       onSelect([...next].at(-1) ?? null);

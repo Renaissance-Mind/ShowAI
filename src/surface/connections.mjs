@@ -1,8 +1,8 @@
+import { pickShape } from "./drawing-geometry.mjs";
 import {
   frameAnchor,
   bindingParent,
   normalizedAnchor,
-  hitFrame,
   objectCapabilities,
   pointsBounds,
 } from "./geometry.mjs";
@@ -130,15 +130,17 @@ export function bindingAtPoint(
   const index = indexSurfaceTree(document.content),
     parent = index.get(parentId)?.node;
   if (!bindingParent(parent, document.layout)) return null;
-  for (const node of [...(parent?.content ?? [])].reverse()) {
+  const candidates = (parent?.content ?? []).flatMap((node) => {
     const id = node.attrs?.id,
       frame = document.layout?.[id];
-    if (!frame || excluded.has(id) || !objectCapabilities(node).bindTarget)
-      continue;
-    if (hitFrame(frame, point, tolerance))
-      return { targetId: id, anchor: normalizedAnchor(frame, point) };
-  }
-  return null;
+    return frame && !excluded.has(id) && objectCapabilities(node).bindTarget
+      ? [{ id, node, frame, point, tolerance, scale: 1 }]
+      : [];
+  });
+  const hit = pickShape(candidates);
+  return hit
+    ? { targetId: hit.id, anchor: normalizedAnchor(hit.frame, point) }
+    : null;
 }
 
 /** A transform retains only relationships whose targets participate in the same command. */

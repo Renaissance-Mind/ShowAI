@@ -237,6 +237,7 @@
   overflow: visible;
 }
 .surface-object.is-drawing {
+  border: 0;
   border-radius: 0;
 }
 .surface-object.is-drawing > .surface-object-header {
@@ -248,7 +249,7 @@
   display: none;
   z-index: 5;
 }
-.surface-object.is-drawing:hover > .surface-object-header,
+.surface-object.is-drawing.is-hovered > .surface-object-header,
 .surface-object.is-drawing.is-selected > .surface-object-header {
   display: flex;
 }
@@ -474,4 +475,37 @@
     position: relative !important;
     min-height: var(--free-height, 200px) !important;
   }
+}
+
+/* Geometry owns drawing hits; transparent SVG viewports never cover other objects. */
+.surface-object[data-board-drawing="true"],
+.surface-object[data-board-drawing="true"] > .surface-object-content {
+  pointer-events: none;
+}
+.surface-object[data-board-drawing="true"] > [data-surface-ui] {
+  pointer-events: auto;
+}
+.surface-object.is-drawing:focus-within {
+  z-index: auto;
+}
+.surface-object.is-drawing:not(.is-selected) > .board-resize-handle {
+  display: none;
+}
+.board-object-outline {
+  position: absolute;
+  pointer-events: none;
+  outline: 1px solid #467de3;
+  opacity: 0.65;
+}
+.surface-object.is-drawing.is-hovered:not(.is-selected) .board-drawing {
+  filter: drop-shadow(0 0 1px #467de3);
+}
+@media print {
+  .board-object-outline {
+    display: none;
+  }
+}
+
+.page-surface.has-drawing-hit {
+  cursor: move;
 }

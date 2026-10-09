@@ -541,12 +541,19 @@ export function useSurfaceViewport(
       if (
         !ownsInput(event.target) ||
         event.defaultPrevented ||
-        (event.target as Element).closest("[data-board-drawing-input]")
+        (event.target as Element).closest('[data-drawing-active="true"]') ||
+        ((event.target as Element).closest("[data-board-drawing-input]") &&
+          event.button !== 1 &&
+          !space)
       )
         return;
       if (springFrame || gesture) interrupt();
       const target = event.target as Element;
-      if (target.closest("[data-surface-handle]")) {
+      if (
+        target.closest("[data-surface-handle]") &&
+        !space &&
+        event.button !== 1
+      ) {
         if (event.button === 0) {
           controls.current.cancel();
           objectGesture = true;
@@ -554,9 +561,10 @@ export function useSurfaceViewport(
         return;
       }
       if (
-        target.closest(
-          '[data-surface-ui], [data-surface-handle], [data-surface-gesture="own"], .react-flow',
-        )
+        target.closest('[data-surface-gesture="own"], .react-flow') ||
+        (!space &&
+          event.button !== 1 &&
+          target.closest("[data-surface-ui], [data-surface-handle]"))
       )
         return;
       const touch = event.pointerType === "touch";

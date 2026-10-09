@@ -40,6 +40,7 @@ import "./surface.css";
 
 export interface SurfaceHandle {
   insertPosition: () => NodeLayout;
+  scale: () => number;
   reveal: (id: string) => void;
   point: (x: number, y: number) => { x: number; y: number };
 }
@@ -61,6 +62,7 @@ interface Props {
   drawColor?: string;
   onDraw?: (node: JSONContent, frame: NodeLayout) => void;
   onDrawExit?: () => void;
+  onToolChange?: (tool: DrawingTool | null) => void;
   nodes: { id: string; name: string }[];
   layoutKey: string;
   paths: Record<string, string[]>;
@@ -107,6 +109,7 @@ export default function PageSurface({
   drawColor = "#252629",
   onDraw,
   onDrawExit,
+  onToolChange,
 }: Props) {
   const [localSelection, setLocalSelection] = useState<string | null>(null);
   const selected =
@@ -180,22 +183,46 @@ export default function PageSurface({
     return true;
   };
   const spaceHeld = useRef(false);
+  const pointing = useRef<{
+    pointer: number;
+    id: string;
+    x: number;
+    y: number;
+    moved: boolean;
+    wasSelected: boolean;
+    additive: boolean;
+  } | null>(null);
+  const hovered = useRef<HTMLElement | null>(null);
+  const clearHover = () => {
+    hovered.current?.classList.remove("is-hovered");
+    hovered.current = null;
+    rootRef.current?.classList.remove("has-drawing-hit");
+  };
+  const cancelPointing = () => {
+    pointing.current = null;
+    board.cancel();
+  };
   const marquee = useRef<{
     id: number;
     start: { x: number; y: number };
     next: NodeLayout;
     element: HTMLDivElement;
     additive: boolean;
+    base: string[];
+    hitId?: string;
   } | null>(null);
-  const cancelMarquee = () => {
-    marquee.current?.element.remove();
+  const cancelMarquee = (restore = false) => {
+    const drag = marquee.current;
+    drag?.element.remove();
     marquee.current = null;
+    if (restore && drag) board.selectIds(drag.base);
   };
   useEffect(() => {
     const cancel = () => {
       spaceHeld.current = false;
-      cancelMarquee();
-      board.cancel();
+      cancelMarquee(true);
+      cancelPointing();
+      clearHover();
     };
     window.addEventListener("blur", cancel);
     return () => {
@@ -316,6 +343,10 @@ export default function PageSurface({
     else if (nodes[0]) focusAfterMount([nodes[0].id], true, true);
   }, []);
   useImperativeHandle(ref, () => ({
+    scale: () =>
+      camera.current.scale *
+      (rootRef.current!.getBoundingClientRect().width /
+        rootRef.current!.clientWidth || 1),
     insertPosition: () => {
       const root = rootRef.current!,
         c = camera.current;
@@ -388,11 +419,22 @@ export default function PageSurface({
         data-viewport-locked={locked}
         data-board-id={pageId}
         onContextMenu={(event) => {
+          if (drawTool || pointing.current || marquee.current) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          const hit = board.hitTest(event.clientX, event.clientY);
           if (
-            openObjectMenu(event.target as Element, {
-              x: event.clientX,
-              y: event.clientY,
-            })
+            openObjectMenu(
+              hit?.node.type === "drawing"
+                ? hit.element
+                : (event.target as Element),
+              {
+                x: event.clientX,
+                y: event.clientY,
+              },
+            )
           ) {
             event.preventDefault();
             event.stopPropagation();
@@ -400,8 +442,8 @@ export default function PageSurface({
         }}
         onPointerDownCapture={(event) => {
           const target = event.target as Element;
+          if (target.closest(".page-surface") !== event.currentTarget) return;
           if (
-            target.closest(".page-surface") === event.currentTarget &&
             target.closest("[data-surface-handle],[data-board-drawing-input]")
           ) {
             cancelMarquee();
@@ -414,11 +456,36 @@ export default function PageSurface({
             event.button !== 0 ||
             event.pointerType === "touch" ||
             spaceHeld.current ||
-            (event.target as Element).closest(
-              "[data-surface-content], [data-surface-ui], [data-board-drawing-input]",
-            ) ||
-            (event.target as Element).closest(".page-surface") !==
-              event.currentTarget
+            target.closest("[data-surface-ui],[data-board-drawing-input]")
+          )
+            return;
+          const hit = board.hitTest(event.clientX, event.clientY);
+          const forceBrush = event.ctrlKey || event.metaKey;
+          if (hit?.node.type === "drawing" && !forceBrush) {
+            event.preventDefault();
+            event.stopPropagation();
+            controls.current.cancel();
+            cancelMarquee();
+            clearHover();
+            const wasSelected = board.ids.has(hit.id);
+            if (event.shiftKey && !wasSelected) board.select(hit.id, true);
+            if (!board.start(hit.id, "move", event)) return;
+            pointing.current = {
+              pointer: event.pointerId,
+              id: hit.id,
+              x: event.clientX,
+              y: event.clientY,
+              moved: false,
+              wasSelected,
+              additive: event.shiftKey,
+            };
+            event.currentTarget.focus({ preventScroll: true });
+            event.currentTarget.setPointerCapture(event.pointerId);
+            return;
+          }
+          if (
+            (hit && (!forceBrush || hit.node.type !== "drawing")) ||
+            target.closest("[data-surface-content]")
           )
             return;
           event.preventDefault();
@@ -435,10 +502,42 @@ export default function PageSurface({
             start,
             next: { ...start, width: 0, height: 0 },
             element,
+            base: [...board.ids],
+            hitId: hit?.id,
             additive: event.shiftKey,
           };
+          if (!event.shiftKey && !forceBrush) board.select(null);
         }}
         onPointerMoveCapture={(event) => {
+          const pointer = pointing.current;
+          if (pointer?.pointer === event.pointerId) {
+            event.preventDefault();
+            event.stopPropagation();
+            pointer.moved ||=
+              Math.hypot(
+                event.clientX - pointer.x,
+                event.clientY - pointer.y,
+              ) >= 3;
+            board.update(event);
+            return;
+          }
+          if (
+            !marquee.current &&
+            !drawTool &&
+            !locked &&
+            !event.buttons &&
+            (event.target as Element).closest(".page-surface") ===
+              event.currentTarget
+          ) {
+            const hit = board.hitTest(event.clientX, event.clientY, false);
+            const element = hit?.node.type === "drawing" ? hit.element : null;
+            if (element !== hovered.current) {
+              clearHover();
+              hovered.current = element;
+              element?.classList.add("is-hovered");
+              rootRef.current?.classList.toggle("has-drawing-hit", !!element);
+            }
+          }
           const drag = marquee.current;
           if (!drag || drag.id !== event.pointerId) return;
           event.preventDefault();
@@ -450,6 +549,12 @@ export default function PageSurface({
             width: Math.abs(end.x - drag.start.x),
             height: Math.abs(end.y - drag.start.y),
           };
+          board.marquee(
+            drag.next,
+            event.shiftKey,
+            drag.base,
+            event.ctrlKey || event.metaKey,
+          );
           Object.assign(drag.element.style, {
             left: `${drag.next.x}px`,
             top: `${drag.next.y}px`,
@@ -458,17 +563,59 @@ export default function PageSurface({
           });
         }}
         onPointerUpCapture={(event) => {
+          const pointer = pointing.current;
+          if (pointer?.pointer === event.pointerId) {
+            event.preventDefault();
+            event.stopPropagation();
+            pointing.current = null;
+            pointer.moved ||=
+              Math.hypot(
+                event.clientX - pointer.x,
+                event.clientY - pointer.y,
+              ) >= 3;
+            board.update(event);
+            board.finish();
+            if (!pointer.moved && pointer.wasSelected)
+              board.select(pointer.id, pointer.additive);
+            if (event.currentTarget.hasPointerCapture(event.pointerId))
+              event.currentTarget.releasePointerCapture(event.pointerId);
+            return;
+          }
           const drag = marquee.current;
           if (!drag || drag.id !== event.pointerId) return;
           event.preventDefault();
           event.stopPropagation();
-          board.marquee(drag.next, drag.additive);
+          if (
+            drag.hitId &&
+            drag.next.width < 3 &&
+            (drag.next.height ?? 0) < 3
+          ) {
+            board.selectIds(drag.base);
+            board.select(
+              drag.hitId,
+              event.shiftKey || event.ctrlKey || event.metaKey,
+            );
+          } else
+            board.marquee(
+              drag.next,
+              event.shiftKey,
+              drag.base,
+              event.ctrlKey || event.metaKey,
+            );
           cancelMarquee();
           if (event.currentTarget.hasPointerCapture(event.pointerId))
             event.currentTarget.releasePointerCapture(event.pointerId);
         }}
-        onPointerCancelCapture={cancelMarquee}
-        onLostPointerCapture={cancelMarquee}
+        onPointerCancelCapture={() => {
+          cancelMarquee(true);
+          cancelPointing();
+          clearHover();
+        }}
+        onLostPointerCapture={() => {
+          cancelMarquee(true);
+          if (pointing.current) cancelPointing();
+        }}
+        onPointerLeave={clearHover}
         onKeyDownCapture={(event) => {
           const target = event.target as Element;
           if (
@@ -504,10 +651,51 @@ export default function PageSurface({
           }
           if (event.code === "Space") spaceHeld.current = true;
           if (event.key === "Escape") {
-            cancelMarquee();
-            board.cancel();
+            if (drawTool && !target.closest('[data-drawing-active="true"]')) {
+              event.preventDefault();
+              event.stopPropagation();
+              onDrawExit?.();
+              return;
+            }
+            const active = !!marquee.current || !!pointing.current;
+            cancelMarquee(true);
+            cancelPointing();
+            if (active) {
+              event.preventDefault();
+              event.stopPropagation();
+              return;
+            }
           }
-          if (!onTransform || locked) return;
+          if (
+            !onTransform ||
+            locked ||
+            target.closest('[data-drawing-active="true"]')
+          )
+            return;
+          if (
+            !event.metaKey &&
+            !event.ctrlKey &&
+            !event.altKey &&
+            !pointing.current &&
+            !marquee.current &&
+            !target.closest('[data-drawing-active="true"]')
+          ) {
+            const key = event.key.toLowerCase(),
+              tools: Record<string, DrawingTool | null> = {
+                v: null,
+                r: "rectangle",
+                e: "ellipse",
+                a: "arrow",
+                p: "pen",
+              };
+            if (key in tools) {
+              event.preventDefault();
+              event.stopPropagation();
+              clearHover();
+              onToolChange?.(tools[key]);
+              return;
+            }
+          }
           if (
             (event.metaKey || event.ctrlKey) &&
             event.key.toLowerCase() === "a"
@@ -563,6 +751,8 @@ export default function PageSurface({
           if (event.code === "Space") spaceHeld.current = false;
         }}
         onPointerDown={(event) => {
+          if (event.defaultPrevented || event.button !== 0 || spaceHeld.current)
+            return;
           if (
             !(event.target as Element).closest(
               "[data-surface-content], [data-surface-ui]",
@@ -590,7 +780,9 @@ export default function PageSurface({
         aria-description={
           locked
             ? "视图已锁定。可以点击内容，滚动用于外层页面阅读；右上角解锁后可缩放和移动。"
-            : "在白板上滚动或拖动空白处浏览。方向键浏览，0 总览；Escape 取消当前操作。"
+            : onTransform
+              ? "拖动空白处框选；空格或中键拖动画布。V 选择，R 矩形，E 椭圆，A 箭头，P 画笔；Escape 取消当前操作。"
+              : "在白板上滚动或拖动空白处浏览。方向键浏览，0 总览；Escape 取消当前操作。"
         }
       >
         {objectMenu && (
@@ -649,11 +841,22 @@ export default function PageSurface({
         </div>
         {drawTool && enabled && !locked && onDraw && (
           <DrawingInput
+            key={drawTool}
             tool={drawTool}
+            panHeld={spaceHeld}
+            makeSnapIndex={board.drawingSnapIndex}
             color={drawColor}
             camera={camera}
             point={(x, y) => controls.current.point(x, y)}
-            onDraw={onDraw}
+            onDraw={(node, frame) => {
+              onDraw(node, frame);
+              requestAnimationFrame(() => {
+                if (
+                  !rootRef.current?.querySelector("[data-board-drawing-input]")
+                )
+                  rootRef.current?.focus({ preventScroll: true });
+              });
+            }}
             onExit={() => onDrawExit?.()}
           />
         )}

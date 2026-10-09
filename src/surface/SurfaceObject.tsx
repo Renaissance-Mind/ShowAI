@@ -1,3 +1,9 @@
+import {
+  drawingBounds,
+  geometryFrame,
+  frameFromGeometry,
+} from "./drawing-geometry.mjs";
+import type { JSONContent } from "@tiptap/core";
 import { resizeFrame, frameHeight, frameBounds } from "./geometry.mjs";
 import type { SurfaceGeometryStore } from "./geometry-store";
 import type { BoardInteraction, BoardGesture } from "./useBoardInteraction";
@@ -50,6 +56,7 @@ export function SurfaceObject({
   region = false,
   container = false,
   drawing = false,
+  drawingNode,
   fixedHeight = false,
   rotatable = false,
   resizable = true,
@@ -62,6 +69,7 @@ export function SurfaceObject({
   region?: boolean;
   container?: boolean;
   drawing?: boolean;
+  drawingNode?: JSONContent;
   fixedHeight?: boolean;
   rotatable?: boolean;
   resizable?: boolean;
@@ -155,6 +163,7 @@ export function SurfaceObject({
     kind: BoardGesture = resize ? "resize" : "move",
   ) => {
     if (
+      event.defaultPrevented ||
       event.button !== 0 ||
       (!positioned && !resize) ||
       !frame ||
@@ -316,6 +325,16 @@ export function SurfaceObject({
     actions.revealAll ||
     actions.revealed.has(id) ||
     (board?.ids.has(id) ?? actions.selected === id);
+  const ink = drawingNode && drawingBounds(drawingNode);
+  const outline =
+    ink && drawingNode
+      ? {
+          left: `${(ink.x / drawingNode.attrs!.extent[0]) * 100}%`,
+          top: `${(ink.y / drawingNode.attrs!.extent[1]) * 100}%`,
+          width: `${(ink.width / drawingNode.attrs!.extent[0]) * 100}%`,
+          height: `${(ink.height / drawingNode.attrs!.extent[1]) * 100}%`,
+        }
+      : undefined;
   const chrome =
     visible || moving || (board?.ids.has(id) ?? actions.selected === id);
   return (
@@ -324,6 +343,7 @@ export function SurfaceObject({
       style={style}
       className={`surface-object${region ? " is-region" : ""}${container ? " is-container" : ""}${drawing ? " is-drawing" : ""}${moving ? " is-moving" : ""}${(board?.ids.has(id) ?? actions.selected === id) ? " is-selected" : ""}`}
       data-surface-id={id}
+      data-board-drawing={(drawing && positioned && !!board) || undefined}
       data-surface-mounted={mount}
       data-board-fixed-height={fixedHeight}
       data-surface-name={name}
@@ -331,6 +351,7 @@ export function SurfaceObject({
       aria-label={name}
       tabIndex={-1}
       onPointerDown={(event) => {
+        if (event.defaultPrevented) return;
         if (
           (event.target as Element).closest("[data-surface-id]") ===
           event.currentTarget
@@ -348,6 +369,15 @@ export function SurfaceObject({
         }
       }}
     >
+      {drawing &&
+        !actions.readOnly &&
+        (board?.ids.has(id) ?? actions.selected === id) && (
+          <div
+            className="board-object-outline"
+            style={outline}
+            aria-hidden="true"
+          />
+        )}
       {rotatable &&
         positioned &&
         !actions.readOnly &&
@@ -466,6 +496,14 @@ export function SurfaceObject({
             data-surface-ui
             data-surface-handle
             data-resize-direction={direction}
+            style={
+              ink && drawingNode
+                ? {
+                    left: `${((ink.x + ink.width * (direction.includes("w") ? 0 : direction.includes("e") ? 1 : 0.5)) / drawingNode.attrs!.extent[0]) * 100}%`,
+                    top: `${((ink.y + ink.height * (direction.includes("n") ? 0 : direction.includes("s") ? 1 : 0.5)) / drawingNode.attrs!.extent[1]) * 100}%`,
+                  }
+                : undefined
+            }
             aria-label={`调整 ${name} ${{ nw: "左上角", n: "上边缘", ne: "右上角", e: "右边缘", se: "右下角", s: "下边缘", sw: "左下角", w: "左边缘" }[direction]}`}
             onKeyDown={(event) => {
               const step = (
@@ -486,7 +524,7 @@ export function SurfaceObject({
                 height: element.current?.offsetHeight ?? frameHeight(frame),
               };
               const next = resizeFrame(
-                measured,
+                drawingNode ? geometryFrame(drawingNode, measured) : measured,
                 { x: step[0] * amount, y: step[1] * amount },
                 direction,
                 { width: drawing ? 1 : 120, height: container ? 180 : 1 },
@@ -495,7 +533,12 @@ export function SurfaceObject({
                 next.height = frame.height;
                 next.y = frame.y;
               }
-              actions.move(id, next);
+              actions.move(
+                id,
+                drawingNode
+                  ? frameFromGeometry(drawingNode, frame, next)
+                  : next,
+              );
             }}
             onPointerDown={(event) => start(event, true, `resize-${direction}`)}
             {...handlers}
