@@ -131,19 +131,6 @@
 .sm-view-controls button:hover {
   background: var(--sb-soft);
 }
-.sm-help {
-  text-align: right;
-  max-width: 460px;
-}
-.sm-help summary {
-  cursor: pointer;
-  line-height: 28px;
-}
-.sm-help p {
-  margin: 4px 0;
-  text-align: left;
-  line-height: 1.8;
-}
 .sm-notice {
   color: var(--sb-accent);
   font-size: 12px;

@@ -490,17 +490,6 @@ export function MindmapBlock({
             <Plus size={15} />
           </button>
         </div>
-        {editable && (
-          <details className="sm-help">
-            <summary>快捷键</summary>
-            <p>
-              选中节点后：Tab 子节点 · Enter 同级节点 · Shift+Enter 在前方插入 ·
-              Shift+Tab 提升层级 · F2 / 双击 编辑 · 方向键 导航 · 空格 折叠 /
-              展开 · Delete 删除分支 · ⌘/Ctrl+Z 撤销 · Shift+⌘/Ctrl+Z 重做 · Esc
-              退出。编辑名称时 Enter 保存，Esc 取消。
-            </p>
-          </details>
-        )}
       </div>
       {notice && (
         <p role="status" className="sm-notice">
@@ -522,8 +511,8 @@ export function MindmapBlock({
           <button
             className="editor-tool"
             type="button"
-            aria-label="编辑节点 F2"
-            title="编辑节点 F2"
+            aria-label="编辑节点"
+            title="编辑节点"
             onClick={() => edit()}
           >
             <Type size={16} />
@@ -532,8 +521,8 @@ export function MindmapBlock({
           <button
             className="editor-tool sm-labeled-action"
             type="button"
-            aria-label="新建子节点 Tab"
-            title="新建子节点 Tab"
+            aria-label="新建子节点"
+            title="新建子节点"
             disabled={data.nodes.length >= MAX_MINDMAP_NODES}
             onClick={() => add("child")}
           >
@@ -543,8 +532,8 @@ export function MindmapBlock({
           <button
             className="editor-tool sm-labeled-action"
             type="button"
-            aria-label="新建同级节点 Enter"
-            title="新建同级节点 Enter"
+            aria-label="新建同级节点"
+            title="新建同级节点"
             disabled={
               data.nodes.length >= MAX_MINDMAP_NODES || node.parentId === null
             }
@@ -557,7 +546,7 @@ export function MindmapBlock({
             className="editor-tool"
             type="button"
             aria-label={collapsed.has(selected) ? "展开分支" : "折叠分支"}
-            title="折叠 / 展开 空格"
+            title="折叠 / 展开"
             disabled={!hasChildren}
             onClick={toggle}
           >
@@ -567,7 +556,7 @@ export function MindmapBlock({
             className="editor-tool"
             type="button"
             aria-label="撤销导图操作"
-            title="撤销 ⌘/Ctrl+Z"
+            title="撤销"
             disabled={!history.current.past.length}
             onClick={() => undo()}
           >
@@ -577,7 +566,7 @@ export function MindmapBlock({
             className="editor-tool"
             type="button"
             aria-label="重做导图操作"
-            title="重做 Shift+⌘/Ctrl+Z"
+            title="重做"
             disabled={!history.current.future.length}
             onClick={() => undo(true)}
           >
@@ -587,7 +576,7 @@ export function MindmapBlock({
             className="editor-tool"
             type="button"
             aria-label="删除节点及其子节点"
-            title="删除分支 Delete"
+            title="删除分支"
             disabled={node.parentId === null}
             onClick={remove}
           >
