@@ -42,10 +42,13 @@ function markedText(node: JSONContent): ReactNode {
         content = (
           <mark
             {...props}
-            style={{
-              backgroundColor:
-                mark.attrs?.color ?? mark.attrs?.backgroundColor ?? "#fff0ac",
-            }}
+            data-color={mark.attrs?.color ?? mark.attrs?.backgroundColor}
+            style={
+              {
+                "--showai-highlight-color":
+                  mark.attrs?.color ?? mark.attrs?.backgroundColor,
+              } as CSSProperties
+            }
           >
             {content}
           </mark>

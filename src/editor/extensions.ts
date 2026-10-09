@@ -7,7 +7,7 @@ import Image from "@tiptap/extension-image";
 import { TableKit } from "@tiptap/extension-table";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
-import Highlight from "@tiptap/extension-highlight";
+import { ReadingHighlight } from "./reading-highlight";
 import TextAlign from "@tiptap/extension-text-align";
 import { TableAlignmentAttributes } from "./table-alignment";
 import { DropCursorCleanup } from "./drop-cursor-cleanup";
@@ -226,7 +226,7 @@ export function createExtensions(
     TableAlignmentAttributes,
     TaskList,
     TaskItem.configure({ nested: true }),
-    Highlight.configure({ multicolor: true }),
+    ReadingHighlight.configure({ multicolor: true }),
     TextAlign.configure({ types: ["heading", "paragraph"] }),
     CalloutNode,
     ToggleNode,

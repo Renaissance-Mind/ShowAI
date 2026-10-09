@@ -3,7 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { PageContent } from "./PageContent";
 import { validateDocument } from "./validation.mjs";
-import type { JSONContent } from "@tiptap/core";
+import { getSchema, type JSONContent } from "@tiptap/core";
+import StarterKit from "@tiptap/starter-kit";
+import { ReadingHighlight } from "../editor/reading-highlight";
 
 const text = (value: string): JSONContent => ({ type: "text", text: value });
 const paragraph = (value: string): JSONContent => ({
@@ -22,6 +24,34 @@ function render(content: JSONContent[]) {
 }
 
 describe("portable read-only content", () => {
+  it("retains the selected highlight colour in editor and exported markup", () => {
+    const schema = getSchema([
+      StarterKit,
+      ReadingHighlight.configure({ multicolor: true }),
+    ]);
+    const colour = "#f8c9dd";
+    const mark = schema.marks.highlight.create({ color: colour });
+    const output = schema.marks.highlight.spec.toDOM!(mark, true) as [
+      string,
+      Record<string, string>,
+      number,
+    ];
+    expect(output[0]).toBe("mark");
+    expect(output[1]["data-color"]).toBe(colour);
+    expect(output[1].style).toBe(`--showai-highlight-color: ${colour}`);
+    const html = render([
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "保留所选颜色", marks: [mark.toJSON()] },
+        ],
+      },
+    ]);
+    expect(html).toContain(`data-color="${colour}"`);
+    expect(html).toContain(`--showai-highlight-color:${colour}`);
+    expect(html).not.toContain("background-color:");
+  });
+
   it("preserves all supported inline formats, line breaks, block alignment and escaped content", () => {
     const html = render([
       {
@@ -71,7 +101,8 @@ describe("portable read-only content", () => {
       "pre",
     ])
       expect(html).toContain(`<${tag}`);
-    expect(html).toContain("background-color:#ffeedd");
+    expect(html).toContain("--showai-highlight-color:#ffeedd");
+    expect(html).toContain('data-color="#ffeedd"');
     expect(html).toContain('rel="noopener noreferrer"');
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(html).not.toContain("<script>");
