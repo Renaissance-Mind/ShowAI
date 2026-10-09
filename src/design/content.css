@@ -435,9 +435,9 @@
 }
 
 /* Page rich-text groups have the same edge spacing as a Markdown component. */
-.page-document-flow > :first-child {
+.document-content .page-document-flow > :first-child {
   margin-top: 0;
 }
-.page-document-flow > :last-child {
+.document-content .page-document-flow > :last-child {
   margin-bottom: 0;
 }
