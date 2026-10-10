@@ -24,6 +24,7 @@ import { injectComponentBootstrap, readCustomBlockData } from "./contract";
 import type { CompiledComponent } from "./types";
 import { InlineComponent } from "./InlineComponent";
 import { findComponent, indexComponents } from "./component-index";
+import { installComponentLinks, openComponentLink } from "./external-links";
 import "./custom.css";
 
 const ComponentsContext = createContext<ReadonlyMap<string, CompiledComponent>>(
@@ -233,7 +234,7 @@ function SandboxComponent({
         component.html,
         `<style>body{color:var(--text)}</style><script>(${installSandboxTheme.toString()})(${safeJson(channel)},${safeJson(initialTheme.current)},${safeJson(appearanceTokens())});</script><script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current })}</script>`,
       ) +
-      `<script>(${installIconTooltips.toString()})(document);</script>`
+      `<script>(${installIconTooltips.toString()})(document);(${installComponentLinks.toString()})(${safeJson(channel)});</script>`
     );
   }, [component.html, channel]);
 
@@ -258,6 +259,10 @@ function SandboxComponent({
       )
         return;
       if (event.data.type === "showai:ready") sendProps();
+      if (event.data.type === "showai:open-url") {
+        openComponentLink(event.data.url);
+        return;
+      }
       if (
         event.data.type === "showai:height" &&
         typeof event.data.height === "number" &&
