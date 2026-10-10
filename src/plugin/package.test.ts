@@ -56,7 +56,7 @@ describe("plugin packaging", () => {
         ].join(eol),
       );
       expect(result.stdout).toContain(
-        "Prepared shared ShowAI skills 0.8.0: example",
+        "Prepared ShowAI MCP plugin 0.8.0: example",
       );
     },
   );

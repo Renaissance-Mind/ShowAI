@@ -115,7 +115,8 @@ async function run(command, args) {
 }
 await run("npm", ["run", "check"]);
 await run("npm", ["run", "build"]);
-await run("npm", ["test"]);
+// Latency assertions need test files to avoid competing for the same disk.
+await run("npm", ["test", "--", "--no-file-parallelism"]);
 await run(join(root, "node_modules/.bin/electron-builder"), [
   "--mac",
   "--arm64",

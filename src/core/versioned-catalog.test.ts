@@ -137,6 +137,8 @@ describe("versioned component and template lifecycle", () => {
       component.version,
       projectId,
     );
+    const versionParts = source.manifest.version.split(".").map(Number);
+    versionParts[2] += 1;
     const next = await withChangeContext(actor, () =>
       saveComponent(
         root,
@@ -144,7 +146,7 @@ describe("versioned component and template lifecycle", () => {
           ...source,
           manifest: {
             ...source.manifest,
-            version: "1.1.1",
+            version: versionParts.join("."),
             description: "Updated description",
           },
         },
