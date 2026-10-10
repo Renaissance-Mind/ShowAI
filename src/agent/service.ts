@@ -65,6 +65,7 @@ import {
 import {
   describeCommand,
   catalogSearchText,
+  compareCatalogVersions,
   catalogEntry,
   catalogPage,
   pageOf,
@@ -226,6 +227,7 @@ export class AgentService {
       home: this.store.root,
       ...(directory ? { sourceDirectory: directory } : {}),
       project: projectSummary(project),
+      componentCatalog: await this.componentContext(project.id),
       next: `showai pages list --project ${shellToken(project.id)} --json`,
     };
   }
@@ -257,20 +259,49 @@ export class AgentService {
       query?: string;
       limit?: number;
       cursor?: string;
+      versions?: "recommended" | "all";
     } = {},
   ) {
     const projectId = this.catalogProject(input.projectId);
+    if (input.versions && !["recommended", "all"].includes(input.versions))
+      throw new CoreError(
+        "INVALID_DATA",
+        "versions must be recommended or all.",
+      );
     const scope = input.scope ?? "all";
     const componentScope = input.scope ?? (projectId ? "project" : "builtin");
     const query = input.query?.trim().toLocaleLowerCase();
     const matches = (item: object) =>
       !query || catalogSearchText(item).includes(query);
+    const identity = (item: {
+      kind: CatalogKind;
+      scope: CatalogScope;
+      id: string;
+      version?: string;
+      integrity?: string;
+    }) =>
+      `${item.kind}:${item.scope}:${item.id}:${item.version ?? ""}:${item.integrity ?? ""}`;
+    const matching = new Set<string>();
+    const documentationRevisions = new Map<string, string>();
+    const summarize = (kind: CatalogKind, item: object) => {
+      const summary = summarizeCatalog(kind, item, projectId);
+      if (matches(item)) matching.add(identity(summary));
+      documentationRevisions.set(
+        identity(summary),
+        createHash("sha256")
+          .update(
+            JSON.stringify(
+              (item as { documentation?: unknown }).documentation ?? null,
+            ),
+          )
+          .digest("hex"),
+      );
+      return summary;
+    };
     const builtin =
       input.kind === "template" || !["all", "builtin"].includes(scope)
         ? []
-        : listBuiltinComponents()
-            .filter(matches)
-            .map((item) => summarizeCatalog("component", item, projectId));
+        : listBuiltinComponents().map((item) => summarize("component", item));
     const components =
       input.kind === "template"
         ? []
@@ -278,19 +309,17 @@ export class AgentService {
             await listComponents(this.store.root, projectId, {
               scope: componentScope,
             })
-          )
-            .filter(matches)
-            .map((item) => summarizeCatalog("component", item, projectId));
+          ).map((item) => summarize("component", item));
     const templates =
       input.kind === "component"
         ? []
-        : (await listTemplates(this.store.root, projectId, { scope }))
-            .filter(matches)
-            .map((item) => summarizeCatalog("template", item, projectId));
+        : (await listTemplates(this.store.root, projectId, { scope })).map(
+            (item) => summarize("template", item),
+          );
     const all = [
       ...new Map(
         [...builtin, ...components, ...templates].map((item) => [
-          `${item.kind}:${item.scope}:${item.id}:${item.version ?? ""}:${item.integrity ?? ""}`,
+          identity(item),
           item,
         ]),
       ).values(),
@@ -300,11 +329,36 @@ export class AgentService {
         a.id.localeCompare(b.id) ||
         ["project", "global", "published", "builtin"].indexOf(a.scope) -
           ["project", "global", "published", "builtin"].indexOf(b.scope) ||
-        (b.version ?? "").localeCompare(a.version ?? "", undefined, {
-          numeric: true,
-        }),
+        compareCatalogVersions(b.version, a.version),
     );
-    const result = catalogPage(all.map(catalogEntry), {
+    const recommended =
+      input.versions === "all"
+        ? all
+        : all.filter(
+            (item, index) =>
+              item.kind !== "component" ||
+              !all
+                .slice(0, index)
+                .some(
+                  (previous) =>
+                    previous.kind === item.kind &&
+                    previous.id === item.id &&
+                    previous.scope === item.scope,
+                ),
+          );
+    const entries = recommended
+      .filter((item) => matching.has(identity(item)))
+      .map(catalogEntry);
+    const revision = createHash("sha256")
+      .update(
+        JSON.stringify([
+          projectId ?? null,
+          entries,
+          entries.map((item) => documentationRevisions.get(identity(item))),
+        ]),
+      )
+      .digest("hex");
+    const result = catalogPage(entries, {
       limit: input.limit,
       cursor: input.cursor,
       key: {
@@ -312,16 +366,22 @@ export class AgentService {
         kind: input.kind,
         scope: input.scope ?? "default",
         query,
+        versions: input.versions ?? "recommended",
+        revision,
       },
     });
     return {
       ...result,
+      revision,
+      complete: result.nextCursor === null && !input.cursor,
+      versions: input.versions ?? "recommended",
       next: result.nextCursor
         ? [
             "showai catalog list",
             ...(projectId ? ["--project", shellToken(projectId)] : []),
             ...(input.kind ? ["--kind", input.kind] : []),
             ...(input.scope ? ["--scope", input.scope] : []),
+            ...(input.versions ? ["--versions", input.versions] : []),
             ...(input.query ? ["--query", shellToken(input.query)] : []),
             "--limit",
             String(result.limit),
@@ -330,6 +390,28 @@ export class AgentService {
             "--json",
           ].join(" ")
         : "showai guide catalog --json",
+    };
+  }
+
+  async componentContext(projectId?: string, knownRevision?: string) {
+    const catalog = await this.catalogList({ projectId, kind: "component" });
+    if (knownRevision === catalog.revision)
+      return {
+        revision: catalog.revision,
+        total: catalog.total,
+        complete: true,
+        unchanged: true,
+        reusePreviousIndex: true,
+      };
+    return {
+      ...catalog,
+      workflows: {
+        page: "Read the current page and template when relevant. Select from this complete index, then read catalog_describe view=guide for each chosen exact revision. Modify instance data/layout and verify before saving.",
+        component:
+          "Define the expression gap, inspect candidates with view=guide, then use view=development and only the required source files. Save documentation, schema, examples and source together as a new version; validate in a real page.",
+      },
+      refresh:
+        "Compare revision after project/catalog changes. Reuse documentation only for the same exact version; historical page references remain authoritative. Explicit scope=global/published/all discovers shared resources.",
     };
   }
 
@@ -444,6 +526,7 @@ export class AgentService {
     const next = Object.fromEntries(
       [
         "guide",
+        "development",
         "schema",
         "examples",
         "dependencies",
@@ -456,11 +539,50 @@ export class AgentService {
     const schema =
       "propsSchema" in component ? component.propsSchema : component.schema;
     const parents = "parents" in component ? (component.parents ?? []) : [];
+    const documentation = component.documentation;
     if (view === "summary") return { ...summary, view, next };
+    if (view === "development")
+      return {
+        ...summary,
+        view,
+        ...(documentation
+          ? {
+              reuse: documentation.reuse,
+              development: documentation.development,
+            }
+          : {
+              missing:
+                "This historical component has no authored development contract. Inspect its exact source and dependencies; do not assume general reusability.",
+            }),
+        dependencies:
+          "dependencies" in component ? (component.dependencies ?? []) : [],
+        next,
+      };
     if (view === "guide")
       return {
         ...summary,
         view,
+        ...(documentation
+          ? {
+              reuse: documentation.reuse,
+              guide: documentation.usage,
+              schema,
+              ...(JSON.stringify(component.examples[0] ?? {}).length <= 12000
+                ? { example: component.examples[0] }
+                : {
+                    exampleReference: {
+                      view: "examples",
+                      index: 0,
+                      name: component.examples[0]?.name,
+                      reason:
+                        "Complete data is large; request examples explicitly. It has not been truncated.",
+                    },
+                  }),
+            }
+          : {
+              missing:
+                "This historical component has no authored use contract. Schema/examples remain available; usage and reuse boundaries are unassessed.",
+            }),
         usage: native
           ? {
               nodeType: native.nodeType,
@@ -578,6 +700,7 @@ export class AgentService {
     return {
       ...summary,
       view: "full",
+      ...(documentation ? { documentation } : {}),
       schema,
       defaultData: component.defaultData,
       examples: component.examples,

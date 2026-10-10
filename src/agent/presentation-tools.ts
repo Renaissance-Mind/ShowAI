@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { CATALOG_VIEWS } from "./disclosure";
 import { version } from "../../package.json";
 import {
   publicCatalog,
@@ -185,9 +186,7 @@ export function registerPresentationTools(
       inputSchema: {
         id: z.string(),
         kind: z.enum(["component", "template"]).optional(),
-        view: z
-          .enum(["summary", "guide", "schema", "examples", "source"])
-          .optional(),
+        view: z.enum(CATALOG_VIEWS).optional(),
         file: z.string().optional(),
       },
       annotations: readOnly,

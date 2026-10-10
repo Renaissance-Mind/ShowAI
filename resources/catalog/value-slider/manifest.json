@@ -1,7 +1,7 @@
 {
   "id": "value-slider",
   "name": "数值滑块",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "通过滑块调整一个数值。编辑时同步页面数据，阅读时可临时探索。",
   "scenarios": [
     "让读者探索单个有界数值，例如调整阈值或观察一个连续参数。",
@@ -24,10 +24,115 @@
         "max": 100
       },
       "request": "创建一个可以在0到100之间调整的数值。"
+    },
+    {
+      "name": "阈值范围示例",
+      "request": "用 0 到 1 的范围探索一个阈值。",
+      "data": {
+        "label": "阈值",
+        "value": 0.5,
+        "min": 0,
+        "max": 1
+      }
     }
   ],
   "effects": [
     "通过滑动显示当前值及取值范围。",
     "编辑模式下将新值写回页面，阅读模式下保留临时探索状态。"
-  ]
+  ],
+  "documentation": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": [
+        "用于不同主题的单个有界数值输入。"
+      ]
+    },
+    "usage": {
+      "purpose": "通过滑块调整一个数值。编辑时同步页面数据，阅读时可临时探索。",
+      "structure": [
+        "label/value/min/max 定义一个连续数值滑块，值与区间由页面输入。"
+      ],
+      "inputs": [
+        {
+          "path": "label",
+          "meaning": "滑块显示名称。"
+        },
+        {
+          "path": "value",
+          "meaning": "初始有限数值，应在区间内。"
+        },
+        {
+          "path": "min",
+          "meaning": "区间的一端。"
+        },
+        {
+          "path": "max",
+          "meaning": "区间另一端；组件内部将两端排序。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "使用最小示例",
+          "steps": [
+            "填写标签、区间与初始值，核对显示单位所表达的含义。",
+            "在真实 Page 查看并操作组件。"
+          ],
+          "exampleIndex": 0
+        },
+        {
+          "title": "替换项目内容",
+          "steps": [
+            "替换为另一个有效区间和初始值，确认滑块与读数一致。",
+            "检查只读探索与编辑保存的差异，重读页面确认正式写入。"
+          ],
+          "exampleIndex": 1
+        }
+      ],
+      "interactions": [
+        {
+          "action": "滑动数值",
+          "effect": "阅读态临时探索；编辑态向宿主提交 value。",
+          "persistence": "mixed"
+        }
+      ],
+      "constraints": [
+        "一次控制一个有界数值；不支持自定义计算公式。",
+        "阅读态滑动仅改变本地状态；非只读且提供 onChange 时提交 value。"
+      ],
+      "editing": {
+        "data": [
+          "label：滑块显示名称。",
+          "value：初始有限数值，应在区间内。",
+          "min：区间的一端。",
+          "max：区间另一端；组件内部将两端排序。"
+        ],
+        "implementation": [
+          "增加步长、格式或计算能力时同步 Data、schema 与控件实现。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "React 组件入口及交互。"
+        }
+      ],
+      "architecture": [
+        "useState 保存阅读值，useEffect 接收新的源 value；onChange 在非只读状态回传。"
+      ],
+      "extensionPoints": [
+        "扩展公开参数时保持输入、读数与宿主保存的一致性。"
+      ],
+      "invariants": [
+        "一次控制一个有界数值；不支持自定义计算公式。",
+        "阅读态滑动仅改变本地状态；非只读且提供 onChange 时提交 value。"
+      ],
+      "verification": [
+        "在不同区间测试初始值、滑动和外部 props 更新。",
+        "检查真实页面中的只读、编辑保存、窄屏及离线导出。"
+      ]
+    }
+  }
 }

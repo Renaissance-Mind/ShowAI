@@ -7,6 +7,7 @@ import type {
 export const CATALOG_VIEWS = [
   "summary",
   "guide",
+  "development",
   "schema",
   "examples",
   "source",
@@ -15,6 +16,45 @@ export const CATALOG_VIEWS = [
 ] as const;
 export type CatalogView = (typeof CATALOG_VIEWS)[number];
 export type CatalogKind = "component" | "template";
+/** Semver precedence, including stable releases versus prerelease identifiers. */
+export function compareCatalogVersions(
+  left = "0.0.0",
+  right = "0.0.0",
+): number {
+  const parse = (version: string) => {
+    const dash = version.indexOf("-");
+    return {
+      core: (dash < 0 ? version : version.slice(0, dash)).split("."),
+      pre: dash < 0 ? [] : version.slice(dash + 1).split("."),
+    };
+  };
+  const a = parse(left),
+    b = parse(right);
+  const numeric = (x: string, y: string) =>
+    x.length - y.length || x.localeCompare(y);
+  for (let i = 0; i < 3; i++) {
+    const result = numeric(a.core[i] ?? "0", b.core[i] ?? "0");
+    if (result) return result;
+  }
+  if (!a.pre.length || !b.pre.length)
+    return Number(!a.pre.length) - Number(!b.pre.length);
+  for (let i = 0; i < Math.max(a.pre.length, b.pre.length); i++) {
+    if (a.pre[i] === undefined || b.pre[i] === undefined)
+      return a.pre.length - b.pre.length;
+    const an = /^\d+$/.test(a.pre[i]),
+      bn = /^\d+$/.test(b.pre[i]);
+    const result =
+      an && bn
+        ? numeric(a.pre[i], b.pre[i])
+        : an !== bn
+          ? an
+            ? -1
+            : 1
+          : a.pre[i].localeCompare(b.pre[i]);
+    if (result) return result;
+  }
+  return 0;
+}
 export interface CatalogSummary {
   kind: CatalogKind;
   id: string;
@@ -25,6 +65,8 @@ export interface CatalogSummary {
   description?: string;
   scenarios: string[];
   effects?: string[];
+  reuse?: "general" | "domain" | "content-specific" | "unclassified";
+  documentationStatus?: "available" | "missing";
   ref?: PackageRevisionRef;
 }
 
@@ -101,6 +143,15 @@ export function summarizeCatalog(
     ...(integrity ? { integrity } : {}),
     ...(kind === "component"
       ? {
+          reuse:
+            (
+              item.documentation as
+                | import("../components/custom/documentation").ComponentDocumentation
+                | undefined
+            )?.reuse.kind ?? "unclassified",
+          documentationStatus: item.documentation
+            ? ("available" as const)
+            : ("missing" as const),
           effects: Array.isArray(item.effects)
             ? item.effects.filter(
                 (value): value is string => typeof value === "string",
@@ -145,8 +196,18 @@ export function describeCommand(
 
 /** Full discovery stays compact; detailed metadata belongs to describe. */
 export function catalogEntry(item: CatalogSummary) {
-  const { kind, id, name, scope, version, integrity, description, scenarios } =
-    item;
+  const {
+    kind,
+    id,
+    name,
+    scope,
+    version,
+    integrity,
+    description,
+    scenarios,
+    reuse,
+    documentationStatus,
+  } = item;
   return {
     kind,
     id,
@@ -154,6 +215,7 @@ export function catalogEntry(item: CatalogSummary) {
     description: description ?? "",
     scenarios,
     scope,
+    ...(reuse ? { reuse, documentationStatus } : {}),
     ...(version ? { version } : {}),
     ...(integrity ? { integrity } : {}),
   };

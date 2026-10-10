@@ -35,6 +35,7 @@ import Ajv from "ajv";
 import standaloneCode from "ajv/dist/standalone/index.js";
 import templates from "../../resources/catalog/templates.json";
 import { builtinComponentCatalog } from "../components/catalog";
+import { validateComponentDocumentation } from "../components/custom/documentation";
 
 import { builtinSources, builtinExports } from "./builtin-sources";
 import { validateDocument } from "../portable/validation.mjs";
@@ -141,6 +142,7 @@ export default function Component({ data, onChange, readOnly }) {
       category: componentCategory(item),
       scenarios: item.scenarios,
       effects: item.effects,
+      ...(item.documentation ? { documentation: item.documentation } : {}),
       entry: "index.tsx",
       defaultData: item.defaultData,
       examples: item.examples,
@@ -1073,6 +1075,14 @@ function manifestFrom(value: unknown): ComponentManifest {
     entry,
     ...(item.reader ? { reader: "readData" as const } : {}),
     scenarios: item.scenarios as string[],
+    ...(item.documentation !== undefined
+      ? {
+          documentation: validateComponentDocumentation(
+            item.documentation,
+            examples.length,
+          ),
+        }
+      : {}),
     defaultData,
     examples,
     ...(item.effects !== undefined

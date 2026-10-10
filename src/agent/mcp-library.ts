@@ -41,11 +41,21 @@ export function createLibraryMcpServer(options: {
       if (name === "guide") return;
       if (name === "project_context") {
         tool.update({
-          paramsSchema: { projectId: z.string().min(1).optional() },
-          callback: ({ projectId }) =>
+          paramsSchema: {
+            projectId: z.string().min(1).optional(),
+            knownCatalogRevision: z
+              .string()
+              .regex(/^[a-f0-9]{64}$/)
+              .optional(),
+          },
+          callback: ({ projectId, knownCatalogRevision }) =>
             call(async () => ({
               root: service.store.root,
               scope: "library",
+              componentCatalog: await service.componentContext(
+                projectId,
+                knownCatalogRevision,
+              ),
               ...(projectId
                 ? { project: await service.store.readProject(projectId) }
                 : {}),

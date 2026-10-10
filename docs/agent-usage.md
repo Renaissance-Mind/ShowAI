@@ -302,3 +302,12 @@ Keep `hash`, `revision` and stable node IDs from a full read. Supply both `--bas
 `history list/read/compare/merge/restore` exposes independent changes, actor/session filters and reviewed three-way merges. `history read --view html` and `export --revision` use the captured reader and pinned dependencies. `history imported/snapshot/restore-snapshot` handles old checkpoints separately. `search --query` searches bodies, nested containers, component/template descriptions and sources.
 
 `history conflicts` discovers external files. `history recover-package CONFLICT_ID --project PROJECT` retains edited source/schema/assets as an editable draft and restores the immutable package projection. Repair the draft and publish a new version. `library stats/compact/cleanup-plan/cleanup/rebuild-index/archive/verify-archive/policy` exposes space accounting and verified maintenance; cleanup never removes formal history.
+
+
+## Versioned component documentation
+
+Project context includes the full compact component index and its revision for both page and component tasks. A caller already retaining that complete index may pass `knownCatalogRevision`; an `unchanged` receipt omits repeated items and instructs the caller to reuse the previous index. Without the previous full index, omit this parameter. Component lists show one recommended revision per ID and scope; use `--versions all` for history. Page references remain pinned. Each entry discloses reuse (`general`, `domain`, `content-specific`, or `unclassified`) and documentation status.
+
+`catalog describe --view guide` provides the authored use contract, schema and a compact example. Large example payloads return an explicit examples-view reference. `--view development` returns the implementation guide without code; source remains explicit. Read `guide component` for the exact `manifest.documentation` schema. New MCP authoring requires this contract; legacy package imports remain readable and visibly unclassified until a new documented revision is created.
+
+The workbench component dialog displays the same use and development guides and saves documentation with customized versions. Documentation validation checks its structure and example references; actual rendering, interaction and independent Agent understanding require separate verification.

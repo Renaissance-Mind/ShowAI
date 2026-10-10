@@ -4,7 +4,7 @@ import { join, resolve, dirname, extname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { AgentService } from "./service";
-import { catalogPage } from "./disclosure";
+import { catalogPage, type CatalogView } from "./disclosure";
 import { FileStore } from "../core/store";
 import { buildPageHtml } from "./exporter";
 import {
@@ -166,7 +166,7 @@ export async function describePublicResource(
   id: string,
   input: {
     kind?: "component" | "template";
-    view?: "summary" | "guide" | "schema" | "examples" | "source";
+    view?: CatalogView;
     file?: string;
   } = {},
 ) {

@@ -5,9 +5,9 @@ description: 通过 ShowAI MCP 创建或改造可复用 React 组件。先查目
 
 沿用已核实MCP连接、项目和页面；缺少时读 [use-showai](../use-showai/SKILL.md)。正式资源保存到目标项目；用户明确独立交付时可把相同源码对象交给render_document，不自动创建个人项目。
 
-先明确内容输入、读者操作及可见结果。先用catalog_list({kind:"component",projectId})获取全部内置组件与当前项目组件的名字、摘要和场景，省略scope/query/limit/cursor；catalog_describe按需取guide/schema/examples；调整数据或组合即可达到目标时复用。需要新实现时读取 [组件设计](references/component-authoring.md)及guide({topic:"component"})。读取详情或源码时沿用目录或页面引用中的scope、version、integrity，准确区分同名组件；修改现有组件前只取选中组件的source。
+先明确内容输入、读者操作及可见结果。先取得或复用project_context的componentCatalog；目录变化时用catalog_list更新。catalog_describe按需取guide/schema/examples；调整数据或组合即可达到目标时复用。需要新实现时读取 [组件设计](references/component-authoring.md)及guide({topic:"component"})。读取详情或源码时沿用目录或页面引用中的scope、version、integrity，准确区分同名组件；实现开发先取development，再只取选中组件所需的source文件。
 
-本机与远程均调用component_save，参数source包含manifest、schema、source及可选files/assets。manifest含id、name、version、description、scenarios、entry、defaultData、examples；默认数据和例子都需满足schema。源码接收data、onChange、readOnly。正式编辑通过onChange返回有效数据；阅读探索使用本地状态。
+本机与远程均调用component_save，参数source包含manifest、schema、source及可选files/assets。manifest含id、name、version、description、scenarios、entry、defaultData、examples；默认数据和例子都需满足schema。新创作还必须提供manifest.documentation：version=1，reuse（kind、boundaries，内容专用还需owner）、usage（用途、结构、输入含义、操作、保存、限制、示例步骤与修改边界）、development（入口、架构、扩展点、不变量与验证）。准确字段读取guide component返回的documentationSchema；recipe.exampleIndex对应真实示例索引。说明与代码随新版本保存；旧版缺项不冒充通用。源码接收data、onChange、readOnly。正式编辑通过onChange返回有效数据；阅读探索使用本地状态。
 
 可以使用React、包内模块、showai:components及明确声明精确依赖的showai:component/ID。新版本不可覆盖旧版本。页面用kind=custom和data={componentId,version,integrity,props}引用保存回执中的精确版本，不把包ID当作内置kind。
 

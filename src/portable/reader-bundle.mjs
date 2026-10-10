@@ -301,6 +301,14 @@ async function compileReader(archivePath, archive, kinds) {
           source = JSON.stringify(
             JSON.parse(source).filter((item) => selected.has(item.kind)),
           );
+        if (args.path === "resources/catalog/component-documentation.json")
+          source = JSON.stringify(
+            Object.fromEntries(
+              Object.entries(JSON.parse(source)).filter(([kind]) =>
+                selected.has(kind),
+              ),
+            ),
+          );
         if (args.path === "src/components/blocks/g2/draws.js") {
           source =
             drawImports.map((item) => item.text).join("\n") +

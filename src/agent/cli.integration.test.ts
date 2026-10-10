@@ -1418,8 +1418,16 @@ test("directory projects are shared across sessions, canonical paths and concurr
     const payload = JSON.parse(
       (context.content as { text: string }[])[0].text,
     ).data;
-    expect(payload.project.id).toBe(root.project.id);
+    expect(payload.scope).toBe("library");
+    expect(payload.componentCatalog.complete).toBe(true);
     expect(payload.root).toBe(library);
+    const selected = await client.callTool({
+      name: "project_context",
+      arguments: { projectId: root.project.id },
+    });
+    expect(
+      JSON.parse((selected.content as { text: string }[])[0].text).data.project.id,
+    ).toBe(root.project.id);
   } finally {
     await client.close();
   }
@@ -2180,7 +2188,7 @@ test("catalog search indexes descriptive examples while returning only summaries
   expect(runtimeOnly.items).toHaveLength(0);
   const builtin = await run(["catalog", "describe", "playground"]);
   expect(Object.keys(builtin.next).sort()).toEqual(
-    ["guide", "schema", "examples", "dependencies", "source"].sort(),
+    ["guide", "development", "schema", "examples", "dependencies", "source"].sort(),
   );
   const unavailable = await run([
     "catalog",

@@ -1,3 +1,6 @@
+import { z } from "zod";
+import { componentDocumentationSchema } from "../components/custom/documentation";
+
 export const GUIDE_TOPICS = [
   "integration",
   "workspace",
@@ -312,9 +315,9 @@ const guides: Record<
     rules: [
       "catalog list and public catalog list return every matching name, description and scenario by default, with IDs, scopes and available revision identities for detail lookup. Omit query, limit and cursor to discover the full accessible catalog. Explicit limit (1–50) opts into pagination with nextCursor; retain the same limit/query/scope for subsequent pages. Restart without a cursor if the catalog changed.",
       "Scopes are builtin, global, published and project. Shared scopes are immutable; author changes in an explicitly selected project.",
-      "Component discovery without scope returns all built-ins plus the selected project's components; without a selected project it returns built-ins only. Explicit scope global, published or all includes shared resources. Template discovery keeps its existing all-scope default. Keep each returned scope/version/integrity when reading details, including components that share an ID.",
+      "Component discovery without scope returns all built-ins plus the selected project's components (one recommended revision per id/scope; versions=all lists history); without a selected project it returns built-ins only. Explicit scope global, published or all includes shared resources. Template discovery keeps its existing all-scope default. Keep each returned scope/version/integrity when reading details, including components that share an ID.",
       "List entries contain names, descriptions and scenarios plus lookup identities; effects and repeated per-item commands are excluded. describe defaults to summary, where component effects are also available. Neither list nor summary includes schema, default data, page body or code.",
-      "Views: guide for usage, schema for props, examples for presets, dependencies for exact references, source for original code/template definition, full for all descriptive metadata. full still excludes source and executable runtimes.",
+      "Views: guide for the versioned use contract, schema and compact example; development for implementation guidance without code; schema for props, examples for complete presets, dependencies for exact references, source for original code/template definition, full for all descriptive metadata. full still excludes source and executable runtimes.",
       "Use the Markdown component (kind text) for headings, paragraphs, lists, quotations, code blocks, dividers and LaTeX formulas together in one content string. Inline math accepts $...$ or \\( ... \\); display math accepts $$...$$ or \\[ ... \\]. Code remains literal. Image and table remain independent components with dedicated editing and appearance features. Toggle and other interactive/custom components use their own kinds and data; request schema/examples before authoring.",
       "Builtins expose an editable starting source. Read --view source, choose a new manifest id/version, then save it in the selected project.",
       "Video, Audio, PDF and References are built-in components. Query their schemas/examples. File components accept src as an http/https URL or a matching base64 data URI; local upload is limited to 6 MB per file and the whole page to 10 MB. Online playback/loading needs network access (PDF URLs also need CORS); offline exports require embedded files and video posters. Custom component sandboxes accept embedded files only. References stores id/title/authors/year/venue/doi/url/note; Markdown links such as [1](#ref-paper-id) target a stable item id.",
@@ -336,11 +339,12 @@ const guides: Record<
     purpose:
       "Create a reusable React component only after reuse and composition leave a real expression or interaction gap.",
     rules: [
+      "New authored components provide manifest.documentation. The versioned contract has reuse (general/domain/content-specific and boundaries; content-specific requires owner), usage (purpose, structure, input meanings, recipes, interactions/persistence, constraints and editing boundaries), and development (entry points, architecture, extensions, invariants and verification). The input.documentationSchema below is authoritative. Legacy imports without it remain readable and explicitly missing/unclassified.",
       "For derived values, declare manifest.reader=readData and export synchronous readData(props) JSON (up to 64 KiB) from the entry. Join computed fields back to source by stable IDs and mark derived fields. It executes in the component browser sandbox; do not read files or call services. Import a new version after adding or changing the contract.",
       "Describe input data, reader actions and resulting state before choosing an implementation. Search component summaries first; read source only for the chosen component being changed.",
       "A local package contains manifest.json, props.schema.json and its React entry. The entry receives {data, onChange, readOnly}; onChange persists valid edits, while reading interactions keep source content unchanged.",
       "Interactive components can import GestureBoundary from showai:components and set axes to x, y and/or zoom to own those gestures. Do not intercept unneeded axes. Native scroll regions and iframe contents already own their inputs.",
-      "manifest needs id, name, version, description, scenarios, entry, defaultData and examples. Default data and every example must pass the schema.",
+      "manifest needs id, name, version, description, scenarios, entry, defaultData, examples and documentation for new authoring. Default data and every example must pass schema; recipe exampleIndex must reference a real example. Documentation is part of immutable source and integrity. Read guide for use and development before changing implementation; source is separate.",
       "Use React, package-local imports or showai:components, including Flowchart. Custom children use showai:component/ID with exact manifest.dependencies refs. External npm libraries belong in the installed ShowAI runtime, not the skill package.",
       "Import into the selected project, use it in a real page and check the main interaction in desktop and exported HTML. New versions are immutable; shared promotion is explicit.",
     ],
@@ -351,6 +355,9 @@ const guides: Record<
       "showai catalog save --project PROJECT --input component-source.json --json",
       "showai export --project PROJECT --page PAGE --format html --out ./component-preview.html --json",
     ],
+    input: {
+      documentationSchema: z.toJSONSchema(componentDocumentationSchema),
+    },
   },
   "template-extraction": {
     purpose:

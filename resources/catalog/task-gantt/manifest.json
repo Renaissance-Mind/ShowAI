@@ -1,7 +1,7 @@
 {
   "id": "task-gantt",
   "name": "任务管理甘特图",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "reader": "readData",
   "description": "紧凑多列任务甘特图，支持多层嵌套、汇总排期、拖动改期与依赖校验。",
   "category": "data",
@@ -18,7 +18,11 @@
   "defaultData": {
     "title": "项目排期",
     "tasks": [],
-    "columns": ["title", "owner", "status"]
+    "columns": [
+      "title",
+      "owner",
+      "status"
+    ]
   },
   "examples": [
     {
@@ -66,7 +70,9 @@
             "start": "2026-10-08",
             "end": "2026-10-12",
             "progress": 40,
-            "dependencies": ["scope"],
+            "dependencies": [
+              "scope"
+            ],
             "parentId": "planning",
             "color": "purple"
           },
@@ -88,7 +94,9 @@
             "start": "2026-10-08",
             "end": "2026-10-13",
             "progress": 25,
-            "dependencies": ["scope"],
+            "dependencies": [
+              "scope"
+            ],
             "parentId": "development",
             "color": "blue"
           },
@@ -100,7 +108,10 @@
             "start": "2026-10-14",
             "end": "2026-10-20",
             "progress": 0,
-            "dependencies": ["design", "model"],
+            "dependencies": [
+              "design",
+              "model"
+            ],
             "parentId": "development",
             "color": "blue"
           },
@@ -112,7 +123,9 @@
             "start": "2026-10-21",
             "end": "2026-10-24",
             "progress": 0,
-            "dependencies": ["timeline"],
+            "dependencies": [
+              "timeline"
+            ],
             "parentId": "development",
             "color": "amber"
           },
@@ -125,12 +138,18 @@
             "end": "2026-10-26",
             "progress": 0,
             "milestone": true,
-            "dependencies": ["qa"],
+            "dependencies": [
+              "qa"
+            ],
             "parentId": "product",
             "color": "rose"
           }
         ],
-        "columns": ["title", "owner", "status"]
+        "columns": [
+          "title",
+          "owner",
+          "status"
+        ]
       }
     },
     {
@@ -139,6 +158,154 @@
         "title": "新项目",
         "tasks": []
       }
+    },
+    {
+      "name": "最小依赖排期示例",
+      "request": "两个示例任务按先后依赖排期。",
+      "data": {
+        "title": "教学排期",
+        "tasks": [
+          {
+            "id": "draft",
+            "title": "整理材料",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "progress": 100
+          },
+          {
+            "id": "review",
+            "title": "检查内容",
+            "start": "2026-10-03",
+            "end": "2026-10-04",
+            "progress": 0,
+            "dependencies": [
+              "draft"
+            ]
+          }
+        ],
+        "columns": [
+          "title",
+          "start",
+          "end",
+          "progress"
+        ]
+      }
     }
-  ]
+  ],
+  "documentation": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": [
+        "用于不同项目的有界任务排期，遵守任务树与依赖约束。"
+      ]
+    },
+    "usage": {
+      "purpose": "紧凑多列任务甘特图，支持多层嵌套、汇总排期、拖动改期与依赖校验。",
+      "structure": [
+        "tasks 同时构成父子任务树与前置依赖图；时间轴和可配置列读取同一份数据。"
+      ],
+      "inputs": [
+        {
+          "path": "title",
+          "meaning": "排期标题。"
+        },
+        {
+          "path": "description",
+          "meaning": "项目范围与日期口径说明。"
+        },
+        {
+          "path": "tasks",
+          "meaning": "最多 200 个任务；每项有唯一 id、title、start/end（YYYY-MM-DD）、progress（整数 0–100）。"
+        },
+        {
+          "path": "tasks[].parentId",
+          "meaning": "可选父任务 ID，必须存在且不形成循环。父任务排期与进度来自子任务汇总。"
+        },
+        {
+          "path": "tasks[].dependencies",
+          "meaning": "前置任务的稳定 ID，不能缺失、重复、自依赖或形成循环；排期冲突会被校验。"
+        },
+        {
+          "path": "tasks[].milestone",
+          "meaning": "里程碑标记；遵守任务模型中的日期约束。"
+        },
+        {
+          "path": "columns",
+          "meaning": "需要显示的列，取 title/owner/status/phase/progress/start/end；1–7 列且不重复。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "使用最小示例",
+          "steps": [
+            "填写任务 ID、标题、起止日期和进度，再添加负责人或阶段。",
+            "在真实 Page 查看并操作组件。"
+          ],
+          "exampleIndex": 0
+        },
+        {
+          "title": "替换项目内容",
+          "steps": [
+            "按新项目建立任务，最后添加 parentId 和 dependencies，检查循环与日期冲突。",
+            "检查只读探索与编辑保存的差异，重读页面确认正式写入。"
+          ],
+          "exampleIndex": 2
+        }
+      ],
+      "interactions": [
+        {
+          "action": "搜索、筛选、折叠、时间导航和详情",
+          "effect": "阅读操作仅改变视图；任务编辑与拖动改期在编辑态通过 onChange 保存。",
+          "persistence": "mixed"
+        }
+      ],
+      "constraints": [
+        "日期采用日粒度，结束不得早于开始。",
+        "父子关系与依赖关系分别校验；保留稳定任务 ID。",
+        "父任务 start/end/progress 为派生汇总，读取时与叶任务原始输入区分。"
+      ],
+      "editing": {
+        "data": [
+          "title：排期标题。",
+          "description：项目范围与日期口径说明。",
+          "tasks：最多 200 个任务；每项有唯一 id、title、start/end（YYYY-MM-DD）、progress（整数 0–100）。",
+          "tasks[].parentId：可选父任务 ID，必须存在且不形成循环。父任务排期与进度来自子任务汇总。",
+          "tasks[].dependencies：前置任务的稳定 ID，不能缺失、重复、自依赖或形成循环；排期冲突会被校验。",
+          "tasks[].milestone：里程碑标记；遵守任务模型中的日期约束。",
+          "columns：需要显示的列，取 title/owner/status/phase/progress/start/end；1–7 列且不重复。"
+        ],
+        "implementation": [
+          "新增列、依赖语义或排期算法时同步 model.ts、schema、读取模型和 UI。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "React 组件入口及交互。"
+        },
+        {
+          "path": "model.ts",
+          "purpose": "任务校验、排期派生与树操作。"
+        }
+      ],
+      "architecture": [
+        "model.ts 处理校验和派生；index.tsx 的 readData 与显示共用任务模型。"
+      ],
+      "extensionPoints": [
+        "扩展任务字段时更新模型、表格列、时间轴、校验与 readData。"
+      ],
+      "invariants": [
+        "日期采用日粒度，结束不得早于开始。",
+        "父子关系与依赖关系分别校验；保留稳定任务 ID。",
+        "父任务 start/end/progress 为派生汇总，读取时与叶任务原始输入区分。"
+      ],
+      "verification": [
+        "用多层任务、里程碑和前置依赖测试日期/循环校验。",
+        "检查真实页面中的只读、编辑保存、窄屏及离线导出。"
+      ]
+    }
+  }
 }

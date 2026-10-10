@@ -1,4 +1,9 @@
 import { BuiltinPreview } from "../components/BuiltinPreview";
+import ComponentDocumentationView from "./ComponentDocumentationView";
+import {
+  validateComponentDocumentation,
+  reuseLabels,
+} from "../components/custom/documentation";
 import { useState, useId } from "react";
 import { useCatalogDraft, CatalogDraftRecovery } from "./useCatalogDraft";
 import {
@@ -1103,7 +1108,12 @@ export function ComponentDialog({
   const [category, setCategory] = useState<ComponentCategory>(() =>
     componentCategory(item),
   );
-  const [tab, setTab] = useState<"about" | "code" | "schema">("about");
+  const [tab, setTab] = useState<
+    "about" | "guide" | "development" | "code" | "schema"
+  >("about");
+  const [documentationJson, setDocumentationJson] = useState(
+    item.documentation ? JSON.stringify(item.documentation, null, 2) : "",
+  );
   const [code, setCode] = useState(source?.source ?? ""),
     [schema, setSchema] = useState(
       JSON.stringify(
@@ -1138,6 +1148,7 @@ export function ComponentDialog({
   );
   const form = {
     code,
+    documentationJson,
     schema,
     defaults,
     examplesJson,
@@ -1162,6 +1173,12 @@ export function ComponentDialog({
     enabled: !!source,
     onRestore: (value) => {
       setCode(value.code);
+      setDocumentationJson(
+        value.documentationJson ??
+          (value.source?.manifest.documentation
+            ? JSON.stringify(value.source.manifest.documentation, null, 2)
+            : ""),
+      );
       setSchema(value.schema);
       setDefaults(value.defaults);
       setExamplesJson(value.examplesJson);
@@ -1194,6 +1211,10 @@ export function ComponentDialog({
   async function save() {
     if (!projectId || !workingSource)
       throw new Error("选择项目并提供组件源码后才能保存定制版本。");
+    if (!documentationJson.trim())
+      throw new Error(
+        "请补充组件说明契约，再保存新的定制版本。旧版本仍可继续阅读。",
+      );
     const retained = await localDraft.persist(true);
     const { mergeBase: _previousMerge, ...baseManifest } =
       workingSource.manifest;
@@ -1209,6 +1230,14 @@ export function ComponentDialog({
         version,
         scenarios: lines(scenarios),
         effects: lines(effects),
+        ...(documentationJson.trim()
+          ? {
+              documentation: validateComponentDocumentation(
+                JSON.parse(documentationJson),
+                JSON.parse(examplesJson).length,
+              ),
+            }
+          : {}),
         defaultData: JSON.parse(defaults),
         examples: JSON.parse(examplesJson),
         ...(origin ? { parents: [origin] } : {}),
@@ -1257,6 +1286,20 @@ export function ComponentDialog({
           >
             数据结构
           </button>
+          <button
+            className={tab === "guide" ? "active" : ""}
+            aria-pressed={tab === "guide"}
+            onClick={() => setTab("guide")}
+          >
+            使用说明
+          </button>
+          <button
+            className={tab === "development" ? "active" : ""}
+            aria-pressed={tab === "development"}
+            onClick={() => setTab("development")}
+          >
+            开发说明
+          </button>
         </nav>
       }
     >
@@ -1285,10 +1328,19 @@ export function ComponentDialog({
           </details>
         )}
         {custom && <Lineage item={custom} />}
+        {(tab === "guide" || tab === "development") && (
+          <ComponentDocumentationView
+            documentation={item.documentation}
+            development={tab === "development"}
+          />
+        )}
         {tab === "about" && (
           <>
             <div className="catalog-reference-intro">
-              <span>{builtin ? "内置组件" : "自定义组件"}</span>
+              <span>
+                {builtin ? "内置组件" : "自定义组件"} ·{" "}
+                {reuseLabels[item.documentation?.reuse.kind ?? "unclassified"]}
+              </span>
               <p>{item.description}</p>
             </div>
             <div className="catalog-overview">
@@ -1445,6 +1497,20 @@ export function ComponentDialog({
                 value={code}
                 onChange={(event) => setCode(event.target.value)}
               />
+            </label>
+            <label>
+              使用与开发说明（随新版本保存）
+              <textarea
+                className="studio-code-editor"
+                aria-label="组件说明契约"
+                spellCheck={false}
+                value={documentationJson}
+                onChange={(event) => setDocumentationJson(event.target.value)}
+              />
+              <small>
+                包含 version: 1、reuse、usage 和
+                development；旧版本缺少说明时显示“待评估”。
+              </small>
             </label>
           </div>
         )}

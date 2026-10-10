@@ -230,6 +230,8 @@ test("catalog discovery returns all compact entries, with optional pagination be
           "description",
           "scenarios",
           "scope",
+          "reuse",
+          "documentationStatus",
           "version",
         ].sort(),
       );
@@ -350,4 +352,138 @@ test("default component discovery combines built-ins and only the selected proje
     integrity: own.integrity,
   });
   expect(detail.integrity).toBe(own.integrity);
+});
+
+test("context delivers the complete index while selected revision guides stay separate from implementation", async () => {
+  const client = await connect(createLibraryMcpServer({ root }));
+  const project = await call(client, "project_create", {
+    name: "Documented versions",
+  });
+  const context = await call(client, "project_context", {
+    projectId: project.id,
+  });
+  expect(context.componentCatalog.complete).toBe(true);
+  expect(context.componentCatalog.items.length).toBe(
+    listBuiltinComponents().length,
+  );
+  expect(context.componentCatalog.workflows.page).toBeTruthy();
+  expect(context.componentCatalog.workflows.component).toBeTruthy();
+  const cached = await call(client, "project_context", {
+    projectId: project.id,
+    knownCatalogRevision: context.componentCatalog.revision,
+  });
+  expect(cached.componentCatalog.unchanged).toBe(true);
+  expect(cached.componentCatalog.items).toBeUndefined();
+  const otherProject = await call(client, "project_create", {
+    name: "Different index scope",
+  });
+  const switched = await call(client, "project_context", {
+    projectId: otherProject.id,
+    knownCatalogRevision: context.componentCatalog.revision,
+  });
+  expect(switched.componentCatalog.items.length).toBe(
+    listBuiltinComponents().length,
+  );
+  expect(switched.componentCatalog.revision).not.toBe(
+    context.componentCatalog.revision,
+  );
+  expect(
+    context.componentCatalog.items.every(
+      (item: any) => !item.guide && !item.schema && !item.source,
+    ),
+  ).toBe(true);
+  const args = { projectId: project.id, id: "text", scope: "builtin" };
+  const guide = await call(client, "catalog_describe", {
+    ...args,
+    view: "guide",
+  });
+  expect(
+    guide.guide.recipes.flatMap((recipe: any) => recipe.steps).join("\n"),
+  ).toContain("引用每行以 >");
+  expect(guide.schema.properties.content).toBeDefined();
+  expect(guide.source).toBeUndefined();
+  expect(guide.development).toBeUndefined();
+  const development = await call(client, "catalog_describe", {
+    ...args,
+    view: "development",
+  });
+  expect(development.development.entryPoints.length).toBeGreaterThan(0);
+  expect(development.source).toBeUndefined();
+  const { source } = await call(client, "catalog_describe", {
+    ...args,
+    view: "source",
+    file: "*",
+  });
+  source.manifest.id = "documented-note";
+  source.manifest.description = "obsolete-marker";
+  const first = await call(client, "component_save", {
+    projectId: project.id,
+    source,
+  });
+  source.manifest.version = "1.3.0";
+  source.manifest.description = "current-marker";
+  source.manifest.documentation.usage.purpose = "A revised use contract";
+  const second = await call(client, "component_save", {
+    projectId: project.id,
+    source,
+  });
+  const listing = await call(client, "catalog_list", {
+    projectId: project.id,
+    kind: "component",
+  });
+  expect(
+    listing.items.filter((item: any) => item.id === "documented-note"),
+  ).toEqual([
+    expect.objectContaining({
+      version: "1.3.0",
+      documentationStatus: "available",
+    }),
+  ]);
+  expect(listing.revision).not.toBe(context.componentCatalog.revision);
+  const history = await call(client, "catalog_list", {
+    projectId: project.id,
+    kind: "component",
+    versions: "all",
+  });
+  expect(
+    history.items.filter((item: any) => item.id === "documented-note"),
+  ).toHaveLength(2);
+  const previous = await call(client, "catalog_describe", {
+    projectId: project.id,
+    id: first.id,
+    scope: "project",
+    version: first.version,
+    integrity: first.integrity,
+    view: "guide",
+  });
+  expect(previous.guide.purpose).not.toBe("A revised use contract");
+  expect(previous.integrity).not.toBe(second.integrity);
+  expect(
+    (
+      await call(client, "catalog_list", {
+        projectId: project.id,
+        kind: "component",
+        query: "obsolete-marker",
+      })
+    ).items,
+  ).toEqual([]);
+  expect(
+    (
+      await call(client, "catalog_list", {
+        projectId: project.id,
+        kind: "component",
+        query: "obsolete-marker",
+        versions: "all",
+      })
+    ).items,
+  ).toHaveLength(1);
+  delete source.manifest.documentation;
+  expect(
+    (
+      await client.callTool({
+        name: "component_save",
+        arguments: { projectId: project.id, source },
+      })
+    ).isError,
+  ).toBe(true);
 });

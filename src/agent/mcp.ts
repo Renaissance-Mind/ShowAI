@@ -173,14 +173,23 @@ export function createMcpServer(options: {
     "project_context",
     {
       description:
-        "Inspect this connection's project identity and storage root. It cannot select another project.",
-      inputSchema: {},
+        "Initialize page/component work: inspect the bound project and receive the complete compact component index, revision and workflow guidance. It cannot select another project.",
+      inputSchema: {
+        knownCatalogRevision: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
+      },
       annotations: readOnly,
     },
-    () =>
+    ({ knownCatalogRevision }) =>
       call(async () => ({
         project: (await service.listProjects())[0],
         root: service.store.root,
+        componentCatalog: await service.componentContext(
+          projectId,
+          knownCatalogRevision,
+        ),
         next: "guide workspace",
       })),
   );
@@ -391,6 +400,7 @@ export function createMcpServer(options: {
         query: z.string().optional(),
         limit: z.number().int().min(1).max(50).optional(),
         cursor: z.string().optional(),
+        versions: z.enum(["recommended", "all"]).optional(),
       },
       annotations: readOnly,
     },
@@ -400,7 +410,7 @@ export function createMcpServer(options: {
     "catalog_describe",
     {
       description:
-        "Read a resource summary by default. Request guide/schema/examples/dependencies/full only as needed; source code or template bodies require view=source.",
+        "Read a summary by default. guide provides the versioned use contract, schema and a compact example; development provides implementation guidance without source. Read examples/dependencies/full as needed. Executable source requires view=source. Legacy missing documentation is explicitly marked.",
       inputSchema: {
         id: z.string(),
         kind: z.enum(["component", "template"]).optional(),
@@ -435,14 +445,19 @@ export function createMcpServer(options: {
       annotations: write,
     },
     ({ source, ...metadata }) =>
-      call(
-        () =>
-          service.saveComponent(
-            projectId,
-            source as unknown as ComponentSource,
-          ),
-        metadata,
-      ),
+      call(() => {
+        if (
+          !(source.manifest as Record<string, unknown> | undefined)
+            ?.documentation
+        )
+          throw new Error(
+            "New component authoring requires manifest.documentation. Read guide component for the contract; use component_import only for an existing legacy package.",
+          );
+        return service.saveComponent(
+          projectId,
+          source as unknown as ComponentSource,
+        );
+      }, metadata),
   );
   register(
     "template_apply",

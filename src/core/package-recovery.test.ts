@@ -90,7 +90,7 @@ describe("external immutable package recovery", () => {
       const form = (await new EditorDrafts(root).read(recovered.draft.id))
         .content as { code: string; version: string };
       expect(form.code).toBe(changed);
-      expect(form.version).toBe("1.1.1");
+      expect(form.version).toBe("1.1.2");
       expect(await readFile(path, "utf8")).toBe(before);
       expect(await operations.conflicts(projectId)).toEqual([]);
     },
@@ -138,7 +138,7 @@ describe("external immutable package recovery", () => {
         library.workspace,
         "projects",
         projectId,
-        "packages/components/value-slider/1.1.0",
+        "packages/components/value-slider/1.1.1",
       );
     const original = await readFile(join(prefix, "index.tsx"), "utf8");
     const changed = `${original}\n// externally edited source\n`;
@@ -167,7 +167,7 @@ describe("external immutable package recovery", () => {
     };
     expect(form.code).toBe(changed);
     expect(form.schema).toBe('{"unfinished":');
-    expect(form.version).toBe("1.1.1");
+    expect(form.version).toBe("1.1.2");
     expect(form.source.assets?.["extra.png"]).toBe(
       Buffer.from("binary asset bytes").toString("base64"),
     );
@@ -187,7 +187,7 @@ describe("external immutable package recovery", () => {
       },
       projectId,
     );
-    expect(saved.version).toBe("1.1.1");
+    expect(saved.version).toBe("1.1.2");
     expect(
       (await getComponent(root, component.id, component.version, projectId))
         .integrity,
@@ -207,7 +207,7 @@ describe("external immutable package recovery", () => {
       library.workspace,
       "projects",
       projectId,
-      "packages/components/value-slider/1.1.0/manifest.json",
+      "packages/components/value-slider/1.1.1/manifest.json",
     );
     await writeFile(path, "{incomplete manifest");
     const [conflict] = await operations.conflicts(projectId);

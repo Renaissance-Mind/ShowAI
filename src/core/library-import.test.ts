@@ -126,7 +126,7 @@ describe("one-time file library import", () => {
         await readComponentSource(
           destination,
           "value-slider",
-          "1.1.0",
+          "1.1.1",
           projectId,
         )
       ).source,

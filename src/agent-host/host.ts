@@ -13,6 +13,7 @@ import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { FileStore, assertId } from "../core/store";
+import { AgentService } from "../agent/service";
 import {
   writeProtected,
   readOptional,
@@ -778,6 +779,11 @@ export class AgentHost {
           .library()
           .readPage(projectId, pageId, { checkpoint: false });
     }
+    const componentCatalog = test
+      ? undefined
+      : await new AgentService({
+          root: this.options.library().root,
+        }).componentContext(projectId);
     const workspace = join(
       this.workspaceRoot,
       projectId || "Connection Tests",
@@ -808,7 +814,7 @@ export class AgentHost {
     const cli = this.options.cli();
     const instructions = test
       ? prompt
-      : `You are working inside ShowAI. The host has supplied these verified selections: projectId=${projectId}${pageId ? `, pageId=${pageId}` : ""}. Operate only that project and focused page. Use project_context to confirm the MCP binding, then read the chosen page. Use the connected ShowAI MCP tools for all library reads and writes. Do not invoke authoring CLI commands or switch connections if MCP fails. Read current hash/revision before saving; preserve conflicting drafts. Do not edit raw library files. Work files belong in ${workspace}. This host displays text and file links, without inline HTML rendering. For a requested preview, use page_present with the requested stable block IDs and return its delivery file link; do not claim it is displayed in the conversation. Read the ShowAI authoring guide before editing. For status-only requests query project_sync_status; do not run project_sync unless the user requests synchronization. The user explicitly requests:\n${prompt}`;
+      : `You are working inside ShowAI. The host has supplied these verified selections: projectId=${projectId}${pageId ? `, pageId=${pageId}` : ""}. Operate only that project and focused page. Use project_context with knownCatalogRevision=${componentCatalog?.revision} to confirm the MCP binding without repeating the supplied index, then read the chosen page. Use the connected ShowAI MCP tools for all library reads and writes. Do not invoke authoring CLI commands or switch connections if MCP fails. Read current hash/revision before saving; preserve conflicting drafts. Do not edit raw library files. Work files belong in ${workspace}. This host displays text and file links, without inline HTML rendering. For a requested preview, use page_present with the requested stable block IDs and return its delivery file link; do not claim it is displayed in the conversation. Read the ShowAI authoring guide before editing. For status-only requests query project_sync_status; do not run project_sync unless the user requests synchronization. Component directory (complete; reuse this index until its revision changes): ${JSON.stringify(componentCatalog)}\nFor page work read selected component guides; for component work read development guidance before source. The user explicitly requests:\n${prompt}`;
     const resume = args.taskId
       ? this.tasks.find(
           (item) =>

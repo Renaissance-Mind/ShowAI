@@ -11,6 +11,7 @@ import {
   Workflow,
 } from "../ui/icons";
 import type { ComponentCategory } from "../components/custom/types";
+import { reuseLabels } from "../components/custom/documentation";
 import type {
   CatalogComponent,
   ComponentGroup,
@@ -282,6 +283,16 @@ export function ComponentCatalog({
                         </span>
                         <h3>
                           {item.name}
+                          <span
+                            className="studio-tag"
+                            title="复用范围，与来源和权限分别判断"
+                          >
+                            {
+                              reuseLabels[
+                                item.documentation?.reuse.kind ?? "unclassified"
+                              ]
+                            }
+                          </span>
                           <span
                             className="studio-tag"
                             title={!builtin ? item.projectName : undefined}

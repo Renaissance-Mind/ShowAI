@@ -102,6 +102,8 @@ export type ComponentCategory =
   "text" | "image" | "table" | "data" | "flow" | "surface" | "other";
 
 export interface ComponentManifest {
+  /** Versioned use/development contract. Older packages remain explicitly undocumented. */
+  documentation?: import("./documentation").ComponentDocumentation;
   id: string;
   name: string;
   version: string;
@@ -148,6 +150,7 @@ export interface ComponentSource {
 }
 
 export interface BuiltinComponentMetadata {
+  documentation?: import("./documentation").ComponentDocumentation;
   insertion?: { nodeType: "surface"; surfaceKind: "page" | "board" };
   kind: string;
   replacedBy?: string;

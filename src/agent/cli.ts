@@ -923,6 +923,7 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
       if (action === "list") {
         requireCount(args, 2);
         return service.catalogList({
+          versions: option(args, "versions") as "recommended" | "all" | undefined,
           projectId:
             option(args, "project") ??
             (!catalogScope(args) ||
