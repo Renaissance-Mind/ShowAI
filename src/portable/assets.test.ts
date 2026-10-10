@@ -46,6 +46,59 @@ afterAll(
 );
 
 describe("self-contained image export", () => {
+  it("embeds structured rich-text widget images after legacy text is edited", async () => {
+    const src = `${origin}/image.png`;
+    const document = validateDocument({
+      id: "rich-text-images",
+      title: "Rich text",
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "widget",
+            attrs: {
+              id: "legacy-text",
+              kind: "text",
+              data: {
+                format: "richtext",
+                content: {
+                  type: "doc",
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [
+                        {
+                          type: "text",
+                          text: "保留高亮",
+                          marks: [
+                            { type: "highlight", attrs: { color: "#ffeedd" } },
+                          ],
+                        },
+                      ],
+                    },
+                    { type: "image", attrs: { src, alt: "Original image" } },
+                  ],
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+    expect(externalImageUrls(document)).toEqual([src]);
+    const embedded = await embedDocumentImages(document);
+    expect(externalImageUrls(embedded)).toEqual([]);
+    expect(() => assertOfflineImages(embedded)).not.toThrow();
+    const content = embedded.content.content![0].attrs!.data.content.content;
+    expect(content[1].attrs.src).toBe(
+      `data:image/png;base64,${png.toString("base64")}`,
+    );
+    expect(content[0].content[0].marks[0].attrs.color).toBe("#ffeedd");
+    expect(
+      document.content.content![0].attrs!.data.content.content[1].attrs.src,
+    ).toBe(src);
+  });
+
   it("embeds PDF files and video posters in nested containers without changing their source", async () => {
     const document = validateDocument({
       id: "files",

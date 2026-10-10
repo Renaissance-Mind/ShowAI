@@ -25,6 +25,7 @@ function imageSlots(document) {
     if (
       node.type === "widget" &&
       ["text", "callout", "toggle"].includes(node.attrs?.kind) &&
+      typeof node.attrs.data?.content === "string" &&
       node.attrs.data?.format !== "plain"
     ) {
       const data = node.attrs.data;
@@ -61,6 +62,13 @@ function imageSlots(document) {
       node.attrs.data?.poster
     )
       slots.push([node.attrs.data, "poster"]);
+    if (
+      node.type === "widget" &&
+      node.attrs?.kind === "text" &&
+      node.attrs.data?.content &&
+      typeof node.attrs.data.content === "object"
+    )
+      visit(node.attrs.data.content);
     node.content?.forEach(visit);
   };
   visit(document.content);
@@ -76,6 +84,13 @@ function fileSlots(document) {
       node.attrs.data?.src
     )
       slots.push([node.attrs.data, "src", node.attrs.kind]);
+    if (
+      node.type === "widget" &&
+      node.attrs?.kind === "text" &&
+      node.attrs.data?.content &&
+      typeof node.attrs.data.content === "object"
+    )
+      visit(node.attrs.data.content);
     node.content?.forEach(visit);
   };
   visit(document.content);
