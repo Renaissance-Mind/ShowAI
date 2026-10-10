@@ -44,10 +44,7 @@ export class ContentLibrary {
     return new GitLibrary(this.root);
   }
   async initialize(options: { migrate?: boolean } = {}) {
-    if (
-      this.storage() === "git" &&
-      (options.migrate || process.env.SHOWAI_SQLITE_MIGRATE === "1")
-    ) {
+    if (this.storage() === "git" && options.migrate !== false) {
       const { migrateGitContent } = await import("./content-migration");
       return migrateGitContent(this.root);
     }

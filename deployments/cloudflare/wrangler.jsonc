@@ -21,7 +21,7 @@
     "SHOWAI_SERVER_NAME": "ShowAI Cloud",
     "SHOWAI_SERVER_URL": "https://showai.renaissancemind.ai/cloud",
     "SHOWAI_OBSERVE": "1",
-    "SHOWAI_METADATA_DRIVER": "d1",
+    "SHOWAI_METADATA_DRIVER": "durable",
     "SHOWAI_METADATA_IMPORT_REQUIRED": "1",
   },
   "routes": [
@@ -65,7 +65,7 @@
         "SHOWAI_SERVER_URL": "https://showai.renaissancemind.ai/cloud-staging",
         "SHOWAI_REGISTRATION_LIMIT": "120",
         "SHOWAI_OBSERVE": "1",
-        "SHOWAI_METADATA_DRIVER": "d1",
+        "SHOWAI_METADATA_DRIVER": "durable",
         "SHOWAI_METADATA_IMPORT_REQUIRED": "1",
       },
       "durable_objects": {

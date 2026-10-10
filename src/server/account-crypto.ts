@@ -151,16 +151,39 @@ export async function verify(
       "INVALID_IDENTITY_KEY",
       "Invalid account identity key.",
     );
-  return crypto.subtle.verify(
-    { name: "ECDSA", hash: "SHA-256" },
-    await crypto.subtle.importKey(
+  if (
+    unbase64url(key.x, 32).length !== 32 ||
+    unbase64url(key.y, 32).length !== 32
+  )
+    throw new SyncError(
+      400,
+      "INVALID_IDENTITY_KEY",
+      "Invalid account identity key.",
+    );
+  const bytes = unbase64url(signature, 64);
+  if (bytes.length !== 64) return false;
+  let publicKey: CryptoKey;
+  try {
+    publicKey = await crypto.subtle.importKey(
       "jwk",
       key,
       { name: "ECDSA", namedCurve: "P-256" },
       false,
       ["verify"],
-    ),
-    unbase64url(signature, 64),
+    );
+  } catch {
+    // Public JWKs are untrusted request input; malformed curve points are a
+    // validation error, while failures reading the server vault still surface.
+    throw new SyncError(
+      400,
+      "INVALID_IDENTITY_KEY",
+      "Invalid account identity key.",
+    );
+  }
+  return crypto.subtle.verify(
+    { name: "ECDSA", hash: "SHA-256" },
+    publicKey,
+    bytes,
     encoder.encode(canonical(value)),
   );
 }

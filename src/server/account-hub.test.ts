@@ -29,7 +29,9 @@ async function setup() {
       registrationMode: "open",
     });
     services.push(service);
-    cleanup.push(() => service.close());
+    cleanup.push(() =>
+      service.server.listening ? service.close() : Promise.resolve(),
+    );
   }
   const client = new SyncManager(join(root, "device-one"));
   cleanup.push(() => client.stop());
@@ -164,6 +166,110 @@ test("grants reject forgery, wrong audience, replay, unrelated users and removed
       )
     ).peers,
   ).toHaveLength(0);
+}, 60_000);
+test("a rejected group binding leaves every peer unchanged", async () => {
+  const f = await setup(),
+    [a, b, c] = f.connections;
+  const descriptors = await Promise.all(
+    f.connections.map((connection) =>
+      accountRequest<SignedIdentity>(
+        connection,
+        "/api/account/identity",
+        "POST",
+        {},
+      ),
+    ),
+  );
+  const record = (descriptor: SignedIdentity) => ({
+    descriptor,
+    state: "active",
+    updatedAt: Date.now(),
+    changeId: crypto.randomUUID(),
+  });
+  await expect(
+    accountRequest(a, "/api/account/bindings", "PUT", {
+      bindings: [
+        record(descriptors[1]),
+        { ...record(descriptors[2]), state: "invalid" },
+      ],
+    }),
+  ).rejects.toMatchObject({ status: 400 });
+  expect((await f.client.accounts.profile(a.id)).peers).toEqual([]);
+  const malformed = structuredClone(descriptors[1]);
+  malformed.identity.publicKey.x = "A".repeat(43);
+  malformed.identity.publicKey.y = "A".repeat(43);
+  await expect(
+    accountRequest(a, "/api/account/bindings", "POST", {
+      descriptor: malformed,
+    }),
+  ).rejects.toMatchObject({ status: 400 });
+  await accountRequest(a, "/api/account/bindings", "PUT", {
+    bindings: [record(descriptors[1]), record(descriptors[2])],
+  });
+  expect(
+    (await f.client.accounts.profile(a.id)).peers
+      .map((peer) => peer.descriptor.identity.serverId)
+      .sort(),
+  ).toEqual([b.serverId, c.serverId].sort());
+}, 60_000);
+test("a restored device unlinks a member from the full group before revoking its own delegated session", async () => {
+  const f = await setup(),
+    [a, b, c] = f.connections;
+  await f.client.accounts.bind(a.id, b.id);
+  await f.client.accounts.bind(b.id, c.id);
+  const device = new SyncManager(join(f.root, "unlink-device"));
+  cleanup.push(() => device.stop());
+  await device.connect({ url: a.url, token: a.token });
+  const restored = (await device.configuration()).connections;
+  const source = restored.find((item) => item.serverId === a.serverId)!;
+  const removed = restored.find((item) => item.serverId === b.serverId)!;
+  expect((await device.accounts.unbind(source.id, b.serverId)).pending).toEqual(
+    [],
+  );
+  expect(
+    (await f.client.accounts.profile(a.id)).peers
+      .filter((item) => item.state === "active")
+      .map((item) => item.descriptor.identity.serverId),
+  ).toEqual([c.serverId]);
+  expect(
+    (await f.client.accounts.profile(b.id)).peers.every(
+      (item) => item.state === "removed",
+    ),
+  ).toBe(true);
+  await expect(accountRequest(removed, "/api/me")).rejects.toMatchObject({
+    status: 401,
+  });
+  expect(
+    (
+      await accountRequest<{ serverId: string }>(
+        restored.find((item) => item.serverId === c.serverId)!,
+        "/api/me",
+      )
+    ).serverId,
+  ).toBe(c.serverId);
+}, 60_000);
+test("an initially unavailable bound service is automatically restored on a later refresh", async () => {
+  const f = await setup(),
+    [a, b] = f.connections;
+  await f.client.accounts.bind(a.id, b.id);
+  await f.services[1].close();
+  const device = new SyncManager(join(f.root, "offline-device"));
+  cleanup.push(() => device.stop());
+  await device.connect({ url: a.url, token: a.token });
+  expect((await device.configuration()).connections).toHaveLength(1);
+  expect(Object.keys((await device.accounts.status()).errors)).not.toHaveLength(
+    0,
+  );
+  const revived = await startSyncServer({
+    home: join(f.root, "server-1"),
+    port: Number(new URL(b.url).port),
+    name: "Service 1",
+    registrationMode: "open",
+  });
+  cleanup.push(() => revived.close());
+  const result = await device.accounts.refresh();
+  expect((await device.configuration()).connections).toHaveLength(2);
+  expect(result.errors).toEqual({});
 }, 60_000);
 test("private personal tokens and device display choices remain independently revocable", async () => {
   const f = await setup(),

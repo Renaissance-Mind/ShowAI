@@ -1,31 +1,33 @@
 # ShowAI Cloud
 
-The official server base URL is **https://showai.renaissancemind.ai/cloud**.
+The official server base URL is **https://showai.renaissancemind.ai/cloud**. Enter this address in **Settings → Servers and synchronization → Add server account**. The base URL includes `/cloud` and excludes `/api`.
 
-Enter the base URL in ShowAI's existing **Settings → Servers and synchronization → Add server account** flow. Use an existing account or register with your own account name and password.
+## Accounts and bound services
 
-Initial registration is controlled by an operator-provided registration key; a project invitation can also authorize registration. The base URL includes `/cloud` and excludes `/api`.
+Sign in with an existing Token or account/password. Private servers can register an account and issue a personal Token directly. GitHub, Google and email-code login appear when the server operator has configured those providers. Controlled registration requires an operator registration key or the supported project invitation flow.
 
-## Projects and offline work
+Sign in to each service once, then select the accounts in **Account bindings**. A new device can subsequently sign in to any member and restore the other bound services. Each service issues its own expiring device session from a short-lived, signed authorization; original login Tokens are not distributed between servers. Inspect or revoke sessions in **Account and devices**. Personal Tokens expire after one year; normal and restored device sessions expire after 30 days.
 
-After signing in, the existing server project list can add a project to the local library. Existing local projects can select the cloud account in the project storage/synchronization settings. Project administrators manage editor/viewer permissions and invitations through the current project management panel. New projects use the storage account chosen in settings. Local copies support **offline editing**; successful authentication and network recovery let synchronization continue.
+Binding grants access to the selected accounts, including their projects and model resources. Bind only services you trust to hold this authority. Unbinding revokes device sessions issued through that peer. Offline services retain a pending revocation until they are reachable and authorized again; revocation is complete only after every target confirms it.
 
-## Access and isolation
+## Projects and model resources
 
-Accounts and device sessions belong to this server. Production and staging have independent databases, private object buckets, registration credentials, operations credentials and rate-limit namespaces.
+Add remote projects from the server project list, or connect an existing local project through its storage/synchronization settings. Administrators manage editor/viewer permissions and invitations in the project panel. Local copies support offline editing and resume synchronization after authentication and network recovery.
 
-The infrastructure operations key is used by backup and recovery tools; it is not an account registration key.
+**Projects shown on this device** controls the local navigation and recent-page list independently on each device. Hiding a project retains its content and server membership.
 
-**Project data is protected** by authenticated membership checks and HTTPS. Infrastructure operators can access stored content; the service does not provide end-to-end encryption or general OIDC login.
+In **Settings → Agent**, retrieve server model resources. Each API Key or ChatGPT authorization shows its source server and account. Select a resource to use it, or save an existing local source to a chosen server. The source server encrypts the credential and supplies it to authenticated devices when needed. ChatGPT refresh remains owned by that source server. An unavailable source is reported explicitly; credentials are not replicated across the bound group.
 
 ## Storage and synchronization
 
-The initial storage policy allows 1 GiB per project, 2 GiB of attributed uploads per account and 64 GiB for the service. Uploads reserve capacity before storage and preserve interrupted tasks. Objects are bounded at **64 MiB** and manifests at 16 MiB. Daily upload, request and download budgets control downstream work; reaching a limit preserves local content and returns an explicit error. Full legacy history and individual manifest reads share download-byte budgets, while summary history stays available.
+Clients use SQLite content history with stable content nodes, immutable objects, attributed revisions and local recovery journals. Local saving completes independently of network publication. Connected services push verified project changes over WebSockets, with bounded inline content and HTTP transfer for larger revisions. The scheduler continues as a fallback when the event connection is unavailable. Idle connections and failed requests use bounded backoff; local file changes, foreground activity and network recovery wake synchronization.
 
-The active client scheduler waits approximately one second after each successful round with jitter. Idle connections back off to approximately one minute, and errors to at most five minutes. Large-file transfer and complete document import can take longer than a project-head observation.
+Linux runs the shared server on Node.js 24 with SQLite and disk objects. Cloudflare runs the same protocol with a SQLite Durable Object and private R2, including a bounded hot object store. D1 is retained as the source of a controlled migration from older deployments. Production and staging have independent identities, databases, buckets, vault keys and infrastructure credentials.
 
-## Operations
+The default policy permits 1 GiB per project, 2 GiB of attributed uploads per account and 64 GiB per service. Objects are limited to **64 MiB** and manifests to 16 MiB. Uploads reserve capacity and retain interrupted tasks. Quota or budget failures preserve local edits and return an explicit error.
 
-Operators deploy from committed code using the production environment in `deployments/cloudflare/wrangler.jsonc`, apply the generated D1 migrations explicitly and install independent secrets through Wrangler. Buckets remain private. [Server operations](server-operations.md) describes consistent freeze/export, protected backups, Linux restore, retained uploads, controlled reconciliation, garbage-collection proof and rollback. A restored server starts frozen; **only the selected replica is reopened**.
+## Operations and access
 
-The first production user chooses their own credentials through the normal application flow. The production registration key and infrastructure key are kept in protected operator files outside the repository.
+Deploy committed code with `deployments/cloudflare/wrangler.jsonc`. [Server operations](server-operations.md) covers schema migration, consistent export, protected vault-key backups, Linux restore, migration into the Durable Object and rollback. Reopen only the chosen replica after a verified restore.
+
+Content is protected by authenticated project membership and HTTPS. Infrastructure operators can access stored content and the vault key; the service does not provide end-to-end encryption. Account Tokens and infrastructure operations credentials have separate purposes. Keep all deployment credentials outside the repository.

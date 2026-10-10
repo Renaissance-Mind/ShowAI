@@ -6,7 +6,7 @@ ShowAI Server 按项目管理共享内容。每个项目使用**管理员、编�
 
 ## 部署
 
-两种部署使用 `src/server/app.ts` 中相同的 HTTP 请求处理器和 `src/sync/protocol.ts` 中相同的协议。Linux 使用 Node.js 24、SQLite 和磁盘对象存储；Cloudflare Workers 使用 D1 和私有 R2。客户端不依赖后端类型。服务器只存储、验证和分发内容，**不执行上传的组件代码**。
+两种部署使用 `src/server/app.ts` 中相同的 HTTP 请求处理器和 `src/sync/protocol.ts` 中相同的协议。Linux 使用 Node.js 24、SQLite 和磁盘对象存储；Cloudflare Workers 使用 SQLite Durable Object 和私有 R2，并用有界热对象存储降低小型编辑的读取耗时。D1 保留为旧部署的迁移来源。客户端不依赖后端类型。服务器只存储、验证和分发内容，**不执行上传的组件代码**。
 
 ```sh
 node scripts/build-server.mjs
@@ -27,18 +27,32 @@ npx wrangler@4.148.0 r2 bucket create showai-cloud-content
 # 将返回的数据库 ID 写入 deployments/cloudflare/wrangler.jsonc。
 npx wrangler@4.148.0 d1 migrations apply DB --remote --config deployments/cloudflare/wrangler.jsonc
 npx wrangler@4.148.0 secret put SHOWAI_REGISTRATION_KEY --config deployments/cloudflare/wrangler.jsonc
+npx wrangler@4.148.0 secret put SHOWAI_OPERATIONS_KEY --config deployments/cloudflare/wrangler.jsonc
+npx wrangler@4.148.0 secret put SHOWAI_VAULT_KEY --config deployments/cloudflare/wrangler.jsonc
+npx wrangler@4.148.0 deploy --config deployments/cloudflare/wrangler.jsonc --var SHOWAI_METADATA_DRIVER:d1
+# 按 server-operations.md 停写并完成 metadata-bootstrap，然后使用默认 durable 配置发布。
 npx wrangler@4.148.0 deploy --config deployments/cloudflare/wrangler.jsonc
 ```
 
-Linux 启动时按版本执行尚未应用的事务迁移，保留旧服务的身份与会话。Worker 仅核对数据库版本；先构建服务生成 `dist-server/migrations/`，再使用 Wrangler 显式应用迁移。配置中的 `staging` 环境绑定独立的测试 D1/R2，相关命令追加 `--env staging`。本地 Cloudflare 验收先执行 `d1 migrations apply DB --local`，再运行 `wrangler dev --local`，使用真实 D1/R2 本地实现。
+Linux 启动时按版本执行尚未应用的事务迁移，保留旧服务的身份与会话。Durable Object 启动时更新自己的 SQLite 结构；旧 D1 迁移来源须先构建服务生成 `dist-server/migrations/`，使用 Wrangler 显式应用迁移，再按运行维护指南停写、导入和核验，最后切换 durable 配置。配置中的 `staging` 环境绑定独立的测试 D1/R2，相关命令追加 `--env staging`。本地 Cloudflare 验收先执行 `d1 migrations apply DB --local`，再运行 `wrangler dev --local`，使用真实 D1/R2 本地实现。
 
 ## 账户与项目权限
 
 ### 登录与设备会话
 
-当前支持账号密码注册、登录和已有 Token 连接。新建或修改密码需 12 至 1024 个字符，保留首尾空格；密码使用独立盐和有版本标记的 PBKDF2 摘要。旧账号可继续使用原密码登录，原有首尾空格处理方式保留；成功登录后升级摘要格式标记。这个过程不会提高旧密码本身的强度。
+支持账号密码、已有 Token 和注册时直接签发个人 Token；配置后可使用 GitHub、Google 或邮箱验证码登录。新建或修改密码需 12 至 1024 个字符，保留首尾空格；密码使用独立盐和有版本标记的 PBKDF2 摘要。旧账号可继续使用原密码登录，原有首尾空格处理方式保留；成功登录后升级摘要格式标记。这个过程不会提高旧密码本身的强度。
 
-新设备会话有效期为 30 天，每个账号最多 100 个同时有效会话。服务器仅保存随机 Token 的摘要。原有会话保留原有效期，仍可撤销。在「服务器与同步 → 账号与设备」查看到期时间、撤销单个设备、退出所有设备或修改密码。修改密码撤销旧会话并保留本设备的新会话。登录到期时，本地编辑和历史保留，重新登录后继续同步。GitHub/Google 登录尚未提供；客户端输出隐藏连接 Token。
+新设备会话有效期为 30 天，每个账号最多 100 个同时有效会话。服务器仅保存随机 Token 的摘要。原有会话保留原有效期，仍可撤销。在「服务器与同步 → 账号与设备」查看到期时间、撤销单个设备、退出所有设备或修改密码。修改密码撤销旧会话并保留本设备的新会话。登录到期时，本地编辑和历史保留，重新登录后继续同步。个人 Token 有效期为一年，可独立撤销；普通和绑定恢复的设备会话为 30 天。GitHub、Google 和邮箱验证码入口由服务端配置启用，成功后使用同一套设备 Token 协议；客户端输出隐藏连接 Token。
+
+### 多服务器账号绑定与模型资源
+
+先分别登录各服务，再在「账号绑定」选择两个账号建立绑定。绑定信息包含服务器身份、账号、签名公钥和变更版本，并在已绑定组内传播。新设备登录任意成员后，通过一分钟内有效且指定目标的签名授权，向其他服务获取独立设备 Token。重放、错误目标、变更的签名身份和已解除的绑定会被拒绝。原始 Token 不在服务器间复制。
+
+解除一个成员时，客户端向整组发送撤销，并保留未完成请求。离线成员需恢复连接和授权后才能确认撤销；尚未确认时设置会明确显示待完成状态。账号绑定意味着各服务可以为组内账号签发访问授权，应选择可信的部署。
+
+「本设备显示的项目」独立保存本机选择，控制项目导航与最近页面，保留内容和成员权限。在「Agent」设置检索所有已登录服务的模型资源，来源服务器、账号和地址会一起展示。来源服务器使用 AES-GCM 加密 API Key 和 ChatGPT 授权，在经过账号鉴权的访问接口提供凭据；客户端验证模型资源的地址和协议，防止修改配置后将密钥发往其他地址。ChatGPT 刷新由来源服务器独占，设备转交时停止本地刷新并保留可重试的转交记录。离线来源不能提供新凭据。
+
+Linux 数据目录自动创建权限 0600 的 `vault.key`；Cloudflare 必须设置独立的 `SHOWAI_VAULT_KEY`。已有加密账号数据恢复后必须提供原保险库密钥。GitHub 使用 `SHOWAI_GITHUB_CLIENT_ID` / `SHOWAI_GITHUB_CLIENT_SECRET`，Google 使用 `SHOWAI_GOOGLE_CLIENT_ID` / `SHOWAI_GOOGLE_CLIENT_SECRET`，邮箱验证码使用 Resend 的 `SHOWAI_EMAIL_API_KEY` / `SHOWAI_EMAIL_FROM`。回调地址分别为服务器基址下的 `/api/auth/callback/github` 与 `/api/auth/callback/google`。
 
 ### 访问限制与审计
 
@@ -58,11 +72,11 @@ Linux 启动时按版本执行尚未应用的事务迁移，保留旧服务的�
 
 ### 同步时机与版本身份
 
-协议传输的是按项目提取的不可变快照和内容对象。首次连接传输完整正式项目历史，每个版本包含精确源码、编译依赖与捕获的历史阅读器；图片等数据使用摘要复用。工作台在启动或唤醒后的活跃窗口约每两秒检查，连续空闲后退避至约一分钟；网络失败逐步退避，最长约五分钟。本地文件变化、窗口回到前台和网络恢复会唤醒检查。独立 CLI 可执行 `sync run`。**保存成功只代表本地提交**，`sync status` 返回的项目状态、错误与 remoteHead 用于核对服务器发布。
+协议传输的是按项目提取的不可变快照和内容对象。首次连接传输完整正式项目历史，每个版本包含精确源码、编译依赖与捕获的历史阅读器；图片等数据使用摘要复用。已连接设备通过 WebSocket 接收经过身份与权限校验的项目变化通知，并可直接导入有界的小型版本。HTTP 同步继续作为重连、大型传输和事件连接不可用时的补偿；连续空闲后检查退避至约一分钟，网络失败逐步退避，最长约五分钟。本地文件变化、窗口回到前台和网络恢复会唤醒检查。独立 CLI 可执行 `sync run`。**保存成功只代表本地提交**，`sync status` 返回的项目状态、错误与 remoteHead 用于核对服务器发布。
 
-支持 `batch-heads-v1` 的服务器按当前账号批量返回项目头和实时权限，每个请求最多 400 个 ID。无权限和不存在的项目均省略。旧服务器保留逐项目查询。后台通过已观察的 Git 版本和项目版本跳过未变化项目的完整扫描；手动同步继续完整检查。同步在同一内容库内单次运行，期间到达的唤醒合并为下一轮。对象上传并发最多两个，按不可变对象或任务身份重试暂时性网络错误。`sync status` 中的 `scheduler` 提供本进程的轮次、扫描、跳过及下一次检查时间。
+支持 `batch-heads-v1` 的服务器按当前账号批量返回项目头和实时权限，每个请求最多 400 个 ID。无权限和不存在的项目均省略。旧服务器保留逐项目查询。后台通过已观察的本地内容版本和项目版本跳过未变化项目的完整扫描；手动同步继续完整检查。同步在同一内容库内单次运行，期间到达的唤醒合并为下一轮。对象上传并发最多两个，按不可变对象或任务身份重试暂时性网络错误。`sync status` 中的 `scheduler` 提供本进程的轮次、扫描、跳过及下一次检查时间。
 
-活跃窗口提供较低延迟，长期空闲且没有前台唤醒的接收设备可能等待下一次空闲检查。公网延迟需单独测量。可用真实后端复测调度指标：
+事件连接正常时，空闲接收端也会被远端变更唤醒。事件连接不可用时，接收端使用下一次调度检查补偿。公网延迟需单独测量。可用真实后端复测调度指标：
 
 ```sh
 SHOWAI_SCHEDULER_MEASURE=1 npx vitest run src/sync/scheduler.test.ts --maxWorkers=1
@@ -70,11 +84,11 @@ SHOWAI_SCHEDULER_MEASURE=1 npx vitest run src/sync/scheduler.test.ts --maxWorker
 
 当前传输协议为 `showai-project-sync-v2`，键排序采用语言无关的 UTF-16 顺序，中文和英文设备生成相同摘要。读取保留 v1 历史兼容；旧格式记录按原服务器保存的序列化内容验证。客户端和服务端需要使用匹配的当前协议。
 
-每个快照记录父快照、来源时间、actor、入口、操作 ID 和来源 Git revision。本地内容库共用 Git，而服务器按项目隔离，因此接收端的本地 Git revision 与源设备及云端快照 revision 不相同。`syncOrigin` 保留来源身份、原始时间和远端父版本，历史界面标记同步来源。接收端的本地父提交表示实际导入过程。客户端提供的 actor 与时间是来源记录，服务器会另外记录实际提交账号与接收时间。
+每个快照记录父快照、来源时间、actor、入口、操作 ID 和来源内容 revision。本地 SQLite 内容库保存全库历史，服务器按项目隔离，因此接收端的本地 revision 与源设备及云端快照 revision 不相同。`syncOrigin` 保留来源身份、原始时间和远端父版本，历史界面标记同步来源。接收端的本地父提交表示实际导入过程。客户端提供的 actor 与时间是来源记录，服务器会另外记录实际提交账号与接收时间。
 
 ### 发布、清单与传输
 
-服务器先验证并保存对象，再用数据库条件更新发布版本；D1/SQLite 与对象存储之间没有跨系统事务。失败可能留下未发布对象或历史分支，当前不会自动删除这些内容。并发发布失败会保留上传版本。离线修改从本地 Git 历史重新发现；下载对象、快照、连接状态和冲突保存于内容库的 `local/sync/`。
+服务器先验证并保存对象，再用数据库条件更新发布版本；D1/SQLite 与对象存储之间没有跨系统事务。失败可能留下未发布对象或历史分支，当前不会自动删除这些内容。并发发布失败会保留上传版本。离线修改从本地 SQLite 历史重新发现；下载对象、快照、连接状态和冲突保存于内容库的 `local/sync/`。
 
 新版本的完整清单存储于 R2/磁盘对象存储的项目命名空间，数据库保存摘要、位置、字节数与稳定序号。清单就绪后才条件更新项目 head。旧内嵌清单继续可读；迁移不改变 revision、来源身份或父关系。支持 `history-summary-v1` 的客户端分页读取摘要，再按需取得正文。旧历史接口按数量与约 1 MiB 总量分页；一份较大的清单可以单独返回，单份清单上限为 16 MiB。
 

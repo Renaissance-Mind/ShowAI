@@ -182,7 +182,7 @@ test("legacy Git content and operation history migrate losslessly into SQLite", 
   const history = await f.library.history({ limit: 1000 }),
     head = await f.library.head(),
     bytes = await f.library.readFile(path);
-  const manifest = await migrateGitContent(f.root);
+  const manifest = await new ContentLibrary(f.root).initialize();
   expect(manifest.id).toBe((await f.library.manifest()).id);
   expect(manifest.storage).toBe("sqlite");
   const sqlite = new ContentLibrary(f.root);

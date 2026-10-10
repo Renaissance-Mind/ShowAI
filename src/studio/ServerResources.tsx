@@ -60,7 +60,10 @@ export default function ServerResources({
                   "agent:serverResources",
                 ),
               );
-              if (Object.keys(status.federation.errors).length)
+              const refreshed = await desktop.invoke<{
+                federation: { errors: Record<string, string> };
+              }>("sync:status");
+              if (Object.keys(refreshed.federation.errors).length)
                 setMessage("部分服务暂时不可用，恢复连接后可重新检索。");
             })
           }
@@ -116,7 +119,7 @@ export default function ServerResources({
         </div>
       ))}
       {resources?.length === 0 && (
-        <p className="settings-help">这些服务尚未保存模型资源。</p>
+        <p className="settings-help">没有检索到模型资源。</p>
       )}
       {selected?.hosted && (
         <p className="settings-help">

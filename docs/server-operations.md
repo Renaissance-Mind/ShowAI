@@ -1,12 +1,12 @@
 # Server backup and migration
 
-Linux and Cloudflare use the same operations protocol and application metadata. **A consistent backup** contains all accounts, password formats, device session digests and expiry/revocation state, memberships, invitation claims, quota reservations, upload tasks, complete revision graphs and the private object inventory. Infrastructure secrets stay in the deployment environment. The **server identity remains unchanged on restore**.
+Linux and Cloudflare use the same operations protocol and application metadata. **A consistent backup** contains all accounts, password formats, device session digests and expiry/revocation state, account binding identities and peers, encrypted model resources, external login identities and pending flows, memberships, invitation claims, quota reservations, upload tasks, complete revision graphs and the private object inventory. Infrastructure secrets stay in the deployment environment. The **server identity remains unchanged on restore**.
 
 Set `SHOWAI_OPERATIONS_KEY` to 32 random bytes encoded as 64 lowercase hexadecimal characters. It is an infrastructure credential independent of user passwords and sessions. Without it, operations endpoints return 404. Keep its source file private; use HTTPS for remote access or a loopback connection through SSH. Cloudflare environments need independent keys installed with Wrangler secrets. The [R2 Workers API](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/#bucket-method-definitions) supplies the paginated object inventory.
 
 The backup tool creates a **new directory** with mode 0700 and files with mode 0600.
 
-**Backups contain password hashes and session metadata.** Copy them through a protected channel and retain access controls on the destination. Run the restore under the same filesystem owner as the Node service.
+**Backups contain password hashes, session metadata and encrypted account credentials.** The account vault key is a separate recovery requirement: retain the original Linux `vault.key` or Cloudflare `SHOWAI_VAULT_KEY` in a protected secret backup. Restoring encrypted rows with a new key cannot recover their credentials. The restore intentionally does not invent a replacement key. Copy them through a protected channel and retain access controls on the destination. Run the restore under the same filesystem owner as the Node service.
 
 ## Consistent export
 
@@ -28,7 +28,7 @@ An interrupted export can reuse the original generation and verified files:
 node scripts/server-backup.mjs export --url https://showai.renaissancemind.ai/cloud-staging --key-file /private/staging-operations.key --destination /private/backups/showai-staging-2026-10-09 --resume
 ```
 
-Resume fails when the source was reopened, its schema changed or the frozen generation changed. Active admission records are never silently expired. If export still reports draining after its deadline, inspect the isolated runtime and retained records before recovering it; a timeout alone does not prove that an object write stopped. Public request bodies have a two-minute transfer deadline. Object writes have 64 admission slots and metadata mutations have 256; both drain before exclusive maintenance. Read-only budget credit grants also participate in the metadata fence. Version 6 backups remain verifiable and restore with an explicit offline upgrade to the current schema.
+Resume fails when the source was reopened, its schema changed or the frozen generation changed. Active admission records are never silently expired. If export still reports draining after its deadline, inspect the isolated runtime and retained records before recovering it; a timeout alone does not prove that an object write stopped. Public request bodies have a two-minute transfer deadline. Object writes have 64 admission slots and metadata mutations have 256; both drain before exclusive maintenance. Read-only budget credit grants also participate in the metadata fence. Version 6 and 7 backups remain verifiable and restore with an explicit offline upgrade to the current schema.
 
 ## Restore and switch
 
@@ -52,6 +52,16 @@ node scripts/server-backup.mjs unfreeze --url https://target.example/cloud --key
 Clients reconnect to the target using their existing account/token. Matching `serverId` and user identity preserve connection IDs, project bindings, default connection and immutable caches. Original valid tokens remain valid; expired or revoked sessions retain their state. Verify continued synchronization from two independent content libraries and viewer restrictions before changing the public route.
 
 For rollback, freeze and export any new target writes first. Close or keep that target frozen, restore the complete latest backup into a new source directory, verify it and reopen the chosen source. **Do not route two writable copies of the same server identity**. Reopening a pre-migration source after the target accepted new changes would omit those changes.
+
+## Cloudflare D1 to Durable Object migration
+
+The current configuration selects `SHOWAI_METADATA_DRIVER=durable`. An older D1 deployment must be migrated before this routing change. Build committed server code and explicitly apply the generated D1 schema migrations. Install the original registration and operations keys and a protected 64-character lowercase hexadecimal `SHOWAI_VAULT_KEY`. Deploy temporarily with `--var SHOWAI_METADATA_DRIVER:d1` so source operations remain accessible.
+
+Export and verify the D1 source as above; leave it frozen and drained. Repeated authenticated POST requests to `/api/ops/metadata-bootstrap` copy bounded pages directly from frozen D1 into the Durable Object. Send the infrastructure key in the Authorization header. The response reports table progress and counts, and `complete: true` only after schema, freeze generation, identity and table counts verify. Retrying resumes the durable checkpoint. The bootstrap rejects a changed source generation and an occupied target.
+
+Deploy the default durable configuration, verify `/api/info` reports the original server identity and `metadataDriver: durable-sqlite`, and inspect the target's operations generation. Resume only the Durable Object after validating existing accounts, project permissions, history and object reads. Keep the D1 source frozen. Both old R2 archives and new hot objects remain included in the complete object inventory used by backup and restore.
+
+A route rollback to the frozen D1 source alone is insufficient after new edits. Freeze and export the active Durable Object first, then restore the latest generation into a verified target with the original vault key. The same one-writer rule applies to Linux migration and rollback.
 
 ## Reachability report
 

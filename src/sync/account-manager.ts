@@ -7,6 +7,7 @@ import { CoreError } from "../core/model";
 import { serverEndpoint, serverBaseUrl } from "./server-url";
 import {
   identifier,
+  canonical,
   SyncError,
   type ServerConnection,
   type SyncConfiguration,
@@ -159,40 +160,75 @@ export class AccountManager {
       throw new CoreError("INVALID_DATA", "服务器返回的账号身份不匹配。");
     return profile;
   }
+  private async exclusive<T>(action: () => Promise<T>) {
+    return withLibraryLock(
+      this.adapter.home,
+      action,
+      "account-federation-work",
+    );
+  }
   private async flush() {
-    for (const pending of (await this.state()).pending) {
+    const pending = (await this.state()).pending;
+    for (let index = 0; index < pending.length;) {
+      const first = pending[index++],
+        batch = [first];
+      // Remove all consecutive peers of a target in one transaction. A restored
+      // session can itself originate from the first removed peer; revoking it
+      // before the remaining removals would strand an incomplete unlink.
+      while (
+        first.state === "removed" &&
+        index < pending.length &&
+        pending[index].state === "removed" &&
+        pending[index].connectionId === first.connectionId
+      )
+        batch.push(pending[index++]);
       try {
-        const restored = pending.target
+        const restored = first.target
           ? (await this.adapter.configuration()).connections.find(
               (item) =>
-                item.serverId === pending.target!.serverId &&
-                item.user.id === pending.target!.userId,
+                item.serverId === first.target!.serverId &&
+                item.user.id === first.target!.userId,
             )
           : undefined;
         const connection = await this.connection(
-          restored?.id ?? pending.connectionId,
+          restored?.id ?? first.connectionId,
         );
-        await accountRequest(
-          connection,
-          "/api/account/bindings",
-          pending.state === "active" ? "POST" : "DELETE",
-          { descriptor: pending.descriptor },
-        );
+        if (first.state === "removed") {
+          const unique = new Map(
+            batch.map((item) => [item.descriptor.identity.serverId, item]),
+          );
+          await accountRequest(connection, "/api/account/bindings", "PUT", {
+            bindings: [...unique.values()].map((item) => ({
+              descriptor: item.descriptor,
+              state: "removed",
+              updatedAt: Date.now(),
+              changeId: crypto.randomUUID(),
+            })),
+          });
+        } else {
+          await accountRequest(connection, "/api/account/bindings", "POST", {
+            descriptor: first.descriptor,
+          });
+        }
+        const completed = new Set(batch.map((item) => item.id));
         await this.update((state) => {
           state.pending = state.pending.filter(
-            (item) => item.id !== pending.id,
+            (item) => !completed.has(item.id),
           );
-          delete state.errors[pending.connectionId];
+          delete state.errors[first.connectionId];
         });
       } catch (error) {
         await this.update((state) => {
-          state.errors[pending.connectionId] =
+          state.errors[first.connectionId] =
             error instanceof Error ? error.message : String(error);
         });
       }
     }
   }
   async bind(firstId: string, secondId: string) {
+    return this.exclusive(() => this.bindGroup(firstId, secondId));
+  }
+  private async bindGroup(firstId: string, secondId: string) {
     if (firstId === secondId)
       throw new CoreError("INVALID_DATA", "请选择两个不同服务的账号。");
     const first = await this.connection(firstId),
@@ -203,6 +239,34 @@ export class AccountManager {
         "同一服务器上的不同账号不能绑定为同一个账号。",
       );
     const [a, b] = await Promise.all([this.own(first), this.own(second)]);
+    const profiles = await Promise.all([
+      this.profile(first.id),
+      this.profile(second.id),
+    ]);
+    const identities = new Map<string, SignedIdentity>();
+    for (const descriptor of [
+      a,
+      b,
+      ...profiles.flatMap((profile) =>
+        profile.peers
+          .filter((peer) => peer.state === "active")
+          .map((peer) => peer.descriptor),
+      ),
+    ]) {
+      const identity = descriptor.identity;
+      const previous = identities.get(identity.serverId)?.identity;
+      if (
+        previous &&
+        (previous.user.id !== identity.user.id ||
+          previous.generation !== identity.generation ||
+          canonical(previous.publicKey) !== canonical(identity.publicKey))
+      )
+        throw new CoreError(
+          "CONFLICT",
+          "两组绑定包含同一服务器的不同账号或身份，请先解除冲突的绑定。",
+        );
+      identities.set(identity.serverId, descriptor);
+    }
     await this.update((state) => {
       state.pending.push(
         {
@@ -220,17 +284,23 @@ export class AccountManager {
       );
     });
     await this.flush();
-    await this.restore(first.id);
-    await this.reconcile();
+    await this.restoreLogin(first.id);
+    await this.reconcileGroup();
     return this.status();
   }
   async restore(connectionId: string) {
+    return this.exclusive(() => this.restoreLogin(connectionId));
+  }
+  private async restoreLogin(
+    connectionId: string,
+    visited = new Set<string>(),
+  ) {
     const initial = await this.connection(connectionId),
       config = await this.adapter.configuration();
     const queue = [initial],
-      visited = new Set<string>(),
-      restored: string[] = [];
-    while (queue.length && visited.size < 32) {
+      restored: string[] = [],
+      maximum = visited.size + 32;
+    while (queue.length && visited.size < maximum) {
       const source = queue.shift()!,
         sourceKey = `${source.serverId}:${source.user.id}`;
       if (visited.has(sourceKey)) continue;
@@ -238,6 +308,9 @@ export class AccountManager {
       let profile: AccountProfile;
       try {
         profile = await this.profile(source.id);
+        await this.update((state) => {
+          delete state.errors[source.id];
+        });
       } catch (error) {
         await this.update((state) => {
           state.errors[source.id] =
@@ -332,6 +405,24 @@ export class AccountManager {
     return { restored, ...(await this.status()) };
   }
   async reconcile() {
+    return this.exclusive(() => this.reconcileGroup());
+  }
+  async refresh() {
+    return this.exclusive(async () => {
+      await this.flush();
+      const visited = new Set<string>();
+      for (const connection of (
+        await this.adapter.configuration()
+      ).connections.filter((item) =>
+        item.capabilities?.includes(accountCapability),
+      )) {
+        if (!visited.has(`${connection.serverId}:${connection.user.id}`))
+          await this.restoreLogin(connection.id, visited);
+      }
+      return this.reconcileGroup();
+    });
+  }
+  private async reconcileGroup() {
     await this.flush();
     const connections = (await this.adapter.configuration()).connections.filter(
       (item) => item.capabilities?.includes(accountCapability),
@@ -397,6 +488,9 @@ export class AccountManager {
     return this.status();
   }
   async unbind(connectionId: string, peerServerId: string) {
+    return this.exclusive(() => this.unbindGroup(connectionId, peerServerId));
+  }
+  private async unbindGroup(connectionId: string, peerServerId: string) {
     const profile = await this.profile(connectionId),
       target = profile.peers.find(
         (item) =>
@@ -440,7 +534,7 @@ export class AccountManager {
       }
     });
     await this.flush();
-    await this.reconcile();
+    await this.reconcileGroup();
     return this.status();
   }
   async resources(): Promise<ResolvedResource[]> {
@@ -522,7 +616,7 @@ export class AccountManager {
     this.stopped = false;
     const tick = () => {
       if (this.stopped) return;
-      this.work = this.reconcile().finally(() => {
+      this.work = this.refresh().finally(() => {
         this.work = undefined;
         if (!this.stopped) {
           this.timer = setTimeout(tick, 60_000);

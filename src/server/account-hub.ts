@@ -18,7 +18,7 @@ import { AccountCipher, sign, signingKeys, verify } from "./account-crypto";
 import type { AuthUser } from "./accounts";
 import { Sessions } from "./sessions";
 import { audit, liveSession, rateLimit } from "./security";
-import type { MetadataStore } from "./storage";
+import type { MetadataStore, SqlStatement } from "./storage";
 
 export type AccountSession = AuthUser & { session_digest: string };
 interface IdentityRow {
@@ -175,9 +175,15 @@ export class AccountHub {
         "IDENTITY_REQUIRED",
         "请先建立此账号的绑定身份。",
       );
+    const prepared: {
+      binding: AccountBinding;
+      descriptor: SignedIdentity;
+      previous?: PeerRow;
+    }[] = [];
+    const seen = new Set<string>();
     for (const value of input) {
       const binding = value as AccountBinding,
-        descriptor = await this.descriptor(binding.descriptor),
+        descriptor = await this.descriptor(binding?.descriptor),
         identity = descriptor.identity;
       if (
         !["active", "removed"].includes(binding.state) ||
@@ -201,6 +207,13 @@ export class AccountHub {
           );
         continue;
       }
+      if (seen.has(identity.serverId))
+        throw new SyncError(
+          400,
+          "INVALID_BINDING",
+          "同一请求不能重复指定服务器。",
+        );
+      seen.add(identity.serverId);
       const previous = (
         await this.db.all<PeerRow>(
           "SELECT * FROM account_peers WHERE user_id=? AND peer_server_id=?",
@@ -226,24 +239,56 @@ export class AccountHub {
           "BINDING_IDENTITY_CHANGED",
           "绑定服务器的身份发生变化，请重新登录该服务器后绑定。",
         );
-      const encoded = JSON.stringify(descriptor);
-      const result = await this.db.batch([
-        {
-          sql: `INSERT INTO account_peers(user_id,peer_server_id,peer_user_id,descriptor,state,updated_at,change_id) SELECT ?,?,?,?,?,?,? WHERE EXISTS(${permission.sql}) AND ((SELECT COUNT(*) FROM account_peers WHERE user_id=?)<31 OR EXISTS(SELECT 1 FROM account_peers WHERE user_id=? AND peer_server_id=?)) ON CONFLICT(user_id,peer_server_id) DO UPDATE SET peer_user_id=excluded.peer_user_id,descriptor=excluded.descriptor,state=excluded.state,updated_at=excluded.updated_at,change_id=excluded.change_id WHERE excluded.updated_at>account_peers.updated_at OR (excluded.updated_at=account_peers.updated_at AND excluded.change_id>account_peers.change_id)`,
-          values: [
-            user.id,
-            identity.serverId,
-            identity.user.id,
-            encoded,
-            binding.state,
-            binding.updatedAt,
-            binding.changeId,
-            ...permission.values!,
-            user.id,
-            user.id,
-            identity.serverId,
-          ],
-        },
+      prepared.push({ binding, descriptor, previous });
+    }
+    if (!prepared.length) return { ok: true };
+    // Validate the entire group before writing. One guarded INSERT handles every
+    // peer, so malformed later entries, concurrent identity changes or the cap
+    // cannot leave only part of a requested group bound.
+    const rows = prepared.map(({ binding, descriptor, previous }) => ({
+      serverId: descriptor.identity.serverId,
+      userId: descriptor.identity.user.id,
+      descriptor: JSON.stringify(descriptor),
+      state: binding.state,
+      updatedAt: binding.updatedAt,
+      changeId: binding.changeId,
+      previous: previous
+        ? {
+            changeId: previous.change_id,
+            updatedAt: previous.updated_at,
+            state: previous.state,
+          }
+        : null,
+    }));
+    const encodedRows = JSON.stringify(rows);
+    const statements: SqlStatement[] = [
+      {
+        sql: `INSERT INTO account_peers(user_id,peer_server_id,peer_user_id,descriptor,state,updated_at,change_id)
+        SELECT ?,json_extract(value,'$.serverId'),json_extract(value,'$.userId'),json_extract(value,'$.descriptor'),json_extract(value,'$.state'),json_extract(value,'$.updatedAt'),json_extract(value,'$.changeId')
+        FROM json_each(?) WHERE EXISTS(${permission.sql})
+        AND EXISTS(SELECT 1 FROM account_identities WHERE user_id=? AND generation=?)
+        AND (SELECT COUNT(*) FROM account_peers WHERE user_id=?)+(SELECT COUNT(*) FROM json_each(?) AS incoming WHERE NOT EXISTS(SELECT 1 FROM account_peers WHERE user_id=? AND peer_server_id=json_extract(incoming.value,'$.serverId')))<=31
+        AND NOT EXISTS(SELECT 1 FROM json_each(?) AS incoming LEFT JOIN account_peers AS previous ON previous.user_id=? AND previous.peer_server_id=json_extract(incoming.value,'$.serverId')
+          WHERE CASE WHEN json_type(incoming.value,'$.previous')='null' THEN previous.peer_server_id IS NOT NULL
+          ELSE previous.peer_server_id IS NULL OR previous.change_id<>json_extract(incoming.value,'$.previous.changeId') OR previous.updated_at<>json_extract(incoming.value,'$.previous.updatedAt') OR previous.state<>json_extract(incoming.value,'$.previous.state') END)
+        ON CONFLICT(user_id,peer_server_id) DO UPDATE SET peer_user_id=excluded.peer_user_id,descriptor=excluded.descriptor,state=excluded.state,updated_at=excluded.updated_at,change_id=excluded.change_id`,
+        values: [
+          user.id,
+          encodedRows,
+          ...permission.values!,
+          user.id,
+          own.generation,
+          user.id,
+          encodedRows,
+          user.id,
+          encodedRows,
+          user.id,
+        ],
+      },
+    ];
+    for (const { binding, descriptor } of prepared) {
+      const identity = descriptor.identity;
+      statements.push(
         {
           sql: "UPDATE sessions SET revoked=1 WHERE user_id=? AND origin_server=? AND (origin_user<>? OR origin_generation<>? OR EXISTS(SELECT 1 FROM account_peers WHERE user_id=? AND peer_server_id=? AND state='removed')) AND EXISTS(SELECT 1 FROM account_peers WHERE user_id=? AND peer_server_id=? AND change_id=?)",
           values: [
@@ -272,14 +317,15 @@ export class AccountHub {
             values: [user.id, identity.serverId, binding.changeId],
           },
         ),
-      ]);
-      if (!result[0].changes && !previous)
-        throw new SyncError(
-          409,
-          "BINDING_UNAVAILABLE",
-          "登录已过期或绑定数量已达上限。",
-        );
+      );
     }
+    const result = await this.db.batch(statements);
+    if (!result[0].changes)
+      throw new SyncError(
+        409,
+        "BINDING_UNAVAILABLE",
+        "登录或绑定身份已变化，或绑定数量已达上限，请刷新后重试。",
+      );
     return { ok: true };
   }
   async grant(
