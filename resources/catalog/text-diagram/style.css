@@ -1,0 +1,228 @@
+.sd-diagram {
+  --paper: var(--block-background, #fff);
+  --ink: var(--block-color, #18212e);
+  --ink-2: #617084;
+  --ink-3: #8894a3;
+  --line: #738398;
+  --line-2: #dbe3ed;
+  --fill: #f3f6fa;
+  --accent: #2861bd;
+  --accent-bg: #eaf2ff;
+  --warn: #a8620a;
+  --warn-bg: #fff4de;
+  --ok: #197849;
+  --err: #bc3745;
+  --radius: 6px;
+  color: var(--ink);
+  font:
+    14px/1.55 system-ui,
+    sans-serif;
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+}
+.sd-diagram * {
+  box-sizing: border-box;
+}
+.sd-header {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  padding: 0 0 16px;
+  border-bottom: 1px solid var(--line-2);
+}
+.sd-header h3 {
+  font-size: 19px;
+  line-height: 1.4;
+  margin: 0;
+  font-weight: 650;
+  letter-spacing: -0.4px;
+}
+.sd-header p {
+  margin: 6px 0 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  max-width: 620px;
+}
+.sd-controls,
+.sd-actions,
+.sd-views {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.sd-diagram button {
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink-2);
+  background: transparent;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  padding: 5px 9px;
+  cursor: pointer;
+  min-height: 30px;
+}
+.sd-diagram button:hover {
+  background: var(--fill);
+  color: var(--ink);
+}
+.sd-diagram button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.sd-diagram button[aria-pressed="true"] {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.sd-diagram :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.sd-viewport {
+  overflow: auto;
+  max-height: 850px;
+  padding: 24px 8px;
+  overscroll-behavior: contain;
+}
+.sd-drawing {
+  margin: auto;
+}
+.sd-diagram .am-diagram {
+  overflow: visible;
+}
+.sd-diagram .am-diagram svg {
+  width: 100%;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  vertical-align: middle;
+}
+.sd-diagram .am-diagram .am-delta-bar {
+  display: none;
+}
+.sd-diagram .sd-drawing .am-view-changes {
+  color: inherit;
+}
+/* The React wrapper owns the view state, so remove the vendor's initial Changes class. */
+.sd-viewport.am-view-before .am-view-changes [data-delta="added"],
+.sd-viewport.am-view-after .am-view-changes [data-delta="removed"] {
+  visibility: hidden;
+}
+.sd-views {
+  padding-top: 14px;
+}
+.sd-source {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--fill);
+  padding: 16px;
+  border-radius: 6px;
+  font:
+    12px/1.8 ui-monospace,
+    monospace;
+  color: var(--ink-2);
+}
+.sd-editor {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line-2);
+}
+.sd-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.sd-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.sd-fields label:first-child {
+  flex: 1;
+  min-width: 130px;
+}
+.sd-diagram input,
+.sd-diagram select,
+.sd-diagram textarea {
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: 5px;
+  padding: 8px;
+  font: inherit;
+  max-width: 100%;
+}
+.sd-diagram textarea {
+  width: 100%;
+  resize: vertical;
+  font:
+    13px/1.7 ui-monospace,
+    monospace;
+}
+.sd-editor .sd-check {
+  flex-direction: row;
+  align-items: center;
+}
+.sd-actions {
+  margin-top: 10px;
+}
+.sd-actions span {
+  flex: 1;
+}
+.sd-error {
+  color: var(--err);
+  white-space: pre-wrap;
+  padding: 16px;
+  background: #fff0f1;
+  border-radius: 6px;
+}
+.sd-warning {
+  color: var(--warn);
+  font-size: 12px;
+}
+.sd-empty {
+  color: var(--ink-2);
+  padding: 28px;
+  text-align: center;
+}
+@media (prefers-color-scheme: dark) {
+  .sd-diagram {
+    --paper: #17202c;
+    --ink: #e4ebf5;
+    --ink-2: #a3b1c6;
+    --ink-3: #73849a;
+    --line: #8091a8;
+    --line-2: #38485c;
+    --fill: #202c3d;
+    --accent: #8cb9ff;
+    --accent-bg: #243b5b;
+    --warn: #edba67;
+    --warn-bg: #3c3223;
+    --ok: #7cd5a2;
+    --err: #ffa1aa;
+  }
+  .sd-error {
+    background: #3f252d;
+  }
+}
+@media print {
+  .sd-controls,
+  .sd-editor,
+  .sd-views {
+    display: none;
+  }
+  .sd-viewport {
+    max-height: none;
+    overflow: visible;
+  }
+  .sd-drawing {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}

@@ -1,0 +1,186 @@
+{
+  "id": "text-diagram",
+  "name": "文本关系图",
+  "version": "1.0.0",
+  "reader": "readData",
+  "category": "flow",
+  "description": "从简短文字自动排版流程、架构与时序图，支持分组、判断节点、变更对照和可编辑保存。",
+  "scenarios": [
+    "解释业务流程和分支判断。",
+    "展示模块结构、依赖与数据流。",
+    "展示消息与响应顺序。"
+  ],
+  "entry": "index.tsx",
+  "defaultData": {
+    "title": "请求如何经过后端服务",
+    "type": "flow",
+    "direction": "LR",
+    "source": "(用户请求) -> {已登录？}\n{已登录？} -> *业务服务: 是\n{已登录？} --> 登录页面: 否\n业务服务 -> [(数据库)]\ngroup 后端: 业务服务, 数据库"
+  },
+  "examples": [
+    {
+      "name": "分支与分组",
+      "data": {
+        "title": "请求如何经过后端服务",
+        "type": "flow",
+        "direction": "LR",
+        "source": "(用户请求) -> {已登录？}\n{已登录？} -> *业务服务: 是\n{已登录？} --> 登录页面: 否\n业务服务 -> [(数据库)]\ngroup 后端: 业务服务, 数据库"
+      }
+    },
+    {
+      "name": "带编号的时序",
+      "data": {
+        "title": "一次请求与响应",
+        "type": "sequence",
+        "numbered": true,
+        "source": "participants: 客户端, API, 数据库\n客户端 -> API: 提交请求\nAPI -> API: 校验权限\nAPI -> 数据库: 查询记录\n数据库 --> API: 返回结果\nAPI --> 客户端: 响应\nnote 客户端, API: 请求完成"
+      }
+    },
+    {
+      "name": "结构变更对照",
+      "data": {
+        "title": "增加缓存后的请求路径",
+        "type": "flow",
+        "direction": "LR",
+        "source": "客户端 -> 网关\n- 网关 -> 服务\n+ 网关 -> [(缓存)]: 查询\n+ 缓存 -> 服务: 未命中\n服务 -> 数据库\n~ *服务"
+      }
+    },
+    {
+      "name": "循环与判断",
+      "data": {
+        "title": "内容检查流程",
+        "type": "flow",
+        "direction": "TB",
+        "source": "(开始) -> 撰写 -> {检查通过？}\n{检查通过？} -> (完成): 是\n{检查通过？} -> 撰写: 修改"
+      }
+    }
+  ],
+  "documentation": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": [
+        "用于流程、模块结构和参与者消息关系；输入须满足本组件语法。"
+      ]
+    },
+    "usage": {
+      "purpose": "用紧凑文字自动生成可缩放关系图，解释流程、架构和消息顺序。",
+      "structure": [
+        "source 保存正式图形描述；节点、连线、坐标为派生结果。"
+      ],
+      "inputs": [
+        {
+          "path": "title / description",
+          "meaning": "可选标题和说明。"
+        },
+        {
+          "path": "type",
+          "meaning": "flow 为结构关系图，sequence 为时序图。"
+        },
+        {
+          "path": "source",
+          "meaning": "最多 12000 字、200 行。节点名称即身份；标点放入方括号。流程：A -> B（实线）、A --> B（虚线）、A -> B & C（分支）、A -> B -> C（链），冒号后为连线说明。(开始)、{判断}、[(数据库)]、*重点；group 名称: A, B 创建不重叠分组。+ / - / ~ 后加空格表示新增/移除/修改，~ 仅用于节点。时序：participants: A, B 固定顺序，A -> B: 消息，B --> A: 返回，note A, B: 说明，== 阶段 ==。"
+        },
+        {
+          "path": "direction",
+          "meaning": "flow 支持 TB/LR/BT/RL，默认 TB。"
+        },
+        {
+          "path": "numbered",
+          "meaning": "sequence 消息编号，默认 true。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "分支与分组",
+          "steps": [
+            "复制对应示例的 data，替换节点、连线与说明。",
+            "在真实 Page 查看图形；编辑时实时预览，校验通过后保存。"
+          ],
+          "exampleIndex": 0
+        },
+        {
+          "title": "带编号的时序",
+          "steps": [
+            "复制对应示例的 data，替换节点、连线与说明。",
+            "在真实 Page 查看图形；编辑时实时预览，校验通过后保存。"
+          ],
+          "exampleIndex": 1
+        },
+        {
+          "title": "结构变更对照",
+          "steps": [
+            "复制对应示例的 data，替换节点、连线与说明。",
+            "在真实 Page 查看图形；编辑时实时预览，校验通过后保存。"
+          ],
+          "exampleIndex": 2
+        },
+        {
+          "title": "循环与判断",
+          "steps": [
+            "复制对应示例的 data，替换节点、连线与说明。",
+            "在真实 Page 查看图形；编辑时实时预览，校验通过后保存。"
+          ],
+          "exampleIndex": 3
+        }
+      ],
+      "interactions": [
+        {
+          "action": "缩放、滚动、查看描述、切换变更视图",
+          "effect": "仅改变阅读状态。",
+          "persistence": "view"
+        },
+        {
+          "action": "编辑图形",
+          "effect": "通过单一编辑面板修改标题、类型、方向和描述；错误显示行号并阻止保存，取消或 Escape 放弃草稿，有效保存通过 onChange 写回宿主。",
+          "persistence": "content"
+        }
+      ],
+      "constraints": [
+        "flow 最多 150 节点、400 边、30 个互不重叠分组；sequence 最多 30 参与者、150 步骤。",
+        "使用本组件独立语法，不执行输入 HTML。",
+        "变更前/后隐藏相应项目，保留原图位置；~ 不包含旧文字。",
+        "错误提示显示引擎原始诊断与相对行号。"
+      ],
+      "editing": {
+        "data": [
+          "修改 title、description、type、source、direction、numbered，遵守语法与上限。"
+        ],
+        "implementation": [
+          "新增语法或图形能力时同步引擎、schema、示例、文档和测试，保存新版本。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.tsx",
+          "purpose": "React 交互与 readData。"
+        },
+        {
+          "path": "engine.js",
+          "purpose": "校验、解析与渲染。"
+        },
+        {
+          "path": "vendor/provenance.json",
+          "purpose": "固定上游来源和依赖版本。"
+        }
+      ],
+      "architecture": [
+        "保留 MIT 上游 flow/sequence SVG 引擎；dagre.js 是包内离线依赖；React 接管阅读状态和编辑保存。"
+      ],
+      "extensionPoints": [
+        "增加类型时同步解析/渲染器、schema、示例和真实页面验证。"
+      ],
+      "invariants": [
+        "用户字符串经转义进入 SVG，不加载远程资源。",
+        "readData 与图形共用 inspect 校验和同一源数据。",
+        "只读不调用 onChange，错误输入保留草稿。"
+      ],
+      "verification": [
+        "覆盖方向、分组、形状、循环、中文、转义、自调用和变更。",
+        "通过 component_save 编译，检查真实 Page 编辑、只读、窄屏和离线 HTML。"
+      ]
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "repository": "https://github.com/QingYunA/answer-me-with-html",
+  "commit": "533c39fd47d814a6bee3d9c1df388345f4e4c858",
+  "license": "MIT",
+  "extraction": [
+    "flow",
+    "sequence",
+    "svg text/shapes",
+    "delta",
+    "bidi"
+  ],
+  "changes": [
+    "Package-local dagre import; React wrapper handles state, editing and view controls."
+  ],
+  "dagre": "3.1.1"
+}

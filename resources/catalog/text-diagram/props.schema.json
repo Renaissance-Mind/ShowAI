@@ -1,0 +1,39 @@
+{
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "type": {
+      "enum": [
+        "flow",
+        "sequence"
+      ]
+    },
+    "source": {
+      "type": "string",
+      "maxLength": 12000
+    },
+    "direction": {
+      "enum": [
+        "TB",
+        "LR",
+        "BT",
+        "RL"
+      ]
+    },
+    "numbered": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "type",
+    "source"
+  ],
+  "additionalProperties": false
+}

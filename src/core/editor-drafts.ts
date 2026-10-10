@@ -9,6 +9,24 @@ import { ContentLibrary as GitLibrary } from "./content-library";
 import { documentHash, canonicalJson } from "./diff";
 import type { ShowDocument } from "./model";
 import type { ChangeActor } from "./history-model";
+import { visitNodes } from "../surface/document.mjs";
+
+function committedDraftHash(document: ShowDocument): string {
+  const normalized = structuredClone(document);
+  visitNodes(normalized.content, (node) => {
+    const data = node.attrs?.data;
+    // Catalog resolution adds a lookup scope; locking an exact revision removes it.
+    // The immutable fingerprint, version and all content props still participate.
+    if (
+      node.type === "widget" &&
+      node.attrs?.kind === "custom" &&
+      typeof data?.integrity === "string" &&
+      /^sha256-[a-f0-9]{64}$/.test(data.integrity)
+    )
+      delete data.scope;
+  });
+  return documentHash(normalized);
+}
 
 export interface EditorDraftInput {
   kind: "page" | "component" | "template";
@@ -540,7 +558,10 @@ export class EditorDrafts {
         );
         const committed = JSON.parse(bytes.toString("utf8"))
           .document as ShowDocument;
-        if (documentHash(committed) !== documentHash(content as ShowDocument))
+        if (
+          committedDraftHash(committed) !==
+          committedDraftHash(content as ShowDocument)
+        )
           throw new CoreError(
             "CONFLICT",
             "The committed page differs from this draft. The draft was retained.",
