@@ -236,10 +236,8 @@ export class ExternalLogins {
         response_type: "code",
         redirect_uri: secret.redirectUri,
         state,
-        scope:
-          provider === "github"
-            ? "read:user user:email"
-            : "openid profile email",
+        // GitHub's public ID and login are sufficient to identify the account.
+        scope: provider === "github" ? "" : "openid profile email",
         nonce,
         code_challenge_method: "S256",
         code_challenge: base64url(
