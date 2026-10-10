@@ -553,7 +553,7 @@ export class SyncManager {
       }>(connection, "/api/auth/start", "POST", {
         provider: input.provider,
         email: input.email,
-        registrationKey: input.registrationKey,
+        registrationKey: input.registrationKey || undefined,
         device: `ShowAI · ${hostname().slice(0, 180)}`,
       })),
       serverUrl: connection.url,

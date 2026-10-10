@@ -205,7 +205,7 @@ export class ExternalLogins {
           : "ShowAI",
       link,
       registrationKey:
-        typeof input.registrationKey === "string"
+        typeof input.registrationKey === "string" && input.registrationKey !== ""
           ? plainText(input.registrationKey, 200)
           : undefined,
     };
