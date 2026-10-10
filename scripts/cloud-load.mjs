@@ -2,6 +2,8 @@ import { parseArgs } from "node:util";
 import { readFile, writeFile } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
 import { connect, constants } from "node:http2";
+import { pathToFileURL } from "node:url";
+import { resolve } from "node:path";
 
 const { values } = parseArgs({
   options: {
@@ -16,8 +18,12 @@ if (!values.fixture || !values.output)
 const fixture = JSON.parse(await readFile(values.fixture, "utf8"));
 const { users, devices, projects } = fixture;
 const base = new URL(fixture.base);
-if (!["fetch", "http2"].includes(values.transport))
-  throw new Error("Use --transport fetch or --transport http2.");
+if (!["fetch", "http2", "client"].includes(values.transport))
+  throw new Error("Use --transport fetch, http2 or client.");
+const clientTransport =
+  values.transport === "client"
+    ? await import(pathToFileURL(resolve("dist-agent/sync-transport.mjs")).href)
+    : undefined;
 if (
   !["https:", "http:"].includes(base.protocol) ||
   (base.protocol !== "https:" &&
@@ -155,17 +161,20 @@ async function request(path, phase, method, data, token, binary = false) {
   try {
     const response = session
       ? await http2Request(path, method, body, token, binary)
-      : await fetch(fixture.base.replace(/\/$/, "") + path, {
-          method,
-          headers: {
-            authorization: `Bearer ${token}`,
-            ...(data !== undefined && !binary
-              ? { "content-type": "application/json" }
-              : {}),
+      : await (clientTransport?.serverFetch ?? fetch)(
+          fixture.base.replace(/\/$/, "") + path,
+          {
+            method,
+            headers: {
+              authorization: `Bearer ${token}`,
+              ...(data !== undefined && !binary
+                ? { "content-type": "application/json" }
+                : {}),
+            },
+            body,
+            signal: AbortSignal.timeout(limits.requestTimeoutMs),
           },
-          body,
-          signal: AbortSignal.timeout(limits.requestTimeoutMs),
-        });
+        );
     const result = await response.json();
     stages.push({
       phase,
@@ -311,7 +320,9 @@ const report = {
   transport:
     values.transport === "http2"
       ? "one TLS connection with independently authenticated HTTP/2 streams"
-      : "Node fetch connection pool",
+      : values.transport === "client"
+        ? "ShowAI client pooled transport with HTTP/2 negotiation and HTTP/1.1 fallback"
+        : "Node fetch connection pool",
   transportConfiguration: session
     ? { streamWindowBytes: 1024 * 1024, connectionWindowBytes: 4 * 1024 * 1024 }
     : {},
@@ -343,6 +354,7 @@ await writeFile(values.output, JSON.stringify(report, null, 2), {
   mode: 0o600,
 });
 session?.destroy();
+await clientTransport?.closeServerTransport();
 console.log(
   JSON.stringify({
     ...report,

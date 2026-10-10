@@ -16,6 +16,7 @@ import { resumableUpload } from "./resumable-upload";
 import { retryUpload } from "./upload-retry";
 import { ProjectEventStream } from "./event-stream";
 import { AccountManager } from "./account-manager";
+import { serverFetch as fetch, closeServerTransport } from "./server-fetch";
 import { accountCapability } from "./accounts";
 import {
   eventCapability,
@@ -86,6 +87,7 @@ export function syncManager(home: string) {
 }
 export async function stopSyncManagers() {
   await Promise.all([...instances.values()].map((manager) => manager.stop()));
+  await closeServerTransport();
 }
 async function readJson<T>(path: string): Promise<T | undefined> {
   return readFile(path, "utf8").then(

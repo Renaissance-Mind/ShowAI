@@ -22,6 +22,7 @@ import {
   type AccountResource,
 } from "./accounts";
 import { verify } from "../server/account-crypto";
+import { serverFetch as fetch } from "./server-fetch";
 
 interface Adapter {
   home: string;

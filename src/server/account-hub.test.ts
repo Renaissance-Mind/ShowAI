@@ -2,6 +2,9 @@ import { afterEach, expect, test } from "vitest";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { once } from "node:events";
+import WebSocket from "ws";
+import { eventProtocol } from "../sync/events";
 import {
   startSyncServer,
   SQLiteMetadata,
@@ -230,9 +233,22 @@ test("a restored device unlinks a member from the full group before revoking its
   const restored = (await device.configuration()).connections;
   const source = restored.find((item) => item.serverId === a.serverId)!;
   const removed = restored.find((item) => item.serverId === b.serverId)!;
+  const socket = new WebSocket(
+    removed.url.replace(/^http/, "ws") + "/api/events",
+    eventProtocol,
+    {
+      headers: { authorization: `Bearer ${removed.token}` },
+    },
+  );
+  cleanup.push(async () => {
+    socket.terminate();
+  });
+  await once(socket, "open", { signal: AbortSignal.timeout(10_000) });
+  const closed = once(socket, "close", { signal: AbortSignal.timeout(10_000) });
   expect((await device.accounts.unbind(source.id, b.serverId)).pending).toEqual(
     [],
   );
+  expect((await closed)[0]).toBe(4001);
   expect(
     (await f.client.accounts.profile(a.id)).peers
       .filter((item) => item.state === "active")

@@ -1499,7 +1499,7 @@ export function createSyncServer(options: ServerOptions) {
             (request.method === "POST" &&
               (/^\/api\/auth\/(?:password|logout)$/.test(logicalPath) ||
                 /^\/api\/sessions\/revoke(?:-all)?$/.test(logicalPath))) ||
-            (request.method === "DELETE" &&
+            (["POST", "PUT", "DELETE"].includes(request.method) &&
               logicalPath === "/api/account/bindings") ||
             (request.method === "POST" &&
               logicalPath === "/api/invites/accept"))

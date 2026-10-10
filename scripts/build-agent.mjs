@@ -16,3 +16,14 @@ await build({
   },
 });
 console.log("Built ShowAI CLI and optional stdio MCP entry.");
+await build({
+  entryPoints: ["src/sync/server-fetch.ts"],
+  outfile: "dist-agent/sync-transport.mjs",
+  platform: "node",
+  target: "node22",
+  format: "esm",
+  bundle: true,
+  banner: {
+    js: 'import { createRequire as __showaiCreateRequire } from "node:module"; const require = __showaiCreateRequire(import.meta.url);',
+  },
+});

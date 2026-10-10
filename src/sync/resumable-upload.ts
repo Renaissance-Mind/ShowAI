@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { SyncError } from "./protocol";
 import { retryUpload } from "./upload-retry";
+import { serverFetch as fetch } from "./server-fetch";
 
 interface UploadStatus {
   id: string | null;
