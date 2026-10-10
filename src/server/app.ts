@@ -358,6 +358,16 @@ export function createSyncServer(options: ServerOptions) {
     }
     if (path === "/api/auth/exchange" && method === "POST")
       return json(await accounts.exchange(await body(request), source));
+    if (path === "/api/auth/google-relay" && method === "POST") {
+      if (
+        !options.googleRelayKey ||
+        options.googleRelay ||
+        (await hash(request.headers.get("authorization") ?? "")) !==
+          (await hash(`Bearer ${options.googleRelayKey}`))
+      )
+        throw new SyncError(401, "UNAUTHORIZED", "Google 登录转发未授权。");
+      return json(await logins.relayGoogle(await body(request), source));
+    }
     if (path === "/api/auth/start" && method === "POST")
       return json(
         await logins.begin(

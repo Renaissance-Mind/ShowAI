@@ -1,8 +1,48 @@
 import { expect, test } from "vitest";
 import { createServer } from "node:http";
 import { once } from "node:events";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { startSyncServer } from "./node";
+import { token } from "../sync/protocol";
 import { base64url } from "./account-crypto";
 import { googleIdentity, providerJson } from "./external-logins";
+
+test("Google relay requires its own credential and rejects unlisted callbacks before forwarding", async () => {
+  const home = await mkdtemp(join(tmpdir(), "showai-relay-"));
+  const key = token();
+  const server = await startSyncServer({
+    home,
+    port: 0,
+    googleLogin: { clientId: "relay-test-client", clientSecret: "local-test-configuration" },
+    googleRelayKey: key,
+    googleRelayRedirects: ["https://private.example.test/private/api/auth/callback/google"],
+  });
+  const request = (authorization: string | undefined, body: unknown) =>
+    fetch(server.url + "/api/auth/google-relay", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...(authorization ? { authorization } : {}) },
+      body: JSON.stringify(body),
+    });
+  try {
+    expect((await request(undefined, { operation: "keys" })).status).toBe(401);
+    expect((await request(`Bearer ${token()}`, { operation: "keys" })).status).toBe(401);
+    expect((await request(`Bearer ${key}`, { operation: "arbitrary-url", url: "https://other.example.test" })).status).toBe(400);
+    const denied = await request(`Bearer ${key}`, {
+      operation: "token",
+      clientId: "relay-test-client",
+      redirectUri: "https://other.example.test/callback",
+      code: "unused-before-forwarding",
+      verifier: "unused-before-forwarding",
+    });
+    expect(denied.status).toBe(403);
+    expect((await denied.json()).error.code).toBe("INVALID_LOGIN_TARGET");
+  } finally {
+    await server.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});
 
 test("provider requests accept JSON but never forward credentials across redirects", async () => {
   let forwarded = 0;

@@ -11,6 +11,9 @@ export interface ExternalLoginOptions extends AccountOptions {
   vaultKey?: string;
   githubLogin?: { clientId: string; clientSecret: string };
   googleLogin?: { clientId: string; clientSecret: string };
+  googleRelay?: { url: string; key: string };
+  googleRelayKey?: string;
+  googleRelayRedirects?: string[];
   emailLogin?: { apiKey: string; from: string };
 }
 export interface LoginEnvironment {
@@ -19,12 +22,23 @@ export interface LoginEnvironment {
   SHOWAI_GITHUB_CLIENT_SECRET?: string;
   SHOWAI_GOOGLE_CLIENT_ID?: string;
   SHOWAI_GOOGLE_CLIENT_SECRET?: string;
+  SHOWAI_GOOGLE_RELAY_URL?: string;
+  SHOWAI_GOOGLE_RELAY_KEY?: string;
+  SHOWAI_GOOGLE_RELAY_REDIRECTS?: string;
   SHOWAI_EMAIL_API_KEY?: string;
   SHOWAI_EMAIL_FROM?: string;
 }
 export function configuredLogins(env: LoginEnvironment): ExternalLoginOptions {
   return {
     vaultKey: env.SHOWAI_VAULT_KEY,
+    googleRelay:
+      env.SHOWAI_GOOGLE_RELAY_URL && env.SHOWAI_GOOGLE_RELAY_KEY
+        ? { url: env.SHOWAI_GOOGLE_RELAY_URL, key: env.SHOWAI_GOOGLE_RELAY_KEY }
+        : undefined,
+    googleRelayKey: env.SHOWAI_GOOGLE_RELAY_KEY,
+    googleRelayRedirects: env.SHOWAI_GOOGLE_RELAY_REDIRECTS?.split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
     githubLogin:
       env.SHOWAI_GITHUB_CLIENT_ID && env.SHOWAI_GITHUB_CLIENT_SECRET
         ? {
@@ -153,6 +167,9 @@ export class ExternalLogins {
     readonly options: ExternalLoginOptions,
   ) {
     this.cipher = new AccountCipher(options.vaultKey);
+    for (const key of [options.googleRelayKey, options.googleRelay?.key])
+      if (key !== undefined && !/^[a-f0-9]{64}$/.test(key))
+        throw new Error("Google login relay keys require 64 lowercase hexadecimal characters.");
   }
   get available() {
     return this.cipher.enabled
@@ -165,6 +182,47 @@ export class ExternalLogins {
   }
   private context(id: string) {
     return `showai-login:${id}`;
+  }
+  async relayGoogle(input: Record<string, unknown>, source: string) {
+    if (!this.options.googleLogin || this.options.googleRelay)
+      throw new SyncError(503, "LOGIN_NOT_CONFIGURED", "Google 登录转发未启用。");
+    await rateLimit(this.db, {
+      scope: "external-login:google-relay",
+      identity: source,
+      maximum: 120,
+      windowMs: 60_000,
+    });
+    if (input.operation === "keys")
+      return providerJson("https://www.googleapis.com/oauth2/v3/certs");
+    if (input.operation !== "token")
+      throw new SyncError(400, "INVALID_DATA", "未知的 Google 登录转发操作。");
+    const redirectUri = plainText(input.redirectUri, 4096);
+    if (
+      input.clientId !== this.options.googleLogin.clientId ||
+      !this.options.googleRelayRedirects?.includes(redirectUri)
+    )
+      throw new SyncError(403, "INVALID_LOGIN_TARGET", "未允许此登录回调地址。");
+    return providerJson("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: this.options.googleLogin.clientId,
+        client_secret: this.options.googleLogin.clientSecret,
+        code: plainText(input.code, 4096),
+        code_verifier: plainText(input.verifier, 200),
+        redirect_uri: redirectUri,
+      }),
+    });
+  }
+  private googleRelay(operation: string, parameters: Record<string, string> = {}) {
+    const relay = this.options.googleRelay!;
+    if (new URL(relay.url).protocol !== "https:")
+      throw new SyncError(400, "INVALID_LOGIN_TARGET", "Google 登录转发需要 HTTPS。");
+    return providerJson(serverEndpoint(relay.url, "/api/auth/google-relay"), {
+      method: "POST",
+      headers: { authorization: `Bearer ${relay.key}`, "content-type": "application/json" },
+      body: JSON.stringify({ operation, ...parameters }),
+    });
   }
   async begin(
     input: Record<string, unknown>,
@@ -448,7 +506,15 @@ export class ExternalLogins {
         provider === "github"
           ? this.options.githubLogin!
           : this.options.googleLogin!;
-      const data = await providerJson(
+      const code = plainText(url.searchParams.get("code"), 4096);
+      const data = provider === "google" && this.options.googleRelay
+        ? await this.googleRelay("token", {
+            clientId: config.clientId,
+            code,
+            verifier: secret.verifier,
+            redirectUri: secret.redirectUri,
+          })
+        : await providerJson(
         provider === "github"
           ? "https://github.com/login/oauth/access_token"
           : "https://oauth2.googleapis.com/token",
@@ -459,7 +525,7 @@ export class ExternalLogins {
             grant_type: "authorization_code",
             client_id: config.clientId,
             client_secret: config.clientSecret,
-            code: plainText(url.searchParams.get("code"), 4096),
+            code,
             code_verifier: secret.verifier,
             redirect_uri: secret.redirectUri,
           }),
@@ -495,9 +561,9 @@ export class ExternalLogins {
             "INVALID_ID_TOKEN",
             "Google 未返回身份凭据。",
           );
-        const keys = await providerJson(
-          "https://www.googleapis.com/oauth2/v3/certs",
-        );
+        const keys = this.options.googleRelay
+          ? await this.googleRelay("keys")
+          : await providerJson("https://www.googleapis.com/oauth2/v3/certs");
         identity = await googleIdentity(
           data.id_token,
           config.clientId,

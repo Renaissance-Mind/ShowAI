@@ -58,6 +58,8 @@ Linux 启动时按版本执行尚未应用的事务迁移，保留旧服务的�
 
 Linux 数据目录自动创建权限 0600 的 `vault.key`；Cloudflare 必须设置独立的 `SHOWAI_VAULT_KEY`。已有加密账号数据恢复后必须提供原保险库密钥。GitHub 使用 `SHOWAI_GITHUB_CLIENT_ID` / `SHOWAI_GITHUB_CLIENT_SECRET`，Google 使用 `SHOWAI_GOOGLE_CLIENT_ID` / `SHOWAI_GOOGLE_CLIENT_SECRET`，邮箱验证码使用 Resend 的 `SHOWAI_EMAIL_API_KEY` / `SHOWAI_EMAIL_FROM`。回调地址分别为服务器基址下的 `/api/auth/callback/github` 与 `/api/auth/callback/google`。
 
+Linux 需要访问第三方登录服务的外网接口。出网受限时，可在可信的 Cloudflare 或 Linux 服务配置 `SHOWAI_GOOGLE_RELAY_KEY`（独立的 64 位十六进制随机密钥）和 `SHOWAI_GOOGLE_RELAY_REDIRECTS`（允许的 Google 回调地址，逗号分隔）；受限服务设置相同密钥及 `SHOWAI_GOOGLE_RELAY_URL`（转发服务的 HTTPS 基址）。两端使用同一个 Google 客户端 ID。转发只处理 Google 授权码交换和公开签名密钥，拒绝未授权请求及未列入允许列表的回调；最终身份、nonce 校验和设备 Token 签发在发起登录的服务完成。正常出网的部署直接连接 Google。
+
 ### 访问限制与审计
 
 登录、注册、邀请预览与领取通过数据库中的原子计数按来源、账号和全局预算限流，返回 429 与 `Retry-After`。Linux 来源取连接地址，忽略客户端伪造的转发头；反向代理后的客户端共享代理来源预算。Worker 使用 Cloudflare 的来源地址。默认每来源每小时最多 20 次注册尝试，可通过 `SHOWAI_REGISTRATION_LIMIT` 调整；staging 为受控验收设为 120。服务默认最多 10000 个账号，可通过 `SHOWAI_ACCOUNT_LIMIT` 调整。新增账号达到容量时返回明确失败，邀请注册失败不会留下账号或消耗领取名额。设置 `SHOWAI_ALLOWED_ORIGINS` 可允许明确的浏览器源（逗号分隔的完整 origin）；桌面、CLI 与浏览器工作台的后台连接使用 Bearer Token。关键账号、会话、邀请和成员变更写入不含密码、Token 与正文的审计记录。
