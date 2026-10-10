@@ -1,5 +1,6 @@
+import { CAPACITY } from "./capacity.mjs";
 /** Shared transport rules for Node verification and the browser reader. No code executes here. */
-export const MAX_PUBLICATION_BUNDLE_BYTES = 32 * 1024 * 1024;
+export const MAX_PUBLICATION_BUNDLE_BYTES = CAPACITY.publicationBytes;
 const digestPattern = /^sha256-[a-f0-9]{64}$/;
 const idPattern = /^[a-z][a-z0-9-]{0,79}$/;
 const versionPattern =
@@ -204,8 +205,8 @@ export async function loadRemoteComponents(input, options = {}) {
           `组件 ${locator.ref.id}@${locator.ref.version} 的文件校验失败（SHA-256 或字节数不一致）。`,
         );
       total += received.bytes.byteLength;
-      if (total > 64 * 1024 * 1024)
-        throw new Error("Remote component downloads exceed the 64 MB limit.");
+      if (total > CAPACITY.publicationTransferBytes)
+        throw new Error("Remote component downloads exceed the 512 MiB limit.");
       bundle = JSON.parse(received.text);
       if (
         bundle?.format !== "showai-catalog-bundle" ||

@@ -1,3 +1,4 @@
+import { CAPACITY, formatBytes } from "./portable/capacity.mjs";
 import { linearContent } from "./surface/document.mjs";
 import { upgradeResource } from "./surface/containers.mjs";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -223,8 +224,10 @@ export default function App() {
   async function openFile(file: File) {
     const request = ++importGeneration.current;
     setMenuOpen(false);
-    if (file.size > 10 * 1024 * 1024) {
-      setError("页面文件不能超过 10 MB。");
+    if (file.size > CAPACITY.artifactBytes) {
+      setError(
+        `导入文件为 ${formatBytes(file.size)}，文件上限 ${formatBytes(CAPACITY.artifactBytes)}。`,
+      );
       return;
     }
     try {

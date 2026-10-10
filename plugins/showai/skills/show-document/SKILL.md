@@ -14,7 +14,19 @@ description: 通过 ShowAI MCP 创作、修改、展示或导出页面、报告�
 普通报告保留一份 Page，用章节、区域和嵌套容器组织。用户要求网站或多个独立文档时才拆分页面。后续修改继续使用原 pageId。新页面用 page_create；修改前 page_read完整源数据，保留 hash、revision与稳定节点 ID，再用 page_apply或page_save。
 
 ```json
-{"projectId":"已核实项目ID","pageId":"已读取页面ID","baseHash":"读取结果的hash","baseRevision":"读取结果的revision","operations":[{"type":"block.text.set","blockId":"稳定节点ID","text":"修改后的正文"}]}
+{
+  "projectId": "已核实项目ID",
+  "pageId": "已读取页面ID",
+  "baseHash": "读取结果的hash",
+  "baseRevision": "读取结果的revision",
+  "operations": [
+    {
+      "type": "block.text.set",
+      "blockId": "稳定节点ID",
+      "text": "修改后的正文"
+    }
+  ]
+}
 ```
 
 这是 page_apply 的参数形状，具体操作查询当前 guide/inputSchema。不要用局部读取或选区导出覆盖完整页面。CONFLICT时比较原始基线、当前内容与尝试稿后处理，不能只换 hash/revision覆盖。跨设备冲突可能返回新的 document.id，后续使用实际返回值。
@@ -38,6 +50,10 @@ description: 通过 ShowAI MCP 创作、修改、展示或导出页面、报告�
 ## 独立交付
 
 用户明确要求不入库或只要独立文件时，可用公开目录与 `render_document({document或templateId,title?,componentSources?,blockIds?})`。document与templateId二选一；自定义源码对象沿用component_save.source结构。读取persistence回执：独立渲染不创建个人项目，也不进行同步。需要后续正式保存时，再把完整文档与组件保存到明确项目。
+
+## 容量
+
+创作大页面或带资源的内容前，读取 showai_capabilities 的 capacities，并按 [容量与大文件](references/capacity.md) 判断具体边界。页面结构、原始资源、组件包、完整导出与聊天预览分别计算；聊天预览超限时仍保留完整 Page 和文件。
 
 ## 验证与交付
 

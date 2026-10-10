@@ -1,3 +1,4 @@
+import { CAPACITY } from "../portable/capacity.mjs";
 import { digestId, identifier, SyncError } from "../sync/protocol";
 import type { MetadataStore, ObjectStore, SqlStatement } from "./storage";
 import { Quotas } from "./quotas";
@@ -64,7 +65,11 @@ export class Uploads {
   ) {
     const name = digestId(digest),
       size = Number(bytes);
-    if (!Number.isSafeInteger(size) || size < 0 || size > 64 * 1024 * 1024)
+    if (
+      !Number.isSafeInteger(size) ||
+      size < 0 ||
+      size > CAPACITY.syncObjectBytes
+    )
       throw new SyncError(
         413,
         "TOO_LARGE",

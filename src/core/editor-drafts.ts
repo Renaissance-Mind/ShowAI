@@ -1,3 +1,4 @@
+import { CAPACITY, assertBytes } from "../portable/capacity.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import { readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -167,11 +168,13 @@ export class EditorDrafts {
         "INVALID_DATA",
         "Draft sequence must be a nonnegative integer.",
       );
-    if (raw === undefined || Buffer.byteLength(raw) > 32 * 1024 * 1024)
-      throw new CoreError(
-        "INVALID_DATA",
-        "Draft content exceeds the 32 MB limit.",
-      );
+    if (raw === undefined)
+      throw new CoreError("INVALID_DATA", "Draft content must be JSON.");
+    assertBytes(
+      "Recovery draft JSON",
+      Buffer.byteLength(raw),
+      CAPACITY.artifactBytes,
+    );
     return withLibraryLock(
       this.root,
       async () => {

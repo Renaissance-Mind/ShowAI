@@ -1,3 +1,4 @@
+import { CAPACITY, assertContent } from "../../portable/capacity.mjs";
 import type { ShowDocument } from "../../types";
 import type {
   CompiledComponent,
@@ -53,6 +54,7 @@ export function componentWidgetData(
   props: Record<string, unknown> = component.defaultData,
 ): Record<string, unknown> {
   assertJsonValue(props);
+  assertContent(props, "Component instance data", CAPACITY.componentPropsBytes);
   return {
     ...readCustomBlockData({
       componentId: component.id,
@@ -95,6 +97,12 @@ export function readCustomBlockData(value: unknown): CustomBlockData {
     Array.isArray(data.props)
   )
     throw new Error("Custom block props must be an object.");
+  assertJsonValue(data.props);
+  assertContent(
+    data.props,
+    "Component instance data",
+    CAPACITY.componentPropsBytes,
+  );
   return {
     componentId: data.componentId,
     version: data.version,

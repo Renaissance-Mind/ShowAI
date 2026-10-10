@@ -1,3 +1,9 @@
+import {
+  CAPACITY,
+  CapacityError,
+  readCapacityText,
+  formatBytes,
+} from "../portable/capacity.mjs";
 import { createServer, type Server } from "node:http";
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -391,7 +397,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
-      maxRequestBodySize: 16 * 1024 * 1024,
+      maxRequestBodySize: CAPACITY.authoringRequestBytes,
     });
     try {
       await server.connect(transport);
@@ -475,9 +481,25 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         return json({ error: "Use Streamable HTTP POST." }, 405, {
           allow: "POST",
         });
-      const raw = await request.text();
-      if (Buffer.byteLength(raw) > 16 * 1024 * 1024)
-        return json({ error: "Request too large." }, 413);
+      let raw: string;
+      try {
+        raw = await readCapacityText(
+          request,
+          CAPACITY.authoringRequestBytes,
+          "HTTP MCP authoring input",
+        );
+      } catch (error) {
+        if (!(error instanceof CapacityError)) throw error;
+        return json(
+          {
+            error: error.message,
+            code: error.code,
+            actualBytes: error.actualBytes,
+            limitBytes: error.limitBytes,
+          },
+          413,
+        );
+      }
       let body: Record<string, unknown>;
       try {
         body = JSON.parse(raw);
@@ -612,9 +634,11 @@ export async function startMcpHttpServer(
       let length = 0;
       for await (const chunk of incoming) {
         length += chunk.length;
-        if (length > 16 * 1024 * 1024) {
+        if (length > CAPACITY.authoringRequestBytes) {
           outgoing.writeHead(413);
-          outgoing.end("Request too large.");
+          outgoing.end(
+            `HTTP MCP authoring input is ${formatBytes(length)}; limit is ${formatBytes(CAPACITY.authoringRequestBytes)}.`,
+          );
           return;
         }
         chunks.push(chunk);

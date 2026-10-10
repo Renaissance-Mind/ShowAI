@@ -680,7 +680,10 @@ try {
   const inlineResponse = JSON.parse(inlineResult.stdout);
   if (inlineResult.status !== 0) {
     assert.equal(inlineResponse.ok, false);
-    assert.match(inlineResponse.error.message, /1 MB conversation limit/);
+    assert.match(
+      inlineResponse.error.message,
+      /Compressed chat preview.*limit is/,
+    );
     await assert.rejects(access(join(output, "nested-inline.html")), {
       code: "ENOENT",
     });

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { CAPACITY, assertBytes } from "../portable/capacity.mjs";
+import { mkdir, readFile, writeFile, stat } from "node:fs/promises";
 import { dirname, resolve, join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { withChangeContext } from "../core/history-context";
@@ -224,22 +225,30 @@ function option(
 }
 
 async function readJson(path: string): Promise<unknown> {
-  const data =
-    path === "-"
-      ? await new Promise<string>((resolveInput, reject) => {
-          let text = "";
-          process.stdin.setEncoding("utf8");
-          process.stdin.on("data", (chunk) => {
-            text += chunk;
-            if (text.length > 10 * 1024 * 1024)
-              reject(new Error("Input exceeds 10 MB."));
-          });
-          process.stdin.once("end", () => resolveInput(text));
-          process.stdin.once("error", reject);
-        })
-      : await readFile(resolve(path), "utf8");
-  if (Buffer.byteLength(data) > 10 * 1024 * 1024)
-    throw new Error("Input exceeds 10 MB.");
+  let data: string;
+  if (path === "-") {
+    const chunks: Buffer[] = [];
+    let bytes = 0;
+    for await (const chunk of process.stdin) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      bytes += buffer.length;
+      assertBytes("CLI authoring input", bytes, CAPACITY.authoringRequestBytes);
+      chunks.push(buffer);
+    }
+    data = Buffer.concat(chunks).toString("utf8");
+  } else {
+    assertBytes(
+      "CLI authoring input",
+      (await stat(resolve(path))).size,
+      CAPACITY.authoringRequestBytes,
+    );
+    data = await readFile(resolve(path), "utf8");
+  }
+  assertBytes(
+    "CLI authoring input",
+    Buffer.byteLength(data),
+    CAPACITY.authoringRequestBytes,
+  );
   return JSON.parse(data);
 }
 

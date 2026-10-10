@@ -1,3 +1,8 @@
+import {
+  CAPACITY,
+  assertContent,
+  formatBytes,
+} from "../../portable/capacity.mjs";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -23,8 +28,7 @@ interface GalleryImage {
   alt: string;
   caption: string;
 }
-const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
-const MAX_GALLERY_BYTES = 8 * 1024 * 1024;
+const MAX_IMAGE_BYTES = CAPACITY.resourceBytes;
 const imageTypes = new Set([
   "image/png",
   "image/jpeg",
@@ -40,7 +44,9 @@ export function imageFileToDataUrl(file: File): Promise<string> {
     );
   if (file.size > MAX_IMAGE_BYTES)
     return Promise.reject(
-      new Error(`「${file.name}」超过 4 MB，请缩小图片后重试。`),
+      new Error(
+        `「${file.name}」为 ${formatBytes(file.size)}，单个资源上限 ${formatBytes(MAX_IMAGE_BYTES)}。`,
+      ),
     );
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -220,11 +226,7 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
           caption: "",
         })),
       );
-      if (
-        JSON.stringify([...draftImages, ...additions]).length >
-        MAX_GALLERY_BYTES
-      )
-        throw new Error("这组图片超过 8 MB，请压缩图片或减少数量。");
+      assertContent([...draftImages, ...additions], "Gallery structure");
       setDraftImages((current) => [...current, ...additions]);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "图片导入失败。");

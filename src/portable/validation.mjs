@@ -9,7 +9,16 @@ import { validateG2Data } from "../components/blocks/g2/contract.mjs";
 import { validateResearchData } from "../components/blocks/research-contract.mjs";
 // Shared by the browser importer and the dependency-free artifact command.
 import { validateRemoteComponents } from "./remote.mjs";
-export const MAX_ARTIFACT_BYTES = 10 * 1024 * 1024;
+import {
+  CAPACITY,
+  assertBytes,
+  assertContent,
+  assertCompiledComponent,
+  utf8Bytes,
+  measureContent,
+} from "./capacity.mjs";
+// Compatibility export for artifact importers; never a page or resource limit.
+export const MAX_ARTIFACT_BYTES = CAPACITY.artifactBytes;
 export const ARTIFACT_DATA_ID = "showai-data";
 const MAX_NODES = 12000;
 const MAX_DEPTH = 48;
@@ -134,7 +143,7 @@ function validateJson(value, path, depth = 0) {
     return;
   }
   if (typeof value === "string") {
-    string(value, path, MAX_ARTIFACT_BYTES);
+    string(value, path, CAPACITY.authoringRequestBytes);
     return;
   }
   if (Array.isArray(value)) {
@@ -238,6 +247,12 @@ function validateAttrs(attrs, path, permitted, surfaceIcon = false) {
 }
 
 function validateWidgetData(kind, data, path) {
+  if (kind === "custom")
+    assertContent(
+      data.props,
+      "Component instance data",
+      CAPACITY.componentPropsBytes,
+    );
   if (["video", "audio", "pdf", "references"].includes(kind)) {
     validateResearchData(kind, data);
     return;
@@ -653,10 +668,7 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
 
 export function validateDocument(value) {
   validateJson(value, "document");
-  if (
-    new TextEncoder().encode(JSON.stringify(value)).length > MAX_ARTIFACT_BYTES
-  )
-    throw new Error("Document exceeds the 10 MB limit.");
+  assertContent(value);
   const document = structuredClone(object(value, "document"));
   string(document.id, "document.id", 200);
   string(document.title, "document.title", 1000);
@@ -759,13 +771,18 @@ function validateComponents(input) {
   if (!Array.isArray(input) || input.length > 100)
     throw new Error("components must be an array of at most 100 packages.");
   validateJson(input, "components");
+  assertBytes(
+    "Embedded components JSON",
+    measureContent(input).jsonBytes,
+    CAPACITY.artifactBytes,
+  );
   const seen = new Set();
   return input.map((item, i) => {
     object(item, `components[${i}]`);
     string(item.id, "component.id", 80);
     string(item.name, "component.name", 200);
     string(item.version, "component.version", 80);
-    string(item.html, "component.html", MAX_ARTIFACT_BYTES);
+    string(item.html, "component.html", CAPACITY.authoringRequestBytes);
     string(item.integrity, "component.integrity", 200);
     if (
       !/^[a-z][a-z0-9-]*$/.test(item.id) ||
@@ -779,9 +796,18 @@ function validateComponents(input) {
       object(item.schema, "component.schema");
     if (item.inline !== undefined) {
       object(item.inline, "component.inline");
-      string(item.inline.script, "component.inline.script", MAX_ARTIFACT_BYTES);
-      string(item.inline.styles, "component.inline.styles", MAX_ARTIFACT_BYTES);
+      string(
+        item.inline.script,
+        "component.inline.script",
+        CAPACITY.authoringRequestBytes,
+      );
+      string(
+        item.inline.styles,
+        "component.inline.styles",
+        CAPACITY.authoringRequestBytes,
+      );
     }
+    assertCompiledComponent(item);
     return structuredClone(item);
   });
 }
@@ -809,11 +835,13 @@ function validateSelection(selection, document) {
 }
 
 export function parseArtifact(input) {
-  if (
-    typeof input === "string" &&
-    new TextEncoder().encode(input).length > MAX_ARTIFACT_BYTES
-  )
-    throw new Error("Artifact exceeds the 10 MB limit.");
+  assertBytes(
+    "Artifact JSON",
+    typeof input === "string"
+      ? utf8Bytes(input)
+      : measureContent(input).jsonBytes,
+    CAPACITY.artifactBytes,
+  );
   const artifact = object(
     typeof input === "string" ? JSON.parse(input) : input,
     "artifact",
@@ -863,32 +891,44 @@ export function serializeArtifact(
     !["spatial", "reading"].includes(presentation)
   )
     throw new Error("Unknown page presentation.");
-  const result = JSON.stringify(
-    {
-      format: "showai",
-      version: artifactVersion(document),
-      document: validateDocument(document),
-      ...(presentation ? { presentation } : {}),
-      ...(selection
-        ? { selection: validateSelection(selection, document) }
-        : {}),
-      ...(components?.length
-        ? { components: validateComponents(components) }
-        : {}),
-      ...(remoteComponents?.length
-        ? { remoteComponents: validateRemoteComponents(remoteComponents) }
-        : {}),
-    },
-    null,
-    2,
+  const artifact = {
+    format: "showai",
+    version: artifactVersion(document),
+    document: validateDocument(document),
+    ...(presentation ? { presentation } : {}),
+    ...(selection ? { selection: validateSelection(selection, document) } : {}),
+    ...(components?.length
+      ? { components: validateComponents(components) }
+      : {}),
+    ...(remoteComponents?.length
+      ? { remoteComponents: validateRemoteComponents(remoteComponents) }
+      : {}),
+  };
+  assertBytes(
+    "Artifact JSON",
+    measureContent(artifact).prettyJsonBytes,
+    CAPACITY.artifactBytes,
   );
-  if (new TextEncoder().encode(result).length > MAX_ARTIFACT_BYTES)
-    throw new Error("Serialized artifact exceeds the 10 MB limit.");
+  const result = JSON.stringify(artifact, null, 2);
+  assertBytes("Artifact JSON", utf8Bytes(result), CAPACITY.artifactBytes);
   return result;
 }
 
 export function escapeJsonForHtml(value) {
-  return JSON.stringify(value)
+  assertBytes(
+    "Embedded artifact JSON",
+    measureContent(value).jsonBytes,
+    CAPACITY.artifactBytes,
+  );
+  const json = JSON.stringify(value);
+  let bytes = utf8Bytes(json);
+  for (let index = 0; index < json.length; index++) {
+    const code = json.charCodeAt(index);
+    if (code === 60 || code === 62 || code === 38) bytes += 5;
+    else if (code === 0x2028 || code === 0x2029) bytes += 3;
+  }
+  assertBytes("HTML-escaped artifact JSON", bytes, CAPACITY.artifactBytes);
+  return json
     .replace(/</g, "\\u003c")
     .replace(/>/g, "\\u003e")
     .replace(/&/g, "\\u0026")
@@ -923,8 +963,11 @@ export function injectArtifactIntoHtml(
       : {}),
   };
   const serialized = escapeJsonForHtml(artifact);
-  if (new TextEncoder().encode(serialized).length > MAX_ARTIFACT_BYTES)
-    throw new Error("Embedded artifact exceeds the 10 MB limit.");
+  assertBytes(
+    "Embedded artifact JSON",
+    utf8Bytes(serialized),
+    CAPACITY.artifactBytes,
+  );
   const dataTag =
     /<script\b(?=[^>]*\bid=["']showai-data["'])(?=[^>]*\btype=["']application\/json["'])[^>]*>[\s\S]*?<\/script>/i;
   if (!dataTag.test(template))
@@ -938,7 +981,7 @@ export function injectArtifactIntoHtml(
         character
       ],
   );
-  return template
+  const html = template
     .replace(
       dataTag,
       () =>
@@ -948,4 +991,6 @@ export function injectArtifactIntoHtml(
       /<title>[\s\S]*?<\/title>/i,
       () => `<title>${title} · ShowAI</title>`,
     );
+  assertBytes("Exported HTML", utf8Bytes(html), CAPACITY.htmlBytes);
+  return html;
 }

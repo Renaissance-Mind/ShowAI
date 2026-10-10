@@ -1,3 +1,4 @@
+import { CAPACITY, CapacityError } from "../portable/capacity.mjs";
 import { randomUUID } from "node:crypto";
 import { changeContext, withChangeContext } from "../core/history-context";
 import type { ChangeContext } from "../core/history-model";
@@ -218,10 +219,15 @@ export function createMcpServer(options: {
           const data = result.structuredContent.data as PageReadResult;
           if (data.view !== "image" || !data.path) return result;
           const png = await readFile(data.path);
-          if (png.length > 8 * 1024 * 1024)
-            throw new Error(
-              "PNG exceeds the 8 MB MCP image limit. Read a smaller blockIds scope or viewport.",
+          if (png.length > CAPACITY.mcpImageBytes) {
+            const error = new CapacityError(
+              "MCP PNG image",
+              png.length,
+              CAPACITY.mcpImageBytes,
             );
+            error.message += " Read a smaller blockIds scope or viewport.";
+            return mcpFailure(error);
+          }
           return {
             ...result,
             content: [
@@ -859,7 +865,11 @@ export async function startMcp(options: {
 }): Promise<void> {
   const service = new AgentService(options);
   await service.listPages(service.requireProject(options.projectId));
-  await createMcpServer(options).connect(new StdioServerTransport());
+  await createMcpServer(options).connect(
+    new StdioServerTransport(process.stdin, process.stdout, {
+      maxBufferSize: CAPACITY.authoringRequestBytes,
+    }),
+  );
   process.stderr.write(
     `ShowAI MCP connected to project ${options.projectId}.\n`,
   );
@@ -900,5 +910,9 @@ export async function startPublicMcp(root: string) {
         )
       ).delivery,
   });
-  await server.connect(new StdioServerTransport());
+  await server.connect(
+    new StdioServerTransport(process.stdin, process.stdout, {
+      maxBufferSize: CAPACITY.authoringRequestBytes,
+    }),
+  );
 }

@@ -1,3 +1,4 @@
+import { CAPACITY, formatBytes } from "../portable/capacity.mjs";
 import { changedResources } from "../core/change-notification";
 import { ModelResourceClient } from "../sync/model-resources";
 import { createServer, type ServerResponse } from "node:http";
@@ -392,9 +393,11 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         const chunks: Buffer[] = [];
         for await (const chunk of request) {
           bytes += chunk.length;
-          if (bytes > 24 * 1024 * 1024) {
+          if (bytes > CAPACITY.authoringRequestBytes) {
             response.writeHead(413);
-            response.end("Request exceeds 24 MB");
+            response.end(
+              `Browser authoring input is ${formatBytes(bytes)}; limit is ${formatBytes(CAPACITY.authoringRequestBytes)}.`,
+            );
             return;
           }
           chunks.push(chunk);

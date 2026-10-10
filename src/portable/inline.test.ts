@@ -82,7 +82,7 @@ describe("inline page delivery", () => {
           "color:red;/*" + randomBytes(1_500_000).toString("base64") + "*/",
         ),
       ),
-    ).toThrow("1 MB");
+    ).toThrow("1000000 bytes");
   });
   it("compresses large repetitive styles and restores the entire transport losslessly", () => {
     const css = "color:red;" + " ".repeat(1_000_000);

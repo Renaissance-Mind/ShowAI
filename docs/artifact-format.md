@@ -271,7 +271,9 @@ The standalone renderer also accepts `--inline`. Its output is an HTML fragment 
 
 ## Validation and limits
 
-Source JSON is limited to 10 MB, 12,000 document nodes, and 48 levels of JSON nesting. Built-in widgets also have the limits described above. Invalid trees, unsupported node types, malformed marks, unsafe URLs, non**finite numbers**, and prototype-pollution keys are rejected before creating the editor. Unknown widget kinds preserve **plain JSON** data.
+Page structure allows 16 MiB of UTF-8 JSON, excluding binary bodies of complete canonical base64 data URLs. Each decoded resource allows 64 MiB; distinct complete resource URLs total at most 128 MiB per page. Artifact JSON and final standalone HTML each allow 256 MiB, including encoded resources, bundled components and the reader. The compressed conversation fragment has a separate 1,000,000-byte host budget. Current values are exposed in `showai_capabilities.capacities`; see [capacity rules](../plugins/showai/skills/show-document/references/capacity.md) for component, transport and synchronization boundaries.
+
+The 12,000-node and 48-level JSON nesting constraints still apply. Built-in widgets also have the semantic limits described above. Invalid trees, unsupported node types, malformed marks, unsafe URLs, non**finite numbers**, and prototype-pollution keys are rejected before creating the editor. Unknown widget kinds preserve **plain JSON** data.
 
 The generated file escapes embedded JSON and the HTML title. Paragraph text and data remain escaped. Custom components are executable code supplied through the explicit component-package mechanism and run in the rendering boundary described above. The reader has no telemetry, background API, or account connection. Image embedding makes network requests only during browser export; ordinary source links navigate when activated.
 

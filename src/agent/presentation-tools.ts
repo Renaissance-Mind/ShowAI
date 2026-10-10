@@ -1,3 +1,4 @@
+import { CAPACITY } from "../portable/capacity.mjs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { CATALOG_VIEWS } from "./disclosure";
@@ -133,6 +134,7 @@ export function registerPresentationTools(
       mcpSuccess({
         version,
         agentProtocol: "showai-mcp-v1",
+        capacities: { unit: "bytes", ...CAPACITY },
         transport: options.transport,
         presentation: {
           publicResources: true,

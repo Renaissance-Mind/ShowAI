@@ -8,7 +8,6 @@ import {
   escapeJsonForHtml,
   injectArtifactIntoHtml,
   isSafeUrl,
-  MAX_ARTIFACT_BYTES,
   parseArtifact,
   serializeArtifact,
   validateDocument,
@@ -201,9 +200,7 @@ describe("portable artifact boundaries", () => {
         ),
       ),
     ).toThrow("too many");
-    expect(() => parseArtifact(" ".repeat(MAX_ARTIFACT_BYTES + 1))).toThrow(
-      "10 MB",
-    );
+
     expect(() =>
       validateDocument(
         documentWith([

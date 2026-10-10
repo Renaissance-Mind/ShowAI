@@ -1,3 +1,4 @@
+import { CapacityError } from "../portable/capacity.mjs";
 import { ReadBaselines } from "../core/read-baselines";
 import { EditorDrafts } from "../core/editor-drafts";
 import { placeTemplate } from "../surface/document.mjs";
@@ -1462,11 +1463,21 @@ export class AgentService {
 }
 
 export function errorResult(error: unknown) {
-  const code = error instanceof CoreError ? error.code : "ERROR";
+  const code =
+    error instanceof CoreError || error instanceof CapacityError
+      ? error.code
+      : "ERROR";
   const message = error instanceof Error ? error.message : String(error);
   return {
     code,
     message,
+    ...(error instanceof CapacityError
+      ? {
+          kind: error.kind,
+          actualBytes: error.actualBytes,
+          limitBytes: error.limitBytes,
+        }
+      : {}),
     ...(error instanceof CoreError && error.saveFailed
       ? {
           saveFailed: true,

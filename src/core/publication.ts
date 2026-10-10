@@ -1,3 +1,8 @@
+import {
+  CAPACITY,
+  assertBytes,
+  measureContent,
+} from "../portable/capacity.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import {
   workspaceRoot,
@@ -136,11 +141,17 @@ export async function preparePublication(
   );
   const files = bundles.map((value) => {
     const bundle = validatePackageBundle(value);
+    assertBytes(
+      "Publication package JSON",
+      measureContent(bundle).prettyJsonBytes,
+      MAX_PUBLICATION_BUNDLE_BYTES,
+    );
     const bytes = Buffer.from(serialize(bundle));
-    if (bytes.length > MAX_PUBLICATION_BUNDLE_BYTES)
-      throw new Error(
-        `Publication package ${publicationRefKey(bundle.root)} exceeds 32 MB.`,
-      );
+    assertBytes(
+      `Publication package ${publicationRefKey(bundle.root)}`,
+      bytes.length,
+      MAX_PUBLICATION_BUNDLE_BYTES,
+    );
     const transportHash = sha256(bytes);
     const file = `packages/${bundle.root.kind}/${bundle.root.id}/${bundle.root.version}/${transportHash.slice(7)}/bundle.json`;
     return { bundle, bytes, file, sha256: transportHash };
@@ -336,10 +347,11 @@ async function verifyPublicationImpl(
       requireCors: true,
     });
     downloaded += file.bytes.byteLength;
-    if (downloaded > 64 * 1024 * 1024)
-      throw new Error(
-        "Publication verification exceeds the 64 MB transfer limit.",
-      );
+    assertBytes(
+      "Publication transfer",
+      downloaded,
+      CAPACITY.publicationTransferBytes,
+    );
     if (file.sha256 !== entry.sha256 || file.bytes.byteLength !== entry.bytes)
       throw new Error(
         `Published package ${publicationRefKey(entry.ref)} failed its SHA-256 or byte-length check.`,

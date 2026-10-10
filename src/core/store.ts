@@ -1,3 +1,4 @@
+import { CAPACITY, assertBytes } from "../portable/capacity.mjs";
 import { ReadBaselines } from "./read-baselines";
 import { EditorDrafts } from "./editor-drafts";
 import { validatePageIcon } from "../lib/page-icon.mjs";
@@ -313,11 +314,11 @@ export class FileStore {
       throw error;
     }
     try {
-      if ((await file.stat()).size > 12 * 1024 * 1024)
-        throw new CoreError(
-          "INVALID_DATA",
-          "Stored JSON exceeds the 12 MB limit.",
-        );
+      assertBytes(
+        "Stored page JSON",
+        (await file.stat()).size,
+        CAPACITY.artifactBytes,
+      );
       const source = await file.readFile("utf8");
       try {
         return JSON.parse(source);

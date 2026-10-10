@@ -1,3 +1,4 @@
+import { CAPACITY } from "../portable/capacity.mjs";
 import {
   digestId,
   hash,
@@ -105,7 +106,7 @@ async function body(request: Request): Promise<Record<string, unknown>> {
   const bytes = await readBounded(
     request,
     path.endsWith("/revisions") || path.endsWith("/snapshot")
-      ? 16 * 1024 * 1024
+      ? CAPACITY.syncManifestBytes
       : 64 * 1024,
   );
   const value = JSON.parse(new TextDecoder().decode(bytes));
@@ -959,7 +960,7 @@ export function createSyncServer(options: ServerOptions) {
           stored.body,
           objects.digest(),
           object[1],
-          64 * 1024 * 1024,
+          CAPACITY.syncObjectBytes,
           stored.bytes,
         ),
         {
@@ -976,7 +977,7 @@ export function createSyncServer(options: ServerOptions) {
       const declared = request.headers.get("content-length");
       if (
         declared &&
-        (!/^\d+$/.test(declared) || Number(declared) > 64 * 1024 * 1024)
+        (!/^\d+$/.test(declared) || Number(declared) > CAPACITY.syncObjectBytes)
       )
         throw new SyncError(413, "TOO_LARGE", "Object exceeds 64 MiB.");
       const gate = writeGate(user, projectId),
@@ -984,11 +985,11 @@ export function createSyncServer(options: ServerOptions) {
           ? Number(declared)
           : url.searchParams.has("bytes")
             ? Number(url.searchParams.get("bytes"))
-            : 64 * 1024 * 1024;
+            : CAPACITY.syncObjectBytes;
       if (
         !Number.isSafeInteger(reservedBytes) ||
         reservedBytes < 0 ||
-        reservedBytes > 64 * 1024 * 1024
+        reservedBytes > CAPACITY.syncObjectBytes
       )
         throw new SyncError(413, "TOO_LARGE", "Object exceeds 64 MiB.");
       const reservation = await quotas.reserve(
@@ -1011,7 +1012,7 @@ export function createSyncServer(options: ServerOptions) {
           input,
           objects.digest(),
           object[1],
-          64 * 1024 * 1024,
+          CAPACITY.syncObjectBytes,
           declared ? reservedBytes : undefined,
         );
         const reader = verified.getReader();
@@ -1279,7 +1280,7 @@ export function createSyncServer(options: ServerOptions) {
         async (path) => {
           const bytes = await objects.get(
             objectKey(projectId, snapshot.files[path]),
-            8 * 1024 * 1024,
+            CAPACITY.syncObjectBytes,
           );
           if (!bytes || (await hash(bytes)) !== snapshot.files[path])
             throw new SyncError(

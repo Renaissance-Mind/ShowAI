@@ -1,3 +1,4 @@
+import { CAPACITY, assertContent } from "../../portable/capacity.mjs";
 import { installIconTooltips } from "../../ui/icon-tooltip.mjs";
 import { useAppearanceTheme } from "../../design/useAppearanceTheme";
 import {
@@ -98,6 +99,7 @@ function jsonObject(value: unknown): value is Record<string, unknown> {
     return (
       !!entry &&
       typeof entry === "object" &&
+      Object.getPrototypeOf(entry) === Object.prototype &&
       Object.entries(entry).every(
         ([key, item]) =>
           !["__proto__", "constructor", "prototype"].includes(key) &&
@@ -105,7 +107,7 @@ function jsonObject(value: unknown): value is Record<string, unknown> {
       )
     );
   };
-  return visit(value) && JSON.stringify(value).length <= 1_000_000;
+  return visit(value);
 }
 
 export function CustomBlock({ data, onChange, readOnly }: BlockProps) {
@@ -201,7 +203,17 @@ function SandboxComponent({
       return;
     }
     if (!jsonObject(next)) {
-      setDraftError("组件数据必须是 JSON 对象，且不超过 1 MB。");
+      setDraftError("组件数据必须是有效的 JSON 对象。");
+      return;
+    }
+    try {
+      assertContent(
+        next,
+        "Component instance data",
+        CAPACITY.componentPropsBytes,
+      );
+    } catch (error) {
+      setDraftError(error instanceof Error ? error.message : "组件数据超限。");
       return;
     }
     if (JSON.stringify(latest.current.parsed.props) !== draftBase.current) {
@@ -363,8 +375,21 @@ function SandboxComponent({
         !current.readOnly &&
         current.onChange &&
         jsonObject(event.data.props)
-      )
+      ) {
+        try {
+          assertContent(
+            event.data.props,
+            "Component instance data",
+            CAPACITY.componentPropsBytes,
+          );
+        } catch (error) {
+          setDraftError(
+            error instanceof Error ? error.message : "组件数据超限。",
+          );
+          return;
+        }
         current.onChange({ ...current.data, props: event.data.props });
+      }
     };
     window.addEventListener("message", receive);
     return () => {
@@ -443,6 +468,11 @@ function SandboxComponent({
             </button>
           </div>
         </div>
+      )}
+      {!editing && draftError && (
+        <p role="alert" className="custom-props-error">
+          {draftError}
+        </p>
       )}
       <iframe
         ref={iframe}

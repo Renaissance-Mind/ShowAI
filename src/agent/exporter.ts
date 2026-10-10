@@ -1,3 +1,4 @@
+import { CAPACITY, assertBytes } from "../portable/capacity.mjs";
 import {
   access,
   lstat,
@@ -520,6 +521,11 @@ export async function exportPage(
       const navigation = `<nav class="showai-site-nav" aria-label="Site pages">${routes.map((route, routeIndex) => `<a href="./${escapeHtml(route.file)}"${index === routeIndex ? ' aria-current="page"' : ""}>${escapeHtml(route.title)}</a>`).join("")}</nav>`;
       html = html.replace(/<body\b[^>]*>/i, (tag) => tag + navigation);
     }
+    assertBytes(
+      "Exported site page HTML",
+      Buffer.byteLength(html),
+      CAPACITY.htmlBytes,
+    );
     await writeFile(join(out, routes[index].file), html);
     const sourcePath = join(
       out,

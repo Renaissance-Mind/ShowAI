@@ -1,3 +1,4 @@
+import { CAPACITY, CapacityError } from "./capacity.mjs";
 import { randomUUID } from "node:crypto";
 import { gzipSync } from "node:zlib";
 
@@ -140,9 +141,11 @@ ${code}
     if (Buffer.byteLength(compressed) < Buffer.byteLength(fragment))
       fragment = compressed;
   }
-  if (Buffer.byteLength(fragment) > 1_000_000)
-    throw new Error(
-      `The compressed inline page is ${Buffer.byteLength(fragment)} bytes and exceeds the 1 MB conversation limit. Export fewer blocks with --blocks or provide the complete standalone HTML with a smaller inline preview.`,
+  if (Buffer.byteLength(fragment) > CAPACITY.chatBytes)
+    throw new CapacityError(
+      "Compressed chat preview",
+      Buffer.byteLength(fragment),
+      CAPACITY.chatBytes,
     );
   return fragment;
 }

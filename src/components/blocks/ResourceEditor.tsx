@@ -1,3 +1,4 @@
+import { CAPACITY, formatBytes } from "../../portable/capacity.mjs";
 import { useState } from "react";
 import { Check, Upload } from "../../ui/icons";
 import { Field } from "./shared";
@@ -34,7 +35,7 @@ export function ResourceEditor({
     }
     if (file.size > MAX_UPLOAD_BYTES) {
       setError(
-        "单个文件最多 6 MB；较大的媒体可以填写在线文件地址。整页保存上限为 10 MB。",
+        `「${file.name}」为 ${formatBytes(file.size)}，单个资源上限 ${formatBytes(CAPACITY.resourceBytes)}。较大的媒体可填写在线文件地址。`,
       );
       return;
     }
@@ -169,8 +170,8 @@ export function ResourceEditor({
         </div>
       )}
       <p className="sb-resource-hint">
-        本地文件随页面保存；在线地址需要网络。上传单文件最多 6 MB，整页最多 10
-        MB。
+        本地文件随页面保存；在线地址需要网络。单个原始文件最多 64
+        MiB，页面资源合计最多 128 MiB；页面文字与结构另行计算。
       </p>
       {error && (
         <p className="sb-error" role="alert">

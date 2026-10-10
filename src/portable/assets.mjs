@@ -1,11 +1,8 @@
+import { CAPACITY, assertBytes } from "./capacity.mjs";
 import { marked } from "marked";
 import { resourceMime } from "../components/blocks/research-contract.mjs";
 import { isImageIcon } from "../lib/page-icon.mjs";
-import {
-  isSafeUrl,
-  MAX_ARTIFACT_BYTES,
-  validateDocument,
-} from "./validation.mjs";
+import { isSafeUrl, validateDocument } from "./validation.mjs";
 
 /** Built-in blocks declare every resource that has to be embedded for offline viewing. */
 function imageSlots(document) {
@@ -149,8 +146,14 @@ async function resourceDataUrl(url, kind = "image") {
       `Offline export requires a supported ${kind} file MIME type. Upload a local file and try again.`,
     );
   const declaredLength = Number(response.headers.get("content-length") ?? 0);
-  if (declaredLength > MAX_ARTIFACT_BYTES)
-    throw new Error("An image exceeds the 10 MB document limit.");
+  if (declaredLength > CAPACITY.resourceBytes) {
+    await response.body?.cancel();
+    assertBytes(
+      "Single resource download",
+      declaredLength,
+      CAPACITY.resourceBytes,
+    );
+  }
   if (!response.body) throw new Error("Image download returned no body.");
   const reader = response.body.getReader();
   const chunks = [];
@@ -159,9 +162,9 @@ async function resourceDataUrl(url, kind = "image") {
     const { value, done } = await reader.read();
     if (done) break;
     length += value.length;
-    if (length > MAX_ARTIFACT_BYTES) {
+    if (length > CAPACITY.resourceBytes) {
       await reader.cancel();
-      throw new Error("An image exceeds the 10 MB document limit.");
+      assertBytes("Single resource download", length, CAPACITY.resourceBytes);
     }
     chunks.push(value);
   }

@@ -1,3 +1,4 @@
+import { CAPACITY, assertContent } from "../../portable/capacity.mjs";
 import Ajv from "ajv";
 import type { ValidateFunction } from "ajv";
 import type { JsonSchema } from "./types";
@@ -18,6 +19,7 @@ export function assertProps(
   props: unknown,
 ): asserts props is Record<string, unknown> {
   assertJsonValue(props);
+  assertContent(props, "Component instance data", CAPACITY.componentPropsBytes);
   if (!props || typeof props !== "object" || Array.isArray(props))
     throw new Error("Component props must be an object.");
   const key = JSON.stringify(schema);

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
+import { CAPACITY, assertBytes } from "../src/portable/capacity.mjs";
 import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  MAX_ARTIFACT_BYTES,
   injectArtifactIntoHtml,
   parseArtifact,
 } from "../src/portable/validation.mjs";
@@ -49,8 +49,11 @@ if (!templatePath)
   throw new Error(
     "No bundled viewer found. Run npm run build:portable or npm run build before exporting.",
   );
-if ((await stat(inputPath)).size > MAX_ARTIFACT_BYTES)
-  throw new Error("Artifact exceeds the 10 MB limit.");
+assertBytes(
+  "Artifact JSON",
+  (await stat(inputPath)).size,
+  CAPACITY.artifactBytes,
+);
 const artifact = parseArtifact(await readFile(inputPath, "utf8"));
 assertOfflineImages(artifact.document);
 const html = injectArtifactIntoHtml(

@@ -1,3 +1,4 @@
+import { CAPACITY } from "../portable/capacity.mjs";
 import {
   hash,
   validateSnapshot,
@@ -73,7 +74,8 @@ export class ReservationReconciliation {
       size += block.byteLength;
       if (
         size > row.bytes ||
-        size > (row.kind === "manifest" ? manifestMaximum : 64 * 1024 * 1024)
+        size >
+          (row.kind === "manifest" ? manifestMaximum : CAPACITY.syncObjectBytes)
       ) {
         return {
           id: row.id,

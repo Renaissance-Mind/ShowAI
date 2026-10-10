@@ -1,3 +1,4 @@
+import { CAPACITY } from "../portable/capacity.mjs";
 import { z } from "zod";
 import type {
   RegisteredTool,
@@ -153,7 +154,11 @@ export async function startLibraryMcp(
   options: Parameters<typeof createLibraryMcpServer>[0],
 ) {
   await openLibrary(options.root);
-  await createLibraryMcpServer(options).connect(new StdioServerTransport());
+  await createLibraryMcpServer(options).connect(
+    new StdioServerTransport(process.stdin, process.stdout, {
+      maxBufferSize: CAPACITY.authoringRequestBytes,
+    }),
+  );
   process.stderr.write(
     "ShowAI MCP connected to the configured library. Select projectId explicitly.\n",
   );

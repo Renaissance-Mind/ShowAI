@@ -1,3 +1,4 @@
+import { CAPACITY } from "../portable/capacity.mjs";
 import { access, mkdir, writeFile, rename } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
@@ -53,6 +54,7 @@ export async function runtimeInfo(home: string) {
   return {
     version,
     protocol: 1,
+    capacities: { unit: "bytes", ...CAPACITY },
     capabilities: {
       presentation: {
         independentOfProject: true,

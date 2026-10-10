@@ -1,3 +1,4 @@
+import { CAPACITY } from "../../portable/capacity.mjs";
 const formats = {
   video: ["video/mp4", "video/webm", "video/ogg", "video/quicktime"],
   audio: [
@@ -12,7 +13,7 @@ const formats = {
   ],
   pdf: ["application/pdf"],
 };
-export const MAX_UPLOAD_BYTES = 6 * 1024 * 1024;
+export const MAX_UPLOAD_BYTES = CAPACITY.resourceBytes;
 export function resourceMime(kind, value) {
   const match =
     typeof value === "string" &&

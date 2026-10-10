@@ -1,4 +1,11 @@
 import {
+  CAPACITY,
+  assertBytes,
+  assertPackageFiles,
+  assertCompiledComponent,
+  base64Bytes,
+} from "../portable/capacity.mjs";
+import {
   isResource,
   createResource,
   insertResourceTemplate,
@@ -153,9 +160,6 @@ export default function Component({ data, onChange, readOnly }) {
   };
 }
 
-const MAX_PACKAGE_BYTES = 8 * 1024 * 1024;
-const MAX_FILES = 200;
-const MAX_HTML_BYTES = 8 * 1024 * 1024;
 const SOURCE_EXTENSIONS = new Set([
   ".ts",
   ".tsx",
@@ -263,13 +267,12 @@ async function readJson(home: string, path: string): Promise<unknown> {
   await safePath(home, path);
   const managed = await readLibraryFile(home, path);
   if (managed !== undefined) {
-    if (managed.length > 12 * 1024 * 1024)
-      throw new Error("Invalid catalog file.");
+    assertBytes("Catalog record JSON", managed.length, CAPACITY.artifactBytes);
     return JSON.parse(managed.toString("utf8"));
   }
   const stat = await lstat(path);
-  if (!stat.isFile() || stat.size > 12 * 1024 * 1024)
-    throw new Error("Invalid catalog file.");
+  if (!stat.isFile()) throw new Error("Invalid catalog file.");
+  assertBytes("Catalog record JSON", stat.size, CAPACITY.artifactBytes);
   return JSON.parse(await readFile(path, "utf8"));
 }
 function packageBase(
@@ -812,8 +815,11 @@ async function writeTemplateRevision(
   scope: "project" | "global" | "published",
   projectId?: string,
 ): Promise<TemplateRecord> {
-  if (Buffer.byteLength(JSON.stringify(template)) > 12 * 1024 * 1024)
-    throw new Error("Template source exceeds the 12 MB catalog record limit.");
+  assertBytes(
+    "Template record JSON",
+    Buffer.byteLength(JSON.stringify(template)),
+    CAPACITY.artifactBytes,
+  );
   const destination = await safePath(
     home,
     join(
@@ -1123,7 +1129,7 @@ async function packageFiles(
   if (home && logicalPath(home, directory)) {
     const prefix = logicalPath(home, directory)! + "/";
     const files = new Map<string, Buffer>();
-    let bytes = 0;
+    const sizes: [string, number, boolean][] = [];
     for (const path of (await libraryPaths(home))!)
       if (path.startsWith(prefix)) {
         const name = path.slice(prefix.length);
@@ -1142,18 +1148,15 @@ async function packageFiles(
           home,
           join(workspaceRoot(home), path),
         ))!;
-        bytes += data.length;
-        if (files.size >= MAX_FILES || bytes > MAX_PACKAGE_BYTES)
-          throw new Error(
-            "Component package exceeds the 200-file / 8 MB limit.",
-          );
+        sizes.push([name, data.length, TEXT_EXTENSIONS.has(extname(name))]);
+        assertPackageFiles(sizes);
         files.set(name, data);
       }
     return files;
   }
   const root = await realpath(directory);
   const files = new Map<string, Buffer>();
-  let bytes = 0;
+  const sizes: [string, number, boolean][] = [];
   const walk = async (path: string) => {
     for (const entry of await readdir(path, { withFileTypes: true })) {
       if (
@@ -1174,9 +1177,12 @@ async function packageFiles(
         !SOURCE_EXTENSIONS.has(extname(entry.name).toLowerCase())
       )
         continue;
-      bytes += stat.size;
-      if (files.size >= MAX_FILES || bytes > MAX_PACKAGE_BYTES)
-        throw new Error("Component package exceeds the 200-file / 8 MB limit.");
+      sizes.push([
+        relative(root, target),
+        stat.size,
+        TEXT_EXTENSIONS.has(extname(target)),
+      ]);
+      assertPackageFiles(sizes);
       files.set(
         relative(root, target).split(sep).join("/"),
         await readFile(target),
@@ -1689,14 +1695,17 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
       .map((file) => file.text)
       .join("\n"),
   };
-  if (
-    Buffer.byteLength(inline.script) + Buffer.byteLength(inline.styles) >
-    MAX_HTML_BYTES
-  )
-    throw new Error("Compiled inline component exceeds 2 MB.");
+  assertBytes(
+    "Compiled component inline code",
+    Buffer.byteLength(inline.script) + Buffer.byteLength(inline.styles),
+    CAPACITY.compiledComponentBytes,
+  );
   const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data:; media-src data:; font-src data:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"><style>html,body{margin:0;padding:0;font:14px/1.6 system-ui,sans-serif;color:#292d29}*{box-sizing:border-box}button,input,select,textarea{font:inherit}#component-root{display:flow-root;overflow-wrap:anywhere}${css.replace(/<\/style/gi, "<\\/style")}</style></head><body><div id="component-root"></div>${COMPONENT_DATA_MARKER}<script>${script.replace(/<\/script/gi, "<\\/script")}</script></body></html>`;
-  if (Buffer.byteLength(html) > MAX_HTML_BYTES)
-    throw new Error("Compiled component exceeds 2 MB.");
+  assertBytes(
+    "Compiled component HTML",
+    Buffer.byteLength(html),
+    CAPACITY.compiledComponentBytes,
+  );
   const component: CompiledComponent = {
     ...manifest,
     schema,
@@ -1852,7 +1861,6 @@ function compiledRecord(value: unknown, scope: CatalogScope): StoredComponent {
   const manifest = manifestFrom(item);
   if (
     typeof item.html !== "string" ||
-    Buffer.byteLength(item.html) > MAX_HTML_BYTES ||
     !item.html.includes(COMPONENT_DATA_MARKER) ||
     typeof item.updatedAt !== "string" ||
     typeof item.sourceIntegrity !== "string"
@@ -1873,12 +1881,10 @@ function compiledRecord(value: unknown, scope: CatalogScope): StoredComponent {
   if (
     result.inline &&
     (typeof result.inline.script !== "string" ||
-      typeof result.inline.styles !== "string" ||
-      Buffer.byteLength(result.inline.script) +
-        Buffer.byteLength(result.inline.styles) >
-        MAX_HTML_BYTES)
+      typeof result.inline.styles !== "string")
   )
     throw new Error("Invalid inline component runtime.");
+  assertCompiledComponent(result);
   if (compiledIntegrity(result) !== result.integrity)
     throw new Error("Compiled component integrity verification failed.");
   return result;
@@ -2267,6 +2273,7 @@ async function saveComponentImpl(
   });
   if (typeof input.source !== "string")
     throw new Error("Component source must be text.");
+  componentSourceFiles({ ...input, manifest, files: input.files ?? {} });
   const directory = await safePath(
     home,
     join(resolve(home), "tmp", `component-${randomUUID()}`),
@@ -2305,8 +2312,7 @@ async function saveComponentImpl(
         !SOURCE_EXTENSIONS.has(extname(path)) ||
         TEXT_EXTENSIONS.has(extname(path)) ||
         typeof encoded !== "string" ||
-        !/^[a-zA-Z0-9+/]*={0,2}$/.test(encoded) ||
-        encoded.length > MAX_PACKAGE_BYTES * 1.4
+        !/^[a-zA-Z0-9+/]*={0,2}$/.test(encoded)
       )
         throw new Error(
           "Component assets must be supported package-local files encoded as base64.",
@@ -2792,6 +2798,11 @@ function componentSourceFiles(source: ComponentSource): Map<string, Buffer> {
       TEXT_EXTENSIONS.has(extname(path))
     )
       throw new Error("Invalid component binary asset.");
+    assertBytes(
+      `Component asset ${path}`,
+      base64Bytes(encoded),
+      CAPACITY.resourceBytes,
+    );
     add(path, Buffer.from(encoded, "base64"));
   }
   if (typeof source.source !== "string")
@@ -2799,12 +2810,13 @@ function componentSourceFiles(source: ComponentSource): Map<string, Buffer> {
   add("manifest.json", Buffer.from(JSON.stringify(manifest, null, 2)));
   add("props.schema.json", Buffer.from(JSON.stringify(source.schema, null, 2)));
   add(manifest.entry.replace(/^\.\//, ""), Buffer.from(source.source));
-  if (
-    files.size > MAX_FILES ||
-    [...files.values()].reduce((total, value) => total + value.length, 0) >
-      MAX_PACKAGE_BYTES
-  )
-    throw new Error("Component source package exceeds its size limit.");
+  assertPackageFiles(
+    [...files].map(([path, data]) => [
+      path,
+      data.length,
+      TEXT_EXTENSIONS.has(extname(path)),
+    ]),
+  );
   return files;
 }
 

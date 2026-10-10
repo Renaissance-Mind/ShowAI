@@ -1,3 +1,4 @@
+import { CAPACITY } from "../portable/capacity.mjs";
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import {
@@ -288,7 +289,7 @@ export async function exportServerBackup(input: {
           !operationObjectKey(item.key) ||
           !Number.isSafeInteger(item.bytes) ||
           item.bytes < 0 ||
-          item.bytes > 64 * 1024 * 1024
+          item.bytes > CAPACITY.syncObjectBytes
         )
           throw new Error("Invalid backup object inventory.");
         const path = join(destination, "objects", item.key),

@@ -1,3 +1,4 @@
+import { CapacityError } from "../portable/capacity.mjs";
 import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname, extname } from "node:path";
@@ -314,13 +315,12 @@ export function inlinePresentation(html: string): {
     return { inline: toInlineFragment(html) };
   } catch (error) {
     if (
-      !(error instanceof Error) ||
-      !error.message.includes("exceeds the 1 MB conversation limit")
+      !(error instanceof CapacityError) ||
+      error.kind !== "Compressed chat preview"
     )
       throw error;
     return {
-      inlineError:
-        "The complete HTML and source are available. Select fewer node IDs with blockIds for an inline preview.",
+      inlineError: `${error.message} This is the conversation host budget after compression. The complete HTML and source are available. Select independently readable blockIds. If a single selected node still exceeds the budget, use the complete HTML delivery. Page saving and file export use separate budgets.`,
     };
   }
 }

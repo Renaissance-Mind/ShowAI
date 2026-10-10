@@ -1,3 +1,4 @@
+import { CAPACITY } from "../portable/capacity.mjs";
 import {
   canonical,
   digestId,
@@ -24,7 +25,7 @@ export interface RevisionRow {
 }
 const encoder = new TextEncoder(),
   decoder = new TextDecoder();
-export const manifestMaximum = 16 * 1024 * 1024;
+export const manifestMaximum = CAPACITY.syncManifestBytes;
 export function manifestKey(projectId: string, digest: string) {
   return `projects/${identifier(projectId)}/manifests/${digestId(digest)}`;
 }

@@ -1,3 +1,4 @@
+import { CAPACITY, formatBytes } from "../../portable/capacity.mjs";
 import { richTextFonts } from "./model.mjs";
 import ExpandableSearch from "../ExpandableSearch";
 import { RichTextEnvironment } from "./environment";
@@ -646,8 +647,10 @@ export default function RichTextEditor({
         setNotice("支持 PNG、JPEG、GIF、WebP 和 AVIF 图片。");
         continue;
       }
-      if (file.size > 8 * 1024 * 1024) {
-        setNotice("图片需小于 8 MB，请压缩后重试。");
+      if (file.size > CAPACITY.resourceBytes) {
+        setNotice(
+          `「${file.name}」为 ${formatBytes(file.size)}，单个资源上限 ${formatBytes(CAPACITY.resourceBytes)}。`,
+        );
         continue;
       }
       let source: string;
@@ -1875,7 +1878,7 @@ export default function RichTextEditor({
                 >
                   <Upload size={23} />
                   <strong>选择本地图片</strong>
-                  <span>PNG、JPEG、GIF、WebP、AVIF · 最大 8 MB</span>
+                  <span>PNG、JPEG、GIF、WebP、AVIF · 原始文件最大 64 MiB</span>
                 </button>
               )}
               <label className="editor-field">

@@ -1,3 +1,4 @@
+import { CAPACITY } from "../portable/capacity.mjs";
 import { mkdir, open, rm } from "node:fs/promises";
 import { dirname } from "node:path";
 import { createHash } from "node:crypto";
@@ -26,7 +27,7 @@ export async function cacheDownload(
       const { value, done } = await reader.read();
       if (done) break;
       length += value.byteLength;
-      if (length > 64 * 1024 * 1024) {
+      if (length > CAPACITY.syncObjectBytes) {
         await reader.cancel();
         throw new CoreError("INVALID_DATA", "Object response exceeds 64 MiB.");
       }

@@ -1,3 +1,4 @@
+import { CapacityError } from "../portable/capacity.mjs";
 import { richTextDocument } from "../components/rich-text/model.mjs";
 import {
   reconcileConnections,
@@ -46,6 +47,7 @@ export function normalizeDocument(
   try {
     document = validateDocument(input);
   } catch (error) {
+    if (error instanceof CapacityError) throw error;
     throw new CoreError(
       "INVALID_DATA",
       error instanceof Error ? error.message : "Invalid page document.",

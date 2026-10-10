@@ -22,6 +22,7 @@ import g2Exports from "../components/blocks/g2/exports-map.json";
 import themeTokens from "../design/tokens.css?raw";
 import themeContent from "../design/content.css?raw";
 import contract from "../components/blocks/primitive-contract.mjs?raw";
+import capacity from "../portable/capacity.mjs?raw";
 import sdk from "../components/blocks/sdk.tsx?raw";
 import gestureBoundary from "../components/blocks/GestureBoundary.tsx?raw";
 import viewportLock from "../components/blocks/ViewportLock.tsx?raw";
@@ -85,6 +86,7 @@ const sources: Record<string, string> = {
   "ExpandableSearch.tsx": expandableSearch,
   "expandable-search.css": expandableSearchCss,
   "primitive-contract.mjs": contract,
+  "capacity.mjs": capacity,
   "sdk.tsx": sdk,
   "GestureBoundary.tsx": gestureBoundary,
   "ViewportLock.tsx": viewportLock,
@@ -127,6 +129,12 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
   Object.entries(sources).map(([name, source]) => [
     name,
     source
+      .replaceAll(
+        '"../../portable/capacity.mjs"',
+        name.startsWith("rich-text/")
+          ? '"../capacity.mjs"'
+          : '"./capacity.mjs"',
+      )
       .replaceAll('"../rich-text/', '"./rich-text/')
       .replaceAll(
         '"../../editor/',

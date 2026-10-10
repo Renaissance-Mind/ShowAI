@@ -1,3 +1,4 @@
+import { CAPACITY, assertBytes } from "../portable/capacity.mjs";
 import {
   mkdir,
   cp,
@@ -1241,8 +1242,8 @@ export class AgentHost {
     if (!file.startsWith(root + sep))
       throw new Error("只能下载此任务工作区内的文件。");
     const info = await stat(file);
-    if (!info.isFile() || info.size > 24 * 1024 * 1024)
-      throw new Error("文件下载上限为 24 MB。");
+    if (!info.isFile()) throw new Error("只能下载文件。");
+    assertBytes("Agent delivery file", info.size, CAPACITY.artifactBytes);
     const mime: Record<string, string> = {
       ".html": "text/html",
       ".svg": "image/svg+xml",
