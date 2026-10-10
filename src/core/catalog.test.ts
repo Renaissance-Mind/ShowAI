@@ -297,9 +297,7 @@ describe("compiled React packages", () => {
     expect(
       builtins.every((item) => item.propsSchema && item.scenarios.length),
     ).toBe(true);
-    expect(builtins.find((item) => item.kind === "text")!.name).toBe(
-      "富文本",
-    );
+    expect(builtins.find((item) => item.kind === "text")!.name).toBe("富文本");
     for (const kind of ["callout", "divider", "code"]) {
       expect(describeBuiltinComponent(kind).replacedBy).toBe("text");
       expect(readBuiltinComponentSource(kind).source).toContain(
@@ -616,33 +614,31 @@ describe("compiled React packages", () => {
 });
 
 describe("component composition and editable primitives", () => {
-  it(
-    "compiles editable builtin sources and identifies native container components",
-    async () => {
-      const home = await temporary();
-      for (const item of listBuiltinComponents({ includeLegacy: true })) {
-        if (item.insertion) {
-          expect(() => readBuiltinComponentSource(item.kind)).toThrow(
-            /native container editing/,
-          );
-          continue;
-        }
-        const original = readBuiltinComponentSource(item.kind);
-        const compiled = await saveComponent(
-          home,
-          {
-            ...original,
-            manifest: { ...original.manifest, id: `my-${item.kind}` },
-          },
-          project(home),
+  it.each(listBuiltinComponents({ includeLegacy: true }))(
+    "compiles editable $kind sources or identifies its native container",
+    async (item) => {
+      if (item.insertion) {
+        expect(() => readBuiltinComponentSource(item.kind)).toThrow(
+          /native container editing/,
         );
-        expect(compiled.html).toContain("Content-Security-Policy");
-        expect(compiled.inline?.script).toBeTruthy();
-        if (item.kind === "text")
-          // The rich-text SDK includes the editing engine and offline math support.
-          expect(compiled.inline!.script.length).toBeLessThan(2000000);
-        expect(compiled.defaultData).toEqual(item.defaultData);
+        return;
       }
+      const home = await temporary();
+      const original = readBuiltinComponentSource(item.kind);
+      const compiled = await saveComponent(
+        home,
+        {
+          ...original,
+          manifest: { ...original.manifest, id: `my-${item.kind}` },
+        },
+        project(home),
+      );
+      expect(compiled.html).toContain("Content-Security-Policy");
+      expect(compiled.inline?.script).toBeTruthy();
+      if (item.kind === "text")
+        // The rich-text SDK includes the editing engine and offline math support.
+        expect(compiled.inline!.script.length).toBeLessThan(2000000);
+      expect(compiled.defaultData).toEqual(item.defaultData);
     },
     process.platform === "win32" ? 600000 : 360000,
   );

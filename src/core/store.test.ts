@@ -40,7 +40,7 @@ describe("file-first project store", () => {
         id: record.document.id,
         title: "A page",
         hash: record.hash,
-        blockCount: 1,
+        blockCount: 2,
       },
     ]);
     expect(await reopened.readPage(projectId, record.document.id)).toEqual(
@@ -164,6 +164,8 @@ describe("file-first project store", () => {
   it("keeps checkpoint-based text diffs and rejects stale saves without losing human edits", async () => {
     const { projectId, record } = await page();
     const blockId = record.document.content.content![0].attrs!.id as string;
+    const paragraphId = record.document.content.content![0].content![0].attrs!
+      .id as string;
     const changed = await store.applyPage(projectId, record.document.id, {
       baseHash: record.hash,
       operations: [
@@ -179,7 +181,7 @@ describe("file-first project store", () => {
     expect(diff).toMatchObject({
       changed: true,
       currentHash: changed.hash,
-      changes: [{ type: "block.changed", blockId }],
+      changes: [{ type: "block.changed", blockId: paragraphId }],
     });
     expect(JSON.stringify(diff)).toContain("人工修订后的结论");
     await expect(

@@ -10,6 +10,7 @@ import { FileStore } from "../core/store";
 import { LibraryOperations } from "../core/library-operations";
 import { withChangeContext } from "../core/history-context";
 import { applyOperations } from "../core/diff";
+import { plainText } from "../lib/document";
 import { importComponent, resolveDocumentComponents } from "../core/catalog";
 import { LibraryImport } from "../core/library-import";
 import { syncProtocol } from "./protocol";
@@ -338,7 +339,7 @@ describe("project synchronization between independent real content libraries", (
     const a = await alice.store.readPage(project.id, page.document.id),
       b = await bob.store.readPage(project.id, page.document.id);
     expect(a.document.title).toBe("Alice title");
-    expect(a.document.content.content![0].content![0].text).toBe("Bob content");
+    expect(plainText(a.document.content.content![0])).toBe("Bob content");
     expect(a.document).toEqual(b.document);
     expect((await bob.manager.status()).projects[0].status).toBe("synced");
     expect(
@@ -877,8 +878,8 @@ describe("project synchronization between independent real content libraries", (
             bob.store.readPage(project.id, item.pageId),
           ),
         );
-        const texts = documents.map(
-          (item) => item.document.content.content![0].content![0].text,
+        const texts = documents.map((item) =>
+          plainText(item.document.content.content![0]),
         );
         expect(texts).toContain("Late local body after process death");
         expect(texts).toContain("Offline content survives process death");
@@ -888,7 +889,7 @@ describe("project synchronization between independent real content libraries", (
             ? "Local title after process death"
             : "Remote title survives process death",
         );
-        expect(result.document.content.content![0].content![0].text).toBe(
+        expect(plainText(result.document.content.content![0])).toBe(
           "Offline content survives process death",
         );
       }

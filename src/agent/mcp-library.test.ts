@@ -420,7 +420,10 @@ test("context delivers the complete index while selected revision guides stay se
     projectId: project.id,
     source,
   });
-  source.manifest.version = "1.3.0";
+  const versionParts = source.manifest.version.split(".").map(Number);
+  versionParts[2] += 1;
+  const revisedVersion = versionParts.join(".");
+  source.manifest.version = revisedVersion;
   source.manifest.description = "current-marker";
   source.manifest.documentation.usage.purpose = "A revised use contract";
   const second = await call(client, "component_save", {
@@ -435,7 +438,7 @@ test("context delivers the complete index while selected revision guides stay se
     listing.items.filter((item: any) => item.id === "documented-note"),
   ).toEqual([
     expect.objectContaining({
-      version: "1.3.0",
+      version: revisedVersion,
       documentationStatus: "available",
     }),
   ]);
