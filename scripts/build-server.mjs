@@ -22,6 +22,14 @@ await build({
   target: "es2022",
   format: "esm",
 });
+await build({
+  entryPoints: ["src/server/private-proxy.ts"],
+  outfile: "dist-server/private-proxy.mjs",
+  bundle: true,
+  platform: "browser",
+  target: "es2022",
+  format: "esm",
+});
 const { schema, migrations } = await import(
   pathToFileURL(resolve("dist-server/server.mjs")).href
 );

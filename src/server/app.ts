@@ -58,6 +58,7 @@ import {
   serverEndpoint,
   invitationUrl,
 } from "../sync/server-url";
+import { serverPrefixes, matchedPrefix } from "./base-path";
 
 export interface ServerOptions extends ExternalLoginOptions {
   vaultKey?: string;
@@ -67,6 +68,7 @@ export interface ServerOptions extends ExternalLoginOptions {
   objects: ObjectStore;
   name?: string;
   publicUrl?: string;
+  pathAliases?: string[];
   autoMigrate?: boolean;
   allowedOrigins?: string[];
   requirePublicOrigin?: boolean;
@@ -144,6 +146,7 @@ export function createSyncServer(options: ServerOptions) {
     ? new URL(publicBase).pathname.replace(/\/$/, "")
     : "";
   const publicOrigin = publicBase ? new URL(publicBase).origin : undefined;
+  const prefixes = serverPrefixes(publicBase, options.pathAliases);
   const allowedOrigins = options.allowedOrigins ?? [];
   const db = options.metadata,
     objects = options.objects;
@@ -285,13 +288,10 @@ export function createSyncServer(options: ServerOptions) {
         "INVALID_ORIGIN",
         "This request origin is not allowed.",
       );
-    if (
-      basePath &&
-      url.pathname !== basePath &&
-      !url.pathname.startsWith(basePath + "/")
-    )
+    const incomingPrefix = matchedPrefix(prefixes, url.pathname);
+    if (incomingPrefix === undefined)
       throw new SyncError(404, "NOT_FOUND", "Unknown server path.");
-    const path = url.pathname.slice(basePath.length).replace(/\/$/, ""),
+    const path = url.pathname.slice(incomingPrefix.length).replace(/\/$/, ""),
       method = request.method;
     await serverId();
     if (method === "OPTIONS") return new Response(null, { status: 204 });
@@ -1456,7 +1456,7 @@ export function createSyncServer(options: ServerOptions) {
       try {
         await serverId();
         const logicalPath = requestPath
-          .slice(basePath.length)
+          .slice((matchedPrefix(prefixes, requestPath) ?? basePath).length)
           .replace(/\/$/, "");
         const writes =
           (!["GET", "HEAD", "OPTIONS"].includes(request.method) ||

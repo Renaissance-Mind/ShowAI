@@ -6,6 +6,10 @@ import { startSyncServer } from "./node";
 import { SyncManager } from "../sync/manager";
 import { ContentLibrary as GitLibrary } from "../core/content-library";
 import { FileStore } from "../core/store";
+import { once } from "node:events";
+import WebSocket from "ws";
+import { eventProtocol } from "../sync/events";
+import privateProxy from "./private-proxy";
 const cleanup: (() => Promise<unknown>)[] = [];
 afterEach(async () => {
   for (const action of cleanup.splice(0).reverse()) await action();
@@ -74,3 +78,94 @@ test("prefixed Linux service supports real clients, invitation aliases and synch
   ).toBe("Prefix content");
   expect((await bob.manager.status()).projects[0].status).toBe("synced");
 });
+
+test("preferred HTTPS prefix and explicit legacy root share accounts, tokens and real event sockets", async () => {
+  const base = process.env.SHOWAI_TEST_ROOT ?? tmpdir();
+  const root = await mkdtemp(join(base, "showai-alias-"));
+  cleanup.push(() => rm(root, { recursive: true }));
+  const server = await startSyncServer({
+    home: join(root, "server"),
+    port: 0,
+    registrationMode: "open",
+    publicUrl: "https://showai.example.com/private",
+    pathAliases: [""],
+  });
+  cleanup.push(() => server.close());
+  const origin = new URL(server.url).origin;
+  const manager = new SyncManager(join(root, "client"));
+  cleanup.push(() => manager.stop());
+  const added = await manager.connect({
+    url: origin,
+    account: "Alias owner",
+    register: true,
+    personalToken: true,
+  });
+  const connection = (await manager.configuration()).connections.find(
+    (item) => item.id === added.id,
+  )!;
+  await manager.stop();
+  for (const base of [origin, server.url]) {
+    const me = await fetch(base + "/api/me", {
+      headers: { authorization: `Bearer ${connection.token}` },
+    });
+    expect(me.status).toBe(200);
+    expect((await me.json()).serverId).toBe(connection.serverId);
+    const socket = new WebSocket(
+      base.replace(/^http/, "ws") + "/api/events",
+      eventProtocol,
+      { headers: { authorization: `Bearer ${connection.token}` } },
+    );
+    cleanup.push(async () => {
+      socket.terminate();
+    });
+    await once(socket, "open", { signal: AbortSignal.timeout(10_000) });
+    const closed = once(socket, "close");
+    socket.close();
+    await closed;
+  }
+  const identity = await fetch(server.url + "/api/account/identity", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${connection.token}`,
+      "content-type": "application/json",
+    },
+    body: "{}",
+  });
+  expect((await identity.json()).identity.url).toBe(
+    "https://showai.example.com/private",
+  );
+  const info = await privateProxy.fetch(
+    new Request("https://showai.example.com/private/api/info?probe=1"),
+    { PRIVATE_ORIGIN: origin },
+  );
+  expect((await info.json()).serverId).toBe(connection.serverId);
+  const generated = await privateProxy.fetch(
+    new Request("https://showai.example.com/private/api/account/tokens", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${connection.token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ device: "Proxy transport acceptance" }),
+    }),
+    { PRIVATE_ORIGIN: origin },
+  );
+  expect(generated.status).toBe(201);
+  expect((await generated.json()).kind).toBe("personal");
+  expect(
+    (
+      await privateProxy.fetch(
+        new Request("https://showai.example.com/private-extra/api/info"),
+        { PRIVATE_ORIGIN: origin },
+      )
+    ).status,
+  ).toBe(404);
+  await expect(
+    startSyncServer({
+      home: join(root, "invalid"),
+      port: 0,
+      publicUrl: "https://showai.example.com/private",
+      pathAliases: ["/private/../cloud"],
+    }),
+  ).rejects.toThrow();
+}, 60_000);

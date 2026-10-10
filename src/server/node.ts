@@ -12,6 +12,7 @@ import {
 import { SyncError, token } from "../sync/protocol";
 import type { EventPeer } from "./events";
 import { serverBaseUrl } from "../sync/server-url";
+import { serverPrefixes, matchedPrefix } from "./base-path";
 import { createSyncServer, type ServerOptions } from "./app";
 import { SQLiteMetadata, DiskObjects } from "./node-storage";
 export { SQLiteMetadata, DiskObjects } from "./node-storage";
@@ -147,12 +148,14 @@ export async function startSyncServer(
         `http://${incoming.headers.host}${incoming.url}`,
         { headers },
       );
-      const basePath = options.publicUrl
-        ? new URL(serverBaseUrl(options.publicUrl)).pathname.replace(/\/$/, "")
-        : "";
+      const prefix = matchedPrefix(
+        serverPrefixes(options.publicUrl, options.pathAliases),
+        new URL(request.url).pathname,
+      );
       if (
         !app.events ||
-        new URL(request.url).pathname !== `${basePath}/api/events` ||
+        prefix === undefined ||
+        new URL(request.url).pathname !== `${prefix}/api/events` ||
         peers.size >= 1024
       )
         throw new SyncError(404, "NOT_FOUND", "Unknown event endpoint.");

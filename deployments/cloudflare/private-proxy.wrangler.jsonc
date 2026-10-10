@@ -1,0 +1,24 @@
+{
+  "name": "showai-private-proxy",
+  "main": "../../dist-server/private-proxy.mjs",
+  "compatibility_date": "2026-10-08",
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "PRIVATE_ORIGIN": "https://showai-private-origin.renaissancemind.ai",
+  },
+  "routes": [
+    {
+      "pattern": "https://showai.renaissancemind.ai/private",
+      "zone_name": "renaissancemind.ai",
+    },
+    {
+      "pattern": "https://showai.renaissancemind.ai/private/*",
+      "zone_name": "renaissancemind.ai",
+    },
+  ],
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": false },
+  },
+}

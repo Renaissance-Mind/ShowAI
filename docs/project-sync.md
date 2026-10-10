@@ -17,6 +17,8 @@ Linux 环境变量：`SHOWAI_SERVER_HOST`（默认 `127.0.0.1`）、`SHOWAI_SERV
 
 `SHOWAI_SERVER_URL` 和客户端连接地址支持根地址与子路径基址，例如 `https://example.com/cloud`。**基址不包含 `/api`**，末尾斜杠统一移除；请求、邀请和桌面加入链接保留该前缀。配置前缀后，服务仅处理该前缀内的路径。反向代理应保留完整前缀转发，外部邀请使用配置地址。
 
+Linux 服务迁入 HTTPS 子路径时，可以显式配置 `SHOWAI_SERVER_PATH_ALIASES='[""]'` 保留旧根路径的 HTTP 与 WebSocket 入口；新的邀请和账号绑定身份使用 `SHOWAI_SERVER_URL` 中的首选地址。没有配置别名时，服务仍仅处理自己的部署前缀。切换地址保留服务器身份、用户、会话、项目与保险库密钥。
+
 `deployments/server/Dockerfile` 和 `compose.yml` 使用相同构建结果。挂载数据目录的 UID 需要允许容器内 UID 1000 写入。用户级 systemd 模板在 `deployments/server/showai-project-sync.service`，示例安装目录是 `~/services/showai-project-server`，运行时放在其中的 `runtime/`，服务配置放在权限为 0600 的 `server.env`。独立运行时不会替换系统 Node.js。
 
 Cloudflare 部署：

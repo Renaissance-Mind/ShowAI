@@ -18,6 +18,9 @@ if (
     name: process.env.SHOWAI_SERVER_NAME,
     vaultKey: process.env.SHOWAI_VAULT_KEY,
     publicUrl: process.env.SHOWAI_SERVER_URL,
+    pathAliases: process.env.SHOWAI_SERVER_PATH_ALIASES
+      ? JSON.parse(process.env.SHOWAI_SERVER_PATH_ALIASES)
+      : undefined,
     registrationKey: process.env.SHOWAI_REGISTRATION_KEY,
     registrationMode: process.env
       .SHOWAI_REGISTRATION_MODE as ServerOptions["registrationMode"],
