@@ -298,7 +298,7 @@ describe("compiled React packages", () => {
       builtins.every((item) => item.propsSchema && item.scenarios.length),
     ).toBe(true);
     expect(builtins.find((item) => item.kind === "text")!.name).toBe(
-      "Markdown",
+      "富文本",
     );
     for (const kind of ["callout", "divider", "code"]) {
       expect(describeBuiltinComponent(kind).replacedBy).toBe("text");
@@ -639,12 +639,12 @@ describe("component composition and editable primitives", () => {
         expect(compiled.html).toContain("Content-Security-Policy");
         expect(compiled.inline?.script).toBeTruthy();
         if (item.kind === "text")
-          // Markdown now includes the offline KaTeX renderer (but no graph/PDF engine).
-          expect(compiled.inline!.script.length).toBeLessThan(400000);
+          // The rich-text SDK includes the editing engine and offline math support.
+          expect(compiled.inline!.script.length).toBeLessThan(2000000);
         expect(compiled.defaultData).toEqual(item.defaultData);
       }
     },
-    process.platform === "win32" ? 600000 : 180000,
+    process.platform === "win32" ? 600000 : 360000,
   );
 
   it("bundles nested exact revisions, preserves closure and validates every dependency", async () => {

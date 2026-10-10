@@ -1,5 +1,11 @@
+import { RichTextEnvironment } from "../rich-text/environment";
+import {
+  useComponentCatalog,
+  RegisterComponentContext,
+} from "../useComponentCatalog";
 import {
   Component,
+  useContext,
   Suspense,
   useSyncExternalStore,
   type ReactNode,
@@ -85,7 +91,9 @@ export function Widget({
   data,
   onChange,
   readOnly,
+  host,
 }: BlockProps & { kind: string }) {
+  const registerComponent = useContext(RegisterComponentContext);
   useSyncExternalStore(
     subscribeToBlocks,
     getRegistryRevision,
@@ -130,11 +138,20 @@ export function Widget({
           </section>
         }
       >
-        <Renderer
-          data={data}
-          onChange={readOnly ? undefined : onChange}
-          readOnly={readOnly}
-        />
+        <RichTextEnvironment.Provider
+          value={{
+            useCatalog: useComponentCatalog,
+            registerComponent,
+            renderWidget: (props) => <Widget {...props} />,
+          }}
+        >
+          <Renderer
+            data={data}
+            onChange={readOnly ? undefined : onChange}
+            readOnly={readOnly}
+            host={host}
+          />
+        </RichTextEnvironment.Provider>
       </Suspense>
     </BlockBoundary>
   );

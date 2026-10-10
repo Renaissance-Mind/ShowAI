@@ -24,7 +24,9 @@ export function SurfaceReader({
       hideTitle={partial}
       header={heading}
       reading={presentation === "reading"}
-      renderContent={({ content }) => <PageContent content={content} />}
+      renderContent={({ content, componentData }) => (
+        <PageContent content={content} data={componentData} />
+      )}
     />
   );
 }

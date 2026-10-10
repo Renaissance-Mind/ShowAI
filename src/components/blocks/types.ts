@@ -5,6 +5,7 @@ export interface BlockProps {
   data: BlockData;
   onChange?: (data: BlockData) => void;
   readOnly?: boolean;
+  host?: import("../rich-text/RichText").RichTextHost;
 }
 
 export interface BlockDefinition {

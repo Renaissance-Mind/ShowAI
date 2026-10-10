@@ -27,7 +27,7 @@ describe("rebuildable content and history index", () => {
     const project = await store.createProject({ name: "论文研究" });
     projectId = project.id;
     const page = await store.createPage(project.id, { title: "实验报告" });
-    paragraph = page.document.content.content![0].attrs!.id;
+    paragraph = page.document.content.content![0].content![0].attrs!.id;
     const document = applyOperations(page.document, [
       {
         type: "block.text.set",

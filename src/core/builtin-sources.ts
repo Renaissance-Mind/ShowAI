@@ -1,3 +1,22 @@
+import richTextTableAlignment from "../components/rich-text/table-alignment.ts?raw";
+import richTextTableSelection from "../components/rich-text/table-selection.ts?raw";
+import richTextExternalContent from "../components/rich-text/external-content.ts?raw";
+import richTextWidgetSelection from "../components/rich-text/widget-selection.ts?raw";
+import richTextDropCursor from "../components/rich-text/drop-cursor-cleanup.ts?raw";
+import richTextInsertion from "../components/rich-text/component-insertion.ts?raw";
+import richTextNodeViews from "../components/rich-text/NodeViews.tsx?raw";
+import richTextComponent from "../components/rich-text/RichText.tsx?raw";
+import richTextEditor from "../components/rich-text/RichTextEditor.tsx?raw";
+import richTextView from "../components/rich-text/RichTextView.tsx?raw";
+import richTextTableControls from "../components/rich-text/TableControls.tsx?raw";
+import richTextTableActions from "../components/rich-text/TableSelectionActions.tsx?raw";
+import richTextCss from "../components/rich-text/editor.css?raw";
+import richTextEnvironment from "../components/rich-text/environment.tsx?raw";
+import richTextExtensions from "../components/rich-text/extensions.ts?raw";
+import richTextModel from "../components/rich-text/model.mjs?raw";
+import richTextHighlight from "../components/rich-text/reading-highlight.ts?raw";
+import sharedSelectionToolbar from "../editor/SelectionToolbar.tsx?raw";
+import sharedSelectionToolbarCss from "../editor/selection-toolbar.css?raw";
 import { g2BuiltinSources } from "./g2-builtin-sources";
 import g2Exports from "../components/blocks/g2/exports-map.json";
 import themeTokens from "../design/tokens.css?raw";
@@ -43,6 +62,25 @@ import expandableSearchCss from "../components/expandable-search.css?raw";
 
 const sources: Record<string, string> = {
   ...g2BuiltinSources,
+  "rich-text/table-alignment.ts": richTextTableAlignment,
+  "rich-text/table-selection.ts": richTextTableSelection,
+  "rich-text/external-content.ts": richTextExternalContent,
+  "rich-text/widget-selection.ts": richTextWidgetSelection,
+  "rich-text/drop-cursor-cleanup.ts": richTextDropCursor,
+  "rich-text/component-insertion.ts": richTextInsertion,
+  "rich-text/NodeViews.tsx": richTextNodeViews,
+  "rich-text/RichText.tsx": richTextComponent,
+  "rich-text/RichTextEditor.tsx": richTextEditor,
+  "rich-text/RichTextView.tsx": richTextView,
+  "rich-text/TableControls.tsx": richTextTableControls,
+  "rich-text/TableSelectionActions.tsx": richTextTableActions,
+  "rich-text/editor.css": richTextCss,
+  "rich-text/environment.tsx": richTextEnvironment,
+  "rich-text/extensions.ts": richTextExtensions,
+  "rich-text/model.mjs": richTextModel,
+  "rich-text/reading-highlight.ts": richTextHighlight,
+  "editor/SelectionToolbar.tsx": sharedSelectionToolbar,
+  "editor/selection-toolbar.css": sharedSelectionToolbarCss,
   "icons.ts": icons,
   "ExpandableSearch.tsx": expandableSearch,
   "expandable-search.css": expandableSearchCss,
@@ -89,20 +127,33 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
   Object.entries(sources).map(([name, source]) => [
     name,
     source
+      .replaceAll('"../rich-text/', '"./rich-text/')
+      .replaceAll(
+        '"../../editor/',
+        name.startsWith("rich-text/") ? '"../editor/' : '"./editor/',
+      )
+      .replaceAll('"../blocks/', '"../')
+      .replaceAll("'../blocks/", "'../")
+      .replaceAll(
+        '"../../ui/icons"',
+        name.startsWith("rich-text/") ? '"../icons"' : '"./icons"',
+      )
       .replace(
         /from\s+["']\.\.\/\.\.\/editor\/SelectionToolbar["']/g,
         'from "./SelectionToolbar"',
       )
       .replace(
         /from\s+["']\.\.\/ExpandableSearch["']/g,
-        'from "./ExpandableSearch"',
+        name.includes("/")
+          ? 'from "../ExpandableSearch"'
+          : 'from "./ExpandableSearch"',
       )
       .replace(/from\s+["'](?:\.\.\/){1,2}ui\/icons["']/g, 'from "./icons"'),
   ]),
 );
 export const builtinExports: Record<string, string> = {
   ...g2Exports,
-  text: "Markdown",
+  text: "RichText",
   image: "Image",
   table: "Table",
   callout: "Callout",

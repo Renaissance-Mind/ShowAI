@@ -1,3 +1,4 @@
+import { validateRichTextData } from "../rich-text/model.mjs";
 export function validatePrimitiveData(kind, data) {
   for (const key of ["color", "backgroundColor"])
     if (data[key] !== undefined && typeof data[key] !== "string")
@@ -22,14 +23,7 @@ export function validatePrimitiveData(kind, data) {
     !["left", "center", "right", "justify"].includes(String(data.align))
   )
     throw new Error("不支持此对齐方式。");
-  if (
-    kind === "text" &&
-    (typeof data.content !== "string" ||
-      data.content.length > 1000000 ||
-      (data.format !== undefined &&
-        !["markdown", "plain"].includes(String(data.format))))
-  )
-    throw new Error("文本框需要文字内容和有效格式。");
+  if (kind === "text") validateRichTextData(data);
   if (kind === "image") {
     for (const key of ["src", "alt", "caption"])
       if (

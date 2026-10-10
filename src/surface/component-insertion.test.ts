@@ -40,7 +40,7 @@ describe("unified component insertion", () => {
       page.nodeId,
     );
     expect(findSurfaceNode(text.document, text.nodeId)!.node.type).toBe(
-      "widget",
+      "richText",
     );
     expect(text.document.layout[page.nodeId].heightMode).toBe("fixed");
     expect(() => validateDocument(text.document)).not.toThrow();

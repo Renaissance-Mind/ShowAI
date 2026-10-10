@@ -1,3 +1,4 @@
+import { richTextDocument } from "../components/rich-text/model.mjs";
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 
@@ -20,6 +21,8 @@ export function newDocument(title = ""): ShowDocument {
 
 export function plainText(node: JSONContent): string {
   if (node.text) return node.text;
+  if (node.type === "widget" && node.attrs?.kind === "text")
+    return plainText(richTextDocument(node.attrs.data));
   return (node.content ?? [])
     .map(plainText)
     .join(node.type === "doc" ? "\n" : "");
@@ -93,7 +96,13 @@ export function toMarkdown(node: JSONContent, depth = 0): string {
       );
     case "image":
       return `![${node.attrs?.alt ?? ""}](${node.attrs?.src ?? ""})\n\n`;
+    case "mathInline":
+      return `$${node.attrs?.latex ?? ""}$`;
+    case "mathBlock":
+      return `$$\n${node.attrs?.latex ?? ""}\n$$\n\n`;
     case "widget":
+      if (node.attrs?.kind === "text")
+        return toMarkdown(richTextDocument(node.attrs.data), depth);
       return (
         "```showai-block\n" + JSON.stringify(node.attrs, null, 2) + "\n```\n\n"
       );

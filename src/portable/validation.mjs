@@ -31,6 +31,8 @@ const nodeTypes = new Set([
   "taskItem",
   "codeBlock",
   "hardBreak",
+  "mathInline",
+  "mathBlock",
   "horizontalRule",
   "image",
   "table",
@@ -49,6 +51,7 @@ const markTypes = new Set([
   "underline",
   "link",
   "highlight",
+  "textStyle",
 ]);
 const nodeAttributes = new Set([
   "id",
@@ -76,6 +79,8 @@ const nodeAttributes = new Set([
   "data",
   "canvas",
   "name",
+  "latex",
+  "display",
 ]);
 const markAttributes = new Set([
   "href",
@@ -255,6 +260,12 @@ function validateWidgetData(kind, data, path) {
     )
   ) {
     validatePrimitiveData(kind, data);
+    if (kind === "text" && typeof data.content === "object")
+      validateNode(data.content, `${path}.content`, {
+        count: 0,
+        surface: false,
+        resource: false,
+      });
     if (kind === "image" && data.src && !isSafeUrl(data.src, true))
       throw new Error(`${path}.src must be a safe raster image URL.`);
     return;
@@ -503,6 +514,12 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
   }
   if (node.type === "image" && !isSafeUrl(node.attrs?.src, true))
     throw new Error(`${path} requires a safe image src.`);
+  if (node.type === "richText")
+    validatePrimitiveData("text", {
+      ...node.attrs?.data,
+      content: { type: "doc", content: node.content ?? [] },
+      format: "richtext",
+    });
   if (node.type === "widget") {
     string(node.attrs?.kind, `${path}.attrs.kind`, 80);
     if (!/^[a-z][a-z0-9-]*$/.test(node.attrs.kind))
@@ -558,6 +575,7 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
   const blockTypes = [
     "paragraph",
     "heading",
+    "mathBlock",
     "blockquote",
     "bulletList",
     "orderedList",
@@ -585,8 +603,8 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
       ...(counter.resource ? ["surface", "drawing"] : []),
     ],
     richText: blockTypes,
-    paragraph: ["text", "hardBreak"],
-    heading: ["text", "hardBreak"],
+    paragraph: ["text", "hardBreak", "mathInline"],
+    heading: ["text", "hardBreak", "mathInline"],
     codeBlock: ["text"],
     blockquote: blockTypes,
     callout: blockTypes,

@@ -44,7 +44,6 @@ const flowNode = (name: string) =>
 
 export const pageEditorNodes = [
   flowNode("region"),
-  flowNode("richText"),
   Node.create({
     name: "pageModule",
     group: "block",

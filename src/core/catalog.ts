@@ -1292,6 +1292,18 @@ async function compilePackage(
     "react",
     "react-dom",
     "scheduler",
+    "@tiptap/core",
+    "@tiptap/react",
+    "@tiptap/pm",
+    "@tiptap/starter-kit",
+    "@tiptap/extension-placeholder",
+    "@tiptap/extension-image",
+    "@tiptap/extension-table",
+    "@tiptap/extension-task-list",
+    "@tiptap/extension-task-item",
+    "@tiptap/extension-highlight",
+    "@tiptap/extension-text-align",
+
     "ajv",
     "marked",
     "katex",
@@ -1476,6 +1488,12 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
           /^data:font\/woff2;base64,[a-z\d+/=]+$/i.test(args.path)
         )
           return { path: args.path, external: true };
+        if (
+          sdkImport &&
+          args.path.startsWith("@tiptap/") &&
+          runtimeRoots.has(args.path.split("/").slice(0, 2).join("/"))
+        )
+          return { path: require.resolve(args.path) };
         if (
           [
             "react",

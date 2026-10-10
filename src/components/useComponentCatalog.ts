@@ -42,7 +42,7 @@ export function useComponentCatalog(open: boolean) {
       return {
         kind: item.kind,
         data: structuredClone(item.defaultData),
-        native: !!item.insertion,
+        native: !!item.insertion || item.kind === "text",
       };
     const component =
       available.find(

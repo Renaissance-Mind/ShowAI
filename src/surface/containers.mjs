@@ -34,7 +34,15 @@ export function createSurface(
     attrs: { id, kind, name },
     content:
       kind === "page"
-        ? [{ type: "paragraph", attrs: { id: crypto.randomUUID() } }]
+        ? [
+            {
+              type: "richText",
+              attrs: { id: crypto.randomUUID(), name: "富文本" },
+              content: [
+                { type: "paragraph", attrs: { id: crypto.randomUUID() } },
+              ],
+            },
+          ]
         : [],
   };
 }

@@ -1,3 +1,4 @@
+import { richTextDocument } from "../components/rich-text/model.mjs";
 import {
   reconcileConnections,
   transformedBindings,
@@ -575,6 +576,19 @@ export function applyOperations(
       }
       case "block.text.set": {
         const node = locate(operation.blockId).node;
+        if (node.type === "richText" && typeof operation.text === "string") {
+          const previousId = node.content?.[0]?.attrs?.id;
+          node.content = richTextDocument({
+            content: operation.text,
+            format: "plain",
+          }).content;
+          if (previousId && node.content?.[0])
+            node.content[0].attrs = {
+              ...node.content[0].attrs,
+              id: previousId,
+            };
+          break;
+        }
         if (
           !["paragraph", "heading", "codeBlock"].includes(node.type ?? "") ||
           typeof operation.text !== "string"

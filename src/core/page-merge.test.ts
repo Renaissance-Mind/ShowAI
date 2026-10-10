@@ -1,3 +1,4 @@
+import { findSurfaceNode } from "../surface/document.mjs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -16,7 +17,7 @@ describe("structural page merges", () => {
     const store = new FileStore(root);
     const project = await store.createProject({ name: "Merge report" });
     const record = await store.createPage(project.id, { title: "Report" });
-    paragraph = record.document.content.content![0].attrs!.id;
+    paragraph = record.document.content.content![0].content![0].attrs!.id;
     base = applyOperations(record.document, [
       { type: "block.text.set", blockId: paragraph, text: "alpha beta gamma" },
     ]);
@@ -35,9 +36,9 @@ describe("structural page merges", () => {
     const before = JSON.stringify([base, ours, theirs]);
     const preview = previewPageMerge(base, ours, theirs);
     expect(preview.conflicts).toEqual([]);
-    expect(preview.document.content.content![0].content![0].text).toBe(
-      "ALPHA beta GAMMA",
-    );
+    expect(
+      findSurfaceNode(preview.document, paragraph)!.node.content![0].text,
+    ).toBe("ALPHA beta GAMMA");
     expect(JSON.stringify([base, ours, theirs])).toBe(before);
   });
 
@@ -112,7 +113,11 @@ describe("structural page merges", () => {
     expect(merged.conflicts).toEqual([]);
     expect(
       merged.document.content.content!.map((node) => node.attrs!.id),
-    ).toEqual([paragraph, "human-block", "agent-block"]);
+    ).toEqual([
+      base.content.content![0].attrs!.id,
+      "human-block",
+      "agent-block",
+    ]);
     const left = applyOperations(base, [
       { type: "block.text.set", blockId: paragraph, text: "alpha FIRST gamma" },
     ]);

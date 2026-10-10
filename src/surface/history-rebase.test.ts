@@ -1,3 +1,4 @@
+import { findSurfaceNode } from "./document.mjs";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -14,7 +15,7 @@ beforeAll(async () => {
     project = await store.createProject({ name: "Undo integration" }),
     page = await store.createPage(project.id);
   initial = page.document;
-  paragraph = initial.content.content![0].attrs!.id;
+  paragraph = initial.content.content![0].content![0].attrs!.id;
 });
 afterAll(async () => rm(root, { recursive: true }));
 const text = (document: ShowDocument, value: string) =>
@@ -22,9 +23,10 @@ const text = (document: ShowDocument, value: string) =>
     { type: "block.text.set", blockId: paragraph, text: value },
   ]);
 const value = (document: ShowDocument) =>
-  document.content
-    .content![0].content?.map((node) => node.text ?? "")
+  findSurfaceNode(document, paragraph)!
+    .node.content?.map((node) => node.text ?? "")
     .join("") ?? "";
+
 test("undo snapshots retain a remote prefix, suffix and insertion inside the owned text span", () => {
   const owned = text(initial, "管理员内容"),
     incoming = text(owned, "编辑端：管理员新内容。");

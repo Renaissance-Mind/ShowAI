@@ -1,3 +1,4 @@
+import { createRichTextNode } from "../components/rich-text/model.mjs";
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import type { NodeLayout } from "./types";
@@ -58,7 +59,10 @@ export function insertComponent(
   if (!definition && kind !== "custom")
     throw new Error(`Unknown component: ${kind}.`);
   let node: JSONContent, frame: NodeLayout;
-  if (definition?.insertion) {
+  if (kind === "text") {
+    node = createRichTextNode(data);
+    frame = { x: 0, y: 0, width: 640 };
+  } else if (definition?.insertion) {
     const incoming = remapSurfaceIds(nativeComponentDocument(kind, data));
     node = incoming.content;
     Object.assign(document.layout, incoming.layout);

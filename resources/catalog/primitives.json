@@ -1,32 +1,61 @@
 [
   {
     "kind": "text",
-    "name": "Markdown",
-    "description": "统一书写标题、段落、列表、引用、代码块、分隔线与行内、行间 LaTeX 公式，可调整字号、颜色、对齐与背景。",
+    "name": "富文本",
+    "description": "统一的富文本组件：App 输入与 AI 写入使用同一内容树，支持标题、列表、表格、公式、字体、字号、颜色、下划线、高亮和段落对齐；组件自带选中、悬停及表格菜单，兼容 Markdown 与纯文本导入。",
     "scenarios": [
       "撰写研究笔记、产品说明或课程讲义，需要在一段连续正文中组织观点、证据与引用。",
       "编写技术教程，需要把操作步骤、代码示例与解释放在一起。",
       "解释数学概念或推导过程，需要让公式与文字说明一起阅读。"
     ],
     "effects": [
-      "用一份 Markdown 内容呈现完整的文字层次与代码片段。",
-      "统一调整文本的颜色、字号、对齐与背景。"
+      "App、AI 与导出共用富文本内容树和格式语义。",
+      "在组件内编辑文字格式、对齐、颜色和高亮。"
     ],
-    "version": "1.2.0",
+    "version": "2.0.0",
     "defaultData": {
-      "content": "在这里写下内容。",
-      "format": "markdown"
+      "content": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": []
+          }
+        ]
+      },
+      "format": "richtext"
     },
     "propsSchema": {
       "type": "object",
       "properties": {
         "content": {
-          "type": "string",
-          "maxLength": 1000000,
-          "description": "Markdown 内容，支持标题、列表、引用、代码与 LaTeX 公式；JSON 字符串中的反斜线需要转义。"
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 1000000
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "doc"
+                },
+                "content": {
+                  "type": "array",
+                  "maxItems": 12000,
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              },
+              "required": ["type", "content"],
+              "additionalProperties": false
+            }
+          ],
+          "description": "首选 doc JSON 树。文字 marks 保存格式，段落 attrs.textAlign 保存对齐。旧 Markdown/plain 字符串作为导入输入，编辑后保存 richtext 内容树。"
         },
         "format": {
-          "enum": ["markdown", "plain"]
+          "enum": ["richtext", "markdown", "plain"]
         },
         "color": {
           "type": "string"
@@ -57,6 +86,41 @@
       "additionalProperties": false
     },
     "examples": [
+      {
+        "name": "格式化正文",
+        "request": "居中显示带下划线和高亮的重点文字。",
+        "data": {
+          "format": "richtext",
+          "content": {
+            "type": "doc",
+            "content": [
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "textAlign": "center"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "重点内容",
+                    "marks": [
+                      {
+                        "type": "underline"
+                      },
+                      {
+                        "type": "highlight",
+                        "attrs": {
+                          "color": "#e8eed0"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
       {
         "name": "研究摘要",
         "request": "用标题、强调和引用展示一段研究说明。",

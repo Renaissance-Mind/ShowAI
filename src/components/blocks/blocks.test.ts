@@ -22,8 +22,8 @@ import { validateDocument } from "../../portable/validation.mjs";
 import type { DatabaseColumn, DatabaseRow } from "./types";
 
 describe("interactive block data", () => {
-  it("offers one Markdown entry while retaining legacy text renderers", () => {
-    expect(getBlockDefinition("text")!.title).toBe("Markdown");
+  it("offers one rich-text entry while retaining legacy text renderers", () => {
+    expect(getBlockDefinition("text")!.title).toBe("富文本");
     for (const kind of ["callout", "divider", "code"]) {
       expect(blockDefinitions.some((block) => block.kind === kind)).toBe(false);
       expect(getBlockDefinition(kind)!.replacedBy).toBe("text");

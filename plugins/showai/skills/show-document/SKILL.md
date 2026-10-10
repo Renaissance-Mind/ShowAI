@@ -23,7 +23,7 @@ description: 通过 ShowAI MCP 创作、修改、展示或导出页面、报告�
 
 新资源使用 v3：根和嵌套容器为 `surface`，kind为 page或board。Page按树顺序阅读，Board表达局部空间。`layout`保存父级给子对象的外框，`surfaceViews`保存命名视图与阅读顺序；当前选中、滚动与展开属于个人状态。原生容器保持surface结构，不编码成普通widget。绘画保存在Board中；连接、旋转和变换按需读 [Board 编辑](references/board-authoring.md)。
 
-组件节点使用稳定 attrs.id。自定义组件用 kind=custom，data包含componentId、version、integrity与props。不得把组件包 ID当成内置kind。正文 Markdown支持行内与块级公式，代码块保持原文。视频、音频、PDF与参考文献优先复用内置组件，先查schema。离线交付所需资源必须嵌入；在线资源的网络要求要如实说明。教学示例明确标记，不能冒充实测数据。
+组件节点使用稳定 attrs.id。自定义组件用 kind=custom，data包含componentId、version、integrity与props。不得把组件包 ID当成内置kind。文字统一使用富文本组件（kind=text），优先提交 format=richtext 与 doc 内容树；文字格式放在 marks，段落对齐放在 attrs.textAlign。通过组件插入形成原生 richText 节点，沿页面读取返回的稳定子节点 ID 续改。旧 Markdown/plain 字符串兼容导入；公式支持行内与块级形式，代码块保持原文。视频、音频、PDF与参考文献优先复用内置组件，先查schema。离线交付所需资源必须嵌入；在线资源的网络要求要如实说明。教学示例明确标记，不能冒充实测数据。
 
 ## 排版与视觉风格
 

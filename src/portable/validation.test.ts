@@ -45,6 +45,8 @@ describe("portable artifact boundaries", () => {
           "text",
           "image",
           "hardBreak",
+          "mathInline",
+          "richText",
           "listItem",
           "taskItem",
           "table",

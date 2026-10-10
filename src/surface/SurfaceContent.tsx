@@ -41,6 +41,7 @@ export interface ContentRenderProps {
   parentId: string;
   ids: string[];
   kind: "children" | "single";
+  componentData?: Record<string, unknown>;
   renderModule?: (node: JSONContent) => ReactNode;
 }
 export type ContentRenderer = (props: ContentRenderProps) => ReactNode;
@@ -207,6 +208,7 @@ const ContentNode = memo(
     } else if (node.type === "richText")
       body = renderContent({
         content: { type: "doc", content: node.content ?? [] },
+        componentData: node.attrs?.data,
         parentId: id,
         ids: (node.content ?? []).map((child) => child.attrs?.id),
         kind: "children",

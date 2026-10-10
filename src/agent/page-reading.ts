@@ -1,3 +1,4 @@
+import { richTextDocument } from "../components/rich-text/model.mjs";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -149,6 +150,7 @@ function text(node: JSONContent): string {
   return node.text ?? (node.content ?? []).map(text).join("");
 }
 function markdownText(node: JSONContent): string {
+  if (node.type === "mathInline") return `$${node.attrs?.latex ?? ""}$`;
   if (node.type !== "text")
     return (node.content ?? []).map(markdownText).join("");
   let value = node.text ?? "";
@@ -185,7 +187,11 @@ export function structuredContent(document: ShowDocument) {
       });
     if (node.type === "widget") {
       if (attrs.kind === "text") {
-        lines.push(String(attrs.data?.content ?? ""), "");
+        if (typeof attrs.data?.content === "string")
+          lines.push(attrs.data.content, "");
+        else
+          for (const child of richTextDocument(attrs.data ?? {}).content ?? [])
+            visit(child, depth + 1);
         return;
       }
       lines.push(
@@ -222,6 +228,10 @@ export function structuredContent(document: ShowDocument) {
           : markdownText(node),
         "",
       );
+      return;
+    }
+    if (node.type === "mathBlock") {
+      lines.push(`$$\n${attrs.latex ?? ""}\n$$`, "");
       return;
     }
     if (node.type === "image") {

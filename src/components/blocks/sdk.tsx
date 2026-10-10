@@ -1,3 +1,4 @@
+export { RichText } from "../rich-text/RichText";
 import "./block.css";
 import "./theme.css";
 export { GestureBoundary } from "./GestureBoundary";

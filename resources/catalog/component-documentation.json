@@ -8,18 +8,20 @@
       ]
     },
     "usage": {
-      "purpose": "统一书写标题、段落、列表、引用、代码块、分隔线与行内、行间 LaTeX 公式，可调整字号、颜色、对齐与背景。",
+      "purpose": "App 正文、AI 写入与独立插入共用的富文本组件，格式、设置与交互菜单由组件拥有。",
       "structure": [
-        "一份 content 保存完整正文；format 选择 Markdown 或纯文本。标题、段落、列表和引用在同一个正文中组织。"
+        "content 首选 doc JSON 内容树，文字 marks 保存格式，段落 attrs.textAlign 保存对齐。",
+        "Page/Board 中 component.insert(kind:text) 创建原生 richText 节点，内部段落 ID 可用于局部读写；旧 widget/text 和 Markdown/plain 字符串进入同一组件。",
+        "组件自行定义选中格式菜单、段落悬停菜单和表格动作；宿主负责项目、保存、布局与组件插入。"
       ],
       "inputs": [
         {
           "path": "content",
-          "meaning": "正文字符串。format=markdown 时解析 Markdown；format=plain 保留字面内容与换行。"
+          "meaning": "doc JSON 内容树；文字 marks 保存 bold/italic/underline/strike/code/highlight/link/textStyle。旧 Markdown/plain 字符串兼容导入。"
         },
         {
           "path": "format",
-          "meaning": "markdown 或 plain；省略时按 Markdown 解析。"
+          "meaning": "richtext 对应内容树；markdown/plain 对应旧字符串输入，编辑后返回 richtext。"
         },
         {
           "path": "color",
@@ -48,6 +50,16 @@
       ],
       "recipes": [
         {
+          "title": "结构化富文本与局部格式",
+          "steps": [
+            "使用 format: richtext 和 content: {type: doc, content: [...]}。",
+            "在文字 marks 中设置 underline、highlight.attrs.color 或 textStyle.attrs 的 color/fontFamily/fontSize；fontSize 可为 20px。",
+            "段落 attrs.textAlign 支持 left/center/right/justify；App 格式菜单继续编辑同一份数据。",
+            "component.insert(kind:text,data) 创建原生富文本实例；以页面读取返回的稳定子节点 ID 续改。"
+          ],
+          "exampleIndex": 0
+        },
+        {
           "title": "构造有效输入",
           "steps": [
             "段落用空行分隔：第一段\n\n第二段。普通单换行不是新段落；行尾两个空格再换行可强制换行。",
@@ -59,7 +71,7 @@
             "公式使用 $x^2$ 或 \\(x^2\\)；块公式用单独行的 $$ 或 \\[ 与 \\]。通过 JSON 提交时换行写作 \\n，LaTeX 反斜线需要 JSON 转义，不把字面的 \\n 当作换行。",
             "Markdown 表格用竖线与表头分隔行，图片用 ![替代文字](URL)。需要表格专属编辑、图注或裁切时使用独立表格/图片组件。"
           ],
-          "exampleIndex": 0
+          "exampleIndex": 1
         },
         {
           "title": "替换为自己的内容",
@@ -72,19 +84,24 @@
       "interactions": [
         {
           "action": "阅读",
-          "effect": "渲染 Markdown 或纯文本；任务框只展示给定状态，代码保持字面内容。",
+          "effect": "共享渲染器显示内容树、格式与公式，不带编辑工具。",
           "persistence": "none"
         },
         {
-          "action": "编辑内容或配置",
-          "effect": "通过宿主编辑入口修改数据与配置，并由 onChange 返回有效数据；页面保存成功后形成正式版本。",
+          "action": "选中文字",
+          "effect": "统一菜单设置字体、字号、粗体、强调、下划线、删除线、高亮、颜色、行内代码、链接和段落对齐。",
+          "persistence": "content"
+        },
+        {
+          "action": "编辑内容",
+          "effect": "输入、列表/表格操作与旧 Markdown 转换统一通过 onChange 返回 richtext 内容树。",
           "persistence": "content"
         }
       ],
       "constraints": [
-        "HTML 标签按文字处理，不用于注入脚本或自定义排版。",
-        "任务复选框是显示状态，不能在阅读态直接勾选保存；修改任务状态应改正文。",
-        "链接仅支持 http/https 或页内锚点；代码中的公式标记保持原样。"
+        "Markdown 是导入格式，任意 HTML 按字面内容处理。",
+        "只读隐藏编辑菜单，任务复选框不写入；可编辑时任务状态保存在 checked 属性。",
+        "保留节点 ID；HTML/JSON 导出保存完整格式，普通 Markdown 无法表达所有样式。"
       ],
       "editing": {
         "data": [
@@ -98,8 +115,16 @@
     "development": {
       "entryPoints": [
         {
-          "path": "src/components/blocks/Primitives.tsx",
+          "path": "src/components/rich-text/RichText.tsx",
           "purpose": "软件内置实现位置；MCP source 返回的是 SDK 包装起点，不是这份软件源码。"
+        },
+        {
+          "path": "src/components/rich-text/RichTextEditor.tsx",
+          "purpose": "组件定义的文字设置、选中菜单、悬停菜单和编辑交互。"
+        },
+        {
+          "path": "src/components/rich-text/model.mjs",
+          "purpose": "共享内容树、校验和旧 Markdown/plain 输入转换。"
         },
         {
           "path": "index.tsx",
@@ -107,11 +132,12 @@
         }
       ],
       "architecture": [
-        "TextBlock 根据 format 选择纯文本或 mathMarkdown 词法分析，markdownNodes 将标记渲染为 React 元素。",
-        "页面实例保存源数据；阅读状态与正式编辑回传分别维护。"
+        "RichText 统一接收内容树与旧字符串；RichTextEditor 拥有文字设置、扩展、选中和悬停菜单。",
+        "RichTextView 与 model.mjs 由 App、Agent 读取和 SDK 共享；Page/Board 只传内容、资源能力与保存回调。",
+        "src/editor/DocumentEditor.tsx 为兼容入口，调用注册的 text 组件，不再定义格式或菜单。"
       ],
       "extensionPoints": [
-        "新增 Markdown 语法需同时检查解析器、markdownNodes、样式与导出；数学语法在 markdown-math.mjs。"
+        "在富文本组件目录扩展模型、渲染、编辑扩展和菜单，同时更新目录 schema 和 examples。"
       ],
       "invariants": [
         "保留原始输入与稳定 ID，明确区分源数据、派生值和阅读状态。",

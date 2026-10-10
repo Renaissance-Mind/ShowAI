@@ -30,7 +30,13 @@ export function toPageEditor(
     });
     let id = `page-tail-${tailId.slice(0, 170)}`;
     while (ids.has(id)) id += "-copy";
-    content!.push({ type: "paragraph", attrs: { id } });
+    let paragraphId = `${id}-paragraph`;
+    while (ids.has(paragraphId)) paragraphId += "-copy";
+    content!.push({
+      type: "richText",
+      attrs: { id, name: "富文本" },
+      content: [{ type: "paragraph", attrs: { id: paragraphId } }],
+    });
   }
   return {
     ...node,

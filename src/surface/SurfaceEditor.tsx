@@ -11,7 +11,6 @@ import {
 } from "react";
 import type { ShowDocument, ContainerDocument } from "../types";
 import { Widget } from "../components/blocks/Widget";
-import DocumentEditor from "../editor/DocumentEditor";
 import { ContainerRuntime } from "./ContainerRuntime";
 import { isResource, upgradeResource } from "./containers.mjs";
 import { editNode, replaceChildren, detachBlock } from "./editing";
@@ -192,6 +191,7 @@ export default function SurfaceEditor({
     ids,
     kind,
     renderModule,
+    componentData,
   }: ContentRenderProps) => {
     const single = kind === "single" ? content.content?.[0] : undefined;
     if (single?.type === "widget")
@@ -220,17 +220,19 @@ export default function SurfaceEditor({
         />
       );
     const editor = (
-      <DocumentEditor
-        content={
-          renderModule
+      <Widget
+        kind="text"
+        data={{
+          ...componentData,
+          format: "richtext",
+          content: renderModule
             ? toPageEditor(content, current.current, parentId)
-            : content
-        }
-        additionalExtensions={renderModule ? pageEditorNodes : undefined}
-        trailingNode={!renderModule}
-        readOnly={readOnly}
-        onInsertNative={
-          readOnly
+            : content,
+        }}
+        host={{
+          additionalExtensions: renderModule ? pageEditorNodes : undefined,
+          continuousPage: !!renderModule,
+          onInsertNative: readOnly
             ? undefined
             : (componentKind, data, point) => {
                 const inserted = insertComponentAtText(
@@ -249,63 +251,62 @@ export default function SurfaceEditor({
                 );
                 commit(inserted.document);
                 setInsertedId(inserted.nodeId);
-              }
-        }
-        minimal
-        onDetachBlock={
-          readOnly || renderModule
-            ? undefined
-            : (block) => {
-                const target = findSurfaceNode(current.current, parentId);
-                if (!target) return;
-                const next = detachBlock(current.current, parentId, block, {
-                  x: 0,
-                  y: 0,
-                  width: 420,
-                });
-                commit(next);
-              }
-        }
-        onChange={(value, options) => {
-          let source = current.current;
-          if (renderModule) {
-            source = {
-              ...source,
-              layout: { ...source.layout },
-              surfaceViews: { ...source.surfaceViews },
-            };
-            value = fromPageEditor(value, source);
-          }
-          const group = options?.separateHistory ? "" : `text:${parentId}`;
-          if (kind === "children")
-            commit(
-              replaceChildren(source, parentId, ids, value.content ?? []),
-              group,
-            );
-          else
-            commit(
-              editNode(current.current, parentId, (node) => {
-                const values = value.content ?? [];
-                if (values.length === 1)
-                  Object.assign(node, values[0], {
-                    attrs: { ...values[0].attrs, id: parentId },
+              },
+          onDetachBlock:
+            readOnly || renderModule
+              ? undefined
+              : (block) => {
+                  const target = findSurfaceNode(current.current, parentId);
+                  if (!target) return;
+                  const next = detachBlock(current.current, parentId, block, {
+                    x: 0,
+                    y: 0,
+                    width: 420,
                   });
-                else {
-                  node.type = "richText";
-                  node.attrs = { id: parentId, name: "文本" };
-                  node.content = values.map((child) =>
-                    child.attrs?.id === parentId
-                      ? {
-                          ...child,
-                          attrs: { ...child.attrs, id: crypto.randomUUID() },
-                        }
-                      : child,
-                  );
-                }
-              }),
-              group,
-            );
+                  commit(next);
+                },
+          onContentChange: (value, options) => {
+            let source = current.current;
+            if (renderModule) {
+              source = {
+                ...source,
+                layout: { ...source.layout },
+                surfaceViews: { ...source.surfaceViews },
+              };
+              value = fromPageEditor(value, source);
+            }
+            const group = options?.separateHistory ? "" : `text:${parentId}`;
+            if (kind === "children")
+              commit(
+                replaceChildren(source, parentId, ids, value.content ?? []),
+                group,
+              );
+            else
+              commit(
+                editNode(current.current, parentId, (node) => {
+                  const values = value.content ?? [];
+                  if (values.length === 1)
+                    Object.assign(node, values[0], {
+                      attrs: { ...values[0].attrs, id: parentId },
+                    });
+                  else {
+                    node.type = "richText";
+                    node.attrs = { id: parentId, name: "文本" };
+                    node.content = values.map((child) =>
+                      child.attrs?.id === parentId
+                        ? {
+                            ...child,
+                            attrs: { ...child.attrs, id: crypto.randomUUID() },
+                          }
+                        : child,
+                    );
+                  }
+                }),
+                group,
+              );
+          },
         }}
+        readOnly={readOnly}
       />
     );
     return renderModule ? (

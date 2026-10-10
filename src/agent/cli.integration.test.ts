@@ -2356,7 +2356,7 @@ test("versioned history/search/merge/restore are reachable from CLI and project-
     JSON.stringify([
       {
         type: "block.text.set",
-        blockId: first.document.content.content[0].attrs.id,
+        blockId: first.document.content.content[0].content[0].attrs.id,
         text: "论文图表检索证据",
       },
     ]),
@@ -2377,7 +2377,7 @@ test("versioned history/search/merge/restore are reachable from CLI and project-
   expect(
     (await local(["search", "--query", "图表", "--project", project.id]))
       .items[0].blockId,
-  ).toBe(first.document.content.content[0].attrs.id);
+  ).toBe(first.document.content.content[0].content[0].attrs.id);
   const history = await local([
     "history",
     "list",
@@ -2504,7 +2504,7 @@ test("versioned history/search/merge/restore are reachable from CLI and project-
           name: "history_page",
           arguments: { pageId: first.document.id, revision: second.revision },
         }),
-      ).data.document.content.content[0].content[0].text,
+      ).data.document.content.content[0].content[0].content[0].text,
     ).toBe("论文图表检索证据");
     const rendered = unpack(
       await client.callTool({
