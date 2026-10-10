@@ -2,7 +2,13 @@ import { afterEach, expect, test } from "vitest";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { startSyncServer, SQLiteMetadata } from "./node";
+import {
+  startSyncServer,
+  SQLiteMetadata,
+  exportServerBackup,
+  restoreServerBackup,
+  operationsRequest,
+} from "./node";
 import { SyncManager } from "../sync/manager";
 import { accountRequest } from "../sync/account-manager";
 import type { SignedIdentity, SignedGrant } from "../sync/accounts";
@@ -27,6 +33,7 @@ async function setup() {
       port: 0,
       name: `Service ${index}`,
       registrationMode: "open",
+      operationsKey: "f".repeat(64),
     });
     services.push(service);
     cleanup.push(() =>
@@ -270,6 +277,78 @@ test("an initially unavailable bound service is automatically restored on a late
   const result = await device.accounts.refresh();
   expect((await device.configuration()).connections).toHaveLength(2);
   expect(result.errors).toEqual({});
+}, 60_000);
+test("a frozen backup restores encrypted credentials, signing identity and original device sessions", async () => {
+  const f = await setup(),
+    a = f.connections[0];
+  await accountRequest(a, "/api/account/identity", "POST", {});
+  const resourceId = crypto.randomUUID(),
+    credential = crypto.randomUUID();
+  await accountRequest(a, "/api/account/resources", "PUT", {
+    id: resourceId,
+    publicationId: crypto.randomUUID(),
+    name: "Restore credential",
+    provider: "custom",
+    baseUrl: "https://api.example.com/v1",
+    model: "storage-only",
+    protocol: "chat",
+    credential: "api-key",
+    secret: { apiKey: credential },
+  });
+  const backup = join(f.root, "complete-backup"),
+    destination = join(f.root, "restored");
+  await exportServerBackup({
+    url: a.url,
+    credential: "f".repeat(64),
+    destination: backup,
+  });
+  const restored = await restoreServerBackup({ backup, home: destination });
+  expect(restored.serverId).toBe(a.serverId);
+  const target = await startSyncServer({
+    home: destination,
+    port: 0,
+    name: "Restored source",
+    vaultKey: await readFile(join(f.root, "server-0/vault.key"), "utf8"),
+    operationsKey: "f".repeat(64),
+  });
+  cleanup.push(() => target.close());
+  const connection = { ...a, url: target.url };
+  expect(
+    (await accountRequest<{ serverId: string }>(connection, "/api/me"))
+      .serverId,
+  ).toBe(a.serverId);
+  await operationsRequest(
+    target.url,
+    "f".repeat(64),
+    `/api/ops/resume?epoch=${restored.epoch}`,
+    "POST",
+  );
+  expect(
+    (
+      await accountRequest<{ token: string }>(
+        connection,
+        `/api/account/resources/${resourceId}/access`,
+        "POST",
+        {},
+      )
+    ).token,
+  ).toBe(credential);
+  const original = (await f.client.accounts.profile(a.id)).own!;
+  const identity = await accountRequest<SignedIdentity>(
+    connection,
+    "/api/account/identity",
+    "POST",
+    {},
+  );
+  expect(identity.identity.publicKey).toEqual(original.identity.publicKey);
+  expect(identity.identity.generation).toBe(original.identity.generation);
+  expect(
+    (
+      await (
+        await operationsRequest(a.url, "f".repeat(64), "/api/ops/state")
+      ).json()
+    ).state,
+  ).toBe("frozen");
 }, 60_000);
 test("private personal tokens and device display choices remain independently revocable", async () => {
   const f = await setup(),
