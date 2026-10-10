@@ -600,7 +600,7 @@ export class ExternalLogins {
           {
             headers: {
               "content-type": "text/html; charset=utf-8",
-              "cache-control": "no-store",
+              "cache-control": "no-store, no-transform",
             },
           },
         );
@@ -626,7 +626,7 @@ export class ExternalLogins {
       {
         headers: {
           "content-type": "text/html; charset=utf-8",
-          "cache-control": "no-store",
+          "cache-control": "no-store, no-transform",
         },
       },
     );
