@@ -10,9 +10,16 @@ import {
 } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
-import { deflateRawSync, inflateRawSync } from "node:zlib";
+import { deflateRaw, inflateRawSync } from "node:zlib";
+import { promisify } from "node:util";
+import {
+  readSqlite,
+  sqliteResourcePath as resourcePath,
+  type SqliteTreeEntry,
+} from "./sqlite-reader";
+const compress = promisify(deflateRaw);
 import { CoreError } from "./model";
-import { encodeFile, decodeFile, nodePrefix } from "./history-codec";
+import { encodeFile, nodePrefix } from "./history-codec";
 import { withLibraryLock } from "./library-lock";
 import { libraryMutations } from "./history-context";
 import { completePageReaders } from "./archived-reader";
@@ -43,11 +50,6 @@ import {
 const oid = (value: string) => /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(value);
 const sha = (value: Buffer | string) =>
   createHash("sha256").update(value).digest("hex");
-interface TreeEntry {
-  path: string;
-  oid: string;
-  bytes?: number;
-}
 interface RevisionRow {
   sequence: number;
   revision: string;
@@ -83,14 +85,6 @@ CREATE TABLE IF NOT EXISTS current_files(path TEXT PRIMARY KEY,oid TEXT NOT NULL
 CREATE TABLE IF NOT EXISTS resource_changes(path TEXT NOT NULL,sequence INTEGER NOT NULL REFERENCES revisions(sequence),PRIMARY KEY(path,sequence));
 CREATE INDEX IF NOT EXISTS resource_changes_latest ON resource_changes(path,sequence DESC);
 `;
-function resourcePath(path: string) {
-  return path
-    .replace(/^(projects\/[^/]+\/pages\/[^/]+)\/reader\.json$/, "$1.json")
-    .replace(
-      /^(projects\/[^/]+\/pages\/[^/]+)\/nodes\/[^/]+\.json$/,
-      "$1.json",
-    );
-}
 function unpack(row: BlobRow) {
   const bytes =
     row.codec === 1 ? inflateRawSync(row.data) : Buffer.from(row.data);
@@ -319,117 +313,49 @@ export class SqliteLibrary {
       );
     return Number(row.sequence);
   }
-  private treeRows(db: DatabaseSync, revision: string): TreeEntry[] {
-    if (
-      db.prepare("SELECT value FROM metadata WHERE key='head'").get()?.value ===
-      revision
-    )
-      return db
-        .prepare(
-          "SELECT f.path,f.oid,b.bytes FROM current_files f JOIN blobs b ON b.oid=f.oid ORDER BY f.path",
-        )
-        .all() as unknown as TreeEntry[];
-    return db
-      .prepare(
-        "SELECT p.path,c.oid,b.bytes FROM paths p JOIN changes c ON c.path=p.path AND c.sequence=(SELECT c2.sequence FROM changes c2 WHERE c2.path=p.path AND c2.sequence<=? ORDER BY c2.sequence DESC LIMIT 1) JOIN blobs b ON b.oid=c.oid WHERE c.oid IS NOT NULL ORDER BY p.path",
-      )
-      .all(this.sequence(db, revision)) as unknown as TreeEntry[];
-  }
-  async tree(revision?: string): Promise<TreeEntry[]> {
+  async tree(revision?: string): Promise<SqliteTreeEntry[]> {
     const selected = revision ?? (await this.head());
     if (!selected) return [];
-    return this.query((db) => this.treeRows(db, selected));
+    return readSqlite(this.root, { kind: "tree", revision: selected });
   }
   async readFiles(
     paths: string[],
     revision?: string,
   ): Promise<Map<string, Buffer>> {
-    const selected = await this.revision(revision),
-      objects = new Map<string, Buffer>();
-    const tree = new Map(
-      (await this.tree(selected)).map((entry) => [entry.path, entry.oid]),
-    );
-    const needed = new Set<string>();
-    for (const path of paths) {
-      const id = tree.get(assertPath(path));
-      if (!id)
-        throw new CoreError(
-          "NOT_FOUND",
-          `File missing in historical revision: ${path}`,
-        );
-      needed.add(id);
-      if (/^projects\/[^/]+\/pages\/[^/]+\.json$/.test(path))
-        for (const [name, id] of tree)
-          if (name.startsWith(nodePrefix(path))) needed.add(id);
-    }
-    const ids = [...needed];
-    await this.query((db) => {
-      for (let offset = 0; offset < ids.length; offset += 500) {
-        const chunk = ids.slice(offset, offset + 500);
-        for (const row of db
-          .prepare(
-            `SELECT * FROM blobs WHERE oid IN(${chunk.map(() => "?").join(",")})`,
-          )
-          .all(...chunk) as unknown as BlobRow[])
-          objects.set(row.oid, unpack(row));
-      }
+    paths.forEach(assertPath);
+    if (!paths.length) return new Map();
+    const selected = await this.revision(revision);
+    const files = await readSqlite<Map<string, Uint8Array>>(this.root, {
+      kind: "files",
+      revision: selected,
+      paths,
     });
-    const read = async (path: string) => {
-      const id = tree.get(assertPath(path));
-      if (!id)
-        throw new CoreError(
-          "NOT_FOUND",
-          `File missing in historical revision: ${path}`,
-        );
-      let bytes = objects.get(id);
-      if (!bytes) {
-        bytes = await this.query((db) => {
-          const row = db
-            .prepare("SELECT * FROM blobs WHERE oid=?")
-            .get(id) as unknown as BlobRow | undefined;
-          if (!row)
-            throw new CoreError(
-              "INVALID_DATA",
-              "Historical content object is missing.",
-            );
-          return unpack(row);
-        });
-        objects.set(id, bytes);
-      }
-      return bytes;
-    };
     return new Map(
-      await Promise.all(
-        paths.map(
-          async (path) =>
-            [
-              path,
-              Buffer.from(await decodeFile(assertPath(path), read)),
-            ] as const,
-        ),
-      ),
+      [...files].map(([path, bytes]) => [path, Buffer.from(bytes)]),
     );
   }
   async readFile(path: string, revision?: string) {
     return (await this.readFiles([path], revision)).get(path)!;
   }
+  async resourceRevisions(
+    paths: string[],
+    revision?: string,
+  ): Promise<Map<string, string | null>> {
+    paths.forEach(assertPath);
+    if (!paths.length) return new Map();
+    const selected = revision ?? (await this.head());
+    if (!selected) return new Map(paths.map((path) => [path, null]));
+    return readSqlite(this.root, {
+      kind: "revisions",
+      revision: selected,
+      paths,
+    });
+  }
   async resourceRevision(
     path: string,
     revision?: string,
   ): Promise<string | null> {
-    const selected = revision ?? (await this.head());
-    if (!selected) return null;
-    const key = resourcePath(assertPath(path)),
-      prefix = `${key}/`;
-    return this.query(
-      (db) =>
-        (db
-          .prepare(
-            "SELECT r.revision FROM resource_changes c JOIN revisions r ON r.sequence=c.sequence WHERE (c.path=? OR substr(c.path,1,?)=?) AND c.sequence<=? ORDER BY c.sequence DESC LIMIT 1",
-          )
-          .get(key, prefix.length, prefix, this.sequence(db, selected))
-          ?.revision as string | undefined) ?? null,
-    );
+    return (await this.resourceRevisions([path], revision)).get(path)!;
   }
   private entry(row: RevisionRow): HistoryEntry {
     if (sha(row.entry) !== row.checksum)
@@ -1116,6 +1042,46 @@ export class SqliteLibrary {
     encoded: FileChanges,
     expectedHead: string | null,
   ) {
+    // Prepare compression before acquiring the database writer transaction.
+    const prepared = new Map<
+      string,
+      { id: string; bytes: Buffer; data?: Buffer; packed?: boolean }
+    >();
+    const objects = new Map<
+      string,
+      { id: string; bytes: Buffer; data?: Buffer; packed?: boolean }
+    >();
+    for (const [path, bytes] of encoded) {
+      assertPath(path);
+      if (bytes === null) continue;
+      const content = Buffer.from(bytes);
+      const id = sha(content),
+        object = objects.get(id) ?? { id, bytes: content };
+      objects.set(id, object);
+      prepared.set(path, object);
+    }
+    // Immutable objects already retained by history need neither recompression nor reinsertion.
+    const stored = await this.query((db) => {
+      const ids = [...objects.keys()],
+        found = new Set<string>();
+      for (let offset = 0; offset < ids.length; offset += 500) {
+        const chunk = ids.slice(offset, offset + 500);
+        for (const row of db
+          .prepare(
+            `SELECT oid FROM blobs WHERE oid IN(${chunk.map(() => "?").join(",")})`,
+          )
+          .all(...chunk))
+          found.add(String(row.oid));
+      }
+      return found;
+    });
+    for (const object of objects.values()) {
+      if (stored.has(object.id)) continue;
+      const compressed =
+        object.bytes.length > 512 ? await compress(object.bytes) : object.bytes;
+      object.packed = compressed.length < object.bytes.length * 0.97;
+      object.data = object.packed ? compressed : object.bytes;
+    }
     const db = await this.database();
     try {
       db.exec("BEGIN IMMEDIATE");
@@ -1134,18 +1100,17 @@ export class SqliteLibrary {
           )
           .run(entry.revision, data, sha(data), entry.operationId),
         sequence = Number(result.lastInsertRowid);
-      for (const [path, bytes] of encoded) {
+      for (const [path] of encoded) {
         assertPath(path);
-        const id = bytes === null ? null : sha(bytes);
-        if (bytes !== null) {
-          const compressed = bytes.length > 512 ? deflateRawSync(bytes) : bytes,
-            packed = compressed.length < bytes.length * 0.97;
+        const object = prepared.get(path),
+          id = object?.id ?? null;
+        if (object?.data) {
           db.prepare("INSERT OR IGNORE INTO blobs VALUES(?,?,?,?,?)").run(
             id,
-            packed ? compressed : bytes,
-            sha(bytes),
-            bytes.length,
-            packed ? 1 : 0,
+            object.data,
+            id,
+            object.bytes.length,
+            object.packed ? 1 : 0,
           );
         }
         db.prepare("INSERT OR IGNORE INTO paths VALUES(?)").run(path);

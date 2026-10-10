@@ -73,6 +73,19 @@ export class ContentLibrary {
   async resourceRevision(path: string, revision?: string) {
     return (await this.backend()).resourceRevision(path, revision);
   }
+  async resourceRevisions(paths: string[], revision?: string) {
+    const backend = await this.backend();
+    return backend instanceof SqliteLibrary
+      ? backend.resourceRevisions(paths, revision)
+      : new Map(
+          await Promise.all(
+            paths.map(
+              async (path) =>
+                [path, await backend.resourceRevision(path, revision)] as const,
+            ),
+          ),
+        );
+  }
   async history(input?: Parameters<LegacyLibrary["history"]>[0]) {
     return (await this.backend()).history(input);
   }

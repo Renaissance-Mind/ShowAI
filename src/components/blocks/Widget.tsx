@@ -6,6 +6,7 @@ import {
 import {
   Component,
   useContext,
+  useMemo,
   Suspense,
   useSyncExternalStore,
   type ReactNode,
@@ -94,6 +95,16 @@ export function Widget({
   host,
 }: BlockProps & { kind: string }) {
   const registerComponent = useContext(RegisterComponentContext);
+  const environment = useMemo(
+    () => ({
+      useCatalog: useComponentCatalog,
+      registerComponent,
+      renderWidget: (props: BlockProps & { kind: string }) => (
+        <Widget {...props} />
+      ),
+    }),
+    [registerComponent],
+  );
   useSyncExternalStore(
     subscribeToBlocks,
     getRegistryRevision,
@@ -138,13 +149,7 @@ export function Widget({
           </section>
         }
       >
-        <RichTextEnvironment.Provider
-          value={{
-            useCatalog: useComponentCatalog,
-            registerComponent,
-            renderWidget: (props) => <Widget {...props} />,
-          }}
-        >
+        <RichTextEnvironment.Provider value={environment}>
           <Renderer
             data={data}
             onChange={readOnly ? undefined : onChange}

@@ -84,6 +84,7 @@ async function build(library: GitLibrary, revision: string) {
     ))
       loaded.set(path, bytes);
   const entries: Record<string, Entry> = {};
+  const revisions = await library.resourceRevisions(paths, revision);
   for (const path of paths) {
     const signature = digest(signatures.get(path));
     const prior = previous?.entries[path];
@@ -109,7 +110,7 @@ async function build(library: GitLibrary, revision: string) {
         }
       : prior!.summary;
     // Even A → B → A must retain its latest resource revision, not an old hash match.
-    const resourceRevision = await library.resourceRevision(path, revision);
+    const resourceRevision = revisions.get(path);
     entries[path] = {
       signature,
       summary: {

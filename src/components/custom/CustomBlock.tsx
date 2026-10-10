@@ -373,7 +373,8 @@ function SandboxComponent({
         window.clearTimeout(pendingValidation.current.timeout);
     };
   }, [channel]);
-  useEffect(sendProps, [parsed.props, readOnly, onChange, channel]);
+  // Callback identity is host plumbing; only data and edit permission cross the sandbox.
+  useEffect(sendProps, [parsed.props, readOnly, editable, channel]);
   useEffect(() => {
     const sendTheme = () =>
       iframe.current?.contentWindow?.postMessage(

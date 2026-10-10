@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { desktop, errorMessage } from "./bridge";
+import { coalescedTask } from "../lib/coalesced-task";
+import { retainEqual } from "./navigation-refresh";
 import Dialog from "./Dialog";
 import SyncDashboard, {
   type SyncMember,
@@ -100,17 +102,21 @@ export default function SyncSettings() {
       }[]
     | null
   >(null);
-  const refresh = useCallback(async () => {
-    const [next, projects] = await Promise.all([
-      desktop.invoke<Status>("sync:status"),
-      desktop.invoke<ProjectSummary[]>("projects:list", {
-        includeArchived: true,
-        includeHidden: true,
+  const refresh = useMemo(
+    () =>
+      coalescedTask(async () => {
+        const [next, projects] = await Promise.all([
+          desktop.invoke<Status>("sync:status"),
+          desktop.invoke<ProjectSummary[]>("projects:list", {
+            includeArchived: true,
+            includeHidden: true,
+          }),
+        ]);
+        setStatus((current) => retainEqual(current, next));
+        setLocalProjects((current) => retainEqual(current, projects));
       }),
-    ]);
-    setStatus(next);
-    setLocalProjects(projects);
-  }, []);
+    [],
+  );
   useEffect(() => {
     void refresh().catch((error) => setError(errorMessage(error)));
     const timer = setInterval(() => {

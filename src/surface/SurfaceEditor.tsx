@@ -2,6 +2,7 @@ import { SurfaceGeometryStore } from "./geometry-store";
 import type { EditorControls } from "./EditorControls";
 import { insertComponentAtText } from "./component-insertion";
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -31,7 +32,7 @@ const contentKey = (document: ShowDocument) =>
     document.surfaceViews,
     document.icon,
   ]);
-export default function SurfaceEditor({
+function SurfaceEditor({
   document: input,
   onChange,
   header,
@@ -367,3 +368,4 @@ export default function SurfaceEditor({
     </div>
   );
 }
+export default memo(SurfaceEditor);

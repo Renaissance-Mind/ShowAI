@@ -1,4 +1,5 @@
 import { validatePageIcon } from "../lib/page-icon.mjs";
+import { PROJECT_SCOPE_LIMIT } from "../desktop/bridge";
 import { syncManager } from "../sync/manager";
 import { remoteSaveOrigin } from "../core/remote-save-conflict";
 import {
@@ -747,8 +748,20 @@ export function createWorkbench(
           required(args, "revision"),
         );
       case "projects:list": {
+        const projectIds =
+          args.projectIds === undefined ? undefined : args.projectIds;
+        if (
+          projectIds !== undefined &&
+          (!Array.isArray(projectIds) ||
+            projectIds.length > PROJECT_SCOPE_LIMIT)
+        )
+          throw new CoreError(
+            "INVALID_DATA",
+            "Project scope must be an array of project identities.",
+          );
         const projects = await store.listProjects({
           includeArchived: args.includeArchived === true,
+          projectIds: projectIds?.map((id) => assertId(id)),
         });
         if (args.includeHidden === true) return projects;
         const hidden = new Set(

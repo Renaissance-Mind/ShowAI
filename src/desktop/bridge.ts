@@ -1,4 +1,5 @@
 import type { TabCommand } from "../workbench/tab-shortcuts";
+export const PROJECT_SCOPE_LIMIT = 1000;
 
 export interface DesktopError {
   code: string;

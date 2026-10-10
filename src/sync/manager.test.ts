@@ -740,8 +740,12 @@ describe("project synchronization between independent real content libraries", (
       actions.push(() => rm(directory, { recursive: true, force: true }));
       const entry = join(directory, "cli.mjs");
       await build({
-        entryPoints: [join(import.meta.dirname, "../agent/cli.ts")],
-        outfile: entry,
+        entryPoints: {
+          cli: join(import.meta.dirname, "../agent/cli.ts"),
+          "index-worker": join(import.meta.dirname, "../core/index-worker.ts"),
+        },
+        outdir: directory,
+        outExtension: { ".js": ".mjs" },
         bundle: true,
         platform: "node",
         target: "node22",

@@ -1,4 +1,11 @@
 import { coalescedTask } from "../lib/coalesced-task";
+import {
+  emptyNavigationScope,
+  queueNavigationScope,
+  mergeNavigationProjects,
+  retainEqual,
+  mergeNavigationScope,
+} from "./navigation-refresh";
 import { readNavigationCache, writeNavigationCache } from "./navigation-cache";
 import { ComponentLibraryContext } from "../components/ComponentLibrary";
 import { insertComponent } from "../surface/component-insertion";
@@ -52,7 +59,7 @@ import type {
   ProjectGroup,
   SidebarOrganization,
 } from "../core/model";
-import type { DesktopInfo } from "../desktop/bridge";
+import type { DesktopInfo, DesktopChange } from "../desktop/bridge";
 import type { ShowArtifact, ShowDocument } from "../types";
 import type {
   BuiltinComponentMetadata,
@@ -392,6 +399,15 @@ export default function Studio() {
     () => new URLSearchParams(location.search).get("focus") === "1",
   );
   const page = usePage();
+  const activePageId = page.draft?.id;
+  const handleActiveSurfaceChange = useCallback(
+    (surfaceId: string) => {
+      if (activePageId)
+        activeSurface.current = { pageId: activePageId, surfaceId };
+    },
+    [activePageId],
+  );
+  const handleRevealHandled = useCallback(() => setRevealNode(null), []);
   const shownSaveFailure = useRef("");
   useEffect(() => {
     if (
@@ -481,72 +497,112 @@ export default function Studio() {
     setContents((current) => ({ ...current, [id]: next }));
     return next;
   }, []);
-  const refresh = useMemo(
+  const navigationScope = useRef(emptyNavigationScope());
+  const navigationState = useRef({ projects, organization: savedOrganization });
+  navigationState.current = { projects, organization: savedOrganization };
+  const refreshNavigation = useMemo(
     () =>
       coalescedTask(async () => {
-        const revision = sidebarRevision.current;
-        const appInfo = await desktop.invoke<DesktopInfo>("app:info");
-        const scope = { expectedHome: appInfo.home };
-        const [next, sidebar] = await Promise.all([
-          desktop.invoke<ProjectSummary[]>("projects:list", scope),
-          desktop.invoke<SidebarOrganization>("sidebar:get", scope),
-        ]);
-        const verifiedInfo = await desktop.invoke<DesktopInfo>("app:info");
-        if (verifiedInfo.home !== appInfo.home) return;
-        const changedHome = sidebarHome.current !== appInfo.home;
-        if (changedHome) {
-          const saved = readSidebarExpansion(appInfo.home);
-          sidebarHome.current = appInfo.home;
-          expandedRef.current = saved.projects;
-          setExpandedProjects(saved.projects);
-          setExpandedFolders(saved.folders);
-          setCollapsedSections(saved.collapsedSections);
-        }
-        setInfo(appInfo);
-        setProjects(next);
-        if (
-          changedHome ||
-          (revision === sidebarRevision.current && !reorderCount.current)
-        )
-          setOrganization(sidebar);
-        setNavigationUpdating(false);
-        performance.clearMarks("showai:navigation-current");
-        performance.mark("showai:navigation-current");
+        const requested = navigationScope.current;
+        navigationScope.current = emptyNavigationScope();
         try {
-          writeNavigationCache(localStorage, {
-            home: appInfo.home,
-            projects: next,
-            organization: sidebar,
+          const revision = sidebarRevision.current;
+          const appInfo = await desktop.invoke<DesktopInfo>("app:info");
+          const scope = { expectedHome: appInfo.home };
+          const changedHome = sidebarHome.current !== appInfo.home;
+          const full = requested.all || changedHome;
+          const [next, sidebar] = await Promise.all([
+            full || requested.ids.size
+              ? desktop.invoke<ProjectSummary[]>("projects:list", {
+                  ...scope,
+                  ...(full ? {} : { projectIds: [...requested.ids] }),
+                })
+              : Promise.resolve([] as ProjectSummary[]),
+            full || requested.sidebar
+              ? desktop.invoke<SidebarOrganization>("sidebar:get", scope)
+              : Promise.resolve(navigationState.current.organization),
+          ]);
+          if (
+            (await desktop.invoke<DesktopInfo>("app:info")).home !==
+            appInfo.home
+          )
+            return;
+          if (changedHome) {
+            const saved = readSidebarExpansion(appInfo.home);
+            sidebarHome.current = appInfo.home;
+            expandedRef.current = saved.projects;
+            setExpandedProjects(saved.projects);
+            setExpandedFolders(saved.folders);
+            setCollapsedSections(saved.collapsedSections);
+          }
+          setInfo((current) => retainEqual(current, appInfo));
+          const nextProjects = mergeNavigationProjects(
+            navigationState.current.projects,
+            next,
+            full ? undefined : requested.ids,
+          );
+          navigationState.current.projects = nextProjects;
+          setProjects(nextProjects);
+          if (
+            changedHome ||
+            (revision === sidebarRevision.current && !reorderCount.current)
+          ) {
+            setOrganization((current) => retainEqual(current, sidebar));
+            navigationState.current.organization = sidebar;
+          }
+          setNavigationUpdating(false);
+          performance.clearMarks("showai:navigation-current");
+          performance.mark("showai:navigation-current");
+          try {
+            writeNavigationCache(localStorage, {
+              home: appInfo.home,
+              projects: nextProjects,
+              organization: sidebar,
+            });
+          } catch (error) {
+            console.warn("无法缓存项目列表", error);
+          }
+          const nextContents = await Promise.all(
+            next.map(async (item) => {
+              const scope = { projectId: item.id, expectedHome: appInfo.home };
+              const [pages, folders] = await Promise.all([
+                desktop.invoke<PageSummary[]>("pages:list", scope),
+                expandedRef.current[item.id] || item.id === selectedRef.current
+                  ? desktop.invoke<FolderMetadata[]>("folders:list", scope)
+                  : Promise.resolve(undefined),
+              ]);
+              return { id: item.id, pages, folders };
+            }),
+          );
+          if (
+            (await desktop.invoke<DesktopInfo>("app:info")).home !==
+            appInfo.home
+          )
+            return;
+          setContents((current) => {
+            const updated = full ? {} : { ...current };
+            for (const id of requested.ids) delete updated[id];
+            for (const { id, pages, folders } of nextContents)
+              updated[id] = retainEqual(current[id], {
+                pages,
+                folders: folders ?? current[id]?.folders ?? [],
+              });
+            return retainEqual(current, updated);
           });
         } catch (error) {
-          console.warn("无法缓存项目列表", error);
+          // A failed scoped read must remain pending when another change asks for a retry.
+          mergeNavigationScope(navigationScope.current, requested);
+          throw error;
         }
-        const nextContents = await Promise.all(
-          next.map(async (item) => {
-            const scope = { projectId: item.id, expectedHome: appInfo.home };
-            const [pages, folders] = await Promise.all([
-              desktop.invoke<PageSummary[]>("pages:list", scope),
-              expandedRef.current[item.id] || item.id === selectedRef.current
-                ? desktop.invoke<FolderMetadata[]>("folders:list", scope)
-                : Promise.resolve(undefined),
-            ]);
-            return { id: item.id, pages, folders };
-          }),
-        );
-        if (
-          (await desktop.invoke<DesktopInfo>("app:info")).home !== appInfo.home
-        )
-          return;
-        setContents((current) =>
-          Object.fromEntries(
-            nextContents.map(({ id, pages, folders }) => [
-              id,
-              { pages, folders: folders ?? current[id]?.folders ?? [] },
-            ]),
-          ),
-        );
       }),
-    [loadProjectContents],
+    [],
+  );
+  const refresh = useCallback(
+    (change?: DesktopChange) => {
+      queueNavigationScope(navigationScope.current, change);
+      return refreshNavigation();
+    },
+    [refreshNavigation],
   );
   const loadCatalog = useMemo(
     () =>
@@ -678,34 +734,26 @@ export default function Studio() {
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
-    let queued = {
-      all: false,
-      projects: false,
-      sidebar: false,
-      catalog: false,
-    };
+    let queued = emptyNavigationScope(),
+      catalog = false;
     const unsubscribe = desktop.onChange((change) => {
-      const all = change.type === "home" || change.all || !change.projectIds;
-      queued = {
-        all: queued.all || !!all,
-        projects: queued.projects || !!change.projects,
-        sidebar: queued.sidebar || !!change.sidebar,
-        catalog: queued.catalog || !!change.catalog,
-      };
-      if (!all && !change.projects && !change.sidebar && !change.catalog)
-        return;
+      queueNavigationScope(queued, change);
+      catalog ||= !!change.catalog;
       clearTimeout(timer);
       timer = setTimeout(() => {
-        const work = queued;
-        queued = {
-          all: false,
-          projects: false,
-          sidebar: false,
-          catalog: false,
-        };
-        if (work.all || work.projects || work.sidebar)
-          void refresh().catch(report);
-        if ((work.all || work.catalog) && catalogLoaded.current)
+        const work = queued,
+          reloadCatalog = catalog;
+        queued = emptyNavigationScope();
+        catalog = false;
+        if (work.all || work.sidebar || work.ids.size)
+          void refresh({
+            type: "files",
+            home: change.home,
+            all: work.all,
+            sidebar: work.sidebar,
+            projectIds: [...work.ids],
+          }).catch(report);
+        if ((work.all || reloadCatalog) && catalogLoaded.current)
           void loadCatalog().catch(report);
       }, 250);
     });
@@ -2469,13 +2517,8 @@ export default function Studio() {
                     readOnly={syncReadOnly ?? page.record?.readOnly}
                     onControlsChange={setEditorControls}
                     revealId={revealNode}
-                    onActiveSurfaceChange={(surfaceId) => {
-                      activeSurface.current = {
-                        pageId: page.draft!.id,
-                        surfaceId,
-                      };
-                    }}
-                    onRevealHandled={() => setRevealNode(null)}
+                    onActiveSurfaceChange={handleActiveSurfaceChange}
+                    onRevealHandled={handleRevealHandled}
                     onChange={page.edit}
                   />
                 </CustomComponentsProvider>

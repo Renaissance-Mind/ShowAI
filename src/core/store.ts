@@ -777,7 +777,7 @@ export class FileStore {
   }
 
   async listProjects(
-    options: { includeArchived?: boolean } = {},
+    options: { includeArchived?: boolean; projectIds?: string[] } = {},
   ): Promise<ProjectSummary[]> {
     if (
       !libraryReadSnapshot.getStore() &&
@@ -789,6 +789,7 @@ export class FileStore {
     const names = await this.contentNames(path, "directory");
     const projects: ProjectSummary[] = [];
     for (const name of names) {
+      if (options.projectIds && !options.projectIds.includes(name)) continue;
       const project = await this.readProject(name);
       if (project.archived && !options.includeArchived) continue;
       const pages = await this.listPages(project.id, {
