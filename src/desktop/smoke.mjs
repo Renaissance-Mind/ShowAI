@@ -227,7 +227,7 @@ try {
   assert.equal(result.home, join(temporary, "home"));
   assert.equal(result.packaged, Boolean(packagedExecutable));
   assert.equal(result.pageCount, 1);
-  assert.match(result.revision, /^[a-f0-9]{40}$/);
+  assert.match(result.revision, /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/);
   assert.equal(result.originalTitle, "Page");
   assert.ok(result.history.items.length >= 5);
   assert.ok(
@@ -352,7 +352,7 @@ try {
           "file persistence",
           "versioned history, original page and human attribution",
           "search from committed content",
-          "Git integrity using bundled runtime",
+          "Library integrity using bundled runtime",
           "nested folders, rename, pin, move, and soft removal",
           "duplicate/import destination and legacy folder compatibility",
           "conflict details",
