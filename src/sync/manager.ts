@@ -1,4 +1,4 @@
-import { readFile, rm } from "node:fs/promises";
+import { readFile, rm, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { hostname } from "node:os";
@@ -31,9 +31,7 @@ import {
 import {
   captureProject,
   decodeSnapshot,
-  importProjectHistory,
   mergeProjectFiles,
-  projectHistory,
   remapProjectFiles,
   validSnapshotRecord,
   sameFiles,
@@ -372,13 +370,73 @@ export class SyncManager {
       `${revision}.json`,
     );
   }
+  private currentCachePath(
+    connection: ServerConnection,
+    project: ProjectConnection,
+    slot: string,
+  ) {
+    return join(
+      this.root,
+      "current-snapshots",
+      this.cacheKey(connection, project),
+      `${slot}.json`,
+    );
+  }
+  private async promoteBaseline(
+    connection: ServerConnection,
+    project: ProjectConnection,
+    record: SnapshotRecord,
+  ) {
+    const path = this.currentCachePath(connection, project, "baseline");
+    const previous = await readLibraryBytes(this.home, path);
+    if (previous)
+      await atomicLibraryFile(
+        this.home,
+        this.currentCachePath(connection, project, "previous"),
+        previous,
+      );
+    await atomicLibraryFile(
+      this.home,
+      path,
+      Buffer.from(JSON.stringify(record)),
+    );
+  }
+  private async pruneCurrentCache(
+    connection: ServerConnection,
+    project: ProjectConnection,
+  ) {
+    const live = new Set<string>();
+    for (const slot of ["baseline", "previous", "candidate", "incoming"]) {
+      const record = await readJson<SnapshotRecord>(
+        this.currentCachePath(connection, project, slot),
+      );
+      if (record)
+        Object.values(record.snapshot.files).forEach((digest) =>
+          live.add(digest),
+        );
+    }
+    const directory = join(
+      this.root,
+      "current-objects",
+      this.cacheKey(connection, project),
+    );
+    const names = await readdir(directory).catch(
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return [];
+        throw error;
+      },
+    );
+    for (const digest of names)
+      if (/^[a-f0-9]{64}$/.test(digest) && !live.has(digest))
+        await rm(join(directory, digest), { force: true });
+  }
   private objectPath(digest: string, namespace?: string) {
     if (!/^[a-f0-9]{64}$/.test(digest))
       throw new CoreError("INVALID_DATA", "Invalid object digest.");
     // Legacy unscoped bytes remain readable only by local recovery plans.
     // Network snapshots cannot reuse objects learned from another project/server.
     return namespace
-      ? join(this.root, "objects", namespace, digest)
+      ? join(this.root, "current-objects", namespace, digest)
       : join(this.root, "objects", digest);
   }
   private async request<T>(
@@ -952,13 +1010,14 @@ export class SyncManager {
     connection: ServerConnection,
     project: ProjectConnection,
     record: SnapshotRecord,
+    slot = "incoming",
   ) {
     validateSnapshot(record.snapshot, project.remoteProjectId);
     if (!(await validSnapshotRecord(record)))
       throw new CoreError("INVALID_DATA", "服务器快照身份或摘要不匹配。");
     await atomicLibraryFile(
       this.home,
-      this.snapshotPath(connection, project, record.revision),
+      this.currentCachePath(connection, project, slot),
       Buffer.from(JSON.stringify(record)),
     );
   }
@@ -967,18 +1026,20 @@ export class SyncManager {
     project: ProjectConnection,
     revision: string,
   ) {
-    const path = this.snapshotPath(connection, project, revision),
-      cached = await readJson<SnapshotRecord>(path);
-    if (cached) validateSnapshot(cached.snapshot, project.remoteProjectId);
-    if (
-      cached &&
-      cached.revision === revision &&
-      (await validSnapshotRecord(cached))
-    )
-      return cached;
+    for (const path of [
+      ...["baseline", "previous", "candidate", "incoming"].map((slot) =>
+        this.currentCachePath(connection, project, slot),
+      ),
+      this.snapshotPath(connection, project, revision),
+    ]) {
+      const cached = await readJson<SnapshotRecord>(path);
+      if (!cached || cached.revision !== revision) continue;
+      validateSnapshot(cached.snapshot, project.remoteProjectId);
+      if (await validSnapshotRecord(cached)) return cached;
+    }
     const record = await this.request<SnapshotRecord>(
       connection,
-      `/api/projects/${project.remoteProjectId}/revisions/${revision}`,
+      `/api/projects/${project.remoteProjectId}/snapshot?revision=${revision}`,
     );
     if (record.revision !== revision)
       throw new CoreError("INVALID_DATA", "服务器返回了错误的快照版本。");
@@ -1003,6 +1064,23 @@ export class SyncManager {
             throw error;
           },
         );
+        const legacy = cached
+          ? null
+          : await readLibraryBytes(
+              this.home,
+              join(
+                this.root,
+                "objects",
+                this.cacheKey(connection, project),
+                digest,
+              ),
+            );
+        if (legacy) {
+          if (hash(legacy) !== digest)
+            throw new CoreError("INVALID_DATA", "本地同步基线缓存损坏。");
+          await atomicLibraryFile(this.home, path, legacy);
+          return legacy;
+        }
         if (cached) {
           if (hash(cached) !== digest)
             throw new CoreError(
@@ -1065,6 +1143,37 @@ export class SyncManager {
             { conflictId: unresolved.id },
           );
       });
+    const receiptPath = join(
+      this.root,
+      "upload-receipts",
+      `${project.projectId}.json`,
+    );
+    const previousReceipt = await readJson<{
+      revision: string;
+      revisions?: string[];
+    }>(receiptPath);
+    await atomicLibraryFile(
+      this.home,
+      receiptPath,
+      Buffer.from(
+        JSON.stringify({
+          revision: captured.revision,
+          revisions: [
+            ...new Set([
+              captured.revision,
+              ...(previousReceipt?.revisions ??
+                (previousReceipt ? [previousReceipt.revision] : [])),
+            ]),
+          ].slice(0, 2),
+        }),
+      ),
+    );
+    for (const [digest, bytes] of captured.objects)
+      await atomicLibraryFile(
+        this.home,
+        this.objectPath(digest, this.cacheKey(connection, project)),
+        bytes,
+      );
     const ids = [...captured.objects.keys()];
     if (connection.capabilities?.includes(inlineRevisionCapability)) {
       const baseline = expected
@@ -1102,14 +1211,14 @@ export class SyncManager {
               this.objectPath(digest, this.cacheKey(connection, project)),
               captured.objects.get(digest)!,
             );
-          await this.cacheRecord(connection, project, captured);
+          await this.cacheRecord(connection, project, captured, "candidate");
           return this.request<{
             revision: string;
             head: string;
             published: boolean;
           }>(
             connection,
-            `/api/projects/${project.remoteProjectId}/revisions`,
+            `/api/projects/${project.remoteProjectId}/snapshot`,
             "POST",
             input,
           );
@@ -1210,10 +1319,10 @@ export class SyncManager {
       const failure = completed.find((item) => item.status === "rejected");
       if (failure?.status === "rejected") throw failure.reason;
     }
-    await this.cacheRecord(connection, project, captured);
+    await this.cacheRecord(connection, project, captured, "candidate");
     return this.request<{ revision: string; head: string; published: boolean }>(
       connection,
-      `/api/projects/${project.remoteProjectId}/revisions`,
+      `/api/projects/${project.remoteProjectId}/snapshot`,
       "POST",
       { snapshot: captured.snapshot, expected, publish },
     );
@@ -1409,448 +1518,198 @@ export class SyncManager {
         "本机保存失败，未解决的文件修改不会发布到服务器。请通过顶部的外部修改入口处理后重新保存。",
         { conflictId: unfinishedSave.id },
       );
-    let pending = await readJson<PendingImport>(
+    if (!connection.capabilities?.includes("current-state-v1")) {
+      await this.refreshCapabilities(connection.id);
+      const refreshed = await this.connection(connection.id);
+      if (!refreshed.capabilities?.includes("current-state-v1"))
+        throw new CoreError(
+          "INVALID_DATA",
+          "服务器需要升级到仅同步当前内容的版本。",
+        );
+      connection.capabilities = refreshed.capabilities;
+    }
+    const pending = await readJson<PendingImport>(
       this.pendingPath(project.projectId),
     );
     if (pending && pending.serverId !== connection.serverId)
       throw new CoreError(
         "CONFLICT",
-        "项目仍有来自原服务器的恢复草稿，请先处理后再更换服务器。",
+        "保留的同步草稿属于另一台服务器，请先处理该草稿。",
       );
-    if (pending) {
-      if (!remote.head)
-        throw new CoreError(
-          "CONFLICT",
-          "服务器当前版本缺失，已保留本地恢复草稿，请先恢复服务器内容。",
-        );
-      const saved = await this.pendingFiles(pending);
-      let anchor: Map<string, Buffer>;
-      if (pending.appliedHead)
-        anchor = await new LibraryOperations(
-          this.home,
-          project.projectId,
-        ).projectFiles(project.projectId, pending.appliedHead);
-      else {
-        const imported = (
-          await library.history({ projectId: project.projectId, limit: 1000 })
-        ).find((entry) => entry.syncOrigin?.serverId === connection.serverId);
-        anchor = imported?.syncOrigin
-          ? await this.files(
-              connection,
-              project,
-              await this.record(
-                connection,
-                project,
-                imported.syncOrigin.revision,
-              ),
-            )
-          : pending.originalHead
-            ? await new LibraryOperations(
-                this.home,
-                project.projectId,
-              ).projectFiles(project.projectId, pending.originalHead)
-            : new Map<string, Buffer>();
-      }
-      const blend = mergeProjectFiles(anchor, localFiles, saved);
-      if (blend.conflicts.length) {
-        const retained = retainSyncConflicts({
-          projectId: project.projectId,
-          files: blend.files,
-          conflicts: blend.conflicts,
-          localFiles,
-          remoteFiles: saved,
-          local: {
-            account: connection.user.name,
-            deviceId,
-            revision: localHead,
-          },
-          remote: {
-            account: "未知账号",
-            deviceId: "unknown",
-            revision: pending.appliedHead ?? null,
-            baseRevision: pending.remoteHead,
-            label: "保留的合并草稿",
-          },
-        });
-        blend.files = retained.files;
-      }
-      localFiles = blend.files;
-      if (
-        pending.appliedHead &&
-        project.remoteHead === pending.remoteHead &&
-        remote.head === pending.remoteHead
-      ) {
-        const actual = await new LibraryOperations(
-          this.home,
-          project.projectId,
-        ).projectFiles(project.projectId, localHead!);
-        if (!sameFiles(actual, localFiles)) {
-          let branch = pending.localBranch ?? project.remoteHead;
-          let cursor = pending.localHistoryRevision ?? project.localRevision;
-          if (remote.role !== "viewer") {
-            for (const entry of await projectHistory(
-              this.home,
-              project.projectId,
-              cursor,
-            )) {
-              const captured = await captureProject(
-                this.home,
-                project.projectId,
-                entry,
-                branch ? [branch] : [],
-                project.remoteProjectId,
-                deviceId,
-              );
-              await this.upload(
-                connection,
-                project,
-                captured,
-                project.remoteHead,
-                false,
-              );
-              branch = captured.revision;
-              cursor = entry.revision;
-            }
-          }
-          pending = await this.savePendingImport(
-            project.projectId,
-            {
-              ...pending,
-              localBranch: branch,
-              localHistoryRevision: cursor,
-              needsPublish: true,
-            },
-            localFiles,
-          );
-          const changes = new Map<string, Buffer | null>(
-            [...localFiles].filter(
-              ([path, bytes]) => !actual.get(path)?.equals(bytes),
-            ),
-          );
-          for (const path of actual.keys())
-            if (!localFiles.has(path)) changes.set(path, null);
-          const expected = new Map<string, string | null>();
-          for (const path of changes.keys())
-            expected.set(
-              path,
-              await library.resourceRevision(path, localHead!),
-            );
-          const recovered = await library.writeFiles(
-            changes,
-            {
-              actor: { kind: "system" },
-              channel: "system",
-              message: "恢复同步并保留双方修改",
-              syncOrigin: {
-                serverId: connection.serverId,
-                projectId: project.projectId,
-                revision: pending.remoteHead,
-                parents: [],
-                at: new Date().toISOString(),
-                deviceId,
-              },
-            },
-            expected,
-          );
-          if (recovered?.workspaceConflicts?.length)
-            throw new CoreError(
-              "CONFLICT",
-              "同步恢复期间文件又有修改，双方草稿已保留，请处理本机保存冲突。",
-              { conflictId: recovered.workspaceConflicts[0].id },
-            );
-          pending.appliedHead = await library.head();
-          await atomicLibraryFile(
-            this.home,
-            this.pendingPath(project.projectId),
-            Buffer.from(JSON.stringify(pending)),
-          );
-          await rm(this.conflictPath(project.projectId), { force: true });
-        }
-      }
-    }
-    if (
-      !pending &&
-      localHead &&
-      remote.head &&
-      remote.head !== project.remoteHead
-    ) {
-      const published = await this.record(connection, project, remote.head);
-      const source = published.snapshot.change.sourceRevision;
-      // Publication may have succeeded before another local process or a killed
-      // client saved its acknowledgement. Verify the actual ancestor contents;
-      // a device label alone does not establish that this is our own upload.
-      if (
-        published.snapshot.change.deviceId === deviceId &&
-        source &&
-        (await library.hasRevision(source)) &&
-        (await library.isAncestor(source, localHead))
-      ) {
-        const original = await new LibraryOperations(
-          this.home,
-          project.projectId,
-        ).projectFiles(project.projectId, source);
-        const uploaded = await this.files(connection, project, published);
-        if (sameFiles(original, uploaded)) {
-          project.remoteHead = remote.head;
-          project.localRevision = source;
-          await this.state(project.projectId, {
-            remoteHead: remote.head,
-            localRevision: source,
-            status: "pending",
-            error: undefined,
-          });
-        }
-      }
-    }
-    const baselineRevision = pending?.remoteHead ?? project.remoteHead;
-    const baseline = baselineRevision
+    let baseline = project.remoteHead
       ? await this.files(
           connection,
           project,
-          await this.record(connection, project, baselineRevision),
+          await this.record(connection, project, project.remoteHead),
         )
       : new Map<string, Buffer>();
-    if (remote.head !== project.remoteHead && remote.head) {
-      // Retain every offline edit as a branch before advancing the local baseline.
-      let localBranch = project.remoteHead;
-      if (remote.role !== "viewer")
-        for (const entry of await projectHistory(
-          this.home,
-          project.projectId,
-          project.localRevision,
-        )) {
-          const captured = await captureProject(
-            this.home,
-            project.projectId,
-            entry,
-            localBranch ? [localBranch] : [],
-            project.remoteProjectId,
-            deviceId,
-          );
-          await this.upload(
-            connection,
-            project,
-            captured,
-            project.remoteHead,
-            false,
-          );
-          localBranch = captured.revision;
-        }
-      const incoming: string[] = [];
-      const pushedHistory: string[] = [];
-      let cursor: string | null = remote.head;
-      while (
-        cursor &&
-        cursor !== project.remoteHead &&
-        pushedHistory.length < 200
-      ) {
-        const entry = this.announced.get(
-          this.announcedKey(connection, project.remoteProjectId, cursor),
-        );
-        if (!entry) break;
-        pushedHistory.push(cursor);
-        cursor = entry.previous;
-      }
-      let after = project.remoteHead;
-      if (cursor === project.remoteHead && pushedHistory.length) {
-        for (const revision of pushedHistory.reverse()) {
-          const record = await this.record(connection, project, revision);
-          await this.files(connection, project, record);
-          incoming.push(revision);
-        }
-      } else
-        while (true) {
-          const page = await this.request<{
-            entries: (
-              (SnapshotRecord & { published: boolean }) | { revision: string }
-            )[];
-            next: string | null;
-          }>(
-            connection,
-            `/api/projects/${project.remoteProjectId}/revisions?${new URLSearchParams({ ...(after ? { after } : {}), ...(connection.capabilities?.includes("history-summary-v1") ? { summary: "1" } : {}) })}`,
-          );
-          for (const item of page.entries) {
-            const record =
-              "snapshot" in item
-                ? item
-                : await this.record(connection, project, item.revision);
-            await this.cacheRecord(connection, project, record);
-            await this.files(connection, project, record);
-            incoming.push(record.revision);
-          }
-          if (!page.next) break;
-          after = page.next;
-        }
-      const remoteRecord = await this.record(connection, project, remote.head),
-        remoteFiles = await this.files(connection, project, remoteRecord);
-      const merge =
-        (remote.role === "viewer" && sameFiles(localFiles, baseline)) ||
-        !localExists
+    // An interrupted import keeps one recovery draft, rather than a version chain.
+    if (pending) {
+      const saved = await this.pendingFiles(pending);
+      const blend = mergeProjectFiles(baseline, localFiles, saved);
+      localFiles = blend.conflicts.length
+        ? retainSyncConflicts({
+            projectId: project.projectId,
+            files: blend.files,
+            conflicts: blend.conflicts,
+            localFiles,
+            remoteFiles: saved,
+            local: {
+              account: connection.user.name,
+              deviceId,
+              revision: localHead,
+            },
+            remote: {
+              account: "保留的同步草稿",
+              deviceId: "unknown",
+              revision: pending.remoteHead,
+            },
+          }).files
+        : blend.files;
+    }
+    const uploadReceipt = await readJson<{
+      revision: string;
+      revisions?: string[];
+    }>(join(this.root, "upload-receipts", `${project.projectId}.json`));
+    let remoteFiles = baseline;
+    let remoteRecord: SnapshotRecord | undefined;
+    if (remote.head) {
+      remoteRecord = await this.record(connection, project, remote.head);
+      remoteFiles = await this.files(connection, project, remoteRecord);
+      if (
+        remoteRecord.snapshot.change.deviceId === deviceId &&
+        (
+          uploadReceipt?.revisions ??
+          (uploadReceipt ? [uploadReceipt.revision] : [])
+        ).includes(remote.head)
+      )
+        baseline = remoteFiles;
+      if (remote.head !== project.remoteHead) {
+        const merge = !localExists
           ? { files: remoteFiles, conflicts: [] as FileConflict[] }
           : mergeProjectFiles(baseline, localFiles, remoteFiles);
-      if (merge.conflicts.length) {
-        const retained = retainSyncConflicts({
-          projectId: project.projectId,
-          files: merge.files,
-          conflicts: merge.conflicts,
-          localFiles,
-          remoteFiles,
-          local: {
-            account: connection.user.name,
-            deviceId,
-            revision: localHead,
-          },
-          remote: {
-            account: remoteRecord.source?.user.name ?? "未知账号",
-            deviceId: remoteRecord.snapshot.change.deviceId ?? "unknown",
-            revision: remoteRecord.revision,
-          },
-        });
-        merge.files = retained.files;
+        localFiles = merge.conflicts.length
+          ? retainSyncConflicts({
+              projectId: project.projectId,
+              files: merge.files,
+              conflicts: merge.conflicts,
+              localFiles,
+              remoteFiles,
+              local: {
+                account: connection.user.name,
+                deviceId,
+                revision: localHead,
+              },
+              remote: {
+                account: remoteRecord.source?.user.name ?? "未知账号",
+                deviceId: remoteRecord.snapshot.change.deviceId ?? "unknown",
+                revision: remoteRecord.revision,
+              },
+            }).files
+          : merge.files;
       }
-      // Pin the imported sequence to the advertised head; later server changes are fetched next time.
-      const end = incoming.indexOf(remote.head);
-      const pinned = end >= 0 ? incoming.slice(0, end + 1) : incoming;
-      if (!pinned.length)
-        throw new CoreError(
-          "INVALID_DATA",
-          "服务器当前版本没有可恢复的历史记录。",
-        );
-      const manager = this;
-      async function* history() {
-        for (const revision of pinned) {
-          const record = await manager.record(connection, project, revision);
-          yield {
-            record,
-            files: await manager.files(connection, project, record),
-          };
-        }
-      }
-      pending = await this.savePendingImport(
+    } else if (project.remoteHead) {
+      throw new CoreError(
+        "CONFLICT",
+        "服务器当前内容缺失，本地修改及同步基线已保留。",
+      );
+    }
+    const actual =
+      localExists && localHead
+        ? await new LibraryOperations(
+            this.home,
+            project.projectId,
+          ).projectFiles(project.projectId, localHead)
+        : new Map<string, Buffer>();
+    const changes = new Map<string, Buffer | null>(
+      [...localFiles].filter(
+        ([path, bytes]) => !actual.get(path)?.equals(bytes),
+      ),
+    );
+    for (const path of actual.keys())
+      if (!localFiles.has(path)) changes.set(path, null);
+    if (changes.size) {
+      await this.savePendingImport(
         project.projectId,
         {
           serverId: connection.serverId,
-          remoteHead: remote.head,
+          remoteHead: remote.head ?? "",
           originalHead: localHead,
-          localBranch,
-          needsPublish: !sameFiles(merge.files, remoteFiles),
+          localBranch: null,
+          needsPublish: !sameFiles(localFiles, remoteFiles),
         },
-        merge.files,
+        localFiles,
       );
-      await importProjectHistory(
-        this.home,
-        project.projectId,
-        connection.serverId,
-        history(),
-        merge.files,
-        localHead,
-        project.remoteProjectId,
-        pinned.length === 1,
+      // Recheck the whole captured state under the content lock. Another window
+      // may have saved during the network request; its edits must be retried.
+      await library.transaction(
+        {
+          actor: { kind: "system" },
+          channel: "system",
+          message: "同步当前项目内容",
+          ...(remoteRecord
+            ? {
+                syncOrigin: {
+                  serverId: connection.serverId,
+                  projectId: project.projectId,
+                  revision: remoteRecord.revision,
+                  parents: [],
+                  at: new Date().toISOString(),
+                  deviceId: remoteRecord.snapshot.change.deviceId,
+                  sourceUser: remoteRecord.source?.user,
+                },
+              }
+            : {}),
+        },
+        async () => {
+          if ((await library.head()) !== localHead)
+            throw new CoreError(
+              "CONFLICT",
+              "下载期间本地内容有新修改，已保留同步草稿，请重试。",
+            );
+          await library.stageFiles(changes);
+        },
       );
-      const mergedHead = await library.head();
-      pending.appliedHead = mergedHead;
-      await atomicLibraryFile(
-        this.home,
-        this.pendingPath(project.projectId),
-        Buffer.from(JSON.stringify(pending)),
-      );
+    }
+    const mergedHead = await library.head();
+    if (remote.role === "viewer" && !sameFiles(localFiles, remoteFiles)) {
       await this.state(project.projectId, {
-        remoteHead: remote.head,
-        localRevision: mergedHead,
-        status: "pending",
-        error: undefined,
+        status: "revoked",
+        error: "账号只有查看权限，未上传的修改仍保留在本地。",
       });
-      project.remoteHead = remote.head;
-      project.localRevision = mergedHead;
-      await rm(this.conflictPath(project.projectId), { force: true });
-      await rm(
-        join(this.root, "conflicts", `${project.projectId}.choices.json`),
-        { force: true },
-      );
+      return;
     }
-    if (pending && project.remoteHead === pending.remoteHead) {
-      if (pending.needsPublish && remote.role === "viewer") {
-        await this.state(project.projectId, {
-          status: "revoked",
-          error:
-            "账号已改为查看者，未上传的合并内容仍保留在本地。请切换有编辑权限的账号。",
-        });
-        return;
-      }
-      if (pending.needsPublish && remote.role !== "viewer") {
-        const mergedHead = await library.head();
-        if (!mergedHead)
-          throw new CoreError("NOT_FOUND", "待发布的本地合并版本不存在。");
-        const entry = await library.entryAt(mergedHead);
-        const captured = await captureProject(
-          this.home,
-          project.projectId,
-          entry,
-          [
-            ...new Set([
-              pending.remoteHead,
-              ...(pending.localBranch &&
-              pending.localBranch !== project.remoteHead
-                ? [pending.localBranch]
-                : []),
-            ]),
-          ],
-          project.remoteProjectId,
-          deviceId,
-        );
-        captured.snapshot.change.message = "合并跨设备项目修改";
-        // Snapshot digest is recomputed by the server; keep cache identity consistent.
-        const { snapshotRevision } = await import("./protocol");
-        captured.revision = await snapshotRevision(captured.snapshot);
-        const result = await this.upload(
-          connection,
-          project,
-          captured,
-          pending.remoteHead,
-        );
-        project.remoteHead = result.head;
-        await this.state(project.projectId, {
-          remoteHead: result.head,
-          localRevision: mergedHead,
-        });
-      }
-      await rm(this.pendingPath(project.projectId), { force: true });
-    }
-    if (remote.role !== "viewer") {
-      const history = await projectHistory(
+    if (remote.role !== "viewer" && !sameFiles(localFiles, remoteFiles)) {
+      if (!mergedHead) throw new CoreError("NOT_FOUND", "当前项目内容不存在。");
+      const captured = await captureProject(
         this.home,
         project.projectId,
-        project.localRevision,
-        project.remoteHead === null,
+        await library.entryAt(mergedHead),
+        remote.head ? [remote.head] : [],
+        project.remoteProjectId,
+        deviceId,
       );
-      for (const entry of history) {
-        const captureStarted = Date.now();
-        const captured = await captureProject(
-          this.home,
-          project.projectId,
-          entry,
-          project.remoteHead ? [project.remoteHead] : [],
-          project.remoteProjectId,
-          deviceId,
-        );
-        this.trace("capture-complete", captureStarted);
-        const uploadStarted = Date.now();
-        const result = await this.upload(
-          connection,
-          project,
-          captured,
-          project.remoteHead,
-        );
-        this.trace("publish-complete", uploadStarted);
-        project.remoteHead = result.head;
-        project.localRevision = entry.revision;
-        await this.state(project.projectId, {
-          remoteHead: result.head,
-          localRevision: entry.revision,
-          status: "pending",
-        });
-      }
+      const result = await this.upload(
+        connection,
+        project,
+        captured,
+        remote.head,
+      );
+      await this.promoteBaseline(connection, project, captured);
+      project.remoteHead = result.head;
+    } else {
+      if (remoteRecord)
+        await this.promoteBaseline(connection, project, remoteRecord);
+      project.remoteHead = remote.head;
     }
+    project.localRevision = mergedHead;
+    await this.state(project.projectId, {
+      remoteHead: project.remoteHead,
+      localRevision: mergedHead,
+    });
+    await rm(this.pendingPath(project.projectId), { force: true });
+    await rm(this.conflictPath(project.projectId), { force: true });
+    await this.pruneCurrentCache(connection, project);
     await this.state(project.projectId, {
       status: "synced",
       error: undefined,

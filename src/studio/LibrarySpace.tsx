@@ -9,7 +9,7 @@ import type {
 } from "../core/library-maintenance";
 import type { MaintenancePolicy } from "../core/maintenance-scheduler";
 const labels: Record<StorageCategory, string> = {
-  repository: "正式内容与历史",
+  repository: "正式内容",
   workspace: "可读文件",
   indexes: "搜索与操作索引",
   receipts: "操作回执缓存",
@@ -109,7 +109,7 @@ export default function LibrarySpace({ home }: { home: string }) {
           <p className="library-space-summary">
             {storage
               ? `文件大小 ${bytes(storage.totalBytes)} · 磁盘分配 ${bytes(storage.allocatedBytes)} · ${storage.files.toLocaleString()} 个文件`
-              : "正在核对文件与历史…"}
+              : "正在核对内容文件…"}
           </p>
           {storage && (
             <div className="library-space-breakdown">
@@ -137,7 +137,7 @@ export default function LibrarySpace({ home }: { home: string }) {
           <label className="library-space-toggle">
             <input
               type="checkbox"
-              aria-label="自动压缩历史"
+              aria-label="自动压缩内容"
               checked={policy?.automatic ?? true}
               disabled={!policy || busy}
               onChange={(event) =>
@@ -166,7 +166,7 @@ export default function LibrarySpace({ home }: { home: string }) {
                     afterBytes: number;
                   }>("library:compact");
                   setNotice(
-                    `压缩完成：${bytes(result.beforeBytes)} → ${bytes(result.afterBytes)}，历史完整保留。`,
+                    `压缩完成：${bytes(result.beforeBytes)} → ${bytes(result.afterBytes)}，内容完整保留。`,
                   );
                 })
               }
@@ -192,7 +192,7 @@ export default function LibrarySpace({ home }: { home: string }) {
               onClick={() =>
                 void run(async () => {
                   await desktop.invoke("library:rebuildIndex");
-                  setNotice("搜索、引用和历史索引已重建。 ");
+                  setNotice("搜索和引用索引已重建。 ");
                 })
               }
             >
@@ -222,7 +222,7 @@ export default function LibrarySpace({ home }: { home: string }) {
                   void run(async () => {
                     await desktop.invoke("library:cleanup", { id: plan.id });
                     setPlan(null);
-                    setNotice("清理完成，正式内容和完整历史已保留。");
+                    setNotice("清理完成，正式内容已保留。");
                   })
                 }
               >
@@ -348,10 +348,10 @@ export default function LibrarySpace({ home }: { home: string }) {
                   <p className="settings-help">内容库中暂无项目。</p>
                 )}
                 <p className="settings-help">
-                  共享历史与其他文件：{bytes(storage.projects.shared.bytes)}
+                  共享存储与其他文件：{bytes(storage.projects.shared.bytes)}
                   ，磁盘分配 {bytes(storage.projects.shared.allocatedBytes)}。
-                  历史仓库、共享资源、索引与本机草稿单独计入此项；
-                  历史仓库的压缩数据由项目共用，无法准确分摊。
+                  内容数据库、共享资源、索引与本机草稿单独计入此项；
+                  内容数据库的压缩数据由项目共用，无法准确分摊。
                 </p>
                 <p className="settings-help">
                   统计时间：

@@ -56,13 +56,13 @@ export default function LibraryMigrationDialog({
   }
   return (
     <Dialog
-      title="启用版本历史"
+      title="升级内容库"
       onClose={onClose}
       className="library-migration-dialog"
     >
       <div className="studio-form">
         <p>
-          为这个内容库启用独立修改历史、全文搜索和版本恢复。原始文件和旧快照会保留，内容库位置保持为：
+          导入现有内容，启用全文搜索和当前内容存储。原始文件会保留，内容库位置为：
         </p>
         <code className="history-import-path">{home}</code>
         {busy && !report && (
@@ -129,7 +129,7 @@ export default function LibraryMigrationDialog({
             disabled={busy || !report}
             onClick={() => void activate()}
           >
-            {busy && <Loader2 size={14} className="studio-spin" />} 启用版本历史
+            {busy && <Loader2 size={14} className="studio-spin" />} 升级内容库
           </button>
         </footer>
       </div>

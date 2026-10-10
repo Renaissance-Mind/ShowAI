@@ -33,6 +33,43 @@ export class Revisions {
     readonly db: MetadataStore,
     readonly objects: ObjectStore,
   ) {}
+  /** Existing records are retained as a frozen archive; new publications replace state. */
+  async activateCurrent(projectId: string) {
+    await this.db.run(
+      "INSERT OR IGNORE INTO settings(key,value) SELECT ?,CAST(COALESCE(MAX(sequence),0) AS TEXT) FROM revisions WHERE project_id=?",
+      [`current-state-boundary:${projectId}`, projectId],
+    );
+  }
+  async retainCurrent(projectId: string, revision: string) {
+    const boundary = Number(
+      (
+        await this.db.all<{ value: string }>(
+          "SELECT value FROM settings WHERE key=?",
+          [`current-state-boundary:${projectId}`],
+        )
+      )[0].value,
+    );
+    const obsolete = await this.db.all<{ manifest_key: string }>(
+      "SELECT manifest_key FROM revisions WHERE project_id=? AND published=1 AND sequence>? AND revision<>? AND revision<>(SELECT head FROM projects WHERE id=?)",
+      [projectId, boundary, revision, projectId],
+    );
+    await this.db.run(
+      "DELETE FROM revisions WHERE project_id=? AND published=1 AND sequence>? AND revision<>? AND revision<>(SELECT head FROM projects WHERE id=?)",
+      [projectId, boundary, revision, projectId],
+    );
+    for (const row of obsolete) {
+      if (
+        row.manifest_key &&
+        !(
+          await this.db.all(
+            "SELECT 1 FROM revisions WHERE manifest_key=? UNION ALL SELECT 1 FROM storage_reservations WHERE digest=? LIMIT 1",
+            [row.manifest_key, row.manifest_key.split("/").at(-1)!],
+          )
+        ).length
+      )
+        await this.objects.remove(row.manifest_key);
+    }
+  }
   async prepare(projectId: string, snapshot: ProjectSnapshot) {
     const serialized = canonical(snapshot),
       bytes = encoder.encode(serialized);

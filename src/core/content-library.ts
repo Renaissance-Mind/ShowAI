@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { CoreError } from "./model";
 import { SqliteLibrary } from "./sqlite-library";
 import type { GitLibrary as LegacyLibrary } from "./git-library";
-import type { ChangeContext, FileChanges } from "./history-model";
+import type { ChangeContext, FileChanges, HistoryEntry } from "./history-model";
 import type { WorkspaceConflict } from "./workspace-conflicts";
 import { retainActivatedGit } from "./content-migration-journal";
 import { withLibraryLock } from "./library-lock";
@@ -42,6 +42,10 @@ export class ContentLibrary {
     if (this.storage() === "sqlite") return new SqliteLibrary(this.root);
     const { GitLibrary } = await import("./git-library");
     return new GitLibrary(this.root);
+  }
+  private async writableBackend() {
+    if (this.storage() === "git") await this.initialize();
+    return this.backend();
   }
   async initialize(options: { migrate?: boolean } = {}) {
     if (this.storage() === "git" && options.migrate !== false) {
@@ -86,27 +90,34 @@ export class ContentLibrary {
           ),
         );
   }
-  async history(input?: Parameters<LegacyLibrary["history"]>[0]) {
-    return (await this.backend()).history(input);
+  async history(
+    input?: Parameters<LegacyLibrary["history"]>[0],
+  ): Promise<HistoryEntry[]> {
+    void input;
+    return [];
   }
   async entryAt(revision: string) {
     return (await this.backend()).entryAt(revision);
   }
   async transaction<T>(context: ChangeContext, action: () => Promise<T>) {
-    return (await this.backend()).transaction(context, action);
+    return (await this.writableBackend()).transaction(context, action);
   }
   async stageFiles(
     changes: FileChanges,
     expected?: Map<string, string | null>,
   ) {
-    return (await this.backend()).stageFiles(changes, expected);
+    return (await this.writableBackend()).stageFiles(changes, expected);
   }
   async writeFiles(
     changes: FileChanges,
     context: ChangeContext,
     expected?: Map<string, string | null>,
   ) {
-    return (await this.backend()).writeFiles(changes, context, expected);
+    return (await this.writableBackend()).writeFiles(
+      changes,
+      context,
+      expected,
+    );
   }
   async resolveWorkspaceConflict<T>(
     id: string,
@@ -114,7 +125,7 @@ export class ContentLibrary {
     context: ChangeContext,
     apply?: (bytes: Buffer | null, conflict: WorkspaceConflict) => Promise<T>,
   ) {
-    return (await this.backend()).resolveWorkspaceConflict(
+    return (await this.writableBackend()).resolveWorkspaceConflict(
       id,
       choice,
       context,

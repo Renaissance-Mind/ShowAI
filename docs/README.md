@@ -24,11 +24,11 @@ ShowAI 用**可阅读、可交互、可编辑**的页面承载人与 Agent 的�
 | [Skills 工作流程](skills.md) | 页面、组件与模板任务的处理方式 |
 | [图标](icons.md) | 内置图标、SVG 图标与图标集 |
 
-## 保存、历史与协作
+## 保存与协作
 
 | 文档 | 内容 |
 | --- | --- |
-| [内容库与历史](versioned-library.md) | 存储结构、版本比较、合并、恢复和备份 |
+| [内容库](versioned-library.md) | 当前存储、草稿合并、冲突恢复和备份 |
 | [项目服务器与同步](project-sync.md) | 自部署服务、账号、项目权限和同步 |
 | [ShowAI Cloud](cloud.md) | 云端连接、离线工作、存储配额与访问范围 |
 | [服务器运维](server-operations.md) | 备份、恢复、上传维护与回滚 |

@@ -920,7 +920,6 @@ export class AgentHost {
           "whiteboard_create",
           "catalog_fork",
           "catalog_merge_resolve",
-          "history_restore",
           "page_merge_save",
         ].map((name) => [name, { approval_mode: "approve" }]),
       ),

@@ -18,9 +18,9 @@ Bu arayüz, insanlarla ajanların iş birliğini ve birlikte üretimini destekle
 
   Bileşen kataloğu, ajanların göreve uygun bileşenleri seçebilmesi için açıklamalar, parametre yapıları ve örnekler sunar. Yeni bir ifade biçimi gerektiğinde React ile yeniden kullanılabilir bileşenler oluşturabilirsiniz.
 
-- **İnsanların doğrudan katılmasını sağlayın**: İçeriği ajanın bağlamında görüntüleyip kullanın veya ShowAI App içinde bir not uygulamasındaki gibi düzenleyip yönetin. Ajan, insanların yaptığı değişikliklerden devam edebilir. Sayfa yapısı, bileşen verileri ve sürüm geçmişi paylaşılır; aynı çalışma sürekli geliştirilebilir.
+- **İnsanların doğrudan katılmasını sağlayın**: İçeriği ajanın bağlamında görüntüleyip kullanın veya ShowAI App içinde bir not uygulamasındaki gibi düzenleyip yönetin. Ajan, insanların yaptığı değişikliklerden devam edebilir. Sayfa yapısı, bileşen verileri paylaşılır; aynı çalışma sürekli geliştirilebilir.
 
-  Sayfalar karşılaştırma, geri yükleme ve yapılandırılmış birleştirmeyi destekler. Eşzamanlı değişiklikler çakıştığında sistem, kullanıcıların inceleyip çözmesi için taslakları ve ilgili sürümleri korur.
+  Sayfalar etkin taslaklar ile mevcut içeriğin yapısal birleştirilmesini destekler. Eşzamanlı değişiklikler çakışırsa iki girdi de inceleme ve çözüm için korunur.
 
 - **Sonuçları paylaşın**: Tamamlanan içeriği bağımsız HTML, ajan sohbetinde gösterilen bir parça veya gezinme özelliği olan statik bir site olarak dışa aktarın.
 
@@ -45,7 +45,7 @@ Bu arayüz, insanlarla ajanların iş birliğini ve birlikte üretimini destekle
 - **Araştırma ve analiz**: Soruları, kaynakları, kanıtları ve karşılaştırmaları tek sayfada düzenleyerek bir değerlendirmeye ulaşın.
 - **Eğitim ve açıklama**: Şemaları, daraltılabilir içeriği ve parametre deneylerini birleştirerek aşamalı anlamayı destekleyin.
 - **Veri keşfi**: Grafikleri, ham verileri ve analiz metnini inceleme ve doğrulama için bir arada tutun.
-- **Ortak planlama**: İnsanlarla ajanlar arasında önerileri geliştirin, değişiklikleri kaydedin ve sürümleri karşılaştırın.
+- **Ortak planlama**: İnsanlar ve ajanlar önerileri geliştirir ve geri bildirimleri paylaşılan sayfaya ekler.
 - **Bilgi paylaşımı**: Ortak çalışmayı başkalarının okuyup keşfedebileceği sayfa veya sitelere dönüştürün.
 
 ## 🚀 Başlangıç
@@ -113,7 +113,7 @@ Eklenti dört Skill içerir:
 
 | Skill | Amaç |
 | --- | --- |
-| `use-showai` | Temel kullanım, çalışma zamanı bağlantısı, içerik bulma ve okuma, geçmişi görüntüleme |
+| `use-showai` | Temel kullanım, çalışma zamanı bağlantısı, içerik bulma ve okuma |
 | `show-document` | Sayfa oluşturma, düzenleme, gösterme ve dışa aktarma; mevcut şablonları uygulama |
 | `create-component` | Yeniden kullanılabilir React bileşenleri oluşturma veya uyarlama |
 | `create-template` | Şablon oluşturma, düzenleme veya mevcut sayfalardan çıkarma |
@@ -179,15 +179,13 @@ Seçilen bileşenleri veya bölgeleri dışa aktarmak için `--blocks ID,ID` kul
 
 Statik site dizini kendi sunucunuza veya bir barındırma hizmetine dağıtılabilir. Biçimler ve seçenekler için [Ajan kılavuzu](../agent-usage.md) belgesine bakın.
 
-## 🔒 İçerik ve geçmiş
+## 🔒 İçerik ve eşitleme
 
-Proje içeriği yerel olarak saklanır; yedeklenebilir ve taşınabilir. Yeni boş kütüphanelerde sürüm geçmişi varsayılan olarak etkinleştirilir. İçerik değişiklikleri ve mevcut insan veya ajan kaynak bilgileri kaydedilir.
+Proje içeriği yerel SQLite kütüphanesinde tutulur; yedekleme ve taşıma desteklenir. Kaydetme mevcut içeriği günceller ve eşzamanlı değişiklikleri sayfa hash ve kaynak token değerleriyle denetler. Yerel taslaklar ve çakışma kurtarma tamamlanmamış çalışmayı korur.
 
-Geçmiş arayüzü sürüm karşılaştırma, değişiklik inceleme ve içerik geri yüklemeyi destekler. Geri yükleme yeni bir sürüm oluşturur. Bileşenler, şablonlar ve sayfa bağımlılıkları da geçmiş içeriğin izlenebilmesi için sürümlenir.
+Cihazlar arasında iş birliği için kendi ShowAI Server sunucunuza bağlanın. Mevcut sayfalar, bileşen bağımlılıkları ve varlıklar proje bazında eşitlenir; erişim yönetici, düzenleyici ve görüntüleyici rolleriyle denetlenir. HTML önizlemeleri ve dışa aktarımlar gerektiğinde oluşturulur.
 
-Cihazlar arasında veya başka kişilerle iş birliği yapmak için kendi barındırdığınız ShowAI Server'a bağlanın. İçerik ve geçmiş proje bazında eşitlenir; yönetici, düzenleyici ve görüntüleyici rolleriyle erişim denetlenir.
-
-[İçerik kütüphanesi ve geçmiş](../versioned-library.md) ile [Proje sunucusu ve eşitleme](../project-sync.md) belgelerine bakın.
+[İçerik kütüphanesi](../versioned-library.md) · [Proje sunucusu ve eşitleme](../project-sync.md).
 
 ## 📚 Belgeler
 
@@ -198,7 +196,7 @@ Cihazlar arasında veya başka kişilerle iş birliği yapmak için kendi barın
 | [Eklenti belgesi](../../plugins/showai/README.md) | Skill görevleri ve kurulum |
 | [Veri grafikleri](../g2-components.md) | Grafik türleri, veri arayüzleri ve ayarlar |
 | [Bileşenler ve şablonlar](../catalog-lifecycle.md) | Katalog, sürümler, bağımlılıklar ve yeniden kullanım |
-| [İçerik kütüphanesi ve geçmiş](../versioned-library.md) | Saklama, karşılaştırma, birleştirme ve geri yükleme |
+| [İçerik kütüphanesi](../versioned-library.md) | SQLite · İçerik ve eşitleme |
 | [Proje sunucusu ve eşitleme](../project-sync.md) | Sunucu dağıtımı, proje izinleri ve eşitleme |
 | [Sayfa veri biçimi](../artifact-format.md) | Sayfa yapısı ve veri kuralları |
 

@@ -1,6 +1,6 @@
 ---
 name: use-showai
-description: 通过 ShowAI MCP 连接、查找与阅读项目页面、查询组件模板及查看历史。先核实连接和项目归属；页面创作、组件开发、模板创建分别进入专门技能。
+description: 通过 ShowAI MCP 连接、查找与阅读项目页面、查询组件模板。先核实连接和项目归属；页面创作、组件开发、模板创建分别进入专门技能。
 ---
 
 # 使用 ShowAI
@@ -36,10 +36,9 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 | 查询组件或模板 | `catalog_list` 默认返回组件默认范围（内置＋当前项目）的全部名字、摘要、场景与查询身份 → `catalog_describe` 按需取 guide / schema / examples；公开目录用 `public_catalog_list/describe`，同样默认全量 |
 | 创建可复用组件 | [create-component](../create-component/SKILL.md) |
 | 创建或提炼模板 | [create-template](../create-template/SKILL.md) |
-| 比较或恢复历史 | `history_list` / `history_page` / `history_compare`；有恢复授权再 `history_restore`；按需 `guide({topic:"history"})` |
 | 同步状态 | 本机 `project_sync_status`，明确需要同步时 `project_sync`；远程检查操作返回的 synchronization |
 
-尚未取得可复用的完整索引时调用 `catalog_list({kind:"component",projectId})`，省略 scope、query、limit、cursor，先获得全部内置组件与当前项目组件的名字、摘要和场景、reuse 与 documentationStatus。默认每个 id/来源一个推荐版本；versions:"all" 用于历史查询，已有页面沿用其精确旧引用。全局或已发布组件可显式指定 scope 为 global、published 或 all 查询。读取详情时沿用返回的 scope、version、integrity，避免同名组件混淆。外部宿主通过上下文初始化取得目录；不能把工具已注册等同于模型已读到。按需 query 筛选；显式 limit/cursor 仍可分页。列表不含参数、示例或源码。通用 general、专题 domain、内容专用 content-specific 表达复用范围，与来源、权限分别判断；旧资料缺失标为 unclassified/missing。选中后 guide 返回专属使用说明；修改实现前读取 development，再按需读 source。
+尚未取得可复用的完整索引时调用 `catalog_list({kind:"component",projectId})`，省略 scope、query、limit、cursor，先获得全部内置组件与当前项目组件的名字、摘要和场景、reuse 与 documentationStatus。默认每个 id/来源一个推荐版本；versions:"all" 用于查询可用组件版本，已有页面沿用其精确旧引用。全局或已发布组件可显式指定 scope 为 global、published 或 all 查询。读取详情时沿用返回的 scope、version、integrity，避免同名组件混淆。外部宿主通过上下文初始化取得目录；不能把工具已注册等同于模型已读到。按需 query 筛选；显式 limit/cursor 仍可分页。列表不含参数、示例或源码。通用 general、专题 domain、内容专用 content-specific 表达复用范围，与来源、权限分别判断；旧资料缺失标为 unclassified/missing。选中后 guide 返回专属使用说明；修改实现前读取 development，再按需读 source。
 
 指南通过 MCP `guide({topic})` 读取，工具的实时 inputSchema 决定参数。共享资源的提升、公开发布及服务器账号配置属于明确的宿主管理操作，不因缺少相应 MCP 工具就转用原始文件或越权命令。
 
@@ -47,6 +46,8 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 修改前读完整 Page，保留 `hash`、`revision` 和节点 ID。`page_save` / `page_apply` 同时传 `baseHash` 与 `baseRevision`。`operationId` 只用于重试同一请求；message、groupId 标记修改目的与批次。
 
-同设备 CONFLICT / saveFailed 表示保存失败：比较旧基线、当前内容和尝试稿，明确合并或放弃。不能只换成新版本参数原样覆盖。跨设备同步合并失败可能返回带来源的可见副本，后续沿用实际 document.id。恢复历史创建新记录，保留原有历史。阅读探索与临时预览不自动保存正文。
+同设备 CONFLICT / saveFailed 表示保存失败：比较旧基线、当前内容和尝试稿，明确合并或放弃。不能只换成新版本参数原样覆盖。跨设备同步合并失败可能返回带来源的可见副本，后续沿用实际 document.id。阅读探索与临时预览不自动保存正文。
 
 正式内容保存后核对结果；需要展示时调用 `page_present`，沿 [对话展示](../show-document/references/conversation-display.md) 使用真实 delivery。工具成功不等于已经显示。远程同步另看 synchronization.state/error/remoteHead；本机保存不证明远端已收到。
+
+页面历史查看、比较和恢复已移除。页面同步只传当前内容、组件依赖与资源；阅读和导出按需生成 HTML。保存冲突保留尝试稿，以实际返回的基线和当前内容明确处理。

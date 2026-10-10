@@ -552,7 +552,7 @@ export default function SyncDashboard({
             <section className="sync-archive-section" aria-label="项目归档">
               <div>
                 <h3>{project.archived ? "恢复项目" : "归档项目"}</h3>
-                <p>项目内容与历史会保留，归档后可随时恢复。</p>
+                <p>项目当前内容会保留，归档后可随时恢复。</p>
               </div>
               <button
                 className="settings-button"
@@ -579,7 +579,7 @@ export default function SyncDashboard({
               >
                 <p>
                   归档 <strong>{project.name}</strong>？
-                  <span>项目内容与历史会保留。</span>
+                  <span>项目当前内容会保留。</span>
                 </p>
                 <div>
                   <button

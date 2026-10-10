@@ -597,7 +597,14 @@ async function verifyContent(
       if (!source) throw new Error("Revision source account is absent.");
       const snapshot = await revisions.snapshot(row.project_id, source);
       validateSnapshot(snapshot, row.project_id);
-      for (const parent of snapshot.parents) {
+      const boundary = (
+        await db.all<{ value: string }>(
+          "SELECT value FROM settings WHERE key=?",
+          [`current-state-boundary:${row.project_id}`],
+        )
+      )[0];
+      const currentState = boundary && row.sequence > Number(boundary.value);
+      for (const parent of currentState ? [] : snapshot.parents) {
         const older = await db.all<{ sequence: number }>(
           "SELECT sequence FROM revisions WHERE project_id=? AND revision=?",
           [row.project_id, parent],

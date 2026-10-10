@@ -215,7 +215,7 @@ test.skipIf(!!process.env.SHOWAI_SYNC_TEST_URL)(
 );
 
 test.skipIf(!!process.env.SHOWAI_SYNC_TEST_URL)(
-  "cleanup dry-run preserves old reachable history and active parts and only reports old orphans",
+  "cleanup dry-run preserves current referenced content and active parts and only reports old orphans",
   async () => {
     const {
       root,
@@ -255,7 +255,7 @@ test.skipIf(!!process.env.SHOWAI_SYNC_TEST_URL)(
     ).value.head;
     const snapshot = (
       await request(
-        `/api/projects/${project.id}/revisions/${head}`,
+        `/api/projects/${project.id}/snapshot?revision=${head}`,
         "GET",
         undefined,
         owner.token,
@@ -392,7 +392,7 @@ test.skipIf(!!process.env.SHOWAI_SYNC_TEST_URL)(
   60_000,
 );
 
-test("consistent backup restores full identity sessions permissions history and retained parts, then continues sync", async () => {
+test("consistent backup restores identity sessions permissions current content and retained parts, then continues sync", async () => {
   const {
     root,
     url,
@@ -498,7 +498,7 @@ test("consistent backup restores full identity sessions permissions history and 
   expect(firstPut.status).toBe(200);
   await firstPut.body?.cancel();
   const before = await request(
-    `/api/projects/${project.id}/revisions?summary=1`,
+    `/api/projects/${project.id}/snapshot`,
     "GET",
     undefined,
     owner.token,
@@ -524,7 +524,7 @@ test("consistent backup restores full identity sessions permissions history and 
   });
   expect(verified.projects).toBeGreaterThanOrEqual(1);
   expect(verified.sessions).toBeGreaterThanOrEqual(4);
-  expect(verified.revisions).toBeGreaterThanOrEqual(3);
+  expect(verified.revisions).toBe(1);
   expect(
     (
       await request(
@@ -605,8 +605,7 @@ test("consistent backup restores full identity sessions permissions history and 
     ).value.role,
   ).toBe("viewer");
   expect(
-    (await restoredRequest(`/api/projects/${project.id}/revisions?summary=1`))
-      .value,
+    (await restoredRequest(`/api/projects/${project.id}/snapshot`)).value,
   ).toEqual(before.value);
   expect(
     (

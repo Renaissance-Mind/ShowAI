@@ -33,8 +33,6 @@ const writeTools = new Set([
   "template_save",
   "catalog_fork",
   "catalog_merge_resolve",
-  "history_restore",
-  "history_restore_imported_snapshot",
   "page_merge_save",
   "workspace_resolve",
 ]);

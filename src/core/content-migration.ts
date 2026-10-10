@@ -150,7 +150,7 @@ export async function migrateGitContent(
         );
         for (const path of lastTree.keys())
           if (!tree.has(path)) encoded.set(path, null);
-        await target.commit(entry, encoded, previous);
+        await target.commit(entry, encoded, previous, true);
         previous = entry.revision;
         lastTree = tree;
         journal.copied++;

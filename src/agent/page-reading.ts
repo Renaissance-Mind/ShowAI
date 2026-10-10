@@ -6,8 +6,6 @@ import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { FileStore } from "../core/store";
 import { CoreError } from "../core/model";
-import { versionedLibrary, logicalPath } from "../core/library-runtime";
-import { readArchivedReader } from "../core/archived-reader";
 import { recordReadingCache } from "../core/reading-cache";
 import { resolveDocumentComponents } from "../core/catalog";
 import { selectDocumentBlocks } from "../portable/selection.mjs";
@@ -417,15 +415,6 @@ export async function readPageView(
     `${pageId}-${record.hash.slice(0, 12)}-${randomUUID()}`,
   );
   if (render) {
-    const library = versionedLibrary(store.root),
-      revision = record.revision ?? (library ? await library.head() : null);
-    const reader =
-      library && revision
-        ? await readArchivedReader(
-            logicalPath(store.root, record.path)!,
-            (path) => library.readFile(path, revision),
-          )
-        : null;
     const html = previewHtml(
       await buildPageHtml(
         document,
@@ -434,7 +423,7 @@ export async function readPageView(
         [],
         options.presentation,
         options.blockIds ? { blockIds: options.blockIds } : undefined,
-        reader?.html,
+        undefined,
       ),
       options,
       identity,

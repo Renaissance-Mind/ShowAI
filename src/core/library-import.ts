@@ -25,7 +25,6 @@ import { withLibraryLock } from "./library-lock";
 import { versionedLibrary } from "./library-runtime";
 import { LibraryIndex } from "./library-index";
 import { changeContext } from "./history-context";
-import { stageReader } from "./archived-reader";
 import type { LibraryManifest, FileChanges } from "./history-model";
 
 const hash = (bytes: Buffer | string) =>
@@ -508,7 +507,6 @@ export class LibraryImport {
             const pageFiles = new Map<string, Buffer | null>([
               [path, Buffer.from(serializeArtifact(document))],
             ]);
-            await stageReader(pageFiles, path, document, "import-time");
             await library.stageFiles(pageFiles);
             pages.push({
               projectId: match[1],
@@ -612,12 +610,6 @@ export class LibraryImport {
               const snapshotFiles = new Map<string, Buffer | null>([
                 [snapshot.path, Buffer.from(serializeArtifact(locked))],
               ]);
-              await stageReader(
-                snapshotFiles,
-                snapshot.path,
-                locked,
-                "import-time",
-              );
               await library.stageFiles(snapshotFiles);
             } catch (error) {
               if (

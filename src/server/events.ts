@@ -116,7 +116,7 @@ export class ProjectEvents {
       encoder.encode(frame).length > maximumEventBytes ||
       (peer.bufferedAmount ?? 0) > maximumEventBytes
     ) {
-      peer.close(1013, "Catch up using project history.");
+      peer.close(1013, "Fetch the current project snapshot.");
       return;
     }
     try {
@@ -266,7 +266,7 @@ export class ProjectEvents {
         continue;
       }
       // The head can advance while objects are read. Never attach an older record
-      // to a newer notification; the normal verified history path catches up.
+      // to a newer notification; the next verified current-state request catches up.
       await this.deliver(peer, {
         type: "revision",
         serverId: await this.serverId(),

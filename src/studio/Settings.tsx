@@ -171,11 +171,11 @@ export function SettingsPanel({
           {info?.libraryVersion === 1 && (
             <div className="settings-row">
               <div className="settings-row-text">
-                <h3>修改历史</h3>
-                <p>导入现有内容，保留原始文件并启用完整修改记录。</p>
+                <h3>升级内容库</h3>
+                <p>导入现有内容并启用当前内容存储，原始文件保留。</p>
               </div>
               <button className="settings-button" onClick={onMigrate}>
-                启用版本历史
+                升级内容库
                 <ChevronRight size={14} />
               </button>
             </div>

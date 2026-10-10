@@ -22,7 +22,6 @@ import { CoreError } from "./model";
 import { encodeFile, nodePrefix } from "./history-codec";
 import { withLibraryLock } from "./library-lock";
 import { libraryMutations } from "./history-context";
-import { completePageReaders } from "./archived-reader";
 import {
   WorkspaceProtection,
   workspaceHash,
@@ -168,6 +167,8 @@ export class SqliteLibrary {
     await safeLibraryPath(this.root, path);
     const db = new DatabaseSync(path);
     db.exec("PRAGMA foreign_keys=ON; PRAGMA busy_timeout=10000;");
+    db.exec(`CREATE TABLE IF NOT EXISTS current_state(id INTEGER PRIMARY KEY CHECK(id=1), revision TEXT NOT NULL, entry TEXT NOT NULL, checksum TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS current_resources(path TEXT PRIMARY KEY, revision TEXT NOT NULL, sequence INTEGER NOT NULL, entry TEXT NOT NULL);`);
     return db;
   }
   private async query<T>(
@@ -375,6 +376,20 @@ export class SqliteLibrary {
   }
   async entryAt(revision: string) {
     return this.query((db) => {
+      const current = db
+        .prepare("SELECT * FROM current_state WHERE revision=?")
+        .get(revision);
+      if (current) return this.entry(current as unknown as RevisionRow);
+      const resource = db
+        .prepare(
+          "SELECT revision,entry FROM current_resources WHERE revision=? LIMIT 1",
+        )
+        .get(revision);
+      if (resource)
+        return this.entry({
+          ...resource,
+          checksum: sha(String(resource.entry)),
+        } as unknown as RevisionRow);
       this.sequence(db, revision);
       return this.entry(
         db
@@ -444,6 +459,11 @@ export class SqliteLibrary {
             throw new CoreError(
               "CONFLICT",
               "This operation ID was already used for a different request.",
+            );
+          if (receipt.revision !== (await this.head()))
+            throw new CoreError(
+              "CONFLICT",
+              "This request already completed before newer edits. Read the current content before issuing a new operation.",
             );
           const value = receipt.response
             ? await restoreResponse(
@@ -859,7 +879,18 @@ export class SqliteLibrary {
     }
   }
   private async receipt(operationId: string) {
+    const bytes = await readLibraryBytes(
+      this.root,
+      join(this.root, "local", "receipts", `${sha(operationId)}.json`),
+    );
+    if (bytes) return JSON.parse(bytes.toString()) as HistoryEntry;
     return this.query((db) => {
+      const current = db
+        .prepare(
+          "SELECT * FROM current_state WHERE json_extract(entry,'$.operationId')=?",
+        )
+        .get(operationId);
+      if (current) return this.entry(current as unknown as RevisionRow);
       const row = db
         .prepare("SELECT * FROM revisions WHERE operation_id=?")
         .get(operationId) as unknown as RevisionRow | undefined;
@@ -936,11 +967,6 @@ export class SqliteLibrary {
           );
       }
     }
-    await completePageReaders(changes, async (path) => {
-      if (!parent)
-        throw new CoreError("NOT_FOUND", `Reader dependency missing: ${path}`);
-      return this.readFile(path, parent);
-    });
     const existingObjects = new Map(
       existing.map((item) => [item.path, item.oid]),
     );
@@ -1041,6 +1067,7 @@ export class SqliteLibrary {
     entry: HistoryEntry,
     encoded: FileChanges,
     expectedHead: string | null,
+    retainHistory = false,
   ) {
     // Prepare compression before acquiring the database writer transaction.
     const prepared = new Map<
@@ -1093,6 +1120,62 @@ export class SqliteLibrary {
           "CONFLICT",
           "Content changed before the transaction committed.",
         );
+      if (!retainHistory) {
+        // The legacy revision tables are a frozen archive. New saves replace only
+        // current content; resource tokens retain optimistic concurrency checks.
+        const data = JSON.stringify(entry);
+        db.prepare(
+          "INSERT INTO current_resources SELECT c.path,r.revision,c.sequence,r.entry FROM resource_changes c JOIN revisions r ON r.sequence=c.sequence WHERE c.sequence=(SELECT MAX(c2.sequence) FROM resource_changes c2 WHERE c2.path=c.path) ON CONFLICT(path) DO NOTHING",
+        ).run();
+        const sequence = Number(
+          db
+            .prepare(
+              "SELECT COALESCE(MAX(sequence),0)+1 AS n FROM current_resources",
+            )
+            .get()!.n,
+        );
+        for (const [path, bytes] of encoded) {
+          const object = prepared.get(path);
+          if (object?.data)
+            db.prepare("INSERT OR IGNORE INTO blobs VALUES(?,?,?,?,?)").run(
+              object.id,
+              object.data,
+              object.id,
+              object.bytes.length,
+              object.packed ? 1 : 0,
+            );
+          if (bytes === null)
+            db.prepare("DELETE FROM current_files WHERE path=?").run(path);
+          else
+            db.prepare(
+              "INSERT INTO current_files VALUES(?,?) ON CONFLICT(path) DO UPDATE SET oid=excluded.oid",
+            ).run(path, object!.id);
+        }
+        for (const path of new Set(entry.paths.map(resourcePath)))
+          db.prepare(
+            "INSERT INTO current_resources VALUES(?,?,?,?) ON CONFLICT(path) DO UPDATE SET revision=excluded.revision,sequence=excluded.sequence,entry=excluded.entry",
+          ).run(
+            path,
+            entry.revision,
+            sequence,
+            JSON.stringify({
+              ...entry,
+              paths: [path],
+              resources: [resourceForPath(path)],
+              response: undefined,
+            }),
+          );
+        db.prepare(
+          "INSERT INTO current_state VALUES(1,?,?,?) ON CONFLICT(id) DO UPDATE SET revision=excluded.revision,entry=excluded.entry,checksum=excluded.checksum",
+        ).run(entry.revision, data, sha(data));
+        db.prepare(
+          "INSERT INTO metadata VALUES('head',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        ).run(entry.revision);
+        db.exec(
+          "DELETE FROM blobs WHERE oid NOT IN(SELECT oid FROM current_files) AND oid NOT IN(SELECT oid FROM changes WHERE oid IS NOT NULL); COMMIT",
+        );
+        return;
+      }
       const data = JSON.stringify(entry),
         result = db
           .prepare(
@@ -1240,11 +1323,15 @@ export class SqliteLibrary {
     if (!oid(revision)) return false;
     return this.query(
       (db) =>
+        !!db
+          .prepare("SELECT 1 FROM current_state WHERE revision=?")
+          .get(revision) ||
         !!db.prepare("SELECT 1 FROM revisions WHERE revision=?").get(revision),
     );
   }
   async isAncestor(ancestor: string, revision: string) {
     if (!oid(ancestor) || !oid(revision)) return false;
+    if (ancestor === revision) return this.hasRevision(revision);
     return this.query((db) => {
       const a = db
           .prepare("SELECT sequence FROM revisions WHERE revision=?")
@@ -1296,6 +1383,11 @@ export class SqliteLibrary {
           );
         previous = entry.revision;
       }
+      const current = db
+        .prepare("SELECT * FROM current_state WHERE id=1")
+        .get();
+      if (current)
+        previous = this.entry(current as unknown as RevisionRow).revision;
       if (
         (db.prepare("SELECT value FROM metadata WHERE key='head'").get()
           ?.value ?? undefined) !== previous

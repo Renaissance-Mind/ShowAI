@@ -134,13 +134,11 @@ import {
 } from "./CatalogDialogs";
 import "./studio.css";
 import {
-  HistoryDialog,
   LibrarySearchResults,
   MergeDialog,
   ExternalConflictDialog,
-  ImportedSnapshotsDialog,
   WorkspaceConflictsDialog,
-} from "./HistoryDialogs";
+} from "./RecoveryDialogs";
 import type { SearchResult } from "../core/library-index";
 import LibraryMigrationDialog from "./LibraryMigrationDialog";
 import {
@@ -161,8 +159,6 @@ type LoadedTemplate = TemplateRecord & {
 type DialogState =
   | { type: "workspaceConflicts" }
   | { type: "migration" }
-  | { type: "importedSnapshots"; projectId: string; pageId?: string }
-  | { type: "history"; projectId: string; pageId?: string }
   | {
       type: "merge";
       projectId: string;
@@ -2001,22 +1997,6 @@ export default function Studio() {
             >
               <FolderOpen size={16} />
             </button>
-            {selectedProject && (
-              <button
-                className="studio-icon"
-                aria-label={view === "page" ? "页面历史" : "项目历史"}
-                title={view === "page" ? "页面历史" : "项目历史"}
-                onClick={() =>
-                  setDialog({
-                    type: "history",
-                    projectId: selectedProject,
-                    pageId: view === "page" ? page.draft?.id : undefined,
-                  })
-                }
-              >
-                <History size={16} />
-              </button>
-            )}
           </>
         )}
         {(view === "projects" ||
@@ -3141,37 +3121,6 @@ export default function Studio() {
             }}
           />
         )}
-        {dialog?.type === "history" && (
-          <HistoryDialog
-            {...dialog}
-            onClose={closeDialog}
-            beforeRestore={page.flush}
-            onImportedSnapshots={() =>
-              setDialog({
-                type: "importedSnapshots",
-                projectId: dialog.projectId,
-                pageId: dialog.pageId,
-              })
-            }
-            onRestored={async () => {
-              await page.reload();
-              await refresh();
-              setNotice("历史版本已恢复，原版本保留在历史中");
-            }}
-          />
-        )}
-        {dialog?.type === "importedSnapshots" && (
-          <ImportedSnapshotsDialog
-            {...dialog}
-            onClose={closeDialog}
-            beforeRestore={page.flush}
-            onRestored={async () => {
-              await page.reload();
-              await refresh();
-              setNotice("旧快照已恢复为新版本，原修改来源仍标记为未知");
-            }}
-          />
-        )}
         {dialog?.type === "migration" && info && (
           <LibraryMigrationDialog
             home={info.home}
@@ -3182,7 +3131,7 @@ export default function Studio() {
               await page.reload();
               await refresh();
               await loadCatalog();
-              setNotice("版本历史已启用，原始文件和旧快照已保留");
+              setNotice("内容库已升级，原始文件已保留");
             }}
           />
         )}

@@ -1,3 +1,5 @@
+import { ReadBaselines } from "./read-baselines";
+import { EditorDrafts } from "./editor-drafts";
 import { IndexClient } from "./index-client";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
@@ -288,25 +290,12 @@ export class LibraryOperations {
         (path) =>
           path.startsWith(`projects/${project}/`) &&
           !/\/pages\/[^/]+\/nodes\//.test(path) &&
-          !path.includes("/.sync/"),
+          !path.includes("/.sync/") &&
+          !path.includes("/history/") &&
+          !/\/reader\.json$|\.reader\.json$/.test(path),
       );
     const files = await this.library.readFiles(paths, sourceRevision);
     for (const [path, bytes] of [...files]) {
-      if (path.endsWith("/reader.json") || path.endsWith(".reader.json")) {
-        const binding = JSON.parse(bytes.toString()) as ReaderBinding;
-        if (binding.format === "showai-page-reader") {
-          const roots = tree
-            .filter((entry) =>
-              entry.path.startsWith(`runtimes/readers/${binding.integrity}/`),
-            )
-            .map((entry) => entry.path);
-          for (const [name, content] of await this.library.readFiles(
-            roots,
-            sourceRevision,
-          ))
-            files.set(name, content);
-        }
-      }
       if (/^projects\/[^/]+\/pages\/[^/]+\.json$/.test(path)) {
         const document = parseArtifact(JSON.parse(bytes.toString())).document;
         const closure = await this.dependencies(
@@ -315,9 +304,6 @@ export class LibraryOperations {
           sourceRevision,
         );
         for (const [name, content] of closure.files) files.set(name, content);
-        const reader = await this.readerAt(path, sourceRevision);
-        if (reader)
-          for (const [name, content] of reader.files) files.set(name, content);
       }
       if (/\/(?:compiled|template)\.json$/.test(path)) {
         const record = JSON.parse(bytes.toString()) as
@@ -719,18 +705,31 @@ export class LibraryOperations {
     baseRevision: string;
     document: ShowDocument;
   }) {
-    const base = await this.pageAt(
-        input.projectId,
-        input.pageId,
-        input.baseRevision,
-      ),
-      current = await this.store.readPage(
-        this.project(input.projectId)!,
-        input.pageId,
+    const current = await this.store.readPage(
+      this.project(input.projectId)!,
+      input.pageId,
+    );
+    const baseline =
+      current.revision === input.baseRevision
+        ? current.document
+        : ((await new EditorDrafts(this.home).baseline(
+            input.projectId,
+            input.pageId,
+            input.baseRevision,
+          )) ??
+          (await new ReadBaselines(this.home).read(
+            input.projectId,
+            input.pageId,
+            input.baseRevision,
+          )));
+    if (!baseline)
+      throw new CoreError(
+        "CONFLICT",
+        "合并基线不可用。当前内容和尝试稿均已保留，请逐项比较后保存。",
       );
     const draft = validateDocument(input.document);
     return {
-      ...previewPageMerge(base.document, draft, current.document),
+      ...previewPageMerge(baseline, draft, current.document),
       baseRevision: input.baseRevision,
       currentRevision: current.revision,
       currentHash: current.hash,

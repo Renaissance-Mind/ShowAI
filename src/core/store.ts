@@ -1,3 +1,5 @@
+import { ReadBaselines } from "./read-baselines";
+import { EditorDrafts } from "./editor-drafts";
 import { validatePageIcon } from "../lib/page-icon.mjs";
 import { artifactVersion } from "../surface/document.mjs";
 import { createResource, upgradeResource } from "../surface/containers.mjs";
@@ -1325,29 +1327,8 @@ export class FileStore {
     projectId: string,
     record: PageRecord,
   ): Promise<void> {
-    if (versionedLibrary(this.root)) return;
-    const path = join(
-      this.projectPath(projectId),
-      "snapshots",
-      record.document.id,
-      `${record.hash}.json`,
-    );
-    await this.ensureDirectory(dirname(path));
-    await this.safePath(path);
-    // Atomically publish a fully written snapshot. Same-hash snapshots have identical semantic content.
-    try {
-      const existing = parseArtifact(await this.readJson(path)).document;
-      if (documentHash(existing) !== record.hash)
-        throw new CoreError(
-          "INVALID_DATA",
-          `Corrupt checkpoint: ${record.hash}`,
-        );
-      return;
-    } catch (error) {
-      if (!(error instanceof CoreError && error.code === "NOT_FOUND"))
-        throw error;
-    }
-    await this.atomicWrite(path, serializeArtifact(record.document));
+    void projectId;
+    void record;
   }
 
   async readPage(
@@ -1584,71 +1565,36 @@ export class FileStore {
     pageId: string,
     sinceHash: string,
   ): Promise<PageDiff> {
-    const library = versionedLibrary(this.root);
-    if (library) {
-      if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(sinceHash))
-        throw new CoreError(
-          "INVALID_DATA",
-          "Versioned page diffs require a revision identifier.",
-        );
-      const current = await this.readPage(projectId, pageId);
-      const baseline = normalizeDocument(
-        parseArtifact(
-          JSON.parse(
-            (
-              await library.readFile(
-                logicalPath(this.root, current.path)!,
-                sinceHash,
-              )
-            ).toString("utf8"),
-          ),
-        ).document,
-      );
-      const baseHash = documentHash(baseline);
-      return {
-        projectId,
-        pageId,
-        baseHash,
-        currentHash: current.hash,
-        baseRevision: sinceHash,
-        currentRevision: current.revision,
-        changed: baseHash !== current.hash,
-        changes: diffDocuments(baseline, current.document),
-      };
-    }
-    assertHash(sinceHash);
     const current = await this.readPage(projectId, pageId);
-    const path = join(
-      this.projectPath(projectId),
-      "snapshots",
-      assertId(pageId),
-      `${sinceHash}.json`,
-    );
-    let baseline: ShowDocument;
-    try {
-      baseline = parseArtifact(await this.readJson(path)).document;
-    } catch (error) {
-      if (error instanceof CoreError && error.code === "NOT_FOUND")
-        throw new CoreError(
-          "MISSING_BASELINE",
-          "The requested checkpoint is unavailable. Read the current page to establish a new baseline.",
-          { currentHash: current.hash },
-        );
-      throw error;
-    }
-    if (baseline.id !== pageId || documentHash(baseline) !== sinceHash)
+    const baseline =
+      sinceHash === current.hash || sinceHash === current.revision
+        ? current.document
+        : ((await new EditorDrafts(this.root).baseline(
+            projectId,
+            pageId,
+            sinceHash,
+          )) ??
+          (await new ReadBaselines(this.root).read(
+            projectId,
+            pageId,
+            sinceHash,
+          )));
+    if (!baseline)
       throw new CoreError(
-        "INVALID_DATA",
-        "The checkpoint content does not match its identity or hash.",
+        "MISSING_BASELINE",
+        "The active read/draft baseline is unavailable. Read current content before comparing changes.",
+        { currentHash: current.hash, currentRevision: current.revision },
       );
-    const changes = diffDocuments(baseline, current.document);
+    const baseHash = documentHash(baseline);
     return {
       projectId,
       pageId,
-      baseHash: sinceHash,
+      baseHash,
       currentHash: current.hash,
-      changed: current.hash !== sinceHash,
-      changes,
+      baseRevision: sinceHash,
+      currentRevision: current.revision,
+      changed: baseHash !== current.hash,
+      changes: diffDocuments(baseline, current.document),
     };
   }
 }

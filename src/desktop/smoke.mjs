@@ -217,22 +217,15 @@ try {
     const frameReady=new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(new Error('Component did not run under the desktop CSP.')),10000);window.addEventListener('message',function receive(event){if(event.source!==frame.contentWindow||event.data?.channel!=='desktop-smoke')return;if(event.data.type==='showai:error'){clearTimeout(timeout);window.removeEventListener('message',receive);reject(new Error(event.data.message));}else if(event.data.type==='showai:ready'){frame.contentWindow.postMessage({channel:'desktop-smoke',type:'showai:validate',requestId:'check',props:component.defaultData},'*');}else if(event.data.type==='showai:validation'&&event.data.requestId==='check'&&event.data.valid){clearTimeout(timeout);window.removeEventListener('message',receive);resolve(true);}})});
     frame.srcdoc=component.html.replace('<!--SHOWAI_COMPONENT_DATA-->','<script id="showai-component-data" type="application/json">'+JSON.stringify({channel:'desktop-smoke',props:component.defaultData,readOnly:false})+'</script>');document.body.append(frame);
     const componentReady=await frameReady;frame.remove();
-    const history=await api.invoke('history:list',{projectId:project.id,pageId:savedCustom.document.id});
-    const original=await api.invoke('history:page',{projectId:project.id,pageId:savedCustom.document.id,revision:page.revision});
     const search=await api.invoke('library:search',{projectId:project.id,query:'Saved'});
     const csp=document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.content;
     const unknown=await api.invoke('arbitrary:read',{}).catch(error=>error.code);
-    return {history,originalTitle:original.document.title,search,revision:savedCustom.revision,home:info.home,packaged:info.packaged,projectId:project.id,pageId:savedCustom.document.id,cli:info.cli,pageCount:pages.length,title:pages[0].title,conflict,organization,templateCount:templates.length,componentBytes:component.html.length,componentSource:source.source.length,componentsOnSave:Array.isArray(saved.components),assetsPreserved:nextSource.assets?.['pixel.png']===asset,componentReady,csp,unknown};
+    return {search,revision:savedCustom.revision,home:info.home,packaged:info.packaged,projectId:project.id,pageId:savedCustom.document.id,cli:info.cli,pageCount:pages.length,title:pages[0].title,conflict,organization,templateCount:templates.length,componentBytes:component.html.length,componentSource:source.source.length,componentsOnSave:Array.isArray(saved.components),assetsPreserved:nextSource.assets?.['pixel.png']===asset,componentReady,csp,unknown};
   })()`);
   assert.equal(result.home, join(temporary, "home"));
   assert.equal(result.packaged, Boolean(packagedExecutable));
   assert.equal(result.pageCount, 1);
   assert.match(result.revision, /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/);
-  assert.equal(result.originalTitle, "Page");
-  assert.ok(result.history.items.length >= 5);
-  assert.ok(
-    result.history.items.every((entry) => entry.actor.kind === "human"),
-  );
   assert.ok(
     result.search.items.some((item) => item.resourceId === result.pageId),
   );

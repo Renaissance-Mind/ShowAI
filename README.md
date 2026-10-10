@@ -20,9 +20,9 @@ This interface supports human–agent collaboration and co-creation. The resulti
 
   The component catalog provides descriptions, parameter schemas, and examples to help agents choose components for the task. When a new form of expression is needed, create a reusable component with React.
 
-- **Let humans participate directly**: Read and use content within the agent's context, or edit and manage it in the ShowAI App as you would in a note-taking app. Agents can build on human edits. Both share page structure, component data, and version history to keep improving the same work.
+- **Let humans participate directly**: Read and use content within the agent's context, or edit and manage it in the ShowAI App as you would in a note-taking app. Agents can build on human edits. Both share page structure and component data to keep improving the same work.
 
-  Pages support comparison, restoration, and structured merging. When concurrent changes conflict, the system preserves drafts and relevant versions for users to inspect and resolve.
+  Pages support structured merging of active drafts and current content. Concurrent conflicts preserve both inputs for explicit review.
 
 - **Let the results travel**: Export finished content as standalone HTML, a fragment displayed in an agent conversation, or a static site with navigation.
 
@@ -47,7 +47,7 @@ This interface supports human–agent collaboration and co-creation. The resulti
 - **Research and analysis**: Organize questions, sources, evidence, and comparisons to reach a judgment on one page.
 - **Teaching and explanation**: Combine diagrams, collapsible content, and parameter experiments to support gradual understanding.
 - **Data exploration**: Keep charts, raw data, and analysis together for inspection and verification.
-- **Collaborative planning**: Refine proposals between humans and agents, record changes, and compare versions.
+- **Collaborative planning**: Refine proposals between humans and agents, integrating feedback into the shared page.
 - **Knowledge sharing**: Turn shared work into pages or sites that others can read and explore.
 
 ## 🚀 Getting started
@@ -115,7 +115,7 @@ The plugin includes four skills:
 
 | Skill | Purpose |
 | --- | --- |
-| `use-showai` | Basic usage, runtime connection, finding and reading content, viewing history |
+| `use-showai` | Basic usage, runtime connection, finding and reading content |
 | `show-document` | Create, edit, display, and export pages; apply existing templates |
 | `create-component` | Create or adapt reusable React components |
 | `create-template` | Create and edit templates, or extract them from existing pages |
@@ -181,15 +181,13 @@ Use `--blocks ID,ID` to export selected components or regions. HTML and inline e
 
 The static site directory can be deployed to your own server or a hosting service. See [Agent guide](docs/agent-usage.md) for export formats and options.
 
-## 🔒 Content and history
+## 🔒 Content and synchronization
 
-Project content is stored locally and can be backed up or migrated. New empty libraries enable version history by default, recording content changes and available human or agent provenance.
+Project content is stored locally in transactional SQLite and can be backed up or migrated. Saves update current content and check resource tokens to prevent overwriting concurrent edits. Local drafts and conflict recovery preserve unfinished work.
 
-The history interface supports comparing versions, inspecting changes, and restoring content. Restoration creates a new version. Components, templates, and page dependencies are also versioned so earlier content can be traced.
+For collaboration across devices or with other people, connect to a self-hosted ShowAI Server to synchronize current pages, component dependencies and assets by project. Administrator, editor and viewer roles control access. HTML previews and exports are generated on demand.
 
-For collaboration across devices or with other people, connect to a self-hosted ShowAI Server to synchronize content and history by project. Administrator, editor, and viewer roles control access.
-
-See [Content library and history](docs/versioned-library.md) and [Project server and synchronization](docs/project-sync.md).
+See [Content library](docs/versioned-library.md) and [Project server and synchronization](docs/project-sync.md).
 
 ## 📚 Documentation
 
@@ -200,7 +198,7 @@ See [Content library and history](docs/versioned-library.md) and [Project server
 | [Plugin documentation](plugins/showai/README.md) | Skill responsibilities and installation |
 | [Data charts](docs/g2-components.md) | Chart types, data interfaces, and settings |
 | [Components and templates](docs/catalog-lifecycle.md) | Catalogs, versions, dependencies, and reuse |
-| [Content library and history](docs/versioned-library.md) | Storage, comparison, merging, and restoration |
+| [Content library](docs/versioned-library.md) | Storage, drafts, merging, and recovery |
 | [Project server and synchronization](docs/project-sync.md) | Server deployment, project permissions, and synchronization |
 | [Page data format](docs/artifact-format.md) | Page structure and data conventions |
 

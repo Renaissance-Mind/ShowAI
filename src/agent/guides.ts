@@ -14,7 +14,7 @@ export const GUIDE_TOPICS = [
   "templates",
   "template-extraction",
   "versions",
-  "history",
+  "recovery",
   "sync",
   "export",
   "publish",
@@ -61,14 +61,14 @@ const guides: Record<
   },
   sync: {
     purpose:
-      "Connect project-scoped servers, inspect synchronization, join invitations and retain complete history across devices.",
+      "Connect project-scoped servers, inspect synchronization, join invitations and synchronize current content across devices.",
     rules: [
       "Servers manage projects with admin, editor and viewer roles. Identity and tokens are per server; each local project binds one server project and one account connection. There is no server administrator or owner role.",
       "Settings → 服务器与同步 configures connections, the default storage for future projects, project accounts, invitation acceptance and the embedded project Dashboard. Existing local projects are attached explicitly; default changes do not upload existing projects.",
       "Use real connection/project IDs returned by status/projects. Credentials come from password-file/token-file/registration-key-file or SHOWAI_SERVER_PASSWORD/SHOWAI_SERVER_TOKEN/SHOWAI_REGISTRATION_KEY. Outputs omit connection tokens. view register creates a password account; configured deployment currently supports password and token authentication.",
-      "The running desktop/browser workbench synchronizes in the background. A standalone Agent can explicitly invoke sync run after local writes; disconnected edits and revisions remain on disk. A local save is not proof of successful remote publication: inspect project status/error and remoteHead.",
-      "Project transfer includes formal history, source/compiled dependencies and archived readers. Shared local library Git IDs differ from remote snapshot IDs; syncOrigin preserves original time/actor/source revision/remote parents. Device paths and directory bindings remain local. Never upload the whole content library to share one project.",
-      "Viewer/revoked connections cannot commit project edits. Same-content A→B→A versions remain distinct. Concurrent independent fields merge. Failed cross-device merges automatically keep both inputs as ordinary source-labeled pages with shared origin records; use sync retained to inspect them. Same-device stale writes fail with saveFailed=true and recovery/nextStep: re-read, compare and deliberately resolve, or abandon the attempted edit. Restoring an old page creates a new commit and syncs normally.",
+      "The running desktop/browser workbench synchronizes in the background. A standalone Agent can explicitly invoke sync run after local writes; disconnected edits remain on disk. A local save is not proof of successful remote publication: inspect project status/error and remoteHead.",
+      "Project transfer contains only current page data, source/compiled dependencies and assets. Each device retains one synchronization baseline for merging concurrent edits. Preview and export generate HTML on demand. Device paths and directory bindings remain local. Never upload the whole content library to share one project.",
+      "Viewer/revoked connections cannot commit project edits. Concurrent independent fields merge. Failed cross-device merges automatically keep both inputs as ordinary source-labeled pages with shared origin records; use sync retained to inspect them. Same-device stale writes fail with saveFailed=true and recovery/nextStep: re-read, compare and deliberately resolve, or abandon the attempted edit.",
       "Invitations expire and are revocable; one link allows unlimited accounts to register and join. Repeated acceptance does not duplicate membership or change an existing role; a removed member cannot reuse a previously accepted link. Signing into an existing server account reuses that identity. Removing a local connection retains content and does not delete the server project. Account switching is restricted to the project's same server; other-server same-ID projects receive separate local IDs.",
     ],
     commands: [
@@ -90,27 +90,18 @@ const guides: Record<
         "Shared origin records contain originalPath, both source accounts/devices/revisions and visible page IDs. Cross-device conflicts continue synchronizing after preserving both inputs.",
     },
   },
-  history: {
-    purpose:
-      "Inspect attributed content history, search full content, merge drafts and restore exact versions safely.",
+  recovery: {
+    purpose: "Resolve retained unsaved drafts and external file conflicts.",
     rules: [
-      "New empty libraries use versioned storage. Existing libraries require reviewed import; preserve original files and mark old checkpoint times/actors/order unknown.",
-      "Retain the full page hash, resource revision and stable node IDs. Save/apply requires both base-hash and base-revision. Reuse operation-id only for an identical request.",
-      "Abandoning App changes archives the current window's active unsaved draft generation and loads the current saved file. Other windows' newer draft generations, other devices' content and formal history remain. Adopting external disk edits must pass validation; an import failure leaves the conflict unresolved.",
-      "History preview/export uses the captured reader and exact component dependencies. Restore creates a new attributed commit; simultaneous changes require another review.",
-      "External package files recover into local editable drafts before saving a new immutable version. Space cleanup preserves formal history, unresolved conflicts and live drafts.",
+      "Keep the current page hash and resource token. Saves require both values and reject stale inputs.",
+      "Content history, historical previews and version restoration are unavailable. Preview and export render current data using installed code.",
+      "Draft merge uses the one baseline retained with the active draft. If unavailable, compare current content and the retained draft explicitly.",
+      "External conflict recovery preserves both inputs and requires an explicit resolution.",
     ],
     commands: [
-      "showai history list --project PROJECT --page PAGE --session ACTUAL_SESSION --json",
-      "showai history compare --project PROJECT --page PAGE --before REVISION --after REVISION --json",
-      "showai history read PAGE --project PROJECT --revision REVISION --view html --out historical.html --json",
-      "showai history merge PAGE --project PROJECT --base-revision BASE --input draft.showai.json --json",
-      "showai history restore PAGE --project PROJECT --revision REVISION --base-revision CURRENT_REVISION --json",
+      "showai workspace conflicts --project PROJECT --json",
+      "showai workspace merge PAGE --project PROJECT --base-revision BASE --input draft.showai.json --json",
       "showai search --query TEXT --project PROJECT --json",
-      "showai history conflicts --project PROJECT --json",
-      "showai history recover-package CONFLICT_ID --project PROJECT --json",
-      "showai library stats --json",
-      "showai library cleanup-plan --json",
     ],
   },
   reading: {
@@ -171,7 +162,7 @@ const guides: Record<
     purpose:
       "Create or revise page content without overwriting edits made by the user or another Agent.",
     rules: [
-      "Read the page and retain its hash, revision and stable block IDs. Versioned diffs use the preceding revision; legacy snapshots use the preceding hash.",
+      "Read the page and retain its hash, revision and stable block IDs. Change comparison requires a retained active draft baseline.",
       "Default to structured reading. Use guide reading for image checks and browser interaction checks; use the full source Page/current hash for writes.",
       "Save/apply requires --base-hash and, when reading returns revision, --base-revision. Same-device CONFLICT with saveFailed=true means the save failed: follow recovery/nextStep, compare the latest version with your original baseRevision, resolve and save or abandon your attempted edit. Never just refresh the hash and overwrite with the unchanged document. Cross-device conflicts may return a source-labeled copy with a new document.id and retainedSyncConflicts; use that returned ID afterwards. Reuse --operation-id only for the same request; --message and --group describe its purpose and editing group.",
       "New resources default to a Page surface. Page and Board containers nest recursively in artifact v3. Use guide containers for structure; query component schemas when adding components.",
@@ -315,7 +306,7 @@ const guides: Record<
     rules: [
       "catalog list and public catalog list return every matching name, description and scenario by default, with IDs, scopes and available revision identities for detail lookup. Omit query, limit and cursor to discover the full accessible catalog. Explicit limit (1–50) opts into pagination with nextCursor; retain the same limit/query/scope for subsequent pages. Restart without a cursor if the catalog changed.",
       "Scopes are builtin, global, published and project. Shared scopes are immutable; author changes in an explicitly selected project.",
-      "Component discovery without scope returns all built-ins plus the selected project's components (one recommended revision per id/scope; versions=all lists history); without a selected project it returns built-ins only. Explicit scope global, published or all includes shared resources. Template discovery keeps its existing all-scope default. Keep each returned scope/version/integrity when reading details, including components that share an ID.",
+      "Component discovery without scope returns all built-ins plus the selected project's components (one recommended revision per id/scope; versions=all lists available package versions); without a selected project it returns built-ins only. Explicit scope global, published or all includes shared resources. Template discovery keeps its existing all-scope default. Keep each returned scope/version/integrity when reading details, including components that share an ID.",
       "List entries contain names, descriptions and scenarios plus lookup identities; effects and repeated per-item commands are excluded. describe defaults to summary, where component effects are also available. Neither list nor summary includes schema, default data, page body or code.",
       "Views: guide for the versioned use contract, schema and compact example; development for implementation guidance without code; schema for props, examples for complete presets, dependencies for exact references, source for original code/template definition, full for all descriptive metadata. full still excludes source and executable runtimes.",
       "Use the rich-text component (kind text) for authored text. Prefer data {format:'richtext',content:{type:'doc',content:[...]}}. Text marks include bold, italic, underline, strike, code, highlight (attrs.color), link and textStyle (attrs.color/fontFamily/fontSize). Paragraph attrs.textAlign supports left/center/right/justify. component.insert creates a native richText node using the same component editor, with stable child IDs for page edits. Legacy widget/text and Markdown/plain strings remain readable and edit into richtext trees. Selection, hover and formatting controls belong to the component. Formulas use mathInline/mathBlock with attrs.latex; code stays literal.",

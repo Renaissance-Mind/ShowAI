@@ -112,7 +112,11 @@ export class DiskObjects implements ObjectStore {
     if (!info) return null;
     if (info.bytes > maximum) {
       await info.body.cancel();
-      throw new SyncError(413, "TOO_LARGE", "Metadata object exceeds 16 MiB.");
+      throw new SyncError(
+        413,
+        "TOO_LARGE",
+        `Stored object exceeds the ${maximum} byte read limit.`,
+      );
     }
     await info.body.cancel();
     return readFile(this.path(key)).catch((error: NodeJS.ErrnoException) => {

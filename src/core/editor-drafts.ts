@@ -16,13 +16,17 @@ export interface EditorDraftInput {
   resourceId: string;
   projectId?: string;
   baseRevision?: string;
+  baseContent?: ShowDocument;
   title?: string;
   actor?: ChangeActor;
   content: unknown;
   sequence?: number;
   recoverySource?: { id: string; generation: string };
 }
-export interface EditorDraftRecord extends Omit<EditorDraftInput, "content"> {
+export interface EditorDraftRecord extends Omit<
+  EditorDraftInput,
+  "content" | "baseContent"
+> {
   format: "showai-editor-draft";
   version: 1;
   id: string;
@@ -271,7 +275,37 @@ export class EditorDrafts {
                 bytes,
               );
           }
-        const { content: _content, ...metadata } = input;
+        if (input.kind === "page" && input.baseRevision) {
+          const basePath = join(directory, "baseline.json");
+          const previousBase = await readLibraryBytes(this.root, basePath);
+          const base = previousBase
+            ? JSON.parse(previousBase.toString())
+            : undefined;
+          if (base?.revision !== input.baseRevision) {
+            let document = input.baseContent;
+            if (!document && input.projectId) {
+              const library = new GitLibrary(this.root);
+              const path = `projects/${input.projectId}/pages/${input.resourceId}.json`;
+              if ((await library.resourceRevision(path)) === input.baseRevision)
+                document = JSON.parse(
+                  (await library.readFile(path)).toString(),
+                ).document;
+            }
+            if (document && document.id === input.resourceId)
+              await atomicLibraryFile(
+                this.root,
+                basePath,
+                Buffer.from(
+                  JSON.stringify({ revision: input.baseRevision, document }),
+                ),
+              );
+          }
+        }
+        const {
+          content: _content,
+          baseContent: _baseContent,
+          ...metadata
+        } = input;
         const record: EditorDraftRecord = {
           ...metadata,
           format: "showai-editor-draft",
@@ -299,6 +333,26 @@ export class EditorDrafts {
       },
       "drafts",
     );
+  }
+
+  async baseline(
+    projectId: string,
+    pageId: string,
+    revision: string,
+  ): Promise<ShowDocument | undefined> {
+    const records = await this.list({ projectId, resourceId: pageId });
+    for (const record of records) {
+      if (record.kind !== "page" || record.baseRevision !== revision) continue;
+      const bytes = await readLibraryBytes(
+        this.root,
+        join(this.root, "local", "editor-drafts", record.id, "baseline.json"),
+      );
+      if (!bytes) continue;
+      const baseline = JSON.parse(bytes.toString());
+      if (baseline.revision === revision && baseline.document?.id === pageId)
+        return baseline.document;
+    }
+    return undefined;
   }
 
   async list(

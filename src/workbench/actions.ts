@@ -119,22 +119,12 @@ export const workbenchActions = new Set([
   "library:prepareImport",
   "library:activateImport",
   "library:imports",
-  "history:importedSnapshots",
-  "history:importedPage",
-  "history:restoreImportedSnapshot",
-  "history:list",
-  "history:compare",
-  "history:page",
-  "history:html",
-  "history:importedHtml",
-  "history:resource",
-  "history:restore",
-  "history:mergePreview",
-  "history:mergeSave",
-  "history:conflicts",
-  "history:recoverPackage",
-  "history:conflict",
-  "history:resolve",
+  "page:mergePreview",
+  "page:mergeSave",
+  "workspace:conflicts",
+  "workspace:recoverPackage",
+  "workspace:conflict",
+  "workspace:resolve",
   "library:search",
   "drafts:list",
   "drafts:read",
@@ -569,17 +559,6 @@ export function createWorkbench(
         );
       case "library:verifyArchive":
         return verifyLibraryArchive(required(args, "path"));
-      case "history:html":
-        return service.historicalHtml(
-          projectId(args),
-          pageId(args),
-          required(args, "revision"),
-        );
-      case "history:importedHtml":
-        return service.importedHtml(projectId(args), pageId(args), {
-          importId: required(args, "importId"),
-          snapshotId: required(args, "snapshotId"),
-        });
       case "library:prepareImport":
         return new LibraryImport(store.root).prepare(
           text(args, "source", true) ?? store.root,
@@ -588,40 +567,11 @@ export function createWorkbench(
         return new LibraryImport(store.root).activate(required(args, "id"));
       case "library:imports":
         return new LibraryImport(store.root).list();
-      case "history:importedSnapshots":
-        return service.importedSnapshots(
-          projectId(args),
-          text(args, "pageId", true),
-        );
-      case "history:importedPage":
-        return service.importedPage(projectId(args), pageId(args), {
-          importId: required(args, "importId"),
-          snapshotId: required(args, "snapshotId"),
-        });
-      case "history:restoreImportedSnapshot":
-        return enrichPage(
-          projectId(args),
-          await service.restoreImportedSnapshot({
-            projectId: projectId(args),
-            pageId: pageId(args),
-            importId: required(args, "importId"),
-            snapshotId: required(args, "snapshotId"),
-            baseRevision:
-              args.baseRevision === null
-                ? null
-                : required(args, "baseRevision"),
-          }),
-        );
       case "app:info":
         return {
           ...(await host.info()),
           libraryVersion: (await versionedLibrary(store.root)) ? 2 : 1,
         };
-      case "history:resource":
-        return service.historicalResource(
-          required(args, "path"),
-          required(args, "revision"),
-        );
       case "library:search":
         return service.search({
           query: required(args, "query"),
@@ -636,50 +586,14 @@ export function createWorkbench(
           limit: args.limit as number | undefined,
           cursor: text(args, "cursor", true),
         });
-      case "history:list":
-        return service.history({
-          projectId: text(args, "projectId", true),
-          pageId: text(args, "pageId", true),
-          path: text(args, "path", true),
-          harness: text(args, "harness", true),
-          sessionId: text(args, "sessionId", true),
-          query: text(args, "query", true),
-          before: text(args, "cursor", true),
-          limit: args.limit as number | undefined,
-        });
-      case "history:compare":
-        return service.compareHistory(
-          required(args, "before"),
-          required(args, "after"),
-          {
-            projectId: text(args, "projectId", true),
-            pageId: text(args, "pageId", true),
-          },
-        );
-      case "history:page":
-        return service.historicalPage(
-          projectId(args),
-          pageId(args),
-          required(args, "revision"),
-        );
-      case "history:restore":
-        return enrichPage(
-          projectId(args),
-          await service.restorePage({
-            projectId: projectId(args),
-            pageId: pageId(args),
-            revision: required(args, "revision"),
-            baseRevision: required(args, "baseRevision"),
-          }),
-        );
-      case "history:mergePreview":
+      case "page:mergePreview":
         return service.pageMergePreview({
           projectId: projectId(args),
           pageId: pageId(args),
           baseRevision: required(args, "baseRevision"),
           document: validateDocument(args.document),
         });
-      case "history:mergeSave":
+      case "page:mergeSave":
         return enrichPage(
           projectId(args),
           await service.pageMergeSave({
@@ -690,17 +604,17 @@ export function createWorkbench(
             document: validateDocument(args.document),
           }),
         );
-      case "history:conflicts":
+      case "workspace:conflicts":
         return service.workspaceConflicts(text(args, "projectId", true));
-      case "history:recoverPackage":
+      case "workspace:recoverPackage":
         return service.recoverPackageConflict({
           id: required(args, "id"),
           clientId: required(args, "clientId"),
           targetProjectId: text(args, "targetProjectId", true),
         });
-      case "history:conflict":
+      case "workspace:conflict":
         return service.workspaceConflict(required(args, "id"));
-      case "history:resolve": {
+      case "workspace:resolve": {
         const resolution = required(args, "resolution");
         if (!["discard", "import", "merge"].includes(resolution))
           throw new CoreError("INVALID_DATA", "Invalid conflict resolution.");
@@ -1455,10 +1369,8 @@ export function createWorkbench(
     "sidebar:moveEntry",
     "library:prepareImport",
     "library:activateImport",
-    "history:restoreImportedSnapshot",
-    "history:restore",
-    "history:mergeSave",
-    "history:resolve",
+    "page:mergeSave",
+    "workspace:resolve",
     "projects:create",
     "projects:rename",
     "projects:pin",
@@ -1491,7 +1403,7 @@ export function createWorkbench(
   ]);
   const dialogActions = new Set([
     "components:import",
-    "history:resolve",
+    "workspace:resolve",
     "library:prepareImport",
     "library:activateImport",
   ]);

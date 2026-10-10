@@ -72,7 +72,7 @@ Start with one project:
   pages list --project PROJECT
 
 Discover only what you need:
-  guide [workspace|reading|authoring|containers|document|catalog|component|templates|versions|history|sync|export|publish]
+  guide [workspace|reading|authoring|containers|document|catalog|component|templates|versions|recovery|sync|export|publish]
   catalog list [--kind component|template] [--scope SCOPE] [--limit N --cursor CURSOR]
   catalog describe ID [--kind component|template] [--view VIEW]
 
@@ -93,16 +93,9 @@ Versioned libraries: library init | verify | compact
   library activate IMPORT_ID --home PATH
   library migrate --home PATH (prepare, verify and activate in place; retain originals)
   library imports --home PATH
-  history imported --project ID [--page ID]
-  history snapshot PAGE --project ID --import IMPORT_ID --snapshot SNAPSHOT_ID
-  history restore-snapshot PAGE --project ID --import IMPORT_ID --snapshot SNAPSHOT_ID --base-revision CURRENT_REVISION
   search --query TEXT [--project ID] [--kind page|component|template|project|source]
-  history list [--project ID] [--page ID] [--session SESSION_ID]
-  history read PAGE --project ID --revision REVISION
-  history compare --before REVISION --after REVISION [--project ID] [--page ID]
-  history restore PAGE --project ID --revision REVISION --base-revision CURRENT_REVISION
-  history merge PAGE --project ID --input DRAFT --base-revision BASE [--revision CURRENT_TO_SAVE]
-  history conflicts [--project ID] | conflict CONFLICT_ID | resolve CONFLICT_ID --resolution discard|import|merge
+  workspace merge PAGE --project ID --input DRAFT --base-revision BASE [--revision CURRENT_TO_SAVE]
+  workspace conflicts [--project ID] | conflict CONFLICT_ID | resolve CONFLICT_ID --resolution discard|import|merge
 Shared: --home PATH, --project ID, --json, --help.
 Project defaults to the host project directory (Git root of cwd); --project overrides it.
 Shared promotion/registration is explicit.
@@ -605,87 +598,8 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
         cursor: option(args, "cursor"),
       });
     }
-    case "history": {
-      if (action === "imported") {
-        requireCount(args, 2);
-        return service.importedSnapshots(await project(), option(args, "page"));
-      }
-      if (action === "snapshot" || action === "restore-snapshot") {
-        requireCount(args, 3);
-        const input = {
-          projectId: await project(),
-          pageId: args.positional[2],
-          importId: option(args, "import", true)!,
-          snapshotId: option(args, "snapshot", true)!,
-        };
-        if (action === "snapshot")
-          return service.importedPage(input.projectId, input.pageId, input);
-        const baseRevision = option(args, "base-revision", true)!;
-        return service.restoreImportedSnapshot({
-          ...input,
-          baseRevision: baseRevision === "absent" ? null : baseRevision,
-        });
-      }
-      if (action === "list") {
-        requireCount(args, 2);
-        return service.history({
-          projectId: option(args, "project"),
-          pageId: option(args, "page"),
-          path: option(args, "path"),
-          harness: option(args, "harness"),
-          sessionId: option(args, "session"),
-          query: option(args, "query"),
-          from: option(args, "from"),
-          to: option(args, "until"),
-          before: option(args, "cursor"),
-          limit: option(args, "limit")
-            ? Number(option(args, "limit"))
-            : undefined,
-        });
-      }
-      if (action === "compare") {
-        requireCount(args, 2);
-        return service.compareHistory(
-          option(args, "before", true)!,
-          option(args, "after", true)!,
-          { projectId: option(args, "project"), pageId: option(args, "page") },
-        );
-      }
-      if (action === "read") {
-        requireCount(args, 3);
-        if (option(args, "view") === "html") {
-          const rendered = await service.historicalHtml(
-            await project(),
-            id,
-            option(args, "revision", true)!,
-          );
-          const out = option(args, "out");
-          if (out)
-            return service.export({
-              projectId: await project(),
-              pageId: id,
-              revision: option(args, "revision", true)!,
-              format: "html",
-              out,
-              overwrite: !!args.options.overwrite,
-            });
-          return rendered;
-        }
-        return service.historicalPage(
-          await project(),
-          id,
-          option(args, "revision", true)!,
-        );
-      }
-      if (action === "restore") {
-        requireCount(args, 3);
-        return service.restorePage({
-          projectId: await project(),
-          pageId: id,
-          revision: option(args, "revision", true)!,
-          baseRevision: option(args, "base-revision", true)!,
-        });
-      }
+    case "workspace": {
+      const id = args.positional[2];
       if (action === "merge") {
         requireCount(args, 3);
         const document = (await readDocument(option(args, "input", true)!))
@@ -923,7 +837,8 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
       if (action === "list") {
         requireCount(args, 2);
         return service.catalogList({
-          versions: option(args, "versions") as "recommended" | "all" | undefined,
+          versions: option(args, "versions") as
+            "recommended" | "all" | undefined,
           projectId:
             option(args, "project") ??
             (!catalogScope(args) ||
@@ -1241,10 +1156,9 @@ export async function runCli(argv: string[]): Promise<unknown> {
       (["import", "save", "promote", "fork"].includes(action) ||
         (action === "merge" && mode === "resolve"))) ||
     (command === "publish" && ["verify", "register"].includes(action)) ||
-    (command === "history" &&
-      (action === "restore" ||
-        action === "restore-snapshot" ||
-        (action === "merge" && !!option(args, "revision"))));
+    (command === "workspace" &&
+      action === "merge" &&
+      !!option(args, "revision"));
   if (!mutation || args.options.help)
     return withChangeContext(context, () => runCliCommand(argv));
   const requestFingerprint = createHash("sha256")

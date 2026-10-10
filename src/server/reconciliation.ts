@@ -96,6 +96,20 @@ export class ReservationReconciliation {
         bytes: size,
         reason: ready[0].bytes === size ? undefined : "metadata-size-mismatch",
       };
+    if (
+      row.kind === "manifest" &&
+      (
+        await this.db.all("SELECT 1 FROM settings WHERE key=?", [
+          `current-state-boundary:${row.project_id}`,
+        ])
+      ).length
+    )
+      return {
+        id: row.id,
+        action: "release-ready",
+        bytes: size,
+        reason: "unpublished-current-state",
+      };
     if (row.kind === "manifest") {
       try {
         await this.manifest(row);

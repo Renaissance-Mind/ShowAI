@@ -13,7 +13,7 @@ const actor: ChangeContext = {
   channel: "cli",
   message: "更新论文图表证据",
 };
-describe("rebuildable content and history index", () => {
+describe("rebuildable current content index", () => {
   let root: string;
   let library: GitLibrary;
   let index: LibraryIndex;
@@ -110,7 +110,7 @@ describe("rebuildable content and history index", () => {
     ).toHaveLength(1);
   });
 
-  it("incrementally updates body searches and rebuilds identical results from Git", async () => {
+  it("updates current body searches and rebuilds identical results", async () => {
     await index.synchronize();
     const document = JSON.parse(source.toString()).document;
     const changed = applyOperations(document, [
@@ -141,9 +141,8 @@ describe("rebuildable content and history index", () => {
       sessionId: "search-session",
       projectId,
     });
-    expect(history.items).toHaveLength(2);
-    expect(history.items[0].message).toBe("更新检索结论");
-    expect((await index.history({ query: "图表" })).items).toHaveLength(1);
+    expect(history.items).toEqual([]);
+    expect((await index.history({ query: "图表" })).items).toEqual([]);
   });
 
   it("rejects stale search cursors and updates reference edges after deleting a component instance", async () => {
@@ -179,9 +178,6 @@ describe("rebuildable content and history index", () => {
     expect(
       await index.references("component", "metrics", { projectId }),
     ).toEqual([]);
-    const one = await index.history({ limit: 1 });
-    expect(
-      (await index.history({ before: one.nextCursor! })).items,
-    ).toHaveLength(1);
+    expect((await index.history()).items).toEqual([]);
   });
 });

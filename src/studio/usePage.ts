@@ -106,6 +106,10 @@ export function usePage() {
             resourceId: source.id,
             projectId: owner,
             baseRevision: draftBase.current,
+            baseContent:
+              recordRef.current?.revision === draftBase.current
+                ? recordRef.current?.document
+                : undefined,
             title: source.title,
             content: source,
             sequence,

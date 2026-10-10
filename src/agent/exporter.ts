@@ -20,8 +20,6 @@ import {
 } from "node:path";
 import { FileStore } from "../core/store";
 import { LibraryOperations } from "../core/library-operations";
-import { versionedLibrary, logicalPath } from "../core/library-runtime";
-import { readArchivedReader } from "../core/archived-reader";
 import { resolveDocumentComponents } from "../core/catalog";
 import { resolvePublishedComponents } from "../core/publication";
 import { publicationRefKey } from "../portable/remote.mjs";
@@ -232,6 +230,10 @@ export async function exportPage(
     !["spatial", "reading"].includes(options.presentation)
   )
     throw new Error("Presentation must be spatial or reading.");
+  if (options.revision || options.importedSnapshot)
+    throw new Error(
+      "Historical export has been removed. Export current content instead.",
+    );
   const store = new FileStore(options.root);
   if (options.blockIds !== undefined && options.format === "site")
     throw new Error(
@@ -299,18 +301,6 @@ export async function exportPage(
           )
         : [];
     const bundledComponents = componentMode === "bundled" ? components : [];
-    const library = versionedLibrary(store.root);
-    const selectedRevision =
-      historical?.sourceRevision ??
-      record.revision ??
-      (library ? await library.head() : null);
-    const frozenReader =
-      library && selectedRevision && !options.templatePath
-        ? await readArchivedReader(
-            logicalPath(store.root, record.path)!,
-            (path) => library.readFile(path, selectedRevision),
-          )
-        : null;
     const html = await buildPageHtml(
       document,
       options.templatePath,
@@ -318,7 +308,7 @@ export async function exportPage(
       remoteComponents,
       presentation,
       selection,
-      frozenReader?.html,
+      undefined,
     );
     const result = options.format === "inline" ? toInlineFragment(html) : html;
     const sourcePath =

@@ -22,7 +22,7 @@ In **Settings → Agent**, retrieve server model resources. Each API Key or Chat
 
 ## Storage and synchronization
 
-Clients use SQLite content history with stable content nodes, immutable objects, attributed revisions and local recovery journals. Local saving completes independently of network publication. Connected services push verified project changes over WebSockets, with bounded inline content and HTTP transfer for larger revisions. The scheduler continues as a fallback when the event connection is unavailable. Idle connections and failed requests use bounded backoff; local file changes, foreground activity and network recovery wake synchronization.
+Clients use SQLite current content with stable nodes, reusable objects, concurrency tokens and local recovery journals. Local saving completes independently of network publication. Connected services push verified project changes over WebSockets, with bounded inline content and HTTP transfer for larger revisions. The scheduler continues as a fallback when the event connection is unavailable. Idle connections and failed requests use bounded backoff; local file changes, foreground activity and network recovery wake synchronization.
 
 Linux runs the shared server on Node.js 24 with SQLite and disk objects. Cloudflare runs the same protocol with a SQLite Durable Object and private R2, including a bounded hot object store. D1 is retained as the source of a controlled migration from older deployments. Production and staging have independent identities, databases, buckets, vault keys and infrastructure credentials.
 

@@ -18,9 +18,9 @@ Esta interfaz permite la colaboración y la creación conjunta entre personas y 
 
   El catálogo de componentes ofrece descripciones, estructuras de parámetros y ejemplos para que los agentes elijan los componentes adecuados. Cuando hace falta una nueva forma de expresión, se puede crear un componente reutilizable con React.
 
-- **Permitir la participación directa de las personas**: Lee y utiliza el contenido dentro del contexto del agente, o edítalo y organízalo en ShowAI App como en una aplicación de notas. El agente puede continuar a partir de los cambios de una persona. Ambos comparten la estructura de la página, los datos de los componentes y el historial de versiones para mejorar el mismo trabajo.
+- **Permitir la participación directa de las personas**: Lee y utiliza el contenido dentro del contexto del agente, o edítalo y organízalo en ShowAI App como en una aplicación de notas. El agente puede continuar a partir de los cambios de una persona. Ambos comparten la estructura de la página, los datos de los componentes para mejorar el mismo trabajo.
 
-  Las páginas admiten comparación, restauración y fusión estructurada. Cuando los cambios simultáneos entran en conflicto, el sistema conserva los borradores y las versiones pertinentes para que el usuario los revise y resuelva.
+  Las páginas permiten fusionar borradores activos con el contenido actual. Los conflictos conservan ambas entradas para su revisión y resolución.
 
 - **Compartir los resultados**: Exporta el contenido terminado como HTML independiente, un fragmento mostrado en una conversación con un agente o un sitio estático con navegación.
 
@@ -45,7 +45,7 @@ Esta interfaz permite la colaboración y la creación conjunta entre personas y 
 - **Investigación y análisis**: Organiza preguntas, fuentes, pruebas y comparaciones para llegar a una conclusión en una sola página.
 - **Enseñanza y explicación**: Combina diagramas, contenido desplegable y experimentos con parámetros para facilitar una comprensión progresiva.
 - **Exploración de datos**: Reúne gráficos, datos originales y análisis para examinarlos y verificarlos.
-- **Planificación colaborativa**: Revisa propuestas entre personas y agentes, registra cambios y compara versiones.
+- **Planificación colaborativa**: Revisa propuestas entre personas y agentes e integra sus comentarios en la página compartida.
 - **Compartir conocimiento**: Convierte el trabajo conjunto en páginas o sitios que otras personas puedan leer y explorar.
 
 ## 🚀 Primeros pasos
@@ -113,7 +113,7 @@ El plugin incluye cuatro Skills:
 
 | Skill | Propósito |
 | --- | --- |
-| `use-showai` | Uso básico, conexión al entorno de ejecución, búsqueda y lectura de contenido, consulta del historial |
+| `use-showai` | Uso básico, conexión al entorno de ejecución, búsqueda y lectura de contenido |
 | `show-document` | Crear, editar, mostrar y exportar páginas; aplicar plantillas existentes |
 | `create-component` | Crear o adaptar componentes React reutilizables |
 | `create-template` | Crear y editar plantillas, o extraerlas de páginas existentes |
@@ -179,15 +179,13 @@ Utiliza `--blocks ID,ID` para exportar componentes o regiones seleccionados. Las
 
 El directorio del sitio estático se puede desplegar en tu propio servidor o en un servicio de alojamiento. Consulta la [Guía para agentes](../agent-usage.md) para formatos y opciones.
 
-## 🔒 Contenido e historial
+## 🔒 Contenido y sincronización
 
-El contenido de los proyectos se almacena localmente y se puede respaldar o migrar. Las bibliotecas nuevas y vacías activan el historial de versiones de forma predeterminada, registrando cambios y la procedencia humana o de agentes que esté disponible.
+El contenido se guarda localmente en SQLite y admite copias de seguridad y migraciones. Cada guardado actualiza el estado actual y comprueba el hash de la página y el token del recurso para detectar cambios simultáneos. Los borradores locales y la recuperación de conflictos conservan el trabajo pendiente.
 
-La interfaz del historial permite comparar versiones, revisar cambios y restaurar contenido. Una restauración crea una versión nueva. Los componentes, las plantillas y las dependencias de las páginas también se versionan para poder rastrear contenido anterior.
+Para colaborar entre dispositivos, conecta un ShowAI Server propio. Se sincronizan las páginas actuales, las dependencias de los componentes y los recursos por proyecto, con roles de administrador, editor y lector. Las vistas previas y las exportaciones HTML se generan cuando se necesitan.
 
-Para colaborar entre dispositivos o con otras personas, conecta un ShowAI Server alojado por ti para sincronizar contenido e historial por proyecto. Los roles de administrador, editor y lector controlan el acceso.
-
-Consulta [Biblioteca de contenido e historial](../versioned-library.md) y [Servidor de proyectos y sincronización](../project-sync.md).
+[Biblioteca de contenido](../versioned-library.md) · [Servidor de proyectos y sincronización](../project-sync.md).
 
 ## 📚 Documentación
 
@@ -198,7 +196,7 @@ Consulta [Biblioteca de contenido e historial](../versioned-library.md) y [Servi
 | [Documentación del plugin](../../plugins/showai/README.md) | Responsabilidades de los Skills e instalación |
 | [Gráficos de datos](../g2-components.md) | Tipos de gráficos, interfaces de datos y ajustes |
 | [Componentes y plantillas](../catalog-lifecycle.md) | Catálogos, versiones, dependencias y reutilización |
-| [Biblioteca de contenido e historial](../versioned-library.md) | Almacenamiento, comparación, fusión y restauración |
+| [Biblioteca de contenido](../versioned-library.md) | SQLite · Contenido y sincronización |
 | [Servidor de proyectos y sincronización](../project-sync.md) | Despliegue, permisos de proyectos y sincronización |
 | [Formato de datos de las páginas](../artifact-format.md) | Estructura de páginas y convenciones de datos |
 

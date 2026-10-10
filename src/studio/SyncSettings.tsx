@@ -266,7 +266,7 @@ export default function SyncSettings() {
       });
       setPreview(null);
       setInviteLink("");
-      setMessage("已加入项目，正在下载完整内容和历史。");
+      setMessage("已加入项目，正在下载当前项目内容。");
     }
     await loadServer(connection.id);
   }
@@ -816,7 +816,7 @@ export default function SyncSettings() {
                       });
                       setPreview(null);
                       setInviteLink("");
-                      setMessage("已加入项目，正在同步内容与历史。");
+                      setMessage("已加入项目，正在同步当前内容。");
                     })
                   }
                 >
@@ -1171,7 +1171,7 @@ export default function SyncSettings() {
               <section className="settings-group sync-conflict">
                 <h2>处理同步冲突</h2>
                 <p className="settings-help">
-                  双方版本和历史都已保留。为每个冲突选择保留的内容，然后发布合并版本。
+                  双方修改均已保留。为每个冲突选择保留的内容，然后发布合并版本。
                 </p>
                 {conflict.files.map((file) => (
                   <div key={file.path}>

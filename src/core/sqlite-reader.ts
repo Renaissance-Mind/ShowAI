@@ -65,9 +65,18 @@ export async function runSqliteRead(home: string, request: Request) {
   const db = new DatabaseSync(path, { readOnly: true });
   db.exec("PRAGMA busy_timeout=10000; BEGIN");
   try {
-    const sequence = db
-      .prepare("SELECT sequence FROM revisions WHERE revision=?")
-      .get(request.revision)?.sequence;
+    const hasCurrentState = !!db
+      .prepare("SELECT 1 FROM sqlite_master WHERE name='current_state'")
+      .get();
+    const state = hasCurrentState
+      ? db.prepare("SELECT revision FROM current_state WHERE id=1").get()
+      : undefined;
+    const stateCurrent = state?.revision === request.revision;
+    const sequence = stateCurrent
+      ? 1
+      : db
+          .prepare("SELECT sequence FROM revisions WHERE revision=?")
+          .get(request.revision)?.sequence;
     if (!sequence)
       throw new CoreError(
         "NOT_FOUND",
@@ -95,6 +104,27 @@ export async function runSqliteRead(home: string, request: Request) {
         if (trees.size > 8) trees.delete(trees.keys().next().value!);
       }
       return tree.map((entry) => ({ ...entry }));
+    }
+    if (request.kind === "revisions" && stateCurrent) {
+      const exact = db.prepare(
+        "SELECT revision,sequence FROM current_resources WHERE path=?",
+      );
+      const children = db.prepare(
+        "SELECT revision,sequence FROM current_resources WHERE path>=? AND path<? ORDER BY sequence DESC LIMIT 1",
+      );
+      return new Map(
+        request.paths.map((path) => {
+          const key = sqliteResourcePath(path);
+          const a = exact.get(key),
+            b = children.get(key + "/", key + "0");
+          const latest = !a
+            ? b
+            : !b || Number(a.sequence) >= Number(b.sequence)
+              ? a
+              : b;
+          return [path, latest ? String(latest.revision) : null];
+        }),
+      );
     }
     if (request.kind === "revisions") {
       const exact = db.prepare(

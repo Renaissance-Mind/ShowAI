@@ -1,5 +1,8 @@
+import { ReadBaselines } from "./read-baselines";
 import { FileStore } from "./store";
 import { versionedLibrary, writeLibraryFiles } from "./library-runtime";
+import { EditorDrafts } from "./editor-drafts";
+import { documentHash } from "./diff";
 import { LibraryOperations } from "./library-operations";
 import { readLibraryBytes } from "./library-files";
 import { join } from "node:path";
@@ -48,19 +51,24 @@ export async function preserveRemoteSave(
   const source = await remoteSaveOrigin(home, projectId, current),
     library = versionedLibrary(home);
   if (!source || !library || !baseRevision) return null;
-  const base = await new LibraryOperations(home, projectId).pageAt(
-    projectId,
-    current.document.id,
-    baseRevision,
-  );
-  if (base.hash !== baseHash)
-    throw new CoreError(
-      "INVALID_DATA",
-      "读取基础版本的 hash 与提交的 baseHash 不一致。",
-    );
+  const baseDocument =
+    (await new EditorDrafts(home).baseline(
+      projectId,
+      current.document.id,
+      baseRevision,
+    )) ??
+    (await new ReadBaselines(home).read(
+      projectId,
+      current.document.id,
+      baseRevision,
+    ));
+  if (baseDocument && documentHash(baseDocument) !== baseHash)
+    throw new CoreError("INVALID_DATA", "草稿基线与 baseHash 不一致。");
   const store = new FileStore(home),
-    preview = previewPageMerge(base.document, document, current.document);
-  if (!preview.conflicts.length)
+    preview = baseDocument
+      ? previewPageMerge(baseDocument, document, current.document)
+      : null;
+  if (preview && !preview.conflicts.length)
     return store.savePage(
       projectId,
       current.document.id,
@@ -86,7 +94,9 @@ export async function preserveRemoteSave(
     conflicts: [
       {
         path,
-        base: Buffer.from(serializeArtifact(base.document)).toString("base64"),
+        base: baseDocument
+          ? Buffer.from(serializeArtifact(baseDocument)).toString("base64")
+          : null,
         local: localBytes.toString("base64"),
         remote: remoteFiles.get(path)!.toString("base64"),
       },

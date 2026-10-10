@@ -1,3 +1,5 @@
+import { ReadBaselines } from "../core/read-baselines";
+import { EditorDrafts } from "../core/editor-drafts";
 import { placeTemplate } from "../surface/document.mjs";
 import { upgradeResource } from "../surface/containers.mjs";
 import { FileStore } from "../core/store";
@@ -993,12 +995,10 @@ export class AgentService {
     pageId: string,
     options: PageReadOptions = {},
   ) {
-    return readPageView(
-      this.store,
-      this.requireProject(projectId),
-      pageId,
-      options,
-    );
+    const project = this.requireProject(projectId);
+    const record = await this.store.readPage(project, pageId);
+    await new ReadBaselines(this.store.root).remember(project, record);
+    return readPageView(this.store, project, pageId, options);
   }
   private async savePageImpl(
     projectId: string,
@@ -1060,14 +1060,25 @@ export class AgentService {
     const current = await this.store.readPage(project, pageId);
     if (current.hash !== input.baseHash) {
       if (input.baseRevision) {
-        const baseline = await this.versioned().pageAt(
-          project,
-          pageId,
-          input.baseRevision,
-        );
+        const baselineDocument =
+          (await new EditorDrafts(this.store.root).baseline(
+            project,
+            pageId,
+            input.baseRevision,
+          )) ??
+          (await new ReadBaselines(this.store.root).read(
+            project,
+            pageId,
+            input.baseRevision,
+          ));
+        if (!baselineDocument)
+          throw new CoreError(
+            "CONFLICT",
+            "页面已有新修改，当前内容和尝试的操作已保留。请重新读取并明确处理。",
+          );
         const document = await lockDocumentComponents(
           this.store.root,
-          applyOperations(baseline.document, input.operations),
+          applyOperations(baselineDocument, input.operations),
           project,
         );
         const preserved = await preserveRemoteSave(
@@ -1128,9 +1139,17 @@ export class AgentService {
     return new LibraryOperations(this.store.root, this.projectId);
   }
   async historicalResource(path: string, revision: string) {
+    throw new CoreError(
+      "INVALID_DATA",
+      "Content history and version restoration have been removed.",
+    );
     return this.versioned().describePath(path, revision);
   }
   importedSnapshots(projectId: string, pageId?: string) {
+    throw new CoreError(
+      "INVALID_DATA",
+      "Content history and version restoration have been removed.",
+    );
     return this.versioned().importedSnapshots(
       this.requireProject(projectId),
       pageId,
@@ -1141,6 +1160,10 @@ export class AgentService {
     pageId: string,
     ref: { importId: string; snapshotId: string },
   ) {
+    throw new CoreError(
+      "INVALID_DATA",
+      "Content history and version restoration have been removed.",
+    );
     return this.versioned().importedPage(
       this.requireProject(projectId),
       pageId,
@@ -1154,12 +1177,20 @@ export class AgentService {
     snapshotId: string;
     baseRevision: string | null;
   }) {
+    throw new CoreError(
+      "INVALID_DATA",
+      "Content history and version restoration have been removed.",
+    );
     this.requireProject(input.projectId);
     return this.mutation("Restore imported snapshot", [input], () =>
       this.versioned().restoreImportedSnapshot(input),
     );
   }
   history(input: HistoryQuery = {}) {
+    throw new CoreError(
+      "INVALID_DATA",
+      "Content history and version restoration have been removed.",
+    );
     return this.versioned().history(input);
   }
   search(input: SearchOptions) {
@@ -1170,9 +1201,17 @@ export class AgentService {
     after: string,
     input: { projectId?: string; pageId?: string } = {},
   ) {
+    throw new CoreError(
+      "INVALID_DATA",
+      "Content history and version restoration have been removed.",
+    );
     return this.versioned().changes(before, after, input);
   }
   historicalPage(projectId: string, pageId: string, revision: string) {
+    throw new CoreError(
+      "INVALID_DATA",
+      "Content history and version restoration have been removed.",
+    );
     return this.versioned().pageAt(
       this.requireProject(projectId),
       pageId,
@@ -1180,6 +1219,10 @@ export class AgentService {
     );
   }
   historicalHtml(projectId: string, pageId: string, revision: string) {
+    throw new CoreError(
+      "INVALID_DATA",
+      "Content history and version restoration have been removed.",
+    );
     return this.versioned().historicalHtml(
       this.requireProject(projectId),
       pageId,
@@ -1191,6 +1234,10 @@ export class AgentService {
     pageId: string,
     ref: { importId: string; snapshotId: string },
   ) {
+    throw new CoreError(
+      "INVALID_DATA",
+      "Content history and version restoration have been removed.",
+    );
     return this.versioned().importedHtml(
       this.requireProject(projectId),
       pageId,
@@ -1203,6 +1250,10 @@ export class AgentService {
     revision: string;
     baseRevision: string;
   }) {
+    throw new CoreError(
+      "INVALID_DATA",
+      "Content history and version restoration have been removed.",
+    );
     this.requireProject(input.projectId);
     return withChangeContext(
       { ...changeContext(), restoredFrom: input.revision },

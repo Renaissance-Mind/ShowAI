@@ -58,13 +58,12 @@ const tools: Record<GuideTopic, string[]> = {
     "catalog_merge_preview",
     "catalog_merge_resolve",
   ],
-  history: [
-    "history_list",
-    "history_page",
-    "history_compare",
-    "history_restore",
+  recovery: [
     "page_merge_preview",
     "page_merge_save",
+    "workspace_conflicts",
+    "workspace_conflict",
+    "workspace_resolve",
   ],
   sync: ["project_context", "project_sync_status", "project_sync"],
   export: ["page_present", "page_export"],

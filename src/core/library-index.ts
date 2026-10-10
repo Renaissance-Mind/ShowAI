@@ -117,177 +117,149 @@ export class LibraryIndex {
 
   async synchronize(force = false): Promise<string | null> {
     await this.library.manifest();
-    return withLibraryLock(
-      this.library.root,
-      async () => {
-        const revision = await this.library.head();
-        const db = this.database();
-        try {
-          const indexed = db
-            .prepare("SELECT value FROM metadata WHERE key='revision'")
-            .get()?.value;
-          if (!force && indexed === (revision ?? "")) return revision;
-          const incremental =
-            !force &&
-            typeof indexed === "string" &&
-            !!indexed &&
-            !!revision &&
-            (await this.library.isAncestor(indexed, revision));
-          const history: HistoryEntry[] = [];
-          if (revision) {
-            let before: string | undefined;
-            while (true) {
-              const batch = await this.library.history({
-                limit: 1000,
-                before,
-                revision,
-              });
-              const boundary = incremental
-                ? batch.findIndex((entry) => entry.revision === indexed)
-                : -1;
-              history.push(
-                ...(boundary < 0 ? batch : batch.slice(0, boundary)),
-              );
-              if (boundary >= 0 || batch.length < 1000) break;
-              before = batch.at(-1)!.revision;
-            }
-          }
-          const allPaths = (
-            revision ? await this.library.tree(revision) : []
-          ).map((entry) => entry.path);
-          const changed = incremental
-            ? await this.library.changedPaths(indexed as string, revision!)
-            : allPaths;
-          const reload = new Set(changed);
-          for (const path of changed) {
-            const resource = resourceForPath(path);
-            if (resource.kind === "component" || resource.kind === "template")
-              for (const related of allPaths)
-                if (related.startsWith(resource.path + "/"))
-                  reload.add(related);
-          }
-          const paths = allPaths.filter(
-            (path) =>
-              reload.has(path) &&
-              !path.startsWith("assets/") &&
-              !path.startsWith("runtimes/") &&
-              !/\/reader\.json$|\.reader\.json$/.test(path) &&
-              !/\/pages\/[^/]+\/nodes\//.test(path) &&
-              (path.endsWith(".json") || /\.(tsx?|jsx?|md)$/.test(path)),
-          );
-          const rows: SearchRow[] = [],
-            edges: ReferenceEdge[] = [];
-          // Read bounded batches; the resulting index always names this exact revision.
-          for (let offset = 0; offset < paths.length; offset += 32) {
-            const batch = await this.library.readFiles(
-              paths.slice(offset, offset + 32),
-              revision!,
-            );
-            for (const [path, bytes] of batch)
-              this.extract(path, bytes, rows, edges);
-          }
-          db.exec("BEGIN IMMEDIATE");
-          try {
-            if (!incremental)
-              db.exec(
-                "DELETE FROM resources; DELETE FROM search; DELETE FROM refs; DELETE FROM history; DELETE FROM history_resources;",
-              );
-            else {
-              const deleteSearch = db.prepare(
-                "DELETE FROM search WHERE id IN(SELECT id FROM resources WHERE path=?)",
-              );
-              const deleteRows = db.prepare(
-                "DELETE FROM resources WHERE path=?",
-              );
-              const deleteRefs = db.prepare("DELETE FROM refs WHERE source=?");
-              for (const path of reload) {
-                deleteSearch.run(path);
-                deleteRows.run(path);
-                const resource = resourceForPath(path);
-                deleteRefs.run(
-                  resource.kind === "component" || resource.kind === "template"
-                    ? resource.path
-                    : path,
-                );
-              }
-            }
-            const rowStatement = db.prepare(
-              "INSERT INTO resources VALUES(?,?,?,?,?,?,?,?,?)",
-            );
-            const searchStatement = db.prepare(
-              "INSERT INTO search VALUES(?,?,?,?)",
-            );
-            for (const row of rows) {
-              rowStatement.run(
-                row.id,
-                row.kind,
-                row.projectId,
-                row.resourceId,
-                row.blockId,
-                row.title,
-                row.body,
-                row.path,
-                JSON.stringify(row.location),
-              );
-              searchStatement.run(
-                row.id,
-                row.title,
-                row.body,
-                cjkTokens(row.title + " " + row.body).join(" "),
-              );
-            }
-            const refStatement = db.prepare(
-              "INSERT INTO refs VALUES(?,?,?,?,?,?)",
-            );
-            for (const ref of edges)
-              refStatement.run(
-                ref.source,
-                ref.targetKind,
-                ref.targetId,
-                ref.version ?? null,
-                ref.integrity ?? null,
-                ref.blockId ?? null,
-              );
-            const historyStatement = db.prepare(
-              "INSERT INTO history VALUES(?,?,?,?,?,?,?)",
-            );
-            const scopeStatement = db.prepare(
-              "INSERT INTO history_resources VALUES(?,?,?,?,?)",
-            );
-            for (const entry of [...history].reverse()) {
-              historyStatement.run(
-                entry.revision,
-                entry.at,
-                entry.actor.kind,
-                entry.actor.harness ?? null,
-                entry.actor.sessionId ?? null,
-                entry.message ?? "",
-                JSON.stringify(entry),
-              );
-              for (const resource of entry.resources)
-                scopeStatement.run(
-                  entry.revision,
-                  resource.kind,
-                  resource.id,
-                  resource.projectId ?? null,
-                  resource.path,
-                );
-            }
-            db.prepare(
-              "INSERT INTO metadata(key,value) VALUES('revision',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-            ).run(revision ?? "");
-            db.exec("COMMIT");
-          } catch (error) {
-            db.exec("ROLLBACK");
-            throw error;
-          }
-          return revision;
-        } finally {
-          db.close();
+    return withLibraryLock(this.library.root, async () => {
+      const revision = await this.library.head();
+      const db = this.database();
+      try {
+        const indexed = db
+          .prepare("SELECT value FROM metadata WHERE key='revision'")
+          .get()?.value;
+        if (!force && indexed === (revision ?? "")) return revision;
+        const incremental = false;
+        const history: HistoryEntry[] = [];
+        const allPaths = (
+          revision ? await this.library.tree(revision) : []
+        ).map((entry) => entry.path);
+        const changed = incremental
+          ? await this.library.changedPaths(indexed as string, revision!)
+          : allPaths;
+        const reload = new Set(changed);
+        for (const path of changed) {
+          const resource = resourceForPath(path);
+          if (resource.kind === "component" || resource.kind === "template")
+            for (const related of allPaths)
+              if (related.startsWith(resource.path + "/")) reload.add(related);
         }
-      },
-      "index",
-    );
+        const paths = allPaths.filter(
+          (path) =>
+            reload.has(path) &&
+            !path.startsWith("assets/") &&
+            !path.startsWith("runtimes/") &&
+            !path.startsWith("imports/") &&
+            !path.includes("/history/") &&
+            !/\/reader\.json$|\.reader\.json$/.test(path) &&
+            !/\/pages\/[^/]+\/nodes\//.test(path) &&
+            (path.endsWith(".json") || /\.(tsx?|jsx?|md)$/.test(path)),
+        );
+        const rows: SearchRow[] = [],
+          edges: ReferenceEdge[] = [];
+        // Read bounded batches; the resulting index always names this exact revision.
+        for (let offset = 0; offset < paths.length; offset += 32) {
+          const batch = await this.library.readFiles(
+            paths.slice(offset, offset + 32),
+            revision!,
+          );
+          for (const [path, bytes] of batch)
+            this.extract(path, bytes, rows, edges);
+        }
+        db.exec("BEGIN IMMEDIATE");
+        try {
+          if (!incremental)
+            db.exec(
+              "DELETE FROM resources; DELETE FROM search; DELETE FROM refs; DELETE FROM history; DELETE FROM history_resources;",
+            );
+          else {
+            const deleteSearch = db.prepare(
+              "DELETE FROM search WHERE id IN(SELECT id FROM resources WHERE path=?)",
+            );
+            const deleteRows = db.prepare("DELETE FROM resources WHERE path=?");
+            const deleteRefs = db.prepare("DELETE FROM refs WHERE source=?");
+            for (const path of reload) {
+              deleteSearch.run(path);
+              deleteRows.run(path);
+              const resource = resourceForPath(path);
+              deleteRefs.run(
+                resource.kind === "component" || resource.kind === "template"
+                  ? resource.path
+                  : path,
+              );
+            }
+          }
+          const rowStatement = db.prepare(
+            "INSERT INTO resources VALUES(?,?,?,?,?,?,?,?,?)",
+          );
+          const searchStatement = db.prepare(
+            "INSERT INTO search VALUES(?,?,?,?)",
+          );
+          for (const row of rows) {
+            rowStatement.run(
+              row.id,
+              row.kind,
+              row.projectId,
+              row.resourceId,
+              row.blockId,
+              row.title,
+              row.body,
+              row.path,
+              JSON.stringify(row.location),
+            );
+            searchStatement.run(
+              row.id,
+              row.title,
+              row.body,
+              cjkTokens(row.title + " " + row.body).join(" "),
+            );
+          }
+          const refStatement = db.prepare(
+            "INSERT INTO refs VALUES(?,?,?,?,?,?)",
+          );
+          for (const ref of edges)
+            refStatement.run(
+              ref.source,
+              ref.targetKind,
+              ref.targetId,
+              ref.version ?? null,
+              ref.integrity ?? null,
+              ref.blockId ?? null,
+            );
+          const historyStatement = db.prepare(
+            "INSERT INTO history VALUES(?,?,?,?,?,?,?)",
+          );
+          const scopeStatement = db.prepare(
+            "INSERT INTO history_resources VALUES(?,?,?,?,?)",
+          );
+          for (const entry of [...history].reverse()) {
+            historyStatement.run(
+              entry.revision,
+              entry.at,
+              entry.actor.kind,
+              entry.actor.harness ?? null,
+              entry.actor.sessionId ?? null,
+              entry.message ?? "",
+              JSON.stringify(entry),
+            );
+            for (const resource of entry.resources)
+              scopeStatement.run(
+                entry.revision,
+                resource.kind,
+                resource.id,
+                resource.projectId ?? null,
+                resource.path,
+              );
+          }
+          db.prepare(
+            "INSERT INTO metadata(key,value) VALUES('revision',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+          ).run(revision ?? "");
+          db.exec("COMMIT");
+        } catch (error) {
+          db.exec("ROLLBACK");
+          throw error;
+        }
+        return revision;
+      } finally {
+        db.close();
+      }
+    });
   }
 
   private extract(

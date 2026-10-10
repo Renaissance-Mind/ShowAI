@@ -352,27 +352,13 @@ export function createMcpServer(options: {
         blockIds: z.array(z.string().min(1)).min(1).optional(),
         format: z.enum(["html", "inline", "site"]),
         presentation: z.enum(["spatial", "reading"]).optional(),
-        revision: z.string().optional(),
-        importedSnapshot: z
-          .object({ importId: z.string(), snapshotId: z.string() })
-          .optional(),
         components: z.enum(["bundled", "remote"]).optional(),
         out: z.string().min(1),
         overwrite: z.boolean().optional(),
       },
       annotations: write,
     },
-    ({
-      pageId,
-      blockIds,
-      format,
-      components,
-      out,
-      overwrite,
-      presentation,
-      revision,
-      importedSnapshot,
-    }) =>
+    ({ pageId, blockIds, format, components, out, overwrite, presentation }) =>
       call(() =>
         service.export({
           projectId,
@@ -383,8 +369,6 @@ export function createMcpServer(options: {
           out,
           overwrite,
           presentation,
-          revision,
-          importedSnapshot,
         }),
       ),
   );
@@ -611,23 +595,6 @@ export function createMcpServer(options: {
     (input) => call(() => service.publications(input)),
   );
   register(
-    "history_list",
-    {
-      description:
-        "List committed change times, actors, sessions and touched resources in this project.",
-      inputSchema: {
-        pageId: z.string().optional(),
-        harness: z.string().optional(),
-        sessionId: z.string().optional(),
-        query: z.string().optional(),
-        limit: z.number().int().min(1).max(200).optional(),
-        before: z.string().optional(),
-      },
-      annotations: readOnly,
-    },
-    (input) => call(() => service.history({ ...input, projectId })),
-  );
-  register(
     "library_search",
     {
       description:
@@ -643,109 +610,6 @@ export function createMcpServer(options: {
       annotations: readOnly,
     },
     (input) => call(() => service.search({ ...input, projectId })),
-  );
-  register(
-    "history_compare",
-    {
-      description:
-        "Compare two exact committed revisions, optionally for one page.",
-      inputSchema: {
-        before: z.string(),
-        after: z.string(),
-        pageId: z.string().optional(),
-      },
-      annotations: readOnly,
-    },
-    ({ before, after, pageId }) =>
-      call(() => service.compareHistory(before, after, { projectId, pageId })),
-  );
-  register(
-    "history_page",
-    {
-      description:
-        "Read a historical page with its exact verified component dependency closure.",
-      inputSchema: { pageId: z.string(), revision: z.string() },
-      annotations: readOnly,
-    },
-    ({ pageId, revision }) =>
-      call(() => service.historicalPage(projectId, pageId, revision)),
-  );
-  register(
-    "history_restore",
-    {
-      description:
-        "Restore a page and its needed component/source versions as a new change. Requires the current resource revision.",
-      inputSchema: {
-        ...changeSchema,
-        pageId: z.string(),
-        revision: z.string(),
-        baseRevision: z.string(),
-      },
-      annotations: write,
-    },
-    ({ operationId, message, groupId, ...input }) =>
-      call(() => service.restorePage({ ...input, projectId }), {
-        operationId,
-        message,
-        groupId,
-      }),
-  );
-  register(
-    "history_html",
-    {
-      description:
-        "Render a historical page with its captured reader code and exact component dependencies.",
-      inputSchema: { pageId: z.string(), revision: z.string() },
-      annotations: readOnly,
-    },
-    ({ pageId, revision }) =>
-      call(() => service.historicalHtml(projectId, pageId, revision)),
-  );
-  register(
-    "history_imported_snapshots",
-    {
-      description:
-        "List separately imported old checkpoints. Original edit times, actors and ordering are unknown.",
-      inputSchema: { pageId: z.string().optional() },
-      annotations: readOnly,
-    },
-    ({ pageId }) => call(() => service.importedSnapshots(projectId, pageId)),
-  );
-  register(
-    "history_imported_page",
-    {
-      description:
-        "Read a retained old checkpoint and its verified dependencies without assigning a fabricated history order.",
-      inputSchema: {
-        pageId: z.string(),
-        importId: z.string(),
-        snapshotId: z.string(),
-      },
-      annotations: readOnly,
-    },
-    ({ pageId, ...ref }) =>
-      call(() => service.importedPage(projectId, pageId, ref)),
-  );
-  register(
-    "history_restore_imported_snapshot",
-    {
-      description:
-        "Restore a reviewed old checkpoint as a new attributed commit while preserving its unknown original provenance.",
-      inputSchema: {
-        ...changeSchema,
-        pageId: z.string(),
-        importId: z.string(),
-        snapshotId: z.string(),
-        baseRevision: z.string().nullable(),
-      },
-      annotations: write,
-    },
-    ({ operationId, message, groupId, ...input }) =>
-      call(() => service.restoreImportedSnapshot({ ...input, projectId }), {
-        operationId,
-        message,
-        groupId,
-      }),
   );
   register(
     "page_merge_preview",

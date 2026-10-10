@@ -15,7 +15,7 @@ import {
 } from "../sync/protocol";
 import { type MetadataStore, type ObjectStore } from "./storage";
 import { prepareMetadata } from "./migrations";
-import { Revisions, type RevisionRow } from "./revisions";
+import { Revisions } from "./revisions";
 import { verifiedStream, deadlineBody } from "./streams";
 import { Quotas, type StoragePolicy } from "./quotas";
 import { Uploads } from "./uploads";
@@ -49,10 +49,7 @@ import {
   publicLimits,
   type AuthUser,
 } from "./accounts";
-import {
-  validateReaderClosure,
-  validatePackageClosure,
-} from "../sync/dependency-validation";
+import { validatePackageClosure } from "../sync/dependency-validation";
 import {
   serverBaseUrl,
   serverEndpoint,
@@ -107,7 +104,9 @@ async function body(request: Request): Promise<Record<string, unknown>> {
   const path = new URL(request.url).pathname.replace(/\/$/, "");
   const bytes = await readBounded(
     request,
-    path.endsWith("/revisions") ? 16 * 1024 * 1024 : 64 * 1024,
+    path.endsWith("/revisions") || path.endsWith("/snapshot")
+      ? 16 * 1024 * 1024
+      : 64 * 1024,
   );
   const value = JSON.parse(new TextDecoder().decode(bytes));
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -311,7 +310,7 @@ export function createSyncServer(options: ServerOptions) {
         capabilities: [
           "account-security-v1",
           "invite-controls-v1",
-          "history-summary-v1",
+          "current-state-v1",
           "object-manifests-v1",
           "storage-quotas-v1",
           "resumable-objects-v1",
@@ -703,7 +702,17 @@ export function createSyncServer(options: ServerOptions) {
           ...snapshot,
           format: syncProtocol,
           parents: [project.head],
-          files: { ...snapshot.files, [metadataPath]: digest },
+          files: {
+            ...Object.fromEntries(
+              Object.entries(snapshot.files).filter(
+                ([path]) =>
+                  !path.startsWith("runtimes/") &&
+                  !path.includes("/history/") &&
+                  !/\/reader\.json$|\.reader\.json$/.test(path),
+              ),
+            ),
+            [metadataPath]: digest,
+          },
           change: {
             at: new Date().toISOString(),
             actor: { kind: "human", label: user.name },
@@ -717,7 +726,7 @@ export function createSyncServer(options: ServerOptions) {
           new Request(
             serverEndpoint(
               publicBase ?? url.origin,
-              `/api/projects/${projectId}/revisions`,
+              `/api/projects/${projectId}/snapshot`,
             ),
             {
               method: "POST",
@@ -1072,86 +1081,61 @@ export function createSyncServer(options: ServerOptions) {
         );
       return json({ ok: true });
     }
-    if (resource === "revisions" && method === "GET") {
-      const after = url.searchParams.get("after"),
-        before = url.searchParams.get("before"),
-        summary = url.searchParams.get("summary") === "1";
-      const limit = Math.min(
-        200,
-        Math.max(1, Number(url.searchParams.get("limit") ?? 100)),
+    if (resource === "revisions" || resource.startsWith("revisions/"))
+      throw new SyncError(
+        410,
+        "HISTORY_REMOVED",
+        "Project history is no longer available. Upgrade the client to current-state synchronization.",
       );
-      if (!Number.isInteger(limit))
-        throw new SyncError(400, "INVALID_LIMIT", "Invalid history limit.");
-      const cursor = before ?? after;
-      const row = cursor
-        ? (
-            await db.all<{ sequence: number }>(
-              "SELECT sequence FROM revisions WHERE project_id=? AND revision=?",
-              [projectId, digestId(cursor)],
-            )
-          )[0]
-        : undefined;
-      if (cursor && !row)
+    if (resource === "snapshot" && method === "GET") {
+      const requested = url.searchParams.get("revision") ?? project.head;
+      // The version parameter guards against a head change during download.
+      if (!requested || requested !== project.head)
         throw new SyncError(
           409,
-          "MISSING_BASELINE",
-          "The history baseline is not present on this server.",
+          "CONFLICT",
+          "The project current state changed. Retry synchronization.",
+          { head: project.head },
         );
-      // Do not select embedded legacy manifests for summary pages.
-      const candidates = await db.all<RevisionRow>(
-        `SELECT r.revision,r.sequence,r.manifest_bytes,r.published,u.id AS source_user_id,u.name AS source_user_name,r.created_at AS received_at FROM revisions r JOIN users u ON u.id=r.user_id WHERE r.project_id=?${row ? ` AND r.sequence${before ? "<" : ">"}?` : ""} ORDER BY r.sequence ${before ? "DESC" : "ASC"} LIMIT ?`,
-        row ? [projectId, row.sequence, limit] : [projectId, limit],
-      );
-      const entries: unknown[] = [];
-      let bytes = 0;
-      let last: string | null = null;
-      for (const candidate of candidates) {
-        if (
-          !summary &&
-          entries.length &&
-          bytes + candidate.manifest_bytes > 1024 * 1024
-        )
-          break;
-        if (!summary)
-          await requestBudgets.consumeRead(user.id, candidate.manifest_bytes);
-        const entry = summary
-          ? revisions.summary(candidate)
-          : await revisions.record(
-              projectId,
-              (await revisions.row(projectId, candidate.revision))!,
-            );
-        const size = new TextEncoder().encode(JSON.stringify(entry)).byteLength;
-        if (entries.length && bytes + size > 1024 * 1024) break;
-        entries.push(entry);
-        bytes += size;
-        last = candidate.revision;
-      }
-      return json({
-        head: project.head,
-        entries,
-        next:
-          entries.length < candidates.length || candidates.length === limit
-            ? last
-            : null,
-      });
-    }
-    const revision = resource.match(/^revisions\/([a-f0-9]{64})$/);
-    if (revision && method === "GET") {
-      const entry = await revisions.row(projectId, revision[1]);
+      const entry = await revisions.row(projectId, requested);
       if (!entry)
         throw new SyncError(
           404,
           "MISSING_REVISION",
-          "Project revision is missing.",
+          "Current project state is missing.",
         );
       await requestBudgets.consumeRead(user.id, entry.manifest_bytes);
       return json(await revisions.record(projectId, entry));
     }
-    if (resource === "revisions" && method === "POST") {
+    if (resource === "snapshot" && method === "POST") {
       await projectFor(user.id, projectId, "editor");
-      const input = await body(request),
-        snapshot: ProjectSnapshot = validateSnapshot(input.snapshot, projectId),
+      const input = await body(request);
+      if (input.publish === false)
+        throw new SyncError(
+          400,
+          "INVALID_STATE",
+          "Only the current project state can be published.",
+        );
+      const expected =
+        input.expected === null ? null : digestId(input.expected);
+      const snapshot: ProjectSnapshot = validateSnapshot(
+          input.snapshot,
+          projectId,
+        ),
         revision = await snapshotRevision(snapshot);
+      if (project.head === revision) {
+        await revisions.activateCurrent(projectId);
+        await revisions.retainCurrent(projectId, revision);
+        return json({ revision, head: revision, published: true });
+      }
+      if (expected !== project.head)
+        throw new SyncError(
+          409,
+          "CONFLICT",
+          "The project has newer changes. Retry synchronization.",
+          { head: project.head },
+        );
+      await revisions.activateCurrent(projectId);
       if (
         Object.keys(snapshot.files).some((path) =>
           path.startsWith("packages/"),
@@ -1260,20 +1244,6 @@ export function createSyncServer(options: ServerOptions) {
             "Only project administrators can archive or restore a project.",
           );
       }
-      for (const parent of snapshot.parents)
-        if (
-          !(
-            await db.all(
-              "SELECT revision FROM revisions WHERE project_id=? AND revision=?",
-              [projectId, parent],
-            )
-          ).length
-        )
-          throw new SyncError(
-            409,
-            "MISSING_PARENT",
-            "Upload the parent version first.",
-          );
       const unique = [...new Set(Object.values(snapshot.files))];
       for (let index = 0; index < unique.length; index += 80) {
         const chunk = unique.slice(index, index + 80);
@@ -1290,22 +1260,19 @@ export function createSyncServer(options: ServerOptions) {
             "Upload every referenced content object before publishing.",
           );
       }
-      await validateReaderClosure(
-        Object.keys(snapshot.files),
-        projectId,
-        async (path) => {
-          const bytes = await objects.get(
-            objectKey(projectId, snapshot.files[path]),
-          );
-          if (!bytes || (await hash(bytes)) !== snapshot.files[path])
-            throw new SyncError(
-              400,
-              "INVALID_DEPENDENCY",
-              "A reader object is missing or corrupt.",
-            );
-          return bytes;
-        },
-      );
+      if (
+        Object.keys(snapshot.files).some(
+          (path) =>
+            path.startsWith("runtimes/") ||
+            path.includes("/history/") ||
+            /\/reader\.json$|\.reader\.json$/.test(path),
+        )
+      )
+        throw new SyncError(
+          400,
+          "INVALID_STATE",
+          "Current-state synchronization excludes archived readers and history.",
+        );
       await validatePackageClosure(
         Object.keys(snapshot.files),
         projectId,
@@ -1371,8 +1338,6 @@ export function createSyncServer(options: ServerOptions) {
       const currentProject = await projectFor(user.id, projectId, "editor");
       if (input.publish === false)
         return json({ revision, head: project.head, published: false });
-      const expected =
-        input.expected === null ? null : digestId(input.expected);
       if (currentProject.head === revision)
         return json({ revision, head: revision, published: true });
       if (
@@ -1386,13 +1351,15 @@ export function createSyncServer(options: ServerOptions) {
         );
       const results = await db.batch([
         {
-          sql: `UPDATE projects SET head=?,name=?,archived=? WHERE id=? AND head IS ? AND EXISTS(${gate.sql}) AND (archived=? OR EXISTS(SELECT 1 FROM members WHERE project_id=? AND user_id=? AND role='admin'))`,
+          sql: `UPDATE projects SET head=?,name=?,archived=? WHERE id=? AND head IS ? AND EXISTS(SELECT 1 FROM revisions WHERE project_id=? AND revision=?) AND EXISTS(${gate.sql}) AND (archived=? OR EXISTS(SELECT 1 FROM members WHERE project_id=? AND user_id=? AND role='admin'))`,
           values: [
             revision,
             projectMetadata?.name ?? project.name,
             projectMetadata?.archived ? 1 : 0,
             projectId,
             expected,
+            projectId,
+            revision,
             ...gate.values,
             projectMetadata?.archived ? 1 : 0,
             projectId,
@@ -1407,14 +1374,19 @@ export function createSyncServer(options: ServerOptions) {
       if (!results[0].changes) {
         await authenticate(request);
         const current = await projectFor(user.id, projectId, "editor");
+        await db.run(
+          "DELETE FROM revisions WHERE project_id=? AND revision=? AND published=0 AND revision<>(SELECT head FROM projects WHERE id=?)",
+          [projectId, revision, projectId],
+        );
         throw new SyncError(
           409,
           "CONFLICT",
-          "The project has a newer version. Your uploaded version is retained.",
+          "The project has newer changes. Your local content is retained; retry synchronization.",
           { head: current.head, revision },
         );
       }
       await events?.published(projectId, expected);
+      await revisions.retainCurrent(projectId, revision);
       return json({ revision, head: revision, published: true });
     }
     throw new SyncError(404, "NOT_FOUND", "Unknown project endpoint.");
@@ -1439,7 +1411,7 @@ export function createSyncServer(options: ServerOptions) {
         requestPath.endsWith("/api/ops/reconcile") ||
         requestPath.endsWith("/api/ops/cleanup") ||
         requestPath.endsWith("/api/ops/export/metadata") ||
-        /\/revisions(?:\/|$)/.test(requestPath) ||
+        /\/(?:revisions|snapshot)(?:\/|$)/.test(requestPath) ||
         (request.method === "PATCH" &&
           /\/api\/projects\/[^/]+\/?$/.test(requestPath));
       if (heavy) {
@@ -1449,7 +1421,7 @@ export function createSyncServer(options: ServerOptions) {
               {
                 error: {
                   code: "BUSY",
-                  message: "Project history is busy; retry shortly.",
+                  message: "Project synchronization is busy; retry shortly.",
                   details: { retryAfter: 1 },
                 },
               },
@@ -1482,7 +1454,7 @@ export function createSyncServer(options: ServerOptions) {
           (request.method === "PUT" &&
             /^\/api\/projects\/[^/]+\/objects\//.test(logicalPath)) ||
           (request.method === "POST" &&
-            /^\/api\/projects\/[^/]+\/(?:revisions|objects\/uploads\/[^/]+\/complete)$/.test(
+            /^\/api\/projects\/[^/]+\/(?:snapshot|objects\/uploads\/[^/]+\/complete)$/.test(
               logicalPath,
             )) ||
           (request.method === "PATCH" &&

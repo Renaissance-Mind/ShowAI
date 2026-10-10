@@ -1,9 +1,13 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { link, lstat, mkdir, readFile, rm, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { CoreError } from "./model";
 import { atomicLibraryFile, safeLibraryPath } from "./library-files";
 import { withWindowsSharingRetry } from "./atomic-rename";
+
+const lockContext = new AsyncLocalStorage<Map<string, string>>();
+const activeLocks = new Map<string, string>();
 
 interface LeaseOwner {
   pid: number;
@@ -62,6 +66,9 @@ export async function withLibraryLock<T>(
 ): Promise<T> {
   if (!/^[a-z-]+$/.test(name))
     throw new CoreError("INVALID_PATH", "Invalid library lock name.");
+  const key = `${root}:${name}`;
+  const inherited = lockContext.getStore()?.get(key);
+  if (inherited && activeLocks.get(key) === inherited) return action();
   const local = join(root, "local");
   await safeLibraryPath(root, local);
   await mkdir(local, { recursive: true });
@@ -128,8 +135,12 @@ export async function withLibraryLock<T>(
         );
       await new Promise((done) => setTimeout(done, 25));
     }
-    return await action();
+    activeLocks.set(key, token);
+    const context = new Map(lockContext.getStore());
+    context.set(key, token);
+    return await lockContext.run(context, action);
   } finally {
+    if (activeLocks.get(key) === token) activeLocks.delete(key);
     if (acquired) {
       const latest = await ownerAt(root, lock);
       if (latest?.token === token) await unlink(lock);

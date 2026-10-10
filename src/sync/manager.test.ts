@@ -1,5 +1,7 @@
+import { createHash } from "node:crypto";
+import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { SyncManager } from "./manager";
@@ -7,19 +9,11 @@ import { AgentService, errorResult } from "../agent/service";
 import { startSyncServer } from "../server/node";
 import { ContentLibrary as GitLibrary } from "../core/content-library";
 import { FileStore } from "../core/store";
-import { LibraryOperations } from "../core/library-operations";
 import { withChangeContext } from "../core/history-context";
 import { applyOperations } from "../core/diff";
 import { plainText } from "../lib/document";
 import { importComponent, resolveDocumentComponents } from "../core/catalog";
-import { LibraryImport } from "../core/library-import";
 import { syncProtocol } from "./protocol";
-import { spawn } from "node:child_process";
-import { watch } from "node:fs";
-import { mkdir, readdir } from "node:fs/promises";
-import { build } from "esbuild";
-import { rawSourcePlugin } from "../../scripts/raw-source-plugin.mjs";
-import { stopTestProcess } from "../../scripts/stop-test-process.mjs";
 const actions: (() => Promise<unknown>)[] = [];
 vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
 afterEach(async () => {
@@ -84,6 +78,130 @@ async function fixture() {
   return { directory, server, alice, bob, project, page };
 }
 describe("project synchronization between independent real content libraries", () => {
+  it("keeps one cloud manifest and a bounded current cache while new devices receive only latest content", async () => {
+    const { directory, server, alice, bob, project, page } = await fixture();
+    let firstRemote: string | null = null;
+    for (let i = 0; i < 8; i++) {
+      const current = await alice.store.readPage(project.id, page.document.id);
+      await alice.store.savePage(
+        project.id,
+        page.document.id,
+        { ...current.document, title: `Latest ${i}` },
+        current.hash,
+        current.revision,
+      );
+      await alice.manager.run();
+      firstRemote ??= (await alice.manager.status()).projects[0].remoteHead;
+    }
+    await bob.manager.run();
+    expect(
+      (await bob.store.readPage(project.id, page.document.id)).document.title,
+    ).toBe("Latest 7");
+    expect(await bob.library.history()).toEqual([]);
+    expect((await alice.manager.status()).projects[0].status).toBe("synced");
+    const db = new DatabaseSync(join(directory, "server", "metadata.sqlite"));
+    try {
+      expect(
+        db
+          .prepare("SELECT COUNT(*) AS n FROM revisions WHERE project_id=?")
+          .get(project.id)!.n,
+      ).toBe(1);
+    } finally {
+      db.close();
+    }
+    const connection = (await alice.manager.configuration()).connections[0];
+    const headers = { authorization: `Bearer ${connection.token}` };
+    expect(
+      (
+        await fetch(`${server.url}/api/projects/${project.id}/revisions`, {
+          headers,
+        })
+      ).status,
+    ).toBe(410);
+    expect(
+      (
+        await fetch(
+          `${server.url}/api/projects/${project.id}/snapshot?revision=${firstRemote}`,
+          { headers },
+        )
+      ).status,
+    ).toBe(409);
+    const snapshot = await (
+      await fetch(`${server.url}/api/projects/${project.id}/snapshot`, {
+        headers,
+      })
+    ).json();
+    expect(
+      Object.keys(snapshot.snapshot.files).some((path) =>
+        /runtimes\/|reader\.json|\/history\//.test(path),
+      ),
+    ).toBe(false);
+    const roots = await readdir(
+      join(alice.home, "local", "sync", "current-snapshots"),
+    );
+    expect(
+      await readdir(
+        join(alice.home, "local", "sync", "current-snapshots", roots[0]),
+      ),
+    ).toHaveLength(4);
+  });
+  it("renames and archives the current cloud project through the current-state publication path", async () => {
+    const { directory, alice, bob, project } = await fixture();
+    await alice.manager.manage(alice.connection.id, project.id, "project", {
+      name: "Updated cloud name",
+    });
+    await bob.manager.run();
+    expect((await bob.store.readProject(project.id)).name).toBe(
+      "Updated cloud name",
+    );
+    await alice.manager.manage(alice.connection.id, project.id, "project", {
+      archived: true,
+    });
+    await alice.manager.run();
+    await bob.manager.run();
+    expect((await bob.store.readProject(project.id)).archived).toBe(true);
+    await alice.manager.manage(alice.connection.id, project.id, "project", {
+      archived: false,
+    });
+    await bob.manager.run();
+    expect((await bob.store.readProject(project.id)).archived).toBe(false);
+    const db = new DatabaseSync(join(directory, "server", "metadata.sqlite"));
+    try {
+      expect(
+        db
+          .prepare("SELECT COUNT(*) AS n FROM revisions WHERE project_id=?")
+          .get(project.id)!.n,
+      ).toBe(1);
+    } finally {
+      db.close();
+    }
+  });
+  it("streams a real SVG object larger than 16 MiB using the object limit", async () => {
+    const { server, alice, project } = await fixture();
+    const svg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="red"/><!--' +
+        "x".repeat(17 * 1024 * 1024) +
+        "--></svg>",
+    );
+    const digest = createHash("sha256").update(svg).digest("hex");
+    const connection = (await alice.manager.configuration()).connections[0];
+    const headers = {
+      authorization: `Bearer ${connection.token}`,
+      "content-type": "application/octet-stream",
+    };
+    const url = `${server.url}/api/projects/${project.id}/objects/${digest}`;
+    expect(
+      (await fetch(url, { method: "PUT", headers, body: svg })).status,
+    ).toBe(200);
+    const response = await fetch(url, { headers });
+    expect(response.status).toBe(200);
+    expect(
+      createHash("sha256")
+        .update(Buffer.from(await response.arrayBuffer()))
+        .digest("hex"),
+    ).toBe(digest);
+  });
+
   it("acknowledges its own published ancestor after a lost local checkpoint without copying later edits", async () => {
     const { alice, bob, project, page } = await fixture();
     const configPath = join(alice.home, "local/sync/config.json");
@@ -282,35 +400,8 @@ describe("project synchronization between independent real content libraries", (
     await bob.manager.join(bob.connection.id, link.toString());
     await bob.manager.stop();
   });
-  it("downloads full history, original actors/times, and the exact archived reader", async () => {
-    const { alice, bob, project, page } = await fixture();
-    expect(
-      (await bob.store.readPage(project.id, page.document.id)).document,
-    ).toEqual(page.document);
-    const source = (
-      await alice.library.history({ projectId: project.id })
-    ).find((entry) => entry.actor.kind === "agent")!;
-    const imported = (
-      await bob.library.history({ projectId: project.id })
-    ).find((entry) => entry.actor.kind === "agent")!;
-    expect(imported.at).toBe(source.at);
-    expect(imported.actor).toEqual(source.actor);
-    expect(imported.syncOrigin?.sourceRevision).toBe(source.revision);
-    const before = await new LibraryOperations(alice.home).historicalHtml(
-      project.id,
-      page.document.id,
-      source.revision,
-    );
-    const after = await new LibraryOperations(bob.home).historicalHtml(
-      project.id,
-      page.document.id,
-      imported.revision,
-    );
-    expect(after.reader.integrity).toBe(before.reader.integrity);
-    expect(after.html).toBe(before.html);
-    expect((await bob.manager.status()).projects[0].status).toBe("synced");
-  });
-  it("merges independent offline page edits and keeps both devices' edits in history", async () => {
+
+  it("merges independent offline page edits without recording content history", async () => {
     const { alice, bob, project, page } = await fixture();
     const one = await alice.store.readPage(project.id, page.document.id),
       two = await bob.store.readPage(project.id, page.document.id);
@@ -344,7 +435,7 @@ describe("project synchronization between independent real content libraries", (
     expect((await bob.manager.status()).projects[0].status).toBe("synced");
     expect(
       (await alice.library.history({ projectId: project.id })).length,
-    ).toBeGreaterThan(3);
+    ).toBe(0);
   });
   it("automatically keeps overlapping edits as two ordinary pages with shared origin records", async () => {
     const { alice, bob, project, page } = await fixture();
@@ -450,7 +541,7 @@ describe("project synchronization between independent real content libraries", (
       ),
     ).toBe(true);
   });
-  it("syncs component sources, deduplicated images and a restored old page", async () => {
+  it("syncs current component sources and deduplicated images", async () => {
     const { alice, bob, project, page } = await fixture();
     const component = await importComponent(
       alice.home,
@@ -506,85 +597,8 @@ describe("project synchronization between independent real content libraries", (
         entry.path.startsWith("assets/"),
       ).length,
     ).toBeGreaterThan(0);
-    const original = (
-      await bob.library.history({ projectId: project.id })
-    ).find((entry) => entry.message === "Create original page")!;
-    await new LibraryOperations(bob.home).restorePage({
-      projectId: project.id,
-      pageId: page.document.id,
-      revision: original.revision,
-      baseRevision: received.revision!,
-    });
-    await bob.manager.run();
-    await alice.manager.run();
-    expect(
-      (await alice.store.readPage(project.id, page.document.id)).document.title,
-    ).toBe("Original page");
   });
-  it("retains unknown legacy checkpoints and their original readers across devices", async () => {
-    const { directory, alice, bob } = await fixture();
-    const old = new FileStore(join(directory, "legacy-source")),
-      project = await old.createProject({ name: "Legacy history" });
-    const first = await old.createPage(project.id, { title: "Old title" });
-    await old.savePage(
-      project.id,
-      first.document.id,
-      { ...first.document, title: "Current legacy title" },
-      first.hash,
-    );
-    const importedHome = join(directory, "legacy-migrated"),
-      importer = new LibraryImport(importedHome),
-      report = await importer.prepare(old.root);
-    await importer.activate(report.id);
-    const sender = new SyncManager(importedHome);
-    actions.push(() => sender.stop());
-    const connection = await sender.connect({
-      url: alice.connection.url,
-      account: `Legacy-${crypto.randomUUID()}`,
-      password: "test-password",
-      register: true,
-      registrationKey: process.env.SHOWAI_SYNC_TEST_KEY,
-    });
-    await sender.stop();
-    await sender.attach(connection.id, project.id);
-    await sender.stop();
-    const invite = (await sender.manage(connection.id, project.id, "invite", {
-      role: "viewer",
-    })) as { url: string };
-    await bob.manager.join(bob.connection.id, invite.url);
-    await bob.manager.stop();
-    const before = await new LibraryOperations(importedHome).importedSnapshots(
-        project.id,
-        first.document.id,
-      ),
-      after = await new LibraryOperations(bob.home).importedSnapshots(
-        project.id,
-        first.document.id,
-      );
-    expect(after.length).toBe(before.length);
-    expect(after.length).toBeGreaterThan(0);
-    expect(
-      after.every(
-        (snapshot) =>
-          snapshot.actor === "unknown" &&
-          snapshot.editTime === null &&
-          snapshot.order === null,
-      ),
-    ).toBe(true);
-    const ref = { importId: before[0].importId, snapshotId: before[0].id };
-    const a = await new LibraryOperations(importedHome).importedHtml(
-        project.id,
-        first.document.id,
-        ref,
-      ),
-      b = await new LibraryOperations(bob.home).importedHtml(
-        project.id,
-        first.document.id,
-        ref,
-      );
-    expect(b.html).toBe(a.html);
-    expect(b.reader.integrity).toBe(a.reader.integrity);
-  });
+
   it("enrolls new projects while the default server is offline and enforces viewer writes", async () => {
     const { alice, bob, project, page } = await fixture();
     await alice.manager.setDefault(alice.connection.id);
@@ -692,222 +706,4 @@ describe("project synchronization between independent real content libraries", (
     const info = await (await fetch(server.url + "/api/info")).json();
     expect(info.protocol).toBe(syncProtocol);
   });
-  it.each([
-    "during history replay",
-    "before merge publication",
-    "before merge publication with later edits",
-    "during history replay with later conflicting edits",
-  ])(
-    "recovers a genuinely killed client %s without losing offline edits",
-    async (phase) => {
-      const { alice, bob, project, page } = await fixture();
-      const own = await bob.store.readPage(project.id, page.document.id),
-        paragraph = own.document.content.content![0].attrs!.id;
-      await bob.store.savePage(
-        project.id,
-        page.document.id,
-        applyOperations(own.document, [
-          {
-            type: "block.text.set",
-            blockId: paragraph,
-            text: "Offline content survives process death",
-          },
-        ]),
-        own.hash,
-        own.revision,
-      );
-      const theirs = await alice.store.readPage(project.id, page.document.id);
-      await alice.store.savePage(
-        project.id,
-        page.document.id,
-        { ...theirs.document, title: "Remote title survives process death" },
-        theirs.hash,
-        theirs.revision,
-      );
-      for (let index = 0; index < 12; index++)
-        await alice.store.createPage(project.id, {
-          title: `Replay history ${index}`,
-        });
-      await alice.manager.run();
-      const expectedRemote = (await alice.manager.status()).projects[0]
-        .remoteHead;
-      const directory = join(
-        import.meta.dirname,
-        "../../node_modules/.cache",
-        `showai-sync-kill-${crypto.randomUUID()}`,
-      );
-      await mkdir(directory, { recursive: true });
-      actions.push(() => rm(directory, { recursive: true, force: true }));
-      const entry = join(directory, "cli.mjs");
-      await build({
-        entryPoints: {
-          cli: join(import.meta.dirname, "../agent/cli.ts"),
-          "index-worker": join(import.meta.dirname, "../core/index-worker.ts"),
-        },
-        outdir: directory,
-        outExtension: { ".js": ".mjs" },
-        bundle: true,
-        platform: "node",
-        target: "node22",
-        format: "esm",
-        external: ["esbuild"],
-        plugins: [rawSourcePlugin],
-        banner: {
-          js: 'import { createRequire as __showaiRequire } from "node:module"; const require = __showaiRequire(import.meta.url);',
-        },
-      });
-      const markers = join(
-          bob.home,
-          "workspace",
-          "projects",
-          project.id,
-          ".sync",
-          "versions",
-        ),
-        before = (await readdir(markers)).filter((name) =>
-          name.endsWith(".json"),
-        ).length;
-      let killed = false,
-        output = "";
-      let stopping: Promise<void> | undefined;
-      const configDirectory = join(bob.home, "local", "sync");
-      const observer = watch(
-        phase.startsWith("during history replay") ? markers : configDirectory,
-        () => {
-          const ready = phase.startsWith("during history replay")
-            ? readdir(markers).then(
-                (names) =>
-                  names.filter((name) => name.endsWith(".json")).length >
-                  before,
-              )
-            : readFile(join(configDirectory, "config.json"), "utf8").then(
-                (value) =>
-                  JSON.parse(value).projects.some(
-                    (entry: {
-                      projectId: string;
-                      remoteHead: string | null;
-                      status: string;
-                    }) =>
-                      entry.projectId === project.id &&
-                      entry.remoteHead === expectedRemote &&
-                      entry.status === "pending",
-                  ),
-              );
-          void ready.then((found) => {
-            if (!killed && found) {
-              killed = true;
-              // Kill immediately at the observed checkpoint. Starting taskkill
-              // here can let the client publish and remove its pending marker.
-              child.kill("SIGKILL");
-            }
-          });
-        },
-      );
-      const child = spawn(
-        process.execPath,
-        [entry, "sync", "run", "--project", project.id, "--json"],
-        {
-          env: {
-            ...process.env,
-            SHOWAI_HOME: bob.home,
-            SHOWAI_VIEWER: join(
-              import.meta.dirname,
-              "../../dist-portable/portable.html",
-            ),
-          },
-          stdio: ["ignore", "pipe", "pipe"],
-        },
-      );
-      child.stdout.on("data", (bytes) => (output += bytes.toString()));
-      child.stderr.on("data", (bytes) => (output += bytes.toString()));
-      const deadline = setTimeout(
-        () => {
-          stopping = stopTestProcess(child);
-        },
-        process.platform === "win32" ? 45_000 : 25_000,
-      );
-      await new Promise<void>((done, reject) => {
-        child.once("error", reject);
-        child.once("exit", () => done());
-      });
-      clearTimeout(deadline);
-      observer.close();
-      await stopping;
-      expect(killed, output).toBe(true);
-      expect(
-        JSON.parse(
-          await readFile(
-            join(bob.home, "local/sync/pending-imports", `${project.id}.json`),
-            "utf8",
-          ),
-        ).needsPublish,
-      ).toBe(true);
-      const lateConflict = phase.endsWith("with later conflicting edits");
-      if (lateConflict) {
-        const current = await bob.store.readPage(project.id, page.document.id);
-        await bob.store.savePage(
-          project.id,
-          page.document.id,
-          applyOperations(current.document, [
-            {
-              type: "block.text.set",
-              blockId: paragraph,
-              text: "Late local body after process death",
-            },
-          ]),
-          current.hash,
-          current.revision,
-        );
-      }
-      if (phase.endsWith("with later edits")) {
-        const current = await bob.store.readPage(project.id, page.document.id);
-        await bob.store.savePage(
-          project.id,
-          page.document.id,
-          { ...current.document, title: "Local title after process death" },
-          current.hash,
-          current.revision,
-        );
-      }
-      const restarted = new SyncManager(bob.home);
-      await restarted.run();
-      const result = await bob.store.readPage(project.id, page.document.id);
-      if (lateConflict) {
-        const record = (await restarted.retainedConflicts(project.id)).find(
-          (item) => item.originalPageId === page.document.id,
-        )!;
-        expect(record).toBeDefined();
-        const documents = await Promise.all(
-          record.variants.map((item) =>
-            bob.store.readPage(project.id, item.pageId),
-          ),
-        );
-        const texts = documents.map((item) =>
-          plainText(item.document.content.content![0]),
-        );
-        expect(texts).toContain("Late local body after process death");
-        expect(texts).toContain("Offline content survives process death");
-      } else {
-        expect(result.document.title).toBe(
-          phase.endsWith("with later edits")
-            ? "Local title after process death"
-            : "Remote title survives process death",
-        );
-        expect(plainText(result.document.content.content![0])).toBe(
-          "Offline content survives process death",
-        );
-      }
-      expect((await restarted.status()).projects[0].status).toBe("synced");
-      await alice.manager.run();
-      expect(
-        (await alice.store.readPage(project.id, page.document.id)).document,
-      ).toEqual(result.document);
-      await expect(
-        readFile(
-          join(bob.home, "local/sync/pending-imports", `${project.id}.json`),
-        ),
-      ).rejects.toMatchObject({ code: "ENOENT" });
-    },
-    process.platform === "win32" ? 120_000 : 60_000,
-  );
 });
