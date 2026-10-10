@@ -1,10 +1,14 @@
 ![ShowAI — Una interfaz entre personas y agentes.](showai-banner.es.svg)
 
+[![Sitio web de ShowAI](https://img.shields.io/badge/Website-showai.renaissancemind.ai-120A8F?style=flat-square)](https://showai.renaissancemind.ai/)
+
 **Idioma:** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | Español | [Türkçe](README.tr.md) | [Русский](README.ru.md)
 
 ShowAI ayuda a las personas y a los agentes a pensar juntos mediante contenido que pueden leer, explorar y editar. Los agentes organizan la información y el análisis en páginas, gráficos y modelos interactivos. Las personas participan leyendo, explorando, modificando y aportando comentarios. Ambos desarrollan su comprensión, toman decisiones y avanzan en la creación sobre el mismo contenido.
 
 Esta interfaz permite la colaboración y la creación conjunta entre personas y agentes. El contenido resultante también puede convertirse en un sitio compartible que otras personas puedan leer, explorar y seguir utilizando.
+
+[![Ejemplos de proyectos de ShowAI: seguimiento de experimentos, gestión personal y planificación del desarrollo](../showai-projects.png)](https://showai.renaissancemind.ai/)
 
 ![Para los agentes: Una interfaz para expresarse y colaborar con las personas, transformando información y análisis en contenido que puedan comprender, utilizar y comentar. — Para las personas: Una interfaz para participar en el trabajo de la IA y aportar su comprensión y criterio mediante la lectura, la exploración y la edición.](showai-audience.es.svg)
 

@@ -1,10 +1,14 @@
 ![ShowAI — 构建人与 Agent 之间的 Interface。](showai-banner.zh-CN.svg)
 
+[![ShowAI 官网](https://img.shields.io/badge/Website-showai.renaissancemind.ai-120A8F?style=flat-square)](https://showai.renaissancemind.ai/)
+
 **语言:** [English](../../README.md) | 简体中文 | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Türkçe](README.tr.md) | [Русский](README.ru.md)
 
 ShowAI 让人与 Agent 通过可阅读、可交互、可编辑的内容共同思考。Agent 将信息与分析组织成页面、图表和交互模型，人通过阅读、探索、修改和反馈参与其中，双方在同一份内容上持续形成理解、作出判断并推进创作。
 
 这个 Interface 承载人机协作与共创，也让共同形成的内容成为可分享的 site，供更多人阅读、探索和继续使用。
+
+[![ShowAI 项目示例：实验监控、个人管理与开发计划](../showai-projects.png)](https://showai.renaissancemind.ai/)
 
 ![对 Agent: 获得一个面向人的表达与协作界面，把信息和分析转化为人可以理解、操作与反馈的内容。 — 对人: 获得一个参与 AI 工作的认知界面，通过阅读、探索和修改，把自己的理解与判断带入共同创作。](showai-audience.zh-CN.svg)
 

@@ -1,10 +1,14 @@
 ![ShowAI — İnsanlar ve ajanlar için bir arayüz.](showai-banner.tr.svg)
 
+[![ShowAI web sitesi](https://img.shields.io/badge/Website-showai.renaissancemind.ai-120A8F?style=flat-square)](https://showai.renaissancemind.ai/)
+
 **Dil:** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | Türkçe | [Русский](README.ru.md)
 
 ShowAI, insanların ve ajanların okunabilir, etkileşimli ve düzenlenebilir içerik üzerinden birlikte düşünmesini sağlar. Ajanlar bilgi ve analizleri sayfalara, grafiklere ve etkileşimli modellere dönüştürür. İnsanlar okuyarak, keşfederek, değişiklik yaparak ve geri bildirim vererek katılır. İki taraf aynı içerik üzerinde anlayış geliştirir, karar verir ve üretimi ilerletir.
 
 Bu arayüz, insanlarla ajanların iş birliğini ve birlikte üretimini destekler. Ortaya çıkan içerik, başkalarının okuyabileceği, keşfedebileceği ve kullanmaya devam edebileceği paylaşılabilir bir siteye de dönüştürülebilir.
+
+[![ShowAI proje örnekleri: deney takibi, kişisel yönetim ve geliştirme planlaması](../showai-projects.png)](https://showai.renaissancemind.ai/)
 
 ![Ajanlar için: Bilgi ve analizleri insanların anlayabileceği, kullanabileceği ve geri bildirim verebileceği içeriğe dönüştüren bir ifade ve iş birliği arayüzü. — İnsanlar için: Okuyarak, keşfederek ve düzenleyerek kendi anlayışınızı ve değerlendirmenizi ortak üretime katabileceğiniz, yapay zekânın çalışmasına katılma arayüzü.](showai-audience.tr.svg)
 

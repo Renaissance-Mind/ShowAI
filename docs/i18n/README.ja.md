@@ -1,10 +1,14 @@
 ![ShowAI — 人と Agent をつなぐ Interface。](showai-banner.ja.svg)
 
+[![ShowAI 公式サイト](https://img.shields.io/badge/Website-showai.renaissancemind.ai-120A8F?style=flat-square)](https://showai.renaissancemind.ai/)
+
 **言語:** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | 日本語 | [한국어](README.ko.md) | [Español](README.es.md) | [Türkçe](README.tr.md) | [Русский](README.ru.md)
 
 ShowAI は、読める・操作できる・編集できるコンテンツを通じて、人と Agent が一緒に考えるためのツールです。Agent が情報や分析をページ、グラフ、インタラクティブなモデルにまとめ、人が読み、探索し、編集やフィードバックを加えます。同じコンテンツの中で理解を深め、判断し、制作を進められます。
 
 この Interface は、人と Agent の協働・共同制作を支えます。共同で作ったコンテンツを共有可能な site にまとめ、ほかの人が読み、探索し、使い続けることもできます。
+
+[![ShowAI のプロジェクト例：実験モニタリング、個人管理、開発計画](../showai-projects.png)](https://showai.renaissancemind.ai/)
 
 ![Agent にとって: 人への表現と協働のためのインターフェースです。情報や分析を、人が理解し、操作し、フィードバックできるコンテンツに変えられます。 — 人にとって: AI の作業に参加するためのインターフェースです。読解、探索、編集を通じて、自分の理解や判断を共同制作に反映できます。](showai-audience.ja.svg)
 
