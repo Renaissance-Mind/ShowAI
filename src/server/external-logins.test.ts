@@ -1,6 +1,41 @@
 import { expect, test } from "vitest";
+import { createServer } from "node:http";
+import { once } from "node:events";
 import { base64url } from "./account-crypto";
-import { googleIdentity } from "./external-logins";
+import { googleIdentity, providerJson } from "./external-logins";
+
+test("provider requests accept JSON but never forward credentials across redirects", async () => {
+  let forwarded = 0;
+  const server = createServer((request, response) => {
+    if (request.url === "/redirect") {
+      response.writeHead(307, { location: "/receiver" }).end();
+    } else {
+      if (request.url === "/receiver") forwarded++;
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ received: true }));
+    }
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("Missing listener");
+  const origin = `http://127.0.0.1:${address.port}`;
+  try {
+    expect(await providerJson(origin + "/json")).toEqual({ received: true });
+    await expect(
+      providerJson(origin + "/redirect", {
+        method: "POST",
+        body: new URLSearchParams({ client_secret: "redirect-guard-fixture" }),
+      }),
+    ).rejects.toMatchObject({ code: "LOGIN_PROVIDER_FAILED" });
+    expect(forwarded).toBe(0);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  }
+});
 
 test("Google identity verification checks signature, audience, nonce, issuer, expiry and verified email", async () => {
   const keys = await crypto.subtle.generateKey(

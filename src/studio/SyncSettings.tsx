@@ -544,6 +544,25 @@ export default function SyncSettings() {
               的设备会话
             </h3>
             <p>会话到期后请重新登录。撤销设备不会删除其已下载的本地内容。</p>
+            <ServiceLogin
+              key={sessionConnectionId}
+              url={
+                status.connections.find(
+                  (connection) => connection.id === sessionConnectionId,
+                )?.url ?? ""
+              }
+              connectionId={sessionConnectionId}
+              registrationKey=""
+              onConnected={async () => {
+                await refresh();
+                setSessions(
+                  await desktop.invoke("sync:sessions", {
+                    connectionId: sessionConnectionId,
+                  }),
+                );
+                setMessage("已添加登录方式，可用它登录当前账号。");
+              }}
+            />
             {status.connections
               .find((connection) => connection.id === sessionConnectionId)
               ?.capabilities?.includes("account-security-v1") && (

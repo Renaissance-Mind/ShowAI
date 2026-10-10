@@ -76,10 +76,10 @@ interface ExternalIdentity {
   email?: string;
 }
 const encoder = new TextEncoder();
-async function providerJson(url: string, options: RequestInit = {}) {
+export async function providerJson(url: string, options: RequestInit = {}) {
   const response = await fetch(url, {
     ...options,
-    redirect: "error",
+    redirect: "manual",
     signal: AbortSignal.timeout(15000),
   });
   if (!response.ok)

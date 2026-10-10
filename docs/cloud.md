@@ -6,6 +6,8 @@ The official server base URL is **https://showai.renaissancemind.ai/cloud**. Ent
 
 Sign in with an existing Token or account/password. Private servers can register an account and issue a personal Token directly. GitHub, Google and email-code login appear when the server operator has configured those providers. Controlled registration requires an operator registration key or the supported project invitation flow.
 
+To add GitHub, Google or email login to an existing account, open **Account and devices** for that server and choose the login method. Complete verification and, for GitHub or Google, confirm the account binding in the browser. Subsequent sign-ins use the same account and retain its projects and server bindings.
+
 Sign in to each service once, then select the accounts in **Account bindings**. A new device can subsequently sign in to any member and restore the other bound services. Each service issues its own expiring device session from a short-lived, signed authorization; original login Tokens are not distributed between servers. Inspect or revoke sessions in **Account and devices**. Personal Tokens expire after one year; normal and restored device sessions expire after 30 days.
 
 Binding grants access to the selected accounts, including their projects and model resources. Bind only services you trust to hold this authority. Unbinding revokes device sessions issued through that peer. Offline services retain a pending revocation until they are reachable and authorized again; revocation is complete only after every target confirms it.

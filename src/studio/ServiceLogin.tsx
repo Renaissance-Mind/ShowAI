@@ -11,10 +11,12 @@ type Flow = {
 export default function ServiceLogin({
   url,
   registrationKey,
+  connectionId,
   onConnected,
 }: {
   url: string;
   registrationKey: string;
+  connectionId?: string;
   onConnected: (id: string) => Promise<void>;
 }) {
   const [methods, setMethods] = useState<string[]>([]),
@@ -100,6 +102,7 @@ export default function ServiceLogin({
           provider,
           email,
           registrationKey,
+          connectionId,
         }),
       );
     } catch (error) {
@@ -112,6 +115,11 @@ export default function ServiceLogin({
     return null;
   return (
     <div className="sync-form">
+      {connectionId && (
+        <p className="settings-help">
+          为当前账号添加登录方式。在浏览器完成授权并确认绑定后，可用该方式登录同一个账号。
+        </p>
+      )}
       {error && (
         <p role="alert" className="sync-error">
           {error}
@@ -126,7 +134,7 @@ export default function ServiceLogin({
               disabled={busy || !!flow}
               onClick={() => void start("github")}
             >
-              使用 GitHub 登录
+              {connectionId ? "添加 GitHub 登录方式" : "使用 GitHub 登录"}
             </button>
           )}
           {methods.includes("google") && (
@@ -136,7 +144,7 @@ export default function ServiceLogin({
               disabled={busy || !!flow}
               onClick={() => void start("google")}
             >
-              使用 Google 登录
+              {connectionId ? "添加 Google 登录方式" : "使用 Google 登录"}
             </button>
           )}
         </div>

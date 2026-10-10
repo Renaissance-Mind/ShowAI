@@ -175,7 +175,7 @@ export function secureResponse(
   headers.set("referrer-policy", "no-referrer");
   headers.set(
     "content-security-policy",
-    "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+    "default-src 'none'; connect-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
   );
   if (new URL(request.url).protocol === "https:")
     headers.set("strict-transport-security", "max-age=31536000");
