@@ -5,7 +5,6 @@ import {
   mkdir,
   mkdtemp,
   readFile,
-  rename,
   rm,
   writeFile,
 } from "node:fs/promises";
@@ -27,7 +26,13 @@ async function assertClosed() {
   if (
     stdout
       .split("\n")
-      .some((line) => line.includes(join(installed, "Contents/MacOS/")))
+      .some(
+        (line) =>
+          line.trim().startsWith(join(installed, "Contents/MacOS/")) &&
+          !line.includes(
+            join(installed, "Contents/Resources/runtime/scripts/cli.mjs"),
+          ),
+      )
   )
     throw new Error(
       "请保存内容并退出 ShowAI 稳定版，再执行更新。开发版可以继续运行。",
@@ -145,8 +150,14 @@ const staging = join(installation, "ShowAI 稳定版.app");
 await cp(built, staging, { recursive: true, verbatimSymlinks: true });
 await execute("/usr/bin/codesign", ["--verify", "--deep", "--strict", staging]);
 await assertClosed();
-await rm(installed, { recursive: true, force: true });
-await rename(staging, installed);
+// Swap both directories atomically; running CLI sessions never see missing files.
+await execute("/usr/bin/swift", [
+  "-module-cache-path",
+  join(working, "swift-modules"),
+  join(source, "scripts/replace-stable-app.swift"),
+  staging,
+  installed,
+]);
 await rm(installation, { recursive: true });
 await execute(
   "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
