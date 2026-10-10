@@ -12,6 +12,14 @@ module.exports = async function beforePack(context) {
     );
   }
   const root = context.packager.projectDir;
+  const project = JSON.parse(
+    await readFile(join(root, "package.json"), "utf8"),
+  );
+  for (const name of Object.keys(project.dependencies).filter((name) =>
+    name.startsWith("@tiptap/"),
+  )) {
+    await access(join(root, "dist-runtime/node_modules", name, "package.json"));
+  }
   const metadata = JSON.parse(
     await readFile(join(root, "dist-runtime/assets/build.json"), "utf8"),
   );

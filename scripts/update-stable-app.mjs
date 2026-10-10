@@ -1,13 +1,6 @@
 // Explicitly build and install a frozen macOS application from a Git commit.
 import { execFile, spawn } from "node:child_process";
-import {
-  cp,
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -141,6 +134,11 @@ const build = JSON.parse(
 if (build.sourceCommit !== sourceCommit || build.sourceDirty === true)
   throw new Error("Built app does not match the requested frozen commit.");
 await execute("/usr/bin/codesign", ["--verify", "--deep", "--strict", built]);
+// Verify the bundled compiler and independent CLI before replacing the daily app.
+await run(process.execPath, [
+  join(source, "src/desktop/smoke.mjs"),
+  join(built, "Contents/MacOS/ShowAI 稳定版"),
+]);
 await assertClosed();
 await mkdir(dirname(installed), { recursive: true });
 const installation = await mkdtemp(

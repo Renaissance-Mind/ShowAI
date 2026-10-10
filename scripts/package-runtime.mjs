@@ -15,7 +15,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const runtime = join(root, "dist-runtime");
 await mkdir(join(runtime, "assets"), { recursive: true });
 await mkdir(join(runtime, "scripts"), { recursive: true });
-await rm(join(runtime, "assets/agent-plugin"), { recursive: true, force: true });
+await rm(join(runtime, "assets/agent-plugin"), {
+  recursive: true,
+  force: true,
+});
 await cp(join(root, "plugins/showai"), join(runtime, "assets/agent-plugin"), {
   recursive: true,
   verbatimSymlinks: true,
@@ -67,6 +70,17 @@ for (const name of [
   "react",
   "react-dom",
   "scheduler",
+  "@tiptap/core",
+  "@tiptap/react",
+  "@tiptap/pm",
+  "@tiptap/starter-kit",
+  "@tiptap/extension-placeholder",
+  "@tiptap/extension-image",
+  "@tiptap/extension-table",
+  "@tiptap/extension-task-list",
+  "@tiptap/extension-task-item",
+  "@tiptap/extension-highlight",
+  "@tiptap/extension-text-align",
   "ajv",
   "marked",
   "katex",
