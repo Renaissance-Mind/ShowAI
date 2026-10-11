@@ -109,11 +109,14 @@ claude plugin marketplace add ./
 claude plugin install showai@renaissance-mind
 ```
 
-插件包含四个 Skill：
+插件包含七个 Skill：
 
 | Skill | 用途 |
 | --- | --- |
 | `use-showai` | 基础用法、连接运行时、查找和阅读内容 |
+| `plan-presentation` | 明确认知起点、证据范围与多级理解路径 |
+| `design-presentation` | 设计视觉表达、布局、交互分镜与静态方式 |
+| `review-presentation` | 检查读者任务、定位问题并按授权修订 |
 | `show-document` | 创建、修改、展示和导出页面，应用已有模板 |
 | `create-component` | 创建或改造可复用的 React 组件 |
 | `create-template` | 创建、修改模板，或从已有页面提炼模板 |

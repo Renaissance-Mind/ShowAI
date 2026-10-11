@@ -5,6 +5,8 @@ description: 通过 ShowAI MCP 创建或改造可复用 React 组件。先查目
 
 沿用已核实MCP连接、项目和页面；缺少时读 [use-showai](../use-showai/SKILL.md)。正式资源保存到目标项目；用户明确独立交付时可把相同源码对象交给render_document，不自动创建个人项目。
 
+用[表达与分镜](../design-presentation/references/expression-and-storyboard.md)明确图形关系、状态与通过条件。组件负责稳定的数据表达和交互，实例保存本次事实；通用、专题和内容专用的复用边界分别判断。usage 的 purpose/structure/constraints 说明理解任务、视觉编码、空态、窄屏与静态方式，interactions 说明操作和保存边界；继续使用当前 documentation schema，不添加未经支持的参数。跨组件联动先核实实际接口，只有具体复用需求成立时才提炼共享能力。
+
 先明确内容输入、读者操作及可见结果。先取得或复用project_context的componentCatalog；目录变化时用catalog_list更新。catalog_describe按需取guide/schema/examples；调整数据或组合即可达到目标时复用。需要新实现时读取 [组件设计](references/component-authoring.md)及guide({topic:"component"})。读取详情或源码时沿用目录或页面引用中的scope、version、integrity，准确区分同名组件；实现开发先取development，再只取选中组件所需的source文件。
 
 大源码或资源包在保存前读取 showai_capabilities 的 capacities，按 [容量与大文件](../show-document/references/capacity.md) 分别检查源码、原始资源、实例数据和编译输出；文件资源预算不代表编译后的 data URI 代码也能达到同样大小。

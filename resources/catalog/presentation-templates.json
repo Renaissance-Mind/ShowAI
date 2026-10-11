@@ -1,0 +1,1748 @@
+[
+  {
+    "id": "concept-explainer",
+    "name": "概念与机制讲解",
+    "version": "1.0.0",
+    "description": "从具体问题出发，建立对象、关系、机制与适用边界，支持深度不同的渐进解释。",
+    "scenarios": [
+      "解释一个读者尚不熟悉的概念、算法或系统机制。",
+      "同一主题需要新手主线与可定位的深入说明。"
+    ],
+    "contentGuide": [
+      {
+        "title": "读者任务与材料",
+        "instructions": [
+          "概念定义、机制或过程的依据、输入输出及成立条件。",
+          "读者认知起点与一个可验证的解释任务；具体例子来自本次材料。"
+        ]
+      },
+      {
+        "title": "内容顺序与深度",
+        "instructions": [
+          "新手路径先用具体问题与对象建立直觉；熟悉主题的读者可直接进入差异和边界。",
+          "复杂机制分成保持对象身份的局部图或连续分镜；短解释可以合并章节。"
+        ]
+      },
+      {
+        "title": "视觉、交互与静态方式",
+        "instructions": [
+          "流程或关系图表达机制，必要术语和条件就近解释。",
+          "选择局部只改变阅读焦点；静态版保留总览、关键状态与完整图注。"
+        ]
+      },
+      {
+        "title": "缺项与填写",
+        "instructions": [
+          "将结构中的填写提示替换为本次材料；保留真实缺项及其对结论的影响。",
+          "按用户认知展开必要定义、例子和条件，重要限制默认可见；可选部分没有材料时可以合并或省略。"
+        ]
+      },
+      {
+        "title": "通过条件",
+        "instructions": [
+          "读者能说明输入经过什么关键作用得到输出，并指出一个适用条件。",
+          "图形中的箭头、对象、标签和证据一致，概念没有停在未解释的名词。"
+        ]
+      }
+    ],
+    "related": [
+      {
+        "kind": "component",
+        "id": "flowchart",
+        "version": "1.0.0",
+        "purpose": "表达过程、分支和节点详情。"
+      },
+      {
+        "kind": "component",
+        "id": "mindmap",
+        "version": "1.0.0",
+        "purpose": "组织深度不同的概念层级。"
+      },
+      {
+        "kind": "component",
+        "id": "image",
+        "version": "1.0.0",
+        "purpose": "展示真实材料或经过核对的解释图。"
+      },
+      {
+        "kind": "component",
+        "id": "text",
+        "version": "2.0.0",
+        "purpose": "保留精确定义与推理。"
+      }
+    ],
+    "examples": [
+      {
+        "name": "概念与机制讲解的应用",
+        "request": "解释一个读者尚不熟悉的概念、算法或系统机制。使用我提供或核实的材料，缺项如实说明。",
+        "steps": [
+          {
+            "kind": "template",
+            "id": "concept-explainer",
+            "version": "1.0.0",
+            "purpose": "从具体问题出发，建立对象、关系、机制与适用边界，支持深度不同的渐进解释。"
+          },
+          {
+            "kind": "component",
+            "id": "flowchart",
+            "version": "1.0.0",
+            "purpose": "表达过程、分支和节点详情。"
+          },
+          {
+            "kind": "component",
+            "id": "mindmap",
+            "version": "1.0.0",
+            "purpose": "组织深度不同的概念层级。"
+          }
+        ]
+      }
+    ],
+    "document": {
+      "content": {
+        "type": "surface",
+        "attrs": {
+          "id": "concept-explainer-root",
+          "kind": "page",
+          "name": "概念与机制讲解",
+          "widthMode": "standard"
+        },
+        "content": [
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "concept-explainer-section-1",
+              "name": "读者要理解的问题",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "concept-explainer-section-1-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "读者要理解的问题"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "concept-explainer-section-1-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "填写具体问题、读者已有知识和看完后能够解释的关系。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "concept-explainer-section-2",
+              "name": "对象与整体关系",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "concept-explainer-section-2-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "对象与整体关系"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "concept-explainer-section-2-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "用已核实的对象、输入输出和关系构建总览；用文字解释图中的关键概念。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "concept-explainer-section-3",
+              "name": "关键过程与局部解释",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "concept-explainer-section-3-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "关键过程与局部解释"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "concept-explainer-section-3-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "按先备关系展开关键变化；各分支深度按理解需要决定。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "widget",
+            "attrs": {
+              "id": "concept-explainer-evidence",
+              "name": "关键概念与关系",
+              "kind": "table",
+              "data": {
+                "title": "关键概念与关系",
+                "columns": [
+                  "对象或概念",
+                  "含义与作用",
+                  "与其他对象的关系",
+                  "依据或条件"
+                ],
+                "rows": [],
+                "fontSize": 18,
+                "padding": 0
+              }
+            }
+          },
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "concept-explainer-section-4",
+              "name": "例子与适用边界",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "concept-explainer-section-4-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "例子与适用边界"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "concept-explainer-section-4-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "加入有来源的具体例子，说明什么情况下该解释成立，何时需要其他方法。"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "layout": {},
+      "surfaceViews": {}
+    }
+  },
+  {
+    "id": "decision-comparison",
+    "name": "方案比较与决策",
+    "version": "1.0.0",
+    "description": "按共同标准呈现可比事实、缺项与取舍，支持带条件的选择。",
+    "scenarios": [
+      "为一个明确任务比较技术路线、产品方案或研究方法。",
+      "读者需要理解推荐依据，并在约束改变时重新判断。"
+    ],
+    "contentGuide": [
+      {
+        "title": "读者任务与材料",
+        "instructions": [
+          "候选选项、共同标准、现实约束和来源。",
+          "定量比较需要一致的测量口径；缺失信息不能当成零。"
+        ]
+      },
+      {
+        "title": "内容顺序与深度",
+        "instructions": [
+          "两项方案可以深入并排比较；多项方案先筛选再展示重点差异。",
+          "短报告保留结论摘要；复杂决定增加可定位的证据和条件。"
+        ]
+      },
+      {
+        "title": "视觉、交互与静态方式",
+        "instructions": [
+          "用对照表或同尺度小多图对齐差异，避免无依据的综合分数。",
+          "筛选后保留当前条件和恢复入口；静态版列明所用条件及完整依据。"
+        ]
+      },
+      {
+        "title": "缺项与填写",
+        "instructions": [
+          "将结构中的填写提示替换为本次材料；保留真实缺项及其对结论的影响。",
+          "按用户认知展开必要定义、例子和条件，重要限制默认可见；可选部分没有材料时可以合并或省略。"
+        ]
+      },
+      {
+        "title": "通过条件",
+        "instructions": [
+          "读者能根据给定约束说明选择及理由，并指出信息不足时不能判断的部分。",
+          "建议、标准和证据对应，重要限制默认可见。"
+        ]
+      }
+    ],
+    "related": [
+      {
+        "kind": "component",
+        "id": "table",
+        "version": "1.1.1",
+        "purpose": "按共同标准对齐少量选项。"
+      },
+      {
+        "kind": "component",
+        "id": "database",
+        "version": "1.0.0",
+        "purpose": "对多项候选筛选排序。"
+      },
+      {
+        "kind": "component",
+        "id": "chart",
+        "version": "1.0.0",
+        "purpose": "呈现同口径的量化差异。"
+      },
+      {
+        "kind": "component",
+        "id": "references",
+        "version": "1.0.0",
+        "purpose": "定位判断所依据的资料。"
+      }
+    ],
+    "examples": [
+      {
+        "name": "方案比较与决策的应用",
+        "request": "为一个明确任务比较技术路线、产品方案或研究方法。使用我提供或核实的材料，缺项如实说明。",
+        "steps": [
+          {
+            "kind": "template",
+            "id": "decision-comparison",
+            "version": "1.0.0",
+            "purpose": "按共同标准呈现可比事实、缺项与取舍，支持带条件的选择。"
+          },
+          {
+            "kind": "component",
+            "id": "table",
+            "version": "1.1.1",
+            "purpose": "按共同标准对齐少量选项。"
+          },
+          {
+            "kind": "component",
+            "id": "database",
+            "version": "1.0.0",
+            "purpose": "对多项候选筛选排序。"
+          }
+        ]
+      }
+    ],
+    "document": {
+      "content": {
+        "type": "surface",
+        "attrs": {
+          "id": "decision-comparison-root",
+          "kind": "page",
+          "name": "方案比较与决策",
+          "widthMode": "standard"
+        },
+        "content": [
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "decision-comparison-section-1",
+              "name": "决策问题与约束",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "decision-comparison-section-1-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "决策问题与约束"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "decision-comparison-section-1-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "说明要作出的选择、使用场景、必须满足的条件和信息截止时间。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "decision-comparison-section-2",
+              "name": "共同标准与差异",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "decision-comparison-section-2-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "共同标准与差异"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "decision-comparison-section-2-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "定义一致的比较维度、单位和条件；填入可核实的事实，保留缺失项。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "decision-comparison-section-3",
+              "name": "取舍与建议",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "decision-comparison-section-3-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "取舍与建议"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "decision-comparison-section-3-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "基于证据说明推荐及其适用前提，并解释条件变化时选择如何改变。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "widget",
+            "attrs": {
+              "id": "decision-comparison-evidence",
+              "name": "共同标准下的对照",
+              "kind": "table",
+              "data": {
+                "title": "共同标准下的对照",
+                "columns": [
+                  "比较标准",
+                  "选项",
+                  "可核实事实",
+                  "限制与缺项",
+                  "来源"
+                ],
+                "rows": [],
+                "fontSize": 18,
+                "padding": 0
+              }
+            }
+          },
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "decision-comparison-section-4",
+              "name": "尚待补充的材料",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "decision-comparison-section-4-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "尚待补充的材料"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "decision-comparison-section-4-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "说明哪些缺口影响当前判断、需要补充什么及如何验证。"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "layout": {},
+      "surfaceViews": {}
+    }
+  },
+  {
+    "id": "evidence-report",
+    "name": "研究与证据报告",
+    "version": "1.0.0",
+    "description": "围绕研究问题组织事实、机制、证据和局限，区分来源主张与分析推断。",
+    "scenarios": [
+      "对一个研究主题形成有来源、可追溯的综合调研报告。",
+      "整理指定时间范围的技术进展，解释变化、支持程度与研究空白。"
+    ],
+    "contentGuide": [
+      {
+        "title": "读者任务与材料",
+        "instructions": [
+          "原始论文、官方发布或其他可核实材料，以及它们的日期和定位。",
+          "记录问题、选择材料的范围与缺口；时间调研区分事件日期和发布或检索日期。"
+        ]
+      },
+      {
+        "title": "内容顺序与深度",
+        "instructions": [
+          "时间调研按主题解释变化，再用时间线支持定位；避免仅罗列发布日期。",
+          "机制复杂的主题增加先备解释；证据密集的部分使用对照与来源索引。"
+        ]
+      },
+      {
+        "title": "视觉、交互与静态方式",
+        "instructions": [
+          "机制用关系图，趋势用真实数据图表，研究路线按共同维度比较。",
+          "来源按需查看，影响结论的条件直接可见；静态版保留图例、条件和引用。"
+        ]
+      },
+      {
+        "title": "缺项与填写",
+        "instructions": [
+          "将结构中的填写提示替换为本次材料；保留真实缺项及其对结论的影响。",
+          "按用户认知展开必要定义、例子和条件，重要限制默认可见；可选部分没有材料时可以合并或省略。"
+        ]
+      },
+      {
+        "title": "通过条件",
+        "instructions": [
+          "读者能复述主要发现，区分事实与推断，并找到支持一条结论的原始材料。",
+          "不可比实验不作直接排名，未经核实的时间段保留缺项。"
+        ]
+      }
+    ],
+    "related": [
+      {
+        "kind": "component",
+        "id": "flowchart",
+        "version": "1.0.0",
+        "purpose": "解释路线与机制关系。"
+      },
+      {
+        "kind": "component",
+        "id": "chart",
+        "version": "1.0.0",
+        "purpose": "展示有同口径数据支持的变化。"
+      },
+      {
+        "kind": "component",
+        "id": "table",
+        "version": "1.1.1",
+        "purpose": "比较研究设置与证据。"
+      },
+      {
+        "kind": "component",
+        "id": "references",
+        "version": "1.0.0",
+        "purpose": "组织可追溯引用。"
+      }
+    ],
+    "examples": [
+      {
+        "name": "研究与证据报告的应用",
+        "request": "对一个研究主题形成有来源、可追溯的综合调研报告。使用我提供或核实的材料，缺项如实说明。",
+        "steps": [
+          {
+            "kind": "template",
+            "id": "evidence-report",
+            "version": "1.0.0",
+            "purpose": "围绕研究问题组织事实、机制、证据和局限，区分来源主张与分析推断。"
+          },
+          {
+            "kind": "component",
+            "id": "flowchart",
+            "version": "1.0.0",
+            "purpose": "解释路线与机制关系。"
+          },
+          {
+            "kind": "component",
+            "id": "chart",
+            "version": "1.0.0",
+            "purpose": "展示有同口径数据支持的变化。"
+          }
+        ]
+      }
+    ],
+    "document": {
+      "content": {
+        "type": "surface",
+        "attrs": {
+          "id": "evidence-report-root",
+          "kind": "page",
+          "name": "研究与证据报告",
+          "widthMode": "standard"
+        },
+        "content": [
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "evidence-report-section-1",
+              "name": "核心发现与适用范围",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "evidence-report-section-1-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "核心发现与适用范围"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "evidence-report-section-1-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "完成材料核对后填写最重要发现、支持程度及会改变结论的限制。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "evidence-report-section-2",
+              "name": "问题、范围与概念",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "evidence-report-section-2-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "问题、范围与概念"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "evidence-report-section-2-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "说明研究问题、目标读者、检索截止日、时间或领域边界；补齐必要概念。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "evidence-report-section-3",
+              "name": "研究路线与机制",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "evidence-report-section-3-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "研究路线与机制"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "evidence-report-section-3-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "按真正不同的任务、机制或假设组织路线，用关系图或分镜说明关键过程。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "widget",
+            "attrs": {
+              "id": "evidence-report-evidence",
+              "name": "主张与来源",
+              "kind": "table",
+              "data": {
+                "title": "主张与来源",
+                "columns": [
+                  "主张或发现",
+                  "性质与支持范围",
+                  "来源及具体定位",
+                  "日期、设置与限制"
+                ],
+                "rows": [],
+                "fontSize": 18,
+                "padding": 0
+              }
+            }
+          },
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "evidence-report-section-4",
+              "name": "证据与解释",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "evidence-report-section-4-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "证据与解释"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "evidence-report-section-4-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "将发现对应到具体研究或原始记录，说明设置、条件、结果与局限。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "evidence-report-section-5",
+              "name": "综合判断与待解问题",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "evidence-report-section-5-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "综合判断与待解问题"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "evidence-report-section-5-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "区分直接证据、分析推断和未来计划，指出未覆盖材料如何影响判断。"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "layout": {},
+      "surfaceViews": {}
+    }
+  },
+  {
+    "id": "procedure-guide",
+    "name": "操作与问题排查",
+    "version": "1.0.0",
+    "description": "围绕目标状态组织真实入口、动作、预期反馈和异常恢复。",
+    "scenarios": [
+      "教读者完成一项操作，并知道每一步是否成功。",
+      "根据可观察症状诊断问题，选择安全的恢复路径。"
+    ],
+    "contentGuide": [
+      {
+        "title": "读者任务与材料",
+        "instructions": [
+          "当前版本、真实界面或操作入口、必要权限和可观察反馈。",
+          "错误说明与恢复依据，涉及不可逆动作时沿用实际授权规则。"
+        ]
+      },
+      {
+        "title": "内容顺序与深度",
+        "instructions": [
+          "熟悉系统的读者使用步骤速览；首次使用者增加截图标注和先备解释。",
+          "排错任务先按症状分支；顺序任务保留主路径。"
+        ]
+      },
+      {
+        "title": "视觉、交互与静态方式",
+        "instructions": [
+          "真实界面标注定位操作对象；流程图表达条件分支，分镜说明状态变化。",
+          "读者能返回主路径；静态版展开必要分支与恢复说明。"
+        ]
+      },
+      {
+        "title": "缺项与填写",
+        "instructions": [
+          "将结构中的填写提示替换为本次材料；保留真实缺项及其对结论的影响。",
+          "按用户认知展开必要定义、例子和条件，重要限制默认可见；可选部分没有材料时可以合并或省略。"
+        ]
+      },
+      {
+        "title": "通过条件",
+        "instructions": [
+          "读者能完成目标操作，识别成功反馈，并知道失败时从哪里恢复。",
+          "截图、文案与实际版本一致，未验证的步骤清楚标明。"
+        ]
+      }
+    ],
+    "related": [
+      {
+        "kind": "component",
+        "id": "image",
+        "version": "1.0.0",
+        "purpose": "标注真实操作界面。"
+      },
+      {
+        "kind": "component",
+        "id": "flowchart",
+        "version": "1.0.0",
+        "purpose": "表达诊断与异常分支。"
+      },
+      {
+        "kind": "component",
+        "id": "video",
+        "version": "1.0.0",
+        "purpose": "展示需要连续观察的操作。"
+      },
+      {
+        "kind": "component",
+        "id": "text",
+        "version": "2.0.0",
+        "purpose": "说明动作和反馈。"
+      }
+    ],
+    "examples": [
+      {
+        "name": "操作与问题排查的应用",
+        "request": "教读者完成一项操作，并知道每一步是否成功。使用我提供或核实的材料，缺项如实说明。",
+        "steps": [
+          {
+            "kind": "template",
+            "id": "procedure-guide",
+            "version": "1.0.0",
+            "purpose": "围绕目标状态组织真实入口、动作、预期反馈和异常恢复。"
+          },
+          {
+            "kind": "component",
+            "id": "image",
+            "version": "1.0.0",
+            "purpose": "标注真实操作界面。"
+          },
+          {
+            "kind": "component",
+            "id": "flowchart",
+            "version": "1.0.0",
+            "purpose": "表达诊断与异常分支。"
+          }
+        ]
+      }
+    ],
+    "document": {
+      "content": {
+        "type": "surface",
+        "attrs": {
+          "id": "procedure-guide-root",
+          "kind": "page",
+          "name": "操作与问题排查",
+          "widthMode": "standard"
+        },
+        "content": [
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "procedure-guide-section-1",
+              "name": "目标状态与前提",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "procedure-guide-section-1-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "目标状态与前提"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "procedure-guide-section-1-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "填写完成后的可观察结果、所需权限、版本和输入材料。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "procedure-guide-section-2",
+              "name": "主操作路径",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "procedure-guide-section-2-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "主操作路径"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "procedure-guide-section-2-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "按依赖顺序说明真实入口、动作和预期反馈，使用对应界面或图示。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "procedure-guide-section-3",
+              "name": "异常分支与恢复",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "procedure-guide-section-3-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "异常分支与恢复"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "procedure-guide-section-3-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "基于可观察现象说明分支条件、原因证据与恢复步骤。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "widget",
+            "attrs": {
+              "id": "procedure-guide-evidence",
+              "name": "动作、反馈与恢复",
+              "kind": "table",
+              "data": {
+                "title": "动作、反馈与恢复",
+                "columns": ["条件或步骤", "动作", "预期反馈", "异常与恢复"],
+                "rows": [],
+                "fontSize": 18,
+                "padding": 0
+              }
+            }
+          },
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "procedure-guide-section-4",
+              "name": "确认结果与继续使用",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "procedure-guide-section-4-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "确认结果与继续使用"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "procedure-guide-section-4-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "说明如何核对结果、保存或撤回，并提供必要来源。"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "layout": {},
+      "surfaceViews": {}
+    }
+  },
+  {
+    "id": "progress-report",
+    "name": "状态与进展报告",
+    "version": "1.0.0",
+    "description": "在明确截止时间下说明当前状态、变化、证据、风险与下一步。",
+    "scenarios": [
+      "汇报真实项目、实验或运行状态，帮助读者判断后续行动。",
+      "比较目标与实际进展，说明偏差依据与待决策事项。"
+    ],
+    "contentGuide": [
+      {
+        "title": "读者任务与材料",
+        "instructions": [
+          "可核实的当前状态、时间戳、比较基线和数据口径。",
+          "相关风险、依赖、责任或待决策事项来自本次真实材料。"
+        ]
+      },
+      {
+        "title": "内容顺序与深度",
+        "instructions": [
+          "快速简报突出结论与需要决策的事项；完整报告展开变化和依据。",
+          "指标不足时用明确状态与证据说明，不制造完成率。"
+        ]
+      },
+      {
+        "title": "视觉、交互与静态方式",
+        "instructions": [
+          "少量核实指标可突出；趋势使用连续可比数据；依赖用流程或时间图。",
+          "筛选和详情支持查找证据；静态版保留截止时间、基线与行动条件。"
+        ]
+      },
+      {
+        "title": "缺项与填写",
+        "instructions": [
+          "将结构中的填写提示替换为本次材料；保留真实缺项及其对结论的影响。",
+          "按用户认知展开必要定义、例子和条件，重要限制默认可见；可选部分没有材料时可以合并或省略。"
+        ]
+      },
+      {
+        "title": "通过条件",
+        "instructions": [
+          "读者能说明当前状态、主要变化及下一步，并分清完成、进行中与未验证。",
+          "所有数字都有对应口径和依据，历史结果不冒充当前状态。"
+        ]
+      }
+    ],
+    "related": [
+      {
+        "kind": "component",
+        "id": "metrics",
+        "version": "1.0.0",
+        "purpose": "突出有来源的重要数量。"
+      },
+      {
+        "kind": "component",
+        "id": "table",
+        "version": "1.1.1",
+        "purpose": "对齐状态、依据和行动。"
+      },
+      {
+        "kind": "component",
+        "id": "chart",
+        "version": "1.0.0",
+        "purpose": "展示同口径变化。"
+      },
+      {
+        "kind": "component",
+        "id": "bookmark",
+        "version": "1.0.0",
+        "purpose": "提供核实入口。"
+      }
+    ],
+    "examples": [
+      {
+        "name": "状态与进展报告的应用",
+        "request": "汇报真实项目、实验或运行状态，帮助读者判断后续行动。使用我提供或核实的材料，缺项如实说明。",
+        "steps": [
+          {
+            "kind": "template",
+            "id": "progress-report",
+            "version": "1.0.0",
+            "purpose": "在明确截止时间下说明当前状态、变化、证据、风险与下一步。"
+          },
+          {
+            "kind": "component",
+            "id": "metrics",
+            "version": "1.0.0",
+            "purpose": "突出有来源的重要数量。"
+          },
+          {
+            "kind": "component",
+            "id": "table",
+            "version": "1.1.1",
+            "purpose": "对齐状态、依据和行动。"
+          }
+        ]
+      }
+    ],
+    "document": {
+      "content": {
+        "type": "surface",
+        "attrs": {
+          "id": "progress-report-root",
+          "kind": "page",
+          "name": "状态与进展报告",
+          "widthMode": "standard"
+        },
+        "content": [
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "progress-report-section-1",
+              "name": "当前结论与截止时间",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "progress-report-section-1-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "当前结论与截止时间"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "progress-report-section-1-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "填写核实的当前状态、截止时间与读者需要作出的判断。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "progress-report-section-2",
+              "name": "变化及其依据",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "progress-report-section-2-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "变化及其依据"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "progress-report-section-2-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "说明相对哪个基线发生什么变化；保留数据口径和来源。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "progress-report-section-3",
+              "name": "风险与未决事项",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "progress-report-section-3-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "风险与未决事项"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "progress-report-section-3-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "区分已经发生的问题、推断的风险和待确认条件，说明影响。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "widget",
+            "attrs": {
+              "id": "progress-report-evidence",
+              "name": "状态与行动依据",
+              "kind": "table",
+              "data": {
+                "title": "状态与行动依据",
+                "columns": [
+                  "事项",
+                  "当前状态与时间",
+                  "变化或问题",
+                  "证据",
+                  "下一步"
+                ],
+                "rows": [],
+                "fontSize": 18,
+                "padding": 0
+              }
+            }
+          },
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "progress-report-section-4",
+              "name": "下一步与所需决定",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "progress-report-section-4-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "下一步与所需决定"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "progress-report-section-4-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "按依赖和责任说明行动、检查点和需要决策的事项。"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "layout": {},
+      "surfaceViews": {}
+    }
+  },
+  {
+    "id": "exploration-map",
+    "name": "探索与资料组织",
+    "version": "1.0.0",
+    "description": "用可定位的分类、属性与关系组织资料，支持总览、筛选和局部核对。",
+    "scenarios": [
+      "整理一个主题的资料、概念或候选项，让读者逐步探索。",
+      "需要同时看到全局分类和可追溯的局部信息。"
+    ],
+    "contentGuide": [
+      {
+        "title": "读者任务与材料",
+        "instructions": [
+          "真实条目、属性和来源，以及分类或关系的依据。",
+          "范围、更新时间和缺失信息；不把资料数量视为研究结论。"
+        ]
+      },
+      {
+        "title": "内容顺序与深度",
+        "instructions": [
+          "层级关系用树，多父关系或交叉关联用网络，精确属性比较用表格。",
+          "条目多时先总览和筛选；条目少时可以直接并列阅读。"
+        ]
+      },
+      {
+        "title": "视觉、交互与静态方式",
+        "instructions": [
+          "总览保留当前位置，聚焦后提供返回入口；颜色与线型保持语义一致。",
+          "静态版保留分类图、条目索引和关键交叉引用。"
+        ]
+      },
+      {
+        "title": "缺项与填写",
+        "instructions": [
+          "将结构中的填写提示替换为本次材料；保留真实缺项及其对结论的影响。",
+          "按用户认知展开必要定义、例子和条件，重要限制默认可见；可选部分没有材料时可以合并或省略。"
+        ]
+      },
+      {
+        "title": "通过条件",
+        "instructions": [
+          "读者能找到一个指定条目、解释它与其他条目的关系，并追溯来源。",
+          "筛选条件可识别，恢复总览不丢失理解线索。"
+        ]
+      }
+    ],
+    "related": [
+      {
+        "kind": "component",
+        "id": "database",
+        "version": "1.0.0",
+        "purpose": "筛选排序真实资料。"
+      },
+      {
+        "kind": "component",
+        "id": "mindmap",
+        "version": "1.0.0",
+        "purpose": "表达层次分类。"
+      },
+      {
+        "kind": "component",
+        "id": "flowchart",
+        "version": "1.0.0",
+        "purpose": "表达交叉关系与局部详情。"
+      },
+      {
+        "kind": "component",
+        "id": "references",
+        "version": "1.0.0",
+        "purpose": "定位来源。"
+      }
+    ],
+    "examples": [
+      {
+        "name": "探索与资料组织的应用",
+        "request": "整理一个主题的资料、概念或候选项，让读者逐步探索。使用我提供或核实的材料，缺项如实说明。",
+        "steps": [
+          {
+            "kind": "template",
+            "id": "exploration-map",
+            "version": "1.0.0",
+            "purpose": "用可定位的分类、属性与关系组织资料，支持总览、筛选和局部核对。"
+          },
+          {
+            "kind": "component",
+            "id": "database",
+            "version": "1.0.0",
+            "purpose": "筛选排序真实资料。"
+          },
+          {
+            "kind": "component",
+            "id": "mindmap",
+            "version": "1.0.0",
+            "purpose": "表达层次分类。"
+          }
+        ]
+      }
+    ],
+    "document": {
+      "content": {
+        "type": "surface",
+        "attrs": {
+          "id": "exploration-map-root",
+          "kind": "page",
+          "name": "探索与资料组织",
+          "widthMode": "standard"
+        },
+        "content": [
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "exploration-map-section-1",
+              "name": "范围与总览",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "exploration-map-section-1-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "范围与总览"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "exploration-map-section-1-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "说明资料范围、读者查找目标、分类依据和更新时间。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "exploration-map-section-2",
+              "name": "分类与关系",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "exploration-map-section-2-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "分类与关系"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "exploration-map-section-2-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "按材料实际属性组织分类；关系含义用明确标签或图例表达。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "exploration-map-section-3",
+              "name": "条目与局部证据",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "exploration-map-section-3-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "条目与局部证据"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "exploration-map-section-3-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "为每个条目保留稳定标识、关键属性、来源及缺失说明。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "widget",
+            "attrs": {
+              "id": "exploration-map-evidence",
+              "name": "可定位的资料索引",
+              "kind": "table",
+              "data": {
+                "title": "可定位的资料索引",
+                "columns": ["条目", "类别或关系", "关键属性", "来源与缺项"],
+                "rows": [],
+                "fontSize": 18,
+                "padding": 0
+              }
+            }
+          },
+          {
+            "type": "richText",
+            "attrs": {
+              "id": "exploration-map-section-4",
+              "name": "使用方式与覆盖边界",
+              "data": {
+                "fontSize": 18,
+                "padding": 0
+              }
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "id": "exploration-map-section-4-title",
+                  "level": 2
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "使用方式与覆盖边界"
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "attrs": {
+                  "id": "exploration-map-section-4-body"
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "说明如何筛选定位、返回全局，以及资料尚未覆盖的范围。"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "layout": {},
+      "surfaceViews": {}
+    }
+  }
+]

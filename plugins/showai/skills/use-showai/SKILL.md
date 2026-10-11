@@ -30,6 +30,9 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 | 任务                             | 操作与指南                                                                                                                                                                                           |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 查询容量、超限原因或同步清单大小 | 读取 `showai_capabilities.capacities` 与 [容量与大文件](../show-document/references/capacity.md)，按实际错误对象解释；只读查询不创建页面                                                             |
+| 先梳理怎么讲清楚、规划内容层次   | [plan-presentation](../plan-presentation/SKILL.md)，形成认知起点、理解路径和通过条件                                                                                                                 |
+| 设计视觉、布局和交互分镜         | [design-presentation](../design-presentation/SKILL.md)，按理解任务选择表达与资源                                                                                                                     |
+| 评估呈现效果、诊断难理解处       | [review-presentation](../review-presentation/SKILL.md)，按授权评审或修订                                                                                                                             |
 | 找项目、页面、正文或已有材料     | `projects_list` / `project_context` → `pages_list` / `library_search` → `page_read`；按需 `guide({topic:"reading"})`                                                                                 |
 | 阅读数据、长页局部               | 默认 structured；先 `detail:"outline"` 获取节点 ID，再用 `blockIds` 取局部；纯源读取用 `rendered:false`                                                                                              |
 | 查看布局或操作效果               | `page_read` 的 image / html；读取 [阅读视图](../show-document/references/page-reading.md)，遵循宿主实际 UI 操控规则                                                                                  |

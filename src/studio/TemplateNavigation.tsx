@@ -4,6 +4,12 @@ import "./template-navigation.css";
 
 const types = [
   { id: "all", label: "全部", icon: LayoutTemplate },
+  { id: "concept-explainer", label: "概念讲解", icon: LayoutTemplate },
+  { id: "decision-comparison", label: "方案决策", icon: Columns3 },
+  { id: "evidence-report", label: "研究证据", icon: FlaskConical },
+  { id: "procedure-guide", label: "操作排查", icon: FileText },
+  { id: "progress-report", label: "进展汇报", icon: FileText },
+  { id: "exploration-map", label: "资料探索", icon: LayoutTemplate },
   { id: "blank", label: "空白", icon: FileText },
   { id: "research", label: "调研", icon: FlaskConical },
   { id: "comparison", label: "对比", icon: Columns3 },

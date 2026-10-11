@@ -84,3 +84,12 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai/skills/use-showai/references/runtime.md
 !/resources/catalog/task-gantt/README.md
 !/resources/catalog/value-slider/README.md
+
+!/plugins/showai/skills/plan-presentation/SKILL.md
+!/plugins/showai/skills/plan-presentation/references/presentation-contract.md
+!/plugins/showai/skills/plan-presentation/references/understanding-plan.md
+!/plugins/showai/skills/design-presentation/SKILL.md
+!/plugins/showai/skills/design-presentation/references/expression-and-storyboard.md
+!/plugins/showai/skills/design-presentation/references/reuse-selection.md
+!/plugins/showai/skills/review-presentation/SKILL.md
+!/plugins/showai/skills/review-presentation/references/review-criteria.md

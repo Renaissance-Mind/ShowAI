@@ -111,11 +111,14 @@ claude plugin marketplace add ./
 claude plugin install showai@renaissance-mind
 ```
 
-The plugin includes four skills:
+The plugin includes seven skills:
 
 | Skill | Purpose |
 | --- | --- |
 | `use-showai` | Basic usage, runtime connection, finding and reading content |
+| `plan-presentation` | Plan reader goals, evidence and a layered understanding path |
+| `design-presentation` | Design visual expression, layout, interactions and static alternatives |
+| `review-presentation` | Evaluate clarity and reader tasks, revise and verify |
 | `show-document` | Create, edit, display, and export pages; apply existing templates |
 | `create-component` | Create or adapt reusable React components |
 | `create-template` | Create and edit templates, or extract them from existing pages |

@@ -40,7 +40,8 @@ import {
 import { build, type Plugin } from "esbuild";
 import Ajv from "ajv";
 import standaloneCode from "ajv/dist/standalone/index.js";
-import templates from "../../resources/catalog/templates.json";
+import legacyTemplates from "../../resources/catalog/templates.json";
+import presentationTemplates from "../../resources/catalog/presentation-templates.json";
 import { builtinComponentCatalog } from "../components/catalog";
 import { validateComponentDocumentation } from "../components/custom/documentation";
 
@@ -619,6 +620,8 @@ function templateRecord(
     );
   return result;
 }
+const templates = [...legacyTemplates, ...presentationTemplates];
+
 function builtinTemplate(id: string): TemplateRecord | undefined {
   const item = templates.find((template) => template.id === id);
   if (!item) return undefined;
@@ -626,16 +629,20 @@ function builtinTemplate(id: string): TemplateRecord | undefined {
   return templateRecord(
     {
       ...item,
-      version: "1.0.0",
+      version: item.version,
       updatedAt: date,
       dependencies: [],
       document: {
         ...blankDocument(),
+        ...("document" in item ? item.document : {}),
         id: `template-${id}`,
         title: id === "blank" ? "" : item.name,
         createdAt: date,
         updatedAt: date,
-        content: { type: "doc", content: item.content },
+        content:
+          "document" in item
+            ? item.document.content
+            : { type: "doc", content: item.content },
       },
     },
     "builtin",

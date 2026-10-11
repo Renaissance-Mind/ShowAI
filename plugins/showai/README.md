@@ -1,6 +1,8 @@
 # ShowAI Agent plugin
 
-ShowAI Agents use MCP for page, component, template and presentation operations. The local package includes four skills and a stdio MCP launcher. Remote packaging uses the same skills with an authorized HTTP endpoint. CLI remains available for service startup, diagnostics, scripts and explicit administration.
+ShowAI Agents use MCP for page, component, template and presentation operations. The local package includes seven skills and a stdio MCP launcher. Remote packaging uses the same skills with an authorized HTTP endpoint. CLI remains available for service startup, diagnostics, scripts and explicit administration.
+
+Plan reader goals with [plan-presentation](skills/plan-presentation/SKILL.md), design expression and interaction with [design-presentation](skills/design-presentation/SKILL.md), and evaluate understanding with [review-presentation](skills/review-presentation/SKILL.md). Page creation continues through show-document; templates reuse narrative structure and components reuse expression capabilities.
 
 Read [use-showai](skills/use-showai/SKILL.md) for connection identity, project selection and task routing. Formal content is saved in the selected project before presentation. Explicitly standalone work uses render_document and reports that no personal project was saved.
 

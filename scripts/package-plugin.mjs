@@ -61,6 +61,40 @@ for (const skill of skills) {
   )
     throw new Error(`Invalid skill: ${skill}`);
 }
+// Relative guidance must ship with the skill, including links across skills.
+async function validateGuidanceLinks(directory) {
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) await validateGuidanceLinks(path);
+    else if (entry.name.endsWith(".md")) {
+      const source = await readFile(path, "utf8");
+      for (const match of source.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
+        const link = match[1];
+        if (/^(?:[a-z][a-z0-9+.-]*:|#)/i.test(link)) continue;
+        const target = resolve(
+          dirname(path),
+          decodeURIComponent(link.split("#")[0]),
+        );
+        const location = relative(plugin, target);
+        if (
+          isAbsolute(location) ||
+          location === ".." ||
+          location.startsWith(".." + sep)
+        )
+          throw new Error(
+            `Skill reference leaves the plugin: ${relative(plugin, path)} → ${link}`,
+          );
+        await access(target).catch((error) => {
+          throw new Error(
+            `Missing skill reference: ${relative(plugin, path)} → ${link}`,
+            { cause: error },
+          );
+        });
+      }
+    }
+  }
+}
+await validateGuidanceLinks(join(plugin, "skills"));
 console.log(
   `Prepared ShowAI MCP plugin ${manifest.version}: ${skills.join(", ")}`,
 );

@@ -16,7 +16,10 @@ afterEach(async () => {
   );
 });
 
-async function packageSkill(source: string) {
+async function packageSkill(
+  source: string,
+  references: Record<string, string> = {},
+) {
   const fixture = await mkdtemp(join(tmpdir(), "showai-plugin-package-"));
   fixtures.push(fixture);
   await Promise.all(
@@ -36,6 +39,11 @@ async function packageSkill(source: string) {
       JSON.stringify({ name: "showai", version: "0.8.0" }),
     ),
     writeFile(join(fixture, "plugins/showai/skills/example/SKILL.md"), source),
+    ...Object.entries(references).map(async ([name, contents]) => {
+      const path = join(fixture, "plugins/showai/skills/example", name);
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, contents);
+    }),
   ]);
   return execute(process.execPath, [
     join(fixture, "scripts/package-plugin.mjs"),
@@ -65,5 +73,24 @@ describe("plugin packaging", () => {
     await expect(
       packageSkill("---\r\nname: example\r\n---\r\nBody."),
     ).rejects.toThrow("Invalid skill: example");
+  });
+
+  it("ships linked guidance and rejects missing references", async () => {
+    const skill =
+      "---\nname: example\ndescription: Example skill.\n---\nRead [guide](references/use.md).";
+    await expect(packageSkill(skill)).rejects.toThrow(
+      "Missing skill reference",
+    );
+    await expect(
+      packageSkill(skill, { "references/use.md": "Guidance." }),
+    ).resolves.toBeDefined();
+  });
+
+  it("rejects a skill link that relies on files outside the plugin", async () => {
+    await expect(
+      packageSkill(
+        "---\nname: example\ndescription: Example skill.\n---\nRead [local](../../../../private.md).",
+      ),
+    ).rejects.toThrow("Skill reference leaves the plugin");
   });
 });

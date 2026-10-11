@@ -453,7 +453,7 @@ export function createMcpServer(options: {
     "template_apply",
     {
       description:
-        "Create a whiteboard from a template, or insert into pageId with its baseHash and optional parentId. Returns the updated page and hash.",
+        "Create a resource preserving the template Page/Board kind, or insert into pageId with its current baseHash/baseRevision and optional parentId. Returns the updated page and hash.",
       inputSchema: {
         ...changeSchema,
         templateId: z.string(),

@@ -7,6 +7,16 @@ description: 通过 ShowAI MCP 创作、修改、展示或导出页面、报告�
 
 先明确读者需要理解什么，依据用户材料与可核实来源组织内容。首次接入或归属不清时读取 [use-showai](../use-showai/SKILL.md)；已有可信 MCP连接与页面身份就继续。正式页面默认保存到所选项目，明确只要独立交付时才使用 `render_document`。保存失败、工具缺失或显示超限不是改为独立文件的理由。
 
+## 从理解目标到页面
+
+按任务规模使用[呈现工作约定](../plan-presentation/references/presentation-contract.md)。复杂报告、机制讲解或决策页面，先由 [plan-presentation](../plan-presentation/SKILL.md) 明确认知起点、证据范围和多级理解路径，再由 [design-presentation](../design-presentation/SKILL.md) 决定图形、布局、文字与交互分镜；已有这些材料时直接组装。简单编辑使用相关判断即可，不强制生成额外规划文档。
+
+用户只要求规划或设计时，保存和展示相应设计产物，不继续实现应用或组件。用户要求成品时，规划与设计是同一创作任务的环节，继续完成制作、修订和交付。只读问题沿 use-showai 回答，不自动创建页面。
+
+先按理解任务选择表达，再核对模板和组件。模板填写约定由 Agent 根据真实材料执行；初始占位提示必须替换为本次内容，真实缺项写成明确限制。生成图逐项核对标签、箭头、数量与含义，精确数据保留原始值和来源。重要结论条件默认可见；补充证据可按需展开。正文只呈现读者需要的信息，制作过程记录保存在相应工作材料中。
+
+续改先读取完整原 Page 和用户反馈。定位事实、认知、顺序、表达或交互障碍，连贯修订受影响的标题、图形、图注、正文和来源；保持原作品身份，保留无关修改。反馈融入新正文，不在正文逐条回应修改要求。
+
 ## 正式页面
 
 先取得或复用 project_context 的 componentCatalog，再调用 `guide({topic:"authoring"})`；构造容器时读 containers，内部正文时读 document。上下文尚未提供索引或目录变化时，用 `catalog_list({kind:"component",projectId})` 取得完整目录；选中后沿用返回的 scope/version/integrity 读取 guide 的内容组织、数据关系、交互与保存边界和示例；按需再取完整 schema/examples，准确区分同名组件。内容专用组件用于所属作品维护，专题组件遵守固定假设。修改实例数据不要求读取源码；模板复用页面结构，沿模板精确依赖读取组件说明。已有组件或组合足够时直接复用；存在明确的表达或交互缺口时进入 [create-component](../create-component/SKILL.md)。需要可复用模板时进入 [create-template](../create-template/SKILL.md)；应用已有模板则直接用 template_apply。
@@ -56,6 +66,8 @@ description: 通过 ShowAI MCP 创作、修改、展示或导出页面、报告�
 创作大页面或带资源的内容前，读取 showai_capabilities 的 capacities，并按 [容量与大文件](references/capacity.md) 判断具体边界。页面结构、原始资源、组件包、完整导出与聊天预览分别计算；聊天预览超限时仍保留完整 Page 和文件。
 
 ## 验证与交付
+
+按 [呈现评审标准](../review-presentation/references/review-criteria.md) 执行与本次内容有关的检查；用户要求整体评审时进入 [review-presentation](../review-presentation/SKILL.md)。事实、主线、可读性、交互与恢复分别检查。静态交付保留关键状态、条件和来源，不能仅用交互初始截图代表完整内容。没有真实读者试读时不宣称已证明理解效果。
 
 源内容用page_read核对；布局用image，同时检查标题、框形装饰、字体一致性、最小字号与长文重点层次；交互按 [阅读视图](references/page-reading.md)检查，并遵循宿主实际UI操控规则。正式编辑不能由临时预览代替。工具回执、视觉检查和实际操作分别记录；未验证的部分不得称为通过。
 

@@ -490,3 +490,122 @@ test("context delivers the complete index while selected revision guides stay se
     ).isError,
   ).toBe(true);
 });
+test("presentation templates apply as independent native Pages, persist edits and export through MCP", async () => {
+  const c = await connect(
+    createLibraryMcpServer({
+      root,
+      presentationDirectory: join(root, "presentation-output"),
+    }),
+  );
+  const projectId = (
+    await call(c, "project_create", { name: "Presentation template contracts" })
+  ).id;
+  const families = [
+    "concept-explainer",
+    "decision-comparison",
+    "evidence-report",
+    "procedure-guide",
+    "progress-report",
+    "exploration-map",
+  ];
+  const listing = await call(c, "catalog_list", {
+    projectId,
+    kind: "template",
+    scope: "builtin",
+  });
+  for (const templateId of families) {
+    const ref = listing.items.find((item: any) => item.id === templateId);
+    expect(ref).toBeDefined();
+    const options = {
+      projectId,
+      templateId,
+      scope: ref.scope,
+      version: ref.version,
+      integrity: ref.integrity,
+    };
+    const first = await call(c, "template_apply", {
+      ...options,
+      title: templateId + " first",
+    });
+    const second = await call(c, "template_apply", {
+      ...options,
+      title: templateId + " second",
+    });
+    expect(first.document.content.type).toBe("surface");
+    expect(first.document.content.attrs.kind).toBe("page");
+    const nodes = (node: any): any[] => [
+      node,
+      ...(node.content ?? []).flatMap(nodes),
+    ];
+    const firstNodes = nodes(first.document.content);
+    const secondIds = new Set(
+      nodes(second.document.content)
+        .map((node) => node.attrs?.id)
+        .filter(Boolean),
+    );
+    expect(
+      firstNodes.filter(
+        (node) => node.attrs?.id && secondIds.has(node.attrs.id),
+      ),
+    ).toEqual([]);
+    const paragraph = firstNodes.find(
+      (node) => node.type === "paragraph" && node.content?.length,
+    );
+    expect(paragraph?.attrs?.id).toBeTruthy();
+    const saved = await call(c, "page_apply", {
+      projectId,
+      pageId: first.document.id,
+      baseHash: first.hash,
+      baseRevision: first.revision,
+      operations: [
+        {
+          type: "block.text.set",
+          blockId: paragraph.attrs.id,
+          text: "Verified native template editing through MCP.",
+        },
+      ],
+    });
+    const read = await call(c, "page_read", {
+      projectId,
+      pageId: first.document.id,
+      rendered: false,
+    });
+    expect(read.hash).toBe(saved.hash);
+    expect(JSON.stringify(read.document)).toContain(
+      "Verified native template editing through MCP.",
+    );
+    expect(
+      JSON.stringify(
+        (
+          await call(c, "page_read", {
+            projectId,
+            pageId: second.document.id,
+            rendered: false,
+          })
+        ).document,
+      ),
+    ).not.toContain("Verified native template editing through MCP.");
+    const shown = await call(c, "page_present", {
+      projectId,
+      pageId: first.document.id,
+    });
+    const exported = JSON.parse(await readFile(shown.delivery.source, "utf8"));
+    expect(exported.version).toBe(3);
+    expect(exported.document.content.attrs.kind).toBe("page");
+    expect(JSON.stringify(exported.document)).toContain(
+      "Verified native template editing through MCP.",
+    );
+    expect(await readFile(shown.delivery.html, "utf8")).toContain(
+      "Verified native template editing through MCP.",
+    );
+    expect(
+      (
+        await call(c, "page_read", {
+          projectId,
+          pageId: first.document.id,
+          rendered: false,
+        })
+      ).hash,
+    ).toBe(saved.hash);
+  }
+}, 120000);

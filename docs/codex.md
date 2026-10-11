@@ -1,6 +1,6 @@
 # 在 Codex 中使用 ShowAI
 
-ShowAI 插件提供四个 Skill 和本机 MCP 启动入口。Agent 通过 MCP 创建、读取、修改和展示内容；正式页面保存到所选 ShowAI 项目。ShowAI 软件提供存储、阅读器与组件编译能力，**需要与插件分别安装**。
+ShowAI 插件提供七个 Skill 和本机 MCP 启动入口。Agent 通过 MCP 创建、读取、修改和展示内容；正式页面保存到所选 ShowAI 项目。ShowAI 软件提供存储、阅读器与组件编译能力，**需要与插件分别安装**。
 
 ## 安装与连接
 

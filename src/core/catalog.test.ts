@@ -131,7 +131,9 @@ describe("filesystem template catalog", () => {
     const home = await temporary();
     expect(
       (await listTemplates(home, project(home))).map((item) => item.id),
-    ).toEqual(["blank", "research", "comparison", "brief"]);
+    ).toEqual(
+      expect.arrayContaining(["blank", "research", "comparison", "brief"]),
+    );
     const research = await getTemplate(home, "research", project(home));
     expect(research.scope).toBe("builtin");
     expect(

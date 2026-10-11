@@ -5,6 +5,8 @@ description: 为 ShowAI 新建、修改可复用模板，或从已有页面提�
 
 模板保存可复用的内容结构、组件组合和填写约定。用户要求创建模板时，交付可应用的模板、使用提示与验证页面。
 
+先按[呈现工作约定](../plan-presentation/references/presentation-contract.md) 明确重复的阅读任务，再从[模板家族与复用选择](../design-presentation/references/reuse-selection.md)检查已有结构。模板说明覆盖认知起点、必需材料、可选区块、内容过多或不足时的调整、交互与静态方式及通过条件；用现有 contentGuide 等字段表达，不添加运行时尚未支持的自动绑定参数。颜色和字体作为样式选择，稳定的理解结构与局部组合才构成复用依据。
+
 沿用已验证的 MCP；首次使用读取 [统一使用指南](../use-showai/SKILL.md) 与 [跨宿主接入](../use-showai/references/integration.md)。公共模板可通过 public_catalog_describe 取得 source 并定制，无需同步登录。只需独立定义时，交付模板定义文件并用 render_document 验证实例；登记到项目时，用真实项目 ID 调用 template_save/template_apply。无 inline 时交付文件或项目结果。读取 `guide({topic:"templates"})`，按用途查询 `catalog_list({kind:"template",projectId,query,limit:8})`，选中后读取 guide/examples；复用、修改或合成定义时才读取所选源码。已有模板可作为基础；说明新增结构或填写约定的用途。
 
 ## 模板结构与填写材料

@@ -1,53 +1,45 @@
 # ShowAI 技能与使用路径
 
-ShowAI 插件提供一个**统一指南和三个专门 Skill**。统一指南建立内容模型、连接与对象归属，再按任务选择**具体路径**。独立软件提供 MCP 文档操作、阅读器、组件编译器及实际资源；宿主提供连接、项目上下文与结果呈现能力。CLI 用于启动、诊断和脚本。
+ShowAI 插件提供七个 Skill，覆盖连接阅读、理解规划、表达设计、页面制作、呈现评审、模板和组件。运行时提供存储、原生容器、目录、编译与渲染；Plugin 分发技能、指南与连接配置。CLI 用于启动、诊断与脚本，Agent 的文档操作统一使用 MCP。
 
-| Skill | 何时读取 | 负责的结果 |
-| --- | --- | --- |
-| [use-showai](../plugins/showai/skills/use-showai/SKILL.md) | 首次使用、询问基础用法、查找或阅读已有内容、查看历史，或不清楚该选择哪个工作流程 | 理解内容库、项目、页面、组件与模板的关系；按条件取得入口、定位对象，完成阅读或路由到专门任务 |
-| [show-document](../plugins/showai/skills/show-document/SKILL.md) | 创作、修改、展示或导出具体页面、报告、网站，或应用已有模板 | 保存可编辑页面，验收内容与交互，并按宿主能力交付整页或选区 |
-| [create-component](../plugins/showai/skills/create-component/SKILL.md) | 用户要求可复用新组件，或数据调整与既有组件组合无法满足表达需求 | 保存精确版本的组件，在真实页面验证；整体任务包含页面时继续完成页面交付 |
-| [create-template](../plugins/showai/skills/create-template/SKILL.md) | 新建、修改模板，或从页面提炼可复用结构 | 保存模板、填写提示和应用验证页面 |
+| Skill                                                                        | 何时使用                             | 产物                                       |
+| ---------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------ |
+| [use-showai](../plugins/showai/skills/use-showai/SKILL.md)                   | 基础用法、连接、查找、阅读与能力发现 | 可靠答案、项目和页面身份、当前目录         |
+| [plan-presentation](../plugins/showai/skills/plan-presentation/SKILL.md)     | 先规划怎么讲清楚、复杂内容组织       | 任务简报、证据范围、多级理解路径与通过条件 |
+| [design-presentation](../plugins/showai/skills/design-presentation/SKILL.md) | 视觉、布局、图形与交互分镜           | 设计稿、主要状态、静态方式与资源选择       |
+| [show-document](../plugins/showai/skills/show-document/SKILL.md)             | 制作、续改、展示、导出或应用模板     | 可继续编辑的 Page 与实际交付               |
+| [review-presentation](../plugins/showai/skills/review-presentation/SKILL.md) | 检查效果、诊断难理解处、按目标重做   | 可定位的问题、修订与复核范围               |
+| [create-template](../plugins/showai/skills/create-template/SKILL.md)         | 建立或提炼可重复使用的内容结构       | 模板、填写约定与应用验证                   |
+| [create-component](../plugins/showai/skills/create-component/SKILL.md)       | 既有数据调整和组合无法满足表达需求   | 精确版本的组件、契约与真实页面实例         |
 
-## 发现与读取顺序
+## 从用户任务开始
 
-Agent 选择技能之前先看到名称与 description，因此主入口的 description 覆盖连接、阅读、查找与任务选择，专门 Skill 的 description 描述各自交付物。只有选择了 Skill 才会读取正文；新增参考文件不会自动使它进入 Agent 上下文。
+简单问题直接回答；普通修改完成对应局部工作。复杂报告或交互讲解由 show-document 组织规划、设计、制作和评审，已有产物直接复用。用户无需手动逐个调用 Skill，也不需要每个阶段都重新确认。
 
-首次使用或基础信息不明确时读 use-showai。用户直接选择专门 Skill 时，由该 Skill 链接到统一指南补齐信息。已经知道内容模型、拥有可信运行入口与对象身份时，可以直接继续专门任务。**按当前操作**读取参考和软件指南，避免每轮加载所有文档。
+用户只要规划或设计时，交付相应方案。用户要成品时继续完成制作、验证、保存与展示。用户说“这里看不懂”时，先读取完整原作品，定位事实、先备概念、主线、图形或交互问题，连贯修改受影响的正文与图示。
 
-## 不同任务的下一步
+共享方法见[呈现工作约定](../plugins/showai/skills/plan-presentation/references/presentation-contract.md)。不同分支可有不同解释深度；概念关系、阅读顺序和屏幕展开分别设计。重要结论条件直接可见，补充材料可按需展开。
 
-| 场景 | 使用路径 |
-| --- | --- |
-| “ShowAI 怎么用” | use-showai 解释内容关系和任务路径；只有问题涉及本机状态时才调用软件 |
-| “找一下项目里的报告并分析” | use-showai → 查询现有项目和页面 → reading；全文检索按需使用 history 指南 |
-| “提取这一页的正文或数据” | use-showai → reading → 结构化或 Markdown；长页先 outline，再按节点读局部 |
-| “看这一页有没有遮挡，按钮是否能用” | use-showai → reading → image 或 html/actions；需要将页面展示给用户时进入 show-document |
-| “把材料做成报告”或“修改这份报告” | show-document → authoring、按需 containers/document → 保存、验收、展示 |
-| “展示这一页/这几个区域”或“导出网站” | show-document → export 与对话展示参考；直接使用已有页面身份 |
-| “有哪些合适的组件或模板” | use-showai → catalog 摘要 → 选中对象的 guide/schema/examples；决定应用后进入 show-document |
-| “做一个新的可复用交互组件” | create-component → 查目录并评估组合 → component → 页面验证；需要页面交付时进入 show-document |
-| “做一个周报模板”或“把这页提炼为模板” | create-template → templates → 按材料决定先做实例或直接建模板 → 应用验证；实例展示使用 show-document |
-| “比较历史、合并草稿或恢复页面” | use-showai → history；写入前重新读完整页面与版本，需要内容修改时进入 show-document |
-| “共享组件、合并资源版本或发布” | 对应专门 Skill → versions/publish；执行用户要求的范围 |
-| “排查桌面编辑器或原生行为” | use-showai → 对应开发规则 → 实际工作台或桌面验收 |
+## 连接与内容归属
 
-具体命令、返回信息和路由条件见统一指南。三种页面读取方式见 [读取视图](../plugins/showai/skills/show-document/references/page-reading.md)。
+首次实际操作调用 showai_capabilities，再用 project_context 或 projects_list 核对连接与归属。本机 library 连接中新正式内容可以用 project_resolve 解析可信宿主目录；只读查询不创建项目。远程只使用授权返回的项目身份。页面修改保留当前 hash、revision 与稳定节点 ID，保存冲突明确处理。
 
-## 运行入口与对象身份
+正式成果先保存到项目，再调用 page_present。独立文件或不入库交付需要用户明确选择。连接、保存或展示失败时保留材料并报告实际限制，不改用另一内容库、创作 CLI 或未保存网页代替。
 
-Agent 通过已连接的 MCP 操作 ShowAI。首次调用 `showai_capabilities`，并通过 `project_context` 或 `projects_list` 核对连接、内容库与项目身份。
+## 模板与组件
 
-新正式内容在本机 library 连接中使用 `project_resolve` 解析可信宿主目录；远程使用授权项目。缺少连接时读取 [连接配置](../plugins/showai/skills/use-showai/references/runtime.md)，由宿主启动或重连，不能切换为创作 CLI 或未保存 HTML。启动器会核对软件能力；插件更新不会升级软件。
+模板复用内容结构和填写约定，组件复用数据表达与交互能力，本次事实保存在 Page 实例中。先选择适合理解任务的表达，再查当前目录；使用精确版本的 guide/schema 准备输入，开发实现时才读取 development 和必要源码。
 
-项目不明确时走对象定位；这与入口是否已知是两个独立判断。读取任务使用现有项目和页面。创作未指定项目时，可按可信宿主目录调用 `project_resolve`，它首次可能创建目录项目。同目录的不同 session 共用项目，session 来源记录不能唯一定位页面。后续编辑保留 `home`、`projectId`、`pageId` 和节点身份，并重新读取当前 hash/revision。
+运行时提供六类原生 Page 模板：概念与机制讲解、方案比较与决策、研究与证据报告、操作与问题排查、状态与进展报告、探索与资料组织。原有空白、调研、对比和简报模板继续可用。匹配条件与组件候选见[复用选择](../plugins/showai/skills/design-presentation/references/reuse-selection.md)。
 
-## 复用、验证与交付
+模板保存 document/composition 与 contentGuide 等说明，由 Agent 根据真实材料填写；它不是自动变量绑定系统。缺少材料时保留缺项和结论限制，完成作品不能残留未处理的填写提示。提炼模板时保留原作品，用不同材料检查适用边界。
 
-目录查询从有限摘要开始，选中对象再查 guide，准备输入时查 schema，需要例子时查 examples。开发组件或修改模板定义时才读取所需源码。组件负责表达与交互，模板负责结构与填写约定；应用已有模板由 show-document 完成。
+组件沿用现有 schema 和版本化 documentation，说明输入、图形语义、状态、保存、窄视口与静态方式。优先调整和组合已有能力；明确缺口才进入组件开发。
 
-模板可先用真实材料创作实例再提炼，也可按明确结构直接建立。两种方式都保存填写提示与可应用定义，再验证应用结果。通用结构反馈更新模板与预览，实例数据反馈更新页面；新组件实现按需进入 create-component。
+## 验证与交付
 
-内容核对使用结构化读取，布局检查使用图像，交互检查使用实际阅读器操作，编辑器与原生行为使用对应软件界面。编译成功、写入成功、导出成功与宿主展示完成**分别证明各自环节**。
+源数据核对、静态截图、实际操作与读者试读分别提供不同证据。遵循宿主规定的界面操控方式。内容、来源、主线、可读性、交互和恢复都按任务检查；静态版本保留重要状态、条件和来源。没有实际检查的范围应明确说明。
 
-页面创作、修改与展示的默认交付由 show-document 定义。保存**完整页面**后，通过 `page_present` 生成整页交付与可选节点预览，执行 [对话展示](../plugins/showai/skills/show-document/references/conversation-display.md) 中的宿主流程。只阅读时交付答案与来源；用户指定只保存、只要文件、面板或后台执行时采用其指定方式。插件更新后通过官方安装入口验证安装副本，并在新会话加载更新后的 Skills。
+完整 Page 保存后，page_present 返回全页 HTML/source 及可选的局部聊天预览。聊天容量不足时选择可独立理解的节点，并保留全页交付。显示契约见[对话展示](../plugins/showai/skills/show-document/references/conversation-display.md)。
+
+插件安装、宿主能力刷新和会话获得新说明分别核验。安装插件不自动升级运行时；更新后检查实际 Skill 列表、MCP 能力和模板目录。
