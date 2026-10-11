@@ -17,6 +17,6 @@ description: 将 ShowAI 理解规划转成视觉与交互设计稿，选择图�
 
 设计稿交付总体阅读节奏、逐段视觉描述、主要交互状态、静态与窄视口方式、候选资源和验收条件。视觉描述应具体到另一位制作者能据此制作，而非只写“高级”“简洁”等形容词。
 
-用户只要设计时，交付可审阅的设计稿与必要素材；需要正式保存时由 [show-document](../show-document/SKILL.md) 保存为 Page。完整制作任务继续组装、验证、保存和展示。设计稿中的拟议界面与实际实现分开说明。
+用户只要设计时，交付可审阅的设计稿与必要素材；按[呈现工作约定](../plan-presentation/references/presentation-contract.md#记录与权限)确定归属，正式成果由 [show-document](../show-document/SKILL.md) 保存为 Page 并展示。完整制作任务继续组装、验证、保存和展示。设计稿中的拟议界面与实际实现分开说明。
 
 完成前按 [review-presentation](../review-presentation/SKILL.md) 中与当前产物有关的条件检查。无需每个画面都增加交互；需要交互时应解释它帮助读者观察或完成什么。

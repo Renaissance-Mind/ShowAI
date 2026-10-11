@@ -17,7 +17,7 @@ description: 规划 ShowAI 内容怎样被理解：梳理读者意图、认知�
 
 交付任务简报、多级理解规划、重要证据缺口及每个主节点的通过条件。重点节点写完整，其余保持足够简洁；不强制统一层数或把所有问题展开到底。
 
-- 用户只要规划：形成可审阅的规划；要求正式方案页面时由 [show-document](../show-document/SKILL.md) 保存与展示。
+- 用户只要规划：形成所需规划，按[呈现工作约定](references/presentation-contract.md#记录与权限)区分对话讨论与正式成果；正式方案由 [show-document](../show-document/SKILL.md) 保存与展示。
 - 用户要视觉或交互设计：将规划交给 [design-presentation](../design-presentation/SKILL.md)。
 - 用户要完整作品：继续 [show-document](../show-document/SKILL.md) 的制作、验证和交付。
 - 用户反馈看不懂：读取当前原作品和反馈，定位障碍后重组相关内容，保持原作品连贯。
