@@ -159,6 +159,26 @@ async function act(page: Page, action: ReadingAction) {
     }
   }
 }
+async function settleFramePaint(frame: Frame): Promise<void> {
+  await frame.evaluate(
+    () =>
+      new Promise<void>((done) => {
+        // Chromium may suspend animation frames in offscreen iframes. Their
+        // DOM still needs to be read, so paint settling must remain bounded.
+        let animation = 0;
+        const finish = () => {
+          clearTimeout(timer);
+          cancelAnimationFrame(animation);
+          done();
+        };
+        const timer = setTimeout(finish, 100);
+        animation = requestAnimationFrame(() => {
+          animation = requestAnimationFrame(finish);
+        });
+      }),
+  );
+}
+
 export async function renderReading(
   htmlPath: string,
   options: ReadingOptions,
@@ -211,24 +231,17 @@ export async function renderReading(
             ).__SHOWAI_COMPONENT_READING__?.ready),
       );
     }
-    for (const frame of page.frames())
+    for (const frame of page.frames()) {
       await frame.evaluate(async () => {
         await document.fonts.ready;
         await Promise.all(
           Array.from(document.images).map((image) => image.decode()),
         );
-        await new Promise<void>((done) =>
-          requestAnimationFrame(() => requestAnimationFrame(() => done())),
-        );
       });
+      await settleFramePaint(frame);
+    }
     for (const action of options.actions) await act(page, action);
-    for (const frame of page.frames())
-      await frame.evaluate(
-        () =>
-          new Promise<void>((done) =>
-            requestAnimationFrame(() => requestAnimationFrame(() => done())),
-          ),
-      );
+    for (const frame of page.frames()) await settleFramePaint(frame);
     if (errors.length)
       throw new Error(`Page preview failed: ${errors.join("; ")}`);
     const visibleError = await page
