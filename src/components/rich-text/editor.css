@@ -1121,13 +1121,25 @@
 .rich-text-component .document-content {
   padding-inline: 0;
 }
-.editor-bubble select {
+.editor-bubble select,
+.editor-toolbar select {
   max-width: 104px;
   height: 28px;
+  padding: 0 4px;
   border: 0;
+  border-radius: 4px;
   background: transparent;
-  color: inherit;
-  font: inherit;
+  color: var(--text, #343a35);
+  font: 12px/1.2 var(--font-ui, system-ui, sans-serif);
+  cursor: pointer;
+}
+.editor-bubble select:hover,
+.editor-toolbar select:hover {
+  background: var(--editor-soft);
+}
+.editor-bubble :is(select, input, button):focus-visible {
+  outline: 2px solid var(--accent, #6c805f);
+  outline-offset: -2px;
 }
 .rich-text-color {
   display: inline-flex;
@@ -1144,7 +1156,7 @@
   background: transparent;
 }
 .editor-bubble {
-  max-width: calc(100vw - 24px);
+  max-width: min(700px, calc(100vw - 24px));
   flex-wrap: wrap;
 }
 .rich-text-component span[style*="color"] :is(strong, mark, em) {

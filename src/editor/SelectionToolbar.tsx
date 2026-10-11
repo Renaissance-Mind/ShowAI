@@ -11,11 +11,13 @@ export function SelectionToolbar({
   onEscape,
   label = "选中文字格式",
   keyboardScope,
+  viewportTop = 8,
 }: {
   id: string;
   label?: string;
   keyboardScope?: string;
-  anchor: { left: number; top: number };
+  anchor: { left: number; top: number; bottom?: number };
+  viewportTop?: number;
   anchorElement?: HTMLElement | null;
   children: ReactNode;
   onEscape: () => void;
@@ -30,14 +32,26 @@ export function SelectionToolbar({
         ? anchorElement.getBoundingClientRect()
         : null;
       const point = bounds
-        ? { left: (bounds.left + bounds.right) / 2, top: bounds.top }
+        ? {
+            left: (bounds.left + bounds.right) / 2,
+            top: bounds.top,
+            bottom: bounds.bottom,
+          }
         : anchor;
       const next = {
         left: Math.max(
           8,
           Math.min(point.left - width / 2, window.innerWidth - width - 8),
         ),
-        top: Math.max(8, point.top - height - 8),
+        top: Math.max(
+          viewportTop,
+          Math.min(
+            point.top - height - 8 >= viewportTop
+              ? point.top - height - 8
+              : (point.bottom ?? point.top) + 8,
+            window.innerHeight - height - 8,
+          ),
+        ),
       };
       setPosition((previous) =>
         previous.left === next.left && previous.top === next.top
@@ -63,7 +77,7 @@ export function SelectionToolbar({
       window.removeEventListener("resize", place);
       if (anchorElement) window.removeEventListener("scroll", place, true);
     };
-  }, [anchor.left, anchor.top, anchorElement]);
+  }, [anchor.left, anchor.top, anchor.bottom, anchorElement, viewportTop]);
   return createPortal(
     <div
       ref={menu}

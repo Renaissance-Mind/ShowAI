@@ -237,10 +237,14 @@ export default function RichTextEditor({
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [dialogError, setDialogError] = useState("");
   const [notice, setNotice] = useState("");
-  const [bubble, setBubble] = useState<{ left: number; top: number } | null>(
-    null,
-  );
+  const [bubble, setBubble] = useState<{
+    left: number;
+    top: number;
+    bottom: number;
+  } | null>(null);
   const dismissedSelection = useRef<string | null>(null);
+  // Native selects and color pickers blur ProseMirror before they emit a value.
+  const selectionMenuInteracting = useRef(false);
   const [, setRevision] = useState(0);
   const selectionBeforeDialog = useRef<{ from: number; to: number } | null>(
     null,
@@ -542,7 +546,7 @@ export default function RichTextEditor({
       if (
         !empty &&
         dismissedSelection.current !== `${from}:${to}` &&
-        editor.isFocused &&
+        (editor.isFocused || selectionMenuInteracting.current) &&
         !editor.isActive("codeBlock") &&
         !editor.isActive("widget") &&
         !editor.isActive("pageModule")
@@ -552,16 +556,40 @@ export default function RichTextEditor({
         setBubble({
           left: (start.left + end.right) / 2,
           top: start.top,
+          bottom: Math.max(start.bottom, end.bottom),
         });
       } else setBubble(null);
     };
-    const hideBubble = () => setBubble(null);
-    const blur = ({ event }: { event: FocusEvent }) => {
+    const ownsMenuTarget = (target: EventTarget | null) =>
+      target instanceof Element &&
+      target.closest(".editor-bubble")?.id === selectionMenuId;
+    const enteringMenu = (event: FocusEvent) => {
+      // Capture keyboard focus transfers before Tiptap's blur transaction.
+      if (ownsMenuTarget(event.relatedTarget))
+        selectionMenuInteracting.current = true;
+    };
+    const hideBubble = () => {
+      selectionMenuInteracting.current = false;
+      setBubble(null);
+    };
+    const trackMenuInteraction = (event: Event) => {
+      selectionMenuInteracting.current = ownsMenuTarget(event.target);
       if (
-        !(event.relatedTarget instanceof Element) ||
-        event.relatedTarget.closest(".editor-bubble")?.id !== selectionMenuId
+        !selectionMenuInteracting.current &&
+        (!(event.target instanceof Node) ||
+          !editor.view.dom.contains(event.target))
       )
         hideBubble();
+    };
+    const blur = ({ event }: { event: FocusEvent }) => {
+      if (
+        !selectionMenuInteracting.current &&
+        !ownsMenuTarget(event.relatedTarget)
+      )
+        hideBubble();
+    };
+    const scroll = (event: Event) => {
+      if (!ownsMenuTarget(event.target)) hideBubble();
     };
     const viewportChanged = (event: Event) => {
       if (
@@ -577,16 +605,22 @@ export default function RichTextEditor({
     editor.on("transaction", refresh);
     editor.on("focus", refresh);
     editor.on("blur", blur);
+    editor.view.dom.addEventListener("blur", enteringMenu, true);
+    document.addEventListener("pointerdown", trackMenuInteraction, true);
+    document.addEventListener("focusin", trackMenuInteraction, true);
     editor.view.dom.addEventListener("contextmenu", hideBubble);
-    window.addEventListener("scroll", hideBubble, true);
+    window.addEventListener("scroll", scroll, true);
     window.addEventListener("resize", refresh);
     window.addEventListener("showai:viewport-change", viewportChanged);
     return () => {
       editor.off("transaction", refresh);
       editor.off("focus", refresh);
       editor.off("blur", blur);
+      editor.view.dom.removeEventListener("blur", enteringMenu, true);
+      document.removeEventListener("pointerdown", trackMenuInteraction, true);
+      document.removeEventListener("focusin", trackMenuInteraction, true);
       editor.view.dom.removeEventListener("contextmenu", hideBubble);
-      window.removeEventListener("scroll", hideBubble, true);
+      window.removeEventListener("scroll", scroll, true);
       window.removeEventListener("resize", refresh);
       window.removeEventListener("showai:viewport-change", viewportChanged);
     };
@@ -1139,11 +1173,7 @@ export default function RichTextEditor({
           aria-label="文字颜色"
           value={editor.getAttributes("textStyle").color ?? "#292733"}
           onChange={(e) =>
-            editor
-              .chain()
-              .focus()
-              .setMark("textStyle", { color: e.target.value })
-              .run()
+            editor.chain().setMark("textStyle", { color: e.target.value }).run()
           }
         />
       </label>
@@ -1154,11 +1184,7 @@ export default function RichTextEditor({
           aria-label="高亮颜色"
           value={editor.getAttributes("highlight").color ?? "#e8eed0"}
           onChange={(e) =>
-            editor
-              .chain()
-              .focus()
-              .setMark("highlight", { color: e.target.value })
-              .run()
+            editor.chain().setMark("highlight", { color: e.target.value }).run()
           }
         />
       </label>
@@ -1666,7 +1692,14 @@ export default function RichTextEditor({
         <SelectionToolbar
           id={selectionMenuId}
           anchor={bubble}
+          viewportTop={
+            (wrapperRef.current
+              ?.closest(".studio")
+              ?.querySelector(".studio-window-topbar")
+              ?.getBoundingClientRect().bottom ?? 0) + 8
+          }
           onEscape={() => {
+            selectionMenuInteracting.current = false;
             dismissedSelection.current = `${editor.state.selection.from}:${editor.state.selection.to}`;
             if (editor.state.selection instanceof CellSelection)
               editor.view.dispatch(
