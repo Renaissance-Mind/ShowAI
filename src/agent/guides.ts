@@ -1,3 +1,4 @@
+import { COMPONENT_PARAMETER_CAPABILITIES } from "../portable/component-parameters.mjs";
 import { z } from "zod";
 import { componentDocumentationSchema } from "../components/custom/documentation";
 
@@ -345,7 +346,9 @@ const guides: Record<
     purpose:
       "Create a reusable React component only after reuse and composition leave a real expression or interaction gap.",
     rules: [
-      "New authored components provide manifest.documentation. The versioned contract has reuse (general/domain/content-specific and boundaries; content-specific requires owner), usage (purpose, structure, input meanings, recipes, interactions/persistence, constraints and editing boundaries), and development (entry points, architecture, extensions, invariants and verification). The input.documentationSchema below is authoritative. Legacy imports without it remain readable and explicitly missing/unclassified.",
+      "Query catalog_describe view=parameters for generated schema + field meanings + real sample values. Select parameterPath for a field/subtree, follow parameterOffset/parameterLimit and reuse knownHash only for held text. Samples and schema defaults are not automatic data filling.",
+      "Version 2 documents every schema parameter's meaning, optional omission behavior, units/coordinates where relevant and explicit opaque payloads. Declare unique/reference/index/sumMaximum relations in usage.rules; the same portable checker validates real inputs and offline sandboxes. Fallbacks declare a JSON value, from:{path,selection:first|last}, or computedFrom paths with an authored derivation description; instructions alone do not prove implementation behavior.",
+      "New authored components provide manifest.documentation version=2; version=1 remains a legacy compatibility format. The versioned contract has reuse (general/domain/content-specific and boundaries; content-specific requires owner), usage (purpose, structure, input meanings, recipes, interactions/persistence, constraints and editing boundaries), and development (entry points, architecture, extensions, invariants and verification). The input.documentationSchema below is authoritative. Legacy imports without it remain readable and explicitly missing/unclassified.",
       "For derived values, declare manifest.reader=readData and export synchronous readData(props) JSON (up to 64 KiB) from the entry. Join computed fields back to source by stable IDs and mark derived fields. It executes in the component browser sandbox; do not read files or call services. Import a new version after adding or changing the contract.",
       "Describe input data, reader actions and resulting state before choosing an implementation. Search component summaries first; read source only for the chosen component being changed.",
       "Use the existing usage/development documentation fields to explain reader tasks, visual semantics, empty/error states, keyboard and narrow-view behavior, static alternatives and verification. Do not invent unsupported schema properties or cross-component interaction APIs.",
@@ -364,6 +367,7 @@ const guides: Record<
     ],
     input: {
       documentationSchema: z.toJSONSchema(componentDocumentationSchema),
+      parameterContract: COMPONENT_PARAMETER_CAPABILITIES,
     },
   },
   "template-extraction": {

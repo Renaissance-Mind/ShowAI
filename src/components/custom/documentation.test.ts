@@ -40,7 +40,7 @@ test("every shipped component has a usable versioned contract, including retaine
 test("invalid contracts cannot claim completeness or refer to nonexistent examples", () => {
   const docs = structuredClone(builtinComponentCatalog()[0].documentation!);
   expect(() =>
-    validateComponentDocumentation({ ...docs, version: 2 }),
+    validateComponentDocumentation({ ...docs, version: 3 }),
   ).toThrow();
   expect(() =>
     validateComponentDocumentation({

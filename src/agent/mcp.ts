@@ -493,7 +493,7 @@ export function createMcpServer(options: {
     "catalog_describe",
     {
       description:
-        "Read a summary by default. guide provides the versioned use contract, schema and a compact example; development provides implementation guidance without source. Read examples/dependencies/full as needed. Executable source requires view=source. Legacy missing documentation is explicitly marked.",
+        "Read a summary by default. parameters joins schema, semantic meanings and samples with optional parameterPath, pagination and knownHash. guide provides the versioned use contract, schema and a compact example; development provides implementation guidance without source. Read examples/dependencies/full as needed. Executable source requires view=source. Legacy missing documentation is explicitly marked.",
       inputSchema: {
         id: z.string(),
         kind: z.enum(["component", "template"]).optional(),
@@ -501,6 +501,13 @@ export function createMcpServer(options: {
         version: z.string().optional(),
         integrity: z.string().optional(),
         view: z.enum(CATALOG_VIEWS).optional(),
+        parameterPath: z.string().min(1).max(500).optional(),
+        parameterOffset: z.number().int().nonnegative().optional(),
+        parameterLimit: z.number().int().min(1).max(50).optional(),
+        knownHash: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
         file: z.string().optional(),
       },
       annotations: readOnly,

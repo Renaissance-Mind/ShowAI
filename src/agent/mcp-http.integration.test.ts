@@ -9,6 +9,7 @@ import { startSyncServer } from "../server/node";
 import { AgentService } from "./service";
 import { syncManager } from "../sync/manager";
 import { startMcpHttpServer } from "./mcp-http";
+import { parameterComponent } from "../test/parameter-component";
 import { templateFixture } from "../test/template-fixture";
 
 let directory: string,
@@ -684,3 +685,84 @@ test("authorized HTTP clients use portable template folders, exact stage refs an
     saved.id,
   );
 });
+
+test("HTTP parameter queries preserve v2 semantics, anonymous compatibility and reject invalid input", async () => {
+  const credentials = await authorize(),
+    remote = await client(credentials.access_token),
+    source = parameterComponent("http-region-reader");
+  const saved = data(
+    await remote.callTool({
+      name: "component_save",
+      arguments: { projectId, source },
+    }),
+  );
+  const query = {
+    projectId,
+    kind: "component",
+    id: saved.id,
+    scope: "project",
+    version: saved.version,
+    integrity: saved.integrity,
+    view: "parameters",
+    parameterPath: "slides[].regions[].box",
+  };
+  const reference = data(
+    await remote.callTool({ name: "catalog_describe", arguments: query }),
+  );
+  expect(reference.definitionValidated).toBe(true);
+  expect(reference.entries).toHaveLength(5);
+  const cached = data(
+    await remote.callTool({
+      name: "catalog_describe",
+      arguments: { ...query, knownHash: reference.hash },
+    }),
+  );
+  expect(cached.unchanged).toBe(true);
+  expect(cached.entries).toBeUndefined();
+  const document = {
+    id: "invalid-http-region",
+    title: "Invalid region",
+    content: {
+      type: "doc",
+      content: [
+        {
+          type: "widget",
+          attrs: {
+            id: "regions",
+            kind: "custom",
+            data: {
+              componentId: saved.id,
+              version: saved.version,
+              integrity: saved.integrity,
+              props: { ...source.manifest.defaultData, selected: "not-an-id" },
+            },
+          },
+        },
+      ],
+    },
+  };
+  const refused = await remote.callTool({
+    name: "page_create",
+    arguments: { projectId, document },
+  });
+  expect(refused.isError).toBe(true);
+  const anonymous = await client();
+  const publicRef = data(
+    await anonymous.callTool({
+      name: "public_catalog_describe",
+      arguments: {
+        id: "text",
+        kind: "component",
+        view: "parameters",
+        parameterLimit: 1,
+      },
+    }),
+  );
+  expect(publicRef.entries).toHaveLength(1);
+  expect(publicRef.protocol).toBe("showai-component-parameters-v1");
+  const privateRef = await anonymous.callTool({
+    name: "catalog_describe",
+    arguments: query,
+  });
+  expect(privateRef.isError).toBe(true);
+}, 60000);

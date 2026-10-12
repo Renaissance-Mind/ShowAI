@@ -8,6 +8,7 @@ export const CATALOG_VIEWS = [
   "summary",
   "guide",
   "development",
+  "parameters",
   "schema",
   "examples",
   "source",
@@ -64,6 +65,10 @@ export interface CatalogSummary {
   integrity?: string;
   description?: string;
   scenarios: string[];
+  parameterDocumentation?: {
+    version: number | null;
+    state: "versioned" | "legacy" | "missing";
+  };
   effects?: string[];
   reuse?: "general" | "domain" | "content-specific" | "unclassified";
   documentationStatus?: "available" | "missing";
@@ -166,6 +171,23 @@ export function summarizeCatalog(
                 | import("../components/custom/documentation").ComponentDocumentation
                 | undefined
             )?.reuse.kind ?? "unclassified",
+          ...(kind === "component"
+            ? {
+                parameterDocumentation: {
+                  version:
+                    typeof (
+                      item.documentation as { version?: number } | undefined
+                    )?.version === "number"
+                      ? (item.documentation as { version: number }).version
+                      : null,
+                  state: !item.documentation
+                    ? "missing"
+                    : (item.documentation as { version: number }).version === 2
+                      ? "versioned"
+                      : "legacy",
+                },
+              }
+            : {}),
           documentationStatus: item.documentation
             ? ("available" as const)
             : ("missing" as const),

@@ -1,3 +1,4 @@
+import { COMPONENT_PARAMETER_CAPABILITIES } from "../portable/component-parameters.mjs";
 import { CAPACITY } from "../portable/capacity.mjs";
 import { access, mkdir, writeFile, rename } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
@@ -57,6 +58,7 @@ export async function runtimeInfo(home: string) {
     protocol: 1,
     capacities: { unit: "bytes", ...CAPACITY },
     capabilities: {
+      componentParameters: COMPONENT_PARAMETER_CAPABILITIES,
       templateWorkflow: TEMPLATE_WORKFLOW_CAPABILITIES,
       presentation: {
         independentOfProject: true,

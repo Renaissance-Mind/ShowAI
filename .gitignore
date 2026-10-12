@@ -145,3 +145,6 @@ plugins/showai/scripts/cli.mjs
 !/resources/templates/exploration-map/guides/05-authoring.md
 !/resources/templates/exploration-map/guides/06-review.md
 !/docs/template-bundles.md
+
+!/docs/component-parameters.md
+!/plugins/showai/skills/create-component/references/parameter-contract.md

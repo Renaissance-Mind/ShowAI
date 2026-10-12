@@ -9,7 +9,7 @@ export const reuseLabels = {
   "content-specific": "内容专用",
   unclassified: "待评估",
 } as const;
-export const componentDocumentationSchema = z
+const documentationV1 = z
   .object({
     version: z.literal(1),
     reuse: z
@@ -69,6 +69,79 @@ export const componentDocumentationSchema = z
       .strict(),
   })
   .strict();
+const parameterInputSchema = z
+  .object({
+    path: text.max(500),
+    meaning: text,
+    units: text.optional(),
+    coordinateSystem: text.optional(),
+    opaque: z.literal(true).optional(),
+    omission: z
+      .object({
+        behavior: z.enum(["reject", "omit", "fallback"]),
+        description: text,
+        value: z.json().optional(),
+        computedFrom: z.array(text.max(500)).min(1).max(20).optional(),
+        from: z
+          .object({ path: text.max(500), selection: z.enum(["first", "last"]) })
+          .strict()
+          .optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+const rulePath = text.max(500);
+export const parameterRuleSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("unique"), path: rulePath }).strict(),
+  z
+    .object({
+      kind: z.literal("reference"),
+      path: rulePath,
+      target: rulePath,
+      sentinelValues: z
+        .array(
+          z.union([z.string(), z.number().finite(), z.boolean(), z.null()]),
+        )
+        .max(10)
+        .optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("index"),
+      path: rulePath,
+      target: rulePath,
+      sentinelValues: z
+        .array(z.union([z.number().int(), z.null()]))
+        .max(10)
+        .optional(),
+      via: z.object({ source: rulePath, target: rulePath }).strict().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("sumMaximum"),
+      paths: z.array(rulePath).min(2).max(8),
+      maximum: z.number().finite(),
+    })
+    .strict(),
+]);
+const documentationV2 = documentationV1
+  .extend({
+    version: z.literal(2),
+    usage: documentationV1.shape.usage
+      .extend({
+        inputs: z.array(parameterInputSchema).max(1000),
+        rules: z.array(parameterRuleSchema).max(100).optional(),
+      })
+      .strict(),
+  })
+  .strict();
+export const componentDocumentationSchema = z.discriminatedUnion("version", [
+  documentationV1,
+  documentationV2,
+]);
 export type ComponentDocumentation = z.infer<
   typeof componentDocumentationSchema
 >;

@@ -73,7 +73,12 @@ import { libraryMutations } from "./history-context";
 import { changeContext } from "./history-context";
 import { mergeValues } from "./catalog-merge";
 import { readCustomBlockData } from "../components/custom/contract";
-import { assertJsonValue, assertProps } from "../components/custom/schema";
+import { parameterRuleIssues } from "../portable/component-parameters.mjs";
+import {
+  assertJsonValue,
+  assertProps,
+  assertParameterDefinition,
+} from "../components/custom/schema";
 import {
   COMPONENT_DATA_MARKER,
   COMPONENT_ID,
@@ -1497,6 +1502,26 @@ export function mount(target,initial){const root=createRoot(target,{onUncaughtEr
 const render=data=>{if(!validate(data)){initial.onError((validate.errors||[]).map(error=>(error.instancePath||'data')+' '+error.message).join('; '));return;}initial.onError('');root.render(React.createElement(UserComponent,{data,readOnly:true,onChange:undefined}));};render(initial.data);return{update:render,destroy:()=>root.unmount()};}`;
 }
 
+function componentValidatorSource(
+  ajv: Ajv,
+  schema: JsonSchema,
+  documentation?: ComponentManifest["documentation"],
+) {
+  const source = standaloneCode(ajv, ajv.compile(schema));
+  if (documentation?.version !== 2) return source;
+  if (!/export default \w+;/.test(source))
+    throw new Error("Standalone validator has no supported default export.");
+  return (
+    source
+      .replace("export const validate =", "const structural =")
+      .replace(/export default \w+;/, "export default combined;") +
+    `
+const relationIssues=${parameterRuleIssues.toString()};
+const relationRules=${JSON.stringify(documentation.usage.rules ?? [])};
+function combined(data){if(!structural(data)){combined.errors=structural.errors;return false;}const issues=relationIssues(data,relationRules);combined.errors=issues.length?issues.map(issue=>({instancePath:issue.path,message:issue.message,keyword:'parameterRelation',params:{}})):null;return !issues.length;}`
+  );
+}
+
 async function compilePackage(
   directory: string,
   manifest: ComponentManifest,
@@ -1509,8 +1534,14 @@ async function compilePackage(
   const require = createRequire(
     process.env.SHOWAI_RUNTIME_ENTRY ?? import.meta.url,
   );
-  assertProps(schema, manifest.defaultData);
-  manifest.examples.forEach((example) => assertProps(schema, example.data));
+  assertParameterDefinition(schema, manifest.documentation, [
+    manifest.defaultData,
+    ...manifest.examples.map((x) => x.data),
+  ]);
+  assertProps(schema, manifest.defaultData, manifest.documentation);
+  manifest.examples.forEach((example) =>
+    assertProps(schema, example.data, manifest.documentation),
+  );
   const root = await realpath(directory);
   if (!files.has(manifest.entry.replace(/^\.\//, "")))
     throw new Error("The component entry does not exist inside the package.");
@@ -1522,7 +1553,11 @@ async function compilePackage(
     code: { source: true, esm: true },
     allErrors: true,
   });
-  const validator = standaloneCode(ajv, ajv.compile(schema));
+  const validator = componentValidatorSource(
+    ajv,
+    schema,
+    manifest.documentation,
+  );
   const runtimeRoots = new Map<string, string>();
   const includeRuntime = (name: string): void => {
     if (runtimeRoots.has(name)) return;
@@ -1629,7 +1664,11 @@ async function compilePackage(
       const child: RuntimePackage = {
         manifest: source.manifest,
         files: componentSourceFiles(source),
-        validator: standaloneCode(ajv, ajv.compile(source.schema)),
+        validator: componentValidatorSource(
+          ajv,
+          source.schema,
+          source.manifest.documentation,
+        ),
         children: new Map(),
       };
       packages.set(key, child);
@@ -2141,6 +2180,10 @@ function compiledRecord(value: unknown, scope: CatalogScope): StoredComponent {
       typeof result.inline.styles !== "string")
   )
     throw new Error("Invalid inline component runtime.");
+  assertParameterDefinition(result.schema, result.documentation, [
+    result.defaultData,
+    ...result.examples.map((x) => x.data),
+  ]);
   assertCompiledComponent(result);
   if (compiledIntegrity(result) !== result.integrity)
     throw new Error("Compiled component integrity verification failed.");
@@ -2629,7 +2672,7 @@ export async function resolveDocumentComponents(
       ref.integrity ? undefined : ref.scope,
     ]);
   const schemas = new Map(
-    refs.map((ref, index) => [key(ref), components[index].schema]),
+    refs.map((ref, index) => [key(ref), components[index]]),
   );
   const visit = (node: typeof document.content) => {
     if (node.type === "widget" && node.attrs?.kind === "custom") {
@@ -2637,7 +2680,8 @@ export async function resolveDocumentComponents(
       const reference = key(data);
       if (!schemas.has(reference))
         throw new Error("A custom component reference was not resolved.");
-      assertProps(schemas.get(reference)!, data.props);
+      const component = schemas.get(reference)!;
+      assertProps(component.schema, data.props, component.documentation);
     }
     node.content?.forEach(visit);
   };
@@ -2660,9 +2704,13 @@ async function importCompiledComponentsImpl(
       { ...component, sourceIntegrity: "portable" },
       scope,
     );
-    assertProps(validated.schema, validated.defaultData);
+    assertProps(
+      validated.schema,
+      validated.defaultData,
+      validated.documentation,
+    );
     validated.examples.forEach((example) =>
-      assertProps(validated.schema, example.data),
+      assertProps(validated.schema, example.data, validated.documentation),
     );
     return validated;
   });
@@ -2743,7 +2791,7 @@ export function componentWidgetData(
   component: CompiledComponent,
   props: Record<string, unknown> = component.defaultData,
 ): Record<string, unknown> {
-  assertProps(component.schema, props);
+  assertProps(component.schema, props, component.documentation);
   return browserComponentWidgetData(component, props);
 }
 export function blankDocument(): ShowDocument {
@@ -2788,7 +2836,7 @@ export async function lockDocumentComponents(
         selected.set(key, pending);
       }
       const component = await pending;
-      assertProps(component.schema, data.props);
+      assertProps(component.schema, data.props, component.documentation);
       const { scope: _scope, ...properties } = data;
       node.attrs.data = {
         ...properties,
@@ -3099,9 +3147,13 @@ export function validatePackageBundle(value: unknown): PackageBundle {
         },
         "published",
       );
-      assertProps(component.schema, component.defaultData);
+      assertProps(
+        component.schema,
+        component.defaultData,
+        component.documentation,
+      );
       component.examples.forEach((example) =>
-        assertProps(component.schema, example.data),
+        assertProps(component.schema, example.data, component.documentation),
       );
       if (entry.source !== undefined) {
         const source = entry.source as ComponentSource;

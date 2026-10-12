@@ -43,6 +43,13 @@ if (
   throw new Error(
     "This plugin requires the staged template workflow runtime. Update/register the intended ShowAI runtime and reconnect; installing skills alone does not add template_context/template_guide.",
   );
+if (
+  info.data?.capabilities?.componentParameters?.protocol !==
+  "showai-component-parameters-v1"
+)
+  throw new Error(
+    "This plugin requires the versioned component parameter runtime. Update/register the intended ShowAI runtime and reconnect; skill installation alone does not update the tool protocol.",
+  );
 const args = [...config.launch.args, "mcp"];
 if (process.env.SHOWAI_TEMPLATES) {
   if (!process.env.SHOWAI_PROJECT_ID)

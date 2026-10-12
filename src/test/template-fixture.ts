@@ -33,7 +33,7 @@ export function templateFixture(
       `# ${stage}\n\nOnly the ${stage} phase instruction.\n`;
   if (component) {
     const documentation = {
-      version: 1,
+      version: 2,
       reuse: {
         kind: "general",
         boundaries: ["Finite sequences with readable text labels."],

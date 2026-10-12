@@ -91,6 +91,10 @@ import {
   type CatalogKind,
   type CatalogView,
 } from "./disclosure";
+import {
+  componentParameterReference,
+  parameterPath,
+} from "../portable/component-parameters.mjs";
 import { getGuide } from "./guides";
 import {
   readPageView,
@@ -107,6 +111,10 @@ export interface CatalogSelection {
   integrity?: string;
   view?: CatalogView;
   file?: string;
+  parameterPath?: string;
+  parameterOffset?: number;
+  parameterLimit?: number;
+  knownHash?: string;
 }
 const projectSummary = (project: {
   id: string;
@@ -434,6 +442,20 @@ export class AgentService {
   async catalogDescribe(id: string, input: CatalogSelection = {}) {
     const projectId = this.catalogProject(input.projectId);
     const view = input.view ?? "summary";
+    if (
+      [
+        input.parameterPath,
+        input.parameterOffset,
+        input.parameterLimit,
+        input.knownHash,
+      ].some((x) => x !== undefined) &&
+      view !== "parameters"
+    )
+      throw new Error("Parameter selectors/cache require view=parameters.");
+    if (input.kind === "template" && view === "parameters")
+      throw new Error(
+        "Parameter references belong to components; use template stage guides.",
+      );
     if (input.kind === "template") {
       const template = await getTemplate(this.store.root, id, projectId, {
         scope: input.scope,
@@ -597,11 +619,28 @@ export class AgentService {
           integrity: input.integrity,
         });
     const summary = summarizeCatalog("component", component, projectId);
+    if (
+      builtin &&
+      input.version !== undefined &&
+      input.version !== summary.version
+    )
+      throw new Error(
+        "Builtin component version differs from the selected revision.",
+      );
+    if (
+      builtin &&
+      input.integrity !== undefined &&
+      input.integrity !== summary.integrity
+    )
+      throw new Error(
+        "Builtin component integrity differs from the selected revision.",
+      );
     const native = "insertion" in component ? component.insertion : undefined;
     const next = Object.fromEntries(
       [
         "guide",
         "development",
+        "parameters",
         "schema",
         "examples",
         "dependencies",
@@ -616,6 +655,106 @@ export class AgentService {
     const parents = "parents" in component ? (component.parents ?? []) : [];
     const documentation = component.documentation;
     if (view === "summary") return { ...summary, view, next };
+    if (view === "parameters") {
+      const report = componentParameterReference(
+        schema,
+        documentation,
+        component.defaultData,
+        component.examples,
+      );
+      const path =
+        input.parameterPath !== undefined
+          ? parameterPath(input.parameterPath)
+          : undefined;
+      const matching = report.entries.filter(
+        (entry) =>
+          !path || entry.path === path || entry.path.startsWith(path + "/"),
+      );
+      if (path && !matching.length)
+        throw new Error("Unknown component parameter: " + path);
+      const offset = input.parameterOffset ?? 0,
+        limit = input.parameterLimit ?? 20;
+      if (
+        !Number.isInteger(offset) ||
+        offset < 0 ||
+        !Number.isInteger(limit) ||
+        limit < 1 ||
+        limit > 50
+      )
+        throw new Error(
+          "Invalid parameter page: limit must be 1–50 and offset nonnegative.",
+        );
+      const entries = matching.slice(offset, offset + limit),
+        visible = new Set(entries.map((entry) => entry.path));
+      const relationPaths = (rule: (typeof report.relations)[number]) =>
+        rule.kind === "sumMaximum"
+          ? rule.paths
+          : [
+              rule.path,
+              ...("target" in rule ? [rule.target] : []),
+              ...("via" in rule && rule.via
+                ? [rule.via.source, rule.via.target]
+                : []),
+            ];
+      const selected = {
+        protocol: report.protocol,
+        documentationVersion: report.documentationVersion,
+        definitionValidated: report.verifiedContract,
+        defaultPolicy: report.defaultPolicy,
+        diagnosticCount: report.diagnostics.length,
+        diagnostics: report.diagnostics.filter((d) => visible.has(d.path)),
+        entries,
+        relations: report.relations.filter((rule) =>
+          relationPaths(rule).some((p) => visible.has(parameterPath(p))),
+        ),
+      };
+      const hash = createHash("sha256")
+        .update(
+          canonicalJson({
+            projectId,
+            ref: summary.ref,
+            path,
+            offset,
+            limit,
+            ...selected,
+          }),
+        )
+        .digest("hex");
+      const result = {
+        ...summary,
+        view,
+        hash,
+        unchanged: input.knownHash === hash,
+        total: matching.length,
+        offset,
+        limit,
+        ...(input.knownHash === hash ? {} : selected),
+        ...(offset + limit < matching.length
+          ? {
+              nextPage: {
+                tool: "catalog_describe",
+                arguments: {
+                  projectId,
+                  kind: "component",
+                  id,
+                  scope: summary.scope,
+                  version: summary.version,
+                  integrity: summary.integrity,
+                  view: "parameters",
+                  ...(path ? { parameterPath: path } : {}),
+                  parameterOffset: offset + limit,
+                  parameterLimit: limit,
+                },
+              },
+            }
+          : {}),
+      };
+      if (Buffer.byteLength(JSON.stringify(result)) > 65536)
+        throw new Error(
+          "Parameter reference exceeds 64 KiB. Request a specific parameterPath or smaller parameterLimit.",
+        );
+      return result;
+    }
     if (view === "development")
       return {
         ...summary,
@@ -640,8 +779,30 @@ export class AgentService {
         ...(documentation
           ? {
               reuse: documentation.reuse,
-              guide: documentation.usage,
-              schema,
+              guide:
+                documentation.version === 2
+                  ? Object.fromEntries(
+                      Object.entries(documentation.usage).filter(
+                        ([key]) => !["inputs", "rules"].includes(key),
+                      ),
+                    )
+                  : documentation.usage,
+              ...(documentation.version === 2
+                ? {
+                    parameterReference: {
+                      tool: "catalog_describe",
+                      arguments: {
+                        projectId,
+                        kind: "component",
+                        id,
+                        scope: summary.scope,
+                        version: summary.version,
+                        integrity: summary.integrity,
+                        view: "parameters",
+                      },
+                    },
+                  }
+                : { schema }),
               ...(JSON.stringify(component.examples[0] ?? {}).length <= 12000
                 ? { example: component.examples[0] }
                 : {

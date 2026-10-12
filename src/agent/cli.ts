@@ -81,6 +81,7 @@ Discover only what you need:
   template guide STAGE --project PROJECT [--input CONTEXT.json | --templates ID]
   catalog list [--kind component|template] [--scope SCOPE] [--limit N --cursor CURSOR]
   catalog describe ID [--kind component|template] [--view VIEW]
+  catalog describe ID --view parameters [--parameter-path PATH --parameter-offset N --parameter-limit N --known-hash HASH]
 
 Display a full page or selected blocks:
   export --project PROJECT --page PAGE [--blocks ID,ID] --format html|inline --out PATH
@@ -174,6 +175,10 @@ function parseArguments(args: string[]): Arguments {
     "description",
     "scope",
     "view",
+    "parameter-path",
+    "parameter-offset",
+    "parameter-limit",
+    "known-hash",
     "file",
     "limit",
     "cursor",
@@ -887,6 +892,16 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
           version: option(args, "version"),
           integrity: option(args, "integrity"),
           view: catalogView(args),
+          parameterPath: option(args, "parameter-path"),
+          parameterOffset:
+            option(args, "parameter-offset") === undefined
+              ? undefined
+              : Number(option(args, "parameter-offset")),
+          parameterLimit:
+            option(args, "parameter-limit") === undefined
+              ? undefined
+              : Number(option(args, "parameter-limit")),
+          knownHash: option(args, "known-hash"),
           file: option(args, "file"),
         });
         const path = await saveOutput(service, args, result);

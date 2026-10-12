@@ -198,11 +198,23 @@ export async function describePublicResource(
     kind?: "component" | "template";
     view?: CatalogView;
     file?: string;
+    parameterPath?: string;
+    parameterOffset?: number;
+    parameterLimit?: number;
+    knownHash?: string;
     stage?: TemplateStage;
     version?: string;
     integrity?: string;
   } = {},
 ) {
+  if (
+    input.view === "parameters" &&
+    (input.kind === "template" ||
+      (input.kind !== "component" &&
+        (folderTemplateIds.has(id) ||
+          publicTemplates.some((x) => x.id === id))))
+  )
+    throw new Error("Parameter references belong to components.");
   if (folderTemplateIds.has(id) && input.kind !== "component") {
     const template = await getTemplate(publicCatalogHome(), id, undefined, {
       scope: "builtin",
@@ -293,8 +305,14 @@ export async function describePublicResource(
   }).catalogDescribe(id, {
     kind: "component",
     scope: "builtin",
+    version: input.version,
+    integrity: input.integrity,
     view: input.view ?? "guide",
     file: input.file,
+    parameterPath: input.parameterPath,
+    parameterOffset: input.parameterOffset,
+    parameterLimit: input.parameterLimit,
+    knownHash: input.knownHash,
   });
 }
 
@@ -370,7 +388,7 @@ export async function renderPresentation(raw: PresentationInput) {
           throw new Error(
             `Custom component is unavailable: ${reference.componentId}@${reference.version}`,
           );
-        assertProps(component.schema, reference.props);
+        assertProps(component.schema, reference.props, component.documentation);
       }
       node.content?.forEach(validateCustomProps);
     };

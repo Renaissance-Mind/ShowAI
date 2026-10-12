@@ -1,3 +1,4 @@
+import { COMPONENT_PARAMETER_CAPABILITIES } from "../portable/component-parameters.mjs";
 import { CAPACITY } from "../portable/capacity.mjs";
 import { TEMPLATE_WORKFLOW_CAPABILITIES } from "../portable/template-bundle.mjs";
 import { TEMPLATE_STAGES } from "../portable/template-bundle.mjs";
@@ -141,6 +142,7 @@ export function registerPresentationTools(
           taskContexts: options.privateProjects !== false,
           baseline: { tool: "guide", arguments: { topic: "presentation" } },
         },
+        componentParameters: COMPONENT_PARAMETER_CAPABILITIES,
         capacities: { unit: "bytes", ...CAPACITY },
         transport: options.transport,
         presentation: {
@@ -202,6 +204,13 @@ export function registerPresentationTools(
           .optional(),
         kind: z.enum(["component", "template"]).optional(),
         view: z.enum(CATALOG_VIEWS).optional(),
+        parameterPath: z.string().min(1).max(500).optional(),
+        parameterOffset: z.number().int().nonnegative().optional(),
+        parameterLimit: z.number().int().min(1).max(50).optional(),
+        knownHash: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
         file: z.string().optional(),
       },
       annotations: readOnly,

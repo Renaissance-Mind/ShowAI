@@ -1,7 +1,7 @@
 {
   "id": "value-slider",
   "name": "数值滑块",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "通过滑块调整一个数值。编辑时同步页面数据，阅读时可临时探索。",
   "scenarios": [
     "让读者探索单个有界数值，例如调整阈值或观察一个连续参数。",
@@ -41,7 +41,7 @@
     "编辑模式下将新值写回页面，阅读模式下保留临时探索状态。"
   ],
   "documentation": {
-    "version": 1,
+    "version": 2,
     "reuse": {
       "kind": "general",
       "boundaries": [
@@ -60,7 +60,8 @@
         },
         {
           "path": "value",
-          "meaning": "初始有限数值，应在区间内。"
+          "meaning": "初始有限数值，应在区间内。",
+          "units": "与本实例min/max相同的量纲；组件不擅自转换单位。"
         },
         {
           "path": "min",
