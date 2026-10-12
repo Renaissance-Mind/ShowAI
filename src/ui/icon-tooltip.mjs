@@ -26,6 +26,7 @@ export function installIconTooltips(root) {
   let active = null;
   let nativeTitle = null;
   let hideTimer = 0;
+  let showTimer = 0;
   let focusTimer = 0;
   let pointerFocus = false;
   let hovered = null;
@@ -66,6 +67,8 @@ export function installIconTooltips(root) {
   };
   const hide = () => {
     win.clearTimeout(hideTimer);
+    win.clearTimeout(showTimer);
+    showTimer = 0;
     if (active) {
       const ids = (active.getAttribute("aria-describedby") || "")
         .split(/\s+/)
@@ -79,15 +82,29 @@ export function installIconTooltips(root) {
     active = null;
     nativeTitle = null;
   };
-  const show = (element) => {
-    win.clearTimeout(hideTimer);
-    if (element === active) return;
-    hide();
-    if (!element || element === tip) return;
-    active = element;
-    nativeTitle = element.getAttribute("title");
-    // Suppress the browser's second tooltip while this trigger is active.
-    element.removeAttribute("title");
+  const hasVisibleText = (element) => {
+    const walker = doc.createTreeWalker(element, win.NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (!/[\p{L}\p{N}]/u.test(node.textContent)) continue;
+      const parent = node.parentElement;
+      if (parent.closest("svg, [aria-hidden='true'], [hidden]")) continue;
+      const style = win.getComputedStyle(parent);
+      if (style.visibility !== "visible") continue;
+      const range = doc.createRange();
+      range.selectNodeContents(node);
+      if (
+        [...range.getClientRects()].some(
+          (rect) => rect.width > 1 && rect.height > 1,
+        )
+      )
+        return true;
+    }
+    return false;
+  };
+  const render = () => {
+    showTimer = 0;
+    const element = active;
+    if (!element) return;
     if (!element.isConnected || !element.getClientRects().length) return hide();
     tip.textContent = label(element);
     tip.showPopover();
@@ -110,17 +127,36 @@ export function installIconTooltips(root) {
       [...new Set([...ids, tip.id])].join(" "),
     );
   };
+  const show = (element, delayText = false) => {
+    win.clearTimeout(hideTimer);
+    if (element === active) {
+      if (showTimer && !delayText) {
+        win.clearTimeout(showTimer);
+        render();
+      }
+      return;
+    }
+    hide();
+    if (!element || element === tip) return;
+    active = element;
+    nativeTitle = element.getAttribute("title");
+    // Suppress native tooltips during the wait as well as while visible.
+    element.removeAttribute("title");
+    if (delayText && hasVisibleText(element))
+      showTimer = win.setTimeout(render, 500);
+    else render();
+  };
   const leave = () => {
     win.clearTimeout(hideTimer);
     hideTimer = win.setTimeout(() => {
-      if (hovered !== tip) show(hovered || focused);
+      if (hovered !== tip) show(hovered || focused, Boolean(hovered));
     }, 90);
   };
   const over = (event) => {
     if (event.pointerType === "touch") return;
     hovered = target(event);
     if (hovered === tip) win.clearTimeout(hideTimer);
-    else show(hovered || focused);
+    else show(hovered || focused, Boolean(hovered));
   };
   const out = (event) => {
     if (
@@ -128,6 +164,7 @@ export function installIconTooltips(root) {
       tip.contains(event.relatedTarget)
     )
       return;
+    if (showTimer) hide();
     hovered = null;
     leave();
   };
