@@ -9,6 +9,7 @@ import { startSyncServer } from "../server/node";
 import { AgentService } from "./service";
 import { syncManager } from "../sync/manager";
 import { startMcpHttpServer } from "./mcp-http";
+import { templateFixture } from "../test/template-fixture";
 
 let directory: string,
   sync: Awaited<ReturnType<typeof startSyncServer>>,
@@ -183,7 +184,60 @@ test("anonymous clients discover and customize public resources without a projec
     }),
   );
   expect(catalog.synchronizationRequired).toBe(false);
-  expect((catalog.items as unknown[]).length).toBe(3);
+  const publicIds = (catalog.items as { id: string }[]).map((item) => item.id);
+  expect(publicIds).toEqual(
+    expect.arrayContaining([
+      "explainer",
+      "comparison",
+      "research-note",
+      "evidence-report",
+      "system-presentation",
+    ]),
+  );
+  expect(new Set(publicIds).size).toBe(publicIds.length);
+  const folder = data(
+    await anonymous.callTool({
+      name: "public_catalog_describe",
+      arguments: {
+        id: "evidence-report",
+        kind: "template",
+        view: "guide",
+        version: "2.0.0",
+      },
+    }),
+  );
+  const stage = data(
+    await anonymous.callTool({
+      name: "public_catalog_describe",
+      arguments: {
+        id: "evidence-report",
+        kind: "template",
+        view: "guide",
+        stage: "design",
+        version: folder.version,
+        integrity: folder.integrity,
+      },
+    }),
+  );
+  expect(stage.documents).toHaveLength(2);
+  expect((stage.documents as { ref: { id: string } }[])[0].ref.id).toBe(
+    "system-presentation",
+  );
+  const folderRender = data(
+    await anonymous.callTool({
+      name: "render_document",
+      arguments: {
+        templateId: "evidence-report",
+        templateVersion: folder.version,
+        templateIntegrity: folder.integrity,
+        title: "Public folder output",
+      },
+    }),
+  );
+  const folderSource = await (
+    await fetch((folderRender.delivery as { source: string }).source)
+  ).json();
+  expect(folderSource.document.title).toBe("Public folder output");
   const template = data(
     await anonymous.callTool({
       name: "public_catalog_describe",
@@ -506,4 +560,123 @@ test("OAuth scope, resource binding, refresh rotation and revocation are enforce
   });
   const revoked = await reader.callTool({ name: "projects_list" });
   expect(revoked.isError).toBe(true);
+});
+
+test("authorized HTTP clients use portable template folders, exact stage refs and compact source receipts", async () => {
+  const credentials = await authorize(),
+    remote = await client(credentials.access_token);
+  const baseline = data(
+    await remote.callTool({
+      name: "guide",
+      arguments: { topic: "presentation" },
+    }),
+  );
+  expect(baseline.required).toBe(true);
+  const saved = data(
+    await remote.callTool({
+      name: "template_save",
+      arguments: {
+        projectId,
+        input: { bundle: templateFixture("http-guided-template") },
+      },
+    }),
+  );
+  expect(saved.document).toBeUndefined();
+  const context = data(
+    await remote.callTool({
+      name: "template_context",
+      arguments: {
+        projectId,
+        templates: [
+          {
+            id: saved.id,
+            version: saved.version,
+            integrity: saved.integrity,
+            scope: "project",
+          },
+        ],
+      },
+    }),
+  );
+  const binding = context.context as { templates: Record<string, unknown>[] };
+  expect(context.components).toHaveLength(1);
+  expect(JSON.stringify(context)).not.toContain("index.tsx");
+  const stage = data(
+    await remote.callTool({
+      name: "template_guide",
+      arguments: { projectId, stage: "design", templates: binding.templates },
+    }),
+  );
+  expect(stage.documents).toHaveLength(2);
+  expect(JSON.stringify(stage)).not.toContain(
+    "Only the review phase instruction",
+  );
+  const page = data(
+    await remote.callTool({
+      name: "template_apply",
+      arguments: {
+        projectId,
+        templateId: saved.id,
+        version: saved.version,
+        integrity: saved.integrity,
+        scope: "project",
+        title: "HTTP template Page",
+      },
+    }),
+  );
+  const document = page.document as { id: string };
+  const read = data(
+    await remote.callTool({
+      name: "page_read",
+      arguments: {
+        projectId,
+        pageId: document.id,
+        rendered: false,
+        response: "source",
+      },
+    }),
+  );
+  expect(read.document).toBeDefined();
+  expect(read.markdown).toBeUndefined();
+  expect(read.projectId).toBe(projectId);
+  const changed = data(
+    await remote.callTool({
+      name: "page_apply",
+      arguments: {
+        projectId,
+        pageId: document.id,
+        baseHash: read.hash,
+        baseRevision: read.revision,
+        operations: [{ type: "page.set", fields: { title: "HTTP revised" } }],
+        response: "receipt",
+      },
+    }),
+  );
+  expect(changed.document).toBeUndefined();
+  expect(changed.hash).not.toBe(read.hash);
+  const other = data(
+    await remote.callTool({
+      name: "template_context",
+      arguments: {
+        projectId,
+        templates: [{ id: "decision-comparison", scope: "builtin" }],
+      },
+    }),
+  );
+  expect(
+    (other.context as { templates: { id: string }[] }).templates[0].id,
+  ).toBe("decision-comparison");
+  const original = data(
+    await remote.callTool({
+      name: "template_guide",
+      arguments: {
+        projectId,
+        stage: "understanding",
+        templates: binding.templates,
+      },
+    }),
+  );
+  expect((original.documents as { ref: { id: string } }[])[1].ref.id).toBe(
+    saved.id,
+  );
 });

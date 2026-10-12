@@ -67,6 +67,12 @@ export interface CatalogSummary {
   effects?: string[];
   reuse?: "general" | "domain" | "content-specific" | "unclassified";
   documentationStatus?: "available" | "missing";
+  workflow?: {
+    format: 1;
+    stages: string[];
+    componentCount: number;
+    system: boolean;
+  };
   ref?: PackageRevisionRef;
 }
 
@@ -139,6 +145,17 @@ export function summarizeCatalog(
     name: String(item.name ?? id),
     description: typeof item.description === "string" ? item.description : "",
     scope,
+    ...(kind === "template" && item.workflow
+      ? {
+          workflow: {
+            format: 1 as const,
+            stages: (item.workflow as { stages: string[] }).stages,
+            componentCount: (item.workflow as { components: unknown[] })
+              .components.length,
+            system: id === "system-presentation",
+          },
+        }
+      : {}),
     ...(version ? { version } : {}),
     ...(integrity ? { integrity } : {}),
     ...(kind === "component"
@@ -207,6 +224,7 @@ export function catalogEntry(item: CatalogSummary) {
     scenarios,
     reuse,
     documentationStatus,
+    workflow,
   } = item;
   return {
     kind,
@@ -216,6 +234,7 @@ export function catalogEntry(item: CatalogSummary) {
     scenarios,
     scope,
     ...(reuse ? { reuse, documentationStatus } : {}),
+    ...(workflow ? { workflow } : {}),
     ...(version ? { version } : {}),
     ...(integrity ? { integrity } : {}),
   };

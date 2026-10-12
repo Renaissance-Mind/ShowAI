@@ -1,0 +1,208 @@
+{
+  "content": {
+    "type": "surface",
+    "attrs": {
+      "id": "decision-comparison-root",
+      "kind": "page",
+      "name": "方案比较与决策",
+      "widthMode": "wide"
+    },
+    "content": [
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "decision-comparison-section-1",
+          "name": "决策问题与约束",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "decision-comparison-section-1-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "决策问题与约束"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "decision-comparison-section-1-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "说明要作出的选择、使用场景、必须满足的条件和信息截止时间。"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "widget",
+        "attrs": {
+          "id": "decision-comparison-evidence-explorer",
+          "name": "按共同条件探索与比较",
+          "kind": "evidence-explorer",
+          "data": {
+            "title": "按共同条件探索与比较",
+            "dimensions": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "decision-comparison-section-2",
+          "name": "共同标准与差异",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "decision-comparison-section-2-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "共同标准与差异"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "decision-comparison-section-2-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "定义一致的比较维度、单位和条件；填入可核实的事实，保留缺失项。"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "decision-comparison-section-3",
+          "name": "取舍与建议",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "decision-comparison-section-3-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "取舍与建议"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "decision-comparison-section-3-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "基于证据说明推荐及其适用前提，并解释条件变化时选择如何改变。"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "widget",
+        "attrs": {
+          "id": "decision-comparison-evidence",
+          "name": "共同标准下的对照",
+          "kind": "table",
+          "data": {
+            "title": "共同标准下的对照",
+            "columns": ["比较标准", "选项", "可核实事实", "限制与缺项", "来源"],
+            "rows": [],
+            "fontSize": 18,
+            "padding": 0
+          }
+        }
+      },
+      {
+        "type": "widget",
+        "attrs": {
+          "id": "decision-comparison-mechanism-steps",
+          "name": "条件改变后会怎样",
+          "kind": "mechanism-steps",
+          "data": {
+            "title": "条件改变后会怎样",
+            "parts": [],
+            "frames": []
+          }
+        }
+      },
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "decision-comparison-section-4",
+          "name": "尚待补充的材料",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "decision-comparison-section-4-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "尚待补充的材料"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "decision-comparison-section-4-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "说明哪些缺口影响当前判断、需要补充什么及如何验证。"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "layout": {},
+  "surfaceViews": {}
+}

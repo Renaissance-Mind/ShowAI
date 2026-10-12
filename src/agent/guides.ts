@@ -2,6 +2,7 @@ import { z } from "zod";
 import { componentDocumentationSchema } from "../components/custom/documentation";
 
 export const GUIDE_TOPICS = [
+  "presentation",
   "integration",
   "workspace",
   "authoring",
@@ -31,6 +32,17 @@ const guides: Record<
     next?: string;
   }
 > = {
+  presentation: {
+    purpose:
+      "Mandatory system presentation baseline and staged template instructions.",
+    rules: [
+      "Read guide presentation for the mandatory baseline. Read one current-stage guide at a time. Select task templates with template_context; template_guide adds their exact-version instructions and component references.",
+    ],
+    commands: [
+      "showai guide presentation --json",
+      "showai template context --project PROJECT --templates evidence-report --json",
+    ],
+  },
   integration: {
     purpose:
       "Use common ShowAI capabilities across harnesses, choosing display and synchronization independently.",
@@ -392,6 +404,8 @@ const guides: Record<
     purpose:
       "Use or compose reusable content structures while keeping template revisions immutable.",
     rules: [
+      "New templates use a folder bundle: strict JSON-frontmatter README, six stage guides, optional components and page.json. import/export manage directories; MCP template_save accepts the same portable files/assets object.",
+      "The system baseline is mandatory and selected task templates are explicit pinned references. template_context returns READMEs and component references; template_guide discloses one stage. Null stage declarations inherit system instructions; guide directories expose their main README and optional subfiles.",
       "Use a template's scenarios to choose it, guide to learn its content structure and related resources, and examples to see realistic sequences.",
       "Match reader task, required evidence, environment and content density before visual style. The presentation families concept-explainer, decision-comparison, evidence-report, procedure-guide, progress-report and exploration-map provide native Page structures; query the connected catalog for their exact revisions.",
       "contentGuide describes required inputs, optional sections, depth/layout variants, interaction/static behavior and acceptance tasks. These are Agent-facing filling instructions, not automatic variable binding. Preserve missing evidence as a limitation instead of inventing content.",

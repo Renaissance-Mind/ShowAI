@@ -1,10 +1,12 @@
 import { build } from "esbuild";
+import { rawSourcePlugin } from "./raw-source-plugin.mjs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 await mkdir("dist-server", { recursive: true });
 await build({
   entryPoints: ["src/server/main.ts"],
+  plugins: [rawSourcePlugin],
   outfile: "dist-server/server.mjs",
   bundle: true,
   platform: "node",
@@ -16,6 +18,7 @@ await build({
 });
 await build({
   entryPoints: ["src/server/worker.ts"],
+  plugins: [rawSourcePlugin],
   outfile: "dist-server/worker.mjs",
   bundle: true,
   platform: "browser",
@@ -24,6 +27,7 @@ await build({
 });
 await build({
   entryPoints: ["src/server/private-proxy.ts"],
+  plugins: [rawSourcePlugin],
   outfile: "dist-server/private-proxy.mjs",
   bundle: true,
   platform: "browser",

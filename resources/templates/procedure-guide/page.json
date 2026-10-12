@@ -1,0 +1,208 @@
+{
+  "content": {
+    "type": "surface",
+    "attrs": {
+      "id": "procedure-guide-root",
+      "kind": "page",
+      "name": "操作与问题排查",
+      "widthMode": "wide"
+    },
+    "content": [
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "procedure-guide-section-1",
+          "name": "目标状态与前提",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "procedure-guide-section-1-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "目标状态与前提"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "procedure-guide-section-1-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "填写完成后的可观察结果、所需权限、版本和输入材料。"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "widget",
+        "attrs": {
+          "id": "procedure-guide-mechanism-steps",
+          "name": "从初始状态到结果",
+          "kind": "mechanism-steps",
+          "data": {
+            "title": "从初始状态到结果",
+            "parts": [],
+            "frames": []
+          }
+        }
+      },
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "procedure-guide-section-2",
+          "name": "主操作路径",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "procedure-guide-section-2-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "主操作路径"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "procedure-guide-section-2-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "按依赖顺序说明真实入口、动作和预期反馈，使用对应界面或图示。"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "procedure-guide-section-3",
+          "name": "异常分支与恢复",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "procedure-guide-section-3-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "异常分支与恢复"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "procedure-guide-section-3-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "基于可观察现象说明分支条件、原因证据与恢复步骤。"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "widget",
+        "attrs": {
+          "id": "procedure-guide-evidence",
+          "name": "动作、反馈与恢复",
+          "kind": "table",
+          "data": {
+            "title": "动作、反馈与恢复",
+            "columns": ["条件或步骤", "动作", "预期反馈", "异常与恢复"],
+            "rows": [],
+            "fontSize": 18,
+            "padding": 0
+          }
+        }
+      },
+      {
+        "type": "widget",
+        "attrs": {
+          "id": "procedure-guide-evidence-explorer",
+          "name": "用例子与反例检查理解",
+          "kind": "evidence-explorer",
+          "data": {
+            "title": "用例子与反例检查理解",
+            "dimensions": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "procedure-guide-section-4",
+          "name": "确认结果与继续使用",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "procedure-guide-section-4-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "确认结果与继续使用"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "procedure-guide-section-4-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "说明如何核对结果、保存或撤回，并提供必要来源。"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "layout": {},
+  "surfaceViews": {}
+}

@@ -1,0 +1,216 @@
+{
+  "content": {
+    "type": "surface",
+    "attrs": {
+      "id": "progress-report-root",
+      "kind": "page",
+      "name": "状态与进展报告",
+      "widthMode": "wide"
+    },
+    "content": [
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "progress-report-section-1",
+          "name": "当前结论与截止时间",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "progress-report-section-1-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "当前结论与截止时间"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "progress-report-section-1-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "填写核实的当前状态、截止时间与读者需要作出的判断。"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "widget",
+        "attrs": {
+          "id": "progress-report-evidence-explorer",
+          "name": "关键变化与证据总览",
+          "kind": "evidence-explorer",
+          "data": {
+            "title": "关键变化与证据总览",
+            "dimensions": [],
+            "items": [],
+            "layout": "timeline",
+            "timeScale": "month"
+          }
+        }
+      },
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "progress-report-section-2",
+          "name": "变化及其依据",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "progress-report-section-2-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "变化及其依据"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "progress-report-section-2-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "说明相对哪个基线发生什么变化；保留数据口径和来源。"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "widget",
+        "attrs": {
+          "id": "progress-report-mechanism-steps",
+          "name": "关键机制逐步展开",
+          "kind": "mechanism-steps",
+          "data": {
+            "title": "关键机制逐步展开",
+            "parts": [],
+            "frames": []
+          }
+        }
+      },
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "progress-report-section-3",
+          "name": "风险与未决事项",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "progress-report-section-3-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "风险与未决事项"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "progress-report-section-3-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "区分已经发生的问题、推断的风险和待确认条件，说明影响。"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "widget",
+        "attrs": {
+          "id": "progress-report-evidence",
+          "name": "状态与行动依据",
+          "kind": "table",
+          "data": {
+            "title": "状态与行动依据",
+            "columns": [
+              "事项",
+              "当前状态与时间",
+              "变化或问题",
+              "证据",
+              "下一步"
+            ],
+            "rows": [],
+            "fontSize": 18,
+            "padding": 0
+          }
+        }
+      },
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "progress-report-section-4",
+          "name": "下一步与所需决定",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "progress-report-section-4-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "下一步与所需决定"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "progress-report-section-4-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "按依赖和责任说明行动、检查点和需要决策的事项。"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "layout": {},
+  "surfaceViews": {}
+}

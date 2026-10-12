@@ -38,6 +38,9 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { writePresentation } from "./presentation";
 import { syncManager } from "../sync/manager";
+import { TEMPLATE_STAGES } from "../portable/template-bundle.mjs";
+import type { TemplateSelection } from "./template-workflow";
+import { compactMcpResult } from "./mcp-response";
 
 const scopeSchema = z.enum([
   "builtin",
@@ -64,6 +67,7 @@ export function createMcpServer(options: {
   presentation?: Parameters<typeof registerPresentationTools>[1];
   sourceContext?: ChangeContext;
   presentationDirectory?: string;
+  sessionTemplates?: TemplateSelection[];
   projectAccess?: "library" | "project";
   storeProjectPresentation?: (
     value: Presentation,
@@ -165,10 +169,91 @@ export function createMcpServer(options: {
     {
       description:
         "Read one focused ShowAI guide only when that operation is needed. Omitting topic lists the available guides.",
-      inputSchema: { topic: z.enum(GUIDE_TOPICS).optional() },
+      inputSchema: {
+        topic: z.enum(GUIDE_TOPICS).optional(),
+        stage: z.enum(TEMPLATE_STAGES).optional(),
+        knownHash: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
+      },
       annotations: readOnly,
     },
-    ({ topic }) => call(async () => getMcpGuide(topic)),
+    ({ topic, stage, knownHash }) =>
+      call(async () => getMcpGuide(topic, stage, knownHash)),
+  );
+  const templateSelection = z.object({
+    id: z.string().min(1),
+    version: z.string().optional(),
+    integrity: z.string().optional(),
+    scope: z.enum(["builtin", "project", "global", "published"]).optional(),
+  });
+  register(
+    "template_context",
+    {
+      description:
+        "Resolve the mandatory system baseline, selected template READMEs, exact refs and template component library for this task. No shared current template is changed; omitted templates use connection defaults, templates:[] uses only the system baseline. Reuse returned refs and knownHash.",
+      inputSchema: {
+        templates: z.array(templateSelection).max(8).optional(),
+        knownHash: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
+        knownSystemHash: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
+        componentOffset: z.number().int().nonnegative().optional(),
+        componentLimit: z.number().int().min(1).max(50).optional(),
+      },
+      annotations: readOnly,
+    },
+    ({
+      templates,
+      knownHash,
+      knownSystemHash,
+      componentOffset,
+      componentLimit,
+    }) =>
+      call(() =>
+        service.templateContext(
+          projectId,
+          templates ?? options.sessionTemplates ?? [],
+          knownHash,
+          componentOffset,
+          componentLimit,
+          knownSystemHash,
+        ),
+      ),
+  );
+  register(
+    "template_guide",
+    {
+      description:
+        "Read only one presentation stage: mandatory system instructions plus the selected exact template guides. Guide folders expose their main README and additional filenames; file reads stay within that stage. Omitted templates use connection defaults; templates:[] reads only the system stage. Does not execute component code or select global state.",
+      inputSchema: {
+        stage: z.enum(TEMPLATE_STAGES),
+        templates: z.array(templateSelection).max(8).optional(),
+        knownHash: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
+        file: z.string().optional(),
+        templateId: z.string().optional(),
+      },
+      annotations: readOnly,
+    },
+    ({ stage, templates, knownHash, file, templateId }) =>
+      call(() =>
+        service.templateGuide(
+          projectId,
+          stage,
+          templates ?? options.sessionTemplates ?? [],
+          knownHash,
+          file,
+          templateId,
+        ),
+      ),
   );
   register(
     "project_context",
@@ -209,15 +294,20 @@ export function createMcpServer(options: {
     {
       description:
         "Read one Page in structured (default JSON/Markdown), image (PNG) or html (browser accessibility/DOM plus an interactive file) view. Use structured for content/data, image to verify styling, and html/actions to check interactions. detail=outline discovers IDs; blockIds selects a component/region. All views share source hash and pinned component refs. draft=true edits only a temporary preview. See guide reading.",
-      inputSchema: { pageId: z.string().min(1), ...pageReadSchema.shape },
+      inputSchema: {
+        pageId: z.string().min(1),
+        ...pageReadSchema.shape,
+        response: z.enum(["full", "source", "receipt"]).default("full"),
+      },
       annotations: readOnly,
     },
-    ({ pageId, ...readOptions }) =>
+    ({ pageId, response, ...readOptions }) =>
       call(() => service.readPage(projectId, pageId, readOptions)).then(
         async (result) => {
           if (!("data" in result.structuredContent)) return result;
           const data = result.structuredContent.data as PageReadResult;
-          if (data.view !== "image" || !data.path) return result;
+          if (data.view !== "image" || !data.path)
+            return compactMcpResult(result, response);
           const png = await readFile(data.path);
           if (png.length > CAPACITY.mcpImageBytes) {
             const error = new CapacityError(
@@ -229,9 +319,9 @@ export function createMcpServer(options: {
             return mcpFailure(error);
           }
           return {
-            ...result,
+            ...compactMcpResult(result, response),
             content: [
-              ...result.content,
+              ...compactMcpResult(result, response).content,
               {
                 type: "image" as const,
                 mimeType: "image/png",
@@ -285,6 +375,7 @@ export function createMcpServer(options: {
         baseRevision: z.string().optional(),
         components: z.array(jsonObject).max(100).optional(),
         remoteComponents: z.array(jsonObject).max(100).optional(),
+        response: z.enum(["full", "source", "receipt"]).default("full"),
       },
       annotations: { ...write, openWorldHint: true },
     },
@@ -293,6 +384,7 @@ export function createMcpServer(options: {
       document,
       baseHash,
       baseRevision,
+      response,
       components,
       remoteComponents,
       ...metadata
@@ -310,7 +402,7 @@ export function createMcpServer(options: {
             baseRevision,
           ),
         metadata,
-      ),
+      ).then((result) => compactMcpResult(result, response)),
   );
   register(
     "page_apply",
@@ -323,10 +415,11 @@ export function createMcpServer(options: {
         baseHash: z.string().min(1),
         baseRevision: z.string().optional(),
         operations: z.array(jsonObject).max(1000),
+        response: z.enum(["full", "source", "receipt"]).default("full"),
       },
       annotations: write,
     },
-    ({ pageId, baseHash, baseRevision, operations, ...metadata }) =>
+    ({ pageId, baseHash, baseRevision, operations, response, ...metadata }) =>
       call(
         () =>
           service.applyPage(projectId, pageId, {
@@ -335,7 +428,7 @@ export function createMcpServer(options: {
             operations: operations as PageOperation[],
           }),
         metadata,
-      ),
+      ).then((result) => compactMcpResult(result, response)),
   );
   register(
     "page_diff",
@@ -457,6 +550,7 @@ export function createMcpServer(options: {
       inputSchema: {
         ...changeSchema,
         templateId: z.string(),
+        templates: z.array(templateSelection).max(8).optional(),
         pageId: z.string().optional(),
         baseHash: z.string().optional(),
         baseRevision: z.string().optional(),
@@ -470,7 +564,11 @@ export function createMcpServer(options: {
     },
     ({ templateId, title, operationId, message, groupId, ...selection }) =>
       call(
-        () => service.applyTemplate(projectId, templateId, title, selection),
+        () =>
+          service.applyTemplate(projectId, templateId, title, {
+            ...selection,
+            templates: selection.templates ?? options.sessionTemplates,
+          }),
         { operationId, message, groupId },
       ),
   );
@@ -478,7 +576,7 @@ export function createMcpServer(options: {
     "template_save",
     {
       description:
-        "Create an immutable project template from a page or explicit metadata/composition. Use guide templates for input shape.",
+        "Create an immutable project template from a page, legacy definition, or input:{bundle:{format:1,files,assets?}}. Folder bundles compile and register their namespaced components automatically and return a compact receipt. Read guide templates for the portable contract.",
       inputSchema: {
         ...changeSchema,
         pageId: z.string().optional(),
@@ -487,15 +585,37 @@ export function createMcpServer(options: {
       annotations: write,
     },
     ({ pageId, input, ...metadata }) =>
-      call(
-        () =>
-          service.saveTemplate(
-            projectId,
-            pageId,
-            input as unknown as SaveTemplateInput,
-          ),
-        metadata,
-      ),
+      call(async () => {
+        const saved = await service.saveTemplate(
+          projectId,
+          pageId,
+          input as unknown as SaveTemplateInput,
+        );
+        return input.bundle
+          ? {
+              id: saved.id,
+              name: saved.name,
+              version: saved.version,
+              integrity: saved.integrity,
+              scope: saved.scope,
+              workflow: saved.workflow,
+              next: {
+                tool: "template_context",
+                arguments: {
+                  projectId,
+                  templates: [
+                    {
+                      id: saved.id,
+                      scope: saved.scope,
+                      version: saved.version,
+                      integrity: saved.integrity,
+                    },
+                  ],
+                },
+              },
+            }
+          : saved;
+      }, metadata),
   );
   register(
     "catalog_fork",
@@ -862,6 +982,7 @@ export async function startMcp(options: {
   root?: string;
   projectId: string;
   presentationDirectory?: string;
+  sessionTemplates?: TemplateSelection[];
 }): Promise<void> {
   const service = new AgentService(options);
   await service.listPages(service.requireProject(options.projectId));
@@ -887,14 +1008,21 @@ export async function startPublicMcp(root: string) {
     "guide",
     {
       description: "Read a focused ShowAI authoring or integration guide.",
-      inputSchema: { topic: z.enum(GUIDE_TOPICS).optional() },
+      inputSchema: {
+        topic: z.enum(GUIDE_TOPICS).optional(),
+        stage: z.enum(TEMPLATE_STAGES).optional(),
+        knownHash: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
+      },
       annotations: { readOnlyHint: true },
     },
-    async ({ topic }) => ({
+    async ({ topic, stage, knownHash }) => ({
       content: [
         {
           type: "text",
-          text: JSON.stringify(getMcpGuide(topic)),
+          text: JSON.stringify(getMcpGuide(topic, stage, knownHash)),
         },
       ],
     }),

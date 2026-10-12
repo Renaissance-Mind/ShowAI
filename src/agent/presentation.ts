@@ -5,6 +5,12 @@ import { join, resolve, dirname, extname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { AgentService } from "./service";
+import { builtinTemplateBundles } from "../core/builtin-template-bundles";
+import {
+  parseTemplateBundle,
+  type TemplateStage,
+} from "../portable/template-bundle.mjs";
+import { templateGuide } from "./template-workflow";
 import { catalogPage, type CatalogView } from "./disclosure";
 import { FileStore } from "../core/store";
 import { buildPageHtml } from "./exporter";
@@ -13,6 +19,8 @@ import {
   resolveDocumentComponents,
   lockDocumentComponents,
   listBuiltinComponents,
+  getTemplate,
+  instantiateTemplateRecord,
 } from "../core/catalog";
 import { toInlineFragment } from "../portable/inline.mjs";
 import {
@@ -38,6 +46,11 @@ export const presentationSchema = {
     .describe(
       "Public template ID; get its editable source and customize it, or instantiate it directly.",
     ),
+  templateVersion: z.string().optional(),
+  templateIntegrity: z
+    .string()
+    .regex(/^sha256-[a-f0-9]{64}$/)
+    .optional(),
   title: z.string().max(300).optional(),
   componentSources: z
     .array(object)
@@ -95,6 +108,12 @@ const publicTemplates = [
     ],
   },
 ];
+const folderTemplateIds = new Set(
+  builtinTemplateBundles.map(
+    (source) => parseTemplateBundle(source).metadata.id,
+  ),
+);
+const publicCatalogHome = () => join(tmpdir(), "showai-public-catalog");
 
 export function publicTemplate(id: string): ShowDocument {
   const found = publicTemplates.find((item) => item.id === id);
@@ -152,7 +171,17 @@ export async function publicCatalog(
             scope: "public",
             version: "1.0.0",
           }));
-  const items = [...components, ...templates];
+  const folders =
+    input.kind === "component"
+      ? []
+      : (
+          await new AgentService({ root: publicCatalogHome() }).catalogList({
+            kind: "template",
+            scope: "builtin",
+            query: input.query,
+          })
+        ).items.filter((item) => folderTemplateIds.has(item.id));
+  const items = [...components, ...templates, ...folders];
   return {
     ...catalogPage(items, {
       limit: input.limit,
@@ -169,8 +198,74 @@ export async function describePublicResource(
     kind?: "component" | "template";
     view?: CatalogView;
     file?: string;
+    stage?: TemplateStage;
+    version?: string;
+    integrity?: string;
   } = {},
 ) {
+  if (folderTemplateIds.has(id) && input.kind !== "component") {
+    const template = await getTemplate(publicCatalogHome(), id, undefined, {
+      scope: "builtin",
+      version: input.version,
+      integrity: input.integrity,
+    });
+    if (input.stage)
+      return templateGuide(
+        publicCatalogHome(),
+        "public",
+        input.stage,
+        [
+          {
+            id,
+            version: template.version,
+            integrity: template.integrity,
+            scope: "builtin",
+          },
+        ],
+        undefined,
+        input.file,
+        input.file ? id : undefined,
+      );
+    const result = await new AgentService({
+      root: publicCatalogHome(),
+    }).catalogDescribe(id, {
+      kind: "template",
+      scope: "builtin",
+      version: template.version,
+      integrity: template.integrity,
+      view: input.view ?? "guide",
+    });
+    return {
+      ...result,
+      next: {
+        stage: {
+          tool: "public_catalog_describe",
+          arguments: {
+            id,
+            kind: "template",
+            view: "guide",
+            version: template.version,
+            integrity: template.integrity,
+            stage: "intent",
+          },
+        },
+        source: {
+          tool: "public_catalog_describe",
+          arguments: {
+            id,
+            kind: "template",
+            view: "source",
+            version: template.version,
+            integrity: template.integrity,
+          },
+        },
+      },
+    };
+  }
+  if (input.stage)
+    throw new Error(
+      "Stage guides are available on folder templates. Read the system baseline with guide presentation for legacy public templates.",
+    );
   if (
     input.kind === "template" ||
     (input.kind !== "component" &&
@@ -210,9 +305,29 @@ export async function renderPresentation(raw: PresentationInput) {
     throw new Error("Provide document or templateId, not both.");
   if (!input.document && !input.templateId)
     throw new Error("Provide a ShowAI document or a public templateId.");
+  if (
+    input.templateId &&
+    !folderTemplateIds.has(input.templateId) &&
+    (input.templateIntegrity ||
+      (input.templateVersion && input.templateVersion !== "1.0.0"))
+  )
+    throw new Error(
+      "Legacy public presets do not expose a versioned template fingerprint. Read their source and render an explicit document, or select a folder template.",
+    );
   let document = input.document
     ? validateDocument(input.document)
-    : publicTemplate(input.templateId!);
+    : folderTemplateIds.has(input.templateId!)
+      ? await instantiateTemplateRecord(
+          publicCatalogHome(),
+          await getTemplate(publicCatalogHome(), input.templateId!, undefined, {
+            scope: "builtin",
+            version: input.templateVersion,
+            integrity: input.templateIntegrity,
+          }),
+        )
+      : publicTemplate(input.templateId!);
+  if (!input.templateId && (input.templateVersion || input.templateIntegrity))
+    throw new Error("Template version/integrity require templateId.");
   if (input.title) document = { ...document, title: input.title };
   const knownKinds = new Set([
     "custom",

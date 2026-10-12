@@ -1,6 +1,9 @@
 import { getGuide, GUIDE_TOPICS, type GuideTopic } from "./guides";
+import { systemPresentationGuide } from "./system-presentation";
+import type { TemplateStage } from "../portable/template-bundle.mjs";
 
 const tools: Record<GuideTopic, string[]> = {
+  presentation: ["guide", "template_context", "template_guide"],
   integration: [
     "showai_capabilities",
     "project_context",
@@ -70,6 +73,7 @@ const tools: Record<GuideTopic, string[]> = {
   publish: ["publication_list", "publication_prepare"],
 };
 const rules: Partial<Record<GuideTopic, string[]>> = {
+  presentation: [],
   integration: [
     "Agent document operations use MCP. CLI remains a host setup, service launch, diagnostics and scripting interface, not an alternative authoring workflow.",
     "Confirm capabilities and connection identity. A library connection requires explicit projectId; bound connections reject another projectId; remote projects are restricted by OAuth and current membership.",
@@ -96,7 +100,10 @@ const rules: Partial<Record<GuideTopic, string[]>> = {
     "Custom components receive data, onChange and readOnly. onChange sends valid edits to the host; reading state never saves by itself. Import into the chosen project, use a real Page, inspect rendering and verify interaction.",
   ],
   templates: [
-    "template_save takes input containing metadata and abstracted document/composition, plus optional pageId. A snapshot alone is not a reusable abstraction. Apply the exact saved ref with template_apply and verify a real preview Page.",
+    "New templates use input:{bundle:{format:1,files,assets?}}. files contains README.md, declared stage Markdown/folders and optional components/page.json; no host-local path is required. README JSON frontmatter is authoritative; duplicate legacy document/composition/contentGuide alongside a bundle is rejected.",
+    "README metadata fields are format=showai-template, schemaVersion=1, id, name, version, description, scenarios, guides, components and page. Declare all six stages; null inherits the system stage. Components declare local id/path; their package includes manifest.json, props.schema.json, entry source and versioned documentation.",
+    "template_save compiles and registers namespaced template components and returns an immutable ref. Use template_context for task READMEs, fixed refs and a paged component index, then template_guide for only the current stage. Apply the exact saved ref and verify a real Page.",
+    "Legacy metadata/document/composition plus optional pageId remain supported. Component version changes accompany source changes; template versions accompany guide/package changes. Project templates cannot replace the mandatory system baseline.",
   ],
   sync: [
     "Local project_sync_status reads status; project_sync is the explicit project synchronization operation. Remote HTTP project calls return synchronization.state/error/remoteHead after pull/operation/push. A retained local write with failed synchronization is not remote success.",
@@ -107,7 +114,15 @@ const rules: Partial<Record<GuideTopic, string[]>> = {
   ],
 };
 /** MCP guides share model facts, but never send shell command recipes to Agents. */
-export function getMcpGuide(topic?: string) {
+export function getMcpGuide(
+  topic?: string,
+  stage?: TemplateStage,
+  knownHash?: string,
+) {
+  if (stage && topic !== "presentation")
+    throw new Error("Stage applies only to guide presentation.");
+  if (topic === "presentation")
+    return systemPresentationGuide(stage, knownHash);
   if (!topic)
     return {
       protocol: "showai-mcp-v1",

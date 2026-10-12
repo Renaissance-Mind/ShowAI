@@ -20,6 +20,7 @@ import {
 } from "../core/maintenance-scheduler";
 import type { ChangeContext } from "../core/history-model";
 import { AgentService, errorResult } from "./service";
+import { systemPresentationGuide } from "./system-presentation";
 import type {
   PageOperation,
   ProjectBinding,
@@ -60,7 +61,7 @@ Independent presentation (no personal project or synchronization required):
   render --template TEMPLATE_ID --title TITLE --out PAGE.html
 
 MCP connections:
-  mcp [--project PROJECT] [--presentation-directory PATH]
+  mcp [--project PROJECT] [--templates ID[@VERSION],ID] [--presentation-directory PATH]
   mcp --public
   mcp serve --state DIRECTORY --public-url HTTPS_ORIGIN [--sync-server SERVER_ORIGIN] [--port 8789]
 
@@ -74,6 +75,10 @@ Start with one project:
 
 Discover only what you need:
   guide [workspace|reading|authoring|containers|document|catalog|component|templates|versions|recovery|sync|export|publish]
+  template import DIRECTORY --project PROJECT
+  template export ID --project PROJECT --out NEW_DIRECTORY
+  template context --project PROJECT [--templates ID[@VERSION],ID]
+  template guide STAGE --project PROJECT [--input CONTEXT.json | --templates ID]
   catalog list [--kind component|template] [--scope SCOPE] [--limit N --cursor CURSOR]
   catalog describe ID [--kind component|template] [--view VIEW]
 
@@ -126,6 +131,8 @@ function parseArguments(args: string[]): Arguments {
     "presentation-directory",
     "host",
     "template",
+    "templates",
+    "stage",
     "home",
     "automatic",
     "older-than-days",
@@ -678,6 +685,11 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
     }
     case "guide":
       requireCount(args, 1, 2);
+      if (action === "presentation")
+        return systemPresentationGuide(
+          option(args, "stage") as
+            import("../portable/template-bundle.mjs").TemplateStage | undefined,
+        );
       return service.guide(action);
     case "projects":
       if (action === "current") {
@@ -973,6 +985,79 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
       break;
     }
     case "template": {
+      const selections = () =>
+        (option(args, "templates") ?? "")
+          .split(",")
+          .filter(Boolean)
+          .map((value) => {
+            const [templateId, version, ...extra] = value.split("@");
+            if (
+              extra.length ||
+              !templateId ||
+              (value.includes("@") && !version)
+            )
+              throw new Error(
+                "Use comma-separated ID or ID@VERSION template selections.",
+              );
+            return {
+              id: templateId,
+              ...(version ? { version } : {}),
+              ...(catalogScope(args, false)
+                ? { scope: catalogScope(args, false) as CatalogScope }
+                : {}),
+            };
+          });
+      if (action === "import") {
+        requireCount(args, 3);
+        const saved = await service.importTemplate(
+          await project(),
+          resolve(id),
+        );
+        return {
+          id: saved.id,
+          name: saved.name,
+          version: saved.version,
+          integrity: saved.integrity,
+          scope: saved.scope,
+          workflow: saved.workflow,
+        };
+      }
+      if (action === "export") {
+        requireCount(args, 3);
+        return service.exportTemplate(
+          await project(),
+          id,
+          resolve(option(args, "out", true)!),
+          {
+            scope: catalogScope(args, false),
+            version: option(args, "version"),
+            integrity: option(args, "integrity"),
+          },
+        );
+      }
+      if (action === "context") {
+        requireCount(args, 2);
+        return service.templateContext(await project(), selections());
+      }
+      if (action === "guide") {
+        requireCount(args, 3);
+        const target = await project();
+        const context = option(args, "input")
+          ? objectInput(await readJson(option(args, "input")!))
+          : await service.templateContext(target, selections());
+        const payload = objectInput(context),
+          data = objectInput(payload.data ?? payload),
+          binding = objectInput(data.context ?? data);
+        return service.templateGuide(
+          target,
+          id as import("../portable/template-bundle.mjs").TemplateStage,
+          (binding.templates ??
+            []) as import("./template-workflow").TemplateSelection[],
+          undefined,
+          option(args, "file"),
+          option(args, "id"),
+        );
+      }
       if (action === "apply" || action === "instantiate") {
         requireCount(args, 3);
         return service.applyTemplate(
@@ -1006,8 +1091,15 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
           ...(option(args, "version")
             ? { version: option(args, "version") }
             : {}),
-          name: option(args, "name") ?? input.name,
-          description: option(args, "description") ?? input.description ?? "",
+          ...(input.bundle && !option(args, "name")
+            ? {}
+            : { name: option(args, "name") ?? input.name }),
+          ...(input.bundle && !option(args, "description")
+            ? {}
+            : {
+                description:
+                  option(args, "description") ?? input.description ?? "",
+              }),
         });
       }
       break;
@@ -1043,6 +1135,10 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
     case "mcp": {
       if (action === "serve") {
         requireCount(args, 2);
+        if (option(args, "templates"))
+          throw new Error(
+            "HTTP clients bind task templates explicitly with template_context, not server-wide --templates.",
+          );
         const { startMcpHttpServer } = await import("./mcp-http");
         const running = await startMcpHttpServer({
           stateDirectory: resolve(
@@ -1081,13 +1177,35 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
       }
       if (args.options.public) {
         requireCount(args, 1);
-        if (option(args, "project"))
-          throw new Error("Choose --public or --project.");
+        if (option(args, "project") || option(args, "templates"))
+          throw new Error(
+            "Public MCP does not accept project/session template bindings. Use public catalogs and guide presentation.",
+          );
         const { startPublicMcp } = await import("./mcp");
         await startPublicMcp(service.store.root);
         return undefined;
       }
       requireCount(args, 1);
+      let sessionTemplates:
+        import("./template-workflow").TemplateSelection[] | undefined;
+      if (option(args, "templates")) {
+        if (!option(args, "project"))
+          throw new Error(
+            "MCP startup --templates requires --project. Library/HTTP clients select templates explicitly with template_context.",
+          );
+        const selections = option(args, "templates")!
+          .split(",")
+          .filter(Boolean)
+          .map((value) => {
+            const [id, version, ...extra] = value.split("@");
+            if (extra.length || !id || (value.includes("@") && !version))
+              throw new Error("Invalid --templates selection.");
+            return { id, ...(version ? { version } : {}) };
+          });
+        sessionTemplates = (
+          await service.templateContext(await project(), selections)
+        ).context.templates;
+      }
       const presentationDirectory = option(args, "presentation-directory")
         ? resolve(option(args, "presentation-directory")!)
         : undefined;
@@ -1103,6 +1221,7 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
           root: service.store.root,
           projectId: await project(),
           presentationDirectory,
+          sessionTemplates,
         });
       }
       return undefined;
@@ -1160,7 +1279,7 @@ export async function runCli(argv: string[]): Promise<unknown> {
       ["current", "create", "bind"].includes(action)) ||
     (command === "pages" && ["create", "save", "apply"].includes(action)) ||
     (command === "template" &&
-      ["apply", "instantiate", "save"].includes(action)) ||
+      ["apply", "instantiate", "save", "import"].includes(action)) ||
     (command === "catalog" &&
       (["import", "save", "promote", "fork"].includes(action) ||
         (action === "merge" && mode === "resolve"))) ||

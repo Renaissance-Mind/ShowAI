@@ -1,4 +1,6 @@
 import { CAPACITY } from "../portable/capacity.mjs";
+import { TEMPLATE_WORKFLOW_CAPABILITIES } from "../portable/template-bundle.mjs";
+import { TEMPLATE_STAGES } from "../portable/template-bundle.mjs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { CATALOG_VIEWS } from "./disclosure";
@@ -134,6 +136,11 @@ export function registerPresentationTools(
       mcpSuccess({
         version,
         agentProtocol: "showai-mcp-v1",
+        templateWorkflow: {
+          ...TEMPLATE_WORKFLOW_CAPABILITIES,
+          taskContexts: options.privateProjects !== false,
+          baseline: { tool: "guide", arguments: { topic: "presentation" } },
+        },
         capacities: { unit: "bytes", ...CAPACITY },
         transport: options.transport,
         presentation: {
@@ -187,6 +194,12 @@ export function registerPresentationTools(
         "Read public component guides, schemas, examples and editable source, or public template source. Customize locally or pass source to render_document; synchronization is optional.",
       inputSchema: {
         id: z.string(),
+        stage: z.enum(TEMPLATE_STAGES).optional(),
+        version: z.string().optional(),
+        integrity: z
+          .string()
+          .regex(/^sha256-[a-f0-9]{64}$/)
+          .optional(),
         kind: z.enum(["component", "template"]).optional(),
         view: z.enum(CATALOG_VIEWS).optional(),
         file: z.string().optional(),

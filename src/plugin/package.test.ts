@@ -23,15 +23,32 @@ async function packageSkill(
   const fixture = await mkdtemp(join(tmpdir(), "showai-plugin-package-"));
   fixtures.push(fixture);
   await Promise.all(
-    ["scripts", "src/desktop/assets", "plugins/showai/skills/example"].map(
-      (path) => mkdir(join(fixture, path), { recursive: true }),
-    ),
+    [
+      "scripts",
+      "src/desktop/assets",
+      "src/portable",
+      "resources/templates/system-presentation",
+      "plugins/showai/skills/show-document",
+      "plugins/showai/skills/example",
+    ].map((path) => mkdir(join(fixture, path), { recursive: true })),
   );
   await copyFile(
     join(root, "scripts/package-plugin.mjs"),
     join(fixture, "scripts/package-plugin.mjs"),
   );
+  await copyFile(
+    join(root, "src/portable/template-bundle.mjs"),
+    join(fixture, "src/portable/template-bundle.mjs"),
+  );
+  await copyFile(
+    join(root, "resources/templates/system-presentation/README.md"),
+    join(fixture, "resources/templates/system-presentation/README.md"),
+  );
   await Promise.all([
+    writeFile(
+      join(fixture, "plugins/showai/skills/show-document/SKILL.md"),
+      "---\nname: show-document\ndescription: Foundational presentation instructions.\n---\n<!-- showai-system-baseline:start -->\n<!-- showai-system-baseline:end -->\n",
+    ),
     writeFile(join(fixture, "src/desktop/assets/icon.svg"), "<svg/>"),
     writeFile(join(fixture, "src/desktop/assets/icon-light.svg"), "<svg/>"),
     writeFile(
@@ -64,7 +81,7 @@ describe("plugin packaging", () => {
         ].join(eol),
       );
       expect(result.stdout).toContain(
-        "Prepared ShowAI MCP plugin 0.8.0: example",
+        "Prepared ShowAI MCP plugin 0.8.0: example, show-document",
       );
     },
   );

@@ -68,18 +68,25 @@ export interface TemplateMetadata {
   parents?: PackageRevisionRef[];
   mergeBase?: PackageRevisionRef;
   legacy?: boolean;
+  workflow?: {
+    format: 1;
+    stages: import("../../portable/template-bundle.mjs").TemplateStage[];
+    components: { id: string; ref: PackageRevisionRef }[];
+  };
 }
 
 export interface TemplateRecord extends TemplateMetadata {
   document: ShowDocument;
   composition?: TemplatePart[];
+  bundle?: import("../../portable/template-bundle.mjs").TemplateBundleSource;
 }
 
 export interface SaveTemplateInput {
   id?: string;
   version?: string;
-  name: string;
-  description: string;
+  name?: string;
+  description?: string;
+  bundle?: import("../../portable/template-bundle.mjs").TemplateBundleSource;
   document?: ShowDocument;
   scenarios?: string[];
   contentGuide?: { title: string; instructions: string[] }[];

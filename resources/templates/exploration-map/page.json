@@ -1,0 +1,208 @@
+{
+  "content": {
+    "type": "surface",
+    "attrs": {
+      "id": "exploration-map-root",
+      "kind": "page",
+      "name": "探索与资料组织",
+      "widthMode": "wide"
+    },
+    "content": [
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "exploration-map-section-1",
+          "name": "范围与总览",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "exploration-map-section-1-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "范围与总览"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "exploration-map-section-1-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "说明资料范围、读者查找目标、分类依据和更新时间。"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "widget",
+        "attrs": {
+          "id": "exploration-map-evidence-explorer",
+          "name": "按共同条件探索与比较",
+          "kind": "evidence-explorer",
+          "data": {
+            "title": "按共同条件探索与比较",
+            "dimensions": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "exploration-map-section-2",
+          "name": "分类与关系",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "exploration-map-section-2-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "分类与关系"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "exploration-map-section-2-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "按材料实际属性组织分类；关系含义用明确标签或图例表达。"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "exploration-map-section-3",
+          "name": "条目与局部证据",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "exploration-map-section-3-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "条目与局部证据"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "exploration-map-section-3-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "为每个条目保留稳定标识、关键属性、来源及缺失说明。"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "widget",
+        "attrs": {
+          "id": "exploration-map-evidence",
+          "name": "可定位的资料索引",
+          "kind": "table",
+          "data": {
+            "title": "可定位的资料索引",
+            "columns": ["条目", "类别或关系", "关键属性", "来源与缺项"],
+            "rows": [],
+            "fontSize": 18,
+            "padding": 0
+          }
+        }
+      },
+      {
+        "type": "widget",
+        "attrs": {
+          "id": "exploration-map-mechanism-steps",
+          "name": "条件改变后会怎样",
+          "kind": "mechanism-steps",
+          "data": {
+            "title": "条件改变后会怎样",
+            "parts": [],
+            "frames": []
+          }
+        }
+      },
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "exploration-map-section-4",
+          "name": "使用方式与覆盖边界",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "exploration-map-section-4-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "使用方式与覆盖边界"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "exploration-map-section-4-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "说明如何筛选定位、返回全局，以及资料尚未覆盖的范围。"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "layout": {},
+  "surfaceViews": {}
+}

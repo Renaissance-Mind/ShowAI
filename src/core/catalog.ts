@@ -42,6 +42,12 @@ import Ajv from "ajv";
 import standaloneCode from "ajv/dist/standalone/index.js";
 import legacyTemplates from "../../resources/catalog/templates.json";
 import presentationTemplates from "../../resources/catalog/presentation-templates.json";
+import { builtinTemplateBundles } from "./builtin-template-bundles";
+import {
+  parseTemplateBundle,
+  TEMPLATE_STAGES,
+  SYSTEM_TEMPLATE_ID,
+} from "../portable/template-bundle.mjs";
 import { builtinComponentCatalog } from "../components/catalog";
 import { validateComponentDocumentation } from "../components/custom/documentation";
 
@@ -472,6 +478,36 @@ function templateRecord(
   verify = true,
 ): TemplateRecord {
   const item = record(value, "Template");
+  const bundle =
+    item.bundle === undefined ? undefined : parseTemplateBundle(item.bundle);
+  if (
+    bundle &&
+    ["id", "name", "version", "description"].some(
+      (key) =>
+        item[key] !==
+        bundle.metadata[key as "id" | "name" | "version" | "description"],
+    )
+  )
+    throw new Error("Template record disagrees with README metadata.");
+  const workflow = bundle
+    ? record(item.workflow ?? { components: [] }, "Template workflow")
+    : undefined;
+  const bindings = workflow
+    ? (workflow.components as { id: string; ref: PackageRevisionRef }[])
+    : [];
+  if (
+    bundle &&
+    (!Array.isArray(bindings) ||
+      bindings.length !== bundle.components.length ||
+      new Set(bindings.map((binding) => binding.id)).size !== bindings.length ||
+      bindings.some(
+        (binding) =>
+          !bundle.components.some((component) => component.id === binding.id),
+      ))
+  )
+    throw new Error(
+      "Template component bindings disagree with README declarations.",
+    );
   if (
     typeof item.id !== "string" ||
     typeof item.name !== "string" ||
@@ -606,6 +642,19 @@ function templateRecord(
       };
     }),
     dependencies: dependencies.map((ref) => portableRef(checkedRef(ref))),
+    ...(bundle
+      ? {
+          bundle: bundle.source,
+          workflow: {
+            format: 1 as const,
+            stages: [...TEMPLATE_STAGES],
+            components: bindings.map(({ id, ref }) => ({
+              id,
+              ref: portableRef(checkedRef(ref, "component")),
+            })),
+          },
+        }
+      : {}),
     ...(composition ? { composition } : {}),
     ...(item.parents
       ? { parents: (item.parents as unknown[]).map((ref) => checkedRef(ref)) }
@@ -620,10 +669,49 @@ function templateRecord(
     );
   return result;
 }
-const templates = [...legacyTemplates, ...presentationTemplates];
+const folderTemplates = builtinTemplateBundles.map((source) => {
+  const bundle = parseTemplateBundle(source);
+  return {
+    ...bundle.metadata,
+    bundle: source,
+    workflow: { components: [] },
+    contentGuide: [],
+    related: [],
+    examples: [],
+    document: bundle.document ?? {
+      content: {
+        type: "surface",
+        attrs: {
+          id: bundle.metadata.id + "-root",
+          kind: "page",
+          name: bundle.metadata.name,
+          widthMode: "wide",
+        },
+        content: [],
+      },
+      layout: {},
+      surfaceViews: {},
+    },
+  };
+});
+const templates = [
+  ...legacyTemplates,
+  ...presentationTemplates,
+  ...folderTemplates,
+];
 
-function builtinTemplate(id: string): TemplateRecord | undefined {
-  const item = templates.find((template) => template.id === id);
+function builtinTemplate(
+  id: string,
+  version?: string,
+): TemplateRecord | undefined {
+  const item = templates
+    .filter(
+      (template) =>
+        template.id === id && (!version || template.version === version),
+    )
+    .sort((a, b) =>
+      compareVersion(b.version ?? "0.0.0-legacy", a.version ?? "0.0.0-legacy"),
+    )[0];
   if (!item) return undefined;
   const date = "2026-10-03T00:00:00.000Z";
   return templateRecord(
@@ -685,6 +773,7 @@ export async function listTemplates(
       const {
         document: _document,
         composition: _composition,
+        bundle: _bundle,
         ...metadata
       } = item;
       result.push(metadata);
@@ -695,8 +784,9 @@ export async function listTemplates(
       const {
         document: _document,
         composition: _composition,
+        bundle: _bundle,
         ...metadata
-      } = builtinTemplate(spec.id)!;
+      } = builtinTemplate(spec.id, spec.version)!;
       result.push(metadata);
     }
   return result;
@@ -749,7 +839,7 @@ export async function getTemplate(
     options.scope === "all" ||
     options.scope === "builtin"
   ) {
-    const item = builtinTemplate(id);
+    const item = builtinTemplate(id, options.version);
     if (
       item &&
       (!options.version || item.version === options.version) &&
@@ -885,6 +975,56 @@ async function saveTemplateImpl(
   projectId?: string,
 ): Promise<TemplateRecord> {
   const project = await requireProjectWrite(home, projectId);
+  const bundle = input.bundle ? parseTemplateBundle(input.bundle) : undefined;
+  let componentBindings: { id: string; ref: PackageRevisionRef }[] = [];
+  if (bundle) {
+    if (bundle.metadata.id === SYSTEM_TEMPLATE_ID)
+      throw new Error(
+        "The system template is supplied by the runtime and cannot be replaced by a project package.",
+      );
+    for (const key of [
+      "id",
+      "name",
+      "version",
+      "description",
+      "scenarios",
+    ] as const)
+      if (
+        input[key] !== undefined &&
+        canonicalJson(input[key]) !== canonicalJson(bundle.metadata[key])
+      )
+        throw new Error(`Template ${key} must agree with README metadata.`);
+    if (input.document || input.composition || input.contentGuide)
+      throw new Error(
+        "A folder template owns its guides and optional page file; do not also send document/composition/contentGuide.",
+      );
+    componentBindings = await installTemplateComponents(home, bundle, project);
+    let skeleton = documentCopy({
+      ...blankDocument(),
+      ...(bundle.document ?? {}),
+      title: bundle.metadata.name,
+    });
+    const visit = (node: ShowDocument["content"]) => {
+      const data = node.attrs?.data;
+      if (node.type === "widget" && node.attrs?.kind === "custom" && data) {
+        const binding = componentBindings.find(
+          (item) => item.id === data.componentId,
+        );
+        if (binding) {
+          const { scope: _scope, ...portable } = data;
+          node.attrs!.data = {
+            ...portable,
+            componentId: binding.ref.id,
+            version: binding.ref.version,
+            integrity: binding.ref.integrity,
+          };
+        }
+      }
+      node.content?.forEach(visit);
+    };
+    visit(skeleton.content);
+    input = { ...input, ...bundle.metadata, document: skeleton };
+  }
   const id = input.id ?? `template-${randomUUID()}`,
     version = input.version ?? "1.0.0";
   assertId(id);
@@ -896,7 +1036,10 @@ async function saveTemplateImpl(
     documentCopy(input.document ?? blankDocument()),
     project,
   );
+  delete document.templateContext;
   const dependencies = new Map<string, PackageRevisionRef>();
+  for (const binding of componentBindings)
+    dependencies.set(revisionIdentity(binding.ref), binding.ref);
   const addComponents = async (doc: ShowDocument) => {
     for (const component of await resolveDocumentComponents(
       home,
@@ -991,6 +1134,12 @@ async function saveTemplateImpl(
         document,
         composition,
         dependencies: [...dependencies.values()],
+        ...(bundle
+          ? {
+              bundle: bundle.source,
+              workflow: { components: componentBindings },
+            }
+          : {}),
         updatedAt: new Date().toISOString(),
       }).filter(([, value]) => value !== undefined),
     ),
@@ -999,6 +1148,107 @@ async function saveTemplateImpl(
   );
   await instantiateTemplateRecord(home, item, project);
   return writeTemplateRevision(home, item, "project", project);
+}
+
+async function installTemplateComponents(
+  home: string,
+  bundle: ReturnType<typeof parseTemplateBundle>,
+  projectId?: string,
+) {
+  const pending = new Map(bundle.components.map((item) => [item.id, item]));
+  const installed = new Map<string, PackageRevisionRef>();
+  const names = new Map(
+    bundle.components.map(({ id }) => [
+      id,
+      `tpl-${bundle.metadata.id.slice(0, 24)}-${id.slice(0, 24)}-${createHash(
+        "sha256",
+      )
+        .update(bundle.metadata.id + "/" + id)
+        .digest("hex")
+        .slice(0, 10)}`,
+    ]),
+  );
+  const graph = new Map(pending);
+  while (graph.size) {
+    const ready = [...graph.values()].find(
+      ({ source }) =>
+        !(source.manifest.dependencies ?? []).some((dependency) =>
+          graph.has(dependency.id),
+        ),
+    );
+    if (!ready)
+      throw new Error("Template component dependencies contain a cycle.");
+    graph.delete(ready.id);
+  }
+  while (pending.size) {
+    const ready = [...pending.values()].find(
+      ({ source }) =>
+        !(source.manifest.dependencies ?? []).some((ref) =>
+          pending.has(ref.id),
+        ),
+    );
+    if (!ready)
+      throw new Error("Template component dependencies contain a cycle.");
+    const rewrite = (source: string) =>
+      source.replace(
+        /showai:component\/([a-zA-Z0-9_-]+)/g,
+        (match, id: string) =>
+          names.has(id) ? `showai:component/${names.get(id)}` : match,
+      );
+    const dependencies = (ready.source.manifest.dependencies ?? []).map(
+      (ref) => {
+        const local = installed.get(ref.id);
+        if (!local) return ref;
+        if (ref.version !== local.version)
+          throw new Error(
+            `Local component ${ref.id} dependency version does not match its manifest.`,
+          );
+        return local;
+      },
+    );
+    const source: ComponentSource = {
+      ...ready.source,
+      manifest: {
+        ...ready.source.manifest,
+        id: names.get(ready.id)!,
+        dependencies,
+      },
+      source: rewrite(ready.source.source),
+      files: Object.fromEntries(
+        Object.entries(ready.source.files).map(([path, value]) => [
+          path,
+          rewrite(value),
+        ]),
+      ),
+    };
+    const compiled = await saveComponentImpl(home, source, projectId);
+    installed.set(
+      ready.id,
+      portableRef(packageRevisionRef("component", compiled)),
+    );
+    pending.delete(ready.id);
+  }
+  return bundle.components.map(({ id }) => ({ id, ref: installed.get(id)! }));
+}
+
+function changedTemplateBundle(
+  source: NonNullable<SaveTemplateInput["bundle"]>,
+  changes: { id?: string; name?: string; version?: string },
+) {
+  const parsed = parseTemplateBundle(source),
+    metadata = {
+      ...parsed.metadata,
+      ...Object.fromEntries(
+        Object.entries(changes).filter(([, value]) => value !== undefined),
+      ),
+    };
+  let body = parsed.body;
+  if (changes.name && body.startsWith(`# ${parsed.metadata.name}\n`))
+    body = `# ${changes.name}\n` + body.slice(parsed.metadata.name.length + 3);
+  const bundle = structuredClone(parsed.source);
+  bundle.files["README.md"] =
+    "---\n" + JSON.stringify(metadata, null, 2) + "\n---\n" + body + "\n";
+  return bundle;
 }
 export function instantiateTemplate(document: ShowDocument): ShowDocument {
   const copy = remapSurfaceIds(documentCopy(document), randomUUID),
@@ -3158,6 +3408,19 @@ async function forkPackageImpl(
     );
   }
   const template = await getTemplateByRef(home, ref, target.projectId);
+  if (template.bundle)
+    return saveTemplate(
+      home,
+      {
+        bundle: changedTemplateBundle(template.bundle, {
+          id: target.id ?? ref.id,
+          version: target.version,
+          name: target.name,
+        }),
+        parents: [ref],
+      },
+      target.projectId,
+    );
   const { mergeBase: _mergeBase, parents: _parents, ...content } = template;
   return saveTemplate(
     home,
@@ -3217,6 +3480,8 @@ async function editablePackage(
     legacy: _legacy,
     ...template
   } = await getTemplateByRef(home, ref, projectId);
+  if (template.bundle)
+    return { kind: "template", template: { bundle: template.bundle } };
   const {
     id: _id,
     createdAt: _created,
@@ -3316,9 +3581,14 @@ async function savePackageMergeImpl(
   return saveTemplate(
     home,
     {
-      ...input.resolved.template,
-      id,
-      version: input.version,
+      ...(input.resolved.template.bundle
+        ? {
+            bundle: changedTemplateBundle(input.resolved.template.bundle, {
+              id,
+              version: input.version,
+            }),
+          }
+        : { ...input.resolved.template, id, version: input.version }),
       parents,
       mergeBase: input.base,
     },

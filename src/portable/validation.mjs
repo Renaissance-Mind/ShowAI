@@ -675,6 +675,53 @@ export function validateDocument(value) {
   validateJson(value, "document");
   assertContent(value);
   const document = structuredClone(object(value, "document"));
+  let templateContext;
+  if (document.templateContext !== undefined) {
+    const context = object(
+      document.templateContext,
+      "document.templateContext",
+    );
+    if (
+      context.format !== 1 ||
+      !Array.isArray(context.templates) ||
+      context.templates.length > 8
+    )
+      throw new Error("Invalid page template context.");
+    const reference = (value) => {
+      const ref = object(value, "Template reference");
+      if (
+        ref.kind !== "template" ||
+        typeof ref.id !== "string" ||
+        !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/.test(ref.id) ||
+        typeof ref.version !== "string" ||
+        !/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(ref.version) ||
+        !/^sha256-[a-f0-9]{64}$/.test(ref.integrity) ||
+        (ref.scope !== undefined &&
+          !["builtin", "project", "global", "published"].includes(ref.scope))
+      )
+        throw new Error(
+          "Page template references require exact id/version/integrity.",
+        );
+      return {
+        kind: "template",
+        id: ref.id,
+        version: ref.version,
+        integrity: ref.integrity,
+        ...(ref.scope ? { scope: ref.scope } : {}),
+      };
+    };
+    const system = reference(context.system),
+      templates = context.templates.map(reference);
+    if (
+      system.id !== "system-presentation" ||
+      system.scope !== "builtin" ||
+      new Set(templates.map((ref) => ref.id)).size !== templates.length
+    )
+      throw new Error(
+        "Page template context requires the builtin system baseline and distinct templates.",
+      );
+    templateContext = { format: 1, system, templates };
+  }
   string(document.id, "document.id", 200);
   string(document.title, "document.title", 1000);
   if (!document.id) throw new Error("Document id is required.");
@@ -768,6 +815,7 @@ export function validateDocument(value) {
         ? { layout: document.layout, views: document.views }
         : {}),
     comments,
+    ...(templateContext ? { templateContext } : {}),
   };
 }
 

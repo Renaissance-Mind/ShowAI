@@ -7,6 +7,7 @@ import { version } from "../../package.json";
 import { versionedLibrary } from "../core/library-runtime";
 import { findViewerTemplate } from "./exporter";
 import { GUIDE_TOPICS } from "./guides";
+import { TEMPLATE_WORKFLOW_CAPABILITIES } from "../portable/template-bundle.mjs";
 export interface RuntimeLaunch {
   command: string;
   args: string[];
@@ -56,6 +57,7 @@ export async function runtimeInfo(home: string) {
     protocol: 1,
     capacities: { unit: "bytes", ...CAPACITY },
     capabilities: {
+      templateWorkflow: TEMPLATE_WORKFLOW_CAPABILITIES,
       presentation: {
         independentOfProject: true,
         publicCatalog: true,

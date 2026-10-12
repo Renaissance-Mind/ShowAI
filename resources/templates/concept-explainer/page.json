@@ -1,0 +1,213 @@
+{
+  "content": {
+    "type": "surface",
+    "attrs": {
+      "id": "concept-explainer-root",
+      "kind": "page",
+      "name": "概念与机制讲解",
+      "widthMode": "wide"
+    },
+    "content": [
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "concept-explainer-section-1",
+          "name": "读者要理解的问题",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "concept-explainer-section-1-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "读者要理解的问题"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "concept-explainer-section-1-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "填写具体问题、读者已有知识和看完后能够解释的关系。"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "widget",
+        "attrs": {
+          "id": "concept-explainer-mechanism-steps",
+          "name": "从初始状态到结果",
+          "kind": "mechanism-steps",
+          "data": {
+            "title": "从初始状态到结果",
+            "parts": [],
+            "frames": []
+          }
+        }
+      },
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "concept-explainer-section-2",
+          "name": "对象与整体关系",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "concept-explainer-section-2-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "对象与整体关系"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "concept-explainer-section-2-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "用已核实的对象、输入输出和关系构建总览；用文字解释图中的关键概念。"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "concept-explainer-section-3",
+          "name": "关键过程与局部解释",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "concept-explainer-section-3-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "关键过程与局部解释"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "concept-explainer-section-3-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "按先备关系展开关键变化；各分支深度按理解需要决定。"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "widget",
+        "attrs": {
+          "id": "concept-explainer-evidence",
+          "name": "关键概念与关系",
+          "kind": "table",
+          "data": {
+            "title": "关键概念与关系",
+            "columns": [
+              "对象或概念",
+              "含义与作用",
+              "与其他对象的关系",
+              "依据或条件"
+            ],
+            "rows": [],
+            "fontSize": 18,
+            "padding": 0
+          }
+        }
+      },
+      {
+        "type": "widget",
+        "attrs": {
+          "id": "concept-explainer-evidence-explorer",
+          "name": "用例子与反例检查理解",
+          "kind": "evidence-explorer",
+          "data": {
+            "title": "用例子与反例检查理解",
+            "dimensions": [],
+            "items": []
+          }
+        }
+      },
+      {
+        "type": "richText",
+        "attrs": {
+          "id": "concept-explainer-section-4",
+          "name": "例子与适用边界",
+          "data": {
+            "fontSize": 18,
+            "padding": 0
+          }
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "id": "concept-explainer-section-4-title",
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "例子与适用边界"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "attrs": {
+              "id": "concept-explainer-section-4-body"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "加入有来源的具体例子，说明什么情况下该解释成立，何时需要其他方法。"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "layout": {},
+  "surfaceViews": {}
+}

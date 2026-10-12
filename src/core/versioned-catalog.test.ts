@@ -45,7 +45,7 @@ describe("versioned component and template lifecycle", () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  it("compiles and uses staged components in templates/pages before one atomic commit", async () => {
+  it("compiles and uses staged components before one atomic current-state update", async () => {
     const before = await library.head();
     const page = await withChangeContext(actor, () =>
       mutateLibrary(root, async () => {
@@ -108,11 +108,12 @@ describe("versioned component and template lifecycle", () => {
       }),
     );
     expect(page.revision).toBeTruthy();
-    const history = await library.history({ limit: 1 });
-    expect(history[0].actor).toEqual(actor.actor);
-    expect(history[0].resources.map((resource) => resource.kind)).toEqual(
+    const current = await library.entryAt((await library.head())!);
+    expect(current!.actor).toEqual(actor.actor);
+    expect(current!.resources.map((resource) => resource.kind)).toEqual(
       expect.arrayContaining(["component", "template", "page"]),
     );
+    expect(await library.history({ limit: 1 })).toEqual([]);
     expect(
       await resolveDocumentComponents(
         root,

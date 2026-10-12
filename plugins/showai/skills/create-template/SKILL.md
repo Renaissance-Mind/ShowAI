@@ -1,37 +1,20 @@
 ---
 name: create-template
-description: 为 ShowAI 新建、修改可复用模板，或从已有页面提取模板。用户说“我想做一个什么样的模板”时，根据需求先做页面再提炼，或直接创建模板并提供可选使用提示。应用已有模板创建普通页面由 show-document 处理。
+description: 创建、修改或提炼可复用的模板文件夹，包含严格 README 元信息、分阶段指南和可选组件库。模板创作请求使用；普通页面应用模板由 show-document 完成。
 ---
 
-模板保存可复用的内容结构、组件组合和填写约定。用户要求创建模板时，交付可应用的模板、使用提示与验证页面。
+# 创建模板包
 
-先按[呈现工作约定](../plan-presentation/references/presentation-contract.md) 明确重复的阅读任务，再从[模板家族与复用选择](../design-presentation/references/reuse-selection.md)检查已有结构。模板说明覆盖认知起点、必需材料、可选区块、内容过多或不足时的调整、交互与静态方式及通过条件；用现有 contentGuide 等字段表达，不添加运行时尚未支持的自动绑定参数。颜色和字体作为样式选择，稳定的理解结构与局部组合才构成复用依据。
+沿 [show-document](../show-document/SKILL.md) 的系统基线，明确重复的读者任务、输入材料、产出和通过条件。用户有成熟实例或具体视觉参考时先验证实例再提炼；结构已明确时直接创建。沿当前模板阶段继续，避免把所有指南重复加载。只询问会改变结构的缺项，信息充分时完成可使用的包及真实应用验证。
 
-沿用已验证的 MCP；首次使用读取 [统一使用指南](../use-showai/SKILL.md) 与 [跨宿主接入](../use-showai/references/integration.md)。公共模板可通过 public_catalog_describe 取得 source 并定制，无需同步登录。只需独立定义时，交付模板定义文件并用 render_document 验证实例；登记到项目时，用真实项目 ID 调用 template_save/template_apply。无 inline 时交付文件或项目结果。读取 `guide({topic:"templates"})`，按用途查询 `catalog_list({kind:"template",projectId,query,limit:8})`，选中后读取 guide/examples；复用、修改或合成定义时才读取所选源码。已有模板可作为基础；说明新增结构或填写约定的用途。
+先读 guide({topic:"templates"}) 的当前格式。新模板采用一个文件夹：README.md 的严格 JSON frontmatter＋简短基础说明；guides/ 的六阶段 Markdown 或阶段子目录；components/ 的可选自定义组件包；可选 page.json 骨架。scenarios 等元信息只在目录层披露，具体阶段只读对应指南。新模板不作为六个全局 skill 安装。
 
-## 模板结构与填写材料
+阶段为 intent、evidence、understanding、design、authoring、review。guides 必须声明全部阶段，null 表示继承系统指南，不用写无意义的重复说明。阶段目录的主文件是 README.md，其他 Markdown 作为按需细节。系统模板由运行时强制提供，项目模板不能替换或关闭它。
 
-模板的 `document` 使用页面的数据结构。新建定义采用版本 3 的 Page/Board 容器，保留所需容器类型；`layout` 保存父级外框，`surfaceViews[surfaceId]` 保存各容器的命名视图、初始视图和阅读顺序。构造这些字段前读取 `guide({topic:"containers"})`。旧版本 2 白板使用 `views`，旧版本 1 文档没有容器视图字段；从已有页面提炼或修改旧模板时，先核对实际模型并保留其有效结构。需要升级时按容器指南转换内容、布局与视图，不直接重命名视图字段。
+模板组件沿 [create-component](../create-component/SKILL.md) 的 source/schema/documentation 规范。README 声明本地 id/path，manifest.id 与本地 id 一致；注册时自动加模板命名空间，页面与后续查询使用回执中的精确引用。本地组件依赖声明本地 id/version，注册器解析和固定；外部依赖仍需精确指纹。组件代码改变时升级组件版本，指南或包结构改变时升级模板版本。
 
-可复用定义中的实例事实替换为填写提示或符合组件 schema 的空状态。组件不接受空数据时，先以文本说明待填写材料。缺少真实材料时，验证页面展示结构与空状态，说明内容和跨材料验证的未覆盖范围。用户明确要求演示数据时才生成，并在页面标明为演示；演示数值不作为实际项目状态或验证真实内容的证据。`examples.request` 与 `examples.steps` 保存使用提示和步骤，不要求编造业务数据。
+本机和网页 MCP 都用 template_save({projectId,input:{bundle:{format:1,files,assets?}}})。files 以相对路径映射 UTF-8 文本，assets 保存组件图像/字体的 base64；网页端不传本机目录。CLI 目录导入/导出属于宿主管理接口，Agent 文档创作继续使用 MCP。旧 document/composition/contentGuide 格式仍可维护；明确新建采用文件夹格式。
 
-## 选择创建方式
+optional page.json 使用当前 Page/Board 结构并抽掉实例事实。模板内自定义节点可先引用本地组件 id，注册器重写成固定引用；无 page.json 时应用会创建可继续填入的空页面。填写规则、场景和步骤放在 README/阶段指南，不假定存在自动材料绑定。
 
-- **先做页面再提炼**：用户提供现有页面、具体材料或视觉参考，需要通过实际内容确定布局与交互。读取 [模板抽象](references/template-abstraction.md)，按 [show-document](../show-document/SKILL.md) 创建或迭代实例，然后回到本技能提炼；已有成熟页面可直接提炼。
-- **直接创建模板**：用户已能说明重复使用的场景、内容结构或填写需求，或明确要求直接新增模板。读取 [直接创建与互动](references/template-creation.md)，提供可选使用提示，建立模板定义，再应用为预览页面。
-
-用户已指定方式就沿用；否则根据材料与结构的明确程度选择，并简短说明。只有选择会明显影响结果且无法推断时，询问“先做一页看效果再提炼”或“直接建模板再看应用效果”。两种方式可在迭代中切换，复用已经形成的页面或模板。
-
-## 与用户迭代
-
-从现有对话提取用途、读者、重复填写的材料与预期阅读或操作结果。只询问影响结构的缺项，例如“每次会提供哪些材料”或“读者最需要比较什么”；用户目标充分明确时直接创作。根据用户的具体场景提供少量有区别的方向或使用提示，允许选择、组合或自由描述，选择方向后开始制作。
-
-展示实际页面或模板应用预览，让用户围绕结构、内容必填项、可选区块与主要交互提出修改。模板任务中的结构调整同时更新模板定义与预览；本次数据或措辞调整只影响实例。范围无法推断时再询问。提炼前或改动预览前重新读取页面当前内容、hash 与 revision，纳入用户手动修改。反馈充分明确时继续完成修改与验证；无需每一步等待确认。需要新的可复用实现时进入 [create-component](../create-component/SKILL.md)，完成后继续模板任务。
-
-## 保存与交付
-
-生成当前 MCP 支持的 document/composition 定义，将实例事实替换为填写提示或 schema 有效的空状态，保留布局、阅读顺序与精确组件引用。contentGuide 记录各区域的必需材料、组织方式、证据要求和可选条件；scenarios 说明适用场景，related 说明依赖用途，examples 保存命名的自然语言使用提示与操作顺序。提示由 Agent 根据材料执行。
-
-项目登记路径调用 `template_save({projectId,input})` 保存；修改已有模板用新版本，再用 template_apply 验证实例。独立定义路径交付定义文件，用 render_document 验证应用的 document，无需追加项目保存。均按选定提示填入材料，检查阅读效果、主要交互和导出。直接创建也要完成应用验证；从实例提炼时使用不同材料检查复用。材料不足时使用填写提示与空状态展示结构，说明内容验证仍待材料补齐。
-
-交付模板名称、适用场景、精确版本与指纹、可复制的使用提示，以及预览或导出结果。原实例与验证页面分别保留。后续反馈延续同一模板并创建新版本；用户要求共享或发布时再读取对应指南。
+保存后 template_context 取得固定引用与组件索引，读当前阶段并用 template_apply 做真实实例；验证内容、组件、主要操作和导出。不同材料检查复用，原实例保持原样。修改可复用结构发布新版本，本次事实修订只改实例。交付元信息、精确引用、阶段与组件说明、应用 Page 和完整交付文件。

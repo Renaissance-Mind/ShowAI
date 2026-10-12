@@ -1,22 +1,14 @@
 ---
 name: design-presentation
-description: 将 ShowAI 理解规划转成视觉与交互设计稿，选择图形表达、布局、逐段分镜、模板组件及静态呈现。适用于“怎么呈现”“设计布局或交互”“先看设计稿”；正式页面制作由 show-document 接续。
+description: 把理解规划转成具体视觉与交互设计，决定对象、关系、布局和状态，选择模板及组件。设计稿请求使用；按当前 design 阶段披露指南，成品继续制作。
 ---
 
 # 设计表达
 
-从用户已经确定的目标、材料和理解路径开始。缺少影响结构的规划时，按 [plan-presentation](../plan-presentation/SKILL.md) 补齐；只缺局部说明时直接补充，不重复规划整篇。
+沿 [show-document](../show-document/SKILL.md) 的系统基线；独立设计入口先读 guide({topic:"presentation"})，本轮已有相同基线可复用。缺少会改变结构的规划时补 [plan-presentation](../plan-presentation/SKILL.md) 的相关部分，不重做整篇。
 
-按 [表达与分镜](references/expression-and-storyboard.md) 为各部分决定视觉主体、准确标签、关系编码、布局、阅读顺序、文字和状态。复杂作品在制作前把逐段分镜写入理解规划文件，检查节点到画面的覆盖，再开始组装。每个画面承担清楚的理解任务，图形表达关系，文字保留精确定义、条件与论证。
+取得或复用 template_context 与固定引用，读当前 design 阶段。用户要求空白时两处都传 templates:[]，覆盖会话默认模板，沿系统基线设计。先形成符合内容关系的表达候选，再按 [复用选择](references/reuse-selection.md) 查询模板元信息和实际组件能力。组件/模板本轮精确版本已读的 guide 可复用；修改实现才读源码。阶段文件夹先读其 README，必要时用 template_guide 的 templateId/file 取该阶段子文件，不把所有文件默认展开。
 
-先形成表达候选，再用已核实项目的目录分别查询模板与组件，读取 [复用选择](references/reuse-selection.md) 后作出实际选择。按 [复用选择](references/reuse-selection.md) 比较任务、材料、环境与密度；读取候选的真实 guide/schema，沿用精确版本。当前目录不足时才说明能力缺口并进入 create-component。用户指定的模板、素材与交互优先，调整应围绕它们的实际用途。
+按 [分镜格式](references/expression-and-storyboard.md) 记录具体对象、位置、关系、标签、阅读顺序、文字落点及状态。每幕服务清楚的理解任务，重要条件直接可见；交互要有可观察的变化和恢复，静态保留主线，窄屏按真实内容重排。用 Image Gen 生成准确构图/概念示意时，检查事实、连线、数量和标签，保留可编辑的精确数据与交互对象。
 
-可使用 Image Gen 制作概念示意、构图候选与设计稿。先提供对象、关系和准确文案，按图中的事实、标签、箭头和阅读顺序逐项检查，再针对问题修订。真实素材和数据图表保留来源与原始含义；不能用生成图冒充实测结果。没有图像生成工具时使用可用的原生图形表达，不伪称已经生成图片。
-
-## 交付与接续
-
-设计稿交付总体阅读节奏、逐段视觉描述、主要交互状态、静态与窄视口方式、候选资源和验收条件。视觉描述应具体到另一位制作者能据此制作，而非只写“高级”“简洁”等形容词。
-
-用户只要设计时，交付可审阅的设计稿与必要素材；按[呈现工作约定](../plan-presentation/references/presentation-contract.md#记录与权限)确定归属，正式成果由 [show-document](../show-document/SKILL.md) 保存为 Page 并展示。完整制作任务继续组装、验证、保存和展示。设计稿中的拟议界面与实际实现分开说明。
-
-完成前按 [review-presentation](../review-presentation/SKILL.md) 中与当前产物有关的条件检查。无需每个画面都增加交互；需要交互时应解释它帮助读者观察或完成什么。
+交付完整设计稿与必要素材；用户只要设计时按用途保存和展示，拟议状态不记为已实现。完整制作请求继续 show-document。发现能力缺口时记录输入、输出、状态、验收条件，获得制作授权且确需实现时，再进入 [create-component](../create-component/SKILL.md)。

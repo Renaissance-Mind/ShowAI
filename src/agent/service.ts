@@ -20,6 +20,20 @@ import {
 } from "../core/library-operations";
 import type { SearchOptions } from "../core/library-index";
 import { CoreError } from "../core/model";
+import {
+  readTemplateDirectory,
+  writeTemplateDirectory,
+} from "../core/template-bundle-files";
+import {
+  parseTemplateBundle,
+  TEMPLATE_STAGES,
+  type TemplateStage,
+} from "../portable/template-bundle.mjs";
+import {
+  templateContext as readTemplateContext,
+  templateGuide as readTemplateGuide,
+  type TemplateSelection,
+} from "./template-workflow";
 import { preserveRemoteSave } from "../core/remote-save-conflict";
 import { projectDirectory } from "../core/project-directory";
 import type {
@@ -339,7 +353,6 @@ export class AgentService {
         ? all
         : all.filter(
             (item, index) =>
-              item.kind !== "component" ||
               !all
                 .slice(0, index)
                 .some(
@@ -436,13 +449,45 @@ export class AgentService {
       );
       if (view === "summary") return { ...summary, view, next };
       if (view === "guide")
-        return {
-          ...summary,
-          view,
-          contentGuide: template.contentGuide,
-          related: template.related,
-          next,
-        };
+        if (template.bundle) {
+          const bundle = parseTemplateBundle(template.bundle);
+          return {
+            ...summary,
+            view,
+            readme: bundle.body,
+            stages: TEMPLATE_STAGES.map((stage) => ({
+              stage,
+              path: bundle.metadata.guides[stage],
+              inherited: bundle.metadata.guides[stage] === null,
+            })),
+            components: template.workflow?.components ?? [],
+            next: {
+              ...next,
+              stage: {
+                tool: "template_guide",
+                arguments: {
+                  projectId,
+                  stage: "intent",
+                  templates: [
+                    {
+                      id: template.id,
+                      version: template.version,
+                      integrity: template.integrity,
+                      scope: template.scope,
+                    },
+                  ],
+                },
+              },
+            },
+          };
+        } else
+          return {
+            ...summary,
+            view,
+            contentGuide: template.contentGuide,
+            related: template.related,
+            next,
+          };
       if (view === "examples")
         return { ...summary, view, examples: template.examples, next };
       if (view === "dependencies")
@@ -460,7 +505,13 @@ export class AgentService {
           view,
           schema: {
             input: "SaveTemplateInput",
-            required: ["name", "description"],
+            oneOf: [
+              { required: ["bundle"], format: "TemplateBundleSource@1" },
+              {
+                required: ["name", "description"],
+                format: "legacy definition",
+              },
+            ],
             optional: [
               "id",
               "version",
@@ -470,7 +521,28 @@ export class AgentService {
               "examples",
               "document",
               "composition",
+              "bundle",
             ],
+            bundle: {
+              format: 1,
+              files: "relative path → UTF-8 text",
+              assets: "component path → base64",
+              readme: {
+                format: "showai-template",
+                schemaVersion: 1,
+                required: [
+                  "id",
+                  "name",
+                  "version",
+                  "description",
+                  "scenarios",
+                  "guides",
+                  "components",
+                  "page",
+                ],
+              },
+              stages: TEMPLATE_STAGES,
+            },
             composition: [
               { type: "content", content: "doc node" },
               {
@@ -716,6 +788,7 @@ export class AgentService {
   }
 
   private templateSource(template: TemplateRecord): SaveTemplateInput {
+    if (template.bundle) return { bundle: template.bundle };
     return {
       id: template.id,
       version: template.version,
@@ -730,6 +803,77 @@ export class AgentService {
         : { document: template.document }),
       parents: template.parents,
       mergeBase: template.mergeBase,
+    };
+  }
+  async templateContext(
+    projectId: string,
+    selections: TemplateSelection[] = [],
+    knownHash?: string,
+    componentOffset?: number,
+    componentLimit?: number,
+    knownSystemHash?: string,
+  ) {
+    const project = this.requireProject(projectId);
+    await this.store.readProject(project);
+    return readTemplateContext(
+      this.store.root,
+      project,
+      selections,
+      knownHash,
+      componentOffset,
+      componentLimit,
+      knownSystemHash,
+    );
+  }
+  async templateGuide(
+    projectId: string,
+    stage: TemplateStage,
+    selections: TemplateSelection[] = [],
+    knownHash?: string,
+    file?: string,
+    templateId?: string,
+  ) {
+    const project = this.requireProject(projectId);
+    await this.store.readProject(project);
+    return readTemplateGuide(
+      this.store.root,
+      project,
+      stage,
+      selections,
+      knownHash,
+      file,
+      templateId,
+    );
+  }
+  async importTemplate(projectId: string, directory: string) {
+    return this.saveTemplate(projectId, undefined, {
+      bundle: await readTemplateDirectory(directory),
+    });
+  }
+  async exportTemplate(
+    projectId: string,
+    id: string,
+    directory: string,
+    options: CatalogSelection = {},
+  ) {
+    const project = this.requireProject(projectId);
+    await this.store.readProject(project);
+    const { assertExportDestination } = await import("./exporter");
+    await assertExportDestination(this.store.root, project, directory);
+    const template = await getTemplate(this.store.root, id, project, options);
+    if (!template.bundle)
+      throw new Error(
+        "This legacy template has no folder bundle. Read its source or migrate it before directory export.",
+      );
+    return {
+      ...(await writeTemplateDirectory(directory, template.bundle)),
+      ref: {
+        kind: "template",
+        id: template.id,
+        version: template.version,
+        integrity: template.integrity,
+        scope: template.scope,
+      },
     };
   }
   private async importComponentImpl(directory: string, projectId: string) {
@@ -764,6 +908,7 @@ export class AgentService {
       baseHash?: string;
       baseRevision?: string;
       parentId?: string;
+      templates?: TemplateSelection[];
     } = {},
   ) {
     const project = this.requireProject(projectId);
@@ -778,6 +923,17 @@ export class AgentService {
       template,
       project,
     );
+    const active = await this.templateContext(project, [
+      ...(options.templates ?? []),
+      {
+        id: template.id,
+        version: template.version,
+        integrity: template.integrity,
+        scope: template.scope,
+      },
+    ]);
+    const { format, system, templates } = active.context;
+    document.templateContext = { format, system, templates };
     if (title !== undefined) document.title = title;
     if (options.pageId) {
       if (!options.baseHash)
@@ -785,10 +941,25 @@ export class AgentService {
           "Inserting a template requires the destination page base hash.",
         );
       const target = await this.store.readPage(project, options.pageId);
+      const previous = target.document.templateContext?.templates ?? [];
+      const combined = await this.templateContext(project, [
+        ...previous,
+        ...templates,
+      ]);
+      const inserted = placeTemplate(
+        target.document,
+        document,
+        options.parentId,
+      );
+      inserted.templateContext = {
+        format: 1,
+        system: combined.context.system,
+        templates: combined.context.templates,
+      };
       return this.store.savePage(
         project,
         options.pageId,
-        placeTemplate(target.document, document, options.parentId),
+        inserted,
         options.baseHash,
         options.baseRevision,
       );
@@ -804,7 +975,7 @@ export class AgentService {
   ) {
     const project = this.requireProject(projectId);
     await this.store.listPages(project);
-    if (pageId && (input.document || input.composition))
+    if (pageId && (input.document || input.composition || input.bundle))
       throw new CoreError(
         "INVALID_DATA",
         "Choose --page or an input document/composition, not both.",

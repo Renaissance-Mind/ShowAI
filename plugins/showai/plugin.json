@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "showai",
-  "version": "0.13.2",
-  "description": "Reader-centered planning, visual design, review and unified MCP workflows for ShowAI pages, templates and components.",
+  "version": "0.14.0",
+  "description": "Staged template workflows, optional template component libraries and unified MCP presentation for local and web agents.",
   "keywords": [
     "research",
     "interactive-pages",

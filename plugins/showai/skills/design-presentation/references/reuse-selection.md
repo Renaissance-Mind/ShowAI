@@ -19,7 +19,7 @@
 
 先核对阅读任务、材料和交付环境，再检查认知深度、信息量和组织方式，最后调整样式。局部结构可以组合。缺少必需证据时保留缺项或缩小结论，避免为填满模板制造内容。
 
-当前模板以 document/composition、contentGuide、scenarios、related、examples 保存结构和说明；Agent 根据材料填写。没有自动变量绑定或跨组件联动的通用承诺。填写约定不是实际调研结果，成品交付前清除未完成的填写提示，真实缺项保留为明确的限制。
+新模板以 README 元信息与简短基础说明、guides 分阶段指南、可选 components 库和 page.json 保存可复用方法。template_context 固定本轮版本，template_guide 只读当前阶段。旧 document/composition/contentGuide 等定义保持可读；Agent 根据材料填写。没有自动变量绑定或跨组件联动的通用承诺。填写约定不是实际调研结果，成品交付前清除未完成的填写提示，真实缺项保留为明确的限制。
 
 ## 组件候选
 

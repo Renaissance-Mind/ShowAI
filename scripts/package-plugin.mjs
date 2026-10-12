@@ -10,6 +10,8 @@ import {
 } from "node:fs/promises";
 import { dirname, resolve, join, relative, sep, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
+import { parseTemplateReadme } from "../src/portable/template-bundle.mjs";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const plugin = join(root, "plugins/showai");
 const args = process.argv.slice(2);
@@ -35,6 +37,69 @@ for (const path of [
   await rm(join(plugin, path), { recursive: true, force: true });
 const manifest = JSON.parse(
   await readFile(join(plugin, "plugin.json"), "utf8"),
+);
+const baseline = parseTemplateReadme(
+  await readFile(
+    join(root, "resources/templates/system-presentation/README.md"),
+    "utf8",
+  ),
+).body;
+const baselineHash = createHash("sha256").update(baseline).digest("hex");
+const entrypoint = join(plugin, "skills/show-document/SKILL.md");
+const entrySource = await readFile(entrypoint, "utf8");
+if (
+  !entrySource.includes("<!-- showai-system-baseline:start -->") ||
+  !entrySource.includes("<!-- showai-system-baseline:end -->")
+)
+  throw new Error(
+    "Foundational presentation skill is missing its mandatory system baseline slot.",
+  );
+await writeFile(
+  entrypoint,
+  entrySource.replace(
+    /<!-- showai-system-baseline:start -->[\s\S]*?<!-- showai-system-baseline:end -->/,
+    `<!-- showai-system-baseline:start -->\n${baseline}\n\n系统基线内容哈希：\`${baselineHash}\`。本轮已读到同一内容时，可用 knownSystemHash 避免重复返回；没有读过时不要仅凭哈希声明已知。\n<!-- showai-system-baseline:end -->`,
+  ),
+);
+// Host packaging differs; skills, system rules and the MCP runtime remain shared.
+await mkdir(join(plugin, ".claude-plugin"), { recursive: true });
+const claudeManifestPath = join(plugin, ".claude-plugin/plugin.json");
+const existingClaude = await readFile(claudeManifestPath, "utf8").then(
+  JSON.parse,
+  (error) => {
+    if (error.code === "ENOENT") return {};
+    throw error;
+  },
+);
+await writeFile(
+  claudeManifestPath,
+  JSON.stringify(
+    {
+      ...existingClaude,
+      name: manifest.name,
+      version: manifest.version,
+      description: manifest.description,
+      skills: existingClaude.skills ?? "./skills/",
+      author: existingClaude.author ?? { name: "ShowAI" },
+    },
+    null,
+    2,
+  ) + "\n",
+);
+await writeFile(
+  join(plugin, ".mcp.json"),
+  JSON.stringify(
+    {
+      mcpServers: {
+        showai: {
+          command: "node",
+          args: ["${CLAUDE_PLUGIN_ROOT}/mcp/launch.mjs"],
+        },
+      },
+    },
+    null,
+    2,
+  ) + "\n",
 );
 if (manifest.apps)
   throw new Error("Use an explicit MCP URL when packaging remote connections.");
@@ -134,6 +199,14 @@ if (settings["--mcp-url"] || settings["--out"]) {
       2,
     ) + "\n",
     { flag: "w" },
+  );
+  await writeFile(
+    join(destination, ".mcp.json"),
+    JSON.stringify(
+      { mcpServers: { showai: { type: "http", url: url.href } } },
+      null,
+      2,
+    ) + "\n",
   );
   console.log(`Prepared remote plugin from the same skills: ${destination}`);
 }

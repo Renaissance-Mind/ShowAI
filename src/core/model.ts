@@ -103,6 +103,7 @@ export type PageFields = Partial<
     | "layout"
     | "views"
     | "surfaceViews"
+    | "templateContext"
   >
 >;
 

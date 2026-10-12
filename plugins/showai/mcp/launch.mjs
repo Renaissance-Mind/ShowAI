@@ -36,7 +36,21 @@ if (
   throw new Error(
     "This ShowAI runtime does not support the unified MCP entry. Update/register the intended ShowAI runtime, then reconnect. Skills alone cannot upgrade it.",
   );
+if (
+  info.data?.capabilities?.templateWorkflow?.protocol !==
+  "showai-template-workflow-v1"
+)
+  throw new Error(
+    "This plugin requires the staged template workflow runtime. Update/register the intended ShowAI runtime and reconnect; installing skills alone does not add template_context/template_guide.",
+  );
 const args = [...config.launch.args, "mcp"];
+if (process.env.SHOWAI_TEMPLATES) {
+  if (!process.env.SHOWAI_PROJECT_ID)
+    throw new Error(
+      "Startup SHOWAI_TEMPLATES requires SHOWAI_PROJECT_ID; library clients select task templates with template_context.",
+    );
+  args.push("--templates", process.env.SHOWAI_TEMPLATES);
+}
 if (process.env.SHOWAI_PROJECT_ID)
   args.push("--project", process.env.SHOWAI_PROJECT_ID);
 if (process.env.SHOWAI_PRESENTATION_DIR) {

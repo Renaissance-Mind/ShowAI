@@ -1,6 +1,9 @@
 {
   "name": "showai",
-  "version": "0.13.2",
-  "description": "Skills for creating ShowAI pages, reusable components and templates through an independently installed ShowAI runtime.",
+  "version": "0.14.0",
+  "description": "Staged template workflows, optional template component libraries and unified MCP presentation for local and web agents.",
+  "author": {
+    "name": "ShowAI"
+  },
   "skills": "./skills/"
 }

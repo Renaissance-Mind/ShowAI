@@ -508,6 +508,7 @@ export function applyOperations(
           "layout",
           "views",
           "surfaceViews",
+          "templateContext",
         ]);
         if (
           !operation.fields ||

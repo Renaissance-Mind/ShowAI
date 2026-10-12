@@ -20,3 +20,7 @@ description: 通过 ShowAI MCP 创建或改造可复用 React 组件。先查目
 保存编译成功后，把组件放入真实Page，读取源数据、检查图像与实际交互，再重新读取确认保存。仅声明readData不证明计算结果正确；按稳定ID核对原始值与派生值。独立结果用render_document验证传入源码，交付可编辑输入及HTML/source。连接或编译失败时保留材料并报告，不转用CLI或未保存网页假装成功。
 
 组件任务完成后继续整体文档任务。交付精确版本与指纹，正式Page通过 [show-document](../show-document/SKILL.md)保存与展示；仅完成组件登记不等于交付了用户页面。
+
+## 模板内组件
+
+模板组件库采用相同的 manifest/schema/source/files/assets 与 versioned documentation。局部 id 在模板内保持简洁，模板保存器自动生成隔离的实际 componentId，并固定版本与指纹。不要手工猜生成名称或重新注册同一份代码；从 template_context 取得本轮绑定并查询相应 guide/schema。新增图形或交互能力仍由实际理解缺口决定。

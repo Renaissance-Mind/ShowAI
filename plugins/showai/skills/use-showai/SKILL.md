@@ -25,6 +25,10 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 内容库与代码目录不同。本机默认库是 `~/.showai`，以实际连接为准。HTML 是阅读交付物；HTML 所在目录不证明有无源 Page。正式文档默认在已选项目中保存为一份 Page，再按需要展示。只有用户明确要独立文件、独立展示或不入库时才用 `render_document`；其中 `savedToProject=false` 必须如实说明。
 
+## 模板阶段与会话
+
+呈现任务使用 show-document 中的必读系统基线；没有本机 skill 的网页客户端先读 guide({topic:"presentation"})。检查 templateWorkflow.protocol，template_context 选择本轮模板并返回固定引用、README 和组件索引；template_guide 只读当前阶段。启动时 --templates 只固定该项目绑定 MCP 会话的默认选择，不修改全局模板或库配置。续改读取 Page.templateContext；目录或引用已知时复用，knownHash 只用于本轮确实持有的内容。模板组件索引按 componentPage 分页，源码只在开发或明确导出时读取。
+
 ## 根据任务继续
 
 | 任务                             | 操作与指南                                                                                                                                                                                           |
@@ -37,12 +41,14 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 | 阅读数据、长页局部               | 默认 structured；先 `detail:"outline"` 获取节点 ID，再用 `blockIds` 取局部；纯源读取用 `rendered:false`                                                                                              |
 | 查看布局或操作效果               | `page_read` 的 image / html；读取 [阅读视图](../show-document/references/page-reading.md)，遵循宿主实际 UI 操控规则                                                                                  |
 | 创建、修改、展示、导出或应用模板 | [show-document](../show-document/SKILL.md)                                                                                                                                                           |
-| 查询组件或模板                   | `catalog_list` 默认返回组件默认范围（内置＋当前项目）的全部名字、摘要、场景与查询身份 → `catalog_describe` 按需取 guide / schema / examples；公开目录用 `public_catalog_list/describe`，同样默认全量 |
+| 查询组件或模板                   | `catalog_list({kind:"component"或"template",projectId})` 读取相应目录元信息；模板先用 template_context 与 template_guide，组件再按需取 guide/schema；公开目录用 public_catalog_list/describe |
 | 创建可复用组件                   | [create-component](../create-component/SKILL.md)                                                                                                                                                     |
 | 创建或提炼模板                   | [create-template](../create-template/SKILL.md)                                                                                                                                                       |
 | 同步状态                         | 本机 `project_sync_status`，明确需要同步时 `project_sync`；远程检查操作返回的 synchronization                                                                                                        |
 
 尚未取得可复用的完整索引时调用 `catalog_list({kind:"component",projectId})`，省略 scope、query、limit、cursor，先获得全部内置组件与当前项目组件的名字、摘要和场景、reuse 与 documentationStatus。默认每个 id/来源一个推荐版本；versions:"all" 用于查询可用组件版本，已有页面沿用其精确旧引用。全局或已发布组件可显式指定 scope 为 global、published 或 all 查询。读取详情时沿用返回的 scope、version、integrity，避免同名组件混淆。外部宿主通过上下文初始化取得目录；不能把工具已注册等同于模型已读到。按需 query 筛选；显式 limit/cursor 仍可分页。列表不含参数、示例或源码。通用 general、专题 domain、内容专用 content-specific 表达复用范围，与来源、权限分别判断；旧资料缺失标为 unclassified/missing。选中后 guide 返回专属使用说明；修改实现前读取 development，再按需读 source。
+
+只读模板查询用 `catalog_list({kind:"template",projectId})`；从已有 Page.templateContext 读取其固定版本后，通过 template_context/template_guide 检查原版说明。缺少绑定记录时明确未知，不把推荐版本当作原版。用户明确要求空白时传 templates:[]，它覆盖该连接的会话默认选择，但仍加载系统基线。
 
 指南通过 MCP `guide({topic})` 读取，工具的实时 inputSchema 决定参数。共享资源的提升、公开发布及服务器账号配置属于明确的宿主管理操作，不因缺少相应 MCP 工具就转用原始文件或越权命令。
 

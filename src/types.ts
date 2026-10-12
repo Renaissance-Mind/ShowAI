@@ -1,5 +1,8 @@
 import type { JSONContent } from "@tiptap/core";
-import type { CompiledComponent } from "./components/custom/types";
+import type {
+  CompiledComponent,
+  PackageRevisionRef,
+} from "./components/custom/types";
 import type { PublishedComponentLocator } from "./portable/publication-types";
 import type { NodeLayout, PageViews } from "./surface/types";
 
@@ -18,6 +21,12 @@ export interface ShowPage {
   layout?: Record<string, NodeLayout>;
   views?: PageViews;
   surfaceViews?: Record<string, PageViews>;
+  /** Exact workflow templates used by this page; rendering does not execute their guides. */
+  templateContext?: {
+    format: 1;
+    system: PackageRevisionRef;
+    templates: PackageRevisionRef[];
+  };
   comments: {
     id: string;
     text: string;
