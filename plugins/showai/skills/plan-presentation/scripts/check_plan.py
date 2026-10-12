@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Check saved presentation-plan coverage; this is not a quality score."""
 import hashlib
+import argparse
 import json
 import sys
 from pathlib import Path
 
 
-def check(plan):
+def check(plan, document=None):
     errors, nodes, scenes, covered = [], {}, {}, set()
 
     def need(record, keys, label):
@@ -101,15 +102,47 @@ def check(plan):
 
     for key in nodes:
         visit(key)
+    source_blocks = set()
+    if document is not None:
+        if isinstance(document.get("data"), dict):
+            document = document["data"]
+        document = document.get("document", document)
+        def collect(node):
+            if not isinstance(node, dict):
+                return
+            identifier = node.get("attrs", {}).get("id")
+            if identifier:
+                source_blocks.add(identifier)
+            for child in node.get("content", []) if isinstance(node.get("content", []), list) else []:
+                collect(child)
+        collect(document.get("content"))
+        if not source_blocks:
+            errors.append("page: no source block IDs found")
+        for key, scene in scenes.items():
+            references = scene.get("blockIds")
+            if not isinstance(references, list) or not references:
+                errors.append(f"{key}: final review requires blockIds from the saved page")
+                continue
+            for reference in references:
+                if not isinstance(reference, str) or reference not in source_blocks:
+                    errors.append(f"{key}: unknown saved-page block {reference}")
     return {"ok": not errors, "errors": errors, "nodeCount": len(nodes),
             "maxDepth": max((d for _, d in nodes.values()), default=0),
             "sceneCount": len(scenes),
-            "scope": "Structural coverage only; inspect explanations, designs and the rendered result."}
+            "sourceMappingChecked": document is not None,
+            "scope": "Structural coverage and optional source references only; inspect semantic agreement and the rendered result."}
 
 
 if __name__ == "__main__":
-    content = Path(sys.argv[1]).read_bytes()
-    result = check(json.loads(content))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("plan")
+    parser.add_argument("--page", help="Saved page_read JSON or .showai.json for final scene mapping")
+    args = parser.parse_args()
+    content = Path(args.plan).read_bytes()
+    page = Path(args.page).read_bytes() if args.page else None
+    result = check(json.loads(content), json.loads(page) if page else None)
     result["sha256"] = hashlib.sha256(content).hexdigest()
+    if page:
+        result["sourceSha256"] = hashlib.sha256(page).hexdigest()
     print(json.dumps(result, ensure_ascii=False, indent=2))
     sys.exit(0 if result["ok"] else 1)

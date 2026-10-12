@@ -279,7 +279,7 @@ function EvidenceTimeline({
     >
       <table className="sp-timeline">
         <caption>
-          按条目标注日期排列；空格表示本报告未收录，不能推断该时期没有进展。选择条目打开依据与条件，关闭后回到当前位置。
+          按条目标注日期排列；空格表示本报告未收录，不能推断该时期没有进展。选择条目查看依据与条件，再返回总览。
         </caption>
         <thead>
           <tr>
@@ -306,6 +306,7 @@ function EvidenceTimeline({
                         <button
                           type="button"
                           aria-label={`${item.title} · ${item.dateLabel ?? "日期未提供"} ${item.date ?? ""}`}
+                          data-evidence-id={item.id}
                           aria-pressed={item.id === selected}
                           aria-controls={detailId}
                           onClick={() => onSelect(item.id)}
@@ -340,19 +341,42 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
   const [category, setCategory] = useState("");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(model.items[0]?.id ?? "");
-  const [view, setView] = useState<"overview" | "compare">("overview");
+  const [view, setView] = useState<"overview" | "compare" | "detail">(
+    "overview",
+  );
   const [pinned, setPinned] = useState<string[]>([]);
-  const [detailOpen, setDetailOpen] = useState(false);
-  const dialog = useRef<HTMLDialogElement>(null);
+  const root = useRef<HTMLElement>(null);
+  const returnButton = useRef<HTMLButtonElement>(null);
+  const restoreSelection = useRef<string | null>(null);
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const observer = new ResizeObserver((entries) =>
+      setNarrow(entries[0].contentRect.width < 650),
+    );
+    observer.observe(root.current!);
+    return () => observer.disconnect();
+  }, []);
   const uid = useId();
   const visible = selectEvidence(model.items, category, query);
   const active = visible.find((i) => i.id === selected) ?? visible[0];
   useEffect(() => {
-    if (detailOpen && active && !dialog.current?.open)
-      dialog.current?.showModal();
-    if ((!detailOpen || !active) && dialog.current?.open)
-      dialog.current.close();
-  }, [detailOpen, active]);
+    if (view === "detail") returnButton.current?.focus();
+    else if (view === "overview" && restoreSelection.current) {
+      const target = [
+        ...(root.current?.querySelectorAll<HTMLButtonElement>(
+          "button[data-evidence-id]",
+        ) ?? []),
+      ].find(
+        (button) => button.dataset.evidenceId === restoreSelection.current,
+      );
+      target?.focus();
+      restoreSelection.current = null;
+    }
+  }, [view, selected]);
+  function returnToOverview() {
+    restoreSelection.current = active?.id ?? null;
+    setView("overview");
+  }
   const comparison = pinned.length
     ? model.items.filter((i) => pinned.includes(i.id))
     : visible;
@@ -377,13 +401,23 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
     setPinned([]);
     setView("overview");
     setSelected(model.items[0]?.id ?? "");
-    setDetailOpen(false);
   }
   return (
-    <section className="sp-block sp-evidence" aria-label={model.title}>
+    <section
+      ref={root}
+      className="sp-block sp-evidence"
+      aria-label={model.title}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && view === "detail") {
+          event.preventDefault();
+          event.stopPropagation();
+          returnToOverview();
+        }
+      }}
+    >
       <header>
         <h2>{model.title}</h2>
-        {model.introduction && <p>{model.introduction}</p>}
+        {view !== "detail" && model.introduction && <p>{model.introduction}</p>}
       </header>
       {!model.items.length ? (
         <p className="sp-empty">
@@ -391,55 +425,75 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
         </p>
       ) : (
         <>
-          <div className="sp-controls">
-            <div className="sp-buttons">
+          {view === "detail" ? (
+            <div className="sp-controls">
               <button
                 type="button"
-                aria-pressed={view === "overview"}
-                onClick={() => setView("overview")}
+                ref={returnButton}
+                onClick={returnToOverview}
               >
-                总览与详情
-              </button>
-              <button
-                type="button"
-                aria-pressed={view === "compare"}
-                onClick={() => setView("compare")}
-              >
-                按共同维度比较{pinned.length ? `（${pinned.length}）` : ""}
-              </button>
-              <button type="button" onClick={reset}>
-                重置视图
+                返回总览
               </button>
             </div>
-            <div className="sp-filters">
-              <label>
-                主题
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+          ) : (
+            <div className="sp-controls">
+              <div className="sp-buttons">
+                <button
+                  type="button"
+                  aria-pressed={view === "overview"}
+                  onClick={() => setView("overview")}
                 >
-                  <option value="">全部主题</option>
-                  {[...new Set(model.items.map((i) => i.category))].map((c) => (
-                    <option key={c}>{c}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                查找
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="名称、结论或条件"
-                />
-              </label>
-              <output aria-live="polite">
-                显示 {visible.length} / {model.items.length} 项
-              </output>
+                  总览与详情
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={view === "compare"}
+                  onClick={() => setView("compare")}
+                >
+                  按共同维度比较{pinned.length ? `（${pinned.length}）` : ""}
+                </button>
+                <button type="button" onClick={reset}>
+                  重置视图
+                </button>
+              </div>
+              <div className="sp-filters">
+                <label>
+                  主题
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                  >
+                    <option value="">全部主题</option>
+                    {[...new Set(model.items.map((i) => i.category))].map(
+                      (c) => (
+                        <option key={c}>{c}</option>
+                      ),
+                    )}
+                  </select>
+                </label>
+                <label>
+                  查找
+                  <input
+                    type="search"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="名称、结论或条件"
+                  />
+                </label>
+                <output aria-live="polite">
+                  显示 {visible.length} / {model.items.length} 项
+                </output>
+              </div>
             </div>
-          </div>
+          )}
           <div className="sp-screen">
-            {view === "compare" ? (
+            {view === "detail" ? (
+              <div id={uid} role="region" aria-label="证据详情与来源">
+                {active && (
+                  <EvidenceDetail item={active} dimensions={model.dimensions} />
+                )}
+              </div>
+            ) : view === "compare" ? (
               <div
                 className="sp-table-wrap"
                 tabIndex={0}
@@ -485,7 +539,7 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
                 </table>
                 {!comparison.length && <p>没有符合条件的条目。可重置视图。</p>}
               </div>
-            ) : model.layout === "timeline" ? (
+            ) : model.layout === "timeline" && !narrow ? (
               <div className="sp-time-overview">
                 <EvidenceTimeline
                   items={visible}
@@ -494,7 +548,7 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
                   detailId={uid}
                   onSelect={(id) => {
                     setSelected(id);
-                    setDetailOpen(true);
+                    setView("detail");
                   }}
                   pinned={pinned}
                   onPin={pin}
@@ -510,9 +564,13 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
                     >
                       <button
                         type="button"
+                        data-evidence-id={item.id}
                         aria-pressed={item.id === active?.id}
                         aria-controls={uid}
-                        onClick={() => setSelected(item.id)}
+                        onClick={() => {
+                          setSelected(item.id);
+                          if (narrow) setView("detail");
+                        }}
                       >
                         {item.date && (
                           <span className="sp-date">
@@ -562,24 +620,6 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
               ))}
             </details>
           </div>
-          {model.layout === "timeline" && (
-            <dialog
-              id={uid}
-              ref={dialog}
-              className="sp-block sp-evidence-dialog"
-              onClose={() => setDetailOpen(false)}
-              aria-label="证据详情与来源"
-            >
-              <div className="sp-dialog-controls">
-                <button type="button" onClick={() => setDetailOpen(false)}>
-                  返回总览
-                </button>
-              </div>
-              {active && (
-                <EvidenceDetail item={active} dimensions={model.dimensions} />
-              )}
-            </dialog>
-          )}
           <div className="sp-print">
             {model.items.map((item) => (
               <EvidenceDetail

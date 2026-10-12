@@ -92,7 +92,7 @@ describe("interactive block data", () => {
             readOnly: true,
           }),
         ),
-      ).toMatch(/sb-block|sb-primitive/);
+      ).toMatch(/sb-block|sb-primitive|sp-block/);
       first.title = "Changed title";
       expect(createBlockData(block.kind)).toEqual(second);
     }

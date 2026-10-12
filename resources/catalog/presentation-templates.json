@@ -2,7 +2,7 @@
   {
     "id": "concept-explainer",
     "name": "概念与机制讲解",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "description": "从具体问题出发，建立对象、关系、机制与适用边界，支持深度不同的渐进解释。",
     "scenarios": [
       "解释一个读者尚不熟悉的概念、算法或系统机制。",
@@ -59,7 +59,7 @@
       {
         "kind": "component",
         "id": "evidence-explorer",
-        "version": "1.1.0",
+        "version": "1.1.1",
         "purpose": "总览、主题筛选、证据详情与共同维度比较。"
       },
       {
@@ -101,7 +101,7 @@
           {
             "kind": "template",
             "id": "concept-explainer",
-            "version": "1.2.0",
+            "version": "1.2.1",
             "purpose": "从具体问题出发，建立对象、关系、机制与适用边界，支持深度不同的渐进解释。"
           },
           {
@@ -336,7 +336,7 @@
   {
     "id": "decision-comparison",
     "name": "方案比较与决策",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "description": "按共同标准呈现可比事实、缺项与取舍，支持带条件的选择。",
     "scenarios": [
       "为一个明确任务比较技术路线、产品方案或研究方法。",
@@ -393,7 +393,7 @@
       {
         "kind": "component",
         "id": "evidence-explorer",
-        "version": "1.1.0",
+        "version": "1.1.1",
         "purpose": "总览、主题筛选、证据详情与共同维度比较。"
       },
       {
@@ -405,7 +405,7 @@
       {
         "kind": "component",
         "id": "table",
-        "version": "1.1.1",
+        "version": "1.1.2",
         "purpose": "按共同标准对齐少量选项。"
       },
       {
@@ -435,13 +435,13 @@
           {
             "kind": "template",
             "id": "decision-comparison",
-            "version": "1.2.0",
+            "version": "1.2.1",
             "purpose": "按共同标准呈现可比事实、缺项与取舍，支持带条件的选择。"
           },
           {
             "kind": "component",
             "id": "table",
-            "version": "1.1.1",
+            "version": "1.1.2",
             "purpose": "按共同标准对齐少量选项。"
           },
           {
@@ -671,7 +671,7 @@
   {
     "id": "evidence-report",
     "name": "研究与证据报告",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "description": "围绕研究问题组织事实、机制、证据和局限，区分来源主张与分析推断。",
     "scenarios": [
       "对一个研究主题形成有来源、可追溯的综合调研报告。",
@@ -728,7 +728,7 @@
       {
         "kind": "component",
         "id": "evidence-explorer",
-        "version": "1.1.0",
+        "version": "1.1.1",
         "purpose": "总览、主题筛选、证据详情与共同维度比较。"
       },
       {
@@ -752,7 +752,7 @@
       {
         "kind": "component",
         "id": "table",
-        "version": "1.1.1",
+        "version": "1.1.2",
         "purpose": "比较研究设置与证据。"
       },
       {
@@ -770,7 +770,7 @@
           {
             "kind": "template",
             "id": "evidence-report",
-            "version": "1.2.0",
+            "version": "1.2.1",
             "purpose": "围绕研究问题组织事实、机制、证据和局限，区分来源主张与分析推断。"
           },
           {
@@ -1045,7 +1045,7 @@
   {
     "id": "procedure-guide",
     "name": "操作与问题排查",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "description": "围绕目标状态组织真实入口、动作、预期反馈和异常恢复。",
     "scenarios": [
       "教读者完成一项操作，并知道每一步是否成功。",
@@ -1102,7 +1102,7 @@
       {
         "kind": "component",
         "id": "evidence-explorer",
-        "version": "1.1.0",
+        "version": "1.1.1",
         "purpose": "总览、主题筛选、证据详情与共同维度比较。"
       },
       {
@@ -1144,7 +1144,7 @@
           {
             "kind": "template",
             "id": "procedure-guide",
-            "version": "1.2.0",
+            "version": "1.2.1",
             "purpose": "围绕目标状态组织真实入口、动作、预期反馈和异常恢复。"
           },
           {
@@ -1307,7 +1307,12 @@
               "kind": "table",
               "data": {
                 "title": "动作、反馈与恢复",
-                "columns": ["条件或步骤", "动作", "预期反馈", "异常与恢复"],
+                "columns": [
+                  "条件或步骤",
+                  "动作",
+                  "预期反馈",
+                  "异常与恢复"
+                ],
                 "rows": [],
                 "fontSize": 18,
                 "padding": 0
@@ -1374,7 +1379,7 @@
   {
     "id": "progress-report",
     "name": "状态与进展报告",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "description": "在明确截止时间下说明当前状态、变化、证据、风险与下一步。",
     "scenarios": [
       "汇报真实项目、实验或运行状态，帮助读者判断后续行动。",
@@ -1431,7 +1436,7 @@
       {
         "kind": "component",
         "id": "evidence-explorer",
-        "version": "1.1.0",
+        "version": "1.1.1",
         "purpose": "总览、主题筛选、证据详情与共同维度比较。"
       },
       {
@@ -1449,7 +1454,7 @@
       {
         "kind": "component",
         "id": "table",
-        "version": "1.1.1",
+        "version": "1.1.2",
         "purpose": "对齐状态、依据和行动。"
       },
       {
@@ -1473,7 +1478,7 @@
           {
             "kind": "template",
             "id": "progress-report",
-            "version": "1.2.0",
+            "version": "1.2.1",
             "purpose": "在明确截止时间下说明当前状态、变化、证据、风险与下一步。"
           },
           {
@@ -1485,7 +1490,7 @@
           {
             "kind": "component",
             "id": "table",
-            "version": "1.1.1",
+            "version": "1.1.2",
             "purpose": "对齐状态、依据和行动。"
           }
         ]
@@ -1711,7 +1716,7 @@
   {
     "id": "exploration-map",
     "name": "探索与资料组织",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "description": "用可定位的分类、属性与关系组织资料，支持总览、筛选和局部核对。",
     "scenarios": [
       "整理一个主题的资料、概念或候选项，让读者逐步探索。",
@@ -1768,7 +1773,7 @@
       {
         "kind": "component",
         "id": "evidence-explorer",
-        "version": "1.1.0",
+        "version": "1.1.1",
         "purpose": "总览、主题筛选、证据详情与共同维度比较。"
       },
       {
@@ -1810,7 +1815,7 @@
           {
             "kind": "template",
             "id": "exploration-map",
-            "version": "1.2.0",
+            "version": "1.2.1",
             "purpose": "用可定位的分类、属性与关系组织资料，支持总览、筛选和局部核对。"
           },
           {
@@ -1973,7 +1978,12 @@
               "kind": "table",
               "data": {
                 "title": "可定位的资料索引",
-                "columns": ["条目", "类别或关系", "关键属性", "来源与缺项"],
+                "columns": [
+                  "条目",
+                  "类别或关系",
+                  "关键属性",
+                  "来源与缺项"
+                ],
                 "rows": [],
                 "fontSize": 18,
                 "padding": 0

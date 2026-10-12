@@ -47,3 +47,5 @@
 文件记录 reader、startingKnowledge、goal、cutoff，environment={width,height,interactive}，nodes 和 scenes。nodes 是嵌套数组：每项含稳定 id、task、answer、check，可含 needs（先备节点 id）和 children；叶子另含 explanation。scenes 的字段见[表达与分镜](../../design-presentation/references/expression-and-storyboard.md#保存分镜)。一幅图可以解释多个节点，一个节点也可跨多幅画面。
 
 设计完成、首次填入完整页面内容之前，运行 `python3 <本技能目录>/scripts/check_plan.py <规划路径>`。处理失联节点、缺少解释、依赖循环和无画面覆盖等错误，再用设计判断检查展开是否足够。校验返回的哈希用于对应本轮规划；通过仅证明结构可追踪，不证明内容正确或设计优秀。宿主不能运行脚本时手工核对同样关系并说明范围。制作中改变主线或画面时同步更新规划；保留最初规划和修订原因，不能用完成后的章节清单代替前置规划。
+
+多个作品分别确定认知缺口和讲解顺序。可以共用来源与组件，不把一份通用分镜批量换标题后作为不同作品的设计。叶子的 explanation 写准备讲清的关系、例子或条件，不能仅写“介绍某概念”这样的写作动作。

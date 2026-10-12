@@ -15,7 +15,7 @@
 | progress-report     | 理解当前状态与下一步 | 截止时间、变化、依据、风险及待决策事项   |
 | exploration-map     | 探索分类与关系       | 条目、属性、分类或关联、来源与检索方式   |
 
-新建复杂作品时，实际查询 `catalog_list({kind:"template",projectId})`，读取匹配项的 guide。匹配则在制作阶段用 template_apply 创建并填入本次内容；没有合适结构时记录具体缺口再从空白组装。目录查询与组件选择是不同操作，componentCatalog 不包含模板。
+新建复杂作品时，实际查询 `catalog_list({kind:"template",projectId})`，读取匹配项的 guide。用户明确指定从空白开始时沿用其选择；其余请求匹配则在制作阶段用 template_apply 创建并填入本次内容，没有合适结构时记录具体缺口再从空白组装。目录查询与组件选择是不同操作，componentCatalog 不包含模板。
 
 先核对阅读任务、材料和交付环境，再检查认知深度、信息量和组织方式，最后调整样式。局部结构可以组合。缺少必需证据时保留缺项或缩小结论，避免为填满模板制造内容。
 

@@ -1347,7 +1347,7 @@
     "kind": "evidence-explorer",
     "name": "证据探索",
     "description": "按主题与时间总览证据，联动条目详情和共同维度比较，保留条件与来源。",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "scenarios": [
       "用 timeline 布局把时间列与主题行交叉，选择事件查看依据；跨年度材料可用 year 刻度。",
       "研究报告按主题或日期定位事件、发现和证据。",

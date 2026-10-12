@@ -77,6 +77,10 @@ export function TableBlock({ data, onChange, readOnly }: BlockProps) {
   const columns = (data.columns ?? []) as string[];
   const rows = (data.rows ?? []) as (string | number | boolean)[][];
   const editable = Boolean(onChange && !readOnly);
+  const minimumWidth =
+    typeof data.fontSize === "number" && data.fontSize >= 18
+      ? columns.length * (data.fontSize * 10 + 16)
+      : undefined;
   const [tableRoot, setTableRoot] = useState<HTMLElement | null>(null);
   const align = (column: number | null, alignment: TableAlignment) => {
     if (!editable) return;
@@ -98,8 +102,17 @@ export function TableBlock({ data, onChange, readOnly }: BlockProps) {
     >
       {text(data.title) && <h3>{text(data.title)}</h3>}
       <div className="sb-table-frame">
-        <div className="sb-table-scroll">
-          <table>
+        <div
+          className="sb-table-scroll"
+          tabIndex={minimumWidth ? 0 : undefined}
+          role={minimumWidth ? "region" : undefined}
+          aria-label={
+            minimumWidth
+              ? `${text(data.title) || "对照表"}：左右滚动查看全部列`
+              : undefined
+          }
+        >
+          <table style={{ minWidth: minimumWidth }}>
             <thead>
               <tr>
                 {columns.map((column, i) => (

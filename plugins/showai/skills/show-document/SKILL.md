@@ -19,6 +19,8 @@ description: 通过 ShowAI MCP 制作可交互的研究报告、讲解页面和�
 
 续改先读取完整原 Page 和用户反馈。定位事实、认知、顺序、表达或交互障碍，连贯修订受影响的标题、图形、图注、正文和来源；保持原作品身份，保留无关修改。反馈融入新正文，不在正文逐条回应修改要求。
 
+完成复杂作品后，按 [review-presentation](../review-presentation/SKILL.md) 将最终分镜映射到保存的源页面并核对语义，保留前置规划及后续修订。
+
 ## 正式页面
 
 先取得或复用 project_context 的 componentCatalog，再调用 `guide({topic:"authoring"})`；构造容器时读 containers，内部正文时读 document。上下文尚未提供索引或目录变化时，用 `catalog_list({kind:"component",projectId})` 取得完整目录；选中后沿用返回的 scope/version/integrity 读取 guide 的内容组织、数据关系、交互与保存边界和示例；按需再取完整 schema/examples，准确区分同名组件。内容专用组件用于所属作品维护，专题组件遵守固定假设。修改实例数据不要求读取源码；模板复用页面结构，沿模板精确依赖读取组件说明。已有组件或组合足够时直接复用；存在明确的表达或交互缺口时进入 [create-component](../create-component/SKILL.md)。需要可复用模板时进入 [create-template](../create-template/SKILL.md)；应用已有模板则直接用 template_apply。
