@@ -1346,9 +1346,10 @@
   {
     "kind": "evidence-explorer",
     "name": "证据探索",
-    "description": "把主题总览、条目详情和共同维度比较连接起来，保留条件与来源。",
-    "version": "1.0.0",
+    "description": "按主题与时间总览证据，联动条目详情和共同维度比较，保留条件与来源。",
+    "version": "1.1.0",
     "scenarios": [
+      "用 timeline 布局把时间列与主题行交叉，选择事件查看依据；跨年度材料可用 year 刻度。",
       "研究报告按主题或日期定位事件、发现和证据。",
       "选择条目查看条件与来源，将指定条目按共同维度并排比较。"
     ],
@@ -1444,6 +1445,10 @@
                   "additionalProperties": false
                 },
                 "maxItems": 80
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
               }
             },
             "required": [
@@ -1457,6 +1462,12 @@
             "additionalProperties": false
           },
           "maxItems": 80
+        },
+        "layout": {
+          "enum": ["list", "timeline"]
+        },
+        "timeScale": {
+          "enum": ["month", "year"]
         }
       },
       "required": ["title", "dimensions", "items"],

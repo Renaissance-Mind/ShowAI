@@ -1,6 +1,9 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { BlockProps } from "./types";
-import { selectEvidence } from "./presentation-contract.mjs";
+import {
+  evidenceTimeBuckets,
+  selectEvidence,
+} from "./presentation-contract.mjs";
 import "./presentation.css";
 
 type Source = { label: string; url: string };
@@ -28,6 +31,7 @@ type Mechanism = {
 type Evidence = {
   id: string;
   title: string;
+  label?: string;
   category: string;
   date?: string;
   dateLabel?: string;
@@ -41,6 +45,8 @@ type Explorer = {
   introduction?: string;
   dimensions: Part[];
   items: Evidence[];
+  layout?: "list" | "timeline";
+  timeScale?: "month" | "year";
 };
 const statusNames = {
   changed: "本步改变",
@@ -243,6 +249,92 @@ function EvidenceDetail({
     </article>
   );
 }
+function EvidenceTimeline({
+  items,
+  scale,
+  selected,
+  detailId,
+  onSelect,
+  pinned,
+  onPin,
+}: {
+  items: Evidence[];
+  scale: "month" | "year";
+  selected?: string;
+  detailId: string;
+  onSelect: (id: string) => void;
+  pinned: string[];
+  onPin: (id: string, checked: boolean) => void;
+}) {
+  const dates = evidenceTimeBuckets(items, scale);
+  const buckets = items.some((i) => !i.date) ? [...dates, "未标日期"] : dates;
+  const categories = [...new Set(items.map((i) => i.category))];
+  const bucket = (item: Evidence) =>
+    item.date?.slice(0, scale === "year" ? 4 : 7) ?? "未标日期";
+  return (
+    <div
+      className="sp-timeline-wrap"
+      tabIndex={0}
+      aria-label="按主题与时间定位证据，可横向滚动"
+    >
+      <table className="sp-timeline">
+        <caption>
+          按条目标注日期排列；空格表示本报告未收录，不能推断该时期没有进展。选择条目打开依据与条件，关闭后回到当前位置。
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">主题</th>
+            {buckets.map((date) => (
+              <th scope="col" key={date}>
+                {date}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {categories.map((category) => (
+            <tr key={category}>
+              <th scope="row">{category}</th>
+              {buckets.map((date) => (
+                <td key={date}>
+                  {items
+                    .filter(
+                      (i) => i.category === category && bucket(i) === date,
+                    )
+                    .map((item) => (
+                      <div className="sp-timeline-item" key={item.id}>
+                        <button
+                          type="button"
+                          aria-label={`${item.title} · ${item.dateLabel ?? "日期未提供"} ${item.date ?? ""}`}
+                          aria-pressed={item.id === selected}
+                          aria-controls={detailId}
+                          onClick={() => onSelect(item.id)}
+                        >
+                          <span className="sp-event-dot" aria-hidden="true" />
+                          <span>{item.label ?? item.title}</span>
+                        </button>
+                        <label className="sp-pin">
+                          <input
+                            type="checkbox"
+                            checked={pinned.includes(item.id)}
+                            onChange={(e) => onPin(item.id, e.target.checked)}
+                            aria-label={`将${item.title}加入比较`}
+                          />
+                          加入比较
+                        </label>
+                      </div>
+                    ))}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {!items.length && <p>没有符合条件的条目。可重置视图。</p>}
+    </div>
+  );
+}
+
 export function EvidenceExplorerBlock({ data }: BlockProps) {
   const model = data as unknown as Explorer;
   const [category, setCategory] = useState("");
@@ -250,18 +342,42 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
   const [selected, setSelected] = useState(model.items[0]?.id ?? "");
   const [view, setView] = useState<"overview" | "compare">("overview");
   const [pinned, setPinned] = useState<string[]>([]);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const dialog = useRef<HTMLDialogElement>(null);
   const uid = useId();
   const visible = selectEvidence(model.items, category, query);
   const active = visible.find((i) => i.id === selected) ?? visible[0];
+  useEffect(() => {
+    if (detailOpen && active && !dialog.current?.open)
+      dialog.current?.showModal();
+    if ((!detailOpen || !active) && dialog.current?.open)
+      dialog.current.close();
+  }, [detailOpen, active]);
   const comparison = pinned.length
     ? model.items.filter((i) => pinned.includes(i.id))
     : visible;
+  useEffect(() => {
+    setPinned((current) => {
+      const next = current.filter((id) =>
+        model.items.some((item) => item.id === id),
+      );
+      return next.length === current.length ? current : next;
+    });
+  }, [model.items]);
+  function pin(id: string, checked: boolean) {
+    setPinned((current) =>
+      checked
+        ? [...new Set([...current, id])]
+        : current.filter((value) => value !== id),
+    );
+  }
   function reset() {
     setCategory("");
     setQuery("");
     setPinned([]);
     setView("overview");
     setSelected(model.items[0]?.id ?? "");
+    setDetailOpen(false);
   }
   return (
     <section className="sp-block sp-evidence" aria-label={model.title}>
@@ -369,6 +485,21 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
                 </table>
                 {!comparison.length && <p>没有符合条件的条目。可重置视图。</p>}
               </div>
+            ) : model.layout === "timeline" ? (
+              <div className="sp-time-overview">
+                <EvidenceTimeline
+                  items={visible}
+                  scale={model.timeScale ?? "month"}
+                  selected={active?.id}
+                  detailId={uid}
+                  onSelect={(id) => {
+                    setSelected(id);
+                    setDetailOpen(true);
+                  }}
+                  pinned={pinned}
+                  onPin={pin}
+                />
+              </div>
             ) : (
               <div className="sp-overview">
                 <ol className="sp-index" aria-label="证据条目">
@@ -431,6 +562,24 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
               ))}
             </details>
           </div>
+          {model.layout === "timeline" && (
+            <dialog
+              id={uid}
+              ref={dialog}
+              className="sp-block sp-evidence-dialog"
+              onClose={() => setDetailOpen(false)}
+              aria-label="证据详情与来源"
+            >
+              <div className="sp-dialog-controls">
+                <button type="button" onClick={() => setDetailOpen(false)}>
+                  返回总览
+                </button>
+              </div>
+              {active && (
+                <EvidenceDetail item={active} dimensions={model.dimensions} />
+              )}
+            </dialog>
+          )}
           <div className="sp-print">
             {model.items.map((item) => (
               <EvidenceDetail

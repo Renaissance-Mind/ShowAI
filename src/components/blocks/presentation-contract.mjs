@@ -57,6 +57,16 @@ export function validatePresentationData(kind, data) {
       sources(frame.sources);
     }
   } else if (kind === "evidence-explorer") {
+    if (
+      data.layout !== undefined &&
+      !["list", "timeline"].includes(data.layout)
+    )
+      fail("layout must be list or timeline.");
+    if (
+      data.timeScale !== undefined &&
+      !["month", "year"].includes(data.timeScale)
+    )
+      fail("timeScale must be month or year.");
     const dimensionIds = items(data.dimensions, "dimensions", 8);
     for (const dimension of data.dimensions)
       string(dimension.label, "dimension.label");
@@ -67,6 +77,16 @@ export function validatePresentationData(kind, data) {
       if (item.date && !/^\d{4}-\d{2}(?:-\d{2})?$/.test(item.date))
         fail("date must be YYYY-MM or YYYY-MM-DD.");
       if (item.date) string(item.dateLabel, "item.dateLabel");
+      if (item.date) {
+        const date = new Date(
+          `${item.date.length === 7 ? item.date + "-01" : item.date}T00:00:00Z`,
+        );
+        if (
+          !Number.isFinite(date.getTime()) ||
+          date.toISOString().slice(0, item.date.length) !== item.date
+        )
+          fail("date must be a real calendar date.");
+      }
       if (
         !item.values ||
         typeof item.values !== "object" ||
@@ -94,4 +114,15 @@ export function selectEvidence(items, category = "", query = "") {
           .toLocaleLowerCase()
           .includes(needle)),
   );
+}
+
+export function evidenceTimeBuckets(items, scale = "month") {
+  const length = scale === "year" ? 4 : 7;
+  return [
+    ...new Set(
+      items
+        .filter((item) => item.date)
+        .map((item) => item.date.slice(0, length)),
+    ),
+  ].sort();
 }

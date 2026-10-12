@@ -1,4 +1,8 @@
 export function validatePresentationData(kind: string, data: unknown): void;
+export function evidenceTimeBuckets(
+  items: { date?: string }[],
+  scale?: "month" | "year",
+): string[];
 export function selectEvidence<
   T extends {
     id: string;

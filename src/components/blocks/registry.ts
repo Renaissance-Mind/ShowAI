@@ -414,18 +414,26 @@ for (const item of g2Metadata) {
   });
 }
 
-for (const [kind, renderer] of [
-  ["mechanism-steps", MechanismStepsBlock],
-  ["evidence-explorer", EvidenceExplorerBlock],
-] as const) {
-  const item = componentMetadata.find((item) => item.kind === kind)!;
-  registerBlock({
-    kind,
-    title: item.name,
-    description: item.description,
-    icon: "⇄",
-    defaultData: item.defaultData as BlockData,
-    renderer,
-    validate: (data) => validatePresentationData(kind, data),
-  });
-}
+// Keep literal registrations: the portable reader removes unused kinds and metadata together.
+registerBlock({
+  kind: "mechanism-steps",
+  title: "机制分镜",
+  description: "稳定对象的逐步变化与继承",
+  icon: "⇄",
+  defaultData: componentMetadata.find(
+    (item) => item.kind === "mechanism-steps",
+  )!.defaultData as BlockData,
+  renderer: MechanismStepsBlock,
+  validate: (data) => validatePresentationData("mechanism-steps", data),
+});
+registerBlock({
+  kind: "evidence-explorer",
+  title: "证据探索",
+  description: "主题、时间、来源与共同维度比较",
+  icon: "⇄",
+  defaultData: componentMetadata.find(
+    (item) => item.kind === "evidence-explorer",
+  )!.defaultData as BlockData,
+  renderer: EvidenceExplorerBlock,
+  validate: (data) => validatePresentationData("evidence-explorer", data),
+});

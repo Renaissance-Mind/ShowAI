@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import catalog from "../../../resources/catalog/components.json";
 import { MechanismStepsBlock, EvidenceExplorerBlock } from "./Presentation";
 import {
+  evidenceTimeBuckets,
   selectEvidence,
   validatePresentationData,
 } from "./presentation-contract.mjs";
@@ -87,4 +88,27 @@ describe("presentation reading contracts", () => {
       validatePresentationData(kind, sample(kind));
     }
   });
+});
+
+it("groups evidence by explicit time scale without inventing missing periods", () => {
+  const items = [
+    { date: "2026-10-12" },
+    { date: "2026-06" },
+    { date: "2025-03-01" },
+    {},
+  ];
+  expect(evidenceTimeBuckets(items, "month")).toEqual([
+    "2025-03",
+    "2026-06",
+    "2026-10",
+  ]);
+  expect(evidenceTimeBuckets(items, "year")).toEqual(["2025", "2026"]);
+});
+it("rejects impossible calendar dates before placing events on an axis", () => {
+  const data = sample("evidence-explorer");
+  data.items[0].date = "2026-02-30";
+  data.items[0].dateLabel = "发布";
+  expect(() => validatePresentationData("evidence-explorer", data)).toThrow(
+    /calendar date/,
+  );
 });

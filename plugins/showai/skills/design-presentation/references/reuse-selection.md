@@ -15,6 +15,8 @@
 | progress-report     | 理解当前状态与下一步 | 截止时间、变化、依据、风险及待决策事项   |
 | exploration-map     | 探索分类与关系       | 条目、属性、分类或关联、来源与检索方式   |
 
+新建复杂作品时，实际查询 `catalog_list({kind:"template",projectId})`，读取匹配项的 guide。匹配则在制作阶段用 template_apply 创建并填入本次内容；没有合适结构时记录具体缺口再从空白组装。目录查询与组件选择是不同操作，componentCatalog 不包含模板。
+
 先核对阅读任务、材料和交付环境，再检查认知深度、信息量和组织方式，最后调整样式。局部结构可以组合。缺少必需证据时保留缺项或缩小结论，避免为填满模板制造内容。
 
 当前模板以 document/composition、contentGuide、scenarios、related、examples 保存结构和说明；Agent 根据材料填写。没有自动变量绑定或跨组件联动的通用承诺。填写约定不是实际调研结果，成品交付前清除未完成的填写提示，真实缺项保留为明确的限制。
@@ -23,7 +25,7 @@
 
 - 对象与材料：image、gallery、video、pdf；局部热点是否可用，查具体组件。
 - 概念与关系：flowchart、mindmap；项目目录有 text-diagram 时按其 guide 使用。
-- 对照与证据：table、database、chart、适配数据类型的 G2 图表、references 和 bookmark。
+- 对照与证据：evidence-explorer 支持主题×时间总览、详情和共同维度比较；table、database、chart、适配数据类型的 G2 图表、references 和 bookmark。
 - 补充说明：text、toggle；关键条件进入主线。
 - 参数探索：playground 只支持它公开的有限计算，专题模型按各自假设使用。
 

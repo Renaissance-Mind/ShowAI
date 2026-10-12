@@ -23,7 +23,7 @@ description: 通过 ShowAI MCP 制作可交互的研究报告、讲解页面和�
 
 先取得或复用 project_context 的 componentCatalog，再调用 `guide({topic:"authoring"})`；构造容器时读 containers，内部正文时读 document。上下文尚未提供索引或目录变化时，用 `catalog_list({kind:"component",projectId})` 取得完整目录；选中后沿用返回的 scope/version/integrity 读取 guide 的内容组织、数据关系、交互与保存边界和示例；按需再取完整 schema/examples，准确区分同名组件。内容专用组件用于所属作品维护，专题组件遵守固定假设。修改实例数据不要求读取源码；模板复用页面结构，沿模板精确依赖读取组件说明。已有组件或组合足够时直接复用；存在明确的表达或交互缺口时进入 [create-component](../create-component/SKILL.md)。需要可复用模板时进入 [create-template](../create-template/SKILL.md)；应用已有模板则直接用 template_apply。
 
-普通报告保留一份 Page，用章节、区域和嵌套容器组织。用户要求网站或多个独立文档时才拆分页面。后续修改继续使用原 pageId。新页面用 page_create；修改前 page_read完整源数据，保留 hash、revision与稳定节点 ID，再用 page_apply或page_save。
+普通报告保留一份 Page，用章节、区域和嵌套容器组织。用户要求网站或多个独立文档时才拆分页面。后续修改继续使用原 pageId。新建复杂作品时先用 catalog_list 查询 template，并读取匹配模板的 guide；有匹配结构就通过 template_apply 建立本次 Page，再按分镜调整实际内容和布局。没有合适模板或用户指定从空白开始时才用 page_create。修改前 page_read完整源数据，保留 hash、revision与稳定节点 ID，再用 page_apply或page_save。
 
 ```json
 {
@@ -53,7 +53,7 @@ description: 通过 ShowAI MCP 制作可交互的研究报告、讲解页面和�
 
 页面创作、续改与模板应用遵循以下默认规则；用户明确指定特殊设计要求时按其要求执行。需要创建组件来承载页面内容时，把这些规则带入组件设计。
 
-- **标题直述主题。** 不用 slogan（口号）充当标题，不使用全大写英文标题，也不在 slogan 上方叠加一行标题。
+- **标题直述主题。** Page 已显示作品标题时，正文直接进入核心回答或首幅主图，不再插入同名 H1。 不用 slogan（口号）充当标题，不使用全大写英文标题，也不在 slogan 上方叠加一行标题。
 - **减少框形装饰。** 优先用留白、对齐、间距和分隔线组织内容；矩形与圆角矩形仅用于有明确意义的分组、图形表达或交互区域，避免给每段文字、每个要点套框。
 - **固定字体体系。** 除非有特殊要求，中文和英文分别选择一种固定字体，同一作品保持一致；通过字号、字重与间距建立层次。
 - **控制小字。** 排版前按阅读场景确定正文基准字号与最小字号。除极少量备注外，说明、标签及其他正文文字不小于正文基准字号；空间不足时调整布局或精简内容，不靠缩小文字塞入。

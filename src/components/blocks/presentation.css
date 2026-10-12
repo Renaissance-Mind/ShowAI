@@ -339,3 +339,99 @@
     grid-template-columns: repeat(2, 1fr) !important;
   }
 }
+
+.sp-timeline-wrap {
+  overflow: auto;
+  margin: 20px 0 28px;
+}
+.sp-block .sp-timeline {
+  min-width: 100%;
+  table-layout: fixed;
+}
+.sp-block .sp-timeline caption {
+  font-weight: 400;
+  color: #486570;
+}
+.sp-block .sp-timeline th,
+.sp-block .sp-timeline td {
+  min-width: 170px;
+  padding: 14px 12px;
+  border: 1px solid var(--sp-line);
+}
+.sp-block .sp-timeline th:first-child {
+  min-width: 120px;
+  width: 120px;
+}
+.sp-timeline-item + .sp-timeline-item {
+  border-top: 1px dashed var(--sp-line);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+.sp-timeline-item > button {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  width: 100%;
+  border: 0;
+  padding: 8px;
+  background: #f2f7f6;
+}
+.sp-timeline-item > button > span:last-child {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sp-event-dot {
+  display: inline-block;
+  flex: 0 0 9px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #167975;
+}
+.sp-timeline-item > button[aria-pressed="true"] .sp-event-dot {
+  background: #fff;
+}
+.sp-timeline-item .sp-pin {
+  padding: 8px 0;
+}
+.sp-time-overview > .sp-detail,
+.sp-time-overview > div > .sp-detail {
+  border-top: 2px solid var(--sp-accent);
+  padding-top: 22px;
+}
+.sp-block.sp-block h2 {
+  font-size: 28px;
+}
+.sp-block.sp-block h3 {
+  font-size: 23px;
+}
+.sp-block.sp-block h4 {
+  font-size: 20px;
+}
+.sp-time-overview {
+  display: block;
+}
+.sp-block.sp-evidence-dialog {
+  width: min(720px, calc(100vw - 36px));
+  max-height: 85vh;
+  padding: 24px;
+  border: 1px solid #8da9ad;
+  border-radius: 6px;
+  overflow: auto;
+  background: white;
+}
+.sp-evidence-dialog::backdrop {
+  background: #102a3d88;
+}
+.sp-dialog-controls {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 18px;
+}
+@media print {
+  .sp-evidence-dialog {
+    display: none !important;
+  }
+}

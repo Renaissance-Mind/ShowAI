@@ -8222,8 +8222,12 @@
     "development": {
       "entryPoints": [
         {
-          "path": "Presentation.tsx",
-          "purpose": "机制分镜与证据探索 React 组件。"
+          "path": "src/components/blocks/Presentation.tsx",
+          "purpose": "软件内置实现位置；source 视图返回 SDK 包装起点。"
+        },
+        {
+          "path": "index.tsx",
+          "purpose": "可编辑 SDK 包装入口，通过 showai:components 组合已有能力。"
         }
       ],
       "architecture": [
@@ -8248,6 +8252,7 @@
     "usage": {
       "purpose": "把主题总览、条目详情和共同维度比较连接起来，保留条件与来源。",
       "structure": [
+        "layout=timeline 时按主题×时间显示二维总览；选择事件打开详情，关闭后回到原位置；list 为列表与详情。",
         "研究报告按主题或日期定位事件、发现和证据。",
         "选择条目查看条件与来源，将指定条目按共同维度并排比较。"
       ],
@@ -8259,6 +8264,18 @@
         {
           "path": "items",
           "meaning": "真实条目，含结论、解释边界、维度值和来源；日期同时填写其含义。"
+        },
+        {
+          "path": "layout",
+          "meaning": "list（默认）或 timeline。时间调研推荐 timeline；它只表示报告收录的证据分布。"
+        },
+        {
+          "path": "timeScale",
+          "meaning": "month（默认）或 year；时间跨度大时选择 year。"
+        },
+        {
+          "path": "items[].label",
+          "meaning": "可选短标签；完整 title 与条件始终保留在详情及连续阅读中。"
         }
       ],
       "recipes": [
@@ -8286,12 +8303,18 @@
           "action": "重置视图、连续阅读全部条目",
           "effect": "恢复全部结果；静态阅读和打印保留所有证据与来源。",
           "persistence": "view"
+        },
+        {
+          "action": "时间总览中打开条目，Escape 或返回总览",
+          "effect": "在可见的详情窗口核对证据和边界，关闭时恢复焦点与阅读位置。",
+          "persistence": "view"
         }
       ],
       "constraints": [
         "按输入顺序展示；时间材料由作者按真实日期排序，日期与发布日期分别说明。",
         "比较仅保留共同口径；未提供值显示资料未提供。",
-        "已选比较项跨筛选保留，界面明确标注；重置清除选择。"
+        "已选比较项跨筛选保留，界面明确标注；重置清除选择。",
+        "时间总览空格只表示未收录，不能解释为没有事件或能力停滞；日期性质在详情中明确。"
       ],
       "editing": {
         "data": ["修改实例数据后经宿主页面保存。"],
@@ -8303,8 +8326,12 @@
     "development": {
       "entryPoints": [
         {
-          "path": "Presentation.tsx",
-          "purpose": "机制分镜与证据探索 React 组件。"
+          "path": "src/components/blocks/Presentation.tsx",
+          "purpose": "软件内置实现位置；source 视图返回 SDK 包装起点。"
+        },
+        {
+          "path": "index.tsx",
+          "purpose": "可编辑 SDK 包装入口，通过 showai:components 组合已有能力。"
         }
       ],
       "architecture": [
