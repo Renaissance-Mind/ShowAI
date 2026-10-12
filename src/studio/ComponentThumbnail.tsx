@@ -26,11 +26,36 @@ export default function ComponentThumbnail({
   theme: AppearanceTheme;
 }) {
   const container = useRef<HTMLDivElement>(null);
+  const frame = useRef<HTMLIFrameElement>(null);
+  const [frameState, setFrameState] = useState({
+    key: "",
+    ready: false,
+    error: "",
+  });
   const [visible, setVisible] = useState(false);
   const [image, setImage] = useState({ key: "", data: "" });
   const [error, setError] = useState("");
   const [scale, setScale] = useState(1);
   const key = JSON.stringify({ ...componentPreviewReference(item), theme });
+  useEffect(() => {
+    if (!browser || !visible) return;
+    setFrameState({ key, ready: false, error: "" });
+    const receive = (event: MessageEvent) => {
+      if (
+        event.source !== frame.current?.contentWindow ||
+        event.data?.type !== "showai:catalog-preview" ||
+        event.data.key !== key
+      )
+        return;
+      setFrameState({
+        key,
+        ready: event.data.ready === true,
+        error: String(event.data.error || ""),
+      });
+    };
+    window.addEventListener("message", receive);
+    return () => window.removeEventListener("message", receive);
+  }, [browser, visible, key]);
   useEffect(() => {
     if (!container.current) return;
     const observer = new IntersectionObserver(
@@ -77,12 +102,34 @@ export default function ComponentThumbnail({
       {image.key === key && image.data ? (
         <img src={image.data} alt="" draggable={false} />
       ) : visible && browser ? (
-        <iframe
-          title={`${item.name}缩略预览`}
-          src={previewUrl.href}
-          tabIndex={-1}
-          style={{ transform: `translate(-50%, -50%) scale(${scale})` }}
-        />
+        <>
+          <iframe
+            ref={frame}
+            title={`${item.name}缩略预览`}
+            src={previewUrl.href}
+            tabIndex={-1}
+            style={{
+              transform: `translate(-50%, -50%) scale(${scale})`,
+              opacity:
+                frameState.key === key && frameState.ready && !frameState.error
+                  ? 1
+                  : 0,
+            }}
+          />
+          {frameState.key === key && frameState.error ? (
+            <span className="component-preview-error" title={frameState.error}>
+              <ImageOff size={20} />
+              预览暂不可用
+            </span>
+          ) : (
+            !frameState.ready && (
+              <Loader2
+                size={18}
+                className="studio-spin component-preview-loading"
+              />
+            )
+          )}
+        </>
       ) : error ? (
         <span className="component-preview-error" title={error}>
           <ImageOff size={20} />

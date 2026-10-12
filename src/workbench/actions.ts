@@ -1030,6 +1030,7 @@ export function createWorkbench(
         return saveTemplate(
           store.root,
           {
+            bundle: args.bundle as SaveTemplateInput["bundle"],
             id: text(args, "id", true),
             version: text(args, "version", true),
             name: required(args, "name"),

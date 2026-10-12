@@ -281,29 +281,26 @@ export function ComponentCatalog({
                             <Code2 size={23} strokeWidth={1.6} />
                           )}
                         </span>
-                        <h3>
-                          {item.name}
-                          <span
-                            className="studio-tag"
-                            title="复用范围，与来源和权限分别判断"
-                          >
-                            {
-                              reuseLabels[
-                                item.documentation?.reuse.kind ?? "unclassified"
-                              ]
-                            }
-                          </span>
-                          <span
-                            className="studio-tag"
-                            title={!builtin ? item.projectName : undefined}
-                          >
-                            {showProjectNames && !builtin && item.projectName
-                              ? item.projectName
-                              : scope}
-                          </span>
-                        </h3>
+                        <h3>{item.name}</h3>
                       </div>
-                      <p>{item.description}</p>
+                      <div className="component-card-metadata">
+                        <span>
+                          {showProjectNames && !builtin && item.projectName
+                            ? item.projectName
+                            : scope}
+                        </span>
+                        {!builtin && <span>v{item.version}</span>}
+                        <span title="可复用的内容范围">
+                          {
+                            reuseLabels[
+                              item.documentation?.reuse.kind ?? "unclassified"
+                            ]
+                          }
+                        </span>
+                      </div>
+                      <p>
+                        {item.documentation?.usage.purpose || item.description}
+                      </p>
                     </div>
                   </button>
                 );

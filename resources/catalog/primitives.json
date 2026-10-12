@@ -394,7 +394,30 @@
           "type": "string"
         },
         "content": {
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 1000000
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "doc"
+                },
+                "content": {
+                  "type": "array",
+                  "maxItems": 12000,
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              },
+              "required": ["type", "content"],
+              "additionalProperties": false
+            }
+          ],
+          "description": "支持 doc JSON 富文本树，兼容 Markdown 字符串。编辑后保留文字格式和段落结构。"
         },
         "color": {
           "type": "string"
@@ -438,7 +461,7 @@
   {
     "kind": "toggle",
     "name": "折叠内容",
-    "description": "按需展开补充信息，正文支持 Markdown。",
+    "description": "按需展开补充信息，正文支持富文本和 Markdown 导入。",
     "scenarios": [
       "组织页面中的说明、补充内容和结构。",
       "在自定义组件中组合内容，并保存可复用的外观。"
@@ -460,7 +483,30 @@
           "type": "string"
         },
         "content": {
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 1000000
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "doc"
+                },
+                "content": {
+                  "type": "array",
+                  "maxItems": 12000,
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              },
+              "required": ["type", "content"],
+              "additionalProperties": false
+            }
+          ],
+          "description": "支持 doc JSON 富文本树，兼容 Markdown 字符串。编辑后保留文字格式和段落结构。"
         },
         "open": {
           "type": "boolean"

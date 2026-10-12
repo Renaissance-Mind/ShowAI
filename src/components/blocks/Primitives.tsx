@@ -217,7 +217,10 @@ export function CalloutBlock({ data, onChange, readOnly }: BlockProps) {
     >
       {text(data.title) && <strong>{text(data.title)}</strong>}
       <TextBlock
-        data={{ content: text(data.content), format: "markdown" }}
+        data={{
+          content: data.content,
+          format: typeof data.content === "string" ? "markdown" : "richtext",
+        }}
         readOnly={readOnly}
         onChange={
           onChange
@@ -237,7 +240,10 @@ export function ToggleBlock({ data, onChange, readOnly }: BlockProps) {
     >
       <summary>{text(data.summary) || "展开内容"}</summary>
       <TextBlock
-        data={{ content: text(data.content), format: "markdown" }}
+        data={{
+          content: data.content,
+          format: typeof data.content === "string" ? "markdown" : "richtext",
+        }}
         readOnly={readOnly}
         onChange={
           onChange

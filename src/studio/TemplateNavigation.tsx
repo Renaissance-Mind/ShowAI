@@ -10,6 +10,7 @@ const types = [
   { id: "procedure-guide", label: "操作排查", icon: FileText },
   { id: "progress-report", label: "进展汇报", icon: FileText },
   { id: "exploration-map", label: "资料探索", icon: LayoutTemplate },
+  { id: "system-presentation", label: "基础指南", icon: FileText },
   { id: "blank", label: "空白", icon: FileText },
   { id: "research", label: "调研", icon: FlaskConical },
   { id: "comparison", label: "对比", icon: Columns3 },

@@ -107,6 +107,10 @@ import TemplateNavigation, {
   matchesTemplateType,
   type TemplateType,
 } from "./TemplateNavigation";
+import {
+  latestTemplateVersions,
+  templateHasPage,
+} from "./template-catalog-model";
 import RecentPages, { recentPages } from "./RecentPages";
 import AutoHideSidebar from "./AutoHideSidebar";
 import WorkspaceTabs, { WorkspaceHistory } from "./WorkspaceTabs";
@@ -335,6 +339,7 @@ export default function Studio() {
     new URLSearchParams(location.search).has("invite") ? "sync" : "general",
   );
   const [templates, setTemplates] = useState<TemplateMetadata[]>([]);
+  const [showTemplateVersions, setShowTemplateVersions] = useState(false);
   const [templateType, setTemplateType] = useState<TemplateType>("all");
   const [catalog, setCatalog] = useState<Catalog>({ builtin: [], custom: [] });
   const [catalogScope, setCatalogScope] =
@@ -1558,7 +1563,10 @@ export default function Studio() {
     () => recentPages(projects, contents),
     [projects, contents],
   );
-  const visibleTemplates = templates.filter((item) =>
+  const catalogTemplates = showTemplateVersions
+    ? templates
+    : latestTemplateVersions(templates);
+  const visibleTemplates = catalogTemplates.filter((item) =>
     matchesTemplateType(item, templateType),
   );
   const folderIds = new Set(folders.map((item) => item.id));
@@ -1843,7 +1851,7 @@ export default function Studio() {
         />
       ) : view === "templates" ? (
         <TemplateNavigation
-          templates={templates}
+          templates={catalogTemplates}
           active={templateType}
           onSelect={(type) => {
             setTemplateType(type);
@@ -2507,6 +2515,16 @@ export default function Studio() {
                   className={`studio-library${view === "components" ? " studio-component-library" : ""}`}
                 >
                   {view === "components" && (
+                    <div className="catalog-library-intro">
+                      <div>
+                        <h2>为内容选择合适的表达</h2>
+                        <p>
+                          点击组件查看示例与使用说明；打开页面后可插入所选示例。
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {view === "components" && (
                     <nav
                       className="studio-filter-tabs component-source-tabs"
                       aria-label="组件来源"
@@ -2514,7 +2532,7 @@ export default function Studio() {
                       {(
                         [
                           ["all", "全部"],
-                          ["builtin", "默认"],
+                          ["builtin", "内置"],
                           ["custom", "自定义"],
                         ] as const
                       ).map(([filter, label]) => (
@@ -2539,7 +2557,7 @@ export default function Studio() {
                   {view === "templates" && (
                     <div className="studio-library-toolbar catalog-scope-controls">
                       <label>
-                        定制项目
+                        保存到项目
                         <select
                           aria-label="目录项目"
                           value={selectedProject ?? ""}
@@ -2706,14 +2724,37 @@ export default function Studio() {
                   )}
                   {view === "templates" && (
                     <>
+                      <div className="catalog-library-intro">
+                        <div>
+                          <h2>选择内容的组织方式</h2>
+                          <p>
+                            查看适用场景、阶段指南与页面起点，再保存到项目。
+                          </p>
+                        </div>
+                        <label className="catalog-version-toggle">
+                          <input
+                            type="checkbox"
+                            checked={showTemplateVersions}
+                            onChange={(event) =>
+                              setShowTemplateVersions(event.target.checked)
+                            }
+                          />
+                          显示所有版本
+                        </label>
+                      </div>
+                      {!selectedProject && (
+                        <p className="catalog-context-hint">
+                          在上方选择项目后，可创建页面和保存定制模板。
+                        </p>
+                      )}
                       <div className="studio-template-grid">
-                        {visibleTemplates.map((item, index) => (
+                        {visibleTemplates.map((item) => (
                           <div
                             className="studio-template-card"
-                            key={`${item.scope}:${item.id}:${item.version}`}
+                            key={`${item.scope}:${item.id}:${item.version}:${item.integrity}`}
                           >
                             <button
-                              className={`studio-template-art art-${index % 4}`}
+                              className="studio-template-art"
                               aria-label={`查看模板 ${item.name} ${item.version} ${item.scope}`}
                               onClick={action(async () => {
                                 const record =
@@ -2721,6 +2762,9 @@ export default function Studio() {
                                     "templates:get",
                                     {
                                       id: item.id,
+                                      version: item.version,
+                                      scope: item.scope,
+                                      integrity: item.integrity,
                                       ...(selectedProject
                                         ? { projectId: selectedProject }
                                         : {}),
@@ -2733,30 +2777,56 @@ export default function Studio() {
                                 });
                               })}
                             >
-                              <div className="template-sheet">
-                                <i />
-                                <i />
-                                <i />
-                                <div />
-                                <i />
-                                <i />
-                              </div>
+                              <span className="template-card-kind">
+                                <LayoutTemplate size={19} />
+                                {item.workflow
+                                  ? item.id === "system-presentation"
+                                    ? "基础指南"
+                                    : "阶段指南 + 页面起点"
+                                  : "页面布局"}
+                              </span>
+                              <h2 className="template-card-title">
+                                {item.name}
+                              </h2>
+                              <span className="template-card-version">
+                                v{item.version}
+                              </span>
+                              <span className="template-card-open">
+                                查看说明{item.workflow ? "与指南" : "与预览"}
+                                <ArrowUpRight size={14} />
+                              </span>
                             </button>
                             <div className="studio-template-info">
                               <div>
-                                <h2>{item.name}</h2>
+                                <span className="template-card-scenario">
+                                  适用场景
+                                </span>
                                 <Scope value={item.scope} />
                               </div>
-                              <p>{item.description}</p>
+                              <p>{item.scenarios[0] || item.description}</p>
                               <button
                                 className="studio-text-button"
-                                disabled={!selectedProject}
+                                disabled={
+                                  !selectedProject ||
+                                  !templateHasPage(item) ||
+                                  busy
+                                }
+                                title={
+                                  !templateHasPage(item)
+                                    ? "基础指南用于指导页面制作"
+                                    : !selectedProject
+                                      ? "请先在上方选择保存到的项目"
+                                      : undefined
+                                }
                                 onClick={() => void createPage(item.id, item)}
                               >
-                                使用模板
+                                {templateHasPage(item)
+                                  ? "创建页面"
+                                  : "基础指南"}
                                 <ArrowUpRight size={14} />
                               </button>
-                              {page.draft &&
+                              {templateHasPage(item) &&
+                                page.draft &&
                                 page.projectId === selectedProject && (
                                   <button
                                     className="studio-text-button"
@@ -3357,11 +3427,11 @@ export default function Studio() {
                 </div>
                 <ArrowUpRight size={16} />
               </button>
-              {dialog.templates
-                .filter((item) => item.id !== "blank")
+              {latestTemplateVersions(dialog.templates)
+                .filter((item) => item.id !== "blank" && templateHasPage(item))
                 .map((item) => (
                   <button
-                    key={`${item.scope}:${item.id}:${item.version}`}
+                    key={`${item.scope}:${item.id}:${item.version}:${item.integrity}`}
                     disabled={busy}
                     onClick={() => void createPage(item.id, item)}
                   >

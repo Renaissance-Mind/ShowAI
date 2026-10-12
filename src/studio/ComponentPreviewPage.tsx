@@ -17,6 +17,18 @@ export default function ComponentPreviewPage() {
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
   const native = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (window.parent === window) return;
+    window.parent.postMessage(
+      {
+        type: "showai:catalog-preview",
+        key: new URLSearchParams(location.search).get("componentPreview"),
+        ready,
+        error,
+      },
+      location.origin,
+    );
+  }, [ready, error]);
   useLayoutEffect(() => {
     const args = JSON.parse(
       new URLSearchParams(location.search).get("componentPreview")!,
@@ -124,7 +136,12 @@ export default function ComponentPreviewPage() {
       if (receive) window.removeEventListener("message", receive);
     };
   }, [component]);
-  const example = component?.examples[0]?.data ?? component?.defaultData ?? {};
+  const example =
+    component && "kind" in component && component.kind === "text"
+      ? (component.examples[1]?.data ??
+        component.examples[0]?.data ??
+        component.defaultData)
+      : (component?.examples[0]?.data ?? component?.defaultData ?? {});
   const data =
     component && "kind" in component && component.kind === "flowchart"
       ? { ...example, height: 360 }

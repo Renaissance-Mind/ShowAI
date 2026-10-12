@@ -230,3 +230,53 @@
   cursor: pointer;
   font-weight: 600;
 }
+
+.component-catalog .studio-component-card {
+  border-color: var(--line);
+  border-radius: 12px;
+}
+.component-card-copy {
+  padding: 18px;
+}
+.component-card-identity {
+  margin-top: 0;
+  align-items: center;
+  gap: 10px;
+}
+.component-card-identity .studio-component-symbol {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.component-card-identity .studio-component-symbol svg {
+  width: 20px;
+  height: 20px;
+}
+.component-card-identity h3 {
+  padding: 0;
+  min-height: 0;
+}
+.component-card-metadata {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 7px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.component-card-metadata > span + span {
+  border-left: 1px solid var(--line);
+  padding-left: 10px;
+}
+.component-catalog .studio-component-card p {
+  font-size: 13px;
+  margin-top: 12px;
+  min-height: 44px;
+}
+.component-catalog .studio-component-card:focus-visible {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 3px;
+}

@@ -37,10 +37,9 @@ export function validatePrimitiveData(kind, data) {
     )
       throw new Error("不支持此图像裁切方式。");
   }
-  if (
-    ["callout", "toggle", "code"].includes(kind) &&
-    typeof data.content !== "string"
-  )
+  if (["callout", "toggle"].includes(kind))
+    validateRichTextData({ content: data.content });
+  if (kind === "code" && typeof data.content !== "string")
     throw new Error("组件需要文字内容。");
   if (kind === "table") {
     if (
