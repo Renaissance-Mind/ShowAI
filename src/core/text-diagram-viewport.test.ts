@@ -104,9 +104,30 @@ it("runs the compiled viewport in a real saved Page and retains view state acros
       ],
     });
     const html = await buildPageHtml(page.document, undefined, [component]);
-    server.on("request", (_request, response) => {
+    let another = await store.createPage(project.id, {
+      title: "Another diagram",
+    });
+    const anotherWidget = structuredClone(
+      page.document.content.content!.find((node) => node.type === "widget")!,
+    );
+    anotherWidget.attrs!.id = "another-diagram";
+    another = await store.applyPage(project.id, another.document.id, {
+      baseHash: another.hash,
+      baseRevision: another.revision,
+      operations: [
+        {
+          type: "block.insert",
+          parentId: another.document.content.attrs!.id,
+          node: anotherWidget,
+        },
+      ],
+    });
+    const anotherHtml = await buildPageHtml(another.document, undefined, [
+      component,
+    ]);
+    server.on("request", (request, response) => {
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      response.end(html);
+      response.end(request.url === "/another" ? anotherHtml : html);
     });
     await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
     const address = server.address();
@@ -125,6 +146,11 @@ it("runs the compiled viewport in a real saved Page and retains view state acros
       .frames()
       .find((candidate) => candidate !== tab.mainFrame())!;
     await frame.locator("svg").waitFor();
+    expect(
+      await frame
+        .getByRole("button", { name: "解锁图形", exact: true })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
     await expect
       .poll(
         async () =>
@@ -145,6 +171,42 @@ it("runs the compiled viewport in a real saved Page and retains view state acros
     expect(enlarged.top).toBeGreaterThan(0);
     expect(enlarged.rootWidth).toBe(initial.rootWidth);
     const viewport = frame.locator(".sd-viewport");
+    const lockedBox = (await viewport.boundingBox())!;
+    await tab.mouse.move(
+      lockedBox.x + lockedBox.width / 2,
+      lockedBox.y + lockedBox.height / 2,
+    );
+    await tab.mouse.down();
+    await tab.mouse.move(
+      lockedBox.x + lockedBox.width / 2 - 80,
+      lockedBox.y + lockedBox.height / 2 - 60,
+      { steps: 5 },
+    );
+    await tab.mouse.up();
+    expect((await geometry(frame)).left).toBe(enlarged.left);
+    expect((await geometry(frame)).top).toBe(enlarged.top);
+    await tab.keyboard.down("Control");
+    await tab.mouse.wheel(0, -100);
+    await tab.keyboard.up("Control");
+    await frame.evaluate(
+      () =>
+        new Promise<void>((done) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => done())),
+        ),
+    );
+    expect((await geometry(frame)).scale).toBeCloseTo(enlarged.scale, 2);
+    await tab.mouse.wheel(0, 100);
+    await expect
+      .poll(async () => (await geometry(frame)).top)
+      .toBeGreaterThan(enlarged.top);
+    await frame.getByRole("button", { name: "解锁图形", exact: true }).click();
+    await expect
+      .poll(() =>
+        frame
+          .getByRole("button", { name: "锁定图形", exact: true })
+          .getAttribute("aria-pressed"),
+      )
+      .toBe("false");
     await viewport.focus();
     await viewport.press("ArrowRight");
     expect((await geometry(frame)).left).toBeGreaterThan(enlarged.left);
@@ -236,11 +298,63 @@ it("runs the compiled viewport in a real saved Page and retains view state acros
     expect(await frame.getByRole("button", { name: "编辑图形" }).count()).toBe(
       0,
     );
+    const beforeLock = await geometry(frame);
+    await frame.getByRole("button", { name: "锁定图形", exact: true }).click();
+    await expect
+      .poll(() =>
+        frame
+          .getByRole("button", { name: "解锁图形", exact: true })
+          .getAttribute("aria-pressed"),
+      )
+      .toBe("true");
+    expect((await geometry(frame)).scale).toBeCloseTo(beforeLock.scale, 2);
+    await frame.getByRole("button", { name: "解锁图形", exact: true }).click();
+    await expect
+      .poll(() =>
+        frame
+          .getByRole("button", { name: "锁定图形", exact: true })
+          .getAttribute("aria-pressed"),
+      )
+      .toBe("false");
+    await tab.reload();
+    await tab.locator("iframe").waitFor();
+    const restored = tab
+      .frames()
+      .find((candidate) => candidate !== tab.mainFrame())!;
+    await expect
+      .poll(() =>
+        restored
+          .getByRole("button", { name: "锁定图形", exact: true })
+          .getAttribute("aria-pressed"),
+      )
+      .toBe("false");
+    expect((await store.readPage(project.id, page.document.id)).hash).toBe(
+      contentBefore.hash,
+    );
+    const anotherTab = await browser.newPage();
+    await anotherTab.goto(`http://127.0.0.1:${address.port}/another`);
+    await anotherTab.locator("iframe").waitFor();
+    const anotherFrame = anotherTab
+      .frames()
+      .find((candidate) => candidate !== anotherTab.mainFrame())!;
+    await expect
+      .poll(() =>
+        anotherFrame
+          .getByRole("button", { name: "解锁图形", exact: true })
+          .getAttribute("aria-pressed"),
+      )
+      .toBe("true");
+    expect(
+      await restored
+        .getByRole("button", { name: "锁定图形", exact: true })
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
     await tab.emulateMedia({ media: "print" });
     await expect
       .poll(
         async () =>
-          (await geometry(frame)).scrollHeight - (await geometry(frame)).height,
+          (await geometry(restored)).scrollHeight -
+          (await geometry(restored)).height,
       )
       .toBeLessThanOrEqual(1);
   } finally {

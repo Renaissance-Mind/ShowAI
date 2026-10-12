@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { inspect, renderDiagram, syntax, type DiagramData } from "./engine.js";
 import { diagramSize, useDiagramViewport } from "./viewport";
+import { useReadingLock } from "./reading-lock";
 import "./style.css";
 import "./diagram.css";
 
@@ -36,11 +37,13 @@ export default function TextDiagram({
   const [sourceOpen, setSourceOpen] = useState(false);
   const editButton = useRef<HTMLButtonElement>(null);
   const current = draft ?? data;
+  const lock = useReadingLock();
   const output = useMemo(() => preview(current, `sd-${uid}`), [current, uid]);
   const size = diagramSize(output.html);
   const viewport = useDiagramViewport(
     size,
     `${current.type}:${current.direction}:${current.source}:${!!output.error}`,
+    lock.locked,
   );
   const dataIdentity = JSON.stringify(data);
   useEffect(() => {
@@ -54,13 +57,33 @@ export default function TextDiagram({
     editButton.current?.focus();
   }
   return (
-    <section className="sd-diagram" aria-label={data.title || "文本关系图"}>
+    <section
+      ref={lock.ref}
+      className="sd-diagram"
+      aria-label={data.title || "文本关系图"}
+      data-viewport-lock-scope="text-diagram"
+      data-viewport-locked={lock.locked}
+    >
       <header className="sd-header">
         <div>
           <h3>{current.title || "文本关系图"}</h3>
           {current.description && <p>{current.description}</p>}
         </div>
         <div className="sd-controls" role="group" aria-label="图形操作">
+          <button
+            type="button"
+            aria-label={`${lock.locked ? "解锁" : "锁定"}图形`}
+            aria-pressed={lock.locked}
+            title={
+              lock.error ||
+              (lock.locked
+                ? "解锁图形：允许拖动和滚轮缩放"
+                : "锁定图形：保持视图，正常滚动阅读")
+            }
+            onClick={lock.toggle}
+          >
+            {lock.locked ? "解锁" : "锁定"}
+          </button>
           <button
             type="button"
             aria-label="缩小"
@@ -106,6 +129,11 @@ export default function TextDiagram({
           )}
         </div>
       </header>
+      {lock.error && (
+        <p className="sd-warning" role="alert">
+          {lock.error}
+        </p>
+      )}
       {draft && editing && (
         <form
           className="sd-editor"
@@ -240,7 +268,11 @@ export default function TextDiagram({
             {...viewport.handlers}
             tabIndex={0}
             role="region"
-            aria-label="图形，可拖动或用方向键平移，按加减缩放，Home 适应宽度"
+            aria-label={
+              lock.locked
+                ? "图形已锁定，可滚动阅读或使用缩放按钮"
+                : "图形，可拖动或用方向键平移，按加减缩放，Home 适应宽度"
+            }
           >
             {output.html ? (
               <div

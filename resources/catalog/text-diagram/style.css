@@ -94,6 +94,12 @@
 .sd-viewport.is-dragging {
   cursor: grabbing;
 }
+.sd-diagram[data-viewport-locked="true"] .sd-viewport {
+  cursor: auto;
+  touch-action: pan-x pan-y;
+  overscroll-behavior: auto;
+  user-select: auto;
+}
 .sd-drawing {
   margin: 0 auto;
   max-width: none;

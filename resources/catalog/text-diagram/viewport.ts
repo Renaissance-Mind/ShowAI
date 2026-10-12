@@ -32,6 +32,7 @@ export function zoomScroll(
 export function useDiagramViewport(
   size: { width: number; height: number },
   identity: string,
+  locked = false,
 ) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -49,8 +50,8 @@ export function useDiagramViewport(
     top: number;
     ratio: number;
   } | null>(null);
-  const latest = useRef({ scale, fit, size });
-  latest.current = { scale, fit, size };
+  const latest = useRef({ scale, fit, size, locked });
+  latest.current = { scale, fit, size, locked };
 
   useLayoutEffect(() => {
     const element = ref.current;
@@ -110,6 +111,7 @@ export function useDiagramViewport(
     const element = ref.current;
     if (!element) return;
     const wheel = (event: WheelEvent) => {
+      if (latest.current.locked) return;
       if (!event.ctrlKey && !event.metaKey) return;
       event.preventDefault();
       event.stopPropagation();
@@ -142,7 +144,11 @@ export function useDiagramViewport(
     window.addEventListener("blur", stopDrag);
     return () => window.removeEventListener("blur", stopDrag);
   }, []);
+  useLayoutEffect(() => {
+    if (locked) stopDrag();
+  }, [locked]);
   function pointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (latest.current.locked) return;
     if (event.button !== 0 || !event.isPrimary || !ref.current) return;
     const element = ref.current;
     if (
@@ -174,6 +180,7 @@ export function useDiagramViewport(
   }
   function keyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.target !== event.currentTarget) return;
+    if (latest.current.locked) return;
     const element = ref.current!;
     const directions: Record<string, [number, number]> = {
       ArrowLeft: [-60, 0],
