@@ -84,12 +84,20 @@
 }
 .sd-viewport {
   overflow: auto;
-  max-height: 850px;
-  padding: 24px 8px;
+  width: 100%;
+  padding: 16px;
   overscroll-behavior: contain;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+.sd-viewport.is-dragging {
+  cursor: grabbing;
 }
 .sd-drawing {
-  margin: auto;
+  margin: 0 auto;
+  max-width: none;
+  flex-shrink: 0;
 }
 .sd-diagram .am-diagram {
   overflow: visible;
@@ -219,10 +227,12 @@
   }
   .sd-viewport {
     max-height: none;
+    height: auto !important;
     overflow: visible;
   }
   .sd-drawing {
     width: 100% !important;
     min-width: 0 !important;
+    height: auto !important;
   }
 }

@@ -1,4 +1,4 @@
-.sd-diagram .am-diagram { margin: 0; overflow-x: auto; text-align: center; }
+.sd-diagram .am-diagram { margin: 0; overflow: visible; text-align: center; }
 /* Embedded previews can lose html[data-theme]; the fallbacks keep diagrams readable, and defined theme variables still win. */
 .sd-diagram .am-diagram svg { max-width: 100%; height: auto; font-family: var(--font-sans, sans-serif); }
 .sd-diagram .am-diagram text { fill: var(--ink, #16181d); font-size: 13px; }
