@@ -65,9 +65,6 @@ export default function ComponentParameterSummary({
   return (
     <section className="catalog-parameter-summary">
       <h3>输入与参数</h3>
-      <p>
-        查看每项数据的用途和默认值。修改组件定义时，可以展开下方的高级编辑。
-      </p>
       {names.length ? (
         <div className="catalog-parameter-table">
           <table>

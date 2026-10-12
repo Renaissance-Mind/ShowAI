@@ -596,19 +596,6 @@ export function TemplateDialog({
                     <RelatedList items={record.related} />
                   </ReferenceSection>
                 )}
-                {bundle && (
-                  <ReferenceSection title="阶段指南" icon="content">
-                    <p>
-                      按读者目标、证据材料、理解路径、视觉设计、页面制作和检查完善组织内容。
-                    </p>
-                    <button
-                      className="studio-text-button"
-                      onClick={() => setTab("guides")}
-                    >
-                      阅读阶段指南 <span aria-hidden="true">↗</span>
-                    </button>
-                  </ReferenceSection>
-                )}
               </aside>
               <section
                 className="catalog-live-example"
@@ -886,9 +873,6 @@ export function TemplateDialog({
             {record.bundle && (
               <section>
                 <h3>定制阶段指南</h3>
-                <p className="studio-caption">
-                  修改对应阶段的说明后，与页面布局一起保存为项目新版本。
-                </p>
                 <TemplateWorkflowView
                   bundle={record.bundle}
                   files={bundleFiles}
@@ -1139,9 +1123,6 @@ export function TemplateDialog({
           </p>
         )}
         <footer>
-          {!projectId && !systemTemplate && (
-            <span>在模板列表上方选择保存到的项目后，可保存定制版本。</span>
-          )}
           {record.scope === "project" && !!record.integrity && (
             <button
               className="studio-button"
@@ -1481,7 +1462,6 @@ export function ComponentDialog({
                     <Monitor size={17} />
                     实时示例
                   </h3>
-                  <span>可直接体验</span>
                 </header>
                 {examples.length > 0 && (
                   <label className="studio-example-picker">
@@ -1682,12 +1662,6 @@ export function ComponentDialog({
           </p>
         )}
         <footer>
-          {!canInsert && (
-            <span>打开项目中的页面后，可将当前示例插入页面。</span>
-          )}
-          {source && !projectId && (tab === "code" || tab === "schema") && (
-            <span>在组件列表上方选择项目后，可保存定制版本。</span>
-          )}
           {!source && custom && (
             <span>此副本只有运行代码；编辑需要原始源码。</span>
           )}
