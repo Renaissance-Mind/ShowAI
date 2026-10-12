@@ -5,7 +5,7 @@ description: 梳理读者意图、证据需求与多级理解路径，规划内�
 
 # 规划呈现
 
-完整作品沿 [show-document](../show-document/SKILL.md) 的系统基线。只做规划时读取 guide({topic:"presentation"}) 的必读基线；已读本轮相同内容可复用。连接与归属不明才读 [use-showai](../use-showai/SKILL.md)。
+系统基线可来自已读的 [show-document](../show-document/SKILL.md)、template_context.system.readme 或 guide({topic:"presentation"})；本轮已持有同版基线时直接复用，不再重复读取。连接与归属不明才读 [use-showai](../use-showai/SKILL.md)。
 
 取得或复用 template_context 的固定模板引用，按需要读取当前 intent、evidence、understanding 阶段；不要为局部规划把后三阶段也一次读入。用户已提供材料足够时复用，领域采集方法按任务选择。区分明确要求、合理假设和未知条件；有影响的误解用可核实例子解释，再推进原任务。
 

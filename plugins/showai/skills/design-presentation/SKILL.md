@@ -5,7 +5,7 @@ description: 把理解规划转成具体视觉与交互设计，决定对象、�
 
 # 设计表达
 
-沿 [show-document](../show-document/SKILL.md) 的系统基线；独立设计入口先读 guide({topic:"presentation"})，本轮已有相同基线可复用。缺少会改变结构的规划时补 [plan-presentation](../plan-presentation/SKILL.md) 的相关部分，不重做整篇。
+系统基线可来自已读的 [show-document](../show-document/SKILL.md)、template_context.system.readme 或 guide({topic:"presentation"})；本轮已持有同版基线时直接复用，不再重复读取。缺少会改变结构的规划时补 [plan-presentation](../plan-presentation/SKILL.md) 的相关部分，不重做整篇。
 
 取得或复用 template_context 与固定引用，读当前 design 阶段。用户要求空白时两处都传 templates:[]，覆盖会话默认模板，沿系统基线设计。先形成符合内容关系的表达候选，再按 [复用选择](references/reuse-selection.md) 查询模板元信息和实际组件能力。组件/模板本轮精确版本已读的 guide 可复用；修改实现才读源码。阶段文件夹先读其 README，必要时用 template_guide 的 templateId/file 取该阶段子文件，不把所有文件默认展开。
 

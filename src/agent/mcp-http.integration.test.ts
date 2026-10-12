@@ -358,16 +358,20 @@ test("a text-only remote client writes the same synchronized page seen by the de
     arguments: {
       projectId,
       pageId: record.document.id,
+      response: "receipt",
       document: { ...initial.document, title: "Stale replacement" },
       baseHash: initial.hash,
       baseRevision: initial.revision,
     },
   });
   const retained = data(stale) as {
-    document: { id: string };
+    pageId: string;
     retainedSyncConflicts: { variants: { pageId: string; title: string }[] }[];
   };
-  expect(retained.document.id).not.toBe(record.document.id);
+  expect(retained.pageId).not.toBe(record.document.id);
+  expect(stale.structuredContent).toMatchObject({
+    synchronization: { state: "synced", projectId },
+  });
   expect(retained.retainedSyncConflicts[0].variants).toHaveLength(2);
   expect(
     retained.retainedSyncConflicts[0].variants.some((v) =>

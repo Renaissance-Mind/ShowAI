@@ -31,6 +31,11 @@ export function compactMcpResult(
     "capturedAt",
     "image",
     "metadataPath",
+    "workspaceConflicts",
+    "retainedSyncConflicts",
+    "synchronization",
+    "persistence",
+    "delivery",
   ];
   const selected = Object.fromEntries(
     fields.filter((key) => key in record).map((key) => [key, record[key]]),
@@ -42,6 +47,7 @@ export function compactMcpResult(
   ) {
     const document = record.document as Record<string, unknown>;
     selected.pageId ??= document.id;
+    selected.title ??= document.title;
     if (profile === "source") selected.document = document;
   }
   selected.response = profile;

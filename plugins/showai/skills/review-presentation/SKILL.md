@@ -5,7 +5,7 @@ description: 评审页面、报告或设计是否支持读者任务，定位证�
 
 # 评审呈现
 
-取得目标、认知起点、环境和完整作品。只读请求保持只读；用户要求修改时完成连贯修订。沿 [show-document](../show-document/SKILL.md) 的系统基线，独立入口先读 guide presentation；本轮已读的有效规则复用。已知连接与身份时直接读当前 Page/hash/revision，不重复发现。
+取得目标、认知起点、环境和完整作品。只读请求保持只读；用户要求修改时完成连贯修订。系统基线可来自已读的 [show-document](../show-document/SKILL.md)、template_context.system.readme 或 guide presentation；本轮已持有同版基线时直接复用，不再重复读取。已知连接与身份时直接读当前 Page/hash/revision，不重复发现。
 
 从 Page.templateContext 或本轮记录恢复精确模板引用，读取 review 阶段。没有前置规划时说明无法证明历史设计对应，不事后补写并冒充原规划。按 [评审标准](references/review-criteria.md) 检查真实内容与操作，设计稿检查设计，成品才执行对应界面路径。
 

@@ -5,7 +5,7 @@ description: 创建、修改或提炼可复用的模板文件夹，包含严格 
 
 # 创建模板包
 
-沿 [show-document](../show-document/SKILL.md) 的系统基线，明确重复的读者任务、输入材料、产出和通过条件。用户有成熟实例或具体视觉参考时先验证实例再提炼；结构已明确时直接创建。沿当前模板阶段继续，避免把所有指南重复加载。只询问会改变结构的缺项，信息充分时完成可使用的包及真实应用验证。
+沿 [show-document](../show-document/SKILL.md) 的系统基线，明确重复的读者任务、输入材料、产出和通过条件。用户有成熟实例或具体视觉参考时先验证实例，再按 [实例提炼](references/template-abstraction.md) 创建；结构已明确时按 [直接创建](references/template-creation.md) 继续。沿当前模板阶段继续，避免把所有指南重复加载。只询问会改变结构的缺项，信息充分时完成可使用的包及真实应用验证。
 
 先读 guide({topic:"templates"}) 的当前格式。新模板采用一个文件夹：README.md 的严格 JSON frontmatter＋简短基础说明；guides/ 的六阶段 Markdown 或阶段子目录；components/ 的可选自定义组件包；可选 page.json 骨架。scenarios 等元信息只在目录层披露，具体阶段只读对应指南。新模板不作为六个全局 skill 安装。
 
