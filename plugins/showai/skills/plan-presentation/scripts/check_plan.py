@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""Check saved presentation-plan coverage; this is not a quality score."""
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+
+def check(plan):
+    errors, nodes, scenes, covered = [], {}, {}, set()
+
+    def need(record, keys, label):
+        if not isinstance(record, dict):
+            errors.append(f"{label}: expected an object")
+            return False
+        for key in keys:
+            if not isinstance(record.get(key), str) or not record[key].strip():
+                errors.append(f"{label}.{key}: required text")
+        return True
+
+    if not need(plan, ["reader", "startingKnowledge", "goal", "cutoff"], "plan"):
+        return {"ok": False, "errors": errors}
+    environment = plan.get("environment", {})
+    for key in ["width", "height"]:
+        if not isinstance(environment.get(key), int) or environment[key] <= 0:
+            errors.append(f"environment.{key}: positive CSS viewport size required")
+    if not isinstance(environment.get("interactive"), bool):
+        errors.append("environment.interactive: boolean required")
+
+    def walk(branches, depth=1):
+        if not isinstance(branches, list):
+            errors.append("nodes/children must be arrays")
+            return
+        for node in branches:
+            if not need(node, ["id", "task", "answer", "check"], "node"):
+                continue
+            key = node.get("id")
+            if not isinstance(key, str):
+                continue
+            if key in nodes:
+                errors.append(f"duplicate node: {key}")
+            nodes[key] = (node, depth)
+            if not isinstance(node.get("needs", []), list):
+                errors.append(f"{key}.needs must be an array of prerequisite ids")
+            children = node.get("children", [])
+            if not children:
+                need(node, ["explanation"], key)
+            walk(children, depth + 1)
+
+    walk(plan.get("nodes", []))
+    if not nodes:
+        errors.append("no understanding nodes")
+    raw_scenes = plan.get("scenes", [])
+    if not isinstance(raw_scenes, list):
+        errors.append("scenes must be an array")
+        raw_scenes = []
+    for scene in raw_scenes:
+        if not need(scene, ["id", "form", "composition", "visualReason", "static", "narrow", "check"], "scene"):
+            continue
+        key = scene.get("id")
+        if not isinstance(key, str):
+            continue
+        if key in scenes:
+            errors.append(f"duplicate scene: {key}")
+        scenes[key] = scene
+        links = scene.get("nodes", [])
+        if not isinstance(links, list) or not links:
+            errors.append(f"{key}: link the understanding nodes explained here")
+            continue
+        for link in links:
+            if not isinstance(link, str):
+                errors.append(f"{key}: node references must be strings")
+                continue
+            if link not in nodes:
+                errors.append(f"{key}: unknown node {link}")
+            covered.add(link)
+        if scene.get("interaction"):
+            need(scene["interaction"], ["trigger", "change", "reset"], f"{key}.interaction")
+    for key, (node, _) in nodes.items():
+        if key not in covered:
+            errors.append(f"{key}: no scene explains this node")
+        for prerequisite in node.get("needs", []) if isinstance(node.get("needs", []), list) else []:
+            if not isinstance(prerequisite, str) or prerequisite not in nodes or prerequisite == key:
+                errors.append(f"{key}: invalid prerequisite {prerequisite}")
+    visited, active = set(), set()
+
+    def visit(key):
+        if not isinstance(key, str) or key not in nodes:
+            return
+        if key in active:
+            errors.append(f"prerequisite cycle at {key}")
+            return
+        if key in visited:
+            return
+        active.add(key)
+        needs = nodes[key][0].get("needs", [])
+        for dep in needs if isinstance(needs, list) else []:
+            visit(dep)
+        active.remove(key)
+        visited.add(key)
+
+    for key in nodes:
+        visit(key)
+    return {"ok": not errors, "errors": errors, "nodeCount": len(nodes),
+            "maxDepth": max((d for _, d in nodes.values()), default=0),
+            "sceneCount": len(scenes),
+            "scope": "Structural coverage only; inspect explanations, designs and the rendered result."}
+
+
+if __name__ == "__main__":
+    content = Path(sys.argv[1]).read_bytes()
+    result = check(json.loads(content))
+    result["sha256"] = hashlib.sha256(content).hexdigest()
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    sys.exit(0 if result["ok"] else 1)

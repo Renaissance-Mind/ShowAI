@@ -26,3 +26,8 @@ export {
   DividerBlock as Divider,
   CodeBlock as Code,
 } from "./Primitives";
+
+export {
+  MechanismStepsBlock as MechanismSteps,
+  EvidenceExplorerBlock as EvidenceExplorer,
+} from "./Presentation";

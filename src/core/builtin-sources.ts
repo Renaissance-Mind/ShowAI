@@ -30,6 +30,9 @@ import viewportLockCss from "../components/blocks/viewport-lock.css?raw";
 import tableHover from "../components/blocks/table-hover.ts?raw";
 import tableAlignment from "../components/blocks/TableAlignment.tsx?raw";
 import primitives from "../components/blocks/Primitives.tsx?raw";
+import presentation from "../components/blocks/Presentation.tsx?raw";
+import presentationCss from "../components/blocks/presentation.css?raw";
+import presentationContract from "../components/blocks/presentation-contract.mjs?raw";
 import chart from "../components/blocks/Chart.tsx?raw";
 import database from "../components/blocks/Database.tsx?raw";
 import metrics from "../components/blocks/Metrics.tsx?raw";
@@ -94,6 +97,9 @@ const sources: Record<string, string> = {
   "Primitives.tsx": primitives,
   "TableAlignment.tsx": tableAlignment,
   "table-hover.ts": tableHover,
+  "Presentation.tsx": presentation,
+  "presentation.css": presentationCss,
+  "presentation-contract.mjs": presentationContract,
   "Chart.tsx": chart,
   "Database.tsx": database,
   "Metrics.tsx": metrics,
@@ -168,6 +174,8 @@ export const builtinExports: Record<string, string> = {
   toggle: "Toggle",
   divider: "Divider",
   code: "Code",
+  "mechanism-steps": "MechanismSteps",
+  "evidence-explorer": "EvidenceExplorer",
   chart: "Chart",
   mindmap: "Mindmap",
   flowchart: "Flowchart",

@@ -293,6 +293,8 @@ describe("compiled React packages", () => {
       "audio",
       "pdf",
       "references",
+      "mechanism-steps",
+      "evidence-explorer",
       "page",
       "board",
     ]);

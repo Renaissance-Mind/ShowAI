@@ -2,13 +2,22 @@
   {
     "id": "concept-explainer",
     "name": "概念与机制讲解",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "从具体问题出发，建立对象、关系、机制与适用边界，支持深度不同的渐进解释。",
     "scenarios": [
       "解释一个读者尚不熟悉的概念、算法或系统机制。",
       "同一主题需要新手主线与可定位的深入说明。"
     ],
     "contentGuide": [
+      {
+        "title": "制作前的设计与首屏",
+        "instructions": [
+          "先保存理解树与逐段分镜，明确每个主要节点由哪个画面讲清；进入制作前检查缺口。",
+          "开篇给出核心回答、范围与第一幅可解释的视觉总览。将解释放在对应对象旁，避免先铺多段背景。",
+          "填入视觉区域的真实内容并检查主要阅读操作。与任务无关的区域可移除；不能把所有视觉区域替换为章节文字。",
+          "机制分镜保持同一组对象；证据探索保持共同维度。图像、数据图表和原生容器按实际关系补充，模板不是最终版式上限。"
+        ]
+      },
       {
         "title": "读者任务与材料",
         "instructions": [
@@ -48,6 +57,18 @@
     "related": [
       {
         "kind": "component",
+        "id": "evidence-explorer",
+        "version": "1.0.0",
+        "purpose": "总览、主题筛选、证据详情与共同维度比较。"
+      },
+      {
+        "kind": "component",
+        "id": "mechanism-steps",
+        "version": "1.0.0",
+        "purpose": "稳定对象的状态变化、继承与条件。"
+      },
+      {
+        "kind": "component",
         "id": "flowchart",
         "version": "1.0.0",
         "purpose": "表达过程、分支和节点详情。"
@@ -79,7 +100,7 @@
           {
             "kind": "template",
             "id": "concept-explainer",
-            "version": "1.0.0",
+            "version": "1.1.0",
             "purpose": "从具体问题出发，建立对象、关系、机制与适用边界，支持深度不同的渐进解释。"
           },
           {
@@ -104,7 +125,7 @@
           "id": "concept-explainer-root",
           "kind": "page",
           "name": "概念与机制讲解",
-          "widthMode": "standard"
+          "widthMode": "wide"
         },
         "content": [
           {
@@ -144,6 +165,19 @@
                 ]
               }
             ]
+          },
+          {
+            "type": "widget",
+            "attrs": {
+              "id": "concept-explainer-mechanism-steps",
+              "name": "从初始状态到结果",
+              "kind": "mechanism-steps",
+              "data": {
+                "title": "从初始状态到结果",
+                "parts": [],
+                "frames": []
+              }
+            }
           },
           {
             "type": "richText",
@@ -242,6 +276,19 @@
             }
           },
           {
+            "type": "widget",
+            "attrs": {
+              "id": "concept-explainer-evidence-explorer",
+              "name": "用例子与反例检查理解",
+              "kind": "evidence-explorer",
+              "data": {
+                "title": "用例子与反例检查理解",
+                "dimensions": [],
+                "items": []
+              }
+            }
+          },
+          {
             "type": "richText",
             "attrs": {
               "id": "concept-explainer-section-4",
@@ -288,13 +335,22 @@
   {
     "id": "decision-comparison",
     "name": "方案比较与决策",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "按共同标准呈现可比事实、缺项与取舍，支持带条件的选择。",
     "scenarios": [
       "为一个明确任务比较技术路线、产品方案或研究方法。",
       "读者需要理解推荐依据，并在约束改变时重新判断。"
     ],
     "contentGuide": [
+      {
+        "title": "制作前的设计与首屏",
+        "instructions": [
+          "先保存理解树与逐段分镜，明确每个主要节点由哪个画面讲清；进入制作前检查缺口。",
+          "开篇给出核心回答、范围与第一幅可解释的视觉总览。将解释放在对应对象旁，避免先铺多段背景。",
+          "填入视觉区域的真实内容并检查主要阅读操作。与任务无关的区域可移除；不能把所有视觉区域替换为章节文字。",
+          "机制分镜保持同一组对象；证据探索保持共同维度。图像、数据图表和原生容器按实际关系补充，模板不是最终版式上限。"
+        ]
+      },
       {
         "title": "读者任务与材料",
         "instructions": [
@@ -334,6 +390,18 @@
     "related": [
       {
         "kind": "component",
+        "id": "evidence-explorer",
+        "version": "1.0.0",
+        "purpose": "总览、主题筛选、证据详情与共同维度比较。"
+      },
+      {
+        "kind": "component",
+        "id": "mechanism-steps",
+        "version": "1.0.0",
+        "purpose": "稳定对象的状态变化、继承与条件。"
+      },
+      {
+        "kind": "component",
         "id": "table",
         "version": "1.1.1",
         "purpose": "按共同标准对齐少量选项。"
@@ -365,7 +433,7 @@
           {
             "kind": "template",
             "id": "decision-comparison",
-            "version": "1.0.0",
+            "version": "1.1.0",
             "purpose": "按共同标准呈现可比事实、缺项与取舍，支持带条件的选择。"
           },
           {
@@ -390,7 +458,7 @@
           "id": "decision-comparison-root",
           "kind": "page",
           "name": "方案比较与决策",
-          "widthMode": "standard"
+          "widthMode": "wide"
         },
         "content": [
           {
@@ -430,6 +498,19 @@
                 ]
               }
             ]
+          },
+          {
+            "type": "widget",
+            "attrs": {
+              "id": "decision-comparison-evidence-explorer",
+              "name": "按共同条件探索与比较",
+              "kind": "evidence-explorer",
+              "data": {
+                "title": "按共同条件探索与比较",
+                "dimensions": [],
+                "items": []
+              }
+            }
           },
           {
             "type": "richText",
@@ -529,6 +610,19 @@
             }
           },
           {
+            "type": "widget",
+            "attrs": {
+              "id": "decision-comparison-mechanism-steps",
+              "name": "条件改变后会怎样",
+              "kind": "mechanism-steps",
+              "data": {
+                "title": "条件改变后会怎样",
+                "parts": [],
+                "frames": []
+              }
+            }
+          },
+          {
             "type": "richText",
             "attrs": {
               "id": "decision-comparison-section-4",
@@ -575,13 +669,22 @@
   {
     "id": "evidence-report",
     "name": "研究与证据报告",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "围绕研究问题组织事实、机制、证据和局限，区分来源主张与分析推断。",
     "scenarios": [
       "对一个研究主题形成有来源、可追溯的综合调研报告。",
       "整理指定时间范围的技术进展，解释变化、支持程度与研究空白。"
     ],
     "contentGuide": [
+      {
+        "title": "制作前的设计与首屏",
+        "instructions": [
+          "先保存理解树与逐段分镜，明确每个主要节点由哪个画面讲清；进入制作前检查缺口。",
+          "开篇给出核心回答、范围与第一幅可解释的视觉总览。将解释放在对应对象旁，避免先铺多段背景。",
+          "填入视觉区域的真实内容并检查主要阅读操作。与任务无关的区域可移除；不能把所有视觉区域替换为章节文字。",
+          "机制分镜保持同一组对象；证据探索保持共同维度。图像、数据图表和原生容器按实际关系补充，模板不是最终版式上限。"
+        ]
+      },
       {
         "title": "读者任务与材料",
         "instructions": [
@@ -621,6 +724,18 @@
     "related": [
       {
         "kind": "component",
+        "id": "evidence-explorer",
+        "version": "1.0.0",
+        "purpose": "总览、主题筛选、证据详情与共同维度比较。"
+      },
+      {
+        "kind": "component",
+        "id": "mechanism-steps",
+        "version": "1.0.0",
+        "purpose": "稳定对象的状态变化、继承与条件。"
+      },
+      {
+        "kind": "component",
         "id": "flowchart",
         "version": "1.0.0",
         "purpose": "解释路线与机制关系。"
@@ -652,7 +767,7 @@
           {
             "kind": "template",
             "id": "evidence-report",
-            "version": "1.0.0",
+            "version": "1.1.0",
             "purpose": "围绕研究问题组织事实、机制、证据和局限，区分来源主张与分析推断。"
           },
           {
@@ -677,7 +792,7 @@
           "id": "evidence-report-root",
           "kind": "page",
           "name": "研究与证据报告",
-          "widthMode": "standard"
+          "widthMode": "wide"
         },
         "content": [
           {
@@ -719,6 +834,19 @@
             ]
           },
           {
+            "type": "widget",
+            "attrs": {
+              "id": "evidence-report-evidence-explorer",
+              "name": "关键变化与证据总览",
+              "kind": "evidence-explorer",
+              "data": {
+                "title": "关键变化与证据总览",
+                "dimensions": [],
+                "items": []
+              }
+            }
+          },
+          {
             "type": "richText",
             "attrs": {
               "id": "evidence-report-section-2",
@@ -755,6 +883,19 @@
                 ]
               }
             ]
+          },
+          {
+            "type": "widget",
+            "attrs": {
+              "id": "evidence-report-mechanism-steps",
+              "name": "关键机制逐步展开",
+              "kind": "mechanism-steps",
+              "data": {
+                "title": "关键机制逐步展开",
+                "parts": [],
+                "frames": []
+              }
+            }
           },
           {
             "type": "richText",
@@ -899,13 +1040,22 @@
   {
     "id": "procedure-guide",
     "name": "操作与问题排查",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "围绕目标状态组织真实入口、动作、预期反馈和异常恢复。",
     "scenarios": [
       "教读者完成一项操作，并知道每一步是否成功。",
       "根据可观察症状诊断问题，选择安全的恢复路径。"
     ],
     "contentGuide": [
+      {
+        "title": "制作前的设计与首屏",
+        "instructions": [
+          "先保存理解树与逐段分镜，明确每个主要节点由哪个画面讲清；进入制作前检查缺口。",
+          "开篇给出核心回答、范围与第一幅可解释的视觉总览。将解释放在对应对象旁，避免先铺多段背景。",
+          "填入视觉区域的真实内容并检查主要阅读操作。与任务无关的区域可移除；不能把所有视觉区域替换为章节文字。",
+          "机制分镜保持同一组对象；证据探索保持共同维度。图像、数据图表和原生容器按实际关系补充，模板不是最终版式上限。"
+        ]
+      },
       {
         "title": "读者任务与材料",
         "instructions": [
@@ -945,6 +1095,18 @@
     "related": [
       {
         "kind": "component",
+        "id": "evidence-explorer",
+        "version": "1.0.0",
+        "purpose": "总览、主题筛选、证据详情与共同维度比较。"
+      },
+      {
+        "kind": "component",
+        "id": "mechanism-steps",
+        "version": "1.0.0",
+        "purpose": "稳定对象的状态变化、继承与条件。"
+      },
+      {
+        "kind": "component",
         "id": "image",
         "version": "1.0.0",
         "purpose": "标注真实操作界面。"
@@ -976,7 +1138,7 @@
           {
             "kind": "template",
             "id": "procedure-guide",
-            "version": "1.0.0",
+            "version": "1.1.0",
             "purpose": "围绕目标状态组织真实入口、动作、预期反馈和异常恢复。"
           },
           {
@@ -1001,7 +1163,7 @@
           "id": "procedure-guide-root",
           "kind": "page",
           "name": "操作与问题排查",
-          "widthMode": "standard"
+          "widthMode": "wide"
         },
         "content": [
           {
@@ -1041,6 +1203,19 @@
                 ]
               }
             ]
+          },
+          {
+            "type": "widget",
+            "attrs": {
+              "id": "procedure-guide-mechanism-steps",
+              "name": "从初始状态到结果",
+              "kind": "mechanism-steps",
+              "data": {
+                "title": "从初始状态到结果",
+                "parts": [],
+                "frames": []
+              }
+            }
           },
           {
             "type": "richText",
@@ -1134,6 +1309,19 @@
             }
           },
           {
+            "type": "widget",
+            "attrs": {
+              "id": "procedure-guide-evidence-explorer",
+              "name": "用例子与反例检查理解",
+              "kind": "evidence-explorer",
+              "data": {
+                "title": "用例子与反例检查理解",
+                "dimensions": [],
+                "items": []
+              }
+            }
+          },
+          {
             "type": "richText",
             "attrs": {
               "id": "procedure-guide-section-4",
@@ -1180,13 +1368,22 @@
   {
     "id": "progress-report",
     "name": "状态与进展报告",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "在明确截止时间下说明当前状态、变化、证据、风险与下一步。",
     "scenarios": [
       "汇报真实项目、实验或运行状态，帮助读者判断后续行动。",
       "比较目标与实际进展，说明偏差依据与待决策事项。"
     ],
     "contentGuide": [
+      {
+        "title": "制作前的设计与首屏",
+        "instructions": [
+          "先保存理解树与逐段分镜，明确每个主要节点由哪个画面讲清；进入制作前检查缺口。",
+          "开篇给出核心回答、范围与第一幅可解释的视觉总览。将解释放在对应对象旁，避免先铺多段背景。",
+          "填入视觉区域的真实内容并检查主要阅读操作。与任务无关的区域可移除；不能把所有视觉区域替换为章节文字。",
+          "机制分镜保持同一组对象；证据探索保持共同维度。图像、数据图表和原生容器按实际关系补充，模板不是最终版式上限。"
+        ]
+      },
       {
         "title": "读者任务与材料",
         "instructions": [
@@ -1226,6 +1423,18 @@
     "related": [
       {
         "kind": "component",
+        "id": "evidence-explorer",
+        "version": "1.0.0",
+        "purpose": "总览、主题筛选、证据详情与共同维度比较。"
+      },
+      {
+        "kind": "component",
+        "id": "mechanism-steps",
+        "version": "1.0.0",
+        "purpose": "稳定对象的状态变化、继承与条件。"
+      },
+      {
+        "kind": "component",
         "id": "metrics",
         "version": "1.0.0",
         "purpose": "突出有来源的重要数量。"
@@ -1257,7 +1466,7 @@
           {
             "kind": "template",
             "id": "progress-report",
-            "version": "1.0.0",
+            "version": "1.1.0",
             "purpose": "在明确截止时间下说明当前状态、变化、证据、风险与下一步。"
           },
           {
@@ -1282,7 +1491,7 @@
           "id": "progress-report-root",
           "kind": "page",
           "name": "状态与进展报告",
-          "widthMode": "standard"
+          "widthMode": "wide"
         },
         "content": [
           {
@@ -1324,6 +1533,19 @@
             ]
           },
           {
+            "type": "widget",
+            "attrs": {
+              "id": "progress-report-evidence-explorer",
+              "name": "关键变化与证据总览",
+              "kind": "evidence-explorer",
+              "data": {
+                "title": "关键变化与证据总览",
+                "dimensions": [],
+                "items": []
+              }
+            }
+          },
+          {
             "type": "richText",
             "attrs": {
               "id": "progress-report-section-2",
@@ -1360,6 +1582,19 @@
                 ]
               }
             ]
+          },
+          {
+            "type": "widget",
+            "attrs": {
+              "id": "progress-report-mechanism-steps",
+              "name": "关键机制逐步展开",
+              "kind": "mechanism-steps",
+              "data": {
+                "title": "关键机制逐步展开",
+                "parts": [],
+                "frames": []
+              }
+            }
           },
           {
             "type": "richText",
@@ -1467,13 +1702,22 @@
   {
     "id": "exploration-map",
     "name": "探索与资料组织",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "用可定位的分类、属性与关系组织资料，支持总览、筛选和局部核对。",
     "scenarios": [
       "整理一个主题的资料、概念或候选项，让读者逐步探索。",
       "需要同时看到全局分类和可追溯的局部信息。"
     ],
     "contentGuide": [
+      {
+        "title": "制作前的设计与首屏",
+        "instructions": [
+          "先保存理解树与逐段分镜，明确每个主要节点由哪个画面讲清；进入制作前检查缺口。",
+          "开篇给出核心回答、范围与第一幅可解释的视觉总览。将解释放在对应对象旁，避免先铺多段背景。",
+          "填入视觉区域的真实内容并检查主要阅读操作。与任务无关的区域可移除；不能把所有视觉区域替换为章节文字。",
+          "机制分镜保持同一组对象；证据探索保持共同维度。图像、数据图表和原生容器按实际关系补充，模板不是最终版式上限。"
+        ]
+      },
       {
         "title": "读者任务与材料",
         "instructions": [
@@ -1513,6 +1757,18 @@
     "related": [
       {
         "kind": "component",
+        "id": "evidence-explorer",
+        "version": "1.0.0",
+        "purpose": "总览、主题筛选、证据详情与共同维度比较。"
+      },
+      {
+        "kind": "component",
+        "id": "mechanism-steps",
+        "version": "1.0.0",
+        "purpose": "稳定对象的状态变化、继承与条件。"
+      },
+      {
+        "kind": "component",
         "id": "database",
         "version": "1.0.0",
         "purpose": "筛选排序真实资料。"
@@ -1544,7 +1800,7 @@
           {
             "kind": "template",
             "id": "exploration-map",
-            "version": "1.0.0",
+            "version": "1.1.0",
             "purpose": "用可定位的分类、属性与关系组织资料，支持总览、筛选和局部核对。"
           },
           {
@@ -1569,7 +1825,7 @@
           "id": "exploration-map-root",
           "kind": "page",
           "name": "探索与资料组织",
-          "widthMode": "standard"
+          "widthMode": "wide"
         },
         "content": [
           {
@@ -1609,6 +1865,19 @@
                 ]
               }
             ]
+          },
+          {
+            "type": "widget",
+            "attrs": {
+              "id": "exploration-map-evidence-explorer",
+              "name": "按共同条件探索与比较",
+              "kind": "evidence-explorer",
+              "data": {
+                "title": "按共同条件探索与比较",
+                "dimensions": [],
+                "items": []
+              }
+            }
           },
           {
             "type": "richText",
@@ -1698,6 +1967,19 @@
                 "rows": [],
                 "fontSize": 18,
                 "padding": 0
+              }
+            }
+          },
+          {
+            "type": "widget",
+            "attrs": {
+              "id": "exploration-map-mechanism-steps",
+              "name": "条件改变后会怎样",
+              "kind": "mechanism-steps",
+              "data": {
+                "title": "条件改变后会怎样",
+                "parts": [],
+                "frames": []
               }
             }
           },

@@ -1128,5 +1128,387 @@
         }
       }
     ]
+  },
+  {
+    "kind": "mechanism-steps",
+    "name": "机制分镜",
+    "description": "固定对象位置，逐步比较什么改变、什么保留，以及改变如何传递。",
+    "version": "1.0.0",
+    "scenarios": [
+      "机制、算法、实验或流程的逐步状态变化。",
+      "比较每轮变化、继承位置和外部固定条件。"
+    ],
+    "defaultData": {
+      "title": "机制如何发生",
+      "parts": [],
+      "frames": []
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "introduction": {
+          "type": "string"
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": ["id", "label"],
+            "additionalProperties": false
+          },
+          "maxItems": 8
+        },
+        "frames": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "explanation": {
+                "type": "string",
+                "minLength": 1
+              },
+              "condition": {
+                "type": "string",
+                "minLength": 1
+              },
+              "states": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "value": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "status": {
+                      "enum": ["changed", "retained", "fixed"]
+                    }
+                  },
+                  "required": ["id", "value", "status"],
+                  "additionalProperties": false
+                },
+                "maxItems": 8
+              },
+              "links": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "from": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "to": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["from", "to", "label"],
+                  "additionalProperties": false
+                },
+                "maxItems": 24
+              },
+              "sources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "url": {
+                      "type": "string",
+                      "pattern": "^https?://"
+                    }
+                  },
+                  "required": ["label", "url"],
+                  "additionalProperties": false
+                },
+                "maxItems": 80
+              }
+            },
+            "required": ["id", "title", "explanation", "states", "links"],
+            "additionalProperties": false
+          },
+          "maxItems": 16
+        }
+      },
+      "required": ["title", "parts", "frames"],
+      "additionalProperties": false
+    },
+    "examples": [
+      {
+        "name": "数学关系示例",
+        "request": "机制分镜",
+        "data": {
+          "title": "约分为什么保持比例",
+          "introduction": "分子和分母同时除以同一个非零数。",
+          "parts": [
+            {
+              "id": "n",
+              "label": "分子"
+            },
+            {
+              "id": "d",
+              "label": "分母"
+            }
+          ],
+          "frames": [
+            {
+              "id": "before",
+              "title": "原始比例",
+              "explanation": "2/4 表示四份中的两份。",
+              "states": [
+                {
+                  "id": "n",
+                  "value": "2",
+                  "status": "fixed"
+                },
+                {
+                  "id": "d",
+                  "value": "4",
+                  "status": "fixed"
+                }
+              ],
+              "links": [
+                {
+                  "from": "n",
+                  "to": "d",
+                  "label": "组成 2/4"
+                }
+              ]
+            },
+            {
+              "id": "after",
+              "title": "同时除以 2",
+              "explanation": "2÷2=1，4÷2=2；1/2 与 2/4 相等。",
+              "condition": "分子分母必须除以同一个非零数。",
+              "states": [
+                {
+                  "id": "n",
+                  "value": "1",
+                  "status": "changed"
+                },
+                {
+                  "id": "d",
+                  "value": "2",
+                  "status": "changed"
+                }
+              ],
+              "links": [
+                {
+                  "from": "n",
+                  "to": "d",
+                  "label": "组成 1/2"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "effects": [
+      "机制、算法、实验或流程的逐步状态变化。",
+      "比较每轮变化、继承位置和外部固定条件。"
+    ]
+  },
+  {
+    "kind": "evidence-explorer",
+    "name": "证据探索",
+    "description": "把主题总览、条目详情和共同维度比较连接起来，保留条件与来源。",
+    "version": "1.0.0",
+    "scenarios": [
+      "研究报告按主题或日期定位事件、发现和证据。",
+      "选择条目查看条件与来源，将指定条目按共同维度并排比较。"
+    ],
+    "defaultData": {
+      "title": "证据总览与比较",
+      "dimensions": [],
+      "items": []
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "introduction": {
+          "type": "string"
+        },
+        "dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": ["id", "label"],
+            "additionalProperties": false
+          },
+          "maxItems": 8
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "category": {
+                "type": "string",
+                "minLength": 1
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}(-\\d{2})?$"
+              },
+              "dateLabel": {
+                "type": "string",
+                "minLength": 1
+              },
+              "claim": {
+                "type": "string",
+                "minLength": 1
+              },
+              "boundary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "values": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "sources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "url": {
+                      "type": "string",
+                      "pattern": "^https?://"
+                    }
+                  },
+                  "required": ["label", "url"],
+                  "additionalProperties": false
+                },
+                "maxItems": 80
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "category",
+              "claim",
+              "boundary",
+              "values"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 80
+        }
+      },
+      "required": ["title", "dimensions", "items"],
+      "additionalProperties": false
+    },
+    "examples": [
+      {
+        "name": "数学关系示例",
+        "request": "证据探索",
+        "data": {
+          "title": "矩形与正方形的关系",
+          "introduction": "共同维度帮助检查充分条件。",
+          "dimensions": [
+            {
+              "id": "angle",
+              "label": "四个角"
+            },
+            {
+              "id": "sides",
+              "label": "边的关系"
+            }
+          ],
+          "items": [
+            {
+              "id": "rectangle",
+              "title": "矩形",
+              "category": "四边形",
+              "claim": "四个角都是直角。",
+              "boundary": "相邻边不必相等。",
+              "values": {
+                "angle": "均为直角",
+                "sides": "对边相等"
+              }
+            },
+            {
+              "id": "square",
+              "title": "正方形",
+              "category": "四边形",
+              "claim": "是四条边相等的矩形。",
+              "boundary": "每个正方形都是矩形，反向命题不成立。",
+              "values": {
+                "angle": "均为直角",
+                "sides": "四边相等"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "effects": [
+      "研究报告按主题或日期定位事件、发现和证据。",
+      "选择条目查看条件与来源，将指定条目按共同维度并排比较。"
+    ]
   }
 ]

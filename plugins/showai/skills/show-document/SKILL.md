@@ -1,6 +1,6 @@
 ---
 name: show-document
-description: 通过 ShowAI MCP 创作、修改、展示或导出页面、报告与小型网站，或应用模板。正式内容先保存 Page，再按宿主能力展示；明确的独立交付可不入库。
+description: 通过 ShowAI MCP 制作可交互的研究报告、讲解页面和小型网站，或续改、展示、导出与应用模板。用户请求完整报告（包括只给报告题目）时使用；普通知识问答不自动制作为页面。
 ---
 
 # 创作与展示文档
@@ -9,7 +9,9 @@ description: 通过 ShowAI MCP 创作、修改、展示或导出页面、报告�
 
 ## 从理解目标到页面
 
-按任务规模使用[呈现工作约定](../plan-presentation/references/presentation-contract.md)。复杂报告、机制讲解或决策页面，先由 [plan-presentation](../plan-presentation/SKILL.md) 明确认知起点、证据范围和多级理解路径，再由 [design-presentation](../design-presentation/SKILL.md) 决定图形、布局、文字与交互分镜；已有这些材料时直接组装。简单编辑使用相关判断即可，不强制生成额外规划文档。
+按任务规模使用[呈现工作约定](../plan-presentation/references/presentation-contract.md)。复杂报告、机制讲解或决策页面，先由 [plan-presentation](../plan-presentation/SKILL.md) 明确认知起点、证据范围和多级理解路径，再由 [design-presentation](../design-presentation/SKILL.md) 决定图形、布局、文字与交互分镜；制作前保存并检查规划文件，已有有效材料时直接组装。简单编辑使用相关判断即可，不强制生成额外规划文档。
+
+只提供报告题目时，根据题目和已有场景推断读者与范围并标明假设，直接推进可独立完成的研究和设计。日期未结束时以实际检索日为界。确有多个会改变研究方向的解释时简短澄清；无需为已经合理确定的字号、模板等常规选择等待用户。
 
 用户只要求规划或设计时，按[呈现工作约定](../plan-presentation/references/presentation-contract.md#记录与权限)交付相应产物；正式成果保存并展示，对话讨论直接回答，不继续实现应用或组件。用户要求成品时，规划与设计是同一创作任务的环节，继续完成制作、修订和交付。只读问题沿 use-showai 回答，不自动创建页面。
 

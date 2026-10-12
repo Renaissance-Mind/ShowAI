@@ -29,6 +29,8 @@ const builtinCategories: Record<string, ComponentCategory> = {
   chart: "data",
   metrics: "data",
   playground: "data",
+  "mechanism-steps": "flow",
+  "evidence-explorer": "table",
   flowchart: "flow",
   mindmap: "flow",
   page: "surface",

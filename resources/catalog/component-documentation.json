@@ -3,9 +3,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "App 正文、AI 写入与独立插入共用的富文本组件，格式、设置与交互菜单由组件拥有。",
@@ -154,15 +152,11 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "单张图像与图注，可调整尺寸、裁切和圆角。离线页面使用内嵌图像。",
-      "structure": [
-        "src 对应一张图像，alt 提供替代文字，caption 提供图注。"
-      ],
+      "structure": ["src 对应一张图像，alt 提供替代文字，caption 提供图注。"],
       "inputs": [
         {
           "path": "src",
@@ -287,15 +281,11 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "轻量的二维表格，支持文字、数字和布尔值，可编辑表头和单元格，并按列或整体设置对齐。",
-      "structure": [
-        "columns 决定列顺序，rows 按同样顺序逐行保存单元格。"
-      ],
+      "structure": ["columns 决定列顺序，rows 按同样顺序逐行保存单元格。"],
       "inputs": [
         {
           "path": "title",
@@ -412,9 +402,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "带标题和 Markdown 正文的提示、引用或说明。",
@@ -485,9 +473,7 @@
           "persistence": "content"
         }
       ],
-      "constraints": [
-        "这是兼容组件；默认目录不展示，旧页面仍可读取和渲染。"
-      ],
+      "constraints": ["这是兼容组件；默认目录不展示，旧页面仍可读取和渲染。"],
       "editing": {
         "data": [
           "替换公开字段中的内容、数值、初始配置与受支持样式；遵守 schema 和字段关系。"
@@ -531,9 +517,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "按需展开补充信息，正文支持 Markdown。",
@@ -652,9 +636,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "在页面内容之间建立轻量的视觉分隔。",
@@ -717,9 +699,7 @@
           "persistence": "content"
         }
       ],
-      "constraints": [
-        "这是兼容组件；默认目录不展示，旧页面仍可读取和渲染。"
-      ],
+      "constraints": ["这是兼容组件；默认目录不展示，旧页面仍可读取和渲染。"],
       "editing": {
         "data": [
           "替换公开字段中的内容、数值、初始配置与受支持样式；遵守 schema 和字段关系。"
@@ -763,9 +743,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "保留缩进与换行的代码片段，可声明语言并自定义外观。",
@@ -836,9 +814,7 @@
           "persistence": "content"
         }
       ],
-      "constraints": [
-        "这是兼容组件；默认目录不展示，旧页面仍可读取和渲染。"
-      ],
+      "constraints": ["这是兼容组件；默认目录不展示，旧页面仍可读取和渲染。"],
       "editing": {
         "data": [
           "替换公开字段中的内容、数值、初始配置与受支持样式；遵守 schema 和字段关系。"
@@ -882,9 +858,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "交互式折线图、柱状图和可展开的原始数据。",
@@ -992,9 +966,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "带筛选、排序和看板视图的表格。单元格支持文字、数字、选择、复选框和链接。",
@@ -1094,9 +1066,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "显示有来源的数值、单位、变化和说明。",
@@ -1146,9 +1116,7 @@
           "persistence": "content"
         }
       ],
-      "constraints": [
-        "组件展示给定指标，不自动推导统计结果或核实数据来源。"
-      ],
+      "constraints": ["组件展示给定指标，不自动推导统计结果或核实数据来源。"],
       "editing": {
         "data": [
           "替换公开字段中的内容、数值、初始配置与受支持样式；遵守 schema 和字段关系。"
@@ -1191,9 +1159,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "用滑块探索求和、乘积或平均值。",
@@ -1301,15 +1267,11 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "包含图注的图片集合。导出离线页面时使用内嵌 PNG、JPEG、GIF、WebP 或 AVIF。",
-      "structure": [
-        "images 按阅读顺序保存图片和图注，columns 控制网格布局。"
-      ],
+      "structure": ["images 按阅读顺序保存图片和图注，columns 控制网格布局。"],
       "inputs": [
         {
           "path": "title",
@@ -1353,9 +1315,7 @@
           "persistence": "content"
         }
       ],
-      "constraints": [
-        "缩略图放大属于阅读操作；编辑源数据才会改变图像集合。"
-      ],
+      "constraints": ["缩略图放大属于阅读操作；编辑源数据才会改变图像集合。"],
       "editing": {
         "data": [
           "替换公开字段中的内容、数值、初始配置与受支持样式；遵守 schema 和字段关系。"
@@ -1398,15 +1358,11 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "带标题、描述和可选缩略图的外部来源链接。",
-      "structure": [
-        "url 指向外部来源，标题、描述与缩略图由输入明确提供。"
-      ],
+      "structure": ["url 指向外部来源，标题、描述与缩略图由输入明确提供。"],
       "inputs": [
         {
           "path": "title",
@@ -1454,9 +1410,7 @@
           "persistence": "content"
         }
       ],
-      "constraints": [
-        "组件不自动抓取、验证或更新网站内容。"
-      ],
+      "constraints": ["组件不自动抓取、验证或更新网站内容。"],
       "editing": {
         "data": [
           "替换公开字段中的内容、数值、初始配置与受支持样式；遵守 schema 和字段关系。"
@@ -1499,9 +1453,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "中心主题的分支自然平衡展开，或选择单向布局；支持键盘编辑、折叠和撤销。",
@@ -1613,9 +1565,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "基于 React Flow 的可缩放流程图，支持节点详情、分支关系、多条流程和编辑节点。",
@@ -1727,15 +1677,11 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "保留画面比例的视频播放器，支持本地上传、在线文件、封面与说明。",
-      "structure": [
-        "src 保存视频文件，poster 和 caption 提供封面与说明。"
-      ],
+      "structure": ["src 保存视频文件，poster 和 caption 提供封面与说明。"],
       "inputs": [
         {
           "path": "title",
@@ -1849,15 +1795,11 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "紧凑音频播放器，支持本地上传、在线文件与说明。",
-      "structure": [
-        "src 保存音频文件，caption 和 fileName 提供阅读信息。"
-      ],
+      "structure": ["src 保存音频文件，caption 和 fileName 提供阅读信息。"],
       "inputs": [
         {
           "path": "title",
@@ -1959,15 +1901,11 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "内置 PDF 阅读器，支持翻页、缩放、初始页码、本页文字和下载。",
-      "structure": [
-        "src 保存 PDF，page 指定初始页码，height 控制阅读区域。"
-      ],
+      "structure": ["src 保存 PDF，page 指定初始页码，height 控制阅读区域。"],
       "inputs": [
         {
           "path": "title",
@@ -2077,15 +2015,11 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "按编号组织作者、年份、标题、出处、DOI、链接与备注，支持正文锚点引用。",
-      "structure": [
-        "items 保存文献信息，稳定 id 用作正文中的引用锚点。"
-      ],
+      "structure": ["items 保存文献信息，稳定 id 用作正文中的引用锚点。"],
       "inputs": [
         {
           "path": "title",
@@ -2174,9 +2108,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "比较类别之间的数值，支持编辑数据、主题和交互。",
@@ -2312,9 +2244,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "观察连续变化与趋势，支持编辑数据、主题和交互。",
@@ -2450,9 +2380,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "通过填充面积强调趋势，支持编辑数据、主题和交互。",
@@ -2588,9 +2516,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "观察变量关系与离群点，支持编辑数据、主题和交互。",
@@ -2726,9 +2652,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "用气泡大小增加一个数值维度，支持编辑数据、主题和交互。",
@@ -2864,9 +2788,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "并排比较不同系列，支持编辑数据、主题和交互。",
@@ -3002,9 +2924,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "向两侧比较正负或两组数据，支持编辑数据、主题和交互。",
@@ -3140,9 +3060,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "比较多个维度的轮廓，支持编辑数据、主题和交互。",
@@ -3278,9 +3196,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "在极坐标中排列条形，支持编辑数据、主题和交互。",
@@ -3694,9 +3610,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "展示整体中的类别占比，支持编辑数据、主题和交互。",
@@ -3832,9 +3746,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "中心留白的比例表达，支持编辑数据、主题和交互。",
@@ -3970,9 +3882,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "比较总量及各部分构成，支持编辑数据、主题和交互。",
@@ -4108,9 +4018,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "观察构成随时间变化，支持编辑数据、主题和交互。",
@@ -4246,9 +4154,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "以扇区半径表现数值差异，支持编辑数据、主题和交互。",
@@ -4384,9 +4290,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "以宽度与面积表现分类构成，支持编辑数据、主题和交互。",
@@ -4522,9 +4426,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "用嵌套矩形表现层级与占比，支持编辑数据、主题和交互。",
@@ -4660,9 +4562,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "按同心层级展开组成，支持编辑数据、主题和交互。",
@@ -4798,9 +4698,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "展示阶段数量的变化，支持编辑数据、主题和交互。",
@@ -4936,9 +4834,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "分箱观察数值频率，支持编辑数据、主题和交互。",
@@ -5074,9 +4970,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "展示分位数与离群值，支持编辑数据、主题和交互。",
@@ -5212,9 +5106,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "叠加密度与分布摘要，支持编辑数据、主题和交互。",
@@ -5350,9 +5242,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "观察连续概率或密度形状，支持编辑数据、主题和交互。",
@@ -5627,9 +5517,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "用颜色编码网格中的数值，支持编辑数据、主题和交互。",
@@ -5765,9 +5653,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "用等值曲线表达连续场，支持编辑数据、主题和交互。",
@@ -6042,9 +5928,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "连接宽度表达流量，支持编辑数据、主题和交互。",
@@ -6180,9 +6064,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "圆环内展示关系强度，支持编辑数据、主题和交互。",
@@ -6318,9 +6200,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "在线性节点之间连接弧线，支持编辑数据、主题和交互。",
@@ -6456,9 +6336,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "用包含关系表达层级，支持编辑数据、主题和交互。",
@@ -6594,9 +6472,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "展示集合及交集，支持编辑数据、主题和交互。",
@@ -6732,9 +6608,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "展示任务的开始与结束区间，支持编辑数据、主题和交互。",
@@ -6870,9 +6744,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "展示开盘、收盘与高低值，支持编辑数据、主题和交互。",
@@ -7147,9 +7019,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "把连续序列排列在螺旋坐标上，支持编辑数据、主题和交互。",
@@ -7702,9 +7572,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "用圆弧表达进度或指标，支持编辑数据、主题和交互。",
@@ -7840,9 +7708,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "同时显示实际、目标与区间，支持编辑数据、主题和交互。",
@@ -7978,9 +7844,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "用字号表达词语权重，支持编辑数据、主题和交互。",
@@ -8116,15 +7980,11 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "按顺序组织文字、图片和组件，可嵌入页面或白板，也可展开编辑。",
-      "structure": [
-        "原生 Page surface 按顺序组织子节点；布局与视图分别保存。"
-      ],
+      "structure": ["原生 Page surface 按顺序组织子节点；布局与视图分别保存。"],
       "inputs": [
         {
           "path": "title",
@@ -8213,9 +8073,7 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": [
-        "可用于不同主题；替换内容必须符合公开数据关系与输入约束。"
-      ]
+      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
       "purpose": "在独立空间中摆放组件和绘画，可嵌入页面或其他白板。",
@@ -8303,6 +8161,162 @@
         "把最小示例放入真实 Page，核对内容、图像与关键交互。",
         "替换一组任务数据，核对边界、空数据、单位与派生结果。",
         "核对编辑保存、只读阅读与离线导出；升级时保留旧版本和引用。"
+      ]
+    }
+  },
+  "mechanism-steps": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": ["内容与证据由实例提供；阅读操作只改变当前视图。"]
+    },
+    "usage": {
+      "purpose": "固定对象位置，逐步比较什么改变、什么保留，以及改变如何传递。",
+      "structure": [
+        "机制、算法、实验或流程的逐步状态变化。",
+        "比较每轮变化、继承位置和外部固定条件。"
+      ],
+      "inputs": [
+        {
+          "path": "parts",
+          "meaning": "2–8 个稳定对象，顺序就是画面中的空间顺序。"
+        },
+        {
+          "path": "frames",
+          "meaning": "每步写全同一组对象的状态，解释箭头的作用与成立条件。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "从理解任务填入真实材料",
+          "steps": [
+            "保持稳定对象和共同比较维度，将重要条件与来源就近写入。",
+            "检查初始视图、主要操作、重置和全部内容的连续阅读。"
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "选择步骤、上一步或下一步",
+          "effect": "相同位置展示该步状态、关系、说明与来源。",
+          "persistence": "view"
+        },
+        {
+          "action": "回到起点或展开全部步骤",
+          "effect": "恢复初始状态，或连续对照所有步骤；打印自动展开。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "每个 frame.states 必须恰好覆盖所有 parts.id；状态不得靠颜色单独表达。",
+        "图示由作者定义，不能把概念关系冒充实测因果。"
+      ],
+      "editing": {
+        "data": ["修改实例数据后经宿主页面保存。"],
+        "implementation": [
+          "新增表达或交互需要同步数据约定、schema、SDK 与验证。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "Presentation.tsx",
+          "purpose": "机制分镜与证据探索 React 组件。"
+        }
+      ],
+      "architecture": [
+        "presentation-contract.mjs 核验对象引用与维度；presentation.css 使用容器查询和打印展开。"
+      ],
+      "extensionPoints": ["添加新视图时保留来源、解释边界与恢复路径。"],
+      "invariants": [
+        "阅读筛选、步骤、选择和比较均不调用 onChange。",
+        "打印展开所有步骤或所有证据，筛选不改变源数据。"
+      ],
+      "verification": [
+        "检查真实 Page、离线导出、390px 重排、键盘操作和 props 更新。"
+      ]
+    }
+  },
+  "evidence-explorer": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": ["内容与证据由实例提供；阅读操作只改变当前视图。"]
+    },
+    "usage": {
+      "purpose": "把主题总览、条目详情和共同维度比较连接起来，保留条件与来源。",
+      "structure": [
+        "研究报告按主题或日期定位事件、发现和证据。",
+        "选择条目查看条件与来源，将指定条目按共同维度并排比较。"
+      ],
+      "inputs": [
+        {
+          "path": "dimensions",
+          "meaning": "稳定比较维度；values 中的键必须存在于 dimensions。"
+        },
+        {
+          "path": "items",
+          "meaning": "真实条目，含结论、解释边界、维度值和来源；日期同时填写其含义。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "从理解任务填入真实材料",
+          "steps": [
+            "保持稳定对象和共同比较维度，将重要条件与来源就近写入。",
+            "检查初始视图、主要操作、重置和全部内容的连续阅读。"
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "筛选主题或搜索",
+          "effect": "列表和当前详情同步改变，显示结果数；无结果显示空态。",
+          "persistence": "view"
+        },
+        {
+          "action": "选择条目、加入比较",
+          "effect": "原位显示详细依据，比较已选条目的相同维度。",
+          "persistence": "view"
+        },
+        {
+          "action": "重置视图、连续阅读全部条目",
+          "effect": "恢复全部结果；静态阅读和打印保留所有证据与来源。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "按输入顺序展示；时间材料由作者按真实日期排序，日期与发布日期分别说明。",
+        "比较仅保留共同口径；未提供值显示资料未提供。",
+        "已选比较项跨筛选保留，界面明确标注；重置清除选择。"
+      ],
+      "editing": {
+        "data": ["修改实例数据后经宿主页面保存。"],
+        "implementation": [
+          "新增表达或交互需要同步数据约定、schema、SDK 与验证。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "Presentation.tsx",
+          "purpose": "机制分镜与证据探索 React 组件。"
+        }
+      ],
+      "architecture": [
+        "presentation-contract.mjs 核验对象引用与维度；presentation.css 使用容器查询和打印展开。"
+      ],
+      "extensionPoints": ["添加新视图时保留来源、解释边界与恢复路径。"],
+      "invariants": [
+        "阅读筛选、步骤、选择和比较均不调用 onChange。",
+        "打印展开所有步骤或所有证据，筛选不改变源数据。"
+      ],
+      "verification": [
+        "检查真实 Page、离线导出、390px 重排、键盘操作和 props 更新。"
       ]
     }
   }

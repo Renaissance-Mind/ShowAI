@@ -6,6 +6,7 @@ import { validatePrimitiveData } from "../components/blocks/primitive-contract.m
 import { validateMindmapData } from "../components/blocks/mindmap-contract.mjs";
 import { validateFlowchartData } from "../components/blocks/flowchart-contract.mjs";
 import { validateG2Data } from "../components/blocks/g2/contract.mjs";
+import { validatePresentationData } from "../components/blocks/presentation-contract.mjs";
 import { validateResearchData } from "../components/blocks/research-contract.mjs";
 // Shared by the browser importer and the dependency-free artifact command.
 import { validateRemoteComponents } from "./remote.mjs";
@@ -247,6 +248,10 @@ function validateAttrs(attrs, path, permitted, surfaceIcon = false) {
 }
 
 function validateWidgetData(kind, data, path) {
+  if (["mechanism-steps", "evidence-explorer"].includes(kind)) {
+    validatePresentationData(kind, data);
+    return;
+  }
   if (kind === "custom")
     assertContent(
       data.props,

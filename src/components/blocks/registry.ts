@@ -16,6 +16,8 @@ import { VideoBlock, AudioBlock } from "./Media";
 import { PdfBlock } from "./Pdf";
 import { ReferencesBlock } from "./References";
 import { validateResearchData } from "./research-contract.mjs";
+import { MechanismStepsBlock, EvidenceExplorerBlock } from "./Presentation";
+import { validatePresentationData } from "./presentation-contract.mjs";
 import { ChartBlock } from "./Chart";
 import { DatabaseBlock } from "./Database";
 import { GalleryBlock } from "./Gallery";
@@ -409,5 +411,21 @@ for (const item of g2Metadata) {
     renderer: (props) =>
       createElement(G2ChartBlock, { ...props, chartType: item.kind.slice(3) }),
     validate: validateG2Data,
+  });
+}
+
+for (const [kind, renderer] of [
+  ["mechanism-steps", MechanismStepsBlock],
+  ["evidence-explorer", EvidenceExplorerBlock],
+] as const) {
+  const item = componentMetadata.find((item) => item.kind === kind)!;
+  registerBlock({
+    kind,
+    title: item.name,
+    description: item.description,
+    icon: "⇄",
+    defaultData: item.defaultData as BlockData,
+    renderer,
+    validate: (data) => validatePresentationData(kind, data),
   });
 }
