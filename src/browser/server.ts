@@ -41,6 +41,8 @@ export interface BrowserServerOptions {
   webRoot: string;
   cliEntry: string;
   settingsPath: string;
+  /** Verification hosts may leave the shared Agent launch registration untouched. */
+  registerAgentRuntime?: boolean;
   /** Only the source development launcher supplies this loopback frontend. */
   development?: { origin: string; token: string };
 }
@@ -108,7 +110,8 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     store = new FileStore(home);
     await openLibrary(store.root);
     service = new AgentService({ root: store.root });
-    await registerRuntime(store.root, info().cli);
+    if (options.registerAgentRuntime !== false)
+      await registerRuntime(store.root, info().cli);
     maintenance = new MaintenanceScheduler(store.root).start();
     syncManager(store.root).start();
     watcher = watch(store.root, {

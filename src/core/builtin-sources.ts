@@ -24,6 +24,7 @@ import themeContent from "../design/content.css?raw";
 import contract from "../components/blocks/primitive-contract.mjs?raw";
 import capacity from "../portable/capacity.mjs?raw";
 import sdk from "../components/blocks/sdk.tsx?raw";
+import actionHost from "../components/blocks/action-host.tsx?raw";
 import gestureBoundary from "../components/blocks/GestureBoundary.tsx?raw";
 import viewportLock from "../components/blocks/ViewportLock.tsx?raw";
 import viewportLockCss from "../components/blocks/viewport-lock.css?raw";
@@ -91,6 +92,7 @@ const sources: Record<string, string> = {
   "primitive-contract.mjs": contract,
   "capacity.mjs": capacity,
   "sdk.tsx": sdk,
+  "action-host.tsx": actionHost,
   "GestureBoundary.tsx": gestureBoundary,
   "ViewportLock.tsx": viewportLock,
   "viewport-lock.css": viewportLockCss,
