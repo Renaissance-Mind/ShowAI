@@ -1,6 +1,13 @@
 export type SurfaceKind = "page" | "board";
 export type PageWidthMode = "standard" | "wide" | "full";
-export type DrawingTool = "pen" | "rectangle" | "ellipse" | "arrow";
+export type DrawingTool =
+  "pen" | "highlighter" | "rectangle" | "ellipse" | "arrow";
+export type BoardTool = DrawingTool | "region";
+export interface DrawingStyle {
+  color: string;
+  fillColor: string;
+  strokeWidth: number;
+}
 export type LayoutMode = "flow" | "grid" | "free";
 export interface NodeLayout {
   x: number;

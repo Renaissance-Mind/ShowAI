@@ -1,5 +1,6 @@
 import type { SnapIndex, SnapGuide } from "./geometry.mjs";
 import { creationPoints, snapCreation } from "./drawing-geometry.mjs";
+import { finishBoardDrawing } from "./board-drawing.mjs";
 import { ObjectContext } from "./SurfaceObject";
 import {
   useContext,
@@ -9,7 +10,7 @@ import {
   type PointerEvent,
 } from "react";
 import type { JSONContent } from "@tiptap/core";
-import type { DrawingTool, NodeLayout } from "./types";
+import type { BoardTool, DrawingTool, NodeLayout } from "./types";
 import type { Camera } from "./model";
 type Point = { x: number; y: number };
 export function Drawing({
@@ -65,10 +66,18 @@ export function Drawing({
     window.addEventListener("blur", cancel);
     return () => window.removeEventListener("blur", cancel);
   }, [dragging]);
-  const { tool, points, color, strokeWidth, extent } = node.attrs! as {
+  const {
+    tool,
+    points,
+    color,
+    fillColor = "none",
+    strokeWidth,
+    extent,
+  } = node.attrs! as {
     tool: DrawingTool;
     points: Point[];
     color: string;
+    fillColor?: string;
     strokeWidth: number;
     extent: [number, number];
   };
@@ -92,8 +101,9 @@ export function Drawing({
         aria-label={node.attrs!.name || tool}
       >
         <g
-          fill="none"
+          fill={tool === "rectangle" || tool === "ellipse" ? fillColor : "none"}
           stroke={color}
+          opacity={tool === "highlighter" ? 0.35 : 1}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -238,6 +248,8 @@ export function Drawing({
 export function DrawingInput({
   tool,
   color,
+  fillColor = "none",
+  strokeWidth = 2.5,
   camera,
   panHeld,
   makeSnapIndex,
@@ -245,8 +257,10 @@ export function DrawingInput({
   onDraw,
   onExit,
 }: {
-  tool: DrawingTool;
+  tool: BoardTool;
   color: string;
+  fillColor?: string;
+  strokeWidth?: number;
   camera: { current: Camera };
   panHeld: { current: boolean };
   makeSnapIndex: () => SnapIndex;
@@ -265,6 +279,7 @@ export function DrawingInput({
     moved: boolean;
   } | null>(null);
   const surface = useRef<SVGSVGElement>(null);
+  const freehand = tool === "pen" || tool === "highlighter";
   const cancel = () => {
     const id = pending.current?.id;
     pending.current = null;
@@ -293,16 +308,20 @@ export function DrawingInput({
       ) *
         scale >=
       3;
-    if (
-      tool === "pen" &&
-      Math.hypot(next.x - last.x, next.y - last.y) * scale < 0.7
-    )
+    if (freehand && Math.hypot(next.x - last.x, next.y - last.y) * scale < 0.7)
       return;
-    let values =
-      tool === "pen"
-        ? [...pending.current.points, next]
-        : creationPoints(tool, pending.current.origin, next, event);
-    if ((tool === "rectangle" || tool === "ellipse") && !event.altKey) {
+    let values = freehand
+      ? [...pending.current.points, next]
+      : creationPoints(
+          tool === "region" ? "rectangle" : tool,
+          pending.current.origin,
+          next,
+          event,
+        );
+    if (
+      (tool === "rectangle" || tool === "ellipse" || tool === "region") &&
+      !event.altKey
+    ) {
       const snapped = snapCreation(
         values,
         pending.current.snap,
@@ -319,7 +338,14 @@ export function DrawingInput({
     points.length > 1
       ? {
           type: "drawing",
-          attrs: { tool, points, color, strokeWidth: 2.5, extent: [1, 1] },
+          attrs: {
+            tool: tool === "region" ? "rectangle" : tool,
+            points,
+            color,
+            fillColor,
+            strokeWidth,
+            extent: [1, 1],
+          },
         }
       : null;
   return (
@@ -351,50 +377,25 @@ export function DrawingInput({
       onPointerUp={(event) => {
         const current = pending.current;
         if (!current || current.id !== event.pointerId) return;
-        add(event);
-        let values = current.points;
-        if (!current.moved) {
-          const a = current.origin;
-          values =
-            tool === "pen"
-              ? [a, { x: a.x + 0.01, y: a.y + 0.01 }]
-              : tool === "arrow"
-                ? [a, { x: a.x + 100, y: a.y }]
-                : [
-                    { x: a.x - 100, y: a.y - 100 },
-                    { x: a.x + 100, y: a.y + 100 },
-                  ];
-        }
-        cancel();
-        if (event.currentTarget.hasPointerCapture(event.pointerId))
-          event.currentTarget.releasePointerCapture(event.pointerId);
-        if (values.length < 2) return;
-        const xs = values.map((p) => p.x),
-          ys = values.map((p) => p.y),
-          x = Math.min(...xs),
-          y = Math.min(...ys),
-          width = Math.max(1, Math.max(...xs) - x),
-          height = Math.max(1, Math.max(...ys) - y);
-        onDraw(
+        event.preventDefault();
+        event.stopPropagation();
+        const scale =
+          camera.current.scale *
+          (surface.current!.getBoundingClientRect().width /
+            surface.current!.clientWidth || 1);
+        const result = finishBoardDrawing(
+          tool,
+          { color, fillColor, strokeWidth },
           {
-            type: "drawing",
-            attrs: {
-              id: crypto.randomUUID(),
-              name: {
-                pen: "笔画",
-                rectangle: "矩形",
-                ellipse: "椭圆",
-                arrow: "箭头",
-              }[tool],
-              tool,
-              color,
-              strokeWidth: 2.5,
-              extent: [width, height],
-              points: values.map((p) => ({ x: p.x - x, y: p.y - y })),
-            },
+            ...current,
+            release: point(event.clientX, event.clientY),
+            scale,
           },
-          { x, y, width, height },
+          event,
         );
+        // Finish this gesture before release can emit lostpointercapture or a parent can unmount us.
+        cancel();
+        onDraw(result.node, result.frame);
       }}
       onPointerCancel={cancel}
       onLostPointerCapture={cancel}
@@ -411,9 +412,9 @@ export function DrawingInput({
           else onExit();
         } else if (pending.current && ["Shift", "Alt"].includes(event.key)) {
           const values = pending.current.points;
-          if (tool !== "pen" && values.length > 1) {
+          if (!freehand && values.length > 1) {
             const next = creationPoints(
-              tool,
+              tool === "region" ? "rectangle" : tool,
               pending.current.origin,
               pending.current.cursor,
               event,
@@ -426,11 +427,11 @@ export function DrawingInput({
       onKeyUp={(event) => {
         if (
           pending.current &&
-          tool !== "pen" &&
+          !freehand &&
           ["Shift", "Alt"].includes(event.key)
         ) {
           const next = creationPoints(
-            tool,
+            tool === "region" ? "rectangle" : tool,
             pending.current.origin,
             pending.current.cursor,
             event,
@@ -471,7 +472,13 @@ export function DrawingInput({
   );
 }
 function DrawingPreview({ node }: { node: JSONContent }) {
-  const { points, tool, color } = node.attrs!;
+  const {
+    points,
+    tool,
+    color,
+    fillColor = "none",
+    strokeWidth = 2.5,
+  } = node.attrs!;
   const a = points[0],
     b = points.at(-1);
   let path = points
@@ -485,8 +492,9 @@ function DrawingPreview({ node }: { node: JSONContent }) {
   return (
     <g
       stroke={color}
-      strokeWidth={2.5}
-      fill="none"
+      strokeWidth={strokeWidth}
+      fill={tool === "rectangle" || tool === "ellipse" ? fillColor : "none"}
+      opacity={tool === "highlighter" ? 0.35 : 1}
       strokeLinecap="round"
       strokeLinejoin="round"
     >

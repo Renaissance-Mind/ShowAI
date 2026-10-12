@@ -46,6 +46,27 @@ const candidate = (
 });
 
 describe("painted drawing geometry", () => {
+  it("filled shapes own their interior and participate in interior marquee selection", () => {
+    for (const tool of ["rectangle", "ellipse"]) {
+      const node = shape("filled", tool);
+      node.attrs!.fillColor = "#ffccaa";
+      expect(shapeHit(node, frame, { x: 50, y: 50 }).solid).toBe(true);
+      expect(
+        shapeIntersects(node, frame, { x: 45, y: 45, width: 10, height: 10 }),
+      ).toBe(true);
+      expect(
+        pickShape([
+          candidate("behind", 100, { x: 50, y: 50 }),
+          { ...candidate("filled", 100, { x: 50, y: 50 }), node },
+        ])?.id,
+      ).toBe("filled");
+      node.attrs!.fillColor = "none";
+      expect(shapeHit(node, frame, { x: 50, y: 50 }).solid).toBe(false);
+      expect(
+        shapeIntersects(node, frame, { x: 45, y: 45, width: 10, height: 10 }),
+      ).toBe(false);
+    }
+  });
   it("lets a smaller hollow shape win through a later, larger empty shape", () => {
     for (const point of [
       { x: 96, y: 50 },

@@ -1,3 +1,4 @@
+import { BlockSettings } from "./action-host";
 import { useId, useState } from "react";
 import { Check, FlaskConical, Plus, RotateCcw, Trash2 } from "../../ui/icons";
 import { finite, text, uid } from "./helpers";
@@ -121,156 +122,158 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
         </button>
       </BlockHeader>
       {editing && (
-        <div className="sb-editor-panel">
-          <div className="sb-form-row">
-            <Field label="标题">
-              <input
-                value={draft.title}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    title: event.target.value,
-                  }))
-                }
-              />
-            </Field>
-            <Field label="计算方式">
-              <select
-                value={draft.operation}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    operation: event.target.value,
-                  }))
-                }
-              >
-                {OPERATIONS.map((operation) => (
-                  <option key={operation.value} value={operation.value}>
-                    {operation.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
-          <div className="sb-form-row">
-            <Field label="结果名称">
-              <input
-                value={draft.resultLabel}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    resultLabel: event.target.value,
-                  }))
-                }
-              />
-            </Field>
-            <Field label="结果单位">
-              <input
-                value={draft.unit}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    unit: event.target.value,
-                  }))
-                }
-              />
-            </Field>
-          </div>
-          {draftInputs.map((input, index) => (
-            <div className="sb-parameter-editor" key={input.id}>
-              <div className="sb-form-row">
-                <Field label="参数名称">
-                  <input
-                    value={input.label}
-                    onChange={(event) =>
-                      updateDraftInput(index, { label: event.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="单位">
-                  <input
-                    value={input.unit ?? ""}
-                    onChange={(event) =>
-                      updateDraftInput(index, { unit: event.target.value })
-                    }
-                  />
-                </Field>
-                <button
-                  type="button"
-                  className="sb-icon-button sb-danger"
-                  aria-label={`删除参数${input.label}`}
-                  onClick={() =>
-                    setDraftInputs((current) =>
-                      current.filter(
-                        (_, currentIndex) => currentIndex !== index,
-                      ),
-                    )
+        <BlockSettings>
+          <div className="sb-editor-panel">
+            <div className="sb-form-row">
+              <Field label="标题">
+                <input
+                  value={draft.title}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      title: event.target.value,
+                    }))
+                  }
+                />
+              </Field>
+              <Field label="计算方式">
+                <select
+                  value={draft.operation}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      operation: event.target.value,
+                    }))
                   }
                 >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-              <div className="sb-form-row">
-                {(["min", "max", "step", "value"] as const).map(
-                  (key, keyIndex) => (
-                    <Field
-                      key={key}
-                      label={["最小值", "最大值", "步长", "初始值"][keyIndex]}
-                    >
-                      <input
-                        type="number"
-                        value={input[key]}
-                        onChange={(event) =>
-                          updateDraftInput(index, {
-                            [key]:
-                              event.target.value === ""
-                                ? 0
-                                : Number(event.target.value),
-                          })
-                        }
-                      />
-                    </Field>
-                  ),
-                )}
-              </div>
+                  {OPERATIONS.map((operation) => (
+                    <option key={operation.value} value={operation.value}>
+                      {operation.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
             </div>
-          ))}
-          {error && (
-            <p className="sb-error" role="alert">
-              {error}
-            </p>
-          )}
-          <div className="sb-panel-footer">
-            <button
-              type="button"
-              className="sb-button"
-              onClick={() =>
-                setDraftInputs((current) => [
-                  ...current,
-                  {
-                    id: uid(),
-                    label: "新参数",
-                    min: 0,
-                    max: 100,
-                    step: 1,
-                    value: 0,
-                  },
-                ])
-              }
-            >
-              <Plus size={14} />
-              添加参数
-            </button>
-            <button
-              type="button"
-              className="sb-button sb-primary"
-              onClick={save}
-            >
-              <Check size={14} />
-              保存
-            </button>
+            <div className="sb-form-row">
+              <Field label="结果名称">
+                <input
+                  value={draft.resultLabel}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      resultLabel: event.target.value,
+                    }))
+                  }
+                />
+              </Field>
+              <Field label="结果单位">
+                <input
+                  value={draft.unit}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      unit: event.target.value,
+                    }))
+                  }
+                />
+              </Field>
+            </div>
+            {draftInputs.map((input, index) => (
+              <div className="sb-parameter-editor" key={input.id}>
+                <div className="sb-form-row">
+                  <Field label="参数名称">
+                    <input
+                      value={input.label}
+                      onChange={(event) =>
+                        updateDraftInput(index, { label: event.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="单位">
+                    <input
+                      value={input.unit ?? ""}
+                      onChange={(event) =>
+                        updateDraftInput(index, { unit: event.target.value })
+                      }
+                    />
+                  </Field>
+                  <button
+                    type="button"
+                    className="sb-icon-button sb-danger"
+                    aria-label={`删除参数${input.label}`}
+                    onClick={() =>
+                      setDraftInputs((current) =>
+                        current.filter(
+                          (_, currentIndex) => currentIndex !== index,
+                        ),
+                      )
+                    }
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+                <div className="sb-form-row">
+                  {(["min", "max", "step", "value"] as const).map(
+                    (key, keyIndex) => (
+                      <Field
+                        key={key}
+                        label={["最小值", "最大值", "步长", "初始值"][keyIndex]}
+                      >
+                        <input
+                          type="number"
+                          value={input[key]}
+                          onChange={(event) =>
+                            updateDraftInput(index, {
+                              [key]:
+                                event.target.value === ""
+                                  ? 0
+                                  : Number(event.target.value),
+                            })
+                          }
+                        />
+                      </Field>
+                    ),
+                  )}
+                </div>
+              </div>
+            ))}
+            {error && (
+              <p className="sb-error" role="alert">
+                {error}
+              </p>
+            )}
+            <div className="sb-panel-footer">
+              <button
+                type="button"
+                className="sb-button"
+                onClick={() =>
+                  setDraftInputs((current) => [
+                    ...current,
+                    {
+                      id: uid(),
+                      label: "新参数",
+                      min: 0,
+                      max: 100,
+                      step: 1,
+                      value: 0,
+                    },
+                  ])
+                }
+              >
+                <Plus size={14} />
+                添加参数
+              </button>
+              <button
+                type="button"
+                className="sb-button sb-primary"
+                onClick={save}
+              >
+                <Check size={14} />
+                保存
+              </button>
+            </div>
           </div>
-        </div>
+        </BlockSettings>
       )}
       <div className="sb-playground-body">
         <div className="sb-parameters">

@@ -1,0 +1,89 @@
+import { creationPoints, snapCreation } from "./drawing-geometry.mjs";
+import { pointsBounds } from "./geometry.mjs";
+
+/** Release coordinates are authoritative even if no move/paint frame was delivered. */
+export function finishBoardDrawing(tool, style, gesture, modifiers = {}) {
+  const { origin, release, scale, snap } = gesture;
+  const freehand = tool === "pen" || tool === "highlighter";
+  const moved =
+    gesture.moved ||
+    Math.hypot(release.x - origin.x, release.y - origin.y) * scale >= 3;
+  let points;
+  if (!moved) {
+    points = freehand
+      ? [origin, { x: origin.x + 0.01, y: origin.y + 0.01 }]
+      : tool === "arrow"
+        ? [origin, { x: origin.x + 100, y: origin.y }]
+        : [
+            { x: origin.x - 100, y: origin.y - 100 },
+            { x: origin.x + 100, y: origin.y + 100 },
+          ];
+  } else if (freehand) {
+    points = [...gesture.points];
+    const last = points.at(-1);
+    if (!last || last.x !== release.x || last.y !== release.y)
+      points.push(release);
+    if (points.length === 1)
+      points.push({ x: release.x + 0.01, y: release.y + 0.01 });
+  } else {
+    points = creationPoints(
+      tool === "region" ? "rectangle" : tool,
+      origin,
+      release,
+      modifiers,
+    );
+    if (
+      snap &&
+      ["rectangle", "ellipse", "region"].includes(tool) &&
+      !modifiers.altKey
+    )
+      points = snapCreation(points, snap, scale, modifiers.shiftKey).points;
+  }
+  if (points.length > 20000)
+    points = [...points.slice(0, 19999), points.at(-1)];
+  const bounds = pointsBounds(points);
+  const frame = {
+    x: bounds.x,
+    y: bounds.y,
+    width: Math.max(1, bounds.width),
+    height: Math.max(1, bounds.height),
+  };
+  if (tool === "region")
+    return {
+      node: {
+        type: "region",
+        attrs: { id: crypto.randomUUID(), name: "区域" },
+        content: [],
+      },
+      frame: {
+        ...frame,
+        width: Math.max(120, frame.width),
+        height: Math.max(40, frame.height),
+        mode: "free",
+        gap: 24,
+      },
+    };
+  return {
+    node: {
+      type: "drawing",
+      attrs: {
+        id: crypto.randomUUID(),
+        name: {
+          pen: "笔画",
+          highlighter: "荧光笔",
+          rectangle: "矩形",
+          ellipse: "椭圆",
+          arrow: "箭头",
+        }[tool],
+        tool,
+        ...style,
+        extent: [frame.width, frame.height],
+        points: points.map((point) => ({
+          x: point.x - frame.x,
+          y: point.y - frame.y,
+        })),
+      },
+    },
+    frame,
+  };
+}

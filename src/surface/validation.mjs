@@ -182,10 +182,20 @@ function validateResource(document) {
     if (node.type === "drawing") {
       if (owner?.attrs.kind !== "board")
         throw new Error("Drawings belong inside a Board.");
-      if (!["pen", "rectangle", "ellipse", "arrow"].includes(node.attrs.tool))
+      if (
+        !["pen", "highlighter", "rectangle", "ellipse", "arrow"].includes(
+          node.attrs.tool,
+        )
+      )
         throw new Error("Unknown drawing tool.");
       if (!/^#[0-9a-fA-F]{6}$/.test(node.attrs.color))
         throw new Error("Drawing color must be a six-digit hex value.");
+      if (
+        node.attrs.fillColor !== undefined &&
+        node.attrs.fillColor !== "none" &&
+        !/^#[0-9a-fA-F]{6}$/.test(node.attrs.fillColor)
+      )
+        throw new Error("Drawing fill must be none or a six-digit hex value.");
       if (!Array.isArray(node.attrs.extent) || node.attrs.extent.length !== 2)
         throw new Error("Drawing extent requires width and height.");
       node.attrs.extent.forEach((value) =>

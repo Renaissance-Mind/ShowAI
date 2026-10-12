@@ -1,3 +1,4 @@
+import { BlockSettings } from "./action-host";
 import { useId, useMemo, useState } from "react";
 import {
   BarChart3,
@@ -185,47 +186,49 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
         )}
       </BlockHeader>
       {editing && (
-        <div className="sb-editor-panel">
-          <div className="sb-form-row">
-            <Field label="标题">
-              <input
-                value={draftTitle}
-                onChange={(event) => setDraftTitle(event.target.value)}
+        <BlockSettings>
+          <div className="sb-editor-panel">
+            <div className="sb-form-row">
+              <Field label="标题">
+                <input
+                  value={draftTitle}
+                  onChange={(event) => setDraftTitle(event.target.value)}
+                />
+              </Field>
+              <Field label="单位">
+                <input
+                  placeholder="例如：ms、%"
+                  value={draftUnit}
+                  onChange={(event) => setDraftUnit(event.target.value)}
+                />
+              </Field>
+            </div>
+            <Field label="数据 · labels 是横轴，series 是数值系列">
+              <textarea
+                className="sb-code-input"
+                rows={10}
+                spellCheck={false}
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
               />
             </Field>
-            <Field label="单位">
-              <input
-                placeholder="例如：ms、%"
-                value={draftUnit}
-                onChange={(event) => setDraftUnit(event.target.value)}
-              />
-            </Field>
+            {error && (
+              <p role="alert" className="sb-error">
+                {error}
+              </p>
+            )}
+            <div className="sb-panel-footer">
+              <button
+                type="button"
+                className="sb-button sb-primary"
+                onClick={save}
+              >
+                <Check size={14} />
+                应用数据
+              </button>
+            </div>
           </div>
-          <Field label="数据 · labels 是横轴，series 是数值系列">
-            <textarea
-              className="sb-code-input"
-              rows={10}
-              spellCheck={false}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-            />
-          </Field>
-          {error && (
-            <p role="alert" className="sb-error">
-              {error}
-            </p>
-          )}
-          <div className="sb-panel-footer">
-            <button
-              type="button"
-              className="sb-button sb-primary"
-              onClick={save}
-            >
-              <Check size={14} />
-              应用数据
-            </button>
-          </div>
-        </div>
+        </BlockSettings>
       )}
       {!labels.length || !series.length ? (
         <EmptyState

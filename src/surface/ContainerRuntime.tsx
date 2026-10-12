@@ -36,6 +36,8 @@ import {
   LayoutDashboard,
   MousePointer2,
   Pencil,
+  Highlighter,
+  PanelsTopLeft,
   Square,
   Circle,
   ArrowUpRight,
@@ -43,7 +45,12 @@ import {
   X,
 } from "../ui/icons";
 import type { ContainerDocument, ShowDocument } from "../types";
-import type { DrawingTool, NodeLayout, PageWidthMode } from "./types";
+import type {
+  BoardTool,
+  DrawingStyle,
+  NodeLayout,
+  PageWidthMode,
+} from "./types";
 import {
   SurfaceContent,
   nodeName,
@@ -79,7 +86,7 @@ interface Runtime {
   pageWidthModes: boolean;
   selected: string | null;
   select: (id: string | null) => void;
-  inspect: (id: string) => void;
+  inspect: (id: string | null) => void;
   expand: (id: string) => void;
   active: string;
   activate: (id: string) => void;
@@ -87,6 +94,11 @@ interface Runtime {
   scrolls: Map<string, number>;
   revealRequest: string | null;
   requestReveal: (id: string | null) => void;
+  openComponents: (
+    parentId: string,
+    point: { x: number; y: number },
+    position: { x: number; y: number },
+  ) => void;
 }
 const Context = createContext<Runtime>(null!);
 export function ContainerRuntime({
@@ -148,6 +160,7 @@ export function ContainerRuntime({
     parentId: string;
     left: number;
     top: number;
+    position?: { x: number; y: number };
   } | null>(null);
   const [loadedComponents, setLoadedComponents] = useState<CompiledComponent[]>(
     [],
@@ -222,6 +235,10 @@ export function ContainerRuntime({
       ? document.title || nodeName(root)
       : nodeName(root);
   const kind = surfaceKind(root);
+  useEffect(() => {
+    if (kind === "board" && inspecting && inspecting !== selected)
+      inspect(null);
+  }, [kind, selected, inspecting]);
   const controls = useMemo<EditorControls | null>(
     () =>
       onChange && undo && redo
@@ -318,6 +335,8 @@ export function ContainerRuntime({
     scrolls: scrolls.current,
     revealRequest,
     requestReveal,
+    openComponents: (parentId, point, position) =>
+      setSlash({ parentId, left: point.x, top: point.y, position }),
   };
   const selectedEntry = inspecting
     ? findSurfaceNode(document, inspecting)
@@ -374,9 +393,14 @@ export function ContainerRuntime({
                   kind,
                   data,
                 );
+                if (slash.position)
+                  Object.assign(
+                    inserted.document.layout[inserted.nodeId],
+                    slash.position,
+                  );
                 runtime.commit(inserted.document);
                 select(inserted.nodeId);
-                requestReveal(inserted.nodeId);
+                if (!slash.position) requestReveal(inserted.nodeId);
                 closeSlash();
               }}
             />
@@ -506,7 +530,7 @@ export function ContainerRuntime({
             </div>
             {selectedEntry && (
               <aside
-                className="surface-inspector container-inspector"
+                className={`surface-inspector container-inspector${kind === "board" ? " board-bottom-inspector" : ""}`}
                 data-surface-ui
                 aria-label="模块设置"
               >
@@ -819,8 +843,20 @@ function ContainerView({
   const viewport = useRef<SurfaceHandle>(null),
     page = useRef<HTMLDivElement>(null);
   const [toolLocked, setToolLocked] = useState(false);
-  const [tool, setTool] = useState<DrawingTool | null>(null),
-    [color, setColor] = useState("#252629");
+  const [tool, setTool] = useState<BoardTool | null>(null);
+  const [styles, setStyles] = useState<Record<string, DrawingStyle>>({
+    pen: { color: "#252629", fillColor: "none", strokeWidth: 2.5 },
+    highlighter: { color: "#facc15", fillColor: "none", strokeWidth: 16 },
+    shape: { color: "#252629", fillColor: "none", strokeWidth: 2.5 },
+  });
+  const styleKey = tool === "pen" || tool === "highlighter" ? tool : "shape";
+  const style = styles[styleKey];
+  const chooseTool = (next: BoardTool | null) => {
+    runtime.activate(id);
+    runtime.select(null);
+    runtime.inspect(null);
+    setTool(next);
+  };
   const enabled = root || runtime.active === id;
   const persistKey = `showai.page-scroll.v3:${runtime.document.id}:${id}:${root ? "expanded" : "embedded"}`;
   useLayoutEffect(() => {
@@ -1069,9 +1105,71 @@ function ContainerView({
                   })
           }
           drawTool={tool}
-          drawColor={color}
+          drawColor={style.color}
+          drawFillColor={style.fillColor}
+          drawStrokeWidth={style.strokeWidth}
+          onStyleChange={(ids, patch) => {
+            const drawings = ids.filter(
+              (nodeId) =>
+                findSurfaceNode(runtime.current.current, nodeId)?.node.type ===
+                "drawing",
+            );
+            if (tool && tool !== "region" && drawings.length)
+              setStyles((before) => ({
+                ...before,
+                [styleKey]: { ...before[styleKey], ...patch },
+              }));
+            if (!drawings.length) {
+              setStyles((before) => ({
+                ...before,
+                [styleKey]: { ...before[styleKey], ...patch },
+              }));
+              return;
+            }
+            let next = runtime.current.current;
+            for (const nodeId of drawings)
+              next = editNode(next, nodeId, (node) => {
+                const applicable = { ...patch };
+                if (!["rectangle", "ellipse"].includes(node.attrs!.tool))
+                  delete applicable.fillColor;
+                node.attrs = { ...node.attrs, ...applicable };
+              }) as ContainerDocument;
+            runtime.commit(next);
+          }}
+          onAddComponent={
+            readOnly
+              ? undefined
+              : (kind, point) => {
+                  const inserted = insertComponent(
+                    runtime.current.current,
+                    id,
+                    kind,
+                    kind === "text"
+                      ? {
+                          format: "richtext",
+                          content: {
+                            type: "doc",
+                            content: [{ type: "paragraph" }],
+                          },
+                        }
+                      : {},
+                  );
+                  Object.assign(
+                    inserted.document.layout[inserted.nodeId],
+                    point,
+                  );
+                  runtime.commit(inserted.document);
+                  runtime.select(inserted.nodeId);
+                  setTool(null);
+                }
+          }
+          onOpenComponents={
+            readOnly
+              ? undefined
+              : (point, position) => runtime.openComponents(id, point, position)
+          }
           onDrawExit={() => setTool(null)}
-          onToolChange={setTool}
+          onToolChange={chooseTool}
           onDraw={
             readOnly
               ? undefined
@@ -1100,7 +1198,7 @@ function ContainerView({
                     addNode(runtime.current.current, drawing, frame, id),
                   );
                   runtime.select(drawing.attrs!.id);
-                  if (tool !== "pen" && !toolLocked) {
+                  if (tool !== "pen" && tool !== "highlighter" && !toolLocked) {
                     setTool(null);
                   }
                 }
@@ -1114,27 +1212,28 @@ function ContainerView({
                     type="button"
                     aria-label="选择工具"
                     aria-pressed={!tool}
-                    onClick={() => setTool(null)}
+                    onClick={() => chooseTool(null)}
                   >
                     <MousePointer2 size={15} />
                   </button>
                   {(
                     [
                       ["pen", "画笔", Pencil],
+                      ["highlighter", "荧光笔", Highlighter],
                       ["rectangle", "矩形", Square],
                       ["ellipse", "椭圆", Circle],
                       ["arrow", "箭头", ArrowUpRight],
+                      ["region", "区域", PanelsTopLeft],
                     ] as const
                   ).map(([value, label, Icon]) => (
                     <button
                       type="button"
                       key={value}
                       aria-label={label}
-                      title={`${label}（${{ pen: "P", rectangle: "R", ellipse: "E", arrow: "A" }[value]}）${value === "pen" ? "" : "；Shift 约束形状，Alt 从中心绘制"}`}
+                      title={`${label}（${{ pen: "P", highlighter: "H", rectangle: "R", ellipse: "E", arrow: "A", region: "F" }[value]}）${value === "pen" || value === "highlighter" ? "" : "；Shift 约束形状，Alt 从中心绘制"}`}
                       aria-pressed={tool === value}
                       onClick={() => {
-                        runtime.activate(id);
-                        setTool(value);
+                        chooseTool(value);
                       }}
                     >
                       <Icon size={15} />
@@ -1149,13 +1248,6 @@ function ContainerView({
                   >
                     <LockKeyhole size={15} />
                   </button>
-                  <input
-                    className="board-pen-color"
-                    type="color"
-                    aria-label="画笔颜色"
-                    value={color}
-                    onChange={(event) => setColor(event.target.value)}
-                  />
                 </>
               )}
             </>

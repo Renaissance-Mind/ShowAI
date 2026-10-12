@@ -1,3 +1,4 @@
+import { BlockSettings } from "./action-host";
 import {
   CAPACITY,
   assertContent,
@@ -264,158 +265,162 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
         onEdit={openEditor}
       />
       {editing && (
-        <div className="sb-editor-panel">
-          <div className="sb-form-row">
-            <Field label="标题">
-              <input
-                value={draftTitle}
-                onChange={(event) => setDraftTitle(event.target.value)}
-              />
-            </Field>
-            <Field label="排列">
-              <select
-                value={draftColumns}
-                onChange={(event) =>
-                  setDraftColumns(Number(event.target.value))
-                }
-              >
-                <option value={1}>单列</option>
-                <option value={2}>两列</option>
-                <option value={3}>三列</option>
-              </select>
-            </Field>
-          </div>
-          {draftImages.map((item, index) => (
-            <div className="sb-gallery-editor" key={item.id}>
-              <div className="sb-gallery-editor-preview">
-                {safeImageUrl(item.src) ? (
-                  <img
-                    src={safeImageUrl(item.src)}
-                    alt=""
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <Images size={20} />
-                )}
-              </div>
-              <div className="sb-gallery-editor-fields">
-                <Field label={`图片 ${index + 1} 地址`}>
-                  <input
-                    value={
-                      item.src.startsWith("data:") ? "已嵌入本地图片" : item.src
-                    }
-                    readOnly={item.src.startsWith("data:")}
-                    placeholder="https://…"
-                    onChange={(event) =>
-                      updateImage(index, { src: event.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="图片描述">
-                  <input
-                    value={item.alt}
-                    onChange={(event) =>
-                      updateImage(index, { alt: event.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="图注">
-                  <input
-                    value={item.caption}
-                    onChange={(event) =>
-                      updateImage(index, { caption: event.target.value })
-                    }
-                  />
-                </Field>
-              </div>
-              <div className="sb-gallery-editor-actions">
-                <button
-                  type="button"
-                  className="sb-icon-button"
-                  aria-label={`上移图片 ${index + 1}`}
-                  disabled={index === 0 || busy}
-                  onClick={() => moveImage(index, -1)}
-                >
-                  <ArrowUp size={14} />
-                </button>
-                <button
-                  type="button"
-                  className="sb-icon-button"
-                  aria-label={`下移图片 ${index + 1}`}
-                  disabled={index === draftImages.length - 1 || busy}
-                  onClick={() => moveImage(index, 1)}
-                >
-                  <ArrowDown size={14} />
-                </button>
-                <button
-                  type="button"
-                  className="sb-icon-button sb-danger"
-                  aria-label={`删除图片 ${index + 1}`}
-                  disabled={busy}
-                  onClick={() =>
-                    setDraftImages((current) =>
-                      current.filter(
-                        (_, currentIndex) => currentIndex !== index,
-                      ),
-                    )
+        <BlockSettings>
+          <div className="sb-editor-panel">
+            <div className="sb-form-row">
+              <Field label="标题">
+                <input
+                  value={draftTitle}
+                  onChange={(event) => setDraftTitle(event.target.value)}
+                />
+              </Field>
+              <Field label="排列">
+                <select
+                  value={draftColumns}
+                  onChange={(event) =>
+                    setDraftColumns(Number(event.target.value))
                   }
                 >
-                  <Trash2 size={14} />
+                  <option value={1}>单列</option>
+                  <option value={2}>两列</option>
+                  <option value={3}>三列</option>
+                </select>
+              </Field>
+            </div>
+            {draftImages.map((item, index) => (
+              <div className="sb-gallery-editor" key={item.id}>
+                <div className="sb-gallery-editor-preview">
+                  {safeImageUrl(item.src) ? (
+                    <img
+                      src={safeImageUrl(item.src)}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <Images size={20} />
+                  )}
+                </div>
+                <div className="sb-gallery-editor-fields">
+                  <Field label={`图片 ${index + 1} 地址`}>
+                    <input
+                      value={
+                        item.src.startsWith("data:")
+                          ? "已嵌入本地图片"
+                          : item.src
+                      }
+                      readOnly={item.src.startsWith("data:")}
+                      placeholder="https://…"
+                      onChange={(event) =>
+                        updateImage(index, { src: event.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="图片描述">
+                    <input
+                      value={item.alt}
+                      onChange={(event) =>
+                        updateImage(index, { alt: event.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="图注">
+                    <input
+                      value={item.caption}
+                      onChange={(event) =>
+                        updateImage(index, { caption: event.target.value })
+                      }
+                    />
+                  </Field>
+                </div>
+                <div className="sb-gallery-editor-actions">
+                  <button
+                    type="button"
+                    className="sb-icon-button"
+                    aria-label={`上移图片 ${index + 1}`}
+                    disabled={index === 0 || busy}
+                    onClick={() => moveImage(index, -1)}
+                  >
+                    <ArrowUp size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    className="sb-icon-button"
+                    aria-label={`下移图片 ${index + 1}`}
+                    disabled={index === draftImages.length - 1 || busy}
+                    onClick={() => moveImage(index, 1)}
+                  >
+                    <ArrowDown size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    className="sb-icon-button sb-danger"
+                    aria-label={`删除图片 ${index + 1}`}
+                    disabled={busy}
+                    onClick={() =>
+                      setDraftImages((current) =>
+                        current.filter(
+                          (_, currentIndex) => currentIndex !== index,
+                        ),
+                      )
+                    }
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+            <input
+              className="sb-hidden"
+              ref={fileInput}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp,image/avif"
+              multiple
+              aria-label="选择本地图片"
+              onChange={(event) => void upload(event.target.files)}
+            />
+            {error && (
+              <p className="sb-error" role="alert">
+                {error}
+              </p>
+            )}
+            <div className="sb-panel-footer">
+              <div className="sb-actions">
+                <button
+                  type="button"
+                  className="sb-button"
+                  disabled={busy}
+                  onClick={() => fileInput.current?.click()}
+                >
+                  <Upload size={14} />
+                  {busy ? "读取中…" : "上传图片"}
+                </button>
+                <button
+                  type="button"
+                  className="sb-button"
+                  disabled={busy}
+                  onClick={() =>
+                    setDraftImages((current) => [
+                      ...current,
+                      { id: uid(), src: "", alt: "", caption: "" },
+                    ])
+                  }
+                >
+                  <Plus size={14} />
+                  添加链接
                 </button>
               </div>
-            </div>
-          ))}
-          <input
-            className="sb-hidden"
-            ref={fileInput}
-            type="file"
-            accept="image/png,image/jpeg,image/gif,image/webp,image/avif"
-            multiple
-            aria-label="选择本地图片"
-            onChange={(event) => void upload(event.target.files)}
-          />
-          {error && (
-            <p className="sb-error" role="alert">
-              {error}
-            </p>
-          )}
-          <div className="sb-panel-footer">
-            <div className="sb-actions">
               <button
                 type="button"
-                className="sb-button"
+                className="sb-button sb-primary"
                 disabled={busy}
-                onClick={() => fileInput.current?.click()}
+                onClick={save}
               >
-                <Upload size={14} />
-                {busy ? "读取中…" : "上传图片"}
-              </button>
-              <button
-                type="button"
-                className="sb-button"
-                disabled={busy}
-                onClick={() =>
-                  setDraftImages((current) => [
-                    ...current,
-                    { id: uid(), src: "", alt: "", caption: "" },
-                  ])
-                }
-              >
-                <Plus size={14} />
-                添加链接
+                <Check size={14} />
+                保存画廊
               </button>
             </div>
-            <button
-              type="button"
-              className="sb-button sb-primary"
-              disabled={busy}
-              onClick={save}
-            >
-              <Check size={14} />
-              保存画廊
-            </button>
           </div>
-        </div>
+        </BlockSettings>
       )}
       {visibleImages.length ? (
         <div className={`sb-gallery-grid sb-gallery-columns-${columns}`}>

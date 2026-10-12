@@ -1,3 +1,4 @@
+import { BlockSettings } from "./action-host";
 import { CAPACITY, formatBytes } from "../../portable/capacity.mjs";
 import { useState } from "react";
 import { Check, Upload } from "../../ui/icons";
@@ -74,121 +75,125 @@ export function ResourceEditor({
     }
   };
   return (
-    <div
-      className="sb-editor-panel"
-      onKeyDown={(event) => {
-        event.stopPropagation();
-        if (event.key === "Escape") onClose();
-      }}
-    >
-      <div className="sb-resource-source">
-        <label className="sb-button sb-resource-upload">
-          <Upload size={14} />
-          {loading ? "读取文件…" : "选择本地文件"}
-          <input
-            type="file"
-            aria-label="选择本地文件"
-            disabled={loading}
-            accept={kind === "pdf" ? ".pdf,application/pdf" : `${kind}/*`}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void upload(file);
-              event.target.value = "";
-            }}
-          />
-        </label>
-        {text(draft.fileName) && (
-          <span className="sb-resource-file-name">{text(draft.fileName)}</span>
-        )}
-      </div>
-      <Field label="在线文件地址">
-        <input
-          type="url"
-          placeholder="https://…"
-          value={text(draft.src).startsWith("data:") ? "" : text(draft.src)}
-          onChange={(event) =>
-            setDraft((current) => ({
-              ...current,
-              src: event.target.value,
-              fileName: "",
-            }))
-          }
-        />
-      </Field>
-      <Field label="标题">
-        <input
-          value={text(draft.title)}
-          onChange={(event) => set("title", event.target.value)}
-        />
-      </Field>
-      <Field label="说明">
-        <textarea
-          rows={2}
-          value={text(draft.caption)}
-          onChange={(event) => set("caption", event.target.value)}
-        />
-      </Field>
-      {kind === "video" && (
-        <>
-          <Field label="画面比例">
-            <select
-              value={text(draft.aspectRatio, "16:9")}
-              onChange={(event) => set("aspectRatio", event.target.value)}
-            >
-              {["16:9", "4:3", "1:1", "9:16"].map((ratio) => (
-                <option key={ratio}>{ratio}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="封面图片地址">
+    <BlockSettings>
+      <div
+        className="sb-editor-panel"
+        onKeyDown={(event) => {
+          event.stopPropagation();
+          if (event.key === "Escape") onClose();
+        }}
+      >
+        <div className="sb-resource-source">
+          <label className="sb-button sb-resource-upload">
+            <Upload size={14} />
+            {loading ? "读取文件…" : "选择本地文件"}
             <input
-              value={text(draft.poster)}
-              onChange={(event) => set("poster", event.target.value)}
+              type="file"
+              aria-label="选择本地文件"
+              disabled={loading}
+              accept={kind === "pdf" ? ".pdf,application/pdf" : `${kind}/*`}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void upload(file);
+                event.target.value = "";
+              }}
             />
-          </Field>
-        </>
-      )}
-      {kind === "pdf" && (
-        <div className="sb-resource-fields">
-          <Field label="初始页码">
-            <input
-              type="number"
-              min={1}
-              value={Number(draft.page ?? 1)}
-              onChange={(event) => set("page", event.target.valueAsNumber)}
-            />
-          </Field>
-          <Field label="阅读区高度">
-            <input
-              type="number"
-              min={240}
-              max={1200}
-              value={Number(draft.height ?? 560)}
-              onChange={(event) => set("height", event.target.valueAsNumber)}
-            />
-          </Field>
+          </label>
+          {text(draft.fileName) && (
+            <span className="sb-resource-file-name">
+              {text(draft.fileName)}
+            </span>
+          )}
         </div>
-      )}
-      <p className="sb-resource-hint">
-        本地文件随页面保存；在线地址需要网络。单个原始文件最多 64
-        MiB，页面资源合计最多 128 MiB；页面文字与结构另行计算。
-      </p>
-      {error && (
-        <p className="sb-error" role="alert">
-          {error}
+        <Field label="在线文件地址">
+          <input
+            type="url"
+            placeholder="https://…"
+            value={text(draft.src).startsWith("data:") ? "" : text(draft.src)}
+            onChange={(event) =>
+              setDraft((current) => ({
+                ...current,
+                src: event.target.value,
+                fileName: "",
+              }))
+            }
+          />
+        </Field>
+        <Field label="标题">
+          <input
+            value={text(draft.title)}
+            onChange={(event) => set("title", event.target.value)}
+          />
+        </Field>
+        <Field label="说明">
+          <textarea
+            rows={2}
+            value={text(draft.caption)}
+            onChange={(event) => set("caption", event.target.value)}
+          />
+        </Field>
+        {kind === "video" && (
+          <>
+            <Field label="画面比例">
+              <select
+                value={text(draft.aspectRatio, "16:9")}
+                onChange={(event) => set("aspectRatio", event.target.value)}
+              >
+                {["16:9", "4:3", "1:1", "9:16"].map((ratio) => (
+                  <option key={ratio}>{ratio}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="封面图片地址">
+              <input
+                value={text(draft.poster)}
+                onChange={(event) => set("poster", event.target.value)}
+              />
+            </Field>
+          </>
+        )}
+        {kind === "pdf" && (
+          <div className="sb-resource-fields">
+            <Field label="初始页码">
+              <input
+                type="number"
+                min={1}
+                value={Number(draft.page ?? 1)}
+                onChange={(event) => set("page", event.target.valueAsNumber)}
+              />
+            </Field>
+            <Field label="阅读区高度">
+              <input
+                type="number"
+                min={240}
+                max={1200}
+                value={Number(draft.height ?? 560)}
+                onChange={(event) => set("height", event.target.valueAsNumber)}
+              />
+            </Field>
+          </div>
+        )}
+        <p className="sb-resource-hint">
+          本地文件随页面保存；在线地址需要网络。单个原始文件最多 64
+          MiB，页面资源合计最多 128 MiB；页面文字与结构另行计算。
         </p>
-      )}
-      <div className="sb-panel-footer">
-        <button
-          className="sb-button sb-primary"
-          type="button"
-          disabled={loading}
-          onClick={save}
-        >
-          <Check size={14} />
-          保存
-        </button>
+        {error && (
+          <p className="sb-error" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="sb-panel-footer">
+          <button
+            className="sb-button sb-primary"
+            type="button"
+            disabled={loading}
+            onClick={save}
+          >
+            <Check size={14} />
+            保存
+          </button>
+        </div>
       </div>
-    </div>
+    </BlockSettings>
   );
 }

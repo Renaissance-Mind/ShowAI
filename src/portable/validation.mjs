@@ -490,6 +490,7 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
             "name",
             "tool",
             "color",
+            "fillColor",
             "strokeWidth",
             "extent",
             "points",

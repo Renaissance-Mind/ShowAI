@@ -1,5 +1,6 @@
 import { Settings2, X } from "../../ui/icons";
-import type { ReactNode } from "react";
+import { useContext, useLayoutEffect, type ReactNode } from "react";
+import { BlockActions, BlockActionHost } from "./action-host";
 
 const genericTitles = new Set([
   "数据图表",
@@ -74,6 +75,14 @@ export function BlockHeader({
   onEdit?: () => void;
   children?: ReactNode;
 }) {
+  const host = useContext(BlockActionHost);
+  useLayoutEffect(() => {
+    if (!host || !editing || !onEdit) return;
+    host.closeSettings = onEdit;
+    return () => {
+      if (host.closeSettings === onEdit) delete host.closeSettings;
+    };
+  }, [host, editing, onEdit]);
   const caption = title?.trim();
 
   const visibleTitle =
@@ -95,20 +104,22 @@ export function BlockHeader({
         </div>
       )}
       {(children || editable) && (
-        <div className="sb-actions" role="group" aria-label="组件操作">
-          {children}
-          {editable && (
-            <button
-              type="button"
-              className={`sb-icon-button ${editing ? "is-active" : ""}`}
-              onClick={onEdit}
-              aria-label={editing ? "关闭设置" : "编辑区块"}
-              title={editing ? "关闭设置" : "编辑区块"}
-            >
-              {editing ? <X size={16} /> : <Settings2 size={16} />}
-            </button>
-          )}
-        </div>
+        <BlockActions>
+          <div className="sb-actions" role="group" aria-label="组件操作">
+            {children}
+            {editable && (
+              <button
+                type="button"
+                className={`sb-icon-button ${editing ? "is-active" : ""}`}
+                onClick={onEdit}
+                aria-label={editing ? "关闭设置" : "编辑区块"}
+                title={editing ? "关闭设置" : "编辑区块"}
+              >
+                {editing ? <X size={16} /> : <Settings2 size={16} />}
+              </button>
+            )}
+          </div>
+        </BlockActions>
       )}
     </div>
   );

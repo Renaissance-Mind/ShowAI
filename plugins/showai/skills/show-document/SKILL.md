@@ -39,6 +39,8 @@ description: 通过 ShowAI MCP 制作、续改、展示和导出可交互报告�
 
 ## 制作与验证
 
+编辑 Board 的绘画、对象属性、布局或连接时，按需读 [Board 对象编辑](references/board-authoring.md)，再以当前运行时 guide 和真实页面核对字段及操作能力。
+
 需要具体操作时才读 guide authoring/containers/document 等技术说明；选择组件后读其精确 guide/schema。模板组件采用 template_context 返回的 componentId/version/integrity，不能把局部名字当内置 kind。现有数据调整或组件组合够用时复用；明确缺口进入 [create-component](../create-component/SKILL.md)。新建可复用模板进入 [create-template](../create-template/SKILL.md)。
 
 模板应用用 template_apply，可带本轮固定 templates。空白路径用 page_create。修改前 page_read({projectId,pageId,rendered:false,response:"source"}) 读取完整源、hash/revision；局部编辑同时保留必要基线，不用局部 source 覆盖整页。优先 page_apply 的稳定节点操作，response:"receipt" 只收保存回执。需要新模板绑定时以 page.set.fields.templateContext 保存 template_context 返回的 format/system/templates，去掉 hash；运行时仍强制提供自身系统基线。CONFLICT 必须比较基线、当前内容和尝试稿，保留无关修改。

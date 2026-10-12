@@ -240,11 +240,13 @@ const ContentNode = memo(
         region={node.type === "region"}
         container={node.type === "surface"}
         drawing={node.type === "drawing"}
+        component={node.type === "widget"}
         drawingNode={node.type === "drawing" ? node : undefined}
         fixedHeight={
           (node.type === "surface" &&
             (surfaceKind(node) === "board" || frame?.heightMode !== "auto")) ||
-          node.type === "drawing"
+          node.type === "drawing" ||
+          (node.type === "region" && frame?.mode === "free" && !!frame.height)
         }
         frame={frame}
       >

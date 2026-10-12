@@ -7,6 +7,7 @@ import type { JSONContent } from "@tiptap/core";
 import { resizeFrame, frameHeight, frameBounds } from "./geometry.mjs";
 import type { SurfaceGeometryStore } from "./geometry-store";
 import type { BoardInteraction, BoardGesture } from "./useBoardInteraction";
+import { BlockActionHost } from "../components/blocks/action-host";
 import {
   createContext,
   useContext,
@@ -21,6 +22,7 @@ import { GripHorizontal, Settings2, Trash2, Maximize2 } from "../ui/icons";
 import type { NodeLayout } from "./types";
 
 export interface ObjectActions {
+  componentActionsHost?: HTMLElement | null;
   scale: number;
   geometry?: SurfaceGeometryStore;
   selected: string | null;
@@ -31,7 +33,7 @@ export interface ObjectActions {
     point: { x: number; y: number },
   ) => void;
   select: (id: string | null, additive?: boolean) => void;
-  inspect?: (id: string) => void;
+  inspect?: (id: string | null) => void;
   expand?: (id: string) => void;
   remove?: (id: string) => void;
   move?: (id: string, frame: NodeLayout) => void;
@@ -57,6 +59,7 @@ export function SurfaceObject({
   container = false,
   drawing = false,
   drawingNode,
+  component = false,
   fixedHeight = false,
   rotatable = false,
   resizable = true,
@@ -70,6 +73,7 @@ export function SurfaceObject({
   container?: boolean;
   drawing?: boolean;
   drawingNode?: JSONContent;
+  component?: boolean;
   fixedHeight?: boolean;
   rotatable?: boolean;
   resizable?: boolean;
@@ -395,7 +399,7 @@ export function SurfaceObject({
             ↻
           </button>
         )}
-      {((!actions.readOnly && chrome) ||
+      {((!actions.readOnly && chrome && !board) ||
         (actions.readOnly && container && mount)) && (
         <div className="surface-object-header" data-surface-ui>
           {actions.readOnly ? (
@@ -471,14 +475,25 @@ export function SurfaceObject({
         </div>
       )}
       <div className="surface-object-content">
-        {mount ? (
-          children
-        ) : (
-          <div
-            className="surface-object-placeholder"
-            style={{ minHeight: frame?.height ?? (region ? 240 : 160) }}
-          />
-        )}
+        <BlockActionHost.Provider
+          value={
+            board && component
+              ? {
+                  target: actions.componentActionsHost ?? null,
+                  selected: board.ids.size === 1 && board.ids.has(id),
+                }
+              : null
+          }
+        >
+          {mount ? (
+            children
+          ) : (
+            <div
+              className="surface-object-placeholder"
+              style={{ minHeight: frame?.height ?? (region ? 240 : 160) }}
+            />
+          )}
+        </BlockActionHost.Provider>
       </div>
       {resizable &&
         chrome &&

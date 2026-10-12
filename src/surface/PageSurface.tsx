@@ -2,9 +2,12 @@ import { LibraryContextMenu } from "../studio/LibraryNavigation";
 import type { SurfaceGeometryStore } from "./geometry-store";
 import type { ShowDocument } from "../types";
 import { useBoardInteraction } from "./useBoardInteraction";
+import type { BoardGesture } from "./useBoardInteraction";
 import { DrawingInput } from "./Drawing";
 import type { JSONContent } from "@tiptap/core";
-import type { DrawingTool } from "./types";
+import type { BoardTool, DrawingStyle } from "./types";
+import { findSurfaceNode } from "./document.mjs";
+import { BoardStyleControls } from "./BoardStyleControls";
 import { flushSync } from "react-dom";
 import {
   useEffect,
@@ -28,6 +31,7 @@ import {
   Trash2,
   Copy,
   Settings2,
+  FileText,
 } from "../ui/icons";
 import { useSurfaceViewport } from "./useSurfaceViewport";
 import {
@@ -58,11 +62,19 @@ interface Props {
   embedded?: boolean;
   printing?: boolean;
   onExpand?: (id: string) => void;
-  drawTool?: DrawingTool | null;
+  drawTool?: BoardTool | null;
   drawColor?: string;
+  drawFillColor?: string;
+  drawStrokeWidth?: number;
+  onStyleChange?: (ids: string[], patch: Partial<DrawingStyle>) => void;
+  onAddComponent?: (kind: string, point: { x: number; y: number }) => void;
+  onOpenComponents?: (
+    point: { x: number; y: number },
+    position: { x: number; y: number },
+  ) => void;
   onDraw?: (node: JSONContent, frame: NodeLayout) => void;
   onDrawExit?: () => void;
-  onToolChange?: (tool: DrawingTool | null) => void;
+  onToolChange?: (tool: BoardTool | null) => void;
   nodes: { id: string; name: string }[];
   layoutKey: string;
   paths: Record<string, string[]>;
@@ -73,7 +85,7 @@ interface Props {
   onMove?: ObjectActions["move"];
   onConnect?: ObjectActions["connect"];
   onRemove?: (id: string) => void;
-  onInspect?: (id: string) => void;
+  onInspect?: (id: string | null) => void;
   onViews?: (views: PageViews) => void;
   extraActions?: ReactNode;
 }
@@ -107,11 +119,18 @@ export default function PageSurface({
   onExpand,
   drawTool,
   drawColor = "#252629",
+  drawFillColor = "none",
+  drawStrokeWidth = 2.5,
+  onStyleChange,
+  onAddComponent,
+  onOpenComponents,
   onDraw,
   onDrawExit,
   onToolChange,
 }: Props) {
   const [localSelection, setLocalSelection] = useState<string | null>(null);
+  const [componentActionsHost, setComponentActionsHost] =
+    useState<HTMLDivElement | null>(null);
   const selected =
     controlledSelection === undefined ? localSelection : controlledSelection;
   const onSelect = selectControlled ?? setLocalSelection;
@@ -151,6 +170,7 @@ export default function PageSurface({
     id: string;
     ids: string[];
     container: boolean;
+    insertion?: { x: number; y: number };
   } | null>(null);
   const openObjectMenu = (target: Element, point: { x: number; y: number }) => {
     if (
@@ -191,16 +211,21 @@ export default function PageSurface({
     moved: boolean;
     wasSelected: boolean;
     additive: boolean;
+    preserveSelection: boolean;
   } | null>(null);
   const hovered = useRef<HTMLElement | null>(null);
+  const hoverWindow = useRef({ id: "", since: 0, until: 0 });
   const clearHover = () => {
     hovered.current?.classList.remove("is-hovered");
     hovered.current = null;
     rootRef.current?.classList.remove("has-drawing-hit");
   };
   const cancelPointing = () => {
+    const pointer = pointing.current?.pointer;
     pointing.current = null;
     board.cancel();
+    if (pointer !== undefined && rootRef.current?.hasPointerCapture(pointer))
+      rootRef.current.releasePointerCapture(pointer);
   };
   const marquee = useRef<{
     id: number;
@@ -216,6 +241,8 @@ export default function PageSurface({
     drag?.element.remove();
     marquee.current = null;
     if (restore && drag) board.selectIds(drag.base);
+    if (drag && rootRef.current?.hasPointerCapture(drag.id))
+      rootRef.current.releasePointerCapture(drag.id);
   };
   useEffect(() => {
     const cancel = () => {
@@ -390,9 +417,18 @@ export default function PageSurface({
     onViews({ ...views, saved: [...views.saved, view] });
     setViewName("");
   };
+  const selectedNodes = boardDocument
+    ? [...board.ids].flatMap((id) => {
+        const node = findSurfaceNode(boardDocument, id)?.node;
+        return node ? [node] : [];
+      })
+    : [];
+  const selectedContainer =
+    selectedNodes.length === 1 && selectedNodes[0].type === "surface";
   return (
     <ObjectContext.Provider
       value={{
+        componentActionsHost,
         scale,
         geometry,
         selected,
@@ -419,12 +455,18 @@ export default function PageSurface({
         data-viewport-locked={locked}
         data-board-id={pageId}
         onContextMenu={(event) => {
-          if (drawTool || pointing.current || marquee.current) {
+          onInspect?.(null);
+          if (
+            pointing.current ||
+            marquee.current ||
+            (event.target as Element).closest('[data-drawing-active="true"]')
+          ) {
             event.preventDefault();
             event.stopPropagation();
             return;
           }
           const hit = board.hitTest(event.clientX, event.clientY);
+          if (navigation.current) navigation.current.open = false;
           if (
             openObjectMenu(
               hit?.node.type === "drawing"
@@ -438,11 +480,60 @@ export default function PageSurface({
           ) {
             event.preventDefault();
             event.stopPropagation();
+          } else if (
+            onAddComponent &&
+            onTransform &&
+            !locked &&
+            (event.target as Element).closest(".page-surface") ===
+              event.currentTarget &&
+            !(event.target as Element).closest(
+              '[data-surface-ui],input,textarea,select,[contenteditable=true],[data-surface-gesture="own"],.react-flow',
+            )
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            setObjectMenu({
+              anchor: event.currentTarget,
+              point: { x: event.clientX, y: event.clientY },
+              id: "",
+              ids: [],
+              container: false,
+              insertion: controls.current.point(event.clientX, event.clientY),
+            });
           }
         }}
         onPointerDownCapture={(event) => {
           const target = event.target as Element;
           if (target.closest(".page-surface") !== event.currentTarget) return;
+          if (!target.closest(".surface-popover-anchor") && navigation.current)
+            navigation.current.open = false;
+          if (!target.closest("[data-surface-ui]")) setObjectMenu(null);
+          const selectionId = board.selectionHit(event.clientX, event.clientY);
+          const handle =
+            drawTool && target.closest("[data-board-drawing-input]")
+              ? [
+                  ...(worldRef.current?.querySelectorAll<HTMLElement>(
+                    ".surface-object.is-selected > .board-resize-handle, .surface-object.is-selected > .surface-object-rotate",
+                  ) ?? []),
+                ].find((element) => {
+                  const box = element.getBoundingClientRect();
+                  return (
+                    event.clientX >= box.left - 4 &&
+                    event.clientX <= box.right + 4 &&
+                    event.clientY >= box.top - 4 &&
+                    event.clientY <= box.bottom + 4
+                  );
+                })
+              : undefined;
+          const edge = board.edgeHit(event.clientX, event.clientY);
+          const quickSelect =
+            !!drawTool &&
+            !!edge &&
+            (board.ids.has(edge.id) ||
+              (hoverWindow.current.id === edge.id &&
+                performance.now() >= hoverWindow.current.since + 180 &&
+                (hovered.current === edge.element ||
+                  performance.now() <= hoverWindow.current.until)));
           if (
             target.closest("[data-surface-handle],[data-board-drawing-input]")
           ) {
@@ -452,32 +543,58 @@ export default function PageSurface({
           if (
             !onTransform ||
             locked ||
-            drawTool ||
+            (drawTool && !quickSelect && !selectionId && !handle) ||
             event.button !== 0 ||
             event.pointerType === "touch" ||
             spaceHeld.current ||
-            target.closest("[data-surface-ui],[data-board-drawing-input]")
+            target.closest("[data-surface-handle]") ||
+            target.closest("[data-surface-ui]") ||
+            target.closest(
+              'input,textarea,select,button,a,[contenteditable=true],iframe,[data-surface-gesture="own"],.react-flow',
+            )
           )
             return;
           const hit = board.hitTest(event.clientX, event.clientY);
           const forceBrush = event.ctrlKey || event.metaKey;
-          if (hit?.node.type === "drawing" && !forceBrush) {
+          const moveId = handle
+            ? handle.closest<HTMLElement>("[data-surface-id]")?.dataset
+                .surfaceId
+            : !forceBrush && !event.shiftKey && selectionId
+              ? selectionId
+              : quickSelect
+                ? edge?.id
+                : hit?.node.type === "drawing" ||
+                    (hit &&
+                      (target === hit.element ||
+                        (board.ids.has(hit.id) &&
+                          !target.closest(
+                            'input,textarea,select,button,a,[contenteditable=true],iframe,[data-surface-gesture="own"],.react-flow',
+                          ))))
+                  ? hit?.id
+                  : null;
+          if (moveId && !forceBrush) {
             event.preventDefault();
             event.stopPropagation();
             controls.current.cancel();
             cancelMarquee();
             clearHover();
-            const wasSelected = board.ids.has(hit.id);
-            if (event.shiftKey && !wasSelected) board.select(hit.id, true);
-            if (!board.start(hit.id, "move", event)) return;
+            const wasSelected = board.ids.has(moveId);
+            if (event.shiftKey && !wasSelected) board.select(moveId, true);
+            const gesture: BoardGesture = handle?.dataset.resizeDirection
+              ? `resize-${handle.dataset.resizeDirection}`
+              : handle
+                ? "rotate"
+                : "move";
+            if (!board.start(moveId, gesture, event)) return;
             pointing.current = {
               pointer: event.pointerId,
-              id: hit.id,
+              id: moveId,
               x: event.clientX,
               y: event.clientY,
               moved: false,
               wasSelected,
               additive: event.shiftKey,
+              preserveSelection: !!selectionId && !event.shiftKey,
             };
             event.currentTarget.focus({ preventScroll: true });
             event.currentTarget.setPointerCapture(event.pointerId);
@@ -523,14 +640,29 @@ export default function PageSurface({
           }
           if (
             !marquee.current &&
-            !drawTool &&
             !locked &&
             !event.buttons &&
             (event.target as Element).closest(".page-surface") ===
               event.currentTarget
           ) {
-            const hit = board.hitTest(event.clientX, event.clientY, false);
-            const element = hit?.node.type === "drawing" ? hit.element : null;
+            const hit = drawTool
+              ? board.edgeHit(event.clientX, event.clientY)
+              : board.hitTest(event.clientX, event.clientY, false);
+            const now = performance.now();
+            if (hit) {
+              if (
+                hoverWindow.current.id !== hit.id ||
+                (hovered.current !== hit.element &&
+                  now > hoverWindow.current.until)
+              )
+                hoverWindow.current = {
+                  id: hit.id,
+                  since: now,
+                  until: now + 900,
+                };
+              else hoverWindow.current.until = now + 900;
+            }
+            const element = hit?.element ?? null;
             if (element !== hovered.current) {
               clearHover();
               hovered.current = element;
@@ -575,7 +707,11 @@ export default function PageSurface({
               ) >= 3;
             board.update(event);
             board.finish();
-            if (!pointer.moved && pointer.wasSelected)
+            if (
+              !pointer.moved &&
+              pointer.wasSelected &&
+              !pointer.preserveSelection
+            )
               board.select(pointer.id, pointer.additive);
             if (event.currentTarget.hasPointerCapture(event.pointerId))
               event.currentTarget.releasePointerCapture(event.pointerId);
@@ -651,18 +787,18 @@ export default function PageSurface({
           }
           if (event.code === "Space") spaceHeld.current = true;
           if (event.key === "Escape") {
-            if (drawTool && !target.closest('[data-drawing-active="true"]')) {
-              event.preventDefault();
-              event.stopPropagation();
-              onDrawExit?.();
-              return;
-            }
             const active = !!marquee.current || !!pointing.current;
             cancelMarquee(true);
             cancelPointing();
             if (active) {
               event.preventDefault();
               event.stopPropagation();
+              return;
+            }
+            if (drawTool && !target.closest('[data-drawing-active="true"]')) {
+              event.preventDefault();
+              event.stopPropagation();
+              onDrawExit?.();
               return;
             }
           }
@@ -681,12 +817,14 @@ export default function PageSurface({
             !target.closest('[data-drawing-active="true"]')
           ) {
             const key = event.key.toLowerCase(),
-              tools: Record<string, DrawingTool | null> = {
+              tools: Record<string, BoardTool | null> = {
                 v: null,
                 r: "rectangle",
                 e: "ellipse",
                 a: "arrow",
                 p: "pen",
+                h: "highlighter",
+                f: "region",
               };
             if (key in tools) {
               event.preventDefault();
@@ -791,43 +929,70 @@ export default function PageSurface({
             point={objectMenu.point}
             label="对象操作"
             onClose={() => setObjectMenu(null)}
-            items={[
-              {
-                label:
-                  objectMenu.ids.length > 1
-                    ? `复制 ${objectMenu.ids.length} 个对象`
-                    : "复制对象",
-                icon: <Copy size={14} />,
-                onSelect: () => duplicateSelection(objectMenu.ids),
-              },
-              {
-                label: "对象设置",
-                icon: <Settings2 size={14} />,
-                onSelect: () => onInspect?.(objectMenu.id),
-              },
-              ...(objectMenu.container
+            items={
+              objectMenu.insertion
                 ? [
                     {
-                      label: "展开容器",
-                      icon: <Maximize2 size={14} />,
-                      onSelect: () => onExpand?.(objectMenu.id),
+                      label: "添加 Page",
+                      icon: <PanelTop size={14} />,
+                      onSelect: () =>
+                        onAddComponent?.("page", objectMenu.insertion!),
+                    },
+                    {
+                      label: "添加富文本",
+                      icon: <FileText size={14} />,
+                      onSelect: () =>
+                        onAddComponent?.("text", objectMenu.insertion!),
+                    },
+                    {
+                      label: "添加组件…",
+                      icon: <Plus size={14} />,
+                      separatorBefore: true,
+                      onSelect: () =>
+                        onOpenComponents?.(
+                          objectMenu.point,
+                          objectMenu.insertion!,
+                        ),
                     },
                   ]
-                : []),
-              {
-                label:
-                  objectMenu.ids.length > 1
-                    ? `删除 ${objectMenu.ids.length} 个对象`
-                    : "删除对象",
-                icon: <Trash2 size={14} />,
-                danger: true,
-                separatorBefore: true,
-                onSelect: () => {
-                  onDeleteSelection?.(objectMenu.ids);
-                  board.select(null);
-                },
-              },
-            ]}
+                : [
+                    {
+                      label:
+                        objectMenu.ids.length > 1
+                          ? `复制 ${objectMenu.ids.length} 个对象`
+                          : "复制对象",
+                      icon: <Copy size={14} />,
+                      onSelect: () => duplicateSelection(objectMenu.ids),
+                    },
+                    {
+                      label: "对象设置",
+                      icon: <Settings2 size={14} />,
+                      onSelect: () => onInspect?.(objectMenu.id),
+                    },
+                    ...(objectMenu.container
+                      ? [
+                          {
+                            label: "展开容器",
+                            icon: <Maximize2 size={14} />,
+                            onSelect: () => onExpand?.(objectMenu.id),
+                          },
+                        ]
+                      : []),
+                    {
+                      label:
+                        objectMenu.ids.length > 1
+                          ? `删除 ${objectMenu.ids.length} 个对象`
+                          : "删除对象",
+                      icon: <Trash2 size={14} />,
+                      danger: true,
+                      separatorBefore: true,
+                      onSelect: () => {
+                        onDeleteSelection?.(objectMenu.ids);
+                        board.select(null);
+                      },
+                    },
+                  ]
+            }
           />
         )}
         {embedded && <ViewportLockButton {...lock} label="白板" />}
@@ -846,6 +1011,8 @@ export default function PageSurface({
             panHeld={spaceHeld}
             makeSnapIndex={board.drawingSnapIndex}
             color={drawColor}
+            fillColor={drawFillColor}
+            strokeWidth={drawStrokeWidth}
             camera={camera}
             point={(x, y) => controls.current.point(x, y)}
             onDraw={(node, frame) => {
@@ -878,6 +1045,15 @@ export default function PageSurface({
           )}
           {onTransform && !objectMenu && board.ids.size > 0 && (
             <>
+              {selectedContainer && (
+                <button
+                  type="button"
+                  aria-label="展开选中容器"
+                  onClick={() => selected && onExpand?.(selected)}
+                >
+                  <Maximize2 size={15} />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => duplicateSelection([...board.ids])}
@@ -1077,6 +1253,37 @@ export default function PageSurface({
           <fieldset className="surface-extra-actions" disabled={locked}>
             {extraActions}
           </fieldset>
+          {onTransform && !locked && (
+            <div className="board-settings-controls" hidden={!!objectMenu}>
+              {board.ids.size > 0 && (
+                <button
+                  type="button"
+                  aria-label="选中对象设置"
+                  title="对象布局设置：名称、尺寸与所属容器"
+                  onClick={() => selected && onInspect?.(selected)}
+                >
+                  <Settings2 size={15} />
+                </button>
+              )}
+              <div
+                ref={setComponentActionsHost}
+                className="board-component-actions"
+                data-surface-ui
+              />
+              {!objectMenu && (
+                <BoardStyleControls
+                  tool={drawTool}
+                  style={{
+                    color: drawColor,
+                    fillColor: drawFillColor,
+                    strokeWidth: drawStrokeWidth,
+                  }}
+                  nodes={selectedNodes}
+                  onChange={(patch) => onStyleChange?.([...board.ids], patch)}
+                />
+              )}
+            </div>
+          )}
         </div>
       </div>
     </ObjectContext.Provider>

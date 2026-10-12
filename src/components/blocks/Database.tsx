@@ -1,3 +1,4 @@
+import { BlockSettings } from "./action-host";
 import ExpandableSearch from "../ExpandableSearch";
 import { useMemo, useState } from "react";
 import {
@@ -412,95 +413,97 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
         </details>
       </BlockHeader>
       {editing && (
-        <div className="sb-editor-panel">
-          <Field label="数据库名称">
-            <input
-              value={draftTitle}
-              onChange={(event) => setDraftTitle(event.target.value)}
-            />
-          </Field>
-          <div className="sb-property-list">
-            {draftColumns.map((column) => (
-              <div className="sb-property-row" key={column.id}>
-                <input
-                  aria-label="属性名称"
-                  value={column.name}
-                  onChange={(event) =>
-                    updateDraftColumn(column.id, { name: event.target.value })
-                  }
-                />
-                <select
-                  aria-label={`${column.name}的类型`}
-                  value={column.type}
-                  onChange={(event) =>
-                    updateDraftColumn(column.id, {
-                      type: event.target.value as ColumnType,
-                    })
-                  }
-                >
-                  {TYPES.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
-                {column.type === "select" && (
+        <BlockSettings>
+          <div className="sb-editor-panel">
+            <Field label="数据库名称">
+              <input
+                value={draftTitle}
+                onChange={(event) => setDraftTitle(event.target.value)}
+              />
+            </Field>
+            <div className="sb-property-list">
+              {draftColumns.map((column) => (
+                <div className="sb-property-row" key={column.id}>
                   <input
-                    className="sb-options-input"
-                    aria-label={`${column.name}的选项，用逗号分隔`}
-                    placeholder="选项，用逗号分隔"
-                    value={column.options?.join(",")}
+                    aria-label="属性名称"
+                    value={column.name}
                     onChange={(event) =>
-                      updateDraftColumn(column.id, {
-                        options: event.target.value.split(/[,，]/),
-                      })
+                      updateDraftColumn(column.id, { name: event.target.value })
                     }
                   />
-                )}
-                <button
-                  type="button"
-                  className="sb-icon-button sb-danger"
-                  aria-label={`删除属性${column.name}`}
-                  onClick={() =>
-                    setDraftColumns((current) =>
-                      current.filter((item) => item.id !== column.id),
-                    )
-                  }
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
+                  <select
+                    aria-label={`${column.name}的类型`}
+                    value={column.type}
+                    onChange={(event) =>
+                      updateDraftColumn(column.id, {
+                        type: event.target.value as ColumnType,
+                      })
+                    }
+                  >
+                    {TYPES.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                  {column.type === "select" && (
+                    <input
+                      className="sb-options-input"
+                      aria-label={`${column.name}的选项，用逗号分隔`}
+                      placeholder="选项，用逗号分隔"
+                      value={column.options?.join(",")}
+                      onChange={(event) =>
+                        updateDraftColumn(column.id, {
+                          options: event.target.value.split(/[,，]/),
+                        })
+                      }
+                    />
+                  )}
+                  <button
+                    type="button"
+                    className="sb-icon-button sb-danger"
+                    aria-label={`删除属性${column.name}`}
+                    onClick={() =>
+                      setDraftColumns((current) =>
+                        current.filter((item) => item.id !== column.id),
+                      )
+                    }
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            {error && (
+              <p role="alert" className="sb-error">
+                {error}
+              </p>
+            )}
+            <div className="sb-panel-footer">
+              <button
+                type="button"
+                className="sb-button"
+                onClick={() =>
+                  setDraftColumns((current) => [
+                    ...current,
+                    { id: uid(), name: "新属性", type: "text" },
+                  ])
+                }
+              >
+                <Plus size={14} />
+                添加属性
+              </button>
+              <button
+                type="button"
+                className="sb-button sb-primary"
+                onClick={saveColumns}
+              >
+                <Check size={14} />
+                保存属性
+              </button>
+            </div>
           </div>
-          {error && (
-            <p role="alert" className="sb-error">
-              {error}
-            </p>
-          )}
-          <div className="sb-panel-footer">
-            <button
-              type="button"
-              className="sb-button"
-              onClick={() =>
-                setDraftColumns((current) => [
-                  ...current,
-                  { id: uid(), name: "新属性", type: "text" },
-                ])
-              }
-            >
-              <Plus size={14} />
-              添加属性
-            </button>
-            <button
-              type="button"
-              className="sb-button sb-primary"
-              onClick={saveColumns}
-            >
-              <Check size={14} />
-              保存属性
-            </button>
-          </div>
-        </div>
+        </BlockSettings>
       )}
       {showFilter && (
         <div className="sb-filter-row">

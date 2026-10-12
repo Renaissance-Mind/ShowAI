@@ -1,3 +1,4 @@
+import { BlockSettings } from "./action-host";
 import { useState } from "react";
 import { Bookmark, Check, ExternalLink, Link2 } from "../../ui/icons";
 import { safeImageUrl, safeUrl, text } from "./helpers";
@@ -56,69 +57,74 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
         onEdit={openEditor}
       />
       {editing && (
-        <div className="sb-editor-panel">
-          <Field label="网址">
-            <input
-              type="url"
-              placeholder="https://…"
-              value={draft.url}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, url: event.target.value }))
-              }
-            />
-          </Field>
-          <Field label="标题">
-            <input
-              placeholder="来源的名称"
-              value={draft.title}
-              onChange={(event) =>
-                setDraft((current) => ({
-                  ...current,
-                  title: event.target.value,
-                }))
-              }
-            />
-          </Field>
-          <Field label="摘要">
-            <textarea
-              rows={3}
-              value={draft.description}
-              onChange={(event) =>
-                setDraft((current) => ({
-                  ...current,
-                  description: event.target.value,
-                }))
-              }
-            />
-          </Field>
-          <Field label="封面图片地址（可选）">
-            <input
-              type="url"
-              value={draft.image}
-              onChange={(event) =>
-                setDraft((current) => ({
-                  ...current,
-                  image: event.target.value,
-                }))
-              }
-            />
-          </Field>
-          {error && (
-            <p className="sb-error" role="alert">
-              {error}
-            </p>
-          )}
-          <div className="sb-panel-footer">
-            <button
-              type="button"
-              className="sb-button sb-primary"
-              onClick={save}
-            >
-              <Check size={14} />
-              保存书签
-            </button>
+        <BlockSettings>
+          <div className="sb-editor-panel">
+            <Field label="网址">
+              <input
+                type="url"
+                placeholder="https://…"
+                value={draft.url}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    url: event.target.value,
+                  }))
+                }
+              />
+            </Field>
+            <Field label="标题">
+              <input
+                placeholder="来源的名称"
+                value={draft.title}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    title: event.target.value,
+                  }))
+                }
+              />
+            </Field>
+            <Field label="摘要">
+              <textarea
+                rows={3}
+                value={draft.description}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
+                }
+              />
+            </Field>
+            <Field label="封面图片地址（可选）">
+              <input
+                type="url"
+                value={draft.image}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    image: event.target.value,
+                  }))
+                }
+              />
+            </Field>
+            {error && (
+              <p className="sb-error" role="alert">
+                {error}
+              </p>
+            )}
+            <div className="sb-panel-footer">
+              <button
+                type="button"
+                className="sb-button sb-primary"
+                onClick={save}
+              >
+                <Check size={14} />
+                保存书签
+              </button>
+            </div>
           </div>
-        </div>
+        </BlockSettings>
       )}
       {url ? (
         <a

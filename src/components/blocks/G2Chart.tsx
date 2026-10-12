@@ -1,3 +1,4 @@
+import { BlockActions, BlockSettings } from "./action-host";
 import { useEffect, useRef, useState } from "react";
 import { BarChart3, Download } from "../../ui/icons";
 import { BlockHeader, Field } from "./shared";
@@ -200,169 +201,175 @@ export function G2ChartBlock({
           unlockDescription="允许框选、拖动等图表交互"
         />
       )}
-      <div className="sb-g2-toolbar">
-        <label>
-          主题{" "}
-          <select
-            aria-label="图表主题"
-            value={theme}
-            disabled={editing}
-            onChange={(e) => changeTheme(e.target.value)}
-          >
-            <option value="indigo">ShowAI 靛蓝</option>
-            <option value="classic">经典</option>
-            <option value="dark">深色</option>
-          </select>
-        </label>
-        {editable && <span>数据与样式可在设置中修改</span>}
-      </div>
+      <BlockActions>
+        <div className="sb-g2-toolbar">
+          <label>
+            主题{" "}
+            <select
+              aria-label="图表主题"
+              value={theme}
+              disabled={editing}
+              onChange={(e) => changeTheme(e.target.value)}
+            >
+              <option value="indigo">ShowAI 靛蓝</option>
+              <option value="classic">经典</option>
+              <option value="dark">深色</option>
+            </select>
+          </label>
+          {editable && <span>数据与样式可在设置中修改</span>}
+        </div>
+      </BlockActions>
       {editing && (
-        <div className="sb-g2-editor">
-          {draftValue && (
-            <>
-              <div className="sb-g2-settings">
-                <Field label="标题">
-                  <input
-                    aria-label="图表标题"
-                    value={draftValue.title ?? ""}
-                    onChange={(e) => updateDraft({ title: e.target.value })}
-                  />
-                </Field>
-                <Field label="高度">
-                  <input
-                    aria-label="图表高度"
-                    type="number"
-                    min={200}
-                    max={900}
-                    value={draftValue.height ?? 320}
-                    onChange={(e) =>
-                      updateDraft({ height: Number(e.target.value) })
-                    }
-                  />
-                </Field>
-                <Field label="字号">
-                  <input
-                    aria-label="图表字号"
-                    type="number"
-                    min={8}
-                    max={32}
-                    value={draftValue.appearance?.fontSize ?? 12}
-                    onChange={(e) =>
-                      updateDraft({
-                        appearance: {
-                          ...draftValue.appearance,
-                          fontSize: Number(e.target.value),
-                        },
-                      })
-                    }
-                  />
-                </Field>
-                <Field label="线宽">
-                  <input
-                    aria-label="图表线宽"
-                    type="number"
-                    min={0}
-                    max={12}
-                    step={0.5}
-                    value={draftValue.appearance?.lineWidth ?? 2}
-                    onChange={(e) =>
-                      updateDraft({
-                        appearance: {
-                          ...draftValue.appearance,
-                          lineWidth: Number(e.target.value),
-                        },
-                      })
-                    }
-                  />
-                </Field>
-              </div>
-              <div className="sb-g2-palette">
-                <span>调色板</span>
-                {draftPalette.map((color: string, index: number) => (
-                  <input
-                    key={index}
-                    type="color"
-                    aria-label={`图表颜色 ${index + 1}`}
-                    value={color}
-                    onChange={(e) => {
-                      const palette = [...draftPalette];
-                      palette[index] = e.target.value;
-                      updateDraft({
-                        appearance: { ...draftValue.appearance, palette },
-                      });
-                    }}
-                  />
-                ))}
-              </div>
-              <div className="sb-g2-toggles">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={draftValue.legend !== false}
-                    onChange={(e) => updateDraft({ legend: e.target.checked })}
-                  />
-                  显示图例
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={Boolean(draftValue.animation)}
-                    onChange={(e) =>
-                      updateDraft({ animation: e.target.checked })
-                    }
-                  />
-                  动画
-                </label>
-                {Object.entries({
-                  tooltip: "悬停提示",
-                  elementHighlight: "悬停高亮",
-                  elementSelect: "点击选择",
-                  brushHighlight: "框选高亮",
-                  brushFilter: "框选过滤",
-                  legendFilter: "图例筛选",
-                }).map(([key, label]) => (
-                  <label key={key}>
+        <BlockSettings>
+          <div className="sb-g2-editor">
+            {draftValue && (
+              <>
+                <div className="sb-g2-settings">
+                  <Field label="标题">
                     <input
-                      type="checkbox"
-                      checked={
-                        draftValue.interaction?.[key] ??
-                        ["tooltip", "legendFilter"].includes(key)
+                      aria-label="图表标题"
+                      value={draftValue.title ?? ""}
+                      onChange={(e) => updateDraft({ title: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="高度">
+                    <input
+                      aria-label="图表高度"
+                      type="number"
+                      min={200}
+                      max={900}
+                      value={draftValue.height ?? 320}
+                      onChange={(e) =>
+                        updateDraft({ height: Number(e.target.value) })
                       }
+                    />
+                  </Field>
+                  <Field label="字号">
+                    <input
+                      aria-label="图表字号"
+                      type="number"
+                      min={8}
+                      max={32}
+                      value={draftValue.appearance?.fontSize ?? 12}
                       onChange={(e) =>
                         updateDraft({
-                          interaction: {
-                            ...draftValue.interaction,
-                            [key]: e.target.checked,
+                          appearance: {
+                            ...draftValue.appearance,
+                            fontSize: Number(e.target.value),
                           },
                         })
                       }
                     />
-                    {label}
+                  </Field>
+                  <Field label="线宽">
+                    <input
+                      aria-label="图表线宽"
+                      type="number"
+                      min={0}
+                      max={12}
+                      step={0.5}
+                      value={draftValue.appearance?.lineWidth ?? 2}
+                      onChange={(e) =>
+                        updateDraft({
+                          appearance: {
+                            ...draftValue.appearance,
+                            lineWidth: Number(e.target.value),
+                          },
+                        })
+                      }
+                    />
+                  </Field>
+                </div>
+                <div className="sb-g2-palette">
+                  <span>调色板</span>
+                  {draftPalette.map((color: string, index: number) => (
+                    <input
+                      key={index}
+                      type="color"
+                      aria-label={`图表颜色 ${index + 1}`}
+                      value={color}
+                      onChange={(e) => {
+                        const palette = [...draftPalette];
+                        palette[index] = e.target.value;
+                        updateDraft({
+                          appearance: { ...draftValue.appearance, palette },
+                        });
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className="sb-g2-toggles">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={draftValue.legend !== false}
+                      onChange={(e) =>
+                        updateDraft({ legend: e.target.checked })
+                      }
+                    />
+                    显示图例
                   </label>
-                ))}
-              </div>
-            </>
-          )}
-          <details className="sb-data-details" open>
-            <summary>数据与高级参数</summary>
-            <Field label="数据、字段对应及样式参数">
-              <textarea
-                aria-label="图表参数 JSON"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                spellCheck={false}
-              />
-            </Field>
-          </details>
-          {draftError && (
-            <p role="alert" className="sb-error">
-              {draftError}
-            </p>
-          )}
-          <button type="button" className="sb-button" onClick={save}>
-            保存图表设置
-          </button>
-        </div>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(draftValue.animation)}
+                      onChange={(e) =>
+                        updateDraft({ animation: e.target.checked })
+                      }
+                    />
+                    动画
+                  </label>
+                  {Object.entries({
+                    tooltip: "悬停提示",
+                    elementHighlight: "悬停高亮",
+                    elementSelect: "点击选择",
+                    brushHighlight: "框选高亮",
+                    brushFilter: "框选过滤",
+                    legendFilter: "图例筛选",
+                  }).map(([key, label]) => (
+                    <label key={key}>
+                      <input
+                        type="checkbox"
+                        checked={
+                          draftValue.interaction?.[key] ??
+                          ["tooltip", "legendFilter"].includes(key)
+                        }
+                        onChange={(e) =>
+                          updateDraft({
+                            interaction: {
+                              ...draftValue.interaction,
+                              [key]: e.target.checked,
+                            },
+                          })
+                        }
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+            <details className="sb-data-details" open>
+              <summary>数据与高级参数</summary>
+              <Field label="数据、字段对应及样式参数">
+                <textarea
+                  aria-label="图表参数 JSON"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  spellCheck={false}
+                />
+              </Field>
+            </details>
+            {draftError && (
+              <p role="alert" className="sb-error">
+                {draftError}
+              </p>
+            )}
+            <button type="button" className="sb-button" onClick={save}>
+              保存图表设置
+            </button>
+          </div>
+        </BlockSettings>
       )}
       {error && (
         <p role="alert" className="sb-error">

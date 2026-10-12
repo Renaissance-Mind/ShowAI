@@ -6,7 +6,14 @@ import {
 } from "./drawing-geometry.mjs";
 import { canCommitBoardGesture, boardSelectionScope } from "./board-commands";
 import type { SurfaceGeometryStore } from "./geometry-store";
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import type { ShowDocument } from "../types";
 import type { NodeLayout } from "./types";
 import type { Camera } from "./model";
@@ -36,6 +43,8 @@ export interface BoardGestureInput {
 export interface BoardInteraction {
   ids: Set<string>;
   drawingSnapIndex: () => SnapIndex;
+  selectionHit: (x: number, y: number) => string | null;
+  edgeHit: (x: number, y: number) => ReturnType<BoardInteraction["hitTest"]>;
   hitTest: (
     x: number,
     y: number,
@@ -108,6 +117,58 @@ export function useBoardInteraction({
   );
   const currentIds = useRef(ids);
   currentIds.current = ids;
+  const groupOutline = useRef<HTMLDivElement | null>(null);
+  const refreshOutline = () => {
+    const outline = groupOutline.current,
+      layer = outline?.parentElement;
+    if (!outline || !layer) return;
+    const rect = layer.getBoundingClientRect();
+    const surface = world.current!.closest(".page-surface") as HTMLElement;
+    const scale = layer.offsetWidth
+      ? rect.width / layer.offsetWidth
+      : camera.current.scale *
+        (surface.getBoundingClientRect().width / surface.clientWidth || 1);
+    const boxes = [...currentIds.current].flatMap((id) => {
+      const el = world.current?.querySelector(
+        `[data-surface-id="${CSS.escape(id)}"]`,
+      );
+      return el
+        ? [
+            (
+              el.querySelector(":scope > .board-object-outline") ?? el
+            ).getBoundingClientRect(),
+          ]
+        : [];
+    });
+    if (!boxes.length) return;
+    const left = Math.min(...boxes.map((box) => box.left)),
+      top = Math.min(...boxes.map((box) => box.top));
+    Object.assign(outline.style, {
+      left: `${(left - rect.left) / scale}px`,
+      top: `${(top - rect.top) / scale}px`,
+      width: `${(Math.max(...boxes.map((box) => box.right)) - left) / scale}px`,
+      height: `${(Math.max(...boxes.map((box) => box.bottom)) - top) / scale}px`,
+    });
+  };
+  const selectionKey = [...ids].join(":");
+  useLayoutEffect(() => {
+    if (ids.size < 2 || !onTransform) return;
+    const first = world.current?.querySelector(
+      `[data-surface-id="${CSS.escape([...ids][0])}"]`,
+    );
+    if (!first?.parentElement) return;
+    const outline = document ? window.document.createElement("div") : null;
+    if (!outline) return;
+    outline.className = "board-group-outline";
+    outline.setAttribute("aria-hidden", "true");
+    first.parentElement.append(outline);
+    groupOutline.current = outline;
+    refreshOutline();
+    return () => {
+      outline.remove();
+      groupOutline.current = null;
+    };
+  }, [selectionKey, document?.layout, onTransform]);
   const pending = useRef<{
     source: ShowDocument;
     original: ShowDocument;
@@ -181,6 +242,7 @@ export function useBoardInteraction({
     }
     pending.current = null;
     geometry?.endGesture();
+    refreshOutline();
   };
   useEffect(() => () => restore(), []);
   const paint = () => {
@@ -344,6 +406,7 @@ export function useBoardInteraction({
       drag.next[id] = next;
       apply(drag.elements.get(id)!, next);
     }
+    refreshOutline();
     // Only connections touching the gesture participate in the per-frame preview.
     if (!drag.affectedArrows.length) return;
     const layout = { ...drag.source.layout, ...drag.next };
@@ -376,6 +439,49 @@ export function useBoardInteraction({
   };
   return {
     ids,
+    selectionHit(x, y) {
+      if (!currentIds.current.size) return null;
+      const boxes = [...currentIds.current].flatMap((id) => {
+        const el = world.current?.querySelector<HTMLElement>(
+          `[data-surface-id="${CSS.escape(id)}"]`,
+        );
+        if (!el) return [];
+        const outline = el.querySelector(":scope > .board-object-outline");
+        return [(outline ?? el).getBoundingClientRect()];
+      });
+      if (!boxes.length) return null;
+      const left = Math.min(...boxes.map((b) => b.left)),
+        right = Math.max(...boxes.map((b) => b.right)),
+        top = Math.min(...boxes.map((b) => b.top)),
+        bottom = Math.max(...boxes.map((b) => b.bottom));
+      return x >= left - 8 &&
+        x <= right + 8 &&
+        y >= top - 8 &&
+        y <= bottom + 8 &&
+        (currentIds.current.size > 1 ||
+          Math.min(
+            Math.abs(x - left),
+            Math.abs(x - right),
+            Math.abs(y - top),
+            Math.abs(y - bottom),
+          ) <= 8)
+        ? [...currentIds.current][0]
+        : null;
+    },
+    edgeHit(x, y) {
+      const hit = this.hitTest(x, y, false);
+      if (!hit) return null;
+      if (hit.node.type === "drawing") return hit;
+      const box = hit.element.getBoundingClientRect();
+      return Math.min(
+        Math.abs(x - box.left),
+        Math.abs(x - box.right),
+        Math.abs(y - box.top),
+        Math.abs(y - box.bottom),
+      ) <= 10
+        ? hit
+        : null;
+    },
     drawingSnapIndex() {
       const source = current.current.document;
       const objects = [];
@@ -435,7 +541,16 @@ export function useBoardInteraction({
             x: (x - box.left) / box.scale,
             y: (y - box.top) / box.scale,
           },
-          tolerance: 6 / box.scale,
+          tolerance: Math.max(
+            8 / box.scale,
+            entry.node.type === "drawing"
+              ? (entry.node.attrs!.strokeWidth / 2) *
+                  Math.max(
+                    frame.width / entry.node.attrs!.extent[0],
+                    frameHeight(frame) / entry.node.attrs!.extent[1],
+                  )
+              : 0,
+          ),
           scale: box.scale,
           viewport: {
             x: (viewport.left - box.left) / box.scale,

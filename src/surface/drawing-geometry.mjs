@@ -220,7 +220,15 @@ export function shapeHit(node, frame, point) {
       segmentDistance(p, vertices[i - 1], vertices[i]),
     );
   if (node.attrs.tool === "ellipse") distance = ellipseDistance(p, box);
-  return { distance, inside, solid: false, area: box.width * box.height };
+  return {
+    distance,
+    inside,
+    solid:
+      (node.attrs.tool === "rectangle" || node.attrs.tool === "ellipse") &&
+      !!node.attrs.fillColor &&
+      node.attrs.fillColor !== "none",
+    area: box.width * box.height,
+  };
 }
 
 /** Brush the visible paths, not the empty area enclosed by a hollow drawing. */
@@ -235,6 +243,27 @@ export function shapeIntersects(node, frame, rect, wrap = false) {
   if (wrap || node.type === "surface" || node.type === "region") return false;
   if (!intersectsFrame(geometryFrame(node, frame), rect)) return false;
   if (node.type !== "drawing") return true;
+  if (
+    node.attrs.fillColor &&
+    node.attrs.fillColor !== "none" &&
+    ["rectangle", "ellipse"].includes(node.attrs.tool)
+  ) {
+    if (
+      [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+      ].some(
+        ([x, y]) =>
+          shapeHit(node, frame, {
+            x: rect.x + x * rect.width,
+            y: rect.y + y * rect.height,
+          }).inside,
+      )
+    )
+      return true;
+  }
   const center = {
     x: frame.x + frame.width / 2,
     y: frame.y + frameHeight(frame) / 2,

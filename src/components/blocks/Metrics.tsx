@@ -1,3 +1,4 @@
+import { BlockSettings } from "./action-host";
 import { useState } from "react";
 import {
   ArrowDownRight,
@@ -49,119 +50,121 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
         onEdit={openEditor}
       />
       {editing && (
-        <div className="sb-editor-panel">
-          <Field label="标题">
-            <input
-              value={draftTitle}
-              onChange={(event) => setDraftTitle(event.target.value)}
-            />
-          </Field>
-          <div className="sb-metric-editors">
-            {draftItems.map((item, index) => (
-              <div className="sb-metric-editor" key={index}>
-                <div className="sb-form-row">
-                  <Field label="名称">
-                    <input
-                      value={item.label}
-                      onChange={(event) =>
-                        updateItem(index, { label: event.target.value })
+        <BlockSettings>
+          <div className="sb-editor-panel">
+            <Field label="标题">
+              <input
+                value={draftTitle}
+                onChange={(event) => setDraftTitle(event.target.value)}
+              />
+            </Field>
+            <div className="sb-metric-editors">
+              {draftItems.map((item, index) => (
+                <div className="sb-metric-editor" key={index}>
+                  <div className="sb-form-row">
+                    <Field label="名称">
+                      <input
+                        value={item.label}
+                        onChange={(event) =>
+                          updateItem(index, { label: event.target.value })
+                        }
+                      />
+                    </Field>
+                    <Field label="数值">
+                      <input
+                        value={item.value}
+                        onChange={(event) =>
+                          updateItem(index, { value: event.target.value })
+                        }
+                      />
+                    </Field>
+                    <Field label="单位">
+                      <input
+                        value={item.unit ?? ""}
+                        onChange={(event) =>
+                          updateItem(index, { unit: event.target.value })
+                        }
+                      />
+                    </Field>
+                  </div>
+                  <div className="sb-form-row">
+                    <Field label="说明">
+                      <input
+                        value={item.detail ?? ""}
+                        onChange={(event) =>
+                          updateItem(index, { detail: event.target.value })
+                        }
+                      />
+                    </Field>
+                    <Field label="变化率 %（可留空）">
+                      <input
+                        type="number"
+                        value={item.trend ?? ""}
+                        onChange={(event) =>
+                          updateItem(index, {
+                            trend:
+                              event.target.value === ""
+                                ? undefined
+                                : Number(event.target.value),
+                          })
+                        }
+                      />
+                    </Field>
+                    <button
+                      type="button"
+                      className="sb-icon-button sb-danger"
+                      aria-label={`删除指标${item.label}`}
+                      onClick={() =>
+                        setDraftItems((current) =>
+                          current.filter(
+                            (_, currentIndex) => currentIndex !== index,
+                          ),
+                        )
                       }
-                    />
-                  </Field>
-                  <Field label="数值">
-                    <input
-                      value={item.value}
-                      onChange={(event) =>
-                        updateItem(index, { value: event.target.value })
-                      }
-                    />
-                  </Field>
-                  <Field label="单位">
-                    <input
-                      value={item.unit ?? ""}
-                      onChange={(event) =>
-                        updateItem(index, { unit: event.target.value })
-                      }
-                    />
-                  </Field>
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
-                <div className="sb-form-row">
-                  <Field label="说明">
-                    <input
-                      value={item.detail ?? ""}
-                      onChange={(event) =>
-                        updateItem(index, { detail: event.target.value })
-                      }
-                    />
-                  </Field>
-                  <Field label="变化率 %（可留空）">
-                    <input
-                      type="number"
-                      value={item.trend ?? ""}
-                      onChange={(event) =>
-                        updateItem(index, {
-                          trend:
-                            event.target.value === ""
-                              ? undefined
-                              : Number(event.target.value),
-                        })
-                      }
-                    />
-                  </Field>
-                  <button
-                    type="button"
-                    className="sb-icon-button sb-danger"
-                    aria-label={`删除指标${item.label}`}
-                    onClick={() =>
-                      setDraftItems((current) =>
-                        current.filter(
-                          (_, currentIndex) => currentIndex !== index,
-                        ),
-                      )
-                    }
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
+            <div className="sb-panel-footer">
+              <button
+                type="button"
+                className="sb-button"
+                onClick={() =>
+                  setDraftItems((current) => [
+                    ...current,
+                    { label: "新指标", value: "" },
+                  ])
+                }
+              >
+                <Plus size={14} />
+                添加指标
+              </button>
+              <button
+                type="button"
+                className="sb-button sb-primary"
+                onClick={() => {
+                  onChange?.({
+                    ...data,
+                    title: draftTitle,
+                    items: draftItems.map(({ trend, ...item }) => ({
+                      ...item,
+                      ...(typeof trend === "number" && Number.isFinite(trend)
+                        ? { trend }
+                        : {}),
+                    })),
+                  });
+                  setEditing(false);
+                }}
+              >
+                <Check size={14} />
+                保存
+              </button>
+            </div>
           </div>
-          <div className="sb-panel-footer">
-            <button
-              type="button"
-              className="sb-button"
-              onClick={() =>
-                setDraftItems((current) => [
-                  ...current,
-                  { label: "新指标", value: "" },
-                ])
-              }
-            >
-              <Plus size={14} />
-              添加指标
-            </button>
-            <button
-              type="button"
-              className="sb-button sb-primary"
-              onClick={() => {
-                onChange?.({
-                  ...data,
-                  title: draftTitle,
-                  items: draftItems.map(({ trend, ...item }) => ({
-                    ...item,
-                    ...(typeof trend === "number" && Number.isFinite(trend)
-                      ? { trend }
-                      : {}),
-                  })),
-                });
-                setEditing(false);
-              }}
-            >
-              <Check size={14} />
-              保存
-            </button>
-          </div>
-        </div>
+        </BlockSettings>
       )}
       {items.length ? (
         <div className="sb-metric-grid">
