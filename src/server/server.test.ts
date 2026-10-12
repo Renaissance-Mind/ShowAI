@@ -438,7 +438,7 @@ describe("portable project server with real SQLite and disk storage", () => {
       ).status,
     ).toBe(403);
   });
-  it("verifies complete content, rejects foreign paths, and preserves concurrent branches", async () => {
+  it("verifies complete content, rejects foreign paths, and rejects stale concurrent publication", async () => {
     const f = await fixture(),
       bytes = new TextEncoder().encode(
         '{"id":"project-one","name":"Project One"}',
@@ -463,7 +463,7 @@ describe("portable project server with real SQLite and disk storage", () => {
     expect(
       (
         await f.request(
-          "/api/projects/project-one/revisions",
+          "/api/projects/project-one/snapshot",
           "POST",
           { snapshot: make("missing"), expected: null },
           f.admin.token,
@@ -480,7 +480,7 @@ describe("portable project server with real SQLite and disk storage", () => {
     );
     expect(uploaded.status).toBe(200);
     const first = await f.request(
-      "/api/projects/project-one/revisions",
+      "/api/projects/project-one/snapshot",
       "POST",
       { snapshot: make("first"), expected: null },
       f.admin.token,
@@ -489,7 +489,7 @@ describe("portable project server with real SQLite and disk storage", () => {
     const responses = await Promise.all(
       ["a", "b"].map((operationId) =>
         f.request(
-          "/api/projects/project-one/revisions",
+          "/api/projects/project-one/snapshot",
           "POST",
           {
             snapshot: make(operationId, [first.value.revision]),
@@ -502,28 +502,35 @@ describe("portable project server with real SQLite and disk storage", () => {
     expect(responses.map((response) => response.status).sort()).toEqual([
       200, 409,
     ]);
-    const history = (
+    const current = (
       await f.request(
-        "/api/projects/project-one/revisions",
+        "/api/projects/project-one/snapshot",
         "GET",
         undefined,
         f.admin.token,
       )
     ).value;
-    expect(history.entries).toHaveLength(3);
+    expect(current.revision).toBe(
+      responses.find((response) => response.status === 200)!.value.revision,
+    );
     expect(
-      history.entries.filter(
-        (entry: { published: boolean }) => !entry.published,
-      ),
-    ).toHaveLength(1);
+      (
+        await f.request(
+          "/api/projects/project-one/revisions",
+          "GET",
+          undefined,
+          f.admin.token,
+        )
+      ).value.error.code,
+    ).toBe("HISTORY_REMOVED");
     const invalid = make("foreign");
     invalid.files["projects/other-project/pages/page.json"] = digest;
     expect(
       (
         await f.request(
-          "/api/projects/project-one/revisions",
+          "/api/projects/project-one/snapshot",
           "POST",
-          { snapshot: invalid, expected: history.head },
+          { snapshot: invalid, expected: current.revision },
           f.admin.token,
         )
       ).status,

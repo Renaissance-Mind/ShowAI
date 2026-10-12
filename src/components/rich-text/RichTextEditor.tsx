@@ -11,6 +11,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useId,
   useRef,
@@ -19,7 +20,12 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { EditorContent, useEditor } from "@tiptap/react";
+import { EditorContent } from "@tiptap/react";
+import {
+  hasRetainedSelection,
+  useWorkspaceEditor,
+} from "../../editor/workspace-editor";
+import { editorNodeJSON } from "../../editor/node-json";
 import type { Editor, JSONContent, Extensions } from "@tiptap/core";
 import { NodeSelection, Selection, TextSelection } from "@tiptap/pm/state";
 import { clearWidgetSelection } from "./widget-selection";
@@ -76,6 +82,7 @@ import { TableControls } from "./TableControls";
 import { createExtensions } from "./extensions";
 import "./editor.css";
 
+const initialSelections = new WeakSet<Editor>();
 export interface RichTextEditorProps {
   content: JSONContent;
   onChange: (
@@ -86,6 +93,7 @@ export interface RichTextEditorProps {
   minimal?: boolean;
   additionalExtensions?: Extensions;
   trailingNode?: boolean;
+  retentionKey?: string;
   onEditorReady?: (editor: Editor) => void;
   onInsertNative?: (
     kind: string,
@@ -181,6 +189,7 @@ export default function RichTextEditor({
   onDetachBlock,
   additionalExtensions,
   trailingNode = true,
+  retentionKey,
 }: RichTextEditorProps) {
   const latestOnChange = useRef(onChange);
   const selectionMenuId = useId();
@@ -259,7 +268,8 @@ export default function RichTextEditor({
     ],
     [additionalExtensions, trailingNode],
   );
-  const editor = useEditor({
+  const editor = useWorkspaceEditor({
+    retentionKey,
     extensions,
     content,
     editable: !readOnly,
@@ -329,7 +339,7 @@ export default function RichTextEditor({
       },
     },
     onUpdate: ({ editor: current, transaction }) =>
-      latestOnChange.current(current.getJSON(), {
+      latestOnChange.current(editorNodeJSON(current.state.doc), {
         separateHistory: Boolean(transaction.getMeta(documentTableActionMeta)),
       }),
   });
@@ -353,7 +363,7 @@ export default function RichTextEditor({
       setBubble(null);
     }
   }, [editor, readOnly]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!editor) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const apply = () => {
@@ -448,8 +458,11 @@ export default function RichTextEditor({
       const transaction = clearWidgetSelection(editor.state);
       if (transaction) editor.view.dispatch(transaction);
     };
-    if (editor.isInitialized) clearInitialSelection();
-    else editor.on("create", clearInitialSelection);
+    if (!initialSelections.has(editor) && !hasRetainedSelection(editor)) {
+      initialSelections.add(editor);
+      if (editor.isInitialized) clearInitialSelection();
+      else editor.on("create", clearInitialSelection);
+    }
     const clearOnBlank = (event: PointerEvent) => {
       if (event.button !== 0 || !(event.target instanceof Element)) return;
       const target = event.target;
@@ -512,7 +525,8 @@ export default function RichTextEditor({
   useEffect(() => {
     if (!editor) return;
     const refresh = () => {
-      setRevision((value) => value + 1);
+      if (!minimal || !editor.state.selection.empty)
+        setRevision((value) => value + 1);
       if (!editor.isEditable) return;
       const { selection } = editor.state;
       const { $from, from, to, empty } = selection;
@@ -624,7 +638,7 @@ export default function RichTextEditor({
       window.removeEventListener("resize", refresh);
       window.removeEventListener("showai:viewport-change", viewportChanged);
     };
-  }, [editor, selectionMenuId]);
+  }, [editor, selectionMenuId, minimal]);
 
   useEffect(() => setSelectedIndex(0), [slash?.query]);
   useEffect(() => {
@@ -1059,7 +1073,7 @@ export default function RichTextEditor({
   const textStyle = editor.isActive("heading")
     ? `标题 ${editor.getAttributes("heading").level}`
     : "正文";
-  const formatButtons = (
+  const formatButtons = (!minimal || bubble) && (
     <>
       <select
         aria-label="文字样式"

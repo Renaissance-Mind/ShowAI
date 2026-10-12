@@ -13,6 +13,7 @@ import {
   diffDocuments,
 } from "../core/diff";
 import { FileStore } from "../core/store";
+import { ReadBaselines } from "../core/read-baselines";
 import { instantiateTemplate } from "../core/catalog";
 import { newDocument, toMarkdown } from "../lib/document";
 import {
@@ -343,7 +344,7 @@ describe("whiteboard page model", () => {
       parseArtifact({ format: "showai", version: 1, document: page }),
     ).toThrow(/version/);
   });
-  it("backs up exact legacy bytes on first upgrade and preserves existing checkpoints", async () => {
+  it("backs up exact legacy bytes and compares an explicitly retained read baseline", async () => {
     const directory = await mkdtemp(join(tmpdir(), "showai-surface-"));
     directories.push(directory);
     const store = new FileStore(directory),
@@ -351,6 +352,7 @@ describe("whiteboard page model", () => {
     const original = await store.createPage(project.id, { document: legacy() });
     const raw = await readFile(original.path, "utf8");
     await store.readPage(project.id, original.document.id);
+    await new ReadBaselines(directory).remember(project.id, original);
     expect(await readFile(original.path, "utf8")).toBe(raw);
     const upgraded = await store.applyPage(project.id, original.document.id, {
       baseHash: original.hash,

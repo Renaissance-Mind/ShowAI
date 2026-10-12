@@ -8,7 +8,7 @@ import { SyncManager } from "./manager";
 import { ContentLibrary as GitLibrary } from "../core/content-library";
 import { FileStore } from "../core/store";
 import { startSyncServer } from "../server/node";
-import { eventCapability } from "./events";
+import { eventCapability, inlineRevisionCapability } from "./events";
 
 const cleanup: (() => Promise<unknown>)[] = [];
 afterEach(async () => {
@@ -105,10 +105,12 @@ async function fixture(dropFirstUpload = false) {
     await manager.stop();
     // This suite measures the real HTTP polling fallback. Dedicated event-stream
     // tests exercise direct WebSocket connections on both deployment adapters.
+    // Retry/concurrency tests need the real object PUT fallback; small inline
+    // revisions exercise a different transport path.
     const saved = await manager.configuration();
     saved.connections[0].capabilities =
       saved.connections[0].capabilities?.filter(
-        (item) => item !== eventCapability,
+        (item) => item !== eventCapability && item !== inlineRevisionCapability,
       );
     await writeFile(
       join(home, "local", "sync", "config.json"),

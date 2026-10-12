@@ -33,7 +33,7 @@ describe("FileStore on a versioned library", () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  it("saves project/page records through Git, attributes their source and creates no duplicate checkpoints", async () => {
+  it("saves current project/page records, attributes resource tokens and creates no history checkpoints", async () => {
     const project = await withChangeContext(human, () =>
       store.createProject({ name: "Report" }),
     );
@@ -47,10 +47,14 @@ describe("FileStore on a versioned library", () => {
     expect(
       (await store.readPage(project.id, page.document.id)).document,
     ).toEqual(page.document);
-    const history = await library.history();
-    expect(history).toHaveLength(2);
-    expect(history[0].actor).toEqual(agent.actor);
-    expect(history[1].actor).toEqual(human.actor);
+    expect(await library.history()).toEqual([]);
+    expect((await library.entryAt(page.revision!)).actor).toEqual(agent.actor);
+    const projectRevision = await library.resourceRevision(
+      `projects/${project.id}/project.json`,
+    );
+    expect((await library.entryAt(projectRevision!)).actor).toEqual(
+      human.actor,
+    );
     expect(
       (await library.tree()).some((entry) => entry.path.includes("snapshots/")),
     ).toBe(false);
@@ -115,9 +119,9 @@ describe("FileStore on a versioned library", () => {
       agent,
     );
     expect(await store.listPages(project.id)).toHaveLength(2);
-    expect(await library.history()).toHaveLength(2);
+    expect(await library.history()).toEqual([]);
     expect(
-      (await library.history())[0].resources.filter(
+      (await library.entryAt((await library.head())!)).resources.filter(
         (resource) => resource.kind === "page",
       ),
     ).toHaveLength(2);

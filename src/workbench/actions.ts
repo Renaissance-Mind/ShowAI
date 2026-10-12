@@ -314,9 +314,27 @@ export function createWorkbench(
     return store.listPages(id, { includeArchived: false });
   }
 
-  async function pageRecord(id: string, page: string) {
+  async function pageRecord(
+    id: string,
+    page: string,
+    conditional?: Record<string, unknown>,
+  ) {
     const record = await store.readPage(id, page);
-    return enrichPage(id, record);
+    if (
+      conditional?.ifHash === record.hash &&
+      conditional.ifRevision === record.revision &&
+      !record.workspaceConflicts?.length
+    ) {
+      const connection = (
+        await syncManager(store.root).configuration()
+      ).projects.find((item) => item.projectId === id);
+      return {
+        unchanged: true as const,
+        readOnly:
+          connection?.role === "viewer" || connection?.status === "revoked",
+      };
+    }
+    return enrichPage(id, record, conditional?.knownComponents);
   }
 
   async function enrichPage(id: string, record: PageRecord, known?: unknown) {
@@ -805,7 +823,7 @@ export function createWorkbench(
       case "pages:list":
         return activePages(projectId(args));
       case "pages:get":
-        return pageRecord(projectId(args), pageId(args));
+        return pageRecord(projectId(args), pageId(args), args);
       case "pages:insertTemplate": {
         const id = projectId(args);
         return enrichPage(
@@ -1275,7 +1293,7 @@ export function createWorkbench(
             "Unsupported page export format.",
           );
         const format = args.format as "html" | "json" | "inline";
-        const record = await pageRecord(id, page);
+        const record = await enrichPage(id, await store.readPage(id, page));
         const selection = await host.saveDialog({
           title: "导出页面",
           defaultPath: `${filename(record.document.title)}${format === "json" ? ".showai.json" : ".html"}`,

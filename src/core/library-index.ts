@@ -91,6 +91,7 @@ export class LibraryIndex {
     const db = new DatabaseSync(this.path);
     db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
       CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS index_state (path TEXT PRIMARY KEY, signature TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS resources (
         id TEXT PRIMARY KEY, kind TEXT NOT NULL, project_id TEXT, resource_id TEXT NOT NULL,
         block_id TEXT, title TEXT NOT NULL, body TEXT NOT NULL, path TEXT NOT NULL, location TEXT NOT NULL
@@ -124,33 +125,63 @@ export class LibraryIndex {
         const indexed = db
           .prepare("SELECT value FROM metadata WHERE key='revision'")
           .get()?.value;
-        if (!force && indexed === (revision ?? "")) return revision;
-        const incremental = false;
+        const signaturesReady =
+          db
+            .prepare("SELECT value FROM metadata WHERE key='signature_version'")
+            .get()?.value === "1";
+        if (!force && signaturesReady && indexed === (revision ?? ""))
+          return revision;
+        const incremental = !force && signaturesReady;
         const history: HistoryEntry[] = [];
-        const allPaths = (
-          revision ? await this.library.tree(revision) : []
-        ).map((entry) => entry.path);
+        const tree = revision ? await this.library.tree(revision) : [];
+        const eligible = (path: string) =>
+          !path.startsWith("assets/") &&
+          !path.startsWith("runtimes/") &&
+          !path.startsWith("imports/") &&
+          !path.includes("/history/") &&
+          !/\/reader\.json$|\.reader\.json$/.test(path) &&
+          !/\/pages\/[^/]+\/nodes\//.test(path) &&
+          (path.endsWith(".json") || /\.(tsx?|jsx?|md)$/.test(path));
+        const allPaths = tree.map((entry) => entry.path).filter(eligible);
+        const signatures = new Map<string, string[]>();
+        for (const entry of tree) {
+          const node = entry.path.match(
+            /^(projects\/[^/]+\/pages\/[^/]+)\/nodes\//,
+          );
+          const path = node ? node[1] + ".json" : entry.path;
+          if (!eligible(path)) continue;
+          if (!signatures.has(path)) signatures.set(path, []);
+          signatures.get(path)!.push(`${entry.path}:${entry.oid}`);
+        }
+        const current = new Map(
+          allPaths.map((path) => [
+            path,
+            createHash("sha256")
+              .update(JSON.stringify(signatures.get(path)))
+              .digest("hex"),
+          ]),
+        );
+        const previous = new Map(
+          (
+            db.prepare("SELECT path,signature FROM index_state").all() as {
+              path: string;
+              signature: string;
+            }[]
+          ).map((row) => [row.path, row.signature]),
+        );
         const changed = incremental
-          ? await this.library.changedPaths(indexed as string, revision!)
+          ? [...new Set([...allPaths, ...previous.keys()])].filter(
+              (path) => current.get(path) !== previous.get(path),
+            )
           : allPaths;
         const reload = new Set(changed);
         for (const path of changed) {
           const resource = resourceForPath(path);
           if (resource.kind === "component" || resource.kind === "template")
-            for (const related of allPaths)
+            for (const related of new Set([...allPaths, ...previous.keys()]))
               if (related.startsWith(resource.path + "/")) reload.add(related);
         }
-        const paths = allPaths.filter(
-          (path) =>
-            reload.has(path) &&
-            !path.startsWith("assets/") &&
-            !path.startsWith("runtimes/") &&
-            !path.startsWith("imports/") &&
-            !path.includes("/history/") &&
-            !/\/reader\.json$|\.reader\.json$/.test(path) &&
-            !/\/pages\/[^/]+\/nodes\//.test(path) &&
-            (path.endsWith(".json") || /\.(tsx?|jsx?|md)$/.test(path)),
-        );
+        const paths = allPaths.filter((path) => reload.has(path));
         const rows: SearchRow[] = [],
           edges: ReferenceEdge[] = [];
         // Read bounded batches; the resulting index always names this exact revision.
@@ -166,7 +197,7 @@ export class LibraryIndex {
         try {
           if (!incremental)
             db.exec(
-              "DELETE FROM resources; DELETE FROM search; DELETE FROM refs; DELETE FROM history; DELETE FROM history_resources;",
+              "DELETE FROM resources; DELETE FROM search; DELETE FROM refs; DELETE FROM history; DELETE FROM history_resources; DELETE FROM index_state;",
             );
           else {
             const deleteSearch = db.prepare(
@@ -222,6 +253,17 @@ export class LibraryIndex {
               ref.integrity ?? null,
               ref.blockId ?? null,
             );
+          const removeSignature = db.prepare(
+            "DELETE FROM index_state WHERE path=?",
+          );
+          const saveSignature = db.prepare(
+            "INSERT INTO index_state VALUES(?,?) ON CONFLICT(path) DO UPDATE SET signature=excluded.signature",
+          );
+          for (const path of reload) {
+            const signature = current.get(path);
+            if (signature === undefined) removeSignature.run(path);
+            else saveSignature.run(path, signature);
+          }
           const historyStatement = db.prepare(
             "INSERT INTO history VALUES(?,?,?,?,?,?,?)",
           );
@@ -250,6 +292,12 @@ export class LibraryIndex {
           db.prepare(
             "INSERT INTO metadata(key,value) VALUES('revision',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
           ).run(revision ?? "");
+          db.prepare(
+            "INSERT INTO metadata VALUES('signature_version','1') ON CONFLICT(key) DO UPDATE SET value='1'",
+          ).run();
+          db.prepare(
+            "INSERT INTO metadata VALUES('last_path_count',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+          ).run(String(paths.length));
           db.exec("COMMIT");
         } catch (error) {
           db.exec("ROLLBACK");

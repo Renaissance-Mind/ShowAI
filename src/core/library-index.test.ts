@@ -7,6 +7,7 @@ import { ContentLibrary as GitLibrary } from "./content-library";
 import { LibraryIndex } from "./library-index";
 import { applyOperations } from "./diff";
 import type { ChangeContext } from "./history-model";
+import { DatabaseSync } from "node:sqlite";
 
 const actor: ChangeContext = {
   actor: { kind: "agent", harness: "codex", sessionId: "search-session" },
@@ -108,6 +109,67 @@ describe("rebuildable current content index", () => {
     expect(
       await index.references("component", "metrics", { projectId }),
     ).toHaveLength(1);
+  });
+  it("reindexes only changed page content and deletes removed indexed paths", async () => {
+    const second = JSON.parse(source.toString());
+    second.document.id = crypto.randomUUID();
+    second.document.title = "Unchanged page";
+    const otherPath = `projects/${projectId}/pages/${second.document.id}.json`;
+    await library.writeFiles(
+      new Map([[otherPath, Buffer.from(JSON.stringify(second))]]),
+      actor,
+    );
+    await index.synchronize();
+    const changed = applyOperations(JSON.parse(source.toString()).document, [
+      {
+        type: "block.text.set",
+        blockId: paragraph,
+        text: "changed isolated phrase",
+      },
+    ]);
+    await library.writeFiles(
+      new Map([
+        [
+          path,
+          Buffer.from(
+            JSON.stringify({ format: "showai", version: 3, document: changed }),
+          ),
+        ],
+      ]),
+      actor,
+    );
+    expect(
+      (await index.search({ query: "isolated" })).items.some(
+        (item) => item.blockId === paragraph,
+      ),
+    ).toBe(true);
+    const db = new DatabaseSync(index.path);
+    try {
+      expect(
+        db
+          .prepare("SELECT value FROM metadata WHERE key='last_path_count'")
+          .get()!.value,
+      ).toBe("1");
+      expect(
+        db
+          .prepare("SELECT COUNT(*) AS n FROM resources WHERE path=?")
+          .get(otherPath)!.n,
+      ).toBeGreaterThan(0);
+    } finally {
+      db.close();
+    }
+    await library.writeFiles(new Map([[otherPath, null]]), actor);
+    await index.synchronize();
+    const checked = new DatabaseSync(index.path);
+    try {
+      expect(
+        checked
+          .prepare("SELECT COUNT(*) AS n FROM resources WHERE path=?")
+          .get(otherPath)!.n,
+      ).toBe(0);
+    } finally {
+      checked.close();
+    }
   });
 
   it("updates current body searches and rebuilds identical results", async () => {

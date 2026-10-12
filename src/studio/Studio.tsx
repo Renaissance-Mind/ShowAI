@@ -71,8 +71,7 @@ import type {
   PackageRevisionRef,
   CatalogReadOptions,
 } from "../components/custom/types";
-import { CustomComponentsProvider } from "../components/custom/CustomBlock";
-import SurfaceEditor from "../surface/SurfaceEditor";
+import { PageWorkspace } from "./PageWorkspace";
 import {
   EditorHistoryButtons,
   containerMenuItems,
@@ -399,7 +398,7 @@ export default function Studio() {
   const [focusWindow] = useState(
     () => new URLSearchParams(location.search).get("focus") === "1",
   );
-  const page = usePage();
+  const page = usePage(info?.home);
   const activePageId = page.draft?.id;
   const handleActiveSurfaceChange = useCallback(
     (surfaceId: string) => {
@@ -823,7 +822,7 @@ export default function Studio() {
     routingRef.current = true;
     setRouting(true);
     try {
-      if (!(await page.flush())) {
+      if (!(await page.leave())) {
         setView("page");
         return;
       }
@@ -848,7 +847,7 @@ export default function Studio() {
     routingRef.current = true;
     setRouting(true);
     try {
-      if (!(await page.flush())) {
+      if (!(await page.leave())) {
         setView("page");
         return false;
       }
@@ -875,20 +874,22 @@ export default function Studio() {
     setRouting(true);
     try {
       if (!projectId) return false;
-      if (await page.open(projectId, id)) {
+      if (await page.open(projectId, id, workspace.activeId)) {
         selectedRef.current = projectId;
         setSelectedProject(projectId);
         setExpandedProjects((current) => ({ ...current, [projectId]: true }));
         setView("page");
-        const loaded = await loadProjectContents(projectId);
+        const loaded = contents[projectId];
         const parentId =
-          loaded.pages.find((item) => item.id === id)?.parentId ?? null;
+          page.sessions.getSnapshot().active?.getSnapshot().draft?.parentId ??
+          loaded?.pages.find((item) => item.id === id)?.parentId ??
+          null;
         setSelectedFolder(parentId);
-        expandFolderPath(loaded.folders, parentId);
+        expandFolderPath(loaded?.folders ?? [], parentId);
         setView("page");
         performance.clearMarks("showai:page-visible");
         performance.mark("showai:page-visible");
-        void loadCatalog().catch(report);
+        if (!loaded) void loadProjectContents(projectId).catch(report);
         setContextMenu(null);
         return true;
       }
@@ -1655,24 +1656,22 @@ export default function Studio() {
     entry: workspaceEntry,
     getScroll: () => catalogScrollRef.current?.scrollTop ?? 0,
     onError: report,
-    restore: async (entry) => {
+    beforeClose: (tabId) => page.sessions.closeTab(tabId),
+    restore: async (entry, tabId) => {
       const target = entry.location;
-      if (!(await page.flush())) {
-        setView("page");
-        return false;
-      }
-      const loaded = target.projectId
-        ? await loadProjectContents(target.projectId)
-        : null;
+      const loaded = target.projectId ? contents[target.projectId] : null;
       if (target.view === "page" && target.projectId && target.pageId) {
-        if (!(await page.open(target.projectId, target.pageId))) return false;
+        if (!(await page.open(target.projectId, target.pageId, tabId)))
+          return false;
       } else if (!(await page.clear())) return false;
       selectedRef.current = target.projectId;
       setSelectedProject(target.projectId);
       const folderId =
         target.view === "page"
-          ? (loaded?.pages.find((item) => item.id === target.pageId)
-              ?.parentId ?? null)
+          ? (page.sessions.getSnapshot().active?.getSnapshot().draft
+              ?.parentId ??
+            loaded?.pages.find((item) => item.id === target.pageId)?.parentId ??
+            null)
           : target.folderId;
       setSelectedFolder(folderId);
       if (target.projectId) {
@@ -1691,11 +1690,9 @@ export default function Studio() {
       setRevealNode(null);
       if (target.view !== "page") setEditorControls(null);
       setView(target.view);
-      if (
-        target.view === "templates" ||
-        target.view === "components" ||
-        catalogLoaded.current
-      )
+      if (target.projectId && !loaded)
+        void loadProjectContents(target.projectId).catch(report);
+      if (target.view === "templates" || target.view === "components")
         void loadCatalog().catch(report);
       requestAnimationFrame(() => {
         catalogScrollRef.current?.scrollTo({ top: entry.scrollTop });
@@ -2229,15 +2226,15 @@ export default function Studio() {
               ) : (
                 <Check size={12} />
               )}
-              {
-                {
-                  saved: "已保存",
-                  saving: "保存中",
-                  changed: "待保存",
-                  conflict: "保存失败",
-                  error: "保存失败",
-                }[page.status]
-              }
+              {page.status === "retained"
+                ? "本机草稿已保留"
+                : {
+                    saved: "本机已保存",
+                    saving: "保存中",
+                    changed: "待保存",
+                    conflict: "保存失败",
+                    error: "保存失败",
+                  }[page.status]}
             </span>
             <button
               className="studio-icon"
@@ -2345,6 +2342,21 @@ export default function Studio() {
                 </button>
               </div>
             )}
+            {!!page.backgroundIssues.length && (
+              <div className="studio-conflict" role="alert">
+                <p>其他页面的后台保存需要处理，草稿已保留。</p>
+                {page.backgroundIssues.map((issue) => (
+                  <button
+                    key={`${issue.projectId}:${issue.pageId}`}
+                    onClick={action(() =>
+                      openPage(issue.pageId, issue.projectId),
+                    )}
+                  >
+                    查看 · {issue.title}
+                  </button>
+                ))}
+              </div>
+            )}
             {view === "page" && page.draftNotice && !page.error && (
               <div className="studio-conflict" role="status">
                 <p>{page.draftNotice}</p>
@@ -2449,6 +2461,15 @@ export default function Studio() {
               ref={catalogScrollRef}
               className={`studio-scroll${view === "page" && page.draft ? " has-page-surface" : ""}`}
             >
+              <PageWorkspace
+                sessions={page.sessions}
+                visible={view === "page" && !!page.draft}
+                readOnly={syncReadOnly}
+                revealId={revealNode}
+                onControlsChange={setEditorControls}
+                onActiveSurfaceChange={handleActiveSurfaceChange}
+                onRevealHandled={handleRevealHandled}
+              />
               {loading && (
                 <div className="studio-loading">
                   <Loader2 size={24} className="studio-spin" />
@@ -2462,7 +2483,7 @@ export default function Studio() {
                   onDarkChange={setDark}
                   onMigrate={() => setDialog({ type: "migration" })}
                   onChooseHome={action(async () => {
-                    if (!(await page.flush())) return;
+                    if (!(await page.prepareClose())) return;
                     const next = await desktop.invoke<DesktopInfo | null>(
                       "settings:chooseHome",
                     );
@@ -2495,22 +2516,7 @@ export default function Studio() {
                     setNotice("本地启动配置已复制");
                   })}
                 />
-              ) : view === "page" && page.draft ? (
-                <CustomComponentsProvider
-                  components={page.record?.components ?? []}
-                >
-                  <SurfaceEditor
-                    key={`${info?.home}:${selectedProject}:${page.draft.id}:${page.renderVersion}`}
-                    document={page.draft}
-                    readOnly={syncReadOnly ?? page.record?.readOnly}
-                    onControlsChange={setEditorControls}
-                    revealId={revealNode}
-                    onActiveSurfaceChange={handleActiveSurfaceChange}
-                    onRevealHandled={handleRevealHandled}
-                    onChange={page.edit}
-                  />
-                </CustomComponentsProvider>
-              ) : (
+              ) : view === "page" && page.draft ? null : (
                 <div
                   className={`studio-library${view === "components" ? " studio-component-library" : ""}`}
                 >

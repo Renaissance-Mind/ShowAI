@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
+import { EditorViewScope } from "../editor/view-scope";
 import { GESTURE_IDLE, normalizedWheel, zoomAt, type Camera } from "./model";
 import {
   clamp,
@@ -86,6 +87,9 @@ export function useSurfaceViewport(
   storageKey?: string,
   enabled = true,
 ) {
+  const viewScope = useContext(EditorViewScope);
+  const sharedStorageKey = storageKey;
+  if (storageKey && viewScope) storageKey = `${storageKey}:${viewScope}`;
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -209,7 +213,13 @@ export function useSurfaceViewport(
     };
     if (storageKey) {
       try {
-        const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+        const saved = JSON.parse(
+          localStorage.getItem(storageKey) ||
+            (sharedStorageKey
+              ? localStorage.getItem(sharedStorageKey)
+              : null) ||
+            "null",
+        );
         if (
           saved &&
           [saved.x, saved.y, saved.scale].every(Number.isFinite) &&

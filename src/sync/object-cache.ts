@@ -1,10 +1,45 @@
 import { CAPACITY } from "../portable/capacity.mjs";
-import { mkdir, open, rm } from "node:fs/promises";
+import { lstat, mkdir, open, rm } from "node:fs/promises";
 import { dirname } from "node:path";
 import { createHash } from "node:crypto";
 import { atomicRename } from "../core/atomic-rename";
-import { safeLibraryPath } from "../core/library-files";
+import {
+  atomicLibraryFile,
+  readLibraryBytes,
+  safeLibraryPath,
+} from "../core/library-files";
 import { CoreError } from "../core/model";
+
+const verified = new Map<string, string>();
+/** Reuse verified immutable bytes; a replaced or damaged cache is checked again. */
+export async function retainCachedObject(
+  home: string,
+  path: string,
+  bytes: Buffer,
+  expected: string,
+) {
+  if (createHash("sha256").update(bytes).digest("hex") !== expected)
+    throw new CoreError("INVALID_DATA", "同步缓存输入摘要不匹配。");
+  await safeLibraryPath(home, path);
+  const info = await lstat(path).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined;
+    throw error;
+  });
+  const signature =
+    info &&
+    `${expected}:${info.dev}:${info.ino}:${info.size}:${info.mtimeMs}:${info.ctimeMs}`;
+  if (signature && verified.get(path) === signature) return false;
+  const existing = info ? await readLibraryBytes(home, path) : null;
+  const reused = !!existing && existing.equals(bytes);
+  if (!reused) await atomicLibraryFile(home, path, bytes);
+  const saved = reused ? info! : await lstat(path);
+  verified.set(
+    path,
+    `${expected}:${saved.dev}:${saved.ino}:${saved.size}:${saved.mtimeMs}:${saved.ctimeMs}`,
+  );
+  if (verified.size > 4096) verified.delete(verified.keys().next().value!);
+  return !reused;
+}
 
 export async function cacheDownload(
   home: string,

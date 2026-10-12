@@ -1,4 +1,5 @@
 import { SurfaceGeometryStore } from "./geometry-store";
+import { EditorViewScope } from "../editor/view-scope";
 import {
   transformObjects,
   duplicateObjects,
@@ -101,6 +102,12 @@ interface Runtime {
   ) => void;
 }
 const Context = createContext<Runtime>(null!);
+export interface ContainerViewState {
+  selected?: string | null;
+  expanded?: string | null;
+  active?: string;
+  scrolls?: Map<string, number>;
+}
 export function ContainerRuntime({
   document: sourceDocument,
   geometry: suppliedGeometry,
@@ -119,6 +126,7 @@ export function ContainerRuntime({
   pageWidthModes = false,
   onActiveSurfaceChange,
   onControlsChange,
+  retainedState,
 }: {
   document: ContainerDocument;
   geometry?: SurfaceGeometryStore;
@@ -138,6 +146,7 @@ export function ContainerRuntime({
   pageWidthModes?: boolean;
   onActiveSurfaceChange?: (id: string) => void;
   onControlsChange?: (controls: EditorControls | null) => void;
+  retainedState?: ContainerViewState;
 }) {
   const document = useMemo(
     () => reconcileConnections({ ...sourceDocument }),
@@ -150,10 +159,16 @@ export function ContainerRuntime({
   const geometry = suppliedGeometry ?? localGeometry;
   const current = useRef(document);
   current.current = document;
-  const [selected, select] = useState<string | null>(null),
+  const [selected, select] = useState<string | null>(
+      retainedState?.selected ?? null,
+    ),
     [inspecting, inspect] = useState<string | null>(null),
-    [expanded, expand] = useState<string | null>(null),
-    [active, activate] = useState(document.content.attrs!.id),
+    [expanded, expand] = useState<string | null>(
+      retainedState?.expanded ?? null,
+    ),
+    [active, activate] = useState(
+      retainedState?.active ?? document.content.attrs!.id,
+    ),
     [revealRequest, requestReveal] = useState<string | null>(null);
   const [iconTarget, setIconTarget] = useState<string | null>(null);
   const [slash, setSlash] = useState<{
@@ -181,7 +196,18 @@ export function ContainerRuntime({
       media.removeEventListener("change", changed);
     };
   }, []);
-  const scrolls = useRef(new Map<string, number>());
+  const scrolls = useRef(retainedState?.scrolls ?? new Map<string, number>());
+  const viewState = useRef({ selected, expanded, active });
+  viewState.current = { selected, expanded, active };
+  useLayoutEffect(
+    () => () => {
+      if (retainedState)
+        Object.assign(retainedState, viewState.current, {
+          scrolls: scrolls.current,
+        });
+    },
+    [retainedState],
+  );
   useEffect(() => {
     onActiveSurfaceChange?.(active);
   }, [active, document.id]);
@@ -411,6 +437,25 @@ export function ContainerRuntime({
             onKeyDown={(event) => {
               if (event.defaultPrevented || event.nativeEvent.isComposing)
                 return;
+              // A reconstructed text view has a fresh ProseMirror history. The
+              // retained surface history still owns edits made before eviction.
+              if (
+                !runtime.readOnly &&
+                (event.metaKey || event.ctrlKey) &&
+                !event.altKey &&
+                !(event.target as Element).closest("input,textarea,select") &&
+                ["z", "y"].includes(event.key.toLowerCase())
+              ) {
+                const forward =
+                  event.shiftKey || event.key.toLowerCase() === "y";
+                if (forward ? canRedo && redo : canUndo && undo) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (forward) redo?.();
+                  else undo?.();
+                  return;
+                }
+              }
               if (
                 event.key === "/" &&
                 !event.metaKey &&
@@ -858,7 +903,8 @@ function ContainerView({
     setTool(next);
   };
   const enabled = root || runtime.active === id;
-  const persistKey = `showai.page-scroll.v3:${runtime.document.id}:${id}:${root ? "expanded" : "embedded"}`;
+  const viewScope = useContext(EditorViewScope);
+  const persistKey = `showai.page-scroll.v3:${runtime.document.id}:${id}:${root ? "expanded" : "embedded"}${viewScope ? `:${viewScope}` : ""}`;
   useLayoutEffect(() => {
     const element = page.current;
     if (!element) return;

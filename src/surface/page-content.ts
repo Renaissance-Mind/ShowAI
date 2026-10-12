@@ -3,6 +3,8 @@ import type { ShowDocument } from "../types";
 import { remapSurfaceIds, visitNodes } from "./document.mjs";
 import { createSurface } from "./containers.mjs";
 
+const moduleJSON = new WeakMap<JSONContent, JSONContent>();
+
 /** Keep structural identities in the document while exposing one continuous editor. */
 export function toPageEditor(
   node: JSONContent,
@@ -14,8 +16,14 @@ export function toPageEditor(
     node.type === "drawing" ||
     (node.type === "region" &&
       (document.layout?.[node.attrs!.id]?.mode ?? "flow") !== "flow")
-  )
-    return { type: "pageModule", attrs: { id: node.attrs!.id, node } };
+  ) {
+    let module = moduleJSON.get(node);
+    if (!module) {
+      module = { type: "pageModule", attrs: { id: node.attrs!.id, node } };
+      moduleJSON.set(node, module);
+    }
+    return module;
+  }
   const content = node.content?.map((child) => toPageEditor(child, document));
   if (
     node.type === "doc" &&
@@ -38,6 +46,12 @@ export function toPageEditor(
       content: [{ type: "paragraph", attrs: { id: paragraphId } }],
     });
   }
+  if (
+    !content ||
+    (content.length === node.content?.length &&
+      content.every((child, index) => child === node.content![index]))
+  )
+    return node;
   return {
     ...node,
     ...(content ? { content } : {}),
@@ -49,6 +63,11 @@ export function fromPageEditor(
   source?: ShowDocument,
 ): JSONContent {
   if (node.type === "pageModule") {
+    const originalNode = node.attrs!.node as JSONContent;
+    if (originalNode.attrs?.id === node.attrs!.id) {
+      moduleJSON.set(originalNode, node);
+      return originalNode;
+    }
     const original = structuredClone(node.attrs!.node) as JSONContent;
     if (original.attrs!.id !== node.attrs!.id) {
       if (!source) throw new Error("复制嵌入内容需要来源文档的布局与视图。");
@@ -83,10 +102,14 @@ export function fromPageEditor(
     original.attrs = { ...original.attrs, id: node.attrs!.id };
     return original;
   }
+  const content = node.content?.map((child) => fromPageEditor(child, source));
+  if (
+    !content ||
+    content.every((child, index) => child === node.content![index])
+  )
+    return node;
   return {
     ...node,
-    ...(node.content
-      ? { content: node.content.map((child) => fromPageEditor(child, source)) }
-      : {}),
+    ...(content ? { content } : {}),
   };
 }

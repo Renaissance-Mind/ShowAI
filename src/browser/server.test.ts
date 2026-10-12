@@ -704,11 +704,13 @@ test("versioned browser bridge attributes human edits and replays a saved reques
   const saved = await invoke<LoadedPage>("pages:save", saveArgs);
   expect(saved.revision).not.toBe(page.revision);
   expect(await invoke<LoadedPage>("pages:save", saveArgs)).toEqual(saved);
-  expect(await invoke<LoadedPage>("pages:create", createArgs)).toEqual(page);
+  await expect(
+    invoke<LoadedPage>("pages:create", createArgs),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
   expect(
     await invoke<unknown[]>("pages:list", { projectId: project.id }),
   ).toHaveLength(1);
-  expect((await library.history({ limit: 1 }))[0]).toMatchObject({
+  expect(await library.entryAt(saved.revision!)).toMatchObject({
     actor: { kind: "human" },
     channel: "browser",
     message: "编辑标题",

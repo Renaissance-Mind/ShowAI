@@ -26,6 +26,7 @@ import type { CompiledComponent } from "./types";
 import { InlineComponent } from "./InlineComponent";
 import { findComponent, indexComponents } from "./component-index";
 import { installComponentLinks, openComponentLink } from "./external-links";
+import { installComponentActivity } from "./activity";
 import "./custom.css";
 
 const ComponentsContext = createContext<ReadonlyMap<string, CompiledComponent>>(
@@ -53,7 +54,8 @@ export function CustomComponentsProvider({
 }
 
 export function useAvailableComponents() {
-  return [...useContext(ComponentsContext).values()];
+  const components = useContext(ComponentsContext);
+  return useMemo(() => [...components.values()], [components]);
 }
 
 export function AdditionalComponentsProvider({
@@ -244,7 +246,7 @@ function SandboxComponent({
       policy +
       injectComponentBootstrap(
         component.html,
-        `<style>body{color:var(--text)}</style><script>(${installSandboxTheme.toString()})(${safeJson(channel)},${safeJson(initialTheme.current)},${safeJson(appearanceTokens())});</script><script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current })}</script>`,
+        `<style>body{color:var(--text)}</style><script>(${installComponentActivity.toString()})(${safeJson(channel)});(${installSandboxTheme.toString()})(${safeJson(channel)},${safeJson(initialTheme.current)},${safeJson(appearanceTokens())});</script><script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current })}</script>`,
       ) +
       `<script>(${installIconTooltips.toString()})(document);(${installComponentLinks.toString()})(${safeJson(channel)});</script>`
     );
@@ -262,6 +264,23 @@ function SandboxComponent({
       "*",
     );
   };
+  useEffect(() => {
+    const frame = iframe.current;
+    const activate = () =>
+      frame?.contentWindow?.postMessage(
+        { channel, type: "showai:activity", active: true },
+        "*",
+      );
+    activate();
+    frame?.addEventListener("load", activate);
+    return () => {
+      frame?.removeEventListener("load", activate);
+      frame?.contentWindow?.postMessage(
+        { channel, type: "showai:activity", active: false },
+        "*",
+      );
+    };
+  }, [channel]);
   useEffect(() => {
     const receive = (event: MessageEvent) => {
       if (

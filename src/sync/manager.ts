@@ -11,7 +11,7 @@ import { FileStore, CoreError, assertId } from "../core/store";
 import { LibraryOperations } from "../core/library-operations";
 import { WorkspaceProtection } from "../core/workspace-conflicts";
 import { serverBaseUrl, serverEndpoint, invitationBaseUrl } from "./server-url";
-import { cacheDownload } from "./object-cache";
+import { cacheDownload, retainCachedObject } from "./object-cache";
 import { resumableUpload } from "./resumable-upload";
 import { retryUpload } from "./upload-retry";
 import { ProjectEventStream } from "./event-stream";
@@ -1169,10 +1169,11 @@ export class SyncManager {
       ),
     );
     for (const [digest, bytes] of captured.objects)
-      await atomicLibraryFile(
+      await retainCachedObject(
         this.home,
         this.objectPath(digest, this.cacheKey(connection, project)),
         bytes,
+        digest,
       );
     const ids = [...captured.objects.keys()];
     if (connection.capabilities?.includes(inlineRevisionCapability)) {
@@ -1205,12 +1206,6 @@ export class SyncManager {
           objects,
         };
         if (Buffer.byteLength(JSON.stringify(input)) <= 512 * 1024) {
-          for (const digest of changed)
-            await atomicLibraryFile(
-              this.home,
-              this.objectPath(digest, this.cacheKey(connection, project)),
-              captured.objects.get(digest)!,
-            );
           await this.cacheRecord(connection, project, captured, "candidate");
           return this.request<{
             revision: string;

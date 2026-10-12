@@ -5,6 +5,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -12,7 +13,7 @@ import {
 } from "react";
 import type { ShowDocument, ContainerDocument } from "../types";
 import { Widget } from "../components/blocks/Widget";
-import { ContainerRuntime } from "./ContainerRuntime";
+import { ContainerRuntime, type ContainerViewState } from "./ContainerRuntime";
 import { isResource, upgradeResource } from "./containers.mjs";
 import { editNode, replaceChildren, detachBlock } from "./editing";
 import {
@@ -32,6 +33,16 @@ const contentKey = (document: ShowDocument) =>
     document.surfaceViews,
     document.icon,
   ]);
+export interface SurfaceEditorState {
+  runtime?: ContainerViewState;
+  document?: ContainerDocument;
+  history?: {
+    past: ContainerDocument[];
+    future: ContainerDocument[];
+    group: string;
+    at: number;
+  };
+}
 function SurfaceEditor({
   document: input,
   onChange,
@@ -41,6 +52,7 @@ function SurfaceEditor({
   readOnly = false,
   onActiveSurfaceChange,
   onControlsChange,
+  retainedState,
 }: {
   document: ShowDocument;
   onChange: (document: ShowDocument) => void;
@@ -50,13 +62,17 @@ function SurfaceEditor({
   onRevealHandled?: () => void;
   onActiveSurfaceChange?: (id: string) => void;
   onControlsChange?: (controls: EditorControls | null) => void;
+  retainedState?: SurfaceEditorState;
 }) {
   const document = useMemo(
     () => (isResource(input) ? input : upgradeResource(input)),
     [input],
   );
   const geometry = useMemo(() => new SurfaceGeometryStore(), [document.id]);
-  const current = useRef<ContainerDocument>(document);
+  const restored =
+    retainedState?.document?.id === document.id ? retainedState : undefined;
+  if (retainedState && !retainedState.runtime) retainedState.runtime = {};
+  const current = useRef<ContainerDocument>(restored?.document ?? document);
   const geometrySettlement = useRef({ generation: 0, first: 0, second: 0 });
   useEffect(
     () => () => {
@@ -70,13 +86,31 @@ function SurfaceEditor({
     future: ContainerDocument[];
     group: string;
     at: number;
-  }>({ past: [], future: [], group: "", at: 0 });
+  }>(restored?.history ?? { past: [], future: [], group: "", at: 0 });
+  useLayoutEffect(
+    () => () => {
+      if (!retainedState) return;
+      retainedState.document = current.current;
+      retainedState.history = {
+        ...history.current,
+        past: [...history.current.past],
+        future: [...history.current.future],
+      };
+    },
+    [retainedState],
+  );
   const [, refresh] = useState(0);
   const [insertedId, setInsertedId] = useState<string | null>(null);
   const latestChange = useRef(onChange);
   latestChange.current = onChange;
-  useEffect(() => {
+  const latestReadOnly = useRef(readOnly);
+  latestReadOnly.current = readOnly;
+  const widgetChanges = useRef(
+    new Map<string, (data: Record<string, unknown>) => void>(),
+  );
+  useLayoutEffect(() => {
     const before = current.current;
+    if (before === document) return;
     if (
       before.content !== document.content ||
       before.layout !== document.layout ||
@@ -85,6 +119,7 @@ function SurfaceEditor({
     ) {
       if (contentKey(before) === contentKey(document)) {
         current.current = document;
+        refresh((value) => value + 1);
         return;
       }
       geometrySettlement.current.generation++;
@@ -103,9 +138,9 @@ function SurfaceEditor({
         history.current.group = "";
         history.current.at = 0;
       }
-      refresh((value) => value + 1);
     }
     current.current = document;
+    refresh((value) => value + 1);
   }, [document]);
   const settleGeometry = useCallback(() => {
     // Let content layout and ResizeObserver settle, then complete this same undo transaction.
@@ -131,6 +166,7 @@ function SurfaceEditor({
   }, [geometry]);
   const commit = useCallback(
     (value: ShowDocument, group = "") => {
+      if (latestReadOnly.current) return;
       const next = (
         isReconciledSurface(value) ? value : reconcileSurface(value)
       ) as ContainerDocument;
@@ -195,22 +231,29 @@ function SurfaceEditor({
     componentData,
   }: ContentRenderProps) => {
     const single = kind === "single" ? content.content?.[0] : undefined;
-    if (single?.type === "widget")
+    if (single?.type === "widget") {
+      let onWidgetChange = widgetChanges.current.get(parentId);
+      if (!onWidgetChange) {
+        onWidgetChange = (data) => {
+          if (latestReadOnly.current) return;
+          commit(
+            editNode(current.current, parentId, (node) => {
+              node.attrs = { ...node.attrs, data };
+            }),
+            `widget:${parentId}`,
+          );
+        };
+        widgetChanges.current.set(parentId, onWidgetChange);
+      }
       return (
         <Widget
           kind={single.attrs!.kind}
           data={single.attrs!.data}
           readOnly={readOnly}
-          onChange={(data) =>
-            commit(
-              editNode(current.current, parentId, (node) => {
-                node.attrs = { ...node.attrs, data };
-              }),
-              `widget:${parentId}`,
-            )
-          }
+          onChange={onWidgetChange}
         />
       );
+    }
     if (single?.type === "image")
       return (
         <img
@@ -231,6 +274,7 @@ function SurfaceEditor({
             : content,
         }}
         host={{
+          retentionKey: `${parentId}:${kind}:${ids?.[0] ?? "content"}`,
           additionalExtensions: renderModule ? pageEditorNodes : undefined,
           continuousPage: !!renderModule,
           onInsertNative: readOnly
@@ -349,7 +393,7 @@ function SurfaceEditor({
       }}
     >
       <ContainerRuntime
-        document={document}
+        document={current.current}
         geometry={geometry}
         pageWidthModes
         onActiveSurfaceChange={onActiveSurfaceChange}
@@ -362,6 +406,7 @@ function SurfaceEditor({
         undo={undo}
         redo={redo}
         onControlsChange={onControlsChange}
+        retainedState={retainedState?.runtime}
         canUndo={!!history.current.past.length}
         canRedo={!!history.current.future.length}
       />

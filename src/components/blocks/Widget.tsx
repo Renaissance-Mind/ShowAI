@@ -7,6 +7,7 @@ import {
   Component,
   useContext,
   useMemo,
+  memo,
   Suspense,
   useSyncExternalStore,
   type ReactNode,
@@ -87,7 +88,7 @@ class BlockBoundary extends Component<
   }
 }
 
-export function Widget({
+export const Widget = memo(function Widget({
   kind,
   data,
   onChange,
@@ -160,4 +161,4 @@ export function Widget({
       </Suspense>
     </BlockBoundary>
   );
-}
+});

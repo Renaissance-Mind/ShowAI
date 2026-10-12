@@ -14,7 +14,11 @@ import "../blocks/katex.css";
 
 export type RichTextHost = Pick<
   RichTextEditorProps,
-  "additionalExtensions" | "onEditorReady" | "onInsertNative" | "onDetachBlock"
+  | "additionalExtensions"
+  | "onEditorReady"
+  | "onInsertNative"
+  | "onDetachBlock"
+  | "retentionKey"
 > & {
   continuousPage?: boolean;
   onContentChange?: (
@@ -31,7 +35,10 @@ export function RichText({
 }: BlockProps & { host?: RichTextHost }) {
   validateRichTextData(data);
   const content = useMemo(
-    () => richTextDocument(data),
+    () =>
+      typeof data.content === "string"
+        ? richTextDocument(data)
+        : (data.content as JSONContent),
     [data.content, data.format],
   );
   const { renderWidget } = useContext(RichTextEnvironment);

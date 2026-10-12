@@ -36,7 +36,10 @@ export function useComponentCatalog(open: boolean) {
       active = false;
     };
   }, [open, library]);
-  const items = catalog ?? [...builtins, ...available];
+  const items = useMemo(
+    () => catalog ?? [...builtins, ...available],
+    [catalog, builtins, available],
+  );
   const resolve = async (item: CatalogComponent) => {
     if ("kind" in item)
       return {

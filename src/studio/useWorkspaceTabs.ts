@@ -18,22 +18,25 @@ export function useWorkspaceTabs({
   restore,
   getScroll,
   onError,
+  beforeClose,
 }: {
   home?: string;
   ready: boolean;
   entry: WorkspaceEntry;
-  restore: (entry: WorkspaceEntry) => Promise<boolean>;
+  restore: (entry: WorkspaceEntry, tabId: string) => Promise<boolean>;
   getScroll: () => number;
   onError: (error: unknown) => void;
+  beforeClose?: (tabId: string) => Promise<boolean>;
 }) {
   const [state, setState] = useState(() => createWorkspace(entry));
   const current = useRef(state);
   const [switching, setSwitching] = useState(false);
   const pending = useRef(false);
+  const closing = useRef(false);
   const library = useRef<string | undefined>(undefined);
   const restored = useRef(false);
-  const latest = useRef({ entry, restore, getScroll, onError });
-  latest.current = { entry, restore, getScroll, onError };
+  const latest = useRef({ entry, restore, getScroll, onError, beforeClose });
+  latest.current = { entry, restore, getScroll, onError, beforeClose };
 
   const publish = (next: WorkspaceTabsState) => {
     current.current = next;
@@ -59,12 +62,13 @@ export function useWorkspaceTabs({
   };
 
   const activate = async (next: WorkspaceTabsState) => {
-    if (pending.current || !ready) return false;
+    if (pending.current || closing.current || !ready) return false;
     pending.current = true;
     setSwitching(true);
     try {
       const target = next.tabs.find((tab) => tab.id === next.activeId)!;
-      if (!(await latest.current.restore(currentEntry(target)))) return false;
+      if (!(await latest.current.restore(currentEntry(target), target.id)))
+        return false;
       publish(next);
       return true;
     } finally {
@@ -74,7 +78,7 @@ export function useWorkspaceTabs({
   };
 
   useLayoutEffect(() => {
-    if (!ready || !home || pending.current) return;
+    if (!ready || !home || pending.current || closing.current) return;
     if (library.current !== home) {
       const firstLibrary = !library.current;
       library.current = home;
@@ -134,11 +138,21 @@ export function useWorkspaceTabs({
     return true;
   };
   const close = async (id = current.current.activeId) => {
-    if (pending.current) return;
-    rememberScroll();
-    const next = closeWorkspaceTab(current.current, id);
-    if (next.activeId === current.current.activeId) publish(next);
-    else await activate(next);
+    if (pending.current || closing.current) return;
+    closing.current = true;
+    setSwitching(true);
+    try {
+      rememberScroll();
+      if (latest.current.beforeClose && !(await latest.current.beforeClose(id)))
+        return;
+      const next = closeWorkspaceTab(current.current, id);
+      closing.current = false;
+      if (next.activeId === current.current.activeId) publish(next);
+      else await activate(next);
+    } finally {
+      closing.current = false;
+      if (!pending.current) setSwitching(false);
+    }
   };
   const step = async (offset: number) => {
     rememberScroll();

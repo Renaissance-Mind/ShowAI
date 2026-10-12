@@ -67,17 +67,43 @@ export function replaceChildren(
   ids: string[],
   replacement: JSONContent[],
 ) {
-  return editNode(source, parentId, (node) => {
-    const selected = new Set(ids);
+  const selected = new Set(ids);
+  let changed = false;
+  const walk = (node: JSONContent): JSONContent => {
+    if (node.attrs?.id !== parentId) {
+      if (!node.content) return node;
+      const content = node.content.map(walk);
+      return content.some((child, index) => child !== node.content![index])
+        ? { ...node, content }
+        : node;
+    }
     const content = node.content ?? [],
       start = content.findIndex((child) => selected.has(child.attrs?.id));
     const index = start < 0 ? content.length : start;
-    node.content = [
+    const next = [
       ...content.slice(0, index),
       ...replacement,
       ...content.slice(index).filter((child) => !selected.has(child.attrs?.id)),
     ];
-  });
+    if (
+      next.length === content.length &&
+      next.every((child, index) => child === content[index])
+    )
+      return node;
+    changed = true;
+    return { ...node, content: next };
+  };
+  const content = walk(source.content);
+  return changed
+    ? reconcileSurface(
+        {
+          ...source,
+          content,
+          ...(source.layout ? { layout: { ...source.layout } } : {}),
+        },
+        { clone: false },
+      )
+    : source;
 }
 
 export function addNode(
