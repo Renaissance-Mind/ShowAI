@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { inspect, renderDiagram, syntax, type DiagramData } from "./engine.js";
+import { diagramSize, useDiagramViewport } from "./viewport";
 import "./style.css";
 import "./diagram.css";
 
@@ -30,21 +31,22 @@ export default function TextDiagram({
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const [draft, setDraft] = useState<DiagramData | null>(null);
-  const [zoom, setZoom] = useState(1);
   const [view, setView] = useState("changes");
   const [help, setHelp] = useState(false);
   const [sourceOpen, setSourceOpen] = useState(false);
   const editButton = useRef<HTMLButtonElement>(null);
   const current = draft ?? data;
   const output = useMemo(() => preview(current, `sd-${uid}`), [current, uid]);
+  const size = diagramSize(output.html);
+  const viewport = useDiagramViewport(
+    size,
+    `${current.type}:${current.direction}:${current.source}:${!!output.error}`,
+  );
+  const dataIdentity = JSON.stringify(data);
   useEffect(() => {
     setDraft(null);
-    setZoom(1);
     setView("changes");
-  }, [data]);
-  const naturalWidth = Number(
-    output.html.match(/<svg[^>]*width="([0-9]+)"/)?.[1] ?? 800,
-  );
+  }, [dataIdentity]);
   const editing = !readOnly && !!onChange;
   const changed = output.html.includes("data-delta=");
   function cancel() {
@@ -62,23 +64,24 @@ export default function TextDiagram({
           <button
             type="button"
             aria-label="缩小"
-            disabled={zoom <= 0.5}
-            onClick={() => setZoom(Math.max(0.5, zoom - 0.25))}
+            disabled={viewport.scale <= Math.min(0.05, viewport.fit)}
+            onClick={() => viewport.zoomTo(viewport.scale / 1.25)}
           >
             −
           </button>
           <button
             type="button"
             aria-label="适应宽度"
-            onClick={() => setZoom(1)}
+            title="适应宽度"
+            onClick={viewport.fitWidth}
           >
-            {Math.round(zoom * 100)}%
+            {Math.round(viewport.scale * 100)}%
           </button>
           <button
             type="button"
             aria-label="放大"
-            disabled={zoom >= 3}
-            onClick={() => setZoom(Math.min(3, zoom + 0.25))}
+            disabled={viewport.scale >= 8}
+            onClick={() => viewport.zoomTo(viewport.scale * 1.25)}
           >
             ＋
           </button>
@@ -231,17 +234,20 @@ export default function TextDiagram({
             </div>
           )}
           <div
-            className={`sd-viewport am-view-${view}`}
+            ref={viewport.ref}
+            className={`sd-viewport am-view-${view}${viewport.dragging ? " is-dragging" : ""}`}
+            style={{ height: viewport.height }}
+            {...viewport.handlers}
             tabIndex={0}
             role="region"
-            aria-label="图形，放大后可横向滚动"
+            aria-label="图形，可拖动或用方向键平移，按加减缩放，Home 适应宽度"
           >
             {output.html ? (
               <div
                 className="sd-drawing"
                 style={{
-                  width: `${zoom * 100}%`,
-                  maxWidth: `${naturalWidth * 1.35 * zoom}px`,
+                  width: `${size.width * viewport.scale}px`,
+                  height: `${size.height * viewport.scale}px`,
                 }}
                 dangerouslySetInnerHTML={{ __html: output.html }}
               />
