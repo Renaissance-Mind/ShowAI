@@ -503,6 +503,7 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
             "extent",
             "points",
             "bindings",
+            "ink",
           ])
         : node.type === "surface"
           ? new Set([...nodeAttributes, "widthMode"])

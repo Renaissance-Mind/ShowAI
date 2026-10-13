@@ -100,16 +100,21 @@ export const surfaceToScreen = (point, origin, camera) => ({
 });
 export function objectCapabilities(node) {
   const drawing = node.type === "drawing";
+  const nativeInk =
+    node.type === "widget" &&
+    node.attrs?.kind === "image" &&
+    !!node.attrs?.data?.nativeInk;
   return {
     rotate:
-      (drawing || node.type === "image") &&
+      (drawing || nativeInk || node.type === "image") &&
       !(drawing && node.attrs?.tool === "arrow"),
     resizeHeight:
       drawing ||
+      nativeInk ||
       node.type === "image" ||
       (node.type === "surface" && node.attrs?.kind === "board"),
     bindTarget: !(drawing && node.attrs?.tool === "arrow"),
-    minWidth: drawing ? 1 : 120,
+    minWidth: drawing || nativeInk ? 1 : 120,
     minHeight: node.type === "surface" ? 180 : 1,
   };
 }

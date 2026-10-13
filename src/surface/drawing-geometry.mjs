@@ -12,6 +12,13 @@ import {
 /** Geometry is the painted centerline, independent of SVG viewport padding. */
 export function drawingBounds(node) {
   if (node.type !== "drawing") return null;
+  if (node.attrs.ink)
+    return {
+      x: 0,
+      y: 0,
+      width: node.attrs.extent[0],
+      height: node.attrs.extent[1],
+    };
   const { points, tool } = node.attrs;
   if (tool !== "arrow") return pointsBounds(points);
   const a = points[0],
@@ -103,7 +110,7 @@ function drawingOutline(node, frame, p = { x: Infinity, y: Infinity }) {
     b = local.at(-1);
   let vertices = local,
     inside = false;
-  if (tool === "rectangle") {
+  if (tool === "rectangle" || node.attrs.ink) {
     vertices = [
       { x: box.x, y: box.y },
       { x: box.x + box.width, y: box.y },
@@ -224,9 +231,10 @@ export function shapeHit(node, frame, point) {
     distance,
     inside,
     solid:
-      (node.attrs.tool === "rectangle" || node.attrs.tool === "ellipse") &&
-      !!node.attrs.fillColor &&
-      node.attrs.fillColor !== "none",
+      !!node.attrs.ink ||
+      ((node.attrs.tool === "rectangle" || node.attrs.tool === "ellipse") &&
+        !!node.attrs.fillColor &&
+        node.attrs.fillColor !== "none"),
     area: box.width * box.height,
   };
 }
@@ -242,6 +250,7 @@ export function shapeIntersects(node, frame, rect, wrap = false) {
   if (contains) return true;
   if (wrap || node.type === "surface" || node.type === "region") return false;
   if (!intersectsFrame(geometryFrame(node, frame), rect)) return false;
+  if (node.attrs?.ink) return true;
   if (node.type !== "drawing") return true;
   if (
     node.attrs.fillColor &&

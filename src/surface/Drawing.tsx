@@ -1,6 +1,7 @@
 import type { SnapIndex, SnapGuide } from "./geometry.mjs";
 import { creationPoints, snapCreation } from "./drawing-geometry.mjs";
 import { finishBoardDrawing } from "./board-drawing.mjs";
+import { flushSync } from "react-dom";
 import { ObjectContext } from "./SurfaceObject";
 import {
   useContext,
@@ -12,6 +13,7 @@ import {
 import type { JSONContent } from "@tiptap/core";
 import type { BoardTool, DrawingTool, NodeLayout } from "./types";
 import type { Camera } from "./model";
+import "./native-ink.css";
 type Point = { x: number; y: number };
 export function Drawing({
   node,
@@ -95,6 +97,7 @@ export function Drawing({
     <>
       <svg
         className="board-drawing"
+        data-native-ink-id={node.attrs!.ink ? node.attrs!.id : undefined}
         viewBox={`0 0 ${extent[0]} ${extent[1]}`}
         preserveAspectRatio="none"
         role="img"
@@ -108,7 +111,28 @@ export function Drawing({
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          {tool === "rectangle" ? (
+          {node.attrs!.ink ? (
+            <>
+              <image
+                className={
+                  node.attrs!.ink.darkPreview ? "board-ink-light" : undefined
+                }
+                href={node.attrs!.ink.preview}
+                width={extent[0]}
+                height={extent[1]}
+                preserveAspectRatio="none"
+              />
+              {node.attrs!.ink.darkPreview && (
+                <image
+                  className="board-ink-dark"
+                  href={node.attrs!.ink.darkPreview}
+                  width={extent[0]}
+                  height={extent[1]}
+                  preserveAspectRatio="none"
+                />
+              )}
+            </>
+          ) : tool === "rectangle" ? (
             <rect
               x={Math.min(first.x, last.x)}
               y={Math.min(first.y, last.y)}
@@ -277,6 +301,7 @@ export function DrawingInput({
     cursor: Point;
     snap: SnapIndex;
     moved: boolean;
+    modifiers: { shiftKey: boolean; altKey: boolean };
   } | null>(null);
   const surface = useRef<SVGSVGElement>(null);
   const freehand = tool === "pen" || tool === "highlighter";
@@ -288,15 +313,59 @@ export function DrawingInput({
     if (id !== undefined && surface.current?.hasPointerCapture(id))
       surface.current.releasePointerCapture(id);
   };
+  const latest = useRef({ tool, color, fillColor, strokeWidth, point, onDraw });
+  latest.current = { tool, color, fillColor, strokeWidth, point, onDraw };
+  const finish = (
+    release?: Point,
+    modifiers?: { shiftKey?: boolean; altKey?: boolean },
+  ) => {
+    const current = pending.current;
+    if (!current) return;
+    const { tool, color, fillColor, strokeWidth, onDraw } = latest.current;
+    const scale =
+      camera.current.scale *
+      (surface.current!.getBoundingClientRect().width /
+        surface.current!.clientWidth || 1);
+    const result = finishBoardDrawing(
+      tool,
+      { color, fillColor, strokeWidth },
+      {
+        ...current,
+        release: release ?? current.cursor,
+        scale,
+      },
+      modifiers ?? current.modifiers,
+    );
+    // Retire the gesture first, but replace its preview with the committed object
+    // in one paint. Capture-loss events cannot discard or commit it twice.
+    pending.current = null;
+    flushSync(() => {
+      onDraw(result.node, result.frame);
+      setPoints([]);
+      setGuides([]);
+    });
+    if (surface.current?.hasPointerCapture(current.id))
+      surface.current.releasePointerCapture(current.id);
+  };
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
   useEffect(() => {
-    window.addEventListener("blur", cancel);
-    return () => window.removeEventListener("blur", cancel);
+    const blur = () => {
+      if (pending.current?.moved) finishRef.current();
+      else cancel();
+    };
+    window.addEventListener("blur", blur);
+    return () => window.removeEventListener("blur", blur);
   }, []);
   const add = (event: PointerEvent<SVGSVGElement>) => {
     if (pending.current?.id !== event.pointerId) return;
     const next = point(event.clientX, event.clientY),
       last = pending.current.points.at(-1)!;
     pending.current.cursor = next;
+    pending.current.modifiers = {
+      shiftKey: event.shiftKey,
+      altKey: event.altKey,
+    };
     const scale =
       camera.current.scale *
       (surface.current!.getBoundingClientRect().width /
@@ -370,6 +439,7 @@ export function DrawingInput({
           cursor: start,
           snap: makeSnapIndex(),
           moved: false,
+          modifiers: { shiftKey: event.shiftKey, altKey: event.altKey },
         };
         setPoints([start]);
       }}
@@ -379,26 +449,22 @@ export function DrawingInput({
         if (!current || current.id !== event.pointerId) return;
         event.preventDefault();
         event.stopPropagation();
-        const scale =
-          camera.current.scale *
-          (surface.current!.getBoundingClientRect().width /
-            surface.current!.clientWidth || 1);
-        const result = finishBoardDrawing(
-          tool,
-          { color, fillColor, strokeWidth },
-          {
-            ...current,
-            release: point(event.clientX, event.clientY),
-            scale,
-          },
-          event,
-        );
-        // Finish this gesture before release can emit lostpointercapture or a parent can unmount us.
-        cancel();
-        onDraw(result.node, result.frame);
+        finish(point(event.clientX, event.clientY), event);
       }}
-      onPointerCancel={cancel}
-      onLostPointerCapture={cancel}
+      onPointerCancel={(event) => {
+        if (pending.current?.id !== event.pointerId) return;
+        if (pending.current.moved) finish();
+        else cancel();
+      }}
+      onLostPointerCapture={(event) => {
+        if (
+          pending.current?.id !== event.pointerId ||
+          event.currentTarget.hasPointerCapture(event.pointerId)
+        )
+          return;
+        if (pending.current.moved) finish();
+        else cancel();
+      }}
       onKeyDown={(event) => {
         if (
           event.key === "Escape" ||
@@ -411,6 +477,10 @@ export function DrawingInput({
           if (pending.current) cancel();
           else onExit();
         } else if (pending.current && ["Shift", "Alt"].includes(event.key)) {
+          pending.current.modifiers = {
+            shiftKey: event.shiftKey,
+            altKey: event.altKey,
+          };
           const values = pending.current.points;
           if (!freehand && values.length > 1) {
             const next = creationPoints(
@@ -430,6 +500,10 @@ export function DrawingInput({
           !freehand &&
           ["Shift", "Alt"].includes(event.key)
         ) {
+          pending.current.modifiers = {
+            shiftKey: event.shiftKey,
+            altKey: event.altKey,
+          };
           const next = creationPoints(
             tool === "region" ? "rectangle" : tool,
             pending.current.origin,

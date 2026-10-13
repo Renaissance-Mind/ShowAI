@@ -12,7 +12,15 @@ export function BoardStyleControls({
   nodes: JSONContent[];
   onChange: (patch: Partial<DrawingStyle>) => void;
 }) {
-  const drawings = nodes.filter((node) => node.type === "drawing");
+  const drawings = nodes.filter(
+    (node) => node.type === "drawing" && !node.attrs?.ink,
+  );
+  if (!drawings.length && nodes.some((node) => node.attrs?.ink))
+    return (
+      <span className="board-style-controls">
+        手写笔迹 · 在 iPad 上编辑笔迹
+      </span>
+    );
   if (!drawings.length && (!tool || tool === "region")) return null;
   const value = (key: keyof DrawingStyle) => {
     if (!drawings.length) return style[key];

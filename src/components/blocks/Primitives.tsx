@@ -1,4 +1,5 @@
 import { useState, type CSSProperties } from "react";
+import { NativeInkPreview } from "../../surface/NativeInkPreview";
 import "./katex.css";
 import "./research-media.css";
 import { safeImageUrl, text } from "./helpers";
@@ -28,6 +29,12 @@ import { RichText as TextBlock } from "../rich-text/RichText";
 
 export function ImageBlock({ data, onChange, readOnly }: BlockProps) {
   validatePrimitiveData("image", data);
+  if (data.nativeInk)
+    return (
+      <NativeInkPreview
+        ink={data.nativeInk as Parameters<typeof NativeInkPreview>[0]["ink"]}
+      />
+    );
   const src = safeImageUrl(data.src);
   return (
     <figure

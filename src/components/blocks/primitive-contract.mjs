@@ -1,4 +1,5 @@
 import { validateRichTextData } from "../rich-text/model.mjs";
+import { validateNativeInk } from "../../surface/native-ink.mjs";
 export function validatePrimitiveData(kind, data) {
   for (const key of ["color", "backgroundColor"])
     if (data[key] !== undefined && typeof data[key] !== "string")
@@ -25,6 +26,13 @@ export function validatePrimitiveData(kind, data) {
     throw new Error("不支持此对齐方式。");
   if (kind === "text") validateRichTextData(data);
   if (kind === "image") {
+    if (data.nativeInk !== undefined) {
+      validateNativeInk(data.nativeInk);
+      if (!data.nativeInk.extent || data.src !== data.nativeInk.preview)
+        throw new Error(
+          "Native ink image requires a matching preview and extent.",
+        );
+    }
     for (const key of ["src", "alt", "caption"])
       if (
         (key === "src" || data[key] !== undefined) &&

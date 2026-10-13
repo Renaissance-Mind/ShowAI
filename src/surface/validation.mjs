@@ -1,4 +1,5 @@
 import { objectCapabilities, bindingParent } from "./geometry.mjs";
+import { validateNativeInk } from "./native-ink.mjs";
 import { isResource, fillResource, surfaceKind } from "./containers.mjs";
 import { fillSurfaceLayout, visitNodes } from "./document.mjs";
 const reserved = new Set(["__proto__", "constructor", "prototype"]);
@@ -180,6 +181,11 @@ function validateResource(document) {
       owner = node;
     }
     if (node.type === "drawing") {
+      if (node.attrs.ink !== undefined) {
+        validateNativeInk(node.attrs.ink);
+        if (node.attrs.tool !== "pen")
+          throw new Error("Native ink uses the pen drawing tool.");
+      }
       if (owner?.attrs.kind !== "board")
         throw new Error("Drawings belong inside a Board.");
       if (
@@ -319,14 +325,14 @@ function validateResource(document) {
     finite(frame.y, -1000000, 1000000, `layout.${id}.y`);
     finite(
       frame.width,
-      node.type === "drawing" ? 1 : 120,
-      10000,
+      node.type === "drawing" || node.attrs?.data?.nativeInk ? 1 : 120,
+      node.attrs?.ink || node.attrs?.data?.nativeInk ? 1000000 : 10000,
       `layout.${id}.width`,
     );
     if (frame.height !== undefined)
       finite(
         frame.height,
-        node.type === "drawing" ? 1 : 40,
+        node.type === "drawing" || node.attrs?.data?.nativeInk ? 1 : 40,
         1000000,
         `layout.${id}.height`,
       );

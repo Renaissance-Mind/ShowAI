@@ -25,6 +25,9 @@ import g2Exports from "../components/blocks/g2/exports-map.json";
 import themeTokens from "../design/tokens.css?raw";
 import themeContent from "../design/content.css?raw";
 import contract from "../components/blocks/primitive-contract.mjs?raw";
+import nativeInkContract from "../surface/native-ink.mjs?raw";
+import nativeInkPreview from "../surface/NativeInkPreview.tsx?raw";
+import nativeInkCss from "../surface/native-ink.css?raw";
 import capacity from "../portable/capacity.mjs?raw";
 import sdk from "../components/blocks/sdk.tsx?raw";
 import actionHost from "../components/blocks/action-host.tsx?raw";
@@ -96,6 +99,9 @@ const sources: Record<string, string> = {
   "ExpandableSearch.tsx": expandableSearch,
   "expandable-search.css": expandableSearchCss,
   "primitive-contract.mjs": contract,
+  "native-ink.mjs": nativeInkContract,
+  "NativeInkPreview.tsx": nativeInkPreview,
+  "native-ink.css": nativeInkCss,
   "capacity.mjs": capacity,
   "sdk.tsx": sdk,
   "action-host.tsx": actionHost,
@@ -143,6 +149,9 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
   Object.entries(sources).map(([name, source]) => [
     name,
     source
+      .replaceAll('"../../surface/native-ink.mjs"', '"./native-ink.mjs"')
+      .replaceAll('"../../surface/NativeInkPreview"', '"./NativeInkPreview"')
+      .replaceAll('"../portable/capacity.mjs"', '"./capacity.mjs"')
       .replaceAll(
         '"../../portable/capacity.mjs"',
         name.startsWith("rich-text/")
