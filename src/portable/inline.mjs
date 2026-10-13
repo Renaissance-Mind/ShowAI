@@ -9,6 +9,9 @@ export function toInlineFragment(html, id = `showai-${randomUUID()}`) {
   const body = html
     .slice(html.lastIndexOf("</head>") + 7)
     .match(/<body\b[^>]*>([\s\S]*?)<\/body>/i)?.[1];
+  // The host page owns <html>; carry the exporter's language on our root.
+  const lang = html.match(/<html\b[^>]*\slang=["']([\w-]+)["']/i)?.[1];
+  const langAttribute = lang ? ` lang="${lang}"` : "";
   const styles = [...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map(
     (match) => match[1],
   );
@@ -96,7 +99,7 @@ export function toInlineFragment(html, id = `showai-${randomUUID()}`) {
   // Page hides its content height behind an inner scrollbar, so let the active
   // root Page grow naturally. Keep spatial Boards and embedded fixed frames
   // bounded. Applying this at export time also adapts archived readers.
-  let fragment = `<section id="${id}" data-showai-inline-root>${markup}</section>
+  let fragment = `<section id="${id}" data-showai-inline-root${langAttribute}>${markup}</section>
 <style>
 @scope (#${id}) {
 ${css}
@@ -137,7 +140,7 @@ ${code}
     );
     const packedId = `${id}-packed`;
     const bootstrap = `const packed=JSON.parse(document.getElementById("${packedId}").textContent);const bytes=Uint8Array.from(atob(packed.data),c=>c.charCodeAt(0));const bundle=JSON.parse(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"))).text());const root=document.getElementById("${id}");const style=document.createElement("style");style.textContent=bundle.css;root.append(style);document.getElementById("${dataId}").textContent=bundle.artifact;for(const code of bundle.modules){await new Promise((resolve,reject)=>{const script=document.createElement("script");script.type="module";script.textContent=code;script.onload=resolve;script.onerror=()=>reject(new Error("ShowAI inline reader could not start."));root.append(script);});}`;
-    const compressed = `<section id="${id}" data-showai-inline-root>${markup}</section>\n<script type="application/json" id="${dataId}">null</script>\n<script type="application/json" id="${packedId}" data-showai-packed-data="gzip">${JSON.stringify({ encoding: "gzip", data: packed })}</script>\n<script type="module" data-showai-packed-reader="gzip">${bootstrap}</script>\n`;
+    const compressed = `<section id="${id}" data-showai-inline-root${langAttribute}>${markup}</section>\n<script type="application/json" id="${dataId}">null</script>\n<script type="application/json" id="${packedId}" data-showai-packed-data="gzip">${JSON.stringify({ encoding: "gzip", data: packed })}</script>\n<script type="module" data-showai-packed-reader="gzip">${bootstrap}</script>\n`;
     if (Buffer.byteLength(compressed) < Buffer.byteLength(fragment))
       fragment = compressed;
   }

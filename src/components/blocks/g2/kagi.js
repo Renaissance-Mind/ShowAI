@@ -1,5 +1,10 @@
 // G2 Kagi concept: https://g2.antv.antgroup.com/en/charts/kagi
 // Closing values from G2's official K-chart example, in chronological order.
+import { translator } from "../../../i18n";
+import messages from "../../../i18n/messages/g2";
+
+const t = translator(messages);
+
 export default async function drawKagi(context) {
   const prices = context.datasets.main;
   if (
@@ -7,7 +12,7 @@ export default async function drawKagi(context) {
     prices.length < 2 ||
     prices.some((v) => !Number.isFinite(v))
   )
-    throw new Error("Kagi 的 main 数据需要至少两个有限价格。");
+    throw new Error(t("error.kagiPrices"));
   const reversal = 0.02;
   let column = 0;
   let direction = 0;
@@ -67,7 +72,7 @@ export default async function drawKagi(context) {
       },
       tooltip: false,
     })),
-    axis: { x: { title: "转向序号" }, y: { title: "价格" } },
+    axis: { x: { title: t("kagi.reversal") }, y: { title: t("kagi.price") } },
   });
   await chart.render();
 }

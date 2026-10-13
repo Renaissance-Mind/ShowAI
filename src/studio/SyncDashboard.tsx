@@ -15,6 +15,10 @@ import type {
   ServerConnection,
   SyncProject,
 } from "../sync/protocol";
+import { getLocale, type MessageKey } from "../i18n";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/sync";
+import common from "../i18n/messages/common";
 
 export type SyncMember = { id: string; name: string; role: ProjectRole };
 export type SyncInvite = {
@@ -27,21 +31,30 @@ export type SyncInvite = {
   max_uses?: number | null;
   target_name?: string | null;
 };
-const roles: Record<ProjectRole, string> = {
-  admin: "管理员",
-  editor: "编辑者",
-  viewer: "查看者",
+type SyncKey = MessageKey<typeof messages>;
+const roles: Record<ProjectRole, SyncKey> = {
+  admin: "role.admin",
+  editor: "role.editor",
+  viewer: "role.viewer",
 };
-const permissions: Record<ProjectRole, string> = {
-  admin: "编辑内容、管理成员与邀请",
-  editor: "编辑项目中的页面与内容",
-  viewer: "阅读项目内容，不能修改",
+const permissions: Record<ProjectRole, SyncKey> = {
+  admin: "permission.admin",
+  editor: "permission.editor",
+  viewer: "permission.viewer",
 };
-const roleOptions = Object.entries(roles).map(([value, label]) => (
-  <option key={value} value={value}>
-    {label}
-  </option>
-));
+const inviteUseOptions = [1, 5, 25, 100];
+
+/** Renders a translated sentence with its `{name}` placeholder in bold. */
+function withStrong(template: string, name: string) {
+  const [before, after = ""] = template.split("{name}");
+  return (
+    <>
+      {before}
+      <strong>{name}</strong>
+      {after}
+    </>
+  );
+}
 
 export default function SyncDashboard({
   connection,
@@ -84,6 +97,20 @@ export default function SyncDashboard({
   onRevoke: (digest: string) => void;
   onArchive: (archived: boolean) => Promise<boolean>;
 }) {
+  const t = useTranslator(messages);
+  const tc = useTranslator(common);
+  const expiry = (date: string) =>
+    new Date(date).toLocaleString(getLocale(), {
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  const roleOptions = (Object.keys(roles) as ProjectRole[]).map((value) => (
+    <option key={value} value={value}>
+      {t(roles[value])}
+    </option>
+  ));
   const [showCreate, setShowCreate] = useState(false),
     [name, setName] = useState("");
   const [query, setQuery] = useState("");
@@ -126,7 +153,7 @@ export default function SyncDashboard({
 
   return (
     <div className="sync-management">
-      <aside className="sync-management-sidebar" aria-label="管理的项目">
+      <aside className="sync-management-sidebar" aria-label={t("managedProjects")}>
         <div className="sync-server-identity">
           <Database size={18} aria-hidden="true" />
           <div>
@@ -135,20 +162,20 @@ export default function SyncDashboard({
           </div>
         </div>
         <div className="sync-project-list-heading">
-          <h3>项目</h3>
+          <h3>{t("projects")}</h3>
           <span>{managed.length}</span>
         </div>
         {managed.length > 5 && (
           <input
-            aria-label="搜索管理的项目"
-            placeholder="搜索项目"
+            aria-label={t("searchManagedProjects")}
+            placeholder={t("searchProjects")}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
         )}
         <select
           className="sync-mobile-project-select"
-          aria-label="切换管理项目"
+          aria-label={t("switchManagedProject")}
           disabled={busy || !managed.length}
           value={selectedId}
           onChange={(event) => {
@@ -156,15 +183,15 @@ export default function SyncDashboard({
             onSelect(event.target.value);
           }}
         >
-          {!selectedId && <option value="">选择项目</option>}
+          {!selectedId && <option value="">{t("chooseProject")}</option>}
           {managed.map((item) => (
             <option key={item.id} value={item.id}>
               {item.name}
-              {item.archived ? " · 已归档" : ""}
+              {item.archived ? ` · ${t("archived")}` : ""}
             </option>
           ))}
         </select>
-        <nav className="sync-managed-projects" aria-label="项目列表">
+        <nav className="sync-managed-projects" aria-label={t("projectList")}>
           {managed
             .filter((item) =>
               item.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
@@ -179,17 +206,19 @@ export default function SyncDashboard({
                 <Folder size={17} aria-hidden="true" />
                 <span>
                   {item.name}
-                  {item.archived && <small>已归档</small>}
+                  {item.archived && <small>{t("archived")}</small>}
                 </span>
               </button>
             ))}
           {!busy && !managed.length && (
-            <p className="sync-empty-note">创建项目后，就能邀请成员协作。</p>
+            <p className="sync-empty-note">{t("noManagedProjects")}</p>
           )}
           {query &&
             !managed.some((item) =>
               item.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
-            ) && <p className="sync-empty-note">没有找到匹配的项目。</p>}
+            ) && (
+              <p className="sync-empty-note">{t("noMatchingProjects")}</p>
+            )}
         </nav>
         <div className={`sync-create-project ${showCreate ? "is-open" : ""}`}>
           {showCreate ? (
@@ -206,10 +235,10 @@ export default function SyncDashboard({
               }}
             >
               <div className="sync-create-heading">
-                <label htmlFor="sync-new-project">新建项目</label>
+                <label htmlFor="sync-new-project">{t("newProject")}</label>
                 <button
                   type="button"
-                  aria-label="取消新建项目"
+                  aria-label={t("cancelNewProject")}
                   disabled={busy}
                   onClick={() => setShowCreate(false)}
                 >
@@ -219,8 +248,8 @@ export default function SyncDashboard({
               <input
                 ref={nameInput}
                 id="sync-new-project"
-                aria-label="新项目名称"
-                placeholder="输入项目名称"
+                aria-label={t("newProjectName")}
+                placeholder={t("enterProjectName")}
                 required
                 maxLength={200}
                 value={name}
@@ -231,7 +260,7 @@ export default function SyncDashboard({
                 className="settings-button sync-primary"
                 disabled={busy || !name.trim()}
               >
-                创建项目
+                {t("createProject")}
               </button>
             </form>
           ) : (
@@ -241,7 +270,7 @@ export default function SyncDashboard({
               onClick={() => setShowCreate(true)}
             >
               <Plus size={16} aria-hidden="true" />
-              新建项目
+              {t("newProject")}
             </button>
           )}
         </div>
@@ -250,28 +279,32 @@ export default function SyncDashboard({
         {project ? (
           <>
             <header className="sync-project-overview">
-              <div className="sync-eyebrow">当前项目</div>
+              <div className="sync-eyebrow">{t("currentProject")}</div>
               <h2>
                 {project.name}
-                {project.archived && <span className="sync-badge">已归档</span>}
+                {project.archived && (
+                  <span className="sync-badge">{t("archived")}</span>
+                )}
               </h2>
-              <p>管理员 · {members.length} 位成员</p>
+              <p>{t("adminOverview", { count: members.length })}</p>
             </header>
             <section
               className="sync-management-section"
               aria-labelledby="sync-members-title"
             >
               <div className="sync-management-section-heading">
-                <h3 id="sync-members-title">项目成员</h3>
-                <span>{members.length} 人</span>
+                <h3 id="sync-members-title">{t("projectMembers")}</h3>
+                <span>{t("memberCount", { count: members.length })}</span>
               </div>
               <table className="sync-members-table">
                 <thead>
                   <tr>
-                    <th scope="col">成员</th>
-                    <th scope="col">权限</th>
+                    <th scope="col">{t("column.member")}</th>
+                    <th scope="col">{t("column.role")}</th>
                     <th scope="col">
-                      <span className="sync-visually-hidden">操作</span>
+                      <span className="sync-visually-hidden">
+                        {t("column.actions")}
+                      </span>
                     </th>
                   </tr>
                 </thead>
@@ -287,20 +320,22 @@ export default function SyncDashboard({
                               <strong>
                                 {member.name}
                                 {member.id === connection?.user.id && (
-                                  <span className="sync-badge">你</span>
+                                  <span className="sync-badge">{t("you")}</span>
                                 )}
                               </strong>
-                              {lastAdmin && <small>唯一管理员</small>}
+                              {lastAdmin && <small>{t("onlyAdmin")}</small>}
                             </div>
                           </div>
                         </td>
                         <td>
                           <select
-                            aria-label={`${member.name}的项目权限`}
+                            aria-label={t("memberRoleFor", {
+                              name: member.name,
+                            })}
                             title={
                               lastAdmin
-                                ? "需先设置另一位管理员，才能更改此权限"
-                                : permissions[member.role]
+                                ? t("lastAdminRole")
+                                : t(permissions[member.role])
                             }
                             value={member.role}
                             disabled={busy || lastAdmin}
@@ -317,10 +352,12 @@ export default function SyncDashboard({
                             disabled={busy || lastAdmin}
                             title={
                               lastAdmin
-                                ? "项目需保留至少一位管理员"
-                                : `移出${member.name}`
+                                ? t("lastAdminRemove")
+                                : t("removeMemberNamed", { name: member.name })
                             }
-                            aria-label={`移出${member.name}`}
+                            aria-label={t("removeMemberNamed", {
+                              name: member.name,
+                            })}
                             onClick={(event) => {
                               confirmationTrigger.current = event.currentTarget;
                               setArchive(false);
@@ -328,7 +365,7 @@ export default function SyncDashboard({
                               setRevokeRelated(true);
                             }}
                           >
-                            移出
+                            {t("removeMember")}
                           </button>
                         </td>
                       </tr>
@@ -337,22 +374,18 @@ export default function SyncDashboard({
                 </tbody>
               </table>
               {admins === 1 && (
-                <p className="sync-permission-note">
-                  需先设置另一位管理员，才能更改唯一管理员的权限或将其移出。
-                </p>
+                <p className="sync-permission-note">{t("lastAdminNote")}</p>
               )}
               {remove && (
                 <div
                   ref={confirmation}
                   className="sync-inline-confirm"
                   role="group"
-                  aria-label="确认移出成员"
+                  aria-label={t("confirmRemoveMember")}
                 >
                   <p>
-                    移出 <strong>{remove.name}</strong>？
-                    <span>
-                      该成员将无法继续访问云端内容；已下载副本仍由其设备持有。
-                    </span>
+                    {withStrong(t("removeMemberQuestion"), remove.name)}
+                    <span>{t("removeMemberConsequence")}</span>
                   </p>
                   {controlledInvites && (
                     <label className="sync-revoke-choice">
@@ -364,7 +397,7 @@ export default function SyncDashboard({
                           setRevokeRelated(event.target.checked)
                         }
                       />
-                      同时撤销该成员创建或领取过的仍有效邀请
+                      {t("revokeRelatedInvites")}
                     </label>
                   )}
                   <div>
@@ -373,7 +406,7 @@ export default function SyncDashboard({
                       disabled={busy}
                       onClick={cancelConfirmation}
                     >
-                      取消
+                      {tc("cancel")}
                     </button>
                     <button
                       className="settings-button sync-danger"
@@ -388,7 +421,7 @@ export default function SyncDashboard({
                         });
                       }}
                     >
-                      确认移出
+                      {t("confirmRemove")}
                     </button>
                   </div>
                 </div>
@@ -401,19 +434,19 @@ export default function SyncDashboard({
               <div className="sync-management-section-heading">
                 <h3 id="sync-invite-title">
                   <Link2 size={17} aria-hidden="true" />
-                  邀请成员
+                  {t("inviteMembers")}
                 </h3>
               </div>
               <p className="sync-section-description">
                 {controlledInvites
-                  ? "同一链接可供多人注册或加入，可限制领取账号数或指定已注册账号。"
-                  : "同一链接可供多人注册或加入项目，人数不限。"}
+                  ? t("inviteHelpControlled")
+                  : t("inviteHelpOpen")}
               </p>
               <div className="sync-invite-controls">
                 <label>
-                  <span>加入后的权限</span>
+                  <span>{t("roleAfterJoin")}</span>
                   <select
-                    aria-label="邀请权限"
+                    aria-label={t("inviteRole")}
                     value={inviteRole}
                     disabled={busy}
                     onChange={(event) =>
@@ -426,25 +459,28 @@ export default function SyncDashboard({
                 {controlledInvites && (
                   <>
                     <label>
-                      <span>领取账号数</span>
+                      <span>{t("inviteUses")}</span>
                       <select
-                        aria-label="邀请领取上限"
+                        aria-label={t("inviteUsesLimit")}
                         value={inviteUses}
                         disabled={busy}
                         onChange={(event) => setInviteUses(event.target.value)}
                       >
-                        <option value="1">1 个账号</option>
-                        <option value="5">5 个账号</option>
-                        <option value="25">25 个账号</option>
-                        <option value="100">100 个账号</option>
-                        <option value="unlimited">不限账号数</option>
+                        {inviteUseOptions.map((count) => (
+                          <option key={count} value={String(count)}>
+                            {t("accountCount", { count })}
+                          </option>
+                        ))}
+                        <option value="unlimited">
+                          {t("policy.unlimited")}
+                        </option>
                       </select>
                     </label>
                     <label>
-                      <span>指定账号（可选）</span>
+                      <span>{t("targetAccount")}</span>
                       <input
-                        aria-label="指定已注册账号"
-                        placeholder="已注册的账号名"
+                        aria-label={t("targetAccountLabel")}
+                        placeholder={t("targetAccountPlaceholder")}
                         maxLength={100}
                         value={inviteTarget}
                         disabled={busy}
@@ -468,17 +504,19 @@ export default function SyncDashboard({
                     })
                   }
                 >
-                  生成邀请链接
+                  {t("createInviteLink")}
                 </button>
               </div>
-              <p className="sync-permission-note">{permissions[inviteRole]}</p>
+              <p className="sync-permission-note">
+                {t(permissions[inviteRole])}
+              </p>
               {generatedInvite && (
                 <div className="sync-generated-invite">
-                  <label htmlFor="sync-generated-link">邀请链接</label>
+                  <label htmlFor="sync-generated-link">{t("inviteLink")}</label>
                   <div>
                     <input
                       id="sync-generated-link"
-                      aria-label="生成的邀请链接"
+                      aria-label={t("generatedInviteLink")}
                       readOnly
                       value={generatedInvite}
                       onFocus={(event) => event.target.select()}
@@ -497,20 +535,20 @@ export default function SyncDashboard({
                       ) : (
                         <Copy size={15} aria-hidden="true" />
                       )}
-                      {copied ? "已复制" : "复制链接"}
+                      {copied ? tc("copied") : t("copyLink")}
                     </button>
                   </div>
                   <p>
-                    {generatedInvitePolicy || "加入人数不限"}
+                    {generatedInvitePolicy || t("anyoneCanJoin")}
                     {generatedInviteExpiresAt &&
-                      ` · ${new Date(generatedInviteExpiresAt).toLocaleString("zh-CN", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })} 到期`}
+                      ` · ${t("expiresAt", { date: expiry(generatedInviteExpiresAt) })}`}
                   </p>
                 </div>
               )}
               {!!pendingInvites.length && (
                 <details className="sync-pending-invites">
                   <summary>
-                    已有邀请 <span>{pendingInvites.length}</span>
+                    {t("existingInvites")} <span>{pendingInvites.length}</span>
                   </summary>
                   {pendingInvites.map((invite) => {
                     const expired =
@@ -518,22 +556,26 @@ export default function SyncDashboard({
                     return (
                       <div className="sync-invite-row" key={invite.digest}>
                         <div>
-                          <strong>{roles[invite.role]}</strong>
+                          <strong>{t(roles[invite.role])}</strong>
                           <span>
-                            已有{" "}
-                            {invite.accepted_count ??
-                              (invite.accepted_by ? 1 : 0)}{" "}
-                            人加入
+                            {t("invite.joined", {
+                              count:
+                                invite.accepted_count ??
+                                (invite.accepted_by ? 1 : 0),
+                            })}
+                            {" / "}
                             {invite.max_uses != null
-                              ? ` / 上限 ${invite.max_uses} 个账号`
-                              : " / 不限账号数"}
+                              ? t("invite.limit", { count: invite.max_uses })
+                              : t("policy.unlimited")}
                             {invite.target_name
-                              ? ` · 指定 ${invite.target_name}`
+                              ? ` · ${t("invite.target", { name: invite.target_name })}`
                               : ""}{" "}
                             ·{" "}
                             {expired
-                              ? "已过期"
-                              : `${new Date(invite.expires_at).toLocaleString("zh-CN", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })} 到期`}
+                              ? t("invite.expired")
+                              : t("expiresAt", {
+                                  date: expiry(invite.expires_at),
+                                })}
                           </span>
                         </div>
                         <button
@@ -541,7 +583,7 @@ export default function SyncDashboard({
                           disabled={busy}
                           onClick={() => onRevoke(invite.digest)}
                         >
-                          撤销邀请
+                          {t("revokeInvite")}
                         </button>
                       </div>
                     );
@@ -549,10 +591,12 @@ export default function SyncDashboard({
                 </details>
               )}
             </section>
-            <section className="sync-archive-section" aria-label="项目归档">
+            <section className="sync-archive-section" aria-label={t("projectArchive")}>
               <div>
-                <h3>{project.archived ? "恢复项目" : "归档项目"}</h3>
-                <p>项目当前内容会保留，归档后可随时恢复。</p>
+                <h3>
+                  {project.archived ? t("restoreProject") : t("archiveProject")}
+                </h3>
+                <p>{t("archiveHelp")}</p>
               </div>
               <button
                 className="settings-button"
@@ -567,7 +611,7 @@ export default function SyncDashboard({
                 }}
               >
                 <Archive size={15} aria-hidden="true" />
-                {project.archived ? "恢复项目" : "归档项目"}
+                {project.archived ? t("restoreProject") : t("archiveProject")}
               </button>
             </section>
             {archive && (
@@ -575,11 +619,11 @@ export default function SyncDashboard({
                 ref={confirmation}
                 className="sync-inline-confirm"
                 role="group"
-                aria-label="确认归档项目"
+                aria-label={t("confirmArchiveProject")}
               >
                 <p>
-                  归档 <strong>{project.name}</strong>？
-                  <span>项目当前内容会保留。</span>
+                  {withStrong(t("archiveQuestion"), project.name)}
+                  <span>{t("archiveConsequence")}</span>
                 </p>
                 <div>
                   <button
@@ -587,7 +631,7 @@ export default function SyncDashboard({
                     disabled={busy}
                     onClick={cancelConfirmation}
                   >
-                    取消
+                    {tc("cancel")}
                   </button>
                   <button
                     className="settings-button"
@@ -599,7 +643,7 @@ export default function SyncDashboard({
                       });
                     }}
                   >
-                    确认归档
+                    {t("confirmArchive")}
                   </button>
                 </div>
               </div>
@@ -608,13 +652,13 @@ export default function SyncDashboard({
         ) : (
           <div className="sync-management-empty">
             <Folder size={28} aria-hidden="true" />
-            <h2>{busy ? "正在读取项目…" : "从这里开始协作"}</h2>
+            <h2>{busy ? t("readingProjects") : t("startCollaborating")}</h2>
             <p>
               {busy
-                ? "正在加载项目与成员信息。"
+                ? t("loadingMembers")
                 : managed.length
-                  ? "选择左侧项目，查看成员与邀请。"
-                  : "从左侧新建项目，然后邀请成员加入。"}
+                  ? t("selectProjectHint")
+                  : t("createProjectHint")}
             </p>
           </div>
         )}

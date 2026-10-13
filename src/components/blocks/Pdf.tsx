@@ -13,6 +13,8 @@ import { safeResourceUrl } from "./research-contract.mjs";
 import { BlockHeader, EmptyState } from "./shared";
 import { ResourceEditor } from "./ResourceEditor";
 import type { BlockProps } from "./types";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/pdf";
 import "./research-media.css";
 
 function PdfReader({
@@ -26,6 +28,7 @@ function PdfReader({
   height: number;
   name: string;
 }) {
+  const t = useTranslator(messages);
   const [pdf, setPdf] = useState<PDFDocumentProxy>();
   const [page, setPage] = useState(initialPage);
   const [zoom, setZoom] = useState(1);
@@ -52,7 +55,10 @@ function PdfReader({
       .catch((failure) => {
         if (active) {
           setError(
-            `PDF 无法读取：${failure instanceof Error ? failure.message : String(failure)}`,
+            t("loadFailed", {
+              error:
+                failure instanceof Error ? failure.message : String(failure),
+            }),
           );
           setPending(false);
         }
@@ -111,7 +117,10 @@ function PdfReader({
       .catch((failure) => {
         if (active) {
           setError(
-            `页面无法显示：${failure instanceof Error ? failure.message : String(failure)}`,
+            t("pageFailed", {
+              error:
+                failure instanceof Error ? failure.message : String(failure),
+            }),
           );
           setPending(false);
         }
@@ -127,12 +136,12 @@ function PdfReader({
       data-surface-gesture="own"
       aria-busy={pending}
     >
-      <div className="sb-pdf-toolbar" role="group" aria-label="PDF 阅读控制">
+      <div className="sb-pdf-toolbar" role="group" aria-label={t("controls")}>
         <div className="sb-pdf-pagination">
           <button
             type="button"
             className="sb-icon-button"
-            aria-label="上一页"
+            aria-label={t("previousPage")}
             disabled={!pdf || page <= 1}
             onClick={() => setPage(page - 1)}
           >
@@ -143,7 +152,7 @@ function PdfReader({
               ref={pageInput}
               key={page}
               type="number"
-              aria-label="PDF 页码"
+              aria-label={t("pageNumber")}
               min={1}
               max={pdf?.numPages ?? 1}
               defaultValue={page}
@@ -168,7 +177,7 @@ function PdfReader({
           <button
             type="button"
             className="sb-icon-button"
-            aria-label="下一页"
+            aria-label={t("nextPage")}
             disabled={!pdf || page >= pdf.numPages}
             onClick={() => setPage(page + 1)}
           >
@@ -179,7 +188,7 @@ function PdfReader({
           <button
             type="button"
             className="sb-icon-button"
-            aria-label="缩小 PDF"
+            aria-label={t("zoomOut")}
             disabled={zoom <= 0.5}
             onClick={() => setZoom(Math.max(0.5, zoom - 0.25))}
           >
@@ -188,8 +197,8 @@ function PdfReader({
           <button
             type="button"
             className="sb-pdf-fit"
-            title="适合宽度"
-            aria-label="PDF 适合宽度"
+            title={t("fitWidth")}
+            aria-label={t("fitWidthLabel")}
             onClick={() => setZoom(1)}
           >
             {Math.round(zoom * 100)}%
@@ -197,7 +206,7 @@ function PdfReader({
           <button
             type="button"
             className="sb-icon-button"
-            aria-label="放大 PDF"
+            aria-label={t("zoomIn")}
             disabled={zoom >= 3}
             onClick={() => setZoom(Math.min(3, zoom + 0.25))}
           >
@@ -206,7 +215,7 @@ function PdfReader({
         </div>
         <a
           className="sb-icon-button"
-          aria-label="下载 PDF"
+          aria-label={t("download")}
           href={src}
           download={name || "document.pdf"}
           target="_blank"
@@ -220,7 +229,7 @@ function PdfReader({
         ref={viewport}
         style={{ height }}
         tabIndex={0}
-        aria-label={`PDF 第 ${page} 页`}
+        aria-label={t("viewportLabel", { page })}
         onKeyDown={(event) => {
           event.stopPropagation();
           if (event.target !== event.currentTarget || !pdf) return;
@@ -236,7 +245,7 @@ function PdfReader({
       >
         {pending && (
           <p className="sb-pdf-status" role="status">
-            正在读取 PDF…
+            {t("loading")}
           </p>
         )}
         {error && (
@@ -248,19 +257,19 @@ function PdfReader({
               target="_blank"
               rel="noopener noreferrer"
             >
-              打开原文件
+              {t("openOriginal")}
             </a>
           </p>
         )}
         <canvas
           ref={canvas}
-          aria-label={`第 ${page} 页内容`}
+          aria-label={t("pageContent", { page })}
           style={{ visibility: pending || error ? "hidden" : "visible" }}
         />
       </div>
       {pageText && (
         <details className="sb-pdf-text">
-          <summary>本页文字</summary>
+          <summary>{t("pageText")}</summary>
           <p>{pageText}</p>
         </details>
       )}
@@ -269,17 +278,18 @@ function PdfReader({
 }
 
 export function PdfBlock({ data, onChange, readOnly }: BlockProps) {
+  const t = useTranslator(messages);
   const [editing, setEditing] = useState(false);
   const src = safeResourceUrl("pdf", data.src);
   const editable = Boolean(onChange && !readOnly);
   return (
     <section
       className="sb-block sb-pdf"
-      aria-label={text(data.title) || "PDF 文档"}
+      aria-label={text(data.title) || t("document")}
     >
       <BlockHeader
         title={text(data.title)}
-        defaultTitle="PDF 文档"
+        defaultTitle={t("document")}
         editable={editable}
         editing={editing}
         onEdit={() => setEditing(!editing)}
@@ -306,8 +316,8 @@ export function PdfBlock({ data, onChange, readOnly }: BlockProps) {
       ) : (
         <EmptyState
           icon={<FileText size={28} strokeWidth={1.4} />}
-          title="添加 PDF 文档"
-          description="在页面中翻阅论文、报告与资料"
+          title={t("emptyTitle")}
+          description={t("emptyDescription")}
           action={
             editable && !editing ? (
               <button
@@ -315,7 +325,7 @@ export function PdfBlock({ data, onChange, readOnly }: BlockProps) {
                 className="sb-button"
                 onClick={() => setEditing(true)}
               >
-                选择 PDF
+                {t("choose")}
               </button>
             ) : undefined
           }

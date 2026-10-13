@@ -19,6 +19,8 @@ import {
 } from "../blocks/TableAlignment";
 import { alignDocumentTable, tableAlignmentValue } from "./table-alignment";
 import { TableSelectionActions } from "./TableSelectionActions";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/richText";
 import {
   documentTableSelection,
   documentTableActionMeta,
@@ -31,6 +33,7 @@ const acceptDocumentTable = (table: HTMLTableElement) =>
   !table.closest(".document-widget");
 
 export function TableControls({ editor }: { editor: Editor }) {
+  const t = useTranslator(messages);
   const [, refresh] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const selected = documentTableSelection(editor.state);
@@ -159,12 +162,12 @@ export function TableControls({ editor }: { editor: Editor }) {
         className="document-table-controls table-global-alignment"
         data-editor-menu-trigger={target.context ? "context" : "hover"}
         role={target.context ? "dialog" : undefined}
-        aria-label="表格对齐设置"
+        aria-label={t("table.alignment")}
         data-table-controls-owner={owner}
         style={positions.global}
       >
         <AlignmentButtons
-          scope="表格"
+          scope="table"
           value={tableAlignmentValue(table, null)}
           onChange={(value) => align(null, value)}
         />
@@ -172,8 +175,8 @@ export function TableControls({ editor }: { editor: Editor }) {
           <button
             className="document-table-menu-trigger"
             type="button"
-            aria-label="表格操作"
-            title="表格操作"
+            aria-label={t("table.actions")}
+            title={t("table.actions")}
             aria-expanded={menuOpen}
             aria-haspopup="menu"
             onMouseDown={(event) => event.preventDefault()}
@@ -189,7 +192,7 @@ export function TableControls({ editor }: { editor: Editor }) {
           <div
             className="document-table-menu"
             role="menu"
-            aria-label="表格操作菜单"
+            aria-label={t("table.actionsMenu")}
             style={{
               ...(menuAbove ? { top: "auto", bottom: "calc(100% + 4px)" } : {}),
               maxHeight: Math.max(
@@ -211,7 +214,7 @@ export function TableControls({ editor }: { editor: Editor }) {
               }
             >
               <Plus size={14} />
-              添加行
+              {t("table.addRow")}
             </button>
             <button
               role="menuitem"
@@ -222,7 +225,7 @@ export function TableControls({ editor }: { editor: Editor }) {
               }
             >
               <Plus size={14} />
-              添加列
+              {t("table.addColumn")}
             </button>
             <button
               role="menuitem"
@@ -233,19 +236,19 @@ export function TableControls({ editor }: { editor: Editor }) {
               }
             >
               <TableProperties size={14} aria-hidden="true" />
-              切换表头
+              {t("table.toggleHeader")}
             </button>
             <button role="menuitem" onClick={() => select("cell")}>
               <SquareDashed size={14} aria-hidden="true" />
-              选择单元格区域
+              {t("table.selectCells")}
             </button>
             <button role="menuitem" onClick={() => select("row")}>
               <TableRowsSplit size={14} aria-hidden="true" />
-              选择当前行
+              {t("table.selectRow")}
             </button>
             <button role="menuitem" onClick={() => select("column")}>
               <TableColumnsSplit size={14} aria-hidden="true" />
-              选择当前列
+              {t("table.selectColumn")}
             </button>
             {target.context && (
               <TableSelectionActions
@@ -266,7 +269,7 @@ export function TableControls({ editor }: { editor: Editor }) {
               }
             >
               <TableRowsSplit size={14} aria-hidden="true" />
-              删除行
+              {t("table.deleteRow")}
             </button>
             <button
               role="menuitem"
@@ -277,7 +280,7 @@ export function TableControls({ editor }: { editor: Editor }) {
               }
             >
               <TableColumnsSplit size={14} aria-hidden="true" />
-              删除列
+              {t("table.deleteColumn")}
             </button>
             <button
               role="menuitem"
@@ -290,7 +293,7 @@ export function TableControls({ editor }: { editor: Editor }) {
               }
             >
               <Trash2 size={14} />
-              删除表格
+              {t("table.deleteTable")}
             </button>
           </div>
         )}
@@ -302,7 +305,7 @@ export function TableControls({ editor }: { editor: Editor }) {
           style={positions.column}
         >
           <AlignmentButtons
-            scope={`第 ${column + 1} 列`}
+            scope={column}
             value={tableAlignmentValue(table, column)}
             onChange={(value) => align(column, value)}
           />

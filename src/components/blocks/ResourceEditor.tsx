@@ -10,6 +10,9 @@ import {
 } from "./research-contract.mjs";
 import { text } from "./helpers";
 import type { BlockData } from "./types";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/resourceEditor";
+import common from "../../i18n/messages/common";
 
 export function ResourceEditor({
   kind,
@@ -22,6 +25,8 @@ export function ResourceEditor({
   onSave: (next: BlockData) => void;
   onClose: () => void;
 }) {
+  const t = useTranslator(messages);
+  const tc = useTranslator(common);
   const [draft, setDraft] = useState(data);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -31,12 +36,16 @@ export function ResourceEditor({
     setError("");
     const mime = fileMime(kind, file);
     if (!mime) {
-      setError("请选择对应类型的文件。");
+      setError(t("wrongType"));
       return;
     }
     if (file.size > MAX_UPLOAD_BYTES) {
       setError(
-        `「${file.name}」为 ${formatBytes(file.size)}，单个资源上限 ${formatBytes(CAPACITY.resourceBytes)}。较大的媒体可填写在线文件地址。`,
+        t("tooLarge", {
+          name: file.name,
+          size: formatBytes(file.size),
+          limit: formatBytes(CAPACITY.resourceBytes),
+        }),
       );
       return;
     }
@@ -52,7 +61,7 @@ export function ResourceEditor({
             ),
           );
         reader.onerror = () =>
-          reject(reader.error ?? new Error("文件读取失败。"));
+          reject(reader.error ?? new Error(t("readFailed")));
         reader.readAsDataURL(file);
       });
       setDraft((current) => ({
@@ -61,7 +70,7 @@ export function ResourceEditor({
         fileName: file.name,
       }));
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "文件读取失败。");
+      setError(failure instanceof Error ? failure.message : t("readFailed"));
     } finally {
       setLoading(false);
     }
@@ -71,7 +80,7 @@ export function ResourceEditor({
       validateResearchData(kind, draft);
       onSave(draft);
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "文件设置不正确。");
+      setError(failure instanceof Error ? failure.message : t("invalid"));
     }
   };
   return (
@@ -86,10 +95,10 @@ export function ResourceEditor({
         <div className="sb-resource-source">
           <label className="sb-button sb-resource-upload">
             <Upload size={14} />
-            {loading ? "读取文件…" : "选择本地文件"}
+            {loading ? t("reading") : t("chooseLocal")}
             <input
               type="file"
-              aria-label="选择本地文件"
+              aria-label={t("chooseLocal")}
               disabled={loading}
               accept={kind === "pdf" ? ".pdf,application/pdf" : `${kind}/*`}
               onChange={(event) => {
@@ -105,7 +114,7 @@ export function ResourceEditor({
             </span>
           )}
         </div>
-        <Field label="在线文件地址">
+        <Field label={t("onlineUrl")}>
           <input
             type="url"
             placeholder="https://…"
@@ -119,13 +128,13 @@ export function ResourceEditor({
             }
           />
         </Field>
-        <Field label="标题">
+        <Field label={t("title")}>
           <input
             value={text(draft.title)}
             onChange={(event) => set("title", event.target.value)}
           />
         </Field>
-        <Field label="说明">
+        <Field label={t("caption")}>
           <textarea
             rows={2}
             value={text(draft.caption)}
@@ -134,7 +143,7 @@ export function ResourceEditor({
         </Field>
         {kind === "video" && (
           <>
-            <Field label="画面比例">
+            <Field label={t("aspectRatio")}>
               <select
                 value={text(draft.aspectRatio, "16:9")}
                 onChange={(event) => set("aspectRatio", event.target.value)}
@@ -144,7 +153,7 @@ export function ResourceEditor({
                 ))}
               </select>
             </Field>
-            <Field label="封面图片地址">
+            <Field label={t("poster")}>
               <input
                 value={text(draft.poster)}
                 onChange={(event) => set("poster", event.target.value)}
@@ -154,7 +163,7 @@ export function ResourceEditor({
         )}
         {kind === "pdf" && (
           <div className="sb-resource-fields">
-            <Field label="初始页码">
+            <Field label={t("initialPage")}>
               <input
                 type="number"
                 min={1}
@@ -162,7 +171,7 @@ export function ResourceEditor({
                 onChange={(event) => set("page", event.target.valueAsNumber)}
               />
             </Field>
-            <Field label="阅读区高度">
+            <Field label={t("readerHeight")}>
               <input
                 type="number"
                 min={240}
@@ -173,10 +182,7 @@ export function ResourceEditor({
             </Field>
           </div>
         )}
-        <p className="sb-resource-hint">
-          本地文件随页面保存；在线地址需要网络。单个原始文件最多 64
-          MiB，页面资源合计最多 128 MiB；页面文字与结构另行计算。
-        </p>
+        <p className="sb-resource-hint">{t("hint")}</p>
         {error && (
           <p className="sb-error" role="alert">
             {error}
@@ -190,7 +196,7 @@ export function ResourceEditor({
             onClick={save}
           >
             <Check size={14} />
-            保存
+            {tc("save")}
           </button>
         </div>
       </div>

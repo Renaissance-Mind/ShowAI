@@ -1,5 +1,8 @@
 import { CAPACITY, formatBytes } from "../../portable/capacity.mjs";
 import { richTextFonts } from "./model.mjs";
+import { translator, type MessageKey } from "../../i18n";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/richText";
 import ExpandableSearch from "../ExpandableSearch";
 import { RichTextEnvironment } from "./environment";
 import type { CatalogComponent } from "../../core/component-categories";
@@ -83,6 +86,13 @@ import { createExtensions } from "./extensions";
 import "./editor.css";
 
 const initialSelections = new WeakSet<Editor>();
+const translate = translator(messages);
+const fontLabels = {
+  "": "format.fontDefault",
+  "sans-serif": "format.fontSans",
+  serif: "format.fontSerif",
+  monospace: "format.fontMono",
+} as const satisfies Record<string, MessageKey<typeof messages>>;
 export interface RichTextEditorProps {
   content: JSONContent;
   onChange: (
@@ -191,6 +201,7 @@ export default function RichTextEditor({
   trailingNode = true,
   retentionKey,
 }: RichTextEditorProps) {
+  const t = useTranslator(messages);
   const latestOnChange = useRef(onChange);
   const selectionMenuId = useId();
   latestOnChange.current = onChange;
@@ -263,7 +274,10 @@ export default function RichTextEditor({
 
   const extensions = useMemo(
     () => [
-      ...createExtensions({ placeholder: "输入 / 添加内容", trailingNode }),
+      ...createExtensions({
+        placeholder: () => translate("placeholder"),
+        trailingNode,
+      }),
       ...(additionalExtensions ?? []),
     ],
     [additionalExtensions, trailingNode],
@@ -278,7 +292,7 @@ export default function RichTextEditor({
     editorProps: {
       attributes: {
         class: "document-content",
-        "aria-label": "文档内容",
+        "aria-label": translate("documentContent"),
         spellcheck: "false",
       },
       handleKeyDown: (view, event) => {
@@ -692,12 +706,16 @@ export default function RichTextEditor({
     editor.on("transaction", mapBookmark);
     for (const file of files) {
       if (!/^image\/(png|jpeg|gif|webp|avif)$/.test(file.type)) {
-        setNotice("支持 PNG、JPEG、GIF、WebP 和 AVIF 图片。");
+        setNotice(t("notice.imageTypes"));
         continue;
       }
       if (file.size > CAPACITY.resourceBytes) {
         setNotice(
-          `「${file.name}」为 ${formatBytes(file.size)}，单个资源上限 ${formatBytes(CAPACITY.resourceBytes)}。`,
+          t("notice.imageTooLarge", {
+            name: file.name,
+            size: formatBytes(file.size),
+            limit: formatBytes(CAPACITY.resourceBytes),
+          }),
         );
         continue;
       }
@@ -707,11 +725,11 @@ export default function RichTextEditor({
           const reader = new FileReader();
           reader.onload = () => resolve(String(reader.result));
           reader.onerror = () => reject(reader.error);
-          reader.onabort = () => reject(new Error("读取已取消"));
+          reader.onabort = () => reject(new Error(t("notice.readCancelled")));
           reader.readAsDataURL(file);
         });
       } catch {
-        setNotice(`无法读取「${file.name}」，请重新选择图片。`);
+        setNotice(t("notice.imageUnreadable", { name: file.name }));
         continue;
       }
       if (editor.isDestroyed || !editor.isEditable) break;
@@ -728,18 +746,18 @@ export default function RichTextEditor({
     () => [
       {
         id: "text",
-        title: "正文",
-        keywords: "text paragraph 正文 文本",
+        title: t("block.text"),
+        keywords: `text paragraph ${t("block.textKeywords")}`,
         icon: <Type size={20} />,
-        group: "基础内容",
+        group: t("group.basic"),
         run: (e: Editor) => {
           e.chain().focus().setParagraph().run();
         },
       },
       ...([1, 2, 3, 4, 5, 6] as const).map((level) => ({
         id: `heading-${level}`,
-        title: `标题 ${level}`,
-        keywords: `heading h${level} 标题`,
+        title: t("block.heading", { level }),
+        keywords: `heading h${level} ${t("block.headingKeywords")}`,
         icon:
           level === 1 ? (
             <Heading1 size={20} />
@@ -748,57 +766,57 @@ export default function RichTextEditor({
           ) : (
             <Heading3 size={20} />
           ),
-        group: "基础内容",
+        group: t("group.basic"),
         run: (e: Editor) => {
           e.chain().focus().setHeading({ level }).run();
         },
       })),
       {
         id: "bullet",
-        title: "无序列表",
-        keywords: "bullet list 无序 列表",
+        title: t("block.bullet"),
+        keywords: `bullet list ${t("block.bulletKeywords")}`,
         icon: <List size={20} />,
-        group: "基础内容",
+        group: t("group.basic"),
         run: (e: Editor) => {
           e.chain().focus().toggleBulletList().run();
         },
       },
       {
         id: "ordered",
-        title: "有序列表",
-        keywords: "ordered numbered list 有序 编号 列表",
+        title: t("block.ordered"),
+        keywords: `ordered numbered list ${t("block.orderedKeywords")}`,
         icon: <ListOrdered size={20} />,
-        group: "基础内容",
+        group: t("group.basic"),
         run: (e: Editor) => {
           e.chain().focus().toggleOrderedList().run();
         },
       },
       {
         id: "todo",
-        title: "待办事项",
-        keywords: "todo task check 待办 任务 清单",
+        title: t("block.todo"),
+        keywords: `todo task check ${t("block.todoKeywords")}`,
         icon: <CheckSquare size={20} />,
-        group: "基础内容",
+        group: t("group.basic"),
         run: (e: Editor) => {
           e.chain().focus().toggleTaskList().run();
         },
       },
       {
         id: "quote",
-        title: "引用",
-        keywords: "blockquote quote 引用",
+        title: t("block.quote"),
+        keywords: `blockquote quote ${t("block.quoteKeywords")}`,
         icon: <Quote size={20} />,
-        group: "基础内容",
+        group: t("group.basic"),
         run: (e: Editor) => {
           e.chain().focus().toggleBlockquote().run();
         },
       },
       {
         id: "callout",
-        title: "提示块",
-        keywords: "callout note 提示 高亮 注释",
+        title: t("block.callout"),
+        keywords: `callout note ${t("block.calloutKeywords")}`,
         icon: <MessageSquareQuote size={20} />,
-        group: "基础内容",
+        group: t("group.basic"),
         run: (e: Editor) => {
           e.chain()
             .focus()
@@ -809,6 +827,7 @@ export default function RichTextEditor({
                 {
                   type: "paragraph",
                   content: [
+                    // i18n-exempt: default text saved into the new callout
                     { type: "text", text: "在这里记录一个值得注意的发现。" },
                   ],
                 },
@@ -819,16 +838,16 @@ export default function RichTextEditor({
       },
       {
         id: "toggle",
-        title: "折叠内容",
-        keywords: "toggle details 折叠 展开",
+        title: t("block.toggle"),
+        keywords: `toggle details ${t("block.toggleKeywords")}`,
         icon: <ChevronRight size={20} />,
-        group: "基础内容",
+        group: t("group.basic"),
         run: (e: Editor) => {
           e.chain()
             .focus()
             .insertContent({
               type: "toggle",
-              attrs: { title: "展开了解更多", open: true },
+              attrs: { title: "展开了解更多", open: true }, // i18n-exempt: default title saved into the new toggle
               content: [{ type: "paragraph" }],
             })
             .run();
@@ -836,38 +855,38 @@ export default function RichTextEditor({
       },
       {
         id: "divider",
-        title: "分割线",
-        keywords: "divider hr 分割 线",
+        title: t("block.divider"),
+        keywords: `divider hr ${t("block.dividerKeywords")}`,
         icon: <Minus size={20} />,
-        group: "基础内容",
+        group: t("group.basic"),
         run: (e: Editor) => {
           e.chain().focus().setHorizontalRule().run();
         },
       },
       {
         id: "image",
-        title: "图片",
-        keywords: "image photo 图片 照片",
+        title: t("block.image"),
+        keywords: `image photo ${t("block.imageKeywords")}`,
         icon: <ImagePlus size={20} />,
-        group: "丰富内容",
+        group: t("group.rich"),
         run: () => openDialog("image"),
       },
       {
         id: "code",
-        title: "代码块",
-        keywords: "code snippet 代码",
+        title: t("block.code"),
+        keywords: `code snippet ${t("block.codeKeywords")}`,
         icon: <CodeXml size={20} />,
-        group: "丰富内容",
+        group: t("group.rich"),
         run: (e: Editor) => {
           e.chain().focus().toggleCodeBlock().run();
         },
       },
       {
         id: "table",
-        title: "简单表格",
-        keywords: "table 表格",
+        title: t("block.table"),
+        keywords: `table ${t("block.tableKeywords")}`,
         icon: <Table2 size={20} />,
-        group: "丰富内容",
+        group: t("group.rich"),
         run: (e: Editor) => {
           e.chain()
             .focus()
@@ -888,12 +907,12 @@ export default function RichTextEditor({
           title: item.name,
           keywords: `${"kind" in item ? item.kind : item.id} ${item.description}`,
           icon: <PanelTop size={20} />,
-          group: "组件",
+          group: t("group.components"),
           component: item,
           run: () => {},
         })),
     ],
-    [openDialog, onInsertNative, catalog.items],
+    [openDialog, onInsertNative, catalog.items, t],
   );
   const filteredItems = items.filter((item) =>
     `${item.title} ${item.keywords}`
@@ -1068,15 +1087,15 @@ export default function RichTextEditor({
   }
 
   if (!editor)
-    return <div className="editor-loading" aria-label="正在打开文档" />;
+    return <div className="editor-loading" aria-label={t("openingDocument")} />;
 
   const textStyle = editor.isActive("heading")
-    ? `标题 ${editor.getAttributes("heading").level}`
-    : "正文";
+    ? t("block.heading", { level: editor.getAttributes("heading").level })
+    : t("block.text");
   const formatButtons = (!minimal || bubble) && (
     <>
       <select
-        aria-label="文字样式"
+        aria-label={t("format.textStyle")}
         value={
           editor.isActive("heading")
             ? String(editor.getAttributes("heading").level)
@@ -1094,15 +1113,15 @@ export default function RichTextEditor({
               .run();
         }}
       >
-        <option value="paragraph">正文</option>
+        <option value="paragraph">{t("block.text")}</option>
         {[1, 2, 3, 4, 5, 6].map((level) => (
           <option key={level} value={level}>
-            标题 {level}
+            {t("block.heading", { level })}
           </option>
         ))}
       </select>
       <select
-        aria-label="文字字体"
+        aria-label={t("format.font")}
         value={editor.getAttributes("textStyle").fontFamily ?? ""}
         onChange={(e) =>
           editor
@@ -1114,12 +1133,15 @@ export default function RichTextEditor({
       >
         {richTextFonts.map((font) => (
           <option key={font.value} value={font.value}>
-            {font.label}
+            {t(
+              fontLabels[font.value as keyof typeof fontLabels] ??
+                "format.fontDefault",
+            )}
           </option>
         ))}
       </select>
       <select
-        aria-label="文字字号"
+        aria-label={t("format.fontSize")}
         value={editor.getAttributes("textStyle").fontSize ?? ""}
         onChange={(e) =>
           editor
@@ -1129,7 +1151,7 @@ export default function RichTextEditor({
             .run()
         }
       >
-        <option value="">默认字号</option>
+        <option value="">{t("format.fontSizeDefault")}</option>
         {[12, 14, 16, 18, 20, 24, 28, 32, 40, 48].map((size) => (
           <option key={size} value={`${size}px`}>
             {size}
@@ -1137,35 +1159,35 @@ export default function RichTextEditor({
         ))}
       </select>
       <ToolButton
-        label="粗体 ⌘B"
+        label={t("format.bold")}
         active={editor.isActive("bold")}
         onClick={() => editor.chain().focus().toggleBold().run()}
       >
         <Bold size={16} />
       </ToolButton>
       <ToolButton
-        label="斜体 ⌘I"
+        label={t("format.italic")}
         active={editor.isActive("italic")}
         onClick={() => editor.chain().focus().toggleItalic().run()}
       >
         <Italic size={16} />
       </ToolButton>
       <ToolButton
-        label="下划线 ⌘U"
+        label={t("format.underline")}
         active={editor.isActive("underline")}
         onClick={() => editor.chain().focus().toggleUnderline().run()}
       >
         <Underline size={16} />
       </ToolButton>
       <ToolButton
-        label="删除线"
+        label={t("format.strike")}
         active={editor.isActive("strike")}
         onClick={() => editor.chain().focus().toggleStrike().run()}
       >
         <Strikethrough size={16} />
       </ToolButton>
       <ToolButton
-        label="文字高亮"
+        label={t("format.highlight")}
         active={editor.isActive("highlight")}
         onClick={() =>
           editor.chain().focus().toggleHighlight({ color: "#e8eed0" }).run()
@@ -1174,28 +1196,28 @@ export default function RichTextEditor({
         <Highlighter size={16} />
       </ToolButton>
       <ToolButton
-        label="行内代码"
+        label={t("format.inlineCode")}
         active={editor.isActive("code")}
         onClick={() => editor.chain().focus().toggleCode().run()}
       >
         <Code size={16} />
       </ToolButton>
-      <label className="rich-text-color" title="文字颜色">
-        字色
+      <label className="rich-text-color" title={t("format.textColor")}>
+        {t("format.textColorShort")}
         <input
           type="color"
-          aria-label="文字颜色"
+          aria-label={t("format.textColor")}
           value={editor.getAttributes("textStyle").color ?? "#292733"}
           onChange={(e) =>
             editor.chain().setMark("textStyle", { color: e.target.value }).run()
           }
         />
       </label>
-      <label className="rich-text-color" title="高亮颜色">
-        高亮
+      <label className="rich-text-color" title={t("format.highlightColor")}>
+        {t("format.highlightColorShort")}
         <input
           type="color"
-          aria-label="高亮颜色"
+          aria-label={t("format.highlightColor")}
           value={editor.getAttributes("highlight").color ?? "#e8eed0"}
           onChange={(e) =>
             editor.chain().setMark("highlight", { color: e.target.value }).run()
@@ -1203,7 +1225,7 @@ export default function RichTextEditor({
         />
       </label>
       <select
-        aria-label="段落对齐"
+        aria-label={t("format.alignment")}
         value={
           editor.getAttributes(
             editor.isActive("heading") ? "heading" : "paragraph",
@@ -1213,13 +1235,13 @@ export default function RichTextEditor({
           editor.chain().focus().setTextAlign(e.target.value).run()
         }
       >
-        <option value="left">左对齐</option>
-        <option value="center">居中</option>
-        <option value="right">右对齐</option>
-        <option value="justify">两端对齐</option>
+        <option value="left">{t("format.alignLeft")}</option>
+        <option value="center">{t("format.alignCenter")}</option>
+        <option value="right">{t("format.alignRight")}</option>
+        <option value="justify">{t("format.alignJustify")}</option>
       </select>
       <ToolButton
-        label="添加链接 ⇧⌘K"
+        label={t("format.addLink")}
         active={editor.isActive("link")}
         onClick={() => openDialog("link")}
       >
@@ -1233,7 +1255,11 @@ export default function RichTextEditor({
       className={`document-editor${readOnly ? " is-readonly" : ""}${minimal ? " is-minimal" : ""}`}
     >
       {!readOnly && !minimal && (
-        <div className="editor-toolbar" role="toolbar" aria-label="文档格式">
+        <div
+          className="editor-toolbar"
+          role="toolbar"
+          aria-label={t("format.toolbar")}
+        >
           <div className="toolbar-style">
             <button
               className="text-style-button"
@@ -1275,14 +1301,14 @@ export default function RichTextEditor({
           {formatButtons}
           <span className="toolbar-divider" />
           <ToolButton
-            label="无序列表"
+            label={t("block.bullet")}
             active={editor.isActive("bulletList")}
             onClick={() => editor.chain().focus().toggleBulletList().run()}
           >
             <List size={17} />
           </ToolButton>
           <ToolButton
-            label="待办事项"
+            label={t("block.todo")}
             active={editor.isActive("taskList")}
             onClick={() => editor.chain().focus().toggleTaskList().run()}
           >
@@ -1290,7 +1316,7 @@ export default function RichTextEditor({
           </ToolButton>
           <div className="toolbar-insert">
             <ToolButton
-              label="更多格式与插入"
+              label={t("format.more")}
               active={insertMenu}
               onClick={() => {
                 setInsertMenu(!insertMenu);
@@ -1308,7 +1334,8 @@ export default function RichTextEditor({
                 <div className="editor-small-menu insert-menu">
                   <button onClick={openSlash}>
                     <Plus size={16} />
-                    插入内容<span className="menu-key">/</span>
+                    {t("insert.content")}
+                    <span className="menu-key">/</span>
                   </button>
                   <button
                     onClick={() => {
@@ -1317,7 +1344,7 @@ export default function RichTextEditor({
                     }}
                   >
                     <ListOrdered size={16} />
-                    有序列表
+                    {t("block.ordered")}
                   </button>
                   <button
                     onClick={() => {
@@ -1326,11 +1353,11 @@ export default function RichTextEditor({
                     }}
                   >
                     <Quote size={16} />
-                    引用
+                    {t("block.quote")}
                   </button>
                   <button onClick={() => openDialog("image")}>
                     <ImagePlus size={16} />
-                    插入图片
+                    {t("insert.image")}
                   </button>
                   <button
                     onClick={() => {
@@ -1343,12 +1370,12 @@ export default function RichTextEditor({
                     }}
                   >
                     <Table2 size={16} />
-                    插入表格
+                    {t("insert.table")}
                   </button>
                   <div className="menu-rule" />
                   <div className="align-tools">
                     <ToolButton
-                      label="左对齐"
+                      label={t("format.alignLeft")}
                       active={editor.isActive({ textAlign: "left" })}
                       onClick={() =>
                         editor.chain().focus().setTextAlign("left").run()
@@ -1357,7 +1384,7 @@ export default function RichTextEditor({
                       <AlignLeft size={17} />
                     </ToolButton>
                     <ToolButton
-                      label="居中"
+                      label={t("format.alignCenter")}
                       active={editor.isActive({ textAlign: "center" })}
                       onClick={() =>
                         editor.chain().focus().setTextAlign("center").run()
@@ -1366,7 +1393,7 @@ export default function RichTextEditor({
                       <AlignCenter size={17} />
                     </ToolButton>
                     <ToolButton
-                      label="右对齐"
+                      label={t("format.alignRight")}
                       active={editor.isActive({ textAlign: "right" })}
                       onClick={() =>
                         editor.chain().focus().setTextAlign("right").run()
@@ -1381,14 +1408,14 @@ export default function RichTextEditor({
           </div>
           <div className="toolbar-spacer" />
           <ToolButton
-            label="撤销 ⌘Z"
+            label={t("format.undo")}
             disabled={!editor.can().undo()}
             onClick={() => editor.chain().focus().undo().run()}
           >
             <Undo2 size={16} />
           </ToolButton>
           <ToolButton
-            label="重做 ⇧⌘Z"
+            label={t("format.redo")}
             disabled={!editor.can().redo()}
             onClick={() => editor.chain().focus().redo().run()}
           >
@@ -1470,16 +1497,16 @@ export default function RichTextEditor({
             onFocus={keepBlockHandle}
           >
             <button
-              aria-label="在下方添加内容"
-              title="添加内容"
+              aria-label={t("insert.addBelow")}
+              title={t("insert.addContent")}
               onMouseDown={(event) => event.preventDefault()}
               onClick={blockAdd}
             >
               <Plus size={15} />
             </button>
             <button
-              aria-label="移动或管理内容块"
-              title="拖动排序 · 点击管理"
+              aria-label={t("block.handle")}
+              title={t("block.handleTitle")}
               draggable
               onDragStart={(event) => {
                 keepBlockHandle();
@@ -1516,7 +1543,7 @@ export default function RichTextEditor({
                         <div
                           className="align-tools"
                           role="group"
-                          aria-label="内容块样式"
+                          aria-label={t("block.style")}
                         >
                           {items.slice(0, 7).map((item, index) => (
                             <ToolButton
@@ -1548,17 +1575,17 @@ export default function RichTextEditor({
                             [
                               [
                                 "left",
-                                "左对齐",
+                                t("format.alignLeft"),
                                 <AlignLeft key="left" size={16} />,
                               ],
                               [
                                 "center",
-                                "居中",
+                                t("format.alignCenter"),
                                 <AlignCenter key="center" size={16} />,
                               ],
                               [
                                 "right",
-                                "右对齐",
+                                t("format.alignRight"),
                                 <AlignRight key="right" size={16} />,
                               ],
                             ] as const
@@ -1597,7 +1624,7 @@ export default function RichTextEditor({
                       }}
                     >
                       <Expand size={15} />
-                      移出区域
+                      {t("block.detach")}
                     </button>
                   )}
                   <button
@@ -1605,14 +1632,14 @@ export default function RichTextEditor({
                     onClick={() => moveBlock(hover.pos, -1)}
                   >
                     <ArrowUp size={15} />
-                    向上移动
+                    {t("block.moveUp")}
                   </button>
                   <button
                     disabled={hover.index === editor.state.doc.childCount - 1}
                     onClick={() => moveBlock(hover.pos, 1)}
                   >
                     <ArrowDown size={15} />
-                    向下移动
+                    {t("block.moveDown")}
                   </button>
                   <button
                     onClick={() => {
@@ -1630,7 +1657,7 @@ export default function RichTextEditor({
                     }}
                   >
                     <Copy size={15} />
-                    复制内容块
+                    {t("block.duplicate")}
                   </button>
                   <div className="menu-rule" />
                   <button
@@ -1649,7 +1676,7 @@ export default function RichTextEditor({
                     }}
                   >
                     <Trash2 size={15} />
-                    删除
+                    {t("block.delete")}
                   </button>
                 </div>
               </>
@@ -1678,7 +1705,7 @@ export default function RichTextEditor({
           }}
         >
           <Plus size={15} />
-          <span>添加内容</span>
+          <span>{t("insert.addContent")}</span>
           <kbd>/</kbd>
         </button>
       )}
@@ -1697,7 +1724,7 @@ export default function RichTextEditor({
       {notice && (
         <div className="editor-notice" role="status">
           {notice}
-          <button aria-label="关闭提示" onClick={() => setNotice("")}>
+          <button aria-label={t("dismissNotice")} onClick={() => setNotice("")}>
             <X size={14} />
           </button>
         </div>
@@ -1743,14 +1770,14 @@ export default function RichTextEditor({
             <div
               className={`slash-menu${minimal ? " is-minimal" : ""}`}
               role="dialog"
-              aria-label="插入内容"
+              aria-label={t("insert.content")}
               style={{ left: slash.left, top: slash.top }}
             >
               <div className="slash-search">
                 {slash.manual ? (
                   <ExpandableSearch
-                    label="搜索内容块"
-                    placeholder="搜索内容…"
+                    label={t("insert.search")}
+                    placeholder={t("insert.searchPlaceholder")}
                     defaultExpanded
                     inputRef={slashInputRef}
                     value={slash.query}
@@ -1781,14 +1808,14 @@ export default function RichTextEditor({
                     }}
                   />
                 ) : (
-                  <span>{slash.query || "添加到文档"}</span>
+                  <span>{slash.query || t("insert.addToDocument")}</span>
                 )}
                 <kbd>esc</kbd>
               </div>
               <div
                 className="slash-items"
                 role="listbox"
-                aria-label="内容块类型"
+                aria-label={t("insert.blockTypes")}
                 aria-busy={inserting || catalog.loading}
               >
                 {catalog.error && (
@@ -1797,7 +1824,7 @@ export default function RichTextEditor({
                   </p>
                 )}
                 {filteredItems.length === 0 && (
-                  <div className="slash-empty">没有找到相关内容块</div>
+                  <div className="slash-empty">{t("insert.noResults")}</div>
                 )}
                 {filteredItems.map((item, index) => (
                   <div key={item.id}>
@@ -1849,13 +1876,11 @@ export default function RichTextEditor({
                 event.preventDefault();
                 const value = dialog.value.trim();
                 if (dialog.type === "image" && !safeImageUrl(value)) {
-                  setDialogError("请输入有效的 http 或 https 图片链接。");
+                  setDialogError(t("dialog.invalidImageUrl"));
                   return;
                 }
                 if (dialog.type === "link" && value && !safeLinkUrl(value)) {
-                  setDialogError(
-                    "请输入 https://、mailto:、tel: 或 # 开头的链接。",
-                  );
+                  setDialogError(t("dialog.invalidLinkUrl"));
                   return;
                 }
                 if (selectionBeforeDialog.current)
@@ -1907,11 +1932,13 @@ export default function RichTextEditor({
                   )}
                 </div>
                 <h3 id="editor-dialog-title">
-                  {dialog.type === "image" ? "插入图片" : "添加链接"}
+                  {dialog.type === "image"
+                    ? t("insert.image")
+                    : t("dialog.addLink")}
                 </h3>
                 <button
                   type="button"
-                  aria-label="关闭弹窗"
+                  aria-label={t("dialog.close")}
                   onClick={() => setDialog(null)}
                 >
                   <X size={18} />
@@ -1924,13 +1951,15 @@ export default function RichTextEditor({
                   onClick={() => fileRef.current?.click()}
                 >
                   <Upload size={23} />
-                  <strong>选择本地图片</strong>
-                  <span>PNG、JPEG、GIF、WebP、AVIF · 原始文件最大 64 MiB</span>
+                  <strong>{t("dialog.chooseImage")}</strong>
+                  <span>{t("dialog.imageFormats")}</span>
                 </button>
               )}
               <label className="editor-field">
                 <span>
-                  {dialog.type === "image" ? "或使用图片链接" : "链接地址"}
+                  {dialog.type === "image"
+                    ? t("dialog.imageUrl")
+                    : t("dialog.linkUrl")}
                 </span>
                 <input
                   autoFocus
@@ -1946,10 +1975,10 @@ export default function RichTextEditor({
               {dialog.type === "image" && (
                 <label className="editor-field">
                   <span>
-                    图片描述 <small>可选</small>
+                    {t("dialog.imageAlt")} <small>{t("dialog.optional")}</small>
                   </span>
                   <input
-                    placeholder="用一句话描述图片"
+                    placeholder={t("dialog.imageAltPlaceholder")}
                     value={dialog.alt}
                     onChange={(event) =>
                       setDialog({ ...dialog, alt: event.target.value })
@@ -1977,7 +2006,7 @@ export default function RichTextEditor({
                       setDialog(null);
                     }}
                   >
-                    移除链接
+                    {t("dialog.removeLink")}
                   </button>
                 )}
                 <button
@@ -1985,7 +2014,7 @@ export default function RichTextEditor({
                   className="editor-secondary"
                   onClick={() => setDialog(null)}
                 >
-                  取消
+                  {t("dialog.cancel")}
                 </button>
                 <button
                   type="submit"
@@ -1993,7 +2022,9 @@ export default function RichTextEditor({
                   disabled={dialog.type === "image" && !dialog.value.trim()}
                 >
                   <Check size={15} />
-                  {dialog.type === "image" ? "插入图片" : "确认"}
+                  {dialog.type === "image"
+                    ? t("insert.image")
+                    : t("dialog.confirm")}
                 </button>
               </div>
             </form>
@@ -2003,7 +2034,7 @@ export default function RichTextEditor({
       {readOnly && (
         <span className="editor-readonly-note">
           <ExternalLink size={12} />
-          交互阅读模式
+          {t("readOnlyNote")}
         </span>
       )}
     </div>

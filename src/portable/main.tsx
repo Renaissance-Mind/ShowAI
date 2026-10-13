@@ -26,16 +26,19 @@ import "../design/content.css";
 
 // Set only by the trusted inline exporter. Ordinary readers and the desktop app
 // keep individual sandboxed iframes for custom code.
-// The exporter writes its language into <html lang>; older exports default to zh-CN.
-setLocale(
-  resolveLocale(window.document.documentElement.lang || navigator.language),
-);
-const translate = translator(messages);
-
 const inlineHost =
   window.document
     .getElementById("root")
     ?.closest<HTMLElement>("[data-showai-inline-root]") ?? null;
+
+// The exporter records its language on <html lang> (or the inline root);
+// older exports default to zh-CN.
+setLocale(
+  resolveLocale(
+    inlineHost?.lang || window.document.documentElement.lang || navigator.language,
+  ),
+);
+const translate = translator(messages);
 
 /** Remote loader errors carry a code so the reader can explain them in its own language. */
 function remoteErrorMessage(error: unknown): string {

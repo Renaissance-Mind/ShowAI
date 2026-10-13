@@ -52,7 +52,7 @@ export function finishBoardDrawing(tool, style, gesture, modifiers = {}) {
     return {
       node: {
         type: "region",
-        attrs: { id: crypto.randomUUID(), name: "区域" },
+        attrs: { id: crypto.randomUUID(), name: "区域" }, // i18n-exempt: default name saved into documents
         content: [],
       },
       frame: {
@@ -69,11 +69,11 @@ export function finishBoardDrawing(tool, style, gesture, modifiers = {}) {
       attrs: {
         id: crypto.randomUUID(),
         name: {
-          pen: "笔画",
-          highlighter: "荧光笔",
-          rectangle: "矩形",
-          ellipse: "椭圆",
-          arrow: "箭头",
+          pen: "笔画", // i18n-exempt: saved default name
+          highlighter: "荧光笔", // i18n-exempt: saved default name
+          rectangle: "矩形", // i18n-exempt: saved default name
+          ellipse: "椭圆", // i18n-exempt: saved default name
+          arrow: "箭头", // i18n-exempt: saved default name
         }[tool],
         tool,
         ...style,

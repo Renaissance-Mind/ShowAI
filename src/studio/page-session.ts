@@ -5,6 +5,13 @@ import type { CompiledComponent } from "../components/custom/types";
 import type { ShowDocument } from "../types";
 import type { EditorDraftRecord } from "../core/editor-drafts";
 import { errorCode, errorMessage } from "./bridge";
+import { translator } from "../i18n";
+import commonMessages from "../i18n/messages/common";
+import pageSessionMessages from "../i18n/messages/pageSession";
+
+const t = translator(pageSessionMessages);
+const common = translator(commonMessages);
+const untitled = () => common("untitled");
 
 export interface LoadedPage extends PageRecord {
   components: CompiledComponent[];
@@ -367,7 +374,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
                 document: source,
                 historyContext: {
                   operationId: operation.id,
-                  message: "解决本机保存冲突",
+                  message: "解决本机保存冲突", // i18n-exempt: saved history record
                 },
               })
             : resolution.current
@@ -378,7 +385,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
                   ...resolution.current,
                   historyContext: {
                     operationId: operation.id,
-                    message: "解决本机保存冲突",
+                    message: "解决本机保存冲突", // i18n-exempt: saved history record
                   },
                 })
               : await options.invoke<LoadedPage>("pages:save", {
@@ -398,7 +405,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
                   historyContext: {
                     operationId: operation.id,
                     groupId: operation.groupId,
-                    message: "编辑页面",
+                    message: "编辑页面", // i18n-exempt: saved history record
                   },
                 });
           const saved = {
@@ -434,9 +441,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
             setConflictId(saved.workspaceConflicts[0].id);
             blocked.current = true;
             setStatus("conflict");
-            setError(
-              "正式修改已保存，但外部文件也有修改，外部版本已保留。请处理冲突。",
-            );
+            setError(t("savedWithExternalConflict"));
             return false;
           }
           if (saved.revision && savedDraft.sequence === sequence) {
@@ -520,11 +525,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     setAvailableDrafts([]);
     setDraftNotice("");
     setStatus(page.workspaceConflicts?.length ? "conflict" : "saved");
-    setError(
-      page.workspaceConflicts?.length
-        ? "外部文件有未处理修改，外部版本已保留。"
-        : "",
-    );
+    setError(page.workspaceConflicts?.length ? t("externalUnresolved") : "");
     blocked.current = !!page.workspaceConflicts?.length;
   };
 
@@ -590,11 +591,11 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         setError(
           conflict
             ? !restored.record.baseRevision && loaded.revision
-              ? "这份旧库草稿缺少可靠的基础版本，已保留在本机。可以保留为副本，或载入正式版本。"
-              : "已恢复本机草稿，正式版本也有新修改。请比较并处理。"
+              ? t("legacyDraftNoBase")
+              : t("draftRestoredWithChanges")
             : "",
         );
-        setDraftNotice("已恢复本机未提交的草稿");
+        setDraftNotice(t("draftRestored"));
         scheduleDraft();
         scheduleSave();
       }
@@ -660,14 +661,14 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       revision.current !== sequence ||
       current.current?.id !== source.id
     ) {
-      setError("读取草稿期间又有新的编辑，当前编辑已保留。请再次选择草稿。");
+      setError(t("editedWhileReadingDraft"));
       return;
     }
     if (
       recovered.record.projectId !== owner ||
       recovered.record.resourceId !== source.id
     )
-      throw new Error("草稿不属于当前页面。");
+      throw new Error(t("draftNotForPage"));
     current.current = recovered.content;
     setDraft(recovered.content);
     recoveredFrom.current = recovered.record;
@@ -685,11 +686,11 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     setError(
       conflict
         ? !recovered.record.baseRevision && baseRevision.current
-          ? "这份旧库草稿缺少可靠的基础版本，已保留在本机。可以保留为副本，或载入正式版本。"
-          : "已恢复本机草稿，正式版本也有新修改。请比较并处理。"
+          ? t("legacyDraftNoBase")
+          : t("draftRestoredWithChanges")
         : "",
     );
-    setDraftNotice("已恢复选中的本机草稿");
+    setDraftNotice(t("selectedDraftRestored"));
     setAvailableDrafts((items) => items.filter((item) => item.id !== id));
     scheduleDraft();
     scheduleSave();
@@ -779,7 +780,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         setConflictId(loaded.workspaceConflicts?.[0]?.id);
         blocked.current = true;
         setStatus("conflict");
-        setError("文件已被其他工具修改。请选择保留本地草稿，或载入文件版本。");
+        setError(t("fileChangedElsewhere"));
       } else install(projectId, loaded);
     } catch (reason) {
       if (
@@ -818,7 +819,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     if (revision.current !== sequence) {
       blocked.current = true;
       setStatus("conflict");
-      setError("读取文件期间又有新的编辑，草稿已保留。请再次选择如何处理。");
+      setError(t("editedWhileReadingFile"));
       return;
     }
     install(projectId, loaded);
@@ -837,7 +838,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       projectId,
       document: {
         ...current.current,
-        title: `${current.current.title || "无标题"} 副本`,
+        title: t("copyTitle", { title: current.current.title || untitled() }),
       },
     });
     if (
@@ -865,7 +866,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       edit({
         ...latest,
         id: copied.document.id,
-        title: `${latest.title || "无标题"} 副本`,
+        title: t("copyTitle", { title: latest.title || untitled() }),
         createdAt: copied.document.createdAt,
       });
     }
@@ -886,7 +887,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     currentHash: string,
   ) => {
     if (!mergeBase || !current.current || current.current.id !== document.id)
-      throw new Error("保存冲突的基础版本已失效，请重新查看。 ");
+      throw new Error(t("mergeBaseExpired"));
     resolution.current = { baseRevision: mergeBase, currentRevision };
     base.current = currentHash;
     baseRevision.current = currentRevision;
@@ -895,7 +896,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     blocked.current = true;
     setDraft(current.current);
     setStatus("conflict");
-    setError("保存失败：请修改当前合并草稿，然后重新保存，或放弃修改。");
+    setError(t("editMergedDraft"));
     setReviewingConflict(true);
     setRenderVersion((value) => value + 1);
     scheduleDraft();
@@ -903,14 +904,14 @@ export function createPageSession(options: PageSessionOptions): PageSession {
 
   const prepareExternalResolution = (document: ShowDocument, id: string) => {
     if (!current.current || current.current.id !== document.id)
-      throw new Error("冲突不属于当前页面。");
+      throw new Error(t("conflictNotForPage"));
     resolution.current = { externalConflictId: id };
     current.current = structuredClone(document);
     revision.current++;
     blocked.current = true;
     setDraft(current.current);
     setStatus("conflict");
-    setError("保存失败：请修改当前合并草稿，然后重新保存，或放弃修改。");
+    setError(t("editMergedDraft"));
     setReviewingConflict(true);
     setRenderVersion((value) => value + 1);
   };
@@ -999,7 +1000,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
             );
         })
         .catch((reason) => {
-          setError(`本机草稿保存失败：${errorMessage(reason)}`);
+          setError(t("draftSaveFailed", { error: errorMessage(reason) }));
           setStatus("error");
           blocked.current = true;
         });
@@ -1021,7 +1022,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         void flush(false);
       return true;
     } catch (reason) {
-      setError(`本机草稿保存失败：${errorMessage(reason)}`);
+      setError(t("draftSaveFailed", { error: errorMessage(reason) }));
       setStatus("error");
       blocked.current = true;
       return false;

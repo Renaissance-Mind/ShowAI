@@ -6,6 +6,9 @@ import { referenceUrl, validateResearchData } from "./research-contract.mjs";
 import { BlockHeader, EmptyState, Field } from "./shared";
 import type { BlockProps } from "./types";
 import "./research-media.css";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/references";
+import common from "../../i18n/messages/common";
 
 type Reference = {
   id: string;
@@ -18,6 +21,8 @@ type Reference = {
   note?: string;
 };
 export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
+  const t = useTranslator(messages);
+  const tc = useTranslator(common);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(data);
   const [error, setError] = useState("");
@@ -42,19 +47,17 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
       onChange?.(draft);
       setEditing(false);
     } catch (failure) {
-      setError(
-        failure instanceof Error ? failure.message : "参考文献格式不正确。",
-      );
+      setError(failure instanceof Error ? failure.message : t("invalid"));
     }
   };
   return (
     <section
       className="sb-block sb-references"
-      aria-label={text(data.title) || "参考文献"}
+      aria-label={text(data.title) || t("references")}
     >
       <BlockHeader
         title={text(data.title)}
-        defaultTitle="参考文献"
+        defaultTitle={t("references")}
         editable={editable}
         editing={editing}
         onEdit={open}
@@ -68,7 +71,7 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
               if (event.key === "Escape") setEditing(false);
             }}
           >
-            <Field label="标题">
+            <Field label={t("title")}>
               <input
                 value={text(draft.title)}
                 onChange={(event) =>
@@ -81,8 +84,8 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
             </Field>
             {draftItems.map((item, index) => (
               <fieldset className="sb-reference-editor" key={item.id}>
-                <legend>文献 {index + 1}</legend>
-                <Field label="文献标题">
+                <legend>{t("entry", { index: index + 1 })}</legend>
+                <Field label={t("entryTitle")}>
                   <input
                     value={item.title}
                     onChange={(event) =>
@@ -90,9 +93,9 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
                     }
                   />
                 </Field>
-                <Field label="作者">
+                <Field label={t("authors")}>
                   <input
-                    placeholder="多个作者用逗号分隔"
+                    placeholder={t("authorsPlaceholder")}
                     value={item.authors ?? ""}
                     onChange={(event) =>
                       change(item.id, "authors", event.target.value)
@@ -100,7 +103,7 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
                   />
                 </Field>
                 <div className="sb-resource-fields">
-                  <Field label="年份">
+                  <Field label={t("year")}>
                     <input
                       value={item.year ?? ""}
                       onChange={(event) =>
@@ -108,7 +111,7 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
                       }
                     />
                   </Field>
-                  <Field label="期刊或会议">
+                  <Field label={t("venue")}>
                     <input
                       value={item.venue ?? ""}
                       onChange={(event) =>
@@ -126,7 +129,7 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
                     }
                   />
                 </Field>
-                <Field label="网址">
+                <Field label={t("url")}>
                   <input
                     type="url"
                     value={item.url ?? ""}
@@ -135,7 +138,7 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
                     }
                   />
                 </Field>
-                <Field label="备注">
+                <Field label={t("note")}>
                   <textarea
                     rows={2}
                     value={item.note ?? ""}
@@ -147,7 +150,7 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
                 <button
                   type="button"
                   className="sb-button"
-                  aria-label={`删除文献 ${index + 1}`}
+                  aria-label={t("deleteEntry", { index: index + 1 })}
                   onClick={() =>
                     setDraft((current) => ({
                       ...current,
@@ -158,7 +161,7 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
                   }
                 >
                   <Trash2 size={14} />
-                  删除
+                  {tc("delete")}
                 </button>
               </fieldset>
             ))}
@@ -183,7 +186,7 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
                 }
               >
                 <Plus size={14} />
-                添加文献
+                {t("addEntry")}
               </button>
               <button
                 type="button"
@@ -191,7 +194,7 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
                 onClick={save}
               >
                 <Check size={14} />
-                保存
+                {tc("save")}
               </button>
             </div>
           </div>
@@ -246,13 +249,13 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
       ) : (
         <EmptyState
           icon={<BookOpen size={28} strokeWidth={1.4} />}
-          title="添加参考文献"
-          description="整理作者、年份、出处与 DOI"
+          title={t("emptyTitle")}
+          description={t("emptyDescription")}
           action={
             editable && !editing ? (
               <button type="button" className="sb-button" onClick={open}>
                 <Plus size={14} />
-                添加文献
+                {t("addEntry")}
               </button>
             ) : undefined
           }

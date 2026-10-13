@@ -7,7 +7,12 @@ import {
   upgradeDocument,
   visitNodes,
 } from "./document.mjs";
+import { translator } from "../i18n";
+import messages from "../i18n/messages/surface";
 
+const t = translator(messages);
+
+// i18n-exempt: default region name saved into documents
 export function createRegion(name = "内容区域", mode: LayoutMode = "flow") {
   const id = crypto.randomUUID();
   return {
@@ -117,7 +122,7 @@ export function addNode(
     ? findSurfaceNode(document, parentId)?.node
     : document.content;
   if (!parent || !["surface", "region"].includes(parent.type ?? ""))
-    throw new Error("目标区域不存在。");
+    throw new Error(t("error.regionMissing"));
   parent.content = [...(parent.content ?? []), node];
   document.layout![node.attrs!.id] = frame;
   return reconcileSurface(document);
@@ -150,13 +155,13 @@ export function moveNode<T extends ShowDocument>(
     !parent ||
     !["surface", "region"].includes(parent.type ?? "")
   )
-    throw new Error("无法移动到这个区域。");
+    throw new Error(t("error.cannotMove"));
   const descendants = new Set<string>();
   visitNodes(target.node, (node) => {
     if (node.attrs?.id) descendants.add(node.attrs.id);
   });
   if (parentId && descendants.has(parentId))
-    throw new Error("区域不能移入自身或子区域。");
+    throw new Error(t("error.regionIntoSelf"));
   target.parent.content = target.parent.content!.filter(
     (node) => node.attrs?.id !== id,
   );
@@ -183,7 +188,7 @@ export function detachBlock(
     ? block
     : {
         type: "richText",
-        attrs: { id: crypto.randomUUID(), name: "文本" },
+        attrs: { id: crypto.randomUUID(), name: "文本" }, // i18n-exempt: default node name saved into documents
         content: [block],
       };
   return addNode(document, node, frame);
@@ -199,7 +204,10 @@ export function regionOptions(document: ShowDocument, excludedId?: string) {
   const result: { id: string; name: string }[] = [];
   visitNodes(document.content, (item) => {
     if (item.type === "region" && !excluded.has(item.attrs!.id))
-      result.push({ id: item.attrs!.id, name: item.attrs?.name || "内容区域" });
+      result.push({
+        id: item.attrs!.id,
+        name: item.attrs?.name || t("node.region"),
+      });
   });
   return result;
 }

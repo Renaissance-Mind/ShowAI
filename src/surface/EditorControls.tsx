@@ -13,6 +13,11 @@ import {
   LibraryContextMenu,
   type LibraryContextMenuItem,
 } from "../studio/LibraryNavigation";
+import { translator } from "../i18n";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/surface";
+
+const translate = translator(messages);
 
 export interface EditorControls {
   documentId: string;
@@ -37,6 +42,7 @@ export function EditorHistoryButtons({
   controls: EditorControls | null;
   className?: string;
 }) {
+  const t = useTranslator(messages);
   const historyKey = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (
       !controls ||
@@ -57,8 +63,8 @@ export function EditorHistoryButtons({
       <button
         type="button"
         className={className}
-        aria-label="撤销操作"
-        title="撤销 ⌘Z / Ctrl+Z"
+        aria-label={t("history.undo")}
+        title={t("history.undoTitle")}
         onMouseDown={(event) => event.preventDefault()}
         onKeyDown={historyKey}
         disabled={!controls?.canUndo}
@@ -69,8 +75,8 @@ export function EditorHistoryButtons({
       <button
         type="button"
         className={className}
-        aria-label="重做操作"
-        title="重做 ⇧⌘Z / Ctrl+Shift+Z"
+        aria-label={t("history.redo")}
+        title={t("history.redoTitle")}
         onMouseDown={(event) => event.preventDefault()}
         onKeyDown={historyKey}
         disabled={!controls?.canRedo}
@@ -86,12 +92,15 @@ export function containerMenuItems(
   controls: EditorControls,
   includeIcon = true,
 ): LibraryContextMenuItem[] {
-  const target = controls.nested ? `「${controls.name}」` : "";
+  const t = translate;
+  const name = controls.nested ? controls.name : "";
   return [
     ...(includeIcon
       ? [
           {
-            label: target ? `设置${target}图标…` : "设置图标…",
+            label: name
+              ? t("container.setIconFor", { name })
+              : t("container.setIcon"),
             icon: <FileText size={15} />,
             onSelect: controls.setIcon,
           },
@@ -100,7 +109,7 @@ export function containerMenuItems(
     ...(controls.kind === "page"
       ? [
           {
-            label: "页面宽度",
+            label: t("pageWidth"),
             icon: <Columns3 size={15} />,
             separatorBefore: true,
             control: (
@@ -113,13 +122,17 @@ export function containerMenuItems(
         ]
       : []),
     {
-      label: target ? `将${target}放入 Board` : "放入 Board",
+      label: name
+        ? t("container.wrapBoardFor", { name })
+        : t("container.wrapBoard"),
       icon: <LayoutDashboard size={15} />,
       separatorBefore: controls.kind === "page",
       onSelect: () => controls.wrap("board"),
     },
     {
-      label: target ? `将${target}放入 Page` : "放入 Page",
+      label: name
+        ? t("container.wrapPageFor", { name })
+        : t("container.wrapPage"),
       icon: <FileText size={15} />,
       onSelect: () => controls.wrap("page"),
     },
@@ -131,14 +144,15 @@ export function EditorContainerMenu({
 }: {
   controls: EditorControls;
 }) {
+  const t = useTranslator(messages);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   return (
     <>
       <button
         type="button"
         className="studio-icon"
-        aria-label="容器操作"
-        title="容器操作"
+        aria-label={t("container.actions")}
+        title={t("container.actions")}
         aria-haspopup="menu"
         aria-expanded={!!anchor}
         onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}
@@ -148,7 +162,7 @@ export function EditorContainerMenu({
       {anchor && (
         <LibraryContextMenu
           anchor={anchor}
-          label={`${controls.name}的容器操作`}
+          label={t("container.actionsFor", { name: controls.name })}
           onClose={() => setAnchor(null)}
           items={containerMenuItems(controls)}
         />

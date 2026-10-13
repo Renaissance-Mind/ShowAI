@@ -1,4 +1,8 @@
 import type { CompiledComponent, CustomComponentRef } from "./types";
+import { translator } from "../../i18n";
+import messages from "../../i18n/messages/customComponents";
+
+const t = translator(messages);
 
 const exactKey = (id: string, version: string, integrity: string) =>
   `${id}@${version}#${integrity}`;
@@ -38,7 +42,7 @@ export function findComponent(
   );
   if (candidates.length > 1)
     throw new Error(
-      `组件 ${ref.componentId}@${ref.version} 有多个不同内容版本，请指定完整性指纹。`,
+      t("ambiguousVersion", { component: `${ref.componentId}@${ref.version}` }),
     );
   return candidates[0];
 }

@@ -8,6 +8,8 @@ import {
   type RefObject,
 } from "react";
 import { Search, X } from "../ui/icons";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/search";
 import "./expandable-search.css";
 
 /** A search action that expands in the toolbar's normal layout flow. */
@@ -30,6 +32,7 @@ export default function ExpandableSearch({
   inputRef?: RefObject<HTMLInputElement | null>;
   onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void;
 }) {
+  const t = useTranslator(messages);
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [engaged, setEngaged] = useState(false);
   const ownInput = useRef<HTMLInputElement>(null);
@@ -99,8 +102,8 @@ export default function ExpandableSearch({
           <button
             type="button"
             className="expandable-search-close"
-            aria-label={`收起${label}`}
-            title="清除并收起搜索"
+            aria-label={t("collapseSearch", { label })}
+            title={t("clearAndCollapseSearch")}
             onClick={close}
           >
             <X size={14} />

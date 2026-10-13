@@ -3,6 +3,9 @@ import { desktop, errorMessage } from "./bridge";
 import type { AccountProfile } from "../sync/accounts";
 import type { ServerConnection } from "../sync/protocol";
 import type { ProjectSummary } from "../core/model";
+import { getLocale } from "../i18n";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/sync";
 export default function AccountBindings({
   connections,
   projects,
@@ -14,6 +17,7 @@ export default function AccountBindings({
   hidden: string[];
   refresh: () => Promise<void>;
 }) {
+  const t = useTranslator(messages);
   const [source, setSource] = useState(""),
     [target, setTarget] = useState(""),
     [profile, setProfile] = useState<AccountProfile | null>(null);
@@ -65,10 +69,8 @@ export default function AccountBindings({
   return (
     <>
       <section className="settings-group">
-        <h2>账号绑定</h2>
-        <p className="settings-help">
-          绑定已登录的服务器账号。以后在新设备登录其中一个服务，就可以恢复其他服务的访问。
-        </p>
+        <h2>{t("accountBindings")}</h2>
+        <p className="settings-help">{t("accountBindingsHelp")}</p>
         {error && (
           <p role="alert" className="sync-error">
             {error}
@@ -83,14 +85,14 @@ export default function AccountBindings({
           <>
             <div className="settings-row">
               <label>
-                当前账号{" "}
+                {t("currentAccount")}{" "}
                 <select
-                  aria-label="绑定来源账号"
+                  aria-label={t("bindSourceAccount")}
                   disabled={busy}
                   value={source}
                   onChange={(event) => setSource(event.target.value)}
                 >
-                  <option value="">选择账号</option>
+                  <option value="">{t("chooseAccount")}</option>
                   {options}
                 </select>
               </label>
@@ -105,13 +107,13 @@ export default function AccountBindings({
                     }>("sync:restoreAccounts", { connectionId: source });
                     setMessage(
                       Object.keys(result.errors).length
-                        ? "已恢复可连接的服务，其余服务将在重新连接后恢复。"
-                        : "已恢复全部绑定服务。",
+                        ? t("toast.restoredPartial")
+                        : t("toast.restoredAll"),
                     );
                   })
                 }
               >
-                恢复绑定服务
+                {t("restoreLinkedServices")}
               </button>
             </div>
             <form
@@ -128,23 +130,23 @@ export default function AccountBindings({
                   });
                   setMessage(
                     result.pending.length || Object.keys(result.errors).length
-                      ? "已保存绑定，部分服务尚未完成确认；恢复连接后会继续。"
-                      : "账号已绑定，新设备可以从任意一个服务恢复登录。",
+                      ? t("toast.bindPending")
+                      : t("toast.bound"),
                   );
                   setTarget("");
                 });
               }}
             >
               <label>
-                绑定另一个已登录的账号
+                {t("bindAnotherAccount")}
                 <select
-                  aria-label="要绑定的账号"
+                  aria-label={t("bindTargetAccount")}
                   required
                   disabled={busy}
                   value={target}
                   onChange={(event) => setTarget(event.target.value)}
                 >
-                  <option value="">选择账号</option>
+                  <option value="">{t("chooseAccount")}</option>
                   {enabled
                     .filter(
                       (item) =>
@@ -164,7 +166,7 @@ export default function AccountBindings({
                 className="settings-button primary"
                 disabled={busy || !source || !target}
               >
-                绑定账号
+                {t("bindAccount")}
               </button>
             </form>
             {profile?.peers
@@ -194,20 +196,20 @@ export default function AccountBindings({
                         });
                         setMessage(
                           result.pending.length
-                            ? "已保存解除请求，离线服务恢复连接后会完成撤销。"
-                            : "已解除绑定，并撤销通过该服务签发的设备登录。",
+                            ? t("toast.unbindPending")
+                            : t("toast.unbound"),
                         );
                       })
                     }
                   >
-                    解除绑定
+                    {t("unbind")}
                   </button>
                 </div>
               ))}
             <div className="settings-row">
               <div className="settings-row-text">
-                <h3>个人 Token</h3>
-                <p>用于登录新设备，可在「账号与设备」中单独撤销。</p>
+                <h3>{t("personalToken")}</h3>
+                <p>{t("personalTokenHelp")}</p>
               </div>
               <button
                 className="settings-button"
@@ -222,13 +224,13 @@ export default function AccountBindings({
                   })
                 }
               >
-                生成个人 Token
+                {t("createPersonalToken")}
               </button>
             </div>
             {personal && (
               <div className="sync-form">
                 <label>
-                  新生成的 Token
+                  {t("newToken")}
                   <input
                     type="password"
                     readOnly
@@ -237,8 +239,11 @@ export default function AccountBindings({
                   />
                 </label>
                 <p className="settings-help">
-                  有效期至 {new Date(personal.expiresAt).toLocaleDateString()}
-                  。关闭此处后只保留在设备列表中的撤销入口。
+                  {t("tokenValidity", {
+                    date: new Date(personal.expiresAt).toLocaleDateString(
+                      getLocale(),
+                    ),
+                  })}
                 </p>
                 <button
                   className="settings-button"
@@ -250,26 +255,24 @@ export default function AccountBindings({
                     )
                   }
                 >
-                  复制 Token
+                  {t("copyToken")}
                 </button>
                 <button
                   className="settings-button"
                   onClick={() => setPersonal(null)}
                 >
-                  已保存
+                  {t("tokenSaved")}
                 </button>
               </div>
             )}
           </>
         ) : (
-          <p className="settings-help">
-            添加启用账号绑定的服务器后，即可在这里建立绑定。
-          </p>
+          <p className="settings-help">{t("noFederatedServers")}</p>
         )}
       </section>
       <section className="settings-group">
-        <h2>本设备显示的项目</h2>
-        <p className="settings-help">每台设备独立选择需要显示的项目。</p>
+        <h2>{t("visibleProjects")}</h2>
+        <p className="settings-help">{t("visibleProjectsHelp")}</p>
         {projects.map((project) => (
           <div className="settings-row" key={project.id}>
             <label>

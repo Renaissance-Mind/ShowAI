@@ -6,6 +6,8 @@ import * as JsxRuntime from "react/jsx-runtime";
 import * as JsxDevRuntime from "react/jsx-dev-runtime";
 import { useEffect, useRef, useState } from "react";
 import type { CompiledComponent } from "./types";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/customComponents";
 
 interface MountedComponent {
   update(data: Record<string, unknown>): void;
@@ -37,6 +39,7 @@ export function InlineComponent({
   const mounted = useRef<MountedComponent | null>(null);
   const currentData = useRef(data);
   const [error, setError] = useState("");
+  const t = useTranslator(messages);
   currentData.current = data;
   useEffect(() => {
     if (
@@ -45,12 +48,14 @@ export function InlineComponent({
       !host.contains(container.current) ||
       window.showai
     ) {
-      setError("此运行方式仅用于对话内的独立页面。");
+      setError(t("inlineOnlyInConversation"));
       return;
     }
     if (!component.inline) {
       setError(
-        `组件 ${component.id}@${component.version} 尚无对话内运行版本，请从源码导入新版本后重新导出。`,
+        t("inlineUnavailable", {
+          component: `${component.id}@${component.version}`,
+        }),
       );
       return;
     }
@@ -90,7 +95,7 @@ export function InlineComponent({
     script.textContent = `(()=>{${component.inline.script}\nglobalThis[${JSON.stringify(callbackKey)}](ShowAIInlineComponent);})();`;
     try {
       host.appendChild(script);
-      if (!mounted.current) setError("宿主未允许此组件运行。");
+      if (!mounted.current) setError(t("inlineBlocked"));
     } finally {
       script.remove();
       delete globals[callbackKey];

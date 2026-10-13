@@ -220,30 +220,6 @@ export function SettingsPanel({
               <ChevronDown size={14} aria-hidden="true" />
             </div>
           </div>
-          <div className="settings-row">
-            <div className="settings-row-text">
-              <label htmlFor="settings-language">{t("language")}</label>
-              <p>{t("languageDetail")}</p>
-            </div>
-            <div className="settings-select">
-              <select
-                id="settings-language"
-                value={language}
-                onChange={(event) => {
-                  if (isLanguagePreference(event.target.value))
-                    setLanguagePreference(event.target.value);
-                }}
-              >
-                <option value="system">{t("languageSystem")}</option>
-                {LOCALES.map((locale) => (
-                  <option key={locale} value={locale} lang={locale}>
-                    {LOCALE_NAMES[locale]}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={14} aria-hidden="true" />
-            </div>
-          </div>
           <fieldset className="settings-theme-options">
             <legend className="settings-sr-only">{t("themePreview")}</legend>
             {(["light", "dark"] as const).map((theme) => {
@@ -271,6 +247,30 @@ export function SettingsPanel({
               );
             })}
           </fieldset>
+          <div className="settings-row">
+            <div className="settings-row-text">
+              <label htmlFor="settings-language">{t("language")}</label>
+              <p>{t("languageDetail")}</p>
+            </div>
+            <div className="settings-select">
+              <select
+                id="settings-language"
+                value={language}
+                onChange={(event) => {
+                  if (isLanguagePreference(event.target.value))
+                    setLanguagePreference(event.target.value);
+                }}
+              >
+                <option value="system">{t("languageSystem")}</option>
+                {LOCALES.map((locale) => (
+                  <option key={locale} value={locale} lang={locale}>
+                    {LOCALE_NAMES[locale]}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={14} aria-hidden="true" />
+            </div>
+          </div>
         </section>
       )}
       {section === "agent" && (

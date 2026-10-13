@@ -1,12 +1,19 @@
 import type { TemplateMetadata } from "../components/custom/types";
+import type { MessageKey } from "../i18n";
+import type templates from "../i18n/messages/templates";
+import type { TemplateStage } from "../portable/template-bundle.mjs";
 
-export const templateStageLabels = {
-  intent: "读者目标",
-  evidence: "证据材料",
-  understanding: "理解路径",
-  design: "视觉设计",
-  authoring: "页面制作",
-  review: "检查完善",
+/** Message keys in the templates namespace; translate at render. */
+export const templateStageLabels: Record<
+  TemplateStage,
+  MessageKey<typeof templates>
+> = {
+  intent: "stage.intent",
+  evidence: "stage.evidence",
+  understanding: "stage.understanding",
+  design: "stage.design",
+  authoring: "stage.authoring",
+  review: "stage.review",
 };
 
 export function latestTemplateVersions(items: TemplateMetadata[]) {

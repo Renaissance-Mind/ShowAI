@@ -16,6 +16,9 @@ import type { SearchResult } from "../core/library-index";
 import type { PageMergePreview } from "../core/page-merge";
 import type { ShowDocument } from "../types";
 import "./recovery.css";
+import { getLocale, type MessageKey } from "../i18n";
+import { useTranslator } from "../i18n/react";
+import recoveryMessages from "../i18n/messages/recovery";
 import type { WorkspaceConflict } from "../core/workspace-conflicts";
 import type { recoverExternalPackage } from "../core/package-recovery";
 export type PackageRecoveryResult = Awaited<
@@ -28,6 +31,7 @@ export function WorkspaceConflictsDialog({
   onClose: () => void;
   onSelect: (id: string) => void;
 }) {
+  const t = useTranslator(recoveryMessages);
   const [items, setItems] = useState<WorkspaceConflict[]>([]),
     [error, setError] = useState("");
   useEffect(() => {
@@ -45,9 +49,9 @@ export function WorkspaceConflictsDialog({
     };
   }, []);
   return (
-    <Dialog title="外部文件修改" onClose={onClose} wide>
+    <Dialog title={t("externalChangesTitle")} onClose={onClose} wide>
       <div className="history-search-results">
-        <p>外部版本会保留。组件与模板先恢复为可编辑草稿，再保存为新版本。</p>
+        <p>{t("externalChangesIntro")}</p>
         {error && (
           <p className="history-error" role="alert">
             {error}
@@ -65,18 +69,22 @@ export function WorkspaceConflictsDialog({
               <small>{item.path}</small>
               <p>
                 {time(item.observedAt)} ·{" "}
-                {
-                  { modified: "已修改", added: "新增文件", deleted: "已删除" }[
-                    item.kind
-                  ]
-                }
+                {t(
+                  (
+                    {
+                      modified: "kind.modified",
+                      added: "kind.added",
+                      deleted: "kind.deleted",
+                    } as const
+                  )[item.kind],
+                )}
               </p>
             </span>
             <ArrowRight size={16} />
           </button>
         ))}
         {!items.length && !error && (
-          <p className="history-empty">正在检查或暂无外部修改。</p>
+          <p className="history-empty">{t("noExternalChanges")}</p>
         )}
       </div>
     </Dialog>
@@ -84,7 +92,7 @@ export function WorkspaceConflictsDialog({
 }
 
 function time(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
+  return new Intl.DateTimeFormat(getLocale(), {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -94,12 +102,17 @@ function time(value: string) {
   }).format(new Date(value));
 }
 function Value({ value }: { value: unknown }) {
+  const t = useTranslator(recoveryMessages);
   if (typeof value === "string" && /^data:image\//.test(value))
     return (
-      <img className="history-value-image" src={value} alt="修改中的图片" />
+      <img
+        className="history-value-image"
+        src={value}
+        alt={t("changedImage")}
+      />
     );
   if (value === undefined)
-    return <span className="history-empty-value">未设置</span>;
+    return <span className="history-empty-value">{t("notSet")}</span>;
   const text =
     typeof value === "string" ? value : JSON.stringify(value, null, 2);
   return (
@@ -107,45 +120,40 @@ function Value({ value }: { value: unknown }) {
       <pre>{text.length > 8000 ? text.slice(0, 8000) + "\n…" : text}</pre>
       {text.length > 8000 && (
         <details>
-          <summary>查看完整内容（{text.length.toLocaleString()} 字符）</summary>
+          <summary>
+            {t("viewFullContent", {
+              count: text.length.toLocaleString(getLocale()),
+            })}
+          </summary>
           <pre>{text}</pre>
         </details>
       )}
     </>
   );
 }
-const fieldNames: Record<string, string> = {
-  title: "标题",
-  icon: "图标",
-  cover: "封面",
-  favorite: "置顶",
-  archived: "归档",
-  parentId: "归属",
-  layout: "布局",
-  views: "视图",
-  surfaceViews: "容器视图",
-  attrs: "区块参数",
-  content: "内容",
-  type: "内容类型",
+const fieldNames: Record<string, MessageKey<typeof recoveryMessages>> = {
+  title: "field.title",
+  icon: "field.icon",
+  cover: "field.cover",
+  favorite: "field.favorite",
+  archived: "field.archived",
+  parentId: "field.parentId",
+  layout: "field.layout",
+  views: "field.views",
+  surfaceViews: "field.surfaceViews",
+  attrs: "field.attrs",
+  content: "field.content",
+  type: "field.type",
 };
 export function ChangeList({ changes }: { changes: PageChange[] }) {
+  const t = useTranslator(recoveryMessages);
   return (
     <div className="history-change-list">
       {changes.length ? (
         changes.map((change, index) => (
           <section key={index} className="history-change">
             <header>
-              <strong>
-                {
-                  {
-                    "page.changed": "页面信息",
-                    "block.changed": "修改区块",
-                    "block.added": "新增区块",
-                    "block.removed": "删除区块",
-                    "block.moved": "移动区块",
-                  }[change.type]
-                }
-              </strong>
+              <strong>{t(`change.${change.type}`)}</strong>
               {"blockId" in change && (
                 <code title={change.blockId}>
                   {change.blockId.slice(0, 12)}
@@ -155,14 +163,18 @@ export function ChangeList({ changes }: { changes: PageChange[] }) {
             {"fields" in change ? (
               change.fields.map((field) => (
                 <div className="history-field" key={field.field}>
-                  <p>{fieldNames[field.field] ?? field.field}</p>
+                  <p>
+                    {Object.hasOwn(fieldNames, field.field)
+                      ? t(fieldNames[field.field])
+                      : field.field}
+                  </p>
                   <div className="history-value-pair">
                     <div className="before">
-                      <small>修改前</small>
+                      <small>{t("before")}</small>
                       <Value value={field.before} />
                     </div>
                     <div className="after">
-                      <small>修改后</small>
+                      <small>{t("after")}</small>
                       <Value value={field.after} />
                     </div>
                   </div>
@@ -170,24 +182,31 @@ export function ChangeList({ changes }: { changes: PageChange[] }) {
               ))
             ) : change.type === "block.moved" ? (
               <p>
-                移动到
                 {change.parentId
-                  ? `容器 ${change.parentId.slice(0, 12)}`
-                  : "页面根部"}
-                {change.afterId
-                  ? `，位于 ${change.afterId.slice(0, 12)} 之后`
-                  : "的开头"}
+                  ? change.afterId
+                    ? t("movedIntoContainerAfter", {
+                        parent: change.parentId.slice(0, 12),
+                        after: change.afterId.slice(0, 12),
+                      })
+                    : t("movedIntoContainerStart", {
+                        parent: change.parentId.slice(0, 12),
+                      })
+                  : change.afterId
+                    ? t("movedToRootAfter", {
+                        after: change.afterId.slice(0, 12),
+                      })
+                    : t("movedToRootStart")}
               </p>
             ) : (
               <details>
-                <summary>查看区块内容</summary>
+                <summary>{t("viewBlockContent")}</summary>
                 <Value value={change.node} />
               </details>
             )}
           </section>
         ))
       ) : (
-        <p className="history-empty">这两个版本的页面内容相同。</p>
+        <p className="history-empty">{t("samePageContent")}</p>
       )}
     </div>
   );
@@ -211,6 +230,7 @@ export function LibrarySearchResults({
     point?: LibraryMenuPoint,
   ) => void;
 }) {
+  const t = useTranslator(recoveryMessages);
   const [kind, setKind] = useState(""),
     [results, setResults] = useState<SearchResult[]>([]),
     [cursor, setCursor] = useState<string | null>(null),
@@ -284,19 +304,19 @@ export function LibrarySearchResults({
     }
   }
   return (
-    <section aria-label="内容库搜索结果">
+    <section aria-label={t("searchResults")}>
       <div className="history-toolbar">
         <select
-          aria-label="搜索内容类型"
+          aria-label={t("searchKind")}
           value={kind}
           onChange={(event) => setKind(event.target.value)}
         >
-          <option value="">全部内容</option>
-          <option value="page">页面正文</option>
-          <option value="component">组件</option>
-          <option value="template">模板</option>
-          <option value="source">源码</option>
-          <option value="project">项目</option>
+          <option value="">{t("searchKind.all")}</option>
+          <option value="page">{t("searchKind.page")}</option>
+          <option value="component">{t("searchKind.component")}</option>
+          <option value="template">{t("searchKind.template")}</option>
+          <option value="source">{t("searchKind.source")}</option>
+          <option value="project">{t("searchKind.project")}</option>
         </select>
       </div>
       {error && (
@@ -307,10 +327,10 @@ export function LibrarySearchResults({
       <div className="history-search-results">
         <p className="history-search-count">
           {busy
-            ? "正在搜索…"
+            ? t("searching")
             : query
-              ? `${total} 个结果`
-              : "输入关键词开始搜索"}
+              ? t("resultCount", { count: total })
+              : t("typeToSearch")}
         </p>
         {results.map((result) => {
           const page = result.path.match(
@@ -364,7 +384,7 @@ export function LibrarySearchResults({
             disabled={busy}
             onClick={() => void find(cursor)}
           >
-            更多结果
+            {t("moreResults")}
           </button>
         )}
       </div>
@@ -397,6 +417,7 @@ export function MergeDialog({
   ) => void;
   onDiscard?: () => Promise<void>;
 }) {
+  const t = useTranslator(recoveryMessages);
   const [reviewed, setReviewed] = useState(false);
   const [preview, setPreview] = useState<
       | (PageMergePreview & { currentRevision: string; currentHash: string })
@@ -448,7 +469,7 @@ export function MergeDialog({
   }
   return (
     <Dialog
-      title={saveFailure ? "保存失败：请处理冲突" : "比较并合并草稿"}
+      title={saveFailure ? t("saveFailedResolve") : t("compareAndMergeDraft")}
       dismissible={!saveFailure}
       onClose={onClose}
       wide
@@ -463,41 +484,31 @@ export function MergeDialog({
         <>
           <p className="history-merge-summary">
             {preview.conflicts.length
-              ? `${preview.conflicts.length} 处修改需要处理，当前草稿尚未保存。`
-              : "修改可以自动合并，请检查结果后保存。"}
+              ? t("conflictsToResolve", { count: preview.conflicts.length })
+              : t("autoMergeable")}
           </p>
           <ChangeList changes={preview.changes} />
           {preview.conflicts.map((conflict, index) => (
             <section className="history-change" key={index}>
               <header>
-                <strong>冲突 {index + 1}</strong>
+                <strong>{t("conflictNumber", { number: index + 1 })}</strong>
                 <code>{conflict.path}</code>
               </header>
               <div className="history-conflict-values">
-                {["base", "ours", "theirs"].map((side) => (
+                {(["base", "ours", "theirs"] as const).map((side) => (
                   <div key={side}>
-                    <small>
-                      {
-                        {
-                          base: "共同基础",
-                          ours: "我的草稿",
-                          theirs: "正式版本",
-                        }[side]
-                      }
-                    </small>
-                    <Value
-                      value={conflict[side as "base" | "ours" | "theirs"]}
-                    />
+                    <small>{t(`side.${side}`)}</small>
+                    <Value value={conflict[side]} />
                   </div>
                 ))}
               </div>
             </section>
           ))}
           <details open={!saveFailure && preview.conflicts.length > 0}>
-            <summary>检查并编辑合并后的页面数据</summary>
+            <summary>{t("reviewMergedData")}</summary>
             <textarea
               className="history-resolution"
-              aria-label="合并后的页面数据"
+              aria-label={t("mergedData")}
               value={resolved}
               onChange={(event) => setResolved(event.target.value)}
               spellCheck={false}
@@ -510,7 +521,7 @@ export function MergeDialog({
                 checked={reviewed}
                 onChange={(event) => setReviewed(event.target.checked)}
               />
-              已检查并解决所有冲突，保存当前合并结果
+              {t("confirmResolved")}
             </label>
           )}
           <footer className="history-footer">
@@ -527,7 +538,7 @@ export function MergeDialog({
                   onClose();
                 }}
               >
-                修改后重新保存
+                {t("editAndResave")}
               </button>
             )}
             {saveFailure && onDiscard && (
@@ -540,7 +551,7 @@ export function MergeDialog({
                     .catch((reason) => setError(errorMessage(reason)))
                 }
               >
-                放弃修改，载入当前文件
+                {t("discardAndLoad")}
               </button>
             )}
             <button
@@ -548,11 +559,11 @@ export function MergeDialog({
               disabled={busy || (!!preview.conflicts.length && !reviewed)}
               onClick={() => void save()}
             >
-              保存合并版本
+              {t("saveMerged")}
             </button>
             {!saveFailure && (
               <button className="studio-button" onClick={onClose}>
-                保留草稿并返回
+                {t("keepDraftAndReturn")}
               </button>
             )}
           </footer>
@@ -567,7 +578,7 @@ export function MergeDialog({
               .catch((reason) => setError(errorMessage(reason)))
           }
         >
-          放弃修改，载入当前文件
+          {t("discardAndLoad")}
         </button>
       ) : (
         <Loader2 className="studio-spin" />
@@ -595,6 +606,7 @@ export function ExternalConflictDialog({
   draftDocument?: ShowDocument;
   onEdit?: (document: ShowDocument) => void;
 }) {
+  const t = useTranslator(recoveryMessages);
   const [detail, setDetail] = useState<{
       path: string;
       baseline: string | null;
@@ -686,15 +698,13 @@ export function ExternalConflictDialog({
   }
   return (
     <Dialog
-      title={saveFailure ? "保存失败：请处理外部修改冲突" : "处理外部文件修改"}
+      title={saveFailure ? t("saveFailedExternal") : t("resolveExternalTitle")}
       dismissible={!saveFailure}
       onClose={onClose}
       wide
       className="history-external-dialog"
     >
-      <p className="history-merge-summary">
-        外部版本已独立保留。选择如何处理，不会删除保存的外部快照。
-      </p>
+      <p className="history-merge-summary">{t("externalKeptIntro")}</p>
       {error && (
         <p className="history-error" role="alert">
           {error}
@@ -707,24 +717,24 @@ export function ExternalConflictDialog({
               aria-pressed={tab === "compare"}
               onClick={() => setTab("compare")}
             >
-              查看版本
+              {t("viewVersions")}
             </button>
             <button
               aria-pressed={tab === "merge"}
               onClick={() => setTab("merge")}
               disabled={packageConflict}
             >
-              编辑合并结果
+              {t("editMergeResult")}
             </button>
           </nav>
           {tab === "compare" && saveFailure && draftDocument ? (
             <div className="history-conflict-values">
               <div>
-                <h3>我的未保存修改</h3>
+                <h3>{t("myUnsavedChanges")}</h3>
                 <ConflictPagePreview value={draftDocument} />
               </div>
               <div>
-                <h3>当前文件版本</h3>
+                <h3>{t("currentFileVersion")}</h3>
                 <ConflictPagePreview value={detail.external} />
               </div>
             </div>
@@ -732,26 +742,26 @@ export function ExternalConflictDialog({
             <div className="history-conflict-values">
               {draftDocument && (
                 <div>
-                  <h3>尚未保存的 App 草稿</h3>
+                  <h3>{t("unsavedAppDraft")}</h3>
                   <Value value={draftDocument} />
                 </div>
               )}
               <div>
-                <h3>原始基础</h3>
+                <h3>{t("originalBase")}</h3>
                 <Value value={detail.baseline} />
               </div>
               <div>
-                <h3>正式版本</h3>
+                <h3>{t("savedVersion")}</h3>
                 <Value value={detail.current} />
               </div>
               <div>
-                <h3>外部修改</h3>
+                <h3>{t("externalVersion")}</h3>
                 <Value value={detail.external} />
               </div>
             </div>
           ) : (
             <textarea
-              aria-label="外部修改的合并结果"
+              aria-label={t("externalMergeResult")}
               className="history-resolution"
               value={resolved}
               onChange={(event) => setResolved(event.target.value)}
@@ -768,7 +778,7 @@ export function ExternalConflictDialog({
                   onClose();
                 }}
               >
-                修改后重新保存
+                {t("editAndResave")}
               </button>
             )}
             <button
@@ -781,23 +791,23 @@ export function ExternalConflictDialog({
               }
             >
               {packageConflict
-                ? "保留为编辑草稿"
+                ? t("keepAsEditDraft")
                 : tab === "merge"
-                  ? "保存合并结果"
+                  ? t("saveMergeResult")
                   : saveFailure
-                    ? "放弃我的修改，采用文件版本"
-                    : "导入外部修改"}
+                    ? t("discardMineUseFile")
+                    : t("importExternal")}
             </button>
             <button
               className="studio-button"
               disabled={busy}
               onClick={() => void choose("discard")}
             >
-              使用正式版本
+              {t("useSavedVersion")}
             </button>
             {!saveFailure && (
               <button className="studio-text-button" onClick={onClose}>
-                稍后处理
+                {t("later")}
               </button>
             )}
           </footer>

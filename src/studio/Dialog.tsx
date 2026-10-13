@@ -1,5 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { X } from "../ui/icons";
+import { useTranslator } from "../i18n/react";
+import studioMessages from "../i18n/messages/studio";
 
 export default function Dialog({
   title,
@@ -22,6 +24,7 @@ export default function Dialog({
   headerActions?: ReactNode;
   dismissible?: boolean;
 }) {
+  const t = useTranslator(studioMessages);
   const panel = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = dismissible ? onClose : () => {};
@@ -113,7 +116,7 @@ export default function Dialog({
               {dismissible && (
                 <button
                   className="studio-icon"
-                  aria-label="关闭弹窗"
+                  aria-label={t("closeDialog")}
                   onClick={onClose}
                 >
                   <X size={18} />
@@ -126,7 +129,7 @@ export default function Dialog({
               {dismissible && (
                 <button
                   className="studio-icon"
-                  aria-label="关闭弹窗"
+                  aria-label={t("closeDialog")}
                   onClick={onClose}
                 >
                   <X size={18} />

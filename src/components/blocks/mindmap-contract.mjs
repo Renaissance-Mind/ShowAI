@@ -84,7 +84,7 @@ export function addMindmapNode(
   const target = data.nodes.find((node) => node.id === selected);
   if (!target) throw new Error("Selected mind map node is missing.");
   if (data.nodes.length >= MAX_MINDMAP_NODES)
-    throw new Error("思维导图最多支持 500 个节点。");
+    throw new Error("思维导图最多支持 500 个节点。"); // i18n-exempt: contract message shared with CLI/MCP
   const parentId =
     relation === "sibling" && target.parentId !== null
       ? target.parentId
@@ -92,7 +92,7 @@ export function addMindmapNode(
   const node = {
     id,
     parentId,
-    label: parentId === target.id ? "子主题" : "同级主题",
+    label: parentId === target.id ? "子主题" : "同级主题", // i18n-exempt: default node label saved into the document
   };
   const nodes = data.nodes.map((item) =>
     item.id === parentId ? { ...item, collapsed: false } : item,

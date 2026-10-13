@@ -22,6 +22,9 @@ import {
 import "./library-row.css";
 import PageIcon from "../components/PageIcon";
 import { useLibraryDrag } from "./LibraryDrag";
+import { useTranslator } from "../i18n/react";
+import commonMessages from "../i18n/messages/common";
+import sidebarMessages from "../i18n/messages/sidebar";
 
 export type LibraryTarget =
   | {
@@ -69,15 +72,17 @@ function LibraryRowView({
   onOpen,
   onMenu,
 }: LibraryRowProps) {
+  const t = useTranslator(sidebarMessages);
+  const tc = useTranslator(commonMessages);
   const menuButton = useRef<HTMLButtonElement>(null);
   const drag = useLibraryDrag();
   const title =
     target.title.trim() ||
     (target.kind === "page"
-      ? "未命名页面"
+      ? tc("untitledPage")
       : target.kind === "folder"
-        ? "新文件夹"
-        : "未命名项目");
+        ? t("newFolder")
+        : t("untitledProject"));
   const Icon =
     target.kind === "page" ? FileText : expanded ? FolderOpen : Folder;
   const openKeyboardMenu = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -110,7 +115,7 @@ function LibraryRowView({
         <button
           type="button"
           className="studio-tree-chevron"
-          aria-label={`${expanded ? "收起" : "展开"}${title}`}
+          aria-label={t(expanded ? "collapseItem" : "expandItem", { title })}
           aria-expanded={expanded}
           onClick={(event) => {
             event.stopPropagation();
@@ -147,7 +152,7 @@ function LibraryRowView({
             <Pin
               size={11}
               className="studio-tree-pin"
-              aria-label="已置顶"
+              aria-label={t("pinned")}
               role="img"
             />
           </span>
@@ -157,7 +162,7 @@ function LibraryRowView({
         ref={menuButton}
         type="button"
         className="studio-row-menu"
-        aria-label={`${title}的操作`}
+        aria-label={t("itemActions", { title })}
         aria-haspopup="menu"
         aria-expanded={false}
         onClick={(event) => {

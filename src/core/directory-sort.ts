@@ -5,10 +5,11 @@ import type {
   PageSummary,
 } from "./model";
 
+/** Labels are translated by the workbench from each option's value. */
 export const directorySortOptions = [
-  { value: "name", label: "按名称排序" },
-  { value: "createdAt", label: "按创建日期排序" },
-  { value: "updatedAt", label: "按编辑日期排序" },
+  { value: "name" },
+  { value: "createdAt" },
+  { value: "updatedAt" },
 ] as const;
 
 export function isDirectorySortBy(value: unknown): value is DirectorySortBy {

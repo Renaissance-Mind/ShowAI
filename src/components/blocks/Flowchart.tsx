@@ -20,6 +20,9 @@ import type { BlockProps, BlockData } from "./types";
 import { BlockHeader, EmptyState } from "./shared";
 import { useViewportLock, ViewportLockButton } from "./ViewportLock";
 import { validateFlowchartData } from "./flowchart-contract.mjs";
+import { type MessageKey } from "../../i18n";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/flowchart";
 import "@xyflow/react/dist/style.css";
 import "./flowchart.css";
 
@@ -57,13 +60,13 @@ interface FlowData extends BlockData {
   flows: Flow[];
 }
 type DiagramNode = Node<FlowNode & { direction: "TB" | "LR" }, "showai">;
-const kinds: Record<Kind, string> = {
-  request: "用户意图",
-  skill: "技能入口",
-  decision: "条件判断",
-  reference: "按需文档",
-  query: "CLI 查询",
-  result: "结果",
+const kinds: Record<Kind, MessageKey<typeof messages>> = {
+  request: "kind.request",
+  skill: "kind.skill",
+  decision: "kind.decision",
+  reference: "kind.reference",
+  query: "kind.query",
+  result: "kind.result",
 };
 const nodeWidth = 176;
 const nodeHeight = 72;
@@ -198,6 +201,7 @@ function NodeEditor({
   node: FlowNode;
   onSave: (patch: Partial<FlowNode>) => void;
 }) {
+  const t = useTranslator(messages);
   const [label, setLabel] = useState(node.label);
   const [detail, setDetail] = useState(node.detail ?? "");
   useEffect(() => {
@@ -206,9 +210,9 @@ function NodeEditor({
   }, [node.id, node.label, node.detail]);
   return (
     <details className="sf-editor">
-      <summary>编辑所选节点</summary>
+      <summary>{t("editNode")}</summary>
       <label>
-        名称
+        {t("nodeName")}
         <input
           value={label}
           aria-invalid={!label.trim()}
@@ -216,19 +220,19 @@ function NodeEditor({
         />
       </label>
       <label>
-        说明
+        {t("nodeDetail")}
         <textarea
           value={detail}
           onChange={(event) => setDetail(event.target.value)}
         />
       </label>
-      {!label.trim() && <p role="alert">节点名称需要有内容。</p>}
+      {!label.trim() && <p role="alert">{t("nodeNameRequired")}</p>}
       <button
         type="button"
         disabled={!label.trim()}
         onClick={() => onSave({ label: label.trim(), detail })}
       >
-        保存节点
+        {t("saveNode")}
       </button>
     </details>
   );
@@ -264,13 +268,14 @@ export function layoutFlow(flow: Flow): DiagramNode[] {
 }
 function FlowControls({ locked }: { locked: boolean }) {
   const graph = useReactFlow();
+  const t = useTranslator(messages);
   return (
-    <div className="sf-controls" aria-label="流程图视图">
+    <div className="sf-controls" aria-label={t("viewControls")}>
       <button
         type="button"
         onClick={() => graph.zoomIn()}
         disabled={locked}
-        aria-label="放大流程图"
+        aria-label={t("zoomIn")}
       >
         <Plus size={16} />
       </button>
@@ -278,7 +283,7 @@ function FlowControls({ locked }: { locked: boolean }) {
         type="button"
         onClick={() => graph.zoomOut()}
         disabled={locked}
-        aria-label="缩小流程图"
+        aria-label={t("zoomOut")}
       >
         <Minus size={16} />
       </button>
@@ -286,7 +291,7 @@ function FlowControls({ locked }: { locked: boolean }) {
         type="button"
         onClick={() => graph.fitView({ padding: 0.08, duration: 200 })}
         disabled={locked}
-        aria-label="显示完整流程"
+        aria-label={t("fitView")}
       >
         <Maximize2 size={16} />
       </button>
@@ -310,6 +315,7 @@ function FlowCanvas({
   selected: string;
   onSelect: (id: string) => void;
 }) {
+  const t = useTranslator(messages);
   const layoutNodes = useMemo(() => layoutFlow(flow), [flow]);
   const initialNodes = useMemo(
     () =>
@@ -368,7 +374,7 @@ function FlowCanvas({
         <FlowControls locked={locked} />
       </ReactFlow>
       <details className="sf-node-picker">
-        <summary aria-label="节点列表">节点</summary>
+        <summary aria-label={t("nodeList")}>{t("nodes")}</summary>
         <div>
           {flow.nodes.map((item) => (
             <button
@@ -391,6 +397,7 @@ export function FlowchartBlock({
   readOnly = false,
 }: BlockProps) {
   const instanceId = useId();
+  const t = useTranslator(messages);
   const lock = useViewportLock("flowchart");
   const data = validateFlowchartData(raw) as FlowData;
   const [flowId, setFlowId] = useState(data.flows[0]?.id ?? "");
@@ -419,22 +426,26 @@ export function FlowchartBlock({
     <section
       ref={lock.ref}
       className="sb-block sf-block"
-      aria-label={data.title || "流程图"}
+      aria-label={data.title || t("flowchart")}
       data-viewport-lock-scope="flowchart"
       data-viewport-locked={lock.locked}
     >
       <BlockHeader
         title={data.title}
-        defaultTitle="交互流程图"
+        defaultTitle={t("defaultTitle")}
         description={data.description}
       />
-      <ViewportLockButton {...lock} label="流程图" />
+      <ViewportLockButton {...lock} label={t("lockTarget")} />
       {!flow ? (
-        <EmptyState title="添加一条流程" />
+        <EmptyState title={t("addFlow")} />
       ) : (
         <>
           {data.flows.length > 1 && (
-            <div className="sf-tabs" role="tablist" aria-label="选择流程">
+            <div
+              className="sf-tabs"
+              role="tablist"
+              aria-label={t("chooseFlow")}
+            >
               {data.flows.map((item) => (
                 <button
                   key={item.id}
@@ -483,12 +494,12 @@ export function FlowchartBlock({
                 (!readOnly && onChange)) && (
                 <div className="sf-detail" aria-live="polite">
                   <div className="sf-detail-heading">
-                    {node.kind && <span>{kinds[node.kind]}</span>}
+                    {node.kind && <span>{t(kinds[node.kind])}</span>}
                     <strong>{node.label}</strong>
                     <button
                       type="button"
                       className="sb-icon-button"
-                      aria-label="关闭节点详情"
+                      aria-label={t("closeNodeDetail")}
                       onClick={() => setSelected("")}
                     >
                       <X size={16} />
@@ -497,7 +508,7 @@ export function FlowchartBlock({
                   {node.detail && <p>{node.detail}</p>}
                   {!!node.commands?.length && (
                     <div className="sf-detail-group">
-                      <span>按需查询</span>
+                      <span>{t("commands")}</span>
                       {node.commands.map((command) => (
                         <code key={command}>{command}</code>
                       ))}
@@ -505,7 +516,7 @@ export function FlowchartBlock({
                   )}
                   {!!node.references?.length && (
                     <div className="sf-detail-group">
-                      <span>此时读取</span>
+                      <span>{t("references")}</span>
                       {node.references.map((reference) => (
                         <code key={reference}>{reference}</code>
                       ))}

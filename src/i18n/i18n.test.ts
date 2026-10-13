@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, posix, relative } from "node:path";
 import { parseSync } from "rolldown/utils";
 import { describe, expect, it } from "vitest";
+import { builtinSources } from "../core/builtin-sources";
 import {
   formatMessage,
   resolveLocale,
@@ -94,6 +95,20 @@ describe("i18n runtime", () => {
   });
 });
 
+describe("built-in component package", () => {
+  it("contains every i18n module its sources import", () => {
+    const missing: string[] = [];
+    for (const [name, source] of Object.entries(builtinSources))
+      for (const [, specifier] of source.matchAll(/from\s+["']([^"']*i18n[^"']*)["']/g)) {
+        if (!specifier.startsWith(".") || /archify-i18n/.test(specifier)) continue;
+        const target = posix.normalize(posix.join(posix.dirname(name), specifier));
+        if (![`${target}.ts`, `${target}/index.ts`].some((file) => file in builtinSources))
+          missing.push(`${name} → ${specifier}`);
+      }
+    expect(missing).toEqual([]);
+  });
+});
+
 // Workbench UI sources whose user-visible strings live in the catalogs.
 const scanned = [
   "src/App.tsx",
@@ -115,6 +130,16 @@ const scanned = [
 const exemptFiles: Record<string, string> = {
   "src/components/blocks/diagrams/archify-i18n.mjs":
     "Archify's own bilingual diagram catalog",
+  "src/components/blocks/registry.ts":
+    "built-in catalog titles, saved defaults and validation shared with the CLI/MCP",
+  "src/components/blocks/g2/catalog.js":
+    "G2 catalog metadata written into resources/catalog/g2.json",
+  "src/components/blocks/research-contract.mjs":
+    "data validation messages shared with the CLI/MCP",
+  "src/components/blocks/primitive-contract.mjs":
+    "data validation messages shared with the CLI/MCP",
+  "src/components/rich-text/model.mjs":
+    "rich-text validation shared with the CLI/MCP and the saved default node name",
 };
 
 function sourceFiles(path: string): string[] {

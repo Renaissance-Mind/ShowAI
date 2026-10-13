@@ -3,12 +3,16 @@ import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import type { NodeLayout } from "./types";
 import { builtinComponent } from "../components/catalog";
+import { translator } from "../i18n";
+import messages from "../i18n/messages/surface";
 import { createSurface, upgradeResource, surfaceKind } from "./containers.mjs";
 import {
   findSurfaceNode,
   reconcileSurface,
   remapSurfaceIds,
 } from "./document.mjs";
+
+const t = translator(messages);
 import { validateDocument } from "../portable/validation.mjs";
 
 export function nativeComponentDocument(
@@ -119,12 +123,12 @@ export function insertComponentAtText(
 ) {
   const draft = upgradeResource(source);
   const target = findSurfaceNode(draft, context.parentId);
-  if (!target) throw new Error("插入位置已不存在。");
+  if (!target) throw new Error(t("error.insertionGone"));
   const text = target.node.type === "richText";
   const parent =
     text || context.kind === "single" ? target.parent : target.node;
   if (!parent || !["surface", "region"].includes(parent.type ?? ""))
-    throw new Error("组件需要放在页面或白板中。");
+    throw new Error(t("error.componentNeedsContainer"));
   const inserted = insertComponent(draft, parent.attrs!.id, kind, data);
   const destination = findSurfaceNode(
     inserted.document,

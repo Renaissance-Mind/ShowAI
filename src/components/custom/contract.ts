@@ -17,7 +17,7 @@ export function injectComponentBootstrap(
   bootstrap: string,
 ): string {
   if (!html.includes(COMPONENT_DATA_MARKER))
-    throw new Error("组件缺少运行入口。");
+    throw new Error("组件缺少运行入口。"); // i18n-exempt: shared contract validation text (CLI/MCP)
   return html.replace(COMPONENT_DATA_MARKER, () => bootstrap);
 }
 

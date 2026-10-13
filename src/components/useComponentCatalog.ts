@@ -8,6 +8,10 @@ import {
 } from "../core/component-categories";
 import { builtinComponentCatalog } from "./catalog";
 import { componentWidgetData } from "./custom/contract";
+import { translator } from "../i18n";
+import messages from "../i18n/messages/customComponents";
+
+const t = translator(messages);
 
 export const RegisterComponentContext = createContext<
   (component: CompiledComponent) => void
@@ -57,7 +61,7 @@ export function useComponentCatalog(open: boolean) {
           value.version === item.version &&
           value.integrity === item.integrity,
       ) ?? (library ? await library.read(item) : null);
-    if (!component) throw new Error("组件尚未安装。");
+    if (!component) throw new Error(t("notInstalledError"));
     return {
       kind: "custom",
       data: componentWidgetData(component),

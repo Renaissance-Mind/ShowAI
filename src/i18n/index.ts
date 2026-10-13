@@ -78,9 +78,19 @@ function systemLanguages(): readonly string[] {
   return [Intl.DateTimeFormat().resolvedOptions().locale];
 }
 
+/**
+ * Compiled components carry their own copy of this module. Their host page
+ * records its language on the root element so every copy starts in it.
+ */
+function hostLocale(): Locale | undefined {
+  if (typeof document === "undefined") return undefined;
+  const value = document.documentElement?.dataset.showaiLocale;
+  return value === "zh-CN" || value === "en" ? value : undefined;
+}
+
 let systemLocale: Locale = resolveLocale(systemLanguages());
 let preference: LanguagePreference = "system";
-let current: Locale = systemLocale;
+let current: Locale = hostLocale() ?? systemLocale;
 const listeners = new Set<() => void>();
 
 function readStoredPreference(): LanguagePreference {
@@ -94,7 +104,10 @@ function readStoredPreference(): LanguagePreference {
 }
 
 function apply(next: Locale, notify = false) {
-  if (typeof document !== "undefined") document.documentElement.lang = next;
+  if (typeof document !== "undefined") {
+    document.documentElement.lang = next;
+    document.documentElement.dataset.showaiLocale = next;
+  }
   if (next === current && !notify) return;
   current = next;
   for (const listener of [...listeners]) listener();

@@ -4,6 +4,10 @@ import { appIconForTheme } from "./design/app-icon";
 import { useAppearanceTheme } from "./design/useAppearanceTheme";
 import { useLocale, useTranslator } from "./i18n/react";
 import messages from "./i18n/messages/common";
+import { registerBuiltinDisplayText } from "./components/component-display";
+import { builtinEnglish } from "./components/builtin-display-text";
+// Editing hosts show built-in component names in English; readers never need them.
+registerBuiltinDisplayText(builtinEnglish);
 const CanvasApp = lazy(() => import("./CanvasApp"));
 const Studio = lazy(() => import("./studio/Studio"));
 const ComponentPreviewPage = lazy(

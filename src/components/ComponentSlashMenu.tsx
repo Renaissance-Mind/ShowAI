@@ -6,10 +6,14 @@ import {
   useComponentCatalog,
   RegisterComponentContext,
 } from "./useComponentCatalog";
+import { componentCategory } from "../core/component-categories";
 import {
-  componentCategory,
-  componentCategories,
-} from "../core/component-categories";
+  componentCategoryLabel,
+  componentDisplayDescription,
+  componentDisplayName,
+} from "./component-display";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/catalog";
 import "../editor/editor.css";
 
 export function ComponentSlashMenu({
@@ -23,6 +27,7 @@ export function ComponentSlashMenu({
   onInsert: (kind: string, data: Record<string, unknown>) => void;
   onClose: () => void;
 }) {
+  const t = useTranslator(messages);
   const catalog = useComponentCatalog(true),
     register = useContext(RegisterComponentContext);
   const [query, setQuery] = useState(""),
@@ -45,7 +50,7 @@ export function ComponentSlashMenu({
       ?.scrollIntoView({ block: "nearest" });
   }, [selected]);
   const items = catalog.items.filter((item) =>
-    `${item.name} ${item.description} ${"kind" in item ? item.kind : item.id}`
+    `${item.name} ${item.description} ${componentDisplayName(item)} ${componentDisplayDescription(item)} ${"kind" in item ? item.kind : item.id}`
       .toLowerCase()
       .includes(query.toLowerCase()),
   );
@@ -74,7 +79,7 @@ export function ComponentSlashMenu({
         ref={root}
         className="slash-menu is-minimal"
         role="dialog"
-        aria-label="插入内容"
+        aria-label={t("insertContent")}
         style={{
           left: Math.max(12, Math.min(left, window.innerWidth - 320)),
           top: Math.max(12, Math.min(top, window.innerHeight - 410)),
@@ -105,8 +110,8 @@ export function ComponentSlashMenu({
       >
         <div className="slash-search">
           <ExpandableSearch
-            label="搜索内容块"
-            placeholder="搜索组件…"
+            label={t("searchBlocks")}
+            placeholder={t("searchComponentsPlaceholder")}
             defaultExpanded
             value={query}
             onChange={(value) => {
@@ -124,12 +129,14 @@ export function ComponentSlashMenu({
         <div
           className="slash-items"
           role="listbox"
-          aria-label="内容块类型"
+          aria-label={t("blockTypes")}
           aria-busy={busy || catalog.loading}
         >
           {!items.length && (
             <p className="slash-empty">
-              {catalog.loading ? "正在加载组件…" : "没有找到相关组件"}
+              {catalog.loading
+                ? t("loadingComponents")
+                : t("noComponentsFound")}
             </p>
           )}
           {items.map((item, index) => (
@@ -151,14 +158,8 @@ export function ComponentSlashMenu({
                 <PanelTop size={20} />
               </span>
               <span>
-                <strong>{item.name}</strong>
-                <small>
-                  {
-                    componentCategories.find(
-                      (category) => category.id === componentCategory(item),
-                    )?.label
-                  }
-                </small>
+                <strong>{componentDisplayName(item)}</strong>
+                <small>{componentCategoryLabel(componentCategory(item))}</small>
               </span>
             </button>
           ))}
