@@ -109,6 +109,7 @@ export function useSurfaceViewport(
     moveTo: (_camera: Camera, _immediate = false) => {},
     refresh: () => {},
     cancel: () => {},
+    objectGesture: (_active: boolean) => {},
   });
 
   useEffect(() => {
@@ -461,6 +462,7 @@ export function useSurfaceViewport(
       moveTo,
       refresh,
       cancel: controls.current.cancel,
+      objectGesture: controls.current.objectGesture,
       restored: controls.current.restored,
       restoredTargets: controls.current.restoredTargets,
       restoredAnchor: previousAnchor?.id ?? null,
@@ -694,8 +696,13 @@ export function useSurfaceViewport(
       space = false;
       root.classList.remove("is-panning", "is-hand");
     };
+    controls.current.objectGesture = (active) => {
+      objectGesture = active;
+      if (!active) refresh();
+    };
     const cancel = (event: PointerEvent) => finish(event, true);
     const lostCapture = (event: PointerEvent) => {
+      if (event.target !== root) return;
       objectGesture = false;
       if (drag?.id === event.pointerId) finish(event, true);
     };
@@ -810,7 +817,7 @@ export function useSurfaceViewport(
           observedCards.add(card);
         }
       }
-      refresh();
+      if (!objectGesture) refresh();
     };
     controls.current.refresh = refreshLayout;
     root.addEventListener("wheel", wheel, { passive: false });

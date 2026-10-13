@@ -1,6 +1,7 @@
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import type { NodeLayout } from "./types";
+import { canonicalJson } from "../core/canonical";
 import {
   indexSurfaceTree,
   type ArrowBindings,
@@ -160,7 +161,7 @@ export function removeObjects<T extends ShowDocument>(
   );
 }
 
-/** Reloading identical JSON must not invalidate a gesture; actual edits must. */
+/** Preserve independent edits; reject changes to the gesture's geometry or ancestry. */
 export function canCommitBoardGesture(
   original: ShowDocument,
   latest: ShowDocument | undefined,
@@ -168,15 +169,33 @@ export function canCommitBoardGesture(
 ) {
   if (!latest) return false;
   const same = (a: unknown, b: unknown) =>
-    a === b || JSON.stringify(a) === JSON.stringify(b);
-  if (!same(original.content, latest.content)) return false;
+    a === b || canonicalJson(a) === canonicalJson(b);
   const index = indexSurfaceTree(original.content),
+    latestIndex = indexSurfaceTree(latest.content),
     frames = new Set<string>();
   for (const id of ids) {
     if (!latest.layout?.[id]) return false;
     let entry = index.get(id);
+    if (!entry) return false;
+    // A fixed Page/Board's contents do not determine its outer frame, and a
+    // transform writes only that frame. Its latest contents can stay intact.
+    const fixedSurface =
+      entry.node.type === "surface" &&
+      original.layout?.[id]?.heightMode !== "auto";
+    if (!fixedSurface && !same(entry.node, latestIndex.get(id)?.node))
+      return false;
     while (entry) {
-      const key = entry.node.attrs?.id;
+      const key: string | undefined = entry.node.attrs?.id;
+      const actual: ReturnType<typeof latestIndex.get> = key
+        ? latestIndex.get(key)
+        : undefined;
+      if (
+        !actual ||
+        entry.node.type !== actual.node.type ||
+        !same(entry.node.attrs, actual.node.attrs) ||
+        entry.parent?.attrs?.id !== actual.parent?.attrs?.id
+      )
+        return false;
       if (key && (original.layout?.[key] || latest.layout?.[key]))
         frames.add(key);
       entry = entry.parent?.attrs?.id

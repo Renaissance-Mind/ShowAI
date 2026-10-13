@@ -366,6 +366,86 @@ describe("native connections and structural commands", () => {
     ).toBe(false);
   });
 
+  it("keeps a Page gesture when a sibling changes and preserves that edit on commit", () => {
+    const original = fixture(),
+      latest = structuredClone(original);
+    findSurfaceNode(latest, "image")!.node.attrs!.alt = "Updated image";
+    latest.layout.image.width = 250;
+    expect(canCommitBoardGesture(original, latest, ["page"])).toBe(true);
+    const next = transformObjects(latest, {
+      page: { ...original.layout.page, x: 180, width: 420 },
+    });
+    expect(next.layout.page.x).toBe(180);
+    expect(next.layout.page.width).toBe(420);
+    expect(next.layout.image.width).toBe(250);
+    expect(findSurfaceNode(next, "image")!.node.attrs!.alt).toBe(
+      "Updated image",
+    );
+    expect(canCommitBoardGesture(original, latest, ["page", "image"])).toBe(
+      false,
+    );
+  });
+
+  it("compares reloaded objects by value regardless of JSON property order", () => {
+    const original = fixture();
+    const reorder = (value: unknown): unknown =>
+      Array.isArray(value)
+        ? value.map(reorder)
+        : value && typeof value === "object"
+          ? Object.fromEntries(
+              Object.entries(value)
+                .reverse()
+                .map(([key, item]) => [key, reorder(item)]),
+            )
+          : value;
+    const reloaded = reorder(original) as typeof original;
+    expect(canCommitBoardGesture(original, reloaded, ["page"])).toBe(true);
+    reloaded.layout.page.width++;
+    expect(canCommitBoardGesture(original, reloaded, ["page"])).toBe(false);
+  });
+
+  it("preserves content updates inside a fixed Page while protecting automatic height", () => {
+    const original = fixture(),
+      latest = structuredClone(original);
+    const page = findSurfaceNode(latest, "page")!.node;
+    page.content = [
+      {
+        type: "paragraph",
+        attrs: { id: "new-text" },
+        content: [{ type: "text", text: "Updated during resize" }],
+      },
+    ];
+    expect(canCommitBoardGesture(original, latest, ["page"])).toBe(true);
+    const next = transformObjects(latest, {
+      page: { ...original.layout.page, width: 420 },
+    });
+    expect(findSurfaceNode(next, "page")!.node.content).toEqual(page.content);
+    original.layout.page.heightMode = "auto";
+    latest.layout.page.heightMode = "auto";
+    expect(canCommitBoardGesture(original, latest, ["page"])).toBe(false);
+  });
+
+  it("rejects reparenting or changes to the selection's coordinate ancestry", () => {
+    const original = fixture(),
+      rootId = original.content.attrs!.id;
+    const reparented = structuredClone(original);
+    const page = findSurfaceNode(reparented, "page")!.node;
+    reparented.content.content = reparented.content.content!.filter(
+      (node) => node.attrs?.id !== "page",
+    );
+    reparented.content.content.push({
+      type: "region",
+      attrs: { id: "new-parent" },
+      content: [page],
+    });
+    reparented.layout["new-parent"] = { x: 0, y: 0, width: 700, mode: "free" };
+    expect(canCommitBoardGesture(original, reparented, ["page"])).toBe(false);
+    const changed = structuredClone(original);
+    changed.content.attrs!.kind = "page";
+    expect(canCommitBoardGesture(original, changed, ["page"])).toBe(false);
+    expect(changed.content.attrs!.id).toBe(rootId);
+  });
+
   it("Agent transforms match UI arrow-only and grouped binding rules", () => {
     const before = fixture();
     const alone = applyOperations(before, [

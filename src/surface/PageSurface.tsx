@@ -227,6 +227,7 @@ export default function PageSurface({
     const pointer = pointing.current?.pointer;
     pointing.current = null;
     board.cancel();
+    controls.current.objectGesture(false);
     if (pointer !== undefined && rootRef.current?.hasPointerCapture(pointer))
       rootRef.current.releasePointerCapture(pointer);
   };
@@ -520,7 +521,10 @@ export default function PageSurface({
           if (!target.closest("[data-surface-ui]")) setObjectMenu(null);
           const selectionId = board.selectionHit(event.clientX, event.clientY);
           const handle =
-            drawTool && target.closest("[data-board-drawing-input]")
+            target.closest<HTMLElement>(
+              ".board-resize-handle,.surface-object-rotate",
+            ) ??
+            (drawTool && target.closest("[data-board-drawing-input]")
               ? [
                   ...(worldRef.current?.querySelectorAll<HTMLElement>(
                     ".surface-object.is-selected > .board-resize-handle, .surface-object.is-selected > .surface-object-rotate",
@@ -534,7 +538,7 @@ export default function PageSurface({
                     event.clientY <= box.bottom + 4
                   );
                 })
-              : undefined;
+              : undefined);
           const edge = board.edgeHit(event.clientX, event.clientY);
           const quickSelect =
             !!drawTool &&
@@ -555,13 +559,14 @@ export default function PageSurface({
             locked ||
             (drawTool && !quickSelect && !selectionId && !handle) ||
             event.button !== 0 ||
-            event.pointerType === "touch" ||
+            (event.pointerType === "touch" && !handle) ||
             spaceHeld.current ||
-            target.closest("[data-surface-handle]") ||
-            target.closest("[data-surface-ui]") ||
-            target.closest(
-              'input,textarea,select,button,a,[contenteditable=true],iframe,[data-surface-gesture="own"],.react-flow',
-            )
+            (!handle && target.closest("[data-surface-handle]")) ||
+            (!handle && target.closest("[data-surface-ui]")) ||
+            (!handle &&
+              target.closest(
+                'input,textarea,select,button,a,[contenteditable=true],iframe,[data-surface-gesture="own"],.react-flow',
+              ))
           )
             return;
           const hit = board.hitTest(event.clientX, event.clientY);
@@ -582,7 +587,7 @@ export default function PageSurface({
                           ))))
                   ? hit?.id
                   : null;
-          if (moveId && !forceBrush) {
+          if (moveId && (!forceBrush || handle)) {
             event.preventDefault();
             event.stopPropagation();
             controls.current.cancel();
@@ -596,6 +601,7 @@ export default function PageSurface({
                 ? "rotate"
                 : "move";
             if (!board.start(moveId, gesture, event)) return;
+            controls.current.objectGesture(true);
             pointing.current = {
               pointer: event.pointerId,
               id: moveId,
@@ -604,9 +610,9 @@ export default function PageSurface({
               moved: false,
               wasSelected,
               additive: event.shiftKey,
-              preserveSelection: !!selectionId && !event.shiftKey,
+              preserveSelection: !!handle || (!!selectionId && !event.shiftKey),
             };
-            event.currentTarget.focus({ preventScroll: true });
+            (handle ?? event.currentTarget).focus({ preventScroll: true });
             event.currentTarget.setPointerCapture(event.pointerId);
             return;
           }
@@ -717,6 +723,7 @@ export default function PageSurface({
               ) >= 3;
             board.update(event);
             board.finish();
+            controls.current.objectGesture(false);
             if (
               !pointer.moved &&
               pointer.wasSelected &&
@@ -752,12 +759,18 @@ export default function PageSurface({
           if (event.currentTarget.hasPointerCapture(event.pointerId))
             event.currentTarget.releasePointerCapture(event.pointerId);
         }}
-        onPointerCancelCapture={() => {
+        onPointerCancelCapture={(event) => {
+          if (
+            event.pointerId !== pointing.current?.pointer &&
+            event.pointerId !== marquee.current?.id
+          )
+            return;
           cancelMarquee(true);
           cancelPointing();
           clearHover();
         }}
-        onLostPointerCapture={() => {
+        onLostPointerCapture={(event) => {
+          if (event.target !== event.currentTarget) return;
           cancelMarquee(true);
           if (pointing.current) cancelPointing();
         }}
