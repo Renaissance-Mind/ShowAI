@@ -1,152 +1,29 @@
+import { useId, useState } from "react";
 import { BuiltinPreview } from "../components/BuiltinPreview";
-import ComponentAdjustmentSummary from "./ComponentAdjustmentSummary";
-import TemplateOutline from "./TemplateOutline";
-import ComponentParameterFacts from "./ComponentParameterFacts";
-import CatalogTabs from "./CatalogTabs";
-import CatalogPreview from "./CatalogPreview";
-import CatalogActions from "./CatalogActions";
-import { SurfaceReader } from "../portable/SurfaceReader";
-import type { ProjectSummary } from "../core/model";
-import { PageWidthSwitch } from "../surface/PageWidthSwitch";
-import TemplateWorkflowView from "./TemplateWorkflowView";
-import { editedTemplateBundle } from "./template-catalog-model";
-import { parseTemplateBundle } from "../portable/template-bundle.mjs";
-import ComponentParameterSummary from "./ComponentParameterSummary";
-import ComponentDocumentationView from "./ComponentDocumentationView";
-import { validateComponentDocumentation } from "../components/custom/documentation";
-import { useState, useId, useRef } from "react";
-import { useCatalogDraft, CatalogDraftRecovery } from "./useCatalogDraft";
-import {
-  ArrowDown,
-  ArrowUp,
-  Globe2,
-  BookOpen,
-  Sparkles,
-  Layers,
-  Loader2,
-  Plus,
-  Trash2,
-  Upload,
-} from "../ui/icons";
-import type { ShowDocument } from "../types";
+import { CustomComponentsProvider } from "../components/custom/CustomBlock";
+import { componentWidgetData } from "../components/custom/contract";
 import type {
   BuiltinComponentMetadata,
   CompiledComponent,
-  ComponentMetadata,
-  ComponentSource,
-  ComponentCategory,
-  PackageRevisionRef,
   RelatedPackage,
-  TemplateMetadata,
-  TemplatePart,
   TemplateRecord,
 } from "../components/custom/types";
-import { CustomComponentsProvider } from "../components/custom/CustomBlock";
-import { componentWidgetData } from "../components/custom/contract";
 import { Widget } from "../components/blocks/Widget";
-import type { DocumentEditorProps } from "../editor/DocumentEditor";
-import SurfaceEditor, {
-  type SurfaceEditorState,
-} from "../surface/SurfaceEditor";
-import {
-  EditorHistoryButtons,
-  EditorContainerMenu,
-  type EditorControls,
-} from "../surface/EditorControls";
-import { newDocument } from "../lib/document";
-import { desktop, errorMessage } from "./bridge";
+import { SurfaceReader } from "../portable/SurfaceReader";
+import { BookOpen, Sparkles, Layers, Plus } from "../ui/icons";
+import type { ShowDocument } from "../types";
+import ComponentAdjustmentSummary from "./ComponentAdjustmentSummary";
+import ComponentParameterFacts from "./ComponentParameterFacts";
+import ComponentParameterSummary from "./ComponentParameterSummary";
+import ComponentDocumentationView from "./ComponentDocumentationView";
+import TemplateOutline from "./TemplateOutline";
+import TemplateWorkflowView from "./TemplateWorkflowView";
+import CatalogTabs from "./CatalogTabs";
+import CatalogPreview from "./CatalogPreview";
+import { errorMessage } from "./bridge";
 import Dialog from "./Dialog";
-import {
-  componentCategories,
-  componentCategory,
-} from "../core/component-categories";
 import "./catalog.css";
 import "./catalog-workspace.css";
-
-function SaveProjectPicker({
-  projects,
-  projectId,
-  onChange,
-}: {
-  projects: ProjectSummary[];
-  projectId?: string;
-  onChange?: (id: string) => void;
-}) {
-  return (
-    <label>
-      保存到
-      <select
-        aria-label="保存到项目"
-        value={projectId ?? ""}
-        disabled={!onChange}
-        onChange={(event) => onChange?.(event.target.value)}
-      >
-        <option value="">选择项目</option>
-        {projects.map((project) => (
-          <option key={project.id} value={project.id}>
-            {project.name}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function contentPartDocument(
-  document: ShowDocument,
-  part: TemplatePart | null,
-  content: ShowDocument["content"],
-): ShowDocument {
-  const {
-    layout: _layout,
-    views: _views,
-    surfaceViews: _surfaceViews,
-    ...metadata
-  } = document;
-  return {
-    ...metadata,
-    content,
-    ...(part?.type === "content"
-      ? {
-          ...(part.layout ? { layout: part.layout } : {}),
-          ...(part.views ? { views: part.views } : {}),
-          ...(part.surfaceViews ? { surfaceViews: part.surfaceViews } : {}),
-        }
-      : {}),
-  };
-}
-function TemplateContent(
-  props: DocumentEditorProps & {
-    document?: ShowDocument;
-    onDocumentChange?: (document: ShowDocument) => void;
-    onControlsChange?: (controls: EditorControls | null) => void;
-    retainedState?: SurfaceEditorState;
-    inspectorHost?: HTMLElement | null;
-  },
-) {
-  const id = useId();
-  const source = props.document ?? {
-    ...newDocument(),
-    id: `template-${id}`,
-    content: props.content,
-  };
-  return (
-    <div className="surface-template">
-      <SurfaceEditor
-        document={source}
-        onChange={(document) =>
-          props.onDocumentChange
-            ? props.onDocumentChange(document)
-            : props.onChange(document.content)
-        }
-        readOnly={props.readOnly}
-        onControlsChange={props.onControlsChange}
-        retainedState={props.retainedState}
-        inspectorHost={props.inspectorHost}
-      />
-    </div>
-  );
-}
 
 function CompactScenarios({ items }: { items: string[] }) {
   return (
@@ -185,88 +62,6 @@ export type LoadedTemplate = TemplateRecord & {
   components?: CompiledComponent[];
   previewDocument?: ShowDocument;
 };
-export function blankTemplate(): LoadedTemplate {
-  return {
-    id: "",
-    version: "1.0.0",
-    integrity: "",
-    name: "",
-    description: "",
-    scope: "project",
-    updatedAt: new Date().toISOString(),
-    document: newDocument(),
-    scenarios: [],
-    contentGuide: [],
-    related: [],
-    examples: [],
-    dependencies: [],
-  };
-}
-const scopeNames: Record<string, string> = {
-  project: "项目",
-  global: "全局",
-  published: "已发布",
-  builtin: "内置",
-  user: "全局",
-};
-function nextVersion(version: string) {
-  const m = version.match(/^(\d+)\.(\d+)\.(\d+)/);
-  return m ? `${m[1]}.${m[2]}.${Number(m[3]) + 1}` : "1.0.0";
-}
-function lines(value: string) {
-  return value
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
-function revision(
-  kind: "component" | "template",
-  item: ComponentMetadata | TemplateMetadata,
-  projectId?: string,
-): PackageRevisionRef {
-  return {
-    kind,
-    id: item.id,
-    version: item.version,
-    integrity: item.integrity,
-    scope: item.scope,
-    ...(item.scope === "project" && projectId ? { projectId } : {}),
-  };
-}
-function Lineage({
-  item,
-}: {
-  item: {
-    id: string;
-    version: string;
-    scope: string;
-    parents?: PackageRevisionRef[];
-  };
-}) {
-  return (
-    <div className="catalog-lineage">
-      <span>{scopeNames[item.scope] ?? item.scope}</span>
-      <code>
-        {item.id}@{item.version}
-      </code>
-      {!!item.parents?.length && (
-        <details>
-          <summary>派生来源</summary>
-          <ul>
-            {item.parents.map((parent) => (
-              <li key={`${parent.kind}:${parent.id}:${parent.integrity}`}>
-                <code>
-                  {parent.id}@{parent.version}
-                </code>
-                <span>{scopeNames[parent.scope ?? ""] ?? ""}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-    </div>
-  );
-}
 function RelatedList({ items }: { items: RelatedPackage[] }) {
   return items.length ? (
     <ul className="catalog-related">
@@ -287,257 +82,22 @@ function RelatedList({ items }: { items: RelatedPackage[] }) {
     <p className="studio-caption">尚未指定。</p>
   );
 }
-function RelatedEditor({
-  items,
-  onChange,
-  label,
-}: {
-  items: RelatedPackage[];
-  onChange: (items: RelatedPackage[]) => void;
-  label: string;
-}) {
-  const patch = (index: number, change: Partial<RelatedPackage>) =>
-    onChange(
-      items.map((item, i) => (i === index ? { ...item, ...change } : item)),
-    );
-  return (
-    <div className="catalog-related-editor">
-      {items.map((item, index) => (
-        <div className="catalog-related-row" key={index}>
-          <div className="catalog-related-fields">
-            <select
-              aria-label={`${label} ${index + 1} 类型`}
-              value={item.kind}
-              onChange={(event) =>
-                patch(index, {
-                  kind: event.target.value as RelatedPackage["kind"],
-                })
-              }
-            >
-              <option value="component">组件</option>
-              <option value="template">模板</option>
-            </select>
-            <input
-              aria-label={`${label} ${index + 1} ID`}
-              placeholder="ID"
-              value={item.id}
-              onChange={(event) => patch(index, { id: event.target.value })}
-            />
-            <input
-              aria-label={`${label} ${index + 1} 版本`}
-              placeholder="版本（可选）"
-              value={item.version ?? ""}
-              onChange={(event) =>
-                patch(index, { version: event.target.value || undefined })
-              }
-            />
-            <button
-              type="button"
-              className="studio-icon"
-              aria-label={`移除${label} ${index + 1}`}
-              onClick={() => onChange(items.filter((_, i) => i !== index))}
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-          <input
-            aria-label={`${label} ${index + 1} 用途`}
-            placeholder="在此处负责什么、如何配合内容呈现"
-            value={item.purpose}
-            onChange={(event) => patch(index, { purpose: event.target.value })}
-          />
-        </div>
-      ))}
-      <button
-        className="studio-text-button"
-        type="button"
-        onClick={() =>
-          onChange([...items, { kind: "component", id: "", purpose: "" }])
-        }
-      >
-        <Plus size={14} />
-        添加{label}
-      </button>
-    </div>
-  );
-}
-
 export function TemplateDialog({
   record,
   components,
-  projectId,
-  projects = [],
-  onProjectChange,
-  templates,
   onClose,
-  onSaved,
-  onPublish,
 }: {
   record: LoadedTemplate;
-  copy?: boolean;
   components: CompiledComponent[];
-  projectId?: string;
-  projects?: ProjectSummary[];
-  onProjectChange?: (id: string) => void;
-  templates: TemplateMetadata[];
   onClose: () => void;
-  onSaved: () => Promise<void>;
-  onPublish: (ref: PackageRevisionRef) => void;
 }) {
   const panelId = useId();
-  const sourceRevision = useRef(
-    record.integrity ? revision("template", record, projectId) : undefined,
-  ).current;
-  const [inspectorHost, setInspectorHost] = useState<HTMLDivElement | null>(
-    null,
-  );
-  const layoutEditors = useRef(new Map<string, SurfaceEditorState>());
-  const [tab, setTab] = useState<
-    "about" | "layout" | "edit" | "composition" | "guides"
-  >(record.id ? "about" : "edit");
-  const [name, setName] = useState(record.name),
-    [description, setDescription] = useState(record.description),
-    [version, setVersion] = useState(
-      record.integrity ? nextVersion(record.version) : "1.0.0",
-    );
-  const bundle = record.bundle ? parseTemplateBundle(record.bundle) : undefined;
+  const [tab, setTab] = useState<"about" | "guides" | "usage">("about");
   const systemTemplate = record.id === "system-presentation";
-  const hasLayout = !bundle || !!bundle.metadata.page;
-  const [bundleFiles, setBundleFiles] = useState(record.bundle?.files ?? {});
-  const [document, setDocument] = useState(record.document);
-  const [scenarios, setScenarios] = useState(
-    (record.scenarios ?? []).join("\n"),
-  );
-  const [contentGuide, setContentGuide] = useState(record.contentGuide ?? []);
-  const [related, setRelated] = useState(record.related ?? []);
-  const [examples, setExamples] = useState(record.examples ?? []);
-  const [parts, setParts] = useState<TemplatePart[]>(record.composition ?? []);
-  const [origin, setOrigin] = useState<PackageRevisionRef | undefined>(
-    record.integrity ? revision("template", record, projectId) : undefined,
-  );
-  const [rawTemplate, setRawTemplate] = useState("");
-  const [recoveryFiles, setRecoveryFiles] = useState<
-    Record<string, string | null>
-  >({});
-  const form = {
-    name,
-    description,
-    version,
-    document,
-    scenarios,
-    contentGuide,
-    related,
-    examples,
-    parts,
-    origin,
-    rawTemplate,
-    bundleFiles,
-    recoveryFiles,
-  };
-  const localDraft = useCatalogDraft({
-    kind: "template",
-    enabled: !systemTemplate,
-    projectId,
-    resourceId: record.id || "new-template",
-    title: name,
-    content: form,
-    onRestore: (value) => {
-      setName(value.name);
-      setDescription(value.description);
-      setVersion(value.version);
-      setDocument(value.document);
-      setScenarios(value.scenarios);
-      setContentGuide(value.contentGuide);
-      setRelated(value.related);
-      setExamples(value.examples);
-      setParts(value.parts);
-      setOrigin(value.origin);
-      setBundleFiles(value.bundleFiles ?? record.bundle?.files ?? {});
-      setRawTemplate(value.rawTemplate ?? "");
-      setRecoveryFiles(value.recoveryFiles ?? {});
-      setTab("edit");
-    },
-  });
-  const [selectedPart, setSelectedPart] = useState("");
-  const [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  const [templateExample, setTemplateExample] = useState(0);
-  const [editingPart, setEditingPart] = useState(0);
-  const [editorControls, setEditorControls] = useState<EditorControls | null>(
-    null,
-  );
-  const localParts = parts
-    .map((part, index) => ({ part, index }))
-    .filter((item) => item.part.type === "content");
-  const activePartIndex =
-    parts[editingPart]?.type === "content"
-      ? editingPart
-      : (localParts[0]?.index ?? -1);
-  const activePart = activePartIndex >= 0 ? parts[activePartIndex] : null;
-  const layoutContent =
-    activePart?.type === "content"
-      ? ["doc", "surface"].includes(activePart.content.type ?? "")
-        ? activePart.content
-        : { type: "doc", content: [activePart.content] }
-      : document.content;
-  const editorKey = parts.length ? String(activePartIndex) : "document";
-  if (!layoutEditors.current.has(editorKey))
-    layoutEditors.current.set(editorKey, {});
-  const run = (operation: () => Promise<unknown>) => {
-    setBusy(true);
-    setError("");
-    void operation()
-      .catch((reason) => setError(errorMessage(reason)))
-      .finally(() => setBusy(false));
-  };
-  const changeComposition = (next: React.SetStateAction<TemplatePart[]>) => {
-    layoutEditors.current.clear();
-    setParts(next);
-  };
-  const candidates = templates.filter(
-    (item) => item.id !== record.id || item.integrity !== record.integrity,
-  );
-  const keyOf = (item: TemplateMetadata) =>
-    `${item.scope}:${item.id}:${item.version}:${item.integrity}`;
-  async function save() {
-    if (!projectId)
-      throw new Error("先选择一个项目，定制版本会保存在该项目中。");
-    const retained = await localDraft.persist(true);
-    await desktop.invoke("templates:save", {
-      ...(rawTemplate ? JSON.parse(rawTemplate) : {}),
-      projectId,
-      id: record.id || undefined,
-      version,
-      name,
-      description,
-      scenarios: lines(scenarios),
-      related,
-      examples,
-      ...(bundle
-        ? {
-            bundle: editedTemplateBundle(record, {
-              name,
-              version,
-              description,
-              scenarios: lines(scenarios),
-              document,
-              files: bundleFiles,
-            }),
-          }
-        : {
-            document: { ...document, title: document.title || name },
-            contentGuide,
-            composition: parts.length ? parts : undefined,
-          }),
-      parents: origin ? [origin] : undefined,
-    });
-    await localDraft.complete(retained, form);
-    await onSaved();
-  }
   return (
     <Dialog
-      title={record.id ? record.name : "新建模板"}
-      onClose={() => void localDraft.close(onClose)}
+      title={record.name}
+      onClose={onClose}
       wide
       className="catalog-template-dialog"
       titleAccessory={
@@ -547,98 +107,52 @@ export function TemplateDialog({
         <CatalogTabs
           label="模板详情菜单"
           panelId={panelId}
-          active={tab === "composition" ? "edit" : tab}
+          active={tab}
           onChange={setTab}
           tabs={[
             { id: "about", label: "预览" },
-            ...(bundle ? [{ id: "guides" as const, label: "阶段指南" }] : []),
-            ...(hasLayout && !systemTemplate
-              ? [{ id: "layout" as const, label: "布局" }]
+            ...(record.contentGuide?.length || record.examples?.length
+              ? [{ id: "usage" as const, label: "使用说明" }]
               : []),
-            ...(!systemTemplate
-              ? [{ id: "edit" as const, label: "定制" }]
-              : []),
-          ]}
-        />
-      }
-      headerActions={
-        <CatalogActions
-          items={[
-            ...(!bundle
-              ? [
-                  {
-                    label: "组合模板",
-                    icon: <Layers size={16} />,
-                    onSelect: () => setTab("composition"),
-                  },
-                ]
-              : []),
-            ...(record.integrity && !systemTemplate
-              ? [
-                  {
-                    label: "发布",
-                    icon: <Upload size={16} />,
-                    onSelect: () =>
-                      run(async () => {
-                        await localDraft.persist();
-                        onPublish(sourceRevision!);
-                      }),
-                  },
-                ]
-              : []),
-            ...(record.scope === "project" && record.integrity
-              ? [
-                  {
-                    label: "注册到全局",
-                    icon: <Globe2 size={16} />,
-                    onSelect: () =>
-                      run(async () => {
-                        await localDraft.persist();
-                        await desktop.invoke("catalog:promote", {
-                          ref: sourceRevision!,
-                          projectId: sourceRevision?.projectId ?? projectId,
-                        });
-                        await onSaved();
-                      }),
-                  },
-                ]
+            ...(record.bundle
+              ? [{ id: "guides" as const, label: "阶段指南" }]
               : []),
           ]}
         />
       }
     >
       <div
-        className="studio-template-edit catalog-detail"
+        className="catalog-detail catalog-template-detail"
         role="tabpanel"
         id={panelId}
-        aria-label={tab}
+        aria-label={
+          { about: "预览", guides: "阶段指南", usage: "使用说明" }[tab]
+        }
       >
-        <CatalogDraftRecovery draft={localDraft} />
-        {rawTemplate && (
-          <details className="catalog-recovery-source" open>
-            <summary>外部模板文件（可修复未完成的 JSON）</summary>
-            <textarea
-              aria-label="恢复的模板 JSON"
-              className="studio-code-editor"
-              value={rawTemplate}
-              onChange={(event) => setRawTemplate(event.target.value)}
-              spellCheck={false}
-            />
-          </details>
-        )}
-        {!!Object.keys(recoveryFiles).length && (
-          <details>
-            <summary>保留的外部文件</summary>
-            {Object.entries(recoveryFiles).map(([name, bytes]) => (
-              <p key={name}>
-                {name} · {bytes === null ? "外部删除" : "原始字节已保留"}
-              </p>
-            ))}
-          </details>
-        )}
-
         {tab === "guides" && record.bundle && (
-          <TemplateWorkflowView bundle={record.bundle} files={bundleFiles} />
+          <TemplateWorkflowView bundle={record.bundle} />
+        )}
+        {tab === "usage" && (
+          <article className="catalog-reading-main">
+            <p>{record.description}</p>
+            {record.contentGuide.map((section, index) => (
+              <section key={index}>
+                <h3>{section.title}</h3>
+                <ul>
+                  {section.instructions.map((text, i) => (
+                    <li key={i}>{text}</li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+            {record.examples.map((example, index) => (
+              <section key={index}>
+                <h3>{example.name}</h3>
+                <p>{example.request}</p>
+                <RelatedList items={example.steps} />
+              </section>
+            ))}
+          </article>
         )}
         {tab === "about" && (
           <div className="catalog-preview-workspace">
@@ -652,24 +166,7 @@ export function TemplateDialog({
                 <CatalogPreview
                   label="模板预览画面"
                   width={960}
-                  resetKey={`${record.integrity}:${templateExample}`}
-                  accessory={
-                    !!record.examples?.length && (
-                      <select
-                        aria-label="模板示例"
-                        value={templateExample}
-                        onChange={(event) =>
-                          setTemplateExample(Number(event.target.value))
-                        }
-                      >
-                        {record.examples.map((example, index) => (
-                          <option key={index} value={index}>
-                            {example.name}
-                          </option>
-                        ))}
-                      </select>
-                    )
-                  }
+                  resetKey={record.integrity}
                 >
                   <CustomComponentsProvider components={components}>
                     <SurfaceReader
@@ -700,511 +197,6 @@ export function TemplateDialog({
             </aside>
           </div>
         )}
-        {tab === "layout" && (
-          <div className="catalog-layout-workspace">
-            <section className="catalog-layout-editor">
-              {!!parts.length && !!localParts.length && (
-                <label className="studio-example-picker">
-                  内容部分
-                  <select
-                    aria-label="要编辑的内容部分"
-                    value={activePartIndex}
-                    onChange={(event) =>
-                      setEditingPart(Number(event.target.value))
-                    }
-                  >
-                    {localParts.map(({ index }) => (
-                      <option key={index} value={index}>
-                        第 {index + 1} 部分
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              {(!parts.length || activePartIndex >= 0) && (
-                <div className="studio-template-document">
-                  <CustomComponentsProvider components={components}>
-                    <TemplateContent
-                      key={parts.length ? activePartIndex : "document"}
-                      onControlsChange={setEditorControls}
-                      retainedState={layoutEditors.current.get(editorKey)}
-                      inspectorHost={inspectorHost}
-                      content={layoutContent}
-                      document={
-                        parts.length
-                          ? contentPartDocument(
-                              document,
-                              activePart,
-                              layoutContent,
-                            )
-                          : document
-                      }
-                      onDocumentChange={(next) => {
-                        if (parts.length && activePartIndex >= 0)
-                          setParts((current) =>
-                            current.map((part, index) =>
-                              index === activePartIndex
-                                ? {
-                                    type: "content",
-                                    content: next.content,
-                                    layout: next.layout,
-                                    ...(next.views
-                                      ? { views: next.views }
-                                      : {}),
-                                    ...(next.surfaceViews
-                                      ? { surfaceViews: next.surfaceViews }
-                                      : {}),
-                                  }
-                                : part,
-                            ),
-                          );
-                        else setDocument(next);
-                      }}
-                      onChange={(content) => {
-                        if (parts.length && activePartIndex >= 0)
-                          setParts((current) =>
-                            current.map((part, index) =>
-                              index === activePartIndex
-                                ? { type: "content", content }
-                                : part,
-                            ),
-                          );
-                        else
-                          setDocument((current) => ({ ...current, content }));
-                      }}
-                      minimal
-                      readOnly={!projectId}
-                    />
-                  </CustomComponentsProvider>
-                </div>
-              )}
-              {!!record.composition?.length && record.previewDocument && (
-                <details className="catalog-example">
-                  <summary>查看组合后的完整布局</summary>
-                  <CustomComponentsProvider components={components}>
-                    <TemplateContent
-                      content={record.previewDocument.content}
-                      document={record.previewDocument}
-                      onChange={() => {}}
-                      readOnly
-                      minimal
-                    />
-                  </CustomComponentsProvider>
-                </details>
-              )}
-            </section>
-            <aside className="catalog-info-panel catalog-layout-settings">
-              <div className="catalog-inspector-host" ref={setInspectorHost} />
-              <h3>当前容器</h3>
-              <p>{editorControls?.name ?? document.title}</p>
-              <label>
-                页面宽度
-                {editorControls && (
-                  <PageWidthSwitch
-                    value={editorControls.pageWidthMode}
-                    onChange={editorControls.setPageWidthMode}
-                  />
-                )}
-              </label>
-              <div className="catalog-editor-actions">
-                <EditorHistoryButtons controls={editorControls} />
-                {editorControls && (
-                  <EditorContainerMenu controls={editorControls} />
-                )}
-              </div>
-              <SaveProjectPicker
-                projects={projects}
-                projectId={projectId}
-                onChange={onProjectChange}
-              />
-              <button
-                className="studio-button primary catalog-save"
-                disabled={!projectId || busy || !name.trim()}
-                onClick={() => run(save)}
-              >
-                保存
-              </button>
-            </aside>
-          </div>
-        )}
-        {tab === "edit" && (
-          <div className="catalog-custom-workspace">
-            <section className="catalog-custom-editor">
-              {" "}
-              {!bundle && (
-                <section>
-                  <h3>内容处理方式</h3>
-                  {contentGuide.map((section, index) => (
-                    <div className="catalog-guide-editor" key={index}>
-                      <div className="catalog-related-fields">
-                        <input
-                          aria-label={`处理环节 ${index + 1}`}
-                          placeholder="环节名称"
-                          value={section.title}
-                          onChange={(event) =>
-                            setContentGuide((current) =>
-                              current.map((item, i) =>
-                                i === index
-                                  ? { ...item, title: event.target.value }
-                                  : item,
-                              ),
-                            )
-                          }
-                        />
-                        <button
-                          className="studio-icon"
-                          aria-label={`移除处理环节 ${index + 1}`}
-                          onClick={() =>
-                            setContentGuide((current) =>
-                              current.filter((_, i) => i !== index),
-                            )
-                          }
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                      <textarea
-                        aria-label={`处理要求 ${index + 1}`}
-                        placeholder="每行一项内容整理与呈现要求"
-                        value={section.instructions.join("\n")}
-                        onChange={(event) =>
-                          setContentGuide((current) =>
-                            current.map((item, i) =>
-                              i === index
-                                ? {
-                                    ...item,
-                                    instructions:
-                                      event.target.value.split("\n"),
-                                  }
-                                : item,
-                            ),
-                          )
-                        }
-                      />
-                    </div>
-                  ))}
-                  <button
-                    className="studio-text-button"
-                    onClick={() =>
-                      setContentGuide((current) => [
-                        ...current,
-                        { title: "", instructions: [] },
-                      ])
-                    }
-                  >
-                    <Plus size={14} />
-                    添加处理环节
-                  </button>
-                </section>
-              )}
-              {record.bundle && (
-                <TemplateWorkflowView
-                  bundle={record.bundle}
-                  files={bundleFiles}
-                  onChange={(path, text) =>
-                    setBundleFiles((current) => ({ ...current, [path]: text }))
-                  }
-                />
-              )}
-            </section>
-            <aside className="catalog-info-panel catalog-edit-form">
-              <h3>模板设置</h3>{" "}
-              <div className="studio-form-row">
-                <label>
-                  名称
-                  <input
-                    aria-label="模板名称"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                  />
-                </label>
-                <label>
-                  新版本
-                  <input
-                    aria-label="模板新版本"
-                    value={version}
-                    onChange={(event) => setVersion(event.target.value)}
-                  />
-                </label>
-              </div>
-              <label>
-                简述
-                <input
-                  aria-label="模板简述"
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                />
-              </label>
-              <SaveProjectPicker
-                projects={projects}
-                projectId={projectId}
-                onChange={onProjectChange}
-              />
-              <details>
-                <summary>适用场景</summary>{" "}
-                <label>
-                  使用场景（每行一项）
-                  <textarea
-                    aria-label="模板使用场景"
-                    value={scenarios}
-                    onChange={(event) => setScenarios(event.target.value)}
-                  />
-                </label>
-              </details>{" "}
-              <details>
-                <summary>关联内容</summary>
-                <RelatedEditor
-                  label="关联"
-                  items={related}
-                  onChange={setRelated}
-                />
-              </details>
-              <details>
-                <summary>示例</summary>
-                {examples.map((example, index) => (
-                  <details className="catalog-example" key={index}>
-                    <summary>{example.name || "新示例"}</summary>
-                    <label>
-                      名称
-                      <input
-                        aria-label={`模板示例 ${index + 1} 名称`}
-                        value={example.name}
-                        onChange={(event) =>
-                          setExamples((current) =>
-                            current.map((item, i) =>
-                              i === index
-                                ? { ...item, name: event.target.value }
-                                : item,
-                            ),
-                          )
-                        }
-                      />
-                    </label>
-                    <label>
-                      需求
-                      <textarea
-                        aria-label={`模板示例 ${index + 1} 需求`}
-                        value={example.request}
-                        onChange={(event) =>
-                          setExamples((current) =>
-                            current.map((item, i) =>
-                              i === index
-                                ? { ...item, request: event.target.value }
-                                : item,
-                            ),
-                          )
-                        }
-                      />
-                    </label>
-                    <RelatedEditor
-                      label="步骤"
-                      items={example.steps}
-                      onChange={(steps) =>
-                        setExamples((current) =>
-                          current.map((item, i) =>
-                            i === index ? { ...item, steps } : item,
-                          ),
-                        )
-                      }
-                    />
-                    <button
-                      className="studio-text-button"
-                      onClick={() =>
-                        setExamples((current) =>
-                          current.filter((_, i) => i !== index),
-                        )
-                      }
-                    >
-                      移除此示例
-                    </button>
-                  </details>
-                ))}
-                <button
-                  className="studio-text-button"
-                  onClick={() =>
-                    setExamples((current) => [
-                      ...current,
-                      { name: "", request: "", steps: [] },
-                    ])
-                  }
-                >
-                  <Plus size={14} />
-                  添加示例
-                </button>
-              </details>
-              <details>
-                <summary>版本信息</summary>
-                <Lineage item={record} />
-              </details>
-              <button
-                className="studio-button primary catalog-save"
-                disabled={!projectId || busy || !name.trim()}
-                onClick={() => run(save)}
-              >
-                保存
-              </button>
-            </aside>
-          </div>
-        )}
-        {tab === "composition" && (
-          <div className="catalog-composition">
-            {parts.map((part, index) => (
-              <div className="catalog-part" key={index}>
-                <div>
-                  <strong>
-                    {part.type === "content"
-                      ? "本模板内容"
-                      : `${templates.find((item) => item.id === part.ref.id && item.version === part.ref.version && item.integrity === part.ref.integrity)?.name ?? part.ref.id} · ${part.ref.version}`}
-                  </strong>
-                  {part.type === "template" && (
-                    <input
-                      aria-label={`组合部分 ${index + 1} 标题`}
-                      placeholder="小节标题（可选）"
-                      value={part.title ?? ""}
-                      onChange={(event) =>
-                        changeComposition((current) =>
-                          current.map((item, i) =>
-                            i === index
-                              ? {
-                                  ...part,
-                                  title: event.target.value || undefined,
-                                }
-                              : item,
-                          ),
-                        )
-                      }
-                    />
-                  )}
-                </div>
-                <button
-                  className="studio-icon"
-                  disabled={index === 0}
-                  aria-label={`上移组合部分 ${index + 1}`}
-                  onClick={() =>
-                    changeComposition((current) => {
-                      const copy = [...current];
-                      [copy[index - 1], copy[index]] = [
-                        copy[index],
-                        copy[index - 1],
-                      ];
-                      return copy;
-                    })
-                  }
-                >
-                  <ArrowUp size={14} />
-                </button>
-                <button
-                  className="studio-icon"
-                  disabled={index === parts.length - 1}
-                  aria-label={`下移组合部分 ${index + 1}`}
-                  onClick={() =>
-                    changeComposition((current) => {
-                      const copy = [...current];
-                      [copy[index], copy[index + 1]] = [
-                        copy[index + 1],
-                        copy[index],
-                      ];
-                      return copy;
-                    })
-                  }
-                >
-                  <ArrowDown size={14} />
-                </button>
-                <button
-                  className="studio-icon"
-                  aria-label={`移除组合部分 ${index + 1}`}
-                  onClick={() =>
-                    changeComposition((current) =>
-                      current.filter((_, i) => i !== index),
-                    )
-                  }
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
-            <div className="catalog-compose-add">
-              <select
-                aria-label="选择子模板"
-                value={selectedPart}
-                onChange={(event) => setSelectedPart(event.target.value)}
-              >
-                <option value="">选择子模板</option>
-                {candidates.map((item) => (
-                  <option key={keyOf(item)} value={keyOf(item)}>
-                    {item.name} · {scopeNames[item.scope]} · {item.version}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="studio-button"
-                disabled={!selectedPart}
-                onClick={() => {
-                  const target = candidates.find(
-                    (item) => keyOf(item) === selectedPart,
-                  );
-                  if (target)
-                    changeComposition((current) => [
-                      ...(current.length
-                        ? current
-                        : [
-                            {
-                              type: "content" as const,
-                              content: document.content,
-                              ...(document.layout
-                                ? { layout: document.layout }
-                                : {}),
-                              ...(document.views
-                                ? { views: document.views }
-                                : {}),
-                              ...(document.surfaceViews
-                                ? { surfaceViews: document.surfaceViews }
-                                : {}),
-                            },
-                          ]),
-                      {
-                        type: "template",
-                        ref: revision("template", target, projectId),
-                      },
-                    ]);
-                  setSelectedPart("");
-                }}
-              >
-                添加部分
-              </button>
-            </div>
-            <button
-              className="studio-text-button"
-              onClick={() => {
-                setEditingPart(parts.length);
-                changeComposition((current) => [
-                  ...current,
-                  {
-                    type: "content",
-                    content: { type: "doc", content: [{ type: "paragraph" }] },
-                  },
-                ]);
-                setTab("layout");
-              }}
-            >
-              <Plus size={14} />
-              添加本地内容部分
-            </button>
-            {!!parts.length && (
-              <button
-                className="studio-text-button"
-                onClick={() => changeComposition([])}
-              >
-                移除所有组合部分
-              </button>
-            )}
-          </div>
-        )}
-        {error && (
-          <p className="studio-form-error" role="alert">
-            {error}
-          </p>
-        )}
       </div>
     </Dialog>
   );
@@ -1213,298 +205,87 @@ export function TemplateDialog({
 export function ComponentDialog({
   builtin,
   custom,
-  source,
   canInsert,
-  projectId,
-  projects = [],
-  onProjectChange,
   onInsert,
   onClose,
-  onSaved,
-  onPublish,
 }: {
   builtin?: BuiltinComponentMetadata;
   custom?: CompiledComponent;
-  source?: ComponentSource;
   canInsert: boolean;
-  projectId?: string;
-  projects?: ProjectSummary[];
-  onProjectChange?: (id: string) => void;
   onInsert: (kind: string, data: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
-  onSaved: (component: CompiledComponent) => Promise<void>;
-  onPublish: (ref: PackageRevisionRef) => void;
 }) {
   const panelId = useId();
-  const sourceRevision = useRef(
-    custom ? revision("component", custom, projectId) : undefined,
-  ).current;
   const item = builtin ?? custom!;
-  const [category, setCategory] = useState<ComponentCategory>(() =>
-    componentCategory(item),
+  const schema = builtin?.propsSchema ?? custom?.schema ?? {};
+  const [tab, setTab] = useState<"about" | "guide" | "schema">("about");
+  const [example, setExample] = useState(
+    builtin?.kind === "text" && item.examples.length > 1 ? 1 : 0,
   );
-  const [tab, setTab] = useState<
-    "about" | "guide" | "development" | "code" | "schema"
-  >("about");
-  const [documentationJson, setDocumentationJson] = useState(
-    item.documentation ? JSON.stringify(item.documentation, null, 2) : "",
-  );
-  const [code, setCode] = useState(source?.source ?? ""),
-    [schema, setSchema] = useState(
-      JSON.stringify(
-        source?.schema ?? builtin?.propsSchema ?? custom?.schema ?? {},
-        null,
-        2,
-      ),
-    ),
-    [defaults, setDefaults] = useState(
-      JSON.stringify(item.defaultData, null, 2),
-    );
-  const [examplesJson, setExamplesJson] = useState(
-    JSON.stringify(item.examples, null, 2),
-  );
-  const [name, setName] = useState(item.name),
-    [description, setDescription] = useState(item.description),
-    [scenarios, setScenarios] = useState(item.scenarios.join("\n")),
-    [effects, setEffects] = useState((item.effects ?? []).join("\n"));
-  const [version, setVersion] = useState(
-    custom ? nextVersion(custom.version) : "1.0.0",
-  );
-  const [componentId, setComponentId] = useState(
-    custom?.id ?? `my-${builtin?.kind}`,
-  );
-  const [workingSource, setWorkingSource] = useState(source);
-  const [manifestJson, setManifestJson] = useState("");
-  const [recoveryFiles, setRecoveryFiles] = useState<
-    Record<string, string | null>
-  >({});
-  const [origin, setOrigin] = useState<PackageRevisionRef | undefined>(
-    custom ? revision("component", custom, projectId) : undefined,
-  );
-  const form = {
-    code,
-    documentationJson,
-    schema,
-    defaults,
-    examplesJson,
-    name,
-    description,
-    scenarios,
-    effects,
-    version,
-    componentId,
-    category,
-    source: workingSource,
-    origin,
-    manifestJson,
-    recoveryFiles,
-  };
-  const localDraft = useCatalogDraft({
-    kind: "component",
-    projectId,
-    resourceId: custom?.id ?? `builtin:${builtin?.kind}`,
-    title: name,
-    content: form,
-    enabled: !!source,
-    onRestore: (value) => {
-      setCode(value.code);
-      setDocumentationJson(
-        value.documentationJson ??
-          (value.source?.manifest.documentation
-            ? JSON.stringify(value.source.manifest.documentation, null, 2)
-            : ""),
-      );
-      setSchema(value.schema);
-      setDefaults(value.defaults);
-      setExamplesJson(value.examplesJson);
-      setName(value.name);
-      setDescription(value.description);
-      setScenarios(value.scenarios);
-      setEffects(value.effects);
-      setVersion(value.version);
-      setComponentId(value.componentId);
-      setCategory(value.category);
-      setWorkingSource(value.source);
-      setOrigin(value.origin);
-      setManifestJson(value.manifestJson ?? "");
-      setRecoveryFiles(value.recoveryFiles ?? {});
-      setTab("code");
-    },
-  });
-  const [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [example, setExample] = useState(
-      builtin?.kind === "text" && item.examples.length > 1 ? 1 : 0,
-    );
-  const examples = item.examples ?? [],
-    data = examples[example]?.data ?? item.defaultData;
-  const run = (operation: () => Promise<unknown>) => {
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const examples = item.examples ?? [];
+  const data = examples[example]?.data ?? item.defaultData;
+  const insert = async () => {
     setBusy(true);
     setError("");
-    void operation()
-      .catch((reason) => setError(errorMessage(reason)))
-      .finally(() => setBusy(false));
-  };
-  async function save() {
-    if (!projectId || !workingSource)
-      throw new Error("选择项目并提供组件源码后才能保存定制版本。");
-    if (!documentationJson.trim())
-      throw new Error(
-        "请补充组件说明契约，再保存新的定制版本。旧版本仍可继续阅读。",
+    try {
+      await onInsert(
+        builtin?.kind ?? "custom",
+        builtin ? structuredClone(data) : componentWidgetData(custom!, data),
       );
-    const retained = await localDraft.persist(true);
-    const { mergeBase: _previousMerge, ...baseManifest } =
-      workingSource.manifest;
-    const saved = await desktop.invoke<CompiledComponent>("components:save", {
-      projectId,
-      manifest: {
-        ...baseManifest,
-        ...(manifestJson ? JSON.parse(manifestJson) : {}),
-        id: componentId,
-        category,
-        name,
-        description,
-        version,
-        scenarios: lines(scenarios),
-        effects: lines(effects),
-        ...(documentationJson.trim()
-          ? {
-              documentation: validateComponentDocumentation(
-                JSON.parse(documentationJson),
-                JSON.parse(examplesJson).length,
-              ),
-            }
-          : {}),
-        defaultData: JSON.parse(defaults),
-        examples: JSON.parse(examplesJson),
-        ...(origin ? { parents: [origin] } : {}),
-      },
-      schema: JSON.parse(schema),
-      source: code,
-      files: workingSource.files,
-      assets: workingSource.assets,
-    });
-    await localDraft.complete(retained, form);
-    await onSaved(saved);
-  }
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <Dialog
       title={item.name}
-      onClose={() => void localDraft.close(onClose)}
+      onClose={onClose}
       wide
       className="catalog-component-dialog"
       titleAccessory={
         <span className="catalog-component-version">
-          {item.version ?? "1.0.0"}
+          v{item.version ?? "1.0.0"}
         </span>
       }
       headerContent={
         <CatalogTabs
           label="组件详情菜单"
           panelId={panelId}
-          active={tab === "development" ? "code" : tab}
+          active={tab}
           onChange={setTab}
           tabs={[
             { id: "about", label: "预览" },
             { id: "guide", label: "使用说明" },
             { id: "schema", label: "参数" },
-            ...(source ? [{ id: "code" as const, label: "定制" }] : []),
           ]}
         />
       }
       headerActions={
-        <CatalogActions
-          items={[
-            ...(canInsert
-              ? [
-                  {
-                    label: "插入页面",
-                    icon: <Plus size={16} />,
-                    onSelect: () =>
-                      run(async () => {
-                        await localDraft.persist();
-                        await onInsert(
-                          builtin?.kind ?? "custom",
-                          builtin
-                            ? structuredClone(data)
-                            : componentWidgetData(custom!, data),
-                        );
-                      }),
-                  },
-                ]
-              : []),
-            ...(custom
-              ? [
-                  {
-                    label: "发布",
-                    icon: <Upload size={16} />,
-                    onSelect: () =>
-                      run(async () => {
-                        await localDraft.persist();
-                        onPublish(sourceRevision!);
-                      }),
-                  },
-                ]
-              : []),
-            ...(custom?.scope === "project"
-              ? [
-                  {
-                    label: "注册到全局",
-                    icon: <Globe2 size={16} />,
-                    onSelect: () =>
-                      run(async () => {
-                        await localDraft.persist();
-                        const result = await desktop.invoke<CompiledComponent>(
-                          "catalog:promote",
-                          {
-                            ref: sourceRevision!,
-                            projectId: sourceRevision?.projectId ?? projectId,
-                          },
-                        );
-                        await onSaved(result);
-                      }),
-                  },
-                ]
-              : []),
-          ]}
-        />
+        canInsert && (
+          <button
+            type="button"
+            className="studio-text-button"
+            disabled={busy}
+            onClick={() => void insert()}
+          >
+            <Plus size={16} />
+            插入页面
+          </button>
+        )
       }
     >
       <div
         className="studio-component-detail catalog-detail"
         role="tabpanel"
         id={panelId}
-        aria-label={tab}
+        aria-label={{ about: "预览", guide: "使用说明", schema: "参数" }[tab]}
       >
-        <CatalogDraftRecovery draft={localDraft} />
-        {manifestJson && (
-          <details className="catalog-recovery-source">
-            <summary>外部组件定义（可修复未完成的 JSON）</summary>
-            <textarea
-              aria-label="恢复的组件定义 JSON"
-              className="studio-code-editor"
-              value={manifestJson}
-              onChange={(event) => setManifestJson(event.target.value)}
-              spellCheck={false}
-            />
-          </details>
-        )}
-        {!!Object.keys(recoveryFiles).length && (
-          <details>
-            <summary>保留的外部文件</summary>
-            {Object.entries(recoveryFiles).map(([name, bytes]) => (
-              <p key={name}>
-                {name} · {bytes === null ? "外部删除" : "原始字节已保留"}
-              </p>
-            ))}
-          </details>
-        )}
-
-        {(tab === "guide" || tab === "development") && (
-          <ComponentDocumentationView
-            documentation={item.documentation}
-            development={tab === "development"}
-          />
+        {tab === "guide" && (
+          <ComponentDocumentationView documentation={item.documentation} />
         )}
         {tab === "about" && (
           <div className="catalog-preview-workspace">
@@ -1550,14 +331,7 @@ export function ComponentDialog({
                 <CompactScenarios items={item.scenarios} />
               </ReferenceSection>
               <ReferenceSection title="可调整" icon="effect">
-                <ComponentAdjustmentSummary
-                  schema={
-                    source?.schema ??
-                    builtin?.propsSchema ??
-                    custom?.schema ??
-                    {}
-                  }
-                />
+                <ComponentAdjustmentSummary schema={schema} />
               </ReferenceSection>
               <details className="catalog-example-data">
                 <summary>示例数据</summary>
@@ -1566,217 +340,24 @@ export function ComponentDialog({
             </aside>
           </div>
         )}
-        {tab === "code" && source && (
-          <div className="catalog-custom-workspace">
-            <section className="catalog-custom-editor">
-              <div className="catalog-file-heading">
-                {source.manifest.entry}
-              </div>{" "}
-              <label>
-                React / TSX
-                <textarea
-                  className="studio-code-editor"
-                  aria-label="组件源码"
-                  spellCheck={false}
-                  value={code}
-                  onChange={(event) => setCode(event.target.value)}
-                />
-              </label>
-            </section>
-            <aside className="catalog-info-panel catalog-edit-form">
-              <h3>组件设置</h3>{" "}
-              <label>
-                类型
-                <select
-                  aria-label="组件类型"
-                  value={category}
-                  onChange={(event) =>
-                    setCategory(event.target.value as ComponentCategory)
-                  }
-                >
-                  {componentCategories.map(({ id, label }) => (
-                    <option key={id} value={id}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {builtin && (
-                <label>
-                  组件 ID
-                  <input
-                    aria-label="组件 ID"
-                    value={componentId}
-                    onChange={(event) => setComponentId(event.target.value)}
-                  />
-                </label>
-              )}
-              <div className="studio-form-row">
-                <label>
-                  名称
-                  <input
-                    aria-label="组件名称"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                  />
-                </label>
-                <label>
-                  新版本
-                  <input
-                    aria-label="组件新版本"
-                    value={version}
-                    onChange={(event) => setVersion(event.target.value)}
-                  />
-                </label>
-              </div>
-              <label>
-                简述
-                <input
-                  aria-label="组件说明"
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                />
-              </label>
-              <SaveProjectPicker
-                projects={projects}
-                projectId={projectId}
-                onChange={onProjectChange}
-              />
-              <details>
-                <summary>场景与效果</summary>{" "}
-                <label>
-                  使用场景（每行一项）
-                  <textarea
-                    aria-label="组件使用场景"
-                    value={scenarios}
-                    onChange={(event) => setScenarios(event.target.value)}
-                  />
-                </label>
-                <label>
-                  可视化效果（每行一项）
-                  <textarea
-                    aria-label="组件效果"
-                    value={effects}
-                    onChange={(event) => setEffects(event.target.value)}
-                  />
-                </label>
-              </details>
-              <details>
-                <summary>说明与示例</summary>{" "}
-                <label>
-                  使用与开发说明（随新版本保存）
-                  <textarea
-                    className="studio-code-editor"
-                    aria-label="组件说明契约"
-                    spellCheck={false}
-                    value={documentationJson}
-                    onChange={(event) =>
-                      setDocumentationJson(event.target.value)
-                    }
-                  />
-                  <small>
-                    包含复用范围、使用说明与开发说明；旧版本缺少说明时显示“待评估”。
-                  </small>
-                </label>
-              </details>
-              <details>
-                <summary>开发说明</summary>
-                <ComponentDocumentationView
-                  documentation={item.documentation}
-                  development
-                />
-              </details>
-              {custom && (
-                <details>
-                  <summary>版本信息</summary>
-                  <Lineage item={custom} />
-                </details>
-              )}
-              <button
-                className="studio-button primary catalog-save"
-                disabled={!projectId || busy}
-                onClick={() => run(save)}
-              >
-                保存
-              </button>
-            </aside>
-          </div>
-        )}
         {tab === "schema" && (
           <div className="catalog-parameters-workspace">
-            <section className="catalog-parameters-main catalog-edit-form">
+            <section className="catalog-parameters-main">
               <ComponentParameterSummary
-                schema={
-                  source?.schema ?? builtin?.propsSchema ?? custom?.schema ?? {}
-                }
+                schema={schema}
                 defaults={item.defaultData}
                 documentation={item.documentation}
               />
               <details className="catalog-advanced-data">
-                <summary>
-                  {source
-                    ? "高级：编辑参数规则与默认数据"
-                    : "查看原始参数规则与默认数据"}
-                </summary>
-                <div className="catalog-edit-form">
-                  <label>
-                    参数规则
-                    <textarea
-                      className="studio-code-editor"
-                      aria-label="组件参数规则"
-                      spellCheck={false}
-                      readOnly={!source}
-                      value={schema}
-                      onChange={(event) => setSchema(event.target.value)}
-                    />
-                  </label>
-                  <label>
-                    默认数据
-                    <textarea
-                      className="studio-code-editor short"
-                      aria-label="组件默认数据"
-                      spellCheck={false}
-                      readOnly={!source}
-                      value={defaults}
-                      onChange={(event) => setDefaults(event.target.value)}
-                    />
-                  </label>
-                  {source && (
-                    <label>
-                      示例（名称、需求、数据）
-                      <textarea
-                        className="studio-code-editor short"
-                        aria-label="组件示例数据"
-                        value={examplesJson}
-                        onChange={(event) =>
-                          setExamplesJson(event.target.value)
-                        }
-                      />
-                    </label>
-                  )}
-                </div>
+                <summary>查看原始参数规则与默认数据</summary>
+                <h3>参数规则</h3>
+                <pre>{JSON.stringify(schema, null, 2)}</pre>
+                <h3>默认数据</h3>
+                <pre>{JSON.stringify(item.defaultData, null, 2)}</pre>
               </details>
             </section>
             <aside className="catalog-info-panel">
-              <ComponentParameterFacts
-                schema={
-                  source?.schema ?? builtin?.propsSchema ?? custom?.schema ?? {}
-                }
-              />
-              <SaveProjectPicker
-                projects={projects}
-                projectId={projectId}
-                onChange={onProjectChange}
-              />
-              {source && (
-                <button
-                  className="studio-button primary catalog-save"
-                  disabled={!projectId || busy}
-                  onClick={() => run(save)}
-                >
-                  保存
-                </button>
-              )}
+              <ComponentParameterFacts schema={schema} />
             </aside>
           </div>
         )}
@@ -1785,92 +366,6 @@ export function ComponentDialog({
             {error}
           </p>
         )}
-      </div>
-    </Dialog>
-  );
-}
-
-export function PublishDialog({
-  refValue,
-  projectId,
-  onClose,
-  onPublished,
-}: {
-  refValue: PackageRevisionRef;
-  projectId?: string;
-  onClose: () => void;
-  onPublished: () => Promise<void>;
-}) {
-  const [path, setPath] = useState(""),
-    [url, setUrl] = useState(""),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  const run = (operation: () => Promise<unknown>) => {
-    setBusy(true);
-    setError("");
-    void operation()
-      .catch((reason) => setError(errorMessage(reason)))
-      .finally(() => setBusy(false));
-  };
-  return (
-    <Dialog title="发布固定版本" onClose={onClose}>
-      <div className="studio-form catalog-edit-form">
-        <p className="catalog-publish-intro">
-          <code>
-            {refValue.id}@{refValue.version}
-          </code>
-        </p>
-
-        <button
-          className="studio-button"
-          disabled={busy}
-          onClick={() =>
-            run(async () => {
-              const result = await desktop.invoke<{
-                manifestPath: string;
-              } | null>("catalog:preparePublish", { ref: refValue, projectId });
-              if (result) setPath(result.manifestPath);
-            })
-          }
-        >
-          生成发布包
-        </button>
-        {path && <p className="studio-path">{path}</p>}
-        <label>
-          已部署的清单地址
-          <input
-            aria-label="发布清单地址"
-            type="url"
-            placeholder="https://example.com/showai/manifest.json"
-            value={url}
-            onChange={(event) => setUrl(event.target.value)}
-          />
-        </label>
-        {error && (
-          <p className="studio-form-error" role="alert">
-            {error}
-          </p>
-        )}
-        <footer>
-          <button className="studio-button" onClick={onClose}>
-            关闭
-          </button>
-          <button
-            className="studio-button primary"
-            disabled={!url.trim() || busy}
-            onClick={() =>
-              run(async () => {
-                await desktop.invoke("catalog:verifyPublish", {
-                  projectId,
-                  manifestUrl: url,
-                });
-                await onPublished();
-              })
-            }
-          >
-            {busy && <Loader2 size={14} className="studio-spin" />}验证并登记
-          </button>
-        </footer>
       </div>
     </Dialog>
   );

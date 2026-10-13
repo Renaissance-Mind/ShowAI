@@ -69,7 +69,7 @@
   background: none;
 }
 .catalog-component-dialog .studio-component-detail,
-.catalog-template-dialog .studio-template-edit {
+.catalog-template-dialog .catalog-template-detail {
   flex: 1;
   min-height: 0;
   padding: 0;
@@ -78,9 +78,7 @@
   flex-direction: column;
 }
 .catalog-preview-workspace,
-.catalog-custom-workspace,
 .catalog-parameters-workspace,
-.catalog-layout-workspace,
 .catalog-reading-workspace,
 .template-workflow-view {
   display: grid;
@@ -344,64 +342,14 @@
 .studio-template-open:hover {
   background: var(--paper);
 }
-.catalog-custom-editor,
 .catalog-parameters-main,
 .catalog-reading-main,
-.template-guide-content,
-.catalog-layout-editor,
-.catalog-composition {
+.template-guide-content {
   min-width: 0;
   min-height: 0;
   overflow: auto;
   padding: 32px;
   background: var(--paper);
-}
-.catalog-custom-editor {
-  display: flex;
-  flex-direction: column;
-  padding: 24px;
-  background: var(--surface);
-}
-.catalog-custom-editor > label {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  flex-direction: column;
-  font-size: 0;
-}
-.catalog-custom-editor > label > textarea {
-  flex: 1;
-  min-height: 300px;
-  width: 100%;
-  font-size: 14px;
-  line-height: 1.8;
-  margin: 0;
-  border-radius: 0 0 6px 6px;
-  resize: none;
-}
-.catalog-file-heading {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 14px 20px;
-  min-height: 48px;
-  border: 1px solid var(--line);
-  border-bottom: 0;
-  background: var(--paper);
-  border-radius: 6px 6px 0 0;
-  font-size: 13px;
-  color: var(--muted);
-}
-.catalog-file-heading select {
-  border: 1px solid var(--line);
-  padding: 6px 10px;
-  color: var(--text);
-  background: var(--paper);
-  border-radius: 5px;
-}
-.catalog-info-panel.catalog-edit-form {
-  display: flex;
-  gap: 18px;
 }
 .catalog-info-panel label {
   display: flex;
@@ -440,12 +388,6 @@
 }
 .catalog-info-panel details label {
   margin-top: 12px;
-}
-.catalog-save {
-  align-self: flex-end;
-  margin-top: auto;
-  flex-shrink: 0;
-  min-width: 100px;
 }
 .catalog-parameters-main {
   background: var(--surface);
@@ -552,6 +494,9 @@
   font-size: 14px;
   line-height: 1.9;
 }
+.template-workflow-view .sb-rich-text > h1:first-child {
+  display: none;
+}
 .template-stage-nav {
   display: flex;
   flex-direction: column;
@@ -570,49 +515,6 @@
   border-left-color: var(--brand-accent);
   color: var(--brand-accent);
   background: var(--accent-soft);
-}
-.template-workflow-view.is-editing {
-  display: flex;
-  width: 100%;
-  flex: 1;
-  height: 100%;
-}
-.template-workflow-view.is-editing .template-guide-content {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  padding: 0;
-  overflow: hidden;
-}
-.template-workflow-view.is-editing textarea {
-  flex: 1;
-  min-height: 200px;
-  margin: 0;
-  resize: none;
-  border-radius: 0 0 6px 6px;
-  font-size: 14px;
-  line-height: 1.9;
-}
-.catalog-layout-editor {
-  padding: 24px;
-  background: var(--surface);
-  display: flex;
-  flex-direction: column;
-}
-.catalog-layout-editor .studio-template-document {
-  flex: 1;
-  min-height: 0;
-  padding: 0;
-  margin: 0;
-  overflow: hidden;
-  background: var(--paper);
-}
-.catalog-layout-editor .surface-template,
-.catalog-layout-editor .surface-editor-shell {
-  height: 100%;
-}
-.catalog-layout-settings .catalog-editor-actions {
-  margin: 0;
 }
 .catalog-detail > .studio-form-error {
   padding: 8px 24px;
@@ -640,9 +542,7 @@
     font-size: 13px;
   }
   .catalog-preview-workspace,
-  .catalog-custom-workspace,
   .catalog-parameters-workspace,
-  .catalog-layout-workspace,
   .catalog-reading-workspace,
   .template-workflow-view {
     grid-template-columns: minmax(0, 1fr) 260px;
@@ -675,9 +575,7 @@
     grid-row: 1;
   }
   .catalog-preview-workspace,
-  .catalog-custom-workspace,
   .catalog-parameters-workspace,
-  .catalog-layout-workspace,
   .catalog-reading-workspace,
   .template-workflow-view {
     grid-template-columns: minmax(0, 1fr) 200px;
@@ -708,7 +606,6 @@
     transition: none;
   }
 }
-
 .catalog-view .studio-topbar {
   min-height: 84px;
   height: auto;
@@ -840,7 +737,6 @@
     padding: 18px;
   }
 }
-
 .studio.catalog-view,
 .studio-modal.catalog-component-dialog,
 .studio-modal.catalog-template-dialog {
@@ -903,57 +799,11 @@
     font-size: 13px;
   }
 }
-
-.catalog-custom-editor > label > textarea.studio-code-editor,
-.template-workflow-view.is-editing
-  .template-guide-content
-  > textarea.studio-code-editor {
-  border: 1px solid var(--line);
-  background: var(--paper);
-  color: var(--text);
-  padding: 20px 24px;
-  font-family: var(--font-mono, "SFMono-Regular", monospace);
-  font-size: 14px;
-  line-height: 1.9;
-  outline-color: var(--brand-accent);
-  box-sizing: border-box;
-}
 .catalog-info-panel .studio-code-editor {
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.7;
   min-height: 140px;
-}
-.catalog-inspector-host:empty {
-  display: none;
-}
-.catalog-inspector-host:not(:empty) {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 94px;
-  padding: 28px;
-  overflow: auto;
-  background: var(--paper);
-  z-index: 2;
-}
-.catalog-layout-settings {
-  position: relative;
-}
-.catalog-inspector-host .container-inspector.surface-inspector {
-  position: static;
-  width: 100%;
-  top: auto;
-  right: auto;
-  bottom: auto;
-  border: 0;
-  padding: 0;
-  border-radius: 0;
-  box-shadow: none;
-}
-.catalog-info-panel .catalog-inspector-host .surface-inspector header {
-  margin-bottom: 22px;
 }
 .catalog-view .studio-topbar {
   flex: 0 0 auto;
@@ -970,7 +820,6 @@
   > .surface-object {
   margin: 16px 0;
 }
-
 .catalog-adjustments p {
   color: var(--muted);
   font-size: 14px;
@@ -984,7 +833,6 @@
   font-size: inherit;
   line-height: 1.9;
 }
-
 .catalog-preview-content
   > .container-workspace
   > .container-main
@@ -999,4 +847,21 @@
 }
 .catalog-view .studio-topbar-view-actions {
   gap: 12px;
+}
+.catalog-advanced-data pre {
+  margin: 12px 0 24px;
+  padding: 16px;
+  max-width: 100%;
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.studio-modal.catalog-template-dialog > header > .studio-icon {
+  justify-self: end;
 }

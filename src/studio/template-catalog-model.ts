@@ -1,11 +1,4 @@
-import type {
-  TemplateMetadata,
-  TemplateRecord,
-} from "../components/custom/types";
-import {
-  parseTemplateBundle,
-  type TemplateBundleSource,
-} from "../portable/template-bundle.mjs";
+import type { TemplateMetadata } from "../components/custom/types";
 
 export const templateStageLabels = {
   intent: "读者目标",
@@ -42,55 +35,4 @@ export function latestTemplateVersions(items: TemplateMetadata[]) {
 
 export function templateHasPage(item: TemplateMetadata) {
   return !item.workflow || item.id !== "system-presentation";
-}
-
-export function editedTemplateBundle(
-  record: TemplateRecord,
-  changes: {
-    name: string;
-    version: string;
-    description: string;
-    scenarios: string[];
-    document: TemplateRecord["document"];
-    files: Record<string, string>;
-  },
-): TemplateBundleSource {
-  const parsed = parseTemplateBundle(record.bundle);
-  const metadata = {
-    ...parsed.metadata,
-    name: changes.name,
-    version: changes.version,
-    description: changes.description,
-    scenarios: changes.scenarios,
-  };
-  const files = { ...changes.files };
-  files["README.md"] =
-    `---\n${JSON.stringify(metadata, null, 2)}\n---\n${parsed.body.startsWith(`# ${parsed.metadata.name}\n`) ? `# ${changes.name}\n` + parsed.body.slice(parsed.metadata.name.length + 3) : parsed.body}\n`;
-  if (metadata.page) {
-    const document = structuredClone(changes.document);
-    document.title = changes.name;
-    // Folder pages use local component names; saved records use installed exact refs.
-    const portable = (node: TemplateRecord["document"]["content"]) => {
-      const data = node.attrs?.data;
-      if (node.type === "widget" && node.attrs?.kind === "custom" && data) {
-        const binding = record.workflow?.components.find(
-          (item) => item.ref.id === data.componentId,
-        );
-        const component =
-          binding && parsed.components.find((item) => item.id === binding.id);
-        if (component) {
-          const { integrity: _integrity, scope: _scope, ...local } = data;
-          node.attrs!.data = {
-            ...local,
-            componentId: component.id,
-            version: component.source.manifest.version,
-          };
-        }
-      }
-      node.content?.forEach(portable);
-    };
-    portable(document.content);
-    files[metadata.page] = JSON.stringify(document, null, 2);
-  }
-  return { ...parsed.source, files };
 }

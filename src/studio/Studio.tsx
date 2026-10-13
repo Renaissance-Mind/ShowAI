@@ -68,11 +68,9 @@ import type { ShowArtifact, ShowDocument } from "../types";
 import type {
   BuiltinComponentMetadata,
   CompiledComponent,
-  ComponentSource,
   ComponentCategory,
   TemplateMetadata,
   TemplateRecord,
-  PackageRevisionRef,
   CatalogReadOptions,
 } from "../components/custom/types";
 import { PageWorkspace } from "./PageWorkspace";
@@ -140,12 +138,7 @@ import {
   type CatalogComponent,
   type CatalogCustomComponent,
 } from "../core/component-categories";
-import {
-  TemplateDialog,
-  ComponentDialog,
-  PublishDialog,
-  blankTemplate,
-} from "./CatalogDialogs";
+import { TemplateDialog, ComponentDialog } from "./CatalogDialogs";
 import "./studio.css";
 import {
   LibrarySearchResults,
@@ -202,17 +195,13 @@ type DialogState =
   | {
       type: "template";
       record: LoadedTemplate;
-      copy?: boolean;
       projectId?: string;
     }
-  | { type: "saveTemplate" }
-  | { type: "publish"; ref: PackageRevisionRef; projectId?: string }
   | {
       type: "component";
       projectId?: string;
       builtin?: BuiltinComponentMetadata;
       custom?: CompiledComponent;
-      source?: ComponentSource;
     }
   | null;
 
@@ -1663,13 +1652,7 @@ export default function Studio() {
           ? componentProjectRef.current
           : undefined;
     if ("kind" in item) {
-      const source = item.insertion
-        ? undefined
-        : await desktop.invoke<ComponentSource>("components:source", {
-            id: item.kind,
-            scope: "builtin",
-          });
-      setDialog({ type: "component", builtin: item, source, projectId: owner });
+      setDialog({ type: "component", builtin: item, projectId: owner });
       return;
     }
     const custom = await desktop.invoke<CompiledComponent>("components:get", {
@@ -1679,22 +1662,8 @@ export default function Studio() {
       integrity: item.integrity,
       ...(owner ? { projectId: owner } : {}),
     });
-    let source: ComponentSource | undefined;
-    if (custom.entry) {
-      try {
-        source = await desktop.invoke<ComponentSource>("components:source", {
-          id: item.id,
-          version: item.version,
-          scope: item.scope,
-          integrity: item.integrity,
-          ...(owner ? { projectId: owner } : {}),
-        });
-      } catch (reason) {
-        if (!errorMessage(reason).includes("source")) throw reason;
-      }
-    }
     if (!expectedDialog || dialogRef.current === expectedDialog)
-      setDialog({ type: "component", custom, source, projectId: owner });
+      setDialog({ type: "component", custom, projectId: owner });
   }
 
   const pickerLibrary = useMemo(
@@ -2104,19 +2073,6 @@ export default function Studio() {
       )}
     </LibraryDragContext.Provider>
   );
-  const changeCatalogOwner = (id: string) =>
-    action(async () => {
-      if (!(await page.flush())) return;
-      selectedRef.current = id || null;
-      setSelectedProject(id || null);
-      setDialog((current) =>
-        current && (current.type === "template" || current.type === "component")
-          ? { ...current, projectId: id || undefined }
-          : current,
-      );
-      if (id) await loadProjectContents(id);
-      await loadCatalog();
-    })();
   const topbar = (
     <div className="studio-topbar">
       {navigationUpdating && (
@@ -2438,23 +2394,6 @@ export default function Studio() {
               </button>
             </>
           )}
-          {view === "templates" && (
-            <button
-              disabled={!selectedProject}
-              className="studio-text-button"
-              onClick={() =>
-                setDialog({
-                  type: "template",
-                  record: blankTemplate(),
-                  copy: true,
-                })
-              }
-              aria-label="新建模板"
-              title="新建模板"
-            >
-              新建模板
-            </button>
-          )}
           {view === "components" && (
             <>
               <label className="component-project-picker">
@@ -2484,51 +2423,6 @@ export default function Studio() {
                   ))}
                 </select>
               </label>
-              <button
-                className="studio-text-button"
-                disabled={componentProject === "all"}
-                title={
-                  componentProject === "all" ? "请选择组件所属项目" : undefined
-                }
-                onClick={action(async () => {
-                  const result = await desktop.invoke<CompiledComponent | null>(
-                    "components:import",
-                    componentProject !== "all"
-                      ? { projectId: componentProject }
-                      : {},
-                  );
-                  if (result) {
-                    await loadCatalog();
-                    setNotice("组件已安装");
-                  }
-                })}
-                aria-label="导入组件"
-              >
-                导入
-              </button>
-              <button
-                className="studio-text-button"
-                disabled={componentProject === "all"}
-                title={
-                  componentProject === "all" ? "请选择组件所属项目" : undefined
-                }
-                onClick={action(async () => {
-                  const result = await desktop.invoke<CompiledComponent>(
-                    "components:createExample",
-                    componentProject !== "all"
-                      ? { projectId: componentProject }
-                      : {},
-                  );
-                  await loadCatalog();
-                  await viewComponent({
-                    ...result,
-                    projectId: componentProject,
-                  });
-                })}
-                aria-label="新建组件"
-              >
-                新建组件
-              </button>
             </>
           )}
         </div>
@@ -2982,7 +2876,6 @@ export default function Studio() {
                               setDialog({
                                 type: "template",
                                 record,
-                                copy: item.scope === "builtin",
                               });
                             })}
                           >
@@ -3238,15 +3131,6 @@ export default function Studio() {
                     ...(contextMenu.pageTools
                       ? [
                           {
-                            label: "保存为模板",
-                            separatorBefore: true,
-                            icon: <LayoutTemplate size={15} />,
-                            onSelect: action(async () => {
-                              if (await page.flush())
-                                setDialog({ type: "saveTemplate" });
-                            }),
-                          },
-                          {
                             label: "复制页面",
                             icon: <Copy size={15} />,
                             onSelect: action(async () => {
@@ -3383,32 +3267,7 @@ export default function Studio() {
                     projectId: ref.projectId,
                   },
                 );
-                let source: ComponentSource;
-                try {
-                  source = await desktop.invoke<ComponentSource>(
-                    "components:source",
-                    {
-                      id: ref.id,
-                      version: ref.version,
-                      scope: ref.scope,
-                      projectId: ref.projectId,
-                    },
-                  );
-                } catch (reason) {
-                  if (!errorMessage(reason).includes("no editable source"))
-                    throw reason;
-                  source = (
-                    await desktop.invoke<{
-                      content: { source: ComponentSource };
-                    }>("drafts:read", { id: result.draft.id })
-                  ).content.source;
-                }
-                setDialog({
-                  type: "component",
-                  custom,
-                  source,
-                  projectId: target,
-                });
+                setDialog({ type: "component", custom, projectId: target });
               } else {
                 const record = await desktop.invoke<LoadedTemplate>(
                   "templates:get",
@@ -3421,7 +3280,7 @@ export default function Studio() {
                 );
                 setDialog({ type: "template", record, projectId: target });
               }
-              setNotice("外部文件已保留为草稿，选择恢复后可保存新版本");
+              setNotice("外部文件已保留为草稿，可通过 Agent 继续处理");
             }}
             onClose={closeDialog}
             onResolved={async () => {
@@ -3593,60 +3452,12 @@ export default function Studio() {
             </div>
           </Dialog>
         )}
-        {dialog?.type === "publish" && (
-          <PublishDialog
-            refValue={dialog.ref}
-            projectId={dialog.projectId ?? selectedProject ?? undefined}
-            onClose={closeDialog}
-            onPublished={async () => {
-              await loadCatalog();
-              setDialog(null);
-              setNotice("发布版本已验证并登记");
-            }}
-          />
-        )}
         {dialog?.type === "template" && (
           <TemplateDialog
-            key={`${dialog.record.id}:${dialog.record.version}:${dialog.record.scope}`}
+            key={`${dialog.record.id}:${dialog.record.version}:${dialog.record.scope}:${dialog.record.integrity}`}
             record={dialog.record}
-            copy={dialog.copy}
             components={dialog.record.components ?? []}
-            templates={templates}
-            projects={projects}
-            onProjectChange={(id) => void changeCatalogOwner(id)}
-            onPublish={(ref) =>
-              setDialog({ type: "publish", ref, projectId: ref.projectId })
-            }
-            projectId={dialog.projectId ?? selectedProject ?? undefined}
             onClose={closeDialog}
-            onSaved={async () => {
-              await loadCatalog();
-              if (dialogRef.current === dialog) setDialog(null);
-              setNotice("模板目录已更新");
-            }}
-          />
-        )}
-        {dialog?.type === "saveTemplate" && page.draft && (
-          <TemplateDialog
-            record={{
-              ...blankTemplate(),
-              name: page.draft.title || "新模板",
-              document: page.draft,
-            }}
-            components={page.record?.components ?? []}
-            templates={templates}
-            projects={projects}
-            onProjectChange={(id) => void changeCatalogOwner(id)}
-            onPublish={(ref) =>
-              setDialog({ type: "publish", ref, projectId: ref.projectId })
-            }
-            projectId={selectedProject ?? undefined}
-            onClose={closeDialog}
-            onSaved={async () => {
-              await loadCatalog();
-              setDialog(null);
-              setNotice("页面已保存为模板");
-            }}
           />
         )}
         {dialog?.type === "component" && (
@@ -3656,38 +3467,16 @@ export default function Studio() {
                 ? `${dialog.custom.id}@${dialog.custom.version}:${dialog.custom.scope}:${dialog.custom.integrity}`
                 : dialog.builtin?.kind
             }
-            projects={projects}
-            onProjectChange={(id) => void changeCatalogOwner(id)}
             builtin={dialog.builtin}
             custom={dialog.custom}
-            source={dialog.source}
             canInsert={
               !!page.draft &&
               page.projectId === selectedProject &&
               (dialog.custom?.scope !== "project" ||
                 page.projectId === dialog.projectId)
             }
-            onPublish={(ref) =>
-              setDialog({
-                type: "publish",
-                ref,
-                projectId: ref.projectId ?? dialog.projectId,
-              })
-            }
-            projectId={dialog.projectId}
             onInsert={addBlock}
             onClose={closeDialog}
-            onSaved={async (component) => {
-              await loadCatalog();
-              await viewComponent(
-                {
-                  ...component,
-                  projectId: dialog.projectId,
-                },
-                dialog,
-              );
-              setNotice("组件目录已更新");
-            }}
           />
         )}
       </div>
