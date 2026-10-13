@@ -32,7 +32,20 @@ import {
   type RefObject,
 } from "react";
 import type { JSONContent } from "@tiptap/core";
-import { ArrowLeft, ChevronRight, LayoutDashboard, X } from "../ui/icons";
+import {
+  ArrowLeft,
+  ChevronRight,
+  LayoutDashboard,
+  MousePointer2,
+  Pencil,
+  Highlighter,
+  PanelsTopLeft,
+  Square,
+  Circle,
+  ArrowUpRight,
+  LockKeyhole,
+  X,
+} from "../ui/icons";
 import type { ContainerDocument, ShowDocument } from "../types";
 import type {
   BoardTool,
@@ -64,7 +77,6 @@ import "./containers.css";
 import PageIcon from "../components/PageIcon";
 import PageIconDialog from "../studio/PageIconDialog";
 import { PageWidthSwitch } from "./PageWidthSwitch";
-import { BoardTools } from "./BoardTools";
 
 interface Runtime {
   geometry: SurfaceGeometryStore;
@@ -901,6 +913,7 @@ function ContainerView({
     readOnly = runtime.readOnly;
   const viewport = useRef<SurfaceHandle>(null),
     page = useRef<HTMLDivElement>(null);
+  const [toolLocked, setToolLocked] = useState(false);
   const [tool, setTool] = useState<BoardTool | null>(null);
   const [styles, setStyles] = useState<Record<string, DrawingStyle>>({
     pen: { color: "#252629", fillColor: "none", strokeWidth: 2.5 },
@@ -1193,9 +1206,7 @@ function ContainerView({
             const drawings = ids.filter(
               (nodeId) =>
                 findSurfaceNode(runtime.current.current, nodeId)?.node.type ===
-                  "drawing" &&
-                !findSurfaceNode(runtime.current.current, nodeId)?.node.attrs
-                  ?.ink,
+                "drawing",
             );
             if (tool && tool !== "region" && drawings.length)
               setStyles((before) => ({
@@ -1280,7 +1291,10 @@ function ContainerView({
                   runtime.commit(
                     addNode(runtime.current.current, drawing, frame, id),
                   );
-                  runtime.select(null);
+                  runtime.select(drawing.attrs!.id);
+                  if (tool !== "pen" && tool !== "highlighter" && !toolLocked) {
+                    setTool(null);
+                  }
                 }
           }
           extraActions={
@@ -1288,7 +1302,46 @@ function ContainerView({
               {!readOnly && (
                 <>
                   <span className="surface-toolbar-divider" />
-                  <BoardTools tool={tool} onChange={chooseTool} />
+                  <button
+                    type="button"
+                    aria-label="选择工具"
+                    aria-pressed={!tool}
+                    onClick={() => chooseTool(null)}
+                  >
+                    <MousePointer2 size={15} />
+                  </button>
+                  {(
+                    [
+                      ["pen", "画笔", Pencil],
+                      ["highlighter", "荧光笔", Highlighter],
+                      ["rectangle", "矩形", Square],
+                      ["ellipse", "椭圆", Circle],
+                      ["arrow", "箭头", ArrowUpRight],
+                      ["region", "区域", PanelsTopLeft],
+                    ] as const
+                  ).map(([value, label, Icon]) => (
+                    <button
+                      type="button"
+                      key={value}
+                      aria-label={label}
+                      title={`${label}（${{ pen: "P", highlighter: "H", rectangle: "R", ellipse: "E", arrow: "A", region: "F" }[value]}）${value === "pen" || value === "highlighter" ? "" : "；Shift 约束形状，Alt 从中心绘制"}`}
+                      aria-pressed={tool === value}
+                      onClick={() => {
+                        chooseTool(value);
+                      }}
+                    >
+                      <Icon size={15} />
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    aria-label="连续绘制"
+                    aria-pressed={toolLocked}
+                    title="连续绘制：完成图形后保留当前工具"
+                    onClick={() => setToolLocked((value) => !value)}
+                  >
+                    <LockKeyhole size={15} />
+                  </button>
                 </>
               )}
             </>
