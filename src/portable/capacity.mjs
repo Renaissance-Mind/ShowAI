@@ -20,8 +20,24 @@ export const CAPACITY = Object.freeze({
   chatBytes: 1_000_000,
   mcpImageBytes: 8 * MiB,
 });
-const encoder = new TextEncoder();
-export const utf8Bytes = (value) => encoder.encode(value).byteLength;
+/** Counts TextEncoder's output without allocating it; lone surrogates encode as U+FFFD. */
+export const utf8Bytes = (value) => {
+  let bytes = value.length;
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index);
+    if (code < 0x80) continue;
+    if (code < 0x800) bytes += 1;
+    else if (
+      code >= 0xd800 &&
+      code <= 0xdbff &&
+      (value.charCodeAt(index + 1) & 0xfc00) === 0xdc00
+    ) {
+      bytes += 2;
+      index++;
+    } else bytes += 2;
+  }
+  return bytes;
+};
 export function formatBytes(bytes) {
   return `${(bytes / MiB).toFixed(2)} MiB (${bytes} bytes)`;
 }

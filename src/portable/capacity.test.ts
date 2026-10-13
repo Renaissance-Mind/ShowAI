@@ -5,6 +5,7 @@ import {
   base64Bytes,
   measureContent,
   readCapacityText,
+  utf8Bytes,
 } from "./capacity.mjs";
 import { validateDocument } from "./validation.mjs";
 
@@ -39,6 +40,21 @@ test("counts escaped UTF-8 structure, distinct decoded resources and repeated re
   expect(measureContent(legacy).structureBytes).toBe(
     Buffer.byteLength(JSON.stringify(legacy)),
   );
+});
+
+test("counts UTF-8 bytes exactly as TextEncoder encodes them", () => {
+  const encoder = new TextEncoder();
+  for (const value of [
+    "",
+    "ascii",
+    "é中文",
+    "emoji 😀 pair",
+    "lone \ud800 high",
+    "lone \udc00 low",
+    "trailing \ud83d",
+    "\u007f\u0080\u07ff\u0800\uffff",
+  ])
+    expect(utf8Bytes(value)).toBe(encoder.encode(value).byteLength);
 });
 
 test("large text cannot evade the page structure budget using characters instead of UTF-8 bytes", () => {

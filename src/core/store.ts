@@ -1252,7 +1252,9 @@ export class FileStore {
     const value = await this.readJson(path);
     let document: ShowDocument;
     try {
-      document = normalizeDocument(parseArtifact(value).document);
+      document = normalizeDocument(parseArtifact(value).document, undefined, {
+        validated: true,
+      });
     } catch (error) {
       if (error instanceof CoreError) throw error;
       throw new CoreError(

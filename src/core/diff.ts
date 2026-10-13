@@ -39,13 +39,20 @@ export function documentHash(document: ShowDocument): string {
   return createHash("sha256").update(canonicalJson(content)).digest("hex");
 }
 
+/**
+ * `validated` is only for the fresh document parseArtifact just returned; it
+ * is mutated in place instead of being validated and cloned a second time.
+ */
 export function normalizeDocument(
   input: unknown,
   previous?: ShowDocument,
+  options: { validated?: boolean } = {},
 ): ShowDocument {
   let document: ShowDocument;
   try {
-    document = validateDocument(input);
+    document = options.validated
+      ? (input as ShowDocument)
+      : validateDocument(input);
   } catch (error) {
     if (error instanceof CapacityError) throw error;
     throw new CoreError(

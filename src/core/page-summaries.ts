@@ -92,6 +92,8 @@ async function build(library: GitLibrary, revision: string) {
       ? normalizeDocument(
           parseArtifact(JSON.parse(loaded.get(path)!.toString("utf8")))
             .document,
+          undefined,
+          { validated: true },
         )
       : undefined;
     if (document && document.id !== path.split("/").at(-1)!.slice(0, -5))

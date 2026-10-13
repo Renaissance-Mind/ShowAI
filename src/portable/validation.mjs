@@ -818,7 +818,8 @@ export function validateDocument(value) {
     archived: document.archived ?? false,
     createdAt: document.createdAt ?? now,
     updatedAt: document.updatedAt ?? now,
-    content: structuredClone(document.content),
+    // `document` is already this call's private clone.
+    content: document.content,
     ...(resource
       ? { layout: document.layout, surfaceViews: document.surfaceViews }
       : surface

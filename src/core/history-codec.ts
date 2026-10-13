@@ -131,6 +131,31 @@ function nodePath(path: string, id: string): string {
 }
 
 /** Storage splits pages, while callers and portable exports keep full readable artifacts. */
+/** Reports the errors that would stop a page artifact from being stored as nodes. */
+export function assertStorablePage(value: {
+  format?: unknown;
+  document?: { content?: NodeValue };
+}): void {
+  if (value.format !== "showai" || !value.document?.content)
+    throw new CoreError(
+      "INVALID_DATA",
+      "A stored page requires a ShowAI artifact.",
+    );
+  const ids = new Set<string>();
+  const visit = (node: NodeValue) => {
+    if (node.type === "text") return;
+    const id = node.attrs?.id;
+    if (typeof id !== "string" || !id || id.length > 200 || ids.has(id))
+      throw new CoreError(
+        "INVALID_DATA",
+        "Page nodes need unique stable identifiers before storage.",
+      );
+    ids.add(id);
+    node.content?.forEach(visit);
+  };
+  visit(value.document.content);
+}
+
 export function encodeFile(path: string, bytes: Buffer): FileChanges {
   const files: FileChanges = new Map();
   if (!jsonEnvelope(path)) {
@@ -139,21 +164,10 @@ export function encodeFile(path: string, bytes: Buffer): FileChanges {
   }
   const value = JSON.parse(bytes.toString("utf8"));
   if (/^projects\/[^/]+\/pages\/[^/]+\.json$/.test(path)) {
-    if (value.format !== "showai" || !value.document?.content)
-      throw new CoreError(
-        "INVALID_DATA",
-        "A stored page requires a ShowAI artifact.",
-      );
-    const ids = new Set<string>();
+    assertStorablePage(value);
     const split = (node: NodeValue): unknown => {
       if (node.type === "text") return node;
-      const id = node.attrs?.id;
-      if (typeof id !== "string" || !id || id.length > 200 || ids.has(id))
-        throw new CoreError(
-          "INVALID_DATA",
-          "Page nodes need unique stable identifiers before storage.",
-        );
-      ids.add(id);
+      const id = node.attrs!.id as string;
       const stored = {
         ...node,
         ...(node.content ? { content: node.content.map(split) } : {}),

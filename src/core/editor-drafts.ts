@@ -2,7 +2,12 @@ import { CAPACITY, assertBytes } from "../portable/capacity.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import { readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { encodeFile, decodeFile, nodePrefix } from "./history-codec";
+import {
+  assertStorablePage,
+  encodeFile,
+  decodeFile,
+  nodePrefix,
+} from "./history-codec";
 import { atomicLibraryFile, readLibraryBytes } from "./library-files";
 import { withLibraryLock } from "./library-lock";
 import { CoreError } from "./model";
@@ -210,7 +215,7 @@ export class EditorDrafts {
             );
           }
         }
-        let content = JSON.parse(raw),
+        const content = JSON.parse(raw),
           path = `drafts/${id}.json`,
           storage: EditorDraftRecord["storage"] = "json";
         const base64Assets: string[] = [];
@@ -238,43 +243,24 @@ export class EditorDrafts {
               }
             }
           }
-        let files: ReturnType<typeof encodeFile>,
-          normalizationWarning: string | undefined;
+        let normalizationWarning: string | undefined;
         if (
           input.kind === "page" &&
           input.projectId &&
           /^[\w-]{1,128}$/.test(input.projectId) &&
           /^[\w-]{1,128}$/.test(input.resourceId)
-        ) {
-          path = `projects/${input.projectId}/pages/${input.resourceId}.json`;
+        )
           try {
-            files = encodeFile(
-              path,
-              Buffer.from(
-                JSON.stringify({
-                  format: "showai",
-                  version: 3,
-                  document: content,
-                }),
-              ),
-            );
-            storage = "page-nodes";
+            assertStorablePage({ format: "showai", document: content });
           } catch (error) {
             if (!(error instanceof CoreError) || error.code !== "INVALID_DATA")
               throw error;
             normalizationWarning = error.message;
-            path = `drafts/${id}.json`;
-            files = encodeFile(path, Buffer.from(JSON.stringify(content)));
           }
-        } else files = encodeFile(path, Buffer.from(JSON.stringify(content)));
-        if (storage === "page-nodes") {
-          // Local recovery snapshots don't need Git's per-node object layout.
-          // Keep the existing JSON representation and asset deduplication so one
-          // keystroke cannot require thousands of individual durable writes.
-          path = `drafts/${id}.json`;
-          storage = "json";
-          files = encodeFile(path, Buffer.from(JSON.stringify(content)));
-        }
+        // Local recovery snapshots don't need Git's per-node object layout.
+        // Keep the existing JSON representation and asset deduplication so one
+        // keystroke cannot require thousands of individual durable writes.
+        const files = encodeFile(path, Buffer.from(JSON.stringify(content)));
         const assets: string[] = [];
         for (const [name, bytes] of files)
           if (bytes !== null) {
