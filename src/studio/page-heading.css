@@ -1,0 +1,64 @@
+.studio-page-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 0;
+}
+.studio-page-heading-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  margin: -8px 0 -8px -8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.studio-page-heading-icon.is-empty {
+  gap: 6px;
+  padding: 6px 8px;
+  margin-top: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.studio-page-heading-icon:hover {
+  background: var(--hover);
+}
+.studio-page-heading-icon:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.container-page-heading .studio-page-heading-title {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
+  resize: none;
+  overflow: hidden;
+}
+.studio-page-heading-title:focus {
+  outline: none;
+}
+.studio-page-heading-title::placeholder {
+  color: var(--muted);
+  opacity: 0.65;
+}
+@media (max-width: 640px) {
+  .container-page-heading .studio-page-heading-title {
+    font-size: 32px;
+  }
+}

@@ -2790,6 +2790,10 @@ export default function Studio() {
                 onControlsChange={setEditorControls}
                 onActiveSurfaceChange={handleActiveSurfaceChange}
                 onRevealHandled={handleRevealHandled}
+                onEditIcon={action(async () => {
+                  const target = activePageTarget();
+                  if (target) await beginPageIcon(target);
+                })}
               />
               {loading && (
                 <div className="studio-loading">

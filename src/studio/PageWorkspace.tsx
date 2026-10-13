@@ -16,6 +16,7 @@ import { EditorViewScope } from "../editor/view-scope";
 import SurfaceEditor from "../surface/SurfaceEditor";
 import type { EditorControls } from "../surface/EditorControls";
 import type { PageSessions, PageViewSession } from "./page-sessions";
+import PageHeading from "./PageHeading";
 
 function PageContent({
   view,
@@ -24,6 +25,7 @@ function PageContent({
   onControlsChange,
   onActiveSurfaceChange,
   onRevealHandled,
+  onEditIcon,
 }: {
   view: PageViewSession;
   readOnly?: boolean;
@@ -31,6 +33,7 @@ function PageContent({
   onControlsChange: (controls: EditorControls | null) => void;
   onActiveSurfaceChange: (id: string) => void;
   onRevealHandled: () => void;
+  onEditIcon: () => void;
 }) {
   const state = useSyncExternalStore(
     view.session.subscribe,
@@ -44,13 +47,25 @@ function PageContent({
     return () => cancelAnimationFrame(frame);
   }, [editors, view.key]);
   if (!state.draft) return null;
+  const locked = !!readOnly || !!state.record?.readOnly;
   return (
     <CustomComponentsProvider components={state.record?.components ?? []}>
       <SurfaceEditor
         key={`${state.draft.id}:${state.renderVersion}`}
         document={state.draft}
-        readOnly={!!readOnly || !!state.record?.readOnly}
+        readOnly={locked}
         onChange={view.session.edit}
+        header={
+          state.draft.content.attrs?.kind === "board" ? undefined : (
+            <PageHeading
+              title={state.draft.title}
+              icon={state.draft.icon}
+              readOnly={locked}
+              onTitleChange={(title) => view.session.edit({ title })}
+              onEditIcon={onEditIcon}
+            />
+          )
+        }
         revealId={revealId}
         onControlsChange={onControlsChange}
         onActiveSurfaceChange={onActiveSurfaceChange}
