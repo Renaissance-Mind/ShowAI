@@ -220,6 +220,10 @@ export default function RichTextEditor({
   const hoverHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hoverMenuOpen = useRef(blockMenu);
   hoverMenuOpen.current = blockMenu;
+  // Pointer moves are measured once per frame; moving within one block keeps state.
+  const hoverFrame = useRef(0);
+  const hoverPointer = useRef(0);
+  useEffect(() => () => cancelAnimationFrame(hoverFrame.current), []);
   const keepBlockHandle = useCallback(() => {
     if (hoverHideTimer.current !== null) {
       clearTimeout(hoverHideTimer.current);
@@ -1426,29 +1430,43 @@ export default function RichTextEditor({
             wrapper.closest(".document-editor")
           )
             return;
-          let next: HoverBlock | null = null;
-          editor.state.doc.forEach((node, pos, index) => {
-            const dom = editor.view.nodeDOM(pos);
-            if (!(dom instanceof HTMLElement)) return;
-            const rect = dom.getBoundingClientRect();
-            if (
-              event.clientY >= rect.top - 3 &&
-              event.clientY <= rect.bottom + 3
-            )
-              next = {
-                pos,
-                size: node.nodeSize,
-                index,
-                top:
-                  (rect.top - wrapper.getBoundingClientRect().top) /
-                  (wrapper.getBoundingClientRect().width /
-                    wrapper.offsetWidth || 1),
-              };
+          hoverPointer.current = event.clientY;
+          if (hoverFrame.current) return;
+          hoverFrame.current = requestAnimationFrame(() => {
+            hoverFrame.current = 0;
+            const wrapper = wrapperRef.current;
+            if (!wrapper || dragPosition.current !== null || editor.isDestroyed)
+              return;
+            const y = hoverPointer.current;
+            const frame = wrapper.getBoundingClientRect();
+            const scale = frame.width / wrapper.offsetWidth || 1;
+            let next: HoverBlock | null = null;
+            editor.state.doc.forEach((node, pos, index) => {
+              const dom = editor.view.nodeDOM(pos);
+              if (!(dom instanceof HTMLElement)) return;
+              const rect = dom.getBoundingClientRect();
+              if (y >= rect.top - 3 && y <= rect.bottom + 3)
+                next = {
+                  pos,
+                  size: node.nodeSize,
+                  index,
+                  top: (rect.top - frame.top) / scale,
+                };
+            });
+            const found = next as HoverBlock | null;
+            if (found) {
+              keepBlockHandle();
+              setHover((current) =>
+                current &&
+                current.pos === found.pos &&
+                current.size === found.size &&
+                current.index === found.index &&
+                Math.abs(current.top - found.top) < 0.5
+                  ? current
+                  : found,
+              );
+            } else hideBlockHandleLater();
           });
-          if (next) {
-            keepBlockHandle();
-            setHover(next);
-          } else hideBlockHandleLater();
         }}
         onMouseLeave={hideBlockHandleLater}
         onDragOver={(event) => {

@@ -1,5 +1,5 @@
 import { BlockActions, BlockSettings } from "./action-host";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, Download } from "../../ui/icons";
 import { BlockHeader, Field } from "./shared";
 import { GestureBoundary } from "./GestureBoundary";
@@ -10,6 +10,8 @@ import { validateG2Data } from "./g2/contract.mjs";
 import licenses from "./g2/licenses.json";
 import type { BlockProps } from "./types";
 import "./g2-chart.css";
+
+const licenseAttribute = JSON.stringify(licenses);
 
 export function G2ChartBlock({
   chartType,
@@ -123,6 +125,11 @@ export function G2ChartBlock({
       current?.destroy();
     };
   }, [chartType, data, theme, lock.locked]);
+  // Editor commits re-render every block; serialize the raw view only on data changes.
+  const rawData = useMemo(
+    () => JSON.stringify(data.datasets, null, 2),
+    [data.datasets],
+  );
   const open = () => {
     baseline.current = JSON.stringify(data);
     setDraft(JSON.stringify(data, null, 2));
@@ -173,7 +180,7 @@ export function G2ChartBlock({
       className={"sb-block sb-g2-chart" + (theme === "dark" ? " is-dark" : "")}
       aria-label={text(data.title, "图表")}
       data-g2-type={chartType}
-      data-third-party-licenses={JSON.stringify(licenses)}
+      data-third-party-licenses={licenseAttribute}
     >
       <BlockHeader
         title={text(data.title, "图表")}
@@ -389,7 +396,7 @@ export function G2ChartBlock({
       </GestureBoundary>
       <details className="sb-data-details">
         <summary>查看原始数据</summary>
-        <pre>{JSON.stringify(data.datasets, null, 2)}</pre>
+        <pre>{rawData}</pre>
       </details>
     </section>
   );
