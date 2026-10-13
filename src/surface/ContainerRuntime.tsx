@@ -86,7 +86,7 @@ interface Runtime {
   readOnly: boolean;
   printing: boolean;
   pageWidthModes: boolean;
-  onHandwriting?: (boardId: string, document: ShowDocument) => Promise<void>;
+  onHandwriting?: (boardId: string, document: ShowDocument, tool?: string) => Promise<void>;
   selected: string | null;
   select: (id: string | null) => void;
   inspect: (id: string | null) => void;
@@ -154,7 +154,7 @@ export function ContainerRuntime({
   onControlsChange?: (controls: EditorControls | null) => void;
   retainedState?: ContainerViewState;
   inspectorHost?: HTMLElement | null;
-  onHandwriting?: (boardId: string, document: ShowDocument) => Promise<void>;
+  onHandwriting?: (boardId: string, document: ShowDocument, tool?: string) => Promise<void>;
 }) {
   const document = useMemo(
     () => reconcileConnections({ ...sourceDocument }),
@@ -930,6 +930,10 @@ function ContainerView({
     runtime.activate(id);
     runtime.select(null);
     runtime.inspect(null);
+    if (runtime.onHandwriting && next && ["pen", "highlighter", "rectangle", "ellipse", "arrow"].includes(next)) {
+      void runtime.onHandwriting(id, runtime.geometry.materialize(runtime.current.current), next);
+      return;
+    }
     setTool(next);
   };
   const enabled = root || runtime.active === id;
@@ -1295,9 +1299,11 @@ function ContainerView({
                   runtime.commit(
                     addNode(runtime.current.current, drawing, frame, id),
                   );
-                  runtime.select(drawing.attrs!.id);
-                  if (tool !== "pen" && tool !== "highlighter" && !toolLocked) {
-                    setTool(null);
+                  if (window.document.documentElement.dataset.native === "ios") {
+                    runtime.select(null);
+                  } else {
+                    runtime.select(drawing.attrs!.id);
+                    if (tool !== "pen" && tool !== "highlighter" && !toolLocked) setTool(null);
                   }
                 }
           }
@@ -1346,11 +1352,7 @@ function ContainerView({
                   >
                     <LockKeyhole size={15} />
                   </button>
-                  {runtime.onHandwriting && (
-                    <button type="button" aria-label="Apple Pencil 手写" title="Apple Pencil 手写" onClick={() => void runtime.onHandwriting?.(id, runtime.geometry.materialize(runtime.current.current))}>
-                      <Pencil size={15} aria-hidden="true" />
-                    </button>
-                  )}
+
                 </>
               )}
             </>

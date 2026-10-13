@@ -66,7 +66,7 @@ function SurfaceEditor({
   onControlsChange?: (controls: EditorControls | null) => void;
   retainedState?: SurfaceEditorState;
   inspectorHost?: HTMLElement | null;
-  onHandwriting?: (boardId: string, document: ShowDocument) => Promise<void>;
+  onHandwriting?: (boardId: string, document: ShowDocument, tool?: string) => Promise<void>;
 }) {
   const document = useMemo(
     () => (isResource(input) ? input : upgradeResource(input)),

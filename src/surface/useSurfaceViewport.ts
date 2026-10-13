@@ -1,5 +1,6 @@
 import { useContext, useEffect, useRef, useSyncExternalStore } from "react";
 import { EditorViewScope } from "../editor/view-scope";
+import { fingerNavigatesBoard } from "./board-input.mjs";
 import { GESTURE_IDLE, normalizedWheel, zoomAt, type Camera } from "./model";
 import {
   clamp,
@@ -581,8 +582,9 @@ export function useSurfaceViewport(
       if (
         !ownsInput(event.target) ||
         event.defaultPrevented ||
-        (event.target as Element).closest('[data-drawing-active="true"]') ||
+        (!fingerNavigatesBoard(event.pointerType) && (event.target as Element).closest('[data-drawing-active="true"]')) ||
         ((event.target as Element).closest("[data-board-drawing-input]") &&
+          !fingerNavigatesBoard(event.pointerType) &&
           event.button !== 1 &&
           !space)
       )

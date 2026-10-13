@@ -11,6 +11,7 @@ import { findSurfaceNode } from "./document.mjs";
 import { BoardStyleControls } from "./BoardStyleControls";
 import { readingCapture } from "./reading-capture";
 import { flushSync } from "react-dom";
+import { fingerNavigatesBoard } from "./board-input.mjs";
 import {
   useEffect,
   useLayoutEffect,
@@ -522,6 +523,7 @@ export default function PageSurface({
         }}
         onPointerDownCapture={(event) => {
           const target = event.target as Element;
+          if (fingerNavigatesBoard(event.pointerType) && !target.closest('[data-surface-ui],button,input,textarea,select,iframe,[contenteditable=true]')) return;
           if (target.closest(".page-surface") !== event.currentTarget) return;
           if (!target.closest(".surface-popover-anchor") && navigation.current)
             navigation.current.open = false;

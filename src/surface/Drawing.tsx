@@ -1,6 +1,7 @@
 import type { SnapIndex, SnapGuide } from "./geometry.mjs";
 import { creationPoints, snapCreation } from "./drawing-geometry.mjs";
 import { finishBoardDrawing } from "./board-drawing.mjs";
+import { fingerNavigatesBoard } from "./board-input.mjs";
 import { flushSync } from "react-dom";
 import { ObjectContext } from "./SurfaceObject";
 import {
@@ -426,6 +427,7 @@ export function DrawingInput({
       aria-label="绘画区域"
       tabIndex={0}
       onPointerDown={(event) => {
+        if (fingerNavigatesBoard(event.pointerType)) return;
         if (event.button !== 0 || panHeld.current || pending.current) return;
         event.preventDefault();
         event.stopPropagation();
