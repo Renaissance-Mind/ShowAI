@@ -240,13 +240,18 @@ export default function AutoHideSidebar({
                 className="studio-sidebar-lock"
                 aria-label={lockLabel}
                 title={lockLabel}
-                aria-pressed={locked}
+                aria-pressed={nativeTouch ? nativeOpen : locked}
+                aria-controls="studio-project-navigation"
+                aria-expanded={nativeTouch ? nativeOpen : !hidden}
                 onPointerDown={nativeTouch ? (event) => {
                   event.preventDefault();
                   setNativeOpen(value => !value);
                 } : undefined}
-                onClick={() => {
-                  if (nativeTouch) return;
+                onClick={(event) => {
+                  if (nativeTouch) {
+                    if (event.detail === 0) setNativeOpen(value => !value);
+                    return;
+                  }
                   const next = !locked;
                   localStorage.setItem("showai:sidebar-locked", String(next));
                   setLocked(next);
