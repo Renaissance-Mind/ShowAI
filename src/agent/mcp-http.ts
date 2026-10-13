@@ -254,6 +254,12 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                   ...(result.structuredContent.data as Record<string, unknown>),
                 };
                 if ("projectId" in data) data.projectId = _projectId;
+                if (name === "board_read" && Array.isArray(data.images))
+                  data.images = data.images.map((value) => {
+                    const image = { ...(value as Record<string, unknown>) };
+                    delete image.path;
+                    return image;
+                  });
                 if (
                   outputDirectory &&
                   typeof data.path === "string" &&
@@ -306,11 +312,14 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                   ...result.structuredContent,
                   data,
                 };
+                let rewritten = false;
                 result.content = result.content.map((item) =>
-                  item.type === "text"
+                  item.type === "text" && (name !== "board_read" || !rewritten)
                     ? {
                         type: "text" as const,
-                        text: JSON.stringify(result.structuredContent),
+                        text:
+                          ((rewritten = true),
+                          JSON.stringify(result.structuredContent)),
                       }
                     : item,
                 );
@@ -572,12 +581,15 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
               data.persistence.synchronized =
                 synchronization.state === "synced";
             }
+            let rewritten = false;
             result.result.content = (result.result.content ?? []).map(
               (item: { type: string; text?: string }) =>
-                item.type === "text"
+                item.type === "text" && (name !== "board_read" || !rewritten)
                   ? {
                       type: "text",
-                      text: JSON.stringify(result.result.structuredContent),
+                      text:
+                        ((rewritten = true),
+                        JSON.stringify(result.result.structuredContent)),
                     }
                   : item,
             );

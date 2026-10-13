@@ -8,6 +8,7 @@ import type { JSONContent } from "@tiptap/core";
 import type { BoardTool, DrawingStyle } from "./types";
 import { findSurfaceNode } from "./document.mjs";
 import { BoardStyleControls } from "./BoardStyleControls";
+import { readingCapture } from "./reading-capture";
 import { flushSync } from "react-dom";
 import {
   useEffect,
@@ -129,6 +130,7 @@ export default function PageSurface({
   onToolChange,
 }: Props) {
   const [localSelection, setLocalSelection] = useState<string | null>(null);
+  const capture = useRef(readingCapture()).current;
   const [componentActionsHost, setComponentActionsHost] =
     useState<HTMLDivElement | null>(null);
   const selected =
@@ -346,6 +348,13 @@ export default function PageSurface({
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
+    if (capture) {
+      controls.current.moveTo(
+        capture.cameras?.[containerId!] ?? { x: 0, y: 0, scale: 1 },
+        true,
+      );
+      return;
+    }
     if (
       controls.current.restored &&
       (!controls.current.restoredAnchor ||
@@ -440,7 +449,7 @@ export default function PageSurface({
         move: locked ? undefined : onMove,
         connect: locked ? undefined : onConnect,
         readOnly: !onMove,
-        revealAll: revealAll || printing,
+        revealAll: revealAll || printing || !!capture,
         revealed,
       }}
     >

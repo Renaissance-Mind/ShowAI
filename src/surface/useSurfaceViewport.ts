@@ -106,7 +106,7 @@ export function useSurfaceViewport(
     restoredAnchor: null as string | null,
     restore: () => {},
     zoom: (_scale: number) => {},
-    moveTo: (_camera: Camera) => {},
+    moveTo: (_camera: Camera, _immediate = false) => {},
     refresh: () => {},
     cancel: () => {},
   });

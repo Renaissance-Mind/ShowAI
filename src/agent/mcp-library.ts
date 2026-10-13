@@ -37,7 +37,7 @@ export function createLibraryMcpServer(options: {
     projectId: "unselected",
     projectAccess: "library",
     instructions:
-      "Use ShowAI MCP for document operations. This connection is fixed to one local content library. Inspect project_context, then projects_list for existing content or project_resolve with a trusted host sourceDirectory for new formal work. Pass projectId explicitly to every project tool. There is no shared mutable current project. Read before editing; save with the returned hash/revision. Use page_present after saving. render_document is only for an explicitly standalone result. Connection failure is not permission to switch libraries, use authoring CLI, or silently produce an unsaved file.",
+      "Use ShowAI MCP for document operations. This connection is fixed to one local content library. Inspect project_context, then projects_list for existing content or project_resolve with a trusted host sourceDirectory for new formal work. Pass projectId explicitly to every project tool. Start Board understanding with board_read images and indexes; use snapshotId for tile, element and Page source details. There is no shared mutable current project. Read current complete source before editing; save with the returned hash/revision. Use page_present after saving. render_document is only for an explicitly standalone result. Connection failure is not permission to switch libraries, use authoring CLI, or silently produce an unsaved file.",
     decorateTool(name, tool) {
       if (name === "guide") return;
       if (name === "project_context") {

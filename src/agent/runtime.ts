@@ -59,6 +59,12 @@ export async function runtimeInfo(home: string) {
     capacities: { unit: "bytes", ...CAPACITY },
     capabilities: {
       componentParameters: COMPONENT_PARAMETER_CAPABILITIES,
+      boardReading: {
+        protocol: "showai-board-reading-v1",
+        tool: "board_read",
+        defaultView: "visual",
+        snapshotMinutes: 30,
+      },
       templateWorkflow: TEMPLATE_WORKFLOW_CAPABILITIES,
       presentation: {
         independentOfProject: true,

@@ -168,6 +168,112 @@ afterAll(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 
+test("authorized Board reads deliver overlapping images without exposing local cache paths", async () => {
+  const tokens = await authorize();
+  const remote = await client(tokens.access_token);
+  const created = data(
+    await remote.callTool({
+      name: "page_create",
+      arguments: {
+        projectId,
+        document: {
+          id: "remote-board",
+          title: "Remote Board capture",
+          comments: [],
+          content: {
+            type: "surface",
+            attrs: { id: "remote-root", kind: "board" },
+            content: [
+              {
+                type: "surface",
+                attrs: {
+                  id: "remote-page",
+                  kind: "page",
+                  name: "Original Page",
+                },
+                content: [
+                  {
+                    type: "paragraph",
+                    attrs: { id: "remote-text" },
+                    content: [
+                      { type: "text", text: "REMOTE ORIGINAL PAGE SOURCE" },
+                    ],
+                  },
+                ],
+              },
+              {
+                type: "drawing",
+                attrs: {
+                  id: "remote-pen",
+                  tool: "pen",
+                  color: "#2563eb",
+                  strokeWidth: 8,
+                  extent: [2300, 100],
+                  points: [
+                    { x: 0, y: 20 },
+                    { x: 2300, y: 80 },
+                  ],
+                },
+              },
+            ],
+          },
+          layout: {
+            "remote-page": { x: 0, y: 0, width: 500, height: 400 },
+            "remote-pen": { x: 0, y: 550, width: 2300, height: 100 },
+          },
+        },
+      },
+    }),
+  );
+  const pageId = (created.document as { id: string }).id;
+  const readers = await authorize("projects.read");
+  const reader = await client(readers.access_token);
+  const response = await reader.callTool({
+    name: "board_read",
+    arguments: { projectId, pageId },
+  });
+  const result = data(response);
+  expect(result.protocol).toBe("showai-board-reading-v1");
+  expect(
+    (response.content as { type: string }[]).filter((c) => c.type === "image"),
+  ).toHaveLength(3);
+  expect((result.images as object[]).every((i) => !("path" in i))).toBe(true);
+  const captions = (response.content as { type: string; text?: string }[])
+    .filter((c) => c.type === "text")
+    .slice(1)
+    .map((c) => JSON.parse(c.text!).imageKey);
+  expect(captions).toEqual(["overview", "T1", "T2"]);
+  const source = data(
+    await reader.callTool({
+      name: "page_read",
+      arguments: {
+        projectId,
+        pageId,
+        snapshotId: result.snapshotId,
+        blockIds: ["remote-page"],
+        rendered: false,
+        response: "source",
+      },
+    }),
+  );
+  expect(JSON.stringify(source)).toContain("REMOTE ORIGINAL PAGE SOURCE");
+  expect(source).not.toHaveProperty("path");
+  const anonymous = await client();
+  expect(
+    (
+      await anonymous.callTool({
+        name: "board_read",
+        arguments: {
+          projectId,
+          pageId,
+          snapshotId: result.snapshotId,
+          mode: "source",
+        },
+      })
+    ).isError,
+  ).toBe(true);
+}, 60000);
+
 test("anonymous clients discover and customize public resources without a project, while private tools challenge for OAuth", async () => {
   const anonymous = await client();
   const tools = await anonymous.listTools();

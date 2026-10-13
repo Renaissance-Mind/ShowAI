@@ -1,4 +1,5 @@
 import { SurfaceGeometryStore } from "./geometry-store";
+import { readingCapture } from "./reading-capture";
 import { EditorViewScope } from "../editor/view-scope";
 import {
   transformObjects,
@@ -928,6 +929,12 @@ function ContainerView({
   useLayoutEffect(() => {
     const element = page.current;
     if (!element) return;
+    const captured = readingCapture()?.pageScrolls?.[id];
+    if (captured) {
+      element.scrollLeft = captured.x;
+      element.scrollTop = captured.y;
+      return;
+    }
     const saved = runtime.scrolls.get(persistKey) ?? readScroll(persistKey);
     if (Number.isFinite(saved)) element.scrollTop = saved;
     return () => {

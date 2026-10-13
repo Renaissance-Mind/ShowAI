@@ -36,6 +36,12 @@ export function compactMcpResult(
     "synchronization",
     "persistence",
     "delivery",
+    "snapshotId",
+    "sourceHash",
+    "currentHash",
+    "currentSourceChanged",
+    "expiresAt",
+    "origin",
   ];
   const selected = Object.fromEntries(
     fields.filter((key) => key in record).map((key) => [key, record[key]]),

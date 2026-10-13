@@ -257,8 +257,7 @@ test("HTML actions edit a temporary draft while preserving the full Page bytes",
         {
           type: "click",
           blockId: "gantt",
-          role: "button",
-          name: "查看任务 交互与视觉设计，第 3 层，进行中",
+          selector: 'button[aria-label^="查看任务 交互与视觉设计，第 3 层，"]',
         },
         { type: "click", blockId: "gantt", role: "button", name: "编辑任务" },
         {

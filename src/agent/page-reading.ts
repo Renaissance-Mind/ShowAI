@@ -14,6 +14,7 @@ import { renderReading, type ReadingCapture } from "./reading-renderer";
 import type { ShowDocument } from "../types";
 import type { JSONContent } from "@tiptap/core";
 import { collectCustomComponentRefs } from "../components/custom/contract";
+import { loadBoardSnapshot } from "./board-reading";
 
 export const READ_VIEWS = ["structured", "image", "html"] as const;
 const roles = [
@@ -74,6 +75,7 @@ export const readingActionSchema = z
   });
 export const pageReadSchema = z
   .object({
+    snapshotId: z.string().uuid().optional(),
     view: z.enum(READ_VIEWS).default("structured"),
     format: z.enum(["json", "markdown"]).default("json"),
     detail: z.enum(["full", "outline"]).default("full"),
@@ -102,6 +104,13 @@ export type PageReadOptions = z.input<typeof pageReadSchema>;
 export type ReadingOptions = z.output<typeof pageReadSchema>;
 export type ReadingAction = z.output<typeof readingActionSchema>;
 export interface ReadIdentity {
+  snapshotId?: string;
+  sourceHash?: string;
+  currentHash?: string;
+  currentSourceChanged?: boolean;
+  capturedAt?: string;
+  expiresAt?: string;
+  origin?: "saved" | "provided-draft";
   revision?: string;
   projectId: string;
   pageId: string;
@@ -320,6 +329,16 @@ export async function readPageView(
 ): Promise<PageReadResult> {
   const options = pageReadSchema.parse(input);
   if (
+    options.snapshotId &&
+    (options.view !== "structured" ||
+      options.rendered === true ||
+      options.actions.length)
+  )
+    throw new CoreError(
+      "INVALID_DATA",
+      "snapshotId on page_read supports source-only structured reading. Use board_read for snapshot images.",
+    );
+  if (
     options.view !== "structured" &&
     (options.detail !== "full" ||
       options.format !== "json" ||
@@ -329,7 +348,19 @@ export async function readPageView(
       "INVALID_DATA",
       "format/detail/rendered apply to structured reading only.",
     );
-  const record = await store.readPage(projectId, pageId);
+  const current = await store.readPage(projectId, pageId);
+  const captured = options.snapshotId
+    ? await loadBoardSnapshot(store, projectId, pageId, options.snapshotId)
+    : undefined;
+  const record = captured
+    ? {
+        ...current,
+        document: captured.document,
+        hash: captured.snapshot.hash,
+        revision: captured.snapshot.revision,
+        path: captured.path,
+      }
+    : current;
   if (options.expectedHash && options.expectedHash !== record.hash)
     throw new CoreError(
       "CONFLICT",
@@ -341,7 +372,9 @@ export async function readPageView(
     : record.document;
   const sourceOnly =
     options.view === "structured" &&
-    (options.detail === "outline" || options.rendered === false);
+    (options.detail === "outline" ||
+      options.rendered === false ||
+      !!options.snapshotId);
   if (sourceOnly && options.actions.length)
     throw new CoreError(
       "INVALID_DATA",
@@ -351,6 +384,17 @@ export async function readPageView(
     ? []
     : await resolveDocumentComponents(store.root, document, projectId);
   const identity: ReadIdentity = {
+    ...(captured
+      ? {
+          snapshotId: options.snapshotId,
+          sourceHash: captured.snapshot.sourceHash,
+          currentHash: current.hash,
+          currentSourceChanged: current.hash !== captured.snapshot.hash,
+          capturedAt: captured.snapshot.createdAt,
+          expiresAt: captured.snapshot.expiresAt,
+          origin: captured.snapshot.origin,
+        }
+      : {}),
     projectId,
     pageId,
     title: record.document.title,

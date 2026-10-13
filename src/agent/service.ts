@@ -1,5 +1,6 @@
 import { CapacityError } from "../portable/capacity.mjs";
 import { ReadBaselines } from "../core/read-baselines";
+import { readBoard, type BoardReadInput } from "./board-reading";
 import { EditorDrafts } from "../core/editor-drafts";
 import { placeTemplate } from "../surface/document.mjs";
 import { upgradeResource } from "../surface/containers.mjs";
@@ -1316,6 +1317,16 @@ export class AgentService {
         )
       : undefined;
     return this.store.createPage(project, { ...input, document });
+  }
+  async readBoard(
+    projectId: string,
+    pageId: string,
+    options: BoardReadInput = {},
+  ) {
+    const project = this.requireProject(projectId);
+    const record = await this.store.readPage(project, pageId);
+    await new ReadBaselines(this.store.root).remember(project, record);
+    return readBoard(this.store, project, pageId, options);
   }
   readPage(projectId: string, pageId: string): Promise<StructuredRead>;
   readPage(

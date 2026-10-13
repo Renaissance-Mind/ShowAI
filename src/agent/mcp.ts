@@ -18,6 +18,7 @@ import {
 import { presentPage } from "./page-presentation";
 import { getObjectShape } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import packageMetadata from "../../package.json";
 import { AgentService, errorResult } from "./service";
@@ -41,6 +42,7 @@ import { syncManager } from "../sync/manager";
 import { TEMPLATE_STAGES } from "../portable/template-bundle.mjs";
 import type { TemplateSelection } from "./template-workflow";
 import { compactMcpResult } from "./mcp-response";
+import { boardReadSchema, type BoardReadResult } from "./board-reading";
 
 const scopeSchema = z.enum([
   "builtin",
@@ -80,7 +82,7 @@ export function createMcpServer(options: {
     {
       instructions:
         options.instructions ??
-        `ShowAI creates interactive pages in project ${projectId}. This connection is bound to that project. Page reading defaults to structured JSON/Markdown. Use image for visual checks and html for browser DOM and interaction checks; guide reading documents viewport, theme, partial scope, actions and temporary draft previews. Retain the source hash and revision before writing; versioned page writes require baseRevision. Use catalog summaries to choose resources and explicit views for details or source. Shared revisions are immutable; fork/merge into this project. Shared promotion or published registration needs an explicit CLI/desktop action.`,
+        `ShowAI creates interactive pages in project ${projectId}. This connection is bound to that project. Start Board understanding with board_read: full image or overview plus overlapping tiles, then use snapshotId for image-local elements and Page sources. Ordinary Page reading defaults to structured JSON/Markdown. Use image for visual checks and html for browser DOM and interaction checks; guide reading documents capture and source queries. Retain the current source hash and revision before writing; versioned page writes require baseRevision. Use catalog summaries to choose resources and explicit views for details or source. Shared revisions are immutable; fork/merge into this project. Shared promotion or published registration needs an explicit CLI/desktop action.`,
     },
   );
   const register: McpServer["registerTool"] = (name, config, callback) => {
@@ -329,6 +331,48 @@ export function createMcpServer(options: {
               },
             ],
           };
+        },
+      ),
+  );
+  register(
+    "board_read",
+    {
+      description:
+        "Read a native Board visually by default: a clear full image for small boards, or overview plus overlapping tiles and element/Page indexes. Use the returned snapshotId for tile, pixel region, element and original-source queries. All images and source stay pinned to that capture; reading never saves. boardId is required when the resource root is a Page. See guide reading.",
+      inputSchema: { pageId: z.string().min(1), ...boardReadSchema.shape },
+      annotations: readOnly,
+    },
+    ({ pageId, ...input }) =>
+      call(() => service.readBoard(projectId, pageId, input)).then(
+        async (result) => {
+          if (!("data" in result.structuredContent)) return result;
+          const data = result.structuredContent.data as BoardReadResult;
+          const content: CallToolResult["content"] = [...result.content];
+          for (const image of data.images) {
+            const png = await readFile(image.path);
+            if (png.length > CAPACITY.mcpImageBytes)
+              return mcpFailure(
+                new CapacityError(
+                  "Board PNG image",
+                  png.length,
+                  CAPACITY.mcpImageBytes,
+                ),
+              );
+            content.push({
+              type: "text",
+              text: JSON.stringify({
+                imageKey: image.imageKey,
+                attachmentIndex: image.attachmentIndex,
+                pixelSize: image.pixelSize,
+              }),
+            });
+            content.push({
+              type: "image",
+              mimeType: "image/png",
+              data: png.toString("base64"),
+            });
+          }
+          return { ...result, content };
         },
       ),
   );

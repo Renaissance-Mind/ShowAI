@@ -31,20 +31,21 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 ## 根据任务继续
 
-| 任务                             | 操作与指南                                                                                                                                                                                           |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 查询容量、超限原因或同步清单大小 | 读取 `showai_capabilities.capacities` 与 [容量与大文件](../show-document/references/capacity.md)，按实际错误对象解释；只读查询不创建页面                                                             |
-| 先梳理怎么讲清楚、规划内容层次   | [plan-presentation](../plan-presentation/SKILL.md)，形成认知起点、理解路径和通过条件                                                                                                                 |
-| 设计视觉、布局和交互分镜         | [design-presentation](../design-presentation/SKILL.md)，按理解任务选择表达与资源                                                                                                                     |
-| 评估呈现效果、诊断难理解处       | [review-presentation](../review-presentation/SKILL.md)，按授权评审或修订                                                                                                                             |
-| 找项目、页面、正文或已有材料     | `projects_list` / `project_context` → `pages_list` / `library_search` → `page_read`；按需 `guide({topic:"reading"})`                                                                                 |
-| 阅读数据、长页局部               | 默认 structured；先 `detail:"outline"` 获取节点 ID，再用 `blockIds` 取局部；纯源读取用 `rendered:false`                                                                                              |
-| 查看布局或操作效果               | `page_read` 的 image / html；读取 [阅读视图](../show-document/references/page-reading.md)，遵循宿主实际 UI 操控规则                                                                                  |
-| 创建、修改、展示、导出或应用模板 | [show-document](../show-document/SKILL.md)                                                                                                                                                           |
-| 查询组件或模板                   | `catalog_list({kind:"component"或"template",projectId})` 读取相应目录元信息；模板先用 template_context 与 template_guide，组件再按需取 guide/schema；公开目录用 public_catalog_list/describe |
-| 创建可复用组件                   | [create-component](../create-component/SKILL.md)                                                                                                                                                     |
-| 创建或提炼模板                   | [create-template](../create-template/SKILL.md)                                                                                                                                                       |
-| 同步状态                         | 本机 `project_sync_status`，明确需要同步时 `project_sync`；远程检查操作返回的 synchronization                                                                                                        |
+| 任务                                 | 操作与指南                                                                                                                                                                                      |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 查询容量、超限原因或同步清单大小     | 读取 `showai_capabilities.capacities` 与 [容量与大文件](../show-document/references/capacity.md)，按实际错误对象解释；只读查询不创建页面                                                        |
+| 先梳理怎么讲清楚、规划内容层次       | [plan-presentation](../plan-presentation/SKILL.md)，形成认知起点、理解路径和通过条件                                                                                                            |
+| 设计视觉、布局和交互分镜             | [design-presentation](../design-presentation/SKILL.md)，按理解任务选择表达与资源                                                                                                                |
+| 评估呈现效果、诊断难理解处           | [review-presentation](../review-presentation/SKILL.md)，按授权评审或修订                                                                                                                        |
+| 找项目、页面、正文或已有材料         | `projects_list` / `project_context` → `pages_list` / `library_search` → `page_read`；按需 `guide({topic:"reading"})`                                                                            |
+| 阅读数据、长页局部                   | 默认 structured；先 `detail:"outline"` 获取节点 ID，再用 `blockIds` 取局部；纯源读取用 `rendered:false`                                                                                         |
+| 理解 Board、从裁切图定位 Page 或对象 | `board_read` 默认图像包 → 同一 snapshotId 的 tile/region/element/source；Page 完整源用 `page_read` 的 snapshotId/blockIds；见 [Board 与 Page 阅读](../show-document/references/page-reading.md) |
+| 查看布局或操作效果                   | `page_read` 的 image / html；读取 [阅读视图](../show-document/references/page-reading.md)，遵循宿主实际 UI 操控规则                                                                             |
+| 创建、修改、展示、导出或应用模板     | [show-document](../show-document/SKILL.md)                                                                                                                                                      |
+| 查询组件或模板                       | `catalog_list({kind:"component"或"template",projectId})` 读取相应目录元信息；模板先用 template_context 与 template_guide，组件再按需取 guide/schema；公开目录用 public_catalog_list/describe    |
+| 创建可复用组件                       | [create-component](../create-component/SKILL.md)                                                                                                                                                |
+| 创建或提炼模板                       | [create-template](../create-template/SKILL.md)                                                                                                                                                  |
+| 同步状态                             | 本机 `project_sync_status`，明确需要同步时 `project_sync`；远程检查操作返回的 synchronization                                                                                                   |
 
 尚未取得可复用的完整索引时调用 `catalog_list({kind:"component",projectId})`，省略 scope、query、limit、cursor，先获得全部内置组件与当前项目组件的名字、摘要和场景、reuse 与 documentationStatus。默认每个 id/来源一个推荐版本；versions:"all" 用于查询可用组件版本，已有页面沿用其精确旧引用。全局或已发布组件可显式指定 scope 为 global、published 或 all 查询。读取详情时沿用返回的 scope、version、integrity，避免同名组件混淆。外部宿主通过上下文初始化取得目录；不能把工具已注册等同于模型已读到。按需 query 筛选；显式 limit/cursor 仍可分页。列表不含参数、示例或源码。通用 general、专题 domain、内容专用 content-specific 表达复用范围，与来源、权限分别判断；旧资料缺失标为 unclassified/missing。选中后 guide 返回专属使用说明；parameters 将schema、字段语义和真实样例合成可分页参考，可用parameterPath查询一个字段或子树，knownHash仅用于已经持有的同一结果。v1/缺失说明会显示诊断，不能当作完整v2契约。修改实现前读取 development，再按需读 source。
 

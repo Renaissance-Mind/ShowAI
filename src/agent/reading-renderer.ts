@@ -21,7 +21,7 @@ export interface ReadingCapture {
   components: ComponentReading[];
 }
 const require = createRequire(import.meta.url);
-async function executable(): Promise<string> {
+export async function readingBrowserExecutable(): Promise<string> {
   const { chromium } =
     require("playwright-core") as typeof import("playwright-core");
   const supplied = process.env.SHOWAI_BROWSER_EXECUTABLE;
@@ -188,7 +188,7 @@ export async function renderReading(
   let browser: Browser | undefined;
   try {
     browser = await chromium.launch({
-      executablePath: await executable(),
+      executablePath: await readingBrowserExecutable(),
       headless: true,
       timeout: 15000,
     });
@@ -240,7 +240,11 @@ export async function renderReading(
       });
       await settleFramePaint(frame);
     }
-    for (const action of options.actions) await act(page, action);
+    for (const action of options.actions) {
+      await act(page, action);
+      // Dialogs and frame resizing triggered by an action must settle before the next control is targeted.
+      for (const frame of page.frames()) await settleFramePaint(frame);
+    }
     for (const frame of page.frames()) await settleFramePaint(frame);
     if (errors.length)
       throw new Error(`Page preview failed: ${errors.join("; ")}`);

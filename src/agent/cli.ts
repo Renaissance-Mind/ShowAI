@@ -42,6 +42,7 @@ import { assertExportDestination } from "./exporter";
 import type { ExportFormat } from "./exporter";
 import { runtimeInfo, registerRuntime } from "./runtime";
 import type { PageReadOptions } from "./page-reading";
+import { boardReadSchema, type BoardReadInput } from "./board-reading";
 import {
   describePublicResource,
   publicCatalog,
@@ -87,6 +88,7 @@ Display a full page or selected blocks:
   export --project PROJECT --page PAGE [--blocks ID,ID] --format html|inline --out PATH
 
 Read one Page through structured data, an image or interactive HTML:
+  boards read PAGE --project PROJECT [--board BOARD_NODE] [--state OPTIONS.json]
   pages read PAGE --project PROJECT [--view structured|image|html] [--blocks ID,ID]
   pages read PAGE --project PROJECT --format markdown [--detail full|outline]
   pages read PAGE --project PROJECT --view image --theme dark --width 1000 --height 900 --out preview.png
@@ -193,6 +195,13 @@ function parseArguments(args: string[]): Arguments {
     "height",
     "state",
     "rendered",
+    "board",
+    "snapshot",
+    "mode",
+    "node",
+    "tiles",
+    "tile",
+    "scale",
     "connection",
     "account",
     "password-file",
@@ -720,6 +729,35 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
         return service.bindProject(id, binding(args, true)!);
       }
       break;
+    case "boards": {
+      if (action !== "read") throw new Error("Use boards read PAGE.");
+      requireCount(args, 3);
+      const state = option(args, "state");
+      const input: BoardReadInput = state
+        ? JSON.parse(await readFile(state, "utf8"))
+        : {};
+      const boardId = option(args, "board"),
+        snapshotId = option(args, "snapshot"),
+        mode = option(args, "mode"),
+        nodeId = option(args, "node"),
+        tiles = option(args, "tiles"),
+        tileId = option(args, "tile"),
+        scale = option(args, "scale");
+      Object.assign(input, {
+        ...(boardId ? { boardId } : {}),
+        ...(snapshotId ? { snapshotId } : {}),
+        ...(mode ? { mode } : {}),
+        ...(nodeId ? { nodeId } : {}),
+        ...(tiles ? { tileIds: tiles.split(",") } : {}),
+        ...(tileId ? { tileId } : {}),
+        ...(scale ? { scale: Number(scale) } : {}),
+      });
+      return service.readBoard(
+        await project(),
+        id,
+        boardReadSchema.parse(input),
+      );
+    }
     case "pages":
       if (action === "list") {
         requireCount(args, 2);
@@ -771,6 +809,8 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
           readOptions.presentation =
             presentation as PageReadOptions["presentation"];
         const rendered = option(args, "rendered");
+        const snapshotId = option(args, "snapshot");
+        if (snapshotId) readOptions.snapshotId = snapshotId;
         if (rendered) {
           if (!["true", "false"].includes(rendered))
             throw new Error("--rendered must be true or false.");

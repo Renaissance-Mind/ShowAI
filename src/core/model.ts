@@ -207,6 +207,7 @@ export interface PageDiff {
 }
 
 export type CoreErrorCode =
+  | "SNAPSHOT_EXPIRED"
   | "NOT_FOUND"
   | "CONFLICT"
   | "MISSING_BASELINE"

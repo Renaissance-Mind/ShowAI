@@ -143,6 +143,21 @@ export function registerPresentationTools(
           baseline: { tool: "guide", arguments: { topic: "presentation" } },
         },
         componentParameters: COMPONENT_PARAMETER_CAPABILITIES,
+        boardReading: {
+          protocol: "showai-board-reading-v1",
+          available: options.privateProjects !== false,
+          tool: "board_read",
+          defaultView: "visual",
+          modes: ["visual", "tile", "region", "element", "source"],
+          snapshotMinutes: 30,
+          maxImages: 8,
+          tilePixels: { width: 1600, height: 1600 },
+          overlapPixels: 200,
+          pageSource: {
+            tool: "page_read",
+            fields: ["snapshotId", "blockIds", "rendered"],
+          },
+        },
         capacities: { unit: "bytes", ...CAPACITY },
         transport: options.transport,
         presentation: {
