@@ -3,6 +3,7 @@ import type {
   DesktopChange,
   DesktopWindowState,
 } from "../desktop/bridge";
+import type { Locale } from "../i18n";
 import type { TabCommand } from "../workbench/tab-shortcuts";
 export interface DesktopBridge {
   openWindow?(
@@ -10,6 +11,7 @@ export interface DesktopBridge {
     prepare: () => Promise<boolean>,
   ): Promise<boolean>;
   setAppearance?(appearance: DesktopAppearance): Promise<void>;
+  setLocale?(locale: Locale): Promise<void>;
   getWindowState?(): Promise<DesktopWindowState>;
   onWindowStateChange?(
     listener: (state: DesktopWindowState) => void,

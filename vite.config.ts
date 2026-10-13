@@ -9,6 +9,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // Tests assert the Chinese UI unless they choose a language themselves.
+    env: { SHOWAI_LANGUAGE: "zh-CN" },
     css: { include: [/\.css(?:\?raw)?$/] },
   },
 } as Parameters<typeof defineConfig>[0]);
