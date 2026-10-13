@@ -17,6 +17,8 @@ import richTextModel from "../components/rich-text/model.mjs?raw";
 import richTextHighlight from "../components/rich-text/reading-highlight.ts?raw";
 import sharedSelectionToolbar from "../editor/SelectionToolbar.tsx?raw";
 import sharedSelectionToolbarCss from "../editor/selection-toolbar.css?raw";
+import workspaceEditor from "../editor/workspace-editor.tsx?raw";
+import editorNodeJson from "../editor/node-json.ts?raw";
 import { g2BuiltinSources } from "./g2-builtin-sources";
 import g2Exports from "../components/blocks/g2/exports-map.json";
 import themeTokens from "../design/tokens.css?raw";
@@ -86,6 +88,8 @@ const sources: Record<string, string> = {
   "rich-text/reading-highlight.ts": richTextHighlight,
   "editor/SelectionToolbar.tsx": sharedSelectionToolbar,
   "editor/selection-toolbar.css": sharedSelectionToolbarCss,
+  "editor/workspace-editor.tsx": workspaceEditor,
+  "editor/node-json.ts": editorNodeJson,
   "icons.ts": icons,
   "ExpandableSearch.tsx": expandableSearch,
   "expandable-search.css": expandableSearchCss,
