@@ -1,9 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FileStore } from "./store";
 import { documentHash } from "./diff";
+import { ReadBaselines } from "./read-baselines";
 import type { PageRecord } from "./model";
 import { fileSymlink } from "../test/file-symlink";
 
@@ -161,8 +169,9 @@ describe("file-first project store", () => {
     });
   });
 
-  it("keeps checkpoint-based text diffs and rejects stale saves without losing human edits", async () => {
+  it("diffs against the retained read baseline and rejects stale saves without losing human edits", async () => {
     const { projectId, record } = await page();
+    await new ReadBaselines(store.root).remember(projectId, record);
     const blockId = record.document.content.content![0].attrs!.id as string;
     const paragraphId = record.document.content.content![0].content![0].attrs!
       .id as string;
@@ -229,6 +238,7 @@ describe("file-first project store", () => {
 
   it("detects direct external file edits while the app is closed", async () => {
     const { projectId, record } = await page();
+    await new ReadBaselines(store.root).remember(projectId, record);
     const source = JSON.parse(await readFile(record.path, "utf8"));
     source.document.title = "External edit";
     source.document.content.content.push({
@@ -281,20 +291,23 @@ describe("file-first project store", () => {
     });
   });
 
-  it("rejects corrupted checkpoint data instead of reporting a misleading diff", async () => {
+  it("ignores a corrupted read baseline instead of reporting a misleading diff", async () => {
     const { projectId, record } = await page();
-    const checkpoint = join(
-      store.projectPath(projectId),
-      "snapshots",
+    await new ReadBaselines(store.root).remember(projectId, record);
+    await store.savePage(
+      projectId,
       record.document.id,
-      `${record.hash}.json`,
+      { ...record.document, title: "Current title" },
+      record.hash,
     );
-    const source = JSON.parse(await readFile(checkpoint, "utf8"));
-    source.document.title = "Corrupted";
-    await writeFile(checkpoint, JSON.stringify(source));
+    const directory = join(store.root, "local", "read-baselines");
+    const [name] = await readdir(directory);
+    const retained = JSON.parse(await readFile(join(directory, name), "utf8"));
+    retained.document.title = "Corrupted";
+    await writeFile(join(directory, name), JSON.stringify(retained));
     await expect(
       store.diffPage(projectId, record.document.id, record.hash),
-    ).rejects.toMatchObject({ code: "INVALID_DATA" });
+    ).rejects.toMatchObject({ code: "MISSING_BASELINE" });
   });
 
   it("rejects traversal and malformed IDs", async () => {

@@ -11,15 +11,15 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
-import { chromium } from "playwright";
+import { DatabaseSync } from "node:sqlite";
 import { FileStore } from "./store";
 import { ContentLibrary as GitLibrary } from "./content-library";
+import { GitLibrary as LegacyGitLibrary } from "./git-library";
+import { SqliteLibrary } from "./sqlite-library";
 import { LibraryOperations } from "./library-operations";
 import { readArchivedReader, readerBindingPath } from "./archived-reader";
-import { exportPage } from "../agent/exporter";
 
-describe("frozen historical readers", () => {
+describe("retained legacy readers", () => {
   let directory: string,
     root: string,
     viewer: string,
@@ -61,118 +61,112 @@ describe("frozen historical readers", () => {
       .digest("hex");
     await writeFile(archive, JSON.stringify(raw));
   }
-  it("preserves emitted code, style and bindings across source updates, missing local runtime and restores", async () => {
-    const store = new FileStore(root),
-      library = new GitLibrary(root),
-      operations = new LibraryOperations(root);
-    const project = await store.createProject({ name: "Frozen renderer" });
-    await readerVersion("A");
-    const first = await store.createPage(project.id, {
+  /**
+   * Current saves no longer capture readers. Readers captured by a legacy Git
+   * library remain retained recovery material after migration.
+   */
+  async function legacyCapturedPage() {
+    const source = new FileStore(join(directory, "source"));
+    const project = await source.createProject({ name: "Frozen renderer" });
+    const page = await source.createPage(project.id, {
       title: "原始阅读器页面",
     });
+    const projectPath = `projects/${project.id}/project.json`,
+      path = `projects/${project.id}/pages/${page.document.id}.json`;
+    await rm(root, { recursive: true, force: true });
+    const legacy = new LegacyGitLibrary(root);
+    await legacy.initialize();
+    await readerVersion("A");
+    const captured = await legacy.writeFiles(
+      new Map([
+        [projectPath, await readFile(join(source.root, projectPath))],
+        [path, await readFile(page.path)],
+      ]),
+      { actor: { kind: "human" }, channel: "desktop" },
+    );
+    const reader = await readArchivedReader(path, (name) =>
+      legacy.readFile(name, captured!.revision),
+    );
+    await new GitLibrary(root).initialize();
+    return { project, page, path, revision: captured!.revision, reader };
+  }
+  it("renders a migrated legacy reader at its archived revision and captures none for current saves", async () => {
+    const { project, page, revision, reader } = await legacyCapturedPage();
+    const operations = new LibraryOperations(root);
     const old = await operations.historicalHtml(
       project.id,
-      first.document.id,
-      first.revision!,
+      page.document.id,
+      revision,
     );
-    await readerVersion("B");
-    const next = await store.savePage(
-      project.id,
-      first.document.id,
-      { ...first.document, title: "新的阅读器页面" },
-      first.hash,
-      first.revision,
-    );
-    const current = await operations.historicalHtml(
-      project.id,
-      first.document.id,
-      next.revision!,
-    );
-    expect(old.reader.integrity).not.toBe(current.reader.integrity);
+    expect(old.reader).toEqual(reader.ref);
+    expect(old.html).toContain("readerProof");
+    expect(old.html).toContain("原始阅读器页面");
     await rm(join(directory, "runtime"), { recursive: true });
     expect(
-      await operations.historicalHtml(
-        project.id,
-        first.document.id,
-        first.revision!,
-      ),
+      await operations.historicalHtml(project.id, page.document.id, revision),
     ).toEqual(old);
-    const exported = await exportPage({
-      root,
-      projectId: project.id,
-      pageId: first.document.id,
-      revision: first.revision,
-      format: "html",
-      out: join(directory, "historical.html"),
-    });
-    expect(exported.pageIds).toEqual([first.document.id]);
-    const browser = await chromium.launch();
-    try {
-      const page = await browser.newPage();
-      const errors: string[] = [];
-      page.on("pageerror", (error) => errors.push(error.message));
-      await page.goto(pathToFileURL(join(directory, "historical.html")).href);
-      await page.locator('html[data-reader-proof="A"]').waitFor();
-      expect(
-        await page.evaluate(() =>
-          getComputedStyle(document.body)
-            .getPropertyValue("--reader-proof")
-            .trim(),
-        ),
-      ).toBe("A");
-      expect(
-        await page.getByText("原始阅读器页面", { exact: true }).count(),
-      ).toBeGreaterThan(0);
-      const currentPath = join(directory, "current.html");
-      await writeFile(currentPath, current.html);
-      await page.goto(pathToFileURL(currentPath).href);
-      await page.locator('html[data-reader-proof="B"]').waitFor();
-      expect(errors).toEqual([]);
-    } finally {
-      await browser.close();
-    }
-    const restored = await operations.restorePage({
-      projectId: project.id,
-      pageId: first.document.id,
-      revision: first.revision!,
-      baseRevision: next.revision!,
-    });
-    const reader = await readArchivedReader(
-      `projects/${project.id}/pages/${first.document.id}.json`,
-      (path) => library.readFile(path, restored.revision),
+    const store = new FileStore(root);
+    const current = await store.readPage(project.id, page.document.id);
+    const next = await store.savePage(
+      project.id,
+      page.document.id,
+      { ...current.document, title: "新的阅读器页面" },
+      current.hash,
+      current.revision,
     );
-    expect(reader.ref).toEqual(old.reader);
-    const indexPaths = (await library.tree()).filter((item) =>
-      item.path.endsWith("/viewer.html"),
-    );
-    expect(indexPaths).toHaveLength(2);
+    // Saving keeps the retained binding instead of capturing a new reader.
+    expect(
+      (
+        await operations.historicalHtml(
+          project.id,
+          page.document.id,
+          next.revision!,
+        )
+      ).reader,
+    ).toEqual(old.reader);
+    const created = await store.createPage(project.id, { title: "当前页面" });
+    await expect(
+      operations.historicalHtml(
+        project.id,
+        created.document.id,
+        created.revision!,
+      ),
+    ).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      message: expect.stringMatching(/predates reader capture/),
+    });
+    expect(
+      await operations.historicalHtml(project.id, page.document.id, revision),
+    ).toEqual(old);
   }, 20000);
-  it("rejects a corrupted frozen runtime while retaining page content", async () => {
-    const library = new GitLibrary(root),
-      store = new FileStore(root),
-      project = await store.createProject({ name: "Integrity" }),
-      page = await store.createPage(project.id);
-    const path = `projects/${project.id}/pages/${page.document.id}.json`,
-      reader = await readArchivedReader(path, (name) => library.readFile(name));
-    await library.writeFiles(
-      new Map([
-        [
-          `runtimes/readers/${reader.ref.integrity}/viewer.html`,
-          Buffer.from("corrupt reader"),
-        ],
-      ]),
-      { actor: { kind: "external" }, channel: "external" },
-    );
+  it("rejects a corrupted archived runtime while retaining page content", async () => {
+    const { project, page, revision, reader } = await legacyCapturedPage();
+    const runtime = (await new SqliteLibrary(root).tree(revision)).find(
+      (entry) =>
+        entry.path === `runtimes/readers/${reader.ref.integrity}/viewer.html`,
+    )!;
+    const db = new DatabaseSync(join(root, "history", "content.sqlite"));
+    try {
+      db.prepare("UPDATE blobs SET data=?,codec=0 WHERE oid=?").run(
+        Buffer.from("corrupt reader"),
+        runtime.oid,
+      );
+    } finally {
+      db.close();
+    }
     await expect(
       new LibraryOperations(root).historicalHtml(
         project.id,
         page.document.id,
-        (await library.head())!,
+        revision,
       ),
     ).rejects.toMatchObject({ code: "INVALID_DATA" });
     expect(
-      (await store.readPage(project.id, page.document.id)).document.id,
+      (await new FileStore(root).readPage(project.id, page.document.id))
+        .document.id,
     ).toBe(page.document.id);
-    expect(readerBindingPath(path)).toContain("/reader.json");
+    expect(readerBindingPath(`projects/${project.id}/pages/x.json`)).toContain(
+      "/reader.json",
+    );
   });
 });

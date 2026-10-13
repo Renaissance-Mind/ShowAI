@@ -76,7 +76,8 @@ describe("revision-backed list projections", () => {
       return store.listPages(project.id);
     });
     await started;
-    await store.savePage(
+    // The writer waits for the pinned current read instead of reading history.
+    const saving = store.savePage(
       project.id,
       page.document.id,
       { ...page.document, title: "After" },
@@ -85,6 +86,7 @@ describe("revision-backed list projections", () => {
     );
     released();
     expect((await prior)[0].title).toBe("Before");
+    await saving;
     expect((await store.listPages(project.id))[0].title).toBe("After");
   });
   it("retains external writes until actual page reads inspect and report conflicts", async () => {

@@ -25,13 +25,35 @@ import {
 import { LibraryIndex } from "./library-index";
 import { LibraryOperations } from "./library-operations";
 import type { PageRecord } from "./model";
+import { serializeArtifact } from "../portable/validation.mjs";
+
+/** Earlier file libraries kept one immutable checkpoint per page state. */
+async function legacyCheckpoint(
+  root: string,
+  projectId: string,
+  record: PageRecord,
+) {
+  const directory = join(
+    root,
+    "projects",
+    projectId,
+    "snapshots",
+    record.document.id,
+  );
+  await mkdir(directory, { recursive: true });
+  await writeFile(
+    join(directory, `${record.hash}.json`),
+    serializeArtifact(record.document),
+  );
+}
 describe("one-time file library import", () => {
   let directory: string,
     source: string,
     destination: string,
     store: FileStore,
     projectId: string,
-    page: PageRecord;
+    page: PageRecord,
+    componentVersion: string;
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), "showai-import-"));
     source = join(directory, "old");
@@ -47,7 +69,9 @@ describe("one-time file library import", () => {
       join(import.meta.dirname, "../../resources/catalog/value-slider"),
       projectId,
     );
+    componentVersion = component.version;
     page = await store.createPage(projectId, { title: "导入前的论文图表" });
+    await legacyCheckpoint(source, projectId, page);
     page = await store.applyPage(projectId, page.document.id, {
       baseHash: page.hash,
       operations: [
@@ -64,6 +88,7 @@ describe("one-time file library import", () => {
         },
       ],
     });
+    await legacyCheckpoint(source, projectId, page);
     await saveTemplate(
       source,
       {
@@ -126,7 +151,7 @@ describe("one-time file library import", () => {
         await readComponentSource(
           destination,
           "value-slider",
-          "1.1.1",
+          componentVersion,
           projectId,
         )
       ).source,
@@ -139,8 +164,10 @@ describe("one-time file library import", () => {
         })
       ).items.length,
     ).toBeGreaterThan(0);
-    expect(await library.history()).toHaveLength(1);
-    expect((await library.history())[0].actor.kind).toBe("unknown");
+    expect(await library.history()).toEqual([]);
+    expect((await library.entryAt(report.revision!)).actor.kind).toBe(
+      "unknown",
+    );
     expect((await importer.list())[0].id).toBe(report.id);
     expect(await readFile(page.path)).toEqual(original);
     await importer.activate(report.id);
@@ -164,10 +191,22 @@ describe("one-time file library import", () => {
     });
     const { updatedAt: _time, ...expected } = historic.document;
     expect(restored.document).toMatchObject({ ...expected, archived: false });
-    expect((await library.history())[0].restoredSnapshot).toEqual({
+    expect(
+      (await library.entryAt((await library.head())!)).restoredSnapshot,
+    ).toEqual({
       importId: first.importId,
       snapshotId: first.id,
     });
+    // The restore superseded the import revision; snapshots stay readable.
+    expect(await library.head()).not.toBe(report.revision);
+    expect(
+      (
+        await operations.importedPage(projectId, page.document.id, {
+          importId: first.importId,
+          snapshotId: first.id,
+        })
+      ).document,
+    ).toEqual(historic.document);
     await expect(
       new LibraryOperations(destination, "other-project").importedPage(
         projectId,
@@ -203,9 +242,7 @@ describe("one-time file library import", () => {
     );
     expect(saved.document.title).toBe("新版本");
     expect(await readFile(page.path)).toEqual(original);
-    expect(
-      (await new LibraryOperations(source).history({ projectId })).items,
-    ).toHaveLength(2);
+    expect(await new GitLibrary(source).head()).toBe(saved.revision);
   }, 20000);
   it("refuses activation after a later source edit and retains a damaged checkpoint as original bytes", async () => {
     const brokenPath = `projects/${projectId}/snapshots/${page.document.id}/${"0".repeat(64)}.json`;
@@ -346,6 +383,7 @@ describe("one-time file library import", () => {
     const saved = await store.createPage(projectId, {
       document: JSON.parse(JSON.stringify(legacy)),
     });
+    await legacyCheckpoint(source, projectId, saved);
     const importer = new LibraryImport(destination),
       report = await importer.prepare(source);
     await importer.activate(report.id);

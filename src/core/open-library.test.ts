@@ -17,8 +17,9 @@ describe("default versioned libraries", () => {
       const project = await new AgentService({ root }).createProject(
         "Versioned by default",
       );
+      const library = new GitLibrary(root);
       expect(
-        (await new GitLibrary(root).history())[0].resources[0].projectId,
+        (await library.entryAt((await library.head())!)).resources[0].projectId,
       ).toBe(project.id);
     } finally {
       await rm(root, { recursive: true, force: true });
