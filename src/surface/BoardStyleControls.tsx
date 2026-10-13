@@ -18,6 +18,7 @@ function StrokeWidthSlider({
     <span className="board-stroke-slider" data-active={active || undefined}>
       <svg
         viewBox="0 0 120 24"
+        preserveAspectRatio="none"
         aria-hidden="true"
         className="board-stroke-track"
       >
