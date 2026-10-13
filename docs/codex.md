@@ -6,15 +6,21 @@ ShowAI 插件提供七个 Skill 和本机 MCP 启动入口。Agent 通过 MCP �
 
 本机需要 **Node.js 22.12+**、Codex 和支持 `showai-mcp-v1` 的 ShowAI 运行时。ShowAI 启动或 `runtime register` 会在目标内容库中登记 `agent-runtime.json`。
 
-在源码仓库中执行：
+在源码仓库中首次安装：
 
 ```sh
-npm run plugin:update -- --json
+npm run plugin:install
 ```
 
-安装器使用官方 Codex 插件命令，并核验版本、启用状态和文件指纹。
+拉取新代码后刷新已安装的插件：
 
-宿主刷新后，**确认 ShowAI MCP 工具实际可见**，再调用 `showai_capabilities` 和 `project_context`。安装文件更新、工具加载和当前会话取得新说明是不同环节。
+```sh
+npm run plugin:update
+```
+
+安装器使用官方 Codex 插件命令，并核验版本、启用状态和文件指纹；加 `-- --json` 可输出机器可读的结果。
+
+安装后重新打开 Codex 会话，**确认 ShowAI MCP 工具可见**，再调用 `showai_capabilities` 和 `project_context`。已打开的会话不会自动加载新安装的插件。
 
 ### 选择内容库与项目
 

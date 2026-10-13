@@ -26,12 +26,6 @@ CANVAS_W, CANVAS_H = 2048, 2048 / 3
 LANGUAGES = {
     "en": {"slogan": "An interface between humans and agents.", "size": 36, "font": "Arial"},
     "zh-CN": {"slogan": "构建人与 Agent 之间的 Interface。", "size": 43, "font": "Arial, PingFang SC, Microsoft YaHei"},
-    "zh-TW": {"slogan": "構建人與 Agent 之間的 Interface。", "size": 43, "font": "Arial, PingFang TC, Microsoft JhengHei"},
-    "ja": {"slogan": "人と Agent をつなぐ Interface。", "size": 41, "font": "Arial, Hiragino Sans, Yu Gothic"},
-    "ko": {"slogan": "사람과 Agent를 잇는 Interface.", "size": 39, "font": "Arial, Apple SD Gothic Neo, Malgun Gothic"},
-    "es": {"slogan": "Una interfaz entre personas y agentes.", "size": 36, "font": "Arial"},
-    "tr": {"slogan": "İnsanlar ve ajanlar için bir arayüz.", "size": 38, "font": "Arial"},
-    "ru": {"slogan": "Интерфейс между людьми и агентами.", "size": 36, "font": "Arial"},
 }
 
 
@@ -344,12 +338,10 @@ def main():
     (out/"notes.md").write_text(notes)
     if args.pptx:
         skill = args.skill_dir
-        if skill is None:
-            skill = source_root/"toolkit/drawai-ppt"
-        if not skill.is_dir() and os.environ.get("SKILL_DIR"):
+        if skill is None and os.environ.get("SKILL_DIR"):
             skill = Path(os.environ["SKILL_DIR"])
-        if not (skill/"scripts/pptx_skill").is_dir():
-            parser.error("Provide the installed DrawAI PPT toolkit with --skill-dir or SKILL_DIR")
+        if skill is None or not (skill/"scripts/pptx_skill").is_dir():
+            parser.error("Optional PPTX export needs a toolkit providing scripts/pptx_skill; pass --skill-dir or SKILL_DIR")
         sys.path.insert(0,str(skill/"scripts"))
         from pptx_skill import import_svg, export_pptx, render_pptx, validate_pptx_package
         # Flatten affine transforms before native SVG import to keep nested
@@ -369,10 +361,7 @@ def main():
                         obj.properties["object.frame"]["left"] += size*.1
                     for run in runs:
                         props = run["properties"]
-                        props["text.run.font.east_asian"] = {
-                            "zh-CN": "PingFang SC", "zh-TW": "PingFang TC",
-                            "ja": "Hiragino Sans", "ko": "Apple SD Gothic Neo",
-                        }.get(args.language,"PingFang SC")
+                        props["text.run.font.east_asian"] = "PingFang SC"
                         if value == "ShowAI":
                             props["text.run.letter_spacing"] = -8*(W/CANVAS_W)*.75
                 if obj.children:

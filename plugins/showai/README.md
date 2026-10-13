@@ -10,7 +10,9 @@ The local launcher uses the selected library's registered ShowAI runtime. It req
 
 `page_present` returns full HTML/source and an optional selected inline preview. The host displays the attached MCP Apps reader, uses a local Codex visualization reference, opens the full HTML, or reports the saved Page when it has no display surface. Output locations are owned by the host/runtime, not chosen by the model. See [delivery](skills/show-document/references/conversation-display.md).
 
-From the source repository, run `npm run plugin:update -- --json`. It uses the official Codex plugin commands and verifies the installed files. Refresh the host's connections and verify tools are visible; file installation alone does not prove an existing conversation has reloaded its capabilities. Do not restart the host without coordinating ongoing tasks.
+To install into Codex, run `npm run plugin:install` from the source repository (requires the Codex CLI on `PATH`); run `npm run plugin:update` to refresh it later. Both use the official Codex plugin commands and verify the installed files. Start a new Codex conversation afterwards and confirm the ShowAI MCP tools are visible; an already open conversation does not reload its tools.
+
+For Claude Code, run `claude plugin marketplace add ./` and `claude plugin install showai@renaissance-mind` from the repository root.
 
 For a remote package, run `npm run package:plugin -- --mcp-url HTTPS_MCP_URL --out NEW_DIRECTORY`. This replaces the local mcp.json with the chosen remote endpoint. No credentials enter the bundle. Publication and production deployment are separate operations.
 

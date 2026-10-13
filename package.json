@@ -5,6 +5,15 @@
   "license": "MIT",
   "type": "module",
   "description": "Offline desktop canvas with file-based projects and Agent tools.",
+  "author": "Renaissance Mind",
+  "homepage": "https://showai.renaissancemind.ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Renaissance-Mind/ShowAI.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Renaissance-Mind/ShowAI/issues"
+  },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "dev:desktop": "node scripts/dev.mjs desktop",

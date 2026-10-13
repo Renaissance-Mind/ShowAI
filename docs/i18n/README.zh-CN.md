@@ -2,7 +2,11 @@
 
 [![ShowAI 官网](https://img.shields.io/badge/Website-showai.renaissancemind.ai-120A8F?style=flat-square)](https://showai.renaissancemind.ai/)
 
-**语言:** [English](../../README.md) | 简体中文 | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Türkçe](README.tr.md) | [Русский](README.ru.md)
+**语言:** [English](../../README.md) | 简体中文
+
+[文档](../README.md) · [快速开始](../quick-start.md) · [在 Codex 中使用](../codex.md)
+
+> **语言说明：** 工作台界面目前为简体中文。下方标注「（英文）」的参考文档暂时只有英文版本。
 
 ShowAI 让人与 Agent 通过可阅读、可交互、可编辑的内容共同思考。Agent 将信息与分析组织成页面、图表和交互模型，人通过阅读、探索、修改和反馈参与其中，双方在同一份内容上持续形成理解、作出判断并推进创作。
 
@@ -96,11 +100,13 @@ ShowAI 提供 Codex 与 Claude Code 插件。安装插件并连接 ShowAI 运行
 
 ### 安装插件
 
-**Codex**：在仓库目录中执行：
+**Codex**：需要先安装 [Codex CLI](https://github.com/openai/codex) 并确保其在 `PATH` 中。在仓库目录中执行：
 
 ```sh
 npm run plugin:install
 ```
+
+拉取新代码后，用 `npm run plugin:update` 刷新已安装的插件。请先启动一次 ShowAI 应用（或执行下文的 `npm run runtime:register`），插件才能在内容库中找到运行时。
 
 **Claude Code**：在仓库目录中执行：
 
@@ -188,20 +194,25 @@ node dist-runtime/scripts/cli.mjs export \
 
 跨设备或与他人协作时，连接自部署的 ShowAI Server，按项目同步当前页面、组件依赖和资源。管理员、编辑者与查看者角色管理访问权限。HTML 预览与导出按需生成。
 
-[内容库](../versioned-library.md) · [项目服务器与同步](../project-sync.md).
+[内容库](../versioned-library.md)（英文） · [项目服务器与同步](../project-sync.md)。
 
 ## 📚 文档
 
 | 文档 | 内容 |
 | --- | --- |
+| [快速开始](../quick-start.md) | 第一个项目、第一份页面与 Agent 接入 |
 | [Page 与 Board](../page-surface.md) | 页面、白板与交互 |
-| [Agent 使用说明](../agent-usage.md) | CLI、MCP、创作与导出 |
-| [插件说明](../../plugins/showai/README.md) | Skill 分工与安装 |
+| [Agent 使用说明](../agent-usage.md)（英文） | CLI、MCP、创作与导出 |
+| [Agent 接入](../agent-integration.md)（英文） | MCP 入口与宿主配置 |
+| [插件说明](../../plugins/showai/README.md)（英文） | Skill 分工与安装 |
+| [在 Codex 中使用](../codex.md) | Codex 插件配置与文档工作流 |
 | [数据图表](../g2-components.md) | 图表类型、数据接口与设置 |
 | [组件与模板](../catalog-lifecycle.md) | 目录、版本、依赖与复用 |
-| [内容库](../versioned-library.md) | SQLite · 内容与同步 |
+| [内容库](../versioned-library.md)（英文） | SQLite · 内容与同步 |
+| [本地浏览器版](../local-browser.md) | 启动器、打包与平台要求 |
 | [项目服务器与同步](../project-sync.md) | 服务部署、项目权限与同步 |
-| [页面数据格式](../artifact-format.md) | 页面结构与数据约定 |
+| [服务器运维](../server-operations.md)（英文） | 备份、恢复与迁移 |
+| [页面数据格式](../artifact-format.md)（英文） | 页面结构与数据约定 |
 
 ## 🛠️ 开发与贡献
 
@@ -219,7 +230,7 @@ npm run dev:open
 npm run dev:status
 ```
 
-浏览器开发版使用 `npm run dev:browser`。默认开发内容库位于 `.showai-dev/library`，可以通过启动参数指定其他目录。
+浏览器开发版使用 `npm run dev:browser`。默认开发内容库位于 `.showai-dev/library`，可以通过启动参数指定其他目录。隔离的开发实例、端口与测试说明见 [CONTRIBUTING.md](../../CONTRIBUTING.md)。
 
 提交改动前执行：
 

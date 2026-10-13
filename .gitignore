@@ -37,9 +37,13 @@ plugins/showai/scripts/cli.mjs
 /screenshots/
 /research/
 /.local/
+/presentations/promo-video/
+/presentations/showai-introduction/
 /docs/board/
 /presentations/**/references/design-contact-sheet.png
 !/README.md
+!/CONTRIBUTING.md
+!/.github/PULL_REQUEST_TEMPLATE.md
 !/docs/README.md
 !/docs/agent-host.md
 !/docs/agent-integration.md
@@ -50,13 +54,7 @@ plugins/showai/scripts/cli.mjs
 !/docs/cloud.md
 !/docs/codex.md
 !/docs/g2-components.md
-!/docs/i18n/README.es.md
-!/docs/i18n/README.ja.md
-!/docs/i18n/README.ko.md
-!/docs/i18n/README.ru.md
-!/docs/i18n/README.tr.md
 !/docs/i18n/README.zh-CN.md
-!/docs/i18n/README.zh-TW.md
 !/docs/icons.md
 !/docs/local-browser.md
 !/docs/mindmap.md
@@ -67,6 +65,7 @@ plugins/showai/scripts/cli.mjs
 !/docs/skills.md
 !/docs/versioned-library.md
 !/examples/g2-style-gallery/README.md
+!/plugins-kimi/showai/README.md
 !/plugins-kimi/showai/skills/showai/SKILL.md
 !/plugins/showai/README.md
 !/plugins/showai/skills/create-component/SKILL.md

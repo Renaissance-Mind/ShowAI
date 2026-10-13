@@ -1,0 +1,20 @@
+name: Feature or use case
+description: Suggest a feature, component, template, or use case
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: Describe the task or reader goal, and what makes it hard today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How could ShowAI support it? Mention existing components, menus, or templates it could extend.
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context

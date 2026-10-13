@@ -10,15 +10,15 @@
     "widget",
     "页面展示"
   ],
-  "author": "ShowAI",
+  "author": "Renaissance Mind",
   "license": "MIT",
   "skillInstructions": "",
   "interface": {
     "displayName": "ShowAI",
     "shortDescription": "创作 ShowAI 页面并在 Kimi 对话内展示",
     "longDescription": "连接本机 ShowAI 运行时（桌面开发版或 CLI），按 guide 读取项目与页面、创作或修改 Page，导出 inline HTML，并通过 Kimi Work 的 Widget 机制把交互预览投射到对话中；不支持 Widget 时降级为完整 HTML 文件交付。",
-    "developerName": "Local developer",
-    "websiteURL": "",
+    "developerName": "Renaissance Mind",
+    "websiteURL": "https://showai.renaissancemind.ai",
     "iconUrl": "",
     "category": "PRODUCTIVITY",
     "defaultLocale": "zh-CN",

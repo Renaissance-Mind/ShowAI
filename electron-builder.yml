@@ -1,5 +1,6 @@
 appId: ai.renaissancemind.showai
 productName: ShowAI
+copyright: Copyright © 2026 Renaissance Mind
 asar: true
 beforePack: src/desktop/before-pack.cjs
 afterPack: src/desktop/after-pack.cjs

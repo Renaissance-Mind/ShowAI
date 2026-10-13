@@ -32,4 +32,6 @@ npm run build --prefix examples/g2-style-gallery
 
 官方目录：<https://g2.antv.antgroup.com/en/charts/overview>。上游示例代码许可证见 `UPSTREAM-LICENSE.txt`。
 
+`data-cache.json` 中的数据集与图像来自上游示例引用的原始地址（保存在各条目的 URL 中），权利归各自来源所有，不随本仓库的 MIT 许可证授权，仅用于本地样式演示。复用这些数据前请核对原始来源的条款。
+
 该示例独立运行于 ShowAI 主应用，不向主应用运行时添加第三方库。

@@ -2,9 +2,11 @@
 
 [![ShowAI website](https://img.shields.io/badge/Website-showai.renaissancemind.ai-120A8F?style=flat-square)](https://showai.renaissancemind.ai/)
 
-**Language:** English | [简体中文](docs/i18n/README.zh-CN.md) | [繁體中文](docs/i18n/README.zh-TW.md) | [日本語](docs/i18n/README.ja.md) | [한국어](docs/i18n/README.ko.md) | [Español](docs/i18n/README.es.md) | [Türkçe](docs/i18n/README.tr.md) | [Русский](docs/i18n/README.ru.md)
+**Language:** English | [简体中文](docs/i18n/README.zh-CN.md)
 
-[Documentation](docs/README.md) · [Quick start](docs/quick-start.md) · [Use with Codex](docs/codex.md)
+[Documentation](docs/README.md) · [Quick start](docs/quick-start.md) · [Use with Codex](docs/codex.md) (Chinese)
+
+> **Language note:** The workbench interface is currently in Simplified Chinese. Documents marked *(Chinese)* below are available in Chinese only; the remaining reference documents are in English.
 
 ShowAI helps humans and agents think together through content they can read, interact with, and edit. Agents organize information and analysis into pages, charts, and interactive models. Humans contribute through reading, exploration, edits, and feedback, building understanding, making decisions, and advancing their work in the same shared content.
 
@@ -84,7 +86,7 @@ npm run desktop
 
 The default content library is `~/.showai`; you can change it in settings. The desktop app, browser workbench, and CLI read and write the same projects when they point to the same library.
 
-The local browser edition supports macOS, Linux, and Windows. It can also be packaged with a bundled Node runtime. See [Local browser edition](docs/local-browser.md) for the launcher and platform requirements.
+The local browser edition supports macOS, Linux, and Windows. It can also be packaged with a bundled Node runtime. See [Local browser edition](docs/local-browser.md) *(Chinese)* for the launcher and platform requirements.
 
 ## 🤖 Connect an agent
 
@@ -98,11 +100,13 @@ ShowAI provides plugins for Codex and Claude Code. After installing a plugin and
 
 ### Install a plugin
 
-**Codex**: Run in the repository directory:
+**Codex**: Requires the [Codex CLI](https://github.com/openai/codex) on your `PATH`. Run in the repository directory:
 
 ```sh
 npm run plugin:install
 ```
+
+Use `npm run plugin:update` to refresh an installed plugin after pulling new changes. Start the ShowAI app once (or run `npm run runtime:register`, below) so the plugin can find the runtime in your content library.
 
 **Claude Code**: Run in the repository directory:
 
@@ -190,19 +194,24 @@ Project content is stored locally in transactional SQLite and can be backed up o
 
 For collaboration across devices or with other people, connect to a self-hosted ShowAI Server to synchronize current pages, component dependencies and assets by project. Administrator, editor and viewer roles control access. HTML previews and exports are generated on demand.
 
-See [Content library](docs/versioned-library.md) and [Project server and synchronization](docs/project-sync.md).
+See [Content library](docs/versioned-library.md) and [Project server and synchronization](docs/project-sync.md) *(Chinese)*.
 
 ## 📚 Documentation
 
 | Document | Contents |
 | --- | --- |
-| [Page and Board](docs/page-surface.md) | Pages, boards, and interaction |
+| [Quick start](docs/quick-start.md) *(Chinese)* | First project, first page, and agent connection |
+| [Page and Board](docs/page-surface.md) *(Chinese)* | Pages, boards, and interaction |
 | [Agent guide](docs/agent-usage.md) | CLI, MCP, authoring, and export |
+| [Agent integration](docs/agent-integration.md) | MCP entry points and host configuration |
 | [Plugin documentation](plugins/showai/README.md) | Skill responsibilities and installation |
-| [Data charts](docs/g2-components.md) | Chart types, data interfaces, and settings |
-| [Components and templates](docs/catalog-lifecycle.md) | Catalogs, versions, dependencies, and reuse |
+| [Use with Codex](docs/codex.md) *(Chinese)* | Codex plugin setup and document workflow |
+| [Data charts](docs/g2-components.md) *(Chinese)* | Chart types, data interfaces, and settings |
+| [Components and templates](docs/catalog-lifecycle.md) *(Chinese)* | Catalogs, versions, dependencies, and reuse |
 | [Content library](docs/versioned-library.md) | Storage, drafts, merging, and recovery |
-| [Project server and synchronization](docs/project-sync.md) | Server deployment, project permissions, and synchronization |
+| [Local browser edition](docs/local-browser.md) *(Chinese)* | Launcher, packaging, and platform requirements |
+| [Project server and synchronization](docs/project-sync.md) *(Chinese)* | Server deployment, project permissions, and synchronization |
+| [Server operations](docs/server-operations.md) | Backup, restore, and migration |
 | [Page data format](docs/artifact-format.md) | Page structure and data conventions |
 
 ## 🛠️ Development and contributions
@@ -221,7 +230,7 @@ Check the current development service:
 npm run dev:status
 ```
 
-Use `npm run dev:browser` for browser development. The default development library is `.showai-dev/library`; startup arguments can select another directory.
+Use `npm run dev:browser` for browser development. The default development library is `.showai-dev/library`; startup arguments can select another directory. See [CONTRIBUTING.md](CONTRIBUTING.md) for isolated development instances, ports, and test notes.
 
 Before submitting changes, run:
 

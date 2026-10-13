@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/Renaissance-Mind/ShowAI/tree/main/docs
+    about: Guides for the workbench, agent integration, components, and sync.

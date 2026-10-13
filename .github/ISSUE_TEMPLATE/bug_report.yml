@@ -1,0 +1,52 @@
+name: Bug report
+description: Report something that does not work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened
+      description: Describe the problem and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+  - type: dropdown
+    id: edition
+    attributes:
+      label: Edition
+      options:
+        - Desktop app
+        - Local browser workbench
+        - Agent plugin / CLI / MCP
+        - Exported HTML or site
+        - Sync server
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: ShowAI version or commit
+      placeholder: 0.9.0 or a commit hash
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      placeholder: macOS 15 arm64, Windows 11 x64, Ubuntu 24.04 ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove personal content before attaching files.
