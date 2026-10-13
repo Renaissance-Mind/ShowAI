@@ -241,8 +241,12 @@ export default function AutoHideSidebar({
                 aria-label={lockLabel}
                 title={lockLabel}
                 aria-pressed={locked}
+                onPointerDown={nativeTouch ? (event) => {
+                  event.preventDefault();
+                  setNativeOpen(value => !value);
+                } : undefined}
                 onClick={() => {
-                  if (nativeTouch) { setNativeOpen(value => !value); return; }
+                  if (nativeTouch) return;
                   const next = !locked;
                   localStorage.setItem("showai:sidebar-locked", String(next));
                   setLocked(next);
