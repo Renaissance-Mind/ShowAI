@@ -67,6 +67,7 @@ export default defineMessages("surface", {
     "tool.shapeWithShortcut":
       "{label}（{key}）；Shift 约束形状，Alt 从中心绘制",
     "tool.continuous": "连续绘制",
+    "tool.applePencil": "Apple Pencil 手写",
     "tool.continuousTitle": "连续绘制：完成图形后保留当前工具",
     "tool.hideShortcuts": "收起快捷键",
     "tool.showShortcuts": "展开快捷键",
@@ -246,6 +247,7 @@ export default defineMessages("surface", {
     "tool.shapeWithShortcut":
       "{label} ({key}). Shift constrains the shape, Alt draws from the center",
     "tool.continuous": "Keep tool selected",
+    "tool.applePencil": "Apple Pencil handwriting",
     "tool.continuousTitle":
       "Keep tool selected: stay on the current tool after finishing a shape",
     "tool.hideShortcuts": "Hide shortcuts",

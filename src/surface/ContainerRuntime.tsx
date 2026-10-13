@@ -1379,7 +1379,7 @@ function ContainerView({
                     <LockKeyhole size={15} />
                   </button>
                   {runtime.onHandwriting && (
-                    <button type="button" aria-label="Apple Pencil 手写" title="Apple Pencil 手写" onClick={() => void runtime.onHandwriting?.(id, runtime.geometry.materialize(runtime.current.current))}>
+                    <button type="button" aria-label={t("tool.applePencil")} title={t("tool.applePencil")} onClick={() => void runtime.onHandwriting?.(id, runtime.geometry.materialize(runtime.current.current))}>
                       <Pencil size={15} aria-hidden="true" />
                     </button>
                   )}
