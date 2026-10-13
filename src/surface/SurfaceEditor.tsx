@@ -54,6 +54,7 @@ function SurfaceEditor({
   onControlsChange,
   retainedState,
   inspectorHost,
+  onHandwriting,
 }: {
   document: ShowDocument;
   onChange: (document: ShowDocument) => void;
@@ -65,6 +66,7 @@ function SurfaceEditor({
   onControlsChange?: (controls: EditorControls | null) => void;
   retainedState?: SurfaceEditorState;
   inspectorHost?: HTMLElement | null;
+  onHandwriting?: (boardId: string, document: ShowDocument) => Promise<void>;
 }) {
   const document = useMemo(
     () => (isResource(input) ? input : upgradeResource(input)),
@@ -410,6 +412,7 @@ function SurfaceEditor({
         onControlsChange={onControlsChange}
         retainedState={retainedState?.runtime}
         inspectorHost={inspectorHost}
+        onHandwriting={onHandwriting}
         canUndo={!!history.current.past.length}
         canRedo={!!history.current.future.length}
       />

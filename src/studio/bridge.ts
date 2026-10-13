@@ -5,6 +5,7 @@ import type {
 } from "../desktop/bridge";
 import type { TabCommand } from "../workbench/tab-shortcuts";
 export interface DesktopBridge {
+  handwrite?(args: { projectId: string; pageId: string; boardId: string }): Promise<import("../types").ShowDocument>;
   openWindow?(
     args: Record<string, unknown>,
     prepare: () => Promise<boolean>,
