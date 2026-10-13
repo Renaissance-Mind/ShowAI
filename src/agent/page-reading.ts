@@ -15,6 +15,7 @@ import type { ShowDocument } from "../types";
 import type { JSONContent } from "@tiptap/core";
 import { collectCustomComponentRefs } from "../components/custom/contract";
 import { loadBoardSnapshot } from "./board-reading";
+import { injectReadingOptions } from "./reading-preview";
 
 export const READ_VIEWS = ["structured", "image", "html"] as const;
 const roles = [
@@ -286,16 +287,12 @@ function previewHtml(
   state: ReadingOptions,
   identity: ReadIdentity,
 ): string {
-  const payload = JSON.stringify({
+  return injectReadingOptions(html, {
     draft: state.draft,
     theme: state.theme,
     identity,
     state,
-  }).replaceAll("<", "\\u003c");
-  return html.replace(
-    "</head>",
-    `<script type="application/json" id="showai-read-options">${payload}</script></head>`,
-  );
+  });
 }
 async function outputPath(
   store: FileStore,

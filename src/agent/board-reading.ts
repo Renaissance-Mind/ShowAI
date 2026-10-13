@@ -21,6 +21,7 @@ import {
   reconcileSurface,
 } from "../surface/document.mjs";
 import { buildPageHtml } from "./exporter";
+import { injectReadingOptions } from "./reading-preview";
 import {
   freezeBoard,
   renderFrozenBoard,
@@ -420,15 +421,11 @@ async function createSnapshot(
       [],
       "spatial",
     );
-    const captureOptions = JSON.stringify({
+    const preview = injectReadingOptions(inputHtml, {
       theme: options.theme,
       draft: false,
       boardCapture: { boardId, ...options.state },
-    }).replaceAll("<", "\\u003c");
-    const preview = inputHtml.replace(
-      "</head>",
-      `<script id="showai-read-options" type="application/json">${captureOptions}</script></head>`,
-    );
+    });
     await writeCache(store.root, id, "capture.html", Buffer.from(preview));
     const frozen = await freezeBoard(
       join(folder, "capture.html"),
