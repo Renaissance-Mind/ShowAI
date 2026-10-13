@@ -7,6 +7,7 @@ import {
   resolveLocale,
   setLocale,
   translator,
+  withHtmlLanguage,
   type Message,
   type Namespace,
 } from "./index";
@@ -75,6 +76,13 @@ describe("i18n runtime", () => {
     const pages = { one: "{count} page", other: "{count} pages" };
     expect(formatMessage(pages, { count: 1 }, "en")).toBe("1 page");
     expect(formatMessage(pages, { count: 3 }, "en")).toBe("3 pages");
+  });
+
+  it("records the exporter language on reader HTML", () => {
+    expect(withHtmlLanguage('<!doctype html><html lang="zh-CN"><head>', "en")).toBe(
+      '<!doctype html><html lang="en"><head>',
+    );
+    expect(withHtmlLanguage("<html><body>", "zh-CN")).toBe('<html lang="zh-CN"><body>');
   });
 
   it("translates with the active locale", () => {

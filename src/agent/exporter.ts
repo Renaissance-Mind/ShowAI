@@ -39,6 +39,7 @@ import {
 } from "../portable/validation.mjs";
 import type { ShowArtifact, ShowDocument } from "../types";
 import { selectDocumentBlocks } from "../portable/selection.mjs";
+import { withHtmlLanguage } from "../i18n";
 
 export type ExportFormat = "html" | "inline" | "site";
 export interface ExportOptions {
@@ -96,15 +97,18 @@ export async function buildPageHtml(
   readerHtml?: string,
 ): Promise<string> {
   assertOfflineImages(document);
-  return injectArtifactIntoHtml(
-    readerHtml ?? (await buildReaderTemplate([document], templatePath)),
-    document,
-    components,
-    remoteComponents,
-    presentation,
-    selection,
+  return withHtmlLanguage(
+    injectArtifactIntoHtml(
+      readerHtml ?? (await buildReaderTemplate([document], templatePath)),
+      document,
+      components,
+      remoteComponents,
+      presentation,
+      selection,
+    ),
   );
 }
+
 
 /** Exported documents pin what was actually resolved, without mutating authoring files. */
 function lockedDocument(
@@ -475,12 +479,14 @@ export async function exportPage(
             )!,
           )
         : [];
-    let html = injectArtifactIntoHtml(
-      template,
-      document,
-      components,
-      remoteComponents,
-      options.presentation ?? "spatial",
+    let html = withHtmlLanguage(
+      injectArtifactIntoHtml(
+        template,
+        document,
+        components,
+        remoteComponents,
+        options.presentation ?? "spatial",
+      ),
     );
     // Each page shares one reader bundle and stylesheet; page data remains embedded.
     const scripts: string[] = [];

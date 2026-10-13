@@ -4,6 +4,10 @@ import { fileURLToPath } from "node:url";
 import { access } from "node:fs/promises";
 import { startBrowserServer } from "./server";
 import { openBrowser } from "./system";
+import { translator } from "../i18n";
+import messages from "../i18n/messages/workbench";
+
+const t = translator(messages);
 
 export async function runBrowser(options: {
   home?: string;
@@ -39,7 +43,7 @@ export async function runBrowser(options: {
     );
   else
     process.stdout.write(
-      `ShowAI 本地工作台：${server.url}\n内容库：${server.home}\n按 Ctrl+C 停止服务。CLI 可以独立运行。\n`,
+      t("serveReady", { url: server.url, home: server.home }) + "\n",
     );
   let closing = false;
   const stop = async () => {
@@ -57,7 +61,8 @@ export async function runBrowser(options: {
   if (options.open)
     await openBrowser(server.url).catch((error: Error) => {
       process.stderr.write(
-        `无法自动打开浏览器：${error.message}\n请手动打开 ${server.url}\n`,
+        t("openBrowserFailed", { message: error.message, url: server.url }) +
+          "\n",
       );
     });
 }

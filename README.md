@@ -6,7 +6,7 @@
 
 [Documentation](docs/README.md) · [Quick start](docs/quick-start.md) · [Use with Codex](docs/codex.md) (Chinese)
 
-> **Language note:** The workbench interface is currently in Simplified Chinese. Documents marked *(Chinese)* below are available in Chinese only; the remaining reference documents are in English.
+> **Language note:** The workbench interface is available in English and Simplified Chinese. It follows your system language by default (Chinese system languages use Simplified Chinese, all others use English); change it in **Settings → Appearance → Language**. Exported pages show their reader controls in the language used when they were exported. Documents marked *(Chinese)* below are available in Chinese only; the remaining reference documents are in English.
 
 ShowAI helps humans and agents think together through content they can read, interact with, and edit. Agents organize information and analysis into pages, charts, and interactive models. Humans contribute through reading, exploration, edits, and feedback, building understanding, making decisions, and advancing their work in the same shared content.
 

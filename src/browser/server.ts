@@ -24,6 +24,7 @@ import { syncManager } from "../sync/manager";
 import { openLibrary } from "../core/open-library";
 import { registerRuntime } from "../agent/runtime";
 import { CoreError, FileStore, assertId } from "../core/store";
+import { setLocale } from "../i18n";
 import {
   createWorkbench,
   workbenchActions,
@@ -306,9 +307,12 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       parent: dirname(path),
       separator: sep,
       shortcuts: [
-        { name: "个人目录", path: homedir() },
-        { name: "内容库", path: store.root },
-        ...(hasDownloads ? [{ name: "下载", path: downloads }] : []),
+        // The picker labels shortcuts by id in the workbench language.
+        { id: "home", name: "Home", path: homedir() },
+        { id: "library", name: "Library", path: store.root },
+        ...(hasDownloads
+          ? [{ id: "downloads", name: "Downloads", path: downloads }]
+          : []),
       ],
       entries: items
         .filter((item) => item !== null)
@@ -418,6 +422,12 @@ export async function startBrowserServer(options: BrowserServerOptions) {
           const path = join(parent, name);
           await mkdir(path);
           data = { path };
+        } else if (url.pathname === "/api/locale") {
+          // Server-side messages and exports follow the workbench language.
+          if (input.locale !== "zh-CN" && input.locale !== "en")
+            throw new CoreError("INVALID_DATA", "Unknown language.");
+          setLocale(input.locale);
+          data = null;
         } else if (url.pathname === "/api/shutdown") {
           data = null;
           response.once("finish", () => {

@@ -171,6 +171,15 @@ export function translator<T extends Record<string, Message>>(
   };
 }
 
+/** Exported readers show their chrome in the language recorded as <html lang>. */
+export function withHtmlLanguage(html: string, locale: Locale = current): string {
+  return html.replace(/<html\b[^>]*>/i, (tag) =>
+    /\slang=/i.test(tag)
+      ? tag.replace(/\slang=(["'])[^"']*\1/i, ` lang="${locale}"`)
+      : tag.replace(/^<html/i, `<html lang="${locale}"`),
+  );
+}
+
 /** Pick a value for the active locale, for cases like Intl formatting options. */
 export function byLocale<T>(values: Record<Locale, T>): T {
   return values[current];

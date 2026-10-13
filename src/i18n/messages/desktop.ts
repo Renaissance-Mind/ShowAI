@@ -38,6 +38,7 @@ export default defineMessages("desktop", {
     openPageFailed: "无法打开页面",
     openWindowFailed: "无法打开窗口",
     startFailed: "ShowAI 无法启动",
+    previewTimeout: "组件预览加载超时。",
   },
   en: {
     "menu.about": "About ShowAI",
@@ -76,5 +77,6 @@ export default defineMessages("desktop", {
     openPageFailed: "Couldn't open page",
     openWindowFailed: "Couldn't open window",
     startFailed: "ShowAI couldn't start",
+    previewTimeout: "The component preview timed out.",
   },
 });

@@ -196,6 +196,7 @@ export async function embedDocumentImages(document) {
         downloaded.set(cacheKey, await resourceDataUrl(url, kind));
       } catch (error) {
         throw new Error(
+          // i18n-exempt: also loaded by plain-Node scripts without the i18n module
           `无法嵌入${kind === "image" ? "图片" : "文件"}，离线导出已停止。请将文件下载后重新上传。${error instanceof Error ? ` ${error.message}` : ""}`,
         );
       }

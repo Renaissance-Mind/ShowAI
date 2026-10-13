@@ -9,6 +9,9 @@ import { fileURLToPath } from "node:url";
 import electron from "electron";
 import { _electron } from "playwright";
 
+// The smoke checks select controls by their Chinese labels.
+process.env.SHOWAI_LANGUAGE ??= "zh-CN";
+
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const parent = resolve(
   process.env.SHOWAI_SMOKE_OUTPUT || join(repository, "output/playwright"),

@@ -1,6 +1,7 @@
 import type { ShowDocument } from "../types";
 import { injectArtifactIntoHtml } from "../portable/validation.mjs";
 import { embedDocumentImages } from "../portable/assets.mjs";
+import { withHtmlLanguage } from "../i18n";
 
 export {
   ARTIFACT_DATA_ID,
@@ -24,5 +25,7 @@ export async function buildArtifactHtml(
       "The HTML viewer is unavailable. Run npm run build:portable, then try again.",
     );
   const template = await response.text();
-  return injectArtifactIntoHtml(template, await embedDocumentImages(document));
+  return withHtmlLanguage(
+    injectArtifactIntoHtml(template, await embedDocumentImages(document)),
+  );
 }
