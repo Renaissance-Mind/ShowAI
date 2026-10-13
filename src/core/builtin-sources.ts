@@ -99,6 +99,7 @@ import i18n_references from "../i18n/messages/references.ts?raw";
 import i18n_resourceEditor from "../i18n/messages/resourceEditor.ts?raw";
 import i18n_richText from "../i18n/messages/richText.ts?raw";
 import i18n_search from "../i18n/messages/search.ts?raw";
+import i18n_analysis from "../i18n/messages/analysis.ts?raw";
 
 const sources: Record<string, string> = {
   ...g2BuiltinSources,
@@ -202,6 +203,7 @@ const sources: Record<string, string> = {
   "i18n/messages/resourceEditor.ts": i18n_resourceEditor,
   "i18n/messages/richText.ts": i18n_richText,
   "i18n/messages/search.ts": i18n_search,
+  "i18n/messages/analysis.ts": i18n_analysis,
 };
 // Package the shared icon module inside the trusted SDK's virtual filesystem.
 // User component packages retain the existing package-local import boundary.
