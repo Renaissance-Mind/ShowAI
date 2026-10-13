@@ -30,7 +30,6 @@ export function matchesTemplateType(
 }
 
 export default function TemplateNavigation({
-  templates,
   active,
   onSelect,
 }: {
@@ -43,9 +42,6 @@ export default function TemplateNavigation({
       <div className="settings-nav-label">类型</div>
       <nav className="settings-nav" aria-label="模板类型">
         {types.map(({ id, label, icon: Icon }) => {
-          const count = templates.filter((item) =>
-            matchesTemplateType(item, id),
-          ).length;
           return (
             <button
               key={id}
@@ -55,9 +51,6 @@ export default function TemplateNavigation({
             >
               <Icon size={17} strokeWidth={1.7} aria-hidden="true" />
               <span>{label}</span>
-              <span className="template-type-count" aria-hidden="true">
-                {count}
-              </span>
             </button>
           );
         })}

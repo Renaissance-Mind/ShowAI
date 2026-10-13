@@ -9,6 +9,7 @@ export default function Dialog({
   className = "",
   titleAccessory,
   headerContent,
+  headerActions,
   dismissible = true,
 }: {
   title: string;
@@ -18,6 +19,7 @@ export default function Dialog({
   className?: string;
   titleAccessory?: ReactNode;
   headerContent?: ReactNode;
+  headerActions?: ReactNode;
   dismissible?: boolean;
 }) {
   const panel = useRef<HTMLDivElement>(null);
@@ -27,7 +29,9 @@ export default function Dialog({
     const previous = document.activeElement as HTMLElement;
     (
       panel.current?.querySelector<HTMLElement>(
-        "input:not([disabled]),textarea:not([disabled]),select:not([disabled])",
+        className.includes("catalog-")
+          ? '[role="tab"][aria-selected="true"]'
+          : "input:not([disabled]),textarea:not([disabled]),select:not([disabled])",
       ) ?? panel.current?.querySelector<HTMLElement>("button")
     )?.focus();
     const handle = (event: KeyboardEvent) => {
@@ -37,13 +41,25 @@ export default function Dialog({
         [...document.querySelectorAll('[role="dialog"]')].at(-1)
       )
         return;
-      if (event.key === "Escape") close.current();
+      if (event.key === "Escape") {
+        if (
+          panel.current?.contains(document.fullscreenElement) ||
+          document.querySelector('[role="menu"]')
+        )
+          return;
+        close.current();
+      }
       if (event.key === "Tab") {
         const items = [
           ...(panel.current?.querySelectorAll<HTMLElement>(
-            "button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),a[href]",
+            'button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),a[href],summary,[tabindex],[contenteditable="true"]',
           ) ?? []),
-        ].filter((item) => item.offsetParent !== null);
+        ].filter(
+          (item) =>
+            item.offsetParent !== null &&
+            item.tabIndex >= 0 &&
+            !item.closest("[inert]"),
+        );
         const first = items[0],
           last = items.at(-1);
         if (!panel.current?.contains(document.activeElement)) {
@@ -91,14 +107,32 @@ export default function Dialog({
             <h2>{title}</h2>
           )}
           {headerContent}
-          {dismissible && (
-            <button
-              className="studio-icon"
-              aria-label="关闭弹窗"
-              onClick={onClose}
-            >
-              <X size={18} />
-            </button>
+          {headerActions ? (
+            <div className="studio-modal-header-actions">
+              {headerActions}{" "}
+              {dismissible && (
+                <button
+                  className="studio-icon"
+                  aria-label="关闭弹窗"
+                  onClick={onClose}
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              {" "}
+              {dismissible && (
+                <button
+                  className="studio-icon"
+                  aria-label="关闭弹窗"
+                  onClick={onClose}
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </>
           )}
         </header>
         {children}

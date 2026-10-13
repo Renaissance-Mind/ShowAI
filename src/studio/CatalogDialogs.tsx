@@ -1,21 +1,26 @@
 import { BuiltinPreview } from "../components/BuiltinPreview";
+import ComponentAdjustmentSummary from "./ComponentAdjustmentSummary";
+import TemplateOutline from "./TemplateOutline";
+import ComponentParameterFacts from "./ComponentParameterFacts";
+import CatalogTabs from "./CatalogTabs";
+import CatalogPreview from "./CatalogPreview";
+import CatalogActions from "./CatalogActions";
+import { SurfaceReader } from "../portable/SurfaceReader";
+import type { ProjectSummary } from "../core/model";
+import { PageWidthSwitch } from "../surface/PageWidthSwitch";
 import TemplateWorkflowView from "./TemplateWorkflowView";
 import { editedTemplateBundle } from "./template-catalog-model";
 import { parseTemplateBundle } from "../portable/template-bundle.mjs";
 import ComponentParameterSummary from "./ComponentParameterSummary";
 import ComponentDocumentationView from "./ComponentDocumentationView";
-import {
-  validateComponentDocumentation,
-  reuseLabels,
-} from "../components/custom/documentation";
-import { useState, useId } from "react";
+import { validateComponentDocumentation } from "../components/custom/documentation";
+import { useState, useId, useRef } from "react";
 import { useCatalogDraft, CatalogDraftRecovery } from "./useCatalogDraft";
 import {
   ArrowDown,
   ArrowUp,
   Globe2,
   BookOpen,
-  Monitor,
   Sparkles,
   Layers,
   Loader2,
@@ -40,7 +45,9 @@ import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import { componentWidgetData } from "../components/custom/contract";
 import { Widget } from "../components/blocks/Widget";
 import type { DocumentEditorProps } from "../editor/DocumentEditor";
-import SurfaceEditor from "../surface/SurfaceEditor";
+import SurfaceEditor, {
+  type SurfaceEditorState,
+} from "../surface/SurfaceEditor";
 import {
   EditorHistoryButtons,
   EditorContainerMenu,
@@ -54,6 +61,36 @@ import {
   componentCategory,
 } from "../core/component-categories";
 import "./catalog.css";
+import "./catalog-workspace.css";
+
+function SaveProjectPicker({
+  projects,
+  projectId,
+  onChange,
+}: {
+  projects: ProjectSummary[];
+  projectId?: string;
+  onChange?: (id: string) => void;
+}) {
+  return (
+    <label>
+      保存到
+      <select
+        aria-label="保存到项目"
+        value={projectId ?? ""}
+        disabled={!onChange}
+        onChange={(event) => onChange?.(event.target.value)}
+      >
+        <option value="">选择项目</option>
+        {projects.map((project) => (
+          <option key={project.id} value={project.id}>
+            {project.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 function contentPartDocument(
   document: ShowDocument,
@@ -83,6 +120,8 @@ function TemplateContent(
     document?: ShowDocument;
     onDocumentChange?: (document: ShowDocument) => void;
     onControlsChange?: (controls: EditorControls | null) => void;
+    retainedState?: SurfaceEditorState;
+    inspectorHost?: HTMLElement | null;
   },
 ) {
   const id = useId();
@@ -102,11 +141,24 @@ function TemplateContent(
         }
         readOnly={props.readOnly}
         onControlsChange={props.onControlsChange}
+        retainedState={props.retainedState}
+        inspectorHost={props.inspectorHost}
       />
     </div>
   );
 }
 
+function CompactScenarios({ items }: { items: string[] }) {
+  return (
+    <ul>
+      {items.map((item, index) => (
+        <li key={index} title={item}>
+          {item.split(/[，。]/)[0]}
+        </li>
+      ))}
+    </ul>
+  );
+}
 function ReferenceSection({
   title,
   icon,
@@ -180,17 +232,6 @@ function revision(
     scope: item.scope,
     ...(item.scope === "project" && projectId ? { projectId } : {}),
   };
-}
-function Bullets({ items }: { items: string[] }) {
-  return items.length ? (
-    <ul>
-      {items.map((item, index) => (
-        <li key={index}>{item}</li>
-      ))}
-    </ul>
-  ) : (
-    <p className="studio-caption">尚未填写。</p>
-  );
 }
 function Lineage({
   item,
@@ -325,6 +366,8 @@ export function TemplateDialog({
   record,
   components,
   projectId,
+  projects = [],
+  onProjectChange,
   templates,
   onClose,
   onSaved,
@@ -334,11 +377,21 @@ export function TemplateDialog({
   copy?: boolean;
   components: CompiledComponent[];
   projectId?: string;
+  projects?: ProjectSummary[];
+  onProjectChange?: (id: string) => void;
   templates: TemplateMetadata[];
   onClose: () => void;
   onSaved: () => Promise<void>;
   onPublish: (ref: PackageRevisionRef) => void;
 }) {
+  const panelId = useId();
+  const sourceRevision = useRef(
+    record.integrity ? revision("template", record, projectId) : undefined,
+  ).current;
+  const [inspectorHost, setInspectorHost] = useState<HTMLDivElement | null>(
+    null,
+  );
+  const layoutEditors = useRef(new Map<string, SurfaceEditorState>());
   const [tab, setTab] = useState<
     "about" | "layout" | "edit" | "composition" | "guides"
   >(record.id ? "about" : "edit");
@@ -427,12 +480,19 @@ export function TemplateDialog({
         ? activePart.content
         : { type: "doc", content: [activePart.content] }
       : document.content;
+  const editorKey = parts.length ? String(activePartIndex) : "document";
+  if (!layoutEditors.current.has(editorKey))
+    layoutEditors.current.set(editorKey, {});
   const run = (operation: () => Promise<unknown>) => {
     setBusy(true);
     setError("");
     void operation()
       .catch((reason) => setError(errorMessage(reason)))
       .finally(() => setBusy(false));
+  };
+  const changeComposition = (next: React.SetStateAction<TemplatePart[]>) => {
+    layoutEditors.current.clear();
+    setParts(next);
   };
   const candidates = templates.filter(
     (item) => item.id !== record.id || item.integrity !== record.integrity,
@@ -483,8 +543,76 @@ export function TemplateDialog({
       titleAccessory={
         <span className="catalog-component-version">v{record.version}</span>
       }
+      headerContent={
+        <CatalogTabs
+          label="模板详情菜单"
+          panelId={panelId}
+          active={tab === "composition" ? "edit" : tab}
+          onChange={setTab}
+          tabs={[
+            { id: "about", label: "预览" },
+            ...(bundle ? [{ id: "guides" as const, label: "阶段指南" }] : []),
+            ...(hasLayout && !systemTemplate
+              ? [{ id: "layout" as const, label: "布局" }]
+              : []),
+            ...(!systemTemplate
+              ? [{ id: "edit" as const, label: "定制" }]
+              : []),
+          ]}
+        />
+      }
+      headerActions={
+        <CatalogActions
+          items={[
+            ...(!bundle
+              ? [
+                  {
+                    label: "组合模板",
+                    icon: <Layers size={16} />,
+                    onSelect: () => setTab("composition"),
+                  },
+                ]
+              : []),
+            ...(record.integrity && !systemTemplate
+              ? [
+                  {
+                    label: "发布",
+                    icon: <Upload size={16} />,
+                    onSelect: () =>
+                      run(async () => {
+                        await localDraft.persist();
+                        onPublish(sourceRevision!);
+                      }),
+                  },
+                ]
+              : []),
+            ...(record.scope === "project" && record.integrity
+              ? [
+                  {
+                    label: "注册到全局",
+                    icon: <Globe2 size={16} />,
+                    onSelect: () =>
+                      run(async () => {
+                        await localDraft.persist();
+                        await desktop.invoke("catalog:promote", {
+                          ref: sourceRevision!,
+                          projectId: sourceRevision?.projectId ?? projectId,
+                        });
+                        await onSaved();
+                      }),
+                  },
+                ]
+              : []),
+          ]}
+        />
+      }
     >
-      <div className="studio-template-edit catalog-detail">
+      <div
+        className="studio-template-edit catalog-detail"
+        role="tabpanel"
+        id={panelId}
+        aria-label={tab}
+      >
         <CatalogDraftRecovery draft={localDraft} />
         {rawTemplate && (
           <details className="catalog-recovery-source" open>
@@ -508,371 +636,268 @@ export function TemplateDialog({
             ))}
           </details>
         )}
-        {!!record.id && <Lineage item={record} />}
-        <nav className="studio-detail-tabs" aria-label="模板详情菜单">
-          <button
-            className={tab === "about" ? "active" : ""}
-            aria-pressed={tab === "about"}
-            onClick={() => setTab("about")}
-          >
-            概览
-          </button>
-          {bundle && (
-            <button
-              aria-pressed={tab === "guides"}
-              className={tab === "guides" ? "active" : ""}
-              onClick={() => setTab("guides")}
-            >
-              阶段指南
-            </button>
-          )}
-          {hasLayout && !systemTemplate && (
-            <button
-              className={tab === "layout" ? "active" : ""}
-              aria-pressed={tab === "layout"}
-              onClick={() => setTab("layout")}
-            >
-              编辑布局
-            </button>
-          )}
-          {!systemTemplate && (
-            <button
-              className={tab === "edit" ? "active" : ""}
-              aria-pressed={tab === "edit"}
-              onClick={() => setTab("edit")}
-            >
-              定制说明
-            </button>
-          )}
-          {!bundle && (
-            <button
-              className={tab === "composition" ? "active" : ""}
-              aria-pressed={tab === "composition"}
-              onClick={() => setTab("composition")}
-            >
-              组合模板
-            </button>
-          )}
-          {tab === "layout" && editorControls && (
-            <div className="catalog-editor-actions">
-              <EditorHistoryButtons controls={editorControls} />
-              <EditorContainerMenu controls={editorControls} />
-            </div>
-          )}
-        </nav>
+
         {tab === "guides" && record.bundle && (
           <TemplateWorkflowView bundle={record.bundle} files={bundleFiles} />
         )}
         {tab === "about" && (
-          <>
-            <div className="catalog-reference-intro">
-              <span>
-                {systemTemplate
-                  ? "基础指南"
-                  : bundle
-                    ? "阶段指南与页面起点"
-                    : "页面布局"}{" "}
-                · v{record.version}
-              </span>
-              <p>{record.description}</p>
-            </div>
-            <div className="catalog-overview">
-              <aside className="catalog-documentation">
-                <ReferenceSection title="使用场景" icon="usage">
-                  <Bullets items={record.scenarios ?? []} />
-                </ReferenceSection>
-                {!!record.contentGuide?.length && (
-                  <ReferenceSection title="内容处理方式" icon="content">
-                    {(record.contentGuide ?? []).map((section, index) => (
-                      <div key={index}>
-                        <h4>{section.title}</h4>
-                        <Bullets items={section.instructions} />
-                      </div>
-                    ))}
-                  </ReferenceSection>
-                )}
-                {!!record.related?.length && (
-                  <ReferenceSection title="相关模板与组件" icon="content">
-                    <RelatedList items={record.related} />
-                  </ReferenceSection>
-                )}
-              </aside>
-              <section
-                className="catalog-live-example"
-                aria-label="模板示例预览"
-              >
-                <header>
-                  <h3>
-                    <Monitor size={17} />
-                    {systemTemplate ? "基础指南概览" : "页面预览"}
-                  </h3>
-                  {hasLayout && !systemTemplate && (
-                    <button
-                      className="studio-text-button"
-                      disabled={
-                        systemTemplate || (!!bundle && !bundle.metadata.page)
-                      }
-                      onClick={() => setTab("layout")}
-                    >
-                      编辑布局 ↗
-                    </button>
-                  )}
-                </header>
-                {!!record.examples?.length && (
-                  <label className="studio-example-picker">
-                    示例
-                    <select
-                      aria-label="模板示例"
-                      value={templateExample}
-                      onChange={(event) =>
-                        setTemplateExample(Number(event.target.value))
-                      }
-                    >
-                      {record.examples.map((example, index) => (
-                        <option key={index} value={index}>
-                          {example.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-                {record.examples?.[templateExample] && (
-                  <p className="catalog-example-request">
-                    {record.examples[templateExample].request}
-                  </p>
-                )}
-                {systemTemplate ? (
-                  <div className="catalog-workflow-summary">
-                    <h3>所有呈现任务的基础指南</h3>
-                    <p>
-                      从“阶段指南”阅读六个阶段的要求。创作页面时，这些规则与所选模板共同使用。
-                    </p>
-                  </div>
-                ) : (
-                  <div className="catalog-preview-stage catalog-template-preview">
-                    <div className="catalog-template-paper">
-                      <CustomComponentsProvider components={components}>
-                        <TemplateContent
-                          content={
-                            (record.previewDocument ?? record.document).content
-                          }
-                          document={record.previewDocument ?? record.document}
-                          onChange={() => {}}
-                          readOnly
-                          minimal
-                        />
-                      </CustomComponentsProvider>
-                    </div>
-                  </div>
-                )}
-                {!!record.examples?.[templateExample]?.steps.length && (
-                  <details className="catalog-example-data">
-                    <summary>示例用法</summary>
-                    <ol>
-                      {record.examples[templateExample].steps.map((step, i) => (
-                        <li key={i}>
-                          <strong>{step.id}</strong> · {step.purpose}
-                        </li>
-                      ))}
-                    </ol>
-                  </details>
-                )}
-              </section>
-            </div>
-          </>
-        )}
-        {tab === "layout" && (
-          <>
-            {!!parts.length && !!localParts.length && (
-              <label className="studio-example-picker">
-                内容部分
-                <select
-                  aria-label="要编辑的内容部分"
-                  value={activePartIndex}
-                  onChange={(event) =>
-                    setEditingPart(Number(event.target.value))
+          <div className="catalog-preview-workspace">
+            <section className="catalog-live-example" aria-label="模板示例预览">
+              {systemTemplate ? (
+                <div className="catalog-reading-content">
+                  <h3>{record.name}</h3>
+                  <p>{record.description}</p>
+                </div>
+              ) : (
+                <CatalogPreview
+                  label="模板预览画面"
+                  width={960}
+                  resetKey={`${record.integrity}:${templateExample}`}
+                  accessory={
+                    !!record.examples?.length && (
+                      <select
+                        aria-label="模板示例"
+                        value={templateExample}
+                        onChange={(event) =>
+                          setTemplateExample(Number(event.target.value))
+                        }
+                      >
+                        {record.examples.map((example, index) => (
+                          <option key={index} value={index}>
+                            {example.name}
+                          </option>
+                        ))}
+                      </select>
+                    )
                   }
                 >
-                  {localParts.map(({ index }) => (
-                    <option key={index} value={index}>
-                      第 {index + 1} 部分
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {(!parts.length || activePartIndex >= 0) && (
-              <div className="studio-template-document">
-                <CustomComponentsProvider components={components}>
-                  <TemplateContent
-                    key={parts.length ? activePartIndex : "document"}
-                    onControlsChange={setEditorControls}
-                    content={layoutContent}
-                    document={
-                      parts.length
-                        ? contentPartDocument(
-                            document,
-                            activePart,
-                            layoutContent,
-                          )
-                        : document
+                  <CustomComponentsProvider components={components}>
+                    <SurfaceReader
+                      document={record.previewDocument ?? record.document}
+                      heading={null}
+                      partial
+                      presentation="spatial"
+                    />
+                  </CustomComponentsProvider>
+                </CatalogPreview>
+              )}
+            </section>
+            <aside className="catalog-info-panel">
+              <ReferenceSection title="适用场景" icon="usage">
+                <CompactScenarios items={record.scenarios ?? []} />
+              </ReferenceSection>
+              <ReferenceSection title="页面结构" icon="content">
+                <TemplateOutline
+                  document={record.previewDocument ?? record.document}
+                />
+              </ReferenceSection>
+              {!!record.related?.length && (
+                <details>
+                  <summary>相关内容</summary>
+                  <RelatedList items={record.related} />
+                </details>
+              )}
+            </aside>
+          </div>
+        )}
+        {tab === "layout" && (
+          <div className="catalog-layout-workspace">
+            <section className="catalog-layout-editor">
+              {!!parts.length && !!localParts.length && (
+                <label className="studio-example-picker">
+                  内容部分
+                  <select
+                    aria-label="要编辑的内容部分"
+                    value={activePartIndex}
+                    onChange={(event) =>
+                      setEditingPart(Number(event.target.value))
                     }
-                    onDocumentChange={(next) => {
-                      if (parts.length && activePartIndex >= 0)
-                        setParts((current) =>
-                          current.map((part, index) =>
-                            index === activePartIndex
-                              ? {
-                                  type: "content",
-                                  content: next.content,
-                                  layout: next.layout,
-                                  ...(next.views ? { views: next.views } : {}),
-                                  ...(next.surfaceViews
-                                    ? { surfaceViews: next.surfaceViews }
-                                    : {}),
-                                }
-                              : part,
-                          ),
-                        );
-                      else setDocument(next);
-                    }}
-                    onChange={(content) => {
-                      if (parts.length && activePartIndex >= 0)
-                        setParts((current) =>
-                          current.map((part, index) =>
-                            index === activePartIndex
-                              ? { type: "content", content }
-                              : part,
-                          ),
-                        );
-                      else setDocument((current) => ({ ...current, content }));
-                    }}
-                    minimal
-                    readOnly={!projectId}
+                  >
+                    {localParts.map(({ index }) => (
+                      <option key={index} value={index}>
+                        第 {index + 1} 部分
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {(!parts.length || activePartIndex >= 0) && (
+                <div className="studio-template-document">
+                  <CustomComponentsProvider components={components}>
+                    <TemplateContent
+                      key={parts.length ? activePartIndex : "document"}
+                      onControlsChange={setEditorControls}
+                      retainedState={layoutEditors.current.get(editorKey)}
+                      inspectorHost={inspectorHost}
+                      content={layoutContent}
+                      document={
+                        parts.length
+                          ? contentPartDocument(
+                              document,
+                              activePart,
+                              layoutContent,
+                            )
+                          : document
+                      }
+                      onDocumentChange={(next) => {
+                        if (parts.length && activePartIndex >= 0)
+                          setParts((current) =>
+                            current.map((part, index) =>
+                              index === activePartIndex
+                                ? {
+                                    type: "content",
+                                    content: next.content,
+                                    layout: next.layout,
+                                    ...(next.views
+                                      ? { views: next.views }
+                                      : {}),
+                                    ...(next.surfaceViews
+                                      ? { surfaceViews: next.surfaceViews }
+                                      : {}),
+                                  }
+                                : part,
+                            ),
+                          );
+                        else setDocument(next);
+                      }}
+                      onChange={(content) => {
+                        if (parts.length && activePartIndex >= 0)
+                          setParts((current) =>
+                            current.map((part, index) =>
+                              index === activePartIndex
+                                ? { type: "content", content }
+                                : part,
+                            ),
+                          );
+                        else
+                          setDocument((current) => ({ ...current, content }));
+                      }}
+                      minimal
+                      readOnly={!projectId}
+                    />
+                  </CustomComponentsProvider>
+                </div>
+              )}
+              {!!record.composition?.length && record.previewDocument && (
+                <details className="catalog-example">
+                  <summary>查看组合后的完整布局</summary>
+                  <CustomComponentsProvider components={components}>
+                    <TemplateContent
+                      content={record.previewDocument.content}
+                      document={record.previewDocument}
+                      onChange={() => {}}
+                      readOnly
+                      minimal
+                    />
+                  </CustomComponentsProvider>
+                </details>
+              )}
+            </section>
+            <aside className="catalog-info-panel catalog-layout-settings">
+              <div className="catalog-inspector-host" ref={setInspectorHost} />
+              <h3>当前容器</h3>
+              <p>{editorControls?.name ?? document.title}</p>
+              <label>
+                页面宽度
+                {editorControls && (
+                  <PageWidthSwitch
+                    value={editorControls.pageWidthMode}
+                    onChange={editorControls.setPageWidthMode}
                   />
-                </CustomComponentsProvider>
+                )}
+              </label>
+              <div className="catalog-editor-actions">
+                <EditorHistoryButtons controls={editorControls} />
+                {editorControls && (
+                  <EditorContainerMenu controls={editorControls} />
+                )}
               </div>
-            )}
-            {!!record.composition?.length && record.previewDocument && (
-              <details className="catalog-example">
-                <summary>查看组合后的完整布局</summary>
-                <CustomComponentsProvider components={components}>
-                  <TemplateContent
-                    content={record.previewDocument.content}
-                    document={record.previewDocument}
-                    onChange={() => {}}
-                    readOnly
-                    minimal
-                  />
-                </CustomComponentsProvider>
-              </details>
-            )}
-          </>
+              <SaveProjectPicker
+                projects={projects}
+                projectId={projectId}
+                onChange={onProjectChange}
+              />
+              <button
+                className="studio-button primary catalog-save"
+                disabled={!projectId || busy || !name.trim()}
+                onClick={() => run(save)}
+              >
+                保存
+              </button>
+            </aside>
+          </div>
         )}
         {tab === "edit" && (
-          <div className="studio-form compact catalog-edit-form">
-            <div className="studio-form-row">
-              <label>
-                名称
-                <input
-                  aria-label="模板名称"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                />
-              </label>
-              <label>
-                新版本
-                <input
-                  aria-label="模板新版本"
-                  value={version}
-                  onChange={(event) => setVersion(event.target.value)}
-                />
-              </label>
-            </div>
-            <label>
-              简述
-              <input
-                aria-label="模板简述"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-              />
-            </label>
-            <label>
-              使用场景（每行一项）
-              <textarea
-                aria-label="模板使用场景"
-                value={scenarios}
-                onChange={(event) => setScenarios(event.target.value)}
-              />
-            </label>
-            {!bundle && (
-              <section>
-                <h3>内容处理方式</h3>
-                {contentGuide.map((section, index) => (
-                  <div className="catalog-guide-editor" key={index}>
-                    <div className="catalog-related-fields">
-                      <input
-                        aria-label={`处理环节 ${index + 1}`}
-                        placeholder="环节名称"
-                        value={section.title}
+          <div className="catalog-custom-workspace">
+            <section className="catalog-custom-editor">
+              {" "}
+              {!bundle && (
+                <section>
+                  <h3>内容处理方式</h3>
+                  {contentGuide.map((section, index) => (
+                    <div className="catalog-guide-editor" key={index}>
+                      <div className="catalog-related-fields">
+                        <input
+                          aria-label={`处理环节 ${index + 1}`}
+                          placeholder="环节名称"
+                          value={section.title}
+                          onChange={(event) =>
+                            setContentGuide((current) =>
+                              current.map((item, i) =>
+                                i === index
+                                  ? { ...item, title: event.target.value }
+                                  : item,
+                              ),
+                            )
+                          }
+                        />
+                        <button
+                          className="studio-icon"
+                          aria-label={`移除处理环节 ${index + 1}`}
+                          onClick={() =>
+                            setContentGuide((current) =>
+                              current.filter((_, i) => i !== index),
+                            )
+                          }
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      <textarea
+                        aria-label={`处理要求 ${index + 1}`}
+                        placeholder="每行一项内容整理与呈现要求"
+                        value={section.instructions.join("\n")}
                         onChange={(event) =>
                           setContentGuide((current) =>
                             current.map((item, i) =>
                               i === index
-                                ? { ...item, title: event.target.value }
+                                ? {
+                                    ...item,
+                                    instructions:
+                                      event.target.value.split("\n"),
+                                  }
                                 : item,
                             ),
                           )
                         }
                       />
-                      <button
-                        className="studio-icon"
-                        aria-label={`移除处理环节 ${index + 1}`}
-                        onClick={() =>
-                          setContentGuide((current) =>
-                            current.filter((_, i) => i !== index),
-                          )
-                        }
-                      >
-                        <Trash2 size={14} />
-                      </button>
                     </div>
-                    <textarea
-                      aria-label={`处理要求 ${index + 1}`}
-                      placeholder="每行一项内容整理与呈现要求"
-                      value={section.instructions.join("\n")}
-                      onChange={(event) =>
-                        setContentGuide((current) =>
-                          current.map((item, i) =>
-                            i === index
-                              ? {
-                                  ...item,
-                                  instructions: event.target.value.split("\n"),
-                                }
-                              : item,
-                          ),
-                        )
-                      }
-                    />
-                  </div>
-                ))}
-                <button
-                  className="studio-text-button"
-                  onClick={() =>
-                    setContentGuide((current) => [
-                      ...current,
-                      { title: "", instructions: [] },
-                    ])
-                  }
-                >
-                  <Plus size={14} />
-                  添加处理环节
-                </button>
-              </section>
-            )}
-            {record.bundle && (
-              <section>
-                <h3>定制阶段指南</h3>
+                  ))}
+                  <button
+                    className="studio-text-button"
+                    onClick={() =>
+                      setContentGuide((current) => [
+                        ...current,
+                        { title: "", instructions: [] },
+                      ])
+                    }
+                  >
+                    <Plus size={14} />
+                    添加处理环节
+                  </button>
+                </section>
+              )}
+              {record.bundle && (
                 <TemplateWorkflowView
                   bundle={record.bundle}
                   files={bundleFiles}
@@ -880,89 +905,145 @@ export function TemplateDialog({
                     setBundleFiles((current) => ({ ...current, [path]: text }))
                   }
                 />
-              </section>
-            )}
-            <section>
-              <h3>相关模板与组件</h3>
-              <RelatedEditor
-                label="关联"
-                items={related}
-                onChange={setRelated}
-              />
+              )}
             </section>
-            <section>
-              <h3>示例</h3>
-              {examples.map((example, index) => (
-                <details className="catalog-example" key={index}>
-                  <summary>{example.name || "新示例"}</summary>
-                  <label>
-                    名称
-                    <input
-                      aria-label={`模板示例 ${index + 1} 名称`}
-                      value={example.name}
-                      onChange={(event) =>
-                        setExamples((current) =>
-                          current.map((item, i) =>
-                            i === index
-                              ? { ...item, name: event.target.value }
-                              : item,
-                          ),
-                        )
-                      }
-                    />
-                  </label>
-                  <label>
-                    需求
-                    <textarea
-                      aria-label={`模板示例 ${index + 1} 需求`}
-                      value={example.request}
-                      onChange={(event) =>
-                        setExamples((current) =>
-                          current.map((item, i) =>
-                            i === index
-                              ? { ...item, request: event.target.value }
-                              : item,
-                          ),
-                        )
-                      }
-                    />
-                  </label>
-                  <RelatedEditor
-                    label="步骤"
-                    items={example.steps}
-                    onChange={(steps) =>
-                      setExamples((current) =>
-                        current.map((item, i) =>
-                          i === index ? { ...item, steps } : item,
-                        ),
-                      )
-                    }
+            <aside className="catalog-info-panel catalog-edit-form">
+              <h3>模板设置</h3>{" "}
+              <div className="studio-form-row">
+                <label>
+                  名称
+                  <input
+                    aria-label="模板名称"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
                   />
-                  <button
-                    className="studio-text-button"
-                    onClick={() =>
-                      setExamples((current) =>
-                        current.filter((_, i) => i !== index),
-                      )
-                    }
-                  >
-                    移除此示例
-                  </button>
-                </details>
-              ))}
+                </label>
+                <label>
+                  新版本
+                  <input
+                    aria-label="模板新版本"
+                    value={version}
+                    onChange={(event) => setVersion(event.target.value)}
+                  />
+                </label>
+              </div>
+              <label>
+                简述
+                <input
+                  aria-label="模板简述"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                />
+              </label>
+              <SaveProjectPicker
+                projects={projects}
+                projectId={projectId}
+                onChange={onProjectChange}
+              />
+              <details>
+                <summary>适用场景</summary>{" "}
+                <label>
+                  使用场景（每行一项）
+                  <textarea
+                    aria-label="模板使用场景"
+                    value={scenarios}
+                    onChange={(event) => setScenarios(event.target.value)}
+                  />
+                </label>
+              </details>{" "}
+              <details>
+                <summary>关联内容</summary>
+                <RelatedEditor
+                  label="关联"
+                  items={related}
+                  onChange={setRelated}
+                />
+              </details>
+              <details>
+                <summary>示例</summary>
+                {examples.map((example, index) => (
+                  <details className="catalog-example" key={index}>
+                    <summary>{example.name || "新示例"}</summary>
+                    <label>
+                      名称
+                      <input
+                        aria-label={`模板示例 ${index + 1} 名称`}
+                        value={example.name}
+                        onChange={(event) =>
+                          setExamples((current) =>
+                            current.map((item, i) =>
+                              i === index
+                                ? { ...item, name: event.target.value }
+                                : item,
+                            ),
+                          )
+                        }
+                      />
+                    </label>
+                    <label>
+                      需求
+                      <textarea
+                        aria-label={`模板示例 ${index + 1} 需求`}
+                        value={example.request}
+                        onChange={(event) =>
+                          setExamples((current) =>
+                            current.map((item, i) =>
+                              i === index
+                                ? { ...item, request: event.target.value }
+                                : item,
+                            ),
+                          )
+                        }
+                      />
+                    </label>
+                    <RelatedEditor
+                      label="步骤"
+                      items={example.steps}
+                      onChange={(steps) =>
+                        setExamples((current) =>
+                          current.map((item, i) =>
+                            i === index ? { ...item, steps } : item,
+                          ),
+                        )
+                      }
+                    />
+                    <button
+                      className="studio-text-button"
+                      onClick={() =>
+                        setExamples((current) =>
+                          current.filter((_, i) => i !== index),
+                        )
+                      }
+                    >
+                      移除此示例
+                    </button>
+                  </details>
+                ))}
+                <button
+                  className="studio-text-button"
+                  onClick={() =>
+                    setExamples((current) => [
+                      ...current,
+                      { name: "", request: "", steps: [] },
+                    ])
+                  }
+                >
+                  <Plus size={14} />
+                  添加示例
+                </button>
+              </details>
+              <details>
+                <summary>版本信息</summary>
+                <Lineage item={record} />
+              </details>
               <button
-                className="studio-text-button"
-                onClick={() =>
-                  setExamples((current) => [
-                    ...current,
-                    { name: "", request: "", steps: [] },
-                  ])
-                }
+                className="studio-button primary catalog-save"
+                disabled={!projectId || busy || !name.trim()}
+                onClick={() => run(save)}
               >
-                <Plus size={14} />
-                添加示例
+                保存
               </button>
-            </section>
+            </aside>
           </div>
         )}
         {tab === "composition" && (
@@ -981,7 +1062,7 @@ export function TemplateDialog({
                       placeholder="小节标题（可选）"
                       value={part.title ?? ""}
                       onChange={(event) =>
-                        setParts((current) =>
+                        changeComposition((current) =>
                           current.map((item, i) =>
                             i === index
                               ? {
@@ -1000,7 +1081,7 @@ export function TemplateDialog({
                   disabled={index === 0}
                   aria-label={`上移组合部分 ${index + 1}`}
                   onClick={() =>
-                    setParts((current) => {
+                    changeComposition((current) => {
                       const copy = [...current];
                       [copy[index - 1], copy[index]] = [
                         copy[index],
@@ -1017,7 +1098,7 @@ export function TemplateDialog({
                   disabled={index === parts.length - 1}
                   aria-label={`下移组合部分 ${index + 1}`}
                   onClick={() =>
-                    setParts((current) => {
+                    changeComposition((current) => {
                       const copy = [...current];
                       [copy[index], copy[index + 1]] = [
                         copy[index + 1],
@@ -1033,7 +1114,9 @@ export function TemplateDialog({
                   className="studio-icon"
                   aria-label={`移除组合部分 ${index + 1}`}
                   onClick={() =>
-                    setParts((current) => current.filter((_, i) => i !== index))
+                    changeComposition((current) =>
+                      current.filter((_, i) => i !== index),
+                    )
                   }
                 >
                   <Trash2 size={14} />
@@ -1061,7 +1144,7 @@ export function TemplateDialog({
                     (item) => keyOf(item) === selectedPart,
                   );
                   if (target)
-                    setParts((current) => [
+                    changeComposition((current) => [
                       ...(current.length
                         ? current
                         : [
@@ -1094,7 +1177,7 @@ export function TemplateDialog({
               className="studio-text-button"
               onClick={() => {
                 setEditingPart(parts.length);
-                setParts((current) => [
+                changeComposition((current) => [
                   ...current,
                   {
                     type: "content",
@@ -1110,7 +1193,7 @@ export function TemplateDialog({
             {!!parts.length && (
               <button
                 className="studio-text-button"
-                onClick={() => setParts([])}
+                onClick={() => changeComposition([])}
               >
                 移除所有组合部分
               </button>
@@ -1122,53 +1205,6 @@ export function TemplateDialog({
             {error}
           </p>
         )}
-        <footer>
-          {record.scope === "project" && !!record.integrity && (
-            <button
-              className="studio-button"
-              disabled={busy}
-              onClick={() =>
-                run(async () => {
-                  await localDraft.persist();
-                  await desktop.invoke("catalog:promote", {
-                    ref: revision("template", record, projectId),
-                    projectId,
-                  });
-                  await onSaved();
-                })
-              }
-            >
-              <Globe2 size={14} />
-              注册到全局
-            </button>
-          )}
-          {record.integrity && !systemTemplate && (
-            <button
-              className="studio-button"
-              onClick={() =>
-                run(async () => {
-                  await localDraft.persist();
-                  onPublish(revision("template", record, projectId));
-                })
-              }
-            >
-              <Upload size={14} />
-              发布
-            </button>
-          )}
-          {systemTemplate ? (
-            <span>系统基础指南由应用提供，创作时与所选模板共同使用。</span>
-          ) : (
-            <button
-              className="studio-button primary"
-              disabled={!projectId || !name.trim() || busy}
-              onClick={() => run(save)}
-            >
-              {busy && <Loader2 size={14} className="studio-spin" />}
-              保存项目新版本
-            </button>
-          )}
-        </footer>
       </div>
     </Dialog>
   );
@@ -1180,6 +1216,8 @@ export function ComponentDialog({
   source,
   canInsert,
   projectId,
+  projects = [],
+  onProjectChange,
   onInsert,
   onClose,
   onSaved,
@@ -1190,11 +1228,17 @@ export function ComponentDialog({
   source?: ComponentSource;
   canInsert: boolean;
   projectId?: string;
+  projects?: ProjectSummary[];
+  onProjectChange?: (id: string) => void;
   onInsert: (kind: string, data: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
   onSaved: (component: CompiledComponent) => Promise<void>;
   onPublish: (ref: PackageRevisionRef) => void;
 }) {
+  const panelId = useId();
+  const sourceRevision = useRef(
+    custom ? revision("component", custom, projectId) : undefined,
+  ).current;
   const item = builtin ?? custom!;
   const [category, setCategory] = useState<ComponentCategory>(() =>
     componentCategory(item),
@@ -1289,7 +1333,9 @@ export function ComponentDialog({
   });
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
-    [example, setExample] = useState(0);
+    [example, setExample] = useState(
+      builtin?.kind === "text" && item.examples.length > 1 ? 1 : 0,
+    );
   const examples = item.examples ?? [],
     data = examples[example]?.data ?? item.defaultData;
   const run = (operation: () => Promise<unknown>) => {
@@ -1353,48 +1399,83 @@ export function ComponentDialog({
         </span>
       }
       headerContent={
-        <nav className="studio-detail-tabs" aria-label="组件详情菜单">
-          <button
-            className={tab === "about" ? "active" : ""}
-            aria-pressed={tab === "about"}
-            onClick={() => setTab("about")}
-          >
-            概览
-          </button>
-          {source && (
-            <button
-              className={tab === "code" ? "active" : ""}
-              aria-pressed={tab === "code"}
-              onClick={() => setTab("code")}
-            >
-              定制组件
-            </button>
-          )}
-          <button
-            className={tab === "schema" ? "active" : ""}
-            aria-pressed={tab === "schema"}
-            onClick={() => setTab("schema")}
-          >
-            数据结构
-          </button>
-          <button
-            className={tab === "guide" ? "active" : ""}
-            aria-pressed={tab === "guide"}
-            onClick={() => setTab("guide")}
-          >
-            使用说明
-          </button>
-          <button
-            className={tab === "development" ? "active" : ""}
-            aria-pressed={tab === "development"}
-            onClick={() => setTab("development")}
-          >
-            开发说明
-          </button>
-        </nav>
+        <CatalogTabs
+          label="组件详情菜单"
+          panelId={panelId}
+          active={tab === "development" ? "code" : tab}
+          onChange={setTab}
+          tabs={[
+            { id: "about", label: "预览" },
+            { id: "guide", label: "使用说明" },
+            { id: "schema", label: "参数" },
+            ...(source ? [{ id: "code" as const, label: "定制" }] : []),
+          ]}
+        />
+      }
+      headerActions={
+        <CatalogActions
+          items={[
+            ...(canInsert
+              ? [
+                  {
+                    label: "插入页面",
+                    icon: <Plus size={16} />,
+                    onSelect: () =>
+                      run(async () => {
+                        await localDraft.persist();
+                        await onInsert(
+                          builtin?.kind ?? "custom",
+                          builtin
+                            ? structuredClone(data)
+                            : componentWidgetData(custom!, data),
+                        );
+                      }),
+                  },
+                ]
+              : []),
+            ...(custom
+              ? [
+                  {
+                    label: "发布",
+                    icon: <Upload size={16} />,
+                    onSelect: () =>
+                      run(async () => {
+                        await localDraft.persist();
+                        onPublish(sourceRevision!);
+                      }),
+                  },
+                ]
+              : []),
+            ...(custom?.scope === "project"
+              ? [
+                  {
+                    label: "注册到全局",
+                    icon: <Globe2 size={16} />,
+                    onSelect: () =>
+                      run(async () => {
+                        await localDraft.persist();
+                        const result = await desktop.invoke<CompiledComponent>(
+                          "catalog:promote",
+                          {
+                            ref: sourceRevision!,
+                            projectId: sourceRevision?.projectId ?? projectId,
+                          },
+                        );
+                        await onSaved(result);
+                      }),
+                  },
+                ]
+              : []),
+          ]}
+        />
       }
     >
-      <div className="studio-component-detail catalog-detail">
+      <div
+        className="studio-component-detail catalog-detail"
+        role="tabpanel"
+        id={panelId}
+        aria-label={tab}
+      >
         <CatalogDraftRecovery draft={localDraft} />
         {manifestJson && (
           <details className="catalog-recovery-source">
@@ -1418,7 +1499,7 @@ export function ComponentDialog({
             ))}
           </details>
         )}
-        {custom && <Lineage item={custom} />}
+
         {(tab === "guide" || tab === "development") && (
           <ComponentDocumentationView
             documentation={item.documentation}
@@ -1426,46 +1507,15 @@ export function ComponentDialog({
           />
         )}
         {tab === "about" && (
-          <>
-            <div className="catalog-reference-intro">
-              <span>
-                {builtin ? "内置组件" : "自定义组件"} ·{" "}
-                {reuseLabels[item.documentation?.reuse.kind ?? "unclassified"]}
-              </span>
-              <p>{item.description}</p>
-            </div>
-            <div className="catalog-overview">
-              <aside className="catalog-documentation">
-                <ReferenceSection title="使用场景" icon="usage">
-                  <Bullets items={item.scenarios} />
-                </ReferenceSection>
-                <ReferenceSection title="可视化效果" icon="effect">
-                  <Bullets items={item.effects ?? []} />
-                </ReferenceSection>
-                {source && (
-                  <ReferenceSection title="定制起点" icon="content">
-                    <button
-                      className="studio-text-button"
-                      onClick={() => setTab("code")}
-                    >
-                      打开源码 <span aria-hidden="true">↗</span>
-                    </button>
-                  </ReferenceSection>
-                )}
-              </aside>
-              <section
-                className="catalog-live-example"
-                aria-label="组件示例预览"
-              >
-                <header>
-                  <h3>
-                    <Monitor size={17} />
-                    实时示例
-                  </h3>
-                </header>
-                {examples.length > 0 && (
-                  <label className="studio-example-picker">
-                    示例
+          <div className="catalog-preview-workspace">
+            <section className="catalog-live-example" aria-label="组件示例预览">
+              <CatalogPreview
+                label="组件预览画面"
+                width={960}
+                minHeight={builtin?.kind === "text" ? 620 : undefined}
+                resetKey={example}
+                accessory={
+                  examples.length > 0 && (
                     <select
                       aria-label="组件示例"
                       value={example}
@@ -1479,181 +1529,255 @@ export function ComponentDialog({
                         </option>
                       ))}
                     </select>
-                  </label>
-                )}
-                {(examples[example]?.request ||
-                  examples[example]?.description) && (
-                  <p className="catalog-example-request">
-                    {examples[example].request ?? examples[example].description}
-                  </p>
-                )}
-                <div className="studio-component-preview catalog-preview-stage">
-                  {builtin ? (
-                    <BuiltinPreview component={builtin} data={data} />
-                  ) : (
-                    <CustomComponentsProvider components={[custom!]}>
-                      <Widget
-                        kind="custom"
-                        data={componentWidgetData(custom!, data)}
-                        readOnly
-                      />
-                    </CustomComponentsProvider>
-                  )}
-                </div>
-                <details className="catalog-example-data">
-                  <summary>示例数据</summary>
-                  <pre>{JSON.stringify(data, null, 2)}</pre>
-                </details>
-              </section>
-            </div>
-          </>
-        )}
-        {tab === "code" && source && (
-          <div className="studio-form catalog-edit-form">
-            <label>
-              类型
-              <select
-                aria-label="组件类型"
-                value={category}
-                onChange={(event) =>
-                  setCategory(event.target.value as ComponentCategory)
+                  )
                 }
               >
-                {componentCategories.map(({ id, label }) => (
-                  <option key={id} value={id}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {builtin && (
+                {builtin ? (
+                  <BuiltinPreview component={builtin} data={data} />
+                ) : (
+                  <CustomComponentsProvider components={[custom!]}>
+                    <Widget
+                      kind="custom"
+                      data={componentWidgetData(custom!, data)}
+                      readOnly
+                    />
+                  </CustomComponentsProvider>
+                )}
+              </CatalogPreview>
+            </section>
+            <aside className="catalog-info-panel">
+              <ReferenceSection title="适用场景" icon="usage">
+                <CompactScenarios items={item.scenarios} />
+              </ReferenceSection>
+              <ReferenceSection title="可调整" icon="effect">
+                <ComponentAdjustmentSummary
+                  schema={
+                    source?.schema ??
+                    builtin?.propsSchema ??
+                    custom?.schema ??
+                    {}
+                  }
+                />
+              </ReferenceSection>
+              <details className="catalog-example-data">
+                <summary>示例数据</summary>
+                <pre>{JSON.stringify(data, null, 2)}</pre>
+              </details>
+            </aside>
+          </div>
+        )}
+        {tab === "code" && source && (
+          <div className="catalog-custom-workspace">
+            <section className="catalog-custom-editor">
+              <div className="catalog-file-heading">
+                {source.manifest.entry}
+              </div>{" "}
               <label>
-                组件 ID
-                <input
-                  aria-label="组件 ID"
-                  value={componentId}
-                  onChange={(event) => setComponentId(event.target.value)}
+                React / TSX
+                <textarea
+                  className="studio-code-editor"
+                  aria-label="组件源码"
+                  spellCheck={false}
+                  value={code}
+                  onChange={(event) => setCode(event.target.value)}
                 />
               </label>
-            )}
-            <div className="studio-form-row">
+            </section>
+            <aside className="catalog-info-panel catalog-edit-form">
+              <h3>组件设置</h3>{" "}
               <label>
-                名称
+                类型
+                <select
+                  aria-label="组件类型"
+                  value={category}
+                  onChange={(event) =>
+                    setCategory(event.target.value as ComponentCategory)
+                  }
+                >
+                  {componentCategories.map(({ id, label }) => (
+                    <option key={id} value={id}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {builtin && (
+                <label>
+                  组件 ID
+                  <input
+                    aria-label="组件 ID"
+                    value={componentId}
+                    onChange={(event) => setComponentId(event.target.value)}
+                  />
+                </label>
+              )}
+              <div className="studio-form-row">
+                <label>
+                  名称
+                  <input
+                    aria-label="组件名称"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                  />
+                </label>
+                <label>
+                  新版本
+                  <input
+                    aria-label="组件新版本"
+                    value={version}
+                    onChange={(event) => setVersion(event.target.value)}
+                  />
+                </label>
+              </div>
+              <label>
+                简述
                 <input
-                  aria-label="组件名称"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
+                  aria-label="组件说明"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
                 />
               </label>
-              <label>
-                新版本
-                <input
-                  aria-label="组件新版本"
-                  value={version}
-                  onChange={(event) => setVersion(event.target.value)}
+              <SaveProjectPicker
+                projects={projects}
+                projectId={projectId}
+                onChange={onProjectChange}
+              />
+              <details>
+                <summary>场景与效果</summary>{" "}
+                <label>
+                  使用场景（每行一项）
+                  <textarea
+                    aria-label="组件使用场景"
+                    value={scenarios}
+                    onChange={(event) => setScenarios(event.target.value)}
+                  />
+                </label>
+                <label>
+                  可视化效果（每行一项）
+                  <textarea
+                    aria-label="组件效果"
+                    value={effects}
+                    onChange={(event) => setEffects(event.target.value)}
+                  />
+                </label>
+              </details>
+              <details>
+                <summary>说明与示例</summary>{" "}
+                <label>
+                  使用与开发说明（随新版本保存）
+                  <textarea
+                    className="studio-code-editor"
+                    aria-label="组件说明契约"
+                    spellCheck={false}
+                    value={documentationJson}
+                    onChange={(event) =>
+                      setDocumentationJson(event.target.value)
+                    }
+                  />
+                  <small>
+                    包含复用范围、使用说明与开发说明；旧版本缺少说明时显示“待评估”。
+                  </small>
+                </label>
+              </details>
+              <details>
+                <summary>开发说明</summary>
+                <ComponentDocumentationView
+                  documentation={item.documentation}
+                  development
                 />
-              </label>
-            </div>
-            <label>
-              简述
-              <input
-                aria-label="组件说明"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-              />
-            </label>
-            <label>
-              使用场景（每行一项）
-              <textarea
-                aria-label="组件使用场景"
-                value={scenarios}
-                onChange={(event) => setScenarios(event.target.value)}
-              />
-            </label>
-            <label>
-              可视化效果（每行一项）
-              <textarea
-                aria-label="组件效果"
-                value={effects}
-                onChange={(event) => setEffects(event.target.value)}
-              />
-            </label>
-            <label>
-              React / TSX
-              <textarea
-                className="studio-code-editor"
-                aria-label="组件源码"
-                spellCheck={false}
-                value={code}
-                onChange={(event) => setCode(event.target.value)}
-              />
-            </label>
-            <label>
-              使用与开发说明（随新版本保存）
-              <textarea
-                className="studio-code-editor"
-                aria-label="组件说明契约"
-                spellCheck={false}
-                value={documentationJson}
-                onChange={(event) => setDocumentationJson(event.target.value)}
-              />
-              <small>
-                包含复用范围、使用说明与开发说明；旧版本缺少说明时显示“待评估”。
-              </small>
-            </label>
+              </details>
+              {custom && (
+                <details>
+                  <summary>版本信息</summary>
+                  <Lineage item={custom} />
+                </details>
+              )}
+              <button
+                className="studio-button primary catalog-save"
+                disabled={!projectId || busy}
+                onClick={() => run(save)}
+              >
+                保存
+              </button>
+            </aside>
           </div>
         )}
         {tab === "schema" && (
-          <div className="studio-form catalog-edit-form">
-            <ComponentParameterSummary
-              schema={
-                source?.schema ?? builtin?.propsSchema ?? custom?.schema ?? {}
-              }
-              defaults={item.defaultData}
-              documentation={item.documentation}
-            />
-            <details className="catalog-advanced-data">
-              <summary>
-                {source
-                  ? "高级：编辑参数规则与默认数据"
-                  : "查看原始参数规则与默认数据"}
-              </summary>
-              <div className="catalog-edit-form">
-                <label>
-                  参数规则
-                  <textarea
-                    className="studio-code-editor"
-                    aria-label="组件参数规则"
-                    spellCheck={false}
-                    readOnly={!source}
-                    value={schema}
-                    onChange={(event) => setSchema(event.target.value)}
-                  />
-                </label>
-                <label>
-                  默认数据
-                  <textarea
-                    className="studio-code-editor short"
-                    aria-label="组件默认数据"
-                    spellCheck={false}
-                    readOnly={!source}
-                    value={defaults}
-                    onChange={(event) => setDefaults(event.target.value)}
-                  />
-                </label>
-                {source && (
+          <div className="catalog-parameters-workspace">
+            <section className="catalog-parameters-main catalog-edit-form">
+              <ComponentParameterSummary
+                schema={
+                  source?.schema ?? builtin?.propsSchema ?? custom?.schema ?? {}
+                }
+                defaults={item.defaultData}
+                documentation={item.documentation}
+              />
+              <details className="catalog-advanced-data">
+                <summary>
+                  {source
+                    ? "高级：编辑参数规则与默认数据"
+                    : "查看原始参数规则与默认数据"}
+                </summary>
+                <div className="catalog-edit-form">
                   <label>
-                    示例（名称、需求、数据）
+                    参数规则
                     <textarea
-                      className="studio-code-editor short"
-                      aria-label="组件示例数据"
-                      value={examplesJson}
-                      onChange={(event) => setExamplesJson(event.target.value)}
+                      className="studio-code-editor"
+                      aria-label="组件参数规则"
+                      spellCheck={false}
+                      readOnly={!source}
+                      value={schema}
+                      onChange={(event) => setSchema(event.target.value)}
                     />
                   </label>
-                )}
-              </div>
-            </details>
+                  <label>
+                    默认数据
+                    <textarea
+                      className="studio-code-editor short"
+                      aria-label="组件默认数据"
+                      spellCheck={false}
+                      readOnly={!source}
+                      value={defaults}
+                      onChange={(event) => setDefaults(event.target.value)}
+                    />
+                  </label>
+                  {source && (
+                    <label>
+                      示例（名称、需求、数据）
+                      <textarea
+                        className="studio-code-editor short"
+                        aria-label="组件示例数据"
+                        value={examplesJson}
+                        onChange={(event) =>
+                          setExamplesJson(event.target.value)
+                        }
+                      />
+                    </label>
+                  )}
+                </div>
+              </details>
+            </section>
+            <aside className="catalog-info-panel">
+              <ComponentParameterFacts
+                schema={
+                  source?.schema ?? builtin?.propsSchema ?? custom?.schema ?? {}
+                }
+              />
+              <SaveProjectPicker
+                projects={projects}
+                projectId={projectId}
+                onChange={onProjectChange}
+              />
+              {source && (
+                <button
+                  className="studio-button primary catalog-save"
+                  disabled={!projectId || busy}
+                  onClick={() => run(save)}
+                >
+                  保存
+                </button>
+              )}
+            </aside>
           </div>
         )}
         {error && (
@@ -1661,75 +1785,6 @@ export function ComponentDialog({
             {error}
           </p>
         )}
-        <footer>
-          {!source && custom && (
-            <span>此副本只有运行代码；编辑需要原始源码。</span>
-          )}
-          {custom?.scope === "project" && (
-            <button
-              className="studio-button"
-              disabled={busy}
-              onClick={() =>
-                run(async () => {
-                  await localDraft.persist();
-                  const result = await desktop.invoke<CompiledComponent>(
-                    "catalog:promote",
-                    {
-                      ref: revision("component", custom, projectId),
-                      projectId,
-                    },
-                  );
-                  await onSaved(result);
-                })
-              }
-            >
-              <Globe2 size={14} />
-              注册到全局
-            </button>
-          )}
-          {custom && (
-            <button
-              className="studio-button"
-              onClick={() =>
-                run(async () => {
-                  await localDraft.persist();
-                  onPublish(revision("component", custom, projectId));
-                })
-              }
-            >
-              <Upload size={14} />
-              发布
-            </button>
-          )}
-          {source && (tab === "code" || tab === "schema") && (
-            <button
-              className="studio-button"
-              disabled={!projectId || busy}
-              onClick={() => run(save)}
-            >
-              {busy && <Loader2 size={14} className="studio-spin" />}
-              保存项目新版本
-            </button>
-          )}
-          <button
-            className="studio-button primary"
-            disabled={!canInsert || busy}
-            onClick={() =>
-              run(async () => {
-                await localDraft.persist();
-                await onInsert(
-                  builtin?.kind ?? "custom",
-                  builtin
-                    ? structuredClone(data)
-                    : componentWidgetData(custom!, data),
-                );
-              })
-            }
-          >
-            <Plus size={15} />
-            插入页面
-          </button>
-        </footer>
       </div>
     </Dialog>
   );

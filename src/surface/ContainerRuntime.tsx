@@ -14,7 +14,7 @@ import {
 import type { EditorControls } from "./EditorControls";
 import { AdditionalComponentsProvider } from "../components/custom/CustomBlock";
 import type { CompiledComponent } from "../components/custom/types";
-import { flushSync } from "react-dom";
+import { flushSync, createPortal } from "react-dom";
 import { ComponentSlashMenu } from "../components/ComponentSlashMenu";
 import { RegisterComponentContext } from "../components/useComponentCatalog";
 import { insertComponent } from "./component-insertion";
@@ -127,6 +127,7 @@ export function ContainerRuntime({
   onActiveSurfaceChange,
   onControlsChange,
   retainedState,
+  inspectorHost,
 }: {
   document: ContainerDocument;
   geometry?: SurfaceGeometryStore;
@@ -147,6 +148,7 @@ export function ContainerRuntime({
   onActiveSurfaceChange?: (id: string) => void;
   onControlsChange?: (controls: EditorControls | null) => void;
   retainedState?: ContainerViewState;
+  inspectorHost?: HTMLElement | null;
 }) {
   const document = useMemo(
     () => reconcileConnections({ ...sourceDocument }),
@@ -574,277 +576,295 @@ export function ContainerRuntime({
               />
             </div>
             {selectedEntry && (
-              <aside
-                className={`surface-inspector container-inspector${kind === "board" ? " board-bottom-inspector" : ""}`}
-                data-surface-ui
-                aria-label="模块设置"
-              >
-                <header>
-                  <strong>模块设置</strong>
-                  <button
-                    type="button"
-                    aria-label="关闭模块设置"
-                    onClick={() => inspect(null)}
-                  >
-                    <X size={16} />
-                  </button>
-                </header>
-                <label>
-                  名称
-                  <input
-                    aria-label="模块名称"
-                    value={
-                      selectedEntry.node.attrs?.name ??
-                      nodeName(selectedEntry.node)
-                    }
-                    maxLength={200}
-                    onChange={(event) =>
-                      runtime.commit(
-                        editNode(current.current, inspecting!, (node) => {
-                          node.attrs = {
-                            ...node.attrs,
-                            name: event.target.value,
-                          };
-                        }),
-                      )
-                    }
-                  />
-                </label>
-                {selectedEntry.node.type === "surface" && (
-                  <button
-                    type="button"
-                    onClick={() => setIconTarget(selectedEntry.node.attrs!.id)}
-                  >
-                    <PageIcon
-                      value={selectedEntry.node.attrs?.icon}
-                      size={18}
-                    />{" "}
-                    设置图标…
-                  </button>
-                )}
-                {pageWidthModes &&
-                  selectedEntry.node.type === "surface" &&
-                  surfaceKind(selectedEntry.node) === "page" && (
+              <InspectorOutlet host={inspectorHost}>
+                <aside
+                  className={`surface-inspector container-inspector${kind === "board" ? " board-bottom-inspector" : ""}`}
+                  data-surface-ui
+                  aria-label="模块设置"
+                >
+                  <header>
+                    <strong>{inspectorHost ? "当前对象" : "模块设置"}</strong>
+                    <button
+                      type="button"
+                      aria-label="关闭模块设置"
+                      onClick={() => inspect(null)}
+                    >
+                      <X size={16} />
+                    </button>
+                  </header>
+                  <label>
+                    名称
+                    <input
+                      aria-label="模块名称"
+                      value={
+                        selectedEntry.node.attrs?.name ??
+                        nodeName(selectedEntry.node)
+                      }
+                      maxLength={200}
+                      onChange={(event) =>
+                        runtime.commit(
+                          editNode(current.current, inspecting!, (node) => {
+                            node.attrs = {
+                              ...node.attrs,
+                              name: event.target.value,
+                            };
+                          }),
+                        )
+                      }
+                    />
+                  </label>
+                  {selectedEntry.node.type === "surface" && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setIconTarget(selectedEntry.node.attrs!.id)
+                      }
+                    >
+                      <PageIcon
+                        value={selectedEntry.node.attrs?.icon}
+                        size={18}
+                      />{" "}
+                      设置图标…
+                    </button>
+                  )}
+                  {pageWidthModes &&
+                    selectedEntry.node.type === "surface" &&
+                    surfaceKind(selectedEntry.node) === "page" && (
+                      <label>
+                        页面宽度
+                        <PageWidthSwitch
+                          value={
+                            selectedEntry.node.attrs?.widthMode ?? "standard"
+                          }
+                          onChange={(mode) =>
+                            runtime.commit(
+                              editNode(current.current, inspecting!, (node) => {
+                                node.attrs = {
+                                  ...node.attrs,
+                                  widthMode: mode,
+                                };
+                              }),
+                            )
+                          }
+                        />
+                      </label>
+                    )}
+                  {selectedEntry.node.type === "region" && (
                     <label>
-                      页面宽度
-                      <PageWidthSwitch
-                        value={
-                          selectedEntry.node.attrs?.widthMode ?? "standard"
+                      排列
+                      <select
+                        aria-label="区域布局"
+                        value={frame?.mode ?? "flow"}
+                        onChange={(event) =>
+                          updateFrame({
+                            ...frame!,
+                            mode: event.target.value as NodeLayout["mode"],
+                          })
                         }
-                        onChange={(mode) =>
-                          runtime.commit(
-                            editNode(current.current, inspecting!, (node) => {
-                              node.attrs = {
-                                ...node.attrs,
-                                widthMode: mode,
-                              };
-                            }),
+                      >
+                        <option value="flow">顺序</option>
+                        <option value="grid">网格</option>
+                        <option value="free">自由</option>
+                      </select>
+                    </label>
+                  )}
+                  {frame?.mode === "grid" && (
+                    <label>
+                      列数
+                      <input
+                        aria-label="网格列数"
+                        type="number"
+                        min={1}
+                        max={12}
+                        value={frame.columns ?? 2}
+                        onChange={(event) => {
+                          const value = Number(event.target.value);
+                          if (
+                            Number.isInteger(value) &&
+                            value >= 1 &&
+                            value <= 12
                           )
-                        }
+                            updateFrame({ ...frame, columns: value });
+                        }}
                       />
                     </label>
                   )}
-                {selectedEntry.node.type === "region" && (
+                  {frame &&
+                    !(
+                      selectedEntry.node.type === "drawing" &&
+                      selectedEntry.node.attrs?.tool === "arrow"
+                    ) && (
+                      <>
+                        <label>
+                          宽度
+                          <input
+                            aria-label="模块宽度"
+                            type="number"
+                            min={
+                              selectedEntry.node.type === "drawing" ? 1 : 120
+                            }
+                            max={10000}
+                            value={Math.round(frame.width)}
+                            onChange={(event) => {
+                              const width = Number(event.target.value);
+                              if (
+                                width >=
+                                  (selectedEntry.node.type === "drawing"
+                                    ? 1
+                                    : 120) &&
+                                width <= 10000
+                              )
+                                updateFrame({ ...frame, width });
+                            }}
+                          />
+                        </label>
+                        {selectedEntry.node.type === "surface" && (
+                          <>
+                            <label>
+                              高度方式
+                              <select
+                                aria-label="模块高度方式"
+                                value={frame.heightMode ?? "fixed"}
+                                onChange={(event) =>
+                                  updateFrame({
+                                    ...frame,
+                                    heightMode: event.target.value as
+                                      "fixed" | "auto",
+                                  })
+                                }
+                              >
+                                <option value="fixed">固定窗口</option>
+                                {surfaceKind(selectedEntry.node) === "page" && (
+                                  <option value="auto">随内容增长</option>
+                                )}
+                              </select>
+                            </label>
+                            {frame.heightMode !== "auto" && (
+                              <label>
+                                高度
+                                <input
+                                  aria-label="模块高度"
+                                  type="number"
+                                  min={180}
+                                  max={5000}
+                                  value={frame.height ?? 460}
+                                  onChange={(event) => {
+                                    const height = Number(event.target.value);
+                                    if (height >= 180 && height <= 5000)
+                                      updateFrame({ ...frame, height });
+                                  }}
+                                />
+                              </label>
+                            )}
+                          </>
+                        )}
+                      </>
+                    )}
                   <label>
-                    排列
+                    所属容器
                     <select
-                      aria-label="区域布局"
-                      value={frame?.mode ?? "flow"}
-                      onChange={(event) =>
-                        updateFrame({
-                          ...frame!,
-                          mode: event.target.value as NodeLayout["mode"],
-                        })
-                      }
+                      aria-label="所属容器"
+                      value={selectedEntry.parent?.attrs?.id ?? ""}
+                      onChange={(event) => {
+                        const parentId = event.target.value;
+                        runtime.commit(
+                          moveNode(
+                            runtime.geometry.materialize(current.current),
+                            inspecting!,
+                            parentId,
+                            {
+                              ...(frame ?? { width: 640 }),
+                              x: 0,
+                              y: 0,
+                            },
+                          ),
+                        );
+                        inspect(null);
+                        focusSurface(parentId);
+                        requestReveal(inspecting);
+                      }}
                     >
-                      <option value="flow">顺序</option>
-                      <option value="grid">网格</option>
-                      <option value="free">自由</option>
+                      {containerOptions(document, inspecting!).map((node) => (
+                        <option key={node.attrs!.id} value={node.attrs!.id}>
+                          {node === document.content ? "根 " : ""}
+                          {nodeName(node)}
+                        </option>
+                      ))}
                     </select>
                   </label>
-                )}
-                {frame?.mode === "grid" && (
-                  <label>
-                    列数
-                    <input
-                      aria-label="网格列数"
-                      type="number"
-                      min={1}
-                      max={12}
-                      value={frame.columns ?? 2}
-                      onChange={(event) => {
-                        const value = Number(event.target.value);
-                        if (
-                          Number.isInteger(value) &&
-                          value >= 1 &&
-                          value <= 12
-                        )
-                          updateFrame({ ...frame, columns: value });
-                      }}
-                    />
-                  </label>
-                )}
-                {frame &&
-                  !(
-                    selectedEntry.node.type === "drawing" &&
-                    selectedEntry.node.attrs?.tool === "arrow"
-                  ) && (
-                    <>
-                      <label>
-                        宽度
-                        <input
-                          aria-label="模块宽度"
-                          type="number"
-                          min={selectedEntry.node.type === "drawing" ? 1 : 120}
-                          max={10000}
-                          value={Math.round(frame.width)}
-                          onChange={(event) => {
-                            const width = Number(event.target.value);
-                            if (
-                              width >=
-                                (selectedEntry.node.type === "drawing"
-                                  ? 1
-                                  : 120) &&
-                              width <= 10000
-                            )
-                              updateFrame({ ...frame, width });
-                          }}
-                        />
-                      </label>
-                      {selectedEntry.node.type === "surface" && (
-                        <>
-                          <label>
-                            高度方式
-                            <select
-                              aria-label="模块高度方式"
-                              value={frame.heightMode ?? "fixed"}
-                              onChange={(event) =>
-                                updateFrame({
-                                  ...frame,
-                                  heightMode: event.target.value as
-                                    "fixed" | "auto",
-                                })
-                              }
-                            >
-                              <option value="fixed">固定窗口</option>
-                              {surfaceKind(selectedEntry.node) === "page" && (
-                                <option value="auto">随内容增长</option>
-                              )}
-                            </select>
-                          </label>
-                          {frame.heightMode !== "auto" && (
-                            <label>
-                              高度
-                              <input
-                                aria-label="模块高度"
-                                type="number"
-                                min={180}
-                                max={5000}
-                                value={frame.height ?? 460}
-                                onChange={(event) => {
-                                  const height = Number(event.target.value);
-                                  if (height >= 180 && height <= 5000)
-                                    updateFrame({ ...frame, height });
-                                }}
-                              />
-                            </label>
-                          )}
-                        </>
-                      )}
-                    </>
-                  )}
-                <label>
-                  所属容器
-                  <select
-                    aria-label="所属容器"
-                    value={selectedEntry.parent?.attrs?.id ?? ""}
-                    onChange={(event) => {
-                      const parentId = event.target.value;
+                  <div className="surface-inspector-actions">
+                    {[-1, 1].map((delta) => (
+                      <button
+                        type="button"
+                        key={delta}
+                        onClick={() => {
+                          const entry = findSurfaceNode(
+                              current.current,
+                              inspecting!,
+                            )!,
+                            parent = entry.parent!;
+                          const index = parent.content!.indexOf(entry.node);
+                          const next = moveNode(
+                            current.current,
+                            inspecting!,
+                            parent.attrs?.id,
+                            undefined,
+                            Math.max(
+                              0,
+                              Math.min(
+                                parent.content!.length - 1,
+                                index + delta,
+                              ),
+                            ),
+                          );
+                          const newParent = findSurfaceNode(
+                            next,
+                            parent.attrs!.id,
+                          )!.node;
+                          const views = next.surfaceViews![parent.attrs!.id];
+                          if (views)
+                            views.readingOrder = newParent.content!.map(
+                              (node) => node.attrs!.id,
+                            );
+                          runtime.commit(next);
+                        }}
+                      >
+                        {delta < 0 ? "向前排列" : "向后排列"}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
                       runtime.commit(
-                        moveNode(
+                        removeNode(
                           runtime.geometry.materialize(current.current),
                           inspecting!,
-                          parentId,
-                          {
-                            ...(frame ?? { width: 640 }),
-                            x: 0,
-                            y: 0,
-                          },
                         ),
                       );
                       inspect(null);
-                      focusSurface(parentId);
-                      requestReveal(inspecting);
+                      select(null);
                     }}
                   >
-                    {containerOptions(document, inspecting!).map((node) => (
-                      <option key={node.attrs!.id} value={node.attrs!.id}>
-                        {node === document.content ? "根 " : ""}
-                        {nodeName(node)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="surface-inspector-actions">
-                  {[-1, 1].map((delta) => (
-                    <button
-                      type="button"
-                      key={delta}
-                      onClick={() => {
-                        const entry = findSurfaceNode(
-                            current.current,
-                            inspecting!,
-                          )!,
-                          parent = entry.parent!;
-                        const index = parent.content!.indexOf(entry.node);
-                        const next = moveNode(
-                          current.current,
-                          inspecting!,
-                          parent.attrs?.id,
-                          undefined,
-                          Math.max(
-                            0,
-                            Math.min(parent.content!.length - 1, index + delta),
-                          ),
-                        );
-                        const newParent = findSurfaceNode(
-                          next,
-                          parent.attrs!.id,
-                        )!.node;
-                        const views = next.surfaceViews![parent.attrs!.id];
-                        if (views)
-                          views.readingOrder = newParent.content!.map(
-                            (node) => node.attrs!.id,
-                          );
-                        runtime.commit(next);
-                      }}
-                    >
-                      {delta < 0 ? "向前排列" : "向后排列"}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    runtime.commit(
-                      removeNode(
-                        runtime.geometry.materialize(current.current),
-                        inspecting!,
-                      ),
-                    );
-                    inspect(null);
-                    select(null);
-                  }}
-                >
-                  删除模块
-                </button>
-              </aside>
+                    删除模块
+                  </button>
+                </aside>
+              </InspectorOutlet>
             )}
           </div>
         </Context.Provider>
       </RegisterComponentContext.Provider>
     </AdditionalComponentsProvider>
   );
+}
+function InspectorOutlet({
+  host,
+  children,
+}: {
+  host?: HTMLElement | null;
+  children: ReactNode;
+}) {
+  return host ? createPortal(children, host) : children;
 }
 function containerOptions(document: ShowDocument, id: string) {
   const excluded = new Set<string>();

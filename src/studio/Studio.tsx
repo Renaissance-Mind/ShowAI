@@ -26,6 +26,7 @@ import {
   AppWindow,
   Blocks,
   Settings2,
+  Search,
   CodeXml,
   Download,
   FolderMinus,
@@ -110,6 +111,7 @@ import {
   latestTemplateVersions,
   templateHasPage,
 } from "./template-catalog-model";
+import TemplateThumbnail from "./TemplateThumbnail";
 import RecentPages, { recentPages } from "./RecentPages";
 import AutoHideSidebar from "./AutoHideSidebar";
 import WorkspaceTabs, { WorkspaceHistory } from "./WorkspaceTabs";
@@ -385,14 +387,22 @@ export default function Studio() {
   const [componentFilter, setComponentFilter] =
     useState<ComponentFilter>("all");
   const [componentCategory, setComponentCategory] =
-    useState<ComponentCategory | null>("text");
-  const [categoryRequest, setCategoryRequest] = useState<{
-    category: ComponentCategory;
-    sequence: number;
-  } | null>(null);
+    useState<ComponentCategory | null>(null);
+  const [catalogQueries, setCatalogQueries] = useState({
+    components: "",
+    templates: "",
+  });
   const componentGroups = useMemo(
-    () => groupComponents(catalog, componentFilter),
-    [catalog, componentFilter],
+    () =>
+      groupComponents(catalog, componentFilter).map((group) => ({
+        ...group,
+        items: group.items.filter((item) =>
+          `${item.name} ${item.description}`
+            .toLowerCase()
+            .includes(catalogQueries.components.toLowerCase()),
+        ),
+      })),
+    [catalog, componentFilter, catalogQueries.components],
   );
   const catalogScrollRef = useRef<HTMLDivElement>(null);
   const [focusWindow] = useState(
@@ -1564,11 +1574,27 @@ export default function Studio() {
     () => recentPages(projects, contents),
     [projects, contents],
   );
-  const catalogTemplates = showTemplateVersions
-    ? templates
-    : latestTemplateVersions(templates);
-  const visibleTemplates = catalogTemplates.filter((item) =>
-    matchesTemplateType(item, templateType),
+  const catalogTemplates = (
+    showTemplateVersions ? templates : latestTemplateVersions(templates)
+  )
+    .slice()
+    .sort((a, b) => {
+      const priority = (item: TemplateMetadata) =>
+        item.scope === "project"
+          ? -3
+          : item.workflow && item.id !== "system-presentation"
+            ? -2
+            : item.id === "system-presentation"
+              ? 2
+              : 0;
+      return priority(a) - priority(b);
+    });
+  const visibleTemplates = catalogTemplates.filter(
+    (item) =>
+      matchesTemplateType(item, templateType) &&
+      `${item.name} ${item.description}`
+        .toLowerCase()
+        .includes(catalogQueries.templates.toLowerCase()),
   );
   const folderIds = new Set(folders.map((item) => item.id));
   const currentFolder = folders.find((item) => item.id === selectedFolder);
@@ -1861,10 +1887,7 @@ export default function Studio() {
           active={componentCategory}
           onSelect={(category) => {
             setComponentCategory(category);
-            setCategoryRequest((current) => ({
-              category,
-              sequence: (current?.sequence ?? 0) + 1,
-            }));
+            catalogScrollRef.current?.scrollTo({ top: 0 });
           }}
         />
       ) : (
@@ -1917,6 +1940,19 @@ export default function Studio() {
       )}
     </LibraryDragContext.Provider>
   );
+  const changeCatalogOwner = (id: string) =>
+    action(async () => {
+      if (!(await page.flush())) return;
+      selectedRef.current = id || null;
+      setSelectedProject(id || null);
+      setDialog((current) =>
+        current && (current.type === "template" || current.type === "component")
+          ? { ...current, projectId: id || undefined }
+          : current,
+      );
+      if (id) await loadProjectContents(id);
+      await loadCatalog();
+    })();
   const topbar = (
     <div className="studio-topbar">
       {navigationUpdating && (
@@ -1991,7 +2027,114 @@ export default function Studio() {
           )}
         </div>
       )}
+      {view === "components" && (
+        <nav
+          className="studio-filter-tabs component-source-tabs"
+          aria-label="组件来源"
+        >
+          {(
+            [
+              ["all", "全部"],
+              ["builtin", "内置"],
+              ["custom", "自定义"],
+            ] as const
+          ).map(([filter, label]) => (
+            <button
+              key={filter}
+              className={componentFilter === filter ? "active" : ""}
+              aria-pressed={componentFilter === filter}
+              onClick={() => {
+                setComponentFilter(filter);
+                setComponentCategory(null);
+                catalogScrollRef.current?.scrollTo({
+                  top: 0,
+                  behavior: "instant",
+                });
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      )}
+
       <div className="studio-header-actions">
+        {" "}
+        {view === "templates" && (
+          <div className="studio-library-toolbar catalog-scope-controls">
+            <label>
+              项目
+              <select
+                aria-label="目录项目"
+                value={selectedProject ?? ""}
+                onChange={(event) => {
+                  const id = event.target.value;
+                  void (async () => {
+                    if (!(await page.flush())) return;
+                    selectedRef.current = id || null;
+                    setSelectedProject(id || null);
+                    setSelectedFolder(null);
+                    if (id) await loadProjectContents(id);
+                    await loadCatalog();
+                  })().catch(report);
+                }}
+              >
+                <option value="">选择项目</option>
+                {projects.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {view === "templates" && (
+              <label>
+                范围
+                <select
+                  aria-label="目录范围"
+                  value={catalogScope ?? "all"}
+                  onChange={(event) =>
+                    setCatalogScope(
+                      event.target.value as CatalogReadOptions["scope"],
+                    )
+                  }
+                >
+                  <option value="all">全部</option>
+                  <option value="project">项目</option>
+                  <option value="global">全局</option>
+                  <option value="published">已发布</option>
+                  <option value="builtin">内置</option>
+                </select>
+              </label>
+            )}
+            <label className="catalog-version-toggle">
+              <input
+                type="checkbox"
+                checked={showTemplateVersions}
+                onChange={(event) =>
+                  setShowTemplateVersions(event.target.checked)
+                }
+              />
+              显示所有版本
+            </label>
+          </div>
+        )}
+        {(view === "components" || view === "templates") && (
+          <label className="catalog-list-search">
+            <Search size={16} />
+            <input
+              aria-label={view === "components" ? "搜索组件" : "搜索模板"}
+              placeholder={view === "components" ? "搜索组件" : "搜索模板"}
+              value={catalogQueries[view]}
+              onChange={(event) =>
+                setCatalogQueries((current) => ({
+                  ...current,
+                  [view]: event.target.value,
+                }))
+              }
+            />
+          </label>
+        )}
         {info?.libraryVersion === 2 && (
           <>
             <button
@@ -2006,52 +2149,54 @@ export default function Studio() {
         )}
         {(view === "projects" ||
           view === "project" ||
-          info?.libraryVersion === 2) && (
-          <ExpandableSearch
-            key={`${view}:${selectedProject}:${selectedFolder}:${searchRevision}`}
-            label={
-              !searchLibrary && view === "projects"
-                ? "搜索最近页面"
-                : !searchLibrary && view === "project"
-                  ? "搜索页面"
-                  : "搜索内容库"
-            }
-            value={query}
-            onChange={setQuery}
-          >
-            {info?.libraryVersion === 2 && (
-              <>
-                {(view === "projects" || view === "project") && (
-                  <nav className="studio-search-scopes" aria-label="搜索范围">
-                    <button
-                      aria-pressed={!searchLibrary}
-                      onClick={() => setSearchLibrary(false)}
-                    >
-                      {view === "projects" ? "最近页面" : "当前项目页面"}
-                    </button>
-                    <button
-                      aria-pressed={searchLibrary}
-                      onClick={() => setSearchLibrary(true)}
-                    >
-                      整个内容库
-                    </button>
-                  </nav>
-                )}
-                {searchLibrary ||
-                (view !== "projects" && view !== "project") ? (
-                  <LibrarySearchResults
-                    query={query}
-                    onOpen={openSearchResult}
-                    onMenu={(result, anchor, point) => {
-                      const target = searchTarget(result);
-                      if (target) showMenu(target, anchor, point);
-                    }}
-                  />
-                ) : null}
-              </>
-            )}
-          </ExpandableSearch>
-        )}
+          info?.libraryVersion === 2) &&
+          view !== "components" &&
+          view !== "templates" && (
+            <ExpandableSearch
+              key={`${view}:${selectedProject}:${selectedFolder}:${searchRevision}`}
+              label={
+                !searchLibrary && view === "projects"
+                  ? "搜索最近页面"
+                  : !searchLibrary && view === "project"
+                    ? "搜索页面"
+                    : "搜索内容库"
+              }
+              value={query}
+              onChange={setQuery}
+            >
+              {info?.libraryVersion === 2 && (
+                <>
+                  {(view === "projects" || view === "project") && (
+                    <nav className="studio-search-scopes" aria-label="搜索范围">
+                      <button
+                        aria-pressed={!searchLibrary}
+                        onClick={() => setSearchLibrary(false)}
+                      >
+                        {view === "projects" ? "最近页面" : "当前项目页面"}
+                      </button>
+                      <button
+                        aria-pressed={searchLibrary}
+                        onClick={() => setSearchLibrary(true)}
+                      >
+                        整个内容库
+                      </button>
+                    </nav>
+                  )}
+                  {searchLibrary ||
+                  (view !== "projects" && view !== "project") ? (
+                    <LibrarySearchResults
+                      query={query}
+                      onOpen={openSearchResult}
+                      onMenu={(result, anchor, point) => {
+                        const target = searchTarget(result);
+                        if (target) showMenu(target, anchor, point);
+                      }}
+                    />
+                  ) : null}
+                </>
+              )}
+            </ExpandableSearch>
+          )}
         <div className="studio-section-actions studio-topbar-view-actions">
           {view === "projects" && (
             <button
@@ -2120,7 +2265,7 @@ export default function Studio() {
           {view === "templates" && (
             <button
               disabled={!selectedProject}
-              className="studio-icon"
+              className="studio-text-button"
               onClick={() =>
                 setDialog({
                   type: "template",
@@ -2131,7 +2276,7 @@ export default function Studio() {
               aria-label="新建模板"
               title="新建模板"
             >
-              <Plus size={15} />
+              新建模板
             </button>
           )}
           {view === "components" && (
@@ -2155,7 +2300,7 @@ export default function Studio() {
                     })().catch(report);
                   }}
                 >
-                  <option value="all">全部</option>
+                  <option value="all">全部项目</option>
                   {projects.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.name}
@@ -2164,7 +2309,7 @@ export default function Studio() {
                 </select>
               </label>
               <button
-                className="studio-icon"
+                className="studio-text-button"
                 disabled={componentProject === "all"}
                 title={
                   componentProject === "all" ? "请选择组件所属项目" : undefined
@@ -2183,10 +2328,10 @@ export default function Studio() {
                 })}
                 aria-label="导入组件"
               >
-                <Upload size={15} />
+                导入
               </button>
               <button
-                className="studio-icon"
+                className="studio-text-button"
                 disabled={componentProject === "all"}
                 title={
                   componentProject === "all" ? "请选择组件所属项目" : undefined
@@ -2206,7 +2351,7 @@ export default function Studio() {
                 })}
                 aria-label="新建组件"
               >
-                <Plus size={15} />
+                新建组件
               </button>
             </>
           )}
@@ -2279,7 +2424,7 @@ export default function Studio() {
   return (
     <ComponentLibraryContext.Provider value={pickerLibrary}>
       <div
-        className={`studio ${focusWindow ? "focus-window" : ""} ${view === "components" ? "components-view" : ""}`}
+        className={`studio ${view === "templates" || view === "components" ? "catalog-view" : ""} ${view === "templates" ? "templates-view" : ""} ${focusWindow ? "focus-window" : ""} ${view === "components" ? "components-view" : ""}`}
         data-navigation-state={navigationUpdating ? "updating" : "current"}
         data-window-fullscreen={windowFullscreen}
         data-native-titlebar={
@@ -2520,96 +2665,6 @@ export default function Studio() {
                 <div
                   className={`studio-library${view === "components" ? " studio-component-library" : ""}`}
                 >
-                  {view === "components" && (
-                    <nav
-                      className="studio-filter-tabs component-source-tabs"
-                      aria-label="组件来源"
-                    >
-                      {(
-                        [
-                          ["all", "全部"],
-                          ["builtin", "内置"],
-                          ["custom", "自定义"],
-                        ] as const
-                      ).map(([filter, label]) => (
-                        <button
-                          key={filter}
-                          className={componentFilter === filter ? "active" : ""}
-                          aria-pressed={componentFilter === filter}
-                          onClick={() => {
-                            setComponentFilter(filter);
-                            setCategoryRequest(null);
-                            catalogScrollRef.current?.scrollTo({
-                              top: 0,
-                              behavior: "instant",
-                            });
-                          }}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </nav>
-                  )}
-                  {view === "templates" && (
-                    <div className="studio-library-toolbar catalog-scope-controls">
-                      <label>
-                        项目
-                        <select
-                          aria-label="目录项目"
-                          value={selectedProject ?? ""}
-                          onChange={(event) => {
-                            const id = event.target.value;
-                            void (async () => {
-                              if (!(await page.flush())) return;
-                              selectedRef.current = id || null;
-                              setSelectedProject(id || null);
-                              setSelectedFolder(null);
-                              if (id) await loadProjectContents(id);
-                              await loadCatalog();
-                            })().catch(report);
-                          }}
-                        >
-                          <option value="">选择项目</option>
-                          {projects.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      {view === "templates" && (
-                        <label>
-                          范围
-                          <select
-                            aria-label="目录范围"
-                            value={catalogScope ?? "all"}
-                            onChange={(event) =>
-                              setCatalogScope(
-                                event.target
-                                  .value as CatalogReadOptions["scope"],
-                              )
-                            }
-                          >
-                            <option value="all">全部</option>
-                            <option value="project">项目</option>
-                            <option value="global">全局</option>
-                            <option value="published">已发布</option>
-                            <option value="builtin">内置</option>
-                          </select>
-                        </label>
-                      )}
-                      <label className="catalog-version-toggle">
-                        <input
-                          type="checkbox"
-                          checked={showTemplateVersions}
-                          onChange={(event) =>
-                            setShowTemplateVersions(event.target.checked)
-                          }
-                        />
-                        显示所有版本
-                      </label>
-                    </div>
-                  )}
                   {view === "projects" && (
                     <RecentPages
                       pages={recent}
@@ -2758,6 +2813,10 @@ export default function Studio() {
                               });
                             })}
                           >
+                            <TemplateThumbnail
+                              item={item}
+                              projectId={selectedProject ?? undefined}
+                            />
                             <h2>{item.name}</h2>
                             <p>{item.description}</p>
                             <div className="template-card-metadata">
@@ -2770,7 +2829,11 @@ export default function Studio() {
                       {!visibleTemplates.length && (
                         <div className="studio-empty">
                           <LayoutTemplate size={30} strokeWidth={1.2} />
-                          <h2>暂无这类模板</h2>
+                          <h2>
+                            {catalogQueries.templates
+                              ? "没有匹配的模板"
+                              : "暂无这类模板"}
+                          </h2>
                         </div>
                       )}
                     </>
@@ -2782,9 +2845,8 @@ export default function Studio() {
                         !!info && "mode" in info && info.mode === "browser"
                       }
                       showProjectNames={componentProject === "all"}
-                      scrollRef={catalogScrollRef}
-                      request={categoryRequest}
-                      onActiveChange={setComponentCategory}
+                      query={catalogQueries.components}
+                      category={componentCategory}
                       onOpen={(item) => void viewComponent(item).catch(report)}
                     />
                   )}
@@ -3375,7 +3437,11 @@ export default function Studio() {
             copy={dialog.copy}
             components={dialog.record.components ?? []}
             templates={templates}
-            onPublish={(ref) => setDialog({ type: "publish", ref })}
+            projects={projects}
+            onProjectChange={(id) => void changeCatalogOwner(id)}
+            onPublish={(ref) =>
+              setDialog({ type: "publish", ref, projectId: ref.projectId })
+            }
             projectId={dialog.projectId ?? selectedProject ?? undefined}
             onClose={closeDialog}
             onSaved={async () => {
@@ -3394,7 +3460,11 @@ export default function Studio() {
             }}
             components={page.record?.components ?? []}
             templates={templates}
-            onPublish={(ref) => setDialog({ type: "publish", ref })}
+            projects={projects}
+            onProjectChange={(id) => void changeCatalogOwner(id)}
+            onPublish={(ref) =>
+              setDialog({ type: "publish", ref, projectId: ref.projectId })
+            }
             projectId={selectedProject ?? undefined}
             onClose={closeDialog}
             onSaved={async () => {
@@ -3411,6 +3481,8 @@ export default function Studio() {
                 ? `${dialog.custom.id}@${dialog.custom.version}:${dialog.custom.scope}:${dialog.custom.integrity}`
                 : dialog.builtin?.kind
             }
+            projects={projects}
+            onProjectChange={(id) => void changeCatalogOwner(id)}
             builtin={dialog.builtin}
             custom={dialog.custom}
             source={dialog.source}
@@ -3421,7 +3493,11 @@ export default function Studio() {
                 page.projectId === dialog.projectId)
             }
             onPublish={(ref) =>
-              setDialog({ type: "publish", ref, projectId: dialog.projectId })
+              setDialog({
+                type: "publish",
+                ref,
+                projectId: ref.projectId ?? dialog.projectId,
+              })
             }
             projectId={dialog.projectId}
             onInsert={addBlock}
