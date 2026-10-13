@@ -60,6 +60,40 @@ export function componentCategory(item: CatalogComponent): ComponentCategory {
   return builtinCategories[item.id.replace(/^my-/, "")] ?? "other";
 }
 
+/** Discovery lists show the newest version within each component's library. */
+export function latestComponentVersions<T extends CatalogComponent>(
+  items: T[],
+): T[] {
+  const key = (item: CatalogCustomComponent) =>
+    JSON.stringify([
+      item.scope,
+      item.scope === "project" ? item.projectId : null,
+      item.id,
+    ]);
+  const newest = new Map<string, CatalogCustomComponent>();
+  for (const item of items) {
+    if ("kind" in item) continue;
+    const identity = key(item),
+      previous = newest.get(identity);
+    const [base, pre] = item.version.split("-"),
+      [oldBase, oldPre] = (previous?.version ?? "0.0.0-legacy").split("-");
+    const order =
+      base.localeCompare(oldBase, undefined, { numeric: true }) ||
+      (!pre && oldPre
+        ? 1
+        : pre && !oldPre
+          ? -1
+          : (pre ?? "").localeCompare(oldPre ?? "", undefined, {
+              numeric: true,
+            }));
+    if (!previous || order > 0) newest.set(identity, item);
+  }
+  // Equal versions with different integrity remain explicit rather than choosing a copy.
+  return items.filter(
+    (item) => "kind" in item || newest.get(key(item))?.version === item.version,
+  );
+}
+
 export function groupComponents(
   catalog: {
     builtin: BuiltinComponentMetadata[];
@@ -67,10 +101,10 @@ export function groupComponents(
   },
   filter: ComponentFilter,
 ): ComponentGroup[] {
-  const items = [
+  const items = latestComponentVersions([
     ...(filter === "custom" ? [] : catalog.builtin),
     ...(filter === "builtin" ? [] : catalog.custom),
-  ];
+  ]);
   return componentCategories.map((category) => ({
     ...category,
     items: items.filter((item) => componentCategory(item) === category.id),

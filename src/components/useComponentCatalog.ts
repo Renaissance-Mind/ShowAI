@@ -2,7 +2,10 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { ComponentLibraryContext } from "./ComponentLibrary";
 import { useAvailableComponents } from "./custom/CustomBlock";
 import type { CompiledComponent } from "./custom/types";
-import type { CatalogComponent } from "../core/component-categories";
+import {
+  latestComponentVersions,
+  type CatalogComponent,
+} from "../core/component-categories";
 import { builtinComponentCatalog } from "./catalog";
 import { componentWidgetData } from "./custom/contract";
 
@@ -37,7 +40,7 @@ export function useComponentCatalog(open: boolean) {
     };
   }, [open, library]);
   const items = useMemo(
-    () => catalog ?? [...builtins, ...available],
+    () => latestComponentVersions(catalog ?? [...builtins, ...available]),
     [catalog, builtins, available],
   );
   const resolve = async (item: CatalogComponent) => {
