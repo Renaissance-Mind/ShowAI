@@ -179,6 +179,48 @@ async function settleFramePaint(frame: Frame): Promise<void> {
   );
 }
 
+const PENDING_SELECTOR = '[data-preview-pending="true"]';
+const PENDING_TIMEOUT = 10000;
+/** Lazily loaded components render a Suspense placeholder until their code resolves. */
+async function settleComponents(page: Page): Promise<void> {
+  const { errors } =
+    require("playwright-core") as typeof import("playwright-core");
+  const deadline = Date.now() + PENDING_TIMEOUT;
+  for (const frame of page.frames()) {
+    const timedOut = await frame
+      .waitForFunction(
+        (selector) => !document.querySelector(selector),
+        PENDING_SELECTOR,
+        // Offscreen frames may not receive animation frames; poll by time instead.
+        { polling: 50, timeout: Math.max(1, deadline - Date.now()) },
+      )
+      .then(
+        () => false,
+        (error) => {
+          if (error instanceof errors.TimeoutError) return true;
+          throw error;
+        },
+      );
+    if (!timedOut) continue;
+    const pending = new Set<string>();
+    for (const owner of page.frames()) {
+      const frameId = await frameBlock(owner);
+      const ids = await owner.evaluate(
+        (selector) =>
+          Array.from(document.querySelectorAll(selector), (node) => {
+            const block = node.closest<HTMLElement>("[data-block-id]");
+            return block?.dataset.blockId ?? "";
+          }),
+        PENDING_SELECTOR,
+      );
+      for (const id of ids) pending.add(id || frameId || "unidentified block");
+    }
+    throw new Error(
+      `Components were still loading after ${PENDING_TIMEOUT / 1000}s: ${[...pending].join(", ")}. The capture would only show a loading placeholder; read them again or use the structured view.`,
+    );
+  }
+}
+
 export async function renderReading(
   htmlPath: string,
   options: ReadingOptions,
@@ -231,6 +273,7 @@ export async function renderReading(
             ).__SHOWAI_COMPONENT_READING__?.ready),
       );
     }
+    await settleComponents(page);
     for (const frame of page.frames()) {
       await frame.evaluate(async () => {
         await document.fonts.ready;
@@ -242,6 +285,8 @@ export async function renderReading(
     }
     for (const action of options.actions) {
       await act(page, action);
+      // An action can reveal a component whose code has not loaded yet.
+      await settleComponents(page);
       // Dialogs and frame resizing triggered by an action must settle before the next control is targeted.
       for (const frame of page.frames()) await settleFramePaint(frame);
     }

@@ -86,3 +86,50 @@ test("rendered reading settles and captures component iframes below the viewport
   ).toBe(true);
   expect(result.height).toBeGreaterThan(2400);
 }, 15000);
+
+test("rendered reading waits for lazily loaded components to replace their placeholder", async () => {
+  const root = await mkdtemp(join(tmpdir(), "showai-reading-pending-"));
+  fixtures.push(root);
+  const html = join(root, "lazy-component.html");
+  await writeFile(
+    html,
+    `<!doctype html><html><body><main class="portable-app">
+<div data-block-id="flow"><section data-preview-pending="true" role="status">正在加载组件…</section></div>
+<button id="reveal">Reveal details</button><div data-block-id="details"></div>
+</main><script>
+const load=(id,text)=>{
+  const owner=document.querySelector('[data-block-id="'+id+'"]');
+  owner.innerHTML='<section data-preview-pending="true" role="status">正在加载组件…</section>';
+  setTimeout(()=>{owner.textContent=text;},800);
+};
+load('flow','Flowchart rendered');
+document.getElementById('reveal').onclick=()=>load('details','Details rendered');
+</script></body></html>`,
+  );
+  const result = await renderReading(
+    html,
+    pageReadSchema.parse({
+      view: "html",
+      actions: [{ type: "click", role: "button", name: "Reveal details" }],
+    }),
+  );
+  expect(result.dom[0].accessibility).toContain("Flowchart rendered");
+  expect(result.dom[0].accessibility).toContain("Details rendered");
+  expect(result.dom[0].accessibility).not.toContain("正在加载组件");
+}, 15000);
+
+test("rendered reading reports components that never finish loading", async () => {
+  const root = await mkdtemp(join(tmpdir(), "showai-reading-stuck-"));
+  fixtures.push(root);
+  const html = join(root, "stuck-component.html");
+  await writeFile(
+    html,
+    `<!doctype html><html><body><main class="portable-app">
+<div data-block-id="ready">Table rendered</div>
+<div data-block-id="overview-flow"><section data-preview-pending="true" role="status">正在加载组件…</section></div>
+</main></body></html>`,
+  );
+  await expect(
+    renderReading(html, pageReadSchema.parse({ view: "image" })),
+  ).rejects.toThrow(/still loading after 10s: overview-flow\./);
+}, 25000);
