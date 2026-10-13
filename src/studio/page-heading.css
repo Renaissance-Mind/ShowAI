@@ -1,16 +1,19 @@
 .studio-page-heading {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-start;
-  gap: 16px;
+  gap: 14px;
   min-width: 0;
 }
 .studio-page-heading-icon {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  padding: 8px;
-  margin: -8px 0 -8px -8px;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  margin: 0;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -18,10 +21,6 @@
   cursor: pointer;
 }
 .studio-page-heading-icon.is-empty {
-  gap: 6px;
-  padding: 6px 8px;
-  margin-top: 0;
-  font-size: 12px;
   color: var(--muted);
 }
 .studio-page-heading-icon:hover {
@@ -33,7 +32,8 @@
 }
 .container-page-heading .studio-page-heading-title {
   display: block;
-  width: 100%;
+  flex: 1;
+  width: 0;
   max-width: 100%;
   min-width: 0;
   margin: 0;

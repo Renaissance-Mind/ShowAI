@@ -206,13 +206,17 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
           partial={!!artifact.selection}
           heading={
             <>
-              {!artifact.selection && document.icon && (
-                <div className="portable-page-icon">
-                  <PageIcon value={document.icon} size={48} />
+              {!artifact.selection && (document.icon || document.title) && (
+                <div className="portable-page-heading">
+                  {document.icon && (
+                    <div className="portable-page-icon">
+                      <PageIcon value={document.icon} size={48} />
+                    </div>
+                  )}
+                  {document.title && (
+                    <h1 className="portable-title">{document.title}</h1>
+                  )}
                 </div>
-              )}
-              {!artifact.selection && document.title && (
-                <h1 className="portable-title">{document.title}</h1>
               )}
               {!!artifact.remoteComponents?.length && (
                 <p className="portable-network-note">

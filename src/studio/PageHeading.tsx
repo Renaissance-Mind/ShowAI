@@ -38,7 +38,7 @@ export default function PageHeading({
   return (
     <div className="studio-page-heading">
       {readOnly ? (
-        icon && <PageIcon value={icon} size={56} />
+        icon && <PageIcon value={icon} size={48} />
       ) : (
         <button
           type="button"
@@ -48,14 +48,7 @@ export default function PageHeading({
           aria-haspopup="dialog"
           onClick={onEditIcon}
         >
-          {icon ? (
-            <PageIcon value={icon} size={56} />
-          ) : (
-            <>
-              <ImagePlus size={16} />
-              <span>添加图标</span>
-            </>
-          )}
+          {icon ? <PageIcon value={icon} size={48} /> : <ImagePlus size={28} />}
         </button>
       )}
       {readOnly ? (
