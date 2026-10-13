@@ -9,6 +9,10 @@ import {
   safeLibraryPath,
 } from "../core/library-files";
 import { CoreError } from "../core/model";
+import { translator } from "../i18n";
+import syncEngineMessages from "../i18n/messages/syncEngine";
+
+const t = translator(syncEngineMessages);
 
 const verified = new Map<string, string>();
 /** Reuse verified immutable bytes; a replaced or damaged cache is checked again. */
@@ -19,7 +23,7 @@ export async function retainCachedObject(
   expected: string,
 ) {
   if (createHash("sha256").update(bytes).digest("hex") !== expected)
-    throw new CoreError("INVALID_DATA", "同步缓存输入摘要不匹配。");
+    throw new CoreError("INVALID_DATA", t("cache.inputDigestMismatch"));
   await safeLibraryPath(home, path);
   const info = await lstat(path).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return undefined;
@@ -70,7 +74,7 @@ export async function cacheDownload(
       await file.writeFile(value);
     }
     if (digest.digest("hex") !== expected)
-      throw new CoreError("INVALID_DATA", "下载内容摘要不匹配。");
+      throw new CoreError("INVALID_DATA", t("cache.downloadDigestMismatch"));
     await file.sync();
     verified = true;
   } finally {

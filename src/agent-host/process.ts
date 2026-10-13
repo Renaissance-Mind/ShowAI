@@ -3,6 +3,10 @@ import { access } from "node:fs/promises";
 import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
+import { translator } from "../i18n";
+import agentHostMessages from "../i18n/messages/agentHost";
+
+const t = translator(agentHostMessages);
 
 export function executablePaths() {
   return [
@@ -106,7 +110,7 @@ export function execute(
           return;
         }
       }
-      if (timedOut) reject(new Error("Agent 调用超时，请检查网络或模型服务。"));
+      if (timedOut) reject(new Error(t("task.timeout")));
       else if (signal) reject(new Error(`Agent exited with ${signal}.`));
       else resolve({ code: code ?? 1, stdout, stderr });
     });

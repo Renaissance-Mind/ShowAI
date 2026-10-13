@@ -5,6 +5,10 @@ import { join, resolve, sep } from "node:path";
 import { execute } from "./process";
 import { readOptional, writeProtected } from "./storage";
 import type { RuntimeStatus } from "./types";
+import { translator } from "../i18n";
+import agentHostMessages from "../i18n/messages/agentHost";
+
+const t = translator(agentHostMessages);
 
 interface PackageMetadata {
   version: string;
@@ -126,7 +130,7 @@ export class SdkInstaller {
   state: RuntimeStatus;
   private active?: Promise<void>;
   constructor(readonly root: string) {
-    this.state = { state: "absent", progress: "尚未安装", root };
+    this.state = { state: "absent", progress: t("runtime.notInstalled"), root };
   }
   async status() {
     if (this.state.state === "installing" || this.state.state === "failed")
@@ -138,7 +142,7 @@ export class SdkInstaller {
       await stat(this.binary(receipt.directory));
       this.state = {
         state: "ready",
-        progress: "Codex SDK 已安装",
+        progress: t("runtime.installed"),
         root: this.root,
         version: receipt.version,
       };
@@ -159,7 +163,7 @@ export class SdkInstaller {
     const receipt = await readOptional<{ version: string; directory: string }>(
       join(this.root, "installed.json"),
     );
-    if (!receipt) throw new Error("请先在设置中安装 Codex SDK。");
+    if (!receipt) throw new Error(t("runtime.installFirst"));
     return {
       binary: this.binary(receipt.directory),
       sdk: join(receipt.directory, "sdk/dist/index.js"),
@@ -170,14 +174,14 @@ export class SdkInstaller {
     if (this.active) return;
     this.state = {
       state: "installing",
-      progress: "正在获取官方安装包…",
+      progress: t("runtime.fetching"),
       root: this.root,
     };
     this.active = this.install()
       .catch((error: Error) => {
         this.state = {
           state: "failed",
-          progress: "安装失败",
+          progress: t("runtime.installFailed"),
           error: error.message,
           root: this.root,
         };
@@ -225,7 +229,7 @@ export class SdkInstaller {
       if (intact) {
         this.state = {
           state: "ready",
-          progress: "Codex SDK 已是当前版本",
+          progress: t("runtime.upToDate"),
           version,
           root: this.root,
         };
@@ -235,13 +239,13 @@ export class SdkInstaller {
     const staging = join(this.root, ".install-" + randomUUID());
     await mkdir(staging, { recursive: true, mode: 0o700 });
     try {
-      this.state.progress = `正在下载 Codex SDK ${version} 与独立运行时…`;
+      this.state.progress = t("runtime.downloading", { version });
       await Promise.all([
         download(sdk, join(staging, "sdk")),
         download(native, join(staging, "native")),
       ]);
       await chmod(this.binary(staging), 0o755);
-      this.state.progress = "正在验证安装…";
+      this.state.progress = t("runtime.verifying");
       const test = await execute(this.binary(staging), ["--version"], {
         timeout: 10000,
       });
@@ -263,7 +267,7 @@ export class SdkInstaller {
       });
       this.state = {
         state: "ready",
-        progress: "Codex SDK 已安装",
+        progress: t("runtime.installed"),
         version,
         root: this.root,
       };

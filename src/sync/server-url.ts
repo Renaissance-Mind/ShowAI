@@ -1,13 +1,13 @@
 import { SyncError, digestId, identifier } from "./protocol";
+import { translator } from "../i18n";
+import syncEngineMessages from "../i18n/messages/syncEngine";
+
+const t = translator(syncEngineMessages);
 
 /** A server base includes its deployment prefix, never /api or a resource. */
 export function serverBaseUrl(input: string): string {
   const invalid = () =>
-    new SyncError(
-      400,
-      "INVALID_SERVER_URL",
-      "填写服务器基址，例如 https://showai.example.com/cloud。",
-    );
+    new SyncError(400, "INVALID_SERVER_URL", t("url.invalidBase"));
   let url: URL;
   try {
     url = new URL(input);

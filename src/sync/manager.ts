@@ -51,6 +51,10 @@ import {
   type SyncProject,
   type ProjectRole,
 } from "./protocol";
+import { translator } from "../i18n";
+import syncEngineMessages from "../i18n/messages/syncEngine";
+
+const t = translator(syncEngineMessages);
 
 export interface SyncConflict {
   projectId: string;
@@ -160,7 +164,7 @@ export class SyncManager {
         !Array.isArray(saved.connections) ||
         !Array.isArray(saved.projects)
       )
-        throw new CoreError("INVALID_DATA", "同步配置格式无效。");
+        throw new CoreError("INVALID_DATA", t("config.invalid"));
       return saved;
     }
     return {
@@ -252,7 +256,7 @@ export class SyncManager {
       (event.type !== "heads" && event.type !== "revision") ||
       event.serverId !== connection.serverId
     )
-      throw new CoreError("INVALID_DATA", "服务器更新事件身份不匹配。");
+      throw new CoreError("INVALID_DATA", t("event.identityMismatch"));
     const config = await this.configuration();
     if (
       !config.connections.some(
@@ -266,7 +270,7 @@ export class SyncManager {
     const allowed = new Set(bindings.map((item) => item.remoteProjectId));
     const incoming = event.type === "heads" ? event.projects : [event.project];
     if (!Array.isArray(incoming) || incoming.length > maximumEventProjects)
-      throw new CoreError("INVALID_DATA", "服务器更新项目数量无效。");
+      throw new CoreError("INVALID_DATA", t("event.invalidCount"));
     for (const project of incoming)
       if (
         !allowed.has(identifier(project.id)) ||
@@ -274,10 +278,10 @@ export class SyncManager {
         typeof project.archived !== "boolean" ||
         (project.head !== null && !/^[a-f0-9]{64}$/.test(project.head))
       )
-        throw new CoreError("INVALID_DATA", "服务器更新项目无效。");
+        throw new CoreError("INVALID_DATA", t("event.invalidProject"));
     if (event.type === "revision" && event.record) {
       if (event.record.revision !== event.project.head)
-        throw new CoreError("INVALID_DATA", "服务器更新版本不匹配。");
+        throw new CoreError("INVALID_DATA", t("event.revisionMismatch"));
       for (const binding of bindings.filter(
         (item) => item.remoteProjectId === event.project.id,
       )) {
@@ -285,17 +289,14 @@ export class SyncManager {
         const ids = new Set(Object.values(event.record.snapshot.files));
         for (const [digest, value] of Object.entries(event.objects ?? {})) {
           if (!ids.has(digest) || typeof value !== "string")
-            throw new CoreError(
-              "INVALID_DATA",
-              "服务器更新包含项目以外的对象。",
-            );
+            throw new CoreError("INVALID_DATA", t("event.foreignObject"));
           const bytes = Buffer.from(value, "base64");
           if (
             bytes.length > 64 * 1024 ||
             bytes.toString("base64") !== value ||
             hash(bytes) !== digest
           )
-            throw new CoreError("INVALID_DATA", "服务器更新对象摘要无效。");
+            throw new CoreError("INVALID_DATA", t("event.invalidDigest"));
           await atomicLibraryFile(
             this.home,
             this.objectPath(digest, this.cacheKey(connection, binding)),
@@ -461,7 +462,7 @@ export class SyncManager {
       throw new SyncError(
         response.status,
         value.error?.code ?? "SERVER_ERROR",
-        value.error?.message ?? `服务器返回 ${response.status}`,
+        value.error?.message ?? t("server.status", { status: response.status }),
         value.error?.details,
       );
     return value as T;
@@ -505,7 +506,7 @@ export class SyncManager {
       capabilities?: string[];
     }>({ url, token: "" }, "/api/info");
     if (info.protocol !== syncProtocol)
-      throw new CoreError("INVALID_DATA", "该地址不是兼容的 ShowAI Server。");
+      throw new CoreError("INVALID_DATA", t("server.incompatible"));
     identifier(info.serverId);
     if (
       info.capabilities !== undefined &&
@@ -513,7 +514,7 @@ export class SyncManager {
         info.capabilities.length > 50 ||
         info.capabilities.some((item) => typeof item !== "string"))
     )
-      throw new CoreError("INVALID_DATA", "服务器能力说明无效。");
+      throw new CoreError("INVALID_DATA", t("server.invalidCapabilities"));
     const result = input.token
       ? {
           ...(await this.request<{
@@ -540,7 +541,7 @@ export class SyncManager {
           },
         );
     if (result.serverId !== info.serverId)
-      throw new CoreError("CONFLICT", "服务器身份发生变化，请重新连接。");
+      throw new CoreError("CONFLICT", t("server.identityChanged"));
     const existing = config.connections.find(
       (connection) =>
         connection.serverId === info.serverId &&
@@ -660,7 +661,7 @@ export class SyncManager {
         connectionId &&
         !config.connections.some((connection) => connection.id === connectionId)
       )
-        throw new CoreError("NOT_FOUND", "服务器连接不存在。");
+        throw new CoreError("NOT_FOUND", t("connection.missing"));
       config.defaultConnectionId = connectionId;
       config.defaultSince = new Date().toISOString();
     });
@@ -671,10 +672,7 @@ export class SyncManager {
       if (
         config.projects.some((project) => project.connectionId === connectionId)
       )
-        throw new CoreError(
-          "CONFLICT",
-          "请先解除该连接下的项目同步；本地项目内容会保留。",
-        );
+        throw new CoreError("CONFLICT", t("connection.unlinkProjectsFirst"));
       config.connections = config.connections.filter(
         (connection) => connection.id !== connectionId,
       );
@@ -687,7 +685,8 @@ export class SyncManager {
     const connection = (await this.configuration()).connections.find(
       (item) => item.id === id,
     );
-    if (!connection) throw new CoreError("NOT_FOUND", "服务器账号连接不存在。");
+    if (!connection)
+      throw new CoreError("NOT_FOUND", t("account.connectionMissing"));
     return connection;
   }
   async remoteProjects(connectionId: string) {
@@ -706,8 +705,7 @@ export class SyncManager {
         managed: projects.filter((project) => project.role === "admin"),
       };
     const selected = projects.find((project) => project.id === projectId);
-    if (!selected)
-      throw new CoreError("NOT_FOUND", "项目不存在或当前账号没有访问权限。");
+    if (!selected) throw new CoreError("NOT_FOUND", t("project.notAccessible"));
     const members = await this.request(
       connection,
       `/api/projects/${identifier(projectId)}/members`,
@@ -763,7 +761,7 @@ export class SyncManager {
           info.capabilities.length > 50 ||
           info.capabilities.some((item) => typeof item !== "string")))
     )
-      throw new CoreError("INVALID_DATA", "服务器身份或能力说明无效。");
+      throw new CoreError("INVALID_DATA", t("server.invalidIdentity"));
     if (
       JSON.stringify(connection.capabilities) !==
       JSON.stringify(info.capabilities)
@@ -808,13 +806,11 @@ export class SyncManager {
       result.serverId !== connection.serverId ||
       result.user.id !== connection.user.id
     )
-      throw new CoreError(
-        "INVALID_DATA",
-        "修改密码后的服务器或账号身份不匹配。",
-      );
+      throw new CoreError("INVALID_DATA", t("password.identityMismatch"));
     await this.update((config) => {
       const saved = config.connections.find((item) => item.id === connectionId);
-      if (!saved) throw new CoreError("NOT_FOUND", "服务器账号连接不存在。");
+      if (!saved)
+        throw new CoreError("NOT_FOUND", t("account.connectionMissing"));
       saved.token = result.token;
     });
     return { ok: true };
@@ -824,7 +820,7 @@ export class SyncManager {
       parameters = new URLSearchParams(url.hash.slice(1)),
       invite = parameters.get("invite");
     if (!invite || !/^[a-f0-9]{64}$/.test(invite))
-      throw new CoreError("INVALID_DATA", "邀请链接无效。");
+      throw new CoreError("INVALID_DATA", t("invite.invalid"));
     const connection = connectionId
       ? await this.connection(connectionId)
       : (await this.configuration()).connections.find(
@@ -851,14 +847,14 @@ export class SyncManager {
       (connection && result.serverId !== connection.serverId) ||
       (parameters.has("server") && parameters.get("server") !== result.serverId)
     )
-      throw new CoreError("INVALID_DATA", "请选择邀请所属服务器上的账号。");
+      throw new CoreError("INVALID_DATA", t("invite.chooseAccount"));
     return result;
   }
   async join(connectionId: string, link: string) {
     const invitation = await this.previewInvite(link, connectionId),
       connection = await this.connection(connectionId);
     if (invitation.serverId !== connection.serverId)
-      throw new CoreError("INVALID_DATA", "请选择邀请所属服务器上的账号。");
+      throw new CoreError("INVALID_DATA", t("invite.chooseAccount"));
     const project = await this.request<SyncProject>(
       connection,
       "/api/invites/accept",
@@ -873,10 +869,7 @@ export class SyncManager {
     const metadata = await new FileStore(this.home).readProject(projectId);
     const config = await this.configuration();
     if (config.projects.some((item) => item.projectId === projectId))
-      throw new CoreError(
-        "CONFLICT",
-        "该项目已经连接到服务器，请先解除原连接。",
-      );
+      throw new CoreError("CONFLICT", t("project.alreadyConnected"));
     const connection = await this.connection(connectionId);
     const remote = await this.request<SyncProject>(
       connection,
@@ -884,11 +877,7 @@ export class SyncManager {
       "POST",
       { id: projectId, name: metadata.name },
     );
-    if (remote.head)
-      throw new CoreError(
-        "CONFLICT",
-        "服务器已有同 ID 的内容，请通过加入远程项目连接，避免覆盖。",
-      );
+    if (remote.head) throw new CoreError("CONFLICT", t("project.remoteExists"));
     await this.update((next) => {
       next.projects.push({
         projectId,
@@ -962,10 +951,7 @@ export class SyncManager {
   async detach(projectId: string) {
     if (this.running) await this.running;
     if (await readJson(this.pendingPath(projectId)))
-      throw new CoreError(
-        "CONFLICT",
-        "项目有待恢复或上传的合并草稿，请先完成同步或处理冲突，再解除连接。",
-      );
+      throw new CoreError("CONFLICT", t("project.pendingDraft"));
     await this.update((config) => {
       config.projects = config.projects.filter(
         (project) => project.projectId !== projectId,
@@ -977,14 +963,11 @@ export class SyncManager {
     if (this.running) await this.running;
     const config = await this.configuration(),
       project = config.projects.find((item) => item.projectId === projectId);
-    if (!project) throw new CoreError("NOT_FOUND", "项目同步连接不存在。");
+    if (!project) throw new CoreError("NOT_FOUND", t("project.syncMissing"));
     const previous = await this.connection(project.connectionId),
       connection = await this.connection(connectionId);
     if (previous.serverId !== connection.serverId)
-      throw new CoreError(
-        "INVALID_DATA",
-        "切换账号需要选择同一服务器；更换存储服务器请先解除同步。",
-      );
+      throw new CoreError("INVALID_DATA", t("project.switchSameServer"));
     const remote = await this.request<SyncProject>(
       connection,
       `/api/projects/${project.remoteProjectId}`,
@@ -1014,7 +997,7 @@ export class SyncManager {
   ) {
     validateSnapshot(record.snapshot, project.remoteProjectId);
     if (!(await validSnapshotRecord(record)))
-      throw new CoreError("INVALID_DATA", "服务器快照身份或摘要不匹配。");
+      throw new CoreError("INVALID_DATA", t("snapshot.mismatch"));
     await atomicLibraryFile(
       this.home,
       this.currentCachePath(connection, project, slot),
@@ -1042,7 +1025,7 @@ export class SyncManager {
       `/api/projects/${project.remoteProjectId}/snapshot?revision=${revision}`,
     );
     if (record.revision !== revision)
-      throw new CoreError("INVALID_DATA", "服务器返回了错误的快照版本。");
+      throw new CoreError("INVALID_DATA", t("snapshot.wrongRevision"));
     await this.cacheRecord(connection, project, record);
     return record;
   }
@@ -1077,16 +1060,13 @@ export class SyncManager {
             );
         if (legacy) {
           if (hash(legacy) !== digest)
-            throw new CoreError("INVALID_DATA", "本地同步基线缓存损坏。");
+            throw new CoreError("INVALID_DATA", t("cache.baselineCorrupt"));
           await atomicLibraryFile(this.home, path, legacy);
           return legacy;
         }
         if (cached) {
           if (hash(cached) !== digest)
-            throw new CoreError(
-              "INVALID_DATA",
-              "本地同步缓存损坏，原始内容仍保留。",
-            );
+            throw new CoreError("INVALID_DATA", t("cache.corrupt"));
           return cached;
         }
         const response = await fetch(
@@ -1101,7 +1081,7 @@ export class SyncManager {
           throw new SyncError(
             response.status,
             error.error?.code ?? "MISSING_OBJECT",
-            error.error?.message ?? "下载资源失败。",
+            error.error?.message ?? t("download.failed"),
           );
         }
         await cacheDownload(this.home, path, response, digest);
@@ -1137,11 +1117,9 @@ export class SyncManager {
               item.path.startsWith(`projects/${project.projectId}/`)),
         );
         if (unresolved)
-          throw new CoreError(
-            "CONFLICT",
-            "本机保存失败，未解决的文件修改不会发布到服务器。请先处理冲突。",
-            { conflictId: unresolved.id },
-          );
+          throw new CoreError("CONFLICT", t("save.failedResolve"), {
+            conflictId: unresolved.id,
+          });
       });
     const receiptPath = join(
       this.root,
@@ -1232,7 +1210,7 @@ export class SyncManager {
         while (next < missing.length) {
           const digest = missing[next++];
           if (!captured.objects.has(digest))
-            throw new CoreError("INVALID_DATA", "服务器请求了快照以外的资源。");
+            throw new CoreError("INVALID_DATA", t("upload.foreignObject"));
           const bytes = captured.objects.get(digest)!;
           if (
             connection.capabilities?.includes("resumable-objects-v1") &&
@@ -1289,7 +1267,7 @@ export class SyncManager {
               throw new SyncError(
                 response.status,
                 "UPLOAD_UNAVAILABLE",
-                "上传服务暂时不可用。",
+                t("upload.unavailable"),
               );
             }
             if (!response.ok) {
@@ -1297,7 +1275,7 @@ export class SyncManager {
               throw new SyncError(
                 response.status,
                 value.error?.code ?? "UPLOAD_FAILED",
-                value.error?.message ?? "上传资源失败。",
+                value.error?.message ?? t("upload.resourceFailed"),
               );
             }
           });
@@ -1339,7 +1317,7 @@ export class SyncManager {
       references[path] = digest;
       const cached = await readLibraryBytes(this.home, this.objectPath(digest));
       if (cached && hash(cached) !== digest)
-        throw new CoreError("INVALID_DATA", "保留的同步缓存未通过完整性检查。");
+        throw new CoreError("INVALID_DATA", t("cache.retainedCorrupt"));
       if (!cached)
         await atomicLibraryFile(this.home, this.objectPath(digest), bytes);
     }
@@ -1356,10 +1334,7 @@ export class SyncManager {
     for (const [path, digest] of Object.entries(pending.files)) {
       const bytes = await readFile(this.objectPath(digest));
       if (hash(bytes) !== digest)
-        throw new CoreError(
-          "INVALID_DATA",
-          "保留的同步合并草稿未通过完整性检查，原始修改历史仍然保留。",
-        );
+        throw new CoreError("INVALID_DATA", t("draft.corrupt"));
       files.set(path, bytes);
     }
     return files;
@@ -1388,14 +1363,14 @@ export class SyncManager {
     choices: Record<string, "local" | "remote">,
   ) {
     const conflict = await this.conflict(projectId);
-    if (!conflict) throw new CoreError("NOT_FOUND", "没有待处理的同步冲突。");
+    if (!conflict) throw new CoreError("NOT_FOUND", t("conflict.none"));
     if (
       conflict.files.some(
         (file) =>
           choices[file.path] !== "local" && choices[file.path] !== "remote",
       )
     )
-      throw new CoreError("INVALID_DATA", "请为每个冲突选择保留的内容。");
+      throw new CoreError("INVALID_DATA", t("conflict.chooseAll"));
     await atomicLibraryFile(
       this.home,
       join(this.root, "conflicts", `${projectId}.choices.json`),
@@ -1435,7 +1410,7 @@ export class SyncManager {
           (item) => item.id === latest.connectionId,
         );
         if (!currentConnection)
-          throw new CoreError("NOT_FOUND", "项目同步账号不存在。");
+          throw new CoreError("NOT_FOUND", t("project.accountMissing"));
         const unchanged =
           JSON.stringify(latest) === JSON.stringify(project) &&
           JSON.stringify(currentConnection) === JSON.stringify(connection);
@@ -1469,10 +1444,7 @@ export class SyncManager {
         { id: project.remoteProjectId, name: metadata.name },
       );
       if (created.head && !project.remoteHead)
-        throw new CoreError(
-          "CONFLICT",
-          "默认服务器已存在同 ID 项目，本地内容已保留。",
-        );
+        throw new CoreError("CONFLICT", t("project.defaultServerExists"));
       await this.state(project.projectId, {
         pendingCreation: false,
         role: created.role,
@@ -1508,29 +1480,21 @@ export class SyncManager {
           item.path.startsWith(`projects/${project.projectId}/`)),
     );
     if (unfinishedSave)
-      throw new CoreError(
-        "CONFLICT",
-        "本机保存失败，未解决的文件修改不会发布到服务器。请通过顶部的外部修改入口处理后重新保存。",
-        { conflictId: unfinishedSave.id },
-      );
+      throw new CoreError("CONFLICT", t("save.failedExternal"), {
+        conflictId: unfinishedSave.id,
+      });
     if (!connection.capabilities?.includes("current-state-v1")) {
       await this.refreshCapabilities(connection.id);
       const refreshed = await this.connection(connection.id);
       if (!refreshed.capabilities?.includes("current-state-v1"))
-        throw new CoreError(
-          "INVALID_DATA",
-          "服务器需要升级到仅同步当前内容的版本。",
-        );
+        throw new CoreError("INVALID_DATA", t("server.upgradeRequired"));
       connection.capabilities = refreshed.capabilities;
     }
     const pending = await readJson<PendingImport>(
       this.pendingPath(project.projectId),
     );
     if (pending && pending.serverId !== connection.serverId)
-      throw new CoreError(
-        "CONFLICT",
-        "保留的同步草稿属于另一台服务器，请先处理该草稿。",
-      );
+      throw new CoreError("CONFLICT", t("draft.otherServer"));
     let baseline = project.remoteHead
       ? await this.files(
           connection,
@@ -1555,7 +1519,7 @@ export class SyncManager {
               revision: localHead,
             },
             remote: {
-              account: "保留的同步草稿",
+              account: "保留的同步草稿", // i18n-exempt: source label written into retained conflict pages
               deviceId: "unknown",
               revision: pending.remoteHead,
             },
@@ -1596,7 +1560,7 @@ export class SyncManager {
                 revision: localHead,
               },
               remote: {
-                account: remoteRecord.source?.user.name ?? "未知账号",
+                account: remoteRecord.source?.user.name ?? "未知账号", // i18n-exempt: source label written into retained conflict pages
                 deviceId: remoteRecord.snapshot.change.deviceId ?? "unknown",
                 revision: remoteRecord.revision,
               },
@@ -1604,10 +1568,7 @@ export class SyncManager {
           : merge.files;
       }
     } else if (project.remoteHead) {
-      throw new CoreError(
-        "CONFLICT",
-        "服务器当前内容缺失，本地修改及同步基线已保留。",
-      );
+      throw new CoreError("CONFLICT", t("server.contentMissing"));
     }
     const actual =
       localExists && localHead
@@ -1641,7 +1602,7 @@ export class SyncManager {
         {
           actor: { kind: "system" },
           channel: "system",
-          message: "同步当前项目内容",
+          message: "同步当前项目内容", // i18n-exempt: commit message persisted in project history
           ...(remoteRecord
             ? {
                 syncOrigin: {
@@ -1658,10 +1619,7 @@ export class SyncManager {
         },
         async () => {
           if ((await library.head()) !== localHead)
-            throw new CoreError(
-              "CONFLICT",
-              "下载期间本地内容有新修改，已保留同步草稿，请重试。",
-            );
+            throw new CoreError("CONFLICT", t("download.changedLocally"));
           await library.stageFiles(changes);
         },
       );
@@ -1670,12 +1628,13 @@ export class SyncManager {
     if (remote.role === "viewer" && !sameFiles(localFiles, remoteFiles)) {
       await this.state(project.projectId, {
         status: "revoked",
-        error: "账号只有查看权限，未上传的修改仍保留在本地。",
+        error: t("role.viewerKept"),
       });
       return;
     }
     if (remote.role !== "viewer" && !sameFiles(localFiles, remoteFiles)) {
-      if (!mergedHead) throw new CoreError("NOT_FOUND", "当前项目内容不存在。");
+      if (!mergedHead)
+        throw new CoreError("NOT_FOUND", t("project.contentMissing"));
       const captured = await captureProject(
         this.home,
         project.projectId,
@@ -1793,7 +1752,7 @@ export class SyncManager {
             if (response.serverId !== connection.serverId)
               throw new CoreError(
                 "INVALID_DATA",
-                "服务器身份已改变，请重新连接。原有内容仍保留。",
+                t("server.identityChangedKept"),
               );
             for (const remote of response.projects)
               heads.set(remote.id, remote);
@@ -1813,11 +1772,7 @@ export class SyncManager {
                   `/api/projects/${project.remoteProjectId}`,
                 );
           if (batched && !project.pendingCreation && !remote)
-            throw new SyncError(
-              403,
-              "FORBIDDEN",
-              "项目不存在或访问权限已撤销。",
-            );
+            throw new SyncError(403, "FORBIDDEN", t("project.accessRevoked"));
           const identity = JSON.stringify([
             connection.serverId,
             connection.user.id,
@@ -1884,7 +1839,7 @@ export class SyncManager {
             status,
             error:
               error instanceof SyncError && error.status === 401
-                ? "服务器登录已到期或撤销，请重新登录。本地修改会保留。"
+                ? t("session.expired")
                 : error instanceof Error
                   ? error.message
                   : String(error),
@@ -2021,9 +1976,6 @@ export class SyncManager {
       (item) => item.projectId === projectId,
     );
     if (project?.role === "viewer" || project?.status === "revoked")
-      throw new CoreError(
-        "CONFLICT",
-        "当前项目账号只有查看权限或访问权限已撤销。本地内容仍保留。",
-      );
+      throw new CoreError("CONFLICT", t("role.readOnly"));
   }
 }
