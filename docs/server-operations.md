@@ -14,8 +14,8 @@ Build the current server and explicitly name a new absolute backup directory:
 
 ```sh
 npm run build:server
-node scripts/server-backup.mjs export --url https://showai.renaissancemind.ai/cloud-staging --key-file /private/staging-operations.key --destination /private/backups/showai-staging-2026-10-09
-node scripts/server-backup.mjs verify --backup /private/backups/showai-staging-2026-10-09
+node scripts/server-backup.mjs export --url https://showai.example.com/cloud --key-file /secure/source-operations.key --destination /secure/backups/showai-2026-10-09
+node scripts/server-backup.mjs verify --backup /secure/backups/showai-2026-10-09
 ```
 
 Export freezes the source and waits for admitted object/manifest writes to finish. Database triggers reject subsequent application writes, including writes started before the freeze. Physical object writes have durable admission records. Objects and metadata are copied only after those records drain to zero. The **source remains frozen after completion or failure**. The JSON receipt reports its `serverId`, counts and verified bytes; the complete generation and per-file digests are in `backup.json`.
@@ -25,7 +25,7 @@ Table export uses stable cursors with bounded pages. Large retained inline manif
 An interrupted export can reuse the original generation and verified files:
 
 ```sh
-node scripts/server-backup.mjs export --url https://showai.renaissancemind.ai/cloud-staging --key-file /private/staging-operations.key --destination /private/backups/showai-staging-2026-10-09 --resume
+node scripts/server-backup.mjs export --url https://showai.example.com/cloud --key-file /secure/source-operations.key --destination /secure/backups/showai-2026-10-09 --resume
 ```
 
 Resume fails when the source was reopened, its schema changed or the frozen generation changed. Active admission records are never silently expired. If export still reports draining after its deadline, inspect the isolated runtime and retained records before recovering it; a timeout alone does not prove that an object write stopped. Public request bodies have a two-minute transfer deadline. Object writes have 64 admission slots and metadata mutations have 256; both drain before exclusive maintenance. Read-only budget credit grants also participate in the metadata fence. Version 6 and 7 backups remain verifiable and restore with an explicit offline upgrade to the current schema.
@@ -35,7 +35,7 @@ Resume fails when the source was reopened, its schema changed or the frozen gene
 Copy the complete backup to the target Linux host, then restore into a **new directory**:
 
 ```sh
-node scripts/server-backup.mjs restore --backup /private/backups/showai-staging-2026-10-09 --home /srv/showai/restored-data
+node scripts/server-backup.mjs restore --backup /secure/backups/showai-2026-10-09 --home /srv/showai/restored-data
 ```
 
 The tool refuses an existing destination, verifies the archive, creates and checks the copied objects and metadata, and publishes the new directory after completion.
@@ -45,8 +45,8 @@ The tool refuses an existing destination, verifies the archive, creates and chec
 Check `/api/info`, existing valid sessions and project roles on the target. Confirm that source writes remain frozen and that the target contains the advertised history and object counts. Then reopen **only the chosen target**, using the generation returned by restore or `state`:
 
 ```sh
-node scripts/server-backup.mjs state --url https://target.example/cloud --key-file /private/target-operations.key
-node scripts/server-backup.mjs unfreeze --url https://target.example/cloud --key-file /private/target-operations.key --epoch CURRENT_FROZEN_GENERATION
+node scripts/server-backup.mjs state --url https://target.example/cloud --key-file /secure/target-operations.key
+node scripts/server-backup.mjs unfreeze --url https://target.example/cloud --key-file /secure/target-operations.key --epoch CURRENT_FROZEN_GENERATION
 ```
 
 Clients reconnect to the target using their existing account/token. Matching `serverId` and user identity preserve connection IDs, project bindings, default connection and immutable caches. Original valid tokens remain valid; expired or revoked sessions retain their state. Verify continued synchronization from two independent content libraries and viewer restrictions before changing the public route.
@@ -68,7 +68,7 @@ A route rollback to the frozen D1 source alone is insufficient after new edits. 
 A **dry-run** can report old, unreferenced objects from a verified frozen backup:
 
 ```sh
-node scripts/server-backup.mjs plan-cleanup --backup /private/backups/showai-staging-2026-10-09 --destination /private/backups/cleanup-plan.ndjson --retention-days 30
+node scripts/server-backup.mjs plan-cleanup --backup /secure/backups/showai-2026-10-09 --destination /secure/backups/cleanup-plan.ndjson --retention-days 30
 ```
 
 The report identifies its backup digest and frozen generation. It protects files from every revision, including unpublished and archived history, all manifest pointers, quota reservations and upload tasks/parts. Objects without a usable age remain protected; the minimum retention is 30 days. The reporting command **deletes zero objects**.
@@ -76,7 +76,7 @@ The report identifies its backup digest and frozen generation. It protects files
 Live cleanup defaults to another **dry-run**. Add `--apply` to remove eligible object/manifest candidates, at most twenty per operation:
 
 ```sh
-node scripts/server-backup.mjs cleanup --url https://target.example/cloud --key-file /private/target-operations.key --backup /private/backups/showai-staging-2026-10-09 --plan /private/backups/cleanup-plan.ndjson --epoch CURRENT_FROZEN_GENERATION
+node scripts/server-backup.mjs cleanup --url https://target.example/cloud --key-file /secure/target-operations.key --backup /secure/backups/showai-2026-10-09 --plan /secure/backups/cleanup-plan.ndjson --epoch CURRENT_FROZEN_GENERATION
 ```
 
 The server independently checks age, exact recorded metadata, complete digest and live references. All project history is inspected, including unpublished versions. Online proof is bounded to 100 revisions and 16 MiB of total manifests per project; candidates exceeding that budget remain protected. Upload task parts remain outside this deletion command. Applying any maintenance operation rotates the frozen generation, so a previous plan cannot be replayed after changes. Regenerate the backup/report for subsequent batches. Ordinary metadata requests and competing exports cannot enter an exclusive maintenance operation.
@@ -86,7 +86,7 @@ The server independently checks age, exact recorded metadata, complete digest an
 After the source is frozen and admitted writes have drained, inspect retained reservations:
 
 ```sh
-node scripts/server-backup.mjs reconcile --url https://target.example/cloud --key-file /private/target-operations.key --epoch CURRENT_FROZEN_GENERATION
+node scripts/server-backup.mjs reconcile --url https://target.example/cloud --key-file /secure/target-operations.key --epoch CURRENT_FROZEN_GENERATION
 ```
 
 Use `--reservation ID` to select up to ten records and `--apply` to perform verified recovery. **Complete verified objects** become ready **without replacing their original uploader**. Complete manifests must pass identity, parent, file, reader and package closure checks; they become retained unpublished revisions and do not advance a project head. Incomplete resumable tasks retain their parts and quota reservation. Missing objects without a task release their storage reservation while retaining the attempted daily upload charge. Corrupt or changed data is retained for investigation. The result includes the new frozen generation and `headsChanged: 0`; query `state` after a failed operation before proceeding.

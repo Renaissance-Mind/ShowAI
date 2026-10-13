@@ -4,9 +4,10 @@
   "compatibility_date": "2026-10-08",
   "workers_dev": false,
   "preview_urls": false,
-  "vars": {
-    "PRIVATE_ORIGIN": "https://showai-private-origin.renaissancemind.ai",
-  },
+  // PRIVATE_ORIGIN is the HTTPS origin of the private Linux server. It is not
+  // committed; supply it at deploy time, for example:
+  //   wrangler deploy -c deployments/cloudflare/private-proxy.wrangler.jsonc \
+  //     --var PRIVATE_ORIGIN:https://origin.example.com
   "routes": [
     {
       "pattern": "https://showai.renaissancemind.ai/private",
