@@ -72,8 +72,16 @@ export function replaceDiagramLabels(source: string, labels: string[]): string {
       for (const attribute of ["data-focus-label", "aria-label"])
         if (node.getAttribute(attribute) === previous)
           node.setAttribute(attribute, labels[i]);
-      if (node.getAttribute("data-node-label") === previous && previous) {
-        node.setAttribute("data-node-label", labels[i]);
+      const semanticFields = [
+        "data-node-label",
+        "data-node-sublabel",
+        "data-node-tag",
+      ].filter(
+        (attribute) => previous && node.getAttribute(attribute) === previous,
+      );
+      if (semanticFields.length) {
+        for (const attribute of semanticFields)
+          node.setAttribute(attribute, labels[i]);
         const accessibleName = node.getAttribute("aria-label");
         if (accessibleName)
           node.setAttribute(
