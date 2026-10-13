@@ -4,6 +4,7 @@ import type { ShowDocument } from "../types";
 import { useBoardInteraction } from "./useBoardInteraction";
 import type { BoardGesture } from "./useBoardInteraction";
 import { DrawingInput } from "./Drawing";
+import { boardToolForKey } from "./board-tools";
 import type { JSONContent } from "@tiptap/core";
 import type { BoardTool, DrawingStyle } from "./types";
 import { findSurfaceNode } from "./document.mjs";
@@ -825,21 +826,13 @@ export default function PageSurface({
             !marquee.current &&
             !target.closest('[data-drawing-active="true"]')
           ) {
-            const key = event.key.toLowerCase(),
-              tools: Record<string, BoardTool | null> = {
-                v: null,
-                r: "rectangle",
-                e: "ellipse",
-                a: "arrow",
-                p: "pen",
-                h: "highlighter",
-                f: "region",
-              };
-            if (key in tools) {
+            const entry = boardToolForKey(event.key);
+            if (entry) {
               event.preventDefault();
               event.stopPropagation();
               clearHover();
-              onToolChange?.(tools[key]);
+              board.select(null);
+              onToolChange?.(entry.tool);
               return;
             }
           }

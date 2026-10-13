@@ -325,6 +325,7 @@ export function SurfaceObject({
     style.minHeight = undefined;
   }
   const mount =
+    drawing ||
     visible ||
     actions.revealAll ||
     actions.revealed.has(id) ||
