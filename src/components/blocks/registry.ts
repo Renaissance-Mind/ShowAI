@@ -40,15 +40,15 @@ import { validateG2Data } from "./g2/contract.mjs";
 import diagramMetadata from "../../../resources/catalog/diagrams.json";
 import { validateDiagramData } from "./diagrams/contract.mjs";
 const diagramRenderers = {
-  archify: lazy(() =>
+  archify: /* @__PURE__ */ lazy(() =>
     import("./ExternalDiagram").then((m) => ({ default: m.ArchifyBlock })),
   ),
-  "diagram-design": lazy(() =>
+  "diagram-design": /* @__PURE__ */ lazy(() =>
     import("./ExternalDiagram").then((m) => ({
       default: m.DiagramDesignBlock,
     })),
   ),
-  "fireworks-tech-graph": lazy(() =>
+  "fireworks-tech-graph": /* @__PURE__ */ lazy(() =>
     import("./ExternalDiagram").then((m) => ({
       default: m.FireworksTechGraphBlock,
     })),

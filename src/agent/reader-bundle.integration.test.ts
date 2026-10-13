@@ -1,13 +1,18 @@
 import { beforeAll, afterAll, test, expect } from "vitest";
 import { createServer, type Server } from "node:http";
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { chromium, type Browser } from "playwright";
 import g2 from "../../resources/catalog/g2.json";
+import components from "../../resources/catalog/components.json";
+import diagrams from "../../resources/catalog/diagrams.json";
 import { blankDocument } from "../core/catalog";
 import { createResource, createSurface } from "../surface/containers.mjs";
 import { addNode } from "../surface/editing";
-import { buildPageHtml, buildReaderTemplate } from "./exporter";
+import { FileStore } from "../core/store";
+import { buildPageHtml, buildReaderTemplate, exportPage } from "./exporter";
+import { CAPACITY } from "../portable/capacity.mjs";
 import { toInlineFragment } from "../portable/inline.mjs";
 import { readerKinds } from "../portable/reader-bundle.mjs";
 
@@ -183,3 +188,110 @@ test("nested regions and multi-page sites share the union of required native com
   expect(JSON.parse(metadata)).toEqual(["g2-line", "metrics"]);
   expect(template).not.toContain('"g2-sankey"');
 });
+
+test("small block selections export inline with only their renderers", async () => {
+  const home = await mkdtemp(join(tmpdir(), "showai-inline-selection-"));
+  try {
+    const store = new FileStore(home),
+      project = await store.createProject({ name: "Inline selection" });
+    const doc = createResource(blankDocument());
+    doc.title = "Monitoring";
+    const builtin = (kind: string) =>
+      components.find((item) => item.kind === kind)!.defaultData;
+    doc.content.content = [
+      {
+        type: "paragraph",
+        attrs: { id: "intro" },
+        content: [{ type: "text", text: "Training monitor." }],
+      },
+      {
+        type: "widget",
+        attrs: {
+          id: "mon-metrics",
+          kind: "metrics",
+          data: { title: "Run", items: [{ label: "Loss", value: "0.42" }] },
+        },
+      },
+      {
+        type: "widget",
+        attrs: {
+          id: "mon-entropy",
+          kind: "chart",
+          data: {
+            title: "Entropy",
+            type: "line",
+            labels: ["1", "2", "3"],
+            series: [{ name: "entropy", values: [3.1, 2.7, 2.2] }],
+            unit: "",
+          },
+        },
+      },
+      {
+        type: "widget",
+        attrs: { id: "ov-flow", kind: "flowchart", data: builtin("flowchart") },
+      },
+      // Unselected heavy renderers must not reach the selection's reader.
+      ...diagrams.map((item) => ({
+        type: "widget",
+        attrs: { id: item.kind, kind: item.kind, data: item.defaultData },
+      })),
+      {
+        type: "widget",
+        attrs: {
+          id: "plot",
+          kind: "g2-sankey",
+          data: g2.find((item) => item.kind === "g2-sankey")!.defaultData,
+        },
+      },
+    ];
+    doc.surfaceViews[doc.content.attrs!.id].readingOrder =
+      doc.content.content.map((node) => node.attrs!.id as string);
+    const page = await store.createPage(project.id, { document: doc });
+    const exportSelection = async (name: string, blockIds: string[]) => {
+      const out = join(store.projectPath(project.id), "exports", name);
+      await exportPage({
+        root: home,
+        projectId: project.id,
+        pageId: page.document.id,
+        blockIds,
+        format: "inline",
+        components: "bundled",
+        out: out + ".html",
+      });
+      await exportPage({
+        root: home,
+        projectId: project.id,
+        pageId: page.document.id,
+        blockIds,
+        format: "html",
+        out: out + "-full.html",
+      });
+      return {
+        inline: await readFile(out + ".html", "utf8"),
+        html: await readFile(out + "-full.html", "utf8"),
+      };
+    };
+    for (const [name, blockIds, budget] of [
+      ["chart", ["mon-metrics", "mon-entropy"], 600_000],
+      ["flowchart", ["ov-flow"], 750_000],
+    ] as const) {
+      const { inline, html } = await exportSelection(name, [...blockIds]);
+      expect(Buffer.byteLength(inline), name).toBeLessThan(budget);
+      expect(Buffer.byteLength(inline), name).toBeLessThan(CAPACITY.chatBytes);
+      expect(Buffer.byteLength(html), name).toBeLessThan(1_500_000);
+      expect(html, name).not.toContain('"g2-sankey"');
+      pages.set("/selection-" + name, inline);
+    }
+    const reader = await browser.newPage();
+    const errors: string[] = [];
+    reader.on("pageerror", (error) => errors.push(error.message));
+    await reader.goto(address + "/selection-chart");
+    await reader.getByText("0.42", { exact: true }).waitFor();
+    await reader.goto(address + "/selection-flowchart");
+    await reader.getByText("明确问题").first().waitFor();
+    expect(errors).toEqual([]);
+    await reader.close();
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+}, 120000);

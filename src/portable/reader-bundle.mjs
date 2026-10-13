@@ -180,11 +180,17 @@ export async function bundleReader(archivePath, documents) {
 
 async function compileReader(archivePath, archive, kinds) {
   const selected = new Set(kinds);
-  const chartKinds = new Set(
-    JSON.parse(archive.files["resources/catalog/g2.json"]).map(
+  const catalogKinds = (name) =>
+    JSON.parse(archive.files[`resources/catalog/${name}.json`]).map(
       (item) => item.kind,
-    ),
-  );
+    );
+  // Registry loops over a catalog stay only when the page uses one of its kinds.
+  const groupKinds = {
+    g2Metadata: catalogKinds("g2"),
+    primitiveMetadata: catalogKinds("primitives"),
+    diagramMetadata: catalogKinds("diagrams"),
+  };
+  const chartKinds = new Set(groupKinds.g2Metadata);
   const charts = kinds.filter((k) => chartKinds.has(k)).map((k) => k.slice(3));
   const drawImports = archive.draws.imports.filter((item) =>
     charts.some((type) => archive.draws.entries[type] === item.name),
@@ -276,32 +282,23 @@ async function compileReader(archivePath, archive, kinds) {
             archive.registry.filter((r) =>
               r.kind
                 ? !selected.has(r.kind)
-                : r.group === "g2Metadata"
-                  ? !charts.length
-                  : r.group === "primitiveMetadata"
-                    ? !kinds.some((k) =>
-                        [
-                          "text",
-                          "image",
-                          "table",
-                          "callout",
-                          "toggle",
-                          "divider",
-                          "code",
-                        ].includes(k),
-                      )
-                    : false,
+                : Object.hasOwn(groupKinds, r.group) &&
+                  !groupKinds[r.group].some((kind) => selected.has(kind)),
             ),
           );
         if (
-          /^resources\/catalog\/(?:g2|components|primitives|surfaces)\.json$/.test(
+          /^resources\/catalog\/(?:g2|components|primitives|surfaces|diagrams)\.json$/.test(
             args.path,
           )
         )
           source = JSON.stringify(
             JSON.parse(source).filter((item) => selected.has(item.kind)),
           );
-        if (args.path === "resources/catalog/component-documentation.json")
+        if (
+          /^resources\/catalog\/(?:component|diagram)-documentation\.json$/.test(
+            args.path,
+          )
+        )
           source = JSON.stringify(
             Object.fromEntries(
               Object.entries(JSON.parse(source)).filter(([kind]) =>
