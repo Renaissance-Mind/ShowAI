@@ -20,6 +20,7 @@ ShowAI 用**可阅读、可交互、可编辑**的页面承载人与 Agent 的�
 | --- | --- |
 | [数据图表](g2-components.md) | G2 图表类型、数据接口、参数和交互 |
 | [思维导图](mindmap.md) | 布局、节点编辑、快捷键和交互式导出 |
+| [图形组件](diagram-components.md) | Archify、Diagram Design、Fireworks 的模板、编辑和离线导出 |
 | [组件与模板](catalog-lifecycle.md) | 目录查找、项目资源、版本、依赖和复用 |
 | [Skills 工作流程](skills.md) | 页面、组件与模板任务的处理方式 |
 | [图标](icons.md) | 内置图标、SVG 图标与图标集 |

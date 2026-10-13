@@ -2,6 +2,8 @@ import primitives from "../../resources/catalog/primitives.json";
 import components from "../../resources/catalog/components.json";
 import surfaces from "../../resources/catalog/surfaces.json";
 import g2 from "../../resources/catalog/g2.json";
+import diagrams from "../../resources/catalog/diagrams.json";
+import diagramDocumentation from "../../resources/catalog/diagram-documentation.json";
 import documentation from "../../resources/catalog/component-documentation.json";
 import type { ComponentDocumentation } from "./custom/documentation";
 import type { BuiltinComponentMetadata } from "./custom/types";
@@ -13,11 +15,15 @@ export function builtinComponentCatalog({
     ...primitives,
     ...components,
     ...g2,
+    ...diagrams,
     ...surfaces,
   ]).map((item) => ({
     ...item,
     documentation: (
-      documentation as unknown as Record<string, ComponentDocumentation>
+      { ...documentation, ...diagramDocumentation } as unknown as Record<
+        string,
+        ComponentDocumentation
+      >
     )[item.kind],
   })) as BuiltinComponentMetadata[];
   return includeLegacy ? items : items.filter((item) => !item.replacedBy);

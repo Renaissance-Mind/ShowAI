@@ -52,6 +52,12 @@ import { builtinComponentCatalog } from "../components/catalog";
 import { validateComponentDocumentation } from "../components/custom/documentation";
 
 import { builtinSources, builtinExports } from "./builtin-sources";
+import { componentSandboxPolicy } from "../components/custom/sandbox-policy.mjs";
+import { diagramSourceFiles } from "../components/blocks/diagrams/templates";
+import {
+  diagramTemplates,
+  type DiagramFamily,
+} from "../components/blocks/diagrams/contract.mjs";
 import { validateDocument } from "../portable/validation.mjs";
 import type { ShowDocument } from "../types";
 import { canonicalJson } from "./diff";
@@ -168,7 +174,12 @@ export default function Component({ data, onChange, readOnly }) {
     },
     schema: item.propsSchema,
     source,
-    files: { "index.tsx": source },
+    files: {
+      "index.tsx": source,
+      ...(Object.hasOwn(diagramTemplates, kind)
+        ? diagramSourceFiles(kind as DiagramFamily)
+        : {}),
+    },
   };
 }
 
@@ -1996,7 +2007,7 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
     Buffer.byteLength(inline.script) + Buffer.byteLength(inline.styles),
     CAPACITY.compiledComponentBytes,
   );
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data:; media-src data:; font-src data:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"><style>html,body{margin:0;padding:0;font:14px/1.6 system-ui,sans-serif;color:#292d29}*{box-sizing:border-box}button,input,select,textarea{font:inherit}#component-root{display:flow-root;overflow-wrap:anywhere}${css.replace(/<\/style/gi, "<\\/style")}</style></head><body><div id="component-root"></div>${COMPONENT_DATA_MARKER}<script>${script.replace(/<\/script/gi, "<\\/script")}</script></body></html>`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${componentSandboxPolicy}"><style>html,body{margin:0;padding:0;font:14px/1.6 system-ui,sans-serif;color:#292d29}*{box-sizing:border-box}button,input,select,textarea{font:inherit}#component-root{display:flow-root;overflow-wrap:anywhere}${css.replace(/<\/style/gi, "<\\/style")}</style></head><body><div id="component-root"></div>${COMPONENT_DATA_MARKER}<script>${script.replace(/<\/script/gi, "<\\/script")}</script></body></html>`;
   assertBytes(
     "Compiled component HTML",
     Buffer.byteLength(html),

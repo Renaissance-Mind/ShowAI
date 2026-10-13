@@ -147,4 +147,5 @@ plugins/showai/scripts/cli.mjs
 !/docs/template-bundles.md
 
 !/docs/component-parameters.md
+!/docs/diagram-components.md
 !/plugins/showai/skills/create-component/references/parameter-contract.md

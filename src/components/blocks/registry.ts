@@ -37,6 +37,23 @@ const G2ChartBlock = /* @__PURE__ */ lazy(() =>
   import("./G2Chart").then((module) => ({ default: module.G2ChartBlock })),
 );
 import { validateG2Data } from "./g2/contract.mjs";
+import diagramMetadata from "../../../resources/catalog/diagrams.json";
+import { validateDiagramData } from "./diagrams/contract.mjs";
+const diagramRenderers = {
+  archify: lazy(() =>
+    import("./ExternalDiagram").then((m) => ({ default: m.ArchifyBlock })),
+  ),
+  "diagram-design": lazy(() =>
+    import("./ExternalDiagram").then((m) => ({
+      default: m.DiagramDesignBlock,
+    })),
+  ),
+  "fireworks-tech-graph": lazy(() =>
+    import("./ExternalDiagram").then((m) => ({
+      default: m.FireworksTechGraphBlock,
+    })),
+  ),
+};
 import { CustomBlock } from "../custom/CustomBlock";
 import { readCustomBlockData } from "../custom/contract";
 import type { BlockData, BlockDefinition, BlockRegistration } from "./types";
@@ -200,6 +217,17 @@ registerBlock({
   renderer: MindmapBlock,
   validate: validateMindmapData,
 });
+for (const item of diagramMetadata) {
+  registerBlock({
+    kind: item.kind,
+    title: item.name,
+    description: item.description,
+    icon: "◇",
+    defaultData: item.defaultData as BlockData,
+    renderer: diagramRenderers[item.kind as keyof typeof diagramRenderers],
+    validate: (data) => validateDiagramData(item.kind, data),
+  });
+}
 registerBlock({
   kind: "flowchart",
   title: "交互流程图",

@@ -1,0 +1,67 @@
+.sb-external-diagram {
+  min-width: 0;
+  position: relative;
+}
+.sb-diagram-frame {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: var(--paper, #fff);
+}
+.sb-diagram-editor {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 520px);
+  padding: 12px;
+}
+.sb-diagram-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 100px;
+  gap: 10px;
+}
+.sb-diagram-editor select,
+.sb-diagram-editor input:not([type="file"]),
+.sb-diagram-editor textarea {
+  width: 100%;
+  min-width: 0;
+}
+.sb-diagram-editor details > summary {
+  cursor: pointer;
+  padding: 8px 0;
+  color: var(--text);
+}
+.sb-diagram-labels > div {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 4px;
+}
+.sb-diagram-source {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  resize: vertical;
+  margin-bottom: 8px;
+}
+.sb-diagram-upload {
+  width: fit-content;
+  cursor: pointer;
+}
+.sb-diagram-upload input {
+  display: none;
+}
+.sb-diagram-editor .sb-editor-footer {
+  display: flex;
+  gap: 8px;
+}
+@media (max-width: 420px) {
+  .sb-diagram-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media print {
+  .sb-external-diagram .viewport-lock-button {
+    display: none;
+  }
+}

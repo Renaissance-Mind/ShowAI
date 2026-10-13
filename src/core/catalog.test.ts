@@ -295,6 +295,9 @@ describe("compiled React packages", () => {
       "references",
       "mechanism-steps",
       "evidence-explorer",
+      "archify",
+      "diagram-design",
+      "fireworks-tech-graph",
       "page",
       "board",
     ]);

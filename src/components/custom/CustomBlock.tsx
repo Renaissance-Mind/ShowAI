@@ -1,5 +1,6 @@
 import { CAPACITY, assertContent } from "../../portable/capacity.mjs";
 import { installIconTooltips } from "../../ui/icon-tooltip.mjs";
+import { componentSandboxPolicy } from "./sandbox-policy.mjs";
 import { useAppearanceTheme } from "../../design/useAppearanceTheme";
 import {
   appearanceTokens,
@@ -240,8 +241,7 @@ function SandboxComponent({
   const html = useMemo(() => {
     // A portable package is executable user content. Enforce the policy before
     // parsing any of its markup, even if its own document omits or changes CSP.
-    const policy =
-      "<!doctype html><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data:; media-src data:; font-src data:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'\">";
+    const policy = `<!doctype html><meta http-equiv="Content-Security-Policy" content="${componentSandboxPolicy}">`;
     return (
       policy +
       injectComponentBootstrap(
@@ -497,7 +497,7 @@ function SandboxComponent({
         ref={iframe}
         title={component.name}
         srcDoc={html}
-        sandbox="allow-scripts allow-forms"
+        sandbox="allow-scripts allow-forms allow-downloads"
         referrerPolicy="no-referrer"
         onLoad={sendProps}
         allow="camera 'none'; microphone 'none'; geolocation 'none'; clipboard-read 'none'; clipboard-write 'none'"

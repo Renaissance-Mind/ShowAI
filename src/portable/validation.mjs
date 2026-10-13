@@ -5,6 +5,10 @@ import { validateSurface } from "../surface/validation.mjs";
 import { validatePrimitiveData } from "../components/blocks/primitive-contract.mjs";
 import { validateMindmapData } from "../components/blocks/mindmap-contract.mjs";
 import { validateFlowchartData } from "../components/blocks/flowchart-contract.mjs";
+import {
+  validateDiagramData,
+  diagramTemplates,
+} from "../components/blocks/diagrams/contract.mjs";
 import { validateG2Data } from "../components/blocks/g2/contract.mjs";
 import { validatePresentationData } from "../components/blocks/presentation-contract.mjs";
 import { validateResearchData } from "../components/blocks/research-contract.mjs";
@@ -248,6 +252,10 @@ function validateAttrs(attrs, path, permitted, surfaceIcon = false) {
 }
 
 function validateWidgetData(kind, data, path) {
+  if (Object.hasOwn(diagramTemplates, kind)) {
+    validateDiagramData(kind, data);
+    return;
+  }
   if (["mechanism-steps", "evidence-explorer"].includes(kind)) {
     validatePresentationData(kind, data);
     return;

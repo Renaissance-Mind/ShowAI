@@ -20,6 +20,7 @@ import sharedSelectionToolbarCss from "../editor/selection-toolbar.css?raw";
 import workspaceEditor from "../editor/workspace-editor.tsx?raw";
 import editorNodeJson from "../editor/node-json.ts?raw";
 import { g2BuiltinSources } from "./g2-builtin-sources";
+import { diagramBuiltinSources } from "./diagram-builtin-sources";
 import g2Exports from "../components/blocks/g2/exports-map.json";
 import themeTokens from "../design/tokens.css?raw";
 import themeContent from "../design/content.css?raw";
@@ -69,6 +70,7 @@ import expandableSearchCss from "../components/expandable-search.css?raw";
 
 const sources: Record<string, string> = {
   ...g2BuiltinSources,
+  ...diagramBuiltinSources,
   "rich-text/table-alignment.ts": richTextTableAlignment,
   "rich-text/table-selection.ts": richTextTableSelection,
   "rich-text/external-content.ts": richTextExternalContent,
@@ -185,6 +187,9 @@ export const builtinExports: Record<string, string> = {
   chart: "Chart",
   mindmap: "Mindmap",
   flowchart: "Flowchart",
+  archify: "Archify",
+  "diagram-design": "DiagramDesign",
+  "fireworks-tech-graph": "FireworksTechGraph",
   database: "Database",
   metrics: "Metrics",
   playground: "Playground",
