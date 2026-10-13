@@ -40,6 +40,11 @@ import primitives from "../components/blocks/Primitives.tsx?raw";
 import presentation from "../components/blocks/Presentation.tsx?raw";
 import presentationCss from "../components/blocks/presentation.css?raw";
 import presentationContract from "../components/blocks/presentation-contract.mjs?raw";
+import comparisonMatrix from "../components/blocks/ComparisonMatrix.tsx?raw";
+import statusTree from "../components/blocks/StatusTree.tsx?raw";
+import experimentTracker from "../components/blocks/ExperimentTracker.tsx?raw";
+import analysisCss from "../components/blocks/analysis.css?raw";
+import analysisContract from "../components/blocks/analysis-contract.mjs?raw";
 import chart from "../components/blocks/Chart.tsx?raw";
 import database from "../components/blocks/Database.tsx?raw";
 import metrics from "../components/blocks/Metrics.tsx?raw";
@@ -138,6 +143,11 @@ const sources: Record<string, string> = {
   "Presentation.tsx": presentation,
   "presentation.css": presentationCss,
   "presentation-contract.mjs": presentationContract,
+  "ComparisonMatrix.tsx": comparisonMatrix,
+  "StatusTree.tsx": statusTree,
+  "ExperimentTracker.tsx": experimentTracker,
+  "analysis.css": analysisCss,
+  "analysis-contract.mjs": analysisContract,
   "Chart.tsx": chart,
   "Database.tsx": database,
   "Metrics.tsx": metrics,
@@ -247,6 +257,9 @@ export const builtinExports: Record<string, string> = {
   code: "Code",
   "mechanism-steps": "MechanismSteps",
   "evidence-explorer": "EvidenceExplorer",
+  "comparison-matrix": "ComparisonMatrix",
+  "status-tree": "StatusTree",
+  "experiment-tracker": "ExperimentTracker",
   chart: "Chart",
   mindmap: "Mindmap",
   flowchart: "Flowchart",

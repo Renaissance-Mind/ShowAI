@@ -14,6 +14,7 @@ import { ContentLibrary as GitLibrary } from "./content-library";
 import { versionedLibrary } from "./library-runtime";
 import { CoreError } from "./model";
 import { withLibraryLock } from "./library-lock";
+import { withoutCachedConnections } from "./sqlite-library";
 import {
   atomicLibraryFile,
   readLibraryBytes,
@@ -697,61 +698,62 @@ export class LibraryMaintenance {
           () =>
             withLibraryLock(
               this.root,
-              async () => {
-                const revision = await this.library.head(),
-                  manifest = await this.library.manifest(),
-                  staging = `${destination}.pending-${randomUUID()}`;
-                await mkdir(staging, { recursive: true });
-                const inventory = (await files(this.root)).filter(
-                  (file) =>
-                    !/^local\/(?:leases\/|[^/]+\.lock(?:\.|$))/.test(
-                      file.path,
-                    ) &&
-                    !/^index\.sqlite(?:-|$)/.test(file.path) &&
-                    !/^(?:cache\/|tmp\/)/.test(file.path),
-                );
-                const recorded: {
-                  path: string;
-                  sha256: string;
-                  bytes: number;
-                }[] = [];
-                for (const file of inventory) {
-                  const source = join(this.root, file.path),
-                    target = join(staging, file.path),
-                    fingerprint = await libraryFingerprint(this.root, source);
-                  if (!fingerprint)
-                    throw new CoreError(
-                      "CONFLICT",
-                      "An archive input changed during copying.",
-                    );
-                  await safeLibraryPath(staging, target);
-                  await mkdir(dirname(target), { recursive: true });
-                  await copyFile(source, target);
-                  recorded.push({ path: file.path, ...fingerprint });
-                }
-                const archiveManifest = {
-                  format: "showai-library-archive",
-                  version: 1,
-                  libraryId: manifest.id,
-                  revision,
-                  createdAt: new Date().toISOString(),
-                  files: recorded,
-                };
-                await atomicLibraryFile(
-                  staging,
-                  join(staging, "archive.json"),
-                  Buffer.from(JSON.stringify(archiveManifest)),
-                );
-                await verifyLibraryArchive(staging);
-                await rename(staging, destination);
-                return {
-                  path: destination,
-                  libraryId: manifest.id,
-                  revision,
-                  files: recorded.length,
-                  bytes: recorded.reduce((sum, file) => sum + file.bytes, 0),
-                };
-              },
+              () =>
+                withoutCachedConnections(this.root, async () => {
+                  const revision = await this.library.head(),
+                    manifest = await this.library.manifest(),
+                    staging = `${destination}.pending-${randomUUID()}`;
+                  await mkdir(staging, { recursive: true });
+                  const inventory = (await files(this.root)).filter(
+                    (file) =>
+                      !/^local\/(?:leases\/|[^/]+\.lock(?:\.|$))/.test(
+                        file.path,
+                      ) &&
+                      !/^index\.sqlite(?:-|$)/.test(file.path) &&
+                      !/^(?:cache\/|tmp\/)/.test(file.path),
+                  );
+                  const recorded: {
+                    path: string;
+                    sha256: string;
+                    bytes: number;
+                  }[] = [];
+                  for (const file of inventory) {
+                    const source = join(this.root, file.path),
+                      target = join(staging, file.path),
+                      fingerprint = await libraryFingerprint(this.root, source);
+                    if (!fingerprint)
+                      throw new CoreError(
+                        "CONFLICT",
+                        "An archive input changed during copying.",
+                      );
+                    await safeLibraryPath(staging, target);
+                    await mkdir(dirname(target), { recursive: true });
+                    await copyFile(source, target);
+                    recorded.push({ path: file.path, ...fingerprint });
+                  }
+                  const archiveManifest = {
+                    format: "showai-library-archive",
+                    version: 1,
+                    libraryId: manifest.id,
+                    revision,
+                    createdAt: new Date().toISOString(),
+                    files: recorded,
+                  };
+                  await atomicLibraryFile(
+                    staging,
+                    join(staging, "archive.json"),
+                    Buffer.from(JSON.stringify(archiveManifest)),
+                  );
+                  await verifyLibraryArchive(staging);
+                  await rename(staging, destination);
+                  return {
+                    path: destination,
+                    libraryId: manifest.id,
+                    revision,
+                    files: recorded.length,
+                    bytes: recorded.reduce((sum, file) => sum + file.bytes, 0),
+                  };
+                }),
               "index",
             ),
           "drafts",

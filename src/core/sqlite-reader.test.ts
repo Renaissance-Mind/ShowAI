@@ -123,3 +123,32 @@ it("reuses an immutable object at new paths", async () => {
   expect(await a.readFile("assets/second")).toEqual(bytes);
   await a.verify();
 });
+it("reclaims a replaced object only after no current path or archived change uses it", async () => {
+  const { root, library: a } = await library();
+  const shared = Buffer.from("shared object ".repeat(200));
+  await a.writeFiles(
+    new Map([
+      ["assets/one", shared],
+      ["assets/two", shared],
+    ]),
+    context(),
+  );
+  const objects = () => {
+    const db = new DatabaseSync(join(root, "history/content.sqlite"));
+    try {
+      return Number(db.prepare("SELECT COUNT(*) AS n FROM blobs").get()!.n);
+    } finally {
+      db.close();
+    }
+  };
+  const before = objects();
+  await a.writeFiles(
+    new Map([["assets/one", Buffer.from("replaced")]]),
+    context(),
+  );
+  expect(await a.readFile("assets/two")).toEqual(shared);
+  expect(objects()).toBe(before + 1);
+  await a.writeFiles(new Map([["assets/two", null]]), context());
+  expect(objects()).toBe(before);
+  await a.verify();
+});

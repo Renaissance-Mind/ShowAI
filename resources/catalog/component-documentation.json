@@ -8348,5 +8348,270 @@
         "检查真实 Page、离线导出、390px 重排、键盘操作和 props 更新。"
       ]
     }
+  },
+  "comparison-matrix": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": ["内容由实例提供；阅读操作只改变当前视图。"]
+    },
+    "usage": {
+      "purpose": "按维度逐行对比多个方案，统一标记采用、不采用与部分采用，并可突出自己的方案。",
+      "structure": [
+        "rows 是对比维度（可按 group 分段），columns 是方案，cells 用 row/column 引用二者。",
+        "缺少的单元格按未涉及显示。"
+      ],
+      "inputs": [
+        {
+          "path": "rows",
+          "meaning": "对比维度：id、label，可选 hint 与 group。"
+        },
+        {
+          "path": "columns",
+          "meaning": "方案：id、label，可选 note、url；highlight=true 的一列（最多一列）始终突出。"
+        },
+        {
+          "path": "cells",
+          "meaning": "单元格：row、column 引用已有 ID，tone 为 yes/no/partial/neutral/na，可选 text 与 note（注释显示为脚注）。"
+        },
+        {
+          "path": "legend",
+          "meaning": "可选：覆盖各 tone 的图例文字。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "从真实材料填入",
+          "steps": [
+            "先确定稳定的 ID 与引用关系，再填写内容。",
+            "在真实 Page、窄屏与离线导出中检查主要交互。"
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击列头",
+          "effect": "聚焦这一列，其余列变淡；再次点击取消。",
+          "persistence": "view"
+        },
+        {
+          "action": "只看差异",
+          "effect": "隐藏所有方案都一致的维度。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "每个 row/column 组合最多一个单元格。",
+        "最多 60 行、12 列；窄屏横向滚动并固定首列。",
+        "内容应来自可核对的来源；未涉及的项用 na。"
+      ],
+      "editing": {
+        "data": ["修改实例数据后经宿主页面保存。"],
+        "implementation": [
+          "新增表达或交互需要同步数据约定、schema、SDK 与验证。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/components/blocks/ComparisonMatrix.tsx",
+          "purpose": "软件内置实现位置；source 视图返回 SDK 包装起点。"
+        },
+        {
+          "path": "index.tsx",
+          "purpose": "可编辑 SDK 包装入口，通过 showai:components 组合已有能力。"
+        }
+      ],
+      "architecture": [
+        "analysis-contract.mjs 校验引用与取值；analysis.css 使用设计变量，适配深色主题与打印。"
+      ],
+      "extensionPoints": ["添加新视图时保留静态阅读与打印。"],
+      "invariants": ["聚焦与只看差异均不调用 onChange。"],
+      "verification": [
+        "检查真实 Page、深色主题、390px 宽度、键盘操作和离线导出。"
+      ]
+    }
+  },
+  "status-tree": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": ["内容由实例提供；阅读操作只改变当前视图。"]
+    },
+    "usage": {
+      "purpose": "把条目按类别展开成树，状态由颜色、图标与线型区分，点击查看说明、结果与关联。",
+      "structure": [
+        "groups 是类别，items 是条目；status 引用 statuses 中的 id，省略 statuses 时使用默认的走通、进行中、没走通、待探索、搁置。"
+      ],
+      "inputs": [
+        {
+          "path": "root",
+          "meaning": "可选：树根的问题；宽度不足时隐藏。"
+        },
+        {
+          "path": "statuses",
+          "meaning": "可选：状态定义 id、label、tone（done/failed/active/todo/paused 决定外观）与可选 color。"
+        },
+        {
+          "path": "groups",
+          "meaning": "类别：id、label、可选 summary 与 items。"
+        },
+        {
+          "path": "groups[].items",
+          "meaning": "条目：id、label、status，可选 source、detail、result 与 links（关联条目的文字标签）。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "从真实材料填入",
+          "steps": [
+            "先确定稳定的 ID 与引用关系，再填写内容。",
+            "在真实 Page、窄屏与离线导出中检查主要交互。"
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击条目",
+          "effect": "在详情面板显示说明、结果与关联。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击顶部状态",
+          "effect": "突出该状态的条目，其他变淡。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "条目 ID 在整棵树内唯一。",
+        "最多 16 类、每类 30 条、8 种状态。",
+        "宽度不足 980px 时详情移到树下方。"
+      ],
+      "editing": {
+        "data": ["修改实例数据后经宿主页面保存。"],
+        "implementation": [
+          "新增表达或交互需要同步数据约定、schema、SDK 与验证。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/components/blocks/StatusTree.tsx",
+          "purpose": "软件内置实现位置；source 视图返回 SDK 包装起点。"
+        },
+        {
+          "path": "index.tsx",
+          "purpose": "可编辑 SDK 包装入口，通过 showai:components 组合已有能力。"
+        }
+      ],
+      "architecture": [
+        "按行计算条目位置，类别居中于其条目；SVG 曲线连接各层。"
+      ],
+      "extensionPoints": ["添加新视图时保留静态阅读与打印。"],
+      "invariants": ["选择与突出均不调用 onChange。"],
+      "verification": ["检查真实 Page、深色主题、窄屏、键盘操作和离线导出。"]
+    }
+  },
+  "experiment-tracker": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": ["内容由实例提供；阅读操作只改变当前视图。"]
+    },
+    "usage": {
+      "purpose": "在一个画面里追踪一组实验：散点与最优前沿、运行列表、资源与成本、训练曲线。",
+      "structure": [
+        "experiments 按 start 放在时间轴上，score 为 null 的实验画在底部「无分数」带。",
+        "groups 决定哪些实验参与最优前沿（frontier）以及形状；runs 提供曲线，charts 选择要画的 series 键。"
+      ],
+      "inputs": [
+        {
+          "path": "metric",
+          "meaning": "主指标：label、可选 unit、direction（higher/lower）与 baseline。lower 时坐标翻转，好的结果始终在上。"
+        },
+        {
+          "path": "groups",
+          "meaning": "可选：实验分组，frontier=false 的组不参与前沿，shape=diamond 画成菱形。"
+        },
+        {
+          "path": "experiments",
+          "meaning": "实验：id、name、status（kept/discarded/failed/running/stopped）、start、score（可为 null），可选 group、category、minutes、resources、note。"
+        },
+        {
+          "path": "runs",
+          "meaning": "可选：带曲线的运行，id 与实验对应；series 的每个数组与 steps 等长。"
+        },
+        {
+          "path": "charts",
+          "meaning": "可选：最多 4 张小图，key 对应 series 键。"
+        },
+        {
+          "path": "resource",
+          "meaning": "可选：资源单位、单价、货币与预算，用于计算资源·时与成本。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "从真实材料填入",
+          "steps": [
+            "先确定稳定的 ID 与引用关系，再填写内容。",
+            "在真实 Page、窄屏与离线导出中检查主要交互。"
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "悬停或点击散点、侧栏行",
+          "effect": "显示实验详情。",
+          "persistence": "view"
+        },
+        {
+          "action": "按状态筛选、勾选运行",
+          "effect": "侧栏筛选；勾选控制小图中的曲线。",
+          "persistence": "view"
+        },
+        {
+          "action": "悬停小图",
+          "effect": "所有小图同步显示同一训练步的数值。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "前沿只在同一组内比较，避免把不同预算的实验混在一起。",
+        "最多 2000 个实验、20 条曲线。",
+        "宽度不足 980px 时三栏改为上下排列。"
+      ],
+      "editing": {
+        "data": ["修改实例数据后经宿主页面保存。"],
+        "implementation": [
+          "新增表达或交互需要同步数据约定、schema、SDK 与验证。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/components/blocks/ExperimentTracker.tsx",
+          "purpose": "软件内置实现位置；source 视图返回 SDK 包装起点。"
+        },
+        {
+          "path": "index.tsx",
+          "purpose": "可编辑 SDK 包装入口，通过 showai:components 组合已有能力。"
+        }
+      ],
+      "architecture": [
+        "experimentFrontier 计算前沿；散点与小图均为 SVG，宽度由 ResizeObserver 测量。"
+      ],
+      "extensionPoints": ["添加新视图时保留静态阅读与打印。"],
+      "invariants": ["筛选、选择与悬停均不调用 onChange。"],
+      "verification": [
+        "检查真实 Page、深色主题、越低越好的指标、窄屏和离线导出。"
+      ]
+    }
   }
 }

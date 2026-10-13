@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import { statSync } from "node:fs";
 import {
   access,
   mkdir,
@@ -152,6 +153,57 @@ function parseRecord(message: string): ChangeRecord {
   return value;
 }
 
+/**
+ * Each query used to open a connection, run its schema statements and close it
+ * again. Connections are now kept while in use and closed after a short idle
+ * period. Windows keeps per-query connections so renames are never blocked.
+ */
+const connections = new Map<
+  string,
+  {
+    db: DatabaseSync;
+    device: number;
+    inode: number;
+    timer?: ReturnType<typeof setTimeout>;
+  }
+>();
+function fileIdentity(path: string) {
+  try {
+    const info = statSync(path);
+    return { device: info.dev, inode: info.ino };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  }
+}
+const uncached = new Map<string, number>();
+/**
+ * File-level copies (archives) need the database without this process's open
+ * connection; queries during the action open and close their own connection.
+ */
+export async function withoutCachedConnections<T>(
+  root: string,
+  action: () => Promise<T>,
+): Promise<T> {
+  const path = join(resolve(root), "history", "content.sqlite");
+  uncached.set(path, (uncached.get(path) ?? 0) + 1);
+  forget(path);
+  try {
+    return await action();
+  } finally {
+    const count = uncached.get(path)! - 1;
+    if (count) uncached.set(path, count);
+    else uncached.delete(path);
+  }
+}
+function forget(path: string) {
+  const cached = connections.get(path);
+  if (!cached) return;
+  connections.delete(path);
+  clearTimeout(cached.timer);
+  if (cached.db.isOpen) cached.db.close();
+}
+
 /** SQLite owns immutable history and the current tree; files are recoverable projections. */
 export class SqliteLibrary {
   readonly root: string;
@@ -165,11 +217,46 @@ export class SqliteLibrary {
   private async database() {
     const path = join(this.repository, "content.sqlite");
     await safeLibraryPath(this.root, path);
+    const cached = connections.get(path);
+    if (cached) {
+      const identity = fileIdentity(path);
+      // A migration, import or restore may have replaced the database file.
+      if (
+        identity?.device === cached.device &&
+        identity.inode === cached.inode &&
+        cached.db.isOpen &&
+        !cached.db.isTransaction
+      ) {
+        clearTimeout(cached.timer);
+        cached.timer = undefined;
+        return cached.db;
+      }
+      forget(path);
+    }
     const db = new DatabaseSync(path);
     db.exec("PRAGMA foreign_keys=ON; PRAGMA busy_timeout=10000;");
     db.exec(`CREATE TABLE IF NOT EXISTS current_state(id INTEGER PRIMARY KEY CHECK(id=1), revision TEXT NOT NULL, entry TEXT NOT NULL, checksum TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS current_resources(path TEXT PRIMARY KEY, revision TEXT NOT NULL, sequence INTEGER NOT NULL, entry TEXT NOT NULL);`);
+    const identity =
+      process.platform === "win32" || uncached.has(path)
+        ? undefined
+        : fileIdentity(path);
+    if (identity) connections.set(path, { db, ...identity });
     return db;
+  }
+  private release(db: DatabaseSync) {
+    const path = join(this.repository, "content.sqlite");
+    const cached = connections.get(path);
+    if (cached?.db !== db || db.isTransaction) {
+      if (cached?.db === db) forget(path);
+      else if (db.isOpen) db.close();
+      return;
+    }
+    clearTimeout(cached.timer);
+    cached.timer = setTimeout(() => {
+      if (connections.get(path) === cached) forget(path);
+    }, 1500);
+    cached.timer.unref();
   }
   private async query<T>(
     action: (db: DatabaseSync) => T,
@@ -185,7 +272,7 @@ export class SqliteLibrary {
       if (transaction) db.exec("ROLLBACK");
       throw error;
     } finally {
-      db.close();
+      this.release(db);
     }
   }
   async manifest(): Promise<LibraryManifest> {
@@ -1134,22 +1221,32 @@ export class SqliteLibrary {
             )
             .get()!.n,
         );
+        const insertBlob = db.prepare(
+            "INSERT OR IGNORE INTO blobs VALUES(?,?,?,?,?)",
+          ),
+          currentObject = db.prepare(
+            "SELECT oid FROM current_files WHERE path=?",
+          ),
+          removeFile = db.prepare("DELETE FROM current_files WHERE path=?"),
+          writeCurrent = db.prepare(
+            "INSERT INTO current_files VALUES(?,?) ON CONFLICT(path) DO UPDATE SET oid=excluded.oid",
+          );
+        // Only objects this commit stops referencing can become unused.
+        const replaced = new Set<string>();
         for (const [path, bytes] of encoded) {
           const object = prepared.get(path);
           if (object?.data)
-            db.prepare("INSERT OR IGNORE INTO blobs VALUES(?,?,?,?,?)").run(
+            insertBlob.run(
               object.id,
               object.data,
               object.id,
               object.bytes.length,
               object.packed ? 1 : 0,
             );
-          if (bytes === null)
-            db.prepare("DELETE FROM current_files WHERE path=?").run(path);
-          else
-            db.prepare(
-              "INSERT INTO current_files VALUES(?,?) ON CONFLICT(path) DO UPDATE SET oid=excluded.oid",
-            ).run(path, object!.id);
+          const previous = currentObject.get(path)?.oid as string | undefined;
+          if (previous && previous !== object?.id) replaced.add(previous);
+          if (bytes === null) removeFile.run(path);
+          else writeCurrent.run(path, object!.id);
         }
         for (const path of new Set(entry.paths.map(resourcePath)))
           db.prepare(
@@ -1171,9 +1268,11 @@ export class SqliteLibrary {
         db.prepare(
           "INSERT INTO metadata VALUES('head',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
         ).run(entry.revision);
-        db.exec(
-          "DELETE FROM blobs WHERE oid NOT IN(SELECT oid FROM current_files) AND oid NOT IN(SELECT oid FROM changes WHERE oid IS NOT NULL); COMMIT",
+        const removeUnused = db.prepare(
+          "DELETE FROM blobs WHERE oid=?1 AND NOT EXISTS(SELECT 1 FROM current_files WHERE oid=?1) AND NOT EXISTS(SELECT 1 FROM changes WHERE oid=?1)",
         );
+        for (const oid of replaced) removeUnused.run(oid);
+        db.exec("COMMIT");
         return;
       }
       const data = JSON.stringify(entry),
@@ -1217,7 +1316,7 @@ export class SqliteLibrary {
       db.exec("ROLLBACK");
       throw error;
     } finally {
-      db.close();
+      this.release(db);
     }
   }
   private async recoverUnlocked() {
@@ -1292,6 +1391,10 @@ export class SqliteLibrary {
       await this.recoverUnlocked();
       const before = await stat(join(this.repository, "content.sqlite"));
       await this.query((db) => {
+        // Saves reclaim only the objects they replace; compaction sweeps the rest.
+        db.exec(
+          "DELETE FROM blobs WHERE oid NOT IN(SELECT oid FROM current_files) AND oid NOT IN(SELECT oid FROM changes WHERE oid IS NOT NULL)",
+        );
         db.exec("PRAGMA wal_checkpoint(TRUNCATE); VACUUM;");
       }, false);
       const after = await stat(join(this.repository, "content.sqlite"));
