@@ -1,19 +1,31 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { link, lstat, mkdir, readFile, rm, unlink } from "node:fs/promises";
+import {
+  link,
+  lstat,
+  mkdir,
+  open,
+  readFile,
+  rm,
+  unlink,
+} from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { uptime } from "node:os";
 import { CoreError } from "./model";
-import { atomicLibraryFile, safeLibraryPath } from "./library-files";
+import { safeLibraryPath } from "./library-files";
 import { withWindowsSharingRetry } from "./atomic-rename";
 
 const lockContext = new AsyncLocalStorage<Map<string, string>>();
 const activeLocks = new Map<string, string>();
+/** Holders in this process take turns instead of polling the shared lease. */
+const localTurns = new Map<string, Promise<void>>();
 
 interface LeaseOwner {
   pid: number;
   token: string;
 }
 function dead(pid: number): boolean {
+  if (pid === 0) return true;
   try {
     process.kill(pid, 0);
     return false;
@@ -44,7 +56,20 @@ async function ownerAt(
       throw error;
     });
     if (source === undefined) return undefined;
-    const value = JSON.parse(source) as LeaseOwner;
+    let value: LeaseOwner;
+    try {
+      value = JSON.parse(source) as LeaseOwner;
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      // Leases are not flushed to disk. Only an OS crash can leave one
+      // incomplete, and a lease from before this boot has no live owner.
+      if (info.mtimeMs < Date.now() - uptime() * 1000 - 2000)
+        return { pid: 0, token: "interrupted" };
+      throw new CoreError(
+        "INVALID_DATA",
+        "The library lock has invalid ownership information.",
+      );
+    }
     if (
       !Number.isInteger(value.pid) ||
       value.pid < 1 ||
@@ -58,7 +83,7 @@ async function ownerAt(
   });
 }
 
-/** Publish a fully persisted owner with an atomic hard link: no empty-owner crash window. */
+/** Publish a fully written owner with an atomic hard link; no reader sees a partial owner. */
 export async function withLibraryLock<T>(
   root: string,
   action: () => Promise<T>,
@@ -69,15 +94,65 @@ export async function withLibraryLock<T>(
   const key = `${root}:${name}`;
   const inherited = lockContext.getStore()?.get(key);
   if (inherited && activeLocks.get(key) === inherited) return action();
+  const deadline = Date.now() + 30_000;
+  const previous = localTurns.get(key) ?? Promise.resolve();
+  let finish!: () => void;
+  const turn = new Promise<void>((done) => {
+    finish = done;
+  });
+  const queue = previous.then(() => turn);
+  localTurns.set(key, queue);
+  try {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const expired = await Promise.race([
+      previous.then(() => false),
+      new Promise<boolean>((done) => {
+        timer = setTimeout(() => done(true), deadline - Date.now());
+      }),
+    ]);
+    clearTimeout(timer);
+    if (expired)
+      throw new CoreError(
+        "LOCKED",
+        "Another library operation is still running. Retry after it finishes.",
+      );
+    return await acquireLibraryLock(root, name, key, deadline, action);
+  } finally {
+    finish();
+    if (localTurns.get(key) === queue) localTurns.delete(key);
+  }
+}
+
+async function acquireLibraryLock<T>(
+  root: string,
+  name: string,
+  key: string,
+  deadline: number,
+  action: () => Promise<T>,
+): Promise<T> {
   const local = join(root, "local");
   await safeLibraryPath(root, local);
   await mkdir(local, { recursive: true });
   const token = randomUUID(),
     owner: LeaseOwner = { pid: process.pid, token };
   const prepared = join(local, "leases", `${name}-${token}.json`);
-  await atomicLibraryFile(root, prepared, Buffer.from(JSON.stringify(owner)));
+  await safeLibraryPath(root, prepared);
+  await mkdir(join(local, "leases"), { recursive: true });
+  await safeLibraryPath(root, prepared);
+  // The lease is complete before it is linked; durability only matters across
+  // an OS crash, after which ownerAt treats a pre-boot partial lease as stale.
+  try {
+    const lease = await open(prepared, "wx", 0o600);
+    try {
+      await lease.writeFile(JSON.stringify(owner));
+    } finally {
+      await lease.close();
+    }
+  } catch (error) {
+    await rm(prepared, { force: true });
+    throw error;
+  }
   const lock = join(local, `${name}.lock`);
-  const deadline = Date.now() + 30_000;
   const reclaim = async (
     path: string,
     observed: LeaseOwner,
