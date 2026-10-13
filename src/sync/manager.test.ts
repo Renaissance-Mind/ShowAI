@@ -78,6 +78,66 @@ async function fixture() {
   return { directory, server, alice, bob, project, page };
 }
 describe("project synchronization between independent real content libraries", () => {
+  it("syncs sorting and manual order per directory and merges independent offline folder changes", async () => {
+    const { alice, bob, project, page } = await fixture();
+    const parent = await alice.store.createFolder(project.id, {
+      name: "Parent",
+    });
+    const child = await alice.store.createFolder(project.id, {
+      name: "Child",
+      parentId: parent.id,
+    });
+    const defaultFolder = await alice.store.createFolder(project.id, {
+      name: "Default",
+    });
+    await alice.store.setDirectorySort(project.id, null, "name");
+    await alice.store.setDirectorySort(project.id, parent.id, "createdAt");
+    await alice.manager.run();
+    await bob.manager.run();
+    expect((await bob.store.readProject(project.id)).sortBy).toBe("name");
+    expect(
+      (await bob.store.listFolders(project.id)).find(
+        (item) => item.id === parent.id,
+      )?.sortBy,
+    ).toBe("createdAt");
+    // Separate devices change different directories while offline.
+    await alice.store.setDirectorySort(project.id, parent.id, "updatedAt");
+    await bob.store.setDirectorySort(project.id, child.id, "name");
+    await alice.manager.run();
+    await bob.manager.run();
+    await alice.manager.run();
+    for (const client of [alice, bob]) {
+      const folders = await new FileStore(client.home).listFolders(project.id);
+      expect(folders.find((item) => item.id === parent.id)?.sortBy).toBe(
+        "updatedAt",
+      );
+      expect(folders.find((item) => item.id === child.id)?.sortBy).toBe("name");
+      expect(
+        folders.find((item) => item.id === defaultFolder.id)?.sortBy,
+      ).toBeUndefined();
+      expect((await client.manager.status()).projects[0].status).toBe("synced");
+      expect(await client.manager.conflict(project.id)).toBeNull();
+    }
+    await alice.store.arrangeEntry({
+      reorderOnly: true,
+      kind: "page",
+      projectId: project.id,
+      destinationProjectId: project.id,
+      id: page.document.id,
+      parentId: null,
+      relativeId: parent.id,
+    });
+    await alice.manager.run();
+    await bob.manager.run();
+    const root = await bob.store.readProject(project.id);
+    expect(root.sortBy).toBe("manual");
+    expect(root.manualOrder!.indexOf(page.document.id)).toBeLessThan(
+      root.manualOrder!.indexOf(parent.id),
+    );
+    expect(
+      (await bob.store.readPage(project.id, page.document.id)).document,
+    ).toEqual(page.document);
+  });
   it("keeps one cloud manifest and a bounded current cache while new devices receive only latest content", async () => {
     const { directory, server, alice, bob, project, page } = await fixture();
     let firstRemote: string | null = null;

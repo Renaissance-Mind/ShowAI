@@ -3,6 +3,7 @@ import { orderSidebarItems, placeSidebarItem } from "../core/sidebar-order";
 
 export interface SidebarReorder {
   projectId: string;
+  parentId?: string | null;
   id: string;
   siblings: string[];
   relativeId?: string;

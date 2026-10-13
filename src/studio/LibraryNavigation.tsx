@@ -178,6 +178,7 @@ interface LibraryMenuItemBase {
   disabled?: boolean;
   separatorBefore?: boolean;
   shortcut?: string;
+  checked?: boolean;
 }
 export type LibraryContextMenuItem = LibraryMenuItemBase &
   (
@@ -218,7 +219,7 @@ function enabledItems(
 ): (HTMLButtonElement | HTMLInputElement)[] {
   return [
     ...menu.querySelectorAll<HTMLButtonElement | HTMLInputElement>(
-      'button[role="menuitem"],input[type="range"]',
+      'button[role="menuitem"],button[role="menuitemradio"],input[type="range"]',
     ),
   ].filter((item) => !item.disabled);
 }
@@ -490,7 +491,8 @@ export function LibraryContextMenu({
           ) : (
             <button
               type="button"
-              role="menuitem"
+              role={item.checked === undefined ? "menuitem" : "menuitemradio"}
+              aria-checked={item.checked}
               tabIndex={-1}
               className={`studio-context-menu-item${item.danger ? " danger" : ""}`}
               disabled={item.disabled}

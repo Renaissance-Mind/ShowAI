@@ -1,4 +1,5 @@
 import type { ProjectSummary, SidebarOrganization } from "../core/model";
+import { isDirectorySortBy } from "../core/directory-sort";
 export interface NavigationSnapshot {
   home: string;
   projects: ProjectSummary[];
@@ -56,6 +57,11 @@ export function readNavigationCache(
     items.length <= 100000 &&
     items.every((id) => typeof id === "string" && /^[\w-]{1,128}$/.test(id)) &&
     new Set(items).size === items.length;
+  const preferences = (
+    directory: ProjectSummary | NonNullable<ProjectSummary["folders"]>[number],
+  ) =>
+    (directory.sortBy === undefined || isDirectorySortBy(directory.sortBy)) &&
+    (directory.manualOrder === undefined || order(directory.manualOrder));
   if (
     (organization.projectOrder !== undefined &&
       !order(organization.projectOrder)) ||
@@ -80,6 +86,7 @@ export function readNavigationCache(
         !date(project.updatedAt) ||
         !optionalBoolean(project.pinned) ||
         !optionalBoolean(project.archived) ||
+        !preferences(project) ||
         (project.folders !== undefined &&
           (!Array.isArray(project.folders) ||
             project.folders.some(
@@ -91,6 +98,7 @@ export function readNavigationCache(
                   typeof folder.parentId !== "string") ||
                 typeof folder.pinned !== "boolean" ||
                 typeof folder.archived !== "boolean" ||
+                !preferences(folder) ||
                 !date(folder.createdAt) ||
                 !date(folder.updatedAt),
             ))),

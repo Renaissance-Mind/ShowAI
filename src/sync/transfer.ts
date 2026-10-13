@@ -13,6 +13,8 @@ import type {
 import { CoreError } from "../core/model";
 import { canonicalJson } from "../core/diff";
 import { previewPageMerge } from "../core/page-merge";
+import { mergeFolders } from "../core/folder-merge";
+import type { FolderMetadata } from "../core/model";
 import { parseArtifact, serializeArtifact } from "../portable/validation.mjs";
 import { validatePackageBundle } from "../core/catalog";
 import { validateReaderClosure } from "./dependency-validation";
@@ -366,6 +368,16 @@ export function mergeProjectFiles(
         ...Object.keys(ours),
         ...Object.keys(theirs),
       ])) {
+        if (key === "folders") {
+          const folders = mergeFolders(
+            (original[key] ?? []) as FolderMetadata[],
+            (ours[key] ?? []) as FolderMetadata[],
+            (theirs[key] ?? []) as FolderMetadata[],
+          );
+          result[key] = folders.folders;
+          conflict ||= folders.conflict;
+          continue;
+        }
         if (
           ["updatedAt", "sourceDirectory", "binding", "bindings"].includes(key)
         ) {

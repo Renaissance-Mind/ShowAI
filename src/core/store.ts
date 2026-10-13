@@ -35,6 +35,11 @@ import { pageSummaries } from "./page-summaries";
 import { WorkspaceProtection } from "./workspace-conflicts";
 import { orderSidebarItems, placeSidebarItem } from "./sidebar-order";
 import {
+  directoryEntries,
+  isDirectorySortBy,
+  sortDirectoryItems,
+} from "./directory-sort";
+import {
   workspaceRoot,
   versionedLibrary,
   logicalPath,
@@ -47,6 +52,8 @@ import {
 } from "./library-runtime";
 import type {
   ApplyPageInput,
+  DirectoryPreferences,
+  DirectorySortBy,
   FolderMetadata,
   PageDiff,
   PageRecord,
@@ -132,6 +139,20 @@ function validateName(name: string): string {
   return name.trim();
 }
 
+function validateDirectoryPreferences(value: DirectoryPreferences): void {
+  if (value.sortBy !== undefined && !isDirectorySortBy(value.sortBy))
+    throw new CoreError("INVALID_DATA", "Invalid directory sort mode.");
+  if (value.manualOrder !== undefined) {
+    if (
+      !Array.isArray(value.manualOrder) ||
+      value.manualOrder.length > 100000 ||
+      new Set(value.manualOrder).size !== value.manualOrder.length
+    )
+      throw new CoreError("INVALID_DATA", "Invalid directory manual order.");
+    value.manualOrder.forEach(assertId);
+  }
+}
+
 function validateProject(value: unknown, expectedId: string): ProjectMetadata {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new CoreError("INVALID_DATA", "Invalid project metadata.");
@@ -148,6 +169,7 @@ function validateProject(value: unknown, expectedId: string): ProjectMetadata {
       `Invalid project metadata: ${expectedId}.`,
     );
   validateName(project.name);
+  validateDirectoryPreferences(project);
   if (project.icon !== undefined)
     validatePageIcon(project.icon, "project.icon");
   if (
@@ -181,6 +203,7 @@ function validateProject(value: unknown, expectedId: string): ProjectMetadata {
       throw new CoreError("INVALID_DATA", "Invalid folder metadata.");
     assertId(folder.id);
     validateName(folder.name);
+    validateDirectoryPreferences(folder);
     if (ids.has(folder.id))
       throw new CoreError("INVALID_DATA", `Duplicate folder id: ${folder.id}`);
     ids.add(folder.id);
@@ -569,19 +592,13 @@ export class FileStore {
         includeArchived: false,
       });
       const folders = await this.listFolders(destinationProjectId);
-      const entries = orderSidebarItems(
-        [
-          ...folders.map((item) => ({
-            id: item.id,
-            parentId: item.parentId,
-            pinned: item.pinned,
-          })),
-          ...pages.map((item) => ({
-            id: item.id,
-            parentId: item.parentId,
-            pinned: item.favorite,
-          })),
-        ].sort((a, b) => Number(b.pinned) - Number(a.pinned)),
+      const preferences =
+        parentId === null
+          ? destination
+          : folders.find((folder) => folder.id === parentId)!;
+      const entries = sortDirectoryItems(
+        directoryEntries(folders, pages),
+        preferences,
         sidebar.entryOrder?.[destinationProjectId],
       );
       if (
@@ -700,6 +717,14 @@ export class FileStore {
           }
         }
       }
+      if (input.reorderOnly || relativeId || preferences.sortBy === "manual")
+        await this.withLock(`project-${destinationProjectId}`, async () => {
+          const current = await this.readProject(destinationProjectId);
+          await this.writeDirectoryPreferences(current, parentId, {
+            sortBy: "manual",
+            manualOrder: ordered,
+          });
+        });
       sidebar.entryOrder ??= {};
       sidebar.entryOrder[destinationProjectId] = nextOrder;
       if (projectId !== destinationProjectId && sidebar.entryOrder[projectId])
@@ -975,6 +1000,43 @@ export class FileStore {
           .length,
       };
     });
+  }
+
+  async setDirectorySort(
+    projectId: string,
+    parentId: string | null,
+    sortBy: DirectorySortBy,
+  ): Promise<ProjectMetadata> {
+    assertId(projectId);
+    if (!isDirectorySortBy(sortBy))
+      throw new CoreError("INVALID_DATA", "Invalid directory sort mode.");
+    return this.withLock(`project-${projectId}`, async () => {
+      const project = await this.readProject(projectId);
+      requireActiveFolder(project, parentId);
+      return this.writeDirectoryPreferences(project, parentId, { sortBy });
+    });
+  }
+
+  private async writeDirectoryPreferences(
+    project: ProjectMetadata,
+    parentId: string | null,
+    preferences: DirectoryPreferences,
+  ): Promise<ProjectMetadata> {
+    const updated: ProjectMetadata =
+      parentId === null
+        ? { ...project, ...preferences }
+        : {
+            ...project,
+            folders: project.folders!.map((folder) =>
+              folder.id === parentId ? { ...folder, ...preferences } : folder,
+            ),
+          };
+    validateDirectoryPreferences(preferences);
+    await this.atomicWrite(
+      join(this.projectPath(project.id), "project.json"),
+      JSON.stringify(updated, null, 2),
+    );
+    return updated;
   }
 
   async bindProject(
@@ -1306,6 +1368,7 @@ export class FileStore {
       pages.push({
         id: record.document.id,
         title: record.document.title,
+        createdAt: record.document.createdAt,
         updatedAt: record.document.updatedAt,
         icon: record.document.icon,
         hash: record.hash,

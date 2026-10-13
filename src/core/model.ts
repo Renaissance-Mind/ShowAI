@@ -11,7 +11,15 @@ export interface ProjectBinding {
   sourceDirectory?: string;
 }
 
-export interface ProjectMetadata {
+export type DirectorySortBy = "name" | "createdAt" | "updatedAt" | "manual";
+
+export interface DirectoryPreferences {
+  /** Applies to the immediate children of this directory; omitted means updatedAt. */
+  sortBy?: DirectorySortBy;
+  manualOrder?: string[];
+}
+
+export interface ProjectMetadata extends DirectoryPreferences {
   format: "showai-project";
   version: 1;
   id: string;
@@ -28,7 +36,7 @@ export interface ProjectMetadata {
   folders?: FolderMetadata[];
 }
 
-export interface FolderMetadata {
+export interface FolderMetadata extends DirectoryPreferences {
   id: string;
   name: string;
   parentId: string | null;
@@ -81,6 +89,7 @@ export interface PageSummary {
   revision?: string;
   id: string;
   title: string;
+  createdAt: string;
   updatedAt: string;
   icon: string;
   hash: string;

@@ -48,6 +48,7 @@ import {
   LayoutTemplate,
   Loader2,
   MoreHorizontal,
+  ListOrdered,
   Plus,
   History,
   Upload,
@@ -59,6 +60,8 @@ import type {
   FolderMetadata,
   ProjectGroup,
   SidebarOrganization,
+  DirectoryPreferences,
+  DirectorySortBy,
 } from "../core/model";
 import type { DesktopInfo, DesktopChange } from "../desktop/bridge";
 import type { ShowArtifact, ShowDocument } from "../types";
@@ -88,6 +91,7 @@ import {
   LibraryContextMenu,
   type LibraryMenuPoint,
   type LibraryTarget,
+  type LibraryContextMenuItem,
 } from "./LibraryNavigation";
 import Dialog from "./Dialog";
 import PageIcon from "../components/PageIcon";
@@ -99,7 +103,12 @@ import {
   useLibraryDragController,
   type LibraryDrop,
 } from "./LibraryDrag";
-import { orderSidebarItems } from "../core/sidebar-order";
+import { placeSidebarItem } from "../core/sidebar-order";
+import {
+  directoryEntries,
+  directorySortOptions,
+  sortDirectoryItems,
+} from "../core/directory-sort";
 import { applySidebarReorder, type SidebarReorder } from "./sidebar-reorder";
 import { readSidebarExpansion, sidebarExpansionKey } from "./sidebar-state";
 import SidebarNavigation from "./SidebarNavigation";
@@ -1142,6 +1151,89 @@ export default function Studio() {
     if (!expandedProjects[id]) await loadProjectContents(id);
     setExpandedProjects((current) => ({ ...current, [id]: !current[id] }));
   }
+  function folderPreferences(
+    projectId: string,
+    parentId: string | null,
+  ): DirectoryPreferences {
+    const current = contents[projectId];
+    const saved =
+      parentId === null
+        ? projects.find((item) => item.id === projectId)
+        : current?.folders.find((item) => item.id === parentId);
+    let preferences: DirectoryPreferences = saved ?? {};
+    for (const move of pendingReorders.filter(
+      (move) =>
+        move.home === info?.home &&
+        move.projectId === projectId &&
+        move.parentId === parentId,
+    )) {
+      const entries = directoryEntries(
+        current?.folders ?? [],
+        current?.pages ?? [],
+      ).filter((item) => item.parentId === parentId);
+      if (
+        !entries.some((item) => item.id === move.id) ||
+        (move.relativeId &&
+          !entries.some((item) => item.id === move.relativeId))
+      )
+        continue;
+      preferences = {
+        sortBy: "manual",
+        manualOrder: placeSidebarItem(
+          sortDirectoryItems(
+            entries,
+            preferences,
+            savedOrganization.entryOrder?.[projectId],
+          ).map((item) => item.id),
+          move.id,
+          move.relativeId,
+          move.placement,
+        ),
+      };
+    }
+    return preferences;
+  }
+  async function changeDirectorySort(
+    target: LibraryTarget,
+    sortBy: DirectorySortBy,
+  ) {
+    await reorderQueue.current;
+    await desktop.invoke("directory:sort", {
+      expectedHome: info?.home,
+      projectId: target.projectId,
+      parentId: target.kind === "folder" ? target.id : null,
+      sortBy,
+    });
+    await refresh();
+  }
+  function directorySortMenuItems(
+    target: LibraryTarget,
+  ): LibraryContextMenuItem[] {
+    if (target.kind === "page") return [];
+    const preferences = folderPreferences(
+      target.projectId,
+      target.kind === "folder" ? target.id : null,
+    );
+    const sortBy = preferences.sortBy ?? "updatedAt";
+    const options: { value: DirectorySortBy; label: string }[] = [
+      ...directorySortOptions,
+      ...(sortBy === "manual" || preferences.manualOrder?.length
+        ? [{ value: "manual" as const, label: "手动顺序" }]
+        : []),
+    ];
+    return options.map((option, index) => ({
+      label: option.label,
+      checked: option.value === sortBy,
+      icon:
+        option.value === sortBy ? (
+          <Check size={15} />
+        ) : (
+          <ListOrdered size={15} />
+        ),
+      separatorBefore: index === 0,
+      onSelect: action(() => changeDirectorySort(target, option.value)),
+    }));
+  }
   async function moveProject(projectId: string, groupId: string | null) {
     await desktop.invoke("projects:group", { projectId, groupId });
     await refresh();
@@ -1152,13 +1244,13 @@ export default function Studio() {
     const current = contents[source.projectId];
     const home = info?.home;
     if (!current || !home) return;
-    const siblings = [
-      ...current.folders.map((item) => ({ ...item, pinned: !!item.pinned })),
-      ...current.pages.map((item) => ({ ...item, pinned: !!item.favorite })),
-    ]
-      .filter((item) => item.parentId === source.parentId)
-      .sort((a, b) => Number(b.pinned) - Number(a.pinned))
-      .map((item) => item.id);
+    const siblings = sortDirectoryItems(
+      directoryEntries(current.folders, current.pages).filter(
+        (item) => item.parentId === source.parentId,
+      ),
+      folderPreferences(source.projectId, source.parentId),
+      organization.entryOrder?.[source.projectId],
+    ).map((item) => item.id);
     const token = ++sidebarRevision.current;
     reorderCount.current++;
     setPendingReorders((pending) => [
@@ -1167,6 +1259,7 @@ export default function Studio() {
         token,
         home,
         projectId: source.projectId,
+        parentId: source.parentId,
         id: source.id,
         siblings,
         relativeId: drop.relativeId,
@@ -1192,6 +1285,7 @@ export default function Studio() {
         );
         if (sidebarHome.current === home) {
           setOrganization(saved);
+          await refresh();
           setNotice("已调整位置");
         }
       } catch (error) {
@@ -1429,11 +1523,11 @@ export default function Studio() {
     const current = contents[projectId];
     if (!current) return null;
     const folderIds = new Set(current.folders.map((item) => item.id));
-    const targets = orderSidebarItems<LibraryTarget>(
+    const targets = sortDirectoryItems(
       [
         ...current.folders
           .filter((item) => (item.parentId ?? null) === parentId)
-          .map((item) => folderTarget(item, projectId)),
+          .map((item) => ({ ...item, target: folderTarget(item, projectId) })),
         ...current.pages
           .filter(
             (item) =>
@@ -1441,10 +1535,16 @@ export default function Studio() {
                 ? item.parentId
                 : null) === parentId,
           )
-          .map((item) => pageTarget(item, projectId)),
-      ].sort((a, b) => Number(b.pinned) - Number(a.pinned)),
+          .map((item) => ({
+            ...item,
+            name: item.title || "无标题",
+            pinned: item.favorite,
+            target: pageTarget(item, projectId),
+          })),
+      ],
+      folderPreferences(projectId, parentId),
       organization.entryOrder?.[projectId],
-    );
+    ).map((item) => item.target);
     return targets.map((target) => (
       <div key={target.id}>
         <LibraryRow
@@ -1611,19 +1711,24 @@ export default function Studio() {
       item.name.toLowerCase().includes(query.toLowerCase()) &&
       (query || (item.parentId ?? null) === selectedFolder),
   );
-  const visibleEntries = orderSidebarItems(
+  const visibleEntries = sortDirectoryItems(
     [
       ...filteredFolders.map((item) => ({
         target: folderTarget(item, selectedProject!),
+        name: item.name,
+        pinned: item.pinned,
+        createdAt: item.createdAt,
         updatedAt: item.updatedAt,
       })),
       ...filteredPages.map((item) => ({
         target: pageTarget(item, selectedProject!),
+        name: item.title || "无标题",
+        pinned: item.favorite,
+        createdAt: item.createdAt,
         updatedAt: item.updatedAt,
       })),
-    ]
-      .sort((a, b) => Number(b.target.pinned) - Number(a.target.pinned))
-      .map((item) => ({ ...item, id: item.target.id })),
+    ].map((item) => ({ ...item, id: item.target.id })),
+    selectedProject ? folderPreferences(selectedProject, selectedFolder) : {},
     organization.entryOrder?.[selectedProject ?? ""],
   );
   const breadcrumbFolders: FolderMetadata[] = [];
@@ -3029,6 +3134,7 @@ export default function Studio() {
                   }),
                 ),
               },
+              ...directorySortMenuItems(contextMenu.target),
               ...(contextMenu.target.kind === "project"
                 ? [
                     {

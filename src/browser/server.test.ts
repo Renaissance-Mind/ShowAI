@@ -32,6 +32,47 @@ import type { DesktopInfo, DesktopResponse } from "../desktop/bridge";
 import type { LoadedPage } from "../studio/usePage";
 import { blankDocument } from "../core/catalog";
 import type { CompiledComponent } from "../components/custom/types";
+import type { ProjectMetadata } from "../core/model";
+
+test("directory sort choices persist through the real workbench action at the selected folder only", async () => {
+  const project = await invoke<{ id: string }>("projects:create", {
+    name: "Sort actions",
+  });
+  const folder = await invoke<{ id: string }>("folders:create", {
+    projectId: project.id,
+    name: "Folder",
+  });
+  const other = await invoke<{ id: string }>("folders:create", {
+    projectId: project.id,
+    name: "Other",
+  });
+  await invoke("directory:sort", {
+    projectId: project.id,
+    parentId: null,
+    sortBy: "name",
+  });
+  const saved = await invoke<ProjectMetadata>("directory:sort", {
+    projectId: project.id,
+    parentId: folder.id,
+    sortBy: "createdAt",
+  });
+  expect(saved.sortBy).toBe("name");
+  expect(saved.folders!.find((item) => item.id === folder.id)?.sortBy).toBe(
+    "createdAt",
+  );
+  expect(
+    saved.folders!.find((item) => item.id === other.id)?.sortBy,
+  ).toBeUndefined();
+  const listed = await invoke<ProjectMetadata[]>("projects:list");
+  expect(listed.find((item) => item.id === project.id)).toMatchObject(saved);
+  await expect(
+    invoke("directory:sort", {
+      projectId: project.id,
+      parentId: folder.id,
+      sortBy: "invalid",
+    }),
+  ).rejects.toMatchObject({ code: "INVALID_DATA" });
+});
 
 test("sidebar moves preserve project-local components and export after a cross-project move", async () => {
   const a = await invoke<{ id: string }>("projects:create", {

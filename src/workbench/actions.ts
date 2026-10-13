@@ -29,6 +29,7 @@ import { AgentService } from "../agent/service";
 import { assertExportDestination, exportPage } from "../agent/exporter";
 import { assertId, CoreError, FileStore } from "../core/store";
 import type { PageRecord, ProjectBinding } from "../core/model";
+import { isDirectorySortBy } from "../core/directory-sort";
 import {
   getComponent,
   blankDocument,
@@ -139,6 +140,7 @@ export const workbenchActions = new Set([
   "sidebar:get",
   "sidebar:moveProject",
   "sidebar:moveEntry",
+  "directory:sort",
   "groups:create",
   "groups:rename",
   "groups:remove",
@@ -704,6 +706,15 @@ export function createWorkbench(
       }
       case "sidebar:get":
         return store.readSidebar();
+      case "directory:sort": {
+        if (!isDirectorySortBy(args.sortBy))
+          throw new CoreError("INVALID_DATA", "Invalid directory sort mode.");
+        return store.setDirectorySort(
+          projectId(args),
+          parentFolder(args),
+          args.sortBy,
+        );
+      }
       case "sidebar:moveProject": {
         const placement = args.placement ?? "before";
         if (placement !== "before" && placement !== "after")
@@ -1386,6 +1397,7 @@ export function createWorkbench(
   const mutationActions = new Set([
     "sidebar:moveProject",
     "sidebar:moveEntry",
+    "directory:sort",
     "library:prepareImport",
     "library:activateImport",
     "page:mergeSave",

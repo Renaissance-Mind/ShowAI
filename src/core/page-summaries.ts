@@ -51,7 +51,7 @@ async function build(library: GitLibrary, revision: string) {
     if (
       previous &&
       (previous.format !== "showai-page-summaries" ||
-        previous.version !== 1 ||
+        previous.version !== 2 ||
         !previous.entries ||
         previous.integrity !== digest([previous.revision, previous.entries]))
     )
@@ -100,6 +100,7 @@ async function build(library: GitLibrary, revision: string) {
       ? {
           id: document.id,
           title: document.title,
+          createdAt: document.createdAt,
           updatedAt: document.updatedAt,
           icon: document.icon,
           hash: documentHash(document),
@@ -121,7 +122,7 @@ async function build(library: GitLibrary, revision: string) {
   }
   const cache: SummaryCache = {
     format: "showai-page-summaries",
-    version: 1,
+    version: 2,
     revision,
     entries,
     integrity: digest([revision, entries]),
