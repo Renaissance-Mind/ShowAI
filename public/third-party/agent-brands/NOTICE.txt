@@ -4,11 +4,12 @@ The image files live in src/studio/assets/agent-brands/ and identify the
 Agent tools and model sources that ShowAI can connect to.
 
 codex.svg, claude-code.svg, gemini-cli.svg, opencode.svg, openai.svg,
-openrouter.svg and deepseek.svg are from LobeHub Icons:
+openrouter.svg, deepseek.svg and kimi.svg are from LobeHub Icons:
 https://github.com/lobehub/lobe-icons
 They are distributed under the MIT license in LICENSE.lobe-icons.txt.
 
-kimi.png is the official Kimi logo. See NOTICE.kimi-logo.txt for its source.
-The same artwork identifies Moonshot model sources.
+kimi.svg is kimi-color.svg from @lobehub/icons-static-svg 1.95.1 with the
+letter drawn in black so it remains visible on the light icon tile. It also
+identifies Moonshot model sources.
 
 Brand names and marks belong to their respective owners.

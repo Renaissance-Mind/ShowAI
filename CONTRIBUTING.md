@@ -91,6 +91,10 @@ Then start a new agent conversation to load the updated skills. If you change a 
 
 Use [GitHub Issues](https://github.com/Renaissance-Mind/ShowAI/issues). For bugs, include your platform, ShowAI version or commit, whether you used the desktop or browser workbench, reproduction steps, and the expected and actual results.
 
+## Code of conduct
+
+Participation in this project is covered by the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## License
 
 By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE).

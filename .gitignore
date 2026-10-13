@@ -43,6 +43,7 @@ plugins/showai/scripts/cli.mjs
 /presentations/**/references/design-contact-sheet.png
 !/README.md
 !/CONTRIBUTING.md
+!/CODE_OF_CONDUCT.md
 !/.github/PULL_REQUEST_TEMPLATE.md
 !/docs/README.md
 !/docs/agent-host.md

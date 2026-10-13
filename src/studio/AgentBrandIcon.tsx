@@ -1,6 +1,6 @@
 import { Settings2 } from "../ui/icons";
 import codex from "./assets/agent-brands/codex.svg";
-import kimi from "./assets/agent-brands/kimi.png";
+import kimi from "./assets/agent-brands/kimi.svg";
 import claude from "./assets/agent-brands/claude-code.svg";
 import gemini from "./assets/agent-brands/gemini-cli.svg";
 import opencode from "./assets/agent-brands/opencode.svg";
