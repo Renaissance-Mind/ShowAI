@@ -88,6 +88,7 @@ interface Runtime {
   readOnly: boolean;
   printing: boolean;
   pageWidthModes: boolean;
+  onHandwriting?: (boardId: string, document: ShowDocument) => Promise<void>;
   selected: string | null;
   select: (id: string | null) => void;
   inspect: (id: string | null) => void;
@@ -132,6 +133,7 @@ export function ContainerRuntime({
   onControlsChange,
   retainedState,
   inspectorHost,
+  onHandwriting,
 }: {
   document: ContainerDocument;
   geometry?: SurfaceGeometryStore;
@@ -154,6 +156,7 @@ export function ContainerRuntime({
   onControlsChange?: (controls: EditorControls | null) => void;
   retainedState?: ContainerViewState;
   inspectorHost?: HTMLElement | null;
+  onHandwriting?: (boardId: string, document: ShowDocument) => Promise<void>;
 }) {
   const t = useTranslator(messages);
   const document = useMemo(
@@ -359,6 +362,7 @@ export function ContainerRuntime({
     readOnly: !onChange,
     printing,
     pageWidthModes,
+    onHandwriting,
     selected,
     select,
     inspect,
@@ -1374,6 +1378,11 @@ function ContainerView({
                   >
                     <LockKeyhole size={15} />
                   </button>
+                  {runtime.onHandwriting && (
+                    <button type="button" aria-label="Apple Pencil 手写" title="Apple Pencil 手写" onClick={() => void runtime.onHandwriting?.(id, runtime.geometry.materialize(runtime.current.current))}>
+                      <Pencil size={15} aria-hidden="true" />
+                    </button>
+                  )}
                 </>
               )}
             </>

@@ -168,7 +168,8 @@ describe("publication and component delivery", () => {
     expect((await listPublishedComponents(f.home))[0].ref.integrity).toBe(
       f.component.integrity,
     );
-    const latest = (await library.history({ limit: 1 }))[0];
+    // The current state entry describes the single commit that published both.
+    const latest = await library.entryAt((await library.head())!);
     expect(latest.parents).toEqual([before]);
     expect(
       latest.paths.some((path) =>

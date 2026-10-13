@@ -35,7 +35,11 @@ import {
   Settings2,
   FileText,
 } from "../ui/icons";
-import { useSurfaceViewport } from "./useSurfaceViewport";
+import {
+  useSurfaceViewport,
+  useViewportScale,
+  type ViewportScale,
+} from "./useSurfaceViewport";
 import {
   useViewportLock,
   ViewportLockButton,
@@ -443,7 +447,10 @@ export default function PageSurface({
     <ObjectContext.Provider
       value={{
         componentActionsHost,
-        scale,
+        // Read live so zoom frames do not re-render every object.
+        get scale() {
+          return camera.current.scale;
+        },
         geometry,
         selected,
         select: onTransform ? board.select : onSelect,
@@ -1254,31 +1261,7 @@ export default function PageSurface({
             <Focus size={15} />
           </button>
           <span className="surface-toolbar-divider" />
-          <button
-            type="button"
-            aria-label={t("board.zoomOut")}
-            disabled={locked || scale <= 0.25}
-            onClick={() => controls.current.zoom(scale / 1.2)}
-          >
-            <Minus size={15} />
-          </button>
-          <button
-            type="button"
-            className="surface-zoom"
-            aria-label={t("board.resetZoom")}
-            disabled={locked}
-            onClick={() => controls.current.zoom(1)}
-          >
-            {Math.round(scale * 100)}%
-          </button>
-          <button
-            type="button"
-            aria-label={t("board.zoomIn")}
-            disabled={locked || scale >= 2}
-            onClick={() => controls.current.zoom(scale * 1.2)}
-          >
-            <Plus size={15} />
-          </button>
+          <ZoomControls scale={scale} controls={controls} locked={locked} />
           <fieldset className="surface-extra-actions" disabled={locked}>
             {extraActions}
           </fieldset>
@@ -1316,5 +1299,47 @@ export default function PageSurface({
         </div>
       </div>
     </ObjectContext.Provider>
+  );
+}
+
+function ZoomControls({
+  scale: store,
+  controls,
+  locked,
+}: {
+  scale: ViewportScale;
+  controls: ReturnType<typeof useSurfaceViewport>["controls"];
+  locked: boolean;
+}) {
+  const scale = useViewportScale(store);
+  const t = useTranslator(messages);
+  return (
+    <>
+      <button
+        type="button"
+        aria-label={t("board.zoomOut")}
+        disabled={locked || scale <= 0.25}
+        onClick={() => controls.current.zoom(scale / 1.2)}
+      >
+        <Minus size={15} />
+      </button>
+      <button
+        type="button"
+        className="surface-zoom"
+        aria-label={t("board.resetZoom")}
+        disabled={locked}
+        onClick={() => controls.current.zoom(1)}
+      >
+        {Math.round(scale * 100)}%
+      </button>
+      <button
+        type="button"
+        aria-label={t("board.zoomIn")}
+        disabled={locked || scale >= 2}
+        onClick={() => controls.current.zoom(scale * 1.2)}
+      >
+        <Plus size={15} />
+      </button>
+    </>
   );
 }

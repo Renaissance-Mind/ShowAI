@@ -20,7 +20,7 @@ const context = () => ({
   actor: { kind: "human" as const },
   channel: "desktop" as const,
 });
-it("pins indexed reads to their requested revision through changes, removals and shared asset decoding", async () => {
+it("reads current content and per-resource tokens through changes, removals and shared asset decoding", async () => {
   const { library: a } = await library(),
     { library: b } = await library();
   const path = "projects/project-a/settings.json",
@@ -45,13 +45,17 @@ it("pins indexed reads to their requested revision through changes, removals and
     context(),
   );
   const third = (await a.head())!;
-  expect(JSON.parse((await a.readFile(path, first)).toString())).toEqual({
+  expect(JSON.parse((await a.readFile(path)).toString())).toEqual({
     value: "A",
     image,
   });
-  expect(JSON.parse((await a.readFile(path, second)).toString()).value).toBe(
-    "B",
+  expect(JSON.parse((await a.readFile(path, third)).toString()).value).toBe(
+    "A",
   );
+  // Superseded states are not retained.
+  await expect(a.readFile(path, second)).rejects.toMatchObject({
+    code: "NOT_FOUND",
+  });
   expect((await a.resourceRevisions([path, other], third)).get(path)).toBe(
     third,
   );
@@ -67,9 +71,10 @@ it("pins indexed reads to their requested revision through changes, removals and
   );
   await a.writeFiles(new Map([[path, null]]), context());
   await expect(a.readFile(path)).rejects.toMatchObject({ code: "NOT_FOUND" });
-  expect(JSON.parse((await a.readFile(path, first)).toString()).image).toBe(
-    image,
+  expect(JSON.parse((await a.readFile(other)).toString()).value).toBe(
+    "unrelated",
   );
+  expect((await a.resourceRevisions([other])).get(other)).toBe(first);
   expect(await a.readFiles([])).toEqual(new Map());
   await expect(a.readFile("projects/../secret")).rejects.toMatchObject({
     code: "INVALID_PATH",
@@ -102,11 +107,10 @@ it("keeps returned trees and bytes isolated and detects corruption on repeated r
     code: "INVALID_DATA",
   });
 });
-it("reuses an immutable object at new paths while retaining both historical revisions", async () => {
+it("reuses an immutable object at new paths", async () => {
   const { library: a } = await library();
   const bytes = Buffer.from("reusable content ".repeat(20000));
   await a.writeFiles(new Map([["assets/first", bytes]]), context());
-  const first = (await a.head())!;
   await a.writeFiles(
     new Map([
       ["assets/second", bytes],
@@ -115,7 +119,7 @@ it("reuses an immutable object at new paths while retaining both historical revi
     context(),
   );
   expect((await a.objectStatistics()).packedObjects).toBe(1);
-  expect(await a.readFile("assets/first", first)).toEqual(bytes);
+  expect(await a.readFile("assets/first")).toEqual(bytes);
   expect(await a.readFile("assets/second")).toEqual(bytes);
   await a.verify();
 });

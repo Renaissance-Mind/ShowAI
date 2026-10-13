@@ -74,6 +74,8 @@ export interface PageSessionOptions {
   invoke<T>(action: string, args?: Record<string, unknown>): Promise<T>;
   saveDelayMs?: number;
   draftDelayMs?: number;
+  /** Lets navigation reflect a save without refetching after its file echo. */
+  onSaved?(projectId: string, record: LoadedPage): void;
 }
 
 function pageContentKey(document: ShowDocument): string {
@@ -422,6 +424,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
           operations.current.delete(sequence);
           savedRevision.current = sequence;
           setRecord(saved);
+          if (projectRef.current) options.onSaved?.(projectRef.current, saved);
           if (revision.current === sequence) {
             const keys = (value: ShowDocument) =>
               JSON.stringify([value.content, value.layout, value.surfaceViews]);

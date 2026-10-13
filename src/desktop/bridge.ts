@@ -39,6 +39,7 @@ export interface DesktopWindowState {
 export type DesktopAppearance = "light" | "dark";
 
 export interface ShowAIBridge {
+  handwrite?(args: { projectId: string; pageId: string; boardId: string }): Promise<import("../types").ShowDocument>;
   openWindow?(
     args: Record<string, unknown>,
     prepare: () => Promise<boolean>,

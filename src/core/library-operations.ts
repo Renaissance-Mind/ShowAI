@@ -508,7 +508,9 @@ export class LibraryOperations {
     }
     const context = {
       ...changeContext(),
-      restoredFrom: historical.sourceRevision,
+      restoredFrom: input.importedSnapshot
+        ? (historical.revision ?? historical.sourceRevision)
+        : historical.sourceRevision,
       restoredSnapshot: input.importedSnapshot,
       message: changeContext().message ?? "Restore page version",
     };
@@ -620,12 +622,15 @@ export class LibraryOperations {
       !/^[a-f0-9]{64}$/.test(ref.snapshotId)
     )
       throw new CoreError("INVALID_DATA", "Invalid imported snapshot path.");
+    // Imported snapshots are immutable files in the current state; the import
+    // revision itself is superseded by later saves and no longer readable.
+    const current = await this.library.head();
+    if (!current)
+      throw new CoreError("NOT_FOUND", "The content library is empty.");
     const document = normalizeDocument(
       parseArtifact(
         JSON.parse(
-          (await this.library.readFile(path, snapshot.sourceRevision)).toString(
-            "utf8",
-          ),
+          (await this.library.readFile(path, current)).toString("utf8"),
         ),
       ).document,
     );
@@ -637,19 +642,15 @@ export class LibraryOperations {
         "INVALID_DATA",
         "Imported page content differs from its manifest.",
       );
-    const closure = await this.dependencies(
-      document,
-      projectId,
-      snapshot.sourceRevision,
-    );
-    const reader = await this.readerAt(path, snapshot.sourceRevision);
+    const closure = await this.dependencies(document, projectId, current);
+    const reader = await this.readerAt(path, current);
     return {
       document,
       components: closure.components,
       hash: documentHash(document),
       path: join(this.library.workspace, path),
       revision: snapshot.sourceRevision,
-      sourceRevision: snapshot.sourceRevision,
+      sourceRevision: current,
       ...(reader ? { reader: reader.ref } : {}),
     };
   }

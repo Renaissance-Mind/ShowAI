@@ -69,6 +69,7 @@ import {
   writeLibraryFiles,
   listLibraryDirectory,
   libraryFileInfo,
+  pinnedFileIdentity,
   libraryPaths,
   mutateLibrary,
   withLibrarySnapshot,
@@ -250,7 +251,6 @@ async function optionalStat(home: string, path: string) {
           isDirectory: () => info.directory,
           isFile: () => info.file,
           isSymbolicLink: () => false,
-          size: info.size,
         }
       : null;
   }
@@ -2039,17 +2039,7 @@ const compiledSize = (value: StoredComponent) =>
   Buffer.byteLength(value.inline?.script ?? "") +
   Buffer.byteLength(value.inline?.styles ?? "");
 async function componentIdentity(home: string, path: string) {
-  const snapshot = libraryReadSnapshot.getStore();
-  if (
-    snapshot?.root !== resolve(home) ||
-    !snapshot.revision ||
-    libraryMutations.getStore()
-  )
-    return;
-  const local = logicalPath(home, path);
-  return (await snapshot.library.tree(snapshot.revision)).find(
-    (entry) => entry.path === local,
-  )?.oid;
+  return pinnedFileIdentity(home, path);
 }
 async function readCompiled(
   home: string,

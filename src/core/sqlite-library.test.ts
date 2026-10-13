@@ -9,7 +9,7 @@ import {
   rename,
   writeFile,
 } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
 import { ContentLibrary } from "./content-library";
@@ -23,19 +23,58 @@ const clean: (() => Promise<unknown>)[] = [];
 afterEach(async () => {
   for (const done of clean.splice(0).reverse()) await done();
 });
-async function fixture(legacy = false) {
+async function fixture() {
   const base = process.env.SHOWAI_TEST_ROOT ?? tmpdir();
   await mkdir(base, { recursive: true });
   const root = await mkdtemp(join(base, "sqlite-library-"));
   clean.push(() => rm(root, { recursive: true }));
-  const library = legacy ? new GitLibrary(root) : new ContentLibrary(root);
+  const library = new ContentLibrary(root);
   await library.initialize();
   const store = new FileStore(root),
     project = await store.createProject({ name: "SQLite library" });
   const page = await store.createPage(project.id, { title: "Initial page" });
   return { root, library, store, project, page };
 }
-test("SQLite saves content, guarded resource revisions, author history and historical restore without Git", async () => {
+/**
+ * The first FileStore write activates SQLite on a legacy root, so legacy
+ * content is committed directly through the original Git library.
+ */
+async function legacyFixture() {
+  const base = process.env.SHOWAI_TEST_ROOT ?? tmpdir();
+  await mkdir(base, { recursive: true });
+  const root = await mkdtemp(join(base, "sqlite-library-"));
+  clean.push(() => rm(root, { recursive: true }));
+  const source = new FileStore(join(root, "..", `${basename(root)}-source`));
+  clean.push(() => rm(source.root, { recursive: true }));
+  const project = await source.createProject({ name: "SQLite library" });
+  const page = await source.createPage(project.id, { title: "Initial page" });
+  const library = new GitLibrary(root);
+  await library.initialize();
+  const projectPath = `projects/${project.id}/project.json`,
+    path = `projects/${project.id}/pages/${page.document.id}.json`;
+  await library.writeFiles(
+    new Map([
+      [projectPath, await readFile(join(source.root, projectPath))],
+      [path, await readFile(page.path)],
+    ]),
+    { actor: { kind: "human" }, channel: "desktop" },
+  );
+  const artifact = JSON.parse((await readFile(page.path)).toString());
+  artifact.document.title = "Before migration";
+  await library.writeFiles(
+    new Map([[path, Buffer.from(JSON.stringify(artifact))]]),
+    {
+      actor: {
+        kind: "agent",
+        harness: "codex",
+        sessionId: "01a11f62-833b-7dd1-9e4d-7fc66ca4dd16",
+      },
+      channel: "cli",
+    },
+  );
+  return { root, library, project, page, path };
+}
+test("SQLite saves current content with guarded resource revisions and author attribution without Git", async () => {
   const f = await fixture();
   expect((await f.library.manifest()).storage).toBe("sqlite");
   await expect(stat(join(f.root, "repository.git"))).rejects.toMatchObject({
@@ -69,15 +108,19 @@ test("SQLite saves content, guarded resource revisions, author history and histo
     ),
   ).rejects.toMatchObject({ code: "CONFLICT" });
   const path = `projects/${f.project.id}/pages/${f.page.document.id}.json`;
-  const history = await f.library.history({ path });
-  expect(history[0].actor.label).toBe("Author");
-  await f.library.restore([path], baseline!, {
-    actor: { kind: "human", label: "Author" },
-    channel: "desktop",
-  });
+  expect((await f.library.entryAt((await f.library.head())!)).actor.label).toBe(
+    "Author",
+  );
+  // Superseded revisions are not retained, so they cannot be restored.
+  await expect(
+    f.library.restore([path], baseline!, {
+      actor: { kind: "human", label: "Author" },
+      channel: "desktop",
+    }),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
   expect(
     (await f.store.readPage(f.project.id, f.page.document.id)).document.title,
-  ).toBe("Initial page");
+  ).toBe("Saved SQLite page");
   await f.library.compact();
   await f.library.verify();
 });
@@ -112,6 +155,17 @@ test("operation retries return their original response and reject reused IDs wit
       (page) => page.title === "Idempotent page",
     ),
   ).toHaveLength(1);
+  await f.store.createPage(f.project.id, { title: "Newer edit" });
+  const head = await f.library.head();
+  await expect(
+    f.library.transaction(context, () =>
+      f.store.createPage(f.project.id, { title: "Must not be created" }),
+    ),
+  ).rejects.toMatchObject({
+    code: "CONFLICT",
+    message: expect.stringMatching(/newer edits/),
+  });
+  expect(await f.library.head()).toBe(head);
 });
 test("a committed SQLite operation recovers its projection and preserves concurrent external bytes", async () => {
   const f = await fixture(),
@@ -167,40 +221,39 @@ test("a committed SQLite operation recovers its projection and preserves concurr
   ).toBe(true);
 });
 test("legacy Git content and operation history migrate losslessly into SQLite", async () => {
-  const f = await fixture(true),
-    path = `projects/${f.project.id}/pages/${f.page.document.id}.json`;
-  const prior = await f.store.readPage(f.project.id, f.page.document.id);
-  const changed = structuredClone(prior.document);
-  changed.title = "Before migration";
-  await f.store.savePage(
-    f.project.id,
-    f.page.document.id,
-    changed,
-    prior.hash,
-    prior.revision,
-  );
+  const f = await legacyFixture(),
+    path = f.path,
+    store = new FileStore(f.root);
   const history = await f.library.history({ limit: 1000 }),
     head = await f.library.head(),
-    bytes = await f.library.readFile(path);
+    bytes = await f.library.readFile(path),
+    original = await f.library.readFile(path, history.at(-1)!.revision);
   const manifest = await new ContentLibrary(f.root).initialize();
   expect(manifest.id).toBe((await f.library.manifest()).id);
   expect(manifest.storage).toBe("sqlite");
   const sqlite = new ContentLibrary(f.root);
   expect(await sqlite.head()).toBe(head);
-  expect(await sqlite.history({ limit: 1000 })).toEqual(history);
+  // Current storage exposes no history; the migrated records stay archived.
+  expect(await sqlite.history({ limit: 1000 })).toEqual([]);
+  expect(await new SqliteLibrary(f.root).history({ limit: 1000 })).toEqual(
+    history,
+  );
   expect(await sqlite.readFile(path)).toEqual(bytes);
+  expect(
+    await new SqliteLibrary(f.root).readFile(path, history.at(-1)!.revision),
+  ).toEqual(original);
   await sqlite.verify();
-  const updated = structuredClone(changed);
-  updated.title = "After migration";
-  await f.store.savePage(
+  const current = await store.readPage(f.project.id, f.page.document.id);
+  expect(current.document.title).toBe("Before migration");
+  await store.savePage(
     f.project.id,
     f.page.document.id,
-    updated,
-    (await f.store.readPage(f.project.id, f.page.document.id)).hash,
-    head ?? undefined,
+    { ...current.document, title: "After migration" },
+    current.hash,
+    current.revision,
   );
   expect(
-    (await f.store.readPage(f.project.id, f.page.document.id)).document.title,
+    (await store.readPage(f.project.id, f.page.document.id)).document.title,
   ).toBe("After migration");
   await expect(stat(join(f.root, "repository.git"))).rejects.toMatchObject({
     code: "ENOENT",
@@ -241,7 +294,7 @@ test("corrupt SQLite objects are reported while readable workspace files remain 
   expect(await readFile(join(f.root, "workspace", path))).toEqual(projection);
 });
 test("migration resumes a durable copied prefix and a history directory installed before its marker", async () => {
-  const f = await fixture(true),
+  const f = await legacyFixture(),
     entries = (await f.library.history({ limit: 1000 })).reverse(),
     sourceHead = await f.library.head(),
     manifest = await f.library.manifest();
@@ -254,7 +307,8 @@ test("migration resumes a durable copied prefix and a history directory installe
       (await f.library.tree(first.revision)).map((entry) => entry.path),
       first.revision,
     );
-  await staged.commit(first, bytes, null);
+  // Migration copies legacy entries into the retained archive.
+  await staged.commit(first, bytes, null, true);
   await writeFile(
     join(directory, "migration.json"),
     JSON.stringify({
@@ -267,7 +321,7 @@ test("migration resumes a durable copied prefix and a history directory installe
     }),
   );
   await migrateGitContent(f.root);
-  expect(await new ContentLibrary(f.root).history({ limit: 1000 })).toEqual(
+  expect(await new SqliteLibrary(f.root).history({ limit: 1000 })).toEqual(
     [...entries].reverse(),
   );
   expect(await readdir(join(f.root, "local/migrations"))).toEqual([id]);
@@ -289,7 +343,7 @@ test("migration resumes a durable copied prefix and a history directory installe
   );
 }, 60_000);
 test("startup finishes archiving the original after the SQLite marker has already committed", async () => {
-  const f = await fixture(true);
+  const f = await legacyFixture();
   await migrateGitContent(f.root);
   const id = (await readdir(join(f.root, "local/migrations")))[0],
     directory = join(f.root, "local/migrations", id),

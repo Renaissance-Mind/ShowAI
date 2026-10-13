@@ -379,10 +379,12 @@ export class LibraryImport {
           throw error;
         },
       );
-      gzip = await (staged ? prepared : new GitLibrary(this.root)).readFile(
-        `imports/${id}/originals/${entry.sha256}.gz`,
-        report.revision,
-      );
+      // Retained originals are immutable; after activation, later saves
+      // supersede the import revision, so read the current state instead.
+      const retained = `imports/${id}/originals/${entry.sha256}.gz`;
+      gzip = staged
+        ? await prepared.readFile(retained, report.revision)
+        : await new GitLibrary(this.root).readFile(retained);
     }
     const bytes = gunzipSync(gzip, {
       maxOutputLength: Math.max(entry.bytes, 1),

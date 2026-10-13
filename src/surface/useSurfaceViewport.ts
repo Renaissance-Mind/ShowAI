@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useSyncExternalStore } from "react";
 import { EditorViewScope } from "../editor/view-scope";
 import { GESTURE_IDLE, normalizedWheel, zoomAt, type Camera } from "./model";
 import { translator } from "../i18n";
@@ -13,6 +13,33 @@ import {
   type SurfaceAnchor,
   type SurfaceRegion,
 } from "./physics";
+
+/** Zoom changes every gesture frame; only the zoom controls subscribe to it. */
+export interface ViewportScale {
+  get(): number;
+  subscribe(listener: () => void): () => void;
+}
+function viewportScale(): ViewportScale & { set(value: number): void } {
+  let value = 1;
+  const listeners = new Set<() => void>();
+  return {
+    get: () => value,
+    set(next) {
+      if (next === value) return;
+      value = next;
+      for (const listener of listeners) listener();
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+}
+export function useViewportScale(scale: ViewportScale) {
+  return useSyncExternalStore(scale.subscribe, scale.get, scale.get);
+}
 
 const editable = (target: EventTarget | null) =>
   target instanceof Element &&
@@ -100,7 +127,8 @@ export function useSurfaceViewport(
   const scrollRef = useRef<HTMLDivElement>(null);
   const worldRef = useRef<HTMLDivElement>(null);
   const camera = useRef<Camera>({ x: 0, y: 0, scale: 1 });
-  const [scale, setScale] = useState(1);
+  const scaleRef = useRef<ReturnType<typeof viewportScale> | null>(null);
+  const scale = (scaleRef.current ??= viewportScale());
   const controls = useRef({
     fit: (_ids?: string[], _immediate?: boolean) => {},
     focus: (_id: string, _immediate?: boolean) => {},
@@ -279,7 +307,7 @@ export function useSurfaceViewport(
           new Event("showai:viewport-change", { bubbles: true }),
         );
       world.style.transform = transform;
-      setScale(c.scale);
+      scale.set(c.scale);
     };
     const paint = () => {
       cancelAnimationFrame(frame);

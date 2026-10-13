@@ -39,6 +39,8 @@ export default function AutoHideSidebar({
 }) {
   const t = useTranslator(sidebarMessages);
   const appIcon = appIconForTheme(useAppearanceTheme());
+  const nativeTouch = document.documentElement.dataset.native === "ios";
+  const [nativeOpen, setNativeOpen] = useState(() => window.innerWidth > 650);
   const [locked, setLocked] = useState(
     () => localStorage.getItem("showai:sidebar-locked") === "true",
   );
@@ -75,8 +77,8 @@ export default function AutoHideSidebar({
     preferredWidth ?? (viewportWidth <= 1100 ? 208 : 240),
   );
   const sidebar = useRef<HTMLElement>(null);
-  const automatic = enabled && !locked && !focusWindow;
-  const mode = automatic ? position : "docked";
+  const automatic = enabled && !locked && !focusWindow && !nativeTouch;
+  const mode = nativeTouch ? nativeOpen ? viewportWidth <= 650 ? "overlay" : "docked" : "hidden" : automatic ? position : "docked";
   const hidden = mode === "hidden";
 
   const pointerIsInside = (point: { x: number; y: number }) => {
@@ -118,6 +120,7 @@ export default function AutoHideSidebar({
 
   useEffect(() => {
     setPosition("docked");
+    if (nativeTouch && enabled && window.innerWidth <= 650) setNativeOpen(false);
   }, [enabled, locked]);
 
   useEffect(() => {
@@ -211,7 +214,13 @@ export default function AutoHideSidebar({
     setHovered(true);
     if (hidden) setPosition("overlay");
   };
-  const lockLabel = locked ? t("unlockSidebar") : t("lockSidebar");
+  const lockLabel = nativeTouch
+    ? nativeOpen
+      ? t("collapseSidebar")
+      : t("expandSidebar")
+    : locked
+      ? t("unlockSidebar")
+      : t("lockSidebar");
   const focusNavigation = () => {
     window.requestAnimationFrame(() => {
       sidebar.current?.querySelector<HTMLButtonElement>("button")?.focus();
@@ -225,7 +234,7 @@ export default function AutoHideSidebar({
         {!focusWindow && (
           <div
             className="studio-topbar-brand"
-            style={{ width } as CSSProperties}
+            style={{ width: nativeTouch && viewportWidth <= 650 ? 56 : width } as CSSProperties}
             onPointerEnter={reveal}
             onPointerLeave={leave}
           >
@@ -242,6 +251,7 @@ export default function AutoHideSidebar({
                 title={lockLabel}
                 aria-pressed={locked}
                 onClick={() => {
+                  if (nativeTouch) { setNativeOpen(value => !value); return; }
                   const next = !locked;
                   localStorage.setItem("showai:sidebar-locked", String(next));
                   setLocked(next);

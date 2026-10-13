@@ -5,6 +5,8 @@ export default defineMessages("sidebar", {
   "zh-CN": {
     unlockSidebar: "解锁项目栏，打开文档后自动收起",
     lockSidebar: "锁定项目栏",
+    collapseSidebar: "收起项目栏",
+    expandSidebar: "展开项目栏",
     projectNavigation: "项目导航",
     resizeSidebar: "调整项目栏宽度",
     widthPixels: "{width} 像素",
@@ -50,6 +52,8 @@ export default defineMessages("sidebar", {
   en: {
     unlockSidebar: "Unlock sidebar (hide it when a document opens)",
     lockSidebar: "Lock sidebar",
+    collapseSidebar: "Collapse sidebar",
+    expandSidebar: "Expand sidebar",
     projectNavigation: "Project navigation",
     resizeSidebar: "Resize sidebar",
     widthPixels: "{width} pixels",

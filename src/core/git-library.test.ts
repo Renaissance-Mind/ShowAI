@@ -43,35 +43,36 @@ describe("transactional content library", () => {
     return Buffer.from(JSON.stringify(artifact));
   }
 
-  it("records A → B → A as three commits with author/session attribution and reusable content", async () => {
+  it("gives A → B → A distinct revisions and resource tokens while keeping only current content", async () => {
     const a = await library.writeFiles(new Map([[path, content("A")]]), human);
+    const tokenA = await library.resourceRevision(path);
     const b = await library.writeFiles(new Map([[path, content("B")]]), agent);
+    const tokenB = await library.resourceRevision(path);
+    expect((await library.entryAt(b!.revision)).actor).toEqual(agent.actor);
+    expect(b!.parents).toEqual([a!.revision]);
     const again = await library.writeFiles(
       new Map([[path, content("A")]]),
       human,
     );
+    const tokenAgain = await library.resourceRevision(path);
     expect(new Set([a!.revision, b!.revision, again!.revision]).size).toBe(3);
-    expect(await library.hasRevision(a!.revision)).toBe(true);
+    expect(new Set([tokenA, tokenB, tokenAgain]).size).toBe(3);
+    expect(await library.hasRevision(again!.revision)).toBe(true);
+    expect(await library.hasRevision(a!.revision)).toBe(false);
     expect(await library.hasRevision("0".repeat(40))).toBe(false);
     expect(await library.hasRevision("not-a-revision")).toBe(false);
-    expect(
-      await library.hasRevision((await library.tree(a!.revision))[0].oid),
-    ).toBe(false);
-    const history = await library.history({ path });
-    expect(history.map((entry) => entry.revision)).toEqual([
-      again!.revision,
-      b!.revision,
-      a!.revision,
-    ]);
-    expect(history[1].actor).toEqual(agent.actor);
-    expect(history[1].parents).toEqual([a!.revision]);
-    expect(await library.tree(a!.revision)).toEqual(
-      await library.tree(again!.revision),
+    expect(await library.hasRevision((await library.tree())[0].oid)).toBe(
+      false,
     );
+    expect((await library.entryAt(again!.revision)).actor).toEqual(human.actor);
+    expect(await library.history({ path })).toEqual([]);
+    await expect(library.readFile(path, b!.revision)).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
     expect(
-      JSON.parse((await library.readFile(path, b!.revision)).toString())
-        .document.content.content[0].content[0].text,
-    ).toBe("B");
+      JSON.parse((await library.readFile(path)).toString()).document.content
+        .content[0].content[0].text,
+    ).toBe("A");
     await library.verify();
   });
 
@@ -84,19 +85,19 @@ describe("transactional content library", () => {
       attrs: { id: "image-one", src: image },
     });
     page.document.cover = image;
-    const first = await library.writeFiles(
+    await library.writeFiles(
       new Map([[path, Buffer.from(JSON.stringify(page))]]),
       human,
     );
+    const before = await library.tree();
     page.document.content.content[0].content = [
       { type: "text", text: "New conclusion" },
     ];
-    const second = await library.writeFiles(
+    await library.writeFiles(
       new Map([[path, Buffer.from(JSON.stringify(page))]]),
       agent,
     );
-    const before = await library.tree(first!.revision);
-    const after = await library.tree(second!.revision);
+    const after = await library.tree();
     expect(
       after.filter((entry) => entry.path.startsWith("assets/")),
     ).toHaveLength(1);
@@ -132,10 +133,18 @@ describe("transactional content library", () => {
     expect(
       results.find((result) => result.status === "rejected"),
     ).toMatchObject({ reason: { code: "CONFLICT" } });
-    expect(await library.history({ path })).toHaveLength(2);
+    const winner = results.findIndex((result) => result.status === "fulfilled");
+    expect(await library.resourceRevision(path)).toBe(
+      (results[winner] as PromiseFulfilledResult<{ revision: string }>).value
+        .revision,
+    );
+    expect(
+      JSON.parse((await library.readFile(path)).toString()).document.content
+        .content[0].content[0].text,
+    ).toBe(winner === 0 ? "human" : "agent");
   });
 
-  it("restores as a new commit and preserves the changed version", async () => {
+  it("refuses to restore a superseded revision and keeps the current version", async () => {
     const first = await library.writeFiles(
       new Map([[path, content("old")]]),
       human,
@@ -144,21 +153,18 @@ describe("transactional content library", () => {
       new Map([[path, content("new")]]),
       agent,
     );
-    const restored = await library.restore(
-      [path],
-      first!.revision,
-      human,
-      new Map([[path, second!.revision]]),
-    );
-    expect(restored!.restoredFrom).toBe(first!.revision);
-    expect(restored!.parents).toEqual([second!.revision]);
+    await expect(
+      library.restore(
+        [path],
+        first!.revision,
+        human,
+        new Map([[path, second!.revision]]),
+      ),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(await library.head()).toBe(second!.revision);
     expect(
       JSON.parse((await library.readFile(path)).toString()).document.content
         .content[0].content[0].text,
-    ).toBe("old");
-    expect(
-      JSON.parse((await library.readFile(path, second!.revision)).toString())
-        .document.content.content[0].content[0].text,
     ).toBe("new");
   });
 
@@ -185,11 +191,15 @@ describe("transactional content library", () => {
         expected,
       ),
     ).toEqual(saved);
-    expect(await library.history()).toHaveLength(2);
+    expect(await library.head()).toBe(saved!.revision);
     await expect(
       library.writeFiles(new Map([[path, content("different")]]), context),
     ).rejects.toMatchObject({ code: "CONFLICT" });
-    expect(await library.history({ before: first!.revision })).toEqual([]);
+    expect(await library.head()).toBe(saved!.revision);
+    expect(
+      JSON.parse((await library.readFile(path)).toString()).document.content
+        .content[0].content[0].text,
+    ).toBe("changed");
   });
 
   it("retains unrelated resource writes, deletes removed nodes and compacts without losing history", async () => {

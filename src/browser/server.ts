@@ -1,5 +1,6 @@
 import { CAPACITY, formatBytes } from "../portable/capacity.mjs";
 import { changedResources } from "../core/change-notification";
+import { OwnWrites } from "../core/own-writes";
 import { ModelResourceClient } from "../sync/model-resources";
 import { createServer, type ServerResponse } from "node:http";
 import {
@@ -82,7 +83,11 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   let service = new AgentService({ root: store.root });
   const token = options.development?.token ?? randomBytes(32).toString("hex");
   const webRoot = await realpath(options.webRoot);
-  const clients = new Set<ServerResponse>();
+  const clients = new Map<ServerResponse, string>();
+  // A browser tab already holds the record of its own save; skip that echo for it.
+  const ownWrites = new OwnWrites();
+  const clientId = (value: unknown) =>
+    typeof value === "string" && /^[\w-]{1,100}$/.test(value) ? value : "";
   let timer: ReturnType<typeof setTimeout> | undefined;
   let watcher!: ReturnType<typeof watch>;
   let maintenance: MaintenanceScheduler | undefined;
@@ -100,15 +105,34 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     },
   });
   const notify = (type: "home" | "files", change?: DesktopChange) => {
-    for (const client of clients)
+    for (const client of clients.keys())
       client.write(
         `data: ${JSON.stringify({ type, home: store.root, ...change })}\n\n`,
       );
   };
+  async function deliverFiles(root: string, batch: string[]) {
+    const echoes = await ownWrites.echoes(batch);
+    if (root !== store.root) return;
+    for (const [client, id] of clients) {
+      const own = id ? echoes.get(id) : undefined;
+      const visible = own ? batch.filter((path) => !own.has(path)) : batch;
+      if (visible.length)
+        client.write(
+          `data: ${JSON.stringify({ ...changedResources(root, visible), type: "files", home: root })}\n\n`,
+        );
+    }
+    const change = changedResources(root, batch);
+    if (change.projectIds?.length || change.catalog || change.all)
+      syncManager(root).wake(
+        change.catalog || change.all ? undefined : change.projectIds,
+        !!(change.catalog || change.all),
+      );
+  }
   async function useHome(home: string) {
     await syncManager(store.root).stop();
     await maintenance?.stop();
     store = new FileStore(home);
+    ownWrites.clear();
     await openLibrary(store.root);
     service = new AgentService({ root: store.root });
     if (options.registerAgentRuntime !== false)
@@ -147,14 +171,11 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       if (timer) return;
       timer = setTimeout(() => {
         timer = undefined;
-        const change = changedResources(store.root, paths);
-        notify("files", change);
-        if (change.projectIds?.length || change.catalog || change.all)
-          syncManager(store.root).wake(
-            change.catalog || change.all ? undefined : change.projectIds,
-            !!(change.catalog || change.all),
-          );
+        const batch = [...paths];
         paths.clear();
+        void deliverFiles(store.root, batch).catch((error) =>
+          console.error("ShowAI file watcher:", error),
+        );
       }, 180);
     });
     watcher.on("error", (error) =>
@@ -382,7 +403,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
           response.write(
             `data: ${JSON.stringify({ type: "files", home: store.root })}\n\n`,
           );
-          clients.add(response);
+          clients.set(response, clientId(url.searchParams.get("client")));
           request.on("close", () => clients.delete(response));
           return;
         }
@@ -449,6 +470,10 @@ export async function startBrowserServer(options: BrowserServerOptions) {
               "Unknown action or invalid arguments.",
             );
           data = await invoke(action, args);
+          const saved = (data as { path?: unknown } | null)?.path;
+          const origin = clientId(request.headers["x-showai-client"]);
+          if (action === "pages:save" && origin && typeof saved === "string")
+            await ownWrites.record(origin, saved);
         } else {
           response.writeHead(404);
           response.end();
@@ -519,7 +544,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     }
   });
   const heartbeat = setInterval(() => {
-    for (const client of clients) client.write(": heartbeat\n\n");
+    for (const client of clients.keys()) client.write(": heartbeat\n\n");
   }, 15000);
   heartbeat.unref();
   try {
@@ -541,7 +566,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     clearTimeout(timer);
     await watcher.close();
     await maintenance?.stop();
-    for (const client of clients) client.end();
+    for (const client of clients.keys()) client.end();
     await new Promise<void>((done, reject) => {
       server.close((error) => (error ? reject(error) : done()));
       server.closeAllConnections();

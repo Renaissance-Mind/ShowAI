@@ -13,6 +13,7 @@ import {
 import { mutateLibrary } from "./library-runtime";
 import { withChangeContext } from "./history-context";
 import type { PageRecord } from "./model";
+import { ReadBaselines } from "./read-baselines";
 
 describe("shared history/search/restore operations", () => {
   let root: string,
@@ -34,7 +35,7 @@ describe("shared history/search/restore operations", () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  it("persists image icons through summaries, copies, history and removal without losing page content", async () => {
+  it("persists image icons through summaries, copies and removal without losing page content", async () => {
     const icon = "data:image/png;base64," + "a".repeat(20000);
     const saved = await store.savePage(
       projectId,
@@ -58,17 +59,17 @@ describe("shared history/search/restore operations", () => {
       operations: [{ type: "page.set", fields: { icon: "" } }],
     });
     expect(removed.document.icon).toBe("");
-    const restored = await operations.restorePage({
-      projectId,
-      pageId: page.document.id,
-      revision: saved.revision!,
-      baseRevision: removed.revision!,
+    expect(removed.document.content).toEqual(saved.document.content);
+    const again = await reopened.applyPage(projectId, page.document.id, {
+      baseHash: removed.hash,
+      baseRevision: removed.revision,
+      operations: [{ type: "page.set", fields: { icon } }],
     });
-    expect(restored.document.icon).toBe(icon);
-    expect(restored.document.content).toEqual(saved.document.content);
+    expect(again.document.icon).toBe(icon);
+    expect(again.document.content).toEqual(saved.document.content);
   });
 
-  it("reads history, searches and compares exact revisions while enforcing project scope", async () => {
+  it("searches and reads the current revision while enforcing project scope", async () => {
     const changed = await withChangeContext(
       {
         actor: {
@@ -94,6 +95,7 @@ describe("shared history/search/restore operations", () => {
     expect(
       (await operations.search({ query: "图表", projectId })).items,
     ).toHaveLength(1);
+    // Current storage records no history and keeps only the current revision.
     expect(
       (
         await operations.history({
@@ -102,22 +104,23 @@ describe("shared history/search/restore operations", () => {
           sessionId: "operations-session",
         })
       ).items,
-    ).toHaveLength(1);
+    ).toEqual([]);
     expect(
-      (
-        await operations.changes(page.revision!, changed.revision!, {
-          projectId,
-          pageId: page.document.id,
-        })
-      ).changes?.length ?? 0,
-    ).toBeGreaterThan(0);
-    expect(
-      (await operations.pageAt(projectId, page.document.id, page.revision!))
+      (await operations.pageAt(projectId, page.document.id, changed.revision!))
         .document,
-    ).toEqual(page.document);
+    ).toEqual(changed.document);
+    await expect(
+      operations.pageAt(projectId, page.document.id, page.revision!),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(
+      operations.changes(page.revision!, changed.revision!, {
+        projectId,
+        pageId: page.document.id,
+      }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
     const bound = new LibraryOperations(root, projectId);
     await expect(
-      bound.pageAt("other-project", page.document.id, page.revision!),
+      bound.pageAt("other-project", page.document.id, changed.revision!),
     ).rejects.toMatchObject({ code: "INVALID_PATH" });
     expect(() =>
       bound.history({
@@ -126,7 +129,7 @@ describe("shared history/search/restore operations", () => {
     ).toThrow("shared or foreign");
   });
 
-  it("restores missing compiled/source dependencies and keeps same-name current identities intact", async () => {
+  it("resolves exact compiled and source dependencies for the current revision", async () => {
     const saved = await mutateLibrary(root, async () => {
       const component = await importComponent(
         root,
@@ -161,28 +164,8 @@ describe("shared history/search/restore operations", () => {
       saved.revision!,
     );
     expect(historical.components).toHaveLength(1);
-    const packagePaths = (await library.tree())
-      .filter((entry) =>
-        entry.path.startsWith(`projects/${projectId}/packages/components/`),
-      )
-      .map((entry) => entry.path);
-    await library.writeFiles(
-      new Map(packagePaths.map((path) => [path, null])),
-      {
-        actor: { kind: "system" },
-        channel: "system",
-        message: "Remove current package files",
-      },
-    );
-    const restored = await operations.restorePage({
-      projectId,
-      pageId: page.document.id,
-      revision: saved.revision!,
-      baseRevision: saved.revision!,
-    });
-    expect(restored.revision).not.toBe(saved.revision);
     expect(
-      await resolveDocumentComponents(root, restored.document, projectId),
+      await resolveDocumentComponents(root, saved.document, projectId),
     ).toHaveLength(1);
     const ref = historical.components[0];
     expect(
@@ -192,18 +175,12 @@ describe("shared history/search/restore operations", () => {
         })
       ).source,
     ).toContain("export default");
-    expect(
-      (
-        await library.history({
-          path: `projects/${projectId}/pages/${page.document.id}.json`,
-          limit: 1,
-        })
-      )[0].restoredFrom,
-    ).toBe(saved.revision);
     await library.verify();
   });
 
   it("merges a draft against its base and refuses a stale reviewed merge", async () => {
+    // Agent reads retain the merge base; superseded revisions are not stored.
+    await new ReadBaselines(root).remember(projectId, page);
     const current = await store.savePage(
       projectId,
       page.document.id,

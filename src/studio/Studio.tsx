@@ -5,6 +5,9 @@ import {
   mergeNavigationProjects,
   retainEqual,
   mergeNavigationScope,
+  savedPageMoved,
+  withSavedPage,
+  withSavedProjectTime,
 } from "./navigation-refresh";
 import { readNavigationCache, writeNavigationCache } from "./navigation-cache";
 import { ComponentLibraryContext } from "../components/ComponentLibrary";
@@ -783,6 +786,27 @@ export default function Studio() {
       unsubscribe();
     };
   }, [refresh, loadCatalog, report]);
+  const contentsRef = useRef(contents);
+  contentsRef.current = contents;
+  // The host no longer echoes this window's own saves, so apply them here.
+  useEffect(
+    () =>
+      page.sessions.subscribeSaved((projectId, record) => {
+        if (savedPageMoved(contentsRef.current, projectId, record)) {
+          void refresh({
+            type: "files",
+            home: info?.home ?? "",
+            projectIds: [projectId],
+          }).catch(report);
+          return;
+        }
+        setContents((current) => withSavedPage(current, projectId, record));
+        setProjects((current) =>
+          withSavedProjectTime(current, projectId, record.document.updatedAt),
+        );
+      }),
+    [page.sessions, refresh, report, info?.home],
+  );
   useEffect(() => {
     if (["components", "templates"].includes(view) || catalogLoaded.current)
       void loadCatalog().catch(report);

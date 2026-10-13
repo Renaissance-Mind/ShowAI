@@ -1,5 +1,5 @@
 import { BlockActions, BlockSettings } from "./action-host";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, Download } from "../../ui/icons";
 import { BlockHeader, Field } from "./shared";
 import { GestureBoundary } from "./GestureBoundary";
@@ -22,6 +22,7 @@ const interactions: [string, MessageKey<typeof messages>][] = [
   ["brushFilter", "interaction.brushFilter"],
   ["legendFilter", "interaction.legendFilter"],
 ];
+const licenseAttribute = JSON.stringify(licenses);
 
 export function G2ChartBlock({
   chartType,
@@ -136,6 +137,11 @@ export function G2ChartBlock({
       current?.destroy();
     };
   }, [chartType, data, theme, lock.locked]);
+  // Editor commits re-render every block; serialize the raw view only on data changes.
+  const rawData = useMemo(
+    () => JSON.stringify(data.datasets, null, 2),
+    [data.datasets],
+  );
   const open = () => {
     baseline.current = JSON.stringify(data);
     setDraft(JSON.stringify(data, null, 2));
@@ -184,7 +190,7 @@ export function G2ChartBlock({
       className={"sb-block sb-g2-chart" + (theme === "dark" ? " is-dark" : "")}
       aria-label={text(data.title, t("chart"))}
       data-g2-type={chartType}
-      data-third-party-licenses={JSON.stringify(licenses)}
+      data-third-party-licenses={licenseAttribute}
     >
       <BlockHeader
         title={text(data.title)}
@@ -393,7 +399,7 @@ export function G2ChartBlock({
       </GestureBoundary>
       <details className="sb-data-details">
         <summary>{t("viewRawData")}</summary>
-        <pre>{JSON.stringify(data.datasets, null, 2)}</pre>
+        <pre>{rawData}</pre>
       </details>
     </section>
   );
