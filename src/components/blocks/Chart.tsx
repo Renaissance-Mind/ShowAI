@@ -15,7 +15,7 @@ import {
   text,
   toCsv,
 } from "./helpers";
-import { BlockHeader, EmptyState, Field } from "./shared";
+import { BlockHeader, EmptyState, Field, blockLabel } from "./shared";
 import type { BlockProps, ChartSeries } from "./types";
 import { getLocale } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
@@ -146,7 +146,7 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
   return (
     <section
       className="sb-block sb-chart"
-      aria-label={text(data.title) || t("dataChart")}
+      aria-label={blockLabel(data.title, t("dataChart"))}
     >
       <BlockHeader
         title={text(data.title)}

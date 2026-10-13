@@ -9,6 +9,10 @@ import {
 import { builtinComponentCatalog } from "./catalog";
 import { componentWidgetData } from "./custom/contract";
 import { translator } from "../i18n";
+import {
+  componentDisplayDescription,
+  componentDisplayName,
+} from "./component-display";
 import messages from "../i18n/messages/customComponents";
 
 const t = translator(messages);
@@ -69,5 +73,13 @@ export function useComponentCatalog(open: boolean) {
       native: false,
     };
   };
-  return { items, resolve, error, loading };
+  return {
+    items,
+    resolve,
+    error,
+    loading,
+    // Hosted editors label built-ins in the workbench language.
+    displayName: componentDisplayName,
+    displayDescription: componentDisplayDescription,
+  };
 }

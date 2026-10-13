@@ -904,15 +904,22 @@ export default function RichTextEditor({
             ("kind" in item
               ? item.kind
               : `${item.id}@${item.version}#${item.integrity}`),
-          title: item.name,
-          keywords: `${"kind" in item ? item.kind : item.id} ${item.description}`,
+          title: catalog.displayName(item),
+          keywords: `${"kind" in item ? item.kind : item.id} ${item.name} ${item.description} ${catalog.displayDescription(item)}`,
           icon: <PanelTop size={20} />,
           group: t("group.components"),
           component: item,
           run: () => {},
         })),
     ],
-    [openDialog, onInsertNative, catalog.items, t],
+    [
+      openDialog,
+      onInsertNative,
+      catalog.items,
+      catalog.displayName,
+      catalog.displayDescription,
+      t,
+    ],
   );
   const filteredItems = items.filter((item) =>
     `${item.title} ${item.keywords}`

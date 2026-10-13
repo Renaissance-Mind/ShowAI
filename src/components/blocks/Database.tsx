@@ -22,7 +22,7 @@ import {
   toCsv,
   uid,
 } from "./helpers";
-import { BlockHeader, EmptyState, Field } from "./shared";
+import { BlockHeader, EmptyState, Field, blockLabel } from "./shared";
 import type { MessageKey } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/database";
@@ -321,7 +321,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   return (
     <section
       className="sb-block sb-database"
-      aria-label={text(data.title) || t("database")}
+      aria-label={blockLabel(data.title, t("database"))}
     >
       <BlockHeader
         title={text(data.title)}

@@ -9,7 +9,7 @@ import {
   Trash2,
 } from "../../ui/icons";
 import { finite, text } from "./helpers";
-import { BlockHeader, EmptyState, Field } from "./shared";
+import { BlockHeader, EmptyState, Field, blockLabel } from "./shared";
 import type { BlockProps } from "./types";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/metrics";
@@ -44,7 +44,7 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
   return (
     <section
       className="sb-block sb-metrics"
-      aria-label={text(data.title) || t("metrics")}
+      aria-label={blockLabel(data.title, t("metrics"))}
     >
       <BlockHeader
         title={text(data.title)}

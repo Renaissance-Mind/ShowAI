@@ -17,7 +17,7 @@ import {
 import { graphlib, layout } from "@dagrejs/dagre";
 import { Maximize2, Minus, Plus, X } from "../../ui/icons";
 import type { BlockProps, BlockData } from "./types";
-import { BlockHeader, EmptyState } from "./shared";
+import { BlockHeader, EmptyState, blockLabel } from "./shared";
 import { useViewportLock, ViewportLockButton } from "./ViewportLock";
 import { validateFlowchartData } from "./flowchart-contract.mjs";
 import { type MessageKey } from "../../i18n";
@@ -426,7 +426,7 @@ export function FlowchartBlock({
     <section
       ref={lock.ref}
       className="sb-block sf-block"
-      aria-label={data.title || t("flowchart")}
+      aria-label={blockLabel(data.title, t("flowchart"))}
       data-viewport-lock-scope="flowchart"
       data-viewport-locked={lock.locked}
     >

@@ -16,6 +16,8 @@ export const RichTextEnvironment = createContext<{
     items: [],
     loading: false,
     error: "",
+    displayName: (item) => item.name,
+    displayDescription: (item) => item.description,
     resolve: async () => {
       throw Error("No component library is connected.");
     },

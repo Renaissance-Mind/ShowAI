@@ -21,7 +21,7 @@ import {
   Undo2,
   Redo2,
 } from "../../ui/icons";
-import { BlockHeader } from "./shared";
+import { BlockHeader, blockLabel } from "./shared";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/mindmap";
 import type { BlockProps } from "./types";
@@ -337,7 +337,7 @@ export function MindmapBlock({
     <section
       ref={section}
       className="sb-block sm-block"
-      aria-label={data.title || t("mindmap")}
+      aria-label={blockLabel(data.title, t("mindmap"))}
       contentEditable={false}
       data-editor-keyboard-scope="mindmap"
       data-mindmap-layout={layout}

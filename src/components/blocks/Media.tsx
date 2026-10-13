@@ -2,7 +2,7 @@ import { useState } from "react";
 import { FileText, Music2, Video } from "../../ui/icons";
 import { safeImageUrl, text } from "./helpers";
 import { safeResourceUrl } from "./research-contract.mjs";
-import { BlockHeader, EmptyState } from "./shared";
+import { BlockHeader, EmptyState, blockLabel } from "./shared";
 import { ResourceEditor } from "./ResourceEditor";
 import type { BlockProps } from "./types";
 import "./research-media.css";
@@ -25,7 +25,7 @@ function MediaBlock({
   return (
     <section
       className={`sb-block sb-media sb-${kind}`}
-      aria-label={text(data.title) || label}
+      aria-label={blockLabel(data.title, label)}
     >
       {(kind === "audio" || !src) && (
         <BlockHeader
@@ -72,7 +72,7 @@ function MediaBlock({
                   ),
                 }}
                 src={src}
-                aria-label={text(data.title) || t("videoPlayer")}
+                aria-label={blockLabel(data.title, t("videoPlayer"))}
                 onError={() => setFailed(src)}
               />
             </div>
@@ -91,7 +91,7 @@ function MediaBlock({
                   preload="metadata"
                   src={src}
                   loop={data.loop === true}
-                  aria-label={text(data.title) || t("audioPlayer")}
+                  aria-label={blockLabel(data.title, t("audioPlayer"))}
                   onError={() => setFailed(src)}
                 />
               </div>

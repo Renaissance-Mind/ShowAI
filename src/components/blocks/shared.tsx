@@ -19,6 +19,15 @@ const genericTitles = new Set(
     .split("|"),
 );
 
+/** Accessible name: the block's own title, or a translated label while it still has a saved default. */
+export function blockLabel(title: unknown, fallback: string): string {
+  return typeof title === "string" &&
+    title.trim() &&
+    !genericTitles.has(title.trim())
+    ? title
+    : fallback;
+}
+
 export function BlockHeader({
   title,
   defaultTitle,

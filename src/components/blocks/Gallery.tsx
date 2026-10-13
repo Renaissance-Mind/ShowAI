@@ -20,7 +20,7 @@ import {
   X,
 } from "../../ui/icons";
 import { safeImageUrl, text, uid } from "./helpers";
-import { BlockHeader, EmptyState, Field } from "./shared";
+import { BlockHeader, EmptyState, Field, blockLabel } from "./shared";
 import type { BlockProps } from "./types";
 import { translator } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
@@ -264,7 +264,7 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
     <section
       ref={galleryRoot}
       className="sb-block sb-gallery"
-      aria-label={text(data.title) || t("gallery")}
+      aria-label={blockLabel(data.title, t("gallery"))}
     >
       <BlockHeader
         title={text(data.title)}

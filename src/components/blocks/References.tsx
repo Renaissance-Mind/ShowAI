@@ -3,7 +3,7 @@ import { useState } from "react";
 import { BookOpen, Check, ExternalLink, Plus, Trash2 } from "../../ui/icons";
 import { text, uid } from "./helpers";
 import { referenceUrl, validateResearchData } from "./research-contract.mjs";
-import { BlockHeader, EmptyState, Field } from "./shared";
+import { BlockHeader, EmptyState, Field, blockLabel } from "./shared";
 import type { BlockProps } from "./types";
 import "./research-media.css";
 import { useTranslator } from "../../i18n/react";
@@ -53,7 +53,7 @@ export function ReferencesBlock({ data, onChange, readOnly }: BlockProps) {
   return (
     <section
       className="sb-block sb-references"
-      aria-label={text(data.title) || t("references")}
+      aria-label={blockLabel(data.title, t("references"))}
     >
       <BlockHeader
         title={text(data.title)}
