@@ -20,8 +20,11 @@ import {
   X,
 } from "../../ui/icons";
 import { safeImageUrl, text, uid } from "./helpers";
-import { BlockHeader, EmptyState, Field } from "./shared";
+import { BlockHeader, EmptyState, Field, blockLabel } from "./shared";
 import type { BlockProps } from "./types";
+import { translator } from "../../i18n";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/gallery";
 
 interface GalleryImage {
   id: string;
@@ -30,6 +33,7 @@ interface GalleryImage {
   caption: string;
 }
 const MAX_IMAGE_BYTES = CAPACITY.resourceBytes;
+const translate = translator(messages);
 const imageTypes = new Set([
   "image/png",
   "image/jpeg",
@@ -40,22 +44,25 @@ const imageTypes = new Set([
 
 export function imageFileToDataUrl(file: File): Promise<string> {
   if (!imageTypes.has(file.type))
-    return Promise.reject(
-      new Error("支持 PNG、JPEG、GIF、WebP 和 AVIF 图片。"),
-    );
+    return Promise.reject(new Error(translate("error.unsupportedType")));
   if (file.size > MAX_IMAGE_BYTES)
     return Promise.reject(
       new Error(
-        `「${file.name}」为 ${formatBytes(file.size)}，单个资源上限 ${formatBytes(MAX_IMAGE_BYTES)}。`,
+        translate("error.tooLarge", {
+          name: file.name,
+          size: formatBytes(file.size),
+          limit: formatBytes(MAX_IMAGE_BYTES),
+        }),
       ),
     );
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error(`无法读取「${file.name}」。`));
+    reader.onerror = () =>
+      reject(new Error(translate("error.cannotRead", { name: file.name })));
     reader.onload = () =>
       typeof reader.result === "string"
         ? resolve(reader.result)
-        : reject(new Error("图片读取失败。"));
+        : reject(new Error(translate("error.readFailed")));
     reader.readAsDataURL(file);
   });
 }
@@ -73,6 +80,7 @@ function Lightbox({
   close: () => void;
   portalHost: HTMLElement;
 }) {
+  const t = useTranslator(messages);
   const closeButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -91,7 +99,7 @@ function Lightbox({
       className="sb-lightbox"
       role="dialog"
       aria-modal="true"
-      aria-label={item.alt || "图片预览"}
+      aria-label={item.alt || t("imagePreview")}
       onClick={(event) => {
         if (event.target === event.currentTarget) close();
       }}
@@ -129,7 +137,7 @@ function Lightbox({
         ref={closeButton}
         type="button"
         className="sb-lightbox-close"
-        aria-label="关闭图片预览"
+        aria-label={t("closePreview")}
         onClick={close}
       >
         <X size={24} />
@@ -138,7 +146,7 @@ function Lightbox({
         <button
           type="button"
           className="sb-lightbox-prev"
-          aria-label="上一张图片"
+          aria-label={t("previousImage")}
           onClick={() => onIndex((index - 1 + images.length) % images.length)}
         >
           <ChevronLeft size={28} />
@@ -161,7 +169,7 @@ function Lightbox({
         <button
           type="button"
           className="sb-lightbox-next"
-          aria-label="下一张图片"
+          aria-label={t("nextImage")}
           onClick={() => onIndex((index + 1) % images.length)}
         >
           <ChevronRight size={28} />
@@ -173,6 +181,7 @@ function Lightbox({
 }
 
 export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
+  const t = useTranslator(messages);
   const galleryRoot = useRef<HTMLElement>(null);
   const images: GalleryImage[] = Array.isArray(data.images)
     ? data.images
@@ -230,7 +239,9 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
       assertContent([...draftImages, ...additions], "Gallery structure");
       setDraftImages((current) => [...current, ...additions]);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "图片导入失败。");
+      setError(
+        caught instanceof Error ? caught.message : t("error.importFailed"),
+      );
     } finally {
       setBusy(false);
       if (fileInput.current) fileInput.current.value = "";
@@ -238,7 +249,7 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
   };
   const save = () => {
     if (draftImages.some((item) => !safeImageUrl(item.src.trim()))) {
-      setError("每张图片需要有效的网址或本地图片。");
+      setError(t("error.invalidSource"));
       return;
     }
     onChange?.({
@@ -253,10 +264,11 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
     <section
       ref={galleryRoot}
       className="sb-block sb-gallery"
-      aria-label={text(data.title) || "图片画廊"}
+      aria-label={blockLabel(data.title, t("gallery"))}
     >
       <BlockHeader
         title={text(data.title)}
+        // i18n-exempt: matches the saved default title
         defaultTitle="图片画廊"
         description={text(data.description)}
         icon={<Images size={17} />}
@@ -268,22 +280,22 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
         <BlockSettings>
           <div className="sb-editor-panel">
             <div className="sb-form-row">
-              <Field label="标题">
+              <Field label={t("title")}>
                 <input
                   value={draftTitle}
                   onChange={(event) => setDraftTitle(event.target.value)}
                 />
               </Field>
-              <Field label="排列">
+              <Field label={t("arrangement")}>
                 <select
                   value={draftColumns}
                   onChange={(event) =>
                     setDraftColumns(Number(event.target.value))
                   }
                 >
-                  <option value={1}>单列</option>
-                  <option value={2}>两列</option>
-                  <option value={3}>三列</option>
+                  <option value={1}>{t("oneColumn")}</option>
+                  <option value={2}>{t("twoColumns")}</option>
+                  <option value={3}>{t("threeColumns")}</option>
                 </select>
               </Field>
             </div>
@@ -301,11 +313,11 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
                   )}
                 </div>
                 <div className="sb-gallery-editor-fields">
-                  <Field label={`图片 ${index + 1} 地址`}>
+                  <Field label={t("imageAddress", { index: index + 1 })}>
                     <input
                       value={
                         item.src.startsWith("data:")
-                          ? "已嵌入本地图片"
+                          ? t("embeddedImage")
                           : item.src
                       }
                       readOnly={item.src.startsWith("data:")}
@@ -315,7 +327,7 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
                       }
                     />
                   </Field>
-                  <Field label="图片描述">
+                  <Field label={t("altText")}>
                     <input
                       value={item.alt}
                       onChange={(event) =>
@@ -323,7 +335,7 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
                       }
                     />
                   </Field>
-                  <Field label="图注">
+                  <Field label={t("caption")}>
                     <input
                       value={item.caption}
                       onChange={(event) =>
@@ -336,7 +348,7 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
                   <button
                     type="button"
                     className="sb-icon-button"
-                    aria-label={`上移图片 ${index + 1}`}
+                    aria-label={t("moveUp", { index: index + 1 })}
                     disabled={index === 0 || busy}
                     onClick={() => moveImage(index, -1)}
                   >
@@ -345,7 +357,7 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
                   <button
                     type="button"
                     className="sb-icon-button"
-                    aria-label={`下移图片 ${index + 1}`}
+                    aria-label={t("moveDown", { index: index + 1 })}
                     disabled={index === draftImages.length - 1 || busy}
                     onClick={() => moveImage(index, 1)}
                   >
@@ -354,7 +366,7 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
                   <button
                     type="button"
                     className="sb-icon-button sb-danger"
-                    aria-label={`删除图片 ${index + 1}`}
+                    aria-label={t("deleteImage", { index: index + 1 })}
                     disabled={busy}
                     onClick={() =>
                       setDraftImages((current) =>
@@ -375,7 +387,7 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
               type="file"
               accept="image/png,image/jpeg,image/gif,image/webp,image/avif"
               multiple
-              aria-label="选择本地图片"
+              aria-label={t("chooseLocalImages")}
               onChange={(event) => void upload(event.target.files)}
             />
             {error && (
@@ -392,7 +404,7 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
                   onClick={() => fileInput.current?.click()}
                 >
                   <Upload size={14} />
-                  {busy ? "读取中…" : "上传图片"}
+                  {busy ? t("reading") : t("uploadImages")}
                 </button>
                 <button
                   type="button"
@@ -406,7 +418,7 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
                   }
                 >
                   <Plus size={14} />
-                  添加链接
+                  {t("addLink")}
                 </button>
               </div>
               <button
@@ -416,7 +428,7 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
                 onClick={save}
               >
                 <Check size={14} />
-                保存画廊
+                {t("saveGallery")}
               </button>
             </div>
           </div>
@@ -429,7 +441,9 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
               <button
                 type="button"
                 onClick={() => setPreview(index)}
-                aria-label={`查看图片：${item.alt || item.caption || index + 1}`}
+                aria-label={t("viewImage", {
+                  name: item.alt || item.caption || index + 1,
+                })}
               >
                 <img
                   src={safeImageUrl(item.src)}
@@ -448,12 +462,12 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
       ) : (
         <EmptyState
           icon={<Images size={29} strokeWidth={1.4} />}
-          title="给想法更多画面"
+          title={t("empty.title")}
           action={
             editable && !editing ? (
               <button type="button" className="sb-button" onClick={openEditor}>
                 <Plus size={14} />
-                添加图片
+                {t("addImages")}
               </button>
             ) : undefined
           }

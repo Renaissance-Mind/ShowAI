@@ -22,7 +22,10 @@ import {
   toCsv,
   uid,
 } from "./helpers";
-import { BlockHeader, EmptyState, Field } from "./shared";
+import { BlockHeader, EmptyState, Field, blockLabel } from "./shared";
+import type { MessageKey } from "../../i18n";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/database";
 import type {
   BlockProps,
   ColumnType,
@@ -30,12 +33,12 @@ import type {
   DatabaseRow,
 } from "./types";
 
-const TYPES: { value: ColumnType; label: string }[] = [
-  { value: "text", label: "文本" },
-  { value: "number", label: "数字" },
-  { value: "select", label: "单选" },
-  { value: "checkbox", label: "复选框" },
-  { value: "url", label: "链接" },
+const TYPES: { value: ColumnType; label: MessageKey<typeof messages> }[] = [
+  { value: "text", label: "type.text" },
+  { value: "number", label: "type.number" },
+  { value: "select", label: "type.select" },
+  { value: "checkbox", label: "type.checkbox" },
+  { value: "url", label: "type.url" },
 ];
 const TYPE_SYMBOL: Record<ColumnType, string> = {
   text: "Aa",
@@ -56,6 +59,7 @@ function Cell({
   editable: boolean;
   update: (value: string | number | boolean) => void;
 }) {
+  const t = useTranslator(messages);
   const value = row[column.id];
   if (column.type === "checkbox")
     return (
@@ -102,7 +106,7 @@ function Cell({
         className={`sb-cell-select sb-tag-${(column.options?.indexOf(String(value)) ?? 0) % 5}`}
         onChange={(event) => update(event.target.value)}
       >
-        <option value="">未设置</option>
+        <option value="">{t("notSet")}</option>
         {column.options?.map((option) => (
           <option key={option} value={option}>
             {option}
@@ -141,7 +145,7 @@ function Cell({
           href={safeUrl(value)}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label={`打开${column.name}`}
+          aria-label={t("openLink", { name: column.name })}
         >
           <ExternalLink size={12} />
         </a>
@@ -151,6 +155,7 @@ function Cell({
 }
 
 export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
+  const t = useTranslator(messages);
   const columns: DatabaseColumn[] = useMemo(
     () =>
       Array.isArray(data.columns)
@@ -158,7 +163,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
             .filter((column) => column && typeof column.id === "string")
             .map((column) => ({
               id: column.id,
-              name: text(column.name, "属性"),
+              name: text(column.name, t("property")),
               type: TYPES.some((type) => type.value === column.type)
                 ? column.type
                 : "text",
@@ -167,7 +172,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                 : [],
             }))
         : [],
-    [data.columns],
+    [data.columns, t],
   );
   const rows: DatabaseRow[] = Array.isArray(data.rows)
     ? data.rows.filter((row) => row && typeof row.id === "string")
@@ -261,11 +266,11 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   };
   const saveColumns = () => {
     if (!draftColumns.length) {
-      setError("请至少保留一个属性。");
+      setError(t("error.keepOneProperty"));
       return;
     }
     if (draftColumns.some((column) => !column.name.trim())) {
-      setError("请为每个属性填写名称。");
+      setError(t("error.nameEveryProperty"));
       return;
     }
     const cleaned = draftColumns.map((column) => ({
@@ -316,10 +321,11 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   return (
     <section
       className="sb-block sb-database"
-      aria-label={text(data.title) || "数据库"}
+      aria-label={blockLabel(data.title, t("database"))}
     >
       <BlockHeader
         title={text(data.title)}
+        // i18n-exempt: matches the saved default title
         defaultTitle="数据库"
         icon={<Table2 size={17} />}
         editable={editable}
@@ -329,12 +335,12 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
         <button
           type="button"
           className="sb-icon-button"
-          aria-label="导出数据库"
-          title="导出 CSV"
+          aria-label={t("exportDatabase")}
+          title={t("exportCsv")}
           onClick={() =>
             downloadFile(
               toCsv(columns, shownRows),
-              `${text(data.title, "数据库")}.csv`,
+              `${text(data.title, t("database"))}.csv`,
               "text/csv;charset=utf-8",
             )
           }
@@ -342,9 +348,9 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           <Download size={15} />
         </button>
         <details className="sb-tools-menu">
-          <summary aria-label="数据库视图与筛选">
+          <summary aria-label={t("viewAndFilterMenu")}>
             <Filter size={14} aria-hidden="true" />
-            视图与筛选
+            {t("viewAndFilter")}
           </summary>
           <div className="sb-database-toolbar">
             <div className="sb-view-tabs">
@@ -354,7 +360,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                 onClick={() => setView("table")}
               >
                 <Table2 size={14} />
-                表格
+                {t("table")}
               </button>
               <button
                 type="button"
@@ -362,12 +368,12 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                 onClick={() => setView("board")}
               >
                 <Columns3 size={14} />
-                看板
+                {t("board")}
               </button>
             </div>
             <div className="sb-database-tools">
               <ExpandableSearch
-                label="搜索数据库"
+                label={t("searchDatabase")}
                 value={query}
                 onChange={(value) => {
                   setQuery(value);
@@ -377,7 +383,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
               <button
                 type="button"
                 className={`sb-icon-button ${showFilter || filter.column ? "is-active" : ""}`}
-                aria-label="筛选数据库"
+                aria-label={t("filterDatabase")}
                 onClick={() => setShowFilter(!showFilter)}
               >
                 <Filter size={15} />
@@ -389,15 +395,15 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                   onClick={() => addRow()}
                 >
                   <Plus size={14} />
-                  新建
+                  {t("newRecord")}
                 </button>
               )}
             </div>
             {view === "board" && selectColumns.length > 0 && (
               <div className="sb-board-grouping">
-                <span>分组依据</span>
+                <span>{t("groupBy")}</span>
                 <select
-                  aria-label="看板分组属性"
+                  aria-label={t("boardGroupProperty")}
                   value={groupColumn?.id ?? ""}
                   onChange={(event) => setGrouping(event.target.value)}
                 >
@@ -415,7 +421,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
       {editing && (
         <BlockSettings>
           <div className="sb-editor-panel">
-            <Field label="数据库名称">
+            <Field label={t("databaseName")}>
               <input
                 value={draftTitle}
                 onChange={(event) => setDraftTitle(event.target.value)}
@@ -425,14 +431,14 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
               {draftColumns.map((column) => (
                 <div className="sb-property-row" key={column.id}>
                   <input
-                    aria-label="属性名称"
+                    aria-label={t("propertyName")}
                     value={column.name}
                     onChange={(event) =>
                       updateDraftColumn(column.id, { name: event.target.value })
                     }
                   />
                   <select
-                    aria-label={`${column.name}的类型`}
+                    aria-label={t("propertyType", { name: column.name })}
                     value={column.type}
                     onChange={(event) =>
                       updateDraftColumn(column.id, {
@@ -442,15 +448,15 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                   >
                     {TYPES.map((type) => (
                       <option key={type.value} value={type.value}>
-                        {type.label}
+                        {t(type.label)}
                       </option>
                     ))}
                   </select>
                   {column.type === "select" && (
                     <input
                       className="sb-options-input"
-                      aria-label={`${column.name}的选项，用逗号分隔`}
-                      placeholder="选项，用逗号分隔"
+                      aria-label={t("propertyOptions", { name: column.name })}
+                      placeholder={t("optionsPlaceholder")}
                       value={column.options?.join(",")}
                       onChange={(event) =>
                         updateDraftColumn(column.id, {
@@ -462,7 +468,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                   <button
                     type="button"
                     className="sb-icon-button sb-danger"
-                    aria-label={`删除属性${column.name}`}
+                    aria-label={t("deleteProperty", { name: column.name })}
                     onClick={() =>
                       setDraftColumns((current) =>
                         current.filter((item) => item.id !== column.id),
@@ -486,12 +492,13 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                 onClick={() =>
                   setDraftColumns((current) => [
                     ...current,
+                    // i18n-exempt: default property name saved into the document
                     { id: uid(), name: "新属性", type: "text" },
                   ])
                 }
               >
                 <Plus size={14} />
-                添加属性
+                {t("addProperty")}
               </button>
               <button
                 type="button"
@@ -499,7 +506,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                 onClick={saveColumns}
               >
                 <Check size={14} />
-                保存属性
+                {t("saveProperties")}
               </button>
             </div>
           </div>
@@ -509,7 +516,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
         <div className="sb-filter-row">
           <Filter size={13} />
           <select
-            aria-label="筛选属性"
+            aria-label={t("filterProperty")}
             value={filter.column}
             onChange={(event) => {
               const column = event.target.value;
@@ -520,7 +527,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
               setPage(0);
             }}
           >
-            <option value="">全部记录</option>
+            <option value="">{t("allRecords")}</option>
             {columns.map((column) => (
               <option key={column.id} value={column.id}>
                 {column.name}
@@ -529,9 +536,9 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           </select>
           {filter.column && (
             <>
-              <span>等于</span>
+              <span>{t("equals")}</span>
               <select
-                aria-label="筛选值"
+                aria-label={t("filterValue")}
                 value={filter.value}
                 onChange={(event) => {
                   setFilter((current) => ({
@@ -543,7 +550,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
               >
                 {options.map((option) => (
                   <option key={option} value={option}>
-                    {option || "未设置"}
+                    {option || t("notSet")}
                   </option>
                 ))}
               </select>
@@ -552,7 +559,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                 className="sb-text-button"
                 onClick={() => setFilter({ column: "", value: "" })}
               >
-                清除
+                {t("clear")}
               </button>
             </>
           )}
@@ -584,7 +591,10 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                     </th>
                   ))}
                   {editable && (
-                    <th className="sb-row-action" aria-label="行操作" />
+                    <th
+                      className="sb-row-action"
+                      aria-label={t("rowActions")}
+                    />
                   )}
                 </tr>
               </thead>
@@ -610,7 +620,9 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                           <button
                             type="button"
                             className="sb-icon-button sb-danger"
-                            aria-label={`删除记录${text(row[columns[0]?.id])}`}
+                            aria-label={t("deleteNamedRecord", {
+                              name: text(row[columns[0]?.id]),
+                            })}
                             onClick={() => removeRow(row.id)}
                           >
                             <Trash2 size={13} />
@@ -625,7 +637,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           {shownRows.length === 0 && (
             <EmptyState
               icon={<LayoutList size={25} strokeWidth={1.4} />}
-              title={rows.length ? "没有符合条件的记录" : "从第一条记录开始"}
+              title={rows.length ? t("empty.noMatches") : t("empty.start")}
             />
           )}
         </>
@@ -653,14 +665,16 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                 >
                   <div className="sb-board-column-header">
                     <span className={`sb-tag sb-tag-${groupIndex % 5}`}>
-                      {group || (groupColumn ? "未设置" : "全部记录")}
+                      {group || (groupColumn ? t("notSet") : t("allRecords"))}
                     </span>
                     <span>{groupRows.length}</span>
                     {editable && (
                       <button
                         type="button"
                         className="sb-icon-button"
-                        aria-label={`在${group || "未设置"}中新建记录`}
+                        aria-label={t("newRecordIn", {
+                          group: group || t("notSet"),
+                        })}
                         onClick={() => addRow(group)}
                       >
                         <Plus size={14} />
@@ -701,7 +715,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                         <div className="sb-board-card-footer">
                           {groupColumn && (
                             <select
-                              aria-label="移动到分组"
+                              aria-label={t("moveToGroup")}
                               value={text(row[groupColumn.id])}
                               onChange={(event) =>
                                 updateRow(
@@ -711,7 +725,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                                 )
                               }
                             >
-                              <option value="">未设置</option>
+                              <option value="">{t("notSet")}</option>
                               {groupNames.filter(Boolean).map((name) => (
                                 <option key={name}>{name}</option>
                               ))}
@@ -720,7 +734,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                           <button
                             type="button"
                             className="sb-icon-button sb-danger"
-                            aria-label="删除记录"
+                            aria-label={t("deleteRecord")}
                             onClick={() => removeRow(row.id)}
                           >
                             <Trash2 size={13} />
@@ -736,7 +750,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                       onClick={() => addRow(group)}
                     >
                       <Plus size={13} />
-                      新记录
+                      {t("addRecord")}
                     </button>
                   )}
                 </div>
@@ -748,15 +762,18 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
       <div className="sb-database-footer">
         <span>
           {shownRows.length === rows.length
-            ? `${rows.length} 条记录`
-            : `${shownRows.length} / ${rows.length} 条记录`}
+            ? t("recordCount", { count: rows.length })
+            : t("filteredRecordCount", {
+                shown: shownRows.length,
+                count: rows.length,
+              })}
           {sort && (
             <button
               type="button"
               className="sb-text-button"
               onClick={() => setSort(null)}
             >
-              清除排序
+              {t("clearSort")}
             </button>
           )}
         </span>
@@ -767,7 +784,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
               disabled={activePage === 0}
               onClick={() => setPage(activePage - 1)}
             >
-              上一页
+              {t("previousPage")}
             </button>
             <span>
               {activePage + 1} / {totalPages}
@@ -777,7 +794,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
               disabled={activePage + 1 === totalPages}
               onClick={() => setPage(activePage + 1)}
             >
-              下一页
+              {t("nextPage")}
             </button>
           </div>
         )}

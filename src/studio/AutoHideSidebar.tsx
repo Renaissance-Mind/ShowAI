@@ -9,6 +9,8 @@ import {
 import { PanelLeft } from "../ui/icons";
 import { appIconForTheme } from "../design/app-icon";
 import { useAppearanceTheme } from "../design/useAppearanceTheme";
+import { useTranslator } from "../i18n/react";
+import sidebarMessages from "../i18n/messages/sidebar";
 import "./auto-hide-sidebar.css";
 import { mobileNavigationLayout, sidebarSwipe } from "./mobile-navigation.mjs";
 import "./mobile-navigation.css";
@@ -37,6 +39,7 @@ export default function AutoHideSidebar({
   focusWindow: boolean;
   switchingTab: boolean;
 }) {
+  const t = useTranslator(sidebarMessages);
   const appIcon = appIconForTheme(useAppearanceTheme());
   const nativeTouch = document.documentElement.dataset.native === "ios";
   const [nativeOpen, setNativeOpen] = useState(false);
@@ -218,7 +221,13 @@ export default function AutoHideSidebar({
     setHovered(true);
     if (hidden) setPosition("overlay");
   };
-  const lockLabel = nativeTouch ? nativeOpen ? "收起项目栏" : "展开项目栏" : locked ? "解锁项目栏，打开文档后自动收起" : "锁定项目栏";
+  const lockLabel = nativeTouch
+    ? nativeOpen
+      ? t("collapseSidebar")
+      : t("expandSidebar")
+    : locked
+      ? t("unlockSidebar")
+      : t("lockSidebar");
   const focusNavigation = () => {
     window.requestAnimationFrame(() => {
       sidebar.current?.querySelector<HTMLButtonElement>("button")?.focus();
@@ -311,7 +320,7 @@ export default function AutoHideSidebar({
               ref={sidebar}
               id="studio-project-navigation"
               className="studio-sidebar"
-              aria-label="项目导航"
+              aria-label={t("projectNavigation")}
               inert={hidden}
               onPointerEnter={reveal}
               onPointerLeave={leave}
@@ -341,13 +350,13 @@ export default function AutoHideSidebar({
                 className="studio-sidebar-resizer"
                 role="separator"
                 tabIndex={0}
-                aria-label="调整项目栏宽度"
+                aria-label={t("resizeSidebar")}
                 aria-orientation="vertical"
                 aria-controls="studio-project-navigation"
                 aria-valuemin={minimumWidth}
                 aria-valuemax={widthLimit}
                 aria-valuenow={width}
-                aria-valuetext={`${width} 像素`}
+                aria-valuetext={t("widthPixels", { width })}
                 onPointerDown={(event) => {
                   if (event.button !== 0 || resize.current) return;
                   event.preventDefault();
@@ -398,7 +407,7 @@ export default function AutoHideSidebar({
               <button
                 type="button"
                 className="studio-sidebar-edge"
-                aria-label="展开项目导航"
+                aria-label={t("showNavigation")}
                 aria-controls="studio-project-navigation"
                 aria-expanded={!hidden}
                 tabIndex={hidden ? 0 : -1}

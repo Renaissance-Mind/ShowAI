@@ -1,3 +1,4 @@
+import type { Locale } from "../i18n";
 import type { TabCommand } from "../workbench/tab-shortcuts";
 export const PROJECT_SCOPE_LIMIT = 1000;
 
@@ -44,6 +45,8 @@ export interface ShowAIBridge {
     prepare: () => Promise<boolean>,
   ): Promise<boolean>;
   setAppearance?(appearance: DesktopAppearance): Promise<void>;
+  /** Keeps native menus and dialogs in the workbench language. */
+  setLocale?(locale: Locale): Promise<void>;
   getWindowState?(): Promise<DesktopWindowState>;
   onWindowStateChange?(
     listener: (state: DesktopWindowState) => void,

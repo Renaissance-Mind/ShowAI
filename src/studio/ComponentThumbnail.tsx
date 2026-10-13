@@ -3,6 +3,9 @@ import { ImageOff, Loader2 } from "../ui/icons";
 import type { CatalogComponent } from "../core/component-categories";
 import { desktop, errorMessage } from "./bridge";
 import type { AppearanceTheme } from "../design/useAppearanceTheme";
+import { componentDisplayName } from "../components/component-display";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/catalog";
 
 export function componentPreviewReference(item: CatalogComponent) {
   return "kind" in item
@@ -25,6 +28,7 @@ export default function ComponentThumbnail({
   browser: boolean;
   theme: AppearanceTheme;
 }) {
+  const t = useTranslator(messages);
   const container = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   const [frameState, setFrameState] = useState({
@@ -91,7 +95,9 @@ export default function ComponentThumbnail({
       cancelled = true;
       void desktop
         .invoke("components:thumbnailCancel", { requestId })
-        .catch((reason) => console.warn("无法取消组件预览", reason));
+        .catch((reason) =>
+          console.warn("Couldn't cancel the component preview", reason),
+        );
     };
   }, [key, visible, browser, image.key]);
   const previewUrl = new URL(location.href);
@@ -105,7 +111,7 @@ export default function ComponentThumbnail({
         <>
           <iframe
             ref={frame}
-            title={`${item.name}缩略预览`}
+            title={t("thumbnailTitle", { name: componentDisplayName(item) })}
             src={previewUrl.href}
             tabIndex={-1}
             style={{
@@ -119,7 +125,7 @@ export default function ComponentThumbnail({
           {frameState.key === key && frameState.error ? (
             <span className="component-preview-error" title={frameState.error}>
               <ImageOff size={20} />
-              预览暂不可用
+              {t("previewUnavailable")}
             </span>
           ) : (
             !frameState.ready && (
@@ -133,7 +139,7 @@ export default function ComponentThumbnail({
       ) : error ? (
         <span className="component-preview-error" title={error}>
           <ImageOff size={20} />
-          预览暂不可用
+          {t("previewUnavailable")}
         </span>
       ) : (
         <Loader2 size={18} className="studio-spin component-preview-loading" />

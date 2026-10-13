@@ -1,5 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { BlockProps } from "./types";
+import type { MessageKey } from "../../i18n";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/presentation";
 import {
   evidenceTimeBuckets,
   selectEvidence,
@@ -48,15 +51,16 @@ type Explorer = {
   layout?: "list" | "timeline";
   timeScale?: "month" | "year";
 };
-const statusNames = {
-  changed: "本步改变",
-  retained: "承接保留",
-  fixed: "保持固定",
+const statusNames: Record<State["status"], MessageKey<typeof messages>> = {
+  changed: "status.changed",
+  retained: "status.retained",
+  fixed: "status.fixed",
 };
 function Sources({ sources = [] }: { sources?: Source[] }) {
+  const t = useTranslator(messages);
   return sources.length ? (
     <p className="sp-sources">
-      依据：
+      {t("sources")}
       {sources.map((s, i) => (
         <a
           key={`${s.url}-${i}`}
@@ -71,6 +75,7 @@ function Sources({ sources = [] }: { sources?: Source[] }) {
   ) : null;
 }
 function FrameView({ frame, parts }: { frame: Frame; parts: Part[] }) {
+  const t = useTranslator(messages);
   return (
     <article className="sp-frame">
       <h3>{frame.title}</h3>
@@ -84,7 +89,7 @@ function FrameView({ frame, parts }: { frame: Frame; parts: Part[] }) {
           const state = frame.states.find((s) => s.id === part.id)!;
           return (
             <div className={`sp-part sp-${state.status}`} key={part.id}>
-              <div className="sp-state">{statusNames[state.status]}</div>
+              <div className="sp-state">{t(statusNames[state.status])}</div>
               <h4>{part.label}</h4>
               <p>{state.value}</p>
             </div>
@@ -92,7 +97,7 @@ function FrameView({ frame, parts }: { frame: Frame; parts: Part[] }) {
         })}
       </div>
       {frame.links.length > 0 && (
-        <ol className="sp-links" aria-label="作用关系">
+        <ol className="sp-links" aria-label={t("links")}>
           {frame.links.map((l, i) => (
             <li key={i}>
               <strong>{parts.find((p) => p.id === l.from)?.label}</strong>
@@ -107,7 +112,7 @@ function FrameView({ frame, parts }: { frame: Frame; parts: Part[] }) {
       <p className="sp-explanation">{frame.explanation}</p>
       {frame.condition && (
         <p className="sp-boundary">
-          <strong>成立条件：</strong>
+          <strong>{t("condition")}</strong>
           {frame.condition}
         </p>
       )}
@@ -117,6 +122,7 @@ function FrameView({ frame, parts }: { frame: Frame; parts: Part[] }) {
 }
 
 export function MechanismStepsBlock({ data }: BlockProps) {
+  const t = useTranslator(messages);
   const model = data as unknown as Mechanism;
   const [selected, setSelected] = useState(model.frames[0]?.id ?? "");
   const [all, setAll] = useState(false);
@@ -136,12 +142,10 @@ export function MechanismStepsBlock({ data }: BlockProps) {
         {model.introduction && <p>{model.introduction}</p>}
       </header>
       {!model.frames.length ? (
-        <p className="sp-empty">
-          尚未填写机制。为同一组对象添加连续状态、变化原因与成立条件。
-        </p>
+        <p className="sp-empty">{t("mechanism.empty")}</p>
       ) : (
         <>
-          <nav className="sp-controls" aria-label="机制步骤">
+          <nav className="sp-controls" aria-label={t("mechanism.steps")}>
             <div className="sp-step-list">
               {model.frames.map((frame, i) => (
                 <button
@@ -168,7 +172,7 @@ export function MechanismStepsBlock({ data }: BlockProps) {
                   setAll(false);
                 }}
               >
-                上一步
+                {t("previousStep")}
               </button>
               <button
                 type="button"
@@ -178,7 +182,7 @@ export function MechanismStepsBlock({ data }: BlockProps) {
                   setAll(false);
                 }}
               >
-                下一步
+                {t("nextStep")}
               </button>
               <button
                 type="button"
@@ -187,14 +191,14 @@ export function MechanismStepsBlock({ data }: BlockProps) {
                   setAll(false);
                 }}
               >
-                回到起点
+                {t("backToStart")}
               </button>
               <button
                 type="button"
                 aria-pressed={all}
                 onClick={() => setAll(!all)}
               >
-                {all ? "逐步阅读" : "展开全部步骤"}
+                {all ? t("readStepByStep") : t("expandAllSteps")}
               </button>
             </div>
           </nav>
@@ -225,6 +229,7 @@ function EvidenceDetail({
   item: Evidence;
   dimensions: Part[];
 }) {
+  const t = useTranslator(messages);
   return (
     <article className="sp-detail">
       <div className="sp-category">
@@ -237,12 +242,12 @@ function EvidenceDetail({
         {dimensions.map((d) => (
           <div key={d.id}>
             <dt>{d.label}</dt>
-            <dd>{item.values[d.id] ?? "资料未提供"}</dd>
+            <dd>{item.values[d.id] ?? t("notProvided")}</dd>
           </div>
         ))}
       </dl>
       <p className="sp-boundary">
-        <strong>解释边界：</strong>
+        <strong>{t("boundary")}</strong>
         {item.boundary}
       </p>
       <Sources sources={item.sources} />
@@ -266,24 +271,24 @@ function EvidenceTimeline({
   pinned: string[];
   onPin: (id: string, checked: boolean) => void;
 }) {
+  const t = useTranslator(messages);
   const dates = evidenceTimeBuckets(items, scale);
-  const buckets = items.some((i) => !i.date) ? [...dates, "未标日期"] : dates;
+  const undated = t("undated");
+  const buckets = items.some((i) => !i.date) ? [...dates, undated] : dates;
   const categories = [...new Set(items.map((i) => i.category))];
   const bucket = (item: Evidence) =>
-    item.date?.slice(0, scale === "year" ? 4 : 7) ?? "未标日期";
+    item.date?.slice(0, scale === "year" ? 4 : 7) ?? undated;
   return (
     <div
       className="sp-timeline-wrap"
       tabIndex={0}
-      aria-label="按主题与时间定位证据，可横向滚动"
+      aria-label={t("timeline.label")}
     >
       <table className="sp-timeline">
-        <caption>
-          按条目标注日期排列；空格表示本报告未收录，不能推断该时期没有进展。选择条目查看依据与条件，再返回总览。
-        </caption>
+        <caption>{t("timeline.caption")}</caption>
         <thead>
           <tr>
-            <th scope="col">主题</th>
+            <th scope="col">{t("topic")}</th>
             {buckets.map((date) => (
               <th scope="col" key={date}>
                 {date}
@@ -305,7 +310,11 @@ function EvidenceTimeline({
                       <div className="sp-timeline-item" key={item.id}>
                         <button
                           type="button"
-                          aria-label={`${item.title} · ${item.dateLabel ?? "日期未提供"} ${item.date ?? ""}`}
+                          aria-label={t("itemWithDate", {
+                            title: item.title,
+                            dateLabel: item.dateLabel ?? t("dateNotProvided"),
+                            date: item.date ?? "",
+                          })}
                           data-evidence-id={item.id}
                           aria-pressed={item.id === selected}
                           aria-controls={detailId}
@@ -319,9 +328,11 @@ function EvidenceTimeline({
                             type="checkbox"
                             checked={pinned.includes(item.id)}
                             onChange={(e) => onPin(item.id, e.target.checked)}
-                            aria-label={`将${item.title}加入比较`}
+                            aria-label={t("addNamedToComparison", {
+                              title: item.title,
+                            })}
                           />
-                          加入比较
+                          {t("addToComparison")}
                         </label>
                       </div>
                     ))}
@@ -331,12 +342,13 @@ function EvidenceTimeline({
           ))}
         </tbody>
       </table>
-      {!items.length && <p>没有符合条件的条目。可重置视图。</p>}
+      {!items.length && <p>{t("noMatches")}</p>}
     </div>
   );
 }
 
 export function EvidenceExplorerBlock({ data }: BlockProps) {
+  const t = useTranslator(messages);
   const model = data as unknown as Explorer;
   const [category, setCategory] = useState("");
   const [query, setQuery] = useState("");
@@ -420,9 +432,7 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
         {view !== "detail" && model.introduction && <p>{model.introduction}</p>}
       </header>
       {!model.items.length ? (
-        <p className="sp-empty">
-          尚未填写证据。添加有来源的条目、共同比较维度和解释边界。
-        </p>
+        <p className="sp-empty">{t("evidence.empty")}</p>
       ) : (
         <>
           {view === "detail" ? (
@@ -432,7 +442,7 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
                 ref={returnButton}
                 onClick={returnToOverview}
               >
-                返回总览
+                {t("backToOverview")}
               </button>
             </div>
           ) : (
@@ -443,27 +453,29 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
                   aria-pressed={view === "overview"}
                   onClick={() => setView("overview")}
                 >
-                  总览与详情
+                  {t("overviewAndDetail")}
                 </button>
                 <button
                   type="button"
                   aria-pressed={view === "compare"}
                   onClick={() => setView("compare")}
                 >
-                  按共同维度比较{pinned.length ? `（${pinned.length}）` : ""}
+                  {pinned.length
+                    ? t("compareByDimensionCount", { count: pinned.length })
+                    : t("compareByDimension")}
                 </button>
                 <button type="button" onClick={reset}>
-                  重置视图
+                  {t("resetView")}
                 </button>
               </div>
               <div className="sp-filters">
                 <label>
-                  主题
+                  {t("topic")}
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
                   >
-                    <option value="">全部主题</option>
+                    <option value="">{t("allTopics")}</option>
                     {[...new Set(model.items.map((i) => i.category))].map(
                       (c) => (
                         <option key={c}>{c}</option>
@@ -472,23 +484,26 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
                   </select>
                 </label>
                 <label>
-                  查找
+                  {t("find")}
                   <input
                     type="search"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="名称、结论或条件"
+                    placeholder={t("findPlaceholder")}
                   />
                 </label>
                 <output aria-live="polite">
-                  显示 {visible.length} / {model.items.length} 项
+                  {t("showingCount", {
+                    shown: visible.length,
+                    count: model.items.length,
+                  })}
                 </output>
               </div>
             </div>
           )}
           <div className="sp-screen">
             {view === "detail" ? (
-              <div id={uid} role="region" aria-label="证据详情与来源">
+              <div id={uid} role="region" aria-label={t("detailRegion")}>
                 {active && (
                   <EvidenceDetail item={active} dimensions={model.dimensions} />
                 )}
@@ -497,16 +512,17 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
               <div
                 className="sp-table-wrap"
                 tabIndex={0}
-                aria-label="证据比较表，可横向滚动"
+                aria-label={t("comparisonTable")}
               >
                 <table>
                   <caption>
-                    {pinned.length ? "已选条目（跨主题保留）" : "当前筛选结果"}
-                    ；缺失资料保留标记
+                    {pinned.length
+                      ? t("comparison.pinned")
+                      : t("comparison.filtered")}
                   </caption>
                   <thead>
                     <tr>
-                      <th>比较维度</th>
+                      <th>{t("dimension")}</th>
                       {comparison.map((i) => (
                         <th key={i.id}>{i.title}</th>
                       ))}
@@ -517,18 +533,20 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
                       <tr key={d.id}>
                         <th scope="row">{d.label}</th>
                         {comparison.map((i) => (
-                          <td key={i.id}>{i.values[d.id] ?? "资料未提供"}</td>
+                          <td key={i.id}>
+                            {i.values[d.id] ?? t("notProvided")}
+                          </td>
                         ))}
                       </tr>
                     ))}
                     <tr>
-                      <th scope="row">解释边界</th>
+                      <th scope="row">{t("boundaryRow")}</th>
                       {comparison.map((i) => (
                         <td key={i.id}>{i.boundary}</td>
                       ))}
                     </tr>
                     <tr>
-                      <th scope="row">依据</th>
+                      <th scope="row">{t("sourcesRow")}</th>
                       {comparison.map((i) => (
                         <td key={i.id}>
                           <Sources sources={i.sources} />
@@ -537,7 +555,7 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
                     </tr>
                   </tbody>
                 </table>
-                {!comparison.length && <p>没有符合条件的条目。可重置视图。</p>}
+                {!comparison.length && <p>{t("noMatches")}</p>}
               </div>
             ) : model.layout === "timeline" && !narrow ? (
               <div className="sp-time-overview">
@@ -556,7 +574,7 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
               </div>
             ) : (
               <div className="sp-overview">
-                <ol className="sp-index" aria-label="证据条目">
+                <ol className="sp-index" aria-label={t("evidenceItems")}>
                   {visible.map((item) => (
                     <li
                       key={item.id}
@@ -592,7 +610,7 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
                             )
                           }
                         />
-                        加入比较
+                        {t("addToComparison")}
                       </label>
                     </li>
                   ))}
@@ -604,13 +622,13 @@ export function EvidenceExplorerBlock({ data }: BlockProps) {
                       dimensions={model.dimensions}
                     />
                   ) : (
-                    <p className="sp-empty">没有符合条件的条目。可重置视图。</p>
+                    <p className="sp-empty">{t("noMatches")}</p>
                   )}
                 </div>
               </div>
             )}
             <details className="sp-static">
-              <summary>连续阅读全部条目与来源（{model.items.length}）</summary>
+              <summary>{t("readAll", { count: model.items.length })}</summary>
               {model.items.map((item) => (
                 <EvidenceDetail
                   key={item.id}

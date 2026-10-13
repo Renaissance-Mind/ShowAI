@@ -1,6 +1,10 @@
 import { createServer } from "node:http";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import type { ModelSource } from "./types";
+import { translator } from "../i18n";
+import agentHostMessages from "../i18n/messages/agentHost";
+
+const t = translator(agentHostMessages);
 
 type ToolMap = Map<
   string,
@@ -18,7 +22,7 @@ export function chatRequest(input: Record<string, any>): {
       return;
     }
     if (!["function", "custom"].includes(tool.type))
-      throw new Error(`Chat Completions 来源不支持工具 ${tool.type}。`);
+      throw new Error(t("gateway.unsupportedTool", { type: tool.type }));
     const alias =
       `t${tools.size}_${tool.name.replace(/[^a-zA-Z0-9_-]/g, "_")}`.slice(
         0,
@@ -60,7 +64,8 @@ export function chatRequest(input: Record<string, any>): {
         ([, tool]) =>
           tool.name === item.name && tool.namespace === item.namespace,
       )?.[0];
-      if (!alias) throw new Error(`无法恢复工具调用 ${item.name}。`);
+      if (!alias)
+        throw new Error(t("gateway.unknownToolCall", { name: item.name }));
       const call = {
         id: item.call_id,
         type: "function",
@@ -101,14 +106,16 @@ export function chatRequest(input: Record<string, any>): {
                   type: "image_url",
                   image_url: { url: part.image_url },
                 };
-              throw new Error(`Chat Completions 来源不支持输入 ${part.type}。`);
+              throw new Error(
+                t("gateway.unsupportedInput", { type: part.type }),
+              );
             });
       messages.push({
         role: item.role === "developer" ? "system" : item.role,
         content,
       });
     } else if (item.type !== "reasoning")
-      throw new Error(`Chat Completions 来源不支持上下文 ${item.type}。`);
+      throw new Error(t("gateway.unsupportedContext", { type: item.type }));
   }
   return {
     body: {
@@ -145,7 +152,7 @@ export async function* sseData(body: ReadableStream<Uint8Array>) {
       }
       if (item.done) break;
     }
-    if (buffer.trim()) throw new Error("模型响应流未完整结束。");
+    if (buffer.trim()) throw new Error(t("gateway.streamIncomplete"));
   } finally {
     await reader.cancel();
     reader.releaseLock();
@@ -182,7 +189,7 @@ export async function* chatResponse(
     if (data === "[DONE]") break;
     const chunk = JSON.parse(data);
     if (chunk.error)
-      throw new Error(String(chunk.error.message ?? "模型调用失败"));
+      throw new Error(String(chunk.error.message ?? t("gateway.callFailed")));
     if (chunk.usage) usage = chunk.usage;
     const choice = chunk.choices?.[0];
     if (!choice) continue;
@@ -226,11 +233,13 @@ export async function* chatResponse(
     }
     if (choice.finish_reason) {
       if (!["stop", "tool_calls"].includes(choice.finish_reason))
-        throw new Error(`模型未完成响应：${choice.finish_reason}`);
+        throw new Error(
+          t("gateway.responseIncomplete", { reason: choice.finish_reason }),
+        );
       terminal = true;
     }
   }
-  if (!terminal) throw new Error("模型响应流中断，未收到完成事件。");
+  if (!terminal) throw new Error(t("gateway.streamInterrupted"));
   const output: any[] = [];
   if (messageStarted) {
     const item = {
@@ -257,7 +266,7 @@ export async function* chatResponse(
   }
   for (const call of calls.values()) {
     const mapped = tools.get(call.name);
-    if (!mapped) throw new Error(`模型调用了未知工具 ${call.name}。`);
+    if (!mapped) throw new Error(t("gateway.unknownTool", { name: call.name }));
     const item = {
       type: mapped.custom ? "custom_tool_call" : "function_call",
       id: "fc_" + randomUUID(),
@@ -361,7 +370,9 @@ export async function startModelGateway(
         });
         response.end(
           JSON.stringify({
-            error: { message: `模型服务拒绝调用：HTTP ${upstream.status}` },
+            error: {
+              message: t("gateway.rejected", { status: upstream.status }),
+            },
           }),
         );
         await upstream.body?.cancel();

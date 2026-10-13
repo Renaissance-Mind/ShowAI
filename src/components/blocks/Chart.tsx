@@ -15,8 +15,11 @@ import {
   text,
   toCsv,
 } from "./helpers";
-import { BlockHeader, EmptyState, Field } from "./shared";
+import { BlockHeader, EmptyState, Field, blockLabel } from "./shared";
 import type { BlockProps, ChartSeries } from "./types";
+import { getLocale } from "../../i18n";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/chart";
 
 const WIDTH = 760,
   HEIGHT = 272,
@@ -25,12 +28,13 @@ const WIDTH = 760,
   TOP = 22,
   BOTTOM = 36;
 const prettyNumber = (value: number) =>
-  new Intl.NumberFormat("zh-CN", {
+  new Intl.NumberFormat(getLocale(), {
     notation: Math.abs(value) >= 10000 ? "compact" : "standard",
     maximumFractionDigits: 2,
   }).format(value);
 
 export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
+  const t = useTranslator(messages);
   const [editing, setEditing] = useState(false);
   const [hidden, setHidden] = useState<number[]>([]);
   const [hover, setHover] = useState<number | null>(null);
@@ -48,7 +52,7 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
             item && typeof item === "object" && Array.isArray(item.values),
         )
         .map((item, index) => ({
-          name: text(item.name, `系列 ${index + 1}`),
+          name: text(item.name, t("seriesName", { index: index + 1 })),
           values: item.values.map((value: unknown) => finite(value)),
           color: /^#[0-9a-f]{3,8}$/i.test(item.color)
             ? item.color
@@ -107,7 +111,7 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
     try {
       result = parseChartData(draft);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "数据格式不正确。");
+      setError(caught instanceof Error ? caught.message : t("invalidData"));
       return;
     }
     onChange?.({ ...data, ...result, title: draftTitle, unit: draftUnit });
@@ -118,7 +122,7 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
     downloadFile(
       toCsv(
         [
-          { id: "label", name: "标签", type: "text" },
+          { id: "label", name: t("csvLabel"), type: "text" },
           ...series.map((item, index) => ({
             id: `s${index}`,
             name: item.name,
@@ -136,17 +140,17 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
           ),
         })),
       ),
-      `${text(data.title) || "图表"}.csv`,
+      `${text(data.title) || t("fileName")}.csv`,
       "text/csv;charset=utf-8",
     );
   return (
     <section
       className="sb-block sb-chart"
-      aria-label={text(data.title) || "数据图表"}
+      aria-label={blockLabel(data.title, t("dataChart"))}
     >
       <BlockHeader
         title={text(data.title)}
-        defaultTitle="数据图表"
+        defaultTitle={t("dataChart")}
         description={text(data.description)}
         icon={<ChartNoAxesCombined size={17} />}
         editable={editable}
@@ -158,17 +162,17 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
             type="button"
             className="sb-icon-button"
             onClick={exportCsv}
-            aria-label="导出图表数据"
-            title="导出 CSV"
+            aria-label={t("exportData")}
+            title={t("exportCsv")}
           >
             <Download size={15} />
           </button>
         )}
         {editable && (
-          <div className="sb-segmented" aria-label="图表类型">
+          <div className="sb-segmented" aria-label={t("chartType")}>
             <button
               type="button"
-              aria-label="折线图"
+              aria-label={t("line")}
               className={type === "line" ? "is-active" : ""}
               onClick={() => onChange?.({ ...data, type: "line" })}
             >
@@ -176,7 +180,7 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
             </button>
             <button
               type="button"
-              aria-label="柱状图"
+              aria-label={t("bar")}
               className={type === "bar" ? "is-active" : ""}
               onClick={() => onChange?.({ ...data, type: "bar" })}
             >
@@ -189,21 +193,21 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
         <BlockSettings>
           <div className="sb-editor-panel">
             <div className="sb-form-row">
-              <Field label="标题">
+              <Field label={t("title")}>
                 <input
                   value={draftTitle}
                   onChange={(event) => setDraftTitle(event.target.value)}
                 />
               </Field>
-              <Field label="单位">
+              <Field label={t("unit")}>
                 <input
-                  placeholder="例如：ms、%"
+                  placeholder={t("unitPlaceholder")}
                   value={draftUnit}
                   onChange={(event) => setDraftUnit(event.target.value)}
                 />
               </Field>
             </div>
-            <Field label="数据 · labels 是横轴，series 是数值系列">
+            <Field label={t("dataField")}>
               <textarea
                 className="sb-code-input"
                 rows={10}
@@ -224,7 +228,7 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
                 onClick={save}
               >
                 <Check size={14} />
-                应用数据
+                {t("applyData")}
               </button>
             </div>
           </div>
@@ -233,12 +237,12 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
       {!labels.length || !series.length ? (
         <EmptyState
           icon={<ChartNoAxesCombined size={30} strokeWidth={1.4} />}
-          title="让数据成为图表"
+          title={t("emptyTitle")}
           action={
             editable && !editing ? (
               <button type="button" className="sb-button" onClick={openEditor}>
                 <Database size={14} />
-                添加数据
+                {t("addData")}
               </button>
             ) : undefined
           }
@@ -265,14 +269,20 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
               </button>
             ))}
             {text(data.unit) && (
-              <span className="sb-chart-unit">单位：{text(data.unit)}</span>
+              <span className="sb-chart-unit">
+                {t("unitValue", { unit: text(data.unit) })}
+              </span>
             )}
           </div>
           <div className="sb-chart-canvas" onMouseLeave={() => setHover(null)}>
             <svg
               viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
               role="img"
-              aria-label={`${text(data.title) || "图表"}，${labels.length} 个数据点，${series.length} 个系列`}
+              aria-label={t("summary", {
+                title: text(data.title) || t("chart"),
+                points: labels.length,
+                series: series.length,
+              })}
               onPointerMove={(event) => {
                 const rect = event.currentTarget.getBoundingClientRect();
                 const relative =
@@ -464,13 +474,13 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
           </div>
           <details className="sb-data-details">
             <summary>
-              查看原始数据 <span>{labels.length} 行</span>
+              {t("rawData")} <span>{t("rows", { count: labels.length })}</span>
             </summary>
             <div className="sb-table-scroll">
               <table>
                 <thead>
                   <tr>
-                    <th>标签</th>
+                    <th>{t("label")}</th>
                     {series.map((item, index) => (
                       <th key={index}>{item.name}</th>
                     ))}

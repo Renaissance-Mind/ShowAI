@@ -340,7 +340,7 @@ function SurfaceEditor({
                     });
                   else {
                     node.type = "richText";
-                    node.attrs = { id: parentId, name: "文本" };
+                    node.attrs = { id: parentId, name: "文本" }; // i18n-exempt: default node name saved into documents
                     node.content = values.map((child) =>
                       child.attrs?.id === parentId
                         ? {

@@ -15,6 +15,8 @@ import type { JSONContent } from "@tiptap/core";
 import type { BoardTool, DrawingTool, NodeLayout } from "./types";
 import type { Camera } from "./model";
 import "./native-ink.css";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/surface";
 type Point = { x: number; y: number };
 export function Drawing({
   node,
@@ -23,6 +25,7 @@ export function Drawing({
   node: JSONContent;
   frame?: NodeLayout;
 }) {
+  const t = useTranslator(messages);
   const actions = useContext(ObjectContext);
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<{
@@ -167,7 +170,11 @@ export function Drawing({
               className="board-arrow-endpoint"
               data-surface-ui
               data-surface-handle
-              aria-label={key === "start" ? "调整箭头起点" : "调整箭头终点"}
+              aria-label={
+                key === "start"
+                  ? t("drawing.arrowStart")
+                  : t("drawing.arrowEnd")
+              }
               style={{
                 left: `${(endpoint.x / extent[0]) * 100}%`,
                 top: `${(endpoint.y / extent[1]) * 100}%`,
@@ -293,6 +300,7 @@ export function DrawingInput({
   onDraw: (node: JSONContent, frame: NodeLayout) => void;
   onExit: () => void;
 }) {
+  const t = useTranslator(messages);
   const [points, setPoints] = useState<Point[]>([]);
   const [guides, setGuides] = useState<SnapGuide[]>([]);
   const pending = useRef<{
@@ -424,7 +432,7 @@ export function DrawingInput({
       className="board-drawing-input"
       data-drawing-active={points.length > 0}
       data-board-drawing-input
-      aria-label="绘画区域"
+      aria-label={t("drawing.area")}
       tabIndex={0}
       onPointerDown={(event) => {
         if (fingerNavigatesBoard(event.pointerType)) return;

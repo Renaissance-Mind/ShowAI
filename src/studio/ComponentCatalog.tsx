@@ -11,7 +11,13 @@ import {
   Workflow,
 } from "../ui/icons";
 import type { ComponentCategory } from "../components/custom/types";
-import { reuseLabels } from "../components/custom/documentation";
+import {
+  componentCategoryLabel,
+  componentDisplayDescription,
+  componentDisplayName,
+} from "../components/component-display";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/catalog";
 import type {
   CatalogComponent,
   ComponentGroup,
@@ -38,19 +44,24 @@ export function ComponentNavigation({
   active: ComponentCategory | null;
   onSelect: (category: ComponentCategory | null) => void;
 }) {
+  const t = useTranslator(messages);
   return (
     <div className="component-type-sidebar">
-      <div className="settings-nav-label">类型</div>
-      <nav className="settings-nav component-type-nav" aria-label="组件类型">
+      <div className="settings-nav-label">{t("types")}</div>
+      <nav
+        className="settings-nav component-type-nav"
+        aria-label={t("componentTypes")}
+      >
         <button
           aria-current={active === null ? "page" : undefined}
           onClick={() => onSelect(null)}
         >
           <Blocks size={17} strokeWidth={1.7} />
-          <span>全部</span>
+          <span>{t("all")}</span>
         </button>
-        {groups.map(({ id, label, items }) => {
+        {groups.map(({ id, items }) => {
           const Icon = categoryIcons[id];
+          const label = componentCategoryLabel(id);
           return (
             <button
               key={id}
@@ -83,6 +94,7 @@ export function ComponentCatalog({
   showProjectNames?: boolean;
   query?: string;
 }) {
+  const t = useTranslator(messages);
   const theme = useAppearanceTheme(),
     [selected, setSelected] = useState<string | null>(null);
   const visible = groups.filter((group) => !category || group.id === category),
@@ -91,7 +103,13 @@ export function ComponentCatalog({
     <div className="component-catalog">
       <section
         className="component-category"
-        aria-label={`${category ? (visible[0]?.label ?? "") : "全部"}组件`}
+        aria-label={
+          category
+            ? t("categoryComponents", {
+                category: componentCategoryLabel(category),
+              })
+            : t("allComponents")
+        }
       >
         <div className="studio-component-grid">
           {items.map((item) => {
@@ -101,14 +119,7 @@ export function ComponentCatalog({
                 categoryIcons[
                   visible.find((group) => group.items.includes(item))!.id
                 ];
-            const scope = builtin
-              ? "内置"
-              : ({
-                  builtin: "内置",
-                  project: "项目",
-                  global: "全局",
-                  published: "已发布",
-                }[item.scope] ?? item.scope);
+            const scope = t(builtin ? "scope.builtin" : `scope.${item.scope}`);
             return (
               <button
                 className={`studio-component-card${selected === key ? " is-selected" : ""}`}
@@ -133,9 +144,9 @@ export function ComponentCatalog({
                         <Code2 size={20} strokeWidth={1.6} />
                       )}
                     </span>
-                    <h3>{item.name}</h3>
+                    <h3>{componentDisplayName(item)}</h3>
                   </div>
-                  <p>{item.description}</p>
+                  <p>{componentDisplayDescription(item)}</p>
                   <div className="component-card-metadata">
                     <span>
                       {showProjectNames && !builtin && item.projectName
@@ -144,11 +155,9 @@ export function ComponentCatalog({
                     </span>
                     {!builtin && <span>v{item.version}</span>}
                     <span>
-                      {
-                        reuseLabels[
-                          item.documentation?.reuse.kind ?? "unclassified"
-                        ]
-                      }
+                      {t(
+                        `reuse.${item.documentation?.reuse.kind ?? "unclassified"}`,
+                      )}
                     </span>
                   </div>
                 </div>
@@ -160,7 +169,7 @@ export function ComponentCatalog({
       {!items.length && (
         <div className="studio-empty">
           <Blocks size={30} />
-          <h2>{query ? "没有匹配的组件" : "暂无组件"}</h2>
+          <h2>{query ? t("empty.noMatches") : t("empty.none")}</h2>
         </div>
       )}
     </div>

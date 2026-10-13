@@ -16,6 +16,10 @@ import { loadRemoteComponents } from "./remote.mjs";
 import type { CompiledComponent } from "../components/custom/types";
 import { SurfaceReader } from "./SurfaceReader";
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
+import { resolveLocale, setLocale, translator } from "../i18n";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/reader";
+import common from "../i18n/messages/common";
 import "./portable.css";
 import "../design/tokens.css";
 import "../design/content.css";
@@ -26,6 +30,33 @@ const inlineHost =
   window.document
     .getElementById("root")
     ?.closest<HTMLElement>("[data-showai-inline-root]") ?? null;
+
+// The exporter records its language on <html lang> (or the inline root);
+// older exports default to zh-CN.
+setLocale(
+  resolveLocale(
+    inlineHost?.lang || window.document.documentElement.lang || navigator.language,
+  ),
+);
+const translate = translator(messages);
+
+/** Remote loader errors carry a code so the reader can explain them in its own language. */
+function remoteErrorMessage(error: unknown): string {
+  const { code, params } = (error ?? {}) as {
+    code?: string;
+    params?: { component?: string; reason?: string };
+  };
+  const component = params?.component ?? "";
+  if (code === "INTEGRITY_UNAVAILABLE") return translate("integrityUnavailable");
+  if (code === "COMPONENT_FETCH_FAILED")
+    return translate("componentFetchFailed", {
+      component,
+      reason: params?.reason || translate("networkFailed"),
+    });
+  if (code === "COMPONENT_CHECKSUM_FAILED")
+    return translate("componentChecksumFailed", { component });
+  return error instanceof Error ? error.message : translate("remoteLoadFailed");
+}
 
 function downloadSource(
   document: ShowDocument,
@@ -58,6 +89,8 @@ function downloadSource(
 }
 
 function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
+  const t = useTranslator(messages);
+  const tc = useTranslator(common);
   const { document } = artifact;
   const draftPreview = useMemo(() => {
     const options = window.document.getElementById(
@@ -84,7 +117,7 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
   useEffect(() => {
     if (!artifact.remoteComponents?.length) return;
     if (inlineHost) {
-      setRemoteError("对话内页面必须完整打包组件，不能使用远程依赖。");
+      setRemoteError(t("remoteInlineBlocked"));
       setRemoteLoading(false);
       return;
     }
@@ -102,11 +135,7 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
       })
       .catch((error) => {
         if (active)
-          setRemoteError(
-            error instanceof Error
-              ? error.message
-              : "远程组件无法加载，请检查网络。",
-          );
+          setRemoteError(remoteErrorMessage(error));
       })
       .finally(() => {
         if (active) setRemoteLoading(false);
@@ -145,14 +174,14 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
     >
       {draftPreview && (
         <div className="portable-draft-note" role="status">
-          交互预览 · 更改仅保存在此预览中
+          {t("draftNote")}
         </div>
       )}
       <div className="portable-options" ref={menuRef}>
         <button
           ref={menuButtonRef}
           className="portable-options-trigger"
-          aria-label="页面选项"
+          aria-label={tc("pageOptions")}
           aria-expanded={menuOpen}
           aria-controls="page-options"
           onClick={() => setMenuOpen(!menuOpen)}
@@ -174,7 +203,9 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
               }}
             >
               <Download size={15} />{" "}
-              {draftPreview ? "下载原始源文件" : "下载源文件"}
+              {draftPreview
+                ? t("downloadOriginalSource")
+                : tc("downloadSource")}
             </button>
             <button
               onClick={() => {
@@ -183,7 +214,7 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
               }}
             >
               {dark ? <Sun size={15} /> : <Moon size={15} />}
-              {dark ? "浅色外观" : "深色外观"}
+              {dark ? tc("lightAppearance") : tc("darkAppearance")}
             </button>
             <button
               onClick={() => {
@@ -191,7 +222,7 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
                 window.print();
               }}
             >
-              <Printer size={15} /> 打印
+              <Printer size={15} /> {tc("print")}
             </button>
           </div>
         )}
@@ -221,8 +252,8 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
               {!!artifact.remoteComponents?.length && (
                 <p className="portable-network-note">
                   {remoteLoading
-                    ? "正在校验并加载已发布的固定版本组件…"
-                    : "此页面使用已发布的固定版本组件，需要联网加载。"}
+                    ? t("remoteLoading")
+                    : t("remoteRequired")}
                 </p>
               )}
               {remoteError && (
@@ -239,22 +270,24 @@ function ArtifactReader({ artifact }: { artifact: ShowArtifact }) {
 }
 
 function App() {
+  const t = useTranslator(messages);
   useLayoutEffect(() => installIconTooltips(window.document), []);
   const result = useMemo(() => {
     const raw = window.document.getElementById("showai-data")?.textContent;
-    if (!raw || raw.trim() === "null") return { error: "页面内容为空。" };
+    if (!raw || raw.trim() === "null") return { error: translate("emptyPage") };
     try {
       return { artifact: parseArtifact(raw) };
     } catch (error) {
       return {
-        error: error instanceof Error ? error.message : "无法读取这份页面。",
+        error:
+          error instanceof Error ? error.message : translate("unreadablePage"),
       };
     }
   }, []);
   if (!result.artifact)
     return (
       <main className="portable-error">
-        <h1>无法打开页面</h1>
+        <h1>{t("openFailed")}</h1>
         <p>{result.error}</p>
       </main>
     );

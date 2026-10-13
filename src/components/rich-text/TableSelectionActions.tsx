@@ -6,6 +6,8 @@ import {
   documentTableActionMeta,
   documentTableSelection,
 } from "./table-selection";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/richText";
 
 /** Shared actions for the selection and context menu slots. */
 export function TableSelectionActions({
@@ -17,6 +19,7 @@ export function TableSelectionActions({
   context?: boolean;
   onAction?: () => void;
 }) {
+  const t = useTranslator(messages);
   const selected = documentTableSelection(editor.state);
   if (!selected && !context && !editor.can().splitCell()) return null;
   const run = (command: "mergeCells" | "splitCell") => {
@@ -35,19 +38,22 @@ export function TableSelectionActions({
       <div
         className="editor-table-actions"
         role="group"
-        aria-label="单元格操作"
+        aria-label={t("table.cellActions")}
       >
         {selected && (
           <span className="editor-menu-status" role="status">
             {selected.rows === 1 && selected.columns === 1
-              ? "按住 Shift 点击另一单元格"
-              : `已选 ${selected.rows} 行 × ${selected.columns} 列`}
+              ? t("table.shiftClickHint")
+              : t("table.selectedCells", {
+                  rows: selected.rows,
+                  columns: selected.columns,
+                })}
           </span>
         )}
         {(
           [
-            ["mergeCells", "合并单元格", TableCellsMerge],
-            ["splitCell", "拆分单元格", TableCellsSplit],
+            ["mergeCells", t("table.mergeCells"), TableCellsMerge],
+            ["splitCell", t("table.splitCell"), TableCellsSplit],
           ] as const
         ).map(([command, label, Icon]) => (
           <button
@@ -69,8 +75,8 @@ export function TableSelectionActions({
           <button
             type="button"
             className="editor-tool"
-            aria-label="取消单元格选择"
-            title="取消单元格选择"
+            aria-label={t("table.clearSelection")}
+            title={t("table.clearSelection")}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
               editor.view.dispatch(

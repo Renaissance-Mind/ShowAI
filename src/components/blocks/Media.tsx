@@ -2,10 +2,12 @@ import { useState } from "react";
 import { FileText, Music2, Video } from "../../ui/icons";
 import { safeImageUrl, text } from "./helpers";
 import { safeResourceUrl } from "./research-contract.mjs";
-import { BlockHeader, EmptyState } from "./shared";
+import { BlockHeader, EmptyState, blockLabel } from "./shared";
 import { ResourceEditor } from "./ResourceEditor";
 import type { BlockProps } from "./types";
 import "./research-media.css";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/media";
 
 function MediaBlock({
   kind,
@@ -13,16 +15,17 @@ function MediaBlock({
   onChange,
   readOnly,
 }: BlockProps & { kind: "video" | "audio" }) {
+  const t = useTranslator(messages);
   const [editing, setEditing] = useState(false);
   const [failed, setFailed] = useState("");
   const editable = Boolean(onChange && !readOnly);
   const src = safeResourceUrl(kind, data.src);
-  const label = kind === "video" ? "视频" : "音频";
+  const label = kind === "video" ? t("video") : t("audio");
   const Icon = kind === "video" ? Video : Music2;
   return (
     <section
       className={`sb-block sb-media sb-${kind}`}
-      aria-label={text(data.title) || label}
+      aria-label={blockLabel(data.title, label)}
     >
       {(kind === "audio" || !src) && (
         <BlockHeader
@@ -69,7 +72,7 @@ function MediaBlock({
                   ),
                 }}
                 src={src}
-                aria-label={text(data.title) || "视频播放器"}
+                aria-label={blockLabel(data.title, t("videoPlayer"))}
                 onError={() => setFailed(src)}
               />
             </div>
@@ -80,7 +83,7 @@ function MediaBlock({
               </div>
               <div className="sb-audio-track">
                 <div className="sb-audio-name">
-                  {text(data.title) || text(data.fileName) || "音频"}
+                  {text(data.title) || text(data.fileName) || t("audio")}
                 </div>
                 <audio
                   key={src}
@@ -88,7 +91,7 @@ function MediaBlock({
                   preload="metadata"
                   src={src}
                   loop={data.loop === true}
-                  aria-label={text(data.title) || "音频播放器"}
+                  aria-label={blockLabel(data.title, t("audioPlayer"))}
                   onError={() => setFailed(src)}
                 />
               </div>
@@ -96,14 +99,14 @@ function MediaBlock({
           )}
           {failed === src && (
             <p className="sb-error" role="alert">
-              文件无法播放，请检查地址、网络或文件编码。
+              {t("playFailed")}{" "}
               <a
                 href={src}
                 download={text(data.fileName) || undefined}
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                打开原文件
+                {t("openOriginal")}
               </a>
             </p>
           )}
@@ -116,8 +119,8 @@ function MediaBlock({
       ) : (
         <EmptyState
           icon={<Icon size={28} strokeWidth={1.4} />}
-          title={`添加${label}`}
-          description="上传本地文件或填写在线文件地址"
+          title={kind === "video" ? t("addVideo") : t("addAudio")}
+          description={t("emptyDescription")}
           action={
             editable && !editing ? (
               <button
@@ -126,7 +129,7 @@ function MediaBlock({
                 onClick={() => setEditing(true)}
               >
                 <FileText size={14} />
-                选择文件
+                {t("chooseFile")}
               </button>
             ) : undefined
           }

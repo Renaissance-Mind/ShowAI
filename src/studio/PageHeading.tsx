@@ -2,6 +2,9 @@ import { useLayoutEffect, useRef } from "react";
 import PageIcon from "../components/PageIcon";
 import { ImagePlus } from "../ui/icons";
 import "./page-heading.css";
+import { useTranslator } from "../i18n/react";
+import commonMessages from "../i18n/messages/common";
+import studioMessages from "../i18n/messages/studio";
 
 export default function PageHeading({
   title,
@@ -16,6 +19,8 @@ export default function PageHeading({
   onTitleChange: (title: string) => void;
   onEditIcon: () => void;
 }) {
+  const t = useTranslator(studioMessages);
+  const tc = useTranslator(commonMessages);
   const input = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
     const element = input.current;
@@ -43,8 +48,8 @@ export default function PageHeading({
         <button
           type="button"
           className={`studio-page-heading-icon${icon ? "" : " is-empty"}`}
-          aria-label={icon ? "设置页面图标" : "添加图标"}
-          title={icon ? "设置页面图标" : "添加图标"}
+          aria-label={icon ? t("setPageIcon") : t("addIcon")}
+          title={icon ? t("setPageIcon") : t("addIcon")}
           aria-haspopup="dialog"
           onClick={onEditIcon}
         >
@@ -52,13 +57,13 @@ export default function PageHeading({
         </button>
       )}
       {readOnly ? (
-        <h1 className="studio-page-heading-title">{title || "无标题"}</h1>
+        <h1 className="studio-page-heading-title">{title || tc("untitled")}</h1>
       ) : (
         <textarea
           ref={input}
           className="studio-page-heading-title"
-          aria-label="正文页面标题"
-          placeholder="无标题"
+          aria-label={t("bodyPageTitle")}
+          placeholder={tc("untitled")}
           rows={1}
           maxLength={1000}
           value={title}

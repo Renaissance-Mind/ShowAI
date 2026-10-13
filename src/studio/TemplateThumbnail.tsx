@@ -6,6 +6,8 @@ import type { TemplateMetadata } from "../components/custom/types";
 import type { LoadedTemplate } from "./CatalogDialogs";
 import CatalogPreview from "./CatalogPreview";
 import { desktop, errorMessage } from "./bridge";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/catalog";
 const cache = new Map<string, Promise<LoadedTemplate>>();
 let queue = Promise.resolve();
 function readTemplate(item: TemplateMetadata, projectId?: string) {
@@ -37,6 +39,7 @@ export default function TemplateThumbnail({
   item: TemplateMetadata;
   projectId?: string;
 }) {
+  const t = useTranslator(messages);
   const host = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false),
     [loaded, setLoaded] = useState<{ key: string; record: LoadedTemplate }>(),
@@ -73,7 +76,7 @@ export default function TemplateThumbnail({
         <CustomComponentsProvider components={record.components ?? []}>
           <CatalogPreview
             thumbnail
-            label={`${item.name}缩略预览`}
+            label={t("thumbnailTitle", { name: item.name })}
             resetKey={key}
             width={960}
           >
@@ -88,7 +91,7 @@ export default function TemplateThumbnail({
       ) : error ? (
         <span className="component-preview-error" title={error}>
           <ImageOff size={18} />
-          预览暂不可用
+          {t("previewUnavailable")}
         </span>
       ) : (
         <Loader2 size={18} className="studio-spin component-preview-loading" />

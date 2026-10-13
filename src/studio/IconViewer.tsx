@@ -15,30 +15,35 @@ import {
   LayoutDashboard,
   Settings2,
 } from "../ui/icons";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/icons";
 import "./icon-viewer.css";
 
-function category(name: string) {
+type Category = "text" | "content" | "files" | "navigation" | "actions";
+type Group = Category | "all";
+
+function category(name: string): Category {
   if (
     /Align|Bold|Heading|Highlighter|Italic|List|Quote|Strikethrough|Type|Underline|Code/.test(
       name,
     )
   )
-    return "文字与排版";
+    return "text";
   if (
     /Chart|Columns|Database|Flask|Gauge|Image|Table|Workflow|Puzzle|Blocks/.test(
       name,
     )
   )
-    return "内容与数据";
+    return "content";
   if (/File|Folder|Package|Download|Upload|Printer|Copy|History/.test(name))
-    return "文件与项目";
+    return "files";
   if (
     /Arrow|Chevron|Expand|Focus|Grip|Layout|Maximize|Mouse|Panel|Square|Circle|Layers/.test(
       name,
     )
   )
-    return "导航与画布";
-  return "操作与状态";
+    return "navigation";
+  return "actions";
 }
 
 // This is the application's shared export list, never a second list of icons.
@@ -48,13 +53,13 @@ const catalog = Object.entries(icons).map(([name, Icon]) => ({
   category: category(name),
 }));
 const categories = [...new Set(catalog.map((item) => item.category))];
-const categoryIcons = {
-  全部: Shapes,
-  文字与排版: Type,
-  内容与数据: Database,
-  文件与项目: Folder,
-  导航与画布: LayoutDashboard,
-  操作与状态: Settings2,
+const categoryIcons: Record<Group, typeof Shapes> = {
+  all: Shapes,
+  text: Type,
+  content: Database,
+  files: Folder,
+  navigation: LayoutDashboard,
+  actions: Settings2,
 };
 const defaults = {
   size: 24,
@@ -64,8 +69,9 @@ const defaults = {
 };
 
 export default function IconViewer() {
+  const t = useTranslator(messages);
   const [query, setQuery] = useState("");
-  const [group, setGroup] = useState("全部");
+  const [group, setGroup] = useState<Group>("all");
   const [selected, setSelected] = useState(catalog[0].name);
   const [preview, setPreview] = useState(defaults);
   const [notice, setNotice] = useState("");
@@ -75,12 +81,12 @@ export default function IconViewer() {
     () =>
       catalog.filter(
         (item) =>
-          (group === "全部" || item.category === group) &&
-          `${item.name} ${item.category}`
+          (group === "all" || item.category === group) &&
+          `${item.name} ${t(`category.${item.category}`)}`
             .toLowerCase()
             .includes(query.trim().toLowerCase()),
       ),
-    [group, query],
+    [group, query, t],
   );
   const current = catalog.find((item) => item.name === selected) ?? catalog[0];
   const Icon = current.Icon;
@@ -102,7 +108,9 @@ export default function IconViewer() {
       setNotice(message);
     } catch (reason) {
       setError(
-        `复制失败：${reason instanceof Error ? reason.message : String(reason)}`,
+        t("copyFailed", {
+          error: reason instanceof Error ? reason.message : String(reason),
+        }),
       );
     }
   };
@@ -117,26 +125,25 @@ export default function IconViewer() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   return (
-    <section className="icon-viewer" aria-label="应用图标浏览器">
+    <section className="icon-viewer" aria-label={t("browser")}>
       <div className="icon-viewer-tools">
         <ExpandableSearch
-          label="搜索图标"
-          placeholder="搜索图标名称或分类…"
+          label={t("search")}
+          placeholder={t("searchPlaceholder")}
           value={query}
           onChange={setQuery}
         />
         <span className="icon-viewer-count" aria-live="polite">
-          {visible.length} / {catalog.length} 个图标
+          {t("count", { visible: visible.length, count: catalog.length })}
         </span>
       </div>
       <div
         className="icon-viewer-categories"
         role="group"
-        aria-label="图标分类"
+        aria-label={t("categories")}
       >
-        {["全部", ...categories].map((item) => {
-          const CategoryIcon =
-            categoryIcons[item as keyof typeof categoryIcons];
+        {(["all", ...categories] as Group[]).map((item) => {
+          const CategoryIcon = categoryIcons[item];
           return (
             <button
               key={item}
@@ -144,13 +151,13 @@ export default function IconViewer() {
               onClick={() => setGroup(item)}
             >
               <CategoryIcon size={14} aria-hidden="true" />
-              {item}
+              {t(`category.${item}`)}
             </button>
           );
         })}
       </div>
       <div className="icon-viewer-layout">
-        <div className="icon-viewer-grid" role="group" aria-label="图标列表">
+        <div className="icon-viewer-grid" role="group" aria-label={t("list")}>
           {visible.map(({ name, Icon }) => (
             <button
               key={name}
@@ -179,19 +186,19 @@ export default function IconViewer() {
           {!visible.length && (
             <div className="icon-viewer-empty">
               <Search size={28} />
-              <p>没有找到图标</p>
+              <p>{t("empty")}</p>
               <button
                 onClick={() => {
                   setQuery("");
-                  setGroup("全部");
+                  setGroup("all");
                 }}
               >
-                显示全部图标
+                {t("showAll")}
               </button>
             </div>
           )}
         </div>
-        <aside className="icon-viewer-detail" aria-label="图标详情">
+        <aside className="icon-viewer-detail" aria-label={t("detail")}>
           <div
             className={`icon-viewer-specimen preview-${preview.background}`}
             ref={specimen}
@@ -204,12 +211,12 @@ export default function IconViewer() {
             />
           </div>
           <h2>{current.name}</h2>
-          <p>{current.category} · Lucide</p>
+          <p>{t(`category.${current.category}`)} · Lucide</p>
           <div className="icon-viewer-controls">
             <label>
-              尺寸 <output>{preview.size} px</output>
+              {t("size")} <output>{preview.size} px</output>
               <input
-                aria-label="图标尺寸"
+                aria-label={t("sizeLabel")}
                 type="range"
                 min={12}
                 max={64}
@@ -221,9 +228,9 @@ export default function IconViewer() {
               />
             </label>
             <label>
-              线宽 <output>{preview.stroke}</output>
+              {t("stroke")} <output>{preview.stroke}</output>
               <input
-                aria-label="图标线宽"
+                aria-label={t("strokeLabel")}
                 type="range"
                 min={1}
                 max={3}
@@ -235,9 +242,9 @@ export default function IconViewer() {
               />
             </label>
             <label className="icon-viewer-color">
-              颜色{" "}
+              {t("color")}{" "}
               <input
-                aria-label="图标颜色"
+                aria-label={t("colorLabel")}
                 type="color"
                 value={preview.color}
                 onChange={(event) =>
@@ -249,7 +256,7 @@ export default function IconViewer() {
             <div
               className="icon-viewer-background"
               role="group"
-              aria-label="预览背景"
+              aria-label={t("background")}
             >
               <button
                 aria-pressed={preview.background === "light"}
@@ -262,7 +269,7 @@ export default function IconViewer() {
                 }
               >
                 <Sun size={14} />
-                浅色
+                {t("light")}
               </button>
               <button
                 aria-pressed={preview.background === "dark"}
@@ -275,11 +282,11 @@ export default function IconViewer() {
                 }
               >
                 <Moon size={14} />
-                深色
+                {t("dark")}
               </button>
               <button
-                aria-label="重置图标预览"
-                title="重置图标预览"
+                aria-label={t("reset")}
+                title={t("reset")}
                 onClick={() => setPreview(defaults)}
               >
                 <RotateCcw size={14} />
@@ -287,17 +294,17 @@ export default function IconViewer() {
             </div>
           </div>
           <div className="icon-viewer-actions">
-            <button onClick={() => void copy(current.name, "已复制图标名称")}>
+            <button onClick={() => void copy(current.name, t("copiedName"))}>
               <Copy size={14} />
-              复制名称
+              {t("copyName")}
             </button>
-            <button onClick={() => void copy(svg(), "已复制 SVG")}>
+            <button onClick={() => void copy(svg(), t("copiedSvg"))}>
               <Copy size={14} />
-              复制 SVG
+              {t("copySvg")}
             </button>
             <button onClick={download}>
               <Download size={14} />
-              下载 SVG
+              {t("downloadSvg")}
             </button>
           </div>
           <div role="status" className="icon-viewer-status">

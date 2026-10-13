@@ -2,6 +2,10 @@ import { useContext, useEffect, useRef, useSyncExternalStore } from "react";
 import { EditorViewScope } from "../editor/view-scope";
 import { fingerNavigatesBoard } from "./board-input.mjs";
 import { GESTURE_IDLE, normalizedWheel, zoomAt, type Camera } from "./model";
+import { translator } from "../i18n";
+import messages from "../i18n/messages/surface";
+
+const t = translator(messages);
 import {
   clamp,
   nearestSnap,
@@ -201,7 +205,7 @@ export function useSurfaceViewport(
           const rect = element.getBoundingClientRect();
           return {
             id: element.dataset.surfaceId!,
-            label: element.dataset.surfaceName || "内容区域",
+            label: element.dataset.surfaceName || t("node.region"),
             x: (rect.left - base.left) / scale,
             y: (rect.top - base.top) / scale,
             width: rect.width / scale,
@@ -285,7 +289,7 @@ export function useSurfaceViewport(
         scale = camera.current.scale;
       return {
         id,
-        label: "内容",
+        label: t("node.content"),
         x: (rect.left - base.left) / scale,
         y: (rect.top - base.top) / scale,
         width: rect.width / scale,

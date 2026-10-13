@@ -2,6 +2,10 @@ import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import { remapSurfaceIds, visitNodes } from "./document.mjs";
 import { createSurface } from "./containers.mjs";
+import { translator } from "../i18n";
+import messages from "../i18n/messages/surface";
+
+const t = translator(messages);
 
 const moduleJSON = new WeakMap<JSONContent, JSONContent>();
 
@@ -42,7 +46,7 @@ export function toPageEditor(
     while (ids.has(paragraphId)) paragraphId += "-copy";
     content!.push({
       type: "richText",
-      attrs: { id, name: "富文本" },
+      attrs: { id, name: "富文本" }, // i18n-exempt: default node name saved into documents
       content: [{ type: "paragraph", attrs: { id: paragraphId } }],
     });
   }
@@ -70,7 +74,7 @@ export function fromPageEditor(
     }
     const original = structuredClone(node.attrs!.node) as JSONContent;
     if (original.attrs!.id !== node.attrs!.id) {
-      if (!source) throw new Error("复制嵌入内容需要来源文档的布局与视图。");
+      if (!source) throw new Error(t("error.embedNeedsSource"));
       const ids = new Set<string>();
       visitNodes(original, (child) => {
         if (child.attrs?.id) ids.add(child.attrs.id);

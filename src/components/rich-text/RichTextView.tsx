@@ -3,6 +3,10 @@ import { createElement, type CSSProperties, type ReactNode } from "react";
 import type { JSONContent } from "@tiptap/core";
 import { mathHtml } from "../blocks/markdown-math.mjs";
 import { safeImageUrl, safeUrl } from "../blocks/helpers";
+import { translator } from "../../i18n";
+import messages from "../../i18n/messages/richText";
+
+const t = translator(messages);
 function nodeStyle(node: JSONContent): CSSProperties {
   const attrs = node.attrs ?? {};
   return {
@@ -279,7 +283,9 @@ export function RichTextNode({
     case "toggle":
       return (
         <details {...props} className="portable-toggle" open={!!attrs.open}>
-          <summary>{attrs.title || attrs.summary || "展开内容"}</summary>
+          <summary>
+            {attrs.title || attrs.summary || t("toggle.expand")}
+          </summary>
           <div className="portable-toggle-body">{children}</div>
         </details>
       );

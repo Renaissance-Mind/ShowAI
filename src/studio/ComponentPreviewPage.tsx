@@ -8,7 +8,11 @@ import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import { componentWidgetData } from "../components/custom/contract";
 import { Widget } from "../components/blocks/Widget";
 import { desktop, errorMessage } from "./bridge";
+import { translator } from "../i18n";
+import messages from "../i18n/messages/catalog";
 import "./component-preview.css";
+
+const t = translator(messages);
 
 export default function ComponentPreviewPage() {
   const [component, setComponent] = useState<
@@ -82,7 +86,7 @@ export default function ComponentPreviewPage() {
         ? Promise.resolve()
         : new Promise<void>((resolve, reject) => {
             timeout = setTimeout(
-              () => reject(new Error("组件示例加载超时。")),
+              () => reject(new Error(t("exampleTimeout"))),
               10000,
             );
             receive = (event: MessageEvent) => {
@@ -108,11 +112,11 @@ export default function ComponentPreviewPage() {
         )
       ) {
         if (cancelled) return;
-        if (Date.now() >= deadline) throw new Error("组件示例加载超时。");
+        if (Date.now() >= deadline) throw new Error(t("exampleTimeout"));
         await new Promise((resolve) => setTimeout(resolve, 30));
       }
       const failure = element.querySelector('[role="alert"]');
-      if (failure) throw new Error(failure.textContent || "组件无法显示。");
+      if (failure) throw new Error(failure.textContent || t("cannotDisplay"));
       await document.fonts.ready;
       await Promise.all(
         [...element.querySelectorAll("img")].map((img) => img.decode()),

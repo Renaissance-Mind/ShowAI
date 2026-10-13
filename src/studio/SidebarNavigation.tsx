@@ -1,11 +1,13 @@
 import { History, LayoutTemplate, Blocks, Settings2 } from "../ui/icons";
+import { useTranslator } from "../i18n/react";
+import sidebarMessages from "../i18n/messages/sidebar";
 export type SidebarSection = "recent" | "templates" | "components" | "settings";
 
 const sections = [
-  ["recent", "最近", History],
-  ["templates", "模板", LayoutTemplate],
-  ["components", "组件", Blocks],
-  ["settings", "设置", Settings2],
+  ["recent", "nav.recent", History],
+  ["templates", "nav.templates", LayoutTemplate],
+  ["components", "nav.components", Blocks],
+  ["settings", "nav.settings", Settings2],
 ] as const;
 
 export default function SidebarNavigation({
@@ -13,16 +15,17 @@ export default function SidebarNavigation({
 }: {
   onSelect: (section: SidebarSection) => void;
 }) {
+  const t = useTranslator(sidebarMessages);
   return (
     <nav
       className="studio-sidebar-bottom studio-main-nav"
-      aria-label="主要导航"
+      aria-label={t("nav.main")}
     >
       {sections.map(([section, label, Icon]) => (
         <button
           key={section}
-          aria-label={label}
-          title={label}
+          aria-label={t(label)}
+          title={t(label)}
           onClick={() => onSelect(section)}
         >
           <Icon size={15} aria-hidden="true" />

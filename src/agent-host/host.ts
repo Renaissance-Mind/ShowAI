@@ -40,6 +40,10 @@ import type {
   LocalAgent,
   ModelSource,
 } from "./types";
+import { translator } from "../i18n";
+import agentHostMessages from "../i18n/messages/agentHost";
+
+const t = translator(agentHostMessages);
 
 const sourceSchema = z.object({
   id: z.string().uuid(),
@@ -214,12 +218,12 @@ export class AgentHost {
       new Set(settings.sources.map((source) => source.id)).size !==
       settings.sources.length
     )
-      throw new Error("来源 ID 重复。");
+      throw new Error(t("source.duplicateId"));
     if (
       settings.sourceId &&
       !settings.sources.some((source) => source.id === settings.sourceId)
     )
-      throw new Error("请选择已有的模型来源。");
+      throw new Error(t("source.selectExisting"));
     for (const source of settings.sources) {
       const url = new URL(source.baseUrl);
       if (
@@ -233,16 +237,14 @@ export class AgentHost {
             ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)
           ))
       )
-        throw new Error(
-          "模型地址需使用 HTTPS；本机服务可以使用 HTTP。地址中不能包含凭据。",
-        );
+        throw new Error(t("source.insecureUrl"));
       if (
         source.credential === "chatgpt" &&
         (source.provider !== "chatgpt" ||
           source.baseUrl !== "https://api.openai.com/v1" ||
           source.protocol !== "responses")
       )
-        throw new Error("ChatGPT 授权只能用于官方 Responses API。");
+        throw new Error(t("source.chatgptOfficialOnly"));
     }
     await writeProtected(join(this.options.root, "settings.json"), settings);
     return this.status();
@@ -251,7 +253,7 @@ export class AgentHost {
     const source = sourceSchema.parse(input),
       settings = await this.settings();
     if (source.hosted && apiKey !== undefined)
-      throw new Error("这份凭据由来源服务器管理，请在来源服务器更新。");
+      throw new Error(t("source.hostedCredential"));
     if (
       apiKey !== undefined &&
       (source.credential !== "api-key" ||
@@ -261,13 +263,13 @@ export class AgentHost {
       throw new Error("Invalid API credential.");
     const previous = settings.sources.find((item) => item.id === source.id);
     if (previous && previous.credential !== source.credential)
-      throw new Error("请先移除原来源，再添加不同类型的连接。");
+      throw new Error(t("source.credentialTypeChanged"));
     if (
       this.tasks.some(
         (task) => task.state === "running" && task.sourceId === source.id,
       )
     )
-      throw new Error("请先停止使用此来源的任务，再修改连接。");
+      throw new Error(t("source.inUse"));
     const index = settings.sources.findIndex((item) => item.id === source.id);
     if (index < 0) settings.sources.push(source);
     else settings.sources[index] = source;
@@ -292,7 +294,7 @@ export class AgentHost {
     if (
       this.tasks.some((task) => task.state === "running" && task.mode === "api")
     )
-      throw new Error("请先停止正在使用模型来源的任务。");
+      throw new Error(t("source.stopTasksFirst"));
     const settings = await this.settings(),
       source = settings.sources.find((item) => item.id === id);
     if (source?.credential === "chatgpt" && !source.hosted)
@@ -318,12 +320,12 @@ export class AgentHost {
             path: null,
             version: "",
             auth: "missing",
-            detail: "未找到程序",
+            detail: t("agent.notFound"),
             callable: null,
           };
         let version = "",
           auth: LocalAgent["auth"] = "unknown",
-          detail = "已找到程序，运行连接测试可确认调用能力";
+          detail = t("agent.found");
         try {
           const result = await execute(path, ["--version"], { timeout: 10000 });
           version = (result.stdout || result.stderr).trim().slice(0, 120);
@@ -333,7 +335,7 @@ export class AgentHost {
             });
             auth = result.code === 0 ? "ready" : "missing";
             detail =
-              auth === "ready" ? "已有 Codex 登录" : "请先在本机 Codex 中登录";
+              auth === "ready" ? t("agent.codexReady") : t("agent.codexSignIn");
           } else if (definition.id === "kimi") {
             const result = await execute(path, ["provider", "list"], {
               timeout: 10000,
@@ -345,8 +347,8 @@ export class AgentHost {
                 : "unknown";
             detail =
               result.code === 0
-                ? "已配置 Kimi 模型来源，调用测试会确认登录是否有效"
-                : "需要运行连接测试确认登录";
+                ? t("agent.kimiConfigured")
+                : t("agent.testToConfirm");
           }
         } catch (error) {
           detail = error instanceof Error ? error.message : String(error);
@@ -369,12 +371,12 @@ export class AgentHost {
     const source = (await this.settings()).sources.find(
       (item) => item.id === id,
     );
-    if (!source) throw new Error("请选择模型来源。");
+    if (!source) throw new Error(t("source.select"));
     return source;
   }
   async token(source: ModelSource, force = false) {
     if (source.hosted) {
-      if (!this.options.resources) throw new Error("服务器资源管理尚未连接。");
+      if (!this.options.resources) throw new Error(t("resources.notConnected"));
       return (await this.options.resources.token(source.hosted, source, force))
         .token;
     }
@@ -389,7 +391,7 @@ export class AgentHost {
         new URL(source.baseUrl).hostname,
       )
     )
-      throw new Error("请保存此来源的 API Key。");
+      throw new Error(t("source.saveApiKey"));
     return saved?.apiKey ?? "local";
   }
   async models(id: string) {
@@ -403,9 +405,7 @@ export class AgentHost {
       },
     );
     if (!response.ok)
-      throw new Error(
-        `无法获取模型列表：HTTP ${response.status}。可在来源中填写模型名称。`,
-      );
+      throw new Error(t("source.modelsFailed", { status: response.status }));
     const result = (await response.json()) as { data?: any[]; models?: any[] };
     return (result.models ?? result.data ?? [])
       .filter(
@@ -418,21 +418,20 @@ export class AgentHost {
   }
   async authorize(id: string) {
     const source = await this.source(id);
-    if (source.hosted)
-      throw new Error("请在资源来源设备重新授权，再保存到来源服务器。");
+    if (source.hosted) throw new Error(t("source.reauthorizeOnOrigin"));
     if (source.credential !== "chatgpt")
-      throw new Error("此来源使用 API Key。");
+      throw new Error(t("source.usesApiKey"));
     const result = await this.chatgpt.start(id);
     await this.options.openUrl?.(result.url);
     return this.options.openUrl ? { pending: true } : result;
   }
   async addServerResource(id: string) {
-    if (!this.options.resources) throw new Error("服务器资源管理尚未连接。");
+    if (!this.options.resources) throw new Error(t("resources.notConnected"));
     const resource: ResolvedResource | undefined = (
       await this.options.resources.list()
     ).find((item) => item.id === id);
     if (!resource?.available || !resource.connected)
-      throw new Error("这份服务器资源尚不可用，请刷新来源列表。");
+      throw new Error(t("resources.unavailable"));
     const existing = (await this.settings()).sources.find(
       (item) =>
         item.hosted?.connectionId === resource.connectionId &&
@@ -465,14 +464,14 @@ export class AgentHost {
     return this.saveSource(source);
   }
   async publishSource(id: string, connectionId: string) {
-    if (!this.options.resources) throw new Error("服务器资源管理尚未连接。");
+    if (!this.options.resources) throw new Error(t("resources.notConnected"));
     if (
       this.chatgpt.state.state === "pending" ||
       this.tasks.some(
         (task) => task.state === "running" && task.sourceId === id,
       )
     )
-      throw new Error("请先完成账号授权或停止使用这份来源的任务。");
+      throw new Error(t("publish.finishFirst"));
     const transferPath = join(
       this.options.root,
       "credentials",
@@ -489,11 +488,9 @@ export class AgentHost {
           secret: Record<string, unknown>;
         }>(transferPath);
         if (current.hosted && !pending)
-          throw new Error("这份来源已经由服务器管理。");
+          throw new Error(t("publish.alreadyHosted"));
         if (pending && pending.connectionId !== connectionId)
-          throw new Error(
-            "这份授权仍在保存到另一台服务器，请先完成原来的保存。",
-          );
+          throw new Error(t("publish.pendingElsewhere"));
         if (!pending) {
           const saved =
             current.credential === "chatgpt"
@@ -505,13 +502,13 @@ export class AgentHost {
             !saved ||
             ("refreshOwner" in saved && saved.refreshOwner !== "local")
           )
-            throw new Error("请先在本设备完成来源授权。");
+            throw new Error(t("publish.authorizeLocally"));
           if (
             "refreshOwner" in saved &&
             (saved.refreshOwner !== "local" ||
               !saved.scopes.includes("chatgpt.tokens.use.direct"))
           )
-            throw new Error("请先授权使用 ChatGPT 套餐，再保存到服务器。");
+            throw new Error(t("publish.authorizeChatgptPlan"));
           pending = {
             source: current,
             connectionId,
@@ -613,7 +610,9 @@ export class AgentHost {
       });
       if (result.code !== 0)
         throw new Error(
-          `ShowAI 插件安装失败：${result.stderr || result.stdout}`,
+          t("isolation.pluginInstallFailed", {
+            detail: result.stderr || result.stdout,
+          }),
         );
       if (args[1] === "add")
         installedPath = JSON.parse(result.stdout).installedPath;
@@ -623,7 +622,7 @@ export class AgentHost {
       cwd: this.workspaceRoot,
       timeout: 30000,
     });
-    if (listing.code !== 0) throw new Error("无法验证独立插件安装。");
+    if (listing.code !== 0) throw new Error(t("isolation.verifyPluginFailed"));
     const plugins = JSON.parse(listing.stdout);
     if (
       plugins.installed?.length !== 1 ||
@@ -631,13 +630,13 @@ export class AgentHost {
       !plugins.installed[0].installed ||
       !plugins.installed[0].enabled
     )
-      throw new Error("独立运行时必须仅启用 ShowAI 插件。");
+      throw new Error(t("isolation.onlyShowai"));
     if (typeof installedPath !== "string")
-      throw new Error("ShowAI 插件不在独立运行目录内。");
+      throw new Error(t("isolation.pluginOutside"));
     installedPath = await realpath(installedPath);
     const ownedHome = await realpath(env.CODEX_HOME);
     if (!installedPath.startsWith(ownedHome + sep))
-      throw new Error("ShowAI 插件不在独立运行目录内。");
+      throw new Error(t("isolation.pluginOutside"));
     const controller = new AbortController();
     const rpc = new RpcProcess(
       binary,
@@ -687,7 +686,7 @@ export class AgentHost {
           (skill: any) => !String(skill.path).startsWith(installedPath),
         )
       )
-        throw new Error("独立运行时 Skill 隔离验证失败。");
+        throw new Error(t("isolation.skillsFailed"));
       await writeProtected(join(root, "isolation.json"), {
         pluginId: "showai@showai-embedded",
         installedPath,
@@ -737,7 +736,7 @@ export class AgentHost {
               ? {
                   ...task,
                   state: "failed",
-                  error: "上次运行已中断，可以继续会话或重新执行。",
+                  error: t("task.interrupted"),
                   approvals: [],
                 }
               : task,
@@ -795,7 +794,7 @@ export class AgentHost {
       id,
       projectId,
       pageId,
-      label: test ? "连接测试" : prompt.slice(0, 100),
+      label: test ? t("task.connectionTest") : prompt.slice(0, 100),
       mode: settings.mode,
       sourceId: source?.id,
       localAgent: settings.mode === "local" ? localAgent : undefined,
@@ -829,7 +828,7 @@ export class AgentHost {
     this.emit(
       task,
       "status",
-      test ? "正在检验真实模型调用…" : "正在连接 Agent…",
+      test ? t("task.checkingModel") : t("task.connecting"),
     );
     const run =
       settings.mode === "api"
@@ -852,7 +851,7 @@ export class AgentHost {
           );
     void run
       .then(async () => {
-        if (controller.signal.aborted) throw new Error("任务已停止");
+        if (controller.signal.aborted) throw new Error(t("task.stopped"));
         if (
           test &&
           !task.events
@@ -861,14 +860,20 @@ export class AgentHost {
             .join("")
             .includes("SHOWAI_AGENT_READY")
         )
-          throw new Error("模型未返回预期的测试结果。");
+          throw new Error(t("task.unexpectedTestResult"));
         task.state = "completed";
         if (test && settings.mode === "local") this.markTest(localAgent, true);
-        this.emit(task, "status", test ? "真实调用已通过" : "任务已完成");
+        this.emit(
+          task,
+          "status",
+          test ? t("task.testPassed") : t("task.completed"),
+        );
       })
       .catch((error: Error) => {
         task.state = controller.signal.aborted ? "cancelled" : "failed";
-        task.error = controller.signal.aborted ? "任务已停止" : error.message;
+        task.error = controller.signal.aborted
+          ? t("task.stopped")
+          : error.message;
         if (
           settings.mode === "local" &&
           /Authentication required|login_required/i.test(task.error)
@@ -876,9 +881,9 @@ export class AgentHost {
           const agent = this.agents.find((item) => item.id === localAgent);
           if (agent) {
             agent.auth = "missing";
-            agent.detail = "本机登录已失效，请先在此 Agent 中登录";
+            agent.detail = t("agent.signInExpired");
           }
-          task.error = "本机 Agent 需要登录。请在原来的 Agent 中登录后重试。";
+          task.error = t("task.signInRequired");
         }
         this.emit(task, "error", task.error);
         if (test && settings.mode === "local") this.markTest(localAgent, false);
@@ -936,8 +941,8 @@ export class AgentHost {
     source?: ModelSource,
   ) {
     await this.prepareIsolation();
-    if (!source) throw new Error("请选择模型来源。");
-    if (!source.model) throw new Error("请先选择或填写模型。");
+    if (!source) throw new Error(t("source.select"));
+    if (!source.model) throw new Error(t("task.chooseModel"));
     const gateway = await startModelGateway(source, (force) =>
       this.token(source, force),
     );
@@ -1001,12 +1006,12 @@ export class AgentHost {
         if (event.type === "turn.completed") complete = true;
         if (event.type === "error" || event.type === "turn.failed")
           throw new Error(
-            event.message ?? event.error?.message ?? "Agent 执行失败",
+            event.message ?? event.error?.message ?? t("task.agentFailed"),
           );
         if (event.type === "item.completed" || event.type === "item.updated")
           this.codexEvent(task, event.item);
       }
-      if (!complete) throw new Error("Agent 未完成本轮任务。");
+      if (!complete) throw new Error(t("task.turnIncomplete"));
     } finally {
       gateway.close();
     }
@@ -1026,7 +1031,7 @@ export class AgentHost {
         `${item.command}\n${item.aggregated_output ?? ""}`,
       );
     else if (item.type === "file_change")
-      this.emit(task, "tool", "工作文件已更新");
+      this.emit(task, "tool", t("task.filesUpdated"));
     else if (item.type === "error") this.emit(task, "status", item.message);
   }
   private async runLocal(
@@ -1042,7 +1047,7 @@ export class AgentHost {
       await this.scan();
       agent = this.agents.find((item) => item.id === agentId);
     }
-    if (!agent?.path) throw new Error("未找到所选本机 Agent，请先安装并登录。");
+    if (!agent?.path) throw new Error(t("task.agentMissing"));
     if (agentId === "codex") {
       const args = [
         "exec",
@@ -1075,14 +1080,14 @@ export class AgentHost {
             this.emit(
               task,
               "error",
-              event.message ?? event.error?.message ?? "Agent 执行失败",
+              event.message ?? event.error?.message ?? t("task.agentFailed"),
             );
           if (event.type === "item.completed")
             this.codexEvent(task, event.item);
         },
       });
       if (result.code !== 0 || !complete)
-        throw new Error(result.stderr || "本机 Codex 未完成调用。");
+        throw new Error(result.stderr || t("task.codexIncomplete"));
       return;
     }
     if (agentId === "claude") {
@@ -1119,7 +1124,7 @@ export class AgentHost {
         },
       });
       if (result.code !== 0 || !complete)
-        throw new Error(result.stderr || "Claude Code 未完成调用。");
+        throw new Error(result.stderr || t("task.claudeIncomplete"));
       return;
     }
     const definition = definitions.find((item) => item.id === agentId)!;
@@ -1151,7 +1156,7 @@ export class AgentHost {
             this.emit(
               task,
               "tool",
-              update.title ?? update.toolCallId ?? "工具执行中",
+              update.title ?? update.toolCallId ?? t("task.toolRunning"),
             );
         }
       },
@@ -1173,7 +1178,7 @@ export class AgentHost {
           task.approvals ??= [];
           task.approvals.push({
             id,
-            title: params.toolCall?.title ?? "Agent 请求执行工具",
+            title: params.toolCall?.title ?? t("task.toolPermission"),
             options,
           });
           const selected = await new Promise<string | null>((resolve) => {
@@ -1222,7 +1227,7 @@ export class AgentHost {
         prompt: [{ type: "text", text: prompt }],
       });
       if (result.stopReason !== "end_turn")
-        throw new Error(`Agent 未完成任务：${result.stopReason}`);
+        throw new Error(t("task.stopReason", { reason: result.stopReason }));
     } finally {
       clearTimeout(timer);
       rpc.close();
@@ -1236,13 +1241,13 @@ export class AgentHost {
   async readTaskFile(id: string, path: string) {
     await this.loadTasks();
     const task = this.tasks.find((item) => item.id === id);
-    if (!task) throw new Error("任务记录不存在。");
+    if (!task) throw new Error(t("task.notFound"));
     const root = await realpath(task.workspace),
       file = await realpath(resolve(root, path));
     if (!file.startsWith(root + sep))
-      throw new Error("只能下载此任务工作区内的文件。");
+      throw new Error(t("task.fileOutsideWorkspace"));
     const info = await stat(file);
-    if (!info.isFile()) throw new Error("只能下载文件。");
+    if (!info.isFile()) throw new Error(t("task.filesOnly"));
     assertBytes("Agent delivery file", info.size, CAPACITY.artifactBytes);
     const mime: Record<string, string> = {
       ".html": "text/html",
@@ -1280,7 +1285,7 @@ export class AgentHost {
         return this.saveSource(args.source, args.apiKey);
       case "agent:serverResources":
         if (!this.options.resources)
-          throw new Error("服务器资源管理尚未连接。");
+          throw new Error(t("resources.notConnected"));
         return this.options.resources.list();
       case "agent:addServerResource":
         return this.addServerResource(z.string().parse(args.id));
@@ -1301,7 +1306,7 @@ export class AgentHost {
               ...this.installer.state,
               state: "failed",
               error: error.message,
-              progress: "独立运行时配置失败",
+              progress: t("isolation.configFailed"),
             };
           });
         return this.status();
@@ -1335,7 +1340,7 @@ export class AgentHost {
           !approval ||
           (option && !approval.options.some((item) => item.id === option))
         )
-          throw new Error("此操作确认已失效。");
+          throw new Error(t("task.approvalExpired"));
         this.permissions.get(id)?.(option);
         return this.status();
       }

@@ -8,6 +8,9 @@ import { resizeFrame, frameHeight, frameBounds } from "./geometry.mjs";
 import type { SurfaceGeometryStore } from "./geometry-store";
 import type { BoardInteraction, BoardGesture } from "./useBoardInteraction";
 import { BlockActionHost } from "../components/blocks/action-host";
+import type { MessageKey } from "../i18n";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/surface";
 import {
   createContext,
   useContext,
@@ -79,6 +82,7 @@ export function SurfaceObject({
   resizable?: boolean;
   children: ReactNode;
 }) {
+  const t = useTranslator(messages);
   const actions = useContext(ObjectContext);
   const board = positioned ? actions.board : undefined;
   const element = useRef<HTMLElement>(null),
@@ -392,8 +396,8 @@ export function SurfaceObject({
             className="surface-object-rotate"
             data-surface-ui
             data-surface-handle
-            aria-label={`旋转 ${name}`}
-            title="拖动旋转；Shift 按 15° 对齐"
+            aria-label={t("object.rotate", { name })}
+            title={t("object.rotateTitle")}
             onPointerDown={(event) => start(event, false, "rotate")}
             {...handlers}
           >
@@ -410,8 +414,8 @@ export function SurfaceObject({
               type="button"
               className="surface-object-grip"
               data-surface-handle={(positioned && !!actions.move) || undefined}
-              aria-label={`移动 ${name}`}
-              title={positioned ? "拖动移动；方向键微调" : "选择内容"}
+              aria-label={t("object.move", { name })}
+              title={positioned ? t("object.moveTitle") : t("object.select")}
               onPointerDown={(event) =>
                 positioned ? start(event) : actions.select(id)
               }
@@ -449,7 +453,7 @@ export function SurfaceObject({
           {container && (
             <button
               type="button"
-              aria-label={`展开 ${name}`}
+              aria-label={t("object.expand", { name })}
               onClick={() => actions.expand?.(id)}
             >
               <Maximize2 size={14} />
@@ -459,14 +463,14 @@ export function SurfaceObject({
             <>
               <button
                 type="button"
-                aria-label={`设置 ${name}`}
+                aria-label={t("object.settings", { name })}
                 onClick={() => actions.inspect?.(id)}
               >
                 <Settings2 size={14} />
               </button>
               <button
                 type="button"
-                aria-label={`删除 ${name}`}
+                aria-label={t("object.delete", { name })}
                 onClick={() => actions.remove?.(id)}
               >
                 <Trash2 size={14} />
@@ -520,7 +524,10 @@ export function SurfaceObject({
                   }
                 : undefined
             }
-            aria-label={`调整 ${name} ${{ nw: "左上角", n: "上边缘", ne: "右上角", e: "右边缘", se: "右下角", s: "下边缘", sw: "左下角", w: "左边缘" }[direction]}`}
+            aria-label={t(
+              `object.resize.${direction}` as MessageKey<typeof messages>,
+              { name },
+            )}
             onKeyDown={(event) => {
               const step = (
                 {
@@ -570,8 +577,11 @@ export function SurfaceObject({
             className="surface-object-resize"
             disabled={!actions.move}
             data-surface-handle
-            aria-label={`调整 ${name} ${fixedHeight ? "尺寸" : "宽度"}`}
-            title="拖动调宽；左右方向键微调"
+            aria-label={t(
+              fixedHeight ? "object.resizeSize" : "object.resizeWidth",
+              { name },
+            )}
+            title={t("object.resizeTitle")}
             onPointerDown={(event) => start(event, true)}
             {...handlers}
             onKeyDown={(event) => {

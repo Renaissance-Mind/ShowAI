@@ -84,7 +84,7 @@ export interface AgentHostStatus {
 export const sourcePresets = [
   {
     provider: "chatgpt",
-    name: "ChatGPT 套餐",
+    name: "ChatGPT 套餐", // i18n-exempt: default source name saved into settings
     baseUrl: "https://api.openai.com/v1",
     credential: "chatgpt",
     protocol: "responses",
@@ -119,7 +119,7 @@ export const sourcePresets = [
   },
   {
     provider: "custom",
-    name: "自定义服务",
+    name: "自定义服务", // i18n-exempt: default source name saved into settings
     baseUrl: "",
     credential: "api-key",
     protocol: "responses",

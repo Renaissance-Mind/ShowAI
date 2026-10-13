@@ -21,7 +21,9 @@ import {
   Undo2,
   Redo2,
 } from "../../ui/icons";
-import { BlockHeader } from "./shared";
+import { BlockHeader, blockLabel } from "./shared";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/mindmap";
 import type { BlockProps } from "./types";
 import {
   addMindmapNode,
@@ -41,6 +43,7 @@ export function MindmapBlock({
   onChange,
   readOnly = false,
 }: BlockProps) {
+  const t = useTranslator(messages);
   const data = useMemo(() => validateMindmapData(raw), [raw]);
   const editable = !readOnly && !!onChange;
   const root = data.nodes.find((node) => node.parentId === null)!;
@@ -217,7 +220,7 @@ export function MindmapBlock({
     if (!editing || editingId.current !== editing.id) return;
     const label = editing.value.trim();
     if (!cancel && !label) {
-      setNotice("请输入节点名称。");
+      setNotice(t("enterNodeName"));
       input.current?.focus();
       return;
     }
@@ -238,7 +241,7 @@ export function MindmapBlock({
   const add = (relation: "child" | "sibling", before = false) => {
     if (!editable) return;
     if (data.nodes.length >= MAX_MINDMAP_NODES) {
-      setNotice("思维导图最多支持 500 个节点。");
+      setNotice(t("nodeLimit", { count: MAX_MINDMAP_NODES }));
       return;
     }
     const id = crypto.randomUUID();
@@ -334,7 +337,7 @@ export function MindmapBlock({
     <section
       ref={section}
       className="sb-block sm-block"
-      aria-label={data.title || "思维导图"}
+      aria-label={blockLabel(data.title, t("mindmap"))}
       contentEditable={false}
       data-editor-keyboard-scope="mindmap"
       data-mindmap-layout={layout}
@@ -358,14 +361,15 @@ export function MindmapBlock({
     >
       <BlockHeader
         title={data.title}
+        // i18n-exempt: matches the saved default title
         defaultTitle="思维导图"
         description={data.description}
       >
         <button
           type="button"
           className="sb-icon-button"
-          aria-label="四周展开"
-          title="四周展开"
+          aria-label={t("radialLayout")}
+          title={t("radialLayout")}
           aria-pressed={layout === "radial"}
           data-surface-ui
           onMouseDown={(event) => event.preventDefault()}
@@ -376,8 +380,20 @@ export function MindmapBlock({
         <button
           type="button"
           className="sb-icon-button"
-          aria-label="单向展开"
-          title={`单向展开，当前向${direction === "right" ? "右" : "左"}${layout === "tree" ? `；再次点击切换向${direction === "right" ? "左" : "右"}` : ""}`}
+          aria-label={t("treeLayout")}
+          title={
+            direction === "right"
+              ? t(
+                  layout === "tree"
+                    ? "treeLayout.rightToggle"
+                    : "treeLayout.right",
+                )
+              : t(
+                  layout === "tree"
+                    ? "treeLayout.leftToggle"
+                    : "treeLayout.left",
+                )
+          }
           aria-pressed={layout === "tree"}
           data-surface-ui
           onMouseDown={(event) => event.preventDefault()}
@@ -408,7 +424,7 @@ export function MindmapBlock({
           <div
             className="sm-map"
             role="tree"
-            aria-label="导图节点"
+            aria-label={t("nodes")}
             style={{
               width: graph.width,
               height: graph.height,
@@ -459,7 +475,7 @@ export function MindmapBlock({
                     <input
                       ref={input}
                       className="sm-node-input"
-                      aria-label="节点名称"
+                      aria-label={t("nodeName")}
                       maxLength={200}
                       value={editing.value}
                       onChange={(event) =>
@@ -519,26 +535,22 @@ export function MindmapBlock({
         </div>
       </div>
       <div className="sm-footer">
-        <div
-          className="sm-view-controls"
-          role="group"
-          aria-label="思维导图视图"
-        >
+        <div className="sm-view-controls" role="group" aria-label={t("view")}>
           <button
             type="button"
-            aria-label="缩小思维导图"
+            aria-label={t("zoomOut")}
             disabled={scale <= 0.15}
             onClick={() => setScale(Math.max(0.15, scale / 1.2))}
           >
             <Minus size={15} />
           </button>
-          <button type="button" aria-label="显示完整思维导图" onClick={fit}>
+          <button type="button" aria-label={t("fit")} onClick={fit}>
             <Maximize2 size={15} />
             <span>{Math.round(scale * 100)}%</span>
           </button>
           <button
             type="button"
-            aria-label="放大思维导图"
+            aria-label={t("zoomIn")}
             disabled={scale >= 2}
             onClick={() => setScale(Math.min(2, scale * 1.2))}
           >
@@ -556,7 +568,7 @@ export function MindmapBlock({
           id={menuId}
           anchor={anchor}
           anchorElement={buttons.current.get(selected)}
-          label="思维导图节点操作"
+          label={t("nodeActions")}
           keyboardScope="mindmap"
           onEscape={() => {
             setActive(false);
@@ -566,8 +578,8 @@ export function MindmapBlock({
           <button
             className="editor-tool"
             type="button"
-            aria-label="编辑节点"
-            title="编辑节点"
+            aria-label={t("editNode")}
+            title={t("editNode")}
             onClick={() => edit()}
           >
             <Type size={16} />
@@ -576,32 +588,34 @@ export function MindmapBlock({
           <button
             className="editor-tool sm-labeled-action"
             type="button"
-            aria-label="新建子节点"
-            title="新建子节点"
+            aria-label={t("newChild")}
+            title={t("newChild")}
             disabled={data.nodes.length >= MAX_MINDMAP_NODES}
             onClick={() => add("child")}
           >
             <Plus size={16} />
-            <span>子节点</span>
+            <span>{t("child")}</span>
           </button>
           <button
             className="editor-tool sm-labeled-action"
             type="button"
-            aria-label="新建同级节点"
-            title="新建同级节点"
+            aria-label={t("newSibling")}
+            title={t("newSibling")}
             disabled={
               data.nodes.length >= MAX_MINDMAP_NODES || node.parentId === null
             }
             onClick={() => add("sibling")}
           >
             <Plus size={16} />
-            <span>同级</span>
+            <span>{t("sibling")}</span>
           </button>
           <button
             className="editor-tool"
             type="button"
-            aria-label={collapsed.has(selected) ? "展开分支" : "折叠分支"}
-            title="折叠 / 展开"
+            aria-label={
+              collapsed.has(selected) ? t("expandBranch") : t("collapseBranch")
+            }
+            title={t("toggleBranch")}
             disabled={!hasChildren}
             onClick={toggle}
           >
@@ -610,8 +624,8 @@ export function MindmapBlock({
           <button
             className="editor-tool"
             type="button"
-            aria-label="撤销导图操作"
-            title="撤销"
+            aria-label={t("undoAction")}
+            title={t("undo")}
             disabled={!history.current.past.length}
             onClick={() => undo()}
           >
@@ -620,8 +634,8 @@ export function MindmapBlock({
           <button
             className="editor-tool"
             type="button"
-            aria-label="重做导图操作"
-            title="重做"
+            aria-label={t("redoAction")}
+            title={t("redo")}
             disabled={!history.current.future.length}
             onClick={() => undo(true)}
           >
@@ -630,8 +644,8 @@ export function MindmapBlock({
           <button
             className="editor-tool"
             type="button"
-            aria-label="删除节点及其子节点"
-            title="删除分支"
+            aria-label={t("deleteNodeAndChildren")}
+            title={t("deleteBranch")}
             disabled={node.parentId === null}
             onClick={remove}
           >

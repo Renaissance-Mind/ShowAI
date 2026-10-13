@@ -1,4 +1,6 @@
 import { richTextStyle } from "./model.mjs";
+import { translator } from "../../i18n";
+import messages from "../../i18n/messages/richText";
 import { Extension, mergeAttributes, Node, Mark } from "@tiptap/core";
 import { ReactNodeViewRenderer } from "@tiptap/react";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
@@ -183,7 +185,7 @@ export const ToggleNode = Node.create({
   defining: true,
   draggable: true,
   addAttributes: () => ({
-    title: { default: "展开了解更多" },
+    title: { default: "展开了解更多" }, // i18n-exempt: default title saved into documents
     open: { default: true },
   }),
   parseHTML: () => [{ tag: "section[data-toggle]" }],
@@ -203,7 +205,7 @@ export const RichTextNode = Node.create({
   defining: true,
   addAttributes: () => ({
     id: { default: null },
-    name: { default: "富文本" },
+    name: { default: "富文本" }, // i18n-exempt: default node name saved into documents
     data: {
       default: {},
       parseHTML: (element) =>
@@ -276,10 +278,13 @@ const mathNode = (inline: boolean) =>
     addNodeView: () => ReactNodeViewRenderer(MathView),
   });
 
+const t = translator(messages);
+
 export function createExtensions(
   options: {
     readOnly?: boolean;
-    placeholder?: string;
+    /** Called while rendering so the placeholder follows the current language. */
+    placeholder?: string | (() => string);
     trailingNode?: boolean;
   } = {},
 ) {
@@ -302,8 +307,10 @@ export function createExtensions(
     Placeholder.configure({
       placeholder: ({ node }) =>
         node.type.name === "heading"
-          ? "标题"
-          : (options.placeholder ?? "写下想法，或输入 / 添加内容…"),
+          ? t("placeholderHeading")
+          : typeof options.placeholder === "function"
+            ? options.placeholder()
+            : (options.placeholder ?? t("placeholderDefault")),
       includeChildren: false,
     }),
     Image.configure({

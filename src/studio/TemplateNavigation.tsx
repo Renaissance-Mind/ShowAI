@@ -1,21 +1,24 @@
 import { FileText, FlaskConical, LayoutTemplate, Columns3 } from "../ui/icons";
 import type { TemplateMetadata } from "../components/custom/types";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/templates";
 import "./template-navigation.css";
 
+// Labels are templates-namespace keys (`type.<id>`), translated at render.
 const types = [
-  { id: "all", label: "全部", icon: LayoutTemplate },
-  { id: "concept-explainer", label: "概念讲解", icon: LayoutTemplate },
-  { id: "decision-comparison", label: "方案决策", icon: Columns3 },
-  { id: "evidence-report", label: "研究证据", icon: FlaskConical },
-  { id: "procedure-guide", label: "操作排查", icon: FileText },
-  { id: "progress-report", label: "进展汇报", icon: FileText },
-  { id: "exploration-map", label: "资料探索", icon: LayoutTemplate },
-  { id: "system-presentation", label: "基础指南", icon: FileText },
-  { id: "blank", label: "空白", icon: FileText },
-  { id: "research", label: "调研", icon: FlaskConical },
-  { id: "comparison", label: "对比", icon: Columns3 },
-  { id: "brief", label: "简报", icon: FileText },
-  { id: "custom", label: "自定义", icon: LayoutTemplate },
+  { id: "all", icon: LayoutTemplate },
+  { id: "concept-explainer", icon: LayoutTemplate },
+  { id: "decision-comparison", icon: Columns3 },
+  { id: "evidence-report", icon: FlaskConical },
+  { id: "procedure-guide", icon: FileText },
+  { id: "progress-report", icon: FileText },
+  { id: "exploration-map", icon: LayoutTemplate },
+  { id: "system-presentation", icon: FileText },
+  { id: "blank", icon: FileText },
+  { id: "research", icon: FlaskConical },
+  { id: "comparison", icon: Columns3 },
+  { id: "brief", icon: FileText },
+  { id: "custom", icon: LayoutTemplate },
 ] as const;
 
 export type TemplateType = (typeof types)[number]["id"];
@@ -37,11 +40,13 @@ export default function TemplateNavigation({
   active: TemplateType;
   onSelect: (type: TemplateType) => void;
 }) {
+  const t = useTranslator(messages);
   return (
     <div className="template-type-sidebar">
-      <div className="settings-nav-label">类型</div>
-      <nav className="settings-nav" aria-label="模板类型">
-        {types.map(({ id, label, icon: Icon }) => {
+      <div className="settings-nav-label">{t("types")}</div>
+      <nav className="settings-nav" aria-label={t("templateTypes")}>
+        {types.map(({ id, icon: Icon }) => {
+          const label = t(`type.${id}`);
           return (
             <button
               key={id}

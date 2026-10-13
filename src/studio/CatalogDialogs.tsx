@@ -22,6 +22,9 @@ import CatalogTabs from "./CatalogTabs";
 import CatalogPreview from "./CatalogPreview";
 import { errorMessage } from "./bridge";
 import Dialog from "./Dialog";
+import { componentDisplayName } from "../components/component-display";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/catalog";
 import "./catalog.css";
 import "./catalog-workspace.css";
 
@@ -63,12 +66,15 @@ export type LoadedTemplate = TemplateRecord & {
   previewDocument?: ShowDocument;
 };
 function RelatedList({ items }: { items: RelatedPackage[] }) {
+  const t = useTranslator(messages);
   return items.length ? (
     <ul className="catalog-related">
       {items.map((item, index) => (
         <li key={index}>
           <div>
-            <span>{item.kind === "template" ? "模板" : "组件"}</span>
+            <span>
+              {t(item.kind === "template" ? "kind.template" : "kind.component")}
+            </span>
             <code>
               {item.id}
               {item.version ? `@${item.version}` : ""}
@@ -79,7 +85,7 @@ function RelatedList({ items }: { items: RelatedPackage[] }) {
       ))}
     </ul>
   ) : (
-    <p className="studio-caption">尚未指定。</p>
+    <p className="studio-caption">{t("notSpecified")}</p>
   );
 }
 export function TemplateDialog({
@@ -91,6 +97,7 @@ export function TemplateDialog({
   components: CompiledComponent[];
   onClose: () => void;
 }) {
+  const t = useTranslator(messages);
   const panelId = useId();
   const [tab, setTab] = useState<"about" | "guides" | "usage">("about");
   const systemTemplate = record.id === "system-presentation";
@@ -105,17 +112,17 @@ export function TemplateDialog({
       }
       headerContent={
         <CatalogTabs
-          label="模板详情菜单"
+          label={t("templateDetailsMenu")}
           panelId={panelId}
           active={tab}
           onChange={setTab}
           tabs={[
-            { id: "about", label: "预览" },
+            { id: "about", label: t("tab.preview") },
             ...(record.contentGuide?.length || record.examples?.length
-              ? [{ id: "usage" as const, label: "使用说明" }]
+              ? [{ id: "usage" as const, label: t("tab.usage") }]
               : []),
             ...(record.bundle
-              ? [{ id: "guides" as const, label: "阶段指南" }]
+              ? [{ id: "guides" as const, label: t("tab.guides") }]
               : []),
           ]}
         />
@@ -125,9 +132,15 @@ export function TemplateDialog({
         className="catalog-detail catalog-template-detail"
         role="tabpanel"
         id={panelId}
-        aria-label={
-          { about: "预览", guides: "阶段指南", usage: "使用说明" }[tab]
-        }
+        aria-label={t(
+          (
+            {
+              about: "tab.preview",
+              guides: "tab.guides",
+              usage: "tab.usage",
+            } as const
+          )[tab],
+        )}
       >
         {tab === "guides" && record.bundle && (
           <TemplateWorkflowView bundle={record.bundle} />
@@ -156,7 +169,10 @@ export function TemplateDialog({
         )}
         {tab === "about" && (
           <div className="catalog-preview-workspace">
-            <section className="catalog-live-example" aria-label="模板示例预览">
+            <section
+              className="catalog-live-example"
+              aria-label={t("templateExamplePreview")}
+            >
               {systemTemplate ? (
                 <div className="catalog-reading-content">
                   <h3>{record.name}</h3>
@@ -164,7 +180,7 @@ export function TemplateDialog({
                 </div>
               ) : (
                 <CatalogPreview
-                  label="模板预览画面"
+                  label={t("templatePreviewCanvas")}
                   width={960}
                   resetKey={record.integrity}
                 >
@@ -180,17 +196,17 @@ export function TemplateDialog({
               )}
             </section>
             <aside className="catalog-info-panel">
-              <ReferenceSection title="适用场景" icon="usage">
+              <ReferenceSection title={t("scenarios")} icon="usage">
                 <CompactScenarios items={record.scenarios ?? []} />
               </ReferenceSection>
-              <ReferenceSection title="页面结构" icon="content">
+              <ReferenceSection title={t("pageStructure")} icon="content">
                 <TemplateOutline
                   document={record.previewDocument ?? record.document}
                 />
               </ReferenceSection>
               {!!record.related?.length && (
                 <details>
-                  <summary>相关内容</summary>
+                  <summary>{t("related")}</summary>
                   <RelatedList items={record.related} />
                 </details>
               )}
@@ -215,6 +231,7 @@ export function ComponentDialog({
   onInsert: (kind: string, data: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
 }) {
+  const t = useTranslator(messages);
   const panelId = useId();
   const item = builtin ?? custom!;
   const schema = builtin?.propsSchema ?? custom?.schema ?? {};
@@ -242,7 +259,7 @@ export function ComponentDialog({
   };
   return (
     <Dialog
-      title={item.name}
+      title={componentDisplayName(item)}
       onClose={onClose}
       wide
       className="catalog-component-dialog"
@@ -253,14 +270,14 @@ export function ComponentDialog({
       }
       headerContent={
         <CatalogTabs
-          label="组件详情菜单"
+          label={t("componentDetailsMenu")}
           panelId={panelId}
           active={tab}
           onChange={setTab}
           tabs={[
-            { id: "about", label: "预览" },
-            { id: "guide", label: "使用说明" },
-            { id: "schema", label: "参数" },
+            { id: "about", label: t("tab.preview") },
+            { id: "guide", label: t("tab.usage") },
+            { id: "schema", label: t("tab.parameters") },
           ]}
         />
       }
@@ -273,7 +290,7 @@ export function ComponentDialog({
             onClick={() => void insert()}
           >
             <Plus size={16} />
-            插入页面
+            {t("insertIntoPage")}
           </button>
         )
       }
@@ -282,23 +299,34 @@ export function ComponentDialog({
         className="studio-component-detail catalog-detail"
         role="tabpanel"
         id={panelId}
-        aria-label={{ about: "预览", guide: "使用说明", schema: "参数" }[tab]}
+        aria-label={t(
+          (
+            {
+              about: "tab.preview",
+              guide: "tab.usage",
+              schema: "tab.parameters",
+            } as const
+          )[tab],
+        )}
       >
         {tab === "guide" && (
           <ComponentDocumentationView documentation={item.documentation} />
         )}
         {tab === "about" && (
           <div className="catalog-preview-workspace">
-            <section className="catalog-live-example" aria-label="组件示例预览">
+            <section
+              className="catalog-live-example"
+              aria-label={t("componentExamplePreview")}
+            >
               <CatalogPreview
-                label="组件预览画面"
+                label={t("componentPreviewCanvas")}
                 width={960}
                 minHeight={builtin?.kind === "text" ? 620 : undefined}
                 resetKey={example}
                 accessory={
                   examples.length > 0 && (
                     <select
-                      aria-label="组件示例"
+                      aria-label={t("componentExample")}
                       value={example}
                       onChange={(event) =>
                         setExample(Number(event.target.value))
@@ -327,14 +355,14 @@ export function ComponentDialog({
               </CatalogPreview>
             </section>
             <aside className="catalog-info-panel">
-              <ReferenceSection title="适用场景" icon="usage">
+              <ReferenceSection title={t("scenarios")} icon="usage">
                 <CompactScenarios items={item.scenarios} />
               </ReferenceSection>
-              <ReferenceSection title="可调整" icon="effect">
+              <ReferenceSection title={t("adjustable")} icon="effect">
                 <ComponentAdjustmentSummary schema={schema} />
               </ReferenceSection>
               <details className="catalog-example-data">
-                <summary>示例数据</summary>
+                <summary>{t("exampleData")}</summary>
                 <pre>{JSON.stringify(data, null, 2)}</pre>
               </details>
             </aside>
@@ -349,10 +377,10 @@ export function ComponentDialog({
                 documentation={item.documentation}
               />
               <details className="catalog-advanced-data">
-                <summary>查看原始参数规则与默认数据</summary>
-                <h3>参数规则</h3>
+                <summary>{t("rawSchemaAndDefaults")}</summary>
+                <h3>{t("parameterRules")}</h3>
                 <pre>{JSON.stringify(schema, null, 2)}</pre>
-                <h3>默认数据</h3>
+                <h3>{t("defaultData")}</h3>
                 <pre>{JSON.stringify(item.defaultData, null, 2)}</pre>
               </details>
             </section>

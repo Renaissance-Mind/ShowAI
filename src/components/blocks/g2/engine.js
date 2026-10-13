@@ -2,6 +2,10 @@ import { Runtime, stdlib, extend } from "@antv/g2";
 import { plotlib } from "@antv/g2-extension-plot";
 import { Renderer } from "@antv/g-svg";
 import { draws } from "./draws.js";
+import { translator } from "../../../i18n";
+import messages from "../../../i18n/messages/g2";
+
+const t = translator(messages);
 
 export const g2Themes = {
   indigo: {
@@ -113,7 +117,8 @@ export function createG2Context(container, chartType, data, locked = false) {
   };
   const datasets = remap(data.datasets, data.fields ?? {});
   const get = (key) => {
-    if (!Object.hasOwn(datasets, key)) throw new Error("缺少数据：" + key);
+    if (!Object.hasOwn(datasets, key))
+      throw new Error(t("error.missingDataset", { key }));
     return datasets[key];
   };
   const prepare = (input, path = "main", root = true) => {
@@ -192,9 +197,7 @@ export function createG2Context(container, chartType, data, locked = false) {
           typeof field === "string" &&
           !records.some((r) => Object.hasOwn(r, field))
         )
-          throw new Error(
-            "数据缺少字段：" + field + "。请设置 fields 对应关系。",
-          );
+          throw new Error(t("error.missingField", { field }));
       }
     }
     if (spec.style) {
@@ -262,7 +265,7 @@ export function createG2Context(container, chartType, data, locked = false) {
   };
   class Chart extends ChartBase {
     constructor(options = {}) {
-      if (disposed) throw new Error("图表绘制已取消。");
+      if (disposed) throw new Error(t("error.renderCancelled"));
       super({
         ...options,
         container,
@@ -317,7 +320,8 @@ export function createG2Context(container, chartType, data, locked = false) {
       }),
     async render() {
       const draw = draws[chartType];
-      if (!draw) throw new Error("不支持的图表类型：" + chartType);
+      if (!draw)
+        throw new Error(t("error.unsupportedType", { type: chartType }));
       await draw(this);
       await Promise.all([...renders]);
       if (renderError) throw renderError;

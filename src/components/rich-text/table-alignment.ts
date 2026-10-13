@@ -3,6 +3,10 @@ import type { Node } from "@tiptap/pm/model";
 import { Plugin, type EditorState, type Transaction } from "@tiptap/pm/state";
 import { TableMap } from "@tiptap/pm/tables";
 import type { TableAlignment } from "../blocks/TableAlignment";
+import { translator } from "../../i18n";
+import messages from "../../i18n/messages/richText";
+
+const t = translator(messages);
 
 export const TableAlignmentAttributes = Extension.create({
   name: "tableAlignment",
@@ -102,7 +106,7 @@ function cellPositions(table: Node, column: number | null): number[] {
     column !== null &&
     (!Number.isInteger(column) || column < 0 || column >= map.width)
   )
-    throw new Error("列索引超出范围。");
+    throw new Error(t("table.columnOutOfRange"));
   // Map offsets include cells spanning several rows or columns only once.
   return [
     ...new Set(
@@ -124,7 +128,7 @@ export function alignDocumentTable(
 ): Transaction {
   const table = state.doc.nodeAt(tablePosition);
   if (!table || table.type.name !== "table")
-    throw new Error("此位置不是表格。");
+    throw new Error(t("table.notATable"));
   const tr = state.tr;
   if (column === null)
     tr.setNodeAttribute(tablePosition, "textAlign", alignment);

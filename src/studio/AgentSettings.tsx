@@ -22,6 +22,10 @@ import { sourcePresets } from "../agent-host/types";
 import type { PageSummary, ProjectSummary } from "../core/model";
 import AgentBrandIcon from "./AgentBrandIcon";
 import ServerResources from "./ServerResources";
+import { getLocale } from "../i18n";
+import { useTranslator } from "../i18n/react";
+import strings from "../i18n/messages/agentSettings";
+import common from "../i18n/messages/common";
 import "./agent-settings.css";
 
 function messageLinks(
@@ -73,26 +77,20 @@ function TaskResult({
   onPermission: (id: string, option: string | null) => void;
   onFile: (path: string) => void;
 }) {
+  const t = useTranslator(strings);
   const messages = task.events.filter((event) => event.type === "message");
   const tools = task.events.filter((event) => event.type === "tool");
   return (
     <article className="agent-task" aria-label={task.label}>
       <header>
         <span className={`agent-state state-${task.state}`}>
-          {
-            {
-              running: "执行中",
-              completed: "已完成",
-              failed: "失败",
-              cancelled: "已停止",
-            }[task.state]
-          }
+          {t(`state.${task.state}`)}
         </span>
         <span>{task.label}</span>
         {task.state === "running" && (
           <button className="settings-button" onClick={onCancel}>
             <Square size={12} />
-            停止
+            {t("stop")}
           </button>
         )}
       </header>
@@ -118,7 +116,7 @@ function TaskResult({
               className="settings-button"
               onClick={() => onPermission(approval.id, null)}
             >
-              取消此操作
+              {t("cancelThisAction")}
             </button>
           </div>
         </div>
@@ -130,7 +128,7 @@ function TaskResult({
       )}
       {tools.length > 0 && (
         <details className="agent-events">
-          <summary>执行记录 · {tools.length}</summary>
+          <summary>{t("eventLog", { count: tools.length })}</summary>
           <pre>{tools.map((event) => event.text).join("\n\n")}</pre>
         </details>
       )}
@@ -138,7 +136,7 @@ function TaskResult({
         <p className="settings-help" role="status">
           <Loader2 size={13} className="studio-spin" />{" "}
           {task.events.filter((event) => event.type === "status").at(-1)
-            ?.text ?? "正在执行…"}
+            ?.text ?? t("running")}
         </p>
       )}
     </article>
@@ -150,6 +148,15 @@ export default function AgentSettings({
 }: {
   contextProjectId?: string;
 }) {
+  const t = useTranslator(strings);
+  const tc = useTranslator(common);
+  // Built-in presets carry Chinese names; show and seed them in the UI language.
+  const presetName = (provider: string, fallback: string) =>
+    provider === "chatgpt"
+      ? t("preset.chatgpt")
+      : provider === "custom"
+        ? t("preset.custom")
+        : fallback;
   const [status, setStatus] = useState<AgentHostStatus | null>(null);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -240,7 +247,12 @@ export default function AgentSettings({
   };
   const add = (provider: string) => {
     const preset = sourcePresets.find((item) => item.provider === provider)!;
-    setEditing({ id: crypto.randomUUID(), ...preset, model: "" });
+    setEditing({
+      id: crypto.randomUUID(),
+      ...preset,
+      name: presetName(preset.provider, preset.name),
+      model: "",
+    });
     setKey("");
     setModels([]);
   };
@@ -253,7 +265,7 @@ export default function AgentSettings({
     setKey("");
     update(next);
     setEditing(null);
-    setNotice("模型来源已保存");
+    setNotice(t("toast.sourceSaved"));
   };
   const test = async (localAgent?: string) => {
     const task = await desktop.invoke<AgentTask>("agent:start", {
@@ -280,7 +292,7 @@ export default function AgentSettings({
   if (!status)
     return (
       <div className="agent-settings">
-        <p role="status">正在读取 Agent 设置…</p>
+        <p role="status">{t("reading")}</p>
         {error && (
           <p role="alert" className="agent-error">
             {error}
@@ -291,23 +303,23 @@ export default function AgentSettings({
   return (
     <div className="agent-settings">
       <section className="settings-group" aria-labelledby="agent-mode-title">
-        <h2 id="agent-mode-title">执行方式</h2>
+        <h2 id="agent-mode-title">{t("mode")}</h2>
         <div
           className="agent-modes"
           role="radiogroup"
-          aria-label="Agent 执行方式"
+          aria-label={t("modeLabel")}
         >
           {(
             [
               {
                 id: "local",
-                title: "本机 Agent",
-                text: "使用已安装 Agent 的登录与模型",
+                title: "mode.local.title",
+                text: "mode.local.text",
               },
               {
                 id: "api",
-                title: "提供 LLM API",
-                text: "连接模型来源，由独立 Codex SDK 执行",
+                title: "mode.api.title",
+                text: "mode.api.text",
               },
             ] as const
           ).map((mode) => (
@@ -341,21 +353,19 @@ export default function AgentSettings({
             >
               <span>
                 <Bot size={17} />
-                {mode.title}
+                {t(mode.title)}
                 {status.settings.mode === mode.id && <Check size={15} />}
               </span>
-              <small>{mode.text}</small>
+              <small>{t(mode.text)}</small>
             </button>
           ))}
         </div>
       </section>
       {status.settings.mode === "local" ? (
         <section className="settings-group" aria-labelledby="local-agent-title">
-          <h2 id="local-agent-title">可用 Agent</h2>
+          <h2 id="local-agent-title">{t("availableAgents")}</h2>
           <div className="settings-row">
-            <p className="settings-help">
-              复用本机登录。连接测试会发送一条简短请求，确认模型能够返回结果。
-            </p>
+            <p className="settings-help">{t("localHelp")}</p>
             <button
               className="settings-button"
               disabled={busy}
@@ -364,10 +374,10 @@ export default function AgentSettings({
               )}
             >
               <RefreshCw size={13} />
-              重新探测
+              {t("rescan")}
             </button>
           </div>
-          <div className="agent-list" role="group" aria-label="选择本机 Agent">
+          <div className="agent-list" role="group" aria-label={t("chooseLocalAgent")}>
             {status.agents.map((agent) => (
               <article
                 className="agent-card"
@@ -379,10 +389,10 @@ export default function AgentSettings({
                   <AgentBrandIcon brand={agent.id} />
                   <span className="agent-card-name">
                     <strong>{agent.name}</strong>
-                    <small>{agent.version || "未安装"}</small>
+                    <small>{agent.version || t("notInstalled")}</small>
                   </span>
                   {status.settings.localAgent === agent.id && (
-                    <span className="agent-current">当前</span>
+                    <span className="agent-current">{t("current")}</span>
                   )}
                   <input
                     type="radio"
@@ -404,22 +414,22 @@ export default function AgentSettings({
                     className={`agent-availability ${agent.callable === true ? "verified" : ""}`}
                   >
                     {agent.callable === true
-                      ? "调用通过"
+                      ? t("availability.passed")
                       : agent.callable === false
-                        ? "调用失败"
+                        ? t("availability.failed")
                         : agent.auth === "ready"
-                          ? "已有登录／来源"
+                          ? t("availability.ready")
                           : agent.path
-                            ? "待测试"
-                            : "未找到"}
+                            ? t("availability.untested")
+                            : t("availability.missing")}
                   </span>
                   <button
                     className="settings-button"
-                    aria-label={`测试 ${agent.name}`}
+                    aria-label={t("testAgent", { name: agent.name })}
                     disabled={!agent.path || busy || hasRunning}
                     onClick={action(() => test(agent.id))}
                   >
-                    测试连接
+                    {t("testConnection")}
                   </button>
                 </div>
               </article>
@@ -432,14 +442,14 @@ export default function AgentSettings({
             className="settings-group"
             aria-labelledby="agent-sources-title"
           >
-            <h2 id="agent-sources-title">模型来源</h2>
+            <h2 id="agent-sources-title">{t("modelSources")}</h2>
             <div className="settings-row">
               <div className="settings-row-text">
-                <h3>当前来源</h3>
+                <h3>{t("currentSource")}</h3>
               </div>
               <div className="settings-select">
                 <select
-                  aria-label="当前模型来源"
+                  aria-label={t("currentSourceLabel")}
                   value={status.settings.sourceId}
                   disabled={busy}
                   onChange={(event) =>
@@ -448,7 +458,7 @@ export default function AgentSettings({
                     )()
                   }
                 >
-                  <option value="">选择来源</option>
+                  <option value="">{t("chooseSource")}</option>
                   {status.settings.sources.map((source) => (
                     <option key={source.id} value={source.id}>
                       {source.name}
@@ -464,18 +474,18 @@ export default function AgentSettings({
                 <div className="agent-source-identity">
                   <strong>{selected.name}</strong>
                   <small>
-                    {selected.model || "尚未选择模型"}
+                    {selected.model || t("noModel")}
                     {selected.account ? ` · ${selected.account}` : ""}
                   </small>
                   <small>
                     {selected.hosted ? `${selected.hosted.serverName} · ` : ""}
                     {selected.credential === "chatgpt"
                       ? selected.planEnabled
-                        ? "已授权使用 ChatGPT 套餐"
-                        : "等待 ChatGPT 套餐授权"
+                        ? t("chatgptAuthorized")
+                        : t("chatgptPending")
                       : selected.apiKeyPresent
-                        ? "API Key 已保存"
-                        : "等待 API Key"}
+                        ? t("apiKeySaved")
+                        : t("apiKeyMissing")}
                   </small>
                 </div>
                 <button
@@ -487,11 +497,11 @@ export default function AgentSettings({
                     setModels([]);
                   }}
                 >
-                  管理来源
+                  {t("manageSource")}
                 </button>
               </div>
             )}
-            <div className="agent-presets" aria-label="添加模型来源">
+            <div className="agent-presets" aria-label={t("addModelSource")}>
               {sourcePresets.map((preset) => (
                 <button
                   className="agent-preset"
@@ -501,13 +511,13 @@ export default function AgentSettings({
                 >
                   <AgentBrandIcon brand={preset.provider} />
                   <span>
-                    <strong>{preset.name}</strong>
+                    <strong>{presetName(preset.provider, preset.name)}</strong>
                     <small>
                       {preset.credential === "chatgpt"
-                        ? "账号授权"
+                        ? t("presetHint.account")
                         : preset.provider === "custom"
-                          ? "连接自己的模型服务"
-                          : "使用 API Key 连接"}
+                          ? t("presetHint.custom")
+                          : t("presetHint.apiKey")}
                     </small>
                   </span>
                   <Plus size={14} aria-hidden="true" />
@@ -534,18 +544,21 @@ export default function AgentSettings({
                       {status.settings.sources.some(
                         (source) => source.id === editing.id,
                       )
-                        ? "管理来源"
-                        : "添加来源"}
+                        ? t("manageSource")
+                        : t("addSource")}
                     </h3>
                     <p>
-                      {sourcePresets.find(
-                        (preset) => preset.provider === editing.provider,
-                      )?.name ?? editing.name}
+                      {presetName(
+                        editing.provider,
+                        sourcePresets.find(
+                          (preset) => preset.provider === editing.provider,
+                        )?.name ?? editing.name,
+                      )}
                     </p>
                   </div>
                 </div>
                 <label>
-                  名称
+                  {t("name")}
                   <input
                     required
                     value={editing.name}
@@ -557,7 +570,7 @@ export default function AgentSettings({
                 {editing.credential === "api-key" && !editing.hosted && (
                   <>
                     <label>
-                      API 地址
+                      {t("apiUrl")}
                       <input
                         type="url"
                         required
@@ -572,7 +585,7 @@ export default function AgentSettings({
                       />
                     </label>
                     <label>
-                      接口类型
+                      {t("protocol")}
                       <select
                         value={editing.protocol}
                         onChange={(event) =>
@@ -588,7 +601,7 @@ export default function AgentSettings({
                       </select>
                     </label>
                     <label>
-                      API Key
+                      {t("apiKey")}
                       <input
                         type="password"
                         autoComplete="new-password"
@@ -596,22 +609,22 @@ export default function AgentSettings({
                         onChange={(event) => setKey(event.target.value)}
                         placeholder={
                           editing.apiKeyPresent
-                            ? "已保存，留空保留现有 Key"
-                            : "输入此来源的 API Key"
+                            ? t("apiKeyKeep")
+                            : t("apiKeyEnter")
                         }
                       />
                     </label>
                   </>
                 )}
                 <label>
-                  模型名称
+                  {t("modelName")}
                   <input
                     list="agent-model-options"
                     value={editing.model}
                     onChange={(event) =>
                       setEditing({ ...editing, model: event.target.value })
                     }
-                    placeholder="从列表选择，或填写服务提供的模型 ID"
+                    placeholder={t("modelPlaceholder")}
                   />
                   <datalist id="agent-model-options">
                     {models.map((model) => (
@@ -627,7 +640,7 @@ export default function AgentSettings({
                     type="submit"
                     disabled={busy}
                   >
-                    保存来源
+                    {t("saveSource")}
                   </button>
                   <button
                     className="settings-button"
@@ -638,7 +651,7 @@ export default function AgentSettings({
                       setKey("");
                     }}
                   >
-                    取消
+                    {tc("cancel")}
                   </button>
                   {status.settings.sources.some(
                     (source) => source.id === editing.id,
@@ -653,18 +666,15 @@ export default function AgentSettings({
                             id: editing.id,
                           }),
                         );
-                        setNotice("模型列表已更新，可以选择模型");
+                        setNotice(t("toast.modelsLoaded"));
                       })}
                     >
-                      获取模型列表
+                      {t("fetchModels")}
                     </button>
                   )}
                 </div>
                 {editing.credential === "chatgpt" && (
-                  <p className="settings-help">
-                    先保存来源，再连接
-                    ChatGPT。使用套餐额度需在授权页允许；可用模型以账号返回的列表为准。
-                  </p>
+                  <p className="settings-help">{t("chatgptHelp")}</p>
                 )}
               </form>
             )}
@@ -692,8 +702,8 @@ export default function AgentSettings({
                       })}
                     >
                       {selected.connected
-                        ? "重新授权 ChatGPT"
-                        : "Continue with ChatGPT"}
+                        ? t("reauthorizeChatgpt")
+                        : t("continueWithChatgpt")}
                     </button>
                     {selected.connected && (
                       <button
@@ -707,7 +717,7 @@ export default function AgentSettings({
                           );
                         })}
                       >
-                        断开连接
+                        {t("disconnect")}
                       </button>
                     )}
                     <a
@@ -716,7 +726,7 @@ export default function AgentSettings({
                       target="_blank"
                       rel="noreferrer"
                     >
-                      管理套餐用量
+                      {t("managePlanUsage")}
                     </a>
                   </>
                 )}
@@ -730,7 +740,7 @@ export default function AgentSettings({
                   }
                   onClick={action(() => test())}
                 >
-                  测试模型调用
+                  {t("testModel")}
                 </button>
                 <button
                   className="settings-button agent-remove"
@@ -745,19 +755,19 @@ export default function AgentSettings({
                   })}
                 >
                   <Trash2 size={12} />
-                  移除来源
+                  {t("removeSource")}
                 </button>
               </div>
             )}
             {status.authorization.state === "pending" && (
               <p className="settings-help" role="status">
-                正在等待浏览器授权…{" "}
+                {t("authPending")}{" "}
                 <button
                   onClick={action(async () =>
                     update(await desktop.invoke("agent:cancelAuth")),
                   )}
                 >
-                  取消授权
+                  {t("cancelAuth")}
                 </button>
               </p>
             )}
@@ -771,11 +781,11 @@ export default function AgentSettings({
             className="settings-group"
             aria-labelledby="agent-runtime-title"
           >
-            <h2 id="agent-runtime-title">内置执行能力</h2>
+            <h2 id="agent-runtime-title">{t("runtime")}</h2>
             <div className="settings-row">
               <div className="settings-row-text">
                 <h3>
-                  独立 Codex SDK{" "}
+                  {t("runtimeName")}{" "}
                   {status.runtime.version && (
                     <span className="agent-version">
                       {status.runtime.version}
@@ -799,15 +809,13 @@ export default function AgentSettings({
                   <Download size={13} />
                 )}
                 {status.runtime.state === "ready"
-                  ? "检查并安装新版"
+                  ? t("runtime.update")
                   : status.runtime.state === "installing"
-                    ? "正在安装"
-                    : "一键安装 Codex SDK"}
+                    ? t("runtime.installing")
+                    : t("runtime.install")}
               </button>
             </div>
-            <p className="settings-help">
-              按需下载官方 SDK 与运行时，使用独立账号、会话和 ShowAI 插件。
-            </p>
+            <p className="settings-help">{t("runtimeHelp")}</p>
             {status.runtime.error && (
               <p className="agent-error" role="alert">
                 {status.runtime.error}
@@ -817,7 +825,7 @@ export default function AgentSettings({
         </>
       )}
       <section className="settings-group" aria-labelledby="agent-task-title">
-        <h2 id="agent-task-title">在 ShowAI 中执行任务</h2>
+        <h2 id="agent-task-title">{t("runInShowAI")}</h2>
         <form
           className="agent-task-form"
           onSubmit={(event) => {
@@ -839,13 +847,13 @@ export default function AgentSettings({
         >
           <div className="agent-target">
             <label>
-              项目
+              {t("project")}
               <select
                 required
                 value={projectId}
                 onChange={(event) => setProjectId(event.target.value)}
               >
-                <option value="">选择要操作的项目</option>
+                <option value="">{t("chooseProject")}</option>
                 {projects
                   .filter((project) => !project.archived)
                   .map((project) => (
@@ -856,13 +864,13 @@ export default function AgentSettings({
               </select>
             </label>
             <label>
-              页面
+              {t("page")}
               <select
                 value={pageId}
                 disabled={!projectId}
                 onChange={(event) => setPageId(event.target.value)}
               >
-                <option value="">整个项目</option>
+                <option value="">{t("wholeProject")}</option>
                 {pages.map((page) => (
                   <option key={page.id} value={page.id}>
                     {page.title}
@@ -871,13 +879,13 @@ export default function AgentSettings({
               </select>
             </label>
           </div>
-          <label htmlFor="agent-prompt">任务要求</label>
+          <label htmlFor="agent-prompt">{t("prompt")}</label>
           <textarea
             id="agent-prompt"
             required
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
-            placeholder="例如：阅读这个页面，将内容整理为可交互的研究概览，保留原有引用。"
+            placeholder={t("promptPlaceholder")}
             rows={4}
           />
           <div className="agent-form-actions">
@@ -894,7 +902,7 @@ export default function AgentSettings({
               }
             >
               <Bot size={14} />
-              执行任务
+              {t("runTask")}
             </button>
             {activeTask?.threadId &&
               status.settings.mode === "api" &&
@@ -905,7 +913,7 @@ export default function AgentSettings({
                     checked={continueTask}
                     onChange={(event) => setContinueTask(event.target.checked)}
                   />
-                  继续所选会话
+                  {t("continueSession")}
                 </label>
               )}
           </div>
@@ -914,13 +922,13 @@ export default function AgentSettings({
           <>
             <div className="agent-task-picker">
               <select
-                aria-label="任务记录"
+                aria-label={t("taskHistory")}
                 value={activeTask?.id ?? ""}
                 onChange={(event) => setTaskId(event.target.value)}
               >
                 {status.tasks.map((task) => (
                   <option key={task.id} value={task.id}>
-                    {new Date(task.startedAt).toLocaleTimeString("zh-CN")} ·{" "}
+                    {new Date(task.startedAt).toLocaleTimeString(getLocale())} ·{" "}
                     {task.label}
                   </option>
                 ))}
@@ -983,23 +991,23 @@ export default function AgentSettings({
                   );
                 })}
               >
-                打开任务项目
+                {t("openTaskProject")}
               </button>
             )}
           </>
         )}
       </section>
       <details className="agent-storage">
-        <summary>存储与运行位置</summary>
+        <summary>{t("storage")}</summary>
         <p>
-          任务工作区：<code>{status.workspaceRoot}</code>
+          {t("taskWorkspace")}
+          <code>{status.workspaceRoot}</code>
         </p>
         <p>
-          账号与运行时：<code>{status.credentialRoot}</code>
+          {t("credentialRoot")}
+          <code>{status.credentialRoot}</code>
         </p>
-        <p>
-          页面通过 ShowAI 工具保存到选定项目，工作区用于任务材料和中间文件。
-        </p>
+        <p>{t("storageHelp")}</p>
       </details>
       {error && (
         <p className="agent-error agent-feedback" role="alert">

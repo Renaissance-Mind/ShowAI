@@ -692,7 +692,7 @@ async function replayProjectHistory(
         context: {
           actor: change.actor,
           channel: change.channel,
-          message: change.message ?? "同步项目历史",
+          message: change.message ?? "同步项目历史", // i18n-exempt: commit message persisted in project history
           operationId: `sync:${serverId}:${projectId}:${record.revision}`,
           syncOrigin: {
             serverId,
@@ -732,7 +732,7 @@ async function replayProjectHistory(
         context: {
           actor: { kind: "system" },
           channel: "system",
-          message: "合并同步内容并保留本地修改",
+          message: "合并同步内容并保留本地修改", // i18n-exempt: commit message persisted in project history
           operationId: `sync-merge:${crypto.randomUUID()}`,
           syncOrigin: {
             serverId,

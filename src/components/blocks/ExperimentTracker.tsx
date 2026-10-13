@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { BlockProps } from "./types";
 import { experimentFrontier } from "./analysis-contract.mjs";
 import "./analysis.css";
+import { blockLabel } from "./shared";
+import { getLocale, type MessageKey } from "../../i18n";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/analysis";
 
 type Status = "kept" | "discarded" | "failed" | "running" | "stopped";
 type Experiment = {
@@ -52,12 +56,12 @@ type Tracker = {
   };
 };
 
-const STATUS_LABEL: Record<Status, string> = {
-  kept: "保留",
-  discarded: "放弃",
-  failed: "失败",
-  running: "运行中",
-  stopped: "已停止",
+const STATUS_LABEL: Record<Status, MessageKey<typeof messages>> = {
+  kept: "tracker.status.kept",
+  discarded: "tracker.status.discarded",
+  failed: "tracker.status.failed",
+  running: "tracker.status.running",
+  stopped: "tracker.status.stopped",
 };
 const FILTERS: ("all" | Status)[] = [
   "all",
@@ -84,7 +88,7 @@ const stamp = (ms: number) => {
 };
 // Small metrics such as a loss need more decimals than counts and hours.
 const number = (value: number) =>
-  value.toLocaleString("zh-CN", {
+  value.toLocaleString(getLocale(), {
     maximumFractionDigits: Math.abs(value) < 10 ? 3 : 1,
   });
 
@@ -114,6 +118,7 @@ function Scatter({
   selected: string | null;
   onSelect: (id: string) => void;
 }) {
+  const t = useTranslator(messages);
   const [ref, width] = useWidth();
   const [hover, setHover] = useState<Experiment | null>(null);
   const height = 360;
@@ -193,7 +198,7 @@ function Scatter({
         width={width}
         height={height}
         role="img"
-        aria-label={`${model.metric.label} 随时间的分布`}
+        aria-label={t("tracker.overTime", { metric: model.metric.label })}
         onMouseLeave={() => setHover(null)}
       >
         {ticks.map((v) => (
@@ -233,7 +238,7 @@ function Scatter({
           rx={6}
         />
         <text x={m.l + 8} y={laneY + 4}>
-          无分数
+          {t("tracker.noScore")}
         </text>
         {model.metric.baseline !== undefined && (
           <g>
@@ -250,7 +255,7 @@ function Scatter({
               y={y(model.metric.baseline) - 5}
               textAnchor="end"
             >
-              基线 {model.metric.baseline}
+              {t("tracker.baseline", { value: model.metric.baseline })}
             </text>
           </g>
         )}
@@ -356,7 +361,7 @@ function Scatter({
           );
         })}
         <text x={m.l} y={height - 2}>
-          开始时间 →
+          {t("tracker.startTime")}
         </text>
       </svg>
       {hover && (
@@ -375,13 +380,16 @@ function Scatter({
           </b>
           <span>
             {stamp(time(hover.start))}
-            {hover.minutes !== undefined && ` · ${hover.minutes} 分钟`}
+            {hover.minutes !== undefined &&
+              ` · ${t("tracker.minutes", { count: hover.minutes })}`}
             {hover.resources !== undefined &&
               ` · ${hover.resources} ${model.resource?.unit ?? ""}`}
           </span>
-          {model.metric.label}：
-          {hover.score === null ? "—" : `${number(hover.score)}${unit}`} ·{" "}
-          {STATUS_LABEL[hover.status]}
+          {t("tracker.metricValue", {
+            metric: model.metric.label,
+            value: hover.score === null ? "—" : `${number(hover.score)}${unit}`,
+          })}{" "}
+          · {t(STATUS_LABEL[hover.status])}
           {hover.note && <span>{hover.note}</span>}
         </div>
       )}
@@ -566,6 +574,7 @@ function Stat({
 }
 
 export function ExperimentTrackerBlock({ data }: BlockProps) {
+  const t = useTranslator(messages);
   const model = data as unknown as Tracker;
   const [filter, setFilter] = useState<"all" | Status>("all");
   const [selected, setSelected] = useState<string | null>(null);
@@ -593,7 +602,7 @@ export function ExperimentTrackerBlock({ data }: BlockProps) {
   );
   const groups = model.groups?.length
     ? model.groups
-    : [{ id: "", label: "最佳" }];
+    : [{ id: "", label: t("tracker.best") }];
   const bestByGroup = groups.map((group) => {
     const pool = scored.filter(
       (e) => !model.groups?.length || e.group === group.id,
@@ -645,7 +654,7 @@ export function ExperimentTrackerBlock({ data }: BlockProps) {
   return (
     <section
       className="sb-block an-block"
-      aria-label={model.title ?? "实验追踪"}
+      aria-label={blockLabel(model.title, t("tracker.title"))}
     >
       <div className="an-tracker">
         <div className="an-head">
@@ -653,7 +662,7 @@ export function ExperimentTrackerBlock({ data }: BlockProps) {
           {model.subtitle && <p className="an-sub">{model.subtitle}</p>}
           {model.updatedAt && (
             <p className="an-sub an-tools">
-              更新于 {stamp(time(model.updatedAt))}
+              {t("tracker.updatedAt", { time: stamp(time(model.updatedAt)) })}
             </p>
           )}
         </div>
@@ -661,13 +670,13 @@ export function ExperimentTrackerBlock({ data }: BlockProps) {
           <div className="an-panel an-runs">
             <div className="an-runs-head">
               <p className="an-panel-title">
-                运行 · {model.experiments.length}
+                {t("tracker.runs", { count: model.experiments.length })}
               </p>
               <div
                 className="an-tools"
                 style={{ marginLeft: 0 }}
                 role="group"
-                aria-label="按状态筛选"
+                aria-label={t("tracker.filterByStatus")}
               >
                 {FILTERS.filter((key) => key === "all" || counts[key]).map(
                   (key) => (
@@ -678,7 +687,7 @@ export function ExperimentTrackerBlock({ data }: BlockProps) {
                       aria-pressed={filter === key}
                       onClick={() => setFilter(key)}
                     >
-                      {key === "all" ? "全部" : STATUS_LABEL[key]}{" "}
+                      {key === "all" ? t("tracker.all") : t(STATUS_LABEL[key])}{" "}
                       {counts[key] ?? 0}
                     </button>
                   ),
@@ -705,7 +714,7 @@ export function ExperimentTrackerBlock({ data }: BlockProps) {
                     {run ? (
                       <input
                         type="checkbox"
-                        aria-label={`在曲线中显示 ${run.id}`}
+                        aria-label={t("tracker.showRun", { id: run.id })}
                         checked={!hidden.has(run.id)}
                         onClick={(event) => event.stopPropagation()}
                         onChange={() => toggleRun(run.id)}
@@ -730,7 +739,7 @@ export function ExperimentTrackerBlock({ data }: BlockProps) {
                       <small>
                         {stamp(time(e.start))} ·{" "}
                         <span className="an-status">
-                          {STATUS_LABEL[e.status]}
+                          {t(STATUS_LABEL[e.status])}
                         </span>
                       </small>
                     </span>
@@ -747,20 +756,22 @@ export function ExperimentTrackerBlock({ data }: BlockProps) {
             <div className="an-panel">
               <div className="an-plot-legend">
                 <b>
-                  全部实验 · {model.metric.label}
+                  {t("tracker.allExperiments", { metric: model.metric.label })}
                   {unit ? ` (${unit})` : ""} ·{" "}
-                  {higher ? "越高越好" : "越低越好"}
+                  {higher
+                    ? t("tracker.higherIsBetter")
+                    : t("tracker.lowerIsBetter")}
                 </b>
-                {frontier.length > 0 && <span>— 最优前沿</span>}
-                <span>● 保留</span>
-                <span>○ 其他</span>
+                {frontier.length > 0 && <span>{t("tracker.frontier")}</span>}
+                <span>{t("tracker.legendKept")}</span>
+                <span>{t("tracker.legendOther")}</span>
                 {model.groups?.some((g) => g.shape === "diamond") && (
                   <span>
                     ◇{" "}
                     {model.groups
                       .filter((g) => g.shape === "diamond")
                       .map((g) => g.label)
-                      .join("、")}
+                      .join(t("tracker.listSeparator"))}
                   </span>
                 )}
               </div>
@@ -795,7 +806,7 @@ export function ExperimentTrackerBlock({ data }: BlockProps) {
                       {run.name}
                     </span>
                   ))}
-                  <span>横轴为训练步；在左侧勾选以显示或隐藏</span>
+                  <span>{t("tracker.runsHint")}</span>
                 </div>
               </>
             )}
@@ -804,7 +815,7 @@ export function ExperimentTrackerBlock({ data }: BlockProps) {
           <div className="an-stats">
             <div className="an-stat-grid">
               <Stat
-                label="实验总数"
+                label={t("tracker.total")}
                 value={String(model.experiments.length)}
                 detail={
                   groups.length > 1
@@ -814,7 +825,7 @@ export function ExperimentTrackerBlock({ data }: BlockProps) {
                             `${g.label} ${model.experiments.filter((e) => e.group === g.id).length}`,
                         )
                         .join(" · ")
-                    : `运行中 ${counts.running ?? 0}`
+                    : t("tracker.runningCount", { count: counts.running ?? 0 })
                 }
               />
               {bestByGroup.map(({ group, best }) =>
@@ -822,7 +833,9 @@ export function ExperimentTrackerBlock({ data }: BlockProps) {
                   <Stat
                     key={group.id}
                     label={
-                      groups.length > 1 ? `${group.label}最佳` : "当前最佳"
+                      groups.length > 1
+                        ? t("tracker.groupBest", { group: group.label })
+                        : t("tracker.currentBest")
                     }
                     value={number(best.score as number)}
                     unit={unit}
@@ -832,29 +845,39 @@ export function ExperimentTrackerBlock({ data }: BlockProps) {
               )}
               {model.metric.baseline !== undefined && frontierBest && (
                 <Stat
-                  label="比基线改善"
+                  label={t("tracker.gain")}
                   value={`${gain >= 0 ? "+" : "−"}${number(Math.abs(gain))}`}
                   unit={unit === "%" ? "pt" : unit}
-                  detail={`前沿上的最佳 ${number(frontierBest.score as number)} · 基线 ${model.metric.baseline}`}
+                  detail={t("tracker.gainDetail", {
+                    best: number(frontierBest.score as number),
+                    baseline: model.metric.baseline,
+                  })}
                 />
               )}
               <Stat
-                label="保留率"
+                label={t("tracker.keepRate")}
                 value={String(
                   Math.round(
                     ((counts.kept ?? 0) / model.experiments.length) * 100,
                   ),
                 )}
                 unit="%"
-                detail={`保留 ${counts.kept ?? 0} · 运行中 ${counts.running ?? 0}`}
+                detail={t("tracker.keepRateDetail", {
+                  kept: counts.kept ?? 0,
+                  running: counts.running ?? 0,
+                })}
               />
               {model.resource && (
                 <Stat
-                  label={`${model.resource.unit} · 时`}
+                  label={t("tracker.resourceHours", {
+                    unit: model.resource.unit,
+                  })}
                   value={number(Math.round(hours))}
                   detail={
                     model.resource.budget
-                      ? `预算 ${number(model.resource.budget)}`
+                      ? t("tracker.budget", {
+                          value: number(model.resource.budget),
+                        })
                       : undefined
                   }
                   meter={
@@ -867,15 +890,18 @@ export function ExperimentTrackerBlock({ data }: BlockProps) {
               {model.resource?.costPerHour !== undefined && (
                 <Stat
                   wide
-                  label="估算成本"
+                  label={t("tracker.cost")}
                   value={`${model.resource.currency ?? "¥"}${number(Math.round(hours * model.resource.costPerHour))}`}
-                  detail={`按 ${model.resource.currency ?? "¥"}${model.resource.costPerHour} / ${model.resource.unit}·时`}
+                  detail={t("tracker.costRate", {
+                    rate: `${model.resource.currency ?? "¥"}${model.resource.costPerHour}`,
+                    unit: model.resource.unit,
+                  })}
                 />
               )}
             </div>
             {categories.length > 0 && (
               <div className="an-panel">
-                <p className="an-panel-title">按方向 · 保留 / 总数</p>
+                <p className="an-panel-title">{t("tracker.byCategory")}</p>
                 {categories.map(([name, c]) => (
                   <div key={name} style={{ fontSize: 11.5, marginBottom: 5 }}>
                     <div
@@ -917,29 +943,34 @@ export function ExperimentTrackerBlock({ data }: BlockProps) {
                 </span>
                 <span>
                   {stamp(time(active.start))}
-                  {active.minutes !== undefined && ` · ${active.minutes} 分钟`}
+                  {active.minutes !== undefined &&
+                    ` · ${t("tracker.minutes", { count: active.minutes })}`}
                   {active.resources !== undefined &&
                     ` · ${active.resources} ${model.resource?.unit ?? ""}`}
                 </span>
-                {model.metric.label}：
-                {active.score === null ? "—" : number(active.score)} ·{" "}
-                {STATUS_LABEL[active.status]}
+                {t("tracker.metricValue", {
+                  metric: model.metric.label,
+                  value: active.score === null ? "—" : number(active.score),
+                })}{" "}
+                · {t(STATUS_LABEL[active.status])}
                 {active.note && <span>{active.note}</span>}
               </div>
             )}
           </div>
         </div>
         <details className="an-static">
-          <summary>{`以表格阅读全部实验（${model.experiments.length}）`}</summary>
+          <summary>
+            {t("tracker.readTable", { count: model.experiments.length })}
+          </summary>
           <table>
             <thead>
               <tr>
                 <th>ID</th>
-                <th>名称</th>
-                <th>开始</th>
-                <th>状态</th>
+                <th>{t("tracker.column.name")}</th>
+                <th>{t("tracker.column.start")}</th>
+                <th>{t("tracker.column.status")}</th>
                 <th>{model.metric.label}</th>
-                <th>备注</th>
+                <th>{t("tracker.column.note")}</th>
               </tr>
             </thead>
             <tbody>
@@ -950,7 +981,7 @@ export function ExperimentTrackerBlock({ data }: BlockProps) {
                     <td>{e.id}</td>
                     <td>{e.name}</td>
                     <td>{stamp(time(e.start))}</td>
-                    <td>{STATUS_LABEL[e.status]}</td>
+                    <td>{t(STATUS_LABEL[e.status])}</td>
                     <td>{e.score === null ? "—" : number(e.score)}</td>
                     <td>{e.note ?? ""}</td>
                   </tr>

@@ -31,9 +31,10 @@ export function BlockSettings({ children }: { children: ReactNode }) {
               event.preventDefault();
               event.stopPropagation();
               host.closeSettings();
+              // The settings toggle is the last header action and is active while open.
               host.target
                 ?.querySelector<HTMLButtonElement>(
-                  'button[aria-label="关闭设置"]',
+                  ".sb-actions > button.sb-icon-button.is-active:last-child",
                 )
                 ?.focus({ preventScroll: true });
             }

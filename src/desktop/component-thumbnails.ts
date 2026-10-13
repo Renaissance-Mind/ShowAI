@@ -18,6 +18,10 @@ import { createHash } from "node:crypto";
 import { CoreError } from "../core/store";
 import { errorResult } from "../agent/service";
 import type { DesktopResponse } from "./bridge";
+import { translator } from "../i18n";
+import messages from "../i18n/messages/desktop";
+
+const t = translator(messages);
 
 const directory = dirname(fileURLToPath(import.meta.url));
 interface PreviewLease {
@@ -159,7 +163,7 @@ async function capture(
         const stage = document.querySelector('[data-preview-ready]');
         if (stage?.dataset.previewError) return reject(new Error(stage.dataset.previewError));
         if (stage?.dataset.previewReady === 'true') return requestAnimationFrame(() => resolve(true));
-        if (Date.now() > deadline) return reject(new Error('组件预览加载超时。'));
+        if (Date.now() > deadline) return reject(new Error(${JSON.stringify(t("previewTimeout"))}));
         setTimeout(poll, 30);
       }; poll();
     })`);
