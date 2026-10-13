@@ -5,8 +5,11 @@ import {
   mergeNavigationProjects,
   retainEqual,
   mergeNavigationScope,
+  savedPageMoved,
+  withSavedPage,
+  withSavedProjectTime,
 } from "./navigation-refresh";
-import type { ProjectSummary } from "../core/model";
+import type { PageSummary, ProjectSummary, ShowDocument } from "../core/model";
 import { PROJECT_SCOPE_LIMIT } from "../desktop/bridge";
 
 it("merges resource scopes and only falls back to the whole library for unscoped changes", () => {
@@ -94,4 +97,74 @@ it("scoped refreshes preserve unrelated project identities and remove missing sc
   expect(next.map((project) => project.id)).toEqual(["a", "b"]);
   expect(next[1]).toBe(b);
   expect(retainEqual(previous, next)).toBe(next);
+});
+
+it("applies an own save to loaded navigation and keeps unchanged values", () => {
+  const summary: PageSummary = {
+    id: "page",
+    title: "Before",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    icon: "📄",
+    hash: "a",
+    revision: "r1",
+    blockCount: 3,
+    parentId: null,
+    favorite: false,
+    archived: false,
+  };
+  const contents = { project: { pages: [summary], folders: [] } };
+  const document = {
+    id: "page",
+    title: "After",
+    icon: "📄",
+    createdAt: summary.createdAt,
+    updatedAt: "2026-01-02T00:00:00.000Z",
+    parentId: null,
+    favorite: false,
+    archived: false,
+  } as ShowDocument;
+  const saved = withSavedPage(contents, "project", {
+    document,
+    hash: "b",
+    revision: "r2",
+  });
+  expect(saved.project.pages[0]).toEqual({
+    ...summary,
+    title: "After",
+    updatedAt: "2026-01-02T00:00:00.000Z",
+    hash: "b",
+    revision: "r2",
+  });
+  expect(
+    withSavedPage(saved, "project", { document, hash: "b", revision: "r2" }),
+  ).toBe(saved);
+  expect(withSavedPage(contents, "other", { document, hash: "b" })).toBe(
+    contents,
+  );
+  expect(savedPageMoved(contents, "project", { document })).toBe(false);
+  expect(
+    savedPageMoved(contents, "project", {
+      document: { ...document, parentId: "folder" },
+    }),
+  ).toBe(true);
+  expect(
+    savedPageMoved(contents, "project", {
+      document: { ...document, id: "new-page" },
+    }),
+  ).toBe(true);
+  expect(savedPageMoved(contents, "unloaded", { document })).toBe(false);
+  const projects = [
+    { id: "older", name: "Older", updatedAt: "2026-01-01T12:00:00.000Z" },
+    { id: "project", name: "Saved", updatedAt: "2026-01-01T00:00:00.000Z" },
+  ] as ProjectSummary[];
+  const resorted = withSavedProjectTime(
+    projects,
+    "project",
+    document.updatedAt,
+  );
+  expect(resorted.map((item) => item.id)).toEqual(["project", "older"]);
+  expect(withSavedProjectTime(resorted, "project", summary.updatedAt)).toBe(
+    resorted,
+  );
 });

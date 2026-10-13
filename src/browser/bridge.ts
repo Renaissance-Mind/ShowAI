@@ -14,6 +14,8 @@ export function installBrowserBridge() {
   const listeners = new Set<(change: DesktopChange) => void>();
   const closeListeners = new Set<() => Promise<boolean>>();
   let dirty = false;
+  // Lets the server skip echoing this tab's own saves back to it.
+  const client = crypto.randomUUID();
   async function request<T>(
     route: string,
     args: Record<string, unknown>,
@@ -23,6 +25,7 @@ export function installBrowserBridge() {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${config!.token}`,
+        "X-ShowAI-Client": client,
       },
       body: JSON.stringify(args),
     });
@@ -127,7 +130,7 @@ export function installBrowserBridge() {
   // frame would exhaust the browser's connections to this loopback host.
   if (!new URLSearchParams(location.search).has("componentPreview")) {
     const events = new EventSource(
-      `/api/events?token=${encodeURIComponent(config.token)}`,
+      `/api/events?token=${encodeURIComponent(config.token)}&client=${client}`,
     );
     events.onmessage = (event) => {
       const change = JSON.parse(event.data) as DesktopChange;

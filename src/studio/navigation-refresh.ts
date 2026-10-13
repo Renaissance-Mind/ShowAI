@@ -1,5 +1,10 @@
 import { PROJECT_SCOPE_LIMIT, type DesktopChange } from "../desktop/bridge";
-import type { ProjectSummary } from "../core/model";
+import type {
+  FolderMetadata,
+  PageRecord,
+  PageSummary,
+  ProjectSummary,
+} from "../core/model";
 
 export interface NavigationScope {
   all: boolean;
@@ -64,4 +69,70 @@ export function mergeNavigationProjects(
       b.updatedAt.localeCompare(a.updatedAt),
   );
   return retainEqual(previous, merged);
+}
+
+type ProjectContents = Record<
+  string,
+  { pages: PageSummary[]; folders: FolderMetadata[] }
+>;
+/**
+ * Applies this window's own save to loaded navigation. The file watcher no
+ * longer echoes that save back here, so the sidebar updates from its record.
+ */
+export function withSavedPage(
+  contents: ProjectContents,
+  projectId: string,
+  record: Pick<PageRecord, "document" | "hash" | "revision">,
+): ProjectContents {
+  const current = contents[projectId];
+  const index = current?.pages.findIndex(
+    (page) => page.id === record.document.id,
+  );
+  if (!current || index === undefined || index < 0) return contents;
+  const previous = current.pages[index];
+  const { document } = record;
+  const next: PageSummary = {
+    ...previous,
+    title: document.title,
+    icon: document.icon ?? previous.icon,
+    createdAt: document.createdAt,
+    updatedAt: document.updatedAt,
+    hash: record.hash,
+    ...(record.revision ? { revision: record.revision } : {}),
+    parentId: document.parentId ?? null,
+    favorite: !!document.favorite,
+    archived: !!document.archived,
+  };
+  if (retainEqual(previous, next) === previous) return contents;
+  const pages = [...current.pages];
+  pages[index] = next;
+  return { ...contents, [projectId]: { ...current, pages } };
+}
+/** Structure changes still need a scoped refresh of that project's lists. */
+export function savedPageMoved(
+  contents: ProjectContents,
+  projectId: string,
+  record: Pick<PageRecord, "document">,
+): boolean {
+  const current = contents[projectId];
+  if (!current) return false;
+  const previous = current.pages.find((page) => page.id === record.document.id);
+  return (
+    !previous ||
+    previous.parentId !== (record.document.parentId ?? null) ||
+    previous.archived !== !!record.document.archived
+  );
+}
+export function withSavedProjectTime(
+  projects: ProjectSummary[],
+  projectId: string,
+  updatedAt: string,
+): ProjectSummary[] {
+  const project = projects.find((item) => item.id === projectId);
+  if (!project || project.updatedAt >= updatedAt) return projects;
+  return mergeNavigationProjects(
+    projects,
+    [{ ...project, updatedAt }],
+    new Set([projectId]),
+  );
 }

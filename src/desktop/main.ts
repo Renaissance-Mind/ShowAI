@@ -1,4 +1,5 @@
 import { changedResources } from "../core/change-notification";
+import { OwnWrites } from "../core/own-writes";
 import { ModelResourceClient } from "../sync/model-resources";
 import "./component-thumbnails";
 import {
@@ -53,6 +54,8 @@ let agentHost: AgentHost;
 let watcher: FSWatcher | undefined;
 let maintenance: MaintenanceScheduler | undefined;
 let notification: ReturnType<typeof setTimeout> | undefined;
+// A window already holds the record of its own save; skip that echo for it.
+const ownWrites = new OwnWrites();
 let pendingDeepLink = process.argv.find((argument) =>
   argument.startsWith("showai://"),
 );
@@ -130,10 +133,33 @@ function broadcast(type: DesktopChange["type"], change?: DesktopChange): void {
       } satisfies DesktopChange);
 }
 
+async function deliverFiles(root: string, batch: string[]): Promise<void> {
+  const echoes = await ownWrites.echoes(batch);
+  if (root !== store.root) return;
+  for (const window of windows) {
+    if (window.isDestroyed()) continue;
+    const own = echoes.get(String(window.webContents.id));
+    const visible = own ? batch.filter((path) => !own.has(path)) : batch;
+    if (visible.length)
+      window.webContents.send("showai:changed", {
+        ...changedResources(root, visible),
+        type: "files",
+        home: root,
+      } satisfies DesktopChange);
+  }
+  const change = changedResources(root, batch);
+  if (change.projectIds?.length || change.catalog || change.all)
+    syncManager(root).wake(
+      change.catalog || change.all ? undefined : change.projectIds,
+      !!(change.catalog || change.all),
+    );
+}
+
 async function useHome(home?: string): Promise<void> {
   if (store) await syncManager(store.root).stop();
   await maintenance?.stop();
   await watcher?.close();
+  ownWrites.clear();
   store = new FileStore(home);
   await openLibrary(store.root);
   service = new AgentService({ root: store.root });
@@ -171,14 +197,11 @@ async function useHome(home?: string): Promise<void> {
     if (notification) return;
     notification = setTimeout(() => {
       notification = undefined;
-      const change = changedResources(store.root, paths);
-      broadcast("files", change);
-      if (change.projectIds?.length || change.catalog || change.all)
-        syncManager(store.root).wake(
-          change.catalog || change.all ? undefined : change.projectIds,
-          !!(change.catalog || change.all),
-        );
+      const batch = [...paths];
       paths.clear();
+      void deliverFiles(store.root, batch).catch((error) =>
+        console.error("ShowAI file watcher:", error),
+      );
     }, 180);
   });
   watcher.on("error", (error) => console.error("ShowAI file watcher:", error));
@@ -275,7 +298,7 @@ async function handle(
 ): Promise<unknown> {
   maintenance?.markActivity();
   if (agentActions.has(action)) return agentHost!.action(action, args);
-  return createWorkbench(store, service, {
+  const result = await createWorkbench(store, service, {
     preferencesChanged: () =>
       broadcast("files", {
         type: "files",
@@ -290,6 +313,10 @@ async function handle(
     saveDialog: (options) => dialog.showSaveDialog(window, options),
     invoke: (action, args) => nativeAction(action, args, window),
   })(action, args);
+  const saved = (result as { path?: unknown } | null)?.path;
+  if (action === "pages:save" && typeof saved === "string")
+    await ownWrites.record(String(window.webContents.id), saved);
+  return result;
 }
 
 function isWorkbenchLocation(source: string): boolean {

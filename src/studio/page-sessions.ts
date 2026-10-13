@@ -1,6 +1,7 @@
 import type { DesktopChange } from "../desktop/bridge";
 import {
   createPageSession,
+  type LoadedPage,
   type PageSession,
   type PageSessionOptions,
 } from "./page-session";
@@ -35,6 +36,9 @@ export class PageSessions {
   private pages = new Map<string, PageSession>();
   private viewStates = new Map<string, PageViewSession>();
   private listeners = new Set<() => void>();
+  private savedListeners = new Set<
+    (projectId: string, record: LoadedPage) => void
+  >();
   private stale = new Map<PageSession, number>();
   private changedComponents = new Set<PageSession>();
   private refreshTimer?: ReturnType<typeof setTimeout>;
@@ -59,6 +63,15 @@ export class PageSessions {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
+    };
+  };
+  /** Every retained page reports its successful saves, including background tabs. */
+  subscribeSaved = (
+    listener: (projectId: string, record: LoadedPage) => void,
+  ) => {
+    this.savedListeners.add(listener);
+    return () => {
+      this.savedListeners.delete(listener);
     };
   };
   private publish(patch: Partial<WorkspaceSnapshot> = {}) {
@@ -202,6 +215,10 @@ export class PageSessions {
       const home = this.home;
       session = createPageSession({
         ...this.options,
+        onSaved: (projectId, record) => {
+          for (const listener of this.savedListeners)
+            listener(projectId, record);
+        },
         invoke: (action, args) =>
           this.options.invoke(action, { ...args, expectedHome: home }),
       });
