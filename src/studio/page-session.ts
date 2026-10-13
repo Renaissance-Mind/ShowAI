@@ -268,6 +268,9 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     undefined,
   );
   const draftTimer = ref<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // The draft store keeps one baseline per base revision and can otherwise
+  // read it from the library, so the full base page is sent only once.
+  const sentBaseline = ref<string | null>(null);
   const persist = async (
     source: ShowDocument,
     sequence: number,
@@ -283,6 +286,12 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     const pending = draftWrites.current.get(key);
     if (pending) return pending;
     const task = (async () => {
+      const baseline = JSON.stringify([owner, source.id, draftBase.current]);
+      const baseContent =
+        sentBaseline.current !== baseline &&
+        recordRef.current?.revision === draftBase.current
+          ? recordRef.current?.document
+          : undefined;
       const saved = await options.invoke<EditorDraftRecord>("drafts:save", {
         input: {
           kind: "page",
@@ -290,16 +299,14 @@ export function createPageSession(options: PageSessionOptions): PageSession {
           resourceId: source.id,
           projectId: owner,
           baseRevision: draftBase.current,
-          baseContent:
-            recordRef.current?.revision === draftBase.current
-              ? recordRef.current?.document
-              : undefined,
+          baseContent,
           title: source.title,
           content: source,
           sequence,
           recoverySource: recoveredFrom.current ?? undefined,
         },
       });
+      if (baseContent) sentBaseline.current = baseline;
       if (
         projectRef.current === owner &&
         current.current?.id === source.id &&

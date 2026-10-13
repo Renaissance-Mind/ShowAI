@@ -88,6 +88,7 @@ import {
   LibraryRow,
   LibraryContextMenu,
   type LibraryMenuPoint,
+  type LibraryRowProps,
   type LibraryTarget,
   type LibraryContextMenuItem,
 } from "./LibraryNavigation";
@@ -121,6 +122,7 @@ import {
 import TemplateThumbnail from "./TemplateThumbnail";
 import RecentPages, { recentPages } from "./RecentPages";
 import AutoHideSidebar from "./AutoHideSidebar";
+import SaveState from "./SaveState";
 import WorkspaceTabs, { WorkspaceHistory } from "./WorkspaceTabs";
 import { useWorkspaceTabs } from "./useWorkspaceTabs";
 import {
@@ -1595,15 +1597,11 @@ export default function Studio() {
           }
           onToggle={
             target.kind === "folder"
-              ? () =>
-                  setExpandedFolders((current) => ({
-                    ...current,
-                    [target.id]: !current[target.id],
-                  }))
+              ? rowToggle("folder", target.id)
               : undefined
           }
-          onOpen={openTargetClick}
-          onMenu={showMenu}
+          onOpen={openRow}
+          onMenu={showRowMenu}
         />
         {target.kind === "folder" && expandedFolders[target.id] && (
           <div className="studio-tree-children">
@@ -1972,6 +1970,35 @@ export default function Studio() {
     busy ||
     !!syncReadOnly ||
     (!!selectedFolder && !currentFolder);
+  // Stable row handlers let memoized LibraryRows skip unrelated Studio renders.
+  const rowHandlers = useRef({ openTargetClick, showMenu, toggleProject });
+  rowHandlers.current = { openTargetClick, showMenu, toggleProject };
+  const openRow = useCallback<LibraryRowProps["onOpen"]>(
+    (target, event) => rowHandlers.current.openTargetClick(target, event),
+    [],
+  );
+  const showRowMenu = useCallback<LibraryRowProps["onMenu"]>(
+    (target, anchor, point) =>
+      rowHandlers.current.showMenu(target, anchor, point),
+    [],
+  );
+  const rowToggles = useRef(new Map<string, () => void>());
+  const rowToggle = (kind: "project" | "folder", id: string) => {
+    const key = `${kind}:${id}`;
+    let toggle = rowToggles.current.get(key);
+    if (!toggle) {
+      toggle =
+        kind === "project"
+          ? () => void rowHandlers.current.toggleProject(id).catch(report)
+          : () =>
+              setExpandedFolders((current) => ({
+                ...current,
+                [id]: !current[id],
+              }));
+      rowToggles.current.set(key, toggle);
+    }
+    return toggle;
+  };
   const sidebarNavigation = (
     <SidebarNavigation
       onSelect={(section) =>
@@ -2045,9 +2072,9 @@ export default function Studio() {
                   !selectedFolder
                 }
                 expanded={!!expandedProjects[item.id]}
-                onToggle={action(() => toggleProject(item.id))}
-                onOpen={openTargetClick}
-                onMenu={showMenu}
+                onToggle={rowToggle("project", item.id)}
+                onOpen={openRow}
+                onMenu={showRowMenu}
               />
               {expandedProjects[item.id] && (
                 <div className="studio-tree-children">
@@ -2061,6 +2088,7 @@ export default function Studio() {
       {sidebarNavigation}
       {libraryDrag.preview && (
         <div
+          ref={libraryDrag.previewRef}
           className="studio-library-drag-preview"
           aria-hidden="true"
           style={{
@@ -2435,22 +2463,7 @@ export default function Studio() {
                   : null
               }
             />
-            <span className={`studio-save-state ${page.status}`}>
-              {page.status === "saving" ? (
-                <Loader2 size={12} className="studio-spin" />
-              ) : (
-                <Check size={12} />
-              )}
-              {page.status === "retained"
-                ? "本机草稿已保留"
-                : {
-                    saved: "本机已保存",
-                    saving: "保存中",
-                    changed: "待保存",
-                    conflict: "保存失败",
-                    error: "保存失败",
-                  }[page.status]}
-            </span>
+            <SaveState sessions={page.sessions} />
             <button
               className="studio-icon"
               aria-label="显示页面文件"

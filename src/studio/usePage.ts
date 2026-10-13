@@ -3,7 +3,7 @@ import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import { desktop } from "./bridge";
 import { PageSessions } from "./page-sessions";
-import type { PageSnapshot } from "./page-session";
+import type { PageSnapshot, SaveStatus } from "./page-session";
 export type { LoadedPage, SaveStatus } from "./page-session";
 
 const empty: PageSnapshot = {
@@ -21,6 +21,57 @@ const empty: PageSnapshot = {
   busy: false,
 };
 
+/** Routine save progress is shown by SaveState and does not re-render Studio. */
+const routineStatus = new Set<SaveStatus>([
+  "saved",
+  "saving",
+  "changed",
+  "retained",
+]);
+type StudioView = {
+  workspace: ReturnType<PageSessions["getSnapshot"]>;
+  state: PageSnapshot;
+};
+function sameStudioView(previous: StudioView, next: StudioView) {
+  const a = previous.workspace;
+  const b = next.workspace;
+  if (
+    a.active !== b.active ||
+    a.activeView !== b.activeView ||
+    a.views !== b.views ||
+    a.issues.length !== b.issues.length ||
+    a.issues.some(
+      (issue, index) =>
+        issue.pageId !== b.issues[index].pageId ||
+        issue.projectId !== b.issues[index].projectId ||
+        issue.title !== b.issues[index].title ||
+        issue.error !== b.issues[index].error,
+    )
+  )
+    return false;
+  const x = previous.state;
+  const y = next.state;
+  return (
+    (x.status === y.status ||
+      (routineStatus.has(x.status) && routineStatus.has(y.status))) &&
+    x.draft?.id === y.draft?.id &&
+    x.draft?.title === y.draft?.title &&
+    x.draft?.icon === y.draft?.icon &&
+    x.draft?.parentId === y.draft?.parentId &&
+    x.draft?.favorite === y.draft?.favorite &&
+    x.record === y.record &&
+    x.error === y.error &&
+    x.renderVersion === y.renderVersion &&
+    x.draftNotice === y.draftNotice &&
+    x.conflictId === y.conflictId &&
+    x.mergeBase === y.mergeBase &&
+    x.reviewingConflict === y.reviewingConflict &&
+    x.saveFailureAttempt === y.saveFailureAttempt &&
+    x.projectId === y.projectId &&
+    x.availableDrafts === y.availableDrafts
+  );
+}
+
 /** Studio observes metadata; each retained editor observes its own document. */
 export function usePage(home?: string) {
   const sessionsRef = useRef<PageSessions | null>(null);
@@ -34,11 +85,18 @@ export function usePage(home?: string) {
     });
   }
   const sessions = sessionsRef.current;
-  useSyncExternalStore(
-    sessions.subscribe,
-    sessions.getSnapshot,
-    sessions.getSnapshot,
-  );
+  const view = useRef<StudioView | null>(null);
+  const readView = useCallback(() => {
+    const workspace = sessions.getSnapshot();
+    const next = {
+      workspace,
+      state: workspace.active?.getSnapshot() ?? empty,
+    };
+    if (!view.current || !sameStudioView(view.current, next))
+      view.current = next;
+    return view.current;
+  }, [sessions]);
+  useSyncExternalStore(sessions.subscribe, readView, readView);
   const active = sessions.getSnapshot().active;
   const state = active?.getSnapshot() ?? empty;
   useEffect(() => {
@@ -53,8 +111,11 @@ export function usePage(home?: string) {
     [sessions],
   );
   useEffect(() => {
-    window.showai?.setDirty?.(sessions.hasUnretainedChanges());
-  });
+    const report = () =>
+      window.showai?.setDirty?.(sessions.hasUnretainedChanges());
+    report();
+    return sessions.subscribe(report);
+  }, [sessions]);
   useEffect(() => {
     const focused = () => {
       void sessions.refresh();
@@ -150,8 +211,22 @@ export function usePage(home?: string) {
       sessions.getSnapshot().active?.prepareExternalResolution(document, id),
     [sessions],
   );
+  const live = () => sessions.getSnapshot().active?.getSnapshot() ?? empty;
   return {
     ...state,
+    // Studio may skip routine save renders, so handlers read the latest edit.
+    get draft() {
+      return live().draft;
+    },
+    get status() {
+      return live().status;
+    },
+    get dirty() {
+      return live().dirty;
+    },
+    get busy() {
+      return live().busy;
+    },
     sessions,
     edit,
     editContent,

@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type HTMLAttributes,
@@ -56,10 +57,13 @@ export function useLibraryDragController(options: {
     sidebar: HTMLElement;
   } | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
+  // Pointer moves position the preview directly instead of re-rendering Studio.
+  const previewPoint = useRef({ x: 0, y: 0 });
+  const previewRef = useRef<HTMLDivElement>(null);
   const [preview, setPreview] = useState<{
     title: string;
-    x: number;
-    y: number;
+    readonly x: number;
+    readonly y: number;
   } | null>(null);
   const [destination, setDestination] = useState<Destination | null>(null);
 
@@ -227,11 +231,29 @@ export function useLibraryDragController(options: {
         frame = requestAnimationFrame(scroll);
       }
       event.preventDefault();
-      setPreview({
-        title: current.source.title,
+      previewPoint.current = {
         x: Math.min(point.x + 14, window.innerWidth - 180),
         y: Math.min(point.y + 14, window.innerHeight - 36),
-      });
+      };
+      const element = previewRef.current;
+      if (element) {
+        element.style.left = `${previewPoint.current.x}px`;
+        element.style.top = `${previewPoint.current.y}px`;
+      }
+      const title = current.source.title;
+      setPreview((shown) =>
+        shown?.title === title
+          ? shown
+          : {
+              title,
+              get x() {
+                return previewPoint.current.x;
+              },
+              get y() {
+                return previewPoint.current.y;
+              },
+            },
+      );
       update();
     };
     const up = (event: PointerEvent) => {
@@ -274,51 +296,54 @@ export function useLibraryDragController(options: {
     };
   }, []);
 
-  const row = (
-    target: LibraryTarget,
-    expanded: boolean,
-    toggle?: () => void,
-  ): HTMLAttributes<HTMLDivElement> => {
-    rows.current.set(target.id, { target, expanded, toggle });
-    return {
-      "aria-description": "拖动调整顺序，拖到项目或文件夹中移动页面",
-      "data-library-draggable": true,
-      "data-dragging": dragging === target.id || undefined,
-      "data-drop-position":
-        destination?.key === target.id ? destination.position : undefined,
-      onDragStart: (event) => event.preventDefault(),
-      onPointerDown: (event) => {
-        if (
-          event.button !== 0 ||
-          (event.target as HTMLElement).closest(
-            ".studio-row-menu,.studio-tree-chevron",
+  const bindings = useMemo(() => {
+    const row = (
+      target: LibraryTarget,
+      expanded: boolean,
+      toggle?: () => void,
+    ): HTMLAttributes<HTMLDivElement> => {
+      rows.current.set(target.id, { target, expanded, toggle });
+      return {
+        "aria-description": "拖动调整顺序，拖到项目或文件夹中移动页面",
+        "data-library-draggable": true,
+        "data-dragging": dragging === target.id || undefined,
+        "data-drop-position":
+          destination?.key === target.id ? destination.position : undefined,
+        onDragStart: (event) => event.preventDefault(),
+        onPointerDown: (event) => {
+          if (
+            event.button !== 0 ||
+            (event.target as HTMLElement).closest(
+              ".studio-row-menu,.studio-tree-chevron",
+            )
           )
-        )
-          return;
-        const sidebar =
-          event.currentTarget.closest<HTMLElement>(".studio-sidebar");
-        if (!sidebar) return;
-        gesture.current = {
-          source: target,
-          x: event.clientX,
-          y: event.clientY,
-          pointerId: event.pointerId,
-          active: false,
-          sidebar,
-        };
-      },
-    } as HTMLAttributes<HTMLDivElement>;
-  };
-  const section = (
-    id: string,
-    expand: () => void,
-  ): HTMLAttributes<HTMLDivElement> => {
-    sections.current.set(id, expand);
-    return {
-      "data-library-drop-section": id,
-      "data-drop-position":
-        destination?.key === `section:${id}` ? "inside" : undefined,
-    } as HTMLAttributes<HTMLDivElement>;
-  };
-  return { dragging: !!dragging, preview, bindings: { row, section } };
+            return;
+          const sidebar =
+            event.currentTarget.closest<HTMLElement>(".studio-sidebar");
+          if (!sidebar) return;
+          gesture.current = {
+            source: target,
+            x: event.clientX,
+            y: event.clientY,
+            pointerId: event.pointerId,
+            active: false,
+            sidebar,
+          };
+        },
+      } as HTMLAttributes<HTMLDivElement>;
+    };
+    const section = (
+      id: string,
+      expand: () => void,
+    ): HTMLAttributes<HTMLDivElement> => {
+      sections.current.set(id, expand);
+      return {
+        "data-library-drop-section": id,
+        "data-drop-position":
+          destination?.key === `section:${id}` ? "inside" : undefined,
+      } as HTMLAttributes<HTMLDivElement>;
+    };
+    return { row, section };
+  }, [dragging, destination]);
+  return { dragging: !!dragging, preview, previewRef, bindings };
 }

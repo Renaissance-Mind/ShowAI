@@ -1,4 +1,5 @@
 import {
+  memo,
   useId,
   useLayoutEffect,
   useRef,
@@ -60,7 +61,7 @@ export interface LibraryRowProps {
   ) => void;
 }
 
-export function LibraryRow({
+function LibraryRowView({
   target,
   active = false,
   expanded = false,
@@ -170,6 +171,28 @@ export function LibraryRow({
     </div>
   );
 }
+
+const sameTarget = (a: LibraryTarget, b: LibraryTarget) =>
+  a === b ||
+  (a.kind === b.kind &&
+    a.id === b.id &&
+    a.projectId === b.projectId &&
+    a.title === b.title &&
+    a.icon === b.icon &&
+    a.pinned === b.pinned &&
+    a.parentId === b.parentId);
+
+/** Targets are rebuilt with each navigation render; rows compare their fields. */
+export const LibraryRow = memo(
+  LibraryRowView,
+  (previous, next) =>
+    sameTarget(previous.target, next.target) &&
+    previous.active === next.active &&
+    previous.expanded === next.expanded &&
+    previous.onToggle === next.onToggle &&
+    previous.onOpen === next.onOpen &&
+    previous.onMenu === next.onMenu,
+);
 
 interface LibraryMenuItemBase {
   label: string;
