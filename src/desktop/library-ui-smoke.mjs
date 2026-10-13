@@ -139,11 +139,17 @@ try {
     (await openMenu(id))
       .getByRole("menuitem", { name: label, exact: true })
       .click();
-  const directoryAction = async (label) => {
+  const addContent = async (label) => {
     await page
-      .getByRole("button", { name: "当前目录操作", exact: true })
+      .getByRole("button", { name: "添加内容", exact: true })
       .click();
-    await page.getByRole("menuitem", { name: label, exact: true }).click();
+    const menu = page.getByRole("menu", { name: "添加内容", exact: true });
+    assert.deepEqual(await menu.getByRole("menuitem").allTextContents(), [
+      "文件夹",
+      "页面",
+      "白板",
+    ]);
+    await menu.getByRole("menuitem", { name: label, exact: true }).click();
   };
   const nameDialog = async (inputLabel, value) => {
     const dialog = page.getByRole("dialog");
@@ -159,8 +165,7 @@ try {
       await toggle.click();
   };
   const createPage = async (title, ownerProjectId = project.id) => {
-    await directoryAction("添加新页面");
-    await page.getByRole("button", { name: "新建 Page", exact: true }).click();
+    await addContent("页面");
     await page
       .getByRole("textbox", { name: "页面标题", exact: true })
       .fill(title);
@@ -223,10 +228,12 @@ try {
   );
 
   const firstMenu = await openMenu(project.id);
-  const labels = await firstMenu.getByRole("menuitem").allTextContents();
+  const labels = await firstMenu
+    .locator('button[role="menuitem"] > span:not([class])')
+    .allTextContents();
   assert.deepEqual(
     labels.map((label) => label.trim()).sort(),
-    ["添加新页面", "新文件夹", "重命名", "删除", "置顶", "移到分组…"].sort(),
+    ["在新标签页打开", "在新窗口打开", "重命名", "删除", "置顶", "移到分组…"].sort(),
   );
   await poll(
     () =>
@@ -304,13 +311,13 @@ try {
     (data) => data.name === "Renamed project" && data.pinned === true,
     "project rename and pin persistence",
   );
-  await choose(project.id, "新文件夹");
+  await addContent("文件夹");
   await nameDialog("文件夹名称", "Folder A");
   const folderA = (await projectData()).folders.find(
     (folder) => folder.name === "Folder A",
   );
   assert.equal(folderA.parentId, null);
-  await directoryAction("新文件夹");
+  await addContent("文件夹");
   await nameDialog("文件夹名称", "Folder B");
   const folderB = (await projectData()).folders.find(
     (folder) => folder.name === "Folder B",

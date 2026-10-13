@@ -381,6 +381,7 @@ export default function Studio() {
     anchor: HTMLElement;
     point?: LibraryMenuPoint;
     pageTools?: boolean;
+    creationOnly?: boolean;
   } | null>(null);
   const [projectsMenu, setProjectsMenu] = useState<HTMLElement | null>(null);
   const [exportMenu, setExportMenu] = useState<HTMLElement | null>(null);
@@ -975,11 +976,16 @@ export default function Studio() {
     templateId = "blank",
     template?: TemplateMetadata,
     kind?: "page" | "board",
+    directory?: { projectId: string; parentId: string | null },
   ) {
     const projectId =
-      dialog?.type === "newPage" ? dialog.projectId : selectedProject;
-    const parentId =
-      dialog?.type === "newPage" ? dialog.parentId : selectedFolder;
+      directory?.projectId ??
+      (dialog?.type === "newPage" ? dialog.projectId : selectedProject);
+    const parentId = directory
+      ? directory.parentId
+      : dialog?.type === "newPage"
+        ? dialog.parentId
+        : selectedFolder;
     if (!projectId) return;
     if (!(await page.flush())) {
       setDialog(null);
@@ -1128,12 +1134,40 @@ export default function Studio() {
     anchor: HTMLElement,
     point?: LibraryMenuPoint,
     pageTools = false,
+    creationOnly = false,
   ) =>
     setContextMenu((current) =>
       !point && current?.anchor === anchor && current.target.id === target.id
         ? null
-        : { target, anchor, point, pageTools },
+        : { target, anchor, point, pageTools, creationOnly },
     );
+  function creationMenuItems(target: LibraryTarget): LibraryContextMenuItem[] {
+    const directory = {
+      projectId: target.projectId,
+      parentId: target.kind === "folder" ? target.id : target.parentId,
+    };
+    return [
+      {
+        label: "文件夹",
+        icon: <FolderPlus size={15} />,
+        onSelect: () => setDialog({ type: "folder", ...directory }),
+      },
+      {
+        label: "页面",
+        icon: <FileText size={15} />,
+        onSelect: action(() =>
+          createPage("blank", undefined, "page", directory),
+        ),
+      },
+      {
+        label: "白板",
+        icon: <LayoutTemplate size={15} />,
+        onSelect: action(() =>
+          createPage("blank", undefined, "board", directory),
+        ),
+      },
+    ];
+  }
   async function beginPageIcon(target: LibraryTarget) {
     if (!(await page.flush())) return;
     const record = await desktop.invoke<LoadedPage>("pages:get", {
@@ -2003,6 +2037,28 @@ export default function Studio() {
           collapsed={collapsedSections}
           setCollapsed={setCollapsedSections}
           onCreate={(groupId) => setDialog({ type: "project", groupId })}
+          onAddContent={
+            (view === "project" || view === "page") && project
+              ? (anchor) =>
+                  showMenu(
+                    currentFolder
+                      ? folderTarget(currentFolder, project.id)
+                      : projectTarget(project),
+                    anchor,
+                    undefined,
+                    false,
+                    true,
+                  )
+              : undefined
+          }
+          addDisabled={
+            !workspaceReady ||
+            routing ||
+            workspace.switching ||
+            busy ||
+            !!syncReadOnly ||
+            (!!selectedFolder && !currentFolder)
+          }
           onMenu={(anchor) =>
             setProjectsMenu((current) => (current === anchor ? null : anchor))
           }
@@ -2872,17 +2928,10 @@ export default function Studio() {
                               ? "没有匹配的内容"
                               : currentFolder
                                 ? "文件夹为空"
-                                : "从空白页面开始"}
+                                : "项目为空"}
                           </h2>
                           {!query && (
-                            <button
-                              className="studio-text-button"
-                              onClick={action(() =>
-                                beginNewPage(selectedProject!, selectedFolder),
-                              )}
-                            >
-                              创建页面
-                            </button>
+                            <p>点击左上角的 + 添加文件夹、页面或白板</p>
                           )}
                         </div>
                       )}
@@ -3045,193 +3094,194 @@ export default function Studio() {
               undefined
             }
             point={contextMenu.point}
-            label={`${contextMenu.target.title}的操作`}
+            label={
+              contextMenu.creationOnly
+                ? "添加内容"
+                : `${contextMenu.target.title}的操作`
+            }
             onClose={() => setContextMenu(null)}
-            items={[
-              {
-                label: "在新标签页打开",
-                icon: <PanelsTopLeft size={15} />,
-                shortcut: info?.platform === "darwin" ? "⌘ 点击" : "Ctrl 点击",
-                disabled: !workspaceReady || routing || workspace.switching,
-                onSelect: action(() => openTarget(contextMenu.target, "tab")),
-              },
-              {
-                label: "在新窗口打开",
-                icon: <AppWindow size={15} />,
-                shortcut: "⇧ 点击",
-                disabled: !workspaceReady || routing || workspace.switching,
-                onSelect: action(() =>
-                  openTarget(contextMenu.target, "window"),
-                ),
-              },
-              {
-                label: "添加新页面",
-                separatorBefore: true,
-                icon: <FilePlus2 size={15} />,
-                onSelect: action(() =>
-                  beginNewPage(
-                    contextMenu.target.projectId,
-                    contextMenu.target.kind === "folder"
-                      ? contextMenu.target.id
-                      : contextMenu.target.parentId,
-                  ),
-                ),
-              },
-              {
-                label: "新文件夹",
-                icon: <FolderPlus size={15} />,
-                onSelect: () =>
-                  setDialog({
-                    type: "folder",
-                    projectId: contextMenu.target.projectId,
-                    parentId:
-                      contextMenu.target.kind === "folder"
-                        ? contextMenu.target.id
-                        : contextMenu.target.parentId,
-                  }),
-              },
-              {
-                label: "重命名",
-                icon: <Pencil size={15} />,
-                onSelect: () => {
-                  const currentProject =
-                    contextMenu.target.kind === "project"
-                      ? projects.find(
-                          (item) => item.id === contextMenu.target.projectId,
-                        )
-                      : undefined;
-                  setDialog(
-                    currentProject
-                      ? { type: "project", project: currentProject }
-                      : { type: "rename", target: contextMenu.target },
-                  );
-                },
-              },
-              ...(contextMenu.target.kind === "page"
-                ? [
+            items={
+              contextMenu.creationOnly
+                ? creationMenuItems(contextMenu.target)
+                : [
                     {
-                      label: "设置图标…",
-                      icon: <FileText size={15} />,
-                      onSelect:
-                        contextMenu.pageTools &&
-                        editorControls?.documentId === contextMenu.target.id &&
-                        !editorControls.nested
-                          ? editorControls.setIcon
-                          : action(() => beginPageIcon(contextMenu.target)),
+                      label: "在新标签页打开",
+                      icon: <PanelsTopLeft size={15} />,
+                      shortcut:
+                        info?.platform === "darwin" ? "⌘ 点击" : "Ctrl 点击",
+                      disabled:
+                        !workspaceReady || routing || workspace.switching,
+                      onSelect: action(() =>
+                        openTarget(contextMenu.target, "tab"),
+                      ),
                     },
-                  ]
-                : []),
-              {
-                label: contextMenu.target.pinned ? "取消置顶" : "置顶",
-                icon: contextMenu.target.pinned ? (
-                  <PinOff size={15} />
-                ) : (
-                  <Pin size={15} />
-                ),
-                onSelect: action(() =>
-                  updateTarget(contextMenu.target, {
-                    pinned: !contextMenu.target.pinned,
-                  }),
-                ),
-              },
-              ...directorySortMenuItems(contextMenu.target),
-              ...(contextMenu.target.kind === "project"
-                ? [
                     {
-                      label: "移到分组…",
-                      icon: <Folder size={15} />,
-                      onSelect: () =>
-                        setDialog({
-                          type: "moveProject",
-                          projectId: contextMenu.target.projectId,
-                        }),
+                      label: "在新窗口打开",
+                      icon: <AppWindow size={15} />,
+                      shortcut: "⇧ 点击",
+                      disabled:
+                        !workspaceReady || routing || workspace.switching,
+                      onSelect: action(() =>
+                        openTarget(contextMenu.target, "window"),
+                      ),
                     },
-                    ...(organization.projectGroups[contextMenu.target.projectId]
+                    {
+                      label: "重命名",
+                      separatorBefore: true,
+                      icon: <Pencil size={15} />,
+                      onSelect: () => {
+                        const currentProject =
+                          contextMenu.target.kind === "project"
+                            ? projects.find(
+                                (item) =>
+                                  item.id === contextMenu.target.projectId,
+                              )
+                            : undefined;
+                        setDialog(
+                          currentProject
+                            ? { type: "project", project: currentProject }
+                            : { type: "rename", target: contextMenu.target },
+                        );
+                      },
+                    },
+                    ...(contextMenu.target.kind === "page"
                       ? [
                           {
-                            label: "移出分组",
-                            icon: <FolderMinus size={15} />,
-                            onSelect: action(() =>
-                              moveProject(contextMenu.target.projectId, null),
-                            ),
+                            label: "设置图标…",
+                            icon: <FileText size={15} />,
+                            onSelect:
+                              contextMenu.pageTools &&
+                              editorControls?.documentId ===
+                                contextMenu.target.id &&
+                              !editorControls.nested
+                                ? editorControls.setIcon
+                                : action(() =>
+                                    beginPageIcon(contextMenu.target),
+                                  ),
                           },
                         ]
                       : []),
-                  ]
-                : []),
-              ...(contextMenu.pageTools &&
-              editorControls?.documentId === contextMenu.target.id
-                ? containerMenuItems(editorControls, editorControls.nested).map(
-                    (item, index) => ({
-                      ...item,
-                      separatorBefore:
-                        item.separatorBefore ||
-                        (editorControls.nested && index === 0),
-                    }),
-                  )
-                : []),
-              ...(contextMenu.pageTools
-                ? [
                     {
-                      label: "保存为模板",
-                      separatorBefore: true,
-                      icon: <LayoutTemplate size={15} />,
-                      onSelect: action(async () => {
-                        if (await page.flush())
-                          setDialog({ type: "saveTemplate" });
-                      }),
+                      label: contextMenu.target.pinned ? "取消置顶" : "置顶",
+                      icon: contextMenu.target.pinned ? (
+                        <PinOff size={15} />
+                      ) : (
+                        <Pin size={15} />
+                      ),
+                      onSelect: action(() =>
+                        updateTarget(contextMenu.target, {
+                          pinned: !contextMenu.target.pinned,
+                        }),
+                      ),
                     },
-                    {
-                      label: "复制页面",
-                      icon: <Copy size={15} />,
-                      onSelect: action(async () => {
-                        if (!(await page.flush())) return;
-                        const result = await desktop.invoke<LoadedPage>(
-                          "pages:duplicate",
+                    ...directorySortMenuItems(contextMenu.target),
+                    ...(contextMenu.target.kind === "project"
+                      ? [
                           {
-                            projectId: contextMenu.target.projectId,
-                            pageId: contextMenu.target.id,
+                            label: "移到分组…",
+                            icon: <Folder size={15} />,
+                            onSelect: () =>
+                              setDialog({
+                                type: "moveProject",
+                                projectId: contextMenu.target.projectId,
+                              }),
                           },
-                        );
-                        await openPage(
-                          result.document.id,
-                          contextMenu.target.projectId,
-                        );
-                        await refresh();
-                      }),
-                    },
+                          ...(organization.projectGroups[
+                            contextMenu.target.projectId
+                          ]
+                            ? [
+                                {
+                                  label: "移出分组",
+                                  icon: <FolderMinus size={15} />,
+                                  onSelect: action(() =>
+                                    moveProject(
+                                      contextMenu.target.projectId,
+                                      null,
+                                    ),
+                                  ),
+                                },
+                              ]
+                            : []),
+                        ]
+                      : []),
+                    ...(contextMenu.pageTools &&
+                    editorControls?.documentId === contextMenu.target.id
+                      ? containerMenuItems(
+                          editorControls,
+                          editorControls.nested,
+                        ).map((item, index) => ({
+                          ...item,
+                          separatorBefore:
+                            item.separatorBefore ||
+                            (editorControls.nested && index === 0),
+                        }))
+                      : []),
+                    ...(contextMenu.pageTools
+                      ? [
+                          {
+                            label: "保存为模板",
+                            separatorBefore: true,
+                            icon: <LayoutTemplate size={15} />,
+                            onSelect: action(async () => {
+                              if (await page.flush())
+                                setDialog({ type: "saveTemplate" });
+                            }),
+                          },
+                          {
+                            label: "复制页面",
+                            icon: <Copy size={15} />,
+                            onSelect: action(async () => {
+                              if (!(await page.flush())) return;
+                              const result = await desktop.invoke<LoadedPage>(
+                                "pages:duplicate",
+                                {
+                                  projectId: contextMenu.target.projectId,
+                                  pageId: contextMenu.target.id,
+                                },
+                              );
+                              await openPage(
+                                result.document.id,
+                                contextMenu.target.projectId,
+                              );
+                              await refresh();
+                            }),
+                          },
+                          {
+                            label: "下载源文件",
+                            icon: <Download size={15} />,
+                            onSelect: () => void exportPage("json"),
+                          },
+                          {
+                            label: "引用已发布组件导出",
+                            icon: <Globe size={15} />,
+                            onSelect: () => void exportPage("html", "remote"),
+                          },
+                          {
+                            label: "导出会话片段",
+                            icon: <CodeXml size={15} />,
+                            onSelect: () => void exportPage("inline"),
+                          },
+                          {
+                            label: "导出阅读网页",
+                            icon: <ArrowUpRight size={15} />,
+                            onSelect: () =>
+                              void exportPage("html", "bundled", "reading"),
+                          },
+                        ]
+                      : []),
                     {
-                      label: "下载源文件",
-                      icon: <Download size={15} />,
-                      onSelect: () => void exportPage("json"),
-                    },
-                    {
-                      label: "引用已发布组件导出",
-                      icon: <Globe size={15} />,
-                      onSelect: () => void exportPage("html", "remote"),
-                    },
-                    {
-                      label: "导出会话片段",
-                      icon: <CodeXml size={15} />,
-                      onSelect: () => void exportPage("inline"),
-                    },
-                    {
-                      label: "导出阅读网页",
-                      icon: <ArrowUpRight size={15} />,
+                      label: "删除",
+                      icon: <Trash2 size={15} />,
+                      danger: true,
+                      separatorBefore: true,
                       onSelect: () =>
-                        void exportPage("html", "bundled", "reading"),
+                        setDialog({
+                          type: "delete",
+                          target: contextMenu.target,
+                        }),
                     },
                   ]
-                : []),
-              {
-                label: "删除",
-                icon: <Trash2 size={15} />,
-                danger: true,
-                separatorBefore: true,
-                onSelect: () =>
-                  setDialog({ type: "delete", target: contextMenu.target }),
-              },
-            ]}
+            }
           />
         )}
         {dialog?.type === "pageIcon" && (

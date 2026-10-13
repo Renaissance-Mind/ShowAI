@@ -22,6 +22,8 @@ export default function ProjectSidebar({
   setCollapsed,
   renderProject,
   onCreate,
+  onAddContent,
+  addDisabled = false,
   onMenu,
   onGroupMenu,
 }: {
@@ -32,6 +34,8 @@ export default function ProjectSidebar({
   setCollapsed: Dispatch<SetStateAction<Record<string, boolean>>>;
   renderProject: (project: ProjectSummary) => ReactNode;
   onCreate: (groupId?: string) => void;
+  onAddContent?: (anchor: HTMLButtonElement) => void;
+  addDisabled?: boolean;
   onMenu: (anchor: HTMLElement) => void;
   onGroupMenu: (group: ProjectGroup, anchor: HTMLElement) => void;
 }) {
@@ -140,10 +144,16 @@ export default function ProjectSidebar({
       <button
         className="studio-new-project"
         type="button"
-        onClick={() => onCreate()}
+        disabled={onAddContent ? addDisabled : false}
+        aria-label={onAddContent ? "添加内容" : "新项目"}
+        aria-haspopup={onAddContent ? "menu" : undefined}
+        title={onAddContent ? "添加文件夹、页面或白板" : undefined}
+        onClick={(event) =>
+          onAddContent ? onAddContent(event.currentTarget) : onCreate()
+        }
       >
         <Plus size={17} aria-hidden="true" />
-        <span>新项目</span>
+        <span>{onAddContent ? "添加" : "新项目"}</span>
       </button>
       {!!pinned.length && section("pinned", "置顶", pinned)}
       {section("projects", "项目", ungrouped)}
