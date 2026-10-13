@@ -1168,6 +1168,18 @@ export default function Studio() {
       },
     ];
   }
+  function showDirectoryCreationMenu(anchor: HTMLElement) {
+    if (!project || (selectedFolder && !currentFolder)) return;
+    showMenu(
+      currentFolder
+        ? folderTarget(currentFolder, project.id)
+        : projectTarget(project),
+      anchor,
+      undefined,
+      false,
+      true,
+    );
+  }
   async function beginPageIcon(target: LibraryTarget) {
     if (!(await page.flush())) return;
     const record = await desktop.invoke<LoadedPage>("pages:get", {
@@ -1984,6 +1996,13 @@ export default function Studio() {
     setSearchRevision((revision) => revision + 1);
   }
 
+  const contentCreationDisabled =
+    !workspaceReady ||
+    routing ||
+    workspace.switching ||
+    busy ||
+    !!syncReadOnly ||
+    (!!selectedFolder && !currentFolder);
   const sidebarNavigation = (
     <SidebarNavigation
       onSelect={(section) =>
@@ -2039,26 +2058,10 @@ export default function Studio() {
           onCreate={(groupId) => setDialog({ type: "project", groupId })}
           onAddContent={
             (view === "project" || view === "page") && project
-              ? (anchor) =>
-                  showMenu(
-                    currentFolder
-                      ? folderTarget(currentFolder, project.id)
-                      : projectTarget(project),
-                    anchor,
-                    undefined,
-                    false,
-                    true,
-                  )
+              ? showDirectoryCreationMenu
               : undefined
           }
-          addDisabled={
-            !workspaceReady ||
-            routing ||
-            workspace.switching ||
-            busy ||
-            !!syncReadOnly ||
-            (!!selectedFolder && !currentFolder)
-          }
+          addDisabled={contentCreationDisabled}
           onMenu={(anchor) =>
             setProjectsMenu((current) => (current === anchor ? null : anchor))
           }
@@ -2220,7 +2223,19 @@ export default function Studio() {
       )}
 
       <div className="studio-header-actions">
-        {" "}
+        {view === "project" && project && (
+          <button
+            type="button"
+            className="studio-icon"
+            aria-label="添加文件夹、页面或白板"
+            aria-haspopup="menu"
+            title="添加内容"
+            disabled={contentCreationDisabled}
+            onClick={(event) => showDirectoryCreationMenu(event.currentTarget)}
+          >
+            <Plus size={16} aria-hidden="true" />
+          </button>
+        )}
         {view === "templates" && (
           <div className="studio-library-toolbar catalog-scope-controls">
             <label>
