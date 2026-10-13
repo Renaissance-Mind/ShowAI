@@ -36,3 +36,6 @@ export {
   MechanismStepsBlock as MechanismSteps,
   EvidenceExplorerBlock as EvidenceExplorer,
 } from "./Presentation";
+export { ComparisonMatrixBlock as ComparisonMatrix } from "./ComparisonMatrix";
+export { StatusTreeBlock as StatusTree } from "./StatusTree";
+export { ExperimentTrackerBlock as ExperimentTracker } from "./ExperimentTracker";

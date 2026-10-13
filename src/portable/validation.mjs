@@ -11,6 +11,7 @@ import {
 } from "../components/blocks/diagrams/contract.mjs";
 import { validateG2Data } from "../components/blocks/g2/contract.mjs";
 import { validatePresentationData } from "../components/blocks/presentation-contract.mjs";
+import { validateAnalysisData } from "../components/blocks/analysis-contract.mjs";
 import { validateResearchData } from "../components/blocks/research-contract.mjs";
 // Shared by the browser importer and the dependency-free artifact command.
 import { validateRemoteComponents } from "./remote.mjs";
@@ -258,6 +259,12 @@ function validateWidgetData(kind, data, path) {
   }
   if (["mechanism-steps", "evidence-explorer"].includes(kind)) {
     validatePresentationData(kind, data);
+    return;
+  }
+  if (
+    ["comparison-matrix", "status-tree", "experiment-tracker"].includes(kind)
+  ) {
+    validateAnalysisData(kind, data);
     return;
   }
   if (kind === "custom")

@@ -20,7 +20,14 @@ afterEach(async () => {
   );
 });
 
-test.each(["text", "mechanism-steps", "evidence-explorer"])(
+test.each([
+  "text",
+  "mechanism-steps",
+  "evidence-explorer",
+  "comparison-matrix",
+  "status-tree",
+  "experiment-tracker",
+])(
   "portable reader mounts %s without requiring unused component metadata",
   async (kind) => {
     const directory = await mkdtemp(

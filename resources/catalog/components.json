@@ -1521,5 +1521,1017 @@
       "研究报告按主题或日期定位事件、发现和证据。",
       "选择条目查看条件与来源，将指定条目按共同维度并排比较。"
     ]
+  },
+  {
+    "kind": "comparison-matrix",
+    "name": "对比矩阵",
+    "description": "按维度逐行对比多个方案，用采用、不采用、部分采用等标记区分，可突出自己的方案并只看差异。",
+    "scenarios": [
+      "调研中对齐多篇论文或多个产品在同一组设计选择上的做法，并标出自己的方案。",
+      "选型或决策前，逐项比较候选方案满足哪些条件。"
+    ],
+    "defaultData": {
+      "title": "对比矩阵",
+      "rows": [
+        {
+          "id": "r1",
+          "label": "维度"
+        }
+      ],
+      "columns": [
+        {
+          "id": "a",
+          "label": "方案 A"
+        },
+        {
+          "id": "b",
+          "label": "方案 B"
+        }
+      ],
+      "cells": []
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 60,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "hint": {
+                "type": "string"
+              },
+              "group": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "label"]
+          }
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string",
+                "pattern": "^https?://"
+              },
+              "highlight": {
+                "type": "boolean"
+              }
+            },
+            "required": ["id", "label"]
+          }
+        },
+        "cells": {
+          "type": "array",
+          "maxItems": 720,
+          "items": {
+            "type": "object",
+            "properties": {
+              "row": {
+                "type": "string"
+              },
+              "column": {
+                "type": "string"
+              },
+              "tone": {
+                "enum": ["yes", "no", "partial", "neutral", "na"]
+              },
+              "text": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": ["row", "column", "tone"]
+          }
+        },
+        "legend": {
+          "type": "object",
+          "properties": {
+            "yes": {
+              "type": "string"
+            },
+            "no": {
+              "type": "string"
+            },
+            "partial": {
+              "type": "string"
+            },
+            "neutral": {
+              "type": "string"
+            },
+            "na": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "required": ["rows", "columns", "cells"]
+    },
+    "examples": [
+      {
+        "name": "策略优化方法的设计选择",
+        "request": "对比 PPO、GRPO、DAPO 与 Dr. GRPO 在关键设计上的差异。",
+        "data": {
+          "title": "策略优化方法的设计选择",
+          "description": "逐项对齐各方法的做法；未在论文中说明的项标为未涉及。",
+          "rows": [
+            {
+              "id": "critic",
+              "label": "价值网络",
+              "hint": "用单独的网络估计基线"
+            },
+            {
+              "id": "group",
+              "label": "组内基线",
+              "hint": "同一题多次采样互相比较"
+            },
+            {
+              "id": "len",
+              "label": "长度归一化",
+              "hint": "损失按回答长度平均"
+            },
+            {
+              "id": "std",
+              "label": "标准差归一化",
+              "hint": "优势除以组内标准差"
+            },
+            {
+              "id": "clip",
+              "label": "截断区间",
+              "hint": "重要性采样比率的允许范围"
+            },
+            {
+              "id": "dyn",
+              "label": "动态采样",
+              "hint": "过滤全对或全错的组"
+            }
+          ],
+          "columns": [
+            {
+              "id": "ppo",
+              "label": "PPO",
+              "url": "https://arxiv.org/abs/1707.06347"
+            },
+            {
+              "id": "grpo",
+              "label": "GRPO",
+              "note": "DeepSeekMath",
+              "url": "https://arxiv.org/abs/2402.03300"
+            },
+            {
+              "id": "dapo",
+              "label": "DAPO",
+              "url": "https://arxiv.org/abs/2503.14476"
+            },
+            {
+              "id": "drgrpo",
+              "label": "Dr. GRPO",
+              "url": "https://arxiv.org/abs/2503.20783"
+            }
+          ],
+          "cells": [
+            {
+              "row": "critic",
+              "column": "ppo",
+              "tone": "yes",
+              "text": "需要"
+            },
+            {
+              "row": "critic",
+              "column": "grpo",
+              "tone": "no",
+              "text": "去掉"
+            },
+            {
+              "row": "critic",
+              "column": "dapo",
+              "tone": "no",
+              "text": "去掉"
+            },
+            {
+              "row": "critic",
+              "column": "drgrpo",
+              "tone": "no",
+              "text": "去掉"
+            },
+            {
+              "row": "group",
+              "column": "ppo",
+              "tone": "no",
+              "text": "不用"
+            },
+            {
+              "row": "group",
+              "column": "grpo",
+              "tone": "yes",
+              "text": "组均值"
+            },
+            {
+              "row": "group",
+              "column": "dapo",
+              "tone": "yes",
+              "text": "组均值"
+            },
+            {
+              "row": "group",
+              "column": "drgrpo",
+              "tone": "yes",
+              "text": "组均值"
+            },
+            {
+              "row": "len",
+              "column": "grpo",
+              "tone": "yes",
+              "text": "按回答长度"
+            },
+            {
+              "row": "len",
+              "column": "dapo",
+              "tone": "partial",
+              "text": "token 级",
+              "note": "整批 token 平均，而不是先按单个回答平均。"
+            },
+            {
+              "row": "len",
+              "column": "drgrpo",
+              "tone": "no",
+              "text": "去掉"
+            },
+            {
+              "row": "std",
+              "column": "grpo",
+              "tone": "yes",
+              "text": "采用"
+            },
+            {
+              "row": "std",
+              "column": "dapo",
+              "tone": "yes",
+              "text": "采用"
+            },
+            {
+              "row": "std",
+              "column": "drgrpo",
+              "tone": "no",
+              "text": "去掉"
+            },
+            {
+              "row": "clip",
+              "column": "ppo",
+              "tone": "yes",
+              "text": "±0.2"
+            },
+            {
+              "row": "clip",
+              "column": "grpo",
+              "tone": "yes",
+              "text": "±0.2"
+            },
+            {
+              "row": "clip",
+              "column": "dapo",
+              "tone": "partial",
+              "text": "0.2 / 0.28",
+              "note": "下界 0.2，上界放宽到 0.28（Clip-Higher）。"
+            },
+            {
+              "row": "dyn",
+              "column": "grpo",
+              "tone": "no",
+              "text": "不用"
+            },
+            {
+              "row": "dyn",
+              "column": "dapo",
+              "tone": "yes",
+              "text": "采用"
+            }
+          ],
+          "legend": {
+            "yes": "采用",
+            "no": "不采用 / 去掉",
+            "partial": "改动或部分采用",
+            "na": "论文未涉及"
+          }
+        }
+      }
+    ],
+    "version": "1.0.0",
+    "effects": [
+      "每个单元格用统一标记表达采用、不采用或部分采用，横向一眼看出差异。",
+      "聚焦一列、只看有差异的行，帮助读者把注意力放在取舍上。"
+    ]
+  },
+  {
+    "kind": "status-tree",
+    "name": "状态树",
+    "description": "把条目按类别展开成树，用颜色、图标和线型区分走通、没走通、进行中、待探索与搁置，点击查看依据。",
+    "scenarios": [
+      "研究或排查时按方向管理假设与想法，一眼看出哪些路走通了。",
+      "跟踪路线图或目标分解中每项的状态与依据。"
+    ],
+    "defaultData": {
+      "title": "状态树",
+      "groups": [
+        {
+          "id": "g1",
+          "label": "方向",
+          "items": [
+            {
+              "id": "i1",
+              "label": "条目",
+              "status": "todo"
+            }
+          ]
+        }
+      ]
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "root": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "statuses": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "tone": {
+                "enum": ["done", "failed", "active", "todo", "paused"]
+              },
+              "color": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              }
+            },
+            "required": ["id", "label", "tone"]
+          }
+        },
+        "groups": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "items": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 30,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "result": {
+                      "type": "string"
+                    },
+                    "links": {
+                      "type": "array",
+                      "maxItems": 20,
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": ["id", "label", "status"]
+                }
+              }
+            },
+            "required": ["id", "label", "items"]
+          }
+        }
+      },
+      "required": ["groups"]
+    },
+    "examples": [
+      {
+        "name": "页面变慢的排查",
+        "request": "按方向列出排查假设，标出哪些已验证、哪些已排除。",
+        "data": {
+          "title": "页面变慢的排查",
+          "root": "为什么首页加载从 1.2 秒变成 3.5 秒？",
+          "description": "按方向列出假设，记录每条是否已被验证。",
+          "groups": [
+            {
+              "id": "net",
+              "label": "网络与资源",
+              "summary": "传输了什么、传了多少",
+              "items": [
+                {
+                  "id": "n1",
+                  "label": "首屏图片未压缩",
+                  "status": "done",
+                  "detail": "新上线的横幅图为 4 MB 原图。",
+                  "result": "压缩后首屏减少 3.1 MB，加载 −1.4 秒。",
+                  "links": ["性能面板记录"]
+                },
+                {
+                  "id": "n2",
+                  "label": "CDN 缓存失效",
+                  "status": "failed",
+                  "detail": "怀疑发布后缓存命中率下降。",
+                  "result": "命中率仍为 97%，排除。"
+                },
+                {
+                  "id": "n3",
+                  "label": "第三方脚本阻塞渲染",
+                  "status": "active",
+                  "detail": "统计脚本改为同步加载。",
+                  "result": "改为异步后在灰度验证中。"
+                }
+              ]
+            },
+            {
+              "id": "srv",
+              "label": "服务端",
+              "summary": "接口与数据库",
+              "items": [
+                {
+                  "id": "s1",
+                  "label": "首页接口慢查询",
+                  "status": "done",
+                  "result": "补索引后接口 P95 从 900 ms 降到 120 ms。",
+                  "source": "慢查询日志"
+                },
+                {
+                  "id": "s2",
+                  "label": "服务实例数不足",
+                  "status": "failed",
+                  "result": "CPU 利用率低于 40%，排除。"
+                }
+              ]
+            },
+            {
+              "id": "fe",
+              "label": "前端渲染",
+              "summary": "打包与执行",
+              "items": [
+                {
+                  "id": "f1",
+                  "label": "打包体积变大",
+                  "status": "todo",
+                  "detail": "新引入的图表库未按需加载。"
+                },
+                {
+                  "id": "f2",
+                  "label": "改用服务端渲染",
+                  "status": "paused",
+                  "detail": "改动面大，先完成其他排查。"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "version": "1.0.0",
+    "effects": [
+      "每条连线和条目按状态着色，排除的条目用删除线和虚线标出。",
+      "类别卡片显示完成比例，详情面板给出说明、结果与关联。"
+    ]
+  },
+  {
+    "kind": "experiment-tracker",
+    "name": "实验追踪",
+    "description": "在一个画面里追踪一组实验：随时间的散点与最优前沿、可筛选的运行列表、资源与成本，以及训练曲线小图。",
+    "scenarios": [
+      "自动化调参或研究循环中，持续追踪大量实验的进展、最优结果与算力花费。",
+      "人定期查看实验，决定继续、调整或停止某个运行。"
+    ],
+    "defaultData": {
+      "title": "实验追踪",
+      "metric": {
+        "label": "指标",
+        "direction": "higher"
+      },
+      "experiments": [
+        {
+          "id": "E01",
+          "name": "基线",
+          "status": "kept",
+          "start": "2026-01-01T09:00",
+          "score": 0
+        }
+      ]
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "subtitle": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "metric": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "direction": {
+              "enum": ["higher", "lower"]
+            },
+            "baseline": {
+              "type": "number"
+            }
+          },
+          "required": ["label", "direction"]
+        },
+        "groups": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "frontier": {
+                "type": "boolean"
+              },
+              "shape": {
+                "enum": ["dot", "diamond"]
+              }
+            },
+            "required": ["id", "label"]
+          }
+        },
+        "experiments": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2000,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "group": {
+                "type": "string"
+              },
+              "category": {
+                "type": "string"
+              },
+              "status": {
+                "enum": ["kept", "discarded", "failed", "running", "stopped"]
+              },
+              "start": {
+                "type": "string"
+              },
+              "minutes": {
+                "type": "number"
+              },
+              "resources": {
+                "type": "number"
+              },
+              "score": {
+                "type": ["number", "null"]
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "name", "status", "start", "score"]
+          }
+        },
+        "runs": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "color": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "steps": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "series": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                }
+              }
+            },
+            "required": ["id", "name", "steps", "series"]
+          }
+        },
+        "charts": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "unit": {
+                "type": "string"
+              }
+            },
+            "required": ["key", "label"]
+          }
+        },
+        "resource": {
+          "type": "object",
+          "properties": {
+            "unit": {
+              "type": "string"
+            },
+            "costPerHour": {
+              "type": "number"
+            },
+            "currency": {
+              "type": "string"
+            },
+            "budget": {
+              "type": "number"
+            }
+          },
+          "required": ["unit"]
+        }
+      },
+      "required": ["metric", "experiments"]
+    },
+    "examples": [
+      {
+        "name": "语言模型预训练调参（示例数据）",
+        "request": "追踪一组学习率扫描与一次长训练，指标为越低越好的验证集 loss。",
+        "data": {
+          "title": "语言模型预训练调参",
+          "subtitle": "示例数据 · 验证集 loss，越低越好",
+          "updatedAt": "2026-03-02T22:00",
+          "metric": {
+            "label": "验证集 loss",
+            "direction": "lower",
+            "baseline": 2.31
+          },
+          "groups": [
+            {
+              "id": "sweep",
+              "label": "短扫描",
+              "frontier": true
+            },
+            {
+              "id": "long",
+              "label": "长训练",
+              "frontier": false,
+              "shape": "diamond"
+            }
+          ],
+          "experiments": [
+            {
+              "id": "E01",
+              "name": "学习率扫描 · 1e-4",
+              "group": "sweep",
+              "category": "学习率扫描",
+              "status": "kept",
+              "start": "2026-03-01T09:00",
+              "minutes": 50,
+              "resources": 4,
+              "score": 2.3
+            },
+            {
+              "id": "E02",
+              "name": "warmup 扫描 · 2e-4",
+              "group": "sweep",
+              "category": "warmup 扫描",
+              "status": "discarded",
+              "start": "2026-03-01T10:30",
+              "minutes": 50,
+              "resources": 4,
+              "score": 2.343
+            },
+            {
+              "id": "E03",
+              "name": "权重衰减扫描 · 3e-4",
+              "group": "sweep",
+              "category": "权重衰减扫描",
+              "status": "discarded",
+              "start": "2026-03-01T12:00",
+              "minutes": 50,
+              "resources": 4,
+              "score": 2.313
+            },
+            {
+              "id": "E04",
+              "name": "学习率扫描 · 5e-4",
+              "group": "sweep",
+              "category": "学习率扫描",
+              "status": "discarded",
+              "start": "2026-03-01T13:30",
+              "minutes": 50,
+              "resources": 4,
+              "score": 2.353
+            },
+            {
+              "id": "E05",
+              "name": "warmup 扫描 · 8e-4",
+              "group": "sweep",
+              "category": "warmup 扫描",
+              "status": "discarded",
+              "start": "2026-03-01T15:00",
+              "minutes": 50,
+              "resources": 4,
+              "score": 2.356
+            },
+            {
+              "id": "E06",
+              "name": "权重衰减扫描 · 1e-3",
+              "group": "sweep",
+              "category": "权重衰减扫描",
+              "status": "kept",
+              "start": "2026-03-01T16:30",
+              "minutes": 50,
+              "resources": 4,
+              "score": 2.261
+            },
+            {
+              "id": "E07",
+              "name": "学习率扫描 · 1e-4",
+              "group": "sweep",
+              "category": "学习率扫描",
+              "status": "kept",
+              "start": "2026-03-01T18:00",
+              "minutes": 50,
+              "resources": 4,
+              "score": 2.213
+            },
+            {
+              "id": "E08",
+              "name": "warmup 扫描 · 2e-4",
+              "group": "sweep",
+              "category": "warmup 扫描",
+              "status": "failed",
+              "start": "2026-03-01T19:30",
+              "minutes": 50,
+              "resources": 4,
+              "score": null,
+              "note": "显存溢出"
+            },
+            {
+              "id": "E09",
+              "name": "权重衰减扫描 · 3e-4",
+              "group": "sweep",
+              "category": "权重衰减扫描",
+              "status": "kept",
+              "start": "2026-03-01T21:00",
+              "minutes": 50,
+              "resources": 4,
+              "score": 2.207
+            },
+            {
+              "id": "E10",
+              "name": "学习率扫描 · 5e-4",
+              "group": "sweep",
+              "category": "学习率扫描",
+              "status": "kept",
+              "start": "2026-03-01T22:30",
+              "minutes": 50,
+              "resources": 4,
+              "score": 2.197
+            },
+            {
+              "id": "E11",
+              "name": "warmup 扫描 · 8e-4",
+              "group": "sweep",
+              "category": "warmup 扫描",
+              "status": "discarded",
+              "start": "2026-03-02T00:00",
+              "minutes": 50,
+              "resources": 4,
+              "score": 2.316
+            },
+            {
+              "id": "E12",
+              "name": "权重衰减扫描 · 1e-3",
+              "group": "sweep",
+              "category": "权重衰减扫描",
+              "status": "discarded",
+              "start": "2026-03-02T01:30",
+              "minutes": 50,
+              "resources": 4,
+              "score": 2.227
+            },
+            {
+              "id": "E13",
+              "name": "学习率扫描 · 1e-4",
+              "group": "sweep",
+              "category": "学习率扫描",
+              "status": "discarded",
+              "start": "2026-03-02T03:00",
+              "minutes": 50,
+              "resources": 4,
+              "score": 2.289
+            },
+            {
+              "id": "E14",
+              "name": "warmup 扫描 · 2e-4",
+              "group": "sweep",
+              "category": "warmup 扫描",
+              "status": "discarded",
+              "start": "2026-03-02T04:30",
+              "minutes": 50,
+              "resources": 4,
+              "score": 2.228
+            },
+            {
+              "id": "E15",
+              "name": "权重衰减扫描 · 3e-4",
+              "group": "sweep",
+              "category": "权重衰减扫描",
+              "status": "discarded",
+              "start": "2026-03-02T06:00",
+              "minutes": 50,
+              "resources": 4,
+              "score": 2.256
+            },
+            {
+              "id": "E16",
+              "name": "学习率扫描 · 5e-4",
+              "group": "sweep",
+              "category": "学习率扫描",
+              "status": "kept",
+              "start": "2026-03-02T07:30",
+              "minutes": 50,
+              "resources": 4,
+              "score": 2.173
+            },
+            {
+              "id": "E17",
+              "name": "warmup 扫描 · 8e-4",
+              "group": "sweep",
+              "category": "warmup 扫描",
+              "status": "discarded",
+              "start": "2026-03-02T09:00",
+              "minutes": 50,
+              "resources": 4,
+              "score": 2.231
+            },
+            {
+              "id": "E18",
+              "name": "权重衰减扫描 · 1e-3",
+              "group": "sweep",
+              "category": "权重衰减扫描",
+              "status": "running",
+              "start": "2026-03-02T10:30",
+              "minutes": 50,
+              "resources": 4,
+              "score": null
+            },
+            {
+              "id": "L1",
+              "name": "最佳配置 · 长训练",
+              "group": "long",
+              "status": "running",
+              "start": "2026-03-02T12:00",
+              "minutes": 360,
+              "resources": 8,
+              "score": 2.05
+            }
+          ],
+          "runs": [
+            {
+              "id": "L1",
+              "name": "最佳配置 · 长训练",
+              "color": "#2f6b4f",
+              "steps": [
+                0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000
+              ],
+              "series": {
+                "loss": [
+                  3.4, 3.112, 2.885, 2.707, 2.567, 2.457, 2.37, 2.302, 2.248,
+                  2.206, 2.172
+                ],
+                "lr": [
+                  0.007, 1.471, 2.714, 2.382, 1.964, 1.5, 1.036, 0.618, 0.286,
+                  0.073, 0.0
+                ]
+              }
+            }
+          ],
+          "charts": [
+            {
+              "key": "loss",
+              "label": "训练 loss"
+            },
+            {
+              "key": "lr",
+              "label": "学习率",
+              "unit": "×1e-4"
+            }
+          ],
+          "resource": {
+            "unit": "GPU",
+            "costPerHour": 2.5,
+            "currency": "$",
+            "budget": 400
+          }
+        }
+      }
+    ],
+    "version": "1.0.0",
+    "effects": [
+      "阶梯状最优前沿显示研究随时间的推进，越低越好的指标会自动翻转坐标。",
+      "侧栏筛选与勾选运行，小图同步显示同一训练步的数值。"
+    ]
   }
 ]

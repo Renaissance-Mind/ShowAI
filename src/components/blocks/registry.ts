@@ -31,6 +31,22 @@ import { validateMindmapData } from "./mindmap-contract.mjs";
 const MindmapBlock = /* @__PURE__ */ lazy(() =>
   import("./Mindmap").then((module) => ({ default: module.MindmapBlock })),
 );
+import { validateAnalysisData } from "./analysis-contract.mjs";
+const ComparisonMatrixBlock = /* @__PURE__ */ lazy(() =>
+  import("./ComparisonMatrix").then((module) => ({
+    default: module.ComparisonMatrixBlock,
+  })),
+);
+const StatusTreeBlock = /* @__PURE__ */ lazy(() =>
+  import("./StatusTree").then((module) => ({
+    default: module.StatusTreeBlock,
+  })),
+);
+const ExperimentTrackerBlock = /* @__PURE__ */ lazy(() =>
+  import("./ExperimentTracker").then((module) => ({
+    default: module.ExperimentTrackerBlock,
+  })),
+);
 import { parseChartData } from "./helpers";
 import g2Metadata from "../../../resources/catalog/g2.json";
 const G2ChartBlock = /* @__PURE__ */ lazy(() =>
@@ -464,4 +480,42 @@ registerBlock({
   )!.defaultData as BlockData,
   renderer: EvidenceExplorerBlock,
   validate: (data) => validatePresentationData("evidence-explorer", data),
+});
+registerBlock({
+  kind: "comparison-matrix",
+  title: "对比矩阵",
+  description: "按维度逐行对比多个方案，突出差异与自己的方案",
+  icon: "▦",
+  defaultData: componentMetadata.find(
+    (item) => item.kind === "comparison-matrix",
+  )!.defaultData as BlockData,
+  renderer: ComparisonMatrixBlock,
+  validate: (data) => {
+    validateAnalysisData("comparison-matrix", data);
+  },
+});
+registerBlock({
+  kind: "status-tree",
+  title: "状态树",
+  description: "按类别展开条目，区分走通、没走通与进行中",
+  icon: "⑂",
+  defaultData: componentMetadata.find((item) => item.kind === "status-tree")!
+    .defaultData as BlockData,
+  renderer: StatusTreeBlock,
+  validate: (data) => {
+    validateAnalysisData("status-tree", data);
+  },
+});
+registerBlock({
+  kind: "experiment-tracker",
+  title: "实验追踪",
+  description: "实验散点与最优前沿、运行列表、资源与训练曲线",
+  icon: "◎",
+  defaultData: componentMetadata.find(
+    (item) => item.kind === "experiment-tracker",
+  )!.defaultData as BlockData,
+  renderer: ExperimentTrackerBlock,
+  validate: (data) => {
+    validateAnalysisData("experiment-tracker", data);
+  },
 });
