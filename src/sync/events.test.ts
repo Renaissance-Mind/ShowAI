@@ -300,6 +300,12 @@ test("continuous edits arrive before editing stops and a disconnected client ret
       (await editor.store.readPage(project.id, pageId)).document.content,
     ).includes("Owner kept offline"),
   );
+  expect(
+    (await editor.store.readPage(project.id, pageId)).document.content,
+  ).toEqual((await owner.store.readPage(project.id, pageId)).document.content);
+  expect(
+    await new GitLibrary(editor.home).history({ projectId: project.id }),
+  ).toEqual([]);
 }, 180_000);
 
 test("open sockets hide private projects and revoke project access and device sessions", async () => {

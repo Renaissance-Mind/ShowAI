@@ -37,7 +37,7 @@ export function createSurface(
         ? [
             {
               type: "richText",
-              attrs: { id: crypto.randomUUID(), name: "富文本" },
+              attrs: { id: crypto.randomUUID(), name: "富文本" }, // i18n-exempt: default node name saved into documents
               content: [
                 { type: "paragraph", attrs: { id: crypto.randomUUID() } },
               ],
@@ -138,7 +138,7 @@ export function upgradeResource(source, { includeTitle = true } = {}) {
       ids.add(boardId);
       const region = {
         type: "region",
-        attrs: { id: node.attrs.id, name: "内容区域" },
+        attrs: { id: node.attrs.id, name: "内容区域" }, // i18n-exempt: default region name saved into documents
         content: node.content ?? [],
       };
       layout[region.attrs.id] = {

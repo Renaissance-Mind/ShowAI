@@ -132,7 +132,7 @@ export function upgradeDocument(source, { includeTitle = true } = {}) {
         name:
           includeTitle && document.title
             ? document.title.slice(0, 200)
-            : "内容区域",
+            : "内容区域", // i18n-exempt: default region name saved into documents
       },
       content: body,
     });
@@ -142,7 +142,7 @@ export function upgradeDocument(source, { includeTitle = true } = {}) {
     const id = node.attrs.id;
     regions.push({
       type: "region",
-      attrs: { id, name: "内容区域" },
+      attrs: { id, name: "内容区域" }, // i18n-exempt: default region name saved into documents
       content: node.content ?? [],
     });
     layout[id] = { ...node.attrs.canvas, mode: "flow", columns: 2, gap: 24 };

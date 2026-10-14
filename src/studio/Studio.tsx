@@ -158,6 +158,14 @@ import {
   SettingsPanel,
   type SettingsSection,
 } from "./Settings";
+import { getLocale } from "../i18n";
+import { useTranslator } from "../i18n/react";
+import commonMessages from "../i18n/messages/common";
+import studioMessages from "../i18n/messages/studio";
+import {
+  componentDisplayDescription,
+  componentDisplayName,
+} from "../components/component-display";
 
 type View = WorkspaceView;
 type Catalog = {
@@ -188,7 +196,13 @@ type DialogState =
       parentId: string | null;
       templates: TemplateMetadata[];
     }
-  | { type: "folder"; projectId: string; parentId: string | null }
+  | {
+      type: "folder";
+      projectId: string;
+      parentId: string | null;
+      /** Present when editing an existing folder's name and icon. */
+      target?: LibraryTarget;
+    }
   | {
       type: "pageIcon";
       target: LibraryTarget;
@@ -211,26 +225,28 @@ type DialogState =
   | null;
 
 function shortDate(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
+  return new Intl.DateTimeFormat(getLocale(), {
     month: "short",
     day: "numeric",
   }).format(new Date(value));
 }
 function Scope({ value }: { value: string }) {
-  return (
-    <span className="studio-tag">
-      {{
-        builtin: "内置",
-        global: "全局",
-        published: "已发布",
-        user: "全局",
-        project: "项目",
-      }[value] ?? value}
-    </span>
-  );
+  const t = useTranslator(studioMessages);
+  const key = (
+    {
+      builtin: "scope.builtin",
+      global: "scope.global",
+      published: "scope.published",
+      user: "scope.global",
+      project: "scope.project",
+    } as const
+  )[value];
+  return <span className="studio-tag">{key ? t(key) : value}</span>;
 }
 
 export default function Studio() {
+  const t = useTranslator(studioMessages);
+  const tc = useTranslator(commonMessages);
   useEffect(() => {
     const wake = () => {
       if (document.visibilityState === "visible" && navigator.onLine)
@@ -302,11 +318,11 @@ export default function Studio() {
         );
     };
     void refreshPermission().catch((error) =>
-      console.error("无法更新项目同步权限", error),
+      console.error("Could not update project sync permissions", error),
     );
     const timer = setInterval(() => {
       void refreshPermission().catch((error) =>
-        console.error("无法更新项目同步权限", error),
+        console.error("Could not update project sync permissions", error),
       );
     }, 3000);
     return () => {
@@ -401,7 +417,7 @@ export default function Studio() {
       groupComponents(catalog, componentFilter).map((group) => ({
         ...group,
         items: group.items.filter((item) =>
-          `${item.name} ${item.description}`
+          `${item.name} ${item.description} ${componentDisplayName(item)} ${componentDisplayDescription(item)}`
             .toLowerCase()
             .includes(catalogQueries.components.toLowerCase()),
         ),
@@ -574,7 +590,7 @@ export default function Studio() {
               organization: sidebar,
             });
           } catch (error) {
-            console.warn("无法缓存项目列表", error);
+            console.warn("Could not cache the project list", error);
           }
           const nextContents = await Promise.all(
             next.map(async (item) => {
@@ -712,7 +728,7 @@ export default function Studio() {
           performance.mark("showai:navigation-cached");
         }
       } catch (error) {
-        console.warn("无法读取项目列表缓存", error);
+        console.warn("Could not read the project list cache", error);
       }
       const verification = refresh();
       const params = new URLSearchParams(location.search);
@@ -735,7 +751,7 @@ export default function Studio() {
           expandFolderPath(loaded.folders, parentId);
         } else {
           if (folderId && !loaded.folders.some((item) => item.id === folderId))
-            throw new Error("这个文件夹已不存在。");
+            throw new Error(t("folderMissing"));
           setSelectedFolder(folderId);
           expandFolderPath(loaded.folders, folderId);
           setView("project");
@@ -831,9 +847,9 @@ export default function Studio() {
   useEffect(() => {
     document.title =
       view === "page" && page.draft
-        ? `${page.draft.title || "无标题"} — ShowAI`
+        ? `${page.draft.title || tc("untitled")} — ShowAI`
         : "ShowAI";
-  }, [view, page.draft?.title]);
+  }, [view, page.draft?.title, tc]);
   useEffect(() => {
     const handle = (event: KeyboardEvent) => {
       if (event.key === "Escape") setContextMenu(null);
@@ -1055,7 +1071,7 @@ export default function Studio() {
     await openPage(imported.document.id, selectedProject);
     setView("page");
     await refresh();
-    setNotice("页面已导入");
+    setNotice(t("pageImported"));
   }
   async function exportPage(
     format: "html" | "json" | "inline",
@@ -1076,7 +1092,7 @@ export default function Studio() {
           presentation,
         },
       );
-      if (result) setNotice("页面已导出");
+      if (result) setNotice(t("pageExported"));
     } catch (reason) {
       report(reason);
     } finally {
@@ -1094,8 +1110,8 @@ export default function Studio() {
       if (result)
         setNotice(
           components === "remote"
-            ? "网站已导出，组件按固定发布版本联网加载"
-            : "网站已导出，可部署到静态托管",
+            ? t("siteExportedRemote")
+            : t("siteExportedBundled"),
         );
     } catch (reason) {
       report(reason);
@@ -1120,6 +1136,7 @@ export default function Studio() {
     projectId,
     id: item.id,
     title: item.name,
+    icon: item.icon,
     pinned: !!item.pinned,
     parentId: item.parentId ?? null,
   });
@@ -1127,7 +1144,7 @@ export default function Studio() {
     kind: "page",
     projectId,
     id: item.id,
-    title: item.title || "无标题",
+    title: item.title || tc("untitled"),
     icon: item.icon,
     pinned: !!item.favorite,
     parentId: item.parentId ?? null,
@@ -1138,7 +1155,7 @@ export default function Studio() {
           kind: "page",
           projectId: page.projectId,
           id: page.draft.id,
-          title: page.draft.title || "无标题",
+          title: page.draft.title || tc("untitled"),
           icon: page.draft.icon,
           pinned: page.draft.favorite,
           parentId: page.draft.parentId,
@@ -1163,19 +1180,19 @@ export default function Studio() {
     };
     return [
       {
-        label: "文件夹",
+        label: t("create.folder"),
         icon: <FolderPlus size={15} />,
         onSelect: () => setDialog({ type: "folder", ...directory }),
       },
       {
-        label: "页面",
+        label: t("create.page"),
         icon: <FileText size={15} />,
         onSelect: action(() =>
           createPage("blank", undefined, "page", directory),
         ),
       },
       {
-        label: "白板",
+        label: t("create.board"),
         icon: <LayoutTemplate size={15} />,
         onSelect: action(() =>
           createPage("blank", undefined, "board", directory),
@@ -1276,14 +1293,14 @@ export default function Studio() {
       target.kind === "folder" ? target.id : null,
     );
     const sortBy = preferences.sortBy ?? "updatedAt";
-    const options: { value: DirectorySortBy; label: string }[] = [
+    const options: { value: DirectorySortBy }[] = [
       ...directorySortOptions,
       ...(sortBy === "manual" || preferences.manualOrder?.length
-        ? [{ value: "manual" as const, label: "手动顺序" }]
+        ? [{ value: "manual" as const }]
         : []),
     ];
     return options.map((option, index) => ({
-      label: option.label,
+      label: t(`sort.${option.value}`),
       checked: option.value === sortBy,
       icon:
         option.value === sortBy ? (
@@ -1347,7 +1364,7 @@ export default function Studio() {
         if (sidebarHome.current === home) {
           setOrganization(saved);
           await refresh();
-          setNotice("已调整位置");
+          setNotice(t("moved"));
         }
       } catch (error) {
         failed = true;
@@ -1433,7 +1450,7 @@ export default function Studio() {
       }
       await refresh();
       if (reopen) await openPage(source.id, drop.projectId!);
-      setNotice("已调整位置");
+      setNotice(t("moved"));
     } catch (error) {
       if (reopen && cleared)
         await openPage(
@@ -1464,7 +1481,7 @@ export default function Studio() {
   });
   async function updateTarget(
     target: LibraryTarget,
-    change: { name?: string; pinned?: boolean },
+    change: { name?: string; icon?: string; pinned?: boolean },
   ) {
     if (!(await page.flush())) {
       setView("page");
@@ -1573,7 +1590,7 @@ export default function Studio() {
       setView("project");
     }
     await refresh();
-    setNotice("已删除");
+    setNotice(t("deleted"));
   }
   function renderChildren(
     projectId: string,
@@ -1598,7 +1615,7 @@ export default function Studio() {
           )
           .map((item) => ({
             ...item,
-            name: item.title || "无标题",
+            name: item.title || tc("untitled"),
             pinned: item.favorite,
             target: pageTarget(item, projectId),
           })),
@@ -1641,7 +1658,7 @@ export default function Studio() {
       !page.projectId ||
       page.projectId !== selectedRef.current
     ) {
-      setNotice("先打开一个页面，再插入组件");
+      setNotice(t("openPageFirst"));
       return;
     }
     const source = upgradeResource(page.draft);
@@ -1759,7 +1776,7 @@ export default function Studio() {
       })),
       ...filteredPages.map((item) => ({
         target: pageTarget(item, selectedProject!),
-        name: item.title || "无标题",
+        name: item.title || tc("untitled"),
         pinned: item.favorite,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
@@ -1781,16 +1798,16 @@ export default function Studio() {
   }
   const heading =
     view === "projects"
-      ? "最近"
+      ? t("heading.recent")
       : view === "project"
-        ? (currentFolder?.name ?? project?.name ?? "项目")
+        ? (currentFolder?.name ?? project?.name ?? t("heading.project"))
         : view === "templates"
-          ? "模板"
+          ? t("heading.templates")
           : view === "components"
-            ? "组件"
+            ? t("heading.components")
             : view === "settings"
-              ? "设置"
-              : page.draft?.title || "无标题";
+              ? t("heading.settings")
+              : page.draft?.title || tc("untitled");
   const workspaceEntry = useMemo<WorkspaceEntry>(
     () => ({
       location: {
@@ -1803,8 +1820,10 @@ export default function Studio() {
       icon:
         view === "page"
           ? page.draft?.icon
-          : view === "project" && !selectedFolder
-            ? project?.icon
+          : view === "project"
+            ? selectedFolder
+              ? currentFolder?.icon
+              : project?.icon
             : undefined,
       scrollTop: 0,
     }),
@@ -1815,6 +1834,7 @@ export default function Studio() {
       page.draft?.id,
       page.draft?.icon,
       project?.icon,
+      currentFolder?.icon,
       heading,
     ],
   );
@@ -1931,7 +1951,7 @@ export default function Studio() {
     if (target && disposition !== "current") {
       event.preventDefault();
       if (!(await openTarget(target, disposition)))
-        throw new Error("请先保存或处理当前页面的草稿。");
+        throw new Error(t("resolveDraftFirst"));
       if (disposition === "foreground-tab") setRevealNode(result.blockId);
       return;
     }
@@ -1945,16 +1965,16 @@ export default function Studio() {
     );
     if (match) {
       if (!(await openPage(match[2], match[1])))
-        throw new Error("请先保存或处理当前页面的草稿。");
+        throw new Error(t("resolveDraftFirst"));
       setRevealNode(result.blockId);
     } else if (result.kind === "project" && result.projectId) {
       if (!(await openProject(result.projectId)))
-        throw new Error("请先保存或处理当前页面的草稿。");
+        throw new Error(t("resolveDraftFirst"));
     } else if (result.kind === "component" || result.kind === "source") {
       const packageMatch = result.path.match(
         /(?:^|\/)components\/([^/]+)\/([^/]+)\//,
       );
-      if (!packageMatch) throw new Error("这个结果没有可打开的组件版本。");
+      if (!packageMatch) throw new Error(t("noComponentVersion"));
       const custom = await desktop.invoke<CompiledComponent>("components:get", {
         id: packageMatch[1],
         version: packageMatch[2],
@@ -1969,7 +1989,7 @@ export default function Studio() {
       const packageMatch = result.path.match(
         /(?:^|\/)templates\/([^/]+)\/([^/]+)\//,
       );
-      if (!packageMatch) throw new Error("这个结果没有可打开的模板版本。");
+      if (!packageMatch) throw new Error(t("noTemplateVersion"));
       const record = await desktop.invoke<LoadedTemplate>("templates:get", {
         id: packageMatch[1],
         version: packageMatch[2],
@@ -2038,11 +2058,11 @@ export default function Studio() {
         view === "settings") && (
         <button
           className="studio-sidebar-back"
-          aria-label="返回最近"
+          aria-label={t("backToRecent")}
           onClick={action(() => navigate("projects"))}
         >
           <ArrowLeft size={17} strokeWidth={1.7} aria-hidden="true" />
-          <span>返回</span>
+          <span>{tc("back")}</span>
         </button>
       )}
       {view === "settings" ? (
@@ -2129,7 +2149,7 @@ export default function Studio() {
     <div className="studio-topbar">
       {navigationUpdating && (
         <span className="studio-navigation-updating" role="status">
-          正在更新项目列表…
+          {t("updatingProjects")}
         </span>
       )}
       {view === "settings" ||
@@ -2161,7 +2181,7 @@ export default function Studio() {
                 size={17}
                 fallback={<Folder size={17} />}
               />
-              <span>{project?.name ?? "项目"}</span>
+              <span>{project?.name ?? t("heading.project")}</span>
             </button>
           )}
           {breadcrumbFolders.map((item) => (
@@ -2172,7 +2192,11 @@ export default function Studio() {
                   openTargetClick(folderTarget(item, selectedProject!), event)
                 }
               >
-                <Folder size={16} aria-hidden="true" />
+                <PageIcon
+                  value={item.icon}
+                  size={16}
+                  fallback={<Folder size={16} />}
+                />
                 <span>{item.name}</span>
               </button>
             </span>
@@ -2183,9 +2207,9 @@ export default function Studio() {
               <PageIcon value={page.draft?.icon} size={18} />
               <input
                 className="studio-page-title-input"
-                aria-label="页面标题"
+                aria-label={t("pageTitle")}
                 readOnly={syncReadOnly ?? page.record?.readOnly}
-                placeholder="无标题"
+                placeholder={tc("untitled")}
                 value={page.draft?.title ?? ""}
                 maxLength={1000}
                 onChange={(event) =>
@@ -2202,13 +2226,13 @@ export default function Studio() {
       {view === "components" && (
         <nav
           className="studio-filter-tabs component-source-tabs"
-          aria-label="组件来源"
+          aria-label={t("componentSource")}
         >
           {(
             [
-              ["all", "全部"],
-              ["builtin", "内置"],
-              ["custom", "自定义"],
+              ["all", "filter.all"],
+              ["builtin", "filter.builtin"],
+              ["custom", "filter.custom"],
             ] as const
           ).map(([filter, label]) => (
             <button
@@ -2224,7 +2248,7 @@ export default function Studio() {
                 });
               }}
             >
-              {label}
+              {t(label)}
             </button>
           ))}
         </nav>
@@ -2235,9 +2259,9 @@ export default function Studio() {
           <button
             type="button"
             className="studio-icon"
-            aria-label="添加文件夹、页面或白板"
+            aria-label={t("addContentHint")}
             aria-haspopup="menu"
-            title="添加内容"
+            title={t("addContent")}
             disabled={contentCreationDisabled}
             onClick={(event) => showDirectoryCreationMenu(event.currentTarget)}
           >
@@ -2247,9 +2271,9 @@ export default function Studio() {
         {view === "templates" && (
           <div className="studio-library-toolbar catalog-scope-controls">
             <label>
-              项目
+              {t("catalogProjectLabel")}
               <select
-                aria-label="目录项目"
+                aria-label={t("catalogProject")}
                 value={selectedProject ?? ""}
                 onChange={(event) => {
                   const id = event.target.value;
@@ -2263,7 +2287,7 @@ export default function Studio() {
                   })().catch(report);
                 }}
               >
-                <option value="">选择项目</option>
+                <option value="">{t("chooseProject")}</option>
                 {projects.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
@@ -2273,9 +2297,9 @@ export default function Studio() {
             </label>
             {view === "templates" && (
               <label>
-                范围
+                {t("catalogScopeLabel")}
                 <select
-                  aria-label="目录范围"
+                  aria-label={t("catalogScope")}
                   value={catalogScope ?? "all"}
                   onChange={(event) =>
                     setCatalogScope(
@@ -2283,11 +2307,11 @@ export default function Studio() {
                     )
                   }
                 >
-                  <option value="all">全部</option>
-                  <option value="project">项目</option>
-                  <option value="global">全局</option>
-                  <option value="published">已发布</option>
-                  <option value="builtin">内置</option>
+                  <option value="all">{t("filter.all")}</option>
+                  <option value="project">{t("scope.project")}</option>
+                  <option value="global">{t("scope.global")}</option>
+                  <option value="published">{t("scope.published")}</option>
+                  <option value="builtin">{t("scope.builtin")}</option>
                 </select>
               </label>
             )}
@@ -2299,7 +2323,7 @@ export default function Studio() {
                   setShowTemplateVersions(event.target.checked)
                 }
               />
-              显示所有版本
+              {t("showAllVersions")}
             </label>
           </div>
         )}
@@ -2307,8 +2331,16 @@ export default function Studio() {
           <label className="catalog-list-search">
             <Search size={16} />
             <input
-              aria-label={view === "components" ? "搜索组件" : "搜索模板"}
-              placeholder={view === "components" ? "搜索组件" : "搜索模板"}
+              aria-label={
+                view === "components"
+                  ? t("searchComponents")
+                  : t("searchTemplates")
+              }
+              placeholder={
+                view === "components"
+                  ? t("searchComponents")
+                  : t("searchTemplates")
+              }
               value={catalogQueries[view]}
               onChange={(event) =>
                 setCatalogQueries((current) => ({
@@ -2323,8 +2355,8 @@ export default function Studio() {
           <>
             <button
               className="studio-icon"
-              aria-label="查看外部文件修改"
-              title="查看外部文件修改"
+              aria-label={t("viewExternalChanges")}
+              title={t("viewExternalChanges")}
               onClick={() => setDialog({ type: "workspaceConflicts" })}
             >
               <FolderOpen size={16} />
@@ -2340,10 +2372,10 @@ export default function Studio() {
               key={`${view}:${selectedProject}:${selectedFolder}:${searchRevision}`}
               label={
                 !searchLibrary && view === "projects"
-                  ? "搜索最近页面"
+                  ? t("searchRecentPages")
                   : !searchLibrary && view === "project"
-                    ? "搜索页面"
-                    : "搜索内容库"
+                    ? t("searchPages")
+                    : t("searchLibrary")
               }
               value={query}
               onChange={setQuery}
@@ -2351,18 +2383,23 @@ export default function Studio() {
               {info?.libraryVersion === 2 && (
                 <>
                   {(view === "projects" || view === "project") && (
-                    <nav className="studio-search-scopes" aria-label="搜索范围">
+                    <nav
+                      className="studio-search-scopes"
+                      aria-label={t("searchScope")}
+                    >
                       <button
                         aria-pressed={!searchLibrary}
                         onClick={() => setSearchLibrary(false)}
                       >
-                        {view === "projects" ? "最近页面" : "当前项目页面"}
+                        {view === "projects"
+                          ? t("searchScope.recent")
+                          : t("searchScope.project")}
                       </button>
                       <button
                         aria-pressed={searchLibrary}
                         onClick={() => setSearchLibrary(true)}
                       >
-                        整个内容库
+                        {t("searchScope.library")}
                       </button>
                     </nav>
                   )}
@@ -2386,8 +2423,8 @@ export default function Studio() {
             <button
               className="studio-icon"
               onClick={() => setDialog({ type: "project" })}
-              aria-label="新建项目"
-              title="新建项目"
+              aria-label={t("newProject")}
+              title={t("newProject")}
             >
               <Plus size={15} />
             </button>
@@ -2396,8 +2433,8 @@ export default function Studio() {
             <>
               <button
                 className="studio-icon"
-                aria-label="打开项目目录"
-                title="打开项目目录"
+                aria-label={t("revealProjectFolder")}
+                title={t("revealProjectFolder")}
                 onClick={action(() =>
                   desktop.invoke("fs:reveal", {
                     projectId: selectedProject,
@@ -2409,8 +2446,8 @@ export default function Studio() {
               <button
                 className="studio-icon"
                 onClick={action(importPage)}
-                aria-label="导入"
-                title="导入"
+                aria-label={tc("import")}
+                title={tc("import")}
               >
                 <Upload size={15} />
               </button>
@@ -2424,14 +2461,14 @@ export default function Studio() {
                     current === anchor ? null : anchor,
                   );
                 }}
-                aria-label="导出网站"
-                title="导出网站"
+                aria-label={t("exportSite")}
+                title={t("exportSite")}
               >
                 <ArrowUpRight size={15} />
               </button>
               <button
                 className="studio-icon"
-                aria-label="当前目录操作"
+                aria-label={t("folderActions")}
                 aria-haspopup="menu"
                 onClick={(event) =>
                   showMenu(
@@ -2449,9 +2486,9 @@ export default function Studio() {
           {view === "components" && (
             <>
               <label className="component-project-picker">
-                项目：
+                {t("componentProjectLabel")}
                 <select
-                  aria-label="目录项目"
+                  aria-label={t("catalogProject")}
                   value={componentProject}
                   onChange={(event) => {
                     const id = event.target.value;
@@ -2467,7 +2504,7 @@ export default function Studio() {
                     })().catch(report);
                   }}
                 >
-                  <option value="all">全部项目</option>
+                  <option value="all">{t("allProjects")}</option>
                   {projects.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.name}
@@ -2490,8 +2527,8 @@ export default function Studio() {
             <SaveState sessions={page.sessions} />
             <button
               className="studio-icon"
-              aria-label="显示页面文件"
-              title="显示页面文件"
+              aria-label={t("revealPageFile")}
+              title={t("revealPageFile")}
               onClick={action(() =>
                 desktop.invoke("fs:reveal", {
                   projectId: selectedProject,
@@ -2503,8 +2540,8 @@ export default function Studio() {
             </button>
             <button
               className="studio-icon"
-              aria-label="导出"
-              title="导出页面"
+              aria-label={tc("export")}
+              title={t("exportPage")}
               disabled={busy}
               onClick={() => void exportPage("html")}
             >
@@ -2512,7 +2549,7 @@ export default function Studio() {
             </button>
             <button
               className="studio-icon"
-              aria-label="页面操作"
+              aria-label={t("pageActions")}
               aria-haspopup="menu"
               onClick={(event) => {
                 const target = activePageTarget();
@@ -2587,7 +2624,7 @@ export default function Studio() {
                 <span>{problem}</span>
                 <button
                   className="studio-icon"
-                  aria-label="关闭错误提示"
+                  aria-label={t("dismissError")}
                   onClick={() => setProblem("")}
                 >
                   <X size={15} />
@@ -2596,7 +2633,7 @@ export default function Studio() {
             )}
             {!!page.backgroundIssues.length && (
               <div className="studio-conflict" role="alert">
-                <p>其他页面的后台保存需要处理，草稿已保留。</p>
+                <p>{t("backgroundSaveIssue")}</p>
                 {page.backgroundIssues.map((issue) => (
                   <button
                     key={`${issue.projectId}:${issue.pageId}`}
@@ -2604,7 +2641,7 @@ export default function Studio() {
                       openPage(issue.pageId, issue.projectId),
                     )}
                   >
-                    查看 · {issue.title}
+                    {t("viewIssue", { title: issue.title })}
                   </button>
                 ))}
               </div>
@@ -2617,7 +2654,7 @@ export default function Studio() {
             {view === "page" &&
               !!page.record?.retainedSyncConflicts?.length && (
                 <div className="studio-conflict" role="status">
-                  <p>跨设备修改未能合并，两份内容及来源记录均已保留。</p>
+                  <p>{t("retainedSyncConflict")}</p>
                   {page.record.retainedSyncConflicts
                     .flatMap((item) => item.variants)
                     .filter((variant) => variant.pageId !== page.draft?.id)
@@ -2626,8 +2663,10 @@ export default function Studio() {
                         key={variant.pageId}
                         onClick={action(() => openPage(variant.pageId))}
                       >
-                        查看另一份 · {variant.source.account} · 设备{" "}
-                        {variant.source.deviceId.slice(0, 8)}
+                        {t("viewOtherVariant", {
+                          account: variant.source.account,
+                          device: variant.source.deviceId.slice(0, 8),
+                        })}
                       </button>
                     ))}
                 </div>
@@ -2637,8 +2676,8 @@ export default function Studio() {
                 <div>
                   <strong>
                     {page.status === "conflict"
-                      ? "保存失败：文件有新的修改"
-                      : "保存遇到问题"}
+                      ? t("saveConflictTitle")
+                      : t("saveProblemTitle")}
                   </strong>
                   <p>{page.error}</p>
                 </div>
@@ -2648,17 +2687,19 @@ export default function Studio() {
                       const copy = await page.keepCopy();
                       if (copy) {
                         await refresh();
-                        setNotice("草稿已保留为副本");
+                        setNotice(t("draftKeptAsCopy"));
                       }
                     })}
                   >
-                    保留为副本
+                    {t("keepAsCopy")}
                   </button>
                 )}
                 {page.status === "conflict" ? (
                   <>
                     {page.reviewingConflict && (
-                      <button onClick={action(page.retry)}>重新保存</button>
+                      <button onClick={action(page.retry)}>
+                        {t("saveAgain")}
+                      </button>
                     )}
                     {page.conflictId ? (
                       <button
@@ -2670,7 +2711,7 @@ export default function Studio() {
                           });
                         })}
                       >
-                        处理外部修改
+                        {t("resolveExternal")}
                       </button>
                     ) : page.mergeBase && page.draft && selectedProject ? (
                       <button
@@ -2684,27 +2725,29 @@ export default function Studio() {
                           });
                         })}
                       >
-                        比较并合并
+                        {t("compareAndMerge")}
                       </button>
                     ) : null}
                     <button onClick={action(page.acceptResolution)}>
-                      放弃修改，载入当前文件
+                      {t("discardAndLoad")}
                     </button>
                   </>
                 ) : (
-                  <button onClick={action(page.retry)}>重试保存</button>
+                  <button onClick={action(page.retry)}>{t("retrySave")}</button>
                 )}
               </div>
             )}
             {view === "page" && !!page.availableDrafts.length && (
               <div className="studio-conflict" role="status">
-                <p>有其他编辑窗口留下的本机草稿，可选择恢复。</p>
+                <p>{t("draftsAvailable")}</p>
                 {page.availableDrafts.map((item) => (
                   <button
                     key={item.id}
                     onClick={action(() => page.recoverDraft(item.id))}
                   >
-                    恢复草稿 · {new Date(item.savedAt).toLocaleString("zh-CN")}
+                    {t("restoreDraft", {
+                      time: new Date(item.savedAt).toLocaleString(getLocale()),
+                    })}
                   </button>
                 ))}
               </div>
@@ -2754,7 +2797,7 @@ export default function Studio() {
                       setExpandedFolders({});
                       await refresh();
                       await loadCatalog();
-                      setNotice("内容库已切换");
+                      setNotice(t("librarySwitched"));
                     }
                   })}
                   onCopyHome={action(async () => {
@@ -2762,14 +2805,14 @@ export default function Studio() {
                     await desktop.invoke("clipboard:write", {
                       text: info.home,
                     });
-                    setNotice("内容库路径已复制");
+                    setNotice(t("libraryPathCopied"));
                   })}
                   onCopyConfig={action(async () => {
                     if (!info) return;
                     await desktop.invoke("clipboard:write", {
                       text: JSON.stringify(info.cli, null, 2),
                     });
-                    setNotice("本地启动配置已复制");
+                    setNotice(t("launchConfigCopied"));
                   })}
                 />
               ) : view === "page" && page.draft ? null : (
@@ -2839,7 +2882,11 @@ export default function Studio() {
                               >
                                 <span className="studio-page-list-icon">
                                   {target.kind === "folder" ? (
-                                    <Folder size={19} />
+                                    <PageIcon
+                                      value={target.icon}
+                                      size={19}
+                                      fallback={<Folder size={19} />}
+                                    />
                                   ) : (
                                     <PageIcon
                                       value={
@@ -2853,13 +2900,15 @@ export default function Studio() {
                                 </span>
                                 <strong>{target.title}</strong>
                                 {target.pinned && (
-                                  <Pin size={12} aria-label="已置顶" />
+                                  <Pin size={12} aria-label={t("pinned")} />
                                 )}
                                 <time>{shortDate(updatedAt)}</time>
                               </button>
                               <button
                                 className="studio-icon studio-row-menu"
-                                aria-label={`${target.title}的操作`}
+                                aria-label={t("itemActions", {
+                                  title: target.title,
+                                })}
                                 aria-haspopup="menu"
                                 onClick={(event) =>
                                   showMenu(target, event.currentTarget)
@@ -2875,14 +2924,12 @@ export default function Studio() {
                           <FilePlus2 size={30} strokeWidth={1.2} />
                           <h2>
                             {query
-                              ? "没有匹配的内容"
+                              ? t("noMatchingContent")
                               : currentFolder
-                                ? "文件夹为空"
-                                : "项目为空"}
+                                ? t("folderEmpty")
+                                : t("projectEmpty")}
                           </h2>
-                          {!query && (
-                            <p>点击左上角的 + 添加文件夹、页面或白板</p>
-                          )}
+                          {!query && <p>{t("emptyHint")}</p>}
                         </div>
                       )}
                     </>
@@ -2894,7 +2941,11 @@ export default function Studio() {
                           <button
                             className="studio-template-card studio-template-open"
                             key={`${item.scope}:${item.id}:${item.version}:${item.integrity}`}
-                            aria-label={`查看模板 ${item.name} ${item.version} ${item.scope}`}
+                            aria-label={t("viewTemplate", {
+                              name: item.name,
+                              version: item.version,
+                              scope: item.scope,
+                            })}
                             aria-haspopup="dialog"
                             onClick={action(async () => {
                               const record =
@@ -2934,8 +2985,8 @@ export default function Studio() {
                           <LayoutTemplate size={30} strokeWidth={1.2} />
                           <h2>
                             {catalogQueries.templates
-                              ? "没有匹配的模板"
-                              : "暂无这类模板"}
+                              ? t("noMatchingTemplates")
+                              : t("noTemplates")}
                           </h2>
                         </div>
                       )}
@@ -2967,16 +3018,16 @@ export default function Studio() {
         {exportMenu && (
           <LibraryContextMenu
             anchor={exportMenu}
-            label="网站导出方式"
+            label={t("siteExportMode")}
             onClose={() => setExportMenu(null)}
             items={[
               {
-                label: "离线网站 · 打包组件",
+                label: t("exportOffline"),
                 icon: <Package size={15} />,
                 onSelect: () => void exportSite("bundled"),
               },
               {
-                label: "联网网站 · 引用发布组件",
+                label: t("exportOnline"),
                 icon: <Globe size={15} />,
                 onSelect: () => void exportSite("remote"),
               },
@@ -2986,16 +3037,16 @@ export default function Studio() {
         {projectsMenu && (
           <LibraryContextMenu
             anchor={projectsMenu}
-            label="项目列表操作"
+            label={t("projectListActions")}
             onClose={() => setProjectsMenu(null)}
             items={[
               {
-                label: "新建项目",
+                label: t("newProject"),
                 icon: <FolderPlus size={15} />,
                 onSelect: () => setDialog({ type: "project" }),
               },
               {
-                label: "新建分组",
+                label: t("newGroup"),
                 icon: <FolderPlus size={15} />,
                 onSelect: () => setDialog({ type: "group" }),
               },
@@ -3005,23 +3056,23 @@ export default function Studio() {
         {groupMenu && (
           <LibraryContextMenu
             anchor={groupMenu.anchor}
-            label={`${groupMenu.group.name}的分组操作`}
+            label={t("groupActions", { name: groupMenu.group.name })}
             onClose={() => setGroupMenu(null)}
             items={[
               {
-                label: "新建项目",
+                label: t("newProject"),
                 icon: <Plus size={15} />,
                 onSelect: () =>
                   setDialog({ type: "project", groupId: groupMenu.group.id }),
               },
               {
-                label: "重命名分组",
+                label: t("renameGroup"),
                 icon: <Pencil size={15} />,
                 onSelect: () =>
                   setDialog({ type: "group", group: groupMenu.group }),
               },
               {
-                label: "移除分组",
+                label: t("removeGroup"),
                 icon: <Trash2 size={15} />,
                 separatorBefore: true,
                 onSelect: action(async () => {
@@ -3029,7 +3080,7 @@ export default function Studio() {
                     groupId: groupMenu.group.id,
                   });
                   await refresh();
-                  setNotice("已移除分组，项目已移回项目列表");
+                  setNotice(t("groupRemoved"));
                 }),
               },
             ]}
@@ -3045,8 +3096,8 @@ export default function Studio() {
             point={contextMenu.point}
             label={
               contextMenu.creationOnly
-                ? "添加内容"
-                : `${contextMenu.target.title}的操作`
+                ? t("addContent")
+                : t("itemActions", { title: contextMenu.target.title })
             }
             onClose={() => setContextMenu(null)}
             items={
@@ -3054,10 +3105,12 @@ export default function Studio() {
                 ? creationMenuItems(contextMenu.target)
                 : [
                     {
-                      label: "在新标签页打开",
+                      label: t("openInNewTab"),
                       icon: <PanelsTopLeft size={15} />,
                       shortcut:
-                        info?.platform === "darwin" ? "⌘ 点击" : "Ctrl 点击",
+                        info?.platform === "darwin"
+                          ? t("cmdClick")
+                          : t("ctrlClick"),
                       disabled:
                         !workspaceReady || routing || workspace.switching,
                       onSelect: action(() =>
@@ -3065,9 +3118,9 @@ export default function Studio() {
                       ),
                     },
                     {
-                      label: "在新窗口打开",
+                      label: t("openInNewWindow"),
                       icon: <AppWindow size={15} />,
-                      shortcut: "⇧ 点击",
+                      shortcut: t("shiftClick"),
                       disabled:
                         !workspaceReady || routing || workspace.switching,
                       onSelect: action(() =>
@@ -3075,7 +3128,7 @@ export default function Studio() {
                       ),
                     },
                     {
-                      label: "重命名",
+                      label: tc("rename"),
                       separatorBefore: true,
                       icon: <Pencil size={15} />,
                       onSelect: () => {
@@ -3089,14 +3142,21 @@ export default function Studio() {
                         setDialog(
                           currentProject
                             ? { type: "project", project: currentProject }
-                            : { type: "rename", target: contextMenu.target },
+                            : contextMenu.target.kind === "folder"
+                              ? {
+                                  type: "folder",
+                                  projectId: contextMenu.target.projectId,
+                                  parentId: contextMenu.target.parentId,
+                                  target: contextMenu.target,
+                                }
+                              : { type: "rename", target: contextMenu.target },
                         );
                       },
                     },
                     ...(contextMenu.target.kind === "page"
                       ? [
                           {
-                            label: "设置图标…",
+                            label: t("setIcon"),
                             icon: <FileText size={15} />,
                             onSelect:
                               contextMenu.pageTools &&
@@ -3111,7 +3171,7 @@ export default function Studio() {
                         ]
                       : []),
                     {
-                      label: contextMenu.target.pinned ? "取消置顶" : "置顶",
+                      label: contextMenu.target.pinned ? t("unpin") : t("pin"),
                       icon: contextMenu.target.pinned ? (
                         <PinOff size={15} />
                       ) : (
@@ -3127,7 +3187,7 @@ export default function Studio() {
                     ...(contextMenu.target.kind === "project"
                       ? [
                           {
-                            label: "移到分组…",
+                            label: t("moveToGroup"),
                             icon: <Folder size={15} />,
                             onSelect: () =>
                               setDialog({
@@ -3140,7 +3200,7 @@ export default function Studio() {
                           ]
                             ? [
                                 {
-                                  label: "移出分组",
+                                  label: t("removeFromGroup"),
                                   icon: <FolderMinus size={15} />,
                                   onSelect: action(() =>
                                     moveProject(
@@ -3168,7 +3228,7 @@ export default function Studio() {
                     ...(contextMenu.pageTools
                       ? [
                           {
-                            label: "复制页面",
+                            label: t("duplicatePage"),
                             icon: <Copy size={15} />,
                             onSelect: action(async () => {
                               if (!(await page.flush())) return;
@@ -3187,22 +3247,22 @@ export default function Studio() {
                             }),
                           },
                           {
-                            label: "下载源文件",
+                            label: tc("downloadSource"),
                             icon: <Download size={15} />,
                             onSelect: () => void exportPage("json"),
                           },
                           {
-                            label: "引用已发布组件导出",
+                            label: t("exportWithPublished"),
                             icon: <Globe size={15} />,
                             onSelect: () => void exportPage("html", "remote"),
                           },
                           {
-                            label: "导出会话片段",
+                            label: t("exportSnippet"),
                             icon: <CodeXml size={15} />,
                             onSelect: () => void exportPage("inline"),
                           },
                           {
-                            label: "导出阅读网页",
+                            label: t("exportReading"),
                             icon: <ArrowUpRight size={15} />,
                             onSelect: () =>
                               void exportPage("html", "bundled", "reading"),
@@ -3210,7 +3270,7 @@ export default function Studio() {
                         ]
                       : []),
                     {
-                      label: "删除",
+                      label: tc("delete"),
                       icon: <Trash2 size={15} />,
                       danger: true,
                       separatorBefore: true,
@@ -3235,9 +3295,7 @@ export default function Studio() {
               ) {
                 page.edit({ icon });
                 if (!(await page.flush()))
-                  throw new Error(
-                    "图标保留在本机草稿中，请处理页面保存错误或冲突。",
-                  );
+                  throw new Error(t("iconKeptInDraft"));
               } else {
                 await desktop.invoke("pages:save", {
                   projectId: dialog.target.projectId,
@@ -3261,7 +3319,7 @@ export default function Studio() {
               await page.reload();
               await refresh();
               await loadCatalog();
-              setNotice("内容库已升级，原始文件已保留");
+              setNotice(t("libraryUpgraded"));
             }}
           />
         )}
@@ -3275,7 +3333,7 @@ export default function Studio() {
             onMerged={async () => {
               await page.acceptResolution();
               await refresh();
-              setNotice("合并版本已保存");
+              setNotice(t("mergeSaved"));
             }}
           />
         )}
@@ -3317,13 +3375,13 @@ export default function Studio() {
                 );
                 setDialog({ type: "template", record, projectId: target });
               }
-              setNotice("外部文件已保留为草稿，可通过 Agent 继续处理");
+              setNotice(t("externalKeptAsDraft"));
             }}
             onClose={closeDialog}
             onResolved={async () => {
               await page.acceptResolution();
               await refresh();
-              setNotice("外部修改已处理，快照仍可保留查看");
+              setNotice(t("externalResolved"));
             }}
           />
         )}
@@ -3335,8 +3393,8 @@ export default function Studio() {
         )}
         {dialog?.type === "group" && (
           <NameDialog
-            title={dialog.group ? "重命名分组" : "新建分组"}
-            inputLabel="分组名称"
+            title={dialog.group ? t("renameGroup") : t("newGroup")}
+            inputLabel={t("groupName")}
             initialValue={dialog.group?.name}
             onClose={closeDialog}
             onSave={async (name) => {
@@ -3369,11 +3427,15 @@ export default function Studio() {
           />
         )}
         {dialog?.type === "folder" && (
-          <NameDialog
-            title="新文件夹"
-            inputLabel="文件夹名称"
+          <FolderDialog
+            folder={dialog.target}
             onClose={closeDialog}
-            onSave={async (name) => {
+            onSave={async (name, icon) => {
+              if (dialog.target) {
+                if (await updateTarget(dialog.target, { name, icon }))
+                  setDialog(null);
+                return;
+              }
               if (!(await page.flush())) return;
               const folder = await desktop.invoke<FolderMetadata>(
                 "folders:create",
@@ -3381,6 +3443,7 @@ export default function Studio() {
                   projectId: dialog.projectId,
                   parentId: dialog.parentId,
                   name,
+                  ...(icon ? { icon } : {}),
                 },
               );
               setExpandedFolders((current) => ({
@@ -3395,8 +3458,8 @@ export default function Studio() {
         )}
         {dialog?.type === "rename" && (
           <NameDialog
-            title="重命名"
-            inputLabel="名称"
+            title={tc("rename")}
+            inputLabel={t("name")}
             initialValue={dialog.target.title}
             onClose={closeDialog}
             onSave={async (name) => {
@@ -3434,23 +3497,23 @@ export default function Studio() {
           />
         )}
         {dialog?.type === "newPage" && (
-          <Dialog title="新页面" onClose={closeDialog}>
+          <Dialog title={t("newPage")} onClose={closeDialog}>
             <div className="studio-template-picker">
               <button
                 disabled={busy}
-                aria-label="新建 Page"
+                aria-label={t("newPageAria")}
                 onClick={() => void createPage("blank", undefined, "page")}
               >
                 <span>
                   <FileText size={21} />
                 </span>
                 <div>
-                  <strong>Page 空白页面</strong>
+                  <strong>{t("blankPage")}</strong>
                 </div>
                 <ArrowUpRight size={16} />
               </button>
               <button
-                aria-label="新建 Board"
+                aria-label={t("newBoardAria")}
                 disabled={busy}
                 onClick={() => void createPage("blank", undefined, "board")}
               >
@@ -3458,7 +3521,7 @@ export default function Studio() {
                   <LayoutTemplate size={21} />
                 </span>
                 <div>
-                  <strong>Board 白板</strong>
+                  <strong>{t("blankBoard")}</strong>
                 </div>
                 <ArrowUpRight size={16} />
               </button>
@@ -3479,7 +3542,7 @@ export default function Studio() {
                     </span>
                     <div>
                       <strong>
-                        {item.id === "blank" ? "Page 空白页面" : item.name}
+                        {item.id === "blank" ? t("blankPage") : item.name}
                       </strong>
                       <p>{item.description}</p>
                     </div>
@@ -3534,11 +3597,13 @@ function MoveProjectDialog({
   onCreate: () => void;
   onSave: (groupId: string | null) => Promise<void>;
 }) {
+  const t = useTranslator(studioMessages);
+  const tc = useTranslator(commonMessages);
   const [groupId, setGroupId] = useState(currentGroup);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   return (
-    <Dialog title="移到分组" onClose={onClose}>
+    <Dialog title={t("moveToGroupTitle")} onClose={onClose}>
       <form
         className="studio-form"
         onSubmit={(event) => {
@@ -3552,13 +3617,13 @@ function MoveProjectDialog({
         }}
       >
         <label>
-          分组
+          {t("group")}
           <select
-            aria-label="目标分组"
+            aria-label={t("targetGroup")}
             value={groupId}
             onChange={(event) => setGroupId(event.target.value)}
           >
-            <option value="">项目（未分组）</option>
+            <option value="">{t("ungrouped")}</option>
             {groups.map((group) => (
               <option key={group.id} value={group.id}>
                 {group.name}
@@ -3568,7 +3633,7 @@ function MoveProjectDialog({
         </label>
         <button className="studio-button" type="button" onClick={onCreate}>
           <Plus size={15} />
-          新建分组
+          {t("newGroup")}
         </button>
         {error && (
           <p className="studio-form-error" role="alert">
@@ -3577,10 +3642,11 @@ function MoveProjectDialog({
         )}
         <footer>
           <button className="studio-button" type="button" onClick={onClose}>
-            取消
+            {tc("cancel")}
           </button>
           <button className="studio-button primary" disabled={busy}>
-            {busy && <Loader2 size={14} className="studio-spin" />}移动
+            {busy && <Loader2 size={14} className="studio-spin" />}
+            {t("move")}
           </button>
         </footer>
       </form>
@@ -3601,6 +3667,7 @@ function NameDialog({
   onClose: () => void;
   onSave: (name: string) => Promise<void>;
 }) {
+  const tc = useTranslator(commonMessages);
   const [name, setName] = useState(initialValue);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -3635,14 +3702,14 @@ function NameDialog({
         )}
         <footer>
           <button className="studio-button" type="button" onClick={onClose}>
-            取消
+            {tc("cancel")}
           </button>
           <button
             className="studio-button primary"
             disabled={!name.trim() || busy}
           >
             {busy && <Loader2 size={14} className="studio-spin" />}
-            {initialValue ? "保存" : "创建"}
+            {initialValue ? tc("save") : tc("create")}
           </button>
         </footer>
       </form>
@@ -3659,17 +3726,25 @@ function DeleteDialog({
   onClose: () => void;
   onDelete: () => Promise<void>;
 }) {
+  const t = useTranslator(studioMessages);
+  const tc = useTranslator(commonMessages);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   return (
     <Dialog
-      title={`删除${target.kind === "project" ? "项目" : target.kind === "folder" ? "文件夹" : "页面"}`}
+      title={t(
+        target.kind === "project"
+          ? "deleteProject"
+          : target.kind === "folder"
+            ? "deleteFolder"
+            : "deletePage",
+      )}
       onClose={onClose}
     >
       <div className="studio-form">
         <p className="studio-delete-description">
-          删除「{target.title}」？
-          {target.kind !== "page" && "其中的页面和子文件夹也会从列表中移除。"}
+          {t("deleteConfirm", { title: target.title })}
+          {target.kind !== "page" && t("deleteChildren")}
         </p>
         {error && (
           <p className="studio-form-error" role="alert">
@@ -3678,7 +3753,7 @@ function DeleteDialog({
         )}
         <footer>
           <button className="studio-button" onClick={onClose}>
-            取消
+            {tc("cancel")}
           </button>
           <button
             className="studio-button danger"
@@ -3690,7 +3765,8 @@ function DeleteDialog({
                 .finally(() => setBusy(false));
             }}
           >
-            {busy && <Loader2 size={14} className="studio-spin" />}删除
+            {busy && <Loader2 size={14} className="studio-spin" />}
+            {tc("delete")}
           </button>
         </footer>
       </div>
@@ -3707,29 +3783,101 @@ function ProjectDialog({
   onClose: () => void;
   onSave: (name: string, icon: string) => Promise<void>;
 }) {
-  const [name, setName] = useState(project?.name ?? "");
-  const [icon, setIcon] = useState(project?.icon ?? "");
+  const t = useTranslator(studioMessages);
+  const tc = useTranslator(commonMessages);
+  return (
+    <DirectoryDialog
+      title={project ? t("projectSettings") : t("newProjectTitle")}
+      inputLabel={t("projectName")}
+      placeholder={t("projectNamePlaceholder")}
+      iconButtonLabel={t("setProjectIcon")}
+      iconDialogTitle={t("projectIcon")}
+      submitLabel={project ? tc("save") : t("createProject")}
+      initialName={project?.name}
+      initialIcon={project?.icon}
+      onClose={onClose}
+      onSave={onSave}
+    />
+  );
+}
+
+function FolderDialog({
+  folder,
+  onClose,
+  onSave,
+}: {
+  folder?: LibraryTarget;
+  onClose: () => void;
+  onSave: (name: string, icon: string) => Promise<void>;
+}) {
+  const t = useTranslator(studioMessages);
+  const tc = useTranslator(commonMessages);
+  return (
+    <DirectoryDialog
+      title={folder ? t("folderSettings") : t("newFolder")}
+      inputLabel={t("folderName")}
+      iconButtonLabel={t("setFolderIcon")}
+      iconDialogTitle={t("folderIcon")}
+      submitLabel={folder ? tc("save") : tc("create")}
+      initialName={folder?.title}
+      initialIcon={folder?.icon}
+      onClose={onClose}
+      onSave={onSave}
+    />
+  );
+}
+
+/** Projects and folders share one name-and-icon form with a folder glyph fallback. */
+function DirectoryDialog({
+  title,
+  inputLabel,
+  placeholder,
+  iconButtonLabel,
+  iconDialogTitle,
+  submitLabel,
+  initialName = "",
+  initialIcon = "",
+  onClose,
+  onSave,
+}: {
+  title: string;
+  inputLabel: string;
+  placeholder?: string;
+  iconButtonLabel: string;
+  iconDialogTitle: string;
+  submitLabel: string;
+  initialName?: string;
+  initialIcon?: string;
+  onClose: () => void;
+  onSave: (name: string, icon: string) => Promise<void>;
+}) {
+  const t = useTranslator(studioMessages);
+  const tc = useTranslator(commonMessages);
+  const [name, setName] = useState(initialName);
+  const [icon, setIcon] = useState(initialIcon);
   const [choosingIcon, setChoosingIcon] = useState(false);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   return (
     <>
-      <Dialog title={project ? "项目设置" : "新项目"} onClose={onClose}>
+      <Dialog title={title} onClose={onClose}>
         <form
           className="studio-form"
           onSubmit={(event) => {
             event.preventDefault();
+            if (!name.trim() || busy) return;
             setBusy(true);
+            setError("");
             void onSave(name.trim(), icon)
               .catch((reason) => setError(errorMessage(reason)))
               .finally(() => setBusy(false));
           }}
         >
           <label>
-            名称
+            {t("name")}
             <input
-              aria-label="项目名称"
-              placeholder="例如：多模态模型调研"
+              aria-label={inputLabel}
+              placeholder={placeholder}
               value={name}
               onChange={(event) => setName(event.target.value)}
               maxLength={1000}
@@ -3740,10 +3888,10 @@ function ProjectDialog({
             className="studio-button studio-project-icon-choice"
             disabled={busy}
             onClick={() => setChoosingIcon(true)}
-            aria-label="设置项目图标"
+            aria-label={iconButtonLabel}
           >
             <PageIcon value={icon} size={28} fallback={<Folder size={28} />} />
-            <span>设置图标</span>
+            <span>{t("setIconButton")}</span>
           </button>
           {error && (
             <p className="studio-form-error" role="alert">
@@ -3752,21 +3900,21 @@ function ProjectDialog({
           )}
           <footer>
             <button type="button" className="studio-button" onClick={onClose}>
-              取消
+              {tc("cancel")}
             </button>
             <button
               className="studio-button primary"
               disabled={!name.trim() || busy}
             >
               {busy ? <Loader2 size={15} className="studio-spin" /> : null}
-              {project ? "保存" : "创建项目"}
+              {submitLabel}
             </button>
           </footer>
         </form>
       </Dialog>
       {choosingIcon && (
         <PageIconDialog
-          title="项目图标"
+          title={iconDialogTitle}
           value={icon}
           fallback={<Folder size={56} />}
           onClose={() => setChoosingIcon(false)}

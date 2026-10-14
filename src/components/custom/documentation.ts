@@ -4,10 +4,10 @@ const text = z.string().trim().min(1).max(12000);
 const texts = z.array(text).min(1).max(100);
 export const REUSE_KINDS = ["general", "domain", "content-specific"] as const;
 export const reuseLabels = {
-  general: "通用",
-  domain: "专题",
-  "content-specific": "内容专用",
-  unclassified: "待评估",
+  general: "通用", // i18n-exempt: unused by the UI (see catalog namespace)
+  domain: "专题", // i18n-exempt: unused by the UI (see catalog namespace)
+  "content-specific": "内容专用", // i18n-exempt: unused by the UI (see catalog namespace)
+  unclassified: "待评估", // i18n-exempt: unused by the UI (see catalog namespace)
 } as const;
 const documentationV1 = z
   .object({

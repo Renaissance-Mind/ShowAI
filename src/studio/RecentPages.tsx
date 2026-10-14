@@ -3,15 +3,31 @@ import PageIcon from "../components/PageIcon";
 import { FileText } from "../ui/icons";
 import type { PageSummary, ProjectSummary } from "../core/model";
 import type { LibraryMenuPoint } from "./LibraryNavigation";
+import { getLocale, translator } from "../i18n";
+import { useTranslator } from "../i18n/react";
+import commonMessages from "../i18n/messages/common";
+import sidebarMessages from "../i18n/messages/sidebar";
 
-const absoluteTime = new Intl.DateTimeFormat("zh-CN", {
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
-});
+const translate = translator(sidebarMessages);
+const absoluteTimeFormats = new Map<string, Intl.DateTimeFormat>();
+
+function formatAbsoluteTime(date: Date): string {
+  const locale = getLocale();
+  let format = absoluteTimeFormats.get(locale);
+  if (!format)
+    absoluteTimeFormats.set(
+      locale,
+      (format = new Intl.DateTimeFormat(locale, {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      })),
+    );
+  return format.format(date);
+}
 
 function recentTime(value: string, now: number): string {
   const date = new Date(value);
@@ -19,11 +35,14 @@ function recentTime(value: string, now: number): string {
   const minute = 60_000;
   const hour = 60 * minute;
   const day = 24 * hour;
-  if (elapsed >= 3 * day) return absoluteTime.format(date);
-  if (elapsed >= day) return `${Math.floor(elapsed / day)} 天前`;
-  if (elapsed >= hour) return `${Math.floor(elapsed / hour)} 小时前`;
-  if (elapsed >= minute) return `${Math.floor(elapsed / minute)} 分钟前`;
-  return "刚刚";
+  if (elapsed >= 3 * day) return formatAbsoluteTime(date);
+  if (elapsed >= day)
+    return translate("daysAgo", { count: Math.floor(elapsed / day) });
+  if (elapsed >= hour)
+    return translate("hoursAgo", { count: Math.floor(elapsed / hour) });
+  if (elapsed >= minute)
+    return translate("minutesAgo", { count: Math.floor(elapsed / minute) });
+  return translate("justNow");
 }
 
 export type RecentPage = PageSummary & {
@@ -71,6 +90,8 @@ export default function RecentPages({
   ) => void;
   onCreateProject: () => void;
 }) {
+  const t = useTranslator(sidebarMessages);
+  const tc = useTranslator(commonMessages);
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000);
@@ -84,10 +105,10 @@ export default function RecentPages({
     return (
       <div className="studio-empty">
         <FileText size={34} strokeWidth={1.2} />
-        <h2>{term ? "没有找到页面" : "暂无最近编辑的页面"}</h2>
+        <h2>{term ? t("noMatchingPages") : t("noRecentPages")}</h2>
         {!term && (
           <button className="studio-button primary" onClick={onCreateProject}>
-            新建项目
+            {t("createProject")}
           </button>
         )}
       </div>
@@ -95,7 +116,7 @@ export default function RecentPages({
   return (
     <div
       className="studio-page-list studio-recent-pages"
-      aria-label="最近编辑的页面"
+      aria-label={t("recentPages")}
     >
       {visible.map((page) => (
         <div
@@ -134,14 +155,14 @@ export default function RecentPages({
               <PageIcon value={page.icon} size={19} />
             </span>
             <span className="studio-recent-page-details">
-              <strong>{page.title || "无标题"}</strong>
+              <strong>{page.title || tc("untitled")}</strong>
               <span className="studio-recent-page-project">
                 {page.projectName}
               </span>
             </span>
             <time
               dateTime={page.updatedAt}
-              title={absoluteTime.format(new Date(page.updatedAt))}
+              title={formatAbsoluteTime(new Date(page.updatedAt))}
             >
               {recentTime(page.updatedAt, now)}
             </time>

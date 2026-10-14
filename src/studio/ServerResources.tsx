@@ -3,6 +3,8 @@ import { desktop, errorMessage } from "./bridge";
 import type { ResolvedResource } from "../sync/accounts";
 import type { ServerConnection } from "../sync/protocol";
 import type { AgentHostStatus, ModelSource } from "../agent-host/types";
+import { useTranslator } from "../i18n/react";
+import strings from "../i18n/messages/agentSettings";
 export default function ServerResources({
   selected,
   disabled,
@@ -12,6 +14,7 @@ export default function ServerResources({
   disabled: boolean;
   update: (status: AgentHostStatus) => void;
 }) {
+  const t = useTranslator(strings);
   const [resources, setResources] = useState<ResolvedResource[] | null>(null),
     [servers, setServers] = useState<Omit<ServerConnection, "token">[]>([]);
   const [target, setTarget] = useState(""),
@@ -34,11 +37,8 @@ export default function ServerResources({
     <div className="agent-server-resources">
       <div className="settings-row">
         <div className="settings-row-text">
-          <h3>服务器上的模型资源</h3>
-          <p>
-            检索已登录服务的 API Key 和 ChatGPT
-            授权，选择后由来源服务器提供凭据。
-          </p>
+          <h3>{t("resources.title")}</h3>
+          <p>{t("resources.help")}</p>
         </div>
         <button
           type="button"
@@ -64,11 +64,11 @@ export default function ServerResources({
                 federation: { errors: Record<string, string> };
               }>("sync:status");
               if (Object.keys(refreshed.federation.errors).length)
-                setMessage("部分服务暂时不可用，恢复连接后可重新检索。");
+                setMessage(t("resources.partial"));
             })
           }
         >
-          检索服务器资源
+          {t("resources.search")}
         </button>
       </div>
       {error && (
@@ -91,9 +91,9 @@ export default function ServerResources({
             </p>
             <p>
               {resource.credential === "chatgpt"
-                ? `ChatGPT 授权${resource.account ? ` · ${resource.account}` : ""}`
-                : "API Key"}
-              {resource.available ? "" : " · 来源暂时离线"}
+                ? `${t("resources.chatgpt")}${resource.account ? ` · ${resource.account}` : ""}`
+                : t("resources.apiKey")}
+              {resource.available ? "" : ` · ${t("resources.offline")}`}
             </p>
           </div>
           <button
@@ -110,33 +110,36 @@ export default function ServerResources({
                     { id: resource.id },
                   ),
                 );
-                setMessage("已添加来源，可以选择模型并使用。");
+                setMessage(t("resources.added"));
               })
             }
           >
-            使用此资源
+            {t("resources.use")}
           </button>
         </div>
       ))}
       {resources?.length === 0 && (
-        <p className="settings-help">没有检索到模型资源。</p>
+        <p className="settings-help">{t("resources.none")}</p>
       )}
       {selected?.hosted && (
         <p className="settings-help">
-          当前来源：{selected.hosted.serverName} · {selected.hosted.url}
+          {t("resources.current", {
+            server: selected.hosted.serverName,
+            url: selected.hosted.url,
+          })}
         </p>
       )}
       {selected && !selected.hosted && resources !== null && (
         <div className="sync-form">
           <label>
-            将当前来源保存到服务器
+            {t("resources.saveTo")}
             <select
-              aria-label="模型资源保存服务器"
+              aria-label={t("resources.saveServer")}
               value={target}
               disabled={disabled || busy}
               onChange={(event) => setTarget(event.target.value)}
             >
-              <option value="">选择来源服务器</option>
+              <option value="">{t("resources.chooseServer")}</option>
               {servers.map((server) => (
                 <option key={server.id} value={server.id}>
                   {server.name} · {server.user.name}
@@ -144,10 +147,7 @@ export default function ServerResources({
               ))}
             </select>
           </label>
-          <p className="settings-help">
-            保存后，本设备和其他绑定设备都会通过该服务器使用此资源。ChatGPT
-            的授权刷新也由该服务器负责。
-          </p>
+          <p className="settings-help">{t("resources.saveHelp")}</p>
           <button
             type="button"
             className="settings-button"
@@ -161,13 +161,11 @@ export default function ServerResources({
                   }),
                 );
                 setResources(await desktop.invoke("agent:serverResources"));
-                setMessage(
-                  "已保存到来源服务器，其他绑定设备现在可以检索使用。",
-                );
+                setMessage(t("resources.saved"));
               })
             }
           >
-            保存到来源服务器
+            {t("resources.save")}
           </button>
         </div>
       )}

@@ -28,6 +28,9 @@ import { InlineComponent } from "./InlineComponent";
 import { findComponent, indexComponents } from "./component-index";
 import { installComponentLinks, openComponentLink } from "./external-links";
 import { installComponentActivity } from "./activity";
+import { useLocale, useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/customComponents";
+import common from "../../i18n/messages/common";
 import "./custom.css";
 
 const ComponentsContext = createContext<ReadonlyMap<string, CompiledComponent>>(
@@ -118,6 +121,8 @@ export function CustomBlock({ data, onChange, readOnly }: BlockProps) {
   const components = useContext(ComponentsContext);
   const inlineHost = useContext(InlineHostContext);
   const component = findComponent(components, parsed);
+  const t = useTranslator(messages);
+  const reference = `${parsed.componentId}@${parsed.version}`;
   return component && inlineHost ? (
     <InlineComponent
       key={component.integrity}
@@ -134,13 +139,16 @@ export function CustomBlock({ data, onChange, readOnly }: BlockProps) {
       readOnly={readOnly}
     />
   ) : (
-    <section className="sb-block sb-unavailable" aria-label="组件尚未安装">
+    <section className="sb-block sb-unavailable" aria-label={t("notInstalled")}>
       <div style={{ padding: 18 }}>
         <strong>{parsed.componentId}</strong>
         <p>
-          需要安装组件 {parsed.componentId}@{parsed.version}
-          {parsed.integrity ? `（${parsed.integrity.slice(7, 19)}）` : ""}
-          。页面数据已保留。
+          {parsed.integrity
+            ? t("installRequiredIntegrity", {
+                component: reference,
+                integrity: parsed.integrity.slice(7, 19),
+              })
+            : t("installRequired", { component: reference })}
         </p>
       </div>
     </section>
@@ -156,6 +164,9 @@ function SandboxComponent({
   const parsed = readCustomBlockData(data);
   const iframe = useRef<HTMLIFrameElement>(null);
   const theme = useAppearanceTheme();
+  const t = useTranslator(messages);
+  const tc = useTranslator(common);
+  const locale = useLocale();
   const initialTheme = useRef(theme);
   const [channel] = useState(() => crypto.randomUUID());
   const [height, setHeight] = useState(180);
@@ -200,13 +211,11 @@ function SandboxComponent({
     try {
       next = JSON.parse(draft);
     } catch (error) {
-      setDraftError(
-        error instanceof Error ? error.message : "JSON 格式不正确。",
-      );
+      setDraftError(error instanceof Error ? error.message : t("invalidJson"));
       return;
     }
     if (!jsonObject(next)) {
-      setDraftError("组件数据必须是有效的 JSON 对象。");
+      setDraftError(t("notJsonObject"));
       return;
     }
     try {
@@ -216,11 +225,11 @@ function SandboxComponent({
         CAPACITY.componentPropsBytes,
       );
     } catch (error) {
-      setDraftError(error instanceof Error ? error.message : "组件数据超限。");
+      setDraftError(error instanceof Error ? error.message : t("dataTooLarge"));
       return;
     }
     if (JSON.stringify(latest.current.parsed.props) !== draftBase.current) {
-      setDraftError("组件数据已更新，请重新打开编辑后再修改。");
+      setDraftError(t("dataChanged"));
       return;
     }
     cancelValidation();
@@ -229,7 +238,7 @@ function SandboxComponent({
     const timeout = window.setTimeout(() => {
       pendingValidation.current = null;
       setValidating(false);
-      setDraftError("组件未响应数据校验，请重新加载组件后再试。");
+      setDraftError(t("validationTimeout"));
     }, 5000);
     pendingValidation.current = { id, props: next, timeout };
     setValidating(true);
@@ -246,11 +255,12 @@ function SandboxComponent({
       policy +
       injectComponentBootstrap(
         component.html,
-        `<style>body{color:var(--text)}</style><script>(${installComponentActivity.toString()})(${safeJson(channel)});(${installSandboxTheme.toString()})(${safeJson(channel)},${safeJson(initialTheme.current)},${safeJson(appearanceTokens())});</script><script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current })}</script>`,
+        // Built-in blocks compiled into the package start in the workbench language.
+        `<style>body{color:var(--text)}</style><script>document.documentElement.lang=document.documentElement.dataset.showaiLocale=${safeJson(locale)};(${installComponentActivity.toString()})(${safeJson(channel)});(${installSandboxTheme.toString()})(${safeJson(channel)},${safeJson(initialTheme.current)},${safeJson(appearanceTokens())});</script><script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current })}</script>`,
       ) +
       `<script>(${installIconTooltips.toString()})(document);(${installComponentLinks.toString()})(${safeJson(channel)});</script>`
     );
-  }, [component.html, channel]);
+  }, [component.html, channel, locale]);
 
   const sendProps = () => {
     const current = latest.current;
@@ -301,7 +311,9 @@ function SandboxComponent({
       )
         setHeight(Math.min(4000, Math.max(48, Math.ceil(event.data.height))));
       if (event.data.type === "showai:error")
-        setError(String(event.data.message || "组件无法显示。").slice(0, 500));
+        setError(
+          String(event.data.message || t("cannotDisplay")).slice(0, 500),
+        );
       if (event.data.type === "showai:valid") setError("");
       if (
         ["showai:viewport-lock-get", "showai:viewport-lock-set"].includes(
@@ -322,7 +334,7 @@ function SandboxComponent({
             writeViewportLock(key, event.data.locked);
           locked = readViewportLock(key);
         } catch (caught) {
-          error = `无法保存阅读锁状态：${String(caught)}`;
+          error = t("viewportLockFailed", { error: String(caught) });
         }
         iframe.current?.contentWindow?.postMessage(
           { channel, type: "showai:viewport-lock-state", scope, locked, error },
@@ -377,13 +389,10 @@ function SandboxComponent({
         cancelValidation();
         if (event.data.valid !== true) {
           setDraftError(
-            String(event.data.message || "数据不符合组件的属性要求。").slice(
-              0,
-              1000,
-            ),
+            String(event.data.message || t("invalidProps")).slice(0, 1000),
           );
         } else if (JSON.stringify(current.parsed.props) !== draftBase.current) {
-          setDraftError("组件数据已更新，请重新打开编辑后再修改。");
+          setDraftError(t("dataChanged"));
         } else if (!current.readOnly && current.onChange) {
           current.onChange({ ...current.data, props: pending.props });
           closeEditor();
@@ -403,7 +412,7 @@ function SandboxComponent({
           );
         } catch (error) {
           setDraftError(
-            error instanceof Error ? error.message : "组件数据超限。",
+            error instanceof Error ? error.message : t("dataTooLarge"),
           );
           return;
         }
@@ -442,8 +451,8 @@ function SandboxComponent({
           ref={settingsButton}
           type="button"
           className="custom-props-trigger"
-          aria-label="编辑组件数据"
-          title="编辑组件数据"
+          aria-label={t("editData")}
+          title={t("editData")}
           onClick={openEditor}
         >
           <Settings2 size={15} />
@@ -459,10 +468,10 @@ function SandboxComponent({
             }
           }}
         >
-          <label htmlFor={`${channel}-props`}>组件数据</label>
+          <label htmlFor={`${channel}-props`}>{t("data")}</label>
           <textarea
             id={`${channel}-props`}
-            aria-label="组件属性 JSON"
+            aria-label={t("propsJson")}
             value={draft}
             spellCheck={false}
             rows={Math.max(5, Math.min(14, draft.split("\n").length))}
@@ -480,10 +489,10 @@ function SandboxComponent({
           )}
           <div className="custom-props-actions">
             <button type="button" onClick={closeEditor}>
-              取消
+              {tc("cancel")}
             </button>
             <button type="button" disabled={validating} onClick={saveDraft}>
-              {validating ? "校验中…" : "应用"}
+              {validating ? t("validating") : t("apply")}
             </button>
           </div>
         </div>

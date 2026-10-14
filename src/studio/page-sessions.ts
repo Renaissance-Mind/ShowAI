@@ -7,6 +7,12 @@ import {
 } from "./page-session";
 import type { SurfaceEditorState } from "../surface/SurfaceEditor";
 import type { WorkspaceEditorState } from "../editor/workspace-editor";
+import { translator } from "../i18n";
+import commonMessages from "../i18n/messages/common";
+import pageSessionMessages from "../i18n/messages/pageSession";
+
+const t = translator(pageSessionMessages);
+const common = translator(commonMessages);
 
 export interface PageViewSession {
   key: string;
@@ -83,7 +89,7 @@ export class PageSessions {
             {
               projectId: state.projectId,
               pageId: state.draft.id,
-              title: state.draft.title || "无标题",
+              title: state.draft.title || common("untitled"),
               error: state.error,
             },
           ]
@@ -104,7 +110,7 @@ export class PageSessions {
         (session) => session.isDirty() && !session.isDurable(),
       )
     )
-      throw new Error("切换内容库前需要可靠保留所有页面草稿。");
+      throw new Error(t("keepDraftsBeforeSwitch"));
     for (const session of new Set(this.pages.values())) session.dispose();
     this.pages.clear();
     this.viewStates.clear();

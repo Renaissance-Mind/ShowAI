@@ -23,6 +23,10 @@ import {
 } from "./accounts";
 import { verify } from "../server/account-crypto";
 import { serverFetch as fetch } from "./server-fetch";
+import { translator } from "../i18n";
+import syncEngineMessages from "../i18n/messages/syncEngine";
+
+const t = translator(syncEngineMessages);
 
 interface Adapter {
   home: string;
@@ -69,7 +73,7 @@ export async function accountRequest<T>(
     throw new SyncError(
       response.status,
       value.error?.code ?? "SERVER_ERROR",
-      value.error?.message ?? `服务器返回 ${response.status}`,
+      value.error?.message ?? t("server.status", { status: response.status }),
       value.error?.details,
     );
   return value as T;
@@ -132,9 +136,10 @@ export class AccountManager {
     const connection = (await this.adapter.configuration()).connections.find(
       (item) => item.id === id,
     );
-    if (!connection) throw new CoreError("NOT_FOUND", "服务器账号连接不存在。");
+    if (!connection)
+      throw new CoreError("NOT_FOUND", t("account.connectionMissing"));
     if (!connection.capabilities?.includes(accountCapability))
-      throw new CoreError("INVALID_DATA", "此服务器尚未启用账号绑定。");
+      throw new CoreError("INVALID_DATA", t("account.bindingDisabled"));
     return connection;
   }
   private async own(connection: ServerConnection) {
@@ -153,7 +158,7 @@ export class AccountManager {
         descriptor.signature,
       ))
     )
-      throw new CoreError("INVALID_DATA", "服务器返回的账号身份不匹配。");
+      throw new CoreError("INVALID_DATA", t("account.identityMismatch"));
     return descriptor;
   }
   async profile(connectionId: string) {
@@ -167,7 +172,7 @@ export class AccountManager {
       (profile.own.identity.serverId !== connection.serverId ||
         profile.own.identity.user.id !== connection.user.id)
     )
-      throw new CoreError("INVALID_DATA", "服务器返回的账号身份不匹配。");
+      throw new CoreError("INVALID_DATA", t("account.identityMismatch"));
     return profile;
   }
   private async exclusive<T>(action: () => Promise<T>) {
@@ -240,14 +245,11 @@ export class AccountManager {
   }
   private async bindGroup(firstId: string, secondId: string) {
     if (firstId === secondId)
-      throw new CoreError("INVALID_DATA", "请选择两个不同服务的账号。");
+      throw new CoreError("INVALID_DATA", t("account.chooseDifferentServices"));
     const first = await this.connection(firstId),
       second = await this.connection(secondId);
     if (first.serverId === second.serverId)
-      throw new CoreError(
-        "CONFLICT",
-        "同一服务器上的不同账号不能绑定为同一个账号。",
-      );
+      throw new CoreError("CONFLICT", t("account.sameServerAccounts"));
     const [a, b] = await Promise.all([this.own(first), this.own(second)]);
     const profiles = await Promise.all([
       this.profile(first.id),
@@ -271,10 +273,7 @@ export class AccountManager {
           previous.generation !== identity.generation ||
           canonical(previous.publicKey) !== canonical(identity.publicKey))
       )
-        throw new CoreError(
-          "CONFLICT",
-          "两组绑定包含同一服务器的不同账号或身份，请先解除冲突的绑定。",
-        );
+        throw new CoreError("CONFLICT", t("account.bindingConflict"));
       identities.set(identity.serverId, descriptor);
     }
     await this.update((state) => {
@@ -375,7 +374,7 @@ export class AccountManager {
               (me.serverId !== identity.serverId ||
                 me.user.id !== identity.user.id)
             )
-              throw new Error("绑定服务器的身份发生变化。");
+              throw new Error(t("account.boundIdentityChanged"));
             if (!me) existing = undefined;
           }
           if (!existing) {
@@ -384,7 +383,7 @@ export class AccountManager {
               "/api/info",
             );
             if (info.serverId !== identity.serverId)
-              throw new Error("绑定服务器的身份发生变化。");
+              throw new Error(t("account.boundIdentityChanged"));
             const grant = await accountRequest<SignedGrant>(
               source,
               "/api/account/grants",
@@ -409,7 +408,7 @@ export class AccountManager {
               session.serverId !== identity.serverId ||
               session.user.id !== identity.user.id
             )
-              throw new Error("恢复的账号与绑定身份不一致。");
+              throw new Error(t("account.restoredMismatch"));
             const result = await this.adapter.connect({
               url: identity.url,
               token: session.token,
@@ -427,8 +426,7 @@ export class AccountManager {
             // Respect a sign-out made on that server instead of undoing it.
             await this.signOut(identity.serverId, identity.user.id);
             await this.update((state) => {
-              state.errors[peerKey] =
-                "此设备在该服务器上的登录已被注销，请重新登录。";
+              state.errors[peerKey] = t("account.signedOutHere");
             });
             continue;
           }
@@ -535,7 +533,7 @@ export class AccountManager {
           item.state === "active",
       );
     if (!target || !profile.own)
-      throw new CoreError("NOT_FOUND", "绑定不存在。");
+      throw new CoreError("NOT_FOUND", t("account.bindingMissing"));
     const connections = (await this.adapter.configuration()).connections;
     const members = [
       profile.own,
@@ -605,7 +603,7 @@ export class AccountManager {
           )
             throw new CoreError(
               "INVALID_DATA",
-              "资源的服务器或账号来源不匹配。",
+              t("account.resourceSourceMismatch"),
             );
           result.push({
             ...resource,

@@ -14,6 +14,8 @@ import {
 } from "@tiptap/react";
 import { ChevronRight } from "../../ui/icons";
 import { RichTextEnvironment } from "./environment";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/richText";
 
 export function WidgetView({
   node,
@@ -77,6 +79,7 @@ const icons = ["💡", "🌱", "📌", "✨", "⚠️", "🔎"];
 const tones = ["sage", "sand", "blue", "rose"];
 
 export function CalloutView({ node, updateAttributes, editor }: NodeViewProps) {
+  const t = useTranslator(messages);
   const editable = useEditorState({
     editor,
     selector: ({ editor: current }) => current.isEditable,
@@ -90,8 +93,8 @@ export function CalloutView({ node, updateAttributes, editor }: NodeViewProps) {
         <button
           className="callout-icon"
           disabled={!editable}
-          title="更换图标"
-          aria-label="更换提示图标"
+          title={t("callout.changeIcon")}
+          aria-label={t("callout.changeIconLabel")}
           onClick={() =>
             updateAttributes({
               icon: icons[(icons.indexOf(node.attrs.icon) + 1) % icons.length],
@@ -103,8 +106,8 @@ export function CalloutView({ node, updateAttributes, editor }: NodeViewProps) {
         {editable && (
           <button
             className="callout-color"
-            title="更换背景色"
-            aria-label="更换提示背景色"
+            title={t("callout.changeColor")}
+            aria-label={t("callout.changeColorLabel")}
             onClick={() =>
               updateAttributes({
                 tone: tones[
@@ -121,6 +124,7 @@ export function CalloutView({ node, updateAttributes, editor }: NodeViewProps) {
 }
 
 export function ToggleView({ node, updateAttributes, editor }: NodeViewProps) {
+  const t = useTranslator(messages);
   const editable = useEditorState({
     editor,
     selector: ({ editor: current }) => current.isEditable,
@@ -134,7 +138,7 @@ export function ToggleView({ node, updateAttributes, editor }: NodeViewProps) {
     >
       <div className="toggle-heading" contentEditable={false}>
         <button
-          aria-label={open ? "收起内容" : "展开内容"}
+          aria-label={open ? t("toggle.collapse") : t("toggle.expand")}
           aria-expanded={open}
           onClick={() => {
             setOpen(!open);
@@ -145,12 +149,12 @@ export function ToggleView({ node, updateAttributes, editor }: NodeViewProps) {
         </button>
         {editable ? (
           <input
-            aria-label="折叠块标题"
+            aria-label={t("toggle.titleLabel")}
             value={node.attrs.title}
             onChange={(event) =>
               updateAttributes({ title: event.target.value })
             }
-            placeholder="折叠标题"
+            placeholder={t("toggle.titlePlaceholder")}
           />
         ) : (
           <span>{node.attrs.title}</span>
@@ -169,6 +173,7 @@ export function MathView({
   editor,
   selected,
 }: NodeViewProps) {
+  const t = useTranslator(messages);
   const display = node.type.name === "mathBlock" || node.attrs.display;
   return (
     <NodeViewWrapper
@@ -183,7 +188,7 @@ export function MathView({
       />
       {selected && editor.isEditable && (
         <input
-          aria-label="公式源码"
+          aria-label={t("math.source")}
           value={node.attrs.latex}
           onChange={(event) => updateAttributes({ latex: event.target.value })}
           onKeyDown={(event) => {

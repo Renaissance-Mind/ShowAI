@@ -2,6 +2,10 @@ import { Fragment, useMemo, useState } from "react";
 import type { BlockProps } from "./types";
 import { differingRows } from "./analysis-contract.mjs";
 import "./analysis.css";
+import { blockLabel } from "./shared";
+import type { MessageKey } from "../../i18n";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/analysis";
 
 type Tone = "yes" | "no" | "partial" | "neutral" | "na";
 type Row = { id: string; label: string; hint?: string; group?: string };
@@ -35,15 +39,16 @@ const MARKS: Record<Tone, string> = {
   neutral: "•",
   na: "",
 };
-const LEGEND: Record<Tone, string> = {
-  yes: "采用 / 满足",
-  no: "不采用 / 不满足",
-  partial: "部分或有改动",
-  neutral: "中性说明",
-  na: "未涉及",
+const LEGEND: Record<Tone, MessageKey<typeof messages>> = {
+  yes: "matrix.legend.yes",
+  no: "matrix.legend.no",
+  partial: "matrix.legend.partial",
+  neutral: "matrix.legend.neutral",
+  na: "matrix.legend.na",
 };
 
 export function ComparisonMatrixBlock({ data }: BlockProps) {
+  const t = useTranslator(messages);
   const model = data as unknown as Matrix;
   const [focus, setFocus] = useState<string | null>(null);
   const [diffOnly, setDiffOnly] = useState(false);
@@ -73,7 +78,7 @@ export function ComparisonMatrixBlock({ data }: BlockProps) {
   return (
     <section
       className="sb-block an-block"
-      aria-label={model.title ?? "对比矩阵"}
+      aria-label={blockLabel(model.title, t("matrix.title"))}
     >
       <div className="an-head">
         {model.title && <h3 className="an-title">{model.title}</h3>}
@@ -85,7 +90,10 @@ export function ComparisonMatrixBlock({ data }: BlockProps) {
             aria-pressed={diffOnly}
             onClick={() => setDiffOnly((value) => !value)}
           >
-            只看差异 {differing.size}/{model.rows.length}
+            {t("matrix.diffOnly", {
+              count: differing.size,
+              total: model.rows.length,
+            })}
           </button>
           {focus && (
             <button
@@ -93,7 +101,7 @@ export function ComparisonMatrixBlock({ data }: BlockProps) {
               className="an-chip"
               onClick={() => setFocus(null)}
             >
-              取消聚焦
+              {t("matrix.clearFocus")}
             </button>
           )}
         </div>
@@ -103,7 +111,7 @@ export function ComparisonMatrixBlock({ data }: BlockProps) {
           <thead>
             <tr>
               <th className="an-rowhead" scope="col">
-                维度
+                {t("matrix.dimension")}
               </th>
               {model.columns.map((column) => (
                 <th key={column.id} scope="col" className={columnClass(column)}>
@@ -127,7 +135,7 @@ export function ComparisonMatrixBlock({ data }: BlockProps) {
                       rel="noreferrer"
                       className="an-col-note"
                     >
-                      来源 ↗
+                      {t("matrix.source")}
                     </a>
                   )}
                 </th>
@@ -138,7 +146,7 @@ export function ComparisonMatrixBlock({ data }: BlockProps) {
             {rows.length === 0 && (
               <tr>
                 <td colSpan={model.columns.length + 1} className="an-empty">
-                  所有维度在各列之间都相同。
+                  {t("matrix.allSame")}
                 </td>
               </tr>
             )}
@@ -181,7 +189,7 @@ export function ComparisonMatrixBlock({ data }: BlockProps) {
                               {cell?.text ??
                                 (tone === "na"
                                   ? "—"
-                                  : (model.legend?.[tone] ?? LEGEND[tone]))}
+                                  : (model.legend?.[tone] ?? t(LEGEND[tone])))}
                             </span>
                           </span>
                           {noteIndex > 0 && (
@@ -201,17 +209,21 @@ export function ComparisonMatrixBlock({ data }: BlockProps) {
         {tones.map((tone) => (
           <span key={tone} className={`an-tone-${tone}`}>
             {MARKS[tone] ? <b>{MARKS[tone]}</b> : "—"}{" "}
-            {model.legend?.[tone] ?? LEGEND[tone]}
+            {model.legend?.[tone] ?? t(LEGEND[tone])}
           </span>
         ))}
-        <span>点击列头可聚焦一列</span>
+        <span>{t("matrix.focusHint")}</span>
       </div>
       {notes.length > 0 && (
-        <ol className="an-static" aria-label="注释">
+        <ol className="an-static" aria-label={t("matrix.notes")}>
           {notes.map((cell) => (
             <li key={`${cell.row}-${cell.column}`}>
-              {model.columns.find((c) => c.id === cell.column)?.label} ·{" "}
-              {model.rows.find((r) => r.id === cell.row)?.label}：{cell.note}
+              {t("matrix.note", {
+                column:
+                  model.columns.find((c) => c.id === cell.column)?.label ?? "",
+                row: model.rows.find((r) => r.id === cell.row)?.label ?? "",
+                note: cell.note ?? "",
+              })}
             </li>
           ))}
         </ol>

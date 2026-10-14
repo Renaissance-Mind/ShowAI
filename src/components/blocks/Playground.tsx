@@ -4,6 +4,10 @@ import { Check, FlaskConical, Plus, RotateCcw, Trash2 } from "../../ui/icons";
 import { finite, text, uid } from "./helpers";
 import { BlockHeader, Field } from "./shared";
 import type { BlockProps } from "./types";
+import { getLocale, type MessageKey } from "../../i18n";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/playground";
+import common from "../../i18n/messages/common";
 
 interface Parameter {
   id: string;
@@ -14,10 +18,19 @@ interface Parameter {
   value: number;
   unit?: string;
 }
-const OPERATIONS = [
-  { value: "sum", label: "求和" },
-  { value: "product", label: "乘积" },
-  { value: "average", label: "平均值" },
+const OPERATIONS: { value: string; label: MessageKey<typeof messages> }[] = [
+  { value: "sum", label: "operation.sum" },
+  { value: "product", label: "operation.product" },
+  { value: "average", label: "operation.average" },
+];
+const LIMITS: {
+  key: "min" | "max" | "step" | "value";
+  label: MessageKey<typeof messages>;
+}[] = [
+  { key: "min", label: "min" },
+  { key: "max", label: "max" },
+  { key: "step", label: "step" },
+  { key: "value", label: "initial" },
 ];
 export function calculate(inputs: number[], operation: string): number {
   if (!inputs.length) return 0;
@@ -28,6 +41,8 @@ export function calculate(inputs: number[], operation: string): number {
 }
 export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
   const controlId = useId();
+  const t = useTranslator(messages);
+  const tc = useTranslator(common);
   const inputs: Parameter[] = Array.isArray(data.inputs) ? data.inputs : [];
   const [values, setValues] = useState<Record<string, number>>({});
   const [editing, setEditing] = useState(false);
@@ -50,14 +65,14 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
     text(data.operation, "sum"),
   );
   const formattedResult = Number.isFinite(result)
-    ? new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 4 }).format(
+    ? new Intl.NumberFormat(getLocale(), { maximumFractionDigits: 4 }).format(
         result,
       )
-    : "超出数值范围";
+    : t("outOfRange");
   const openEditor = () => {
     setDraft({
-      title: text(data.title, "交互计算"),
-      resultLabel: text(data.resultLabel, "计算结果"),
+      title: text(data.title, t("defaultTitle")),
+      resultLabel: text(data.resultLabel, t("defaultResult")),
       unit: text(data.unit),
       operation: text(data.operation, "sum"),
     });
@@ -77,7 +92,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
           input.step <= 0,
       )
     ) {
-      setError("每个参数需要名称，最大值须大于最小值，步长须大于 0。");
+      setError(t("invalidInputs"));
       return;
     }
     onChange?.({
@@ -100,11 +115,11 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
   return (
     <section
       className="sb-block sb-playground"
-      aria-label={text(data.title) || "交互计算"}
+      aria-label={text(data.title) || t("defaultTitle")}
     >
       <BlockHeader
         title={text(data.title)}
-        defaultTitle="交互计算"
+        defaultTitle={t("defaultTitle")}
         description={text(data.description)}
         icon={<FlaskConical size={17} />}
         editable={editable}
@@ -114,8 +129,8 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
         <button
           type="button"
           className="sb-icon-button"
-          aria-label="重置参数"
-          title="重置参数"
+          aria-label={t("reset")}
+          title={t("reset")}
           onClick={() => setValues({})}
         >
           <RotateCcw size={15} />
@@ -125,7 +140,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
         <BlockSettings>
           <div className="sb-editor-panel">
             <div className="sb-form-row">
-              <Field label="标题">
+              <Field label={t("title")}>
                 <input
                   value={draft.title}
                   onChange={(event) =>
@@ -136,7 +151,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
                   }
                 />
               </Field>
-              <Field label="计算方式">
+              <Field label={t("operation")}>
                 <select
                   value={draft.operation}
                   onChange={(event) =>
@@ -148,14 +163,14 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
                 >
                   {OPERATIONS.map((operation) => (
                     <option key={operation.value} value={operation.value}>
-                      {operation.label}
+                      {t(operation.label)}
                     </option>
                   ))}
                 </select>
               </Field>
             </div>
             <div className="sb-form-row">
-              <Field label="结果名称">
+              <Field label={t("resultLabel")}>
                 <input
                   value={draft.resultLabel}
                   onChange={(event) =>
@@ -166,7 +181,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
                   }
                 />
               </Field>
-              <Field label="结果单位">
+              <Field label={t("resultUnit")}>
                 <input
                   value={draft.unit}
                   onChange={(event) =>
@@ -181,7 +196,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
             {draftInputs.map((input, index) => (
               <div className="sb-parameter-editor" key={input.id}>
                 <div className="sb-form-row">
-                  <Field label="参数名称">
+                  <Field label={t("parameterName")}>
                     <input
                       value={input.label}
                       onChange={(event) =>
@@ -189,7 +204,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
                       }
                     />
                   </Field>
-                  <Field label="单位">
+                  <Field label={t("unit")}>
                     <input
                       value={input.unit ?? ""}
                       onChange={(event) =>
@@ -200,7 +215,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
                   <button
                     type="button"
                     className="sb-icon-button sb-danger"
-                    aria-label={`删除参数${input.label}`}
+                    aria-label={t("deleteParameter", { label: input.label })}
                     onClick={() =>
                       setDraftInputs((current) =>
                         current.filter(
@@ -213,27 +228,22 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
                   </button>
                 </div>
                 <div className="sb-form-row">
-                  {(["min", "max", "step", "value"] as const).map(
-                    (key, keyIndex) => (
-                      <Field
-                        key={key}
-                        label={["最小值", "最大值", "步长", "初始值"][keyIndex]}
-                      >
-                        <input
-                          type="number"
-                          value={input[key]}
-                          onChange={(event) =>
-                            updateDraftInput(index, {
-                              [key]:
-                                event.target.value === ""
-                                  ? 0
-                                  : Number(event.target.value),
-                            })
-                          }
-                        />
-                      </Field>
-                    ),
-                  )}
+                  {LIMITS.map(({ key, label }) => (
+                    <Field key={key} label={t(label)}>
+                      <input
+                        type="number"
+                        value={input[key]}
+                        onChange={(event) =>
+                          updateDraftInput(index, {
+                            [key]:
+                              event.target.value === ""
+                                ? 0
+                                : Number(event.target.value),
+                          })
+                        }
+                      />
+                    </Field>
+                  ))}
                 </div>
               </div>
             ))}
@@ -251,7 +261,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
                     ...current,
                     {
                       id: uid(),
-                      label: "新参数",
+                      label: t("newParameter"),
                       min: 0,
                       max: 100,
                       step: 1,
@@ -261,7 +271,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
                 }
               >
                 <Plus size={14} />
-                添加参数
+                {t("addParameter")}
               </button>
               <button
                 type="button"
@@ -269,7 +279,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
                 onClick={save}
               >
                 <Check size={14} />
-                保存
+                {tc("save")}
               </button>
             </div>
           </div>
@@ -286,7 +296,7 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
                   </label>
                   <div>
                     <input
-                      aria-label={`${input.label}数值`}
+                      aria-label={t("parameterValue", { label: input.label })}
                       type="number"
                       min={input.min}
                       max={input.max}
@@ -341,21 +351,21 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
           ) : (
             <div className="sb-empty">
               <FlaskConical size={26} />
-              <strong>试着改变一个变量</strong>
+              <strong>{t("emptyTitle")}</strong>
               {editable && !editing && (
                 <button
                   type="button"
                   className="sb-button"
                   onClick={openEditor}
                 >
-                  设置参数
+                  {t("setUp")}
                 </button>
               )}
             </div>
           )}
         </div>
         <div className="sb-calculation-result">
-          <span>{text(data.resultLabel, "计算结果")}</span>
+          <span>{text(data.resultLabel, t("defaultResult"))}</span>
           <strong aria-live="polite">
             {formattedResult}
             <small>{text(data.unit)}</small>
@@ -365,8 +375,10 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
               ? inputs
                   .map((input) => input.label)
                   .join(data.operation === "product" ? " × " : " + ") +
-                (data.operation === "average" ? `，÷ ${inputs.length}` : "")
-              : "等待设置参数"}
+                (data.operation === "average"
+                  ? t("averageSuffix", { count: inputs.length })
+                  : "")
+              : t("waiting")}
           </span>
         </div>
       </div>

@@ -7,6 +7,7 @@ export default async function draw(context) {
   const Math = context.math;
   // 需要精确对比的数据示例
   const data = [];
+  // i18n-exempt: upstream sample data
   const categories = ["产品A", "产品B", "产品C", "产品D"];
   categories.forEach((category, index) => {
     for (let month = 1; month <= 12; month++) {

@@ -1,6 +1,11 @@
 import { useContext, useEffect, useRef, useSyncExternalStore } from "react";
 import { EditorViewScope } from "../editor/view-scope";
+import { fingerNavigatesBoard } from "./board-input.mjs";
 import { GESTURE_IDLE, normalizedWheel, zoomAt, type Camera } from "./model";
+import { translator } from "../i18n";
+import messages from "../i18n/messages/surface";
+
+const t = translator(messages);
 import {
   clamp,
   nearestSnap,
@@ -200,7 +205,7 @@ export function useSurfaceViewport(
           const rect = element.getBoundingClientRect();
           return {
             id: element.dataset.surfaceId!,
-            label: element.dataset.surfaceName || "内容区域",
+            label: element.dataset.surfaceName || t("node.region"),
             x: (rect.left - base.left) / scale,
             y: (rect.top - base.top) / scale,
             width: rect.width / scale,
@@ -284,7 +289,7 @@ export function useSurfaceViewport(
         scale = camera.current.scale;
       return {
         id,
-        label: "内容",
+        label: t("node.content"),
         x: (rect.left - base.left) / scale,
         y: (rect.top - base.top) / scale,
         width: rect.width / scale,
@@ -578,11 +583,14 @@ export function useSurfaceViewport(
       };
     };
     const down = (event: PointerEvent) => {
+      const panTool = root.dataset.boardTool === "pan";
       if (
         !ownsInput(event.target) ||
         event.defaultPrevented ||
-        (event.target as Element).closest('[data-drawing-active="true"]') ||
+        (!fingerNavigatesBoard(event.pointerType) &&
+          (event.target as Element).closest('[data-drawing-active="true"]')) ||
         ((event.target as Element).closest("[data-board-drawing-input]") &&
+          !fingerNavigatesBoard(event.pointerType) &&
           event.button !== 1 &&
           !space)
       )
@@ -592,6 +600,7 @@ export function useSurfaceViewport(
       if (
         target.closest("[data-surface-handle]") &&
         !space &&
+        !panTool &&
         event.button !== 1
       ) {
         if (event.button === 0) {
@@ -603,6 +612,7 @@ export function useSurfaceViewport(
       if (
         target.closest('[data-surface-gesture="own"], .react-flow') ||
         (!space &&
+          !panTool &&
           event.button !== 1 &&
           target.closest("[data-surface-ui], [data-surface-handle]"))
       )
@@ -630,11 +640,18 @@ export function useSurfaceViewport(
         event.button > 1 ||
         (interactive(target) &&
           !touchReading &&
-          !(event.button === 1 || (space && !editable(target))))
+          !(event.button === 1 || ((space || panTool) && !editable(target))))
       )
         return;
       const background = !target.closest("[data-surface-content]");
-      if (!background && !touchReading && !space && event.button !== 1) return;
+      if (
+        !background &&
+        !touchReading &&
+        !space &&
+        !panTool &&
+        event.button !== 1
+      )
+        return;
       if (!touch) {
         event.preventDefault();
         root.focus({ preventScroll: true });

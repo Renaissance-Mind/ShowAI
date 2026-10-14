@@ -13,6 +13,8 @@ import {
 import PageIcon from "../components/PageIcon";
 import { currentEntry, type WorkspaceTabsState } from "./workspace-tabs";
 import "./workspace-tabs.css";
+import { useTranslator } from "../i18n/react";
+import sidebarMessages from "../i18n/messages/sidebar";
 
 export function WorkspaceHistory({
   busy,
@@ -25,12 +27,13 @@ export function WorkspaceHistory({
   canForward: boolean;
   onStep: (offset: number) => void;
 }) {
+  const t = useTranslator(sidebarMessages);
   return (
-    <div className="studio-tab-history" aria-label="标签页浏览历史">
+    <div className="studio-tab-history" aria-label={t("tabHistory")}>
       <button
         type="button"
-        aria-label="后退"
-        title="后退"
+        aria-label={t("back")}
+        title={t("back")}
         disabled={busy || !canBack}
         onClick={() => onStep(-1)}
       >
@@ -38,8 +41,8 @@ export function WorkspaceHistory({
       </button>
       <button
         type="button"
-        aria-label="前进"
-        title="前进"
+        aria-label={t("forward")}
+        title={t("forward")}
         disabled={busy || !canForward}
         onClick={() => onStep(1)}
       >
@@ -62,6 +65,7 @@ export default function WorkspaceTabs({
   onClose: (id: string) => void;
   onAdd: () => void;
 }) {
+  const t = useTranslator(sidebarMessages);
   const list = useRef<HTMLDivElement>(null);
   const restoreFocus = useRef(false);
   useEffect(() => {
@@ -83,7 +87,7 @@ export default function WorkspaceTabs({
         ref={list}
         className="studio-tabs"
         role="tablist"
-        aria-label="工作区标签页"
+        aria-label={t("workspaceTabs")}
       >
         {tabs.map((tab, index) => {
           const entry = currentEntry(tab);
@@ -158,8 +162,8 @@ export default function WorkspaceTabs({
                 className="studio-tab-close"
                 tabIndex={active ? 0 : -1}
                 disabled={busy}
-                aria-label={`关闭标签页 ${entry.title}`}
-                title="关闭标签页"
+                aria-label={t("closeTabNamed", { title: entry.title })}
+                title={t("closeTab")}
                 onClick={() => {
                   restoreFocus.current = true;
                   onClose(tab.id);
@@ -175,8 +179,8 @@ export default function WorkspaceTabs({
         type="button"
         className="studio-tab-add"
         disabled={busy}
-        aria-label="新建标签页"
-        title="新建标签页 · ⌘T / Ctrl+T"
+        aria-label={t("newTab")}
+        title={t("newTabShortcut")}
         onClick={() => {
           restoreFocus.current = true;
           onAdd();

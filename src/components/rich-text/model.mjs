@@ -11,11 +11,12 @@ export const richTextFormats = [
   "textStyle",
 ];
 export const richTextAlignments = ["left", "center", "right", "justify"];
+// Editors label these by value from their own message catalog.
 export const richTextFonts = [
-  { label: "默认字体", value: "" },
-  { label: "无衬线", value: "sans-serif" },
-  { label: "衬线", value: "serif" },
-  { label: "等宽", value: "monospace" },
+  { value: "" },
+  { value: "sans-serif" },
+  { value: "serif" },
+  { value: "monospace" },
 ];
 const decodeText = (value) =>
   value.replace(

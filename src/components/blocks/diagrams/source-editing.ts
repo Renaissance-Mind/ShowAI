@@ -1,3 +1,8 @@
+import { translator } from "../../../i18n";
+import messages from "../../../i18n/messages/diagram";
+
+const t = translator(messages);
+
 /** Parse inert SVG only. HTML scripts and hosted resources never enter the app DOM. */
 export function svgSource(source: string): string {
   const container = source.search(
@@ -5,7 +10,7 @@ export function svgSource(source: string): string {
   );
   const rest = source.slice(container < 0 ? 0 : container);
   const start = rest.search(/<svg\b/i);
-  if (start < 0) throw new Error("图形源码缺少完整的 SVG。");
+  if (start < 0) throw new Error(t("error.missingSvg"));
   const svg = rest.slice(start);
   const tags =
     /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\/?svg\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi;
@@ -16,7 +21,7 @@ export function svgSource(source: string): string {
     else if (!/\/\s*>$/.test(match[0])) depth++;
     if (depth === 0) return svg.slice(0, match.index! + match[0].length);
   }
-  throw new Error("图形源码缺少完整的 SVG。");
+  throw new Error(t("error.missingSvg"));
 }
 
 export function namespacedSvg(source: string) {
@@ -35,8 +40,7 @@ export function namespacedSvg(source: string) {
 function svgDocument(source: string) {
   const svg = namespacedSvg(source);
   const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
-  if (doc.querySelector("parsererror"))
-    throw new Error("SVG 的 XML 结构不正确。");
+  if (doc.querySelector("parsererror")) throw new Error(t("error.invalidXml"));
   return doc;
 }
 
@@ -58,7 +62,7 @@ export function replaceDiagramLabels(source: string, labels: string[]): string {
   const doc = svgDocument(source);
   const elements = textElements(doc);
   if (labels.length !== elements.length)
-    throw new Error("图形结构已变化，请重新读取文字。");
+    throw new Error(t("error.structureChanged"));
   elements.forEach((element, i) => {
     const previous = element.textContent;
     if (previous === labels[i]) return;

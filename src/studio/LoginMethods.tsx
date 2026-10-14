@@ -1,15 +1,12 @@
 import { useEffect, useState } from "react";
 import { desktop, errorMessage } from "./bridge";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/sync";
 type LoginMethod = {
   provider: string;
   subject: string;
   email: string | null;
   created_at: string;
-};
-const providers: Record<string, string> = {
-  github: "GitHub",
-  google: "Google",
-  email: "邮箱",
 };
 /** Bound external login methods, so an unfamiliar one can be removed. */
 export default function LoginMethods({
@@ -19,6 +16,12 @@ export default function LoginMethods({
   connectionId: string;
   revision: number;
 }) {
+  const t = useTranslator(messages);
+  const providers: Record<string, string> = {
+    github: "GitHub",
+    google: "Google",
+    email: t("methods.email"),
+  };
   const [methods, setMethods] = useState<LoginMethod[] | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
@@ -37,10 +40,8 @@ export default function LoginMethods({
   if (!methods?.length) return null;
   return (
     <div>
-      <h3>已绑定的登录方式</h3>
-      <p className="settings-help">
-        不认识的登录方式应立即移除，并退出所有设备。移除需要最近 15 分钟内直接登录本服务器。
-      </p>
+      <h3>{t("methods.title")}</h3>
+      <p className="settings-help">{t("methods.help")}</p>
       {error && (
         <p role="alert" className="sync-error">
           {error}
@@ -56,7 +57,11 @@ export default function LoginMethods({
               {providers[method.provider] ?? method.provider}
               {method.email ? ` · ${method.email}` : ` · #${method.subject}`}
             </h3>
-            <p>添加于 {new Date(method.created_at).toLocaleString()}</p>
+            <p>
+              {t("methods.added", {
+                date: new Date(method.created_at).toLocaleString(),
+              })}
+            </p>
           </div>
           <button
             type="button"
@@ -76,7 +81,7 @@ export default function LoginMethods({
                 .finally(() => setBusy(false));
             }}
           >
-            移除
+            {t("methods.remove")}
           </button>
         </div>
       ))}

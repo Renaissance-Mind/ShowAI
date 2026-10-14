@@ -8,10 +8,15 @@ import {
   ArrowUpRight,
   PanelsTopLeft,
   ChevronDown,
+  Hand,
+  Eraser,
+  Lasso,
 } from "../ui/icons";
 import { boardTools } from "./board-tools";
 import type { BoardTool } from "./types";
 import "./board-tools.css";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/surface";
 
 const icons = [
   MousePointer2,
@@ -21,6 +26,9 @@ const icons = [
   Circle,
   ArrowUpRight,
   PanelsTopLeft,
+  Hand,
+  Eraser,
+  Lasso,
 ];
 
 export function BoardTools({
@@ -30,14 +38,20 @@ export function BoardTools({
   tool: BoardTool | null;
   onChange: (tool: BoardTool | null) => void;
 }) {
+  const t = useTranslator(messages);
   const [expanded, setExpanded] = useState(true);
   return (
-    <div className="board-tool-stack">
+    <div
+      className="board-tool-stack"
+      style={{ "--board-tool-count": boardTools.length } as React.CSSProperties}
+    >
       <div className="board-tool-shortcuts">
         <button
           type="button"
           className="board-tool-disclosure"
-          aria-label={expanded ? "收起快捷键" : "展开快捷键"}
+          aria-label={
+            expanded ? t("tool.hideShortcuts") : t("tool.showShortcuts")
+          }
           aria-expanded={expanded}
           onClick={() => setExpanded((value) => !value)}
         >
@@ -61,9 +75,9 @@ export function BoardTools({
             <button
               type="button"
               key={key}
-              aria-label={label}
+              aria-label={t(label)}
               aria-keyshortcuts={key}
-              title={`${label}（${key}）`}
+              title={t("tool.withShortcut", { label: t(label), key })}
               aria-pressed={tool === value}
               onClick={() => onChange(value)}
             >

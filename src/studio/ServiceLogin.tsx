@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { desktop, errorMessage } from "./bridge";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/sync";
 type Flow = {
   id: string;
   pollSecret: string;
@@ -19,6 +21,7 @@ export default function ServiceLogin({
   connectionId?: string;
   onConnected: (id: string) => Promise<void>;
 }) {
+  const t = useTranslator(messages);
   const [methods, setMethods] = useState<string[]>([]),
     [flow, setFlow] = useState<Flow | null>(null);
   const [email, setEmail] = useState(""),
@@ -76,7 +79,7 @@ export default function ServiceLogin({
     const poll = async () => {
       if (cancelled) return;
       if (Date.now() >= flow.expiresAt) {
-        setError("登录等待已过期，请重新发起。");
+        setError(t("login.expired"));
         setFlow(null);
         return;
       }
@@ -123,9 +126,7 @@ export default function ServiceLogin({
   return (
     <div className="sync-form">
       {connectionId && (
-        <p className="settings-help">
-          为当前账号添加登录方式。在浏览器完成授权并确认绑定后，可用该方式登录同一个账号。
-        </p>
+        <p className="settings-help">{t("login.addMethodHelp")}</p>
       )}
       {error && (
         <p role="alert" className="sync-error">
@@ -141,7 +142,7 @@ export default function ServiceLogin({
               disabled={busy || !!flow}
               onClick={() => void start("github")}
             >
-              {connectionId ? "添加 GitHub 登录方式" : "使用 GitHub 登录"}
+              {connectionId ? t("login.addGithub") : t("login.github")}
             </button>
           )}
           {methods.includes("google") && (
@@ -151,7 +152,7 @@ export default function ServiceLogin({
               disabled={busy || !!flow}
               onClick={() => void start("google")}
             >
-              {connectionId ? "添加 Google 登录方式" : "使用 Google 登录"}
+              {connectionId ? t("login.addGoogle") : t("login.google")}
             </button>
           )}
         </div>
@@ -159,18 +160,20 @@ export default function ServiceLogin({
       {flow?.url && !confirming && (
         <p className="settings-help">
           <a href={flow.url} target="_blank" rel="noopener noreferrer">
-            打开 {flow.provider === "github" ? "GitHub" : "Google"} 授权页面
+            {t("login.openAuthPage", {
+              provider: flow.provider === "github" ? "GitHub" : "Google",
+            })}
           </a>
-          ，完成后返回这里。正在等待登录…
+          {t("login.waiting")}
         </p>
       )}
       {flow?.url && confirming && (
         <>
           <p className="settings-help">
-            授权已完成。点击浏览器页面中的「在 ShowAI 中完成」，或输入页面显示的完成码。
+            {t("login.completeHelp")}
           </p>
           <label>
-            完成码
+            {t("login.completionCode")}
             <input
               autoComplete="one-time-code"
               maxLength={9}
@@ -194,14 +197,14 @@ export default function ServiceLogin({
                 .finally(() => setBusy(false));
             }}
           >
-            完成登录
+            {t("login.complete")}
           </button>
         </>
       )}
       {methods.includes("email") && !flow && (
         <>
           <label>
-            邮箱
+            {t("login.email")}
             <input
               type="email"
               value={email}
@@ -215,14 +218,14 @@ export default function ServiceLogin({
             disabled={busy || !email}
             onClick={() => void start("email")}
           >
-            发送登录验证码
+            {t("login.sendCode")}
           </button>
         </>
       )}
       {flow?.provider === "email" && (
         <>
           <label>
-            邮箱验证码
+            {t("login.code")}
             <input
               inputMode="numeric"
               autoComplete="one-time-code"
@@ -243,7 +246,7 @@ export default function ServiceLogin({
                 .finally(() => setBusy(false));
             }}
           >
-            确认邮箱登录
+            {t("login.confirmEmail")}
           </button>
         </>
       )}
@@ -257,7 +260,7 @@ export default function ServiceLogin({
             setConfirming(false);
           }}
         >
-          取消本次登录
+          {t("login.cancel")}
         </button>
       )}
     </div>

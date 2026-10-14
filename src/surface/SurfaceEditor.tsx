@@ -1,3 +1,4 @@
+import { applyInkUpdate } from "./inline-ink";
 import { SurfaceGeometryStore } from "./geometry-store";
 import type { EditorControls } from "./EditorControls";
 import { insertComponentAtText } from "./component-insertion";
@@ -54,7 +55,8 @@ function SurfaceEditor({
   onControlsChange,
   retainedState,
   inspectorHost,
-  onHandwriting,
+  inlineInkProjectId,
+  onInkSave,
 }: {
   document: ShowDocument;
   onChange: (document: ShowDocument) => void;
@@ -66,7 +68,8 @@ function SurfaceEditor({
   onControlsChange?: (controls: EditorControls | null) => void;
   retainedState?: SurfaceEditorState;
   inspectorHost?: HTMLElement | null;
-  onHandwriting?: (boardId: string, document: ShowDocument) => Promise<void>;
+  inlineInkProjectId?: string;
+  onInkSave?: () => Promise<boolean>;
 }) {
   const document = useMemo(
     () => (isResource(input) ? input : upgradeResource(input)),
@@ -199,8 +202,21 @@ function SurfaceEditor({
     },
     [settleGeometry],
   );
+  const inkSave = useRef(onInkSave);
+  inkSave.current = onInkSave;
+  useEffect(() => {
+    const bridge = window.showai?.inlineInk;
+    if (!bridge || !inlineInkProjectId || readOnly) return;
+    return bridge.bind(document.id, inlineInkProjectId, async (value) => {
+      if (latestReadOnly.current || current.current.id !== value.pageId)
+        return false;
+      commit(applyInkUpdate(current.current, value));
+      return (await inkSave.current?.()) ?? true;
+    });
+  }, [document.id, inlineInkProjectId, readOnly, commit]);
   const travel = useCallback(
-    (redo = false) => {
+    async (redo = false) => {
+      await window.showai?.inlineInk?.flush();
       geometrySettlement.current.generation++;
       const stack = history.current,
         source = redo ? stack.future : stack.past,
@@ -340,7 +356,7 @@ function SurfaceEditor({
                     });
                   else {
                     node.type = "richText";
-                    node.attrs = { id: parentId, name: "文本" };
+                    node.attrs = { id: parentId, name: "文本" }; // i18n-exempt: default node name saved into documents
                     node.content = values.map((child) =>
                       child.attrs?.id === parentId
                         ? {
@@ -412,7 +428,6 @@ function SurfaceEditor({
         onControlsChange={onControlsChange}
         retainedState={retainedState?.runtime}
         inspectorHost={inspectorHost}
-        onHandwriting={onHandwriting}
         canUndo={!!history.current.past.length}
         canRedo={!!history.current.future.length}
       />

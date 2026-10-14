@@ -57,36 +57,36 @@ export function validateDiagramData(kind, data) {
   if (!Object.hasOwn(diagramTemplates, kind))
     throw new Error(`Unknown diagram family: ${kind}.`);
   if (!data || typeof data !== "object" || Array.isArray(data))
-    throw new Error("图形数据必须是对象。");
+    throw new Error("图形数据必须是对象。"); // i18n-exempt: contract message shared with CLI/MCP
   for (const key of Object.keys(data))
     if (!["template", "source", "title", "description", "height"].includes(key))
-      throw new Error(`不支持的图形字段：${key}。`);
+      throw new Error(`不支持的图形字段：${key}。`); // i18n-exempt: contract message shared with CLI/MCP
   if (
     !diagramTemplates[kind].includes(data.template) &&
     data.template !== "custom"
   )
-    throw new Error("请选择该组件提供的模板，或使用 custom 导入图形源码。");
+    throw new Error("请选择该组件提供的模板，或使用 custom 导入图形源码。"); // i18n-exempt: contract message shared with CLI/MCP
   for (const key of ["title", "description"])
     if (
       data[key] !== undefined &&
       (typeof data[key] !== "string" || data[key].length > 2000)
     )
-      throw new Error(`${key} 必须是最多 2000 字符的文本。`);
+      throw new Error(`${key} 必须是最多 2000 字符的文本。`); // i18n-exempt: contract message shared with CLI/MCP
   if (
     data.height !== undefined &&
     (!Number.isFinite(data.height) || data.height < 240 || data.height > 1200)
   )
-    throw new Error("图形高度须在 240–1200 px 之间。");
+    throw new Error("图形高度须在 240–1200 px 之间。"); // i18n-exempt: contract message shared with CLI/MCP
   if (data.source !== undefined) {
     if (typeof data.source !== "string" || !data.source.trim())
-      throw new Error("图形源码须为非空的 SVG 或 HTML 文本。");
+      throw new Error("图形源码须为非空的 SVG 或 HTML 文本。"); // i18n-exempt: contract message shared with CLI/MCP
     if (new TextEncoder().encode(data.source).byteLength > 8 * 1024 * 1024)
-      throw new Error("图形源码超过 8 MiB 上限。");
+      throw new Error("图形源码超过 8 MiB 上限。"); // i18n-exempt: contract message shared with CLI/MCP
     if (!/<svg\b/i.test(data.source))
       throw new Error(
-        "图形源码须包含 SVG。JSON 输入请先用原项目渲染器生成 SVG 或 HTML。",
+        "图形源码须包含 SVG。JSON 输入请先用原项目渲染器生成 SVG 或 HTML。", // i18n-exempt: contract message shared with CLI/MCP
       );
   }
   if (data.template === "custom" && data.source === undefined)
-    throw new Error("自定义图形须提供 source。");
+    throw new Error("自定义图形须提供 source。"); // i18n-exempt: contract message shared with CLI/MCP
 }

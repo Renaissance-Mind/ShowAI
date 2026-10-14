@@ -4,6 +4,10 @@ import type {
   DatabaseColumn,
   DatabaseRow,
 } from "./types";
+import { getLocale, translator } from "../../i18n";
+import messages from "../../i18n/messages/blockHelpers";
+
+const t = translator(messages);
 
 export const COLORS = [
   "#120a8f",
@@ -48,35 +52,33 @@ export function parseChartData(value: string): {
 } {
   const parsed: unknown = JSON.parse(value);
   if (!parsed || typeof parsed !== "object")
-    throw new Error("请填写包含 labels 和 series 的 JSON 对象。");
+    throw new Error(t("chartData.notObject"));
   const { labels, series } = parsed as Partial<ChartData>;
   if (
     !Array.isArray(labels) ||
     !labels.every((label) => typeof label === "string")
   )
-    throw new Error("labels 必须是文字数组。");
-  if (!Array.isArray(series)) throw new Error("series 必须是数据系列数组。");
+    throw new Error(t("chartData.labels"));
+  if (!Array.isArray(series)) throw new Error(t("chartData.series"));
   if (labels.length > 500 || series.length > 20)
-    throw new Error("单个图表最多支持 500 个横轴标签、20 个数据系列。");
+    throw new Error(t("chartData.tooLarge"));
   for (const item of series) {
     if (!item || typeof item.name !== "string" || !Array.isArray(item.values))
-      throw new Error("每个系列需要 name 和 values。");
+      throw new Error(t("chartData.seriesShape"));
     if (item.values.length !== labels.length)
-      throw new Error(`「${item.name}」的数据数量必须与 labels 一致。`);
+      throw new Error(t("chartData.length", { name: item.name }));
     if (
       !item.values.every(
         (value) => typeof value === "number" && Number.isFinite(value),
       )
     )
-      throw new Error(`「${item.name}」只能包含有限数字。`);
+      throw new Error(t("chartData.finite", { name: item.name }));
     if (
       item.color !== undefined &&
       (typeof item.color !== "string" ||
         !/^#(?:[a-f\d]{3}|[a-f\d]{4}|[a-f\d]{6}|[a-f\d]{8})$/i.test(item.color))
     )
-      throw new Error(
-        `「${item.name}」的颜色需要有效的十六进制颜色，例如 #44745a。`,
-      );
+      throw new Error(t("chartData.color", { name: item.name }));
   }
   return { labels, series };
 }
@@ -109,7 +111,7 @@ export function filterSortRows(
         ? Number(aValue) - Number(bValue)
         : column?.type === "checkbox"
           ? Number(Boolean(aValue)) - Number(Boolean(bValue))
-          : String(aValue).localeCompare(String(bValue), "zh-CN", {
+          : String(aValue).localeCompare(String(bValue), getLocale(), {
               numeric: true,
             });
     return sort.direction === "asc" ? comparison : -comparison;

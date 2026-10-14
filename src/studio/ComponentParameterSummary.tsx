@@ -1,39 +1,45 @@
 import type { ComponentDocumentation } from "../components/custom/documentation";
 import type { JsonSchema } from "../components/custom/types";
-const typeNames: Record<string, string> = {
-  string: "文字",
-  number: "数值",
-  integer: "整数",
-  boolean: "开关",
-  array: "列表",
-  object: "对象",
-  null: "空值",
+import { translator, type MessageKey } from "../i18n";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/catalog";
+
+const t = translator(messages);
+// Catalog-namespace keys, translated when the summary renders.
+const typeNames: Record<string, MessageKey<typeof messages>> = {
+  string: "type.string",
+  number: "type.number",
+  integer: "type.integer",
+  boolean: "type.boolean",
+  array: "type.array",
+  object: "type.object",
+  null: "type.null",
 };
+const typeName = (type: string) =>
+  Object.hasOwn(typeNames, type) ? t(typeNames[type]) : type;
 
 function parameterType(field: Record<string, unknown>): string {
   if (Array.isArray(field.type))
-    return field.type
-      .map((type) => typeNames[String(type)] ?? String(type))
-      .join(" / ");
-  if (typeof field.type === "string")
-    return typeNames[field.type] ?? field.type;
+    return field.type.map((type) => typeName(String(type))).join(" / ");
+  if (typeof field.type === "string") return typeName(field.type);
   const variants = field.anyOf ?? field.oneOf;
   if (Array.isArray(variants))
     return [...new Set(variants.map((rule) => parameterType(rule)))].join(
       " / ",
     );
-  if (Array.isArray(field.enum)) return "选项";
-  if (Object.hasOwn(field, "const")) return "固定值";
+  if (Array.isArray(field.enum)) return t("type.enum");
+  if (Object.hasOwn(field, "const")) return t("type.const");
   return "—";
 }
 
 function displayDefault(value: unknown): string {
   if (value === undefined) return "—";
-  if (value === null) return "空值";
-  if (Array.isArray(value)) return `列表 · ${value.length} 项`;
+  if (value === null) return t("type.null");
+  if (Array.isArray(value)) return t("default.list", { count: value.length });
   if (typeof value === "object")
-    return `对象 · ${Object.keys(value).length} 项`;
-  if (typeof value === "boolean") return value ? "开启" : "关闭";
+    return t("default.object", { count: Object.keys(value).length });
+  if (typeof value === "boolean")
+    return t(value ? "default.on" : "default.off");
   return String(value);
 }
 
@@ -46,6 +52,8 @@ export default function ComponentParameterSummary({
   defaults: Record<string, unknown>;
   documentation?: ComponentDocumentation;
 }) {
+  // Re-render when the language changes; helpers above call t() lazily.
+  const tr = useTranslator(messages);
   const properties =
     typeof schema === "object" &&
     schema.properties &&
@@ -64,16 +72,16 @@ export default function ComponentParameterSummary({
   ];
   return (
     <section className="catalog-parameter-summary">
-      <h3>输入与参数</h3>
+      <h3>{tr("inputsAndParameters")}</h3>
       {names.length ? (
         <div className="catalog-parameter-table">
           <table>
             <thead>
               <tr>
-                <th>参数</th>
-                <th>用途</th>
-                <th>类型</th>
-                <th>默认值</th>
+                <th>{tr("column.parameter")}</th>
+                <th>{tr("column.purpose")}</th>
+                <th>{tr("column.type")}</th>
+                <th>{tr("column.default")}</th>
               </tr>
             </thead>
             <tbody>
@@ -95,12 +103,14 @@ export default function ComponentParameterSummary({
                   <tr key={name}>
                     <th>
                       <code>{name}</code>
-                      {required.includes(name) && <small>必填</small>}
+                      {required.includes(name) && (
+                        <small>{tr("required")}</small>
+                      )}
                     </th>
                     <td>
                       {typeof meaning === "string"
                         ? meaning
-                        : "查看使用说明与示例"}
+                        : tr("seeUsageAndExamples")}
                     </td>
                     <td>{parameterType(field)}</td>
                     <td title={raw}>
@@ -115,7 +125,7 @@ export default function ComponentParameterSummary({
           </table>
         </div>
       ) : (
-        <p>此组件没有单独的顶层参数。查看使用说明和示例数据。</p>
+        <p>{tr("noTopLevelParameters")}</p>
       )}
     </section>
   );

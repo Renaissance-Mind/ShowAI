@@ -12,6 +12,14 @@ import {
   Terminal,
 } from "../ui/icons";
 import type { DesktopInfo } from "../desktop/bridge";
+import {
+  isLanguagePreference,
+  LOCALE_NAMES,
+  LOCALES,
+  setLanguagePreference,
+} from "../i18n";
+import { useLanguagePreference, useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/settings";
 import "./settings.css";
 import LibrarySpace from "./LibrarySpace";
 import IconViewer from "./IconViewer";
@@ -21,32 +29,32 @@ import AgentSettings from "./AgentSettings";
 const sections = [
   {
     id: "sync",
-    label: "服务器与同步",
+    label: "section.sync",
     icon: Folder,
   },
   {
     id: "general",
-    label: "通用",
+    label: "section.general",
     icon: Settings2,
   },
   {
     id: "appearance",
-    label: "外观",
+    label: "section.appearance",
     icon: Sun,
   },
   {
     id: "agent",
-    label: "Agent",
+    label: "section.agent",
     icon: Bot,
   },
   {
     id: "icons",
-    label: "图标",
+    label: "section.icons",
     icon: Shapes,
   },
   {
     id: "about",
-    label: "关于",
+    label: "section.about",
     icon: Info,
   },
 ] as const;
@@ -60,10 +68,11 @@ export function SettingsNavigation({
   section: SettingsSection;
   onSelect: (section: SettingsSection) => void;
 }) {
+  const t = useTranslator(messages);
   return (
     <div className="settings-category-sidebar">
-      <div className="settings-nav-label">设置</div>
-      <nav className="settings-nav" aria-label="设置分类">
+      <div className="settings-nav-label">{t("title")}</div>
+      <nav className="settings-nav" aria-label={t("categories")}>
         {sections.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -71,7 +80,7 @@ export function SettingsNavigation({
             onClick={() => onSelect(id)}
           >
             <Icon size={17} strokeWidth={1.7} aria-hidden="true" />
-            {label}
+            {t(label)}
           </button>
         ))}
       </nav>
@@ -127,11 +136,13 @@ export function SettingsPanel({
   onCopyConfig: () => void;
   onMigrate: () => void;
 }) {
+  const t = useTranslator(messages);
+  const language = useLanguagePreference();
   const current = sections.find((item) => item.id === section)!;
   return (
     <div className="studio-settings" key={section}>
       <header className="settings-heading">
-        <h2>{current.label}</h2>
+        <h2>{t(current.label)}</h2>
       </header>
       {section === "icons" && <IconViewer />}
       {section === "sync" && <SyncSettings />}
@@ -140,27 +151,27 @@ export function SettingsPanel({
           className="settings-group"
           aria-labelledby="settings-library-title"
         >
-          <h2 id="settings-library-title">内容库</h2>
+          <h2 id="settings-library-title">{t("library")}</h2>
           <div className="settings-row">
             <div className="settings-row-text">
-              <h3>存储位置</h3>
+              <h3>{t("storageLocation")}</h3>
             </div>
             <button
               className="settings-button"
               disabled={!info}
               onClick={onChooseHome}
             >
-              选择内容库
+              {t("chooseLibrary")}
               <ChevronRight size={14} aria-hidden="true" />
             </button>
           </div>
           <div className="settings-path">
             <Folder size={17} aria-hidden="true" />
-            <code>{info?.home ?? "正在读取内容库…"}</code>
+            <code>{info?.home ?? t("readingLibrary")}</code>
             <button
               className="settings-icon-button"
-              aria-label="复制内容库路径"
-              title="复制内容库路径"
+              aria-label={t("copyLibraryPath")}
+              title={t("copyLibraryPath")}
               disabled={!info}
               onClick={onCopyHome}
             >
@@ -171,11 +182,11 @@ export function SettingsPanel({
           {info?.libraryVersion === 1 && (
             <div className="settings-row">
               <div className="settings-row-text">
-                <h3>升级内容库</h3>
-                <p>导入现有内容并启用当前内容存储，原始文件保留。</p>
+                <h3>{t("upgradeLibrary")}</h3>
+                <p>{t("upgradeLibraryDetail")}</p>
               </div>
               <button className="settings-button" onClick={onMigrate}>
-                升级内容库
+                {t("upgradeLibrary")}
                 <ChevronRight size={14} />
               </button>
             </div>
@@ -190,10 +201,10 @@ export function SettingsPanel({
           className="settings-group"
           aria-labelledby="settings-theme-title"
         >
-          <h2 id="settings-theme-title">界面</h2>
+          <h2 id="settings-theme-title">{t("interface")}</h2>
           <div className="settings-row">
             <div className="settings-row-text">
-              <label htmlFor="settings-theme">主题</label>
+              <label htmlFor="settings-theme">{t("theme")}</label>
             </div>
             <div className="settings-select">
               <select
@@ -203,14 +214,14 @@ export function SettingsPanel({
                   onDarkChange(event.target.value === "dark")
                 }
               >
-                <option value="light">浅色</option>
-                <option value="dark">深色</option>
+                <option value="light">{t("light")}</option>
+                <option value="dark">{t("dark")}</option>
               </select>
               <ChevronDown size={14} aria-hidden="true" />
             </div>
           </div>
           <fieldset className="settings-theme-options">
-            <legend className="settings-sr-only">主题预览</legend>
+            <legend className="settings-sr-only">{t("themePreview")}</legend>
             {(["light", "dark"] as const).map((theme) => {
               const selected = dark === (theme === "dark");
               const Icon = theme === "light" ? Sun : Moon;
@@ -229,13 +240,37 @@ export function SettingsPanel({
                   <ThemePreview theme={theme} />
                   <span className="settings-theme-label">
                     <Icon size={16} strokeWidth={1.7} aria-hidden="true" />
-                    <span>{theme === "light" ? "浅色" : "深色"}</span>
+                    <span>{t(theme)}</span>
                     <span className="settings-radio-mark" aria-hidden="true" />
                   </span>
                 </label>
               );
             })}
           </fieldset>
+          <div className="settings-row">
+            <div className="settings-row-text">
+              <label htmlFor="settings-language">{t("language")}</label>
+              <p>{t("languageDetail")}</p>
+            </div>
+            <div className="settings-select">
+              <select
+                id="settings-language"
+                value={language}
+                onChange={(event) => {
+                  if (isLanguagePreference(event.target.value))
+                    setLanguagePreference(event.target.value);
+                }}
+              >
+                <option value="system">{t("languageSystem")}</option>
+                {LOCALES.map((locale) => (
+                  <option key={locale} value={locale} lang={locale}>
+                    {LOCALE_NAMES[locale]}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={14} aria-hidden="true" />
+            </div>
+          </div>
         </section>
       )}
       {section === "agent" && (
@@ -245,10 +280,10 @@ export function SettingsPanel({
             className="settings-group"
             aria-labelledby="settings-agent-title"
           >
-            <h2 id="settings-agent-title">本地连接</h2>
+            <h2 id="settings-agent-title">{t("localConnection")}</h2>
             <div className="settings-row">
               <div className="settings-row-text">
-                <h3>启动配置</h3>
+                <h3>{t("launchConfig")}</h3>
               </div>
               <button
                 className="settings-button"
@@ -256,20 +291,20 @@ export function SettingsPanel({
                 onClick={onCopyConfig}
               >
                 <Copy size={14} aria-hidden="true" />
-                复制启动配置
+                {t("copyLaunchConfig")}
               </button>
             </div>
             <details className="settings-config">
               <summary>
                 <ChevronRight size={14} aria-hidden="true" />
                 <Terminal size={15} aria-hidden="true" />
-                启动配置
+                {t("launchConfig")}
               </summary>
               <pre>
                 <code>
                   {info
                     ? JSON.stringify(info.cli, null, 2)
-                    : "正在读取启动配置…"}
+                    : t("readingLaunchConfig")}
                 </code>
               </pre>
             </details>
@@ -288,15 +323,15 @@ export function SettingsPanel({
           </div>
           <section
             className="settings-group settings-about"
-            aria-label="应用信息"
+            aria-label={t("appInfo")}
           >
             <dl>
               <div className="settings-row">
-                <dt>版本</dt>
+                <dt>{t("version")}</dt>
                 <dd>{info?.version ?? "—"}</dd>
               </div>
               <div className="settings-row">
-                <dt>运行平台</dt>
+                <dt>{t("platform")}</dt>
                 <dd>
                   {info
                     ? ({ darwin: "macOS", win32: "Windows", linux: "Linux" }[
@@ -306,14 +341,14 @@ export function SettingsPanel({
                 </dd>
               </div>
               <div className="settings-row">
-                <dt>应用环境</dt>
+                <dt>{t("environment")}</dt>
                 <dd>
                   {info
                     ? info.mode === "browser"
-                      ? "本地浏览器版"
+                      ? t("environmentBrowser")
                       : info.packaged
-                        ? "桌面安装包"
-                        : "开发环境"
+                        ? t("environmentPackaged")
+                        : t("environmentDevelopment")
                     : "—"}
                 </dd>
               </div>

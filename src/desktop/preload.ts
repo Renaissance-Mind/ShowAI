@@ -24,6 +24,9 @@ if (process.isMainFrame) {
     setAppearance(appearance) {
       return ipcRenderer.invoke("showai:set-appearance", appearance);
     },
+    setLocale(locale) {
+      return ipcRenderer.invoke("showai:set-locale", locale);
+    },
     getWindowState() {
       return ipcRenderer.invoke("showai:window-state");
     },

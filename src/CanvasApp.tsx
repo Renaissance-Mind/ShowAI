@@ -37,6 +37,12 @@ import type { CompiledComponent } from "./components/custom/types";
 import { downloadFile, newDocument, toMarkdown } from "./lib/document";
 import { parseMarkdown } from "./lib/markdown";
 import type { ShowArtifact, ShowDocument } from "./types";
+import { translator } from "./i18n";
+import { useTranslator } from "./i18n/react";
+import messages from "./i18n/messages/canvas";
+import common from "./i18n/messages/common";
+
+const translate = translator(messages);
 
 function initialPage() {
   try {
@@ -54,12 +60,14 @@ function initialPage() {
     return {
       document: newDocument(),
       components: [] as CompiledComponent[],
-      error: "本地页面未能读取，原始数据已保留。",
+      error: translate("readFailed"),
     };
   }
 }
 
 export default function App() {
+  const t = useTranslator(messages);
+  const tc = useTranslator(common);
   const [initial] = useState(initialPage);
   const [page, setPage] = useState(initial.document);
   const [components, setComponents] = useState(initial.components);
@@ -107,7 +115,7 @@ export default function App() {
       });
       setError("");
     } catch {
-      setError("保存失败，请下载源文件备份。");
+      setError(t("saveFailed"));
     }
   }, []);
 
@@ -211,10 +219,12 @@ export default function App() {
             toMarkdown(linearContent(source)),
           "text/markdown;charset=utf-8",
         );
-      setNotice("已导出");
+      setNotice(t("exported"));
     } catch (reason) {
       setError(
-        `导出失败：${reason instanceof Error ? reason.message : "请重试"}`,
+        t("exportFailed", {
+          reason: reason instanceof Error ? reason.message : t("tryAgain"),
+        }),
       );
     } finally {
       setBusy(false);
@@ -226,7 +236,10 @@ export default function App() {
     setMenuOpen(false);
     if (file.size > CAPACITY.artifactBytes) {
       setError(
-        `导入文件为 ${formatBytes(file.size)}，文件上限 ${formatBytes(CAPACITY.artifactBytes)}。`,
+        t("fileTooLarge", {
+          size: formatBytes(file.size),
+          limit: formatBytes(CAPACITY.artifactBytes),
+        }),
       );
       return;
     }
@@ -290,7 +303,9 @@ export default function App() {
     } catch (reason) {
       if (request !== importGeneration.current) return;
       setError(
-        `打开失败：${reason instanceof Error ? reason.message : "请检查页面格式"}`,
+        t("openFailed", {
+          reason: reason instanceof Error ? reason.message : t("checkFormat"),
+        }),
       );
     }
   }
@@ -306,8 +321,8 @@ export default function App() {
         />
         <button
           className="canvas-icon-button"
-          aria-label="导出页面"
-          title="导出页面"
+          aria-label={t("exportPage")}
+          title={t("exportPage")}
           disabled={busy}
           onClick={() => void exportPage("html")}
         >
@@ -321,10 +336,10 @@ export default function App() {
           <button
             ref={buttonRef}
             className="canvas-icon-button"
-            aria-label="页面选项"
+            aria-label={tc("pageOptions")}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            title="页面选项"
+            title={tc("pageOptions")}
             onClick={() => setMenuOpen(!menuOpen)}
           >
             <MoreHorizontal size={19} />
@@ -334,7 +349,7 @@ export default function App() {
               ref={menuRef}
               className="canvas-menu"
               role="menu"
-              aria-label="页面选项"
+              aria-label={tc("pageOptions")}
               onBlur={(event) => {
                 if (
                   !event.currentTarget.contains(event.relatedTarget as Node) &&
@@ -369,7 +384,7 @@ export default function App() {
                 }}
               >
                 <Upload size={15} />
-                打开页面…
+                {t("openPage")}
               </button>
               <button
                 role="menuitem"
@@ -377,7 +392,7 @@ export default function App() {
                 onClick={() => void exportPage("json")}
               >
                 <FileJson size={15} />
-                下载源文件
+                {tc("downloadSource")}
               </button>
               <button
                 role="menuitem"
@@ -385,7 +400,7 @@ export default function App() {
                 onClick={() => void exportPage("md")}
               >
                 <FileText size={15} />
-                导出 Markdown
+                {t("exportMarkdown")}
               </button>
               <button
                 role="menuitem"
@@ -395,7 +410,7 @@ export default function App() {
                 }}
               >
                 {dark ? <Sun size={15} /> : <Moon size={15} />}
-                {dark ? "浅色外观" : "深色外观"}
+                {dark ? tc("lightAppearance") : tc("darkAppearance")}
               </button>
             </div>
           )}
@@ -404,10 +419,12 @@ export default function App() {
       {error && (
         <div className="canvas-error" role="alert">
           <span>{error}</span>
-          <button onClick={() => void exportPage("json")}>下载源文件</button>
+          <button onClick={() => void exportPage("json")}>
+            {tc("downloadSource")}
+          </button>
           <button
             className="canvas-icon-button"
-            aria-label="关闭提示"
+            aria-label={tc("dismissNotice")}
             onClick={() => setError("")}
           >
             <X size={14} />
@@ -424,8 +441,8 @@ export default function App() {
             <textarea
               ref={titleRef}
               className="surface-page-title"
-              aria-label="页面标题"
-              placeholder="无标题"
+              aria-label={t("pageTitle")}
+              placeholder={tc("untitled")}
               rows={1}
               maxLength={1000}
               value={page.title}

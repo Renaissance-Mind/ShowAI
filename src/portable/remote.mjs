@@ -113,7 +113,11 @@ export function validateRemoteComponents(input) {
 
 export async function sha256Bytes(bytes) {
   if (!globalThis.crypto?.subtle)
-    throw new Error("组件完整性校验需要 HTTPS 或在本机打开页面。");
+    throw Object.assign(
+      // i18n-exempt: CLI message; readers translate by code
+      new Error("组件完整性校验需要 HTTPS 或在本机打开页面。"),
+      { code: "INTEGRITY_UNAVAILABLE" },
+    );
   const result = await globalThis.crypto.subtle.digest("SHA-256", bytes);
   return (
     "sha256-" +
@@ -192,17 +196,34 @@ export async function loadRemoteComponents(input, options = {}) {
           maxBytes: locator.bytes,
         });
       } catch (error) {
-        throw new Error(
-          `无法加载组件 ${locator.ref.id}@${locator.ref.version}：${error instanceof Error ? error.message : "网络请求失败"}。请检查网络和发布服务器的 CORS 设置。`,
-          { cause: error },
+        throw Object.assign(
+          new Error(
+            // i18n-exempt: CLI message; readers translate by code
+            `无法加载组件 ${locator.ref.id}@${locator.ref.version}：${error instanceof Error ? error.message : "网络请求失败"}。请检查网络和发布服务器的 CORS 设置。`,
+            { cause: error },
+          ),
+          {
+            code: "COMPONENT_FETCH_FAILED",
+            params: {
+              component: `${locator.ref.id}@${locator.ref.version}`,
+              reason: error instanceof Error ? error.message : "",
+            },
+          },
         );
       }
       if (
         received.bytes.byteLength !== locator.bytes ||
         received.sha256 !== locator.sha256
       )
-        throw new Error(
-          `组件 ${locator.ref.id}@${locator.ref.version} 的文件校验失败（SHA-256 或字节数不一致）。`,
+        throw Object.assign(
+          new Error(
+            // i18n-exempt: CLI message; readers translate by code
+            `组件 ${locator.ref.id}@${locator.ref.version} 的文件校验失败（SHA-256 或字节数不一致）。`,
+          ),
+          {
+            code: "COMPONENT_CHECKSUM_FAILED",
+            params: { component: `${locator.ref.id}@${locator.ref.version}` },
+          },
         );
       total += received.bytes.byteLength;
       if (total > CAPACITY.publicationTransferBytes)

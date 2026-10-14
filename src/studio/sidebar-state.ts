@@ -21,7 +21,7 @@ export function readSidebarExpansion(home: string): SidebarExpansion {
       localStorage.getItem(sidebarExpansionKey(home)) ?? "null",
     );
   } catch (error) {
-    console.warn("无法读取项目栏展开状态", error);
+    console.warn("Could not read the sidebar expansion state", error);
   }
   return {
     projects: booleanMap(saved?.projects),

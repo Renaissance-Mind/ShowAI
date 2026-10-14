@@ -3,14 +3,17 @@ import type { SurfaceGeometryStore } from "./geometry-store";
 import type { ShowDocument } from "../types";
 import { useBoardInteraction } from "./useBoardInteraction";
 import type { BoardGesture } from "./useBoardInteraction";
+import { useInlineInk } from "./useInlineInk";
+import { BoardGestureInput } from "./BoardGestureInput";
 import { DrawingInput } from "./Drawing";
 import { boardToolForKey } from "./board-tools";
 import type { JSONContent } from "@tiptap/core";
-import type { BoardTool, DrawingStyle } from "./types";
+import type { BoardTool, BoardDrawingTool, DrawingStyle } from "./types";
 import { findSurfaceNode } from "./document.mjs";
 import { BoardStyleControls } from "./BoardStyleControls";
 import { readingCapture } from "./reading-capture";
 import { flushSync } from "react-dom";
+import { fingerNavigatesBoard } from "./board-input.mjs";
 import {
   useEffect,
   useLayoutEffect,
@@ -34,6 +37,7 @@ import {
   Copy,
   Settings2,
   FileText,
+  Ruler,
 } from "../ui/icons";
 import {
   useSurfaceViewport,
@@ -47,6 +51,8 @@ import {
 import { ObjectContext, type ObjectActions } from "./SurfaceObject";
 import type { NodeLayout, PageViews, SavedView } from "./types";
 import "./surface.css";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/surface";
 
 export interface SurfaceHandle {
   insertPosition: () => NodeLayout;
@@ -134,6 +140,7 @@ export default function PageSurface({
   onDrawExit,
   onToolChange,
 }: Props) {
+  const t = useTranslator(messages);
   const [localSelection, setLocalSelection] = useState<string | null>(null);
   const capture = useRef(readingCapture()).current;
   const [componentActionsHost, setComponentActionsHost] =
@@ -152,6 +159,25 @@ export default function PageSurface({
       onMove ? `showai.viewport.v3:${pageId}` : undefined,
       enabled && !locked,
     );
+  const [ruler, setRuler] = useState(false);
+  const writingSettings = useRef<HTMLDetailsElement>(null);
+  useInlineInk({
+    root: rootRef,
+    world: worldRef,
+    document: boardDocument,
+    boardId: containerId ?? "",
+    tool: drawTool,
+    color: drawColor,
+    width: drawStrokeWidth,
+    ruler,
+    enabled: enabled && !locked && !!onDraw && !printing,
+    onCamera: (value) => controls.current.moveTo(value, true),
+    onTool: (value) => {
+      if (value === "settings") {
+        if (writingSettings.current) writingSettings.current.open = true;
+      } else if (value === "eraser" || value === "pen") onToolChange?.(value);
+    },
+  });
   const board = useBoardInteraction({
     geometry,
     document: boardDocument,
@@ -472,6 +498,7 @@ export default function PageSurface({
         data-viewport-lock-scope={embedded ? "board" : undefined}
         data-viewport-locked={locked}
         data-board-id={pageId}
+        data-board-tool={drawTool ?? "select"}
         onContextMenu={(event) => {
           onInspect?.(null);
           if (
@@ -522,11 +549,31 @@ export default function PageSurface({
         }}
         onPointerDownCapture={(event) => {
           const target = event.target as Element;
+          if (
+            ["pan", "eraser"].includes(drawTool ?? "") &&
+            !target.closest("[data-surface-ui]")
+          )
+            return;
+          if (
+            fingerNavigatesBoard(event.pointerType) &&
+            !target.closest(
+              "[data-surface-ui],button,input,textarea,select,iframe,[contenteditable=true]",
+            )
+          )
+            return;
           if (target.closest(".page-surface") !== event.currentTarget) return;
           if (!target.closest(".surface-popover-anchor") && navigation.current)
             navigation.current.open = false;
           if (!target.closest("[data-surface-ui]")) setObjectMenu(null);
-          const selectionId = board.selectionHit(event.clientX, event.clientY);
+          const selectedHit =
+            drawTool === "lasso"
+              ? board.hitTest(event.clientX, event.clientY)
+              : null;
+          const selectionId =
+            board.selectionHit(event.clientX, event.clientY) ??
+            (selectedHit && board.ids.has(selectedHit.id)
+              ? selectedHit.id
+              : null);
           const handle =
             target.closest<HTMLElement>(
               ".board-resize-handle,.surface-object-rotate",
@@ -921,7 +968,7 @@ export default function PageSurface({
             board.select(null);
         }}
         role="region"
-        aria-label="白板"
+        aria-label={t("board")}
         tabIndex={0}
         onKeyDown={(event) => {
           if (
@@ -939,35 +986,35 @@ export default function PageSurface({
         }}
         aria-description={
           locked
-            ? "视图已锁定。可以点击内容，滚动用于外层页面阅读；右上角解锁后可缩放和移动。"
+            ? t("board.descriptionLocked")
             : onTransform
-              ? "拖动空白处框选；空格或中键拖动画布。V 选择，R 矩形，E 椭圆，A 箭头，P 画笔；Escape 取消当前操作。"
-              : "在白板上滚动或拖动空白处浏览。方向键浏览，0 总览；Escape 取消当前操作。"
+              ? t("board.descriptionEdit")
+              : t("board.descriptionRead")
         }
       >
         {objectMenu && (
           <LibraryContextMenu
             anchor={objectMenu.anchor}
             point={objectMenu.point}
-            label="对象操作"
+            label={t("menu.objectActions")}
             onClose={() => setObjectMenu(null)}
             items={
               objectMenu.insertion
                 ? [
                     {
-                      label: "添加 Page",
+                      label: t("menu.addPage"),
                       icon: <PanelTop size={14} />,
                       onSelect: () =>
                         onAddComponent?.("page", objectMenu.insertion!),
                     },
                     {
-                      label: "添加富文本",
+                      label: t("menu.addRichText"),
                       icon: <FileText size={14} />,
                       onSelect: () =>
                         onAddComponent?.("text", objectMenu.insertion!),
                     },
                     {
-                      label: "添加组件…",
+                      label: t("menu.addComponent"),
                       icon: <Plus size={14} />,
                       separatorBefore: true,
                       onSelect: () =>
@@ -981,20 +1028,22 @@ export default function PageSurface({
                     {
                       label:
                         objectMenu.ids.length > 1
-                          ? `复制 ${objectMenu.ids.length} 个对象`
-                          : "复制对象",
+                          ? t("menu.duplicateMany", {
+                              count: objectMenu.ids.length,
+                            })
+                          : t("menu.duplicate"),
                       icon: <Copy size={14} />,
                       onSelect: () => duplicateSelection(objectMenu.ids),
                     },
                     {
-                      label: "对象设置",
+                      label: t("menu.settings"),
                       icon: <Settings2 size={14} />,
                       onSelect: () => onInspect?.(objectMenu.id),
                     },
                     ...(objectMenu.container
                       ? [
                           {
-                            label: "展开容器",
+                            label: t("menu.expand"),
                             icon: <Maximize2 size={14} />,
                             onSelect: () => onExpand?.(objectMenu.id),
                           },
@@ -1003,8 +1052,10 @@ export default function PageSurface({
                     {
                       label:
                         objectMenu.ids.length > 1
-                          ? `删除 ${objectMenu.ids.length} 个对象`
-                          : "删除对象",
+                          ? t("menu.deleteMany", {
+                              count: objectMenu.ids.length,
+                            })
+                          : t("menu.delete"),
                       icon: <Trash2 size={14} />,
                       danger: true,
                       separatorBefore: true,
@@ -1017,7 +1068,9 @@ export default function PageSurface({
             }
           />
         )}
-        {embedded && <ViewportLockButton {...lock} label="白板" />}
+        {embedded && (
+          <ViewportLockButton {...lock} label={t("board.lockTarget")} />
+        )}
         <div className="surface-metadata" data-surface-ui>
           {header}
         </div>
@@ -1026,43 +1079,67 @@ export default function PageSurface({
             {children}
           </div>
         </div>
-        {drawTool && enabled && !locked && onDraw && (
-          <DrawingInput
-            key={drawTool}
-            tool={drawTool}
-            panHeld={spaceHeld}
-            makeSnapIndex={board.drawingSnapIndex}
-            color={drawColor}
-            fillColor={drawFillColor}
-            strokeWidth={drawStrokeWidth}
-            camera={camera}
-            point={(x, y) => controls.current.point(x, y)}
-            onDraw={(node, frame) => {
-              onDraw(node, frame);
-              requestAnimationFrame(() => {
-                if (
-                  !rootRef.current?.querySelector("[data-board-drawing-input]")
-                )
-                  rootRef.current?.focus({ preventScroll: true });
-              });
-            }}
-            onExit={() => onDrawExit?.()}
-          />
-        )}
+        {drawTool &&
+          !["pan", "eraser", "lasso"].includes(drawTool) &&
+          !(
+            window.showai?.inlineInk &&
+            (drawTool === "pen" || drawTool === "highlighter")
+          ) &&
+          enabled &&
+          !locked &&
+          onDraw && (
+            <DrawingInput
+              key={drawTool}
+              tool={drawTool as BoardDrawingTool}
+              ruler={ruler}
+              panHeld={spaceHeld}
+              makeSnapIndex={board.drawingSnapIndex}
+              color={drawColor}
+              fillColor={drawFillColor}
+              strokeWidth={drawStrokeWidth}
+              camera={camera}
+              point={(x, y) => controls.current.point(x, y)}
+              onDraw={(node, frame) => {
+                onDraw(node, frame);
+                requestAnimationFrame(() => {
+                  if (
+                    !rootRef.current?.querySelector(
+                      "[data-board-drawing-input]",
+                    )
+                  )
+                    rootRef.current?.focus({ preventScroll: true });
+                });
+              }}
+              onExit={() => onDrawExit?.()}
+            />
+          )}
+        {(drawTool === "eraser" || drawTool === "lasso") &&
+          enabled &&
+          !locked &&
+          onDeleteSelection && (
+            <BoardGestureInput
+              key={drawTool}
+              tool={drawTool}
+              board={board}
+              world={worldRef}
+              onDelete={onDeleteSelection}
+              onExit={() => onDrawExit?.()}
+            />
+          )}
         {!nodes.length && !drawTool && !onMove && (
           <div className="surface-empty" data-surface-ui>
-            <p>这块白板还没有内容</p>
+            <p>{t("board.empty")}</p>
           </div>
         )}
         <div
           className="surface-toolbar"
           data-surface-ui
           role="group"
-          aria-label="白板工具"
+          aria-label={t("board.tools")}
         >
           {onTransform && !objectMenu && board.ids.size > 1 && (
             <span className="board-selection-count" role="status">
-              已选 {board.ids.size} 项
+              {t("board.selectedCount", { count: board.ids.size })}
             </span>
           )}
           {onTransform && !objectMenu && board.ids.size > 0 && (
@@ -1070,7 +1147,7 @@ export default function PageSurface({
               {selectedContainer && (
                 <button
                   type="button"
-                  aria-label="展开选中容器"
+                  aria-label={t("board.expandSelected")}
                   onClick={() => selected && onExpand?.(selected)}
                 >
                   <Maximize2 size={15} />
@@ -1079,10 +1156,10 @@ export default function PageSurface({
               <button
                 type="button"
                 onClick={() => duplicateSelection([...board.ids])}
-                aria-label="复制选中对象"
-                title="复制选中对象（⌘/Ctrl D）"
+                aria-label={t("board.duplicateSelected")}
+                title={t("board.duplicateSelectedTitle")}
               >
-                复制
+                {t("board.duplicate")}
               </button>
               <button
                 type="button"
@@ -1090,7 +1167,7 @@ export default function PageSurface({
                   onDeleteSelection?.([...board.ids]);
                   board.select(null);
                 }}
-                aria-label="删除选中对象"
+                aria-label={t("board.deleteSelected")}
               >
                 <Trash2 size={15} />
               </button>
@@ -1108,11 +1185,14 @@ export default function PageSurface({
               }
             }}
           >
-            <summary aria-label="区域与视图" title="区域与视图">
+            <summary
+              aria-label={t("nav.regionsAndViews")}
+              title={t("nav.regionsAndViews")}
+            >
               <List size={16} />
             </summary>
             <div className="surface-navigation">
-              <strong>区域与内容</strong>
+              <strong>{t("nav.regionsAndContent")}</strong>
               {nodes.map((node) => (
                 <div className="surface-navigation-row" key={node.id}>
                   <button
@@ -1131,7 +1211,7 @@ export default function PageSurface({
                     <>
                       <button
                         type="button"
-                        aria-label={`前移 ${node.name} 阅读顺序`}
+                        aria-label={t("nav.moveEarlier", { name: node.name })}
                         disabled={views.readingOrder.indexOf(node.id) < 1}
                         onClick={() => {
                           const order = [...views.readingOrder],
@@ -1150,7 +1230,7 @@ export default function PageSurface({
                 </div>
               ))}
 
-              <strong>命名视图</strong>
+              <strong>{t("nav.namedViews")}</strong>
               {views.saved.map((view) => (
                 <div className="surface-navigation-row" key={view.id}>
                   <button
@@ -1168,7 +1248,7 @@ export default function PageSurface({
                     <>
                       <button
                         type="button"
-                        aria-label={`设为初始视图 ${view.name}`}
+                        aria-label={t("nav.setInitial", { name: view.name })}
                         aria-pressed={views.initial === view.id}
                         onClick={() =>
                           onViews({
@@ -1181,7 +1261,7 @@ export default function PageSurface({
                       </button>
                       <button
                         type="button"
-                        aria-label={`删除视图 ${view.name}`}
+                        aria-label={t("nav.deleteView", { name: view.name })}
                         onClick={() =>
                           onViews({
                             ...views,
@@ -1207,11 +1287,13 @@ export default function PageSurface({
                   }}
                 >
                   <input
-                    aria-label="视图名称"
+                    aria-label={t("nav.viewName")}
                     placeholder={
                       selected
-                        ? `${names.get(selected) || "所选内容"}的视图`
-                        : "当前可见内容的视图"
+                        ? names.get(selected)
+                          ? t("nav.viewOf", { name: names.get(selected)! })
+                          : t("nav.viewOfSelection")
+                        : t("nav.viewOfVisible")
                     }
                     maxLength={200}
                     value={viewName}
@@ -1222,7 +1304,7 @@ export default function PageSurface({
                     disabled={!viewName.trim() || !viewTargets.length}
                   >
                     <BookmarkPlus size={14} />
-                    保存视图
+                    {t("nav.saveView")}
                   </button>
                 </form>
               )}
@@ -1230,17 +1312,17 @@ export default function PageSurface({
           </details>
           <button
             type="button"
-            aria-label="总览"
+            aria-label={t("board.fit")}
             disabled={locked}
-            title="总览全部内容（0）"
+            title={t("board.fitTitle")}
             onClick={() => focusAfterMount()}
           >
             <Maximize2 size={15} />
           </button>
           <button
             type="button"
-            aria-label="定位所选"
-            title="定位所选内容"
+            aria-label={t("board.locate")}
+            title={t("board.locateTitle")}
             disabled={locked || !selected}
             onClick={() => selected && focusAfterMount([selected], true)}
           >
@@ -1251,13 +1333,60 @@ export default function PageSurface({
           <fieldset className="surface-extra-actions" disabled={locked}>
             {extraActions}
           </fieldset>
+          {onDraw && !locked && (
+            <div className="board-writing-options" data-surface-ui>
+              <button
+                type="button"
+                aria-label={t("tool.ruler")}
+                title={t("tool.ruler")}
+                aria-pressed={ruler}
+                onClick={() => setRuler((value) => !value)}
+              >
+                <Ruler size={15} />
+              </button>
+              {window.showai?.inlineInk && (
+                <details ref={writingSettings}>
+                  <summary
+                    aria-label={t("tool.writingSettings")}
+                    title={t("tool.writingSettings")}
+                  >
+                    <Settings2 size={15} />
+                  </summary>
+                  <div data-surface-ui>
+                    <label>
+                      <input
+                        type="checkbox"
+                        defaultChecked={
+                          document.documentElement.dataset.fingerDrawing ===
+                          "true"
+                        }
+                        onChange={async (e) => {
+                          const fingerDrawing = e.currentTarget.checked;
+                          await window.showai!.invoke(
+                            "native:boardPreferences",
+                            { fingerDrawing },
+                          );
+                          document.documentElement.dataset.fingerDrawing =
+                            String(fingerDrawing);
+                          document.dispatchEvent(
+                            new Event("showai-board-preferences"),
+                          );
+                        }}
+                      />
+                      {t("tool.fingerDrawing")}
+                    </label>
+                  </div>
+                </details>
+              )}
+            </div>
+          )}
           {onTransform && !locked && (
             <div className="board-settings-controls" hidden={!!objectMenu}>
               {board.ids.size > 0 && (
                 <button
                   type="button"
-                  aria-label="选中对象设置"
-                  title="对象布局设置：名称、尺寸与所属容器"
+                  aria-label={t("board.objectSettings")}
+                  title={t("board.objectSettingsTitle")}
                   onClick={() => selected && onInspect?.(selected)}
                 >
                   <Settings2 size={15} />
@@ -1298,11 +1427,12 @@ function ZoomControls({
   locked: boolean;
 }) {
   const scale = useViewportScale(store);
+  const t = useTranslator(messages);
   return (
     <>
       <button
         type="button"
-        aria-label="缩小白板"
+        aria-label={t("board.zoomOut")}
         disabled={locked || scale <= 0.25}
         onClick={() => controls.current.zoom(scale / 1.2)}
       >
@@ -1311,7 +1441,7 @@ function ZoomControls({
       <button
         type="button"
         className="surface-zoom"
-        aria-label="重置缩放"
+        aria-label={t("board.resetZoom")}
         disabled={locked}
         onClick={() => controls.current.zoom(1)}
       >
@@ -1319,7 +1449,7 @@ function ZoomControls({
       </button>
       <button
         type="button"
-        aria-label="放大白板"
+        aria-label={t("board.zoomIn")}
         disabled={locked || scale >= 2}
         onClick={() => controls.current.zoom(scale * 1.2)}
       >

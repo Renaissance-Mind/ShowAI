@@ -54,11 +54,11 @@ export const EXPERIMENT_STATUSES = [
 
 /** Default statuses used by a status tree that does not define its own. */
 export const DEFAULT_TREE_STATUSES = [
-  { id: "done", label: "走通", tone: "done" },
-  { id: "active", label: "进行中", tone: "active" },
-  { id: "failed", label: "没走通", tone: "failed" },
-  { id: "todo", label: "待探索", tone: "todo" },
-  { id: "paused", label: "搁置", tone: "paused" },
+  { id: "done", label: "走通", tone: "done" }, // i18n-exempt: default status data, translated at display by id
+  { id: "active", label: "进行中", tone: "active" }, // i18n-exempt: default status data, translated at display by id
+  { id: "failed", label: "没走通", tone: "failed" }, // i18n-exempt: default status data, translated at display by id
+  { id: "todo", label: "待探索", tone: "todo" }, // i18n-exempt: default status data, translated at display by id
+  { id: "paused", label: "搁置", tone: "paused" }, // i18n-exempt: default status data, translated at display by id
 ];
 
 function validateMatrix(data) {

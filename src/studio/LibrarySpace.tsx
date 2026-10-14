@@ -8,26 +8,17 @@ import type {
   StorageCategory,
 } from "../core/library-maintenance";
 import type { MaintenancePolicy } from "../core/maintenance-scheduler";
-const labels: Record<StorageCategory, string> = {
-  repository: "正式内容",
-  workspace: "可读文件",
-  indexes: "搜索与操作索引",
-  receipts: "操作回执缓存",
-  cache: "临时执行文件",
-  drafts: "本机草稿",
-  conflicts: "外部修改快照",
-  recovery: "恢复数据",
-  imports: "导入准备文件",
-  originals: "原始内容库",
-  other: "设置与其他文件",
-};
+import { getLocale } from "../i18n";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/library";
 function bytes(value: number) {
-  if (value < 1024) return `${value.toLocaleString("zh-CN")} B`;
+  if (value < 1024) return `${value.toLocaleString(getLocale())} B`;
   const unit = value >= 1024 ** 3 ? "GB" : value >= 1024 ** 2 ? "MB" : "KB",
     divisor = unit === "GB" ? 1024 ** 3 : unit === "MB" ? 1024 ** 2 : 1024;
-  return `${(value / divisor).toLocaleString("zh-CN", { maximumFractionDigits: 1 })} ${unit}`;
+  return `${(value / divisor).toLocaleString(getLocale(), { maximumFractionDigits: 1 })} ${unit}`;
 }
 export default function LibrarySpace({ home }: { home: string }) {
+  const t = useTranslator(messages);
   const [storage, setStorage] = useState<LibraryStorage | null>(null),
     [policy, setPolicy] = useState<MaintenancePolicy | null>(null);
   const [plan, setPlan] = useState<CleanupPlan | null>(null),
@@ -78,12 +69,12 @@ export default function LibrarySpace({ home }: { home: string }) {
   return (
     <section
       className="settings-group library-space"
-      aria-label="内容库空间管理"
+      aria-label={t("spaceManagement")}
     >
-      <section className="library-space-section" aria-label="存储空间">
+      <section className="library-space-section" aria-label={t("storage")}>
         <div className="settings-row">
           <div className="settings-row-text">
-            <h3>存储空间</h3>
+            <h3>{t("storage")}</h3>
           </div>
           <div className="library-space-actions">
             <button
@@ -92,13 +83,13 @@ export default function LibrarySpace({ home }: { home: string }) {
               onClick={analyzeProjects}
             >
               {analyzing && <Loader2 size={14} className="studio-spin" />}
-              {analyzing ? "正在分析项目存储空间…" : "分析项目存储空间"}
+              {analyzing ? t("analyzingProjects") : t("analyzeProjects")}
             </button>
             <button
               className="settings-button settings-button-icon"
               disabled={busy}
-              aria-label="刷新空间统计"
-              title="刷新空间统计"
+              aria-label={t("refreshStats")}
+              title={t("refreshStats")}
               onClick={() => void run(async () => {})}
             >
               <RefreshCw size={14} />
@@ -108,8 +99,12 @@ export default function LibrarySpace({ home }: { home: string }) {
         <div className="library-space-section-content">
           <p className="library-space-summary">
             {storage
-              ? `文件大小 ${bytes(storage.totalBytes)} · 磁盘分配 ${bytes(storage.allocatedBytes)} · ${storage.files.toLocaleString()} 个文件`
-              : "正在核对内容文件…"}
+              ? t("summary", {
+                  size: bytes(storage.totalBytes),
+                  allocated: bytes(storage.allocatedBytes),
+                  count: storage.files.toLocaleString(getLocale()),
+                })
+              : t("checkingFiles")}
           </p>
           {storage && (
             <div className="library-space-breakdown">
@@ -117,27 +112,29 @@ export default function LibrarySpace({ home }: { home: string }) {
                 .filter(([, item]) => item.files)
                 .map(([name, item]) => (
                   <div key={name}>
-                    <span>{labels[name as StorageCategory]}</span>
+                    <span>{t(`category.${name as StorageCategory}`)}</span>
                     <span>{bytes(item.bytes)}</span>
                   </div>
                 ))}
               <p>
-                {storage.git.packs} 个存储包 ·{" "}
-                {storage.git.looseObjects.toLocaleString()} 个未打包对象
+                {t("gitSummary", {
+                  packs: storage.git.packs.toLocaleString(getLocale()),
+                  objects: storage.git.looseObjects.toLocaleString(getLocale()),
+                })}
               </p>
             </div>
           )}
         </div>
       </section>
-      <section className="library-space-section" aria-label="自动压缩">
+      <section className="library-space-section" aria-label={t("autoCompact")}>
         <div className="settings-row">
           <div className="settings-row-text">
-            <h3>自动压缩</h3>
+            <h3>{t("autoCompact")}</h3>
           </div>
           <label className="library-space-toggle">
             <input
               type="checkbox"
-              aria-label="自动压缩内容"
+              aria-label={t("autoCompactLabel")}
               checked={policy?.automatic ?? true}
               disabled={!policy || busy}
               onChange={(event) =>
@@ -151,7 +148,7 @@ export default function LibrarySpace({ home }: { home: string }) {
                 })
               }
             />
-            开启
+            {t("on")}
           </label>
         </div>
         <div className="library-space-section-content">
@@ -166,12 +163,15 @@ export default function LibrarySpace({ home }: { home: string }) {
                     afterBytes: number;
                   }>("library:compact");
                   setNotice(
-                    `压缩完成：${bytes(result.beforeBytes)} → ${bytes(result.afterBytes)}，内容完整保留。`,
+                    t("toast.compacted", {
+                      before: bytes(result.beforeBytes),
+                      after: bytes(result.afterBytes),
+                    }),
                   );
                 })
               }
             >
-              立即压缩
+              {t("compactNow")}
             </button>
             <button
               className="settings-button"
@@ -184,7 +184,7 @@ export default function LibrarySpace({ home }: { home: string }) {
                 })
               }
             >
-              检查可清理文件
+              {t("findCleanup")}
             </button>
             <button
               className="settings-button"
@@ -192,23 +192,26 @@ export default function LibrarySpace({ home }: { home: string }) {
               onClick={() =>
                 void run(async () => {
                   await desktop.invoke("library:rebuildIndex");
-                  setNotice("搜索和引用索引已重建。 ");
+                  setNotice(t("toast.indexRebuilt"));
                 })
               }
             >
-              重建搜索索引
+              {t("rebuildIndex")}
             </button>
             {busy && <Loader2 size={15} className="studio-spin" />}
           </div>
           {plan && (
             <div className="library-space-plan">
               <p>
-                可清理 {plan.files.length} 个文件，共 {bytes(plan.bytes)}。保留{" "}
-                {plan.protectedDrafts} 份草稿及 {plan.protectedConflicts}{" "}
-                份冲突快照。
+                {t("cleanupPlan", {
+                  count: plan.files.length,
+                  size: bytes(plan.bytes),
+                  drafts: plan.protectedDrafts,
+                  conflicts: plan.protectedConflicts,
+                })}
               </p>
               <details>
-                <summary>查看待清理文件</summary>
+                <summary>{t("showCleanupFiles")}</summary>
                 {plan.files.map((item) => (
                   <p key={item.path}>
                     <code>{item.path}</code> · {bytes(item.bytes)}
@@ -222,27 +225,27 @@ export default function LibrarySpace({ home }: { home: string }) {
                   void run(async () => {
                     await desktop.invoke("library:cleanup", { id: plan.id });
                     setPlan(null);
-                    setNotice("清理完成，正式内容已保留。");
+                    setNotice(t("toast.cleaned"));
                   })
                 }
               >
-                清理这些文件
+                {t("cleanUpFiles")}
               </button>
             </div>
           )}
         </div>
       </section>
-      <section className="library-space-section" aria-label="完整归档">
+      <section className="library-space-section" aria-label={t("fullArchive")}>
         <div className="settings-row">
           <div className="settings-row-text">
-            <h3>完整归档</h3>
+            <h3>{t("fullArchive")}</h3>
           </div>
         </div>
         <div className="library-space-section-content">
           <div className="library-space-archive">
             <input
-              aria-label="归档保存位置"
-              placeholder="完整的新文件夹路径"
+              aria-label={t("archiveLocation")}
+              placeholder={t("archivePlaceholder")}
               value={archivePath}
               onChange={(event) => setArchivePath(event.target.value)}
             />
@@ -255,21 +258,21 @@ export default function LibrarySpace({ home }: { home: string }) {
                     "library:archive",
                     { out: archivePath },
                   );
-                  setNotice(`完整归档已保存并验证：${result.path}`);
+                  setNotice(t("toast.archived", { path: result.path }));
                 })
               }
             >
-              保存完整归档
+              {t("saveArchive")}
             </button>
           </div>
         </div>
       </section>
       {storage?.maintenance?.state === "running" && (
-        <p role="status">后台维护正在进行，编辑草稿仍可保留。</p>
+        <p role="status">{t("maintenanceRunning")}</p>
       )}
       {storage?.maintenance?.state === "failed" && (
         <p className="settings-help" role="status">
-          上一次维护未完成：{storage.maintenance.error}
+          {t("maintenanceFailed", { error: storage.maintenance.error ?? "" })}
         </p>
       )}
       {notice && (
@@ -279,7 +282,7 @@ export default function LibrarySpace({ home }: { home: string }) {
       )}
       {showProjects && (
         <Dialog
-          title="项目存储空间"
+          title={t("projectStorage")}
           wide
           className="library-project-space-dialog"
           onClose={() => setShowProjects(false)}
@@ -296,36 +299,36 @@ export default function LibrarySpace({ home }: { home: string }) {
                 ) : (
                   <RefreshCw size={14} />
                 )}
-                {analyzing ? "正在分析…" : "重新分析"}
+                {analyzing ? t("analyzing") : t("analyzeAgain")}
               </button>
               {analyzing && (
                 <p className="settings-help" role="status">
-                  正在核对各项目的文件占用…
+                  {t("checkingProjects")}
                 </p>
               )}
             </div>
             {storage?.projects && (
               <section
                 className="library-project-space"
-                aria-label="项目占用空间"
+                aria-label={t("projectUsage")}
               >
                 <p className="settings-help" role="status">
-                  {storage.projects.items.length}{" "}
-                  个项目，按文件大小从大到小排列。
-                  统计项目目录中的内容、资源、导出与缓存，以及保留的原始文件。
+                  {t("projectsSummary", {
+                    count: storage.projects.items.length,
+                  })}
                 </p>
                 {storage.projects.items.length ? (
                   <div className="library-project-space-table">
                     <table>
                       <caption className="settings-sr-only">
-                        每个项目的存储占用
+                        {t("tableCaption")}
                       </caption>
                       <thead>
                         <tr>
-                          <th scope="col">项目</th>
-                          <th scope="col">文件大小</th>
-                          <th scope="col">磁盘分配</th>
-                          <th scope="col">文件数</th>
+                          <th scope="col">{t("column.project")}</th>
+                          <th scope="col">{t("column.size")}</th>
+                          <th scope="col">{t("column.allocated")}</th>
+                          <th scope="col">{t("column.files")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -333,29 +336,36 @@ export default function LibrarySpace({ home }: { home: string }) {
                           <tr key={project.id}>
                             <th scope="row">
                               {project.name}
-                              {project.archived && <small>已归档</small>}
-                              {project.retained && <small>保留文件</small>}
+                              {project.archived && (
+                                <small>{t("archived")}</small>
+                              )}
+                              {project.retained && (
+                                <small>{t("retained")}</small>
+                              )}
                             </th>
                             <td>{bytes(project.bytes)}</td>
                             <td>{bytes(project.allocatedBytes)}</td>
-                            <td>{project.files.toLocaleString("zh-CN")}</td>
+                            <td>{project.files.toLocaleString(getLocale())}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                 ) : (
-                  <p className="settings-help">内容库中暂无项目。</p>
+                  <p className="settings-help">{t("noProjects")}</p>
                 )}
                 <p className="settings-help">
-                  共享存储与其他文件：{bytes(storage.projects.shared.bytes)}
-                  ，磁盘分配 {bytes(storage.projects.shared.allocatedBytes)}。
-                  内容数据库、共享资源、索引与本机草稿单独计入此项；
-                  内容数据库的压缩数据由项目共用，无法准确分摊。
+                  {t("sharedStorage", {
+                    size: bytes(storage.projects.shared.bytes),
+                    allocated: bytes(storage.projects.shared.allocatedBytes),
+                  })}
                 </p>
                 <p className="settings-help">
-                  统计时间：
-                  {new Date(storage.measuredAt).toLocaleString("zh-CN")}
+                  {t("measuredAt", {
+                    date: new Date(storage.measuredAt).toLocaleString(
+                      getLocale(),
+                    ),
+                  })}
                 </p>
               </section>
             )}

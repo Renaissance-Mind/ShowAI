@@ -1,4 +1,8 @@
 import { validatePageIcon } from "../lib/page-icon.mjs";
+import { translator } from "../i18n";
+import commonMessages from "../i18n/messages/common";
+import fileMessages from "../i18n/messages/files";
+import workbenchMessages from "../i18n/messages/workbench";
 import { PROJECT_SCOPE_LIMIT } from "../desktop/bridge";
 import { syncManager } from "../sync/manager";
 import { remoteSaveOrigin } from "../core/remote-save-conflict";
@@ -72,6 +76,10 @@ import type {
 } from "../components/custom/types";
 import type { ComponentManifest, JsonSchema } from "../components/custom/types";
 import type { DesktopInfo } from "../desktop/bridge";
+
+const t = translator(workbenchMessages);
+const tc = translator(commonMessages);
+const tf = translator(fileMessages);
 
 export const workbenchActions = new Set([
   "sync:status",
@@ -452,7 +460,7 @@ export function createWorkbench(
           return sync.accounts.resources();
         case "sync:projectVisibility": {
           if (typeof args.visible !== "boolean")
-            throw new CoreError("INVALID_DATA", "请选择项目是否在本设备显示。");
+            throw new CoreError("INVALID_DATA", t("chooseProjectVisibility"));
           const result = await sync.setProjectVisibility(
             projectId(args),
             args.visible,
@@ -510,7 +518,7 @@ export function createWorkbench(
             typeof args.input !== "object" ||
             Array.isArray(args.input)
           )
-            throw new CoreError("INVALID_DATA", "无效的项目管理操作。");
+            throw new CoreError("INVALID_DATA", t("invalidProjectAction"));
           return sync.manage(
             required(args, "connectionId"),
             projectId(args),
@@ -821,13 +829,23 @@ export function createWorkbench(
       case "folders:create":
         return store.createFolder(projectId(args), {
           name: required(args, "name"),
+          icon:
+            args.icon === undefined
+              ? undefined
+              : validatePageIcon(args.icon, "folder.icon"),
           parentId: parentFolder(args),
         });
       case "folders:rename":
         return store.updateFolder(
           projectId(args),
           assertId(required(args, "folderId")),
-          { name: required(args, "name") },
+          {
+            name: required(args, "name"),
+            icon:
+              args.icon === undefined
+                ? undefined
+                : validatePageIcon(args.icon, "folder.icon"),
+          },
         );
       case "folders:pin":
         return store.updateFolder(
@@ -981,7 +999,9 @@ export function createWorkbench(
             document: {
               ...instantiateTemplate({
                 ...original.document,
-                title: `${original.document.title || "未命名页面"} 副本`,
+                title: t("pageCopyTitle", {
+                  title: original.document.title || tc("untitledPage"),
+                }),
                 archived: false,
               }),
               parentId,
@@ -1135,7 +1155,7 @@ export function createWorkbench(
         const project = projectId(args);
         await store.listPages(project);
         const result = await host.openDialog({
-          title: "选择组件源码目录",
+          title: tf("title.componentSource"),
           properties: ["openDirectory"],
         });
         if (result.canceled || !result.filePaths[0]) return null;
@@ -1180,23 +1200,27 @@ export function createWorkbench(
           {
             manifest: {
               id,
-              name: "计数器",
+              name: "计数器", // i18n-exempt: sample component content
               version: "1.0.0",
+              // i18n-exempt: sample component content
               description: "可编辑的 React 控件示例，点击按钮调整计数。",
               scenarios: [
+                // i18n-exempt: sample component content
                 "理解组件输入、交互和页面数据保存，例如用按钮记录一个本地计数。",
               ],
               effects: [
-                "点击按钮即可观察数值变化。",
+                "点击按钮即可观察数值变化。", // i18n-exempt: sample component content
+                // i18n-exempt: sample component content
                 "编辑状态下将计数保存到页面，阅读时可临时操作。",
               ],
               entry: "Component.tsx",
-              defaultData: { label: "计数", value: 0 },
+              defaultData: { label: "计数", value: 0 }, // i18n-exempt: sample data
               examples: [
                 {
-                  name: "从零开始",
+                  name: "从零开始", // i18n-exempt: sample component content
+                  // i18n-exempt: sample component content
                   request: "从0开始，用增加和减少按钮探索整数变化。",
-                  data: { label: "计数", value: 0 },
+                  data: { label: "计数", value: 0 }, // i18n-exempt: sample data
                 },
               ],
             },
@@ -1209,6 +1233,7 @@ export function createWorkbench(
               required: ["label", "value"],
               additionalProperties: false,
             },
+            // i18n-exempt: sample component source
             source: `import React, {useEffect, useState} from "react";\nexport default function Counter({data,onChange,readOnly}) {\n const [value,setValue]=useState(data.value);\n useEffect(()=>setValue(data.value),[data.value]);\n function change(next) {setValue(next); if(!readOnly) onChange?.({...data,value:next});}\n return <section style={{fontFamily:"system-ui",padding:28,textAlign:"center",background:"#f4f6f3",borderRadius:12}}><p>{data.label}</p><output style={{fontSize:48}}>{value}</output><div style={{display:"flex",justifyContent:"center",gap:12,marginTop:16}}><button onClick={()=>change(value-1)} aria-label="减少">−</button><button onClick={()=>change(value+1)} aria-label="增加">+</button></div></section>;\n}\n`,
           },
           project,
@@ -1266,7 +1291,7 @@ export function createWorkbench(
         const project = await optionalProject(args),
           ref = revisionArg(args);
         const selection = await host.openDialog({
-          title: "选择发布包保存位置",
+          title: tf("title.publishPackage"),
           properties: ["openDirectory", "createDirectory"],
         });
         if (selection.canceled || !selection.filePaths[0]) return null;
@@ -1289,9 +1314,9 @@ export function createWorkbench(
       }
       case "dialog:openPage": {
         const result = await host.openDialog({
-          title: "导入 ShowAI 页面",
+          title: tf("title.importPage"),
           properties: ["openFile"],
-          filters: [{ name: "ShowAI 页面", extensions: ["json", "html"] }],
+          filters: [{ name: tf("filter.page"), extensions: ["json", "html"] }],
         });
         if (result.canceled || !result.filePaths[0]) return null;
         const path = result.filePaths[0];
@@ -1316,11 +1341,11 @@ export function createWorkbench(
         const format = args.format as "html" | "json" | "inline";
         const record = await enrichPage(id, await store.readPage(id, page));
         const selection = await host.saveDialog({
-          title: "导出页面",
+          title: tf("title.exportPage"),
           defaultPath: `${filename(record.document.title)}${format === "json" ? ".showai.json" : ".html"}`,
           filters: [
             {
-              name: format === "json" ? "ShowAI 页面源" : "HTML 页面",
+              name: format === "json" ? tf("filter.pageSource") : tf("filter.html"),
               extensions: [format === "json" ? "json" : "html"],
             },
           ],
@@ -1352,7 +1377,7 @@ export function createWorkbench(
         const id = projectId(args);
         await store.listPages(id);
         const selection = await host.openDialog({
-          title: "选择网站输出目录",
+          title: tf("title.siteOutput"),
           properties: ["openDirectory", "createDirectory"],
         });
         if (selection.canceled || !selection.filePaths[0]) return null;
@@ -1454,7 +1479,7 @@ export function createWorkbench(
       (typeof args.expectedHome !== "string" ||
         resolve(args.expectedHome) !== store.root)
     )
-      throw new CoreError("CONFLICT", "内容库已切换，请重新载入。");
+      throw new CoreError("CONFLICT", t("librarySwitched"));
     if (!mutationActions.has(action)) return handle(action, args);
     const supplied = args.historyContext as
       | {

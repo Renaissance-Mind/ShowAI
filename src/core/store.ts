@@ -204,6 +204,7 @@ function validateProject(value: unknown, expectedId: string): ProjectMetadata {
     assertId(folder.id);
     validateName(folder.name);
     validateDirectoryPreferences(folder);
+    if (folder.icon !== undefined) validatePageIcon(folder.icon, "folder.icon");
     if (ids.has(folder.id))
       throw new CoreError("INVALID_DATA", `Duplicate folder id: ${folder.id}`);
     ids.add(folder.id);
@@ -1111,10 +1112,14 @@ export class FileStore {
 
   async createFolder(
     projectId: string,
-    input: { name: string; parentId?: string | null },
+    input: { name: string; icon?: string; parentId?: string | null },
   ): Promise<FolderMetadata> {
     assertId(projectId);
     const name = validateName(input.name);
+    const icon =
+      input.icon === undefined
+        ? undefined
+        : validatePageIcon(input.icon, "folder.icon");
     return this.withLock(`project-${projectId}`, async () => {
       const project = await this.readProject(projectId);
       requireActiveFolder(project, input.parentId ?? null);
@@ -1122,6 +1127,7 @@ export class FileStore {
       const folder: FolderMetadata = {
         id: randomUUID(),
         name,
+        ...(icon !== undefined ? { icon } : {}),
         parentId: input.parentId ?? null,
         pinned: false,
         archived: false,
@@ -1147,10 +1153,19 @@ export class FileStore {
   async updateFolder(
     projectId: string,
     folderId: string,
-    input: { name?: string; pinned?: boolean; archived?: boolean },
+    input: {
+      name?: string;
+      icon?: string;
+      pinned?: boolean;
+      archived?: boolean;
+    },
   ): Promise<FolderMetadata> {
     assertId(projectId);
     assertId(folderId);
+    const icon =
+      input.icon === undefined
+        ? undefined
+        : validatePageIcon(input.icon, "folder.icon");
     for (const key of ["pinned", "archived"] as const)
       if (input[key] !== undefined && typeof input[key] !== "boolean")
         throw new CoreError("INVALID_DATA", `${key} must be boolean.`);
@@ -1162,6 +1177,7 @@ export class FileStore {
       const updated: FolderMetadata = {
         ...folder,
         ...(input.name !== undefined ? { name: validateName(input.name) } : {}),
+        ...(icon !== undefined ? { icon } : {}),
         ...(input.pinned !== undefined ? { pinned: input.pinned } : {}),
         ...(input.archived !== undefined ? { archived: input.archived } : {}),
         updatedAt: now,

@@ -71,15 +71,8 @@ function PageContent({
         onActiveSurfaceChange={onActiveSurfaceChange}
         onRevealHandled={onRevealHandled}
         retainedState={view.surface}
-        onHandwriting={window.showai?.handwrite && !locked ? async (boardId, document) => {
-          view.session.edit(document);
-          if (!(await view.session.flush())) return;
-          const current = view.session.getSnapshot();
-          if (!current.projectId || !current.draft) return;
-          const updated = await window.showai!.handwrite!({ projectId: current.projectId, pageId: current.draft.id, boardId });
-          view.session.edit(updated);
-          await view.session.flush();
-        } : undefined}
+        inlineInkProjectId={state.projectId ?? undefined}
+        onInkSave={view.session.flush}
       />
     </CustomComponentsProvider>
   );

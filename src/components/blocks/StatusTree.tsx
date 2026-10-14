@@ -2,6 +2,10 @@ import { type CSSProperties, useEffect, useRef, useState } from "react";
 import type { BlockProps } from "./types";
 import { DEFAULT_TREE_STATUSES, statusCounts } from "./analysis-contract.mjs";
 import "./analysis.css";
+import { blockLabel } from "./shared";
+import type { MessageKey } from "../../i18n";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/analysis";
 
 type Tone = "done" | "failed" | "active" | "todo" | "paused";
 type Status = { id: string; label: string; tone: Tone; color?: string };
@@ -45,6 +49,30 @@ const toneStyle = (status: Status): CSSProperties =>
       ? `color-mix(in srgb, ${status.color} 14%, transparent)`
       : TONE_VARS[status.tone][1],
   }) as CSSProperties;
+
+// Statuses still carrying a contract default label are shown in the reader's language.
+const DEFAULT_LABELS = new Map(
+  (DEFAULT_TREE_STATUSES as Status[]).map((status) => [
+    status.id,
+    status.label,
+  ]),
+);
+const DEFAULT_KEYS: Record<string, MessageKey<typeof messages>> = {
+  done: "tree.status.done",
+  active: "tree.status.active",
+  failed: "tree.status.failed",
+  todo: "tree.status.todo",
+  paused: "tree.status.paused",
+};
+function localizeStatus(
+  status: Status,
+  t: (key: MessageKey<typeof messages>) => string,
+): Status {
+  const key = DEFAULT_KEYS[status.id];
+  return key && DEFAULT_LABELS.get(status.id) === status.label
+    ? { ...status, label: t(key) }
+    : status;
+}
 
 function useWidth() {
   const ref = useRef<HTMLDivElement>(null);
@@ -93,8 +121,11 @@ function StatusBar({
 }
 
 export function StatusTreeBlock({ data }: BlockProps) {
+  const t = useTranslator(messages);
   const model = data as unknown as Tree;
-  const statuses = model.statuses ?? (DEFAULT_TREE_STATUSES as Status[]);
+  const statuses = (model.statuses ?? (DEFAULT_TREE_STATUSES as Status[])).map(
+    (status) => localizeStatus(status, t),
+  );
   const statusOf = new Map(statuses.map((status) => [status.id, status]));
   const all = model.groups.flatMap((group) => group.items);
   const counts = statusCounts(model) as Record<string, number>;
@@ -143,11 +174,18 @@ export function StatusTreeBlock({ data }: BlockProps) {
   const dim = (item: Item) => focus !== null && item.status !== focus;
 
   return (
-    <section className="sb-block an-block" aria-label={model.title ?? "状态树"}>
+    <section
+      className="sb-block an-block"
+      aria-label={blockLabel(model.title, t("tree.title"))}
+    >
       <div className="an-head">
         {model.title && <h3 className="an-title">{model.title}</h3>}
         {model.description && <p className="an-sub">{model.description}</p>}
-        <div className="an-tools" role="group" aria-label="按状态突出">
+        <div
+          className="an-tools"
+          role="group"
+          aria-label={t("tree.highlightByStatus")}
+        >
           {statuses.map((status) => (
             <button
               key={status.id}
@@ -207,7 +245,7 @@ export function StatusTreeBlock({ data }: BlockProps) {
               className="an-root"
               style={{ left: 0, top: rootY - 60, width: rootW, height: 120 }}
             >
-              <small>问题</small>
+              <small>{t("tree.question")}</small>
               {model.root}
             </div>
           )}
@@ -280,25 +318,28 @@ export function StatusTreeBlock({ data }: BlockProps) {
                 {MARKS[activeStatus.tone]} {activeStatus.label}
               </span>
               {active.source && (
-                <span className="an-sub"> · 来源：{active.source}</span>
+                <span className="an-sub">
+                  {" · "}
+                  {t("tree.source", { source: active.source })}
+                </span>
               )}
               {active.detail && (
                 <div className="an-field">
-                  <small>说明</small>
+                  <small>{t("tree.detail")}</small>
                   {active.detail}
                 </div>
               )}
               {active.result && (
                 <div className="an-result-box" style={toneStyle(activeStatus)}>
                   <small style={{ color: "var(--tone)", fontWeight: 600 }}>
-                    结果
+                    {t("tree.result")}
                   </small>
                   <div>{active.result}</div>
                 </div>
               )}
               {active.links && active.links.length > 0 && (
                 <div className="an-field">
-                  <small>关联</small>
+                  <small>{t("tree.links")}</small>
                   <div className="an-tags">
                     {active.links.map((link) => (
                       <span key={link} className="an-tag">
@@ -310,7 +351,7 @@ export function StatusTreeBlock({ data }: BlockProps) {
               )}
             </div>
             <div className="an-panel">
-              <p className="an-panel-title">整体进度</p>
+              <p className="an-panel-title">{t("tree.overall")}</p>
               <StatusBar items={all} statuses={statuses} height={10} />
               <div className="an-legend">
                 {statuses.map((status) => (
@@ -325,15 +366,20 @@ export function StatusTreeBlock({ data }: BlockProps) {
         )}
       </div>
       <details className="an-static">
-        <summary>按类别阅读全部条目（{all.length}）</summary>
+        <summary>{t("tree.readAll", { count: all.length })}</summary>
         {model.groups.map((group) => (
           <div key={group.id}>
             <h4>{group.label}</h4>
             <ul>
               {group.items.map((item) => (
                 <li key={item.id}>
-                  <b>{statusOf.get(item.status)?.label}</b> · {item.label}
-                  {item.result ? `：${item.result}` : ""}
+                  <b>{statusOf.get(item.status)?.label}</b> ·{" "}
+                  {item.result
+                    ? t("tree.itemResult", {
+                        label: item.label,
+                        result: item.result,
+                      })
+                    : item.label}
                 </li>
               ))}
             </ul>

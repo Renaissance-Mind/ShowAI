@@ -1,5 +1,9 @@
 import { Agent, request } from "undici";
 import { Readable } from "node:stream";
+import { translator } from "../i18n";
+import syncEngineMessages from "../i18n/messages/syncEngine";
+
+const t = translator(syncEngineMessages);
 
 let dispatcher: Agent | undefined;
 
@@ -55,7 +59,7 @@ export async function serverFetch(
   }).catch((error: unknown) => {
     if (init?.signal?.aborted) throw init.signal.reason;
     throw new TypeError(
-      error instanceof Error ? error.message : "同步网络请求失败。",
+      error instanceof Error ? error.message : t("network.failed"),
       { cause: error },
     );
   });
@@ -65,7 +69,7 @@ export async function serverFetch(
     init?.redirect !== "manual"
   ) {
     await response.body.dump();
-    throw new TypeError("服务器地址发生重定向，请使用最终服务器基址重新连接。");
+    throw new TypeError(t("network.redirected"));
   }
   const resultHeaders = new Headers();
   for (const [name, value] of Object.entries(response.headers))

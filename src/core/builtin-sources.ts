@@ -75,6 +75,31 @@ import flowchartContract from "../components/blocks/flowchart-contract.mjs?raw";
 import icons from "../ui/icons.ts?raw";
 import expandableSearch from "../components/ExpandableSearch.tsx?raw";
 import expandableSearchCss from "../components/expandable-search.css?raw";
+import i18nCore from "../i18n/index.ts?raw";
+import i18nReact from "../i18n/react.ts?raw";
+import i18n_blockHelpers from "../i18n/messages/blockHelpers.ts?raw";
+import i18n_blocks from "../i18n/messages/blocks.ts?raw";
+import i18n_chart from "../i18n/messages/chart.ts?raw";
+import i18n_common from "../i18n/messages/common.ts?raw";
+import i18n_database from "../i18n/messages/database.ts?raw";
+import i18n_diagram from "../i18n/messages/diagram.ts?raw";
+import i18n_editor from "../i18n/messages/editor.ts?raw";
+import i18n_flowchart from "../i18n/messages/flowchart.ts?raw";
+import i18n_g2 from "../i18n/messages/g2.ts?raw";
+import i18n_gallery from "../i18n/messages/gallery.ts?raw";
+import i18n_media from "../i18n/messages/media.ts?raw";
+import i18n_metrics from "../i18n/messages/metrics.ts?raw";
+import i18n_mindmap from "../i18n/messages/mindmap.ts?raw";
+import i18n_nativeInk from "../i18n/messages/nativeInk.ts?raw";
+import i18n_pdf from "../i18n/messages/pdf.ts?raw";
+import i18n_playground from "../i18n/messages/playground.ts?raw";
+import i18n_presentation from "../i18n/messages/presentation.ts?raw";
+import i18n_primitives from "../i18n/messages/primitives.ts?raw";
+import i18n_references from "../i18n/messages/references.ts?raw";
+import i18n_resourceEditor from "../i18n/messages/resourceEditor.ts?raw";
+import i18n_richText from "../i18n/messages/richText.ts?raw";
+import i18n_search from "../i18n/messages/search.ts?raw";
+import i18n_analysis from "../i18n/messages/analysis.ts?raw";
 
 const sources: Record<string, string> = {
   ...g2BuiltinSources,
@@ -152,6 +177,33 @@ const sources: Record<string, string> = {
   "flowchart.css": flowchartCss,
   "flowchart-contract.mjs": flowchartContract,
   "theme.css": `${themeTokens}\n${themeContent}`,
+  // Built-in blocks read their catalogs from here; each compiled component
+  // keeps its own copy of the i18n core, which starts in the host's language.
+  "i18n/index.ts": i18nCore,
+  "i18n/react.ts": i18nReact,
+  "i18n/messages/blockHelpers.ts": i18n_blockHelpers,
+  "i18n/messages/blocks.ts": i18n_blocks,
+  "i18n/messages/chart.ts": i18n_chart,
+  "i18n/messages/common.ts": i18n_common,
+  "i18n/messages/database.ts": i18n_database,
+  "i18n/messages/diagram.ts": i18n_diagram,
+  "i18n/messages/editor.ts": i18n_editor,
+  "i18n/messages/flowchart.ts": i18n_flowchart,
+  "i18n/messages/g2.ts": i18n_g2,
+  "i18n/messages/gallery.ts": i18n_gallery,
+  "i18n/messages/media.ts": i18n_media,
+  "i18n/messages/metrics.ts": i18n_metrics,
+  "i18n/messages/mindmap.ts": i18n_mindmap,
+  "i18n/messages/nativeInk.ts": i18n_nativeInk,
+  "i18n/messages/pdf.ts": i18n_pdf,
+  "i18n/messages/playground.ts": i18n_playground,
+  "i18n/messages/presentation.ts": i18n_presentation,
+  "i18n/messages/primitives.ts": i18n_primitives,
+  "i18n/messages/references.ts": i18n_references,
+  "i18n/messages/resourceEditor.ts": i18n_resourceEditor,
+  "i18n/messages/richText.ts": i18n_richText,
+  "i18n/messages/search.ts": i18n_search,
+  "i18n/messages/analysis.ts": i18n_analysis,
 };
 // Package the shared icon module inside the trusted SDK's virtual filesystem.
 // User component packages retain the existing package-local import boundary.
@@ -189,7 +241,11 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
           ? 'from "../ExpandableSearch"'
           : 'from "./ExpandableSearch"',
       )
-      .replace(/from\s+["'](?:\.\.\/){1,2}ui\/icons["']/g, 'from "./icons"'),
+      .replace(/from\s+["'](?:\.\.\/){1,2}ui\/icons["']/g, 'from "./icons"')
+      .replace(
+        /(from\s+["'])(?:\.\.\/)+i18n(?=["'/])/g,
+        `$1${"../".repeat(name.split("/").length - 1) || "./"}i18n`,
+      ),
   ]),
 );
 export const builtinExports: Record<string, string> = {

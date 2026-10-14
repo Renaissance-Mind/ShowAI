@@ -1,3 +1,8 @@
+import { translator } from "../i18n";
+import sidebarMessages from "../i18n/messages/sidebar";
+
+const t = translator(sidebarMessages);
+
 export type WorkspaceView =
   "projects" | "project" | "page" | "templates" | "components" | "settings";
 
@@ -28,7 +33,7 @@ export interface WorkspaceTabsState {
 
 export const recentEntry = (): WorkspaceEntry => ({
   location: { view: "projects", projectId: null, folderId: null, pageId: null },
-  title: "最近",
+  title: t("nav.recent"),
   scrollTop: 0,
 });
 

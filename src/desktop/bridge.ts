@@ -1,3 +1,4 @@
+import type { Locale } from "../i18n";
 import type { TabCommand } from "../workbench/tab-shortcuts";
 export const PROJECT_SCOPE_LIMIT = 1000;
 
@@ -38,12 +39,14 @@ export interface DesktopWindowState {
 export type DesktopAppearance = "light" | "dark";
 
 export interface ShowAIBridge {
-  handwrite?(args: { projectId: string; pageId: string; boardId: string }): Promise<import("../types").ShowDocument>;
+  inlineInk?: import("../surface/inline-ink").InlineInkBridge;
   openWindow?(
     args: Record<string, unknown>,
     prepare: () => Promise<boolean>,
   ): Promise<boolean>;
   setAppearance?(appearance: DesktopAppearance): Promise<void>;
+  /** Keeps native menus and dialogs in the workbench language. */
+  setLocale?(locale: Locale): Promise<void>;
   getWindowState?(): Promise<DesktopWindowState>;
   onWindowStateChange?(
     listener: (state: DesktopWindowState) => void,

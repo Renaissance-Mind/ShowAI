@@ -27,6 +27,7 @@ export function iconSvg(mode, { masked = true } = {}) {
   ];
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${design.canvasSize}" height="${design.canvasSize}" viewBox="0 0 ${design.canvasSize} ${design.canvasSize}" role="img" aria-labelledby="title">`,
+    // i18n-exempt: design asset title, not UI
     `  <title id="title">ShowAI · ${mode === "dark" ? "亮色界面" : "暗色界面"}${masked ? "" : " · 无遮罩母版"}</title>`,
     masked
       ? `  <path d="${frame}" fill="${colors.background}"/>`

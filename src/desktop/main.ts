@@ -36,6 +36,16 @@ import {
   projectId,
   text,
 } from "../workbench/actions";
+import {
+  getLocale,
+  isLanguagePreference,
+  languageOverride,
+  resolveLocale,
+  setLocale,
+  translator,
+  type Locale,
+} from "../i18n";
+import desktopMessages from "../i18n/messages/desktop";
 import type {
   DesktopAppearance,
   DesktopChange,
@@ -43,6 +53,7 @@ import type {
   DesktopResponse,
 } from "./bridge";
 
+const t = translator(desktopMessages);
 const directory = dirname(fileURLToPath(import.meta.url));
 const repository = resolve(directory, "..");
 const windows = new Set<BrowserWindow>();
@@ -72,6 +83,9 @@ let checkingQuit = false;
 let allowedQuit = false;
 
 app.setName("ShowAI");
+// Chromium reports this to the renderer as the system language.
+const pinnedLocale = languageOverride();
+if (pinnedLocale) app.commandLine.appendSwitch("lang", pinnedLocale);
 if (process.env.SHOWAI_USER_DATA)
   app.setPath("userData", resolve(process.env.SHOWAI_USER_DATA));
 
@@ -207,7 +221,13 @@ async function useHome(home?: string): Promise<void> {
   watcher.on("error", (error) => console.error("ShowAI file watcher:", error));
 }
 
-async function readSettings(): Promise<{ home?: string }> {
+interface DesktopSettings {
+  home?: string;
+  /** Last workbench language, so native menus match it before a window loads. */
+  locale?: Locale;
+}
+
+async function readSettings(): Promise<DesktopSettings> {
   const path = join(app.getPath("userData"), "showai-settings.json");
   let contents: string;
   try {
@@ -216,21 +236,115 @@ async function readSettings(): Promise<{ home?: string }> {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return {};
     throw error;
   }
-  const settings = JSON.parse(contents) as { home?: unknown };
+  const settings = JSON.parse(contents) as { home?: unknown; locale?: unknown };
   if (settings.home !== undefined && typeof settings.home !== "string")
     throw new Error("ShowAI settings contain an invalid home directory.");
-  return settings as { home?: string };
+  return {
+    home: settings.home,
+    // An unknown saved language falls back to the system language.
+    locale:
+      isLanguagePreference(settings.locale) && settings.locale !== "system"
+        ? settings.locale
+        : undefined,
+  };
 }
 
-async function saveSettings(home: string): Promise<void> {
+async function saveSettings(update: DesktopSettings): Promise<void> {
   const path = join(app.getPath("userData"), "showai-settings.json");
+  const settings = { ...(await readSettings()), ...update };
   await mkdir(dirname(path), { recursive: true });
   const temporary = `${path}.${randomUUID()}.tmp`;
-  await writeFile(temporary, JSON.stringify({ home }, null, 2), {
+  await writeFile(temporary, JSON.stringify(settings, null, 2), {
     flag: "wx",
     mode: 0o600,
   });
   await atomicRename(temporary, path);
+}
+
+function buildApplicationMenu() {
+  const darwin = process.platform === "darwin";
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      ...(darwin
+        ? [
+            {
+              role: "appMenu" as const,
+              submenu: [
+                { role: "about" as const, label: t("menu.about") },
+                { type: "separator" as const },
+                {
+                  role: "services" as const,
+                  label: t("menu.services"),
+                },
+                { type: "separator" as const },
+                { role: "hide" as const, label: t("menu.hide") },
+                { role: "hideOthers" as const, label: t("menu.hideOthers") },
+                { role: "unhide" as const, label: t("menu.showAll") },
+                { type: "separator" as const },
+                { role: "quit" as const, label: t("menu.quit") },
+              ],
+            },
+          ]
+        : []),
+      {
+        role: "editMenu",
+        label: t("menu.edit"),
+        submenu: [
+          { role: "undo", label: t("menu.undo") },
+          { role: "redo", label: t("menu.redo") },
+          { type: "separator" },
+          { role: "cut", label: t("menu.cut") },
+          { role: "copy", label: t("menu.copy") },
+          { role: "paste", label: t("menu.paste") },
+          ...(darwin
+            ? [
+                {
+                  role: "pasteAndMatchStyle" as const,
+                  label: t("menu.pasteAndMatchStyle"),
+                },
+              ]
+            : []),
+          { role: "delete", label: t("menu.delete") },
+          { role: "selectAll", label: t("menu.selectAll") },
+        ],
+      },
+      {
+        role: "viewMenu",
+        label: t("menu.view"),
+        submenu: [
+          {
+            label: t("menu.refreshPage"),
+            accelerator: "CommandOrControl+R",
+            click: (_item, window) => {
+              if (window instanceof BrowserWindow && windows.has(window))
+                window.webContents.send("showai:refresh-page");
+            },
+          },
+          { role: "toggleDevTools", label: t("menu.toggleDevTools") },
+          { type: "separator" },
+          { role: "resetZoom", label: t("menu.resetZoom") },
+          { role: "zoomIn", label: t("menu.zoomIn") },
+          { role: "zoomOut", label: t("menu.zoomOut") },
+          { type: "separator" },
+          { role: "togglefullscreen", label: t("menu.toggleFullScreen") },
+        ],
+      },
+      {
+        role: "windowMenu",
+        label: t("menu.window"),
+        submenu: [
+          { role: "minimize", label: t("menu.minimize") },
+          { role: "zoom", label: t("menu.zoom") },
+          ...(darwin
+            ? [
+                { type: "separator" as const },
+                { role: "front" as const, label: t("menu.front") },
+              ]
+            : [{ role: "close" as const, label: t("menu.close") }]),
+        ],
+      },
+    ]),
+  );
 }
 
 async function nativeAction(
@@ -261,14 +375,14 @@ async function nativeAction(
           "SHOWAI_HOME fixes this launch's storage directory. Change it before the next launch.",
         );
       const selection = await dialog.showOpenDialog(window, {
-        title: "选择 ShowAI 数据目录",
+        title: t("chooseDataDirectory"),
         defaultPath: store.root,
         properties: ["openDirectory", "createDirectory"],
       });
       if (selection.canceled || !selection.filePaths[0]) return null;
       const home = await realpath(selection.filePaths[0]);
       await new FileStore(home).listProjects();
-      await saveSettings(home);
+      await saveSettings({ home });
       await useHome(home);
       broadcast("home");
       return info();
@@ -368,9 +482,9 @@ function requestClose(window: BrowserWindow): Promise<boolean> {
       if (allow !== null || window.isDestroyed()) return allow ?? true;
       const choice = await dialog.showMessageBox(window, {
         type: "warning",
-        message: "页面还没有确认保存完成",
-        detail: "可以继续编辑，或放弃尚未保存的修改并关闭窗口。",
-        buttons: ["继续编辑", "放弃修改并关闭"],
+        message: t("unsavedMessage"),
+        detail: t("unsavedDetail"),
+        buttons: [t("keepEditing"), t("discardAndClose")],
         defaultId: 0,
         cancelId: 0,
         noLink: true,
@@ -470,7 +584,7 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
             }
           : undefined,
       ).catch((error) =>
-        dialog.showErrorBox("无法打开页面", errorResult(error).message),
+        dialog.showErrorBox(t("openPageFailed"), errorResult(error).message),
       );
       return { action: "deny" };
     }
@@ -504,7 +618,7 @@ async function openDeepLink(source: string): Promise<void> {
   const url = new URL(source);
   if (url.protocol === "showai:" && url.hostname === "login") {
     // The browser returns the login completion code to the window polling for it.
-    if (!store) throw new CoreError("NOT_FOUND", "请先打开 ShowAI 内容库。");
+    if (!store) throw new CoreError("NOT_FOUND", t("login.libraryClosed"));
     syncManager(store.root).deliverLoginCompletion(
       url.searchParams.get("flow") ?? "",
       url.searchParams.get("code") ?? "",
@@ -549,7 +663,7 @@ else {
       ) {
         if ("url" in message && typeof message.url === "string")
           void openDeepLink(message.url).catch((error) =>
-            dialog.showErrorBox("无法打开页面", errorResult(error).message),
+            dialog.showErrorBox(t("openPageFailed"), errorResult(error).message),
           );
         else {
           const window = [...windows][0];
@@ -559,7 +673,7 @@ else {
             window.focus();
           } else
             void createWindow().catch((error) =>
-              dialog.showErrorBox("无法打开窗口", errorResult(error).message),
+              dialog.showErrorBox(t("openWindowFailed"), errorResult(error).message),
             );
         }
       }
@@ -569,14 +683,14 @@ else {
     if (!app.isReady()) pendingDeepLink = url;
     else
       void openDeepLink(url).catch((error) =>
-        dialog.showErrorBox("无法打开页面", errorResult(error).message),
+        dialog.showErrorBox(t("openPageFailed"), errorResult(error).message),
       );
   });
   app.on("second-instance", (_event, argv) => {
     const link = argv.find((argument) => argument.startsWith("showai://"));
     if (link)
       void openDeepLink(link).catch((error) =>
-        dialog.showErrorBox("无法打开页面", errorResult(error).message),
+        dialog.showErrorBox(t("openPageFailed"), errorResult(error).message),
       );
     else {
       const window = [...windows][0];
@@ -588,6 +702,11 @@ else {
     .whenReady()
     .then(async () => {
       const settings = await readSettings();
+      setLocale(
+        pinnedLocale ??
+          settings.locale ??
+          resolveLocale(app.getPreferredSystemLanguages()),
+      );
       await useHome(process.env.SHOWAI_HOME ?? settings.home);
       process.env.SHOWAI_VIEWER ??= join(
         runtimePath(),
@@ -630,35 +749,16 @@ else {
         openUrl: (url) => shell.openExternal(url),
       });
       if (app.isPackaged) app.setAsDefaultProtocolClient("showai");
-      Menu.setApplicationMenu(
-        Menu.buildFromTemplate([
-          ...(process.platform === "darwin"
-            ? [{ role: "appMenu" as const }]
-            : []),
-          { role: "editMenu" },
-          {
-            role: "viewMenu",
-            submenu: [
-              {
-                label: "刷新当前页面",
-                accelerator: "CommandOrControl+R",
-                click: (_item, window) => {
-                  if (window instanceof BrowserWindow && windows.has(window))
-                    window.webContents.send("showai:refresh-page");
-                },
-              },
-              { role: "toggleDevTools" },
-              { type: "separator" },
-              { role: "resetZoom" },
-              { role: "zoomIn" },
-              { role: "zoomOut" },
-              { type: "separator" },
-              { role: "togglefullscreen" },
-            ],
-          },
-          { role: "windowMenu" },
-        ]),
-      );
+      buildApplicationMenu();
+      ipcMain.handle("showai:set-locale", async (event, locale: unknown) => {
+        trustedSender(event);
+        if (locale !== "zh-CN" && locale !== "en")
+          throw new CoreError("INVALID_DATA", "Unknown language.");
+        if (locale === getLocale()) return;
+        setLocale(locale);
+        buildApplicationMenu();
+        await saveSettings({ locale });
+      });
       ipcMain.handle("showai:window-state", (event) => ({
         fullScreen: trustedSender(event).isFullScreen(),
       }));
@@ -726,7 +826,7 @@ else {
       });
     })
     .catch((error) => {
-      dialog.showErrorBox("ShowAI 无法启动", errorResult(error).message);
+      dialog.showErrorBox(t("startFailed"), errorResult(error).message);
       app.quit();
     });
   app.on("window-all-closed", () => {

@@ -32,20 +32,7 @@ import {
   type RefObject,
 } from "react";
 import type { JSONContent } from "@tiptap/core";
-import {
-  ArrowLeft,
-  ChevronRight,
-  LayoutDashboard,
-  MousePointer2,
-  Pencil,
-  Highlighter,
-  PanelsTopLeft,
-  Square,
-  Circle,
-  ArrowUpRight,
-  LockKeyhole,
-  X,
-} from "../ui/icons";
+import { ArrowLeft, ChevronRight, LayoutDashboard, X } from "../ui/icons";
 import type { ContainerDocument, ShowDocument } from "../types";
 import type {
   BoardTool,
@@ -77,6 +64,9 @@ import "./containers.css";
 import PageIcon from "../components/PageIcon";
 import PageIconDialog from "../studio/PageIconDialog";
 import { PageWidthSwitch } from "./PageWidthSwitch";
+import { BoardTools } from "./BoardTools";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/surface";
 
 interface Runtime {
   geometry: SurfaceGeometryStore;
@@ -86,7 +76,6 @@ interface Runtime {
   readOnly: boolean;
   printing: boolean;
   pageWidthModes: boolean;
-  onHandwriting?: (boardId: string, document: ShowDocument) => Promise<void>;
   selected: string | null;
   select: (id: string | null) => void;
   inspect: (id: string | null) => void;
@@ -131,7 +120,6 @@ export function ContainerRuntime({
   onControlsChange,
   retainedState,
   inspectorHost,
-  onHandwriting,
 }: {
   document: ContainerDocument;
   geometry?: SurfaceGeometryStore;
@@ -154,8 +142,8 @@ export function ContainerRuntime({
   onControlsChange?: (controls: EditorControls | null) => void;
   retainedState?: ContainerViewState;
   inspectorHost?: HTMLElement | null;
-  onHandwriting?: (boardId: string, document: ShowDocument) => Promise<void>;
 }) {
+  const t = useTranslator(messages);
   const document = useMemo(
     () => reconcileConnections({ ...sourceDocument }),
     [sourceDocument],
@@ -359,7 +347,6 @@ export function ContainerRuntime({
     readOnly: !onChange,
     printing,
     pageWidthModes,
-    onHandwriting,
     selected,
     select,
     inspect,
@@ -406,7 +393,7 @@ export function ContainerRuntime({
                   runtime.commit({ ...source, icon });
                 else {
                   if (!findSurfaceNode(source, iconTarget))
-                    throw new Error("该 Page 已被移除。");
+                    throw new Error(t("error.pageRemoved"));
                   runtime.commit(
                     editNode(source, iconTarget, (node) => {
                       node.attrs = { ...node.attrs, icon };
@@ -521,7 +508,7 @@ export function ContainerRuntime({
           >
             {chain.length > 1 && (
               <div className="container-workspace-bar" data-surface-ui>
-                <nav aria-label="内容层级">
+                <nav aria-label={t("nav.hierarchy")}>
                   {chain.map((node, index) => (
                     <span key={node.attrs!.id}>
                       {index > 0 && <ChevronRight size={13} />}
@@ -559,7 +546,7 @@ export function ContainerRuntime({
                     onClick={() => focusSurface(chain.at(-2)!.attrs!.id)}
                   >
                     <ArrowLeft size={14} />
-                    返回上层
+                    {t("nav.back")}
                   </button>
                 )}
               </div>
@@ -588,22 +575,26 @@ export function ContainerRuntime({
                 <aside
                   className={`surface-inspector container-inspector${kind === "board" ? " board-bottom-inspector" : ""}`}
                   data-surface-ui
-                  aria-label="模块设置"
+                  aria-label={t("inspector.title")}
                 >
                   <header>
-                    <strong>{inspectorHost ? "当前对象" : "模块设置"}</strong>
+                    <strong>
+                      {inspectorHost
+                        ? t("inspector.currentObject")
+                        : t("inspector.title")}
+                    </strong>
                     <button
                       type="button"
-                      aria-label="关闭模块设置"
+                      aria-label={t("inspector.close")}
                       onClick={() => inspect(null)}
                     >
                       <X size={16} />
                     </button>
                   </header>
                   <label>
-                    名称
+                    {t("inspector.name")}
                     <input
-                      aria-label="模块名称"
+                      aria-label={t("inspector.nameLabel")}
                       value={
                         selectedEntry.node.attrs?.name ??
                         nodeName(selectedEntry.node)
@@ -632,14 +623,14 @@ export function ContainerRuntime({
                         value={selectedEntry.node.attrs?.icon}
                         size={18}
                       />{" "}
-                      设置图标…
+                      {t("container.setIcon")}
                     </button>
                   )}
                   {pageWidthModes &&
                     selectedEntry.node.type === "surface" &&
                     surfaceKind(selectedEntry.node) === "page" && (
                       <label>
-                        页面宽度
+                        {t("pageWidth")}
                         <PageWidthSwitch
                           value={
                             selectedEntry.node.attrs?.widthMode ?? "standard"
@@ -659,9 +650,9 @@ export function ContainerRuntime({
                     )}
                   {selectedEntry.node.type === "region" && (
                     <label>
-                      排列
+                      {t("inspector.arrange")}
                       <select
-                        aria-label="区域布局"
+                        aria-label={t("inspector.regionLayout")}
                         value={frame?.mode ?? "flow"}
                         onChange={(event) =>
                           updateFrame({
@@ -670,17 +661,17 @@ export function ContainerRuntime({
                           })
                         }
                       >
-                        <option value="flow">顺序</option>
-                        <option value="grid">网格</option>
-                        <option value="free">自由</option>
+                        <option value="flow">{t("layout.flow")}</option>
+                        <option value="grid">{t("layout.grid")}</option>
+                        <option value="free">{t("layout.free")}</option>
                       </select>
                     </label>
                   )}
                   {frame?.mode === "grid" && (
                     <label>
-                      列数
+                      {t("inspector.columns")}
                       <input
-                        aria-label="网格列数"
+                        aria-label={t("inspector.gridColumns")}
                         type="number"
                         min={1}
                         max={12}
@@ -704,9 +695,9 @@ export function ContainerRuntime({
                     ) && (
                       <>
                         <label>
-                          宽度
+                          {t("inspector.width")}
                           <input
-                            aria-label="模块宽度"
+                            aria-label={t("inspector.moduleWidth")}
                             type="number"
                             min={
                               selectedEntry.node.type === "drawing" ? 1 : 120
@@ -729,9 +720,9 @@ export function ContainerRuntime({
                         {selectedEntry.node.type === "surface" && (
                           <>
                             <label>
-                              高度方式
+                              {t("inspector.heightMode")}
                               <select
-                                aria-label="模块高度方式"
+                                aria-label={t("inspector.moduleHeightMode")}
                                 value={frame.heightMode ?? "fixed"}
                                 onChange={(event) =>
                                   updateFrame({
@@ -741,17 +732,21 @@ export function ContainerRuntime({
                                   })
                                 }
                               >
-                                <option value="fixed">固定窗口</option>
+                                <option value="fixed">
+                                  {t("heightMode.fixed")}
+                                </option>
                                 {surfaceKind(selectedEntry.node) === "page" && (
-                                  <option value="auto">随内容增长</option>
+                                  <option value="auto">
+                                    {t("heightMode.auto")}
+                                  </option>
                                 )}
                               </select>
                             </label>
                             {frame.heightMode !== "auto" && (
                               <label>
-                                高度
+                                {t("inspector.height")}
                                 <input
-                                  aria-label="模块高度"
+                                  aria-label={t("inspector.moduleHeight")}
                                   type="number"
                                   min={180}
                                   max={5000}
@@ -769,9 +764,9 @@ export function ContainerRuntime({
                       </>
                     )}
                   <label>
-                    所属容器
+                    {t("inspector.parent")}
                     <select
-                      aria-label="所属容器"
+                      aria-label={t("inspector.parent")}
                       value={selectedEntry.parent?.attrs?.id ?? ""}
                       onChange={(event) => {
                         const parentId = event.target.value;
@@ -794,8 +789,11 @@ export function ContainerRuntime({
                     >
                       {containerOptions(document, inspecting!).map((node) => (
                         <option key={node.attrs!.id} value={node.attrs!.id}>
-                          {node === document.content ? "根 " : ""}
-                          {nodeName(node)}
+                          {node === document.content
+                            ? t("inspector.rootOption", {
+                                name: nodeName(node),
+                              })
+                            : nodeName(node)}
                         </option>
                       ))}
                     </select>
@@ -837,7 +835,9 @@ export function ContainerRuntime({
                           runtime.commit(next);
                         }}
                       >
-                        {delta < 0 ? "向前排列" : "向后排列"}
+                        {delta < 0
+                          ? t("inspector.moveEarlier")
+                          : t("inspector.moveLater")}
                       </button>
                     ))}
                   </div>
@@ -854,7 +854,7 @@ export function ContainerRuntime({
                       select(null);
                     }}
                   >
-                    删除模块
+                    {t("inspector.delete")}
                   </button>
                 </aside>
               </InspectorOutlet>
@@ -917,7 +917,6 @@ function ContainerView({
     readOnly = runtime.readOnly;
   const viewport = useRef<SurfaceHandle>(null),
     page = useRef<HTMLDivElement>(null);
-  const [toolLocked, setToolLocked] = useState(false);
   const [tool, setTool] = useState<BoardTool | null>(null);
   const [styles, setStyles] = useState<Record<string, DrawingStyle>>({
     pen: { color: "#252629", fillColor: "none", strokeWidth: 2.5 },
@@ -926,7 +925,8 @@ function ContainerView({
   });
   const styleKey = tool === "pen" || tool === "highlighter" ? tool : "shape";
   const style = styles[styleKey];
-  const chooseTool = (next: BoardTool | null) => {
+  const chooseTool = async (next: BoardTool | null) => {
+    await window.showai?.inlineInk?.flush();
     runtime.activate(id);
     runtime.select(null);
     runtime.inspect(null);
@@ -1295,10 +1295,7 @@ function ContainerView({
                   runtime.commit(
                     addNode(runtime.current.current, drawing, frame, id),
                   );
-                  runtime.select(drawing.attrs!.id);
-                  if (tool !== "pen" && tool !== "highlighter" && !toolLocked) {
-                    setTool(null);
-                  }
+                  runtime.select(null);
                 }
           }
           extraActions={
@@ -1306,51 +1303,7 @@ function ContainerView({
               {!readOnly && (
                 <>
                   <span className="surface-toolbar-divider" />
-                  <button
-                    type="button"
-                    aria-label="选择工具"
-                    aria-pressed={!tool}
-                    onClick={() => chooseTool(null)}
-                  >
-                    <MousePointer2 size={15} />
-                  </button>
-                  {(
-                    [
-                      ["pen", "画笔", Pencil],
-                      ["highlighter", "荧光笔", Highlighter],
-                      ["rectangle", "矩形", Square],
-                      ["ellipse", "椭圆", Circle],
-                      ["arrow", "箭头", ArrowUpRight],
-                      ["region", "区域", PanelsTopLeft],
-                    ] as const
-                  ).map(([value, label, Icon]) => (
-                    <button
-                      type="button"
-                      key={value}
-                      aria-label={label}
-                      title={`${label}（${{ pen: "P", highlighter: "H", rectangle: "R", ellipse: "E", arrow: "A", region: "F" }[value]}）${value === "pen" || value === "highlighter" ? "" : "；Shift 约束形状，Alt 从中心绘制"}`}
-                      aria-pressed={tool === value}
-                      onClick={() => {
-                        chooseTool(value);
-                      }}
-                    >
-                      <Icon size={15} />
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    aria-label="连续绘制"
-                    aria-pressed={toolLocked}
-                    title="连续绘制：完成图形后保留当前工具"
-                    onClick={() => setToolLocked((value) => !value)}
-                  >
-                    <LockKeyhole size={15} />
-                  </button>
-                  {runtime.onHandwriting && (
-                    <button type="button" aria-label="Apple Pencil 手写" title="Apple Pencil 手写" onClick={() => void runtime.onHandwriting?.(id, runtime.geometry.materialize(runtime.current.current))}>
-                      <Pencil size={15} aria-hidden="true" />
-                    </button>
-                  )}
+                  <BoardTools tool={tool} onChange={chooseTool} />
                 </>
               )}
             </>

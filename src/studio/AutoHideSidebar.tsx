@@ -9,7 +9,11 @@ import {
 import { PanelLeft } from "../ui/icons";
 import { appIconForTheme } from "../design/app-icon";
 import { useAppearanceTheme } from "../design/useAppearanceTheme";
+import { useTranslator } from "../i18n/react";
+import sidebarMessages from "../i18n/messages/sidebar";
 import "./auto-hide-sidebar.css";
+import { mobileNavigationLayout, sidebarSwipe } from "./mobile-navigation.mjs";
+import "./mobile-navigation.css";
 
 const minimumWidth = 200;
 const maximumWidth = 480;
@@ -35,9 +39,10 @@ export default function AutoHideSidebar({
   focusWindow: boolean;
   switchingTab: boolean;
 }) {
+  const t = useTranslator(sidebarMessages);
   const appIcon = appIconForTheme(useAppearanceTheme());
   const nativeTouch = document.documentElement.dataset.native === "ios";
-  const [nativeOpen, setNativeOpen] = useState(() => window.innerWidth > 650);
+  const [nativeOpen, setNativeOpen] = useState(false);
   const [locked, setLocked] = useState(
     () => localStorage.getItem("showai:sidebar-locked") === "true",
   );
@@ -55,6 +60,10 @@ export default function AutoHideSidebar({
       : null;
   });
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
+  const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
+  const [viewportOrientation, setViewportOrientation] = useState(document.documentElement.dataset.nativeOrientation);
+  const nativeLayout = mobileNavigationLayout(document.documentElement.dataset.nativeDevice, viewportWidth, viewportHeight, viewportOrientation);
+  const swipe = useRef<{ id: number; x: number; y: number } | null>(null);
   const [resizing, setResizing] = useState(false);
   const resize = useRef<{
     pointerId: number;
@@ -70,12 +79,12 @@ export default function AutoHideSidebar({
   );
   const clampWidth = (value: number) =>
     Math.round(Math.max(minimumWidth, Math.min(widthLimit, value)));
-  const width = clampWidth(
+  const width = nativeTouch ? nativeLayout.width : clampWidth(
     preferredWidth ?? (viewportWidth <= 1100 ? 208 : 240),
   );
   const sidebar = useRef<HTMLElement>(null);
   const automatic = enabled && !locked && !focusWindow && !nativeTouch;
-  const mode = nativeTouch ? nativeOpen ? viewportWidth <= 650 ? "overlay" : "docked" : "hidden" : automatic ? position : "docked";
+  const mode = nativeTouch ? nativeLayout.docked ? "docked" : nativeOpen ? "overlay" : "hidden" : automatic ? position : "docked";
   const hidden = mode === "hidden";
 
   const pointerIsInside = (point: { x: number; y: number }) => {
@@ -117,13 +126,14 @@ export default function AutoHideSidebar({
 
   useEffect(() => {
     setPosition("docked");
-    if (nativeTouch && enabled && window.innerWidth <= 650) setNativeOpen(false);
+    if (nativeTouch) setNativeOpen(false);
   }, [enabled, locked]);
 
   useEffect(() => {
-    const update = () => setViewportWidth(window.innerWidth);
+    const update = () => { setViewportWidth(window.innerWidth); setViewportHeight(window.innerHeight); setViewportOrientation(document.documentElement.dataset.nativeOrientation); };
     window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
+    window.addEventListener("showai-native-layout", update);
+    return () => { window.removeEventListener("resize", update); window.removeEventListener("showai-native-layout", update); };
   }, []);
 
   useEffect(() => {
@@ -211,13 +221,42 @@ export default function AutoHideSidebar({
     setHovered(true);
     if (hidden) setPosition("overlay");
   };
-  const lockLabel = nativeTouch ? nativeOpen ? "收起项目栏" : "展开项目栏" : locked ? "解锁项目栏，打开文档后自动收起" : "锁定项目栏";
+  const lockLabel = nativeTouch
+    ? nativeOpen
+      ? t("collapseSidebar")
+      : t("expandSidebar")
+    : locked
+      ? t("unlockSidebar")
+      : t("lockSidebar");
   const focusNavigation = () => {
     window.requestAnimationFrame(() => {
       sidebar.current?.querySelector<HTMLButtonElement>("button")?.focus();
       setKeyboardFocus(true);
     });
   };
+
+  if (nativeTouch) return (
+    <div className="studio-workspace" data-mobile-sidebar={mode} inert={switchingTab} aria-busy={switchingTab}>
+      {!nativeLayout.docked && <div className="studio-mobile-navigation-tools">
+        <button type="button" aria-label="项目导航" aria-controls="studio-project-navigation" aria-expanded={nativeOpen} onClick={() => setNativeOpen(value => !value)}><PanelLeft size={20} aria-hidden="true" /></button>
+        {history}
+      </div>}
+      <div className="studio-sidebar-shell" data-sidebar-mode={mode} style={{ "--navigation-width": `${width}px` } as CSSProperties}>
+        <aside ref={sidebar} id="studio-project-navigation" className="studio-sidebar" aria-label="项目导航" inert={hidden}
+          onKeyDown={event => { if (event.key === "Escape") setNativeOpen(false); }}
+          onClickCapture={event => { if (!nativeLayout.docked && (event.target as Element).closest('.studio-tree-main')) setNativeOpen(false); }}>
+          <div className="studio-mobile-sidebar-brand"><img src={appIcon} alt="" /><strong>ShowAI</strong></div>
+          {navigation}
+        </aside>
+      </div>
+      {nativeOpen && !nativeLayout.docked && <button className="studio-mobile-sidebar-scrim" aria-label="关闭项目导航" onClick={() => setNativeOpen(false)} />}
+      {children}
+      {!nativeLayout.docked && !nativeOpen && <div className="studio-mobile-sidebar-edge" aria-hidden="true"
+        onPointerDown={event => { if (event.pointerType !== "touch") return; swipe.current = { id: event.pointerId, x: event.clientX, y: event.clientY }; event.currentTarget.setPointerCapture(event.pointerId); }}
+        onPointerMove={event => { const start = swipe.current; if (start?.id === event.pointerId && sidebarSwipe(start, {x: event.clientX, y: event.clientY})) { setNativeOpen(true); swipe.current = null; } }}
+        onPointerUp={() => { swipe.current = null; }} onPointerCancel={() => { swipe.current = null; }} />}
+    </div>
+  );
 
   return (
     <>
@@ -240,13 +279,18 @@ export default function AutoHideSidebar({
                 className="studio-sidebar-lock"
                 aria-label={lockLabel}
                 title={lockLabel}
-                aria-pressed={locked}
+                aria-pressed={nativeTouch ? nativeOpen : locked}
+                aria-controls="studio-project-navigation"
+                aria-expanded={nativeTouch ? nativeOpen : !hidden}
                 onPointerDown={nativeTouch ? (event) => {
                   event.preventDefault();
                   setNativeOpen(value => !value);
                 } : undefined}
-                onClick={() => {
-                  if (nativeTouch) return;
+                onClick={(event) => {
+                  if (nativeTouch) {
+                    if (event.detail === 0) setNativeOpen(value => !value);
+                    return;
+                  }
                   const next = !locked;
                   localStorage.setItem("showai:sidebar-locked", String(next));
                   setLocked(next);
@@ -276,7 +320,7 @@ export default function AutoHideSidebar({
               ref={sidebar}
               id="studio-project-navigation"
               className="studio-sidebar"
-              aria-label="项目导航"
+              aria-label={t("projectNavigation")}
               inert={hidden}
               onPointerEnter={reveal}
               onPointerLeave={leave}
@@ -306,13 +350,13 @@ export default function AutoHideSidebar({
                 className="studio-sidebar-resizer"
                 role="separator"
                 tabIndex={0}
-                aria-label="调整项目栏宽度"
+                aria-label={t("resizeSidebar")}
                 aria-orientation="vertical"
                 aria-controls="studio-project-navigation"
                 aria-valuemin={minimumWidth}
                 aria-valuemax={widthLimit}
                 aria-valuenow={width}
-                aria-valuetext={`${width} 像素`}
+                aria-valuetext={t("widthPixels", { width })}
                 onPointerDown={(event) => {
                   if (event.button !== 0 || resize.current) return;
                   event.preventDefault();
@@ -363,7 +407,7 @@ export default function AutoHideSidebar({
               <button
                 type="button"
                 className="studio-sidebar-edge"
-                aria-label="展开项目导航"
+                aria-label={t("showNavigation")}
                 aria-controls="studio-project-navigation"
                 aria-expanded={!hidden}
                 tabIndex={hidden ? 0 : -1}

@@ -1,21 +1,26 @@
 import type { JsonSchema } from "../components/custom/types";
-const appearanceLabels: Record<string, string> = {
-  fontFamily: "字体",
-  fontSize: "字号",
-  color: "文字颜色",
-  backgroundColor: "背景颜色",
-  align: "对齐",
-  padding: "内边距",
-  radius: "圆角",
-  width: "宽度",
-  height: "高度",
-  fit: "裁切方式",
+import type { MessageKey } from "../i18n";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/catalog";
+// Catalog-namespace keys, translated at render.
+const appearanceLabels: Record<string, MessageKey<typeof messages>> = {
+  fontFamily: "appearance.fontFamily",
+  fontSize: "appearance.fontSize",
+  color: "appearance.color",
+  backgroundColor: "appearance.backgroundColor",
+  align: "appearance.align",
+  padding: "appearance.padding",
+  radius: "appearance.radius",
+  width: "appearance.width",
+  height: "appearance.height",
+  fit: "appearance.fit",
 };
 export default function ComponentAdjustmentSummary({
   schema,
 }: {
   schema: JsonSchema;
 }) {
+  const t = useTranslator(messages);
   const properties =
     typeof schema === "object" &&
     schema.properties &&
@@ -24,7 +29,7 @@ export default function ComponentAdjustmentSummary({
       : {};
   const appearance = Object.keys(properties)
     .filter((key) => appearanceLabels[key])
-    .map((key) => appearanceLabels[key]);
+    .map((key) => t(appearanceLabels[key]));
   const content = Object.entries(properties)
     .filter(([key]) => !appearanceLabels[key])
     .slice(0, 5)
@@ -37,8 +42,8 @@ export default function ComponentAdjustmentSummary({
     );
   return (
     <div className="catalog-adjustments">
-      {appearance.length > 0 && <p>{appearance.join("、")}</p>}
-      {content.length > 0 && <p>{content.join("、")}</p>}
+      {appearance.length > 0 && <p>{appearance.join(t("listSeparator"))}</p>}
+      {content.length > 0 && <p>{content.join(t("listSeparator"))}</p>}
     </div>
   );
 }

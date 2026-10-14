@@ -2,7 +2,8 @@ export type SurfaceKind = "page" | "board";
 export type PageWidthMode = "standard" | "wide" | "full";
 export type DrawingTool =
   "pen" | "highlighter" | "rectangle" | "ellipse" | "arrow";
-export type BoardTool = DrawingTool | "region";
+export type BoardDrawingTool = DrawingTool | "region";
+export type BoardTool = BoardDrawingTool | "pan" | "eraser" | "lasso";
 export interface DrawingStyle {
   color: string;
   fillColor: string;

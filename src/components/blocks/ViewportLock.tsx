@@ -1,6 +1,11 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { LockKeyhole, UnlockKeyhole } from "../../ui/icons";
+import { translator } from "../../i18n";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/blockHelpers";
 import "./viewport-lock.css";
+
+const lockMessages = translator(messages);
 
 export function viewportLockKey(element: Element, scope: string) {
   const owner = element.closest("[data-block-id], [data-surface-id]");
@@ -105,7 +110,9 @@ export function useViewportLock(scope: string, storageKey?: string) {
     try {
       setLocked(readViewportLock(key.current));
     } catch (caught) {
-      setError(`无法读取阅读锁状态：${String(caught)}`);
+      setError(
+        lockMessages("viewportLock.readFailed", { error: String(caught) }),
+      );
     }
   }, [scope, storageKey]);
   const toggle = () => {
@@ -121,7 +128,9 @@ export function useViewportLock(scope: string, storageKey?: string) {
       writeViewportLock(key.current, next);
       setError("");
     } catch (caught) {
-      setError(`无法保存阅读锁状态：${String(caught)}`);
+      setError(
+        lockMessages("viewportLock.saveFailed", { error: String(caught) }),
+      );
     }
     setLocked(next);
   };
@@ -133,15 +142,20 @@ export function ViewportLockButton({
   toggle,
   error = "",
   label,
-  unlockDescription = "允许缩放和移动",
+  unlockDescription,
 }: {
   locked: boolean;
   toggle: () => void;
   error?: string;
+  /** What the button locks, phrased to follow "Unlock"/"Lock" (e.g. "flowchart"). */
   label: string;
+  /** What unlocking allows, phrased to follow a colon (e.g. "allow zooming and panning"). */
   unlockDescription?: string;
 }) {
-  const action = `${locked ? "解锁" : "锁定"}${label}`;
+  const t = useTranslator(messages);
+  const action = t(locked ? "viewportLock.unlock" : "viewportLock.lock", {
+    target: label,
+  });
   return (
     <button
       type="button"
@@ -151,7 +165,13 @@ export function ViewportLockButton({
       aria-pressed={locked}
       title={
         error ||
-        `${action}：${locked ? unlockDescription : "保持视图，正常滚动阅读"}`
+        (locked
+          ? t("viewportLock.unlockTitle", {
+              target: label,
+              description:
+                unlockDescription ?? t("viewportLock.unlockDescription"),
+            })
+          : t("viewportLock.lockTitle", { target: label }))
       }
       onClick={toggle}
     >
