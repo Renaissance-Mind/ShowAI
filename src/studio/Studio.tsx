@@ -78,6 +78,7 @@ import type {
   TemplateMetadata,
   TemplateRecord,
   CatalogReadOptions,
+  ComponentSource,
 } from "../components/custom/types";
 import { PageWorkspace } from "./PageWorkspace";
 import {
@@ -3615,6 +3616,20 @@ export default function Studio() {
             }
             builtin={dialog.builtin}
             custom={dialog.custom}
+            loadSource={() =>
+              desktop.invoke<ComponentSource>(
+                "components:source",
+                dialog.builtin
+                  ? { scope: "builtin", id: dialog.builtin.kind }
+                  : {
+                      id: dialog.custom!.id,
+                      version: dialog.custom!.version,
+                      scope: dialog.custom!.scope,
+                      integrity: dialog.custom!.integrity,
+                      projectId: dialog.projectId,
+                    },
+              )
+            }
             canInsert={
               !!page.draft &&
               page.projectId === selectedProject &&

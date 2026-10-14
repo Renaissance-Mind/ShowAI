@@ -10,6 +10,8 @@ import i18n from "../components/blocks/diagrams/archify-i18n.mjs?raw";
 import design from "../components/blocks/diagrams/design-samples.json?raw";
 import fireworks from "../components/blocks/diagrams/fireworks-samples.json?raw";
 import licenses from "../components/blocks/diagrams/licenses.json?raw";
+import presentation from "../components/blocks/diagrams/presentation.ts?raw";
+import fonts from "../components/blocks/diagrams/editorial-fonts.json?raw";
 
 export const diagramBuiltinSources: Record<string, string> = {
   "ExternalDiagram.tsx": component,
@@ -24,4 +26,6 @@ export const diagramBuiltinSources: Record<string, string> = {
   "diagrams/design-samples.json": design,
   "diagrams/fireworks-samples.json": fireworks,
   "diagrams/licenses.json": licenses,
+  "diagrams/presentation.ts": presentation,
+  "diagrams/editorial-fonts.json": fonts,
 };

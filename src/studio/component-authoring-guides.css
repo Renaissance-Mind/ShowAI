@@ -1,0 +1,19 @@
+.component-authoring-guides > label {
+  display: grid;
+  gap: 8px;
+}
+.component-authoring-guides select {
+  width: 100%;
+  min-width: 0;
+}
+.component-authoring-guides > details {
+  margin: 12px 0;
+}
+.component-authoring-downloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.component-authoring-guides .sb-block {
+  padding: 0;
+}

@@ -4,8 +4,8 @@
     "reuse": {
       "kind": "general",
       "boundaries": [
-        "模板是可修改的原版示例；任务中的事实保存在 source 中。",
-        "SVG/HTML 是图形内容，Page/Board 负责布局与保存；自然语言生成由 Agent 和原项目的绘图流程完成。"
+        "制作包固定到所记录的上游版本，包含原版指南、输入规范、示例、渲染工具和许可证。",
+        "Archify 与 Fireworks 的生成风格执行原版程序；Diagram Design 和 Fireworks style 8 按完整规范创作 SVG/HTML。不同 Agent 的自由绘图不保证逐字相同；相同原稿保持相同图形。"
       ]
     },
     "usage": {
@@ -32,18 +32,26 @@
         },
         {
           "path": "title",
-          "meaning": "ShowAI 组件外部的可选标题；不改写图形源码内的标题。",
+          "meaning": "可选外部标题；outside 时优先使用此值，其次读取原稿标题；hidden 隐藏外部标题。",
           "omission": {
-            "behavior": "omit",
-            "description": "省略外部标题；辅助名称使用组件名称。"
+            "behavior": "fallback",
+            "description": "outside 时从原稿提取标题，其他模式省略外部标题。",
+            "computedFrom": [
+              "source",
+              "presentation.title"
+            ]
           }
         },
         {
           "path": "description",
-          "meaning": "ShowAI 组件外部的可选说明。",
+          "meaning": "可选外部说明；outside 时优先使用此值，其次读取原稿说明；hidden 隐藏外部说明。",
           "omission": {
-            "behavior": "omit",
-            "description": "不显示外部说明。"
+            "behavior": "fallback",
+            "description": "outside 时从原稿提取说明，其他模式省略外部说明。",
+            "computedFrom": [
+              "source",
+              "presentation.description"
+            ]
           }
         },
         {
@@ -55,6 +63,66 @@
             "description": "使用默认高度 560 px。",
             "value": 560
           }
+        },
+        {
+          "path": "presentation",
+          "meaning": "标题、说明、补充说明、图例及阅读控件的呈现设置；只改变显示与导出，source 保留完整原稿。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用完整原版。新插入图形的 defaultData 显式指定简洁显示。",
+            "value": {
+              "title": "inside",
+              "description": "inside",
+              "notes": "inline",
+              "legend": true,
+              "controls": true
+            }
+          }
+        },
+        {
+          "path": "presentation.title",
+          "meaning": "标题位置：inside 原稿内部，outside 移到组件外部，hidden 隐藏。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用原版设置。",
+            "value": "inside"
+          }
+        },
+        {
+          "path": "presentation.description",
+          "meaning": "说明位置：inside 原稿内部，outside 移到组件外部，hidden 隐藏。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用原版设置。",
+            "value": "inside"
+          }
+        },
+        {
+          "path": "presentation.notes",
+          "meaning": "补充说明：inline 保留原稿中的说明，details 移到外部折叠区域，hidden 隐藏。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用原版设置。",
+            "value": "inline"
+          }
+        },
+        {
+          "path": "presentation.legend",
+          "meaning": "是否显示原稿中标记的图例。保留图例有助于理解连线与颜色语义。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用原版设置。",
+            "value": true
+          }
+        },
+        {
+          "path": "presentation.controls",
+          "meaning": "是否显示原稿阅读控件；静态 SVG 没有阅读控件。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用原版设置。",
+            "value": true
+          }
         }
       ],
       "recipes": [
@@ -62,9 +130,18 @@
           "title": "从原版模板开始",
           "exampleIndex": 0,
           "steps": [
-            "选择 examples 中的 template ID，插入图形。",
-            "读取 view=source、file=diagram-templates.json，取得模板的 source、上游路径、精确提交和对应 guide。",
-            "根据读者任务修改 source 的文字、对象、关系与布局，再保存到该实例。"
+            "先读取该版本说明及 authoring/index.json；在组件目录的使用指南中也可打开原版制作指南。",
+            "根据任务读取原版制作流程、共享语义与布局规范、所选图形类型或风格指南；读取 authoring/schemas.json 和 authoring/examples.json 中的原始输入。",
+            "从组件源码包保存 authoring/kit.json、run.mjs、diagram-authoring-fonts.mjs 和 font-licenses.json 到同一目录；使用索引中命令调用原版制作工具。",
+            "将制作结果的 data 写入组件，或导入生成的 SVG/HTML。比较原项目输出时切换为完整原版显示。"
+          ]
+        },
+        {
+          "title": "简化图形呈现",
+          "steps": [
+            "通过已有组件设置选择简洁或原版，也可分别设置标题、说明和补充说明。",
+            "简洁模式将标题、说明移到组件外部，并隐藏补充说明；图例与阅读控件可单独关闭。",
+            "这些设置保留完整 source；切回原版可恢复原图。下载 HTML 包含移到外部的标题与折叠说明。"
           ]
         },
         {
@@ -97,7 +174,7 @@
         },
         {
           "action": "下载图形",
-          "effect": "生成含第三方许可证的独立 SVG 或离线 HTML，保持保存的完整图形。",
+          "effect": "按当前呈现设置生成含许可证的 SVG 或离线 HTML；保存的 source 保留完整原稿。",
           "persistence": "none"
         }
       ],
@@ -106,11 +183,12 @@
         "原图内的阅读控件按原项目提供；静态 SVG 模板只有图形本身。",
         "窄屏保留原图的可读宽度并在图形区域内滚动。",
         "普通文字修改保持几何，长标签需要同步调整 SVG 布局；完整源码可修改全部对象和样式。",
-        "只读隐藏设置和导入；保存冲突保留当前草稿并提示重新读取。"
+        "只读隐藏设置和导入；保存冲突保留当前草稿并提示重新读取。",
+        "简化只处理已标记的标题、补充说明、图例和阅读控件；任意导入图形中的自定义结构需在 source 中明确标记或编辑。"
       ],
       "editing": {
         "data": [
-          "修改 template、source、title、description 和 height。source 中的事实由当前任务提供。"
+          "修改 template、source、title、description、height 和 presentation。制作工具输出的 source 保存任务中的真实内容。"
         ],
         "implementation": [
           "新增渲染行为时维护隔离边界、样式导出和原版许可证；内置模板升级时固定上游提交。"
@@ -126,6 +204,10 @@
         {
           "path": "diagram-templates.json",
           "purpose": "原版 SVG/HTML 源码、模板 ID、上游路径、许可证和绘图说明；通过 source file 查询读取。"
+        },
+        {
+          "path": "authoring/index.json",
+          "purpose": "可查询的制作索引；按引用读取完整指南、输入 Schema、示例、原版工具及固定提交。"
         }
       ],
       "architecture": [
@@ -139,12 +221,16 @@
       "invariants": [
         "source 是已保存图形；阅读状态不回写 source。",
         "外部内容只进入受隔离的阅读 frame；文字编辑只解析SVG 源码，且不执行其中的脚本。",
-        "导出保留 CSS、内嵌资源、SVG 标记和第三方许可证。"
+        "导出保留 CSS、内嵌资源、SVG 标记和第三方许可证。",
+        "原版制作程序逐文件保留并验证 SHA-256；展示简化不回写原稿。网络字体须本地嵌入，制作内容不发送给字体服务。"
       ],
       "verification": [
         "校验默认数据、所有模板、参数说明、实际插入与组件编译。",
         "核对文字修改保存、只读、窄屏、菜单和 SVG/HTML 离线导出。"
       ]
+    },
+    "authoring": {
+      "entry": "authoring/index.json"
     }
   },
   "diagram-design": {
@@ -152,8 +238,8 @@
     "reuse": {
       "kind": "general",
       "boundaries": [
-        "模板是可修改的原版示例；任务中的事实保存在 source 中。",
-        "SVG/HTML 是图形内容，Page/Board 负责布局与保存；自然语言生成由 Agent 和原项目的绘图流程完成。"
+        "制作包固定到所记录的上游版本，包含原版指南、输入规范、示例、渲染工具和许可证。",
+        "Archify 与 Fireworks 的生成风格执行原版程序；Diagram Design 和 Fireworks style 8 按完整规范创作 SVG/HTML。不同 Agent 的自由绘图不保证逐字相同；相同原稿保持相同图形。"
       ]
     },
     "usage": {
@@ -180,18 +266,26 @@
         },
         {
           "path": "title",
-          "meaning": "ShowAI 组件外部的可选标题；不改写图形源码内的标题。",
+          "meaning": "可选外部标题；outside 时优先使用此值，其次读取原稿标题；hidden 隐藏外部标题。",
           "omission": {
-            "behavior": "omit",
-            "description": "省略外部标题；辅助名称使用组件名称。"
+            "behavior": "fallback",
+            "description": "outside 时从原稿提取标题，其他模式省略外部标题。",
+            "computedFrom": [
+              "source",
+              "presentation.title"
+            ]
           }
         },
         {
           "path": "description",
-          "meaning": "ShowAI 组件外部的可选说明。",
+          "meaning": "可选外部说明；outside 时优先使用此值，其次读取原稿说明；hidden 隐藏外部说明。",
           "omission": {
-            "behavior": "omit",
-            "description": "不显示外部说明。"
+            "behavior": "fallback",
+            "description": "outside 时从原稿提取说明，其他模式省略外部说明。",
+            "computedFrom": [
+              "source",
+              "presentation.description"
+            ]
           }
         },
         {
@@ -203,6 +297,66 @@
             "description": "使用默认高度 560 px。",
             "value": 560
           }
+        },
+        {
+          "path": "presentation",
+          "meaning": "标题、说明、补充说明、图例及阅读控件的呈现设置；只改变显示与导出，source 保留完整原稿。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用完整原版。新插入图形的 defaultData 显式指定简洁显示。",
+            "value": {
+              "title": "inside",
+              "description": "inside",
+              "notes": "inline",
+              "legend": true,
+              "controls": true
+            }
+          }
+        },
+        {
+          "path": "presentation.title",
+          "meaning": "标题位置：inside 原稿内部，outside 移到组件外部，hidden 隐藏。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用原版设置。",
+            "value": "inside"
+          }
+        },
+        {
+          "path": "presentation.description",
+          "meaning": "说明位置：inside 原稿内部，outside 移到组件外部，hidden 隐藏。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用原版设置。",
+            "value": "inside"
+          }
+        },
+        {
+          "path": "presentation.notes",
+          "meaning": "补充说明：inline 保留原稿中的说明，details 移到外部折叠区域，hidden 隐藏。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用原版设置。",
+            "value": "inline"
+          }
+        },
+        {
+          "path": "presentation.legend",
+          "meaning": "是否显示原稿中标记的图例。保留图例有助于理解连线与颜色语义。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用原版设置。",
+            "value": true
+          }
+        },
+        {
+          "path": "presentation.controls",
+          "meaning": "是否显示原稿阅读控件；静态 SVG 没有阅读控件。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用原版设置。",
+            "value": true
+          }
         }
       ],
       "recipes": [
@@ -210,9 +364,18 @@
           "title": "从原版模板开始",
           "exampleIndex": 0,
           "steps": [
-            "选择 examples 中的 template ID，插入图形。",
-            "读取 view=source、file=diagram-templates.json，取得模板的 source、上游路径、精确提交和对应 guide。",
-            "根据读者任务修改 source 的文字、对象、关系与布局，再保存到该实例。"
+            "先读取该版本说明及 authoring/index.json；在组件目录的使用指南中也可打开原版制作指南。",
+            "根据任务读取原版制作流程、共享语义与布局规范、所选图形类型或风格指南；读取 authoring/schemas.json 和 authoring/examples.json 中的原始输入。",
+            "从组件源码包保存 authoring/kit.json、run.mjs、diagram-authoring-fonts.mjs 和 font-licenses.json 到同一目录；使用索引中命令调用原版制作工具。",
+            "将制作结果的 data 写入组件，或导入生成的 SVG/HTML。比较原项目输出时切换为完整原版显示。"
+          ]
+        },
+        {
+          "title": "简化图形呈现",
+          "steps": [
+            "通过已有组件设置选择简洁或原版，也可分别设置标题、说明和补充说明。",
+            "简洁模式将标题、说明移到组件外部，并隐藏补充说明；图例与阅读控件可单独关闭。",
+            "这些设置保留完整 source；切回原版可恢复原图。下载 HTML 包含移到外部的标题与折叠说明。"
           ]
         },
         {
@@ -245,7 +408,7 @@
         },
         {
           "action": "下载图形",
-          "effect": "生成含第三方许可证的独立 SVG 或离线 HTML，保持保存的完整图形。",
+          "effect": "按当前呈现设置生成含许可证的 SVG 或离线 HTML；保存的 source 保留完整原稿。",
           "persistence": "none"
         }
       ],
@@ -254,11 +417,12 @@
         "原图内的阅读控件按原项目提供；静态 SVG 模板只有图形本身。",
         "窄屏保留原图的可读宽度并在图形区域内滚动。",
         "普通文字修改保持几何，长标签需要同步调整 SVG 布局；完整源码可修改全部对象和样式。",
-        "只读隐藏设置和导入；保存冲突保留当前草稿并提示重新读取。"
+        "只读隐藏设置和导入；保存冲突保留当前草稿并提示重新读取。",
+        "简化只处理已标记的标题、补充说明、图例和阅读控件；任意导入图形中的自定义结构需在 source 中明确标记或编辑。"
       ],
       "editing": {
         "data": [
-          "修改 template、source、title、description 和 height。source 中的事实由当前任务提供。"
+          "修改 template、source、title、description、height 和 presentation。制作工具输出的 source 保存任务中的真实内容。"
         ],
         "implementation": [
           "新增渲染行为时维护隔离边界、样式导出和原版许可证；内置模板升级时固定上游提交。"
@@ -274,6 +438,10 @@
         {
           "path": "diagram-templates.json",
           "purpose": "原版 SVG/HTML 源码、模板 ID、上游路径、许可证和绘图说明；通过 source file 查询读取。"
+        },
+        {
+          "path": "authoring/index.json",
+          "purpose": "可查询的制作索引；按引用读取完整指南、输入 Schema、示例、原版工具及固定提交。"
         }
       ],
       "architecture": [
@@ -287,12 +455,16 @@
       "invariants": [
         "source 是已保存图形；阅读状态不回写 source。",
         "外部内容只进入受隔离的阅读 frame；文字编辑只解析SVG 源码，且不执行其中的脚本。",
-        "导出保留 CSS、内嵌资源、SVG 标记和第三方许可证。"
+        "导出保留 CSS、内嵌资源、SVG 标记和第三方许可证。",
+        "原版制作程序逐文件保留并验证 SHA-256；展示简化不回写原稿。网络字体须本地嵌入，制作内容不发送给字体服务。"
       ],
       "verification": [
         "校验默认数据、所有模板、参数说明、实际插入与组件编译。",
         "核对文字修改保存、只读、窄屏、菜单和 SVG/HTML 离线导出。"
       ]
+    },
+    "authoring": {
+      "entry": "authoring/index.json"
     }
   },
   "fireworks-tech-graph": {
@@ -300,8 +472,8 @@
     "reuse": {
       "kind": "general",
       "boundaries": [
-        "模板是可修改的原版示例；任务中的事实保存在 source 中。",
-        "SVG/HTML 是图形内容，Page/Board 负责布局与保存；自然语言生成由 Agent 和原项目的绘图流程完成。"
+        "制作包固定到所记录的上游版本，包含原版指南、输入规范、示例、渲染工具和许可证。",
+        "Archify 与 Fireworks 的生成风格执行原版程序；Diagram Design 和 Fireworks style 8 按完整规范创作 SVG/HTML。不同 Agent 的自由绘图不保证逐字相同；相同原稿保持相同图形。"
       ]
     },
     "usage": {
@@ -328,18 +500,26 @@
         },
         {
           "path": "title",
-          "meaning": "ShowAI 组件外部的可选标题；不改写图形源码内的标题。",
+          "meaning": "可选外部标题；outside 时优先使用此值，其次读取原稿标题；hidden 隐藏外部标题。",
           "omission": {
-            "behavior": "omit",
-            "description": "省略外部标题；辅助名称使用组件名称。"
+            "behavior": "fallback",
+            "description": "outside 时从原稿提取标题，其他模式省略外部标题。",
+            "computedFrom": [
+              "source",
+              "presentation.title"
+            ]
           }
         },
         {
           "path": "description",
-          "meaning": "ShowAI 组件外部的可选说明。",
+          "meaning": "可选外部说明；outside 时优先使用此值，其次读取原稿说明；hidden 隐藏外部说明。",
           "omission": {
-            "behavior": "omit",
-            "description": "不显示外部说明。"
+            "behavior": "fallback",
+            "description": "outside 时从原稿提取说明，其他模式省略外部说明。",
+            "computedFrom": [
+              "source",
+              "presentation.description"
+            ]
           }
         },
         {
@@ -351,6 +531,66 @@
             "description": "使用默认高度 560 px。",
             "value": 560
           }
+        },
+        {
+          "path": "presentation",
+          "meaning": "标题、说明、补充说明、图例及阅读控件的呈现设置；只改变显示与导出，source 保留完整原稿。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用完整原版。新插入图形的 defaultData 显式指定简洁显示。",
+            "value": {
+              "title": "inside",
+              "description": "inside",
+              "notes": "inline",
+              "legend": true,
+              "controls": true
+            }
+          }
+        },
+        {
+          "path": "presentation.title",
+          "meaning": "标题位置：inside 原稿内部，outside 移到组件外部，hidden 隐藏。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用原版设置。",
+            "value": "inside"
+          }
+        },
+        {
+          "path": "presentation.description",
+          "meaning": "说明位置：inside 原稿内部，outside 移到组件外部，hidden 隐藏。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用原版设置。",
+            "value": "inside"
+          }
+        },
+        {
+          "path": "presentation.notes",
+          "meaning": "补充说明：inline 保留原稿中的说明，details 移到外部折叠区域，hidden 隐藏。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用原版设置。",
+            "value": "inline"
+          }
+        },
+        {
+          "path": "presentation.legend",
+          "meaning": "是否显示原稿中标记的图例。保留图例有助于理解连线与颜色语义。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用原版设置。",
+            "value": true
+          }
+        },
+        {
+          "path": "presentation.controls",
+          "meaning": "是否显示原稿阅读控件；静态 SVG 没有阅读控件。",
+          "omission": {
+            "behavior": "fallback",
+            "description": "使用原版设置。",
+            "value": true
+          }
         }
       ],
       "recipes": [
@@ -358,9 +598,18 @@
           "title": "从原版模板开始",
           "exampleIndex": 0,
           "steps": [
-            "选择 examples 中的 template ID，插入图形。",
-            "读取 view=source、file=diagram-templates.json，取得模板的 source、上游路径、精确提交和对应 guide。",
-            "根据读者任务修改 source 的文字、对象、关系与布局，再保存到该实例。"
+            "先读取该版本说明及 authoring/index.json；在组件目录的使用指南中也可打开原版制作指南。",
+            "根据任务读取原版制作流程、共享语义与布局规范、所选图形类型或风格指南；读取 authoring/schemas.json 和 authoring/examples.json 中的原始输入。",
+            "从组件源码包保存 authoring/kit.json、run.mjs、diagram-authoring-fonts.mjs 和 font-licenses.json 到同一目录；使用索引中命令调用原版制作工具。",
+            "将制作结果的 data 写入组件，或导入生成的 SVG/HTML。比较原项目输出时切换为完整原版显示。"
+          ]
+        },
+        {
+          "title": "简化图形呈现",
+          "steps": [
+            "通过已有组件设置选择简洁或原版，也可分别设置标题、说明和补充说明。",
+            "简洁模式将标题、说明移到组件外部，并隐藏补充说明；图例与阅读控件可单独关闭。",
+            "这些设置保留完整 source；切回原版可恢复原图。下载 HTML 包含移到外部的标题与折叠说明。"
           ]
         },
         {
@@ -393,7 +642,7 @@
         },
         {
           "action": "下载图形",
-          "effect": "生成含第三方许可证的独立 SVG 或离线 HTML，保持保存的完整图形。",
+          "effect": "按当前呈现设置生成含许可证的 SVG 或离线 HTML；保存的 source 保留完整原稿。",
           "persistence": "none"
         }
       ],
@@ -402,11 +651,12 @@
         "原图内的阅读控件按原项目提供；静态 SVG 模板只有图形本身。",
         "窄屏保留原图的可读宽度并在图形区域内滚动。",
         "普通文字修改保持几何，长标签需要同步调整 SVG 布局；完整源码可修改全部对象和样式。",
-        "只读隐藏设置和导入；保存冲突保留当前草稿并提示重新读取。"
+        "只读隐藏设置和导入；保存冲突保留当前草稿并提示重新读取。",
+        "简化只处理已标记的标题、补充说明、图例和阅读控件；任意导入图形中的自定义结构需在 source 中明确标记或编辑。"
       ],
       "editing": {
         "data": [
-          "修改 template、source、title、description 和 height。source 中的事实由当前任务提供。"
+          "修改 template、source、title、description、height 和 presentation。制作工具输出的 source 保存任务中的真实内容。"
         ],
         "implementation": [
           "新增渲染行为时维护隔离边界、样式导出和原版许可证；内置模板升级时固定上游提交。"
@@ -422,6 +672,10 @@
         {
           "path": "diagram-templates.json",
           "purpose": "原版 SVG/HTML 源码、模板 ID、上游路径、许可证和绘图说明；通过 source file 查询读取。"
+        },
+        {
+          "path": "authoring/index.json",
+          "purpose": "可查询的制作索引；按引用读取完整指南、输入 Schema、示例、原版工具及固定提交。"
         }
       ],
       "architecture": [
@@ -435,12 +689,16 @@
       "invariants": [
         "source 是已保存图形；阅读状态不回写 source。",
         "外部内容只进入受隔离的阅读 frame；文字编辑只解析SVG 源码，且不执行其中的脚本。",
-        "导出保留 CSS、内嵌资源、SVG 标记和第三方许可证。"
+        "导出保留 CSS、内嵌资源、SVG 标记和第三方许可证。",
+        "原版制作程序逐文件保留并验证 SHA-256；展示简化不回写原稿。网络字体须本地嵌入，制作内容不发送给字体服务。"
       ],
       "verification": [
         "校验默认数据、所有模板、参数说明、实际插入与组件编译。",
         "核对文字修改保存、只读、窄屏、菜单和 SVG/HTML 离线导出。"
       ]
+    },
+    "authoring": {
+      "entry": "authoring/index.json"
     }
   }
 }

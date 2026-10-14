@@ -59,8 +59,17 @@ export function validateDiagramData(kind, data) {
   if (!data || typeof data !== "object" || Array.isArray(data))
     throw new Error("图形数据必须是对象。"); // i18n-exempt: contract message shared with CLI/MCP
   for (const key of Object.keys(data))
-    if (!["template", "source", "title", "description", "height"].includes(key))
-      throw new Error(`不支持的图形字段：${key}。`); // i18n-exempt: contract message shared with CLI/MCP
+    if (
+      ![
+        "template",
+        "source",
+        "title",
+        "description",
+        "height",
+        "presentation",
+      ].includes(key)
+    )
+      throw new Error(`不支持的图形字段：${key}。`);
   if (
     !diagramTemplates[kind].includes(data.template) &&
     data.template !== "custom"
@@ -88,5 +97,29 @@ export function validateDiagramData(kind, data) {
       );
   }
   if (data.template === "custom" && data.source === undefined)
-    throw new Error("自定义图形须提供 source。"); // i18n-exempt: contract message shared with CLI/MCP
+    throw new Error("自定义图形须提供 source。");
+  if (data.presentation !== undefined) {
+    const p = data.presentation;
+    if (!p || typeof p !== "object" || Array.isArray(p))
+      throw new Error("presentation 必须是显示设置对象。");
+    for (const key of Object.keys(p))
+      if (
+        !["title", "description", "notes", "legend", "controls"].includes(key)
+      )
+        throw new Error(`不支持的显示设置：${key}。`);
+    for (const key of ["title", "description"])
+      if (
+        p[key] !== undefined &&
+        !["inside", "outside", "hidden"].includes(p[key])
+      )
+        throw new Error(`${key} 的显示位置无效。`);
+    if (
+      p.notes !== undefined &&
+      !["inline", "details", "hidden"].includes(p.notes)
+    )
+      throw new Error("说明文字的显示方式无效。");
+    for (const key of ["legend", "controls"])
+      if (p[key] !== undefined && typeof p[key] !== "boolean")
+        throw new Error(`${key} 必须是布尔值。`);
+  }
 }

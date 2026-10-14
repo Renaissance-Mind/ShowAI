@@ -790,6 +790,23 @@ export class AgentService {
                   : documentation.usage,
               ...(documentation.version === 2
                 ? {
+                    ...(documentation.authoring
+                      ? {
+                          authoringReference: {
+                            tool: "catalog_describe",
+                            arguments: {
+                              projectId,
+                              kind: "component",
+                              id,
+                              scope: summary.scope,
+                              version: summary.version,
+                              integrity: summary.integrity,
+                              view: "source",
+                              file: documentation.authoring.entry,
+                            },
+                          },
+                        }
+                      : {}),
                     parameterReference: {
                       tool: "catalog_describe",
                       arguments: {

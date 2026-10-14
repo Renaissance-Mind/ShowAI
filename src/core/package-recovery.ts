@@ -76,6 +76,7 @@ const textFiles = new Set([
   ".tsx",
   ".js",
   ".jsx",
+  ".mjs",
   ".json",
   ".css",
   ".md",

@@ -20,6 +20,23 @@
   grid-template-columns: minmax(0, 1fr) 100px;
   gap: 10px;
 }
+.sb-diagram-display-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+.sb-diagram-editor .sb-diagram-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sb-diagram-editor .sb-diagram-toggle input {
+  width: auto;
+}
+.sb-diagram-notes {
+  margin: 8px 0;
+  color: var(--muted);
+}
 .sb-diagram-editor select,
 .sb-diagram-editor input:not([type="file"]),
 .sb-diagram-editor textarea {

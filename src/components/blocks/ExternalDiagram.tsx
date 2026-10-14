@@ -6,8 +6,10 @@ import { useViewportLock, ViewportLockButton } from "./ViewportLock";
 import { downloadFile, text } from "./helpers";
 import {
   diagramDocument,
+  diagramExportDocument,
   diagramLicense,
   diagramSource,
+  diagramStyledSource,
   listDiagramTemplates,
 } from "./diagrams/templates";
 import {
@@ -20,6 +22,13 @@ import {
   type DiagramFamily,
 } from "./diagrams/contract.mjs";
 import type { BlockData, BlockProps } from "./types";
+import {
+  compactDiagramPresentation,
+  originalDiagramPresentation,
+  diagramPresentation,
+  diagramCaptions,
+  diagramPresentationSource,
+} from "./diagrams/presentation";
 import type { MessageKey } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/diagram";
@@ -41,7 +50,32 @@ function ExternalDiagramBlock({
   const name = t(names[family]);
   const templates = useMemo(() => listDiagramTemplates(family), [family]);
   const source = useMemo(() => diagramSource(family, data), [family, data]);
-  const html = useMemo(() => diagramDocument(family, source), [family, source]);
+  const presentation = useMemo(() => diagramPresentation(data), [data]);
+  const captions = useMemo(() => diagramCaptions(source), [source]);
+  const shownSource = useMemo(
+    () =>
+      diagramPresentationSource(
+        diagramStyledSource(family, source),
+        presentation,
+      ),
+    [family, source, presentation],
+  );
+  const html = useMemo(
+    () => diagramDocument(family, shownSource, presentation),
+    [family, shownSource, presentation],
+  );
+  const outsideTitle =
+    presentation.title === "outside"
+      ? text(data.title, captions.title)
+      : !data.presentation && presentation.title === "inside"
+        ? text(data.title)
+        : "";
+  const outsideDescription =
+    presentation.description === "outside"
+      ? text(data.description, captions.description)
+      : !data.presentation && presentation.description === "inside"
+        ? text(data.description)
+        : "";
   const lock = useViewportLock(`diagram-${family}`);
   const baseline = useRef("");
   const [editing, setEditing] = useState(false);
@@ -127,7 +161,7 @@ function ExternalDiagramBlock({
   };
   const exportSvg = () => {
     try {
-      const svg = standaloneDiagramSvg(source);
+      const svg = standaloneDiagramSvg(shownSource);
       downloadFile(
         `<!--\n${diagramLicense(family).replaceAll("--", "—")}\n-->${svg}`,
         `${family}.svg`,
@@ -150,9 +184,9 @@ function ExternalDiagramBlock({
       data-diagram-ready={ready}
     >
       <BlockHeader
-        title={text(data.title, name)}
+        title={outsideTitle || name}
         defaultTitle={name}
-        description={text(data.description)}
+        description={outsideDescription}
         editable={editable}
         editing={editing}
         onEdit={open}
@@ -171,11 +205,30 @@ function ExternalDiagramBlock({
           className="sb-icon-button"
           aria-label={t("downloadHtml")}
           title={t("downloadHtml")}
-          onClick={() => downloadFile(html, `${family}.html`, "text/html")}
+          onClick={() =>
+            downloadFile(
+              diagramExportDocument(
+                html,
+                outsideTitle,
+                outsideDescription,
+                presentation.notes === "details" ? captions.notes : [],
+              ),
+              `${family}.html`,
+              "text/html",
+            )
+          }
         >
           HTML
         </button>
       </BlockHeader>
+      {presentation.notes === "details" && captions.notes.length > 0 && (
+        <details className="sb-diagram-notes">
+          <summary>补充说明</summary>
+          {captions.notes.map((note, i) => (
+            <p key={i}>{note}</p>
+          ))}
+        </details>
+      )}
       <ViewportLockButton
         {...lock}
         label={t("diagram")}
@@ -208,6 +261,105 @@ function ExternalDiagramBlock({
               if (event.key === "Escape") setEditing(false);
             }}
           >
+            <Field label="图形呈现">
+              <select
+                aria-label="图形呈现"
+                value={
+                  JSON.stringify(diagramPresentation(draft)) ===
+                  JSON.stringify(originalDiagramPresentation)
+                    ? "original"
+                    : JSON.stringify(diagramPresentation(draft)) ===
+                        JSON.stringify(compactDiagramPresentation)
+                      ? "compact"
+                      : "custom"
+                }
+                onChange={(event) => {
+                  if (event.target.value !== "custom")
+                    setDraft((current) => ({
+                      ...current,
+                      presentation:
+                        event.target.value === "original"
+                          ? originalDiagramPresentation
+                          : compactDiagramPresentation,
+                    }));
+                }}
+              >
+                <option value="compact">简洁：标题与说明放在图外</option>
+                <option value="original">原版：保留上游完整图形</option>
+                <option value="custom">自定义显示</option>
+              </select>
+            </Field>
+            <div className="sb-diagram-display-settings">
+              {(
+                [
+                  ["title", "标题"],
+                  ["description", "说明"],
+                ] as const
+              ).map(([key, label]) => (
+                <Field key={key} label={`${label}位置`}>
+                  <select
+                    aria-label={`${label}位置`}
+                    value={diagramPresentation(draft)[key]}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        presentation: {
+                          ...diagramPresentation(current),
+                          [key]: event.target.value,
+                        },
+                      }))
+                    }
+                  >
+                    <option value="outside">放在图外</option>
+                    <option value="inside">保留在图内</option>
+                    <option value="hidden">隐藏</option>
+                  </select>
+                </Field>
+              ))}
+              <Field label="补充说明">
+                <select
+                  aria-label="补充说明显示"
+                  value={diagramPresentation(draft).notes}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      presentation: {
+                        ...diagramPresentation(current),
+                        notes: event.target.value,
+                      },
+                    }))
+                  }
+                >
+                  <option value="hidden">隐藏</option>
+                  <option value="details">折叠到图外</option>
+                  <option value="inline">保留原位置</option>
+                </select>
+              </Field>
+              {(
+                [
+                  ["legend", "显示图例"],
+                  ["controls", "显示阅读控件"],
+                ] as const
+              ).map(([key, label]) => (
+                <label key={key} className="sb-diagram-toggle">
+                  <input
+                    aria-label={label}
+                    type="checkbox"
+                    checked={diagramPresentation(draft)[key]}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        presentation: {
+                          ...diagramPresentation(current),
+                          [key]: event.target.checked,
+                        },
+                      }))
+                    }
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
             <Field label={t("template")}>
               <select
                 aria-label={t("diagramTemplate")}

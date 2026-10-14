@@ -1,6 +1,10 @@
 import { COMPONENT_PARAMETER_CAPABILITIES } from "../portable/component-parameters.mjs";
 import { z } from "zod";
 import { componentDocumentationSchema } from "../components/custom/documentation";
+import {
+  componentAuthoringIndexSchema,
+  componentAuthoringGuideSchema,
+} from "../components/custom/authoring";
 
 export const GUIDE_TOPICS = [
   "presentation",
@@ -354,6 +358,8 @@ const guides: Record<
     purpose:
       "Create a reusable React component only after reuse and composition leave a real expression or interaction gap.",
     rules: [
+      "When a component guide returns authoringReference, follow its scoped source-file reference to the versioned production index. Read the original process and selected type/style guides plus inputs before generating new content. These authoring files are part of normal component use; implementation source remains a separate development step.",
+      "documentation.version=2 can declare authoring:{entry:'authoring/index.json'}. Store the JSON index and guide records in source.files using the authoring schemas below. Guide SHA-256 is over the exact UTF-8 markdown. All referenced files and guide hashes are checked on save. Repository/commit/sourcePath/url and renderer kit/runner are optional for local authoring instructions; preserve full provenance and unmodified production files when wrapping an upstream project.",
       "Query catalog_describe view=parameters for generated schema + field meanings + real sample values. Select parameterPath for a field/subtree, follow parameterOffset/parameterLimit and reuse knownHash only for held text. Samples and schema defaults are not automatic data filling.",
       "Version 2 documents every schema parameter's meaning, optional omission behavior, units/coordinates where relevant and explicit opaque payloads. Declare unique/reference/index/sumMaximum relations in usage.rules; the same portable checker validates real inputs and offline sandboxes. Fallbacks declare a JSON value, from:{path,selection:first|last}, or computedFrom paths with an authored derivation description; instructions alone do not prove implementation behavior.",
       "New authored components provide manifest.documentation version=2; version=1 remains a legacy compatibility format. The versioned contract has reuse (general/domain/content-specific and boundaries; content-specific requires owner), usage (purpose, structure, input meanings, recipes, interactions/persistence, constraints and editing boundaries), and development (entry points, architecture, extensions, invariants and verification). The input.documentationSchema below is authoritative. Legacy imports without it remain readable and explicitly missing/unclassified.",
@@ -375,6 +381,8 @@ const guides: Record<
     ],
     input: {
       documentationSchema: z.toJSONSchema(componentDocumentationSchema),
+      authoringIndexSchema: z.toJSONSchema(componentAuthoringIndexSchema),
+      authoringGuideSchema: z.toJSONSchema(componentAuthoringGuideSchema),
       parameterContract: COMPONENT_PARAMETER_CAPABILITIES,
     },
   },

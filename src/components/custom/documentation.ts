@@ -130,6 +130,10 @@ export const parameterRuleSchema = z.discriminatedUnion("kind", [
 const documentationV2 = documentationV1
   .extend({
     version: z.literal(2),
+    authoring: z
+      .object({ entry: text.max(500) })
+      .strict()
+      .optional(),
     usage: documentationV1.shape.usage
       .extend({
         inputs: z.array(parameterInputSchema).max(1000),

@@ -3,8 +3,14 @@ import archify from "./archify-samples.json";
 import design from "./design-samples.json";
 import fireworks from "./fireworks-samples.json";
 import licenses from "./licenses.json";
+import fonts from "./editorial-fonts.json";
 import { applyTemplate, renderCards } from "./archify-utils.mjs";
 import { validateDiagramData, type DiagramFamily } from "./contract.mjs";
+import {
+  diagramPresentationCss,
+  originalDiagramPresentation,
+  type DiagramPresentation,
+} from "./presentation";
 
 export interface DiagramTemplate {
   id: string;
@@ -54,11 +60,50 @@ export function diagramLicense(kind: DiagramFamily) {
   return `${item.repository}\nCommit: ${item.commit}\n\n${item.text}\n${item.notices}`;
 }
 
+export function diagramStyledSource(kind: DiagramFamily, source: string) {
+  if (kind !== "diagram-design" || source.includes("data:font/")) return source;
+  const notice = Object.entries(fonts.licenses)
+    .map(([name, license]) => `${name}\n${license}`)
+    .join("\n\n")
+    .replaceAll("--", "—");
+  return `<!-- Offline font licenses\n${notice}\n--><style>${fonts.css}</style>${source}`;
+}
+
+/** Standalone HTML retains the captions moved outside the diagram reader. */
+export function diagramExportDocument(
+  html: string,
+  title: string,
+  description: string,
+  notes: string[],
+) {
+  const escape = (value: string) =>
+    value
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;");
+  if (!title && !description && !notes.length) return html;
+  const caption = `<section style="max-width:1120px;margin:20px auto;font-family:system-ui,sans-serif">${title ? `<h2>${escape(title)}</h2>` : ""}${description ? `<p>${escape(description)}</p>` : ""}${notes.length ? `<details><summary>补充说明</summary>${notes.map((note) => `<p>${escape(note)}</p>`).join("")}</details>` : ""}</section>`;
+  return /<body\b[^>]*>/i.test(html)
+    ? html.replace(/<body\b[^>]*>/i, (body) => body + caption)
+    : html.replace(/<style>/i, caption + "<style>");
+}
+
 /** Put this policy before all imported markup, including an authored head. */
-export function diagramDocument(kind: DiagramFamily, source: string): string {
+export function diagramDocument(
+  kind: DiagramFamily,
+  source: string,
+  presentation: DiagramPresentation = originalDiagramPresentation,
+): string {
   const policy =
     "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'";
-  return `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${policy}"><!--\n${diagramLicense(kind).replaceAll("--", "—")}\n-->${source}<style>html{color-scheme:light dark}body{margin:0}body:has(>svg){padding:16px;background:transparent}body>svg{display:block;width:100%;height:auto}html[data-embed=true] body{padding:12px}body>.frame{max-width:none}html:not([data-embed]) body{padding:20px}.diagram-container{max-width:100%}@media print{.diagram-container{overflow:visible}svg{min-width:0!important}}</style>`;
+  const simplified =
+    JSON.stringify(presentation) !==
+    JSON.stringify(originalDiagramPresentation);
+  const fitSvg = /<html\b|<body\b/i.test(source)
+    ? ""
+    : "body{margin:0;padding:12px}body>svg{display:block;width:100%;height:auto}";
+  return `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${policy}"><!--\n${diagramLicense(kind).replaceAll("--", "—")}\n-->${source}<style>${fitSvg}${simplified ? diagramPresentationCss(presentation) : ""}</style>`;
 }
 
 export function diagramSourceFiles(kind: DiagramFamily) {

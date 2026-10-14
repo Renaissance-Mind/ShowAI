@@ -2,7 +2,7 @@
   {
     "kind": "archify",
     "name": "Archify 交互架构图",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "保留 Archify 原生 HTML/SVG 阅读器的工作流、系统架构、时序、数据流和生命周期图，支持节点查找、路径探索、主题与导出。",
     "scenarios": [
       "解释系统模块的职责、调用路径和状态变化。",
@@ -11,11 +11,19 @@
     "effects": [
       "通过 / 插入到 Page 或 Board，沿用宿主的组件设置菜单。",
       "解锁后操作图形；阅读操作只改变当前视图。",
-      "保存文字和源码修改；下载独立 SVG 或离线 HTML。"
+      "保存文字和源码修改；下载独立 SVG 或离线 HTML。",
+      "新图默认将标题和说明放在外部，补充说明可折叠或隐藏；可切回完整原版。"
     ],
     "defaultData": {
       "template": "workflow",
-      "height": 560
+      "height": 560,
+      "presentation": {
+        "title": "outside",
+        "description": "outside",
+        "notes": "hidden",
+        "legend": true,
+        "controls": true
+      }
     },
     "propsSchema": {
       "type": "object",
@@ -50,6 +58,42 @@
           "type": "number",
           "minimum": 240,
           "maximum": 1200
+        },
+        "presentation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "title": {
+              "type": "string",
+              "enum": [
+                "inside",
+                "outside",
+                "hidden"
+              ]
+            },
+            "description": {
+              "type": "string",
+              "enum": [
+                "inside",
+                "outside",
+                "hidden"
+              ]
+            },
+            "notes": {
+              "type": "string",
+              "enum": [
+                "inline",
+                "details",
+                "hidden"
+              ]
+            },
+            "legend": {
+              "type": "boolean"
+            },
+            "controls": {
+              "type": "boolean"
+            }
+          }
         }
       },
       "required": [
@@ -83,7 +127,14 @@
         "request": "使用 Archify 交互架构图 的工作流模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "workflow",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -91,7 +142,14 @@
         "request": "使用 Archify 交互架构图 的系统架构模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "architecture",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -99,7 +157,14 @@
         "request": "使用 Archify 交互架构图 的时序交互模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "sequence",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -107,7 +172,14 @@
         "request": "使用 Archify 交互架构图 的数据流模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "dataflow",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -115,7 +187,14 @@
         "request": "使用 Archify 交互架构图 的生命周期模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "lifecycle",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       }
     ]
@@ -123,7 +202,7 @@
   {
     "kind": "diagram-design",
     "name": "Diagram Design 图形",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "45 类 Diagram Design 图形模板，保留原版 HTML/SVG 布局和样式，覆盖架构、流程、关系与数据表达；支持文字修改和图形源码编辑。",
     "scenarios": [
       "用图形梳理架构、关系、过程、旅程和数量分布。",
@@ -132,11 +211,19 @@
     "effects": [
       "通过 / 插入到 Page 或 Board，沿用宿主的组件设置菜单。",
       "解锁后操作图形；阅读操作只改变当前视图。",
-      "保存文字和源码修改；下载独立 SVG 或离线 HTML。"
+      "保存文字和源码修改；下载独立 SVG 或离线 HTML。",
+      "新图默认将标题和说明放在外部，补充说明可折叠或隐藏；可切回完整原版。"
     ],
     "defaultData": {
       "template": "architecture",
-      "height": 560
+      "height": 560,
+      "presentation": {
+        "title": "outside",
+        "description": "outside",
+        "notes": "hidden",
+        "legend": true,
+        "controls": true
+      }
     },
     "propsSchema": {
       "type": "object",
@@ -211,6 +298,42 @@
           "type": "number",
           "minimum": 240,
           "maximum": 1200
+        },
+        "presentation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "title": {
+              "type": "string",
+              "enum": [
+                "inside",
+                "outside",
+                "hidden"
+              ]
+            },
+            "description": {
+              "type": "string",
+              "enum": [
+                "inside",
+                "outside",
+                "hidden"
+              ]
+            },
+            "notes": {
+              "type": "string",
+              "enum": [
+                "inline",
+                "details",
+                "hidden"
+              ]
+            },
+            "legend": {
+              "type": "boolean"
+            },
+            "controls": {
+              "type": "boolean"
+            }
+          }
         }
       },
       "required": [
@@ -244,7 +367,14 @@
         "request": "使用 Diagram Design 图形 的系统架构模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "architecture",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -252,7 +382,14 @@
         "request": "使用 Diagram Design 图形 的架构变化模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "architecture-delta",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -260,7 +397,14 @@
         "request": "使用 Diagram Design 图形 的轴测平面模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "axonometric-plan",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -268,7 +412,14 @@
         "request": "使用 Diagram Design 图形 的柱状图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "bar",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -276,7 +427,14 @@
         "request": "使用 Diagram Design 图形 的数据流模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "data-flow",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -284,7 +442,14 @@
         "request": "使用 Diagram Design 图形 的数据库结构模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "db-schema",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -292,7 +457,14 @@
         "request": "使用 Diagram Design 图形 的依赖关系模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "dependency",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -300,7 +472,14 @@
         "request": "使用 Diagram Design 图形 的部署架构模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "deployment",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -308,7 +487,14 @@
         "request": "使用 Diagram Design 图形 的数据平台集成模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "dp-integration",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -316,7 +502,14 @@
         "request": "使用 Diagram Design 图形 的数据平台权限矩阵模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "dp-security-matrix",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -324,7 +517,14 @@
         "request": "使用 Diagram Design 图形 的实体关系模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "er",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -332,7 +532,14 @@
         "request": "使用 Diagram Design 图形 的轴测分解模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "exploded",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -340,7 +547,14 @@
         "request": "使用 Diagram Design 图形 的鱼骨图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "fishbone",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -348,7 +562,14 @@
         "request": "使用 Diagram Design 图形 的流程图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "flowchart",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -356,7 +577,14 @@
         "request": "使用 Diagram Design 图形 的甘特图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "gantt",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -364,7 +592,14 @@
         "request": "使用 Diagram Design 图形 的热力图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "heatmap",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -372,7 +607,14 @@
         "request": "使用 Diagram Design 图形 的高层架构模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "high-level",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -380,7 +622,14 @@
         "request": "使用 Diagram Design 图形 的IT 现状模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "it-state",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -388,7 +637,14 @@
         "request": "使用 Diagram Design 图形 的用户旅程模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "journey",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -396,7 +652,14 @@
         "request": "使用 Diagram Design 图形 的看板模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "kanban",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -404,7 +667,14 @@
         "request": "使用 Diagram Design 图形 的分层结构模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "layers",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -412,7 +682,14 @@
         "request": "使用 Diagram Design 图形 的折线图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "line",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -420,7 +697,14 @@
         "request": "使用 Diagram Design 图形 的反馈循环模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "loop",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -428,7 +712,14 @@
         "request": "使用 Diagram Design 图形 的数据分层模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "medallion",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -436,7 +727,14 @@
         "request": "使用 Diagram Design 图形 的嵌套关系模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "nested",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -444,7 +742,14 @@
         "request": "使用 Diagram Design 图形 的组织结构模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "org-chart",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -452,7 +757,14 @@
         "request": "使用 Diagram Design 图形 的极坐标图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "polar",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -460,7 +772,14 @@
         "request": "使用 Diagram Design 图形 的过程图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "process",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -468,7 +787,14 @@
         "request": "使用 Diagram Design 图形 的金字塔模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "pyramid",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -476,7 +802,14 @@
         "request": "使用 Diagram Design 图形 的四象限模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "quadrant",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -484,7 +817,14 @@
         "request": "使用 Diagram Design 图形 的雷达图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "radar",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -492,7 +832,14 @@
         "request": "使用 Diagram Design 图形 的桑基图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "sankey",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -500,7 +847,14 @@
         "request": "使用 Diagram Design 图形 的散点图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "scatter",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -508,7 +862,14 @@
         "request": "使用 Diagram Design 图形 的时序图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "sequence",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -516,7 +877,14 @@
         "request": "使用 Diagram Design 图形 的服务蓝图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "service-blueprint",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -524,7 +892,14 @@
         "request": "使用 Diagram Design 图形 的状态机模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "state",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -532,7 +907,14 @@
         "request": "使用 Diagram Design 图形 的用户故事地图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "story-map",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -540,7 +922,14 @@
         "request": "使用 Diagram Design 图形 的泳道图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "swimlane",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -548,7 +937,14 @@
         "request": "使用 Diagram Design 图形 的时间线模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "timeline",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -556,7 +952,14 @@
         "request": "使用 Diagram Design 图形 的层级树模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "tree",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -564,7 +967,14 @@
         "request": "使用 Diagram Design 图形 的矩形树图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "treemap",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -572,7 +982,14 @@
         "request": "使用 Diagram Design 图形 的UML 类图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "uml-class",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -580,7 +997,14 @@
         "request": "使用 Diagram Design 图形 的韦恩图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "venn",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -588,7 +1012,14 @@
         "request": "使用 Diagram Design 图形 的Wardley 地图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "wardley",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -596,7 +1027,14 @@
         "request": "使用 Diagram Design 图形 的瀑布图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "waterfall",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       }
     ]
@@ -604,7 +1042,7 @@
   {
     "kind": "fireworks-tech-graph",
     "name": "Fireworks 技术图",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Fireworks Tech Graph 的 12 种技术图风格，保留原版 SVG 及语义连线，支持文字修改、完整 SVG/HTML 导入和离线导出。",
     "scenarios": [
       "解释 Agent、存储、服务、云部署和事件流。",
@@ -613,11 +1051,19 @@
     "effects": [
       "通过 / 插入到 Page 或 Board，沿用宿主的组件设置菜单。",
       "解锁后操作图形；阅读操作只改变当前视图。",
-      "保存文字和源码修改；下载独立 SVG 或离线 HTML。"
+      "保存文字和源码修改；下载独立 SVG 或离线 HTML。",
+      "新图默认将标题和说明放在外部，补充说明可折叠或隐藏；可切回完整原版。"
     ],
     "defaultData": {
       "template": "style-6",
-      "height": 560
+      "height": 560,
+      "presentation": {
+        "title": "outside",
+        "description": "outside",
+        "notes": "hidden",
+        "legend": true,
+        "controls": true
+      }
     },
     "propsSchema": {
       "type": "object",
@@ -659,6 +1105,42 @@
           "type": "number",
           "minimum": 240,
           "maximum": 1200
+        },
+        "presentation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "title": {
+              "type": "string",
+              "enum": [
+                "inside",
+                "outside",
+                "hidden"
+              ]
+            },
+            "description": {
+              "type": "string",
+              "enum": [
+                "inside",
+                "outside",
+                "hidden"
+              ]
+            },
+            "notes": {
+              "type": "string",
+              "enum": [
+                "inline",
+                "details",
+                "hidden"
+              ]
+            },
+            "legend": {
+              "type": "boolean"
+            },
+            "controls": {
+              "type": "boolean"
+            }
+          }
         }
       },
       "required": [
@@ -692,7 +1174,14 @@
         "request": "使用 Fireworks 技术图 的扁平图标模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "style-1",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -700,7 +1189,14 @@
         "request": "使用 Fireworks 技术图 的深色终端模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "style-2",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -708,7 +1204,14 @@
         "request": "使用 Fireworks 技术图 的蓝图模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "style-3",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -716,7 +1219,14 @@
         "request": "使用 Fireworks 技术图 的简洁笔记模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "style-4",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -724,7 +1234,14 @@
         "request": "使用 Fireworks 技术图 的玻璃质感模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "style-5",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -732,7 +1249,14 @@
         "request": "使用 Fireworks 技术图 的Claude 风格模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "style-6",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -740,7 +1264,14 @@
         "request": "使用 Fireworks 技术图 的OpenAI 风格模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "style-7",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -748,7 +1279,14 @@
         "request": "使用 Fireworks 技术图 的深色精致模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "style-8",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -756,7 +1294,14 @@
         "request": "使用 Fireworks 技术图 的C4 评审画布模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "style-9",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -764,7 +1309,14 @@
         "request": "使用 Fireworks 技术图 的云基础设施模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "style-10",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -772,7 +1324,14 @@
         "request": "使用 Fireworks 技术图 的事件轨道模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "style-11",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       },
       {
@@ -780,7 +1339,14 @@
         "request": "使用 Fireworks 技术图 的运维脉搏模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "style-12",
-          "height": 560
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
         }
       }
     ]
