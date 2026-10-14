@@ -200,20 +200,22 @@ async function main() {
 
   console.log("[5/6] 部署 ShowAI MCP。");
   await verifyCloudMcpRelease(source, manifest);
+  const deployStartedAt = Date.now();
   await wrangler(deployArgs);
-  console.log("[6/6] 验证 HTTPS、OAuth 和 MCP 工具。");
+  console.log("[6/6] 等待新容器接管并验证 HTTPS、OAuth 和 MCP 工具（滚动替换旧容器可能需要十几分钟）。");
   let health;
-  // A new Container application can take several minutes to provision, then
-  // restores state and renders a real screenshot before it reports ready.
-  const healthDeadline = Date.now() + 10 * 60_000;
+  // A running instance keeps serving until Cloudflare replaces it, so only a
+  // browser check rendered after this deployment proves the new image is live.
+  const fresh = (value) => value?.ok && Date.parse(value.browserRendering?.checkedAt ?? "") > deployStartedAt;
+  const healthDeadline = Date.now() + 30 * 60_000;
   while (Date.now() < healthDeadline) {
     try {
       const response = await fetch(`${origin}/health`, { signal: AbortSignal.timeout(55000) });
-      if (response.ok) { health = await response.json(); if (health.ok) break; }
+      if (response.ok) { health = await response.json(); if (fresh(health)) break; }
     } catch { /* DNS, certificate or container may still be starting. */ }
-    await new Promise((r) => setTimeout(r, 10000));
+    await new Promise((r) => setTimeout(r, 15000));
   }
-  if (!health?.ok) throw new Error("已提交部署，但健康检查尚未通过。请把终端最后的提示告诉我。");
+  if (!fresh(health)) throw new Error(health?.ok ? "已提交部署，但旧容器仍在服务，新容器尚未接管。稍后检查 /health 的 browserRendering.checkedAt。" : "已提交部署，但健康检查尚未通过。请把终端最后的提示告诉我。");
   if (health.browserRendering?.passed !== true || health.browserRendering.architecture !== "x64") throw new Error("Cloudflare AMD64 容器的实际渲染检查尚未通过，不能确认部署完成。");
   async function json(url, options) {
     const response = await fetch(url, { ...options, signal: AbortSignal.timeout(55000) });

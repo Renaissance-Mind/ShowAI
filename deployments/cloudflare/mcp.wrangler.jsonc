@@ -25,6 +25,8 @@
       "image_build_context": "../..",
       "instance_type": "standard-1",
       "max_instances": 1,
+      // One gateway instance: replace it in a single step.
+      "rollout_step_percentage": 100,
     },
   ],
   "r2_buckets": [{ "binding": "STATE", "bucket_name": "showai-mcp-state" }],

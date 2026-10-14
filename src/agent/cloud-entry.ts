@@ -9,7 +9,7 @@ if (!publicUrl || !stateKey || !syncServer)
 const stateDirectory = "/state";
 // A deployment is ready only after Chromium renders on the actual cloud CPU.
 const browserRendering = await checkCloudBrowser();
-await startMcpHttpServer({
+const gateway = await startMcpHttpServer({
   host: "0.0.0.0",
   port: 8789,
   publicUrl,
@@ -21,5 +21,12 @@ await startMcpHttpServer({
     httpObjectStore(publicUrl, stateKey),
     stateKey,
   ),
+});
+// As PID 1 the process ignores SIGTERM without a handler, so rollouts would
+// wait for SIGKILL. Stop accepting requests and exit once in-flight requests,
+// whose responses follow their state checkpoint, have finished.
+process.once("SIGTERM", () => {
+  gateway.server.close(() => process.exit(0));
+  gateway.server.closeIdleConnections();
 });
 console.log("ShowAI Cloud MCP is ready.");
