@@ -29,3 +29,7 @@
   width: 100%;
   will-change: transform;
 }
+
+.page-surface[data-native-ink-active="true"] [data-native-ink] {
+  visibility: hidden;
+}

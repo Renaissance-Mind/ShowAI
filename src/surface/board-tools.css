@@ -6,9 +6,12 @@
 .board-tool-keys {
   box-sizing: border-box;
   width: 100%;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--board-tool-count), minmax(0, 1fr));
   display: grid;
-  grid-template-columns: repeat(7, var(--board-tool-width));
+  grid-template-columns: repeat(
+    var(--board-tool-count),
+    var(--board-tool-width)
+  );
   gap: 2px;
 }
 .surface-toolbar .board-tool-buttons button {
@@ -53,4 +56,48 @@
   .board-tool-stack {
     --board-tool-width: 24px;
   }
+}
+
+@media (pointer: coarse) {
+  .board-tool-shortcuts {
+    display: none;
+  }
+  .board-tool-stack {
+    --board-tool-width: 36px;
+  }
+}
+.board-writing-options {
+  position: relative;
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+.board-writing-options details > summary {
+  display: flex;
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.board-writing-options details[open] > div {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  right: 0;
+  padding: 12px;
+  min-width: 190px;
+  background: var(--paper, var(--bg));
+  border: 1px solid var(--line, var(--border));
+  border-radius: 8px;
+  box-shadow: 0 4px 20px #0002;
+}
+.board-writing-options label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.page-surface[data-board-tool="pan"] {
+  cursor: grab;
+}
+.page-surface[data-board-tool="eraser"] .board-drawing-input {
+  cursor: crosshair;
 }

@@ -8,6 +8,9 @@ import {
   ArrowUpRight,
   PanelsTopLeft,
   ChevronDown,
+  Hand,
+  Eraser,
+  Lasso,
 } from "../ui/icons";
 import { boardTools } from "./board-tools";
 import type { BoardTool } from "./types";
@@ -23,6 +26,9 @@ const icons = [
   Circle,
   ArrowUpRight,
   PanelsTopLeft,
+  Hand,
+  Eraser,
+  Lasso,
 ];
 
 export function BoardTools({
@@ -35,7 +41,10 @@ export function BoardTools({
   const t = useTranslator(messages);
   const [expanded, setExpanded] = useState(true);
   return (
-    <div className="board-tool-stack">
+    <div
+      className="board-tool-stack"
+      style={{ "--board-tool-count": boardTools.length } as React.CSSProperties}
+    >
       <div className="board-tool-shortcuts">
         <button
           type="button"

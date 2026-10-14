@@ -32,20 +32,7 @@ import {
   type RefObject,
 } from "react";
 import type { JSONContent } from "@tiptap/core";
-import {
-  ArrowLeft,
-  ChevronRight,
-  LayoutDashboard,
-  MousePointer2,
-  Pencil,
-  Highlighter,
-  PanelsTopLeft,
-  Square,
-  Circle,
-  ArrowUpRight,
-  LockKeyhole,
-  X,
-} from "../ui/icons";
+import { ArrowLeft, ChevronRight, LayoutDashboard, X } from "../ui/icons";
 import type { ContainerDocument, ShowDocument } from "../types";
 import type {
   BoardTool,
@@ -77,6 +64,7 @@ import "./containers.css";
 import PageIcon from "../components/PageIcon";
 import PageIconDialog from "../studio/PageIconDialog";
 import { PageWidthSwitch } from "./PageWidthSwitch";
+import { BoardTools } from "./BoardTools";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";
 
@@ -88,7 +76,6 @@ interface Runtime {
   readOnly: boolean;
   printing: boolean;
   pageWidthModes: boolean;
-  onHandwriting?: (boardId: string, document: ShowDocument, tool?: string) => Promise<void>;
   selected: string | null;
   select: (id: string | null) => void;
   inspect: (id: string | null) => void;
@@ -133,7 +120,6 @@ export function ContainerRuntime({
   onControlsChange,
   retainedState,
   inspectorHost,
-  onHandwriting,
 }: {
   document: ContainerDocument;
   geometry?: SurfaceGeometryStore;
@@ -156,7 +142,6 @@ export function ContainerRuntime({
   onControlsChange?: (controls: EditorControls | null) => void;
   retainedState?: ContainerViewState;
   inspectorHost?: HTMLElement | null;
-  onHandwriting?: (boardId: string, document: ShowDocument, tool?: string) => Promise<void>;
 }) {
   const t = useTranslator(messages);
   const document = useMemo(
@@ -362,7 +347,6 @@ export function ContainerRuntime({
     readOnly: !onChange,
     printing,
     pageWidthModes,
-    onHandwriting,
     selected,
     select,
     inspect,
@@ -931,10 +915,8 @@ function ContainerView({
     id = node.attrs!.id,
     kind = surfaceKind(node),
     readOnly = runtime.readOnly;
-  const t = useTranslator(messages);
   const viewport = useRef<SurfaceHandle>(null),
     page = useRef<HTMLDivElement>(null);
-  const [toolLocked, setToolLocked] = useState(false);
   const [tool, setTool] = useState<BoardTool | null>(null);
   const [styles, setStyles] = useState<Record<string, DrawingStyle>>({
     pen: { color: "#252629", fillColor: "none", strokeWidth: 2.5 },
@@ -943,14 +925,11 @@ function ContainerView({
   });
   const styleKey = tool === "pen" || tool === "highlighter" ? tool : "shape";
   const style = styles[styleKey];
-  const chooseTool = (next: BoardTool | null) => {
+  const chooseTool = async (next: BoardTool | null) => {
+    await window.showai?.inlineInk?.flush();
     runtime.activate(id);
     runtime.select(null);
     runtime.inspect(null);
-    if (runtime.onHandwriting && next && ["pen", "highlighter", "rectangle", "ellipse", "arrow"].includes(next)) {
-      void runtime.onHandwriting(id, runtime.geometry.materialize(runtime.current.current), next);
-      return;
-    }
     setTool(next);
   };
   const enabled = root || runtime.active === id;
@@ -1316,12 +1295,7 @@ function ContainerView({
                   runtime.commit(
                     addNode(runtime.current.current, drawing, frame, id),
                   );
-                  if (window.document.documentElement.dataset.native === "ios") {
-                    runtime.select(null);
-                  } else {
-                    runtime.select(drawing.attrs!.id);
-                    if (tool !== "pen" && tool !== "highlighter" && !toolLocked) setTool(null);
-                  }
+                  runtime.select(null);
                 }
           }
           extraActions={
@@ -1329,61 +1303,7 @@ function ContainerView({
               {!readOnly && (
                 <>
                   <span className="surface-toolbar-divider" />
-                  <button
-                    type="button"
-                    aria-label={t("tool.select")}
-                    aria-pressed={!tool}
-                    onClick={() => chooseTool(null)}
-                  >
-                    <MousePointer2 size={15} />
-                  </button>
-                  {(
-                    [
-                      ["pen", t("tool.pen"), Pencil],
-                      ["highlighter", t("tool.highlighter"), Highlighter],
-                      ["rectangle", t("tool.rectangle"), Square],
-                      ["ellipse", t("tool.ellipse"), Circle],
-                      ["arrow", t("tool.arrow"), ArrowUpRight],
-                      ["region", t("tool.region"), PanelsTopLeft],
-                    ] as const
-                  ).map(([value, label, Icon]) => (
-                    <button
-                      type="button"
-                      key={value}
-                      aria-label={label}
-                      title={t(
-                        value === "pen" || value === "highlighter"
-                          ? "tool.withShortcut"
-                          : "tool.shapeWithShortcut",
-                        {
-                          label,
-                          key: {
-                            pen: "P",
-                            highlighter: "H",
-                            rectangle: "R",
-                            ellipse: "E",
-                            arrow: "A",
-                            region: "F",
-                          }[value],
-                        },
-                      )}
-                      aria-pressed={tool === value}
-                      onClick={() => {
-                        chooseTool(value);
-                      }}
-                    >
-                      <Icon size={15} />
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    aria-label={t("tool.continuous")}
-                    aria-pressed={toolLocked}
-                    title={t("tool.continuousTitle")}
-                    onClick={() => setToolLocked((value) => !value)}
-                  >
-                    <LockKeyhole size={15} />
-                  </button>
+                  <BoardTools tool={tool} onChange={chooseTool} />
                 </>
               )}
             </>

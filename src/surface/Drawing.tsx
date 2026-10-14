@@ -12,7 +12,7 @@ import {
   type PointerEvent,
 } from "react";
 import type { JSONContent } from "@tiptap/core";
-import type { BoardTool, DrawingTool, NodeLayout } from "./types";
+import type { BoardDrawingTool, DrawingTool, NodeLayout } from "./types";
 import type { Camera } from "./model";
 import "./native-ink.css";
 import { useTranslator } from "../i18n/react";
@@ -101,6 +101,7 @@ export function Drawing({
     <>
       <svg
         className="board-drawing"
+        data-native-ink={node.attrs!.ink ? "" : undefined}
         data-native-ink-id={node.attrs!.ink ? node.attrs!.id : undefined}
         viewBox={`0 0 ${extent[0]} ${extent[1]}`}
         preserveAspectRatio="none"
@@ -284,17 +285,19 @@ export function DrawingInput({
   strokeWidth = 2.5,
   camera,
   panHeld,
+  ruler = false,
   makeSnapIndex,
   point,
   onDraw,
   onExit,
 }: {
-  tool: BoardTool;
+  tool: BoardDrawingTool;
   color: string;
   fillColor?: string;
   strokeWidth?: number;
   camera: { current: Camera };
   panHeld: { current: boolean };
+  ruler?: boolean;
   makeSnapIndex: () => SnapIndex;
   point: (x: number, y: number) => Point;
   onDraw: (node: JSONContent, frame: NodeLayout) => void;
@@ -386,10 +389,16 @@ export function DrawingInput({
       ) *
         scale >=
       3;
-    if (freehand && Math.hypot(next.x - last.x, next.y - last.y) * scale < 0.7)
+    if (
+      freehand &&
+      !ruler &&
+      Math.hypot(next.x - last.x, next.y - last.y) * scale < 0.7
+    )
       return;
     let values = freehand
-      ? [...pending.current.points, next]
+      ? ruler
+        ? [pending.current.origin, next]
+        : [...pending.current.points, next]
       : creationPoints(
           tool === "region" ? "rectangle" : tool,
           pending.current.origin,
