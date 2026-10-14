@@ -3,10 +3,12 @@ import type { SurfaceGeometryStore } from "./geometry-store";
 import type { ShowDocument } from "../types";
 import { useBoardInteraction } from "./useBoardInteraction";
 import type { BoardGesture } from "./useBoardInteraction";
+import { useInlineInk } from "./useInlineInk";
+import { BoardGestureInput } from "./BoardGestureInput";
 import { DrawingInput } from "./Drawing";
 import { boardToolForKey } from "./board-tools";
 import type { JSONContent } from "@tiptap/core";
-import type { BoardTool, DrawingStyle } from "./types";
+import type { BoardTool, BoardDrawingTool, DrawingStyle } from "./types";
 import { findSurfaceNode } from "./document.mjs";
 import { BoardStyleControls } from "./BoardStyleControls";
 import { readingCapture } from "./reading-capture";
@@ -35,6 +37,7 @@ import {
   Copy,
   Settings2,
   FileText,
+  Ruler,
 } from "../ui/icons";
 import {
   useSurfaceViewport,
@@ -156,6 +159,25 @@ export default function PageSurface({
       onMove ? `showai.viewport.v3:${pageId}` : undefined,
       enabled && !locked,
     );
+  const [ruler, setRuler] = useState(false);
+  const writingSettings = useRef<HTMLDetailsElement>(null);
+  useInlineInk({
+    root: rootRef,
+    world: worldRef,
+    document: boardDocument,
+    boardId: containerId ?? "",
+    tool: drawTool,
+    color: drawColor,
+    width: drawStrokeWidth,
+    ruler,
+    enabled: enabled && !locked && !!onDraw && !printing,
+    onCamera: (value) => controls.current.moveTo(value, true),
+    onTool: (value) => {
+      if (value === "settings") {
+        if (writingSettings.current) writingSettings.current.open = true;
+      } else if (value === "eraser" || value === "pen") onToolChange?.(value);
+    },
+  });
   const board = useBoardInteraction({
     geometry,
     document: boardDocument,
@@ -476,6 +498,7 @@ export default function PageSurface({
         data-viewport-lock-scope={embedded ? "board" : undefined}
         data-viewport-locked={locked}
         data-board-id={pageId}
+        data-board-tool={drawTool ?? "select"}
         onContextMenu={(event) => {
           onInspect?.(null);
           if (
@@ -526,12 +549,31 @@ export default function PageSurface({
         }}
         onPointerDownCapture={(event) => {
           const target = event.target as Element;
-          if (fingerNavigatesBoard(event.pointerType) && !target.closest('[data-surface-ui],button,input,textarea,select,iframe,[contenteditable=true]')) return;
+          if (
+            ["pan", "eraser"].includes(drawTool ?? "") &&
+            !target.closest("[data-surface-ui]")
+          )
+            return;
+          if (
+            fingerNavigatesBoard(event.pointerType) &&
+            !target.closest(
+              "[data-surface-ui],button,input,textarea,select,iframe,[contenteditable=true]",
+            )
+          )
+            return;
           if (target.closest(".page-surface") !== event.currentTarget) return;
           if (!target.closest(".surface-popover-anchor") && navigation.current)
             navigation.current.open = false;
           if (!target.closest("[data-surface-ui]")) setObjectMenu(null);
-          const selectionId = board.selectionHit(event.clientX, event.clientY);
+          const selectedHit =
+            drawTool === "lasso"
+              ? board.hitTest(event.clientX, event.clientY)
+              : null;
+          const selectionId =
+            board.selectionHit(event.clientX, event.clientY) ??
+            (selectedHit && board.ids.has(selectedHit.id)
+              ? selectedHit.id
+              : null);
           const handle =
             target.closest<HTMLElement>(
               ".board-resize-handle,.surface-object-rotate",
@@ -1037,29 +1079,53 @@ export default function PageSurface({
             {children}
           </div>
         </div>
-        {drawTool && enabled && !locked && onDraw && (
-          <DrawingInput
-            key={drawTool}
-            tool={drawTool}
-            panHeld={spaceHeld}
-            makeSnapIndex={board.drawingSnapIndex}
-            color={drawColor}
-            fillColor={drawFillColor}
-            strokeWidth={drawStrokeWidth}
-            camera={camera}
-            point={(x, y) => controls.current.point(x, y)}
-            onDraw={(node, frame) => {
-              onDraw(node, frame);
-              requestAnimationFrame(() => {
-                if (
-                  !rootRef.current?.querySelector("[data-board-drawing-input]")
-                )
-                  rootRef.current?.focus({ preventScroll: true });
-              });
-            }}
-            onExit={() => onDrawExit?.()}
-          />
-        )}
+        {drawTool &&
+          !["pan", "eraser", "lasso"].includes(drawTool) &&
+          !(
+            window.showai?.inlineInk &&
+            (drawTool === "pen" || drawTool === "highlighter")
+          ) &&
+          enabled &&
+          !locked &&
+          onDraw && (
+            <DrawingInput
+              key={drawTool}
+              tool={drawTool as BoardDrawingTool}
+              ruler={ruler}
+              panHeld={spaceHeld}
+              makeSnapIndex={board.drawingSnapIndex}
+              color={drawColor}
+              fillColor={drawFillColor}
+              strokeWidth={drawStrokeWidth}
+              camera={camera}
+              point={(x, y) => controls.current.point(x, y)}
+              onDraw={(node, frame) => {
+                onDraw(node, frame);
+                requestAnimationFrame(() => {
+                  if (
+                    !rootRef.current?.querySelector(
+                      "[data-board-drawing-input]",
+                    )
+                  )
+                    rootRef.current?.focus({ preventScroll: true });
+                });
+              }}
+              onExit={() => onDrawExit?.()}
+            />
+          )}
+        {(drawTool === "eraser" || drawTool === "lasso") &&
+          enabled &&
+          !locked &&
+          onDeleteSelection && (
+            <BoardGestureInput
+              key={drawTool}
+              tool={drawTool}
+              board={board}
+              world={worldRef}
+              onDelete={onDeleteSelection}
+              onExit={() => onDrawExit?.()}
+            />
+          )}
         {!nodes.length && !drawTool && !onMove && (
           <div className="surface-empty" data-surface-ui>
             <p>{t("board.empty")}</p>
@@ -1267,6 +1333,53 @@ export default function PageSurface({
           <fieldset className="surface-extra-actions" disabled={locked}>
             {extraActions}
           </fieldset>
+          {onDraw && !locked && (
+            <div className="board-writing-options" data-surface-ui>
+              <button
+                type="button"
+                aria-label={t("tool.ruler")}
+                title={t("tool.ruler")}
+                aria-pressed={ruler}
+                onClick={() => setRuler((value) => !value)}
+              >
+                <Ruler size={15} />
+              </button>
+              {window.showai?.inlineInk && (
+                <details ref={writingSettings}>
+                  <summary
+                    aria-label={t("tool.writingSettings")}
+                    title={t("tool.writingSettings")}
+                  >
+                    <Settings2 size={15} />
+                  </summary>
+                  <div data-surface-ui>
+                    <label>
+                      <input
+                        type="checkbox"
+                        defaultChecked={
+                          document.documentElement.dataset.fingerDrawing ===
+                          "true"
+                        }
+                        onChange={async (e) => {
+                          const fingerDrawing = e.currentTarget.checked;
+                          await window.showai!.invoke(
+                            "native:boardPreferences",
+                            { fingerDrawing },
+                          );
+                          document.documentElement.dataset.fingerDrawing =
+                            String(fingerDrawing);
+                          document.dispatchEvent(
+                            new Event("showai-board-preferences"),
+                          );
+                        }}
+                      />
+                      {t("tool.fingerDrawing")}
+                    </label>
+                  </div>
+                </details>
+              )}
+            </div>
+          )}
           {onTransform && !locked && (
             <div className="board-settings-controls" hidden={!!objectMenu}>
               {board.ids.size > 0 && (

@@ -74,7 +74,11 @@ export function BoardStyleControls({
   );
   if (!drawings.length && nodes.some((node) => node.attrs?.ink))
     return <span className="board-style-controls">{t("style.inkNotice")}</span>;
-  if (!drawings.length && (!tool || tool === "region")) return null;
+  if (
+    !drawings.length &&
+    (!tool || ["region", "pan", "eraser", "lasso"].includes(tool))
+  )
+    return null;
   const value = (key: keyof DrawingStyle) => {
     if (!drawings.length) return style[key];
     const applicable =
