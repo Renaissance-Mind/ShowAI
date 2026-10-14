@@ -5,7 +5,7 @@ import {
   formatBytes,
 } from "../portable/capacity.mjs";
 import { createServer, type Server } from "node:http";
-import { mkdir, readFile, rm } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { randomBytes, randomUUID } from "node:crypto";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
@@ -29,8 +29,10 @@ import {
 } from "./presentation-tools";
 import { inlinePresentation } from "./presentation";
 import { serverBaseUrl } from "../sync/server-url";
+import type { CloudBrowserCheck } from "./cloud-browser-check";
 
 const writeTools = new Set([
+  "project_create",
   "page_create",
   "page_save",
   "page_apply",
@@ -92,6 +94,16 @@ export interface McpHttpOptions {
   syncServers?: string[];
   widgetDomain?: string;
   allowedHosts?: string[];
+  /** Successful startup screenshot check, supplied by the Cloud entry point. */
+  browserRendering?: CloudBrowserCheck;
+  /** Cloud deployments persist private state before acknowledging a request. */
+  durableState?: {
+    restore(): Promise<void>;
+    run(
+      operation: () => Promise<Response>,
+      checkpoint: () => void,
+    ): Promise<Response>;
+  };
 }
 export async function createMcpHttpApp(options: McpHttpOptions) {
   const url = new URL(options.publicUrl);
@@ -121,13 +133,26 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
   );
   const workspaces = new RemoteWorkspaces(join(state, "replicas"));
   const artifacts = new Map<string, StoredArtifact>();
+  const artifactDirectory = join(state, "artifacts");
+  await mkdir(artifactDirectory, { recursive: true, mode: 0o700 });
+  for (const entry of await readdir(artifactDirectory)) {
+    if (!/^[A-Za-z0-9_-]{43}\.json$/.test(entry)) continue;
+    const value = JSON.parse(
+      await readFile(join(artifactDirectory, entry), "utf8"),
+    ) as StoredArtifact;
+    if (value.expires > Date.now()) artifacts.set(entry.slice(0, -5), value);
+    else await rm(join(artifactDirectory, entry));
+  }
   let renderCount = 0;
   const storePresentation = async (
     value: Presentation,
     publicSource = false,
   ) => {
     for (const [key, item] of artifacts)
-      if (item.expires <= Date.now()) artifacts.delete(key);
+      if (item.expires <= Date.now()) {
+        artifacts.delete(key);
+        await rm(join(artifactDirectory, key + ".json"), { force: true });
+      }
     if (artifacts.size >= 100)
       throw new Error(
         "Presentation capacity reached. Retry after older previews expire.",
@@ -143,6 +168,11 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
       expires,
       publicSource,
     });
+    await writeFile(
+      join(artifactDirectory, key + ".json"),
+      JSON.stringify(artifacts.get(key)),
+      { mode: 0o600 },
+    );
     return {
       artifactId: key,
       html: `${origin}/artifacts/${key}/page.html`,
@@ -174,7 +204,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         channel: "mcp",
       },
       instructions:
-        "Use ShowAI MCP for Agent document operations. Formal content is saved in an authorized project before page_present; render_document is only for explicitly standalone output. Connection failure must not change the project or persistence mode. Public catalogs and standalone rendering require no login. Private project tools require OAuth and an explicit projectId from projects_list. Read the current page/hash/revision before modifying it. A successful shared write includes synchronization state. HTML display is optional; tools work in text-only harnesses. Use page_present only when the user wants a preview.",
+        "Use ShowAI MCP for Agent document operations. Formal content is saved in an authorized project before page_present; render_document is only for explicitly standalone output. Connection failure must not change the project or persistence mode. Public catalogs and standalone rendering require no login. Private project tools require OAuth and an explicit projectId from projects_list. Account-wide grants discover current and future accessible projects; selected-project grants stay limited. When the user explicitly requests a new project, use project_create with a retained operationId and projects.create authorization, then use the returned server project id. Local projects become remotely visible after synchronization. Read the current page/hash/revision before modifying it. A successful shared write includes synchronization state. HTML display is optional; tools work in text-only harnesses. Use page_present only when the user wants a preview.",
       presentation: {
         transport: "http",
         storePresentation: (value) => storePresentation(value, true),
@@ -415,6 +445,47 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           ? mcpSuccess(await workspaces.projects(grant))
           : mcpFailure(new Error("Sign in to ShowAI.")),
     );
+    server.registerTool(
+      "project_create",
+      {
+        description:
+          "Create a cloud project in the authorized account when the user asks. Requires account-wide authorization and projects.create. Returns the server project id to use for subsequent page operations.",
+        inputSchema: {
+          name: z.string().trim().min(1).max(1000),
+          operationId: z
+            .string()
+            .uuid()
+            .optional()
+            .describe(
+              "Reuse the same UUID only to retry the same project creation.",
+            ),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          openWorldHint: false,
+        },
+        _meta: {
+          securitySchemes: [
+            {
+              type: "oauth2",
+              scopes: ["projects.read", "projects.write", "projects.create"],
+            },
+          ],
+        },
+      },
+      async ({ name, operationId }) => {
+        try {
+          return grant
+            ? mcpSuccess(
+                await workspaces.createProject(grant, name, operationId),
+              )
+            : mcpFailure(new Error("Sign in to ShowAI."));
+        } catch (error) {
+          return mcpFailure(error);
+        }
+      },
+    );
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
@@ -456,6 +527,9 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           protocol: "showai-agent-http-v1",
           publicPresentation: true,
           privateProjects: servers.length > 0,
+          ...(options.browserRendering
+            ? { browserRendering: options.browserRendering }
+            : {}),
         });
       const auth = await authorization.fetch(request);
       if (auth) return auth;
@@ -555,9 +629,11 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                   _meta: {
                     "mcp/www_authenticate": [
                       authorization.challenge(
-                        writeTools.has(name ?? "")
-                          ? "projects.read projects.write"
-                          : "projects.read",
+                        name === "project_create"
+                          ? "projects.read projects.write projects.create"
+                          : writeTools.has(name ?? "")
+                            ? "projects.read projects.write"
+                            : "projects.read",
                       ),
                     ],
                   },
@@ -572,9 +648,13 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
             ?.match(/^Bearer ([A-Za-z0-9_-]+)$/)?.[1];
           const grant = authorization.verify(
             bearer,
-            writeTools.has(name) ? "projects.write" : "projects.read",
+            name === "project_create"
+              ? "projects.create"
+              : writeTools.has(name)
+                ? "projects.write"
+                : "projects.read",
           );
-          if (name === "projects_list")
+          if (name === "projects_list" || name === "project_create")
             return execute(request, body, undefined, grant);
           const project = params?.arguments?.projectId;
           if (typeof project !== "string" || !project)
@@ -676,18 +756,23 @@ export async function startMcpHttpServer(
         if (value)
           headers.set(name, Array.isArray(value) ? value.join(",") : value);
       const method = incoming.method ?? "GET";
-      const response = await app.fetch(
-        new Request(
-          `http://${incoming.headers.host ?? "localhost"}${incoming.url ?? "/"}`,
-          {
-            method,
-            headers,
-            ...(!["GET", "HEAD"].includes(method)
-              ? { body: Uint8Array.from(Buffer.concat(chunks)) }
-              : {}),
-          },
-        ),
+      const request = new Request(
+        `http://${incoming.headers.host ?? "localhost"}${incoming.url ?? "/"}`,
+        {
+          method,
+          headers,
+          ...(!["GET", "HEAD"].includes(method)
+            ? { body: Uint8Array.from(Buffer.concat(chunks)) }
+            : {}),
+        },
       );
+      const response =
+        options.durableState && new URL(request.url).pathname !== "/health"
+          ? await options.durableState.run(
+              () => app!.fetch(request),
+              () => app!.authorization.checkpoint(),
+            )
+          : await app.fetch(request);
       outgoing.writeHead(response.status, Object.fromEntries(response.headers));
       outgoing.end(Buffer.from(await response.arrayBuffer()));
     } catch (error) {
@@ -708,6 +793,7 @@ export async function startMcpHttpServer(
     throw new Error("MCP server has no TCP address.");
   const localUrl = `http://127.0.0.1:${address.port}`;
   try {
+    await options.durableState?.restore();
     app = await createMcpHttpApp({
       ...options,
       publicUrl: options.publicUrl ?? localUrl,

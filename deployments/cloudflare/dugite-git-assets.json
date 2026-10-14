@@ -1,0 +1,16 @@
+{
+  "dugiteVersion": "3.2.3",
+  "npmIntegrity": "sha512-kPBJ0uevCPY4pcGl0R0+dgC/prPBvnHN9109ZUUWDttkWHz4HqFGwyFri9Btmd2YucAXIJTYMGECh/Q5VAfpfA==",
+  "assets": {
+    "linux-x64": {
+      "name": "dugite-native-v2.53.0-4098283-ubuntu-x64.tar.gz",
+      "url": "https://github.com/desktop/dugite-native/releases/download/v2.53.0-4/dugite-native-v2.53.0-4098283-ubuntu-x64.tar.gz",
+      "checksum": "cca76aa31ad9e835e771ee7f55b73934777fbd8d16757a10d307ba06de860901"
+    },
+    "linux-arm64": {
+      "name": "dugite-native-v2.53.0-4098283-ubuntu-arm64.tar.gz",
+      "url": "https://github.com/desktop/dugite-native/releases/download/v2.53.0-4/dugite-native-v2.53.0-4098283-ubuntu-arm64.tar.gz",
+      "checksum": "a161f45af4626bb7e0c688854bd4a9aee47cc514bca404cff0a5e3536ef1c0af"
+    }
+  }
+}

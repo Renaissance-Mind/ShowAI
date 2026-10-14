@@ -12,6 +12,8 @@ export interface ProjectGrant {
   user: { id: string; name: string };
   upstreamToken: string;
   projectIds: string[];
+  /** Omitted on old grants, which remain limited to their selected projects. */
+  projectAccess?: "selected" | "account";
   scopes: string[];
 }
 type Client = {
@@ -31,6 +33,13 @@ type Flow = {
   attempts: number;
   connection?: Omit<ProjectGrant, "id" | "clientId" | "projectIds" | "scopes">;
   projects?: SyncProject[];
+  external?: {
+    serverUrl: string;
+    serverId: string;
+    id: string;
+    pollSecret: string;
+    url: string;
+  };
 };
 const token = () => randomBytes(32).toString("base64url");
 const hash = (value: string) =>
@@ -62,7 +71,7 @@ export class AuthorizationError extends Error {
     super(message);
   }
 }
-const scopeNames = ["projects.read", "projects.write"];
+const scopeNames = ["projects.read", "projects.write", "projects.create"];
 function scopes(value: unknown) {
   const result =
     typeof value === "string" && value.trim()
@@ -156,6 +165,9 @@ export class McpAuthorization {
   }
   close() {
     this.db.close();
+  }
+  checkpoint() {
+    this.db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
   }
   private get<T>(kind: string, key: string): T | undefined {
     const row = this.db
@@ -276,7 +288,7 @@ export class McpAuthorization {
     const hidden = `<input type="hidden" name="flow" value="${escaped(flowId)}"><input type="hidden" name="csrf" value="${escaped(flow.csrf)}">`;
     const client = this.get<Client>("client", flow.clientId)!;
     const content = flow.connection
-      ? `<p>${escaped(client.client_name || "Agent")} 请求访问以下项目。${flow.scopes.includes("projects.write") ? "授权包含读取和修改。" : "授权仅包含读取。"}</p><form method="post" action="${this.url}/oauth/consent">${hidden}<label>选择一个项目<select name="project" required><option value="">请选择</option>${(
+      ? `<p>${escaped(client.client_name || "Agent")} 请求访问服务器上的 ShowAI 账号 <strong>${escaped(flow.connection.user.name)}</strong>。</p><p>${flow.scopes.includes("projects.write") ? "可读取及编辑；每次操作都检查最新项目成员权限。" : "只允许读取。"}${flow.scopes.includes("projects.create") ? "包含新建项目。" : ""}</p><form method="post" action="${this.url}/oauth/consent">${hidden}<label><input type="radio" name="access" value="account" checked>授权这个账号当前及今后有权限的所有项目</label><p>以后从本地同步到此账号的项目也会进入授权范围。可以随时在 ChatGPT 断开连接。</p><label><input type="radio" name="access" value="selected">仅授权一个项目<select name="project"><option value="">请选择</option>${(
           flow.projects ?? []
         )
           .filter((p) => !p.archived)
@@ -286,8 +298,10 @@ export class McpAuthorization {
           )
           .join(
             "",
-          )}</select></label><p>以后每次操作都会重新检查项目权限。你可以在 Agent 宿主中断开连接。</p><button name="decision" value="allow">授权所选项目</button><button name="decision" value="deny" class="secondary">取消</button></form>`
-      : `<p>公开组件、模板和展示无需登录。访问私有项目时，使用你已有的 ShowAI Server 账号。</p><form method="post" action="${this.url}/oauth/login">${hidden}<label>服务器<select name="server" required>${this.servers.map((s) => `<option value="${escaped(s)}">${escaped(s)}</option>`).join("")}</select></label><label>账号<input name="account" autocomplete="username" required maxlength="100"></label><label>密码<input name="password" type="password" autocomplete="current-password" required></label><button>登录并选择项目</button></form>`;
+          )}</select></label><button name="decision" value="allow">确认授权</button><button name="decision" value="deny" class="secondary">取消</button></form>`
+      : flow.external
+        ? `<p>打开登录页面完成验证。页面最后会显示一个 8 位完成码，把它填到这里继续。已有账号需要先在 ShowAI 中绑定该登录方式。</p><a href="${escaped(flow.external.url)}" target="_blank" rel="noopener noreferrer">打开登录页面</a><form method="post" action="${this.url}/oauth/external/finish">${hidden}<label>完成码<input name="completionCode" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="12" placeholder="XXXX-XXXX"></label><button>继续</button><button name="restart" value="1" class="secondary">重新选择登录方式</button></form>`
+        : `<p>公开组件、模板和展示无需登录。访问私有项目时，使用你已有的 ShowAI Server 账号。</p><form method="post" action="${this.url}/oauth/login">${hidden}<label>服务器<select name="server" required>${this.servers.map((s) => `<option value="${escaped(s)}">${escaped(s)}</option>`).join("")}</select></label><button formaction="${this.url}/oauth/external/start" name="provider" value="github">使用 GitHub 登录</button><button formaction="${this.url}/oauth/external/start" name="provider" value="google">使用 Google 登录</button><label>账号<input name="account" autocomplete="username" maxlength="100"></label><label>密码<input name="password" type="password" autocomplete="current-password"></label><button>使用账号密码登录</button></form>`;
     return new Response(
       `<!doctype html><html lang="zh"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>连接 ShowAI</title><style>body{font:16px/1.6 system-ui;max-width:520px;margin:8vh auto;padding:24px;color:#173341;background:#f9fbfc}h1{font-size:30px}label{display:block;margin:18px 0}input,select{display:block;box-sizing:border-box;width:100%;padding:12px;margin-top:5px;border:1px solid #aebdc5;border-radius:5px;font:inherit}button{padding:12px 20px;border:0;border-radius:5px;background:#075e7c;color:white;font:inherit;margin-right:12px}.secondary{background:#e5edf1;color:#173341}.error{color:#a42e29}</style><h1>连接 ShowAI</h1>${error ? `<p class="error" role="alert">${escaped(error)}</p>` : ""}${content}</html>`,
       {
@@ -427,7 +441,12 @@ export class McpAuthorization {
         return this.form(id, flow);
       }
       if (
-        ["/oauth/login", "/oauth/consent"].includes(path) &&
+        [
+          "/oauth/login",
+          "/oauth/consent",
+          "/oauth/external/start",
+          "/oauth/external/finish",
+        ].includes(path) &&
         request.method === "POST"
       ) {
         const input = await parameters(request),
@@ -450,6 +469,134 @@ export class McpAuthorization {
             "invalid_request",
             400,
           );
+        if (
+          path === "/oauth/external/start" ||
+          path === "/oauth/external/finish"
+        ) {
+          this.limit("external-login", 30);
+          if (++flow.attempts > 10)
+            throw new AuthorizationError(
+              "Too many login attempts. Start again.",
+              "access_denied",
+              429,
+            );
+          this.put("flow", flowId, flow, 10 * 60_000);
+          try {
+            if (path.endsWith("/start")) {
+              const server = String(input.server ?? ""),
+                provider = String(input.provider ?? "");
+              if (
+                !this.servers.includes(server) ||
+                !["github", "google"].includes(provider)
+              )
+                throw new AuthorizationError(
+                  "Choose a configured server and login provider.",
+                  "invalid_request",
+                  400,
+                );
+              const info = await upstream<{
+                protocol: string;
+                serverId: string;
+                auth: string[];
+              }>(server, "/api/info");
+              if (
+                info.protocol !== syncProtocol ||
+                !info.auth.includes(provider)
+              )
+                throw new AuthorizationError(
+                  "此服务器尚未启用这种登录方式。请使用账号密码，或联系管理员配置。",
+                  "temporarily_unavailable",
+                  503,
+                );
+              const started = await upstream<{
+                id: string;
+                pollSecret: string;
+                url: string;
+              }>(server, "/api/auth/start", undefined, {
+                provider,
+                device: "ShowAI MCP",
+              });
+              const providerUrl = new URL(started.url);
+              const expectedHost =
+                provider === "github" ? "github.com" : "accounts.google.com";
+              if (
+                providerUrl.protocol !== "https:" ||
+                providerUrl.hostname !== expectedHost
+              )
+                throw new AuthorizationError(
+                  "Invalid login provider URL.",
+                  "invalid_request",
+                  400,
+                );
+              flow.external = {
+                serverUrl: server,
+                serverId: info.serverId,
+                ...started,
+              };
+            } else {
+              const external = flow.external;
+              if (!external)
+                throw new AuthorizationError(
+                  "Restart the login flow.",
+                  "invalid_request",
+                  400,
+                );
+              if (input.restart) {
+                delete flow.external;
+                this.put("flow", flowId, flow, 10 * 60_000);
+                return this.form(flowId, flow);
+              }
+              // The server binds provider logins to this window with a one-time
+              // completion code; an empty field only checks status so it never
+              // spends one of the server's limited code attempts.
+              const completionCode = String(input.completionCode ?? "").trim();
+              const result = await upstream<{
+                status?: string;
+                serverId?: string;
+                user?: ProjectGrant["user"];
+                token?: string;
+              }>(external.serverUrl, "/api/auth/finish", undefined, {
+                id: external.id,
+                pollSecret: external.pollSecret,
+                ...(completionCode ? { completionCode } : {}),
+              });
+              if (!result.token || !result.user)
+                return this.form(
+                  flowId,
+                  flow,
+                  result.status === "confirm"
+                    ? "请输入登录页面显示的完成码。"
+                    : "登录尚未完成，请完成登录后再继续。",
+                );
+              if (result.serverId !== external.serverId)
+                throw new AuthorizationError(
+                  "Server identity changed during login.",
+                  "access_denied",
+                  403,
+                );
+              flow.connection = {
+                serverUrl: external.serverUrl,
+                serverId: external.serverId,
+                user: result.user,
+                upstreamToken: result.token,
+              };
+              flow.projects = await upstream<SyncProject[]>(
+                external.serverUrl,
+                "/api/projects",
+                result.token,
+              );
+              delete flow.external;
+            }
+            this.put("flow", flowId, flow, 10 * 60_000);
+            return this.form(flowId, flow);
+          } catch (error) {
+            return this.form(
+              flowId,
+              flow,
+              error instanceof Error ? error.message : "Login failed.",
+            );
+          }
+        }
         if (path === "/oauth/login") {
           this.limit("login", 30);
           if (++flow.attempts > 5) {
@@ -522,6 +669,8 @@ export class McpAuthorization {
               400,
             );
           const projectId = String(input.project ?? "");
+          const projectAccess =
+            input.access === "account" ? "account" : "selected";
           const projects = await upstream<SyncProject[]>(
             flow.connection.serverUrl,
             "/api/projects",
@@ -531,12 +680,14 @@ export class McpAuthorization {
             (p) => p.id === projectId && !p.archived,
           );
           if (
-            !project ||
-            (flow.scopes.includes("projects.write") &&
-              project.role === "viewer")
+            projectAccess === "selected" &&
+            (!project ||
+              (flow.scopes.includes("projects.write") &&
+                project.role === "viewer") ||
+              flow.scopes.includes("projects.create"))
           )
             throw new AuthorizationError(
-              "This account cannot grant the requested project permissions.",
+              "Select account authorization to create projects, or choose a project with the requested permissions.",
               "access_denied",
               403,
             );
@@ -544,7 +695,8 @@ export class McpAuthorization {
             ...flow.connection,
             id: token(),
             clientId: flow.clientId,
-            projectIds: [projectId],
+            projectAccess,
+            projectIds: projectAccess === "account" ? [] : [projectId],
             scopes: flow.scopes,
           };
           this.put("grant", grant.id, grant, 180 * 86400_000);

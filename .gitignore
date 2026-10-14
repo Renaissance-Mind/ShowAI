@@ -151,3 +151,6 @@ plugins/showai/scripts/cli.mjs
 !/docs/component-parameters.md
 !/docs/diagram-components.md
 !/plugins/showai/skills/create-component/references/parameter-contract.md
+
+/dist-cloud-mcp/
+!/docs/cloud-mcp-deployment.md

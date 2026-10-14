@@ -44,15 +44,23 @@ showai mcp serve \
   --sync-server https://content.example.com
 ```
 
-Use a stable HTTPS reverse proxy for the public URL. The MCP URL is `https://agent.example.com/mcp`; `/health` reports readiness without exposing private paths or credentials. `--sync-server` accepts a comma-separated list of deployment-approved ShowAI Server base URLs (including prefixes such as /cloud). With no sync server configured, public rendering remains usable. The OAuth login page lets users select one configured server and explicitly authorize one project; another project can use another account connection.
+Use a stable HTTPS reverse proxy for the public URL. The MCP URL is `https://agent.example.com/mcp`; `/health` reports readiness without exposing private paths or credentials. `--sync-server` accepts a comma-separated list of deployment-approved ShowAI Server base URLs (including prefixes such as /cloud). With no sync server configured, public rendering remains usable. The OAuth login page lets users select one configured server and authorize either one selected project or the account’s current and future accessible projects. Each server account uses its own connection.
 
 `--state` contains the private OAuth database and per-grant project replicas. Restrict it to the service account. Its tokens and replicas must not be published or copied into the plugin. Reverse proxies must preserve the public Host. `--widget-domain` can declare the dedicated UI origin required for public plugin submission. Local development permits a loopback HTTP public URL; published connections require HTTPS.
+
+### Cloudflare deployment
+
+The all-Cloudflare deployment uses `deployments/cloudflare/mcp.wrangler.jsonc`: a Worker and Durable Object route to the Node.js Container. `scripts/build-cloud-mcp.mjs` builds the gateway; the Dockerfile installs Linux dependencies and packages compiler/reader assets. No separate VPS is required.
+
+Private state is encrypted with the independent `SHOWAI_MCP_STATE_KEY` and checkpointed in the private `showai-mcp-state` R2 bucket before a request is acknowledged. A fresh container restores and verifies that checkpoint. Preview artifacts retain their one-hour expiry across restart. A failed checkpoint prevents a success response and must be retried before the next mutation. Keep the original state key securely backed up; replacing it makes existing checkpoints unreadable. Unreferenced encrypted chunks are retained; garbage collection is not implemented in this release.
+
+For deployment commands and acceptance gates, see [Cloudflare MCP operations](cloud-mcp-deployment.md). A local build or Worker dry-run does not establish a working Container deployment, provider login or ChatGPT acceptance.
 
 ### Public and authorized tools
 
 Public tools are `showai_capabilities`, `guide`, `public_catalog_list`, `public_catalog_describe`, `render_document` and `presentation_source`. The last tool retrieves the editable public render input in text chunks when a host cannot download the HTTP URL; it does not expose private project exports. The catalog includes built-in components and editable starter templates. All public rendering inputs come from the caller; no anonymous operation reads the user's content library.
 
-Private tools retain the existing authoring names, add an explicit `projectId`, and use OAuth. `projects_list` returns only the project authorized in that grant and checks current server membership. `page_present` supplies the same reader as public rendering. Local path-based import, whole-site publication and local recovery tools stay local; remote component customization uses `component_save` with source. Remote exports use service-owned temporary paths and return downloadable artifacts instead of server filesystem paths.
+Private tools retain the existing authoring names, add an explicit `projectId`, and use OAuth. `projects_list` queries current server membership on every call. Selected-project grants remain restricted to their original IDs; account grants include later projects. `project_create` requires account authorization and the separate `projects.create` scope; it creates and synchronizes the project, returns its server ID, and accepts an operationId UUID for retrying the same request. `page_present` supplies the same reader as public rendering. Local path-based import, whole-site publication and local recovery tools stay local; remote component customization uses `component_save` with source. Remote exports use service-owned temporary paths and return downloadable artifacts instead of server filesystem paths.
 
 ### Permissions and synchronization
 
@@ -60,7 +68,7 @@ Each private call checks its token, consented project, scopes and current server
 
 ### Authorization
 
-OAuth supports discovery, dynamic client registration, authorization code with S256 PKCE, resource binding, access-token expiry, rotating refresh tokens, consent and revocation. It authenticates existing ShowAI Server accounts; it does not create users during linking. The login password is forwarded only to the explicitly configured server and is not stored. Upstream session credentials are held in private state to perform the consented project operations.
+OAuth supports discovery, dynamic client registration, authorization code with S256 PKCE, resource binding, access-token expiry, rotating refresh tokens, consent and revocation. It authenticates existing ShowAI Server accounts; it does not create users during linking. GitHub and Google login use the explicitly configured server’s existing login providers. The user completes provider login in a separate tab, which then shows a one-time completion code; the user enters that code in the MCP authorization tab and continues to explicit project/account consent. The code binds the provider login to the tab that started it, so a forwarded provider link cannot sign in another client. The provider polling credential stays server-side. Existing accounts must bind the chosen provider first; linking does not silently create or merge accounts. Account/password login remains available; the password is forwarded only to the explicitly configured server and is not stored. Upstream session credentials are held in private state to perform the consented project operations.
 
 ## ChatGPT and other display hosts
 

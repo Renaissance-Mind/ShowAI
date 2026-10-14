@@ -5,6 +5,9 @@ import { join } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { AccountCipher } from "../server/account-crypto";
+import { hash } from "../sync/protocol";
+import { SQLiteMetadata } from "../server/node-storage";
 import { startSyncServer } from "../server/node";
 import { AgentService } from "./service";
 import { syncManager } from "../sync/manager";
@@ -51,7 +54,10 @@ function data(result: Awaited<ReturnType<Client["callTool"]>>) {
   expect(result.isError, JSON.stringify(result.content)).not.toBe(true);
   return (result.structuredContent as { data: Record<string, unknown> }).data;
 }
-async function authorize(scope = "projects.read projects.write") {
+async function authorize(
+  scope = "projects.read projects.write",
+  access = "selected",
+) {
   const redirect = "http://127.0.0.1:12345/callback";
   const registration = await post(http.url + "/oauth/register", {
     client_name: "ShowAI acceptance client",
@@ -99,6 +105,7 @@ async function authorize(scope = "projects.read projects.write") {
       flow,
       csrf,
       project: projectId,
+      access,
       decision: "allow",
     }),
     redirect: "manual",
@@ -872,3 +879,240 @@ test("HTTP parameter queries preserve v2 semantics, anonymous compatibility and 
   });
   expect(privateRef.isError).toBe(true);
 }, 60000);
+
+test("account authorization discovers future projects and creates synchronized cloud projects with safe retries", async () => {
+  const tokens = await authorize(
+    "projects.read projects.write projects.create",
+    "account",
+  );
+  const remote = await client(tokens.access_token);
+  const operationId = crypto.randomUUID();
+  const result = data(
+    await remote.callTool({
+      name: "project_create",
+      arguments: { name: "Created from ChatGPT", operationId },
+    }),
+  );
+  const id = (result.project as { id: string }).id;
+  expect((result.synchronization as { state: string }).state).toBe("synced");
+  const again = data(
+    await remote.callTool({
+      name: "project_create",
+      arguments: { name: "Created from ChatGPT", operationId },
+    }),
+  );
+  expect((again.project as { id: string }).id).toBe(id);
+  const changed = await remote.callTool({
+    name: "project_create",
+    arguments: { name: "Different request", operationId },
+  });
+  expect(changed.isError).toBe(true);
+  const localFuture = await local.createProject(
+    "Added locally after authorization",
+  );
+  const manager = syncManager(local.store.root);
+  const connection = (await manager.configuration()).connections[0];
+  await manager.attach(connection.id, localFuture.id);
+  await manager.stop();
+  const projects = data(
+    await remote.callTool({ name: "projects_list", arguments: {} }),
+  ) as unknown as { id: string }[];
+  expect(projects.map((p) => p.id)).toEqual(
+    expect.arrayContaining([projectId, id, localFuture.id]),
+  );
+  const pages = data(
+    await remote.callTool({ name: "pages_list", arguments: { projectId: id } }),
+  );
+  expect(pages).toEqual([]);
+  const selectedTokens = await authorize();
+  const selected = await client(selectedTokens.access_token);
+  const selectedProjects = data(
+    await selected.callTool({ name: "projects_list", arguments: {} }),
+  ) as unknown as { id: string }[];
+  expect(selectedProjects.map((p) => p.id)).toEqual([projectId]);
+  expect(
+    (
+      await selected.callTool({
+        name: "pages_list",
+        arguments: { projectId: id },
+      })
+    ).isError,
+  ).toBe(true);
+  const readOnly = await client(
+    (await authorize("projects.read", "account")).access_token,
+  );
+  expect(
+    (
+      await readOnly.callTool({
+        name: "project_create",
+        arguments: { name: "Forbidden" },
+      })
+    ).isError,
+  ).toBe(true);
+});
+
+test("third-party login rejects CSRF and reports unconfigured providers without leaking polling credentials", async () => {
+  const redirect = "http://127.0.0.1:12345/callback";
+  const registration = await post(http.url + "/oauth/register", {
+    redirect_uris: [redirect],
+  });
+  const query = new URLSearchParams({
+    client_id: registration.client_id,
+    response_type: "code",
+    redirect_uri: redirect,
+    code_challenge: createHash("sha256")
+      .update("test-verifier")
+      .digest("base64url"),
+    code_challenge_method: "S256",
+  });
+  const response = await fetch(http.url + "/oauth/authorize?" + query),
+    html = await response.text();
+  expect(html).toContain("使用 GitHub 登录");
+  expect(html).toContain("使用 Google 登录");
+  const flow = html.match(/name="flow" value="([^\"]+)"/)![1],
+    csrf = html.match(/name="csrf" value="([^\"]+)"/)![1];
+  const headers = {
+    "content-type": "application/x-www-form-urlencoded",
+    cookie: response.headers.get("set-cookie")!.split(";")[0],
+    origin: http.url,
+  };
+  const missing = await fetch(http.url + "/oauth/external/start", {
+    method: "POST",
+    headers,
+    body: new URLSearchParams({
+      flow,
+      csrf,
+      server: sync.url,
+      provider: "github",
+    }),
+  });
+  expect(await missing.text()).toContain("此服务器尚未启用这种登录方式");
+  const invalid = await fetch(http.url + "/oauth/external/start", {
+    method: "POST",
+    headers,
+    body: new URLSearchParams({
+      flow,
+      csrf: "wrong",
+      server: sync.url,
+      provider: "google",
+    }),
+  });
+  expect(invalid.status).toBe(400);
+});
+
+test("social login resumes a completed upstream account flow without exposing its session or polling secret", async () => {
+  const root = join(directory, "social-server"),
+    vaultKey = "e".repeat(64);
+  const social = await startSyncServer({
+    home: root,
+    port: 0,
+    vaultKey,
+    githubLogin: { clientId: "test-client", clientSecret: "test-secret" },
+    registrationKey: "social-test-register",
+  });
+  const gateway = await startMcpHttpServer({
+    stateDirectory: join(directory, "social-gateway"),
+    syncServers: [social.url],
+    port: 0,
+  });
+  const db = new SQLiteMetadata(join(root, "metadata.sqlite"));
+  try {
+    const user = await post(social.url + "/api/auth/register", {
+      name: "social-user",
+      password: "social-test-password-123",
+      registrationKey: "social-test-register",
+    });
+    const redirect = "http://127.0.0.1:12345/callback";
+    const registration = await post(gateway.url + "/oauth/register", {
+      redirect_uris: [redirect],
+    });
+    const query = new URLSearchParams({
+      client_id: registration.client_id,
+      response_type: "code",
+      redirect_uri: redirect,
+      code_challenge: createHash("sha256")
+        .update("test-verifier")
+        .digest("base64url"),
+      code_challenge_method: "S256",
+    });
+    const start = await fetch(gateway.url + "/oauth/authorize?" + query),
+      initial = await start.text();
+    const flow = initial.match(/name="flow" value="([^\"]+)"/)![1],
+      csrf = initial.match(/name="csrf" value="([^\"]+)"/)![1];
+    const headers = {
+      "content-type": "application/x-www-form-urlencoded",
+      cookie: start.headers.get("set-cookie")!.split(";")[0],
+      origin: gateway.url,
+    };
+    const response = await fetch(gateway.url + "/oauth/external/start", {
+      method: "POST",
+      headers,
+      body: new URLSearchParams({
+        flow,
+        csrf,
+        server: social.url,
+        provider: "github",
+      }),
+    });
+    const html = await response.text();
+    expect(html).toContain("https://github.com/login/oauth/authorize");
+    expect(html).not.toContain("pollSecret");
+    const pending = await fetch(gateway.url + "/oauth/external/finish", {
+      method: "POST",
+      headers,
+      body: new URLSearchParams({ flow, csrf }),
+    });
+    expect(await pending.text()).toContain("登录尚未完成");
+    // Seed the persisted state produced by a verified provider callback. No provider network call is simulated.
+    const row = (
+      await db.all<{ id: string; secret: string }>(
+        "SELECT id,secret FROM login_flows WHERE provider='github'",
+      )
+    )[0];
+    const cipher = new AccountCipher(vaultKey),
+      context = "showai-login:" + row.id;
+    const secret = await cipher.open<Record<string, unknown>>(
+      context,
+      row.secret,
+    );
+    // The callback binds the provider identity and shows a one-time completion code.
+    await db.run(
+      "INSERT INTO login_identities(provider,subject,user_id,email,created_at) VALUES('github','social-subject',?,NULL,?)",
+      [user.user.id, new Date().toISOString()],
+    );
+    const code = "ABCD2345";
+    await db.run(
+      "UPDATE login_flows SET status='completed',secret=? WHERE id=?",
+      [
+        await cipher.seal(context, {
+          ...secret,
+          externalIdentity: { subject: "social-subject", name: "social-user" },
+          completionDigest: await hash(`${row.id}:${code}`),
+        }),
+        row.id,
+      ],
+    );
+    // Without a code the gateway only checks status and asks for the code.
+    const awaiting = await fetch(gateway.url + "/oauth/external/finish", {
+      method: "POST",
+      headers,
+      body: new URLSearchParams({ flow, csrf }),
+    });
+    const prompt = await awaiting.text();
+    expect(prompt).toContain("请输入登录页面显示的完成码");
+    expect(prompt).toContain('name="completionCode"');
+    const finish = await fetch(gateway.url + "/oauth/external/finish", {
+      method: "POST",
+      headers,
+      body: new URLSearchParams({ flow, csrf, completionCode: "abcd-2345" }),
+    });
+    const consent = await finish.text();
+    expect(consent).toContain("social-user");
+    expect(consent).toContain('value="account"');
+    expect(consent).not.toContain(user.token);
+  } finally {
+    db.close();
+    await gateway.close();
+    await social.close();
+  }
+});

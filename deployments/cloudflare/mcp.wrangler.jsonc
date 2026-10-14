@@ -1,0 +1,35 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "showai-mcp",
+  "main": "./mcp-worker.mjs",
+  "compatibility_date": "2026-10-08",
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "SHOWAI_MCP_URL": "https://agent.showai.renaissancemind.ai",
+    "SHOWAI_MCP_SYNC_SERVER": "https://showai.renaissancemind.ai/cloud",
+  },
+  "routes": [
+    { "pattern": "agent.showai.renaissancemind.ai", "custom_domain": true },
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "GATEWAY", "class_name": "ShowAIMcpGateway" }],
+  },
+  "migrations": [
+    { "tag": "mcp-gateway-v1", "new_sqlite_classes": ["ShowAIMcpGateway"] },
+  ],
+  "containers": [
+    {
+      "class_name": "ShowAIMcpGateway",
+      "image": "./mcp.Dockerfile",
+      "image_build_context": "../..",
+      "instance_type": "standard-1",
+      "max_instances": 1,
+    },
+  ],
+  "r2_buckets": [{ "binding": "STATE", "bucket_name": "showai-mcp-state" }],
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": false },
+  },
+}
