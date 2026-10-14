@@ -3,22 +3,57 @@ import type { RefObject } from "react";
 import type { ShowDocument } from "../types";
 import { findSurfaceNode } from "./document.mjs";
 import { inkNodes } from "./inline-ink";
+import type { Camera } from "./model";
 
-function probe(parent: HTMLElement) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 1 1");
-  svg.setAttribute("width", "1");
-  svg.setAttribute("height", "1");
-  svg.style.cssText =
-    "position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none";
-  parent.append(svg);
-  return svg;
+/** WebKit's SVG screen matrix omits ancestor CSS scales. Read the CSS basis
+ * and locate its transformed border box, including rotated/nested objects. */
+function clientMatrix(element: Element, width: number, height: number) {
+  let matrix = new DOMMatrix();
+  for (
+    let parent: Element | null = element;
+    parent;
+    parent = parent.parentElement
+  ) {
+    const transform = getComputedStyle(parent).transform;
+    if (transform === "none") continue;
+    const m = new DOMMatrix(transform);
+    matrix = new DOMMatrix([m.a, m.b, m.c, m.d, 0, 0]).multiply(matrix);
+  }
+  const rect = element.getBoundingClientRect();
+  matrix.e =
+    rect.left -
+    Math.min(
+      0,
+      matrix.a * width,
+      matrix.c * height,
+      matrix.a * width + matrix.c * height,
+    );
+  matrix.f =
+    rect.top -
+    Math.min(
+      0,
+      matrix.b * width,
+      matrix.d * height,
+      matrix.b * width + matrix.d * height,
+    );
+  return matrix;
+}
+function inkMatrix(element: SVGSVGElement) {
+  const style = getComputedStyle(element),
+    box = element.viewBox.baseVal;
+  const width = parseFloat(style.width),
+    height = parseFloat(style.height);
+  if (!(width > 0 && height > 0 && box.width > 0 && box.height > 0)) return;
+  return clientMatrix(element, width, height)
+    .scale(width / box.width, height / box.height)
+    .translate(-box.x, -box.y);
 }
 const values = (m: DOMMatrix) =>
   [m.a, m.b, m.c, m.d, m.e, m.f].map((n) => Math.round(n * 1e6) / 1e6);
 export function useInlineInk({
   root,
   world,
+  camera: viewCamera,
   document: source,
   boardId,
   tool,
@@ -31,6 +66,7 @@ export function useInlineInk({
 }: {
   root: RefObject<HTMLDivElement | null>;
   world: RefObject<HTMLDivElement | null>;
+  camera: RefObject<Camera>;
   document?: ShowDocument;
   boardId: string;
   tool: string | null | undefined;
@@ -97,9 +133,7 @@ export function useInlineInk({
       return;
     const token = crypto.randomUUID(),
       surface = root.current,
-      content = world.current,
-      viewportProbe = probe(surface),
-      worldProbe = probe(content);
+      content = world.current;
     let alive = true,
       pending = false,
       failed = false,
@@ -132,10 +166,16 @@ export function useInlineInk({
         return;
       const documentValue = current.current.source;
       if (!documentValue) return;
-      const viewport = viewportProbe.getScreenCTM(),
-        worldMatrix = worldProbe.getScreenCTM();
-      if (!viewport || !worldMatrix) return;
-      const camera = viewport.inverse().multiply(worldMatrix);
+      const viewport = clientMatrix(
+          surface,
+          surface.offsetWidth,
+          surface.offsetHeight,
+        ),
+        worldMatrix = clientMatrix(
+          content,
+          content.offsetWidth,
+          content.offsetHeight,
+        );
       const size = surface.clientWidth + ":" + surface.clientHeight;
       if (poseDocument !== documentValue || poseSize !== size) {
         const inverse = worldMatrix.inverse(),
@@ -151,7 +191,8 @@ export function useInlineInk({
           ),
         );
         for (const node of inkNodes(board ?? { content: [] })) {
-          const m = elements.get(node.attrs!.id)?.getScreenCTM();
+          const element = elements.get(node.attrs!.id),
+            m = element && inkMatrix(element);
           if (!m) return;
           next[node.attrs!.id] = values(inverse.multiply(m));
         }
@@ -187,7 +228,9 @@ export function useInlineInk({
         widthPx: surface.clientWidth,
         heightPx: surface.clientHeight,
         viewport: values(viewport),
-        camera: { x: camera.e, y: camera.f, scale: camera.a },
+        // WebKit's SVG screen matrix can omit ancestor CSS scale. The shared
+        // viewport already owns these coordinates; never infer them from SVG.
+        camera: { ...viewCamera.current },
         cameraVersion: cameraRevision.current,
         holes,
       };
@@ -287,8 +330,6 @@ export function useInlineInk({
       document.removeEventListener("transitionend", animationEnd, true);
       document.removeEventListener("transitioncancel", animationEnd, true);
       window.removeEventListener("resize", schedule);
-      viewportProbe.remove();
-      worldProbe.remove();
       void bridge.hide(source.id, boardId, token).finally(() => {
         if (surface.dataset.nativeInkToken === token) {
           delete surface.dataset.nativeInkActive;
@@ -296,5 +337,5 @@ export function useInlineInk({
         }
       });
     };
-  }, [enabled, source?.id, boardId, tool, root, world]);
+  }, [enabled, source?.id, boardId, tool, root, world, viewCamera]);
 }

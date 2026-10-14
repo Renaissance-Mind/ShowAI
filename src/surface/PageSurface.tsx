@@ -296,6 +296,7 @@ export default function PageSurface({
   useInlineInk({
     root: rootRef,
     world: worldRef,
+    camera,
     document: boardDocument,
     boardId: containerId ?? "",
     tool: drawTool,
