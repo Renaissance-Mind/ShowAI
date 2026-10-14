@@ -15,6 +15,9 @@ export const boardTools: {
   { tool: "ellipse", label: "tool.ellipse", key: "5", alias: "e" },
   { tool: "arrow", label: "tool.arrow", key: "6", alias: "a" },
   { tool: "region", label: "tool.region", key: "7", alias: "f" },
+  { tool: "pan", label: "tool.pan", key: "8", alias: "m" },
+  { tool: "eraser", label: "tool.eraser", key: "9", alias: "x" },
+  { tool: "lasso", label: "tool.lasso", key: "L", alias: "l" },
 ];
 
 export function boardToolForKey(key: string) {
