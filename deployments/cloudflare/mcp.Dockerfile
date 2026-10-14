@@ -1,4 +1,6 @@
-FROM node:24-bookworm-slim AS build
+# Dependencies with native binaries (dugite's Git, esbuild) install for the
+# target platform. Under emulation this stage only runs npm ci.
+FROM node:24-bookworm-slim AS deps
 WORKDIR /build
 ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
 ENV DUGITE_CACHE_DIR=/tmp/showai-dugite-cache
@@ -8,6 +10,17 @@ COPY deployments/cloudflare/dugite-git-assets.json ./deployments/cloudflare/
 # Keep npm lifecycle scripts, including dugite's verified Git extraction.
 # Pre-fetch atomically because dugite's downloader cannot retry interrupted bodies.
 RUN node scripts/download-cloud-git.mjs && npm ci && node scripts/download-cloud-git.mjs --verify-installed && rm -rf /tmp/showai-dugite-cache
+
+# The gateway bundle and reader assets are platform-independent; build them
+# natively so an emulated amd64 build does not run Vite under qemu.
+FROM --platform=$BUILDPLATFORM node:24-bookworm-slim AS build
+WORKDIR /build
+ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
+ENV DUGITE_CACHE_DIR=/tmp/showai-dugite-cache
+COPY package.json package-lock.json ./
+COPY scripts/download-cloud-git.mjs ./scripts/
+COPY deployments/cloudflare/dugite-git-assets.json ./deployments/cloudflare/
+RUN node scripts/download-cloud-git.mjs && npm ci && rm -rf /tmp/showai-dugite-cache
 COPY src ./src
 COPY scripts ./scripts
 COPY resources ./resources
@@ -24,7 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends chromium fonts-
 # which describes the ARM kernel when this amd64 image runs under qemu-user.
 ENV SHOWAI_BROWSER_EXECUTABLE=/usr/lib/chromium/chromium
 COPY --from=build /build/dist-cloud-mcp /app
-COPY --from=build /build/node_modules /app/node_modules
+COPY --from=deps /build/node_modules /app/node_modules
 RUN mkdir /state && chown node:node /state
 USER node
 # Project history needs Git; verify the actual runtime binary and shared libraries.
