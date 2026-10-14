@@ -231,6 +231,23 @@
   left: auto;
   right: calc(100% + 12px);
 }
+.surface-toolbar.board-dockable-toolbar[data-dock="top"] .board-align-options {
+  bottom: auto;
+  top: calc(100% + 12px);
+}
+.surface-toolbar.board-dockable-toolbar:is([data-dock="left"], [data-dock="right"])
+  .board-align-options {
+  bottom: auto;
+  top: 0;
+  transform: none;
+}
+.surface-toolbar.board-dockable-toolbar[data-dock="left"] .board-align-options {
+  left: calc(100% + 12px);
+}
+.surface-toolbar.board-dockable-toolbar[data-dock="right"] .board-align-options {
+  left: auto;
+  right: calc(100% + 12px);
+}
 @media print {
   .board-toolbar-dock-preview {
     display: none;

@@ -24,7 +24,7 @@ export function drawingBounds(node) {
   const a = points[0],
     b = points.at(-1),
     angle = Math.atan2(b.y - a.y, b.x - a.x),
-    head = Math.min(20, Math.hypot(b.x - a.x, b.y - a.y) * 0.3);
+    head = arrowHeadLength(a, b, node.attrs.strokeWidth);
   return pointsBounds([
     ...points,
     ...[-0.5, 0.5].map((turn) => ({
@@ -139,10 +139,7 @@ function drawingOutline(node, frame, p = { x: Infinity, y: Infinity }) {
     const first = points[0],
       last = points.at(-1),
       angle = Math.atan2(last.y - first.y, last.x - first.x);
-    const head = Math.min(
-      20,
-      Math.hypot(last.x - first.x, last.y - first.y) * 0.3,
-    );
+    const head = arrowHeadLength(first, last, node.attrs.strokeWidth);
     const tip = (sign) => ({
       x:
         ((last.x - head * Math.cos(angle + sign * 0.5)) * frame.width) /
@@ -199,13 +196,25 @@ export function shapeHit(node, frame, point) {
       { x: frame.x + frame.width / 2, y: frame.y + frameHeight(frame) / 2 },
       -(frame.rotation ?? 0),
     );
+    const inside = hitFrame(frame, point);
+    // A free region is a frame around other objects: only its border is
+    // solid, so objects overlapped by its empty interior stay reachable.
+    const hollow = node.type === "region" && frame.mode === "free";
     return {
-      inside: hitFrame(frame, point),
-      distance: Math.hypot(
-        Math.max(frame.x - p.x, 0, p.x - frame.x - frame.width),
-        Math.max(frame.y - p.y, 0, p.y - frame.y - frameHeight(frame)),
-      ),
-      solid: true,
+      inside,
+      distance:
+        hollow && inside
+          ? Math.min(
+              p.x - frame.x,
+              frame.x + frame.width - p.x,
+              p.y - frame.y,
+              frame.y + frameHeight(frame) - p.y,
+            )
+          : Math.hypot(
+              Math.max(frame.x - p.x, 0, p.x - frame.x - frame.width),
+              Math.max(frame.y - p.y, 0, p.y - frame.y - frameHeight(frame)),
+            ),
+      solid: !hollow,
       area: frame.width * frameHeight(frame),
     };
   }
@@ -387,6 +396,33 @@ export function pickShape(candidates, hitInside = true) {
       hollow = { item, area: hit.area * item.scale ** 2 };
   }
   return edge?.item ?? hollow?.item ?? null;
+}
+
+/** Arrowheads grow with the stroke so thick arrows keep a visible head. */
+export function arrowHeadLength(a, b, strokeWidth = 2.5) {
+  return Math.min(
+    Math.max(20, strokeWidth * 4),
+    Math.hypot(b.x - a.x, b.y - a.y) * 0.3,
+  );
+}
+export function arrowPath(a, b, strokeWidth = 2.5) {
+  const angle = Math.atan2(b.y - a.y, b.x - a.x),
+    head = arrowHeadLength(a, b, strokeWidth);
+  return `M ${a.x} ${a.y} L ${b.x} ${b.y} M ${b.x - head * Math.cos(angle - 0.5)} ${b.y - head * Math.sin(angle - 0.5)} L ${b.x} ${b.y} L ${b.x - head * Math.cos(angle + 0.5)} ${b.y - head * Math.sin(angle + 0.5)}`;
+}
+
+/** Freehand strokes render through segment midpoints as smooth quadratic curves. */
+export function smoothPath(points) {
+  if (points.length < 3)
+    return points.map((p, i) => `${i ? "L" : "M"} ${p.x} ${p.y}`).join(" ");
+  let path = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 1; i < points.length - 1; i++) {
+    const p = points[i],
+      q = points[i + 1];
+    path += ` Q ${p.x} ${p.y} ${(p.x + q.x) / 2} ${(p.y + q.y) / 2}`;
+  }
+  const last = points.at(-1);
+  return `${path} L ${last.x} ${last.y}`;
 }
 
 /** Creation modifiers match the geometry later used for selection and snapping. */

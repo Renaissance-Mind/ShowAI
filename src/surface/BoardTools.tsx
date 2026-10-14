@@ -11,6 +11,7 @@ import {
   Hand,
   Eraser,
   Lasso,
+  Type,
 } from "../ui/icons";
 import { boardTools } from "./board-tools";
 import type { BoardTool } from "./types";
@@ -29,6 +30,7 @@ const icons = [
   Hand,
   Eraser,
   Lasso,
+  Type,
 ];
 
 export function BoardTools({

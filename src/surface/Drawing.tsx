@@ -1,5 +1,10 @@
 import type { SnapIndex, SnapGuide } from "./geometry.mjs";
-import { creationPoints, snapCreation } from "./drawing-geometry.mjs";
+import {
+  arrowPath,
+  creationPoints,
+  smoothPath,
+  snapCreation,
+} from "./drawing-geometry.mjs";
 import { finishBoardDrawing } from "./board-drawing.mjs";
 import { fingerNavigatesBoard } from "./board-input.mjs";
 import { flushSync } from "react-dom";
@@ -63,6 +68,7 @@ export function Drawing({
     };
   };
   const cancel = () => {
+    if (drag.current) actions.highlightTarget?.(null);
     drag.current = null;
     setDragging(false);
     setPreview(null);
@@ -89,14 +95,8 @@ export function Drawing({
   };
   const first = preview?.key === "start" ? preview.point : points[0],
     last = preview?.key === "end" ? preview.point : points.at(-1)!;
-  let path = points
-    .map((point, index) => `${index ? "L" : "M"} ${point.x} ${point.y}`)
-    .join(" ");
-  if (tool === "arrow") {
-    const angle = Math.atan2(last.y - first.y, last.x - first.x),
-      head = Math.min(20, Math.hypot(last.x - first.x, last.y - first.y) * 0.3);
-    path = `M ${first.x} ${first.y} L ${last.x} ${last.y} M ${last.x - head * Math.cos(angle - 0.5)} ${last.y - head * Math.sin(angle - 0.5)} L ${last.x} ${last.y} L ${last.x - head * Math.cos(angle + 0.5)} ${last.y - head * Math.sin(angle + 0.5)}`;
-  }
+  const path =
+    tool === "arrow" ? arrowPath(first, last, strokeWidth) : smoothPath(points);
   return (
     <>
       <svg
@@ -214,6 +214,11 @@ export function Drawing({
                 event.stopPropagation();
                 d.next = endpointPoint(event.clientX, event.clientY);
                 setPreview({ key, point: d.next });
+                actions.highlightTarget?.(
+                  event.clientX,
+                  event.clientY,
+                  node.attrs!.id,
+                );
               }}
               onPointerUp={(event) => {
                 const d = drag.current;
@@ -226,6 +231,7 @@ export function Drawing({
                   JSON.stringify(latest.current.frame) ===
                     JSON.stringify(d.frame);
                 cancel();
+                actions.highlightTarget?.(null);
                 if (event.currentTarget.hasPointerCapture(event.pointerId))
                   event.currentTarget.releasePointerCapture(event.pointerId);
                 if (
@@ -290,6 +296,7 @@ export function DrawingInput({
   point,
   onDraw,
   onExit,
+  onTarget,
 }: {
   tool: BoardDrawingTool;
   color: string;
@@ -302,9 +309,14 @@ export function DrawingInput({
   point: (x: number, y: number) => Point;
   onDraw: (node: JSONContent, frame: NodeLayout) => void;
   onExit: () => void;
+  /** Arrow tool: highlight the object an endpoint at this client point would bind to. */
+  onTarget?: (x: number, y: number) => void;
 }) {
   const t = useTranslator(messages);
-  const [points, setPoints] = useState<Point[]>([]);
+  // Points live in the gesture; a version counter repaints without copying
+  // the whole stroke on every pointer sample.
+  const [, setVersion] = useState(0);
+  const repaint = () => setVersion((value) => value + 1);
   const [guides, setGuides] = useState<SnapGuide[]>([]);
   const pending = useRef<{
     id: number;
@@ -313,38 +325,35 @@ export function DrawingInput({
     cursor: Point;
     snap: SnapIndex;
     moved: boolean;
-    modifiers: { shiftKey: boolean; altKey: boolean };
+    modifiers: Modifiers;
   } | null>(null);
   const surface = useRef<SVGSVGElement>(null);
   const freehand = tool === "pen" || tool === "highlighter";
   const cancel = () => {
     const id = pending.current?.id;
     pending.current = null;
-    setPoints([]);
+    repaint();
     setGuides([]);
     if (id !== undefined && surface.current?.hasPointerCapture(id))
       surface.current.releasePointerCapture(id);
   };
   const latest = useRef({ tool, color, fillColor, strokeWidth, point, onDraw });
   latest.current = { tool, color, fillColor, strokeWidth, point, onDraw };
-  const finish = (
-    release?: Point,
-    modifiers?: { shiftKey?: boolean; altKey?: boolean },
-  ) => {
+  const scaleNow = () =>
+    camera.current.scale *
+    (surface.current!.getBoundingClientRect().width /
+      surface.current!.clientWidth || 1);
+  const finish = (release?: Point, modifiers?: Modifiers) => {
     const current = pending.current;
     if (!current) return;
     const { tool, color, fillColor, strokeWidth, onDraw } = latest.current;
-    const scale =
-      camera.current.scale *
-      (surface.current!.getBoundingClientRect().width /
-        surface.current!.clientWidth || 1);
     const result = finishBoardDrawing(
       tool,
       { color, fillColor, strokeWidth },
       {
         ...current,
         release: release ?? current.cursor,
-        scale,
+        scale: scaleNow(),
       },
       modifiers ?? current.modifiers,
     );
@@ -353,7 +362,7 @@ export function DrawingInput({
     pending.current = null;
     flushSync(() => {
       onDraw(result.node, result.frame);
-      setPoints([]);
+      repaint();
       setGuides([]);
     });
     if (surface.current?.hasPointerCapture(current.id))
@@ -368,64 +377,81 @@ export function DrawingInput({
     };
     const root = surface.current?.closest(".page-surface");
     root?.addEventListener("showai-board-pinch", cancel);
+    // Panning while drawing keeps the preview attached to the content.
+    root?.addEventListener("showai:viewport-change", repaint);
     window.addEventListener("blur", blur);
     return () => {
       window.removeEventListener("blur", blur);
       root?.removeEventListener("showai-board-pinch", cancel);
+      root?.removeEventListener("showai:viewport-change", repaint);
     };
   }, []);
-  const add = (event: PointerEvent<SVGSVGElement>) => {
-    if (pending.current?.id !== event.pointerId) return;
-    const next = point(event.clientX, event.clientY),
-      last = pending.current.points.at(-1)!;
-    pending.current.cursor = next;
-    pending.current.modifiers = {
-      shiftKey: event.shiftKey,
-      altKey: event.altKey,
-    };
-    const scale =
-      camera.current.scale *
-      (surface.current!.getBoundingClientRect().width /
-        surface.current!.clientWidth || 1);
-    pending.current.moved ||=
-      Math.hypot(
-        next.x - pending.current.origin.x,
-        next.y - pending.current.origin.y,
-      ) *
-        scale >=
-      3;
-    if (
-      freehand &&
-      !ruler &&
-      Math.hypot(next.x - last.x, next.y - last.y) * scale < 0.7
-    )
-      return;
-    let values = freehand
-      ? ruler
-        ? [pending.current.origin, next]
-        : [...pending.current.points, next]
-      : creationPoints(
-          tool === "region" ? "rectangle" : tool,
-          pending.current.origin,
-          next,
-          event,
-        );
+  const modifiersOf = (event: Modifiers): Modifiers => ({
+    shiftKey: event.shiftKey,
+    altKey: event.altKey,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+  });
+  const reshape = (current: NonNullable<typeof pending.current>) => {
+    let values = creationPoints(
+      tool === "region" ? "rectangle" : tool,
+      current.origin,
+      current.cursor,
+      current.modifiers,
+    );
     if (
       (tool === "rectangle" || tool === "ellipse" || tool === "region") &&
-      !event.altKey
+      !current.modifiers.ctrlKey &&
+      !current.modifiers.metaKey
     ) {
       const snapped = snapCreation(
         values,
-        pending.current.snap,
-        scale,
-        event.shiftKey,
+        current.snap,
+        scaleNow(),
+        current.modifiers.shiftKey,
       );
       values = snapped.points;
       setGuides(snapped.guides);
     } else setGuides([]);
-    pending.current.points = values.slice(0, 20000);
-    setPoints(pending.current.points);
+    current.points = values;
   };
+  const add = (event: PointerEvent<SVGSVGElement>) => {
+    if (tool === "arrow") onTarget?.(event.clientX, event.clientY);
+    const current = pending.current;
+    if (current?.id !== event.pointerId) return;
+    const samples = freehand
+      ? (event.nativeEvent.getCoalescedEvents?.() ?? []).filter(
+          (sample) => sample.pointerId === event.pointerId,
+        )
+      : [];
+    if (!samples.length) samples.push(event.nativeEvent);
+    const scale = scaleNow();
+    for (const sample of samples) {
+      const next = point(sample.clientX, sample.clientY),
+        last = current.points.at(-1)!;
+      current.cursor = next;
+      current.moved ||=
+        Math.hypot(next.x - current.origin.x, next.y - current.origin.y) *
+          scale >=
+        3;
+      if (freehand && ruler) {
+        // The ruler keeps a straight stroke from the start point.
+        current.points = [current.origin, next];
+        continue;
+      }
+      if (
+        freehand &&
+        (Math.hypot(next.x - last.x, next.y - last.y) * scale < 0.7 ||
+          current.points.length >= 20000)
+      )
+        continue;
+      if (freehand) current.points.push(next);
+    }
+    current.modifiers = modifiersOf(event);
+    if (!freehand) reshape(current);
+    repaint();
+  };
+  const points = pending.current?.points ?? [];
   const preview =
     points.length > 1
       ? {
@@ -463,17 +489,19 @@ export function DrawingInput({
           cursor: start,
           snap: makeSnapIndex(),
           moved: false,
-          modifiers: { shiftKey: event.shiftKey, altKey: event.altKey },
+          modifiers: modifiersOf(event),
         };
-        setPoints([start]);
+        repaint();
       }}
       onPointerMove={add}
+      onPointerLeave={() => tool === "arrow" && onTarget?.(NaN, NaN)}
       onPointerUp={(event) => {
         const current = pending.current;
         if (!current || current.id !== event.pointerId) return;
         event.preventDefault();
         event.stopPropagation();
-        finish(point(event.clientX, event.clientY), event);
+        finish(point(event.clientX, event.clientY), modifiersOf(event));
+        if (tool === "arrow") onTarget?.(NaN, NaN);
       }}
       onPointerCancel={(event) => {
         if (pending.current?.id !== event.pointerId) return;
@@ -500,21 +528,14 @@ export function DrawingInput({
           event.stopPropagation();
           if (pending.current) cancel();
           else onExit();
-        } else if (pending.current && ["Shift", "Alt"].includes(event.key)) {
-          pending.current.modifiers = {
-            shiftKey: event.shiftKey,
-            altKey: event.altKey,
-          };
-          const values = pending.current.points;
-          if (!freehand && values.length > 1) {
-            const next = creationPoints(
-              tool === "region" ? "rectangle" : tool,
-              pending.current.origin,
-              pending.current.cursor,
-              event,
-            );
-            pending.current.points = next;
-            setPoints(next);
+        } else if (
+          pending.current &&
+          ["Shift", "Alt", "Control", "Meta"].includes(event.key)
+        ) {
+          pending.current.modifiers = modifiersOf(event);
+          if (!freehand && pending.current.points.length > 1) {
+            reshape(pending.current);
+            repaint();
           }
         }
       }}
@@ -522,26 +543,11 @@ export function DrawingInput({
         if (
           pending.current &&
           !freehand &&
-          ["Shift", "Alt"].includes(event.key)
+          ["Shift", "Alt", "Control", "Meta"].includes(event.key)
         ) {
-          pending.current.modifiers = {
-            shiftKey: event.shiftKey,
-            altKey: event.altKey,
-          };
-          const next = creationPoints(
-            tool === "region" ? "rectangle" : tool,
-            pending.current.origin,
-            pending.current.cursor,
-            event,
-          );
-          pending.current.points = next;
-          setPoints(next);
-        }
-      }}
-      onWheelCapture={(event) => {
-        if (pending.current) {
-          event.preventDefault();
-          event.stopPropagation();
+          pending.current.modifiers = modifiersOf(event);
+          reshape(pending.current);
+          repaint();
         }
       }}
     >
@@ -569,6 +575,12 @@ export function DrawingInput({
     </svg>
   );
 }
+type Modifiers = {
+  shiftKey: boolean;
+  altKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+};
 function DrawingPreview({ node }: { node: JSONContent }) {
   const {
     points,
@@ -579,14 +591,8 @@ function DrawingPreview({ node }: { node: JSONContent }) {
   } = node.attrs!;
   const a = points[0],
     b = points.at(-1);
-  let path = points
-    .map((p: Point, i: number) => `${i ? "L" : "M"} ${p.x} ${p.y}`)
-    .join(" ");
-  if (tool === "arrow") {
-    const angle = Math.atan2(b.y - a.y, b.x - a.x),
-      head = Math.min(20, Math.hypot(b.x - a.x, b.y - a.y) * 0.3);
-    path = `M ${a.x} ${a.y} L ${b.x} ${b.y} M ${b.x - head * Math.cos(angle - 0.5)} ${b.y - head * Math.sin(angle - 0.5)} L ${b.x} ${b.y} L ${b.x - head * Math.cos(angle + 0.5)} ${b.y - head * Math.sin(angle + 0.5)}`;
-  }
+  const path =
+    tool === "arrow" ? arrowPath(a, b, strokeWidth) : smoothPath(points);
   return (
     <g
       stroke={color}

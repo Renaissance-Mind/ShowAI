@@ -1,4 +1,5 @@
 import {
+  arrowPath,
   geometryFrame,
   frameFromGeometry,
   pickShape,
@@ -32,6 +33,10 @@ import {
   type Point,
 } from "./geometry.mjs";
 import { boundEndpoints, indexSurfaceTree } from "./connections.mjs";
+import { translator } from "../i18n";
+import messages from "../i18n/messages/surface";
+
+const t = translator(messages);
 
 export type BoardGesture = "move" | "resize" | `resize-${string}` | "rotate";
 export interface BoardGestureInput {
@@ -39,6 +44,8 @@ export interface BoardGestureInput {
   clientY: number;
   altKey: boolean;
   shiftKey: boolean;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
 }
 export interface BoardInteraction {
   ids: Set<string>;
@@ -58,6 +65,10 @@ export interface BoardInteraction {
   selectAll: () => void;
   selectIds: (ids: string[]) => void;
   nudge: (x: number, y: number) => void;
+  /** Visual bounds in the selection's coordinate layer, including measured heights. */
+  measured: (
+    ids: string[],
+  ) => Record<string, { x: number; y: number; width: number; height: number }>;
   start: (id: string, kind: BoardGesture, point: BoardGestureInput) => boolean;
   update: (point: BoardGestureInput) => void;
   finish: () => void;
@@ -78,7 +89,7 @@ export function useBoardInteraction({
   containerId?: string;
   world: RefObject<HTMLDivElement | null>;
   camera: RefObject<Camera>;
-  onTransform?: (frames: Record<string, NodeLayout>) => void;
+  onTransform?: (frames: Record<string, NodeLayout>, group?: string) => void;
   onSelect: (id: string | null) => void;
   selected: string | null;
 }): BoardInteraction & {
@@ -160,7 +171,33 @@ export function useBoardInteraction({
     const outline = document ? window.document.createElement("div") : null;
     if (!outline) return;
     outline.className = "board-group-outline";
-    outline.setAttribute("aria-hidden", "true");
+    // One set of handles scales the whole selection from the group's corners.
+    const fixed = [...ids].some(
+      (id) =>
+        world.current?.querySelector<HTMLElement>(
+          `[data-surface-id="${CSS.escape(id)}"]`,
+        )?.dataset.boardFixedHeight === "true",
+    );
+    const locked = [...ids].some((id) => document?.layout?.[id]?.locked);
+    for (const direction of locked
+      ? []
+      : fixed
+        ? ["nw", "n", "ne", "e", "se", "s", "sw", "w"]
+        : ["e", "w"]) {
+      const handle = window.document.createElement("button");
+      handle.type = "button";
+      handle.className = `board-resize-handle handle-${direction}`;
+      handle.dataset.surfaceUi = "true";
+      handle.dataset.surfaceHandle = "true";
+      handle.dataset.resizeDirection = direction;
+      handle.dataset.groupTarget = [...ids][0];
+      handle.tabIndex = -1;
+      handle.setAttribute(
+        "aria-label",
+        t("board.groupHandles", { count: ids.size }),
+      );
+      outline.append(handle);
+    }
     first.parentElement.append(outline);
     groupOutline.current = outline;
     refreshOutline();
@@ -298,17 +335,38 @@ export function useBoardInteraction({
       resizing &&
       (input.shiftKey ||
         (!single && selectedIds.some((id) => !!drag.frames[id].rotation)));
+    // Alt resizes symmetrically around the center; Shift locks a move to the
+    // dominant axis; Command/Ctrl turns snapping off.
+    const centered = resizing && input.altKey;
+    const axis =
+      !resizing && drag.kind === "move" && input.shiftKey
+        ? Math.abs(dx) >= Math.abs(dy)
+          ? "x"
+          : "y"
+        : null;
     let candidate = resizing
       ? resizeFrame(
           resizeOrigin,
-          { x: dx, y: dy },
+          centered ? { x: dx * 2, y: dy * 2 } : { x: dx, y: dy },
           resizeHandle,
           minimum,
           keepAspect,
         )
-      : { ...drag.bounds, x: drag.bounds.x + dx, y: drag.bounds.y + dy };
+      : {
+          ...drag.bounds,
+          x: drag.bounds.x + (axis === "y" ? 0 : dx),
+          y: drag.bounds.y + (axis === "x" ? 0 : dy),
+        };
+    if (centered)
+      candidate = {
+        ...candidate,
+        x: resizeOrigin.x + (resizeOrigin.width - candidate.width) / 2,
+        y:
+          resizeOrigin.y +
+          ((resizeOrigin.height ?? 0) - (candidate.height ?? 0)) / 2,
+      };
     const snap =
-      input.altKey || drag.kind === "rotate"
+      input.metaKey || input.ctrlKey || centered || drag.kind === "rotate"
         ? { frame: candidate, guides: [] }
         : resizing
           ? snapResizeFrame(
@@ -333,7 +391,11 @@ export function useBoardInteraction({
           ? Math.abs(x - candidate.x) < 0.001
           : Math.abs(y - candidate.y) < 0.001,
       );
-      candidate = { ...candidate, x, y };
+      candidate = {
+        ...candidate,
+        x: axis === "y" ? drag.bounds.x : x,
+        y: axis === "x" ? drag.bounds.y : y,
+      };
     }
     drag.guides.replaceChildren();
     for (const guide of snap.guides) {
@@ -429,12 +491,7 @@ export function useBoardInteraction({
             (layout[id].height ?? 1),
         }),
       );
-      const angle = Math.atan2(b.y - a.y, b.x - a.x),
-        head = Math.min(20, Math.hypot(b.x - a.x, b.y - a.y) * 0.3);
-      path.setAttribute(
-        "d",
-        `M ${a.x} ${a.y} L ${b.x} ${b.y} M ${b.x - head * Math.cos(angle - 0.5)} ${b.y - head * Math.sin(angle - 0.5)} L ${b.x} ${b.y} L ${b.x - head * Math.cos(angle + 0.5)} ${b.y - head * Math.sin(angle + 0.5)}`,
-      );
+      path.setAttribute("d", arrowPath(a, b, entry.node.attrs!.strokeWidth));
     }
   };
   return {
@@ -578,7 +635,8 @@ export function useBoardInteraction({
       const next = new Set<string>(
         (parent?.content ?? [])
           .map((node) => node.attrs?.id)
-          .filter((id) => !!source?.layout?.[id]),
+          // Like a marquee, select-all leaves locked objects alone.
+          .filter((id) => !!source?.layout?.[id] && !source.layout[id].locked),
       );
       setSelection(next);
       currentIds.current = next;
@@ -589,7 +647,7 @@ export function useBoardInteraction({
       if (!source || !current.current.onTransform) return;
       const frames = Object.fromEntries(
         [...currentIds.current]
-          .filter((id) => source.layout?.[id])
+          .filter((id) => source.layout?.[id] && !source.layout[id].locked)
           .map((id) => [id, source.layout![id]]),
       );
       const delta = translationDelta(Object.values(frames), { x, y });
@@ -601,7 +659,28 @@ export function useBoardInteraction({
             { ...frame, x: frame.x + delta.x, y: frame.y + delta.y },
           ]),
         ),
+        // Holding an arrow key is one undo step.
+        `nudge:${Object.keys(frames).sort().join(",")}`,
       );
+    },
+    measured(ids) {
+      const source = current.current.document;
+      const result: Record<
+        string,
+        { x: number; y: number; width: number; height: number }
+      > = {};
+      for (const id of ids) {
+        const element = world.current?.querySelector<HTMLElement>(
+            `[data-surface-id="${CSS.escape(id)}"]`,
+          ),
+          frame = source?.layout?.[id],
+          node = selectionIndex.get(id)?.node;
+        if (element && frame && node)
+          result[id] = frameBounds(
+            geometryFrame(node, measureFrame(frame, element)),
+          );
+      }
+      return result;
     },
     start(id, kind, point) {
       const original = current.current.document,
@@ -625,6 +704,7 @@ export function useBoardInteraction({
         objectElement.closest(".page-surface") !== root.closest(".page-surface")
       )
         return false;
+      if (source.layout?.[id]?.locked) return false;
       const chosen =
         kind === "rotate"
           ? new Set([id])
@@ -652,7 +732,7 @@ export function useBoardInteraction({
           index.get(nodeId)!.node,
           measureFrame(frame, el),
         );
-        if (chosen.has(nodeId)) frames[nodeId] = frame;
+        if (chosen.has(nodeId) && !frame.locked) frames[nodeId] = frame;
       }
       if (!frames[id]) return false;
       const bounds = pointsBounds(
@@ -758,6 +838,7 @@ export function useBoardInteraction({
         if (
           id &&
           frame &&
+          !frame.locked &&
           shapeIntersects(
             selectionIndex.get(id)!.node,
             measureFrame(frame, child),

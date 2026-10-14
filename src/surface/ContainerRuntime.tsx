@@ -5,6 +5,13 @@ import {
   transformObjects,
   duplicateObjects,
   removeObjects,
+  copyObjects,
+  pasteObjects,
+  reorderObjects,
+  groupObjects,
+  ungroupRegion,
+  adoptIntoRegion,
+  setObjectsLocked,
 } from "./board-commands";
 import {
   reconcileConnections,
@@ -68,11 +75,14 @@ import { BoardTools } from "./BoardTools";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";
 
+/** Text placed on a Board starts as a note-sized box rather than a page column. */
+const boardTextWidth = 320;
 interface Runtime {
   geometry: SurfaceGeometryStore;
   document: ContainerDocument;
   current: RefObject<ContainerDocument>;
-  commit: (next: ShowDocument) => void;
+  /** Commits sharing a group within a short interval form one undo step. */
+  commit: (next: ShowDocument, group?: string) => void;
   readOnly: boolean;
   printing: boolean;
   pageWidthModes: boolean;
@@ -123,7 +133,7 @@ export function ContainerRuntime({
 }: {
   document: ContainerDocument;
   geometry?: SurfaceGeometryStore;
-  onChange?: (next: ShowDocument) => void;
+  onChange?: (next: ShowDocument, group?: string) => void;
   renderContent: ContentRenderer;
   header?: ReactNode;
   revealId?: string | null;
@@ -333,7 +343,7 @@ export function ContainerRuntime({
     geometry,
     document,
     current,
-    commit: (next) => {
+    commit: (next, group) => {
       const measured = reconcileSurface(
         {
           ...geometry.materialize(next),
@@ -342,7 +352,7 @@ export function ContainerRuntime({
         { clone: false },
       );
       current.current = measured as ContainerDocument;
-      onChange?.(measured);
+      onChange?.(measured, group);
     },
     readOnly: !onChange,
     printing,
@@ -924,6 +934,8 @@ function ContainerView({
     shape: { color: "#252629", fillColor: "none", strokeWidth: 2.5 },
   });
   const styleKey = tool === "pen" || tool === "highlighter" ? tool : "shape";
+  const drawingTool =
+    !!tool && !["pan", "eraser", "lasso", "text"].includes(tool);
   const style = styles[styleKey];
   const chooseTool = async (next: BoardTool | null) => {
     await window.showai?.inlineInk?.flush();
@@ -1097,26 +1109,142 @@ function ContainerView({
           onTransform={
             readOnly
               ? undefined
-              : (frames) =>
+              : (frames, group) =>
                   runtime.commit(
                     transformObjects(
                       runtime.geometry.materialize(runtime.current.current),
                       frames,
                     ),
+                    group,
                   )
           }
           onDuplicate={
             readOnly
               ? undefined
-              : (ids) => {
+              : (ids, offset) => {
                   const copied = duplicateObjects(
                     runtime.geometry.materialize(runtime.current.current),
                     ids,
+                    offset,
                   );
                   runtime.commit(copied.document);
                   runtime.select(copied.ids[0] ?? null);
                   return copied.ids;
                 }
+          }
+          onCopyObjects={(ids) =>
+            copyObjects(
+              runtime.geometry.materialize(runtime.current.current),
+              ids,
+            )
+          }
+          onPasteObjects={
+            readOnly
+              ? undefined
+              : (paste, point) => {
+                  const source = runtime.geometry.materialize(
+                    runtime.current.current,
+                  );
+                  if ("text" in paste) {
+                    const inserted = insertComponent(source, id, "text", {
+                      format: "richtext",
+                      content: {
+                        type: "doc",
+                        content: paste.text
+                          .split(/\r?\n/)
+                          .slice(0, 500)
+                          .map((line) => ({
+                            type: "paragraph",
+                            ...(line
+                              ? { content: [{ type: "text", text: line }] }
+                              : {}),
+                          })),
+                      },
+                    });
+                    Object.assign(inserted.document.layout[inserted.nodeId], {
+                      width: boardTextWidth,
+                      ...point,
+                    });
+                    runtime.commit(inserted.document);
+                    runtime.select(inserted.nodeId);
+                    return [inserted.nodeId];
+                  }
+                  const roots = paste.clip.nodes
+                    .map((node) => paste.clip.layout[node.attrs!.id])
+                    .filter(Boolean);
+                  // Paste centers the copy under the pointer when it is over
+                  // the Board; otherwise it lands slightly offset.
+                  const offset =
+                    point && roots.length
+                      ? {
+                          x:
+                            point.x -
+                            (Math.min(...roots.map((f) => f.x)) +
+                              Math.max(...roots.map((f) => f.x + f.width))) /
+                              2,
+                          y: point.y - Math.min(...roots.map((f) => f.y)),
+                        }
+                      : { x: 24, y: 24 };
+                  const pasted = pasteObjects(source, id, paste.clip, offset);
+                  runtime.commit(pasted.document);
+                  runtime.select(pasted.ids[0] ?? null);
+                  return pasted.ids;
+                }
+          }
+          onReorder={
+            readOnly
+              ? undefined
+              : (ids, order) =>
+                  runtime.commit(
+                    reorderObjects(
+                      runtime.geometry.materialize(runtime.current.current),
+                      ids,
+                      order,
+                    ),
+                  )
+          }
+          onGroup={
+            readOnly
+              ? undefined
+              : (ids, bounds, offset) => {
+                  const grouped = groupObjects(
+                    runtime.geometry.materialize(runtime.current.current),
+                    ids,
+                    bounds,
+                    offset,
+                  );
+                  if (!grouped) return null;
+                  runtime.commit(grouped.document);
+                  runtime.select(grouped.id);
+                  return grouped.id;
+                }
+          }
+          onUngroup={
+            readOnly
+              ? undefined
+              : (regionId, offset) => {
+                  const result = ungroupRegion(
+                    runtime.geometry.materialize(runtime.current.current),
+                    regionId,
+                    offset,
+                  );
+                  if (!result) return [];
+                  runtime.commit(result.document);
+                  runtime.select(result.ids[0] ?? null);
+                  return result.ids;
+                }
+          }
+          onLock={
+            readOnly
+              ? undefined
+              : (ids, locked) =>
+                  runtime.commit(
+                    setObjectsLocked(
+                      runtime.geometry.materialize(runtime.current.current),
+                      ids,
+                      locked,
+                    ),
+                  )
           }
           onDeleteSelection={
             readOnly
@@ -1137,7 +1265,7 @@ function ContainerView({
             id: child.attrs!.id,
             name: nodeName(child),
           }))}
-          layoutKey={JSON.stringify(runtime.document.layout)}
+          layoutKey={runtime.document.layout}
           paths={nodePaths({ ...runtime.document, content: node })}
           views={surfaceViews(runtime.document, node)}
           header={root ? heading : undefined}
@@ -1212,12 +1340,8 @@ function ContainerView({
                 findSurfaceNode(runtime.current.current, nodeId)?.node.type ===
                 "drawing",
             );
-            if (tool && tool !== "region" && drawings.length)
-              setStyles((before) => ({
-                ...before,
-                [styleKey]: { ...before[styleKey], ...patch },
-              }));
-            if (!drawings.length) {
+            // With a tool active, style changes set up the next drawing only.
+            if (drawingTool || !drawings.length) {
               setStyles((before) => ({
                 ...before,
                 [styleKey]: { ...before[styleKey], ...patch },
@@ -1232,7 +1356,8 @@ function ContainerView({
                   delete applicable.fillColor;
                 node.attrs = { ...node.attrs, ...applicable };
               }) as ContainerDocument;
-            runtime.commit(next);
+            // Dragging a slider or color picker is one undo step.
+            runtime.commit(next, `style:${[...drawings].sort().join(",")}`);
           }}
           onAddComponent={
             readOnly
@@ -1254,11 +1379,13 @@ function ContainerView({
                   );
                   Object.assign(
                     inserted.document.layout[inserted.nodeId],
+                    kind === "text" ? { width: boardTextWidth } : {},
                     point,
                   );
                   runtime.commit(inserted.document);
                   runtime.select(inserted.nodeId);
                   setTool(null);
+                  return inserted.nodeId;
                 }
           }
           onOpenComponents={
@@ -1271,7 +1398,7 @@ function ContainerView({
           onDraw={
             readOnly
               ? undefined
-              : (drawing, frame) => {
+              : (drawing, frame, adopt) => {
                   if (drawing.attrs?.tool === "arrow") {
                     const endpoints = arrowEndpoints(drawing, frame);
                     const start = bindingAtPoint(
@@ -1292,9 +1419,22 @@ function ContainerView({
                         ...(end ? { end } : {}),
                       };
                   }
-                  runtime.commit(
-                    addNode(runtime.current.current, drawing, frame, id),
+                  let next = addNode(
+                    runtime.current.current,
+                    drawing,
+                    frame,
+                    id,
                   );
+                  if (adopt)
+                    next = adoptIntoRegion(
+                      next,
+                      drawing.attrs!.id,
+                      adopt.ids,
+                      adopt.offset,
+                    );
+                  runtime.commit(next);
+                  // Keep drawing: the tool stays active and the next stroke
+                  // must not grab what was just drawn.
                   runtime.select(null);
                 }
           }

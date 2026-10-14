@@ -32,10 +32,12 @@ export function finishBoardDrawing(tool, style, gesture, modifiers = {}) {
       release,
       modifiers,
     );
+    // Command/Ctrl turns snapping off; Alt only draws from the center.
     if (
       snap &&
       ["rectangle", "ellipse", "region"].includes(tool) &&
-      !modifiers.altKey
+      !modifiers.ctrlKey &&
+      !modifiers.metaKey
     )
       points = snapCreation(points, snap, scale, modifiers.shiftKey).points;
   }

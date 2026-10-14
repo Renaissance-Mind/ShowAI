@@ -241,7 +241,10 @@ function SurfaceEditor({
   );
   const undo = useCallback(() => travel(), [travel]);
   const redo = useCallback(() => travel(true), [travel]);
-  const change = useCallback((next: ShowDocument) => commit(next), [commit]);
+  const change = useCallback(
+    (next: ShowDocument, group?: string) => commit(next, group),
+    [commit],
+  );
   const render = ({
     content,
     parentId,
