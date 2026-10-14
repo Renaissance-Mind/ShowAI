@@ -6,7 +6,10 @@ import { findViewerTemplate, readerFileExists } from "./reader-template";
 export type ReaderMode = "bundled" | "cdn";
 
 /** Public CDNs that serve npm packages; conversation hosts commonly allow them. */
+// ShowAI's own source first (Cloudflare, copied from the same npm release),
+// then the public npm CDNs as backups.
 const DEFAULT_SOURCES = [
+  "https://reader.showai.renaissancemind.ai/{name}@{version}/",
   "https://cdn.jsdelivr.net/npm/{name}@{version}/",
   "https://unpkg.com/{name}@{version}/",
 ];

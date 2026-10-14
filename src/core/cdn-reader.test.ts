@@ -25,13 +25,15 @@ describe("CDN reader resolution", () => {
     await rm(directory, { recursive: true, force: true });
   });
 
-  it("pins jsDelivr then unpkg to the exact build", async () => {
+  it("pins ShowAI's source, then jsDelivr and unpkg, to the exact build", async () => {
     const urls = await cdnReaderUrls();
     expect(urls).toEqual([
+      "https://reader.showai.renaissancemind.ai/showai-reader@0.9.0-reader.abc123/reader-ABC123.js",
       "https://cdn.jsdelivr.net/npm/showai-reader@0.9.0-reader.abc123/reader-ABC123.js",
       "https://unpkg.com/showai-reader@0.9.0-reader.abc123/reader-ABC123.js",
     ]);
     expect(cdnReaderOrigins(urls)).toEqual([
+      "https://reader.showai.renaissancemind.ai",
       "https://cdn.jsdelivr.net",
       "https://unpkg.com",
     ]);

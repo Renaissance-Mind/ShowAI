@@ -265,6 +265,7 @@ export function registerPresentationTools(
               resourceAttached: true,
               inlineAvailable: !!presentation.inline,
               onlineAvailable: !!presentation.online,
+              compactAvailable: !!presentation.compact,
               note: "The host displays the attached MCP Apps reader directly. Download URLs are for file delivery. If the execution sandbox cannot download them, use presentation_source when available.",
             },
             ...(presentation.inlineError

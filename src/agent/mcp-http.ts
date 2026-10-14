@@ -67,6 +67,7 @@ type StoredArtifact = {
   html: string;
   inline?: string;
   online?: string;
+  compact?: string;
   source: string;
   expires: number;
   publicSource: boolean;
@@ -137,6 +138,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
       html: value.html,
       inline: value.inline,
       online: value.online,
+      compact: value.compact,
       source: value.source,
       expires,
       publicSource,
@@ -149,6 +151,9 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         : {}),
       ...(value.online
         ? { online: `${origin}/artifacts/${key}/online.html` }
+        : {}),
+      ...(value.compact
+        ? { compact: `${origin}/artifacts/${key}/compact.html` }
         : {}),
       source: `${origin}/artifacts/${key}/page.showai.json`,
       expiresAt: new Date(expires).toISOString(),
@@ -298,6 +303,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                         ? Buffer.byteLength(preview.inline)
                         : null,
                       online: null,
+                      compact: null,
                     },
                   });
                   data.delivery = delivery;
@@ -454,7 +460,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
       const auth = await authorization.fetch(request);
       if (auth) return auth;
       const asset = target.pathname.match(
-        /^\/artifacts\/([A-Za-z0-9_-]{43})\/(page\.html|inline\.html|online\.html|page\.showai\.json)$/,
+        /^\/artifacts\/([A-Za-z0-9_-]{43})\/(page\.html|inline\.html|online\.html|compact\.html|page\.showai\.json)$/,
       );
       if (asset && ["GET", "HEAD"].includes(request.method)) {
         const value = artifacts.get(asset[1]);
@@ -470,7 +476,9 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
               ? value.inline
               : asset[2] === "online.html"
                 ? value.online
-                : value.source;
+                : asset[2] === "compact.html"
+                  ? value.compact
+                  : value.source;
         if (!content)
           return json(
             {

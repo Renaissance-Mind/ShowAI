@@ -999,6 +999,7 @@ export function createMcpServer(options: {
               resourceAttached: true,
               inlineAvailable: !!value.inline,
               onlineAvailable: !!value.online,
+              compactAvailable: !!value.compact,
               fullPageAvailable: true,
               ...(blockIds ? { blockIds } : {}),
             },

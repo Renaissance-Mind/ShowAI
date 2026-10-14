@@ -22,7 +22,7 @@ import {
   getTemplate,
   instantiateTemplateRecord,
 } from "../core/catalog";
-import { toCdnPage } from "../portable/cdn-fragment.mjs";
+import { toCdnFragment, toCdnPage } from "../portable/cdn-fragment.mjs";
 import { cdnReaderUrls } from "../core/cdn-reader";
 import { conversationPreview } from "../core/conversation-preview";
 import {
@@ -417,12 +417,14 @@ export async function renderPresentation(raw: PresentationInput) {
       : html;
     const preview = await inlinePresentation(inlineHtml);
     const online = await onlinePresentation(html);
+    const compact = await compactPresentation(inlineHtml);
     return {
       title: document.title,
       document,
       html,
       ...preview,
       ...(online ? { online } : {}),
+      ...(compact ? { compact } : {}),
       source: JSON.stringify(
         {
           ...JSON.parse(serializeArtifact(document, components, [], "reading")),
@@ -438,6 +440,7 @@ export async function renderPresentation(raw: PresentationInput) {
         html: Buffer.byteLength(html),
         inline: preview.inline ? Buffer.byteLength(preview.inline) : null,
         online: online ? Buffer.byteLength(online) : null,
+        compact: compact ? Buffer.byteLength(compact) : null,
       },
     };
   } finally {
@@ -468,6 +471,21 @@ export async function inlinePresentation(html: string): Promise<{
   }
 }
 
+/**
+ * A few-kilobyte preview fragment that loads the published reader, for hosts
+ * where the model writes the HTML itself; undefined without a CDN reader.
+ */
+export async function compactPresentation(html: string) {
+  const urls = await cdnReaderUrls();
+  if (!urls) return undefined;
+  try {
+    return toCdnFragment(html, { readerUrls: urls });
+  } catch (error) {
+    if (error instanceof CapacityError) return undefined;
+    throw error;
+  }
+}
+
 /** A complete page that loads the CDN reader, or undefined without one. */
 export async function onlinePresentation(html: string) {
   const urls = await cdnReaderUrls();
@@ -485,12 +503,14 @@ export async function writePresentation(
   const stem = html.slice(0, -5),
     inline = value.inline ? stem + ".inline.html" : undefined,
     online = value.online ? stem + ".online.html" : undefined,
+    compact = value.compact ? stem + ".compact.html" : undefined,
     source = stem + ".showai.json";
   const outputs: [string, string][] = [
     [html, value.html],
     [source, value.source],
     ...(inline ? [[inline, value.inline!] as [string, string]] : []),
     ...(online ? [[online, value.online!] as [string, string]] : []),
+    ...(compact ? [[compact, value.compact!] as [string, string]] : []),
   ];
   await mkdir(dirname(html), { recursive: true });
   // Fail before writing if any output already exists; replacement is explicit.
@@ -517,6 +537,7 @@ export async function writePresentation(
       html,
       ...(inline ? { inline } : {}),
       ...(online ? { online } : {}),
+      ...(compact ? { compact } : {}),
       source,
     },
     bytes: value.bytes,

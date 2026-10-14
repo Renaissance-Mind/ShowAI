@@ -3,7 +3,11 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { withLibrarySnapshot } from "../core/library-runtime";
 import { AgentService } from "./service";
-import { inlinePresentation, onlinePresentation } from "./presentation";
+import {
+  compactPresentation,
+  inlinePresentation,
+  onlinePresentation,
+} from "./presentation";
 
 /** One captured source revision, a complete reader and an optional focused preview. */
 export async function presentPage(input: {
@@ -45,10 +49,12 @@ export async function presentPage(input: {
             out: join(directory, "selection.html"),
           })
         : undefined;
-      const preview = await inlinePresentation(
-        selected ? await readFile(selected.path, "utf8") : html,
-      );
+      const previewHtml = selected
+        ? await readFile(selected.path, "utf8")
+        : html;
+      const preview = await inlinePresentation(previewHtml);
       const online = await onlinePresentation(html);
+      const compact = await compactPresentation(previewHtml);
       return {
         title: record.document.title,
         document: record.document,
@@ -60,12 +66,14 @@ export async function presentPage(input: {
         source,
         ...preview,
         ...(online ? { online } : {}),
+        ...(compact ? { compact } : {}),
         // This operation never initiates synchronization. HTTP adds its verified receipt.
         persistence: { savedToProject: true, synchronized: false },
         bytes: {
           html: Buffer.byteLength(html),
           inline: preview.inline ? Buffer.byteLength(preview.inline) : null,
           online: online ? Buffer.byteLength(online) : null,
+          compact: compact ? Buffer.byteLength(compact) : null,
         },
       };
     });

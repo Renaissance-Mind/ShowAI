@@ -1,0 +1,16 @@
+{
+  // ShowAI reader source: reader.showai.renaissancemind.ai serves immutable
+  // showai-reader builds copied on demand from the npm registry into R2.
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "showai-reader",
+  "main": "reader-worker.mjs",
+  "compatibility_date": "2026-10-01",
+  "account_id": "8f1753ad2d5e392716033248d7c5639e",
+  "routes": [
+    { "pattern": "reader.showai.renaissancemind.ai", "custom_domain": true }
+  ],
+  "r2_buckets": [{ "binding": "READER", "bucket_name": "showai-reader" }],
+  // Importing a release gunzips and hashes a few MB once per version.
+  "limits": { "cpu_ms": 30000 },
+  "observability": { "enabled": true }
+}

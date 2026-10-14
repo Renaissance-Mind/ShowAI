@@ -42,3 +42,17 @@ jobs:
           else
             npm publish ./dist-cdn --access public --provenance --tag latest
           fi
+      # ShowAI's reader source copies each release from npm on first request;
+      # requesting the entry now spares the first reader that wait.
+      - name: Warm ShowAI's reader source
+        run: |
+          name=$(node -p 'require("./dist-cdn/manifest.json").name')
+          version=$(node -p 'require("./dist-cdn/manifest.json").version')
+          entry=$(node -p 'require("./dist-cdn/manifest.json").entry')
+          url="https://reader.showai.renaissancemind.ai/$name@$version/$entry"
+          for attempt in $(seq 1 40); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "$url" || true)
+            if [ "$code" = "200" ]; then echo "Warmed $url"; exit 0; fi
+            sleep 15
+          done
+          echo "::warning::$url is not available yet; readers fall back to jsDelivr and unpkg."

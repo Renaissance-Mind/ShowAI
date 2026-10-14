@@ -7,6 +7,7 @@ import { buildPageHtml } from "../agent/exporter";
 import { blankDocument } from "./catalog";
 import { createResource } from "../surface/containers.mjs";
 import { conversationPreview } from "./conversation-preview";
+import { compactPresentation } from "../agent/presentation";
 
 let directory: string, html: string;
 const saved = { ...process.env };
@@ -57,4 +58,20 @@ it("keeps explicit online export small and does not hide an invalid local reader
   await expect(
     conversationPreview(html.replace('id="root"', 'id="missing"')),
   ).rejects.toThrow("mount point");
+});
+
+it("offers a few-kilobyte compact fragment for hosts that write the HTML", async () => {
+  const compact = await compactPresentation(html);
+  expect(compact).toBeDefined();
+  expect(Buffer.byteLength(compact!)).toBeLessThan(20_000);
+  const reader = compact!.indexOf("reader.showai.renaissancemind.ai/showai-reader@1.0.0-reader.test/reader-TEST.js");
+  const jsdelivr = compact!.indexOf("cdn.jsdelivr.net/npm/showai-reader@1.0.0-reader.test/reader-TEST.js");
+  expect(reader).toBeGreaterThan(-1);
+  expect(jsdelivr).toBeGreaterThan(reader);
+  process.env.SHOWAI_READER_CDN = "off";
+  try {
+    expect(await compactPresentation(html)).toBeUndefined();
+  } finally {
+    delete process.env.SHOWAI_READER_CDN;
+  }
 });
