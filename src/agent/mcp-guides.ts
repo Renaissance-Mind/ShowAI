@@ -100,6 +100,7 @@ const rules: Partial<Record<GuideTopic, string[]>> = {
     "With a published CDN reader, delivery.inline and delivery.online carry only page data, embedded images and custom components and load the reader from jsDelivr or unpkg, so they need network access; delivery.html stays a complete offline file. Use delivery.online for file previews that can go online and delivery.html when offline reading matters or the reader cannot load.",
     "Output placement is host/runtime configuration, not a required ~/.codex path. The local launcher accepts SHOWAI_PRESENTATION_DIR; default delivery is a runtime-owned preview directory. No arbitrary output path is accepted by page_present.",
     "If inline is too large, full HTML/source still exist and inlineError describes the limit. Retry page_present with a meaningful block selection; do not replace the saved Page with a smaller document.",
+    "The MCP Apps reader reports the reader's latest local control values through model context (structuredContent.showai.readerState with blockId, label and value). They describe the user's current exploration of the preview and were not saved; use them to interpret follow-ups. Change the Page only when the user asks to keep that state.",
     "page_export remains for an explicitly requested file/site export. Its local out path and remote availability are transport-specific; check the exposed tool schema. No fallback to authoring CLI.",
   ],
   component: [
