@@ -6,29 +6,35 @@
 
 [Documentation](docs/README.md) · [Quick start](docs/quick-start.md) · [Use with Codex](docs/codex.md) (Chinese)
 
-> **Language note:** The workbench interface is available in English and Simplified Chinese. It follows your system language by default (Chinese system languages use Simplified Chinese, all others use English); change it in **Settings → Appearance → Language**. Exported pages show their reader controls in the language used when they were exported. Documents marked *(Chinese)* below are available in Chinese only; the remaining reference documents are in English.
+**Your agent answers with a UI, not a wall of text.**
 
-ShowAI helps humans and agents think together through content they can read, interact with, and edit. Agents organize information and analysis into pages, charts, and interactive models. Humans contribute through reading, exploration, edits, and feedback, building understanding, making decisions, and advancing their work in the same shared content.
-
-This interface supports human–agent collaboration and co-creation. The resulting content can also become a shareable site that others can read, explore, and continue using.
+Chat is a poor interface for real work. Agents can analyze a market, plan a project or explain a system, but the result arrives as a long block of text you can only reply to. ShowAI lets the agent answer with an interactive page instead, one that you and the agent keep working on together.
 
 [![ShowAI project examples: research, personal management, and development planning](docs/showai-projects.png)](https://showai.renaissancemind.ai/)
 
 ![For Agents: A way to communicate and collaborate with humans, turning information and analysis into content people can understand, use, and give feedback on. — For Humans: A way to participate in AI work, bringing your understanding and judgment into shared creation through reading, exploration, and editing.](docs/showai-audience.svg)
 
-### ✨ From understanding to co-creation
+### ✨ Highlights
 
-- **Give information the right form**: Combine text, images, tables, charts, flow diagrams, and interactive controls in one piece of content. Connect research findings to sources and data, explain complex relationships with diagrams, and explore parameter changes with interactive models.
+- **Intelligent UI**: The agent composes each page for the task at hand from components such as charts, flow diagrams, mind maps, tables, sliders, and interactive models. Every component has a description, a parameter schema, and examples, so the agent picks the right form instead of writing throwaway HTML.
 
-  The component catalog provides descriptions, parameter schemas, and examples to help agents choose components for the task. When a new form of expression is needed, create a reusable component with React.
+  When a task needs something new, the agent writes a React component that stays reusable for later pages.
 
-- **Let humans participate directly**: Read and use content within the agent's context, or edit and manage it in the ShowAI App as you would in a note-taking app. Agents can build on human edits. Both share page structure and component data to keep improving the same work.
+- **Human–agent collaboration**: The page is not a one-off output. Inspect charts, adjust parameters, and edit content directly, in the conversation or in the ShowAI App, a workbench that feels like a note-taking app. The agent picks up from your changes instead of starting over.
 
-  Pages support structured merging of active drafts and current content. Concurrent conflicts preserve both inputs for explicit review.
+  Drafts and current content merge structurally. Concurrent conflicts keep both inputs for you to review.
 
-- **Let the results travel**: Export finished content as standalone HTML, a fragment displayed in an agent conversation, or a static site with navigation.
+- **Works with ChatGPT and local agents**: In ChatGPT, pages render right inside the conversation through a custom MCP connector. Claude Code and Codex connect through the ShowAI plugin, and other MCP clients can use the stdio entry point.
 
-  Standalone HTML includes the page, data, and components it uses. Readers can read and interact offline without installing ShowAI. Exported ShowAI HTML and JSON can be imported into the workbench for further editing.
+  The ShowAI App also has a built-in agent that can use your ChatGPT plan, OpenRouter, DeepSeek, and other model providers.
+
+- **One workspace across devices**: Sign in to ShowAI Cloud or your own ShowAI Server to sync projects, components, and assets between devices. Keep editing offline; changes catch up when you reconnect, and conflicting edits from different devices are both preserved.
+
+  Invite others to a project as editors or viewers.
+
+When the work is done, export it as standalone HTML that works offline, or as a static site. See [Share pages and sites](#-share-pages-and-sites).
+
+> **Language note:** The workbench interface is available in English and Simplified Chinese. It follows your system language by default (Chinese system languages use Simplified Chinese, all others use English); change it in **Settings → Appearance → Language**. Exported pages show their reader controls in the language used when they were exported. Documents marked *(Chinese)* below are available in Chinese only; the remaining reference documents are in English.
 
 ## 🧩 Design
 
