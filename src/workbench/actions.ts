@@ -115,6 +115,8 @@ export const workbenchActions = new Set([
   "sync:beginLogin",
   "sync:finishLogin",
   "sync:createToken",
+  "sync:loginMethods",
+  "sync:removeLoginMethod",
   "app:info",
   "library:storage",
   "library:compact",
@@ -545,6 +547,14 @@ export function createWorkbench(
           );
         case "sync:revokeAllTokens":
           return sync.revokeAllTokens(required(args, "connectionId"));
+        case "sync:loginMethods":
+          return sync.loginMethods(required(args, "connectionId"));
+        case "sync:removeLoginMethod":
+          return sync.removeLoginMethod(
+            required(args, "connectionId"),
+            required(args, "provider"),
+            required(args, "subject"),
+          );
         case "sync:changePassword":
           return sync.changePassword(
             required(args, "connectionId"),

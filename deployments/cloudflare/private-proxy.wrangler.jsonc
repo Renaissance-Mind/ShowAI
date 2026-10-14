@@ -8,6 +8,8 @@
   // committed; supply it at deploy time, for example:
   //   wrangler deploy -c deployments/cloudflare/private-proxy.wrangler.jsonc \
   //     --var PRIVATE_ORIGIN:https://origin.example.com
+  // PROXY_KEY is a secret (`wrangler secret put PROXY_KEY`) matching the
+  // server's SHOWAI_TRUSTED_PROXY_KEY so per-visitor rate limits apply.
   "routes": [
     {
       "pattern": "https://showai.renaissancemind.ai/private",

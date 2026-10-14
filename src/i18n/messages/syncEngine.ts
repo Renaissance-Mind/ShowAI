@@ -75,6 +75,8 @@ export default defineMessages("syncEngine", {
     "account.connectionMissing": "服务器账号连接不存在。",
     "account.bindingDisabled": "此服务器尚未启用账号绑定。",
     "account.identityMismatch": "服务器返回的账号身份不匹配。",
+    "account.signedOutHere": "此设备在该服务器上的登录已被注销，请重新登录。",
+    "login.invalidCompletionLink": "登录完成链接无效。",
     "account.chooseDifferentServices": "请选择两个不同服务的账号。",
     "account.sameServerAccounts":
       "同一服务器上的不同账号不能绑定为同一个账号。",
@@ -183,6 +185,9 @@ export default defineMessages("syncEngine", {
     "account.connectionMissing":
       "This server account connection doesn't exist.",
     "account.bindingDisabled": "Account linking isn't enabled on this server.",
+    "account.signedOutHere":
+      "This device was signed out of that server. Please sign in again.",
+    "login.invalidCompletionLink": "The sign-in completion link is invalid.",
     "account.identityMismatch":
       "The account identity returned by the server doesn't match.",
     "account.chooseDifferentServices":

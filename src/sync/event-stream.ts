@@ -4,6 +4,7 @@ import {
   maximumEventProjects,
   type ProjectEvent,
 } from "./events";
+import { revisionDeltaFeature } from "./delta";
 
 /** Reconnects with a complete subscription; a missed frame never substitutes
  * for verified project history. The socket carries no draft or write command. */
@@ -35,7 +36,13 @@ export class ProjectEventStream {
     return this.ids.includes(id);
   }
   private sendSubscription() {
-    this.socket!.send(JSON.stringify({ type: "subscribe", ids: this.ids }));
+    this.socket!.send(
+      JSON.stringify({
+        type: "subscribe",
+        ids: this.ids,
+        features: [revisionDeltaFeature],
+      }),
+    );
   }
   start() {
     if (this.stopped || this.socket) return;

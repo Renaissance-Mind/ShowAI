@@ -91,12 +91,15 @@ export async function captureProject(
   parents: string[],
   remoteProjectId = projectId,
   deviceId?: string,
+  /** Project files already read at `entry.revision`. */
+  read?: Map<string, Buffer>,
 ): Promise<CapturedSnapshot> {
   const logical = remapProjectFiles(
-    await new LibraryOperations(home, projectId).projectFiles(
-      projectId,
-      entry.revision,
-    ),
+    read ??
+      (await new LibraryOperations(home, projectId).projectFiles(
+        projectId,
+        entry.revision,
+      )),
     projectId,
     remoteProjectId,
   );

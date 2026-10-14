@@ -19,6 +19,11 @@ import { AccountManager } from "./account-manager";
 import { serverFetch as fetch, closeServerTransport } from "./server-fetch";
 import { accountCapability } from "./accounts";
 import {
+  applySnapshotDelta,
+  snapshotDelta,
+  snapshotDeltaCapability,
+} from "./delta";
+import {
   eventCapability,
   inlineRevisionCapability,
   maximumEventProjects,
@@ -279,14 +284,47 @@ export class SyncManager {
         (project.head !== null && !/^[a-f0-9]{64}$/.test(project.head))
       )
         throw new CoreError("INVALID_DATA", t("event.invalidProject"));
-    if (event.type === "revision" && event.record) {
-      if (event.record.revision !== event.project.head)
+    let record = event.type === "revision" ? event.record : undefined;
+    if (
+      event.type === "revision" &&
+      !record &&
+      event.delta &&
+      event.project.head &&
+      typeof event.previousHead === "string" &&
+      /^[a-f0-9]{64}$/.test(event.previousHead)
+    ) {
+      // Rebuild from the cached previous state; without it the head alone
+      // starts a normal synchronization that downloads the snapshot.
+      const binding = bindings.find(
+        (item) => item.remoteProjectId === event.project.id,
+      );
+      const base =
+        binding &&
+        (await this.cachedRecord(connection, binding, event.previousHead));
+      if (base?.snapshot.format === syncProtocol)
+        try {
+          const rebuilt: SnapshotRecord = {
+            revision: event.project.head,
+            source: event.delta.source,
+            snapshot: applySnapshotDelta(
+              base.snapshot,
+              event.delta,
+              event.project.id,
+            ),
+          };
+          if (await validSnapshotRecord(rebuilt)) record = rebuilt;
+        } catch {
+          // A malformed change set is ignored like a head-only notice.
+        }
+    }
+    if (event.type === "revision" && record) {
+      if (record.revision !== event.project.head)
         throw new CoreError("INVALID_DATA", t("event.revisionMismatch"));
       for (const binding of bindings.filter(
         (item) => item.remoteProjectId === event.project.id,
       )) {
-        await this.cacheRecord(connection, binding, event.record);
-        const ids = new Set(Object.values(event.record.snapshot.files));
+        await this.cacheRecord(connection, binding, record);
+        const ids = new Set(Object.values(record.snapshot.files));
         for (const [digest, value] of Object.entries(event.objects ?? {})) {
           if (!ids.has(digest) || typeof value !== "string")
             throw new CoreError("INVALID_DATA", t("event.foreignObject"));
@@ -309,18 +347,14 @@ export class SyncManager {
         Number.isSafeInteger(event.previousSequence) &&
         event.sequence! === event.previousSequence! + 1 &&
         ((event.previousHead === null &&
-          event.record.snapshot.parents.length === 0) ||
+          record.snapshot.parents.length === 0) ||
           (typeof event.previousHead === "string" &&
             /^[a-f0-9]{64}$/.test(event.previousHead) &&
-            event.record.snapshot.parents.includes(event.previousHead)))
+            record.snapshot.parents.includes(event.previousHead)))
       ) {
         this.announced.set(
-          this.announcedKey(
-            connection,
-            event.project.id,
-            event.record.revision,
-          ),
-          { previous: event.previousHead, record: event.record },
+          this.announcedKey(connection, event.project.id, record.revision),
+          { previous: event.previousHead, record: record },
         );
         while (this.announced.size > 200)
           this.announced.delete(this.announced.keys().next().value!);
@@ -446,26 +480,45 @@ export class SyncManager {
     method = "GET",
     data?: unknown,
   ): Promise<T> {
-    const response = await fetch(serverEndpoint(connection.url, path), {
-      method,
-      headers: {
-        ...(connection.token
-          ? { authorization: `Bearer ${connection.token}` }
-          : {}),
-        ...(data === undefined ? {} : { "content-type": "application/json" }),
-      },
-      body: data === undefined ? undefined : JSON.stringify(data),
-      signal: AbortSignal.timeout(30_000),
-    });
-    const value = await response.json();
-    if (!response.ok)
+    for (let attempt = 0; ; attempt++) {
+      const response = await fetch(serverEndpoint(connection.url, path), {
+        method,
+        headers: {
+          ...(connection.token
+            ? { authorization: `Bearer ${connection.token}` }
+            : {}),
+          ...(data === undefined ? {} : { "content-type": "application/json" }),
+        },
+        body: data === undefined ? undefined : JSON.stringify(data),
+        signal: AbortSignal.timeout(30_000),
+      });
+      const value = await response.json();
+      if (response.ok) return value as T;
+      // BUSY is returned before the server performs any work, so waiting and
+      // repeating the same request is safe for every endpoint.
+      const retryAfter = Number(value.error?.details?.retryAfter ?? 1);
+      if (
+        response.status === 429 &&
+        value.error?.code === "BUSY" &&
+        attempt < 3
+      ) {
+        await new Promise((resolve) =>
+          setTimeout(
+            resolve,
+            Math.min(5, Math.max(1, retryAfter)) *
+              1000 *
+              (0.8 + Math.random() * 0.4),
+          ),
+        );
+        continue;
+      }
       throw new SyncError(
         response.status,
         value.error?.code ?? "SERVER_ERROR",
         value.error?.message ?? t("server.status", { status: response.status }),
         value.error?.details,
       );
-    return value as T;
+    }
   }
   async status() {
     const config = await this.configuration();
@@ -574,6 +627,7 @@ export class SyncManager {
       );
       next.connections.push(connection);
     });
+    await this.accounts.signedIn(connection.serverId, connection.user.id);
     this.start();
     if (
       input.restoreBindings !== false &&
@@ -618,18 +672,38 @@ export class SyncManager {
       serverUrl: connection.url,
     };
   }
+  /** Completion codes the browser delivered through a showai://login link. */
+  private readonly loginCompletions = new Map<string, string>();
+  deliverLoginCompletion(flowId: string, code: string) {
+    identifier(flowId);
+    if (!/^[A-Za-z0-9-]{8,9}$/.test(code))
+      throw new CoreError("INVALID_DATA", t("login.invalidCompletionLink"));
+    if (this.loginCompletions.size >= 16) this.loginCompletions.clear();
+    this.loginCompletions.set(flowId, code);
+  }
   async finishLogin(input: {
     url: string;
     id: string;
     pollSecret: string;
     code?: string;
+    completionCode?: string;
   }) {
+    const completionCode =
+      input.completionCode || this.loginCompletions.get(input.id);
     const result = await this.request<{ status: string; token?: string }>(
       { url: serverBaseUrl(input.url), token: "" },
       "/api/auth/finish",
       "POST",
-      input,
-    );
+      {
+        id: input.id,
+        pollSecret: input.pollSecret,
+        code: input.code,
+        completionCode,
+      },
+    ).finally(() => {
+      if (completionCode) this.loginCompletions.delete(input.id);
+    });
+    if (result.status === "confirm") return { status: "confirm" };
     if (result.status !== "completed" || !result.token)
       return { status: "pending" };
     return {
@@ -668,6 +742,21 @@ export class SyncManager {
     return this.status();
   }
   async disconnect(connectionId: string) {
+    const removed = (await this.configuration()).connections.find(
+      (connection) => connection.id === connectionId,
+    );
+    if (
+      removed &&
+      !(await this.configuration()).projects.some(
+        (project) => project.connectionId === connectionId,
+      )
+    ) {
+      // End the server session too, and keep bound servers from restoring it.
+      await this.request(removed, "/api/auth/logout", "POST").catch(
+        () => undefined,
+      );
+      await this.accounts.signOut(removed.serverId, removed.user.id);
+    }
     await this.update((config) => {
       if (
         config.projects.some((project) => project.connectionId === connectionId)
@@ -781,12 +870,54 @@ export class SyncManager {
       { digest },
     );
   }
-  async revokeAllTokens(connectionId: string) {
+  async loginMethods(connectionId: string) {
     return this.request(
       await this.connection(connectionId),
-      "/api/sessions/revoke-all",
-      "POST",
+      "/api/account/logins",
     );
+  }
+  async removeLoginMethod(
+    connectionId: string,
+    provider: string,
+    subject: string,
+  ) {
+    return this.request(
+      await this.connection(connectionId),
+      "/api/account/logins",
+      "DELETE",
+      { provider, subject },
+    );
+  }
+  async revokeAllTokens(connectionId: string) {
+    const connection = await this.connection(connectionId);
+    // Bound servers sign each other in, so a sign-out must reach the whole group.
+    const peers = await this.accounts
+      .profile(connectionId)
+      .then((profile) =>
+        profile.peers
+          .filter((binding) => binding.state === "active")
+          .map((binding) => binding.descriptor.identity),
+      )
+      .catch(() => []);
+    await this.request(connection, "/api/sessions/revoke-all", "POST");
+    await this.accounts.signOut(connection.serverId, connection.user.id);
+    const connections = (await this.configuration()).connections,
+      unreachable: string[] = [];
+    for (const peer of peers) {
+      await this.accounts.signOut(peer.serverId, peer.user.id);
+      const local = connections.find(
+        (item) =>
+          item.serverId === peer.serverId && item.user.id === peer.user.id,
+      );
+      const revoked =
+        local &&
+        (await this.request(local, "/api/sessions/revoke-all", "POST").then(
+          () => true,
+          () => false,
+        ));
+      if (!revoked) unreachable.push(peer.url);
+    }
+    return { ok: true, unreachable };
   }
   async changePassword(
     connectionId: string,
@@ -1009,6 +1140,22 @@ export class SyncManager {
     project: ProjectConnection,
     revision: string,
   ) {
+    const cached = await this.cachedRecord(connection, project, revision);
+    if (cached) return cached;
+    const record = await this.request<SnapshotRecord>(
+      connection,
+      `/api/projects/${project.remoteProjectId}/snapshot?revision=${revision}`,
+    );
+    if (record.revision !== revision)
+      throw new CoreError("INVALID_DATA", t("snapshot.wrongRevision"));
+    await this.cacheRecord(connection, project, record);
+    return record;
+  }
+  private async cachedRecord(
+    connection: ServerConnection,
+    project: ProjectConnection,
+    revision: string,
+  ) {
     for (const path of [
       ...["baseline", "previous", "candidate", "incoming"].map((slot) =>
         this.currentCachePath(connection, project, slot),
@@ -1020,20 +1167,21 @@ export class SyncManager {
       validateSnapshot(cached.snapshot, project.remoteProjectId);
       if (await validSnapshotRecord(cached)) return cached;
     }
-    const record = await this.request<SnapshotRecord>(
-      connection,
-      `/api/projects/${project.remoteProjectId}/snapshot?revision=${revision}`,
-    );
-    if (record.revision !== revision)
-      throw new CoreError("INVALID_DATA", t("snapshot.wrongRevision"));
-    await this.cacheRecord(connection, project, record);
-    return record;
+    return undefined;
   }
+  /** The last decoded state per binding; a revision's content never changes. */
+  private decoded = new Map<
+    string,
+    { revision: string; files: Map<string, Buffer> }
+  >();
   private async files(
     connection: ServerConnection,
     project: ProjectConnection,
     record: SnapshotRecord,
   ) {
+    const memoKey = `${this.cacheKey(connection, project)}:${project.projectId}`;
+    const memo = this.decoded.get(memoKey);
+    if (memo?.revision === record.revision) return memo.files;
     const files = await decodeSnapshot(
       record,
       async (digest) => {
@@ -1064,11 +1212,8 @@ export class SyncManager {
           await atomicLibraryFile(this.home, path, legacy);
           return legacy;
         }
-        if (cached) {
-          if (hash(cached) !== digest)
-            throw new CoreError("INVALID_DATA", t("cache.corrupt"));
-          return cached;
-        }
+        // decodeSnapshot verifies every object digest, including cached ones.
+        if (cached) return cached;
         const response = await fetch(
           `${connection.url}/api/projects/${project.remoteProjectId}/objects/${digest}`,
           {
@@ -1089,7 +1234,17 @@ export class SyncManager {
       },
       project.remoteProjectId,
     );
-    return remapProjectFiles(files, project.remoteProjectId, project.projectId);
+    const decoded = remapProjectFiles(
+      files,
+      project.remoteProjectId,
+      project.projectId,
+    );
+    let size = 0;
+    for (const bytes of decoded.values()) size += bytes.length;
+    if (size <= 64 * 1024 * 1024)
+      this.decoded.set(memoKey, { revision: record.revision, files: decoded });
+    else this.decoded.delete(memoKey);
+    return decoded;
   }
   private async upload(
     connection: ServerConnection,
@@ -1152,14 +1307,58 @@ export class SyncManager {
         this.objectPath(digest, this.cacheKey(connection, project)),
         bytes,
         digest,
+        true,
       );
     const ids = [...captured.objects.keys()];
-    if (connection.capabilities?.includes(inlineRevisionCapability)) {
-      const baseline = expected
-        ? await this.record(connection, project, expected)
+    // Objects of the expected current state are already on the server.
+    const baseline = expected
+      ? await this.record(connection, project, expected)
+      : undefined;
+    const known = new Set(Object.values(baseline?.snapshot.files ?? {}));
+    const changed = ids.filter((digest) => !known.has(digest));
+    // A server with the delta capability rebuilds the snapshot from its head.
+    const deltaBase =
+      baseline?.snapshot.format === syncProtocol &&
+      captured.snapshot.format === syncProtocol &&
+      connection.capabilities?.includes(snapshotDeltaCapability)
+        ? baseline.snapshot
         : undefined;
-      const known = new Set(Object.values(baseline?.snapshot.files ?? {}));
-      const changed = ids.filter((digest) => !known.has(digest));
+    const body = (full: boolean, objects?: Record<string, string>) => ({
+      ...(!full && deltaBase
+        ? {
+            revision: captured.revision,
+            delta: snapshotDelta(deltaBase, captured.snapshot),
+          }
+        : { snapshot: captured.snapshot }),
+      expected,
+      publish,
+      ...(objects ? { objects } : {}),
+    });
+    const post = async (objects?: Record<string, string>) => {
+      const publishWith = (full: boolean) =>
+        this.request<{ revision: string; head: string; published: boolean }>(
+          connection,
+          `/api/projects/${project.remoteProjectId}/snapshot`,
+          "POST",
+          body(full, objects),
+        );
+      try {
+        return await publishWith(false);
+      } catch (error) {
+        if (
+          deltaBase &&
+          error instanceof SyncError &&
+          [
+            "DELTA_MISMATCH",
+            "DELTA_BASE_UNAVAILABLE",
+            "INVALID_DELTA",
+          ].includes(error.code)
+        )
+          return publishWith(true);
+        throw error;
+      }
+    };
+    if (connection.capabilities?.includes(inlineRevisionCapability)) {
       const total = changed.reduce(
         (sum, digest) => sum + captured.objects.get(digest)!.length,
         0,
@@ -1177,128 +1376,126 @@ export class SyncManager {
             captured.objects.get(digest)!.toString("base64"),
           ]),
         );
-        const input = {
-          snapshot: captured.snapshot,
-          expected,
-          publish,
-          objects,
-        };
-        if (Buffer.byteLength(JSON.stringify(input)) <= 512 * 1024) {
+        if (
+          Buffer.byteLength(JSON.stringify(body(false, objects))) <=
+          512 * 1024
+        ) {
           await this.cacheRecord(connection, project, captured, "candidate");
-          return this.request<{
-            revision: string;
-            head: string;
-            published: boolean;
-          }>(
-            connection,
-            `/api/projects/${project.remoteProjectId}/snapshot`,
-            "POST",
-            input,
-          );
+          return post(objects);
         }
       }
     }
-    for (let offset = 0; offset < ids.length; offset += 500) {
-      const { missing } = await this.request<{ missing: string[] }>(
-        connection,
-        `/api/projects/${project.remoteProjectId}/objects/check`,
-        "POST",
-        { digests: ids.slice(offset, offset + 500) },
-      );
-      let next = 0;
-      const send = async () => {
-        while (next < missing.length) {
-          const digest = missing[next++];
-          if (!captured.objects.has(digest))
-            throw new CoreError("INVALID_DATA", t("upload.foreignObject"));
-          const bytes = captured.objects.get(digest)!;
-          if (
-            connection.capabilities?.includes("resumable-objects-v1") &&
-            bytes.length >= 5 * 1024 * 1024
-          ) {
-            await resumableUpload(
-              `${connection.url}/api/projects/${project.remoteProjectId}/objects`,
-              connection.token,
-              digest,
-              bytes,
-            );
+    const send = async (digests: string[]) => {
+      for (let offset = 0; offset < digests.length; offset += 500) {
+        const { missing } = await this.request<{ missing: string[] }>(
+          connection,
+          `/api/projects/${project.remoteProjectId}/objects/check`,
+          "POST",
+          { digests: digests.slice(offset, offset + 500) },
+        );
+        let next = 0;
+        const send = async () => {
+          while (next < missing.length) {
+            const digest = missing[next++];
+            if (!captured.objects.has(digest))
+              throw new CoreError("INVALID_DATA", t("upload.foreignObject"));
+            const bytes = captured.objects.get(digest)!;
+            if (
+              connection.capabilities?.includes("resumable-objects-v1") &&
+              bytes.length >= 5 * 1024 * 1024
+            ) {
+              await resumableUpload(
+                `${connection.url}/api/projects/${project.remoteProjectId}/objects`,
+                connection.token,
+                digest,
+                bytes,
+              );
+              await atomicLibraryFile(
+                this.home,
+                this.objectPath(digest, this.cacheKey(connection, project)),
+                bytes,
+              );
+              continue;
+            }
+            await retryUpload(async () => {
+              const response = await fetch(
+                `${connection.url}/api/projects/${project.remoteProjectId}/objects/${digest}`,
+                {
+                  method: "PUT",
+                  body: (() => {
+                    let offset = 0;
+                    return new ReadableStream<Uint8Array>({
+                      pull(controller) {
+                        if (offset === bytes.length) {
+                          controller.close();
+                          return;
+                        }
+                        const count = Math.min(
+                          64 * 1024,
+                          bytes.length - offset,
+                        );
+                        controller.enqueue(
+                          new Uint8Array(
+                            bytes.buffer,
+                            bytes.byteOffset + offset,
+                            count,
+                          ),
+                        );
+                        offset += count;
+                      },
+                    });
+                  })(),
+                  duplex: "half",
+                  headers: {
+                    authorization: `Bearer ${connection.token}`,
+                    "content-length": String(bytes.length),
+                  },
+                  signal: AbortSignal.timeout(60_000),
+                } as RequestInit,
+              );
+              if ([502, 503, 504].includes(response.status)) {
+                await response.body?.cancel();
+                throw new SyncError(
+                  response.status,
+                  "UPLOAD_UNAVAILABLE",
+                  t("upload.unavailable"),
+                );
+              }
+              if (!response.ok) {
+                const value = await response.json();
+                throw new SyncError(
+                  response.status,
+                  value.error?.code ?? "UPLOAD_FAILED",
+                  value.error?.message ?? t("upload.resourceFailed"),
+                );
+              }
+            });
             await atomicLibraryFile(
               this.home,
               this.objectPath(digest, this.cacheKey(connection, project)),
               bytes,
             );
-            continue;
           }
-          await retryUpload(async () => {
-            const response = await fetch(
-              `${connection.url}/api/projects/${project.remoteProjectId}/objects/${digest}`,
-              {
-                method: "PUT",
-                body: (() => {
-                  let offset = 0;
-                  return new ReadableStream<Uint8Array>({
-                    pull(controller) {
-                      if (offset === bytes.length) {
-                        controller.close();
-                        return;
-                      }
-                      const count = Math.min(64 * 1024, bytes.length - offset);
-                      controller.enqueue(
-                        new Uint8Array(
-                          bytes.buffer,
-                          bytes.byteOffset + offset,
-                          count,
-                        ),
-                      );
-                      offset += count;
-                    },
-                  });
-                })(),
-                duplex: "half",
-                headers: {
-                  authorization: `Bearer ${connection.token}`,
-                  "content-length": String(bytes.length),
-                },
-                signal: AbortSignal.timeout(60_000),
-              } as RequestInit,
-            );
-            if ([502, 503, 504].includes(response.status)) {
-              await response.body?.cancel();
-              throw new SyncError(
-                response.status,
-                "UPLOAD_UNAVAILABLE",
-                t("upload.unavailable"),
-              );
-            }
-            if (!response.ok) {
-              const value = await response.json();
-              throw new SyncError(
-                response.status,
-                value.error?.code ?? "UPLOAD_FAILED",
-                value.error?.message ?? t("upload.resourceFailed"),
-              );
-            }
-          });
-          await atomicLibraryFile(
-            this.home,
-            this.objectPath(digest, this.cacheKey(connection, project)),
-            bytes,
-          );
-        }
-      };
-      const completed = await Promise.allSettled(
-        Array.from({ length: Math.min(2, missing.length) }, send),
-      );
-      const failure = completed.find((item) => item.status === "rejected");
-      if (failure?.status === "rejected") throw failure.reason;
-    }
+        };
+        const completed = await Promise.allSettled(
+          Array.from({ length: Math.min(2, missing.length) }, send),
+        );
+        const failure = completed.find((item) => item.status === "rejected");
+        if (failure?.status === "rejected") throw failure.reason;
+      }
+    };
+    await send(changed);
     await this.cacheRecord(connection, project, captured, "candidate");
-    return this.request<{ revision: string; head: string; published: boolean }>(
-      connection,
-      `/api/projects/${project.remoteProjectId}/snapshot`,
-      "POST",
-      { snapshot: captured.snapshot, expected, publish },
-    );
+    const publishCaptured = () => post();
+    try {
+      return await publishCaptured();
+    } catch (error) {
+      // A server that lost part of its current state receives every object.
+      if (!(error instanceof SyncError && error.code === "MISSING_OBJECT"))
+        throw error;
+      await send(ids);
+      return publishCaptured();
+    }
   }
   private conflictPath(projectId: string) {
     return join(this.root, "conflicts", `${assertId(projectId)}.json`);
@@ -1472,6 +1669,8 @@ export class SyncManager {
             project.projectId,
           ).projectFiles(project.projectId, localHead)
         : new Map<string, Buffer>();
+    // The files at localHead; merges below replace localFiles with new maps.
+    const actual = localFiles;
     this.trace("local-files-read", phaseStarted);
     const unfinishedSave = (await new WorkspaceProtection(library).list()).find(
       (item) =>
@@ -1534,7 +1733,10 @@ export class SyncManager {
     let remoteRecord: SnapshotRecord | undefined;
     if (remote.head) {
       remoteRecord = await this.record(connection, project, remote.head);
-      remoteFiles = await this.files(connection, project, remoteRecord);
+      remoteFiles =
+        remote.head === project.remoteHead
+          ? baseline
+          : await this.files(connection, project, remoteRecord);
       if (
         remoteRecord.snapshot.change.deviceId === deviceId &&
         (
@@ -1570,13 +1772,6 @@ export class SyncManager {
     } else if (project.remoteHead) {
       throw new CoreError("CONFLICT", t("server.contentMissing"));
     }
-    const actual =
-      localExists && localHead
-        ? await new LibraryOperations(
-            this.home,
-            project.projectId,
-          ).projectFiles(project.projectId, localHead)
-        : new Map<string, Buffer>();
     const changes = new Map<string, Buffer | null>(
       [...localFiles].filter(
         ([path, bytes]) => !actual.get(path)?.equals(bytes),
@@ -1642,6 +1837,7 @@ export class SyncManager {
         remote.head ? [remote.head] : [],
         project.remoteProjectId,
         deviceId,
+        mergedHead === localHead ? actual : undefined,
       );
       const result = await this.upload(
         connection,

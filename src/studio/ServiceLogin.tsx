@@ -26,6 +26,7 @@ export default function ServiceLogin({
     [flow, setFlow] = useState<Flow | null>(null);
   const [email, setEmail] = useState(""),
     [code, setCode] = useState(""),
+    [confirming, setConfirming] = useState(false),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -49,7 +50,10 @@ export default function ServiceLogin({
       clearTimeout(timer);
     };
   }, [url]);
-  async function finish(current: Flow, emailCode?: string) {
+  async function finish(
+    current: Flow,
+    entered?: { code?: string; completionCode?: string },
+  ) {
     const result = await desktop.invoke<{
       status: string;
       connection?: { id: string };
@@ -57,13 +61,15 @@ export default function ServiceLogin({
       url: current.serverUrl,
       id: current.id,
       pollSecret: current.pollSecret,
-      code: emailCode,
+      ...entered,
     });
     if (result.status === "completed" && result.connection) {
       setFlow(null);
+      setConfirming(false);
       await onConnected(result.connection.id);
       return true;
     }
+    if (result.status === "confirm") setConfirming(true);
     return false;
   }
   useEffect(() => {
@@ -98,6 +104,7 @@ export default function ServiceLogin({
     setBusy(true);
     setError("");
     setCode("");
+    setConfirming(false);
     try {
       setFlow(
         await desktop.invoke<Flow>("sync:beginLogin", {
@@ -150,7 +157,7 @@ export default function ServiceLogin({
           )}
         </div>
       )}
-      {flow?.url && (
+      {flow?.url && !confirming && (
         <p className="settings-help">
           <a href={flow.url} target="_blank" rel="noopener noreferrer">
             {t("login.openAuthPage", {
@@ -159,6 +166,40 @@ export default function ServiceLogin({
           </a>
           {t("login.waiting")}
         </p>
+      )}
+      {flow?.url && confirming && (
+        <>
+          <p className="settings-help">
+            {t("login.completeHelp")}
+          </p>
+          <label>
+            {t("login.completionCode")}
+            <input
+              autoComplete="one-time-code"
+              maxLength={9}
+              value={code}
+              onChange={(event) => setCode(event.target.value.toUpperCase())}
+            />
+          </label>
+          <button
+            type="button"
+            className="settings-button"
+            disabled={busy || code.replace(/[\s-]/g, "").length !== 8}
+            onClick={() => {
+              setBusy(true);
+              setError("");
+              void finish(flow, { completionCode: code })
+                .catch((error) => {
+                  setError(errorMessage(error));
+                  setFlow(null);
+                  setConfirming(false);
+                })
+                .finally(() => setBusy(false));
+            }}
+          >
+            {t("login.complete")}
+          </button>
+        </>
       )}
       {methods.includes("email") && !flow && (
         <>
@@ -200,7 +241,7 @@ export default function ServiceLogin({
             onClick={() => {
               setBusy(true);
               setError("");
-              void finish(flow, code)
+              void finish(flow, { code })
                 .catch((error) => setError(errorMessage(error)))
                 .finally(() => setBusy(false));
             }}
@@ -216,6 +257,7 @@ export default function ServiceLogin({
           onClick={() => {
             setFlow(null);
             setCode("");
+            setConfirming(false);
           }}
         >
           {t("login.cancel")}

@@ -128,6 +128,40 @@ export function liveSession(user: {
   };
 }
 
+/** Window in which a direct sign-in may add lasting credentials to an account. */
+export const recentSignInMs = 15 * 60_000;
+/**
+ * A live session that was issued by signing in to this server moments ago.
+ * Federated sessions are excluded so a peer cannot mint lasting credentials.
+ */
+export function recentSession(user: {
+  id: string;
+  session_digest: string;
+  auth_version: number;
+}): SqlStatement {
+  const live = liveSession(user);
+  return {
+    sql: `${live.sql} AND s.credential_kind IN ('session','personal') AND s.created_at>?`,
+    values: [
+      ...live.values!,
+      new Date(Date.now() - recentSignInMs).toISOString(),
+    ],
+  };
+}
+export async function requireRecentSignIn(
+  db: MetadataStore,
+  user: { id: string; session_digest: string; auth_version: number },
+) {
+  const recent = recentSession(user);
+  if (!(await db.all(recent.sql, recent.values)).length)
+    throw new SyncError(
+      403,
+      "RECENT_SIGN_IN_REQUIRED",
+      "此操作需要最近 15 分钟内直接登录本服务器，请重新登录后再试。",
+    );
+  return recent;
+}
+
 /** Bound allocation even if Content-Length is absent or false. */
 export async function readBounded(
   request: Request,
