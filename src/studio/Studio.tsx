@@ -1820,8 +1820,10 @@ export default function Studio() {
       icon:
         view === "page"
           ? page.draft?.icon
-          : view === "project" && !selectedFolder
-            ? project?.icon
+          : view === "project"
+            ? selectedFolder
+              ? currentFolder?.icon
+              : project?.icon
             : undefined,
       scrollTop: 0,
     }),
@@ -1832,6 +1834,7 @@ export default function Studio() {
       page.draft?.id,
       page.draft?.icon,
       project?.icon,
+      currentFolder?.icon,
       heading,
     ],
   );
