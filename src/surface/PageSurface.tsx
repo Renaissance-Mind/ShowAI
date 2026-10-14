@@ -27,7 +27,7 @@ import {
 } from "./board-commands";
 import { MAX_ZOOM, MIN_ZOOM } from "./model";
 import { flushSync } from "react-dom";
-import { fingerNavigatesBoard } from "./board-input.mjs";
+import { fingerNavigatesBoard, isBoardShape } from "./board-input.mjs";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";
 import {
@@ -1087,6 +1087,37 @@ export default function PageSurface({
         }}
         onPointerDownCapture={(event) => {
           const target = event.target as Element;
+          if (target.closest(".page-surface") !== event.currentTarget) return;
+          // Secondary contacts belong to the viewport's two-finger gesture.
+          if (event.pointerType === "touch" && !event.isPrimary) return;
+          const hit = board.hitTest(event.clientX, event.clientY);
+          const shapeId = isBoardShape(hit?.node)
+            ? hit!.id
+            : target.closest<HTMLElement>('[data-board-shape="true"]')?.dataset
+                .surfaceId;
+          if (
+            shapeId &&
+            event.pointerType === "touch" &&
+            event.button === 0 &&
+            onTransform &&
+            !locked &&
+            !target.closest("[data-surface-ui]")
+          ) {
+            event.preventDefault();
+            controls.current.cancel();
+            cancelMarquee();
+            board.select(shapeId);
+            setObjectMenu(null);
+            return;
+          }
+          if (shapeId && event.pointerType === "pen") {
+            // Drawing and erasing may start over a shape; selection may not.
+            if (!drawingTool && drawTool !== "eraser") {
+              event.preventDefault();
+              event.stopPropagation();
+            }
+            return;
+          }
           if (
             ["pan", "eraser"].includes(drawTool ?? "") &&
             !target.closest("[data-surface-ui]")
@@ -1182,7 +1213,6 @@ export default function PageSurface({
             (!handle && target.closest(controlSelector))
           )
             return;
-          const hit = board.hitTest(event.clientX, event.clientY);
           const forceBrush = event.ctrlKey || event.metaKey;
           let enterEdit: HTMLElement | null = null;
           let moveId: string | null | undefined = null;

@@ -32,25 +32,47 @@ export function BoardGestureInput({
     id: number;
     points: Point[];
     erased: Set<string>;
+    hidden: Set<HTMLElement>;
+    pointerType: string;
     last: Point;
   } | null>(null);
   const isInk = (node: JSONContent) =>
     node.type === "drawing" || !!node.attrs?.data?.nativeInk;
+  const restore = (value: NonNullable<typeof gesture.current>) => {
+    for (const element of value.hidden) delete element.dataset.erasing;
+  };
+  const cancel = () => {
+    const value = gesture.current;
+    gesture.current = null;
+    if (value) restore(value);
+    setPreview([]);
+    if (value && svg.current?.hasPointerCapture(value.id))
+      svg.current.releasePointerCapture(value.id);
+  };
   useEffect(() => {
     const root = svg.current?.closest(".page-surface");
-    const cancel = () => {
-      const id = gesture.current?.id;
-      gesture.current = null;
-      setPreview([]);
-      if (id !== undefined && svg.current?.hasPointerCapture(id))
-        svg.current.releasePointerCapture(id);
-    };
     root?.addEventListener("showai-board-pinch", cancel);
-    return () => root?.removeEventListener("showai-board-pinch", cancel);
+    window.addEventListener("blur", cancel);
+    return () => {
+      root?.removeEventListener("showai-board-pinch", cancel);
+      window.removeEventListener("blur", cancel);
+      const value = gesture.current;
+      if (value) restore(value);
+    };
   }, []);
   const erase = (p: Point) => {
     const hit = board.hitTest(p.x, p.y);
-    if (hit && isInk(hit.node)) gesture.current?.erased.add(hit.id);
+    const value = gesture.current;
+    if (
+      value &&
+      hit &&
+      isInk(hit.node) &&
+      !hit.element.classList.contains("is-locked")
+    ) {
+      value.erased.add(hit.id);
+      value.hidden.add(hit.element);
+      hit.element.dataset.erasing = "true";
+    }
   };
   const add = (p: Point) => {
     const value = gesture.current;
@@ -77,6 +99,7 @@ export function BoardGestureInput({
     setPreview([]);
     if (tool === "eraser") {
       if (value.erased.size) onDelete([...value.erased]);
+      restore(value);
       return;
     }
     if (value.points.length < 3) return;
@@ -86,7 +109,8 @@ export function BoardGestureInput({
     ) ?? []) {
       if (
         element.closest(".page-surface") !==
-        world.current?.closest(".page-surface")
+          world.current?.closest(".page-surface") ||
+        (value.pointerType === "pen" && element.dataset.boardShape === "true")
       )
         continue;
       const rect = element.getBoundingClientRect();
@@ -112,6 +136,7 @@ export function BoardGestureInput({
       tabIndex={0}
       onPointerDown={(e) => {
         if (
+          e.defaultPrevented ||
           e.button !== 0 ||
           fingerNavigatesBoard(e.pointerType) ||
           gesture.current
@@ -133,6 +158,8 @@ export function BoardGestureInput({
           id: e.pointerId,
           points: [p],
           erased: new Set(),
+          hidden: new Set(),
+          pointerType: e.pointerType,
           last: p,
         };
         if (tool === "eraser") erase(p);
@@ -150,14 +177,13 @@ export function BoardGestureInput({
         add({ x: e.clientX, y: e.clientY });
         finish();
       }}
-      onPointerCancel={finish}
-      onLostPointerCapture={finish}
+      onPointerCancel={cancel}
+      onLostPointerCapture={cancel}
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.preventDefault();
           e.stopPropagation();
-          gesture.current = null;
-          setPreview([]);
+          cancel();
           onExit();
         }
       }}

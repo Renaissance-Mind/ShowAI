@@ -475,6 +475,7 @@ export function DrawingInput({
       aria-label={t("drawing.area")}
       tabIndex={0}
       onPointerDown={(event) => {
+        if (event.defaultPrevented) return;
         if (fingerNavigatesBoard(event.pointerType)) return;
         if (event.button !== 0 || panHeld.current || pending.current) return;
         event.preventDefault();

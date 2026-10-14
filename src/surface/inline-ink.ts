@@ -25,6 +25,7 @@ export interface InkFrame {
   cameraVersion: number;
   poses?: Record<string, number[]>;
   holes: { x: number; y: number; width: number; height: number }[];
+  shapes?: { x: number; y: number; width: number; height: number }[];
 }
 export interface InkCommand {
   pageId: string;
