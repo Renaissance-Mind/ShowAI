@@ -1,8 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, normalize, resolve } from "node:path";
-import { createServer, type Server } from "node:http";
+import { join, resolve } from "node:path";
 import { chromium, type Browser } from "playwright";
 import { FileStore } from "../core/store";
 import {
@@ -14,6 +13,7 @@ import { createResource } from "../surface/containers.mjs";
 import { buildPageHtml } from "../agent/exporter";
 import { buildCdnReader } from "../../scripts/build-cdn-reader.mjs";
 import { toCdnFragment } from "./cdn-fragment.mjs";
+import { startCdnHost } from "./cdn-test-host";
 import components from "../../resources/catalog/components.json";
 
 // Like injectArtifactIntoHtml, keep the JSON inert inside its script element.
@@ -65,36 +65,19 @@ describe("CDN fragment", () => {
 });
 
 describe("CDN reader", () => {
-  let outdir: string, home: string, server: Server, browser: Browser;
+  let outdir: string, home: string, browser: Browser;
+  let host: Awaited<ReturnType<typeof startCdnHost>>;
   let entry = "";
-  const hosted = new Map<string, string>();
   beforeAll(async () => {
     outdir = await mkdtemp(join(tmpdir(), "showai-cdn-reader-"));
     home = await mkdtemp(join(tmpdir(), "showai-cdn-home-"));
     entry = (await buildCdnReader(outdir)).manifest.entry;
-    server = createServer(async (request, response) => {
-      const path = new URL(request.url!, "http://host").pathname;
-      if (hosted.has(path)) {
-        response.setHeader("Content-Type", "text/html; charset=utf-8");
-        return response.end(hosted.get(path));
-      }
-      try {
-        const file = normalize(join(outdir, path));
-        if (!file.startsWith(outdir)) throw new Error("outside");
-        response.setHeader("Content-Type", "text/javascript");
-        response.setHeader("Access-Control-Allow-Origin", "*");
-        response.end(await readFile(file));
-      } catch {
-        response.statusCode = 404;
-        response.end();
-      }
-    });
-    await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+    host = await startCdnHost(outdir);
     browser = await chromium.launch();
   }, 300_000);
   afterAll(async () => {
     await browser?.close();
-    await new Promise((done) => server?.close(done));
+    await host?.close();
     await rm(outdir, { recursive: true, force: true });
     await rm(home, { recursive: true, force: true });
   });
@@ -128,31 +111,21 @@ describe("CDN reader", () => {
       },
     ];
     doc.surfaceViews[doc.content.attrs!.id].readingOrder = ["scene", "slider"];
-    const address = server.address();
-    if (!address || typeof address === "string") throw new Error("No address");
-    const origin = `http://127.0.0.1:${address.port}`;
     const fragment = toCdnFragment(
       await buildPageHtml(doc, undefined, [slider]),
-      { readerUrl: `${origin}/${entry}` },
+      { readerUrl: `${host.origin}/${entry}` },
     );
     // The page data dominates; the reader itself is not embedded.
     expect(Buffer.byteLength(fragment)).toBeLessThan(
       Buffer.byteLength(JSON.stringify(slider)) + 20_000,
     );
-    const source =
-      `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' ${origin}; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; base-uri 'none'">${fragment}`
-        .replaceAll("&", "&amp;")
-        .replaceAll('"', "&quot;");
-    hosted.set(
-      "/host",
-      `<iframe title="Host" sandbox="allow-scripts allow-same-origin" style="width:900px;height:900px" srcdoc="${source}"></iframe>`,
-    );
+    const url = host.host("/host", fragment);
     const tab = await browser.newPage();
     const errors: string[] = [];
     const requested: string[] = [];
     tab.on("pageerror", (error) => errors.push(error.message));
     tab.on("request", (request) => requested.push(request.url()));
-    await tab.goto(`${origin}/host`);
+    await tab.goto(url);
     const frame = tab.frameLocator('iframe[title="Host"]');
     await frame.getByRole("slider", { name: "转动" }).waitFor();
     await frame.locator("canvas.s3-canvas").waitFor();
