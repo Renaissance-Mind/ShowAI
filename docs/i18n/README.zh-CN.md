@@ -12,7 +12,9 @@ ShowAI 让人与 Agent 通过可阅读、可交互、可编辑的内容共同思
 
 这个 Interface 承载人机协作与共创，也让共同形成的内容成为可分享的 site，供更多人阅读、探索和继续使用。
 
-[![ShowAI 项目示例：实验监控、个人管理与开发计划](../showai-projects.png)](https://showai.renaissancemind.ai/)
+https://github.com/user-attachments/assets/375d6ff3-fe3e-47c2-b6a4-d69df1b86b20
+
+<sub>在任意 Agent 对话里提问，得到一个能用、能一起改、能分享的界面。示例可在 [showai.renaissancemind.ai](https://showai.renaissancemind.ai/) 体验。</sub>
 
 ![对 Agent: 获得一个面向人的表达与协作界面，把信息和分析转化为人可以理解、操作与反馈的内容。 — 对人: 获得一个参与 AI 工作的认知界面，通过阅读、探索和修改，把自己的理解与判断带入共同创作。](showai-audience.zh-CN.svg)
 

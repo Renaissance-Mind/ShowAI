@@ -12,7 +12,9 @@ ShowAI helps humans and agents think together through content they can read, int
 
 This interface supports human–agent collaboration and co-creation. The resulting content can also become a shareable site that others can read, explore, and continue using.
 
-[![ShowAI project examples: research, personal management, and development planning](docs/showai-projects.png)](https://showai.renaissancemind.ai/)
+https://github.com/user-attachments/assets/ecdccdec-1def-45a9-811f-121a7d07b906
+
+<sub>Ask a question in any agent conversation and get back an interface you can use, edit together and share. Try the examples at [showai.renaissancemind.ai](https://showai.renaissancemind.ai/).</sub>
 
 ![For Agents: A way to communicate and collaborate with humans, turning information and analysis into content people can understand, use, and give feedback on. — For Humans: A way to participate in AI work, bringing your understanding and judgment into shared creation through reading, exploration, and editing.](docs/showai-audience.svg)
 
