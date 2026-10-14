@@ -59,6 +59,7 @@ export function useInlineInk({
   tool,
   color,
   width,
+  pressure,
   ruler,
   enabled,
   onCamera,
@@ -72,6 +73,7 @@ export function useInlineInk({
   tool: string | null | undefined;
   color: string;
   width: number;
+  pressure: boolean;
   ruler: boolean;
   enabled: boolean;
   onCamera: (
@@ -84,6 +86,7 @@ export function useInlineInk({
     source,
     color,
     width,
+    pressure,
     ruler,
     onCamera,
     onTool,
@@ -94,7 +97,16 @@ export function useInlineInk({
   const invalidate = useRef<(() => void) | null>(null);
   const navigating = useRef(false);
   if (tool === "pen" || tool === "highlighter") previousInk.current = tool;
-  current.current = { source, color, width, ruler, onCamera, onTool, tool };
+  current.current = {
+    source,
+    color,
+    width,
+    pressure,
+    ruler,
+    onCamera,
+    onTool,
+    tool,
+  };
   useEffect(() => {
     const bridge = window.showai?.inlineInk;
     if (!bridge || !enabled || !source) return;
@@ -120,7 +132,7 @@ export function useInlineInk({
   }, [enabled, source?.id, boardId]);
   useEffect(() => {
     invalidate.current?.();
-  }, [source, color, width, ruler]);
+  }, [source, color, width, pressure, ruler]);
   useEffect(() => {
     const bridge = window.showai?.inlineInk;
     if (
@@ -208,7 +220,6 @@ export function useInlineInk({
       ]
         .filter(
           (element) =>
-            !content.contains(element) &&
             element.getClientRects().length &&
             getComputedStyle(element).pointerEvents !== "none" &&
             getComputedStyle(element).visibility !== "hidden",
@@ -224,6 +235,7 @@ export function useInlineInk({
         tool: tool as "pen" | "highlighter",
         color: current.current.color,
         width: current.current.width,
+        pressure: current.current.pressure,
         ruler: current.current.ruler,
         dark: document.documentElement.dataset.theme === "dark",
         widthPx: surface.clientWidth,

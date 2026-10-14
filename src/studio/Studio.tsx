@@ -129,7 +129,6 @@ import {
 import TemplateThumbnail from "./TemplateThumbnail";
 import RecentPages, { recentPages } from "./RecentPages";
 import AutoHideSidebar from "./AutoHideSidebar";
-import SaveState from "./SaveState";
 import WorkspaceTabs, { WorkspaceHistory } from "./WorkspaceTabs";
 import { useWorkspaceTabs } from "./useWorkspaceTabs";
 import {
@@ -2557,7 +2556,6 @@ export default function Studio() {
                   : null
               }
             />
-            <SaveState sessions={page.sessions} />
             <button
               className="studio-icon"
               aria-label={t("revealPageFile")}

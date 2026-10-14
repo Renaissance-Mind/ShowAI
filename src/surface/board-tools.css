@@ -101,3 +101,98 @@
 .page-surface[data-board-tool="eraser"] .board-drawing-input {
   cursor: crosshair;
 }
+.board-style-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.board-style-section + .board-style-section {
+  border-inline-start: 1px solid var(--line, var(--border));
+  padding-inline-start: 8px;
+}
+.board-width-controls {
+  flex-direction: column;
+  gap: 4px;
+}
+.board-color-picker {
+  position: relative;
+}
+.board-color-picker > summary {
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 2px var(--paper, var(--bg)),
+    0 0 0 1px var(--line, var(--border));
+  cursor: pointer;
+  list-style: none;
+}
+.board-color-picker > summary::-webkit-details-marker {
+  display: none;
+}
+.board-color-menu {
+  position: absolute;
+  z-index: 5;
+  bottom: calc(100% + 12px);
+  right: 0;
+  width: 156px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--paper, var(--bg));
+  border: 1px solid var(--line, var(--border));
+  box-shadow: 0 5px 20px #0002;
+}
+.board-color-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.surface-toolbar .board-color-presets button {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid #8885;
+}
+.surface-toolbar .board-color-presets button[aria-pressed="true"] {
+  outline: 2px solid var(--accent, #467de3);
+  outline-offset: 2px;
+}
+.board-color-menu .board-full-palette {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--line, var(--border));
+  margin-top: 10px;
+  padding-top: 10px;
+  font-size: 12px;
+}
+.board-pressure-options {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+}
+.board-pressure-toggle {
+  display: flex;
+  border: 1px solid var(--line, var(--border));
+  border-radius: 6px;
+  padding: 2px;
+}
+.surface-toolbar .board-pressure-toggle button {
+  min-width: 18px;
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 2px;
+}
+.board-pressure-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+.board-pressure-toggle button[aria-pressed="true"] {
+  background: var(--hover);
+  color: var(--accent, #467de3);
+}

@@ -83,6 +83,7 @@ export function finishBoardDrawing(tool, style, gesture, modifiers = {}) {
         points: points.map((point) => ({
           x: point.x - frame.x,
           y: point.y - frame.y,
+          ...(freehand && point.pressure !== undefined ? { pressure: point.pressure } : {}),
         })),
       },
     },

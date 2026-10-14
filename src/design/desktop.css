@@ -135,10 +135,6 @@
   font-size: 14px;
   gap: 8px;
 }
-.studio-save-state {
-  font-size: 12px;
-  font-weight: 400;
-}
 .studio-menu-shade {
   inset: var(--studio-topbar-height) 0 0;
 }

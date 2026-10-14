@@ -56,6 +56,7 @@ export interface BoardInteraction {
     x: number,
     y: number,
     inside?: boolean,
+    radius?: number,
   ) => {
     id: string;
     node: import("@tiptap/core").JSONContent;
@@ -555,7 +556,7 @@ export function useBoardInteraction({
       }
       return createSnapIndex(objects);
     },
-    hitTest(x, y, inside = true) {
+    hitTest(x, y, inside = true, radius = 8) {
       const root = world.current,
         source = current.current.document;
       if (!root || !source) return null;
@@ -600,7 +601,7 @@ export function useBoardInteraction({
             y: (y - box.top) / box.scale,
           },
           tolerance: Math.max(
-            8 / box.scale,
+            radius / box.scale,
             entry.node.type === "drawing"
               ? (entry.node.attrs!.strokeWidth / 2) *
                   Math.max(

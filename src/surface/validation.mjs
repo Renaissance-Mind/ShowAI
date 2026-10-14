@@ -208,6 +208,7 @@ function validateResource(document) {
         finite(value, 1, 1000000, "drawing.extent"),
       );
       finite(node.attrs.strokeWidth, 0.5, 40, "drawing.strokeWidth");
+      if (node.attrs.pressure !== undefined && typeof node.attrs.pressure !== "boolean") throw new Error("drawing.pressure must be boolean.");
       if (
         !Array.isArray(node.attrs.points) ||
         node.attrs.points.length < 2 ||
@@ -218,6 +219,7 @@ function validateResource(document) {
         object(point, "drawing point");
         finite(point.x, -1000000, 1000000, "point.x");
         finite(point.y, -1000000, 1000000, "point.y");
+        if (point.pressure !== undefined) finite(point.pressure,0,1,"point.pressure");
       }
     }
     for (const child of node.content ?? []) walk(child, node, owner);

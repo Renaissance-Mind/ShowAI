@@ -9,6 +9,7 @@ export interface DrawingStyle {
   color: string;
   fillColor: string;
   strokeWidth: number;
+  pressure?: boolean;
 }
 export type LayoutMode = "flow" | "grid" | "free";
 export interface NodeLayout {

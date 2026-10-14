@@ -16,6 +16,7 @@ export interface InkFrame {
   tool: "pen" | "highlighter";
   color: string;
   width: number;
+  pressure?: boolean;
   ruler: boolean;
   dark: boolean;
   widthPx: number;
