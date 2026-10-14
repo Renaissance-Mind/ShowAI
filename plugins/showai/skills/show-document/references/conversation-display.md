@@ -12,7 +12,7 @@
 | 文件/网页预览 | 联网阅读优先打开delivery.online；需要离线或宿主不能联网时打开delivery.html。两者都是阅读快照，不自动回写项目 |
 | 无内嵌显示 | 交付项目、Page、版本、保存/同步结果；需要时附文件链接 |
 
-运行时带有已发布的 CDN 阅读器时，delivery.inline 与 delivery.online 只携带页面数据、内嵌图片和自定义组件，阅读器与内置组件从 jsDelivr（失败时 unpkg）按需加载，体积通常只有几 KB 到几百 KB，打开时需要联网。delivery.html 始终是离线完整文件。display.onlineAvailable 为 false 时没有在线版，按原方式使用 delivery.html；宿主显示“无法加载 ShowAI 阅读器”时同样改用 delivery.html。
+运行时带有已发布的 CDN 阅读器时，delivery.inline 与 delivery.online 只携带页面数据、内嵌图片和自定义组件，阅读器与内置组件从 jsDelivr（失败时 unpkg）按需加载，体积通常只有几 KB 到几百 KB，打开时需要联网。delivery.html 始终是离线完整文件。display.onlineAvailable 为 false 时没有在线版，此时 delivery.inline 是离线打包片段，仍按上表使用；文件预览改用 delivery.html。宿主显示“无法加载 ShowAI 阅读器”说明它拦截了 jsDelivr／unpkg：该宿主不能显示 CDN 片段，也不要把完整 delivery.html 粘进回复，改为交付 delivery.html 文件或链接，并说明需要宿主放行这两个来源，或由宿主设 SHOWAI_READER_CDN=off 重新连接以取得离线片段。
 
 Codex当前引用契约：
 
@@ -26,7 +26,7 @@ HTML URL不能填写为本机path。远程HTTP交付是URL时，优先使用已�
 
 本机page_present默认在连接内容库的local/agent-previews生成交付物；宿主可通过SHOWAI_PRESENTATION_DIR或启动配置指定可读的任务输出目录。Codex会话可视化目录是可用的宿主选择，不是ShowAI源页面的存储要求。保存位置仍由连接与项目决定。
 
-HTTP结果含有时限的下载地址。完整源文件或项目是长期保存依据。独立render_document返回savedToProject=false；page_present展示已保存Page，返回其身份、hash/revision。synchronized只表示此次操作是否确认了同步，本机返回not_checked时不能据此称远端已更新。
+HTTP结果含有时限的下载地址；要交给其他电脑长期使用时，下载 delivery.online 或 delivery.html 后作为文件交付。完整源文件或项目是长期保存依据。独立render_document返回savedToProject=false；page_present展示已保存Page，返回其身份、hash/revision。synchronized只表示此次操作是否确认了同步，本机返回not_checked时不能据此称远端已更新。
 
 ## 局部预览
 
