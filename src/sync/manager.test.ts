@@ -199,11 +199,21 @@ describe("project synchronization between independent real content libraries", (
     const roots = await readdir(
       join(alice.home, "local", "sync", "current-snapshots"),
     );
+    // At most the four fixed slots; the publisher receives no incoming copy.
+    const slots = await readdir(
+      join(alice.home, "local", "sync", "current-snapshots", roots[0]),
+    );
     expect(
-      await readdir(
-        join(alice.home, "local", "sync", "current-snapshots", roots[0]),
+      slots.every((name) =>
+        [
+          "baseline.json",
+          "previous.json",
+          "candidate.json",
+          "incoming.json",
+        ].includes(name),
       ),
-    ).toHaveLength(4);
+    ).toBe(true);
+    expect(slots).toContain("baseline.json");
   });
   it("renames and archives the current cloud project through the current-state publication path", async () => {
     const { directory, alice, bob, project } = await fixture();

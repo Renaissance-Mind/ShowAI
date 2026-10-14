@@ -15,7 +15,8 @@ export async function retryUpload<T>(operation: () => Promise<T>): Promise<T> {
           : error instanceof TypeError ||
             (error instanceof Error &&
               ["AbortError", "TimeoutError"].includes(error.name));
-      if (!transient || attempt >= 4) throw error;
+      // Busy servers recover within seconds; allow about half a minute.
+      if (!transient || attempt >= 8) throw error;
       await new Promise((resolve) =>
         setTimeout(
           resolve,

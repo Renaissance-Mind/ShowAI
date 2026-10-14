@@ -540,7 +540,7 @@ test("editor snapshots cannot bypass administrator-only project archive settings
   expect(
     (
       await f.request(
-        "/api/projects/project/revisions",
+        "/api/projects/project/snapshot",
         "POST",
         { snapshot, expected: null },
         editor.token,

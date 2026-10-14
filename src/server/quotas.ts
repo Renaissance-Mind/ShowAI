@@ -23,6 +23,8 @@ export const defaultStoragePolicy: StoragePolicy = {
   accountProjects: 50,
   serviceProjects: 10000,
 };
+/** Longer than any request body deadline plus publication. */
+export const reservationLifetimeMs = 15 * 60_000;
 export interface Reservation {
   id: string;
   projectId: string;
@@ -32,8 +34,11 @@ export interface Reservation {
   bytes: number;
   day: string;
 }
+/** How long a service-wide stored byte total may be reused. */
+const serviceUsageMs = 60_000;
 export class Quotas {
   readonly policy: StoragePolicy;
+  private stored?: { bytes: number; at: number };
   constructor(
     readonly db: MetadataStore,
     policy: Partial<StoragePolicy> = {},
@@ -66,6 +71,7 @@ export class Quotas {
         ? "SELECT 1 FROM objects WHERE project_id=? AND digest=?"
         : "SELECT 1 FROM revisions WHERE project_id=? AND manifest_digest=?";
     if ((await this.db.all(present, [projectId, digest])).length) return null;
+    await this.expire();
     const id = crypto.randomUUID(),
       day = new Date().toISOString().slice(0, 10),
       p = this.policy;
@@ -73,7 +79,10 @@ export class Quotas {
       `COALESCE((SELECT SUM(${column}) FROM ${table}${where ? ` WHERE ${where}` : ""}),0)`;
     const projectTotal = `${sum("objects", "bytes", "project_id=?")}+${sum("revisions", "manifest_bytes", "project_id=?")}+${sum("storage_reservations", "bytes", "project_id=?")}`;
     const accountTotal = `${sum("objects", "bytes", "uploaded_by=?")}+${sum("revisions", "manifest_bytes", "user_id=?")}+${sum("storage_reservations", "bytes", "user_id=?")}`;
-    const serviceTotal = `${sum("objects", "bytes")}+${sum("revisions", "manifest_bytes")}+${sum("storage_reservations", "bytes")}`;
+    // Project and account totals are indexed; the service total scans every
+    // object, so it is sampled once a minute. Pending reservations stay exact.
+    const serviceTotal = `?+${sum("storage_reservations", "bytes")}`;
+    const stored = await this.storedBytes();
     const budget =
       "COALESCE((SELECT bytes FROM upload_budgets WHERE day=? AND user_id=?),0)+?<=? AND COALESCE((SELECT hits FROM upload_budgets WHERE day=? AND user_id=?),0)<?";
     const results = await this.db.batch([
@@ -98,6 +107,7 @@ export class Quotas {
           userId,
           bytes,
           p.accountBytes,
+          stored,
           bytes,
           p.serviceBytes,
           userId,
@@ -155,6 +165,28 @@ export class Quotas {
       );
     }
     return { id, projectId, userId, kind, digest, bytes, day };
+  }
+  private async storedBytes(now = Date.now()) {
+    if (!this.stored || now - this.stored.at > serviceUsageMs)
+      this.stored = {
+        bytes: (
+          await this.db.all<{ bytes: number }>(
+            "SELECT COALESCE((SELECT SUM(bytes) FROM objects),0)+COALESCE((SELECT SUM(manifest_bytes) FROM revisions),0) AS bytes",
+          )
+        )[0].bytes,
+        at: now,
+      };
+    return this.stored.bytes;
+  }
+  /**
+   * Request-owned reservations outlive their request only after a crash or
+   * reset; resumable tasks own theirs until the task itself expires.
+   */
+  async expire(now = Date.now()) {
+    await this.db.run(
+      "DELETE FROM storage_reservations WHERE id IN(SELECT r.id FROM storage_reservations r WHERE r.created_at<? AND NOT EXISTS(SELECT 1 FROM object_uploads u WHERE u.reservation_id=r.id AND u.completed=0) LIMIT 20)",
+      [new Date(now - reservationLifetimeMs).toISOString()],
+    );
   }
   releaseStatement(reservation: Reservation): SqlStatement {
     return {

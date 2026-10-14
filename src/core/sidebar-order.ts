@@ -9,6 +9,19 @@ export function orderSidebarItems<T extends { id: string }>(
   );
 }
 
+/** Legacy projects without a saved rank use immutable creation time, then identity. */
+export function orderSidebarProjects<
+  T extends { id: string; createdAt: string; pinned?: boolean },
+>(projects: T[], order: string[] = []): T[] {
+  const stable = [...projects].sort(
+    (a, b) =>
+      a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+  );
+  return orderSidebarItems(stable, order).sort(
+    (a, b) => Number(!!b.pinned) - Number(!!a.pinned),
+  );
+}
+
 export function placeSidebarItem(
   order: string[],
   id: string,

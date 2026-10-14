@@ -1,0 +1,238 @@
+.surface-toolbar.board-dockable-toolbar {
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  max-height: calc(100% - 24px);
+}
+.surface-toolbar .board-toolbar-grip {
+  cursor: grab;
+  touch-action: none;
+  padding-inline: 2px;
+  min-width: 20px;
+}
+.board-dockable-toolbar[data-dragging] {
+  opacity: 0.85;
+  user-select: none;
+}
+.board-dockable-toolbar[data-dragging] .board-toolbar-grip {
+  cursor: grabbing;
+}
+.board-toolbar-dock-preview {
+  position: absolute;
+  z-index: 19;
+  pointer-events: none;
+  background: var(--accent, #467de3);
+  opacity: 0.4;
+  border-radius: 4px;
+}
+.board-toolbar-dock-preview[data-edge="top"] {
+  inset: 4px 16px auto;
+  height: 3px;
+}
+.board-toolbar-dock-preview[data-edge="bottom"] {
+  inset: auto 16px 4px;
+  height: 3px;
+}
+.board-toolbar-dock-preview[data-edge="left"] {
+  inset: 16px auto 16px 4px;
+  width: 3px;
+}
+.board-toolbar-dock-preview[data-edge="right"] {
+  inset: 16px 4px 16px auto;
+  width: 3px;
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  ) {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  --toolbar-reserve: 124px;
+  width: 54px;
+  max-width: 54px;
+  padding-inline: 4px;
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  ):has(.board-style-controls) {
+  --toolbar-reserve: 270px;
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  ):has(.board-style-controls[data-filled]) {
+  --toolbar-reserve: 350px;
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  ):has(.surface-zoom) {
+  --toolbar-reserve: 300px;
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  ):has(.surface-zoom):has(.board-style-controls) {
+  --toolbar-reserve: 460px;
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  ):has(.surface-zoom):has(.board-style-controls[data-filled]) {
+  --toolbar-reserve: 550px;
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .board-tool-stack {
+  flex: 0 0 auto;
+  width: auto;
+  max-height: max(
+    72px,
+    calc(var(--board-toolbar-height, 100dvh) - var(--toolbar-reserve))
+  );
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .board-tool-buttons {
+  grid-template-columns: var(--board-tool-width);
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .board-tool-buttons
+  button {
+  width: var(--board-tool-width);
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .board-settings-controls,
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .board-style-controls {
+  flex-direction: column;
+  gap: 4px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .board-style-controls
+  label,
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .board-writing-options {
+  flex-direction: column;
+  gap: 4px;
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .board-stroke-slider {
+  width: 36px;
+  height: 84px;
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  :is(
+    .board-stroke-track,
+    .board-stroke-slider input[type="range"],
+    .board-stroke-value-rail
+  ) {
+  position: absolute;
+  inset: auto;
+  width: 80px;
+  height: 24px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .board-stroke-slider
+  input {
+  cursor: ns-resize;
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .board-stroke-value-rail
+  output {
+  transform: translateX(-50%) rotate(90deg);
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .surface-toolbar-divider {
+  height: 1px;
+  width: 24px;
+}
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
+  .board-tool-shortcuts {
+  display: none;
+}
+.surface-toolbar.board-dockable-toolbar[data-dock="top"]
+  :is(
+    .surface-navigation,
+    .surface-add-menu,
+    .board-writing-options details[open] > div,
+    .board-component-settings
+  ) {
+  bottom: auto;
+  top: calc(100% + 12px);
+}
+.surface-toolbar.board-dockable-toolbar[data-dock="left"]
+  :is(
+    .surface-navigation,
+    .surface-add-menu,
+    .board-writing-options details[open] > div,
+    .board-component-settings
+  ) {
+  bottom: auto;
+  top: 0;
+  right: auto;
+  left: calc(100% + 12px);
+}
+.surface-toolbar.board-dockable-toolbar[data-dock="right"]
+  :is(
+    .surface-navigation,
+    .surface-add-menu,
+    .board-writing-options details[open] > div,
+    .board-component-settings
+  ) {
+  bottom: auto;
+  top: 0;
+  left: auto;
+  right: calc(100% + 12px);
+}
+@media print {
+  .board-toolbar-dock-preview {
+    display: none;
+  }
+}

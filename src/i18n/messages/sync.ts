@@ -57,7 +57,8 @@ export default defineMessages("sync", {
     saveNewPassword: "保存新密码",
     signOutAll: "退出所有设备",
     confirmSignOutAll: "确认退出所有设备",
-    signOutAllHelp: "所有设备包括本设备都会退出登录。项目与本地内容保留。",
+    signOutAllHelp:
+      "此账号及其绑定服务器上的所有设备（包括本设备）都会退出登录。项目与本地内容保留。",
     "session.revoked": "已撤销",
     "session.expired": "已到期",
     "session.validUntil": "有效至 {date}",
@@ -102,6 +103,8 @@ export default defineMessages("sync", {
     "toast.loginMethodAdded": "已添加登录方式，可用它登录当前账号。",
     "toast.passwordChanged": "密码已修改，其他设备会话已撤销。本设备保持登录。",
     "toast.signedOutAll": "所有设备已退出，请重新登录。",
+    "toast.signedOutAllPartial":
+      "所有设备已退出，请重新登录。以下绑定服务器未能退出，请分别登录后再操作：{servers}",
     "toast.sessionRevoked": "本设备会话已撤销，请重新登录。",
     "toast.projectCreated": "已创建项目“{name}”。",
     "toast.roleChanged": "已将 {name} 的权限设为{role}。",
@@ -229,6 +232,16 @@ export default defineMessages("sync", {
     "login.code": "邮箱验证码",
     "login.confirmEmail": "确认邮箱登录",
     "login.cancel": "取消本次登录",
+    "login.completeHelp":
+      "授权已完成。点击浏览器页面中的「在 ShowAI 中完成」，或输入页面显示的完成码。",
+    "login.completionCode": "完成码",
+    "login.complete": "完成登录",
+    "methods.title": "已绑定的登录方式",
+    "methods.help":
+      "不认识的登录方式应立即移除，并退出所有设备。移除需要最近 15 分钟内直接登录本服务器。",
+    "methods.email": "邮箱",
+    "methods.added": "添加于 {date}",
+    "methods.remove": "移除",
   },
   en: {
     "role.admin": "Admin",
@@ -286,7 +299,7 @@ export default defineMessages("sync", {
     signOutAll: "Sign out of all devices",
     confirmSignOutAll: "Confirm sign out of all devices",
     signOutAllHelp:
-      "Every device, including this one, will be signed out. Projects and local content are kept.",
+      "Every device signed in to this account and its bound servers, including this one, will be signed out. Projects and local content are kept.",
     "session.revoked": "Revoked",
     "session.expired": "Expired",
     "session.validUntil": "Valid until {date}",
@@ -334,6 +347,8 @@ export default defineMessages("sync", {
     "toast.passwordChanged":
       "Password changed and sessions on other devices revoked. This device stays signed in.",
     "toast.signedOutAll": "All devices are signed out. Please sign in again.",
+    "toast.signedOutAllPartial":
+      "All devices are signed out. Please sign in again. These bound servers could not be reached; sign in to each and sign out there: {servers}",
     "toast.sessionRevoked": "This device's session was revoked. Please sign in again.",
     "toast.projectCreated": "Created project “{name}”.",
     "toast.roleChanged": "Changed {name}'s role to {role}.",
@@ -468,5 +483,15 @@ export default defineMessages("sync", {
     "login.code": "Email code",
     "login.confirmEmail": "Sign in with email",
     "login.cancel": "Cancel sign-in",
+    "login.completeHelp":
+      "Authorization is complete. Click “Open in ShowAI” on the browser page, or enter the completion code it shows.",
+    "login.completionCode": "Completion code",
+    "login.complete": "Finish sign-in",
+    "methods.title": "Bound sign-in methods",
+    "methods.help":
+      "Remove any sign-in method you don't recognize, then sign out of all devices. Removing one requires signing in to this server directly within the last 15 minutes.",
+    "methods.email": "Email",
+    "methods.added": "Added {date}",
+    "methods.remove": "Remove",
   },
 });

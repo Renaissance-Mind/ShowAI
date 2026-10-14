@@ -44,10 +44,10 @@
 
 研究报告、机制讲解和综合方案在制作正文前，将本轮规划保存为工作材料 `presentation-plan.json`。它不是读者正文，也不是 MCP 参数。已有合适规划可续改；简单问答与局部编辑不用创建。每个主要分支展开实际的子问题；叶子写清定义、过程、例子或条件，不能只列术语。按认知缺口决定深度，不为满足层数填充内容。
 
-文件记录 reader、startingKnowledge、goal、cutoff，environment={width,height,interactive}，nodes 和 scenes。nodes 是嵌套数组：每项含稳定 id、task、answer、check，可含 needs（先备节点 id）和 children；叶子另含 explanation。scenes 的字段见[表达与分镜](../../design-presentation/references/expression-and-storyboard.md#保存分镜)。一幅图可以解释多个节点，一个节点也可跨多幅画面。
+文件记录 reader、startingKnowledge、goal、cutoff（材料检索截止日期），environment={width,height,interactive}，nodes 和 scenes。nodes 是嵌套数组：每项含稳定 id、task、answer、check，可含 needs（先备节点 id）和 children；叶子另含 explanation。scenes 的字段见[表达与分镜](../../design-presentation/references/expression-and-storyboard.md#保存分镜)。一幅图可以解释多个节点，一个节点也可跨多幅画面。
 
-没有文件系统的授权网页宿主，将同一 JSON 保存为目标项目内独立的“工作材料：呈现规划”Page（文本或代码内容），保留它的真实 Page ID，与成品分别维护；初稿和修订原因保存在该材料中。仅有匿名独立渲染能力时，交付可下载的完整规划文本并说明未保存到项目。不能把本机路径当作网页端已保存的证明。
+有文件系统的本机宿主把文件写在宿主当前的任务工作目录或用户指定位置，不写进内容库、插件目录或展示输出目录，交付时说明实际路径。没有文件系统的授权网页宿主，将同一 JSON 保存为目标项目内独立的“工作材料：呈现规划”Page（文本或代码内容），保留它的真实 Page ID，与成品分别维护；初稿和修订原因保存在该材料中。仅有匿名独立渲染能力时，交付可下载的完整规划文本并说明未保存到项目。不能把本机路径当作网页端已保存的证明。
 
-设计完成、首次填入完整页面内容之前，运行 `python3 <本技能目录>/scripts/check_plan.py <规划路径>`。直接执行脚本即可，使用前无需读取实现源码。处理失联节点、缺少解释、依赖循环和无画面覆盖等错误，再用设计判断检查展开是否足够。校验返回的哈希用于对应本轮规划；通过仅证明结构可追踪，不证明内容正确或设计优秀。宿主不能运行脚本时手工核对同样关系并说明范围。制作中改变主线或画面时同步更新规划；保留最初规划和修订原因，不能用完成后的章节清单代替前置规划。
+设计完成、首次填入完整页面内容之前，运行 `python3 <plan-presentation目录>/scripts/check_plan.py <规划路径>`；从 show-document 或 review-presentation 进入时同样使用 plan-presentation 技能目录下的脚本。直接执行脚本即可，使用前无需读取实现源码。处理失联节点、缺少解释、依赖循环和无画面覆盖等错误，再用设计判断检查展开是否足够。校验返回的哈希用于对应本轮规划；通过仅证明结构可追踪，不证明内容正确或设计优秀。宿主不能运行脚本时手工核对同样关系并说明范围。制作中改变主线或画面时同步更新规划；保留最初规划和修订原因，不能用完成后的章节清单代替前置规划。
 
 多个作品分别确定认知缺口和讲解顺序。可以共用来源与组件，不把一份通用分镜批量换标题后作为不同作品的设计。叶子的 explanation 写准备讲清的关系、例子或条件，不能仅写“介绍某概念”这样的写作动作。

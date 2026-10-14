@@ -16,6 +16,7 @@
   isolation: isolate;
   background: var(--paper, var(--bg));
   outline-offset: -3px;
+  touch-action: none;
 }
 .surface-scroll {
   position: absolute;

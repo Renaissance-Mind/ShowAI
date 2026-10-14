@@ -38,11 +38,52 @@ export function useInlineInk({
   width: number;
   ruler: boolean;
   enabled: boolean;
-  onCamera: (camera: { x: number; y: number; scale: number }) => void;
+  onCamera: (
+    camera: { x: number; y: number; scale: number },
+    final: boolean,
+  ) => void;
   onTool: (tool: string) => void;
 }) {
-  const current = useRef({ source, color, width, ruler, onCamera, onTool });
-  current.current = { source, color, width, ruler, onCamera, onTool };
+  const current = useRef({
+    source,
+    color,
+    width,
+    ruler,
+    onCamera,
+    onTool,
+    tool,
+  });
+  const cameraRevision = useRef(0),
+    previousInk = useRef("pen");
+  const invalidate = useRef<(() => void) | null>(null);
+  const navigating = useRef(false);
+  if (tool === "pen" || tool === "highlighter") previousInk.current = tool;
+  current.current = { source, color, width, ruler, onCamera, onTool, tool };
+  useEffect(() => {
+    const bridge = window.showai?.inlineInk;
+    if (!bridge || !enabled || !source) return;
+    return bridge.onCommand((value) => {
+      if (value.pageId !== source.id || value.boardId !== boardId) return;
+      if (value.camera) {
+        navigating.current = !!value.navigating;
+        cameraRevision.current = value.cameraVersion ?? cameraRevision.current;
+        current.current.onCamera(value.camera, !value.navigating);
+      }
+      if (value.tool)
+        current.current.onTool(
+          value.tool === "toggleEraser"
+            ? current.current.tool === "eraser"
+              ? previousInk.current
+              : "eraser"
+            : value.tool === "previous"
+              ? previousInk.current
+              : value.tool,
+        );
+    });
+  }, [enabled, source?.id, boardId]);
+  useEffect(() => {
+    invalidate.current?.();
+  }, [source, color, width, ruler]);
   useEffect(() => {
     const bridge = window.showai?.inlineInk;
     if (
@@ -65,18 +106,24 @@ export function useInlineInk({
       lastKey = "",
       lastDocument: ShowDocument | undefined,
       frame = 0,
-      cameraVersion = 0;
-    const command = bridge.onCommand((value) => {
-      if (value.pageId !== source.id || value.boardId !== boardId) return;
-      if (value.camera) {
-        cameraVersion = value.cameraVersion ?? cameraVersion;
-        current.current.onCamera(value.camera);
-      }
-      if (value.tool) current.current.onTool(value.tool);
-    });
+      poseDocument: ShowDocument | undefined,
+      poseSize = "",
+      poses: Record<string, number[]> = {},
+      lastPoses: Record<string, number[]> | undefined;
+    let dirty = false,
+      animations = 0;
+    const schedule = () => {
+      dirty = true;
+      if (!alive || failed || frame || pending) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        void send();
+      });
+    };
+    invalidate.current = schedule;
     const send = async () => {
       if (!alive || failed) return;
-      frame = requestAnimationFrame(() => void send());
+      dirty = false;
       if (
         pending ||
         !surface.getClientRects().length ||
@@ -88,24 +135,42 @@ export function useInlineInk({
       const viewport = viewportProbe.getScreenCTM(),
         worldMatrix = worldProbe.getScreenCTM();
       if (!viewport || !worldMatrix) return;
-      const camera = viewport.inverse().multiply(worldMatrix),
-        inverse = worldMatrix.inverse(),
-        poses: Record<string, number[]> = {};
-      const board = findSurfaceNode(documentValue, boardId)?.node;
-      for (const node of inkNodes(board ?? { content: [] })) {
-        const element = content.querySelector(
-          `[data-surface-id="${CSS.escape(node.attrs!.id)}"] [data-native-ink]`,
-        ) as SVGSVGElement | null;
-        const m = element?.getScreenCTM();
-        if (!m) return;
-        poses[node.attrs!.id] = values(inverse.multiply(m));
+      const camera = viewport.inverse().multiply(worldMatrix);
+      const size = surface.clientWidth + ":" + surface.clientHeight;
+      if (poseDocument !== documentValue || poseSize !== size) {
+        const inverse = worldMatrix.inverse(),
+          next: Record<string, number[]> = {};
+        const board = findSurfaceNode(documentValue, boardId)?.node;
+        const elements = new Map(
+          [...content.querySelectorAll<SVGSVGElement>("[data-native-ink]")].map(
+            (element) => [
+              element.closest<HTMLElement>("[data-surface-id]")?.dataset
+                .surfaceId,
+              element,
+            ],
+          ),
+        );
+        for (const node of inkNodes(board ?? { content: [] })) {
+          const m = elements.get(node.attrs!.id)?.getScreenCTM();
+          if (!m) return;
+          next[node.attrs!.id] = values(inverse.multiply(m));
+        }
+        poses = next;
+        poseDocument = documentValue;
+        poseSize = size;
       }
       const holes = [
         ...document.querySelectorAll<HTMLElement>(
-          "[data-surface-ui],.surface-toolbar,.studio-context-menu,.studio-modal-shade,.container-inspector",
+          "[data-surface-ui],.surface-toolbar,.studio-context-menu,.studio-modal-shade,.container-inspector,.studio-sidebar-shell:not([data-sidebar-mode=hidden]) .studio-sidebar,.studio-mobile-sidebar-edge,.studio-mobile-sidebar-scrim,.studio-mobile-navigation-tools",
         ),
       ]
-        .filter((element) => element.getClientRects().length)
+        .filter(
+          (element) =>
+            !content.contains(element) &&
+            element.getClientRects().length &&
+            getComputedStyle(element).pointerEvents !== "none" &&
+            getComputedStyle(element).visibility !== "hidden",
+        )
         .map((element) => {
           const r = element.getBoundingClientRect();
           return { x: r.x, y: r.y, width: r.width, height: r.height };
@@ -123,38 +188,105 @@ export function useInlineInk({
         heightPx: surface.clientHeight,
         viewport: values(viewport),
         camera: { x: camera.e, y: camera.f, scale: camera.a },
-        cameraVersion,
-        poses,
+        cameraVersion: cameraRevision.current,
         holes,
       };
       const key = JSON.stringify(packet);
-      if (key === lastKey && documentValue === lastDocument) return;
+      if (key === lastKey && documentValue === lastDocument) {
+        if (animations) schedule();
+        return;
+      }
       pending = true;
       try {
         await bridge.frame({
           ...packet,
+          ...(lastPoses !== poses ? { poses } : {}),
           ...(lastDocument !== documentValue
             ? { document: documentValue }
             : {}),
         });
         lastKey = key;
         lastDocument = documentValue;
+        lastPoses = poses;
         if (alive) {
-          surface.dataset.nativeInkToken = token;
-          surface.dataset.nativeInkActive = "true";
+          if (surface.dataset.nativeInkToken !== token)
+            surface.dataset.nativeInkToken = token;
+          if (surface.dataset.nativeInkActive !== "true")
+            surface.dataset.nativeInkActive = "true";
         }
       } catch (error) {
         failed = true;
         throw error;
       } finally {
         pending = false;
+        if (dirty || animations) schedule();
       }
     };
-    void send();
+    const mutations = new MutationObserver((changes) => {
+      if (
+        changes.some(
+          (change) =>
+            !(
+              navigating.current &&
+              change.target === content &&
+              change.attributeName === "style"
+            ),
+        )
+      )
+        schedule();
+    });
+    mutations.observe(document.documentElement, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: [
+        "style",
+        "class",
+        "hidden",
+        "open",
+        "data-sidebar-mode",
+        "data-mobile-sidebar",
+        "data-theme",
+        "data-native-orientation",
+        "data-dragging",
+      ],
+    });
+    const resize = new ResizeObserver(schedule);
+    resize.observe(surface);
+    const viewportChanged = () => {
+      if (!navigating.current) schedule();
+    };
+    const animationStart = (event: Event) => {
+      if (event.target instanceof Element && !content.contains(event.target)) {
+        animations++;
+        schedule();
+      }
+    };
+    const animationEnd = (event: Event) => {
+      if (event.target instanceof Element && !content.contains(event.target)) {
+        animations = Math.max(0, animations - 1);
+        schedule();
+      }
+    };
+    surface.addEventListener("showai:viewport-change", viewportChanged);
+    document.addEventListener("visibilitychange", schedule);
+    document.addEventListener("transitionrun", animationStart, true);
+    document.addEventListener("transitionend", animationEnd, true);
+    document.addEventListener("transitioncancel", animationEnd, true);
+    window.addEventListener("resize", schedule);
+    schedule();
     return () => {
       alive = false;
+      if (invalidate.current === schedule) invalidate.current = null;
       cancelAnimationFrame(frame);
-      command();
+      mutations.disconnect();
+      resize.disconnect();
+      surface.removeEventListener("showai:viewport-change", viewportChanged);
+      document.removeEventListener("visibilitychange", schedule);
+      document.removeEventListener("transitionrun", animationStart, true);
+      document.removeEventListener("transitionend", animationEnd, true);
+      document.removeEventListener("transitioncancel", animationEnd, true);
+      window.removeEventListener("resize", schedule);
       viewportProbe.remove();
       worldProbe.remove();
       void bridge.hide(source.id, boardId, token).finally(() => {

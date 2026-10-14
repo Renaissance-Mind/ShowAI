@@ -140,6 +140,7 @@ export function useSurfaceViewport(
     restore: () => {},
     zoom: (_scale: number) => {},
     moveTo: (_camera: Camera, _immediate = false) => {},
+    navigateTo: (_camera: Camera, _final = false) => {},
     refresh: () => {},
     cancel: () => {},
     objectGesture: (_active: boolean) => {},
@@ -162,6 +163,8 @@ export function useSurfaceViewport(
       return { x: (x - rect.left) / scale, y: (y - rect.top) / scale };
     };
     const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+    const maximumZoom =
+      document.documentElement.dataset.native === "ios" ? 4 : 2;
     let frame = 0,
       springFrame = 0,
       idle = 0;
@@ -258,7 +261,7 @@ export function useSurfaceViewport(
           saved &&
           [saved.x, saved.y, saved.scale].every(Number.isFinite) &&
           saved.scale >= 0.25 &&
-          saved.scale <= 2 &&
+          saved.scale <= maximumZoom &&
           Array.isArray(saved.visibleIds) &&
           saved.visibleIds.length <= 100 &&
           saved.visibleIds.every((id: unknown) => typeof id === "string")
@@ -364,6 +367,11 @@ export function useSurfaceViewport(
       springFrame = requestAnimationFrame(step);
     };
     const refresh = () => {
+      if (document.documentElement.dataset.native === "ios") {
+        setAnchor(null);
+        paint();
+        return;
+      }
       if (gesture) gesture.released = true;
       const visible = nearestSnap(regions(), camera.current, bounds());
       // Content edits/resize may change geometry. Refresh resistance without
@@ -375,6 +383,12 @@ export function useSurfaceViewport(
       clearTimeout(idle);
       const current = gesture;
       gesture = null;
+      if (document.documentElement.dataset.native === "ios") {
+        setAnchor(null);
+        paintNow();
+        remember();
+        return;
+      }
       if (
         current?.anchor &&
         !current.released &&
@@ -426,6 +440,13 @@ export function useSurfaceViewport(
         paintNow();
         refresh();
       } else springTo(target, refresh);
+    };
+    const navigateTo = (target: Camera, final = false) => {
+      interrupt();
+      setAnchor(null);
+      camera.current = target;
+      paintNow();
+      if (final) remember();
     };
     const fit = (ids?: string[], immediate = false) => {
       const all = regions(),
@@ -484,7 +505,7 @@ export function useSurfaceViewport(
     ) => {
       interrupt();
       setAnchor(null);
-      camera.current = zoomAt(camera.current, point, value);
+      camera.current = zoomAt(camera.current, point, value, maximumZoom);
       paint();
       later();
     };
@@ -493,6 +514,7 @@ export function useSurfaceViewport(
       focus,
       zoom,
       moveTo,
+      navigateTo,
       refresh,
       cancel: controls.current.cancel,
       objectGesture: controls.current.objectGesture,
@@ -581,6 +603,26 @@ export function useSurfaceViewport(
         distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
         center: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
       };
+    };
+    const captureTouch = (event: PointerEvent) => {
+      if (
+        !ownsInput(event.target) ||
+        event.pointerType !== "touch" ||
+        (event.target as Element).closest(
+          '[data-surface-ui],iframe,[data-surface-gesture="own"],.react-flow',
+        )
+      )
+        return;
+      touches.set(event.pointerId, localPoint(event));
+      if (touches.size !== 2) return;
+      event.preventDefault();
+      event.stopPropagation();
+      interrupt();
+      drag = null;
+      root.dispatchEvent(new Event("showai-board-pinch"));
+      pinch = { ...pinchMetrics(), camera: { ...camera.current }, anchor };
+      setAnchor(null);
+      for (const id of touches.keys()) root.setPointerCapture(id);
     };
     const down = (event: PointerEvent) => {
       const panTool = root.dataset.boardTool === "pan";
@@ -677,6 +719,7 @@ export function useSurfaceViewport(
           pinch.camera,
           pinch.center,
           (pinch.camera.scale * metrics.distance) / pinch.distance,
+          maximumZoom,
         );
         camera.current = {
           ...next,
@@ -706,10 +749,14 @@ export function useSurfaceViewport(
       if (pinch) {
         const initial = pinch;
         pinch = null;
-        if (cancelled) {
+        if (cancelled && document.documentElement.dataset.native !== "ios") {
           setAnchor(initial.anchor);
           springTo(initial.camera);
-        } else settle();
+        } else {
+          setAnchor(null);
+          paintNow();
+          remember();
+        }
       }
       if (drag && (!event || drag.id === event.pointerId)) {
         const initial = drag;
@@ -717,7 +764,7 @@ export function useSurfaceViewport(
         if (root.hasPointerCapture(initial.id))
           root.releasePointerCapture(initial.id);
         if (initial.started) {
-          if (cancelled) {
+          if (cancelled && document.documentElement.dataset.native !== "ios") {
             setAnchor(initial.gesture.anchor);
             springTo(initial.gesture.origin);
           } else {
@@ -729,6 +776,19 @@ export function useSurfaceViewport(
       root.classList.remove("is-panning");
     };
     const up = (event: PointerEvent) => finish(event);
+    const captureMove = (event: PointerEvent) => {
+      if (!pinch) return;
+      event.preventDefault();
+      event.stopPropagation();
+      move(event);
+    };
+    const captureEnd = (event: PointerEvent) => {
+      if (pinch) {
+        event.preventDefault();
+        event.stopPropagation();
+        finish(event, event.type === "pointercancel");
+      } else if (!drag) touches.delete(event.pointerId);
+    };
     controls.current.cancel = () => {
       interrupt();
       if (drag && root.hasPointerCapture(drag.id))
@@ -866,6 +926,10 @@ export function useSurfaceViewport(
     };
     controls.current.refresh = refreshLayout;
     root.addEventListener("wheel", wheel, { passive: false });
+    root.addEventListener("pointerdown", captureTouch, true);
+    root.addEventListener("pointermove", captureMove, true);
+    root.addEventListener("pointerup", captureEnd, true);
+    root.addEventListener("pointercancel", captureEnd, true);
     root.addEventListener("pointerdown", down);
     root.addEventListener("pointermove", move);
     root.addEventListener("pointerup", up);
@@ -883,6 +947,10 @@ export function useSurfaceViewport(
       cancelAnimationFrame(springFrame);
       clearTimeout(idle);
       root.removeEventListener("wheel", wheel);
+      root.removeEventListener("pointerdown", captureTouch, true);
+      root.removeEventListener("pointermove", captureMove, true);
+      root.removeEventListener("pointerup", captureEnd, true);
+      root.removeEventListener("pointercancel", captureEnd, true);
       root.removeEventListener("pointerdown", down);
       root.removeEventListener("pointermove", move);
       root.removeEventListener("pointerup", up);

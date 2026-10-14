@@ -13,6 +13,20 @@ import {
 } from "../portable/validation.mjs";
 import { normalizedWheel, zoomAt } from "./model";
 
+it("keeps the same mobile zoom range and contact anchor when switching Board input tools", () => {
+  const camera = { x: -500, y: -300, scale: 3 };
+  const point = { x: 300, y: 200 };
+  const next = zoomAt(camera, point, 4, 4);
+  expect(next.scale).toBe(4);
+  expect((point.x - next.x) / next.scale).toBeCloseTo(
+    (point.x - camera.x) / camera.scale,
+  );
+  expect((point.y - next.y) / next.scale).toBeCloseTo(
+    (point.y - camera.y) / camera.scale,
+  );
+  expect(zoomAt(camera, point, 5, 4).scale).toBe(4);
+});
+
 const paragraph = (text: string): JSONContent => ({
   type: "paragraph",
   attrs: { id: `p-${text}` },

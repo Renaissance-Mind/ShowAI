@@ -21,7 +21,10 @@ def check(plan, document=None):
 
     if not need(plan, ["reader", "startingKnowledge", "goal", "cutoff"], "plan"):
         return {"ok": False, "errors": errors}
-    environment = plan.get("environment", {})
+    environment = plan.get("environment")
+    if not isinstance(environment, dict):
+        errors.append("environment: object with width, height and interactive required")
+        environment = {}
     for key in ["width", "height"]:
         if not isinstance(environment.get(key), int) or environment[key] <= 0:
             errors.append(f"environment.{key}: positive CSS viewport size required")

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { JSONContent } from "@tiptap/core";
 import type { BoardInteraction } from "./useBoardInteraction";
 import { fingerNavigatesBoard } from "./board-input.mjs";
@@ -36,6 +36,18 @@ export function BoardGestureInput({
   } | null>(null);
   const isInk = (node: JSONContent) =>
     node.type === "drawing" || !!node.attrs?.data?.nativeInk;
+  useEffect(() => {
+    const root = svg.current?.closest(".page-surface");
+    const cancel = () => {
+      const id = gesture.current?.id;
+      gesture.current = null;
+      setPreview([]);
+      if (id !== undefined && svg.current?.hasPointerCapture(id))
+        svg.current.releasePointerCapture(id);
+    };
+    root?.addEventListener("showai-board-pinch", cancel);
+    return () => root?.removeEventListener("showai-board-pinch", cancel);
+  }, []);
   const erase = (p: Point) => {
     const hit = board.hitTest(p.x, p.y);
     if (hit && isInk(hit.node)) gesture.current?.erased.add(hit.id);

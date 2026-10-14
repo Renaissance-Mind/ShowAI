@@ -11,6 +11,7 @@ import type { JSONContent } from "@tiptap/core";
 import type { BoardTool, BoardDrawingTool, DrawingStyle } from "./types";
 import { findSurfaceNode } from "./document.mjs";
 import { BoardStyleControls } from "./BoardStyleControls";
+import { DockableBoardToolbar } from "./DockableBoardToolbar";
 import { readingCapture } from "./reading-capture";
 import { flushSync } from "react-dom";
 import { fingerNavigatesBoard } from "./board-input.mjs";
@@ -141,6 +142,9 @@ export default function PageSurface({
   onToolChange,
 }: Props) {
   const t = useTranslator(messages);
+  const mobile =
+    typeof document !== "undefined" &&
+    document.documentElement.dataset.native === "ios";
   const [localSelection, setLocalSelection] = useState<string | null>(null);
   const capture = useRef(readingCapture()).current;
   const [componentActionsHost, setComponentActionsHost] =
@@ -171,11 +175,16 @@ export default function PageSurface({
     width: drawStrokeWidth,
     ruler,
     enabled: enabled && !locked && !!onDraw && !printing,
-    onCamera: (value) => controls.current.moveTo(value, true),
+    onCamera: (value, final) => controls.current.navigateTo(value, final),
     onTool: (value) => {
       if (value === "settings") {
         if (writingSettings.current) writingSettings.current.open = true;
-      } else if (value === "eraser" || value === "pen") onToolChange?.(value);
+      } else if (
+        value === "eraser" ||
+        value === "pen" ||
+        value === "highlighter"
+      )
+        onToolChange?.(value);
     },
   });
   const board = useBoardInteraction({
@@ -603,7 +612,9 @@ export default function PageSurface({
                 (hovered.current === edge.element ||
                   performance.now() <= hoverWindow.current.until)));
           if (
-            target.closest("[data-surface-handle],[data-board-drawing-input]")
+            target.closest("[data-surface-handle]") ||
+            (event.pointerType !== "touch" &&
+              target.closest("[data-board-drawing-input]"))
           ) {
             cancelMarquee();
             controls.current.cancel();
@@ -894,7 +905,7 @@ export default function PageSurface({
             !target.closest('[data-drawing-active="true"]')
           ) {
             const entry = boardToolForKey(event.key);
-            if (entry) {
+            if (entry && (!mobile || entry.tool !== "region")) {
               event.preventDefault();
               event.stopPropagation();
               clearHover();
@@ -1131,11 +1142,9 @@ export default function PageSurface({
             <p>{t("board.empty")}</p>
           </div>
         )}
-        <div
-          className="surface-toolbar"
-          data-surface-ui
-          role="group"
-          aria-label={t("board.tools")}
+        <DockableBoardToolbar
+          root={rootRef}
+          enabled={enabled && !locked && !printing}
         >
           {onTransform && !objectMenu && board.ids.size > 1 && (
             <span className="board-selection-count" role="status">
@@ -1173,163 +1182,172 @@ export default function PageSurface({
               </button>
             </>
           )}
-          <details
-            ref={navigation}
-            className="surface-popover-anchor"
-            onKeyDownCapture={(event) => {
-              if (event.key === "Escape") {
-                event.preventDefault();
-                event.stopPropagation();
-                navigation.current!.open = false;
-                navigation.current!.querySelector("summary")?.focus();
-              }
-            }}
-          >
-            <summary
-              aria-label={t("nav.regionsAndViews")}
-              title={t("nav.regionsAndViews")}
+          {!mobile && (
+            <details
+              ref={navigation}
+              className="surface-popover-anchor"
+              onKeyDownCapture={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  navigation.current!.open = false;
+                  navigation.current!.querySelector("summary")?.focus();
+                }
+              }}
             >
-              <List size={16} />
-            </summary>
-            <div className="surface-navigation">
-              <strong>{t("nav.regionsAndContent")}</strong>
-              {nodes.map((node) => (
-                <div className="surface-navigation-row" key={node.id}>
-                  <button
-                    type="button"
-                    disabled={locked}
-                    onClick={() => {
-                      onSelect(node.id);
-                      focusAfterMount([node.id], true);
-                      navigation.current!.open = false;
-                    }}
-                  >
-                    <PanelTop size={14} aria-hidden="true" />
-                    {node.name}
-                  </button>
-                  {onViews && (
-                    <>
-                      <button
-                        type="button"
-                        aria-label={t("nav.moveEarlier", { name: node.name })}
-                        disabled={views.readingOrder.indexOf(node.id) < 1}
-                        onClick={() => {
-                          const order = [...views.readingOrder],
-                            index = order.indexOf(node.id);
-                          [order[index - 1], order[index]] = [
-                            order[index],
-                            order[index - 1],
-                          ];
-                          onViews({ ...views, readingOrder: order });
-                        }}
-                      >
-                        <ArrowUp size={13} aria-hidden="true" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              ))}
+              <summary
+                aria-label={t("nav.regionsAndViews")}
+                title={t("nav.regionsAndViews")}
+              >
+                <List size={16} />
+              </summary>
+              <div className="surface-navigation">
+                <strong>{t("nav.regionsAndContent")}</strong>
+                {nodes.map((node) => (
+                  <div className="surface-navigation-row" key={node.id}>
+                    <button
+                      type="button"
+                      disabled={locked}
+                      onClick={() => {
+                        onSelect(node.id);
+                        focusAfterMount([node.id], true);
+                        navigation.current!.open = false;
+                      }}
+                    >
+                      <PanelTop size={14} aria-hidden="true" />
+                      {node.name}
+                    </button>
+                    {onViews && (
+                      <>
+                        <button
+                          type="button"
+                          aria-label={t("nav.moveEarlier", { name: node.name })}
+                          disabled={views.readingOrder.indexOf(node.id) < 1}
+                          onClick={() => {
+                            const order = [...views.readingOrder],
+                              index = order.indexOf(node.id);
+                            [order[index - 1], order[index]] = [
+                              order[index],
+                              order[index - 1],
+                            ];
+                            onViews({ ...views, readingOrder: order });
+                          }}
+                        >
+                          <ArrowUp size={13} aria-hidden="true" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ))}
 
-              <strong>{t("nav.namedViews")}</strong>
-              {views.saved.map((view) => (
-                <div className="surface-navigation-row" key={view.id}>
-                  <button
-                    type="button"
-                    disabled={locked}
-                    onClick={() => {
-                      focusAfterMount(view.targets);
-                      navigation.current!.open = false;
+                <strong>{t("nav.namedViews")}</strong>
+                {views.saved.map((view) => (
+                  <div className="surface-navigation-row" key={view.id}>
+                    <button
+                      type="button"
+                      disabled={locked}
+                      onClick={() => {
+                        focusAfterMount(view.targets);
+                        navigation.current!.open = false;
+                      }}
+                    >
+                      <BookmarkPlus size={14} aria-hidden="true" />
+                      {view.name}
+                    </button>
+                    {onViews && (
+                      <>
+                        <button
+                          type="button"
+                          aria-label={t("nav.setInitial", { name: view.name })}
+                          aria-pressed={views.initial === view.id}
+                          onClick={() =>
+                            onViews({
+                              ...views,
+                              initial:
+                                views.initial === view.id ? null : view.id,
+                            })
+                          }
+                        >
+                          <Star size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={t("nav.deleteView", { name: view.name })}
+                          onClick={() =>
+                            onViews({
+                              ...views,
+                              initial:
+                                views.initial === view.id
+                                  ? null
+                                  : views.initial,
+                              saved: views.saved.filter(
+                                (entry) => entry.id !== view.id,
+                              ),
+                            })
+                          }
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ))}
+                {onViews && (
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      saveView();
                     }}
                   >
-                    <BookmarkPlus size={14} aria-hidden="true" />
-                    {view.name}
-                  </button>
-                  {onViews && (
-                    <>
-                      <button
-                        type="button"
-                        aria-label={t("nav.setInitial", { name: view.name })}
-                        aria-pressed={views.initial === view.id}
-                        onClick={() =>
-                          onViews({
-                            ...views,
-                            initial: views.initial === view.id ? null : view.id,
-                          })
-                        }
-                      >
-                        <Star size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={t("nav.deleteView", { name: view.name })}
-                        onClick={() =>
-                          onViews({
-                            ...views,
-                            initial:
-                              views.initial === view.id ? null : views.initial,
-                            saved: views.saved.filter(
-                              (entry) => entry.id !== view.id,
-                            ),
-                          })
-                        }
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </>
-                  )}
-                </div>
-              ))}
-              {onViews && (
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    saveView();
-                  }}
-                >
-                  <input
-                    aria-label={t("nav.viewName")}
-                    placeholder={
-                      selected
-                        ? names.get(selected)
-                          ? t("nav.viewOf", { name: names.get(selected)! })
-                          : t("nav.viewOfSelection")
-                        : t("nav.viewOfVisible")
-                    }
-                    maxLength={200}
-                    value={viewName}
-                    onChange={(event) => setViewName(event.target.value)}
-                  />
-                  <button
-                    type="submit"
-                    disabled={!viewName.trim() || !viewTargets.length}
-                  >
-                    <BookmarkPlus size={14} />
-                    {t("nav.saveView")}
-                  </button>
-                </form>
-              )}
-            </div>
-          </details>
-          <button
-            type="button"
-            aria-label={t("board.fit")}
-            disabled={locked}
-            title={t("board.fitTitle")}
-            onClick={() => focusAfterMount()}
-          >
-            <Maximize2 size={15} />
-          </button>
-          <button
-            type="button"
-            aria-label={t("board.locate")}
-            title={t("board.locateTitle")}
-            disabled={locked || !selected}
-            onClick={() => selected && focusAfterMount([selected], true)}
-          >
-            <Focus size={15} />
-          </button>
-          <span className="surface-toolbar-divider" />
-          <ZoomControls scale={scale} controls={controls} locked={locked} />
+                    <input
+                      aria-label={t("nav.viewName")}
+                      placeholder={
+                        selected
+                          ? names.get(selected)
+                            ? t("nav.viewOf", { name: names.get(selected)! })
+                            : t("nav.viewOfSelection")
+                          : t("nav.viewOfVisible")
+                      }
+                      maxLength={200}
+                      value={viewName}
+                      onChange={(event) => setViewName(event.target.value)}
+                    />
+                    <button
+                      type="submit"
+                      disabled={!viewName.trim() || !viewTargets.length}
+                    >
+                      <BookmarkPlus size={14} />
+                      {t("nav.saveView")}
+                    </button>
+                  </form>
+                )}
+              </div>
+            </details>
+          )}
+          {!mobile && (
+            <>
+              <button
+                type="button"
+                aria-label={t("board.fit")}
+                disabled={locked}
+                title={t("board.fitTitle")}
+                onClick={() => focusAfterMount()}
+              >
+                <Maximize2 size={15} />
+              </button>
+              <button
+                type="button"
+                aria-label={t("board.locate")}
+                title={t("board.locateTitle")}
+                disabled={locked || !selected}
+                onClick={() => selected && focusAfterMount([selected], true)}
+              >
+                <Focus size={15} />
+              </button>
+              <span className="surface-toolbar-divider" />
+              <ZoomControls scale={scale} controls={controls} locked={locked} />
+            </>
+          )}
           <fieldset className="surface-extra-actions" disabled={locked}>
             {extraActions}
           </fieldset>
@@ -1411,7 +1429,7 @@ export default function PageSurface({
               )}
             </div>
           )}
-        </div>
+        </DockableBoardToolbar>
       </div>
     </ObjectContext.Provider>
   );

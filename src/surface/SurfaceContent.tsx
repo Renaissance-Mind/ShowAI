@@ -124,6 +124,7 @@ const ContentNode = memo(
       actions.geometry,
     );
     const id = node.attrs!.id;
+    const nativeInk = node.type === "widget" && !!node.attrs?.data?.nativeInk;
     let body: ReactNode;
     if (node.type === "surface") body = renderSurface?.(node);
     else if (node.type === "drawing")
@@ -245,13 +246,14 @@ const ContentNode = memo(
         positioned={positioned}
         region={node.type === "region"}
         container={node.type === "surface"}
-        drawing={node.type === "drawing"}
+        drawing={node.type === "drawing" || nativeInk}
         component={node.type === "widget"}
         drawingNode={node.type === "drawing" ? node : undefined}
         fixedHeight={
           (node.type === "surface" &&
             (surfaceKind(node) === "board" || frame?.heightMode !== "auto")) ||
           node.type === "drawing" ||
+          nativeInk ||
           (node.type === "region" && frame?.mode === "free" && !!frame.height)
         }
         frame={frame}

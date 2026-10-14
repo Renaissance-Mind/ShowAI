@@ -6,7 +6,7 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { PanelLeft } from "../ui/icons";
+import { ArrowLeft, PanelLeft } from "../ui/icons";
 import { appIconForTheme } from "../design/app-icon";
 import { useAppearanceTheme } from "../design/useAppearanceTheme";
 import { useTranslator } from "../i18n/react";
@@ -29,6 +29,8 @@ export default function AutoHideSidebar({
   topbar,
   focusWindow,
   switchingTab,
+  mobileBoardKey,
+  onMobileBack,
 }: {
   enabled: boolean;
   interactionHeld: boolean;
@@ -38,6 +40,8 @@ export default function AutoHideSidebar({
   topbar: ReactNode;
   focusWindow: boolean;
   switchingTab: boolean;
+  mobileBoardKey?: string;
+  onMobileBack?: () => void;
 }) {
   const t = useTranslator(sidebarMessages);
   const appIcon = appIconForTheme(useAppearanceTheme());
@@ -61,8 +65,16 @@ export default function AutoHideSidebar({
   });
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
   const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
-  const [viewportOrientation, setViewportOrientation] = useState(document.documentElement.dataset.nativeOrientation);
-  const nativeLayout = mobileNavigationLayout(document.documentElement.dataset.nativeDevice, viewportWidth, viewportHeight, viewportOrientation);
+  const [viewportOrientation, setViewportOrientation] = useState(
+    document.documentElement.dataset.nativeOrientation,
+  );
+  const nativeLayout = mobileNavigationLayout(
+    document.documentElement.dataset.nativeDevice,
+    viewportWidth,
+    viewportHeight,
+    viewportOrientation,
+    !!mobileBoardKey,
+  );
   const swipe = useRef<{ id: number; x: number; y: number } | null>(null);
   const [resizing, setResizing] = useState(false);
   const resize = useRef<{
@@ -79,12 +91,20 @@ export default function AutoHideSidebar({
   );
   const clampWidth = (value: number) =>
     Math.round(Math.max(minimumWidth, Math.min(widthLimit, value)));
-  const width = nativeTouch ? nativeLayout.width : clampWidth(
-    preferredWidth ?? (viewportWidth <= 1100 ? 208 : 240),
-  );
+  const width = nativeTouch
+    ? nativeLayout.width
+    : clampWidth(preferredWidth ?? (viewportWidth <= 1100 ? 208 : 240));
   const sidebar = useRef<HTMLElement>(null);
   const automatic = enabled && !locked && !focusWindow && !nativeTouch;
-  const mode = nativeTouch ? nativeLayout.docked ? "docked" : nativeOpen ? "overlay" : "hidden" : automatic ? position : "docked";
+  const mode = nativeTouch
+    ? nativeLayout.docked
+      ? "docked"
+      : nativeOpen
+        ? "overlay"
+        : "hidden"
+    : automatic
+      ? position
+      : "docked";
   const hidden = mode === "hidden";
 
   const pointerIsInside = (point: { x: number; y: number }) => {
@@ -127,13 +147,22 @@ export default function AutoHideSidebar({
   useEffect(() => {
     setPosition("docked");
     if (nativeTouch) setNativeOpen(false);
-  }, [enabled, locked]);
+  }, [enabled, locked, mobileBoardKey]);
 
   useEffect(() => {
-    const update = () => { setViewportWidth(window.innerWidth); setViewportHeight(window.innerHeight); setViewportOrientation(document.documentElement.dataset.nativeOrientation); };
+    const update = () => {
+      setViewportWidth(window.innerWidth);
+      setViewportHeight(window.innerHeight);
+      setViewportOrientation(
+        document.documentElement.dataset.nativeOrientation,
+      );
+    };
     window.addEventListener("resize", update);
     window.addEventListener("showai-native-layout", update);
-    return () => { window.removeEventListener("resize", update); window.removeEventListener("showai-native-layout", update); };
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("showai-native-layout", update);
+    };
   }, []);
 
   useEffect(() => {
@@ -235,28 +264,111 @@ export default function AutoHideSidebar({
     });
   };
 
-  if (nativeTouch) return (
-    <div className="studio-workspace" data-mobile-sidebar={mode} inert={switchingTab} aria-busy={switchingTab}>
-      {!nativeLayout.docked && <div className="studio-mobile-navigation-tools">
-        <button type="button" aria-label="项目导航" aria-controls="studio-project-navigation" aria-expanded={nativeOpen} onClick={() => setNativeOpen(value => !value)}><PanelLeft size={20} aria-hidden="true" /></button>
-        {history}
-      </div>}
-      <div className="studio-sidebar-shell" data-sidebar-mode={mode} style={{ "--navigation-width": `${width}px` } as CSSProperties}>
-        <aside ref={sidebar} id="studio-project-navigation" className="studio-sidebar" aria-label="项目导航" inert={hidden}
-          onKeyDown={event => { if (event.key === "Escape") setNativeOpen(false); }}
-          onClickCapture={event => { if (!nativeLayout.docked && (event.target as Element).closest('.studio-tree-main')) setNativeOpen(false); }}>
-          <div className="studio-mobile-sidebar-brand"><img src={appIcon} alt="" /><strong>ShowAI</strong></div>
-          {navigation}
-        </aside>
+  if (nativeTouch)
+    return (
+      <div
+        className="studio-workspace"
+        data-mobile-sidebar={mode}
+        data-mobile-board={!!mobileBoardKey || undefined}
+        inert={switchingTab}
+        aria-busy={switchingTab}
+      >
+        {!nativeLayout.docked && (
+          <div className="studio-mobile-navigation-tools">
+            {mobileBoardKey ? (
+              <button
+                type="button"
+                aria-label={t("back")}
+                onClick={onMobileBack}
+              >
+                <ArrowLeft size={20} aria-hidden="true" />
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  aria-label={t("projectNavigation")}
+                  aria-controls="studio-project-navigation"
+                  aria-expanded={nativeOpen}
+                  onClick={() => setNativeOpen((value) => !value)}
+                >
+                  <PanelLeft size={20} aria-hidden="true" />
+                </button>
+                {history}
+              </>
+            )}
+          </div>
+        )}
+        <div
+          className="studio-sidebar-shell"
+          data-sidebar-mode={mode}
+          style={{ "--navigation-width": `${width}px` } as CSSProperties}
+        >
+          <aside
+            ref={sidebar}
+            id="studio-project-navigation"
+            className="studio-sidebar"
+            aria-label={t("projectNavigation")}
+            inert={hidden}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setNativeOpen(false);
+            }}
+            onClickCapture={(event) => {
+              if (
+                !nativeLayout.docked &&
+                (event.target as Element).closest(".studio-tree-main")
+              )
+                setNativeOpen(false);
+            }}
+          >
+            <div className="studio-mobile-sidebar-brand">
+              <img src={appIcon} alt="" />
+              <strong>ShowAI</strong>
+            </div>
+            {navigation}
+          </aside>
+        </div>
+        {nativeOpen && !nativeLayout.docked && (
+          <button
+            className="studio-mobile-sidebar-scrim"
+            aria-label={t("collapseSidebar")}
+            onClick={() => setNativeOpen(false)}
+          />
+        )}
+        {children}
+        {!nativeLayout.docked && !nativeOpen && (
+          <div
+            className="studio-mobile-sidebar-edge"
+            aria-hidden="true"
+            onPointerDown={(event) => {
+              if (event.pointerType !== "touch") return;
+              swipe.current = {
+                id: event.pointerId,
+                x: event.clientX,
+                y: event.clientY,
+              };
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              const start = swipe.current;
+              if (
+                start?.id === event.pointerId &&
+                sidebarSwipe(start, { x: event.clientX, y: event.clientY })
+              ) {
+                setNativeOpen(true);
+                swipe.current = null;
+              }
+            }}
+            onPointerUp={() => {
+              swipe.current = null;
+            }}
+            onPointerCancel={() => {
+              swipe.current = null;
+            }}
+          />
+        )}
       </div>
-      {nativeOpen && !nativeLayout.docked && <button className="studio-mobile-sidebar-scrim" aria-label="关闭项目导航" onClick={() => setNativeOpen(false)} />}
-      {children}
-      {!nativeLayout.docked && !nativeOpen && <div className="studio-mobile-sidebar-edge" aria-hidden="true"
-        onPointerDown={event => { if (event.pointerType !== "touch") return; swipe.current = { id: event.pointerId, x: event.clientX, y: event.clientY }; event.currentTarget.setPointerCapture(event.pointerId); }}
-        onPointerMove={event => { const start = swipe.current; if (start?.id === event.pointerId && sidebarSwipe(start, {x: event.clientX, y: event.clientY})) { setNativeOpen(true); swipe.current = null; } }}
-        onPointerUp={() => { swipe.current = null; }} onPointerCancel={() => { swipe.current = null; }} />}
-    </div>
-  );
+    );
 
   return (
     <>
@@ -264,7 +376,11 @@ export default function AutoHideSidebar({
         {!focusWindow && (
           <div
             className="studio-topbar-brand"
-            style={{ width: nativeTouch && viewportWidth <= 650 ? 56 : width } as CSSProperties}
+            style={
+              {
+                width: nativeTouch && viewportWidth <= 650 ? 56 : width,
+              } as CSSProperties
+            }
             onPointerEnter={reveal}
             onPointerLeave={leave}
           >
@@ -282,13 +398,17 @@ export default function AutoHideSidebar({
                 aria-pressed={nativeTouch ? nativeOpen : locked}
                 aria-controls="studio-project-navigation"
                 aria-expanded={nativeTouch ? nativeOpen : !hidden}
-                onPointerDown={nativeTouch ? (event) => {
-                  event.preventDefault();
-                  setNativeOpen(value => !value);
-                } : undefined}
+                onPointerDown={
+                  nativeTouch
+                    ? (event) => {
+                        event.preventDefault();
+                        setNativeOpen((value) => !value);
+                      }
+                    : undefined
+                }
                 onClick={(event) => {
                   if (nativeTouch) {
-                    if (event.detail === 0) setNativeOpen(value => !value);
+                    if (event.detail === 0) setNativeOpen((value) => !value);
                     return;
                   }
                   const next = !locked;

@@ -1,4 +1,8 @@
+import { CAPACITY } from "../portable/capacity.mjs";
 import { createSyncServer } from "./app";
+import { hotLimit } from "./durable-storage";
+import { secureResponse } from "./security";
+import { deadlineBody, verifiedStream } from "./streams";
 import { configuredLogins, type LoginEnvironment } from "./external-logins";
 import { SyncError } from "../sync/protocol";
 import type { StreamDigest } from "./storage";
@@ -210,7 +214,9 @@ export function workerObjects(env: WorkerEnvironment): ObjectStore {
       await env.CONTENT.put(key, bytes);
     },
     async putVerified(key, body, expected, maximum) {
-      if (activeUploads >= 2)
+      // Each streaming upload buffers one 5 MiB part; six stay well inside the
+      // isolate's memory while letting several devices upload at once.
+      if (activeUploads >= 6)
         throw new SyncError(
           429,
           "BUSY",
@@ -311,6 +317,153 @@ export function workerObjects(env: WorkerEnvironment): ObjectStore {
     },
   };
 }
+/** Headers only this front end may send to the Durable Object. */
+const internalHeaders = ["x-showai-transfer", "x-showai-length"];
+const objectRoute = /\/api\/projects\/[^/]+\/objects\/([a-f0-9]{64})$/;
+type DurableStub = { fetch(request: Request): Promise<Response> };
+function internal(
+  request: Request,
+  kind: string,
+  method: string,
+  input?: unknown,
+  extra: Record<string, string> = {},
+) {
+  const headers = new Headers({ "x-showai-transfer": kind, ...extra });
+  for (const name of ["authorization", "origin", "cf-connecting-ip"]) {
+    const value = request.headers.get(name);
+    if (value) headers.set(name, value);
+  }
+  if (input !== undefined) headers.set("content-type", "application/json");
+  return new Request(request.url, {
+    method,
+    headers,
+    body: input === undefined ? undefined : JSON.stringify(input),
+  });
+}
+function failure(request: Request, env: WorkerEnvironment, error: unknown) {
+  if (!(error instanceof SyncError))
+    console.error("Object transfer failed", error);
+  const known = error instanceof SyncError;
+  const response = new Response(
+    JSON.stringify({
+      error: {
+        code: known ? error.code : "SERVER_ERROR",
+        message: known ? error.message : "Object transfer failed.",
+        ...(known && error.details ? { details: error.details } : {}),
+      },
+    }),
+    {
+      status: known ? error.status : 500,
+      headers: {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+      },
+    },
+  );
+  return secureResponse(
+    response,
+    request,
+    env.SHOWAI_ALLOWED_ORIGINS?.split(",").filter(Boolean) ?? [],
+    env.SHOWAI_SERVER_URL ? new URL(env.SHOWAI_SERVER_URL).origin : undefined,
+  );
+}
+/**
+ * Streams large object bytes between the client and R2 in this Worker. The
+ * Durable Object keeps authority: it authorizes and charges every read, and
+ * admits, commits or aborts every write, but never carries the bytes.
+ */
+async function objectTransfer(
+  request: Request,
+  env: WorkerEnvironment,
+  server: DurableStub,
+): Promise<Response | undefined> {
+  const digest = new URL(request.url).pathname.match(objectRoute)?.[1];
+  if (!digest) return undefined;
+  if (request.method === "GET") {
+    const answer = await server.fetch(internal(request, "read", "GET"));
+    if (answer.headers.get("x-showai-transfer") !== "read") return answer;
+    const { key, bytes } = (await answer.json()) as {
+      key: string;
+      bytes: number;
+    };
+    const stored = await env.CONTENT.get(key);
+    if (!stored || stored.size !== bytes) {
+      await stored?.body.cancel();
+      return failure(
+        request,
+        env,
+        new SyncError(404, "MISSING_OBJECT", "Content object is missing."),
+      );
+    }
+    const headers = new Headers(answer.headers);
+    headers.delete("x-showai-transfer");
+    headers.set("content-type", "application/octet-stream");
+    headers.set("cache-control", "private, no-store");
+    headers.set("content-length", String(bytes));
+    return new Response(
+      verifiedStream(
+        stored.body,
+        workerDigest(),
+        digest,
+        CAPACITY.syncObjectBytes,
+        bytes,
+      ),
+      { headers },
+    );
+  }
+  const declared = Number(request.headers.get("content-length"));
+  if (
+    request.method !== "PUT" ||
+    !request.body ||
+    !Number.isSafeInteger(declared) ||
+    declared <= hotLimit ||
+    declared > CAPACITY.syncObjectBytes
+  )
+    return undefined;
+  const admitted = await server.fetch(
+    internal(request, "admit", "PUT", undefined, {
+      "x-showai-length": String(declared),
+    }),
+  );
+  if (admitted.headers.get("x-showai-transfer") !== "admit") {
+    await request.body.cancel();
+    return admitted;
+  }
+  const ticket = (await admitted.json()) as {
+    key: string;
+    reservation: string;
+    lease: string;
+  };
+  const transfer = deadlineBody(request.body);
+  let length: number;
+  try {
+    length = await workerObjects(env).putVerified(
+      ticket.key,
+      transfer.body,
+      digest,
+      declared,
+    );
+    if (length !== declared)
+      throw new SyncError(
+        400,
+        "INVALID_SIZE",
+        "Upload length does not match its declared size.",
+      );
+  } catch (error) {
+    const possible = !!(await env.CONTENT.head(ticket.key).catch(() => null));
+    await (
+      await server.fetch(
+        internal(request, "abort", "POST", { ...ticket, possible }),
+      )
+    ).body?.cancel();
+    return failure(request, env, error);
+  } finally {
+    await transfer.dispose().catch(() => undefined);
+  }
+  return server.fetch(
+    internal(request, "commit", "POST", { ...ticket, length }),
+  );
+}
 const instances = new WeakMap<
   WorkerEnvironment,
   ReturnType<typeof createSyncServer>
@@ -318,6 +471,11 @@ const instances = new WeakMap<
 export default {
   async fetch(request: Request, env: WorkerEnvironment) {
     const begun = performance.now();
+    if (internalHeaders.some((name) => request.headers.has(name))) {
+      const headers = new Headers(request.headers);
+      for (const name of internalHeaders) headers.delete(name);
+      request = new Request(request, { headers });
+    }
     const source = request.headers.get("cf-connecting-ip") ?? "unknown";
     const credential = request.headers
       .get("authorization")
@@ -364,9 +522,16 @@ export default {
     if (env.SHOWAI_METADATA_DRIVER === "durable" || bootstrap) {
       if (!env.SERVER)
         throw new Error("Configure the ShowAI Server Durable Object binding.");
-      return env.SERVER.get(env.SERVER.idFromName("showai-server-v1"), {
+      const server = env.SERVER.get(env.SERVER.idFromName("showai-server-v1"), {
         locationHint: "apac",
-      }).fetch(request);
+      });
+      if (!bootstrap) {
+        const transferred = await objectTransfer(request, env, server).catch(
+          (error: unknown) => failure(request, env, error),
+        );
+        if (transferred) return transferred;
+      }
+      return server.fetch(request);
     }
     let app = instances.get(env);
     if (!app) {
