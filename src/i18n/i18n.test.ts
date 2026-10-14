@@ -128,6 +128,8 @@ const scanned = [
 // marker (`// i18n-exempt: reason` on the line or the line above) for single
 // strings such as saved defaults or agent-facing protocol text.
 const exemptFiles: Record<string, string> = {
+  "src/portable/cdn-fragment.mjs":
+    "standalone reader bootstrap selects bilingual text from the page language before i18n is loaded",
   "src/components/blocks/diagrams/archify-i18n.mjs":
     "Archify's own bilingual diagram catalog",
   "src/components/blocks/registry.ts":
