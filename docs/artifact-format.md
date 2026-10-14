@@ -113,15 +113,15 @@ The built-in data shapes below are **plain JSON**. Optional fields are marked wi
 
 Basic components use the same widget envelope, with these kinds and data fields:
 
-| Kind      | Data                                                                     |
-| --------- | ------------------------------------------------------------------------ |
-| `text`    | `content: string`, `format?: "markdown" \| "plain"` |
+| Kind      | Data                                                                                 |
+| --------- | ------------------------------------------------------------------------------------ |
+| `text`    | `content: string`, `format?: "markdown" \| "plain"`                                  |
 | `image`   | `src: string`, `alt?`, `caption?`, `width?`, `height?`, `fit?: "contain" \| "cover"` |
-| `table`   | `title?`, `columns: string[]`, `rows: (string \| number \| boolean)[][]` |
-| `callout` | `title?`, `content: string` (Markdown)                                   |
-| `toggle`  | `summary: string`, `content: string` (Markdown), `open?: boolean`        |
-| `divider` | `color?: string`                                                         |
-| `code`    | `content: string`, `language?: string`                                   |
+| `table`   | `title?`, `columns: string[]`, `rows: (string \| number \| boolean)[][]`             |
+| `callout` | `title?`, `content: string` (Markdown)                                               |
+| `toggle`  | `summary: string`, `content: string` (Markdown), `open?: boolean`                    |
+| `divider` | `color?: string`                                                                     |
+| `code`    | `content: string`, `language?: string`                                               |
 
 Appearance fields include `color`, `backgroundColor`, `fontSize`, `align`, `padding`, and `radius`. Tables have 1–100 columns and up to 1,000 rectangular rows. Image URLs and Markdown images must be embedded for offline delivery. Browser export embeds image component URLs and inline/reference Markdown images. Builtins are discoverable by Agent and expose a source wrapper for creating a project variant. Existing editor-native nodes remain readable in the same artifact format.
 
@@ -236,6 +236,10 @@ Software builds ship a fingerprinted reader source archive. HTML and inline expo
 For inline fragments of 128 KB or more, the exporter losslessly gzip-compresses its reader modules, scoped styles and artifact together when this reduces the emitted size. A small local bootstrap restores the exact JSON and styles before starting the reader; custom component HTML, inline code and integrity remain intact. The companion `.showai.json` remains complete editable source. No network request is required to unpack or render. Reader templates are cached by source fingerprint and sorted component kinds; page data is inserted afterwards, so cached readers never contain another page's contents.
 
 The 1 MB limit applies to the **final emitted UTF-8 fragment**, after compression. A standalone HTML file larger than 1 MB can still fit in conversation. If the compressed fragment remains too large, export meaningful selected blocks and link the full HTML; the error reports the actual compressed byte count. Large media and incompressible data can still exceed the host limit.
+
+### CDN reader fragments
+
+Some conversation surfaces accept only a small amount of HTML but allow scripts from public CDNs. For those, `npm run build:cdn` builds the reader as code-split ES modules in `dist-cdn/` (entry name and `integrity` in `dist-cdn/manifest.json`), and `node scripts/render-artifact.mjs page.showai.json out.html --cdn READER_URL` writes a fragment that carries only the page data and a one-line loader importing `READER_URL`. The reader mounts into the fragment root like an inline page: styles are scoped to it, custom components use their `inline` runtimes, and each built-in block's code and styles load with its own chunk, so a page fetches only the kinds it uses. Host the whole `dist-cdn/` directory at an immutable, versioned HTTPS location with CORS (for example a jsDelivr URL pinned to a commit), and allow that origin in the host's script policy. The fragment needs network access to that host; the bundled inline mode below does not.
 
 ### Application-level block registration
 

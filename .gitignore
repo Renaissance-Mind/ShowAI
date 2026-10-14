@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-portable/
+dist-cdn/
 public/portable.html
 artifacts/
 test-results/

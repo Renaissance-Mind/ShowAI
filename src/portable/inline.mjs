@@ -1,6 +1,42 @@
 import { CAPACITY, CapacityError } from "./capacity.mjs";
 import { randomUUID } from "node:crypto";
 import { gzipSync } from "node:zlib";
+import { inlineStyleSheet, scopeReaderCss } from "./inline-style.mjs";
+
+/** Inline hosts block network requests: every component must travel with the page. */
+export function assertInlineArtifact(artifact) {
+  if (artifact?.remoteComponents?.length)
+    throw new Error(
+      "Inline conversation pages must bundle all components; the host blocks remote component requests.",
+    );
+  const references = new Map();
+  const visit = (node) => {
+    if (node?.type === "widget" && node.attrs?.kind === "custom") {
+      const data = node.attrs.data;
+      references.set(
+        `${data?.componentId}@${data?.version}#${data?.integrity ?? data?.scope ?? "legacy"}`,
+        data,
+      );
+    }
+    node?.content?.forEach(visit);
+  };
+  visit(artifact?.document?.content);
+  for (const [reference, ref] of references) {
+    const candidates = artifact.components?.filter(
+      (item) =>
+        item.id === ref.componentId &&
+        item.version === ref.version &&
+        (ref.integrity
+          ? item.integrity === ref.integrity
+          : !ref.scope || item.scope === ref.scope),
+    );
+    const component = candidates?.length === 1 ? candidates[0] : undefined;
+    if (!component?.inline?.script)
+      throw new Error(
+        `Custom component ${reference} needs an inline runtime. Import its rebuilt source as a new version, or export standalone HTML.`,
+      );
+  }
+}
 
 /** Adapt our self-contained reader to the conversation's isolated HTML surface. */
 export function toInlineFragment(html, id = `showai-${randomUUID()}`) {
@@ -21,40 +57,7 @@ export function toInlineFragment(html, id = `showai-${randomUUID()}`) {
       match[1].includes("application/json") &&
       /\bid=["']showai-data["']/.test(match[1]),
   );
-  if (artifactSource) {
-    const artifact = JSON.parse(artifactSource[2]);
-    if (artifact?.remoteComponents?.length)
-      throw new Error(
-        "Inline conversation pages must bundle all components; the host blocks remote component requests.",
-      );
-    const references = new Map();
-    const visit = (node) => {
-      if (node?.type === "widget" && node.attrs?.kind === "custom") {
-        const data = node.attrs.data;
-        references.set(
-          `${data?.componentId}@${data?.version}#${data?.integrity ?? data?.scope ?? "legacy"}`,
-          data,
-        );
-      }
-      node?.content?.forEach(visit);
-    };
-    visit(artifact?.document?.content);
-    for (const [reference, ref] of references) {
-      const candidates = artifact.components?.filter(
-        (item) =>
-          item.id === ref.componentId &&
-          item.version === ref.version &&
-          (ref.integrity
-            ? item.integrity === ref.integrity
-            : !ref.scope || item.scope === ref.scope),
-      );
-      const component = candidates?.length === 1 ? candidates[0] : undefined;
-      if (!component?.inline?.script)
-        throw new Error(
-          `Custom component ${reference} needs an inline runtime. Import its rebuilt source as a new version, or export standalone HTML.`,
-        );
-    }
-  }
+  if (artifactSource) assertInlineArtifact(JSON.parse(artifactSource[2]));
   if (
     !body ||
     !styles.length ||
@@ -68,11 +71,7 @@ export function toInlineFragment(html, id = `showai-${randomUUID()}`) {
     .replace('id="root"', `id="${mountId}"`);
   if (!markup.includes(`id="${mountId}"`))
     throw new Error("The reader mount point is missing.");
-  const css = styles
-    .join("\n")
-    .replace(/@charset[^;]+;/g, "")
-    .replaceAll(":root", ":scope")
-    .replace(/(?<![\w-])(?:html|body)(?=[,{])/g, ":scope");
+  const css = scopeReaderCss(styles.join("\n"));
   const code = scripts
     .map(([, attributes, source]) => {
       if (attributes.includes("application/json"))
@@ -95,32 +94,9 @@ export function toInlineFragment(html, id = `showai-${randomUUID()}`) {
       return `<script type="module">${script}</script>`;
     })
     .join("\n");
-  // The conversation measures the fragment's outer height. A viewport-sized
-  // Page hides its content height behind an inner scrollbar, so let the active
-  // root Page grow naturally. Keep spatial Boards and embedded fixed frames
-  // bounded. Applying this at export time also adapts archived readers.
   let fragment = `<section id="${id}" data-showai-inline-root${langAttribute}>${markup}</section>
 <style>
-@scope (#${id}) {
-${css}
-.portable-document { max-width: none; padding: 24px 0 12px; }
-.portable-title { padding-right: 96px; font-size: 28px; margin-bottom: 24px; }
-.portable-options { display: none; }
-.portable-app { min-height: 0; }
-.portable-app:has(> .container-workspace > .container-main > .container-page.is-root),
-.portable-app > .container-workspace:has(> .container-main > .container-page.is-root) {
-  height: auto;
-}
-.portable-app > .container-workspace > .container-main:has(> .container-page.is-root) {
-  flex: none;
-}
-.portable-app > .container-workspace > .container-main > .container-page.is-root {
-  height: auto;
-  overflow: visible;
-  overscroll-behavior: auto;
-  scrollbar-gutter: auto;
-}
-}
+${inlineStyleSheet(id, css)}
 </style>
 ${code}
 `;

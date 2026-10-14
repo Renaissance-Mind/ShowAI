@@ -10,13 +10,23 @@ import {
 
 import { assertOfflineImages } from "../src/portable/assets.mjs";
 import { toInlineFragment } from "../src/portable/inline.mjs";
+import { toCdnFragment } from "../src/portable/cdn-fragment.mjs";
 import { bundleReader } from "../src/portable/reader-bundle.mjs";
 
 const inline = process.argv.includes("--inline");
-const args = process.argv.slice(2).filter((arg) => arg !== "--inline");
+const cdnIndex = process.argv.indexOf("--cdn");
+const readerUrl = cdnIndex >= 0 ? process.argv[cdnIndex + 1] : undefined;
+if (cdnIndex >= 0 && !readerUrl)
+  throw new Error("--cdn needs the reader entry URL.");
+const args = process.argv
+  .slice(2)
+  .filter(
+    (arg, index) =>
+      arg !== "--inline" && arg !== "--cdn" && index !== cdnIndex - 1,
+  );
 if (args.includes("--help") || args.length < 2 || args.length > 3) {
   console.log(
-    "Usage: node render-artifact.mjs input.showai.json output.html [viewer-template.html] [--inline]\nCreates a standalone page, or an inline conversation fragment with --inline. Images must be embedded.\nBuild the viewer first with npm run build:portable, or use the packaged plugin command.",
+    "Usage: node render-artifact.mjs input.showai.json output.html [viewer-template.html] [--inline | --cdn reader-url]\nCreates a standalone page, or an inline conversation fragment with --inline. --cdn writes a small fragment that imports the reader from a CDN build (scripts/build-cdn-reader.mjs). Images must be embedded.\nBuild the viewer first with npm run build:portable, or use the packaged plugin command.",
   );
   process.exit(args.includes("--help") ? 0 : 1);
 }
@@ -56,19 +66,23 @@ assertBytes(
 );
 const artifact = parseArtifact(await readFile(inputPath, "utf8"));
 assertOfflineImages(artifact.document);
+// A CDN fragment carries only the page, so it needs no bundled reader.
+const cdnTemplate = `<!doctype html><html lang="zh-CN"><head><title></title></head><body><script id="showai-data" type="application/json">null</script></body></html>`;
 const html = injectArtifactIntoHtml(
-  !explicitTemplate &&
-    (await stat(join(dirname(templatePath), "reader-source.json")).then(
-      () => true,
-      (error) => {
-        if (error.code === "ENOENT") return false;
-        throw error;
-      },
-    ))
-    ? await bundleReader(join(dirname(templatePath), "reader-source.json"), [
-        artifact.document,
-      ])
-    : await readFile(templatePath, "utf8"),
+  readerUrl
+    ? cdnTemplate
+    : !explicitTemplate &&
+        (await stat(join(dirname(templatePath), "reader-source.json")).then(
+          () => true,
+          (error) => {
+            if (error.code === "ENOENT") return false;
+            throw error;
+          },
+        ))
+      ? await bundleReader(join(dirname(templatePath), "reader-source.json"), [
+          artifact.document,
+        ])
+      : await readFile(templatePath, "utf8"),
   artifact.document,
   artifact.components,
   artifact.remoteComponents,
@@ -76,8 +90,12 @@ const html = injectArtifactIntoHtml(
   artifact.selection,
 );
 await mkdir(dirname(resolve(outputPath)), { recursive: true });
-const output = inline ? toInlineFragment(html) : html;
+const output = readerUrl
+  ? toCdnFragment(html, { readerUrl })
+  : inline
+    ? toInlineFragment(html)
+    : html;
 await writeFile(outputPath, output, "utf8");
 console.log(
-  `Saved ${resolve(outputPath)} (${(Buffer.byteLength(output) / 1024).toFixed(0)} KB${inline ? ", inline" : ""})`,
+  `Saved ${resolve(outputPath)} (${(Buffer.byteLength(output) / 1024).toFixed(0)} KB${readerUrl ? ", CDN fragment" : inline ? ", inline" : ""})`,
 );
