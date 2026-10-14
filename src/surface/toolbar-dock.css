@@ -86,7 +86,8 @@
     [data-dock="right"]
   )
   .board-tool-stack {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-height: 72px;
   width: auto;
   max-height: max(
     72px,
@@ -121,6 +122,7 @@
     [data-dock="right"]
   )
   .board-style-controls {
+  flex-shrink: 0;
   flex-direction: column;
   gap: 4px;
   border: 0;
@@ -138,6 +140,7 @@
     [data-dock="right"]
   )
   .board-writing-options {
+  flex-shrink: 0;
   flex-direction: column;
   gap: 4px;
 }
