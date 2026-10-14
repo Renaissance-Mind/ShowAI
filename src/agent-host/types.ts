@@ -69,6 +69,52 @@ export interface AgentTask {
   }[];
   error?: string;
 }
+/** What the user pointed at when sending a turn. Ids are stable page block ids. */
+export interface AgentTarget {
+  kind: "page" | "text" | "blocks" | "board";
+  pageId?: string;
+  surfaceId?: string;
+  blockIds?: string[];
+  text?: string;
+}
+/** One user request and the Agent run that answered it. */
+export interface AgentTurn extends AgentTask {
+  conversationId: string;
+  prompt: string;
+  target: AgentTarget;
+  pageTitle?: string;
+  baseHash?: string;
+  resultHash?: string;
+  changedBlockIds?: string[];
+  undone?: boolean;
+}
+/** A project-scoped Agent conversation; execution settings stay fixed for its lifetime. */
+export interface AgentConversation {
+  id: string;
+  projectId: string;
+  title: string;
+  mode: AgentMode;
+  sourceId?: string;
+  localAgent?: AgentId;
+  threadId?: string;
+  catalogRevision?: string;
+  workspace: string;
+  createdAt: string;
+  updatedAt: string;
+  turns: AgentTurn[];
+}
+export interface AgentConversationSummary {
+  id: string;
+  projectId: string;
+  title: string;
+  mode: AgentMode;
+  sourceId?: string;
+  localAgent?: AgentId;
+  createdAt: string;
+  updatedAt: string;
+  turnCount: number;
+  running: boolean;
+}
 export interface AgentHostStatus {
   settings: AgentSettings;
   agents: LocalAgent[];

@@ -735,11 +735,10 @@ else {
       agentHost = new AgentHost({
         resources: new ModelResourceClient(() => store.root),
         root: join(app.getPath("userData"), "agent-host"),
-        workspaceRoot: join(
-          app.getPath("documents"),
-          "ShowAI",
-          "Agent Workspaces",
-        ),
+        // Isolated development instances keep Agent work files in their task directory.
+        workspaceRoot:
+          process.env.SHOWAI_AGENT_WORKSPACES ||
+          join(app.getPath("documents"), "ShowAI", "Agent Workspaces"),
         library: () => store,
         cli: () => info().cli,
         pluginRoot: () =>

@@ -72,6 +72,7 @@ import {
   Plus,
   Quote,
   Redo2,
+  Sparkles,
   Strikethrough,
   Table2,
   Trash2,
@@ -179,6 +180,23 @@ function safeLinkUrl(value: string) {
   return /^(https?:\/\/|mailto:|tel:|#)/i.test(value);
 }
 
+/** Page editors append a synthetic tail paragraph that is not stored in the document. */
+function isSyntheticId(id: string) {
+  return id.startsWith("page-tail-");
+}
+/** The innermost id-carrying text blocks touched by a selection, else its top-level blocks. */
+function selectionBlockIds(editor: Editor, from: number, to: number) {
+  const inner: string[] = [];
+  const outer: string[] = [];
+  editor.state.doc.nodesBetween(from, to, (node, _pos, parent) => {
+    const id = node.attrs?.id;
+    if (typeof id !== "string" || isSyntheticId(id)) return;
+    if (node.isTextblock) inner.push(id);
+    else if (parent === editor.state.doc) outer.push(id);
+  });
+  return [...new Set(inner.length ? inner : outer)].slice(0, 100);
+}
+
 function menuPosition(editor: Editor, from: number) {
   const rect = editor.view.coordsAtPos(
     Math.min(from, editor.state.doc.content.size),
@@ -215,7 +233,8 @@ export default function RichTextEditor({
   const selectedRef = useRef(0);
   const dragPosition = useRef<number | null>(null);
   const [slash, setSlash] = useState<SlashState | null>(null);
-  const { useCatalog, registerComponent } = useContext(RichTextEnvironment);
+  const { useCatalog, registerComponent, assistant } =
+    useContext(RichTextEnvironment);
   const catalog = useCatalog(!!slash);
   const [inserting, setInserting] = useState(false);
   const insertionTicket = useRef(0);
@@ -1684,6 +1703,30 @@ export default function RichTextEditor({
                     <Copy size={15} />
                     {t("block.duplicate")}
                   </button>
+                  {assistant && (
+                    <button
+                      onClick={(event) => {
+                        const id = editor.state.doc.nodeAt(hover.pos)?.attrs.id;
+                        const rect = event.currentTarget
+                          .closest(".block-handle")!
+                          .getBoundingClientRect();
+                        setBlockMenu(false);
+                        if (typeof id === "string" && !isSyntheticId(id))
+                          assistant.open({
+                            kind: "blocks",
+                            blockIds: [id],
+                            anchor: {
+                              left: rect.right + 160,
+                              top: rect.top,
+                              bottom: rect.bottom,
+                            },
+                          });
+                      }}
+                    >
+                      <Sparkles size={15} />
+                      {t("assistant.askBlock")}
+                    </button>
+                  )}
                   <div className="menu-rule" />
                   <button
                     className="danger"
@@ -1779,6 +1822,32 @@ export default function RichTextEditor({
         >
           {formatButtons}
           <TableSelectionActions editor={editor} />
+          {assistant && (
+            <>
+              <span className="toolbar-divider" aria-hidden="true" />
+              <button
+                type="button"
+                className="editor-bubble-assistant"
+                aria-label={t("assistant.ask")}
+                title={t("assistant.ask")}
+                onClick={() => {
+                  const { from, to } = editor.state.selection;
+                  const anchor = bubble;
+                  selectionMenuInteracting.current = false;
+                  setBubble(null);
+                  assistant.open({
+                    kind: "text",
+                    blockIds: selectionBlockIds(editor, from, to),
+                    text: editor.state.doc.textBetween(from, to, "\n"),
+                    anchor,
+                  });
+                }}
+              >
+                <Sparkles size={15} />
+                <span>AI</span>
+              </button>
+            </>
+          )}
         </SelectionToolbar>
       )}
       {slash &&

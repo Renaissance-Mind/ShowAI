@@ -30,7 +30,9 @@ import { flushSync } from "react-dom";
 import { fingerNavigatesBoard, isBoardShape } from "./board-input.mjs";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";
+import { AssistantContext } from "../components/assistant-context";
 import {
+  useContext,
   useEffect,
   useLayoutEffect,
   useImperativeHandle,
@@ -75,6 +77,7 @@ import {
   AlignVerticalDistributeCenter,
   MapIcon,
   CheckSquare,
+  Sparkles,
 } from "../ui/icons";
 import {
   useSurfaceViewport,
@@ -259,6 +262,7 @@ export default function PageSurface({
   onToolChange,
 }: Props) {
   const t = useTranslator(messages);
+  const assistant = useContext(AssistantContext);
   const mobile =
     typeof document !== "undefined" &&
     document.documentElement.dataset.native === "ios";
@@ -848,6 +852,16 @@ export default function PageSurface({
       "⌥⇧V",
     ],
   ];
+  const askAssistant = (
+    ids: string[],
+    anchor: { left: number; top: number; bottom: number },
+  ) =>
+    assistant?.open({
+      kind: "board",
+      blockIds: ids.slice(0, 100),
+      surfaceId: boardDocument?.content.attrs?.id,
+      anchor,
+    });
   const objectMenuItems = (ids: string[], id: string, container: boolean) => {
     const many = ids.length > 1;
     const lockedNow = ids.every((item) => layoutOf(item)?.locked);
@@ -856,11 +870,27 @@ export default function PageSurface({
       boardDocument &&
       findSurfaceNode(boardDocument, id)?.node.type === "region" &&
       layoutOf(id)?.mode === "free";
+    const point = objectMenu?.point ?? { x: 0, y: 0 };
     const items: LibraryContextMenuItem[] = [
+      ...(assistant
+        ? [
+            {
+              label: t("menu.assistant"),
+              icon: <Sparkles size={14} />,
+              onSelect: () =>
+                askAssistant(ids, {
+                  left: point.x,
+                  top: point.y,
+                  bottom: point.y,
+                }),
+            },
+          ]
+        : []),
       {
         label: many
           ? t("menu.duplicateMany", { count: ids.length })
           : t("menu.duplicate"),
+        separatorBefore: !!assistant,
         icon: <Copy size={14} />,
         shortcut: "⌘D",
         onSelect: () => duplicateSelection(ids),
@@ -1910,6 +1940,23 @@ export default function PageSurface({
           )}
           {onTransform && !objectMenu && board.ids.size > 0 && (
             <>
+              {assistant && (
+                <button
+                  type="button"
+                  aria-label={t("board.assistant")}
+                  title={t("board.assistant")}
+                  onClick={(event) => {
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    askAssistant(selectedIds, {
+                      left: rect.left + rect.width / 2,
+                      top: rect.top,
+                      bottom: rect.bottom,
+                    });
+                  }}
+                >
+                  <Sparkles size={15} />
+                </button>
+              )}
               {selectedContainer && (
                 <button
                   type="button"

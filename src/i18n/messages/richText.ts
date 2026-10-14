@@ -95,6 +95,8 @@ export default defineMessages("richText", {
     "block.moveUp": "向上移动",
     "block.moveDown": "向下移动",
     "block.duplicate": "复制内容块",
+    "assistant.ask": "让 AI 处理",
+    "assistant.askBlock": "让 AI 处理此块",
     "block.delete": "删除",
 
     "dialog.addLink": "添加链接",
@@ -236,6 +238,8 @@ export default defineMessages("richText", {
     "block.moveUp": "Move up",
     "block.moveDown": "Move down",
     "block.duplicate": "Duplicate block",
+    "assistant.ask": "Ask AI",
+    "assistant.askBlock": "Ask AI about this block",
     "block.delete": "Delete",
 
     "dialog.addLink": "Add link",

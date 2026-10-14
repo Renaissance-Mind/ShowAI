@@ -53,6 +53,7 @@ import {
   LayoutTemplate,
   Loader2,
   MoreHorizontal,
+  Sparkles,
   ListOrdered,
   Plus,
   History,
@@ -165,6 +166,8 @@ import { getLocale } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import commonMessages from "../i18n/messages/common";
 import studioMessages from "../i18n/messages/studio";
+import assistantMessages from "../i18n/messages/assistant";
+import AssistantWorkbench from "./assistant/AssistantWorkbench";
 import {
   componentDisplayDescription,
   componentDisplayName,
@@ -250,6 +253,7 @@ function Scope({ value }: { value: string }) {
 export default function Studio() {
   const t = useTranslator(studioMessages);
   const tc = useTranslator(commonMessages);
+  const ta = useTranslator(assistantMessages);
   useEffect(() => {
     const wake = () => {
       if (document.visibilityState === "visible" && navigator.onLine)
@@ -383,6 +387,13 @@ export default function Studio() {
   const [problem, setProblem] = useState("");
   const [busy, setBusy] = useState(false);
   const [revealNode, setRevealNode] = useState<string | null>(null);
+  const [assistantOpen, setAssistantOpen] = useState(
+    () => localStorage.getItem("showai:assistant-open") === "true",
+  );
+  const changeAssistantOpen = useCallback((open: boolean) => {
+    setAssistantOpen(open);
+    localStorage.setItem("showai:assistant-open", String(open));
+  }, []);
   const [editorControls, setEditorControls] = useState<EditorControls | null>(
     null,
   );
@@ -920,6 +931,38 @@ export default function Studio() {
       routingRef.current = false;
       setRouting(false);
     }
+  }
+  /** Open the page an Agent turn worked on and highlight the blocks it named. */
+  async function locateAssistantTarget(pageId: string, ids: string[]) {
+    const projectId = page.projectId ?? selectedProject;
+    if (page.draft?.id !== pageId && !(await openPage(pageId, projectId)))
+      return;
+    if (ids[0]) setRevealNode(ids[0]);
+    // Editors own their DOM attributes, so the highlight is a separate overlay.
+    window.setTimeout(() => {
+      const scope = document.querySelector(".studio-main");
+      const found = ids
+        .map((id) =>
+          scope?.querySelector(
+            `[data-surface-id="${CSS.escape(id)}"],[data-block-id="${CSS.escape(id)}"]`,
+          ),
+        )
+        .filter((element): element is Element => !!element);
+      found[0]?.scrollIntoView({ block: "center" });
+      for (const element of found) {
+        const rect = element.getBoundingClientRect();
+        const box = document.createElement("div");
+        box.className = "assistant-flash";
+        Object.assign(box.style, {
+          left: `${rect.left - 4}px`,
+          top: `${rect.top - 4}px`,
+          width: `${rect.width + 8}px`,
+          height: `${rect.height + 8}px`,
+        });
+        document.body.append(box);
+        window.setTimeout(() => box.remove(), 1600);
+      }
+    }, 240);
   }
   async function openPage(id: string, projectId = selectedProject) {
     if (routingRef.current) return false;
@@ -2580,6 +2623,15 @@ export default function Studio() {
               <ArrowUpRight size={14} />
             </button>
             <button
+              className={`studio-icon${assistantOpen ? " is-active" : ""}`}
+              aria-label={ta("panel.toggle")}
+              aria-pressed={assistantOpen}
+              title={ta("panel.toggle")}
+              onClick={() => changeAssistantOpen(!assistantOpen)}
+            >
+              <Sparkles size={15} />
+            </button>
+            <button
               className="studio-icon"
               aria-label={t("pageActions")}
               aria-haspopup="menu"
@@ -2646,6 +2698,20 @@ export default function Studio() {
             />
           }
         >
+          <AssistantWorkbench
+            enabled={view === "page" && !!page.draft}
+            open={assistantOpen}
+            onOpenChange={changeAssistantOpen}
+            projectId={view === "page" && page.draft ? page.projectId : null}
+            pageId={view === "page" ? (page.draft?.id ?? null) : null}
+            pageTitle={page.draft?.title}
+            flush={page.flush}
+            onLocate={locateAssistantTarget}
+            onOpenSettings={() => {
+              setSettingsSection("agent");
+              void navigate("settings").catch(report);
+            }}
+          >
           <main
             className="studio-main"
             id="studio-tab-panel"
@@ -3042,6 +3108,7 @@ export default function Studio() {
               )}
             </div>
           </main>
+          </AssistantWorkbench>
         </AutoHideSidebar>
         {notice && (
           <div className="studio-toast" role="status">
