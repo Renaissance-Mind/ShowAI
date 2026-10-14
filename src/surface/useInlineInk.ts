@@ -104,6 +104,7 @@ export function useInlineInk({
         navigating.current = !!value.navigating;
         cameraRevision.current = value.cameraVersion ?? cameraRevision.current;
         current.current.onCamera(value.camera, !value.navigating);
+        if (!value.navigating) invalidate.current?.();
       }
       if (value.tool)
         current.current.onTool(
@@ -233,6 +234,23 @@ export function useInlineInk({
         camera: { ...viewCamera.current },
         cameraVersion: cameraRevision.current,
         holes,
+        shapes: [
+          ...content.querySelectorAll<HTMLElement>('[data-board-shape="true"]'),
+        ]
+          .filter(
+            (element) =>
+              element.closest(".page-surface") === surface &&
+              element.getClientRects().length,
+          )
+          .map((element) => {
+            const r = element.getBoundingClientRect();
+            return {
+              x: r.x - 8,
+              y: r.y - 8,
+              width: r.width + 16,
+              height: r.height + 16,
+            };
+          }),
       };
       const key = JSON.stringify(packet);
       if (key === lastKey && documentValue === lastDocument) {

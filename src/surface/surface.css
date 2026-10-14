@@ -120,6 +120,9 @@
 .surface-object.is-moving {
   user-select: none;
 }
+.surface-object[data-erasing="true"] {
+  opacity: 0 !important;
+}
 .surface-object-content {
   padding: 18px 28px 26px;
   min-width: 0;

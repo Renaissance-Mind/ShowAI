@@ -29,6 +29,7 @@ import {
   Maximize2,
 } from "../ui/icons";
 import type { NodeLayout } from "./types";
+import { isBoardShape } from "./board-input.mjs";
 
 export interface ObjectActions {
   componentActionsHost?: HTMLElement | null;
@@ -180,6 +181,7 @@ export function SurfaceObject({
   ) => {
     if (
       event.defaultPrevented ||
+      (event.pointerType === "pen" && isBoardShape(drawingNode)) ||
       event.button !== 0 ||
       (!positioned && !resize) ||
       !frame ||
@@ -364,6 +366,9 @@ export function SurfaceObject({
       className={`surface-object${region ? " is-region" : ""}${container ? " is-container" : ""}${drawing ? " is-drawing" : ""}${moving ? " is-moving" : ""}${locked ? " is-locked" : ""}${(board?.ids.has(id) ?? actions.selected === id) ? " is-selected" : ""}`}
       data-surface-id={id}
       data-board-drawing={(drawing && positioned && !!board) || undefined}
+      data-board-shape={
+        isBoardShape(drawingNode) || undefined
+      }
       data-surface-mounted={mount}
       data-board-fixed-height={fixedHeight}
       data-surface-name={name}
@@ -372,6 +377,7 @@ export function SurfaceObject({
       tabIndex={-1}
       onPointerDown={(event) => {
         if (event.defaultPrevented) return;
+        if (event.pointerType === "pen" && isBoardShape(drawingNode)) return;
         if (
           (event.target as Element).closest("[data-surface-id]") ===
           event.currentTarget

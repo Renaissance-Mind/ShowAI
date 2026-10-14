@@ -568,6 +568,7 @@ export function useBoardInteraction({
       for (const element of root.querySelectorAll<HTMLElement>(
         ".surface-object[data-surface-id]",
       )) {
+        if (element.dataset.erasing === "true") continue;
         if (element.closest(".page-surface") !== root.closest(".page-surface"))
           continue;
         const id = element.dataset.surfaceId!,

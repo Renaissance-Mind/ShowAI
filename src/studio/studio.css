@@ -43,6 +43,29 @@
   background: var(--paper);
   color: var(--text);
 }
+.studio
+  :is(
+    .studio-topbar-brand,
+    .studio-topbar,
+    .studio-sidebar-shell,
+    .workspace-tabs,
+    .surface-toolbar,
+    .studio-context-menu,
+    .studio-dialog,
+    button,
+    summary,
+    [role="button"],
+    [data-surface-ui]
+  ) {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.studio :is(input, textarea, [contenteditable="true"]) {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
 .studio-sidebar {
   width: 226px;
   flex-shrink: 0;
