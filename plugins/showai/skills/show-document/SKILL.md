@@ -47,6 +47,6 @@ description: 通过 ShowAI MCP 制作、续改、展示和导出可交互报告�
 
 复杂作品在制作前保存理解树与具体分镜；格式见 [理解规划](../plan-presentation/references/understanding-plan.md) 和 [表达与分镜](../design-presentation/references/expression-and-storyboard.md)。已有有效规划可复用。校验脚本位于 plan-presentation 技能目录的 `scripts/check_plan.py`（相对本技能为 `../plan-presentation/scripts/check_plan.py`），直接执行即可，不为使用它加载整段源码。
 
-源检查用 response:"source"；派生值/计算读模型按需请求 full/rendered。图像检查可用 response:"receipt"，图片仍返回，避免同时重复整页 DOM。实际宿主交互遵循官方操控规则；没有执行的路径明确标注。完成后读当前 review 阶段并按 [review-presentation](../review-presentation/SKILL.md) 检查真实分镜对应、画面与操作。
+源检查用 response:"source"；派生值/计算读模型用默认 structured 视图与 response:"full"，不要传 rendered:false（含 readData 的组件会自动渲染）。图像检查可用 response:"receipt"，图片仍返回，避免同时重复整页 DOM。实际宿主交互遵循官方操控规则；没有执行的路径明确标注。完成后读当前 review 阶段并按 [review-presentation](../review-presentation/SKILL.md) 检查真实分镜对应、画面与操作。
 
 正式保存后用 page_present，按 [对话展示](references/conversation-display.md) 展示本轮真实 delivery。容量按需读 [容量](references/capacity.md)，局部展示/临时状态读 [页面阅读](references/page-reading.md)。只有用户明确独立交付时用 render_document；连接、保存或显示失败不自动改变内容归属。
