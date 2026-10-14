@@ -12,6 +12,7 @@ import { flushSync } from "react-dom";
 import { ObjectContext } from "./SurfaceObject";
 import {
   useContext,
+  useId,
   useEffect,
   useRef,
   useState,
@@ -33,6 +34,7 @@ export function Drawing({
 }) {
   const t = useTranslator(messages);
   const actions = useContext(ObjectContext);
+  const contourId = useId();
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<{
     key: "start" | "end";
@@ -98,6 +100,54 @@ export function Drawing({
     last = preview?.key === "end" ? preview.point : points.at(-1)!;
   const path =
     tool === "arrow" ? arrowPath(first, last, strokeWidth) : smoothPath(points);
+  const shape = node.attrs!.ink ? (
+    <>
+      <image
+        className={node.attrs!.ink.darkPreview ? "board-ink-light" : undefined}
+        href={node.attrs!.ink.preview}
+        width={extent[0]}
+        height={extent[1]}
+        preserveAspectRatio="none"
+      />
+      {node.attrs!.ink.darkPreview && (
+        <image
+          className="board-ink-dark"
+          href={node.attrs!.ink.darkPreview}
+          width={extent[0]}
+          height={extent[1]}
+          preserveAspectRatio="none"
+        />
+      )}
+    </>
+  ) : node.attrs!.pressure !== false &&
+    (tool === "pen" || tool === "highlighter") &&
+    points.some((p) => p.pressure !== undefined) ? (
+    <path d={pressureOutline(points, strokeWidth)} fill={color} stroke="none" />
+  ) : tool === "rectangle" ? (
+    <rect
+      x={Math.min(first.x, last.x)}
+      y={Math.min(first.y, last.y)}
+      width={Math.abs(last.x - first.x)}
+      height={Math.abs(last.y - first.y)}
+    />
+  ) : tool === "ellipse" ? (
+    <ellipse
+      cx={(first.x + last.x) / 2}
+      cy={(first.y + last.y) / 2}
+      rx={Math.abs(last.x - first.x) / 2}
+      ry={Math.abs(last.y - first.y) / 2}
+    />
+  ) : (
+    <path d={path} />
+  );
+  const selected =
+    !actions.readOnly &&
+    (actions.board?.ids.has(node.attrs!.id) ??
+      actions.selected === node.attrs!.id);
+  const contourRadius = [
+    (1.5 * extent[0]) / ((frame?.width ?? extent[0]) * actions.scale),
+    (1.5 * extent[1]) / ((frame?.height ?? extent[1]) * actions.scale),
+  ].join(" ");
   return (
     <>
       <svg
@@ -117,54 +167,55 @@ export function Drawing({
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          {node.attrs!.ink ? (
-            <>
-              <image
-                className={
-                  node.attrs!.ink.darkPreview ? "board-ink-light" : undefined
-                }
-                href={node.attrs!.ink.preview}
-                width={extent[0]}
-                height={extent[1]}
-                preserveAspectRatio="none"
-              />
-              {node.attrs!.ink.darkPreview && (
-                <image
-                  className="board-ink-dark"
-                  href={node.attrs!.ink.darkPreview}
-                  width={extent[0]}
-                  height={extent[1]}
-                  preserveAspectRatio="none"
-                />
-              )}
-            </>
-          ) : node.attrs!.pressure !== false &&
-            (tool === "pen" || tool === "highlighter") &&
-            points.some((p) => p.pressure !== undefined) ? (
-            <path
-              d={pressureOutline(points, strokeWidth)}
-              fill={color}
-              stroke="none"
-            />
-          ) : tool === "rectangle" ? (
-            <rect
-              x={Math.min(first.x, last.x)}
-              y={Math.min(first.y, last.y)}
-              width={Math.abs(last.x - first.x)}
-              height={Math.abs(last.y - first.y)}
-            />
-          ) : tool === "ellipse" ? (
-            <ellipse
-              cx={(first.x + last.x) / 2}
-              cy={(first.y + last.y) / 2}
-              rx={Math.abs(last.x - first.x) / 2}
-              ry={Math.abs(last.y - first.y) / 2}
-            />
-          ) : (
-            <path d={path} />
-          )}
+          {shape}
         </g>
       </svg>
+      {selected && (
+        <svg
+          className="board-drawing-selection"
+          viewBox={`0 0 ${extent[0]} ${extent[1]}`}
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <defs>
+            <filter
+              id={contourId}
+              filterUnits="userSpaceOnUse"
+              x="-50%"
+              y="-50%"
+              width="200%"
+              height="200%"
+            >
+              <feMorphology
+                in="SourceAlpha"
+                operator="dilate"
+                radius={contourRadius}
+                result="expanded"
+              />
+              <feComposite
+                in="expanded"
+                in2="SourceAlpha"
+                operator="out"
+                result="edge"
+              />
+              <feFlood floodColor="#467de3" result="color" />
+              <feComposite in="color" in2="edge" operator="in" />
+            </filter>
+          </defs>
+          <g
+            filter={`url(#${contourId})`}
+            fill={
+              tool === "rectangle" || tool === "ellipse" ? fillColor : "none"
+            }
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            {shape}
+          </g>
+        </svg>
+      )}
       {tool === "arrow" &&
         frame &&
         !actions.readOnly &&

@@ -494,14 +494,25 @@
 .board-object-outline {
   position: absolute;
   pointer-events: none;
-  outline: calc(1.5px * var(--board-inv, 1)) solid #467de3;
-  opacity: 0.65;
+}
+.board-drawing-selection {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.surface-object.is-drawing > .board-resize-handle,
+.board-group-outline[data-drawing-selection="true"] > .board-resize-handle {
+  border-radius: 50%;
 }
 .surface-object.is-drawing.is-hovered:not(.is-selected) .board-drawing {
   filter: drop-shadow(0 0 1px #467de3);
 }
 @media print {
-  .board-object-outline {
+  .board-object-outline,
+  .board-drawing-selection {
     display: none;
   }
 }

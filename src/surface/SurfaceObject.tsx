@@ -359,6 +359,42 @@ export function SurfaceObject({
   // A multi-selection shares one set of handles on its group outline.
   const single = !board || board.ids.size <= 1;
   const locked = !!frame?.locked;
+  const drawingTool = drawingNode?.attrs?.tool;
+  const resizeDirections =
+    drawingTool === "arrow"
+      ? []
+      : drawing && drawingTool !== "rectangle"
+        ? ["n", "e", "s", "w"]
+        : fixedHeight
+          ? ["nw", "n", "ne", "e", "se", "s", "sw", "w"]
+          : ["e", "w"];
+  const drawingHandle = (direction: string) => {
+    if (!ink || !drawingNode) return undefined;
+    let x =
+      ink.x +
+      ink.width *
+        (direction.includes("w") ? 0 : direction.includes("e") ? 1 : 0.5);
+    let y =
+      ink.y +
+      ink.height *
+        (direction.includes("n") ? 0 : direction.includes("s") ? 1 : 0.5);
+    if (
+      !drawingNode.attrs!.ink &&
+      (drawingTool === "pen" || drawingTool === "highlighter")
+    ) {
+      const axis = direction === "n" || direction === "s" ? "y" : "x";
+      const sign = direction === "n" || direction === "w" ? -1 : 1;
+      const point = drawingNode.attrs!.points.reduce(
+        (edge: { x: number; y: number }, point: { x: number; y: number }) =>
+          point[axis] * sign > edge[axis] * sign ? point : edge,
+      );
+      ({ x, y } = point);
+    }
+    return {
+      left: `${(x / drawingNode.attrs!.extent[0]) * 100}%`,
+      top: `${(y / drawingNode.attrs!.extent[1]) * 100}%`,
+    };
+  };
   return (
     <section
       ref={element}
@@ -366,9 +402,7 @@ export function SurfaceObject({
       className={`surface-object${region ? " is-region" : ""}${container ? " is-container" : ""}${drawing ? " is-drawing" : ""}${moving ? " is-moving" : ""}${locked ? " is-locked" : ""}${(board?.ids.has(id) ?? actions.selected === id) ? " is-selected" : ""}`}
       data-surface-id={id}
       data-board-drawing={(drawing && positioned && !!board) || undefined}
-      data-board-shape={
-        isBoardShape(drawingNode) || undefined
-      }
+      data-board-shape={isBoardShape(drawingNode) || undefined}
       data-surface-mounted={mount}
       data-board-fixed-height={fixedHeight}
       data-surface-name={name}
@@ -415,6 +449,7 @@ export function SurfaceObject({
         </span>
       )}
       {rotatable &&
+        drawingTool !== "arrow" &&
         positioned &&
         single &&
         !locked &&
@@ -427,6 +462,14 @@ export function SurfaceObject({
             data-surface-handle
             aria-label={t("object.rotate", { name })}
             title={t("object.rotateTitle")}
+            style={
+              ink && drawingNode
+                ? {
+                    left: `calc(${((ink.x + ink.width / 2) / drawingNode.attrs!.extent[0]) * 100}% - 12px * var(--board-inv, 1))`,
+                    top: `calc(${(ink.y / drawingNode.attrs!.extent[1]) * 100}% - 44px * var(--board-inv, 1))`,
+                  }
+                : undefined
+            }
             onPointerDown={(event) => start(event, false, "rotate")}
             {...handlers}
           >
@@ -536,10 +579,7 @@ export function SurfaceObject({
         !actions.readOnly &&
         positioned &&
         board &&
-        (fixedHeight
-          ? ["nw", "n", "ne", "e", "se", "s", "sw", "w"]
-          : ["e", "w"]
-        ).map((direction) => (
+        resizeDirections.map((direction) => (
           <button
             key={direction}
             type="button"
@@ -547,14 +587,7 @@ export function SurfaceObject({
             data-surface-ui
             data-surface-handle
             data-resize-direction={direction}
-            style={
-              ink && drawingNode
-                ? {
-                    left: `${((ink.x + ink.width * (direction.includes("w") ? 0 : direction.includes("e") ? 1 : 0.5)) / drawingNode.attrs!.extent[0]) * 100}%`,
-                    top: `${((ink.y + ink.height * (direction.includes("n") ? 0 : direction.includes("s") ? 1 : 0.5)) / drawingNode.attrs!.extent[1]) * 100}%`,
-                  }
-                : undefined
-            }
+            style={drawingHandle(direction)}
             aria-label={t(
               `object.resize.${direction}` as MessageKey<typeof messages>,
               { name },

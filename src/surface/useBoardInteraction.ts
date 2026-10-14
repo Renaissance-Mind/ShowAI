@@ -172,7 +172,11 @@ export function useBoardInteraction({
     const outline = document ? window.document.createElement("div") : null;
     if (!outline) return;
     outline.className = "board-group-outline";
-    // One set of handles scales the whole selection from the group's corners.
+    const drawings = [...ids].every(
+      (id) => selectionIndex.get(id)?.node.type === "drawing",
+    );
+    outline.dataset.drawingSelection = String(drawings);
+    // Drawing selections use edge handles without surrounding their contours.
     const fixed = [...ids].some(
       (id) =>
         world.current?.querySelector<HTMLElement>(
@@ -182,9 +186,11 @@ export function useBoardInteraction({
     const locked = [...ids].some((id) => document?.layout?.[id]?.locked);
     for (const direction of locked
       ? []
-      : fixed
-        ? ["nw", "n", "ne", "e", "se", "s", "sw", "w"]
-        : ["e", "w"]) {
+      : drawings
+        ? ["n", "e", "s", "w"]
+        : fixed
+          ? ["nw", "n", "ne", "e", "se", "s", "sw", "w"]
+          : ["e", "w"]) {
       const handle = window.document.createElement("button");
       handle.type = "button";
       handle.className = `board-resize-handle handle-${direction}`;
@@ -275,6 +281,11 @@ export function useBoardInteraction({
         const path = el.querySelector(".board-drawing path"),
           original = el.dataset.boardOriginalPath;
         if (path && original !== undefined) path.setAttribute("d", original);
+        if (original !== undefined)
+          el.querySelector(".board-drawing-selection > g > path")?.setAttribute(
+            "d",
+            original,
+          );
         delete el.dataset.boardOriginalPath;
       }
     }
@@ -492,13 +503,26 @@ export function useBoardInteraction({
             (layout[id].height ?? 1),
         }),
       );
-      path.setAttribute("d", arrowPath(a, b, entry.node.attrs!.strokeWidth));
+      const preview = arrowPath(a, b, entry.node.attrs!.strokeWidth);
+      path.setAttribute("d", preview);
+      el.querySelector(".board-drawing-selection > g > path")?.setAttribute(
+        "d",
+        preview,
+      );
     }
   };
   return {
     ids,
     selectionHit(x, y) {
       if (!currentIds.current.size) return null;
+      if (
+        [...currentIds.current].every(
+          (id) => selectionIndex.get(id)?.node.type === "drawing",
+        )
+      ) {
+        const hit = this.hitTest(x, y);
+        return hit && currentIds.current.has(hit.id) ? hit.id : null;
+      }
       const boxes = [...currentIds.current].flatMap((id) => {
         const el = world.current?.querySelector<HTMLElement>(
           `[data-surface-id="${CSS.escape(id)}"]`,
