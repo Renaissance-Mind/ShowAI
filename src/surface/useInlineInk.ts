@@ -3,6 +3,7 @@ import type { RefObject } from "react";
 import type { ShowDocument } from "../types";
 import { findSurfaceNode } from "./document.mjs";
 import { inkNodes } from "./inline-ink";
+import type { Camera } from "./model";
 
 function probe(parent: HTMLElement) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -19,6 +20,7 @@ const values = (m: DOMMatrix) =>
 export function useInlineInk({
   root,
   world,
+  camera: viewCamera,
   document: source,
   boardId,
   tool,
@@ -31,6 +33,7 @@ export function useInlineInk({
 }: {
   root: RefObject<HTMLDivElement | null>;
   world: RefObject<HTMLDivElement | null>;
+  camera: RefObject<Camera>;
   document?: ShowDocument;
   boardId: string;
   tool: string | null | undefined;
@@ -135,7 +138,6 @@ export function useInlineInk({
       const viewport = viewportProbe.getScreenCTM(),
         worldMatrix = worldProbe.getScreenCTM();
       if (!viewport || !worldMatrix) return;
-      const camera = viewport.inverse().multiply(worldMatrix);
       const size = surface.clientWidth + ":" + surface.clientHeight;
       if (poseDocument !== documentValue || poseSize !== size) {
         const inverse = worldMatrix.inverse(),
@@ -187,7 +189,9 @@ export function useInlineInk({
         widthPx: surface.clientWidth,
         heightPx: surface.clientHeight,
         viewport: values(viewport),
-        camera: { x: camera.e, y: camera.f, scale: camera.a },
+        // WebKit's SVG screen matrix can omit ancestor CSS scale. The shared
+        // viewport already owns these coordinates; never infer them from SVG.
+        camera: { ...viewCamera.current },
         cameraVersion: cameraRevision.current,
         holes,
       };
@@ -296,5 +300,5 @@ export function useInlineInk({
         }
       });
     };
-  }, [enabled, source?.id, boardId, tool, root, world]);
+  }, [enabled, source?.id, boardId, tool, root, world, viewCamera]);
 }
