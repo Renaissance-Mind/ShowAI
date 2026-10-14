@@ -43,7 +43,7 @@ description: 通过 ShowAI MCP 制作、续改、展示和导出可交互报告�
 
 需要具体操作时才读 guide authoring/containers/document 等技术说明；选择组件后读其精确 guide，再按当前材料用parameters的parameterPath查字段含义、约束、遗漏行为和例子；只在需要原始结构时读schema。模板组件采用 template_context 返回的 componentId/version/integrity，不能把局部名字当内置 kind。现有数据调整或组件组合够用时复用；明确缺口进入 [create-component](../create-component/SKILL.md)。新建可复用模板进入 [create-template](../create-template/SKILL.md)。
 
-模板应用用 template_apply，可带本轮固定 templates。空白路径用 page_create。修改前 page_read({projectId,pageId,rendered:false,response:"source"}) 读取完整源、hash/revision；局部编辑同时保留必要基线，不用局部 source 覆盖整页。优先 page_apply 的稳定节点操作，response:"receipt" 只收保存回执。需要新模板绑定时以 page.set.fields.templateContext 保存 template_context 返回的 format/system/templates，去掉 hash；运行时仍强制提供自身系统基线。CONFLICT 必须比较基线、当前内容和尝试稿，保留无关修改；使用 page_merge_preview / page_merge_save，流程见 [use-showai](../use-showai/SKILL.md) 的编辑与验证。
+模板应用用 template_apply，可带本轮固定 templates。空白路径用 page_create。修改前 page_read({projectId,pageId,rendered:false,response:"source"}) 读取完整源、hash/revision；局部编辑同时保留必要基线，不用局部 source 覆盖整页。优先 page_apply 的稳定节点操作，response:"receipt" 只收保存回执。需要新模板绑定时以 page.set.fields.templateContext 保存 template_context 返回的 format/system/templates，去掉 hash；运行时仍强制提供自身系统基线。CONFLICT 必须比较基线、当前内容和尝试稿，保留无关修改；page_apply 与 page_save 的冲突分别按 [use-showai](../use-showai/SKILL.md) 编辑与验证中的流程处理。
 
 复杂作品在制作前保存理解树与具体分镜；格式见 [理解规划](../plan-presentation/references/understanding-plan.md) 和 [表达与分镜](../design-presentation/references/expression-and-storyboard.md)。已有有效规划可复用。校验脚本位于 plan-presentation 技能目录的 `scripts/check_plan.py`（相对本技能为 `../plan-presentation/scripts/check_plan.py`），直接执行即可，不为使用它加载整段源码。
 
