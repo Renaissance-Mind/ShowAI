@@ -125,10 +125,34 @@ const ContentNode = memo(
     );
     const id = node.attrs!.id;
     const nativeInk = node.type === "widget" && !!node.attrs?.data?.nativeInk;
+    // Keep stored native widgets intact while sharing the drawing's chrome.
+    const drawingNode: JSONContent | undefined =
+      node.type === "drawing"
+        ? node
+        : nativeInk
+          ? {
+              type: "drawing",
+              attrs: {
+                id,
+                name: node.attrs!.name,
+                tool: "pen",
+                color: "#252629",
+                strokeWidth: 2.5,
+                extent: node.attrs!.data.nativeInk.extent,
+                points: [
+                  { x: 0, y: 0 },
+                  {
+                    x: node.attrs!.data.nativeInk.extent[0],
+                    y: node.attrs!.data.nativeInk.extent[1],
+                  },
+                ],
+                ink: node.attrs!.data.nativeInk,
+              },
+            }
+          : undefined;
     let body: ReactNode;
     if (node.type === "surface") body = renderSurface?.(node);
-    else if (node.type === "drawing")
-      body = <Drawing node={node} frame={frame} />;
+    else if (drawingNode) body = <Drawing node={drawingNode} frame={frame} />;
     else if (node.type === "region") {
       const mode = frame?.mode ?? "flow",
         children = node.content ?? [];
@@ -248,7 +272,7 @@ const ContentNode = memo(
         container={node.type === "surface"}
         drawing={node.type === "drawing" || nativeInk}
         component={node.type === "widget"}
-        drawingNode={node.type === "drawing" ? node : undefined}
+        drawingNode={drawingNode}
         fixedHeight={
           (node.type === "surface" &&
             (surfaceKind(node) === "board" || frame?.heightMode !== "auto")) ||

@@ -1,0 +1,27 @@
+{
+  "name": "@showai/dsh-showai-preview",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Render ShowAI page previews inline in the DeepSeek Harness Web conversation.",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md"
+  ]
+}

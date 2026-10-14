@@ -1,0 +1,5 @@
+# Harness profile patch for the ShowAI inline page preview.
+# `plugin_manager install_bundle` selects this bundle and appends the row below.
+- insert:
+    - id: showai-preview
+      name: '@showai/dsh-showai-preview'

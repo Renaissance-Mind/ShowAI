@@ -570,7 +570,6 @@
 }
 .board-group-outline {
   position: absolute;
-  border: calc(1.5px * var(--board-inv, 1)) solid #467de3;
   pointer-events: none;
   z-index: 13;
 }
