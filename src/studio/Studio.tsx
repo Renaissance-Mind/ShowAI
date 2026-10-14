@@ -25,6 +25,8 @@ import {
 } from "react";
 import {
   ArrowLeft,
+  ArrowUp,
+  ArrowDown,
   ArrowUpRight,
   AppWindow,
   Blocks,
@@ -66,6 +68,7 @@ import type {
   DirectoryPreferences,
   DirectorySortBy,
 } from "../core/model";
+import { orderSidebarProjects } from "../core/sidebar-order";
 import type { DesktopInfo, DesktopChange } from "../desktop/bridge";
 import type { ShowArtifact, ShowDocument } from "../types";
 import type {
@@ -1316,6 +1319,32 @@ export default function Studio() {
     await desktop.invoke("projects:group", { projectId, groupId });
     await refresh();
   }
+  function projectOrderMenuItems(target: LibraryTarget) {
+    if (target.kind !== "project") return [];
+    const sectionFor = (item: ProjectSummary) =>
+      item.pinned ? "pinned" : (organization.projectGroups[item.id] ?? "projects");
+    const project = projects.find((item) => item.id === target.id);
+    if (!project) return [];
+    const sectionId = sectionFor(project);
+    const siblings = orderSidebarProjects(
+      projects,
+      organization.projectOrder,
+    ).filter((item) => sectionFor(item) === sectionId);
+    const index = siblings.findIndex((item) => item.id === target.id);
+    return ([-1, 1] as const).map((direction) => ({
+      label: t(direction < 0 ? "moveProjectUp" : "moveProjectDown"),
+      icon: direction < 0 ? <ArrowUp size={15} /> : <ArrowDown size={15} />,
+      disabled: !siblings[index + direction] || movingLibrary.current,
+      onSelect: action(() =>
+        dropLibraryItem({
+          source: target,
+          sectionId,
+          relativeId: siblings[index + direction]?.id,
+          placement: direction < 0 ? "before" : "after",
+        }),
+      ),
+    }));
+  }
   const movingLibrary = useRef(false);
   function reorderLibraryItem(drop: LibraryDrop) {
     const source = drop.source;
@@ -1400,12 +1429,13 @@ export default function Studio() {
     let cleared = false;
     try {
       await reorderQueue.current;
-      if (!(await page.flush())) {
+      if (source.kind !== "project" && !(await page.flush())) {
         setView("page");
         return;
       }
       if (source.kind === "project") {
         await desktop.invoke("sidebar:moveProject", {
+          expectedHome: info?.home,
           projectId: source.id,
           sectionId: drop.sectionId,
           relativeId: drop.relativeId,
@@ -3184,6 +3214,7 @@ export default function Studio() {
                       ),
                     },
                     ...directorySortMenuItems(contextMenu.target),
+                    ...projectOrderMenuItems(contextMenu.target),
                     ...(contextMenu.target.kind === "project"
                       ? [
                           {

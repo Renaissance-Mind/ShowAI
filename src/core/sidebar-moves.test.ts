@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FileStore } from "./store";
@@ -17,6 +17,75 @@ describe.each([false, true])("sidebar moves (versioned: %s)", (versioned) => {
   afterEach(async () => {
     await rm(home, { recursive: true, force: true });
   });
+
+  it("appends new projects and keeps manual ranks after page edits, pinning and restore", async () => {
+    const a = await store.createProject({ name: "A" });
+    const b = await store.createProject({ name: "B" });
+    const c = await store.createProject({ name: "C" });
+    const ids = async () =>
+      (await new FileStore(home).listProjects()).map((item) => item.id);
+    expect(await ids()).toEqual([a.id, b.id, c.id]);
+    await store.arrangeProject(c.id, "projects", a.id, "before");
+    const before = await store.readProject(c.id);
+    const page = await store.createPage(b.id, { title: "Editing" });
+    await store.savePage(
+      b.id,
+      page.document.id,
+      { ...page.document, title: "Edited" },
+      page.hash,
+      page.revision,
+    );
+    await store.updateProject(a.id, { name: "Renamed" });
+    expect(await ids()).toEqual([c.id, a.id, b.id]);
+    expect(await store.readProject(c.id)).toEqual(before);
+    await store.updateProject(a.id, { archived: true });
+    await store.arrangeProject(b.id, "projects", c.id, "before");
+    const d = await store.createProject({ name: "D" });
+    await store.updateProject(a.id, { archived: false });
+    expect((await store.readSidebar()).projectOrder).toContain(a.id);
+    expect((await ids()).filter((id) => id !== a.id)).toEqual([
+      b.id,
+      c.id,
+      d.id,
+    ]);
+    await store.updateProject(b.id, { pinned: true });
+    expect((await ids())[0]).toBe(b.id);
+    if (versioned) await new GitLibrary(home).verify();
+  });
+
+  if (!versioned)
+    it("reads old sidebar data without ranks using stable creation dates and freezes it on create", async () => {
+      const a = await store.createProject({ name: "Legacy A" });
+      const b = await store.createProject({ name: "Legacy B" });
+      await writeFile(
+        join(home, "sidebar.json"),
+        JSON.stringify({ groups: [], projectGroups: {} }),
+      );
+      for (const [index, project] of [a, b].entries()) {
+        await writeFile(
+          join(store.projectPath(project.id), "project.json"),
+          JSON.stringify({
+            ...project,
+            createdAt: `2026-01-0${index + 1}T00:00:00.000Z`,
+            updatedAt: `2026-02-0${2 - index}T00:00:00.000Z`,
+          }),
+        );
+      }
+      expect((await store.listProjects()).map((item) => item.id)).toEqual([
+        a.id,
+        b.id,
+      ]);
+      await store.updateProject(a.id, { name: "Edited legacy" });
+      const c = await store.createProject({ name: "New" });
+      expect(
+        (await new FileStore(home).listProjects()).map((item) => item.id),
+      ).toEqual([a.id, b.id, c.id]);
+      expect((await store.readSidebar()).projectOrder).toEqual([
+        a.id,
+        b.id,
+        c.id,
+      ]);
+    });
 
   it("persists project order, groups and pinning across a reopened store", async () => {
     const a = await store.createProject({ name: "A" }),

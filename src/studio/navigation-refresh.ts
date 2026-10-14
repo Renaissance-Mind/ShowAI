@@ -60,14 +60,20 @@ export function mergeNavigationProjects(
   const incoming = next.map((project) =>
     retainEqual(old.get(project.id), project)!,
   );
+  const byId = new Map(incoming.map((project) => [project.id, project]));
   const merged = ids
-    ? [...previous.filter((project) => !ids.has(project.id)), ...incoming]
+    ? [
+        ...previous.flatMap((project) =>
+          ids.has(project.id)
+            ? byId.has(project.id)
+              ? [byId.get(project.id)!]
+              : []
+            : [project],
+        ),
+        ...incoming.filter((project) => !old.has(project.id)),
+      ]
     : incoming;
-  merged.sort(
-    (a, b) =>
-      Number(!!b.pinned) - Number(!!a.pinned) ||
-      b.updatedAt.localeCompare(a.updatedAt),
-  );
+  merged.sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
   return retainEqual(previous, merged);
 }
 

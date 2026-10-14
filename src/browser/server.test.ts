@@ -34,6 +34,45 @@ import { blankDocument } from "../core/catalog";
 import type { CompiledComponent } from "../components/custom/types";
 import type { ProjectMetadata } from "../core/model";
 
+test("project manual order survives workbench page and board saves and appends newly created projects", async () => {
+  const a = await invoke<{ id: string }>("projects:create", { name: "First" });
+  const b = await invoke<{ id: string }>("projects:create", { name: "Second" });
+  const ids = async () =>
+    (await invoke<{ id: string }[]>("projects:list")).map((item) => item.id);
+  expect(await ids()).toEqual([a.id, b.id]);
+  const original = await invoke<ProjectMetadata[]>("projects:list");
+  await invoke("sidebar:moveProject", {
+    projectId: b.id,
+    sectionId: "projects",
+    relativeId: a.id,
+  });
+  expect(await ids()).toEqual([b.id, a.id]);
+  const reordered = await invoke<ProjectMetadata[]>("projects:list");
+  expect(reordered.find((item) => item.id === b.id)?.updatedAt).toBe(
+    original.find((item) => item.id === b.id)?.updatedAt,
+  );
+  for (const kind of ["page", "board"]) {
+    const record = await invoke<LoadedPage>("pages:create", {
+      projectId: a.id,
+      title: kind,
+      kind,
+    });
+    await invoke("pages:save", {
+      projectId: a.id,
+      pageId: record.document.id,
+      baseHash: record.hash,
+      baseRevision: record.revision,
+      document: { ...record.document, title: `${kind} edited` },
+    });
+    expect(await ids()).toEqual([b.id, a.id]);
+  }
+  const c = await invoke<{ id: string }>("projects:create", { name: "Third" });
+  expect(await ids()).toEqual([b.id, a.id, c.id]);
+  expect(
+    (await invoke<{ projectOrder: string[] }>("sidebar:get")).projectOrder,
+  ).toEqual([b.id, a.id, c.id]);
+});
+
 test("directory sort choices persist through the real workbench action at the selected folder only", async () => {
   const project = await invoke<{ id: string }>("projects:create", {
     name: "Sort actions",
