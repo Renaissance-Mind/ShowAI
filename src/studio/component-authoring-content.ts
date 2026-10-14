@@ -5,6 +5,7 @@ import { markdownToRichText } from "../components/rich-text/model.mjs";
 export function componentAuthoringContent(
   markdown: string,
   sourceUrl?: string,
+  imageLabel = "Image",
 ) {
   // Skill files open with YAML metadata; show it as a code block instead of
   // letting it run into the first paragraph.
@@ -37,7 +38,7 @@ export function componentAuthoringContent(
           content: [
             {
               type: "text",
-              text: node.attrs?.alt || String(node.attrs?.src || "图片"),
+              text: node.attrs?.alt || String(node.attrs?.src || imageLabel),
             },
           ],
         };

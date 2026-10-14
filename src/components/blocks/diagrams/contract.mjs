@@ -69,6 +69,7 @@ export function validateDiagramData(kind, data) {
         "presentation",
       ].includes(key)
     )
+      // i18n-exempt: agent-facing diagram data validation shared with CLI/MCP
       throw new Error(`不支持的图形字段：${key}。`);
   if (
     !diagramTemplates[kind].includes(data.template) &&
@@ -97,29 +98,35 @@ export function validateDiagramData(kind, data) {
       );
   }
   if (data.template === "custom" && data.source === undefined)
+    // i18n-exempt: agent-facing diagram data validation shared with CLI/MCP
     throw new Error("自定义图形须提供 source。");
   if (data.presentation !== undefined) {
     const p = data.presentation;
     if (!p || typeof p !== "object" || Array.isArray(p))
+      // i18n-exempt: agent-facing diagram data validation shared with CLI/MCP
       throw new Error("presentation 必须是显示设置对象。");
     for (const key of Object.keys(p))
       if (
         !["title", "description", "notes", "legend", "controls"].includes(key)
       )
+        // i18n-exempt: agent-facing diagram data validation shared with CLI/MCP
         throw new Error(`不支持的显示设置：${key}。`);
     for (const key of ["title", "description"])
       if (
         p[key] !== undefined &&
         !["inside", "outside", "hidden"].includes(p[key])
       )
+        // i18n-exempt: agent-facing diagram data validation shared with CLI/MCP
         throw new Error(`${key} 的显示位置无效。`);
     if (
       p.notes !== undefined &&
       !["inline", "details", "hidden"].includes(p.notes)
     )
+      // i18n-exempt: agent-facing diagram data validation shared with CLI/MCP
       throw new Error("说明文字的显示方式无效。");
     for (const key of ["legend", "controls"])
       if (p[key] !== undefined && typeof p[key] !== "boolean")
+        // i18n-exempt: agent-facing diagram data validation shared with CLI/MCP
         throw new Error(`${key} 必须是布尔值。`);
   }
 }

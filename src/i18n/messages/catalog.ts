@@ -117,6 +117,17 @@ export default defineMessages("catalog", {
     cannotDisplay: "组件无法显示。",
     thumbnailTitle: "{name}缩略预览",
     previewUnavailable: "预览暂不可用",
+    "authoring.title": "原版制作指南",
+    "authoring.intro": "查看原项目的制作流程、类型规范、输入示例和原版工具。",
+    "authoring.loading": "正在读取指南…",
+    "authoring.open": "打开原版制作指南",
+    "authoring.guide": "制作指南",
+    "authoring.source": "原文与来源版本",
+    "authoring.local": "本地制作指南",
+    "authoring.tools": "制作工具与输入规范",
+    "authoring.toolsHelp":
+      "组件源码包内保留原版文件。按指南选择输入与类型，运行制作工具后导入生成的 SVG 或 HTML。选择“原版”显示可核对完整布局。",
+    "authoring.image": "图片",
   },
   en: {
     "category.text": "Text",
@@ -240,5 +251,17 @@ export default defineMessages("catalog", {
     cannotDisplay: "This component can't be displayed.",
     thumbnailTitle: "{name} thumbnail",
     previewUnavailable: "Preview unavailable",
+    "authoring.title": "Original authoring guides",
+    "authoring.intro":
+      "Read the original project's process, type specifications, input examples and tools.",
+    "authoring.loading": "Reading guides…",
+    "authoring.open": "Open the original authoring guides",
+    "authoring.guide": "Authoring guide",
+    "authoring.source": "Original text and source version",
+    "authoring.local": "Local authoring guide",
+    "authoring.tools": "Tools and input specifications",
+    "authoring.toolsHelp":
+      "The component package keeps the original files. Choose an input and type from the guide, run the tool, then import the generated SVG or HTML. Choose “Original” to check the complete layout.",
+    "authoring.image": "Image",
   },
 });

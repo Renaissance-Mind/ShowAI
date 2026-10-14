@@ -9,6 +9,7 @@ const file = z
       !value.startsWith("/") &&
       !value.includes("\\") &&
       value.split("/").every((part) => part && part !== "." && part !== ".."),
+    // i18n-exempt: agent-facing authoring package validation shared with CLI/MCP
     "制作文件必须位于组件源码包内。",
   );
 const guideReference = z
@@ -63,6 +64,7 @@ export function componentAuthoringIndex(
   entry: string,
 ) {
   file.parse(entry);
+  // i18n-exempt: agent-facing authoring package validation shared with CLI/MCP
   if (!files[entry]) throw new Error(`缺少制作索引：${entry}`);
   const index = componentAuthoringIndexSchema.parse(JSON.parse(files[entry]));
   for (const path of [
@@ -72,10 +74,12 @@ export function componentAuthoringIndex(
     index.examples,
     ...index.guides.map((guide) => guide.file),
   ].filter((value): value is string => !!value))
+    // i18n-exempt: agent-facing authoring package validation shared with CLI/MCP
     if (!files[path]) throw new Error(`缺少制作文件：${path}`);
   if (
     new Set(index.guides.map((guide) => guide.id)).size !== index.guides.length
   )
+    // i18n-exempt: agent-facing authoring package validation shared with CLI/MCP
     throw new Error("制作指南 ID 重复。");
   return index;
 }
@@ -85,6 +89,7 @@ export function componentAuthoringGuide(
   id: string,
 ) {
   const ref = index.guides.find((guide) => guide.id === id);
+  // i18n-exempt: agent-facing authoring package validation shared with CLI/MCP
   if (!ref) throw new Error("找不到制作指南。");
   const guide = componentAuthoringGuideSchema.parse(
     JSON.parse(files[ref.file]),
@@ -100,6 +105,7 @@ export function componentAuthoringGuide(
     guide.title !== ref.title ||
     JSON.stringify(guide.appliesTo) !== JSON.stringify(ref.appliesTo)
   )
+    // i18n-exempt: agent-facing authoring package validation shared with CLI/MCP
     throw new Error("制作指南与来源索引不一致。");
   return guide;
 }
