@@ -582,6 +582,26 @@ export function useSurfaceViewport(
         center: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
       };
     };
+    const captureTouch = (event: PointerEvent) => {
+      if (
+        !ownsInput(event.target) ||
+        event.pointerType !== "touch" ||
+        (event.target as Element).closest(
+          '[data-surface-ui],iframe,[data-surface-gesture="own"],.react-flow',
+        )
+      )
+        return;
+      touches.set(event.pointerId, localPoint(event));
+      if (touches.size !== 2) return;
+      event.preventDefault();
+      event.stopPropagation();
+      interrupt();
+      drag = null;
+      root.dispatchEvent(new Event("showai-board-pinch"));
+      pinch = { ...pinchMetrics(), camera: { ...camera.current }, anchor };
+      setAnchor(null);
+      for (const id of touches.keys()) root.setPointerCapture(id);
+    };
     const down = (event: PointerEvent) => {
       const panTool = root.dataset.boardTool === "pan";
       if (
@@ -729,6 +749,19 @@ export function useSurfaceViewport(
       root.classList.remove("is-panning");
     };
     const up = (event: PointerEvent) => finish(event);
+    const captureMove = (event: PointerEvent) => {
+      if (!pinch) return;
+      event.preventDefault();
+      event.stopPropagation();
+      move(event);
+    };
+    const captureEnd = (event: PointerEvent) => {
+      if (pinch) {
+        event.preventDefault();
+        event.stopPropagation();
+        finish(event, event.type === "pointercancel");
+      } else if (!drag) touches.delete(event.pointerId);
+    };
     controls.current.cancel = () => {
       interrupt();
       if (drag && root.hasPointerCapture(drag.id))
@@ -866,6 +899,10 @@ export function useSurfaceViewport(
     };
     controls.current.refresh = refreshLayout;
     root.addEventListener("wheel", wheel, { passive: false });
+    root.addEventListener("pointerdown", captureTouch, true);
+    root.addEventListener("pointermove", captureMove, true);
+    root.addEventListener("pointerup", captureEnd, true);
+    root.addEventListener("pointercancel", captureEnd, true);
     root.addEventListener("pointerdown", down);
     root.addEventListener("pointermove", move);
     root.addEventListener("pointerup", up);
@@ -883,6 +920,10 @@ export function useSurfaceViewport(
       cancelAnimationFrame(springFrame);
       clearTimeout(idle);
       root.removeEventListener("wheel", wheel);
+      root.removeEventListener("pointerdown", captureTouch, true);
+      root.removeEventListener("pointermove", captureMove, true);
+      root.removeEventListener("pointerup", captureEnd, true);
+      root.removeEventListener("pointercancel", captureEnd, true);
       root.removeEventListener("pointerdown", down);
       root.removeEventListener("pointermove", move);
       root.removeEventListener("pointerup", up);

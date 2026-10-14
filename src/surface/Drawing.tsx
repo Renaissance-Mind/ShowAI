@@ -366,8 +366,13 @@ export function DrawingInput({
       if (pending.current?.moved) finishRef.current();
       else cancel();
     };
+    const root = surface.current?.closest(".page-surface");
+    root?.addEventListener("showai-board-pinch", cancel);
     window.addEventListener("blur", blur);
-    return () => window.removeEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("blur", blur);
+      root?.removeEventListener("showai-board-pinch", cancel);
+    };
   }, []);
   const add = (event: PointerEvent<SVGSVGElement>) => {
     if (pending.current?.id !== event.pointerId) return;

@@ -2609,6 +2609,8 @@ export default function Studio() {
       >
         <AutoHideSidebar
           enabled={view === "page" && !!page.draft}
+          mobileBoardKey={view === "page" && page.draft?.content.attrs?.kind === "board" ? page.draft.id : undefined}
+          onMobileBack={() => { if (selectedProject) void openProject(selectedProject, selectedFolder).catch(report); }}
           interactionHeld={
             !!dialog ||
             libraryDrag.dragging ||

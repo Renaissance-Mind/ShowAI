@@ -1,21 +1,87 @@
-html[data-native="ios"] .studio-workspace { position: relative; }
-.studio-mobile-navigation-tools {
-  position: absolute; top: 6px; left: 6px; z-index: 112;
-  height: 36px; display: flex; align-items: center; gap: 2px;
+html[data-native="ios"] .studio-workspace {
+  position: relative;
 }
-.studio-mobile-navigation-tools > button { width: 40px; height: 36px; display: grid; place-items: center; border-radius: 8px; }
-.studio-mobile-navigation-tools .studio-tab-history button:last-child { display: none; }
-html[data-native="ios"] .studio-topbar { padding-left: 94px; height: 48px; min-height: 48px; }
-html[data-native="ios"] .studio-workspace[data-mobile-sidebar="docked"] .studio-topbar { padding-left: 24px; }
-html[data-native="ios"] .studio-workspace[data-mobile-sidebar="docked"] .studio-mobile-navigation-tools { display: none; }
+.studio-mobile-navigation-tools {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 112;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.studio-mobile-navigation-tools > button {
+  width: 40px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+}
+.studio-mobile-navigation-tools .studio-tab-history button:last-child {
+  display: none;
+}
+html[data-native="ios"] .studio-topbar {
+  padding-left: 94px;
+  height: 48px;
+  min-height: 48px;
+}
+html[data-native="ios"] .studio-workspace[data-mobile-board] .studio-topbar {
+  padding-left: 54px;
+}
+html[data-native="ios"]
+  .studio-workspace[data-mobile-sidebar="docked"]
+  .studio-topbar {
+  padding-left: 24px;
+}
+html[data-native="ios"]
+  .studio-workspace[data-mobile-sidebar="docked"]
+  .studio-mobile-navigation-tools {
+  display: none;
+}
 html[data-native="ios"] .studio-sidebar-shell,
-html[data-native="ios"] .studio-sidebar-shell > .studio-sidebar { transition: transform 180ms ease, visibility 180ms; }
-html[data-native="ios"] .studio-sidebar-shell > .studio-sidebar { padding-top: 16px; }
-.studio-mobile-sidebar-scrim { position: absolute; inset: 0; z-index: 90; background: #0003; border-radius: 0; }
-.studio-mobile-sidebar-edge { position: absolute; inset: 48px auto 0 0; width: 20px; z-index: 111; touch-action: pan-y; }
-.studio-mobile-sidebar-brand { display: flex; align-items: center; gap: 8px; margin: 0 8px 16px; }
-.studio-mobile-sidebar-brand img { width: 22px; height: 22px; }
-html[data-native="ios"] .board-tool-shortcuts { display: none; }
-html[data-native="ios"] .surface-toolbar button { min-width: 36px; min-height: 36px; }
-html[data-native="ios"] .surface-toolbar button[aria-label="锁定绘图工具"] { display: none; }
-html[data-native="ios"] .surface-toolbar button[aria-label="连续绘制"] { display: none; }
+html[data-native="ios"] .studio-sidebar-shell > .studio-sidebar {
+  transition:
+    transform 180ms ease,
+    visibility 180ms;
+}
+html[data-native="ios"] .studio-sidebar-shell > .studio-sidebar {
+  padding-top: 16px;
+}
+.studio-mobile-sidebar-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 90;
+  background: #0003;
+  border-radius: 0;
+}
+.studio-mobile-sidebar-edge {
+  position: absolute;
+  inset: 48px auto 0 0;
+  width: 20px;
+  z-index: 111;
+  touch-action: pan-y;
+}
+.studio-mobile-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 8px 16px;
+}
+.studio-mobile-sidebar-brand img {
+  width: 22px;
+  height: 22px;
+}
+html[data-native="ios"] .board-tool-shortcuts {
+  display: none;
+}
+html[data-native="ios"] .surface-toolbar button {
+  min-width: 36px;
+  min-height: 36px;
+}
+html[data-native="ios"] .surface-toolbar button[aria-label="锁定绘图工具"] {
+  display: none;
+}
+html[data-native="ios"] .surface-toolbar button[aria-label="连续绘制"] {
+  display: none;
+}

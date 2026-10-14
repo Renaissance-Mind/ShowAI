@@ -15,6 +15,8 @@ export default defineMessages("surface", {
     "board.lockTarget": "白板",
     "board.empty": "这块白板还没有内容",
     "board.tools": "白板工具",
+    "board.moveToolbar": "移动工具栏",
+    "board.moveToolbarTitle": "拖动并吸附到任意边缘；方向键切换停靠位置",
     "board.selectedCount": "已选 {count} 项",
     "board.expandSelected": "展开选中容器",
     "board.duplicateSelected": "复制选中对象",
@@ -194,6 +196,9 @@ export default defineMessages("surface", {
     "board.lockTarget": "board",
     "board.empty": "This board is empty",
     "board.tools": "Board tools",
+    "board.moveToolbar": "Move toolbar",
+    "board.moveToolbarTitle":
+      "Drag to dock on any edge; use arrow keys to change the dock",
     "board.selectedCount": "{count} selected",
     "board.expandSelected": "Expand selected container",
     "board.duplicateSelected": "Duplicate selected objects",
