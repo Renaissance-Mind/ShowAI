@@ -26,8 +26,9 @@ export function zoomAt(
   camera: Camera,
   point: { x: number; y: number },
   scale: number,
+  maximum = MAX_ZOOM,
 ): Camera {
-  const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, scale));
+  const next = Math.max(MIN_ZOOM, Math.min(maximum, scale));
   return {
     x: point.x - ((point.x - camera.x) * next) / camera.scale,
     y: point.y - ((point.y - camera.y) * next) / camera.scale,

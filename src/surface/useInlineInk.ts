@@ -38,7 +38,10 @@ export function useInlineInk({
   width: number;
   ruler: boolean;
   enabled: boolean;
-  onCamera: (camera: { x: number; y: number; scale: number }) => void;
+  onCamera: (
+    camera: { x: number; y: number; scale: number },
+    final: boolean,
+  ) => void;
   onTool: (tool: string) => void;
 }) {
   const current = useRef({
@@ -52,6 +55,8 @@ export function useInlineInk({
   });
   const cameraRevision = useRef(0),
     previousInk = useRef("pen");
+  const invalidate = useRef<(() => void) | null>(null);
+  const navigating = useRef(false);
   if (tool === "pen" || tool === "highlighter") previousInk.current = tool;
   current.current = { source, color, width, ruler, onCamera, onTool, tool };
   useEffect(() => {
@@ -60,8 +65,9 @@ export function useInlineInk({
     return bridge.onCommand((value) => {
       if (value.pageId !== source.id || value.boardId !== boardId) return;
       if (value.camera) {
+        navigating.current = !!value.navigating;
         cameraRevision.current = value.cameraVersion ?? cameraRevision.current;
-        current.current.onCamera(value.camera);
+        current.current.onCamera(value.camera, !value.navigating);
       }
       if (value.tool)
         current.current.onTool(
@@ -75,6 +81,9 @@ export function useInlineInk({
         );
     });
   }, [enabled, source?.id, boardId]);
+  useEffect(() => {
+    invalidate.current?.();
+  }, [source, color, width, ruler]);
   useEffect(() => {
     const bridge = window.showai?.inlineInk;
     if (
@@ -101,9 +110,20 @@ export function useInlineInk({
       poseSize = "",
       poses: Record<string, number[]> = {},
       lastPoses: Record<string, number[]> | undefined;
+    let dirty = false,
+      animations = 0;
+    const schedule = () => {
+      dirty = true;
+      if (!alive || failed || frame || pending) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        void send();
+      });
+    };
+    invalidate.current = schedule;
     const send = async () => {
       if (!alive || failed) return;
-      frame = requestAnimationFrame(() => void send());
+      dirty = false;
       if (
         pending ||
         !surface.getClientRects().length ||
@@ -172,7 +192,10 @@ export function useInlineInk({
         holes,
       };
       const key = JSON.stringify(packet);
-      if (key === lastKey && documentValue === lastDocument) return;
+      if (key === lastKey && documentValue === lastDocument) {
+        if (animations) schedule();
+        return;
+      }
       pending = true;
       try {
         await bridge.frame({
@@ -186,20 +209,84 @@ export function useInlineInk({
         lastDocument = documentValue;
         lastPoses = poses;
         if (alive) {
-          surface.dataset.nativeInkToken = token;
-          surface.dataset.nativeInkActive = "true";
+          if (surface.dataset.nativeInkToken !== token)
+            surface.dataset.nativeInkToken = token;
+          if (surface.dataset.nativeInkActive !== "true")
+            surface.dataset.nativeInkActive = "true";
         }
       } catch (error) {
         failed = true;
         throw error;
       } finally {
         pending = false;
+        if (dirty || animations) schedule();
       }
     };
-    void send();
+    const mutations = new MutationObserver((changes) => {
+      if (
+        changes.some(
+          (change) =>
+            !(
+              navigating.current &&
+              change.target === content &&
+              change.attributeName === "style"
+            ),
+        )
+      )
+        schedule();
+    });
+    mutations.observe(document.documentElement, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: [
+        "style",
+        "class",
+        "hidden",
+        "open",
+        "data-sidebar-mode",
+        "data-mobile-sidebar",
+        "data-theme",
+        "data-native-orientation",
+        "data-dragging",
+      ],
+    });
+    const resize = new ResizeObserver(schedule);
+    resize.observe(surface);
+    const viewportChanged = () => {
+      if (!navigating.current) schedule();
+    };
+    const animationStart = (event: Event) => {
+      if (event.target instanceof Element && !content.contains(event.target)) {
+        animations++;
+        schedule();
+      }
+    };
+    const animationEnd = (event: Event) => {
+      if (event.target instanceof Element && !content.contains(event.target)) {
+        animations = Math.max(0, animations - 1);
+        schedule();
+      }
+    };
+    surface.addEventListener("showai:viewport-change", viewportChanged);
+    document.addEventListener("visibilitychange", schedule);
+    document.addEventListener("transitionrun", animationStart, true);
+    document.addEventListener("transitionend", animationEnd, true);
+    document.addEventListener("transitioncancel", animationEnd, true);
+    window.addEventListener("resize", schedule);
+    schedule();
     return () => {
       alive = false;
+      if (invalidate.current === schedule) invalidate.current = null;
       cancelAnimationFrame(frame);
+      mutations.disconnect();
+      resize.disconnect();
+      surface.removeEventListener("showai:viewport-change", viewportChanged);
+      document.removeEventListener("visibilitychange", schedule);
+      document.removeEventListener("transitionrun", animationStart, true);
+      document.removeEventListener("transitionend", animationEnd, true);
+      document.removeEventListener("transitioncancel", animationEnd, true);
+      window.removeEventListener("resize", schedule);
       viewportProbe.remove();
       worldProbe.remove();
       void bridge.hide(source.id, boardId, token).finally(() => {

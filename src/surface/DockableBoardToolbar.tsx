@@ -1,8 +1,11 @@
 import {
+  createContext,
+  useContext,
   useEffect,
   useRef,
   useState,
   type ReactNode,
+  type CSSProperties,
   type RefObject,
   type PointerEvent,
 } from "react";
@@ -17,6 +20,9 @@ import {
   type ToolbarDock,
 } from "./toolbar-dock";
 import "./toolbar-dock.css";
+
+const ToolbarDockContext = createContext<DockEdge>("bottom");
+export const useToolbarDock = () => useContext(ToolbarDockContext);
 
 export function DockableBoardToolbar({
   children,
@@ -97,7 +103,7 @@ export function DockableBoardToolbar({
   };
   const preview = point?.edge;
   return (
-    <>
+    <ToolbarDockContext.Provider value={dock.edge}>
       {preview && (
         <div
           className="board-toolbar-dock-preview"
@@ -113,11 +119,14 @@ export function DockableBoardToolbar({
         data-surface-ui
         role="group"
         aria-label={t("board.tools")}
-        style={{
-          left: (point ?? center).x,
-          top: (point ?? center).y,
-          bottom: "auto",
-        }}
+        style={
+          {
+            left: (point ?? center).x,
+            top: (point ?? center).y,
+            bottom: "auto",
+            "--board-toolbar-height": `${bounds.height}px`,
+          } as CSSProperties
+        }
       >
         {enabled && (
           <button
@@ -172,6 +181,6 @@ export function DockableBoardToolbar({
         )}
         {children}
       </div>
-    </>
+    </ToolbarDockContext.Provider>
   );
 }

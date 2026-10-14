@@ -31,6 +31,7 @@ export interface InkCommand {
   boardId: string;
   camera?: InkFrame["camera"];
   cameraVersion?: number;
+  navigating?: boolean;
   tool?: string;
   error?: string;
 }

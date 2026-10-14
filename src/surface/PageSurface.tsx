@@ -175,7 +175,7 @@ export default function PageSurface({
     width: drawStrokeWidth,
     ruler,
     enabled: enabled && !locked && !!onDraw && !printing,
-    onCamera: (value) => controls.current.moveTo(value, true),
+    onCamera: (value, final) => controls.current.navigateTo(value, final),
     onTool: (value) => {
       if (value === "settings") {
         if (writingSettings.current) writingSettings.current.open = true;
