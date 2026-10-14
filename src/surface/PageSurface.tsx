@@ -1855,7 +1855,10 @@ export default function PageSurface({
                           type="button"
                           key={mode}
                           aria-label={label}
-                          title={`${label}（${shortcut}）`}
+                          title={t("tool.withShortcut", {
+                            label,
+                            key: shortcut,
+                          })}
                           disabled={
                             mode.startsWith("distribute") && board.ids.size < 3
                           }
