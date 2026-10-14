@@ -1,4 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ChevronDown,
+  Database,
+  Folder,
+  Link2,
+  Plus,
+  RefreshCw,
+  Upload,
+  X,
+} from "../ui/icons";
 import { desktop, errorMessage } from "./bridge";
 import { coalescedTask } from "../lib/coalesced-task";
 import { retainEqual } from "./navigation-refresh";
@@ -9,7 +19,7 @@ import SyncDashboard, {
 } from "./SyncDashboard";
 import AccountBindings from "./AccountBindings";
 import ServiceLogin from "./ServiceLogin";
-import LoginMethods from "./LoginMethods";
+import SyncAccountPanel, { IssuedToken } from "./SyncAccountPanel";
 import { conflictPreview } from "./sync-conflict-preview";
 import type { ProjectSummary } from "../core/model";
 import type {
@@ -27,7 +37,9 @@ type Status = Omit<SyncConfiguration, "connections"> & {
   connections: Omit<SyncConfiguration["connections"][number], "token">[];
   running: boolean;
 };
+type Binding = Status["projects"][number];
 type SyncKey = MessageKey<typeof messages>;
+type ConnectMode = "login" | "register" | "token";
 const roleKeys: Record<ProjectRole, SyncKey> = {
   admin: "role.admin",
   editor: "role.editor",
@@ -41,6 +53,24 @@ const stateKeys = {
   conflict: "state.conflict",
   revoked: "state.revoked",
 } satisfies Record<string, SyncKey>;
+/** Visual tone of each sync state; anything needing attention reads as a problem. */
+const stateTones: Record<Binding["status"], "ok" | "busy" | "problem"> = {
+  synced: "ok",
+  pending: "busy",
+  offline: "problem",
+  conflict: "problem",
+  "save-failed": "problem",
+  revoked: "problem",
+};
+const emptyForm = {
+  url: "",
+  account: "",
+  password: "",
+  registrationKey: "",
+  token: "",
+  tokenOnly: false,
+  mode: "login" as ConnectMode,
+};
 export default function SyncSettings() {
   const t = useTranslator(messages);
   const tc = useTranslator(common);
@@ -50,17 +80,19 @@ export default function SyncSettings() {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
-  const [form, setForm] = useState({
-    url: "",
-    account: "",
-    password: "",
-    registrationKey: "",
-    token: "",
-    mode: "login",
-  });
+  const [form, setForm] = useState(emptyForm);
   const [showConnect, setShowConnect] = useState(false),
     [server, setServer] = useState("");
   const [issuedToken, setIssuedToken] = useState("");
+  const [accountPanel, setAccountPanel] = useState("");
+  const [expanded, setExpanded] = useState(""),
+    [confirmDetach, setConfirmDetach] = useState(""),
+    [uploadTarget, setUploadTarget] = useState("");
+  const [showJoin, setShowJoin] = useState(
+    () => !!new URLSearchParams(location.search).get("invite"),
+  );
+  const connectSection = useRef<HTMLDivElement>(null);
+  const [connectRequest, setConnectRequest] = useState(0);
   const [panel, setPanel] = useState<
     "projects" | "dashboard" | "conflict" | null
   >(null);
@@ -75,9 +107,6 @@ export default function SyncSettings() {
     [generatedInvite, setGeneratedInvite] = useState("");
   const [generatedInviteExpiresAt, setGeneratedInviteExpiresAt] = useState("");
   const [generatedInvitePolicy, setGeneratedInvitePolicy] = useState("");
-  const [sessionConnectionId, setSessionConnectionId] = useState("");
-  const [passwords, setPasswords] = useState({ current: "", next: "" });
-  const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [inviteLink, setInviteLink] = useState(
       () => new URLSearchParams(location.search).get("invite") ?? "",
     ),
@@ -100,18 +129,6 @@ export default function SyncSettings() {
       ),
     [conflict],
   );
-  const [loginMethodsRevision, setLoginMethodsRevision] = useState(0);
-  const [sessions, setSessions] = useState<
-    | {
-        digest: string;
-        device: string;
-        created_at: string;
-        expires_at: string;
-        revoked: number;
-        current?: number;
-      }[]
-    | null
-  >(null);
   const refresh = useMemo(
     () =>
       coalescedTask(async () => {
@@ -135,6 +152,12 @@ export default function SyncSettings() {
     return () => clearInterval(timer);
   }, [refresh]);
   useEffect(() => {
+    // Success notices fade; errors stay until dismissed or replaced.
+    if (!message) return;
+    const timer = setTimeout(() => setMessage(""), 6000);
+    return () => clearTimeout(timer);
+  }, [message]);
+  useEffect(() => {
     const link = new URLSearchParams(location.search).get("invite");
     if (!link) return;
     void desktop
@@ -155,9 +178,18 @@ export default function SyncSettings() {
     const existing = status.connections.find(
       (connection) => connection.serverId === preview.serverId,
     );
+    // Without an account there, the invitation card offers sign-in explicitly.
     if (existing) setServer(existing.id);
-    else setShowConnect(true);
   }, [preview, status, server]);
+  useEffect(() => {
+    // Opening the form from an invite or a sign-out lands far from it on this page.
+    if (!showConnect) return;
+    const section = connectSection.current;
+    section?.scrollIntoView({ block: "nearest" });
+    [...(section?.querySelectorAll("input") ?? [])]
+      .find((input) => !input.value)
+      ?.focus({ preventScroll: true });
+  }, [showConnect, connectRequest]);
   useEffect(() => {
     // Disabling a loading selector can move focus out of the dialog.
     if (panel && !busy && !document.activeElement?.closest(".sync-dialog")) {
@@ -200,7 +232,6 @@ export default function SyncSettings() {
     setManagedProject("");
     setServer(connectionId);
     setRemote([]);
-    setSessions(null);
     if (connectionId)
       setRemote(
         await desktop.invoke<SyncProject[]>("sync:projects", { connectionId }),
@@ -253,22 +284,26 @@ export default function SyncSettings() {
     return result;
   }
   async function connect() {
+    const register = form.mode === "register";
     const connection = await desktop.invoke<{
       id: string;
       issuedPersonalToken?: string;
     }>("sync:connect", {
       url: form.url,
       account: form.account,
-      password: form.mode === "personal" ? undefined : form.password,
-      registrationKey: form.registrationKey,
+      password:
+        form.mode === "token" || (register && form.tokenOnly)
+          ? undefined
+          : form.password,
+      registrationKey: register ? form.registrationKey : "",
       token: form.mode === "token" ? form.token : undefined,
-      register: form.mode === "register" || form.mode === "personal",
-      personalToken: form.mode === "personal",
+      register,
+      personalToken: register && form.tokenOnly,
       invite: preview?.invite,
     });
     setShowConnect(false);
     setIssuedToken(connection.issuedPersonalToken ?? "");
-    setForm({ ...form, password: "", token: "", registrationKey: "" });
+    setForm(emptyForm);
     if (preview) {
       await desktop.invoke("sync:join", {
         connectionId: connection.id,
@@ -276,716 +311,858 @@ export default function SyncSettings() {
       });
       setPreview(null);
       setInviteLink("");
+      setShowJoin(false);
       setMessage(t("toast.joinedDownloading"));
+      return;
     }
-    await loadServer(connection.id);
+    setMessage(t("toast.connected", { name: form.account || form.url }));
+    // An existing account usually has server projects to bring to this device.
+    if (!register) await loadServer(connection.id);
   }
-  const connectionSelect = (
-    value: string,
-    change: (value: string) => void,
-    empty = t("chooseServerAccount"),
-  ) => (
-    <select
-      value={value}
-      onChange={(event) => change(event.target.value)}
-      disabled={busy}
-    >
-      <option value="">{empty}</option>
-      {status?.connections.map((connection) => (
-        <option key={connection.id} value={connection.id}>
-          {connection.name} · {connection.user.name}
-        </option>
-      ))}
-    </select>
-  );
-  if (!status) return <p className="settings-help">{t("readingConnections")}</p>;
+  function openConnect(next: Partial<typeof emptyForm> = {}) {
+    setForm({ ...emptyForm, ...next });
+    setShowConnect(true);
+    setConnectRequest((value) => value + 1);
+    setError("");
+  }
+  async function previewInvite() {
+    const result = await desktop.invoke<NonNullable<typeof preview>>(
+      "sync:previewInvite",
+      { link: inviteLink },
+    );
+    setPreview(result);
+    const existing = status?.connections.find(
+      (connection) => connection.serverId === result.serverId,
+    );
+    setServer(existing?.id ?? "");
+  }
+  const connectionLabel = (id: string) => {
+    const connection = status?.connections.find((item) => item.id === id);
+    return connection ? `${connection.name} · ${connection.user.name}` : "";
+  };
+  const syncTime = (value?: string) =>
+    value
+      ? new Date(value).toLocaleString(getLocale(), {
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "";
+  if (!status)
+    return <p className="settings-help">{t("readingConnections")}</p>;
+  const hidden = new Set(status.hiddenProjectIds ?? []);
+  const bindingFor = (projectId: string) =>
+    status.projects.find((item) => item.projectId === projectId);
+  const projectsOn = (connectionId: string) =>
+    status.projects.filter((item) => item.connectionId === connectionId).length;
+  const attention = status.projects.filter(
+    (item) => stateTones[item.status] === "problem",
+  ).length;
+  const invitedServer =
+    preview &&
+    status.connections.filter(
+      (connection) => connection.serverId === preview.serverId,
+    );
   return (
     <div className="sync-settings" aria-busy={busy}>
-      {error && !panel && (
-        <p className="sync-error" role="alert">
-          {error}
-        </p>
-      )}
-      {message && !panel && (
-        <p className="sync-message" role="status">
-          {message}
-        </p>
-      )}
-      <section className="settings-group">
-        <h2>{t("defaultStorage")}</h2>
-        <div className="settings-row">
-          <div className="settings-row-text">
-            <h3>{t("newProjectLocation")}</h3>
-            <p>{t("newProjectLocationDetail")}</p>
+      <section
+        className="settings-group sync-section"
+        aria-labelledby="sync-projects-title"
+      >
+        <div className="sync-section-header">
+          <div>
+            <h2 id="sync-projects-title">{t("section.projects")}</h2>
+            <p className="settings-help">
+              {attention
+                ? t("projectsAttention", { count: attention })
+                : t("section.projectsHelp")}
+            </p>
           </div>
-          {connectionSelect(
-            status.defaultConnectionId ?? "",
-            (value) =>
-              void run(() =>
-                desktop.invoke("sync:default", { connectionId: value || null }),
-              ),
-            t("localOnly"),
-          )}
-        </div>
-      </section>
-      <section className="settings-group">
-        <h2>{t("serversAndAccounts")}</h2>
-        {status.connections.map((connection) => (
-          <div className="sync-connection" key={connection.id}>
-            <div className="settings-row-text">
-              <h3>{connection.name}</h3>
-              <p>
-                {connection.url} · {connection.user.name}
-              </p>
-            </div>
-            <button
-              className="settings-button"
-              disabled={busy}
-              onClick={() => void run(() => loadServer(connection.id))}
-            >
-              {t("viewProjects")}
-            </button>
-            <button
-              className="settings-button"
-              disabled={busy}
-              onClick={() => void run(() => loadDashboard(connection.id))}
-            >
-              {t("manageProjects")}
-            </button>
-            <button
-              className="settings-button"
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  setServer(connection.id);
-                  setSessionConnectionId(connection.id);
-                  setPasswords({ current: "", next: "" });
-                  setConfirmSignOut(false);
-                  setSessions(
-                    await desktop.invoke("sync:sessions", {
-                      connectionId: connection.id,
-                    }),
-                  );
-                })
-              }
-            >
-              {t("accountAndDevices")}
-            </button>
-            <button
-              className="settings-button"
-              disabled={
-                busy ||
-                status.projects.some(
-                  (project) => project.connectionId === connection.id,
-                )
-              }
-              onClick={() =>
-                void run(() =>
-                  desktop.invoke("sync:disconnect", {
-                    connectionId: connection.id,
-                  }),
-                )
-              }
-            >
-              {t("removeConnection")}
-            </button>
-          </div>
-        ))}
-        <button
-          className="settings-button"
-          onClick={() => {
-            setShowConnect(!showConnect);
-            setError("");
-          }}
-          disabled={busy}
-        >
-          {showConnect ? t("hideConnect") : t("addServerAccount")}
-        </button>
-        {showConnect && (
-          <form
-            className="sync-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void run(connect);
-            }}
+          <button
+            className="settings-button"
+            aria-expanded={showJoin}
+            disabled={busy}
+            onClick={() => setShowJoin(!showJoin)}
           >
-            <label>
-              {t("serverUrl")}
-              <input
-                required
-                type="url"
-                placeholder="https://showai.example.com"
-                value={form.url}
-                onChange={(event) =>
-                  setForm({ ...form, url: event.target.value })
-                }
-              />
-            </label>
-            <label>
-              {t("connectMethod")}
-              <select
-                value={form.mode}
-                onChange={(event) =>
-                  setForm({ ...form, mode: event.target.value })
-                }
-              >
-                <option value="login">{t("mode.login")}</option>
-                <option value="register">{t("mode.register")}</option>
-                <option value="personal">{t("mode.personal")}</option>
-                <option value="token">{t("mode.token")}</option>
-              </select>
-            </label>
-            {form.mode === "token" ? (
-              <label>
-                {t("token")}
+            <Link2 size={14} aria-hidden="true" />
+            {t("joinShared")}
+          </button>
+        </div>
+        {showJoin && (
+          <div className="sync-card sync-join">
+            <form
+              className="sync-inline-field"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void run(previewInvite);
+              }}
+            >
+              <label className="sync-field">
+                <span>{t("inviteLinkLabel")}</span>
                 <input
+                  type="url"
                   required
-                  type="password"
-                  autoComplete="off"
-                  value={form.token}
-                  onChange={(event) =>
-                    setForm({ ...form, token: event.target.value })
-                  }
+                  placeholder={t("pasteInviteLink")}
+                  value={inviteLink}
+                  onChange={(event) => {
+                    setInviteLink(event.target.value);
+                    setPreview(null);
+                  }}
                 />
               </label>
-            ) : (
-              <>
-                <label>
-                  {t("account")}
-                  <input
-                    required
-                    autoComplete="username"
-                    value={form.account}
-                    onChange={(event) =>
-                      setForm({ ...form, account: event.target.value })
-                    }
-                  />
-                </label>
-                {form.mode !== "personal" && (
-                  <label>
-                    {t("password")}
-                    <input
-                      required
-                      minLength={form.mode === "register" ? 12 : 1}
-                      maxLength={1024}
-                      placeholder={
-                        form.mode === "register" ? t("passwordMinLength") : undefined
-                      }
-                      type="password"
-                      autoComplete={
-                        form.mode === "register"
-                          ? "new-password"
-                          : "current-password"
-                      }
-                      value={form.password}
-                      onChange={(event) =>
-                        setForm({ ...form, password: event.target.value })
-                      }
-                    />
-                  </label>
-                )}
-                {["register", "personal"].includes(form.mode) && !preview && (
-                  <label>
-                    {t("registrationKey")}
-                    <input
-                      type="password"
-                      autoComplete="off"
-                      value={form.registrationKey}
-                      onChange={(event) =>
-                        setForm({
-                          ...form,
-                          registrationKey: event.target.value,
-                        })
-                      }
-                    />
-                  </label>
-                )}
-              </>
-            )}
-            <button className="settings-button" type="submit" disabled={busy}>
-              {preview ? t("connectAndJoin") : t("connectServer")}
-            </button>
-          </form>
-        )}
-        {showConnect && (
-          <ServiceLogin
-            url={form.url}
-            registrationKey={form.registrationKey}
-            onConnected={async (id) => {
-              setShowConnect(false);
-              await loadServer(id);
-              await refresh();
-            }}
-          />
-        )}
-        {issuedToken && (
-          <div className="sync-form">
-            <label>
-              {t("newPersonalToken")}
-              <input
-                type="password"
-                readOnly
-                autoComplete="off"
-                value={issuedToken}
-              />
-            </label>
-            <button
-              className="settings-button"
-              onClick={() =>
-                void run(() =>
-                  desktop.invoke("clipboard:write", { text: issuedToken }),
-                )
-              }
-            >
-              {t("copyPersonalToken")}
-            </button>
-            <button
-              className="settings-button"
-              onClick={() => setIssuedToken("")}
-            >
-              {t("tokenSaved")}
-            </button>
-          </div>
-        )}
-        {sessions && (
-          <div className="sync-dashboard-list">
-            <h3>
-              {t("deviceSessions", {
-                name:
-                  status.connections.find(
-                    (connection) => connection.id === sessionConnectionId,
-                  )?.user.name ?? "",
-              })}
-            </h3>
-            <p>{t("deviceSessionsHelp")}</p>
-            <ServiceLogin
-              key={sessionConnectionId}
-              url={
-                status.connections.find(
-                  (connection) => connection.id === sessionConnectionId,
-                )?.url ?? ""
-              }
-              connectionId={sessionConnectionId}
-              registrationKey=""
-              onConnected={async () => {
-                await refresh();
-                setSessions(
-                  await desktop.invoke("sync:sessions", {
-                    connectionId: sessionConnectionId,
-                  }),
-                );
-                setLoginMethodsRevision((value) => value + 1);
-                setMessage(t("toast.loginMethodAdded"));
-              }}
-            />
-            <LoginMethods
-              connectionId={sessionConnectionId}
-              revision={loginMethodsRevision}
-            />
-            {status.connections
-              .find((connection) => connection.id === sessionConnectionId)
-              ?.capabilities?.includes("account-security-v1") && (
-              <>
-                <details>
-                  <summary>{t("changePassword")}</summary>
-                  <p>{t("changePasswordHelp")}</p>
-                  <form
-                    className="sync-connect-form"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void run(async () => {
-                        await desktop.invoke("sync:changePassword", {
-                          connectionId: sessionConnectionId,
-                          currentPassword: passwords.current,
-                          newPassword: passwords.next,
-                        });
-                        setPasswords({ current: "", next: "" });
-                        setSessions(
-                          await desktop.invoke("sync:sessions", {
-                            connectionId: sessionConnectionId,
-                          }),
-                        );
-                        setMessage(t("toast.passwordChanged"));
-                      });
-                    }}
-                  >
-                    <label>
-                      {t("currentPassword")}
-                      <input
-                        type="password"
-                        required
-                        autoComplete="current-password"
-                        value={passwords.current}
-                        onChange={(event) =>
-                          setPasswords({
-                            ...passwords,
-                            current: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                    <label>
-                      {t("newPassword")}
-                      <input
-                        type="password"
-                        required
-                        minLength={12}
-                        maxLength={1024}
-                        placeholder={t("passwordMinLength")}
-                        autoComplete="new-password"
-                        value={passwords.next}
-                        onChange={(event) =>
-                          setPasswords({
-                            ...passwords,
-                            next: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
+              <button className="settings-button" disabled={busy}>
+                {t("viewInvite")}
+              </button>
+              <button
+                type="button"
+                className="settings-icon-button"
+                aria-label={t("closeJoin")}
+                onClick={() => {
+                  setShowJoin(false);
+                  setPreview(null);
+                }}
+              >
+                <X size={14} aria-hidden="true" />
+              </button>
+            </form>
+            {preview && (
+              <div className="sync-invitation">
+                <Folder size={18} aria-hidden="true" />
+                <div>
+                  <strong>{preview.name}</strong>
+                  <span>
+                    {preview.serverName} · {preview.url}
+                  </span>
+                  <span>{t("joinAsRole", { role: role(preview.role) })}</span>
+                </div>
+                {invitedServer?.length ? (
+                  <div className="sync-invitation-actions">
+                    {invitedServer.length > 1 && (
+                      <select
+                        aria-label={t("joinWithAccount")}
+                        value={server}
+                        onChange={(event) => setServer(event.target.value)}
+                      >
+                        {invitedServer.map((connection) => (
+                          <option key={connection.id} value={connection.id}>
+                            {connection.user.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     <button
-                      className="settings-button"
-                      disabled={busy}
-                      type="submit"
-                    >
-                      {t("saveNewPassword")}
-                    </button>
-                  </form>
-                </details>
-                <button
-                  className="settings-button"
-                  disabled={busy}
-                  onClick={() => setConfirmSignOut(true)}
-                >
-                  {t("signOutAll")}
-                </button>
-                {confirmSignOut && (
-                  <div role="group" aria-label={t("confirmSignOutAll")}>
-                    <p>{t("signOutAllHelp")}</p>
-                    <button
-                      className="settings-button"
-                      disabled={busy}
-                      onClick={() => setConfirmSignOut(false)}
-                    >
-                      {tc("cancel")}
-                    </button>
-                    <button
-                      className="settings-button"
-                      disabled={busy}
+                      className="settings-button sync-primary"
+                      disabled={busy || !server}
                       onClick={() =>
                         void run(async () => {
-                          const result = await desktop.invoke<{
-                            unreachable: string[];
-                          }>("sync:revokeAllTokens", {
-                            connectionId: sessionConnectionId,
+                          await desktop.invoke("sync:join", {
+                            connectionId: server,
+                            link: inviteLink,
                           });
-                          setSessions(null);
-                          setConfirmSignOut(false);
-                          const connection = status.connections.find(
-                            (item) => item.id === sessionConnectionId,
-                          )!;
-                          setForm({
-                            ...form,
-                            url: connection.url,
-                            account: connection.user.name,
-                            password: "",
-                            token: "",
-                            registrationKey: "",
-                            mode: "login",
-                          });
-                          setShowConnect(true);
-                          setMessage(
-                            result.unreachable.length
-                              ? t("toast.signedOutAllPartial", {
-                                  servers: result.unreachable.join(", "),
-                                })
-                              : t("toast.signedOutAll"),
-                          );
+                          setPreview(null);
+                          setInviteLink("");
+                          setShowJoin(false);
+                          setMessage(t("toast.joinedSyncing"));
                         })
                       }
                     >
-                      {t("confirmSignOutAll")}
+                      {invitedServer.length > 1
+                        ? t("confirmJoin")
+                        : t("joinAs", { name: invitedServer[0].user.name })}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="sync-invitation-actions">
+                    <p className="settings-help">{t("signInBeforeJoin")}</p>
+                    <button
+                      className="settings-button sync-primary"
+                      disabled={busy}
+                      onClick={() =>
+                        openConnect({
+                          url: preview.url,
+                          mode: preview.target_name ? "login" : "register",
+                          account: preview.target_name ?? "",
+                        })
+                      }
+                    >
+                      {t("signInToJoin")}
                     </button>
                   </div>
                 )}
-              </>
-            )}
-            {sessions.map((session) => (
-              <div className="sync-connection" key={session.digest}>
-                <div className="settings-row-text">
-                  <h3>{session.device}</h3>
-                  <p>
-                    {new Date(session.created_at).toLocaleString(getLocale())} ·{" "}
-                    {session.revoked
-                      ? t("session.revoked")
-                      : new Date(session.expires_at).getTime() <= Date.now()
-                        ? t("session.expired")
-                        : t("session.validUntil", {
-                            date: new Date(session.expires_at).toLocaleString(
-                              getLocale(),
-                            ),
-                          })}
-                    {session.current ? ` · ${t("session.thisDevice")}` : ""}
-                  </p>
-                </div>
-                <button
-                  className="settings-button"
-                  disabled={
-                    busy ||
-                    !!session.revoked ||
-                    new Date(session.expires_at).getTime() <= Date.now()
-                  }
-                  onClick={() =>
-                    void run(async () => {
-                      await desktop.invoke("sync:revokeToken", {
-                        connectionId: sessionConnectionId,
-                        digest: session.digest,
-                      });
-                      if (session.current) {
-                        setSessions(null);
-                        setMessage(t("toast.sessionRevoked"));
-                      } else
-                        setSessions(
-                          await desktop.invoke("sync:sessions", {
-                            connectionId: sessionConnectionId,
-                          }),
-                        );
-                    })
-                  }
-                >
-                  {t("revokeToken")}
-                </button>
               </div>
-            ))}
-          </div>
-        )}
-      </section>
-      <AccountBindings
-        connections={status.connections}
-        projects={localProjects}
-        hidden={status.hiddenProjectIds ?? []}
-        refresh={refresh}
-      />
-      <section className="settings-group">
-        <h2>{t("joinShared")}</h2>
-        <form
-          className="sync-inline-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void run(async () => {
-              const result = await desktop.invoke<NonNullable<typeof preview>>(
-                "sync:previewInvite",
-                { link: inviteLink },
-              );
-              setPreview(result);
-              const existing = status.connections.find(
-                (connection) => connection.serverId === result.serverId,
-              );
-              setServer(existing?.id ?? "");
-              if (!existing) {
-                setForm({ ...form, url: result.url, mode: "register" });
-                setShowConnect(true);
-              }
-            });
-          }}
-        >
-          <input
-            type="url"
-            required
-            aria-label={t("inviteLinkLabel")}
-            placeholder={t("pasteInviteLink")}
-            value={inviteLink}
-            onChange={(event) => {
-              setInviteLink(event.target.value);
-              setPreview(null);
-            }}
-          />
-          <button className="settings-button" disabled={busy}>
-            {t("viewInvite")}
-          </button>
-        </form>
-        {preview && (
-          <div className="sync-invitation">
-            <h3>{preview.name}</h3>
-            <p>
-              {preview.serverName} · {preview.url} ·{" "}
-              {t("joinAsRole", { role: role(preview.role) })}
-            </p>
-            {status.connections.some(
-              (connection) => connection.serverId === preview.serverId,
-            ) ? (
-              <div className="sync-inline-form">
-                <select
-                  value={server}
-                  onChange={(event) => setServer(event.target.value)}
-                >
-                  {status.connections
-                    .filter(
-                      (connection) => connection.serverId === preview.serverId,
-                    )
-                    .map((connection) => (
-                      <option key={connection.id} value={connection.id}>
-                        {connection.user.name}
-                      </option>
-                    ))}
-                </select>
-                <button
-                  className="settings-button"
-                  disabled={busy || !server}
-                  onClick={() =>
-                    void run(async () => {
-                      await desktop.invoke("sync:join", {
-                        connectionId: server,
-                        link: inviteLink,
-                      });
-                      setPreview(null);
-                      setInviteLink("");
-                      setMessage(t("toast.joinedSyncing"));
-                    })
-                  }
-                >
-                  {t("confirmJoin")}
-                </button>
-              </div>
-            ) : (
-              <p className="settings-help">{t("signInBeforeJoin")}</p>
             )}
           </div>
         )}
-      </section>
-      <section className="settings-group">
-        <h2>{t("projectStorage")}</h2>
-        {localProjects.map((project) => {
-          const binding = status.projects.find(
-              (item) => item.projectId === project.id,
-            ),
-            connection =
-              binding &&
-              status.connections.find(
-                (item) => item.id === binding.connectionId,
+        <div className="sync-card">
+          <div className="sync-card-row sync-default-row">
+            <div>
+              <label htmlFor="sync-default-location">
+                {t("newProjectLocation")}
+              </label>
+              <p className="settings-help">{t("newProjectLocationDetail")}</p>
+            </div>
+            <select
+              id="sync-default-location"
+              value={status.defaultConnectionId ?? ""}
+              disabled={busy}
+              onChange={(event) => {
+                const value = event.target.value;
+                void run(() =>
+                  desktop.invoke("sync:default", {
+                    connectionId: value || null,
+                  }),
+                );
+              }}
+            >
+              <option value="">{t("localOnly")}</option>
+              {status.connections.map((connection) => (
+                <option key={connection.id} value={connection.id}>
+                  {connectionLabel(connection.id)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <ul className="sync-project-list">
+            {localProjects.map((project) => {
+              const binding = bindingFor(project.id),
+                connection =
+                  binding &&
+                  status.connections.find(
+                    (item) => item.id === binding.connectionId,
+                  );
+              const open = expanded === project.id;
+              const tone = binding ? stateTones[binding.status] : "local";
+              const sameServer = status.connections.filter(
+                (item) => item.serverId === connection?.serverId,
               );
-          return (
-            <div className="sync-project" key={project.id}>
-              <div className="sync-project-heading">
-                <div className="settings-row-text">
-                  <h3>{project.name}</h3>
-                  <p>
-                    {connection
-                      ? `${connection.name} · ${connection.user.name} · ${role(binding!.role)} · ${t(stateKeys[binding!.status])}`
-                      : t("storedLocally")}
-                  </p>
-                  {binding?.error && (
-                    <p className="sync-error">{binding.error}</p>
-                  )}
-                </div>
-                {binding ? (
-                  <>
-                    <select
-                      aria-label={t("syncAccountFor", { name: project.name })}
-                      value={binding.connectionId}
-                      disabled={busy}
-                      onChange={(event) =>
-                        void run(() =>
-                          desktop.invoke("sync:changeAccount", {
-                            projectId: project.id,
-                            connectionId: event.target.value,
-                          }),
-                        )
-                      }
-                    >
-                      {status.connections
-                        .filter(
-                          (item) => item.serverId === connection?.serverId,
-                        )
-                        .map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.user.name}
-                          </option>
-                        ))}
-                    </select>
-                    <button
-                      className="settings-button"
-                      disabled={busy}
-                      onClick={() =>
-                        void run(() =>
-                          desktop.invoke("sync:run", { projectId: project.id }),
-                        )
-                      }
-                    >
-                      {t("syncNow")}
-                    </button>
-                    {binding.role === "admin" && (
+              const toggle = () => {
+                setExpanded(open ? "" : project.id);
+                setConfirmDetach("");
+                setUploadTarget(
+                  status.defaultConnectionId ?? status.connections[0]?.id ?? "",
+                );
+              };
+              return (
+                <li
+                  key={project.id}
+                  className={`sync-project-item ${open ? "is-open" : ""}`}
+                >
+                  <div className="sync-project-summary">
+                    <div className="sync-project-name">
+                      <strong>
+                        {project.name}
+                        {hidden.has(project.id) && (
+                          <span className="sync-badge">
+                            {t("hiddenOnDevice")}
+                          </span>
+                        )}
+                      </strong>
+                      <span>
+                        {connection
+                          ? `${connection.name} · ${connection.user.name} · ${role(binding!.role)}`
+                          : t("storedLocally")}
+                        {binding?.status === "synced" && binding.syncedAt
+                          ? ` · ${t("syncedAt", { date: syncTime(binding.syncedAt) })}`
+                          : ""}
+                      </span>
+                    </div>
+                    <span className={`sync-state is-${tone}`}>
+                      {binding
+                        ? t(stateKeys[binding.status])
+                        : t("status.local")}
+                    </span>
+                    <div className="sync-project-actions">
+                      {binding?.status === "conflict" ? (
+                        <button
+                          className="settings-button sync-primary"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(async () => {
+                              setPanel("conflict");
+                              setConflict(null);
+                              setChoices({});
+                              setConflict(
+                                await desktop.invoke("sync:conflict", {
+                                  projectId: project.id,
+                                }),
+                              );
+                            })
+                          }
+                        >
+                          {t("resolveConflict")}
+                        </button>
+                      ) : binding ? (
+                        <button
+                          className="settings-button"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(async () => {
+                              await desktop.invoke("sync:run", {
+                                projectId: project.id,
+                              });
+                              setMessage(
+                                t("toast.synced", { name: project.name }),
+                              );
+                            })
+                          }
+                        >
+                          <RefreshCw size={14} aria-hidden="true" />
+                          {t("syncNow")}
+                        </button>
+                      ) : (
+                        <button
+                          className="settings-button"
+                          disabled={busy || !status.connections.length}
+                          title={
+                            status.connections.length
+                              ? undefined
+                              : t("needAccountFirst")
+                          }
+                          onClick={() => {
+                            if (!open) toggle();
+                          }}
+                        >
+                          <Upload size={14} aria-hidden="true" />
+                          {t("uploadToServer")}
+                        </button>
+                      )}
                       <button
-                        className="settings-button"
-                        disabled={busy}
-                        onClick={() =>
-                          void run(() =>
-                            loadDashboard(
-                              binding.connectionId,
-                              binding.remoteProjectId,
-                            ),
-                          )
-                        }
+                        className="settings-icon-button sync-disclosure"
+                        aria-expanded={open}
+                        aria-label={t("manageProject", { name: project.name })}
+                        title={t("manageProject", { name: project.name })}
+                        onClick={toggle}
                       >
-                        {t("manageMembers")}
+                        <ChevronDown size={16} aria-hidden="true" />
                       </button>
-                    )}
-                    <button
-                      className="settings-button"
-                      disabled={busy}
-                      onClick={() =>
-                        void run(() =>
-                          desktop.invoke("sync:detach", {
-                            projectId: project.id,
-                          }),
-                        )
-                      }
-                    >
-                      {t("detach")}
-                    </button>
-                  </>
-                ) : (
-                  connectionSelect(
-                    "",
-                    (value) => {
-                      if (value)
-                        void run(() =>
-                          desktop.invoke("sync:attach", {
-                            projectId: project.id,
-                            connectionId: value,
-                          }),
-                        );
-                    },
-                    t("connectToServer"),
-                  )
-                )}
+                    </div>
+                  </div>
+                  {binding?.error && (
+                    <p className="sync-error sync-project-error">
+                      {binding.error}
+                    </p>
+                  )}
+                  {open && (
+                    <div className="sync-project-details">
+                      {binding ? (
+                        <>
+                          {sameServer.length > 1 && (
+                            <div className="sync-detail-row">
+                              <div>
+                                <label htmlFor={`sync-account-${project.id}`}>
+                                  {t("syncAccount")}
+                                </label>
+                                <p className="settings-help">
+                                  {t("syncAccountHelp")}
+                                </p>
+                              </div>
+                              <select
+                                id={`sync-account-${project.id}`}
+                                value={binding.connectionId}
+                                disabled={busy}
+                                onChange={(event) => {
+                                  const value = event.target.value;
+                                  void run(() =>
+                                    desktop.invoke("sync:changeAccount", {
+                                      projectId: project.id,
+                                      connectionId: value,
+                                    }),
+                                  );
+                                }}
+                              >
+                                {sameServer.map((item) => (
+                                  <option key={item.id} value={item.id}>
+                                    {item.user.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                          <div className="sync-detail-row">
+                            <div>
+                              <strong>{t("membersAndInvites")}</strong>
+                              <p className="settings-help">
+                                {binding.role === "admin"
+                                  ? t("membersAdminHelp")
+                                  : t("membersOnlyAdmins", {
+                                      role: role(binding.role),
+                                    })}
+                              </p>
+                            </div>
+                            {binding.role === "admin" && (
+                              <button
+                                className="settings-button"
+                                disabled={busy}
+                                onClick={() =>
+                                  void run(() =>
+                                    loadDashboard(
+                                      binding.connectionId,
+                                      binding.remoteProjectId,
+                                    ),
+                                  )
+                                }
+                              >
+                                {t("manageMembers")}
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <form
+                          className="sync-detail-row"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            void run(async () => {
+                              await desktop.invoke("sync:attach", {
+                                projectId: project.id,
+                                connectionId: uploadTarget,
+                              });
+                              setMessage(
+                                t("toast.uploaded", {
+                                  name: project.name,
+                                  server: connectionLabel(uploadTarget),
+                                }),
+                              );
+                            });
+                          }}
+                        >
+                          <div>
+                            <label htmlFor={`sync-upload-${project.id}`}>
+                              {t("uploadAccount")}
+                            </label>
+                            <p className="settings-help">
+                              {status.connections.length
+                                ? t("uploadHelp")
+                                : t("needAccountFirst")}
+                            </p>
+                          </div>
+                          {!!status.connections.length && (
+                            <div className="sync-detail-controls">
+                              <select
+                                id={`sync-upload-${project.id}`}
+                                required
+                                value={uploadTarget}
+                                disabled={busy}
+                                onChange={(event) =>
+                                  setUploadTarget(event.target.value)
+                                }
+                              >
+                                {status.connections.map((item) => (
+                                  <option key={item.id} value={item.id}>
+                                    {connectionLabel(item.id)}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                className="settings-button sync-primary"
+                                disabled={busy || !uploadTarget}
+                              >
+                                {t("confirmUpload")}
+                              </button>
+                            </div>
+                          )}
+                        </form>
+                      )}
+                      <div className="sync-detail-row">
+                        <div>
+                          <label htmlFor={`sync-visible-${project.id}`}>
+                            {t("showOnDevice")}
+                          </label>
+                          <p className="settings-help">
+                            {t("showOnDeviceHelp")}
+                          </p>
+                        </div>
+                        <input
+                          id={`sync-visible-${project.id}`}
+                          type="checkbox"
+                          role="switch"
+                          className="sync-switch"
+                          disabled={busy}
+                          checked={!hidden.has(project.id)}
+                          onChange={(event) => {
+                            const visible = event.target.checked;
+                            void run(() =>
+                              desktop.invoke("sync:projectVisibility", {
+                                projectId: project.id,
+                                visible,
+                              }),
+                            );
+                          }}
+                        />
+                      </div>
+                      {binding && (
+                        <div className="sync-detail-row">
+                          <div>
+                            <strong>{t("detach")}</strong>
+                            <p className="settings-help">{t("detachHelp")}</p>
+                          </div>
+                          {confirmDetach === project.id ? (
+                            <div
+                              className="sync-detail-controls"
+                              role="group"
+                              aria-label={t("confirmDetach")}
+                            >
+                              <button
+                                className="settings-button"
+                                disabled={busy}
+                                onClick={() => setConfirmDetach("")}
+                              >
+                                {tc("cancel")}
+                              </button>
+                              <button
+                                className="settings-button sync-danger-fill"
+                                disabled={busy}
+                                onClick={() =>
+                                  void run(async () => {
+                                    await desktop.invoke("sync:detach", {
+                                      projectId: project.id,
+                                    });
+                                    setConfirmDetach("");
+                                    setMessage(
+                                      t("toast.detached", {
+                                        name: project.name,
+                                      }),
+                                    );
+                                  })
+                                }
+                              >
+                                {t("confirmDetach")}
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              className="settings-button sync-danger"
+                              disabled={busy}
+                              onClick={() => setConfirmDetach(project.id)}
+                            >
+                              {t("detach")}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          {!localProjects.length && (
+            <p className="sync-empty">{t("noLocalProjects")}</p>
+          )}
+        </div>
+      </section>
+      <section
+        className="settings-group sync-section"
+        aria-labelledby="sync-servers-title"
+      >
+        <div className="sync-section-header">
+          <div>
+            <h2 id="sync-servers-title">{t("serverAccounts")}</h2>
+            <p className="settings-help">{t("serverAccountsHelp")}</p>
+          </div>
+          {!showConnect && (
+            <button
+              className="settings-button"
+              disabled={busy}
+              onClick={() => openConnect()}
+            >
+              <Plus size={14} aria-hidden="true" />
+              {t("addServerAccount")}
+            </button>
+          )}
+        </div>
+        {issuedToken && (
+          <IssuedToken
+            token={issuedToken}
+            busy={busy}
+            run={run}
+            onDone={() => setIssuedToken("")}
+          />
+        )}
+        {!status.connections.length && !showConnect && (
+          <p className="sync-empty">{t("noServers")}</p>
+        )}
+        {status.connections.map((connection) => {
+          const open = accountPanel === connection.id;
+          const count = projectsOn(connection.id);
+          return (
+            <article
+              className={`sync-card sync-server ${open ? "is-open" : ""}`}
+              key={connection.id}
+            >
+              <div className="sync-server-summary">
+                <Database size={18} aria-hidden="true" />
+                <div className="sync-server-name">
+                  <strong>{connection.name}</strong>
+                  <span>
+                    {connection.user.name} · {connection.url}
+                  </span>
+                </div>
+                <span className="sync-server-count">
+                  {count
+                    ? t("projectsSyncing", { count })
+                    : t("noProjectsSyncing")}
+                </span>
               </div>
-              {binding?.status === "conflict" && (
+              <div className="sync-server-actions">
                 <button
                   className="settings-button"
                   disabled={busy}
-                  onClick={() =>
-                    void run(async () => {
-                      setPanel("conflict");
-                      setConflict(null);
-                      setChoices({});
-                      setConflict(
-                        await desktop.invoke("sync:conflict", {
-                          projectId: project.id,
-                        }),
-                      );
-                    })
-                  }
+                  title={t("serverProjectsHelp")}
+                  onClick={() => void run(() => loadServer(connection.id))}
                 >
-                  {t("compareChanges")}
+                  {t("serverProjects")}
                 </button>
+                <button
+                  className="settings-button"
+                  disabled={busy}
+                  title={t("membersAdminHelp")}
+                  onClick={() => void run(() => loadDashboard(connection.id))}
+                >
+                  {t("membersAndInvites")}
+                </button>
+                <button
+                  className="settings-button"
+                  aria-expanded={open}
+                  onClick={() => setAccountPanel(open ? "" : connection.id)}
+                >
+                  {t("accountAndDevices")}
+                  <ChevronDown
+                    className="sync-chevron"
+                    size={14}
+                    aria-hidden="true"
+                  />
+                </button>
+              </div>
+              {open && (
+                <SyncAccountPanel
+                  connection={connection}
+                  busy={busy}
+                  syncedProjects={count}
+                  run={run}
+                  notify={setMessage}
+                  onSignedOut={() => {
+                    setAccountPanel("");
+                    openConnect({
+                      url: connection.url,
+                      account: connection.user.name,
+                    });
+                  }}
+                  onRemoved={() => {
+                    setAccountPanel("");
+                    setMessage(
+                      t("toast.connectionRemoved", { name: connection.name }),
+                    );
+                  }}
+                />
               )}
-            </div>
+            </article>
           );
         })}
-        {!localProjects.length && (
-          <p className="settings-help">{t("noLocalProjects")}</p>
+        {showConnect && (
+          <div className="sync-card sync-connect" ref={connectSection}>
+            <div className="sync-connect-heading">
+              <h3>
+                {preview
+                  ? t("connectForInvite", { name: preview.name })
+                  : t("addServerAccount")}
+              </h3>
+              <button
+                className="settings-icon-button"
+                aria-label={tc("cancel")}
+                disabled={busy}
+                onClick={() => setShowConnect(false)}
+              >
+                <X size={15} aria-hidden="true" />
+              </button>
+            </div>
+            <form
+              className="sync-connect-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void run(connect);
+              }}
+            >
+              <label className="sync-field">
+                <span>{t("serverUrl")}</span>
+                <input
+                  required
+                  type="url"
+                  placeholder="https://showai.example.com"
+                  value={form.url}
+                  onChange={(event) =>
+                    setForm({ ...form, url: event.target.value })
+                  }
+                />
+                <small>{t("serverUrlHint")}</small>
+              </label>
+              <div
+                className="sync-segmented"
+                role="radiogroup"
+                aria-label={t("connectMethod")}
+              >
+                {(["login", "register", "token"] as const).map((mode) => (
+                  <label
+                    key={mode}
+                    className={form.mode === mode ? "is-active" : ""}
+                  >
+                    <input
+                      type="radio"
+                      name="sync-connect-mode"
+                      value={mode}
+                      checked={form.mode === mode}
+                      onChange={() => setForm({ ...form, mode })}
+                    />
+                    {t(`mode.${mode}`)}
+                  </label>
+                ))}
+              </div>
+              {form.mode === "token" ? (
+                <label className="sync-field">
+                  <span>{t("token")}</span>
+                  <input
+                    required
+                    type="password"
+                    autoComplete="off"
+                    value={form.token}
+                    onChange={(event) =>
+                      setForm({ ...form, token: event.target.value })
+                    }
+                  />
+                  <small>{t("tokenHint")}</small>
+                </label>
+              ) : (
+                <div className="sync-field-grid">
+                  <label className="sync-field">
+                    <span>{t("account")}</span>
+                    <input
+                      required
+                      autoComplete="username"
+                      value={form.account}
+                      onChange={(event) =>
+                        setForm({ ...form, account: event.target.value })
+                      }
+                    />
+                  </label>
+                  {!(form.mode === "register" && form.tokenOnly) && (
+                    <label className="sync-field">
+                      <span>{t("password")}</span>
+                      <input
+                        required
+                        minLength={form.mode === "register" ? 12 : 1}
+                        maxLength={1024}
+                        placeholder={
+                          form.mode === "register"
+                            ? t("passwordMinLength")
+                            : undefined
+                        }
+                        type="password"
+                        autoComplete={
+                          form.mode === "register"
+                            ? "new-password"
+                            : "current-password"
+                        }
+                        value={form.password}
+                        onChange={(event) =>
+                          setForm({ ...form, password: event.target.value })
+                        }
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
+              {form.mode === "register" && (
+                <>
+                  {preview ? (
+                    <p className="settings-help">{t("inviteRegistration")}</p>
+                  ) : (
+                    <label className="sync-field">
+                      <span>{t("registrationKey")}</span>
+                      <input
+                        type="password"
+                        autoComplete="off"
+                        value={form.registrationKey}
+                        onChange={(event) =>
+                          setForm({
+                            ...form,
+                            registrationKey: event.target.value,
+                          })
+                        }
+                      />
+                      <small>{t("registrationKeyHelp")}</small>
+                    </label>
+                  )}
+                  <label className="sync-check">
+                    <input
+                      type="checkbox"
+                      checked={form.tokenOnly}
+                      onChange={(event) =>
+                        setForm({ ...form, tokenOnly: event.target.checked })
+                      }
+                    />
+                    <span>
+                      {t("tokenOnly")}
+                      <small>{t("tokenOnlyHelp")}</small>
+                    </span>
+                  </label>
+                </>
+              )}
+              <div className="sync-form-actions">
+                <button
+                  className="settings-button sync-primary"
+                  type="submit"
+                  disabled={busy}
+                >
+                  {preview ? t("connectAndJoin") : t(`submit.${form.mode}`)}
+                </button>
+                <button
+                  type="button"
+                  className="settings-button"
+                  disabled={busy}
+                  onClick={() => setShowConnect(false)}
+                >
+                  {tc("cancel")}
+                </button>
+              </div>
+            </form>
+            {form.mode !== "token" && (
+              <ServiceLogin
+                url={form.url}
+                registrationKey={
+                  form.mode === "register" ? form.registrationKey : ""
+                }
+                onConnected={async (id) => {
+                  setShowConnect(false);
+                  setForm(emptyForm);
+                  await refresh();
+                  setMessage(t("toast.connected", { name: form.url }));
+                  await loadServer(id);
+                }}
+              />
+            )}
+          </div>
         )}
       </section>
+      <AccountBindings connections={status.connections} refresh={refresh} />
+      {(error || message) && !panel && (
+        <div
+          className={`sync-feedback ${error ? "is-error" : ""}`}
+          role={error ? "alert" : "status"}
+        >
+          <p>{error || message}</p>
+          <button
+            className="settings-icon-button"
+            aria-label={t("dismiss")}
+            onClick={() => {
+              setError("");
+              setMessage("");
+            }}
+          >
+            <X size={14} aria-hidden="true" />
+          </button>
+        </div>
+      )}
       {panel && (
         <Dialog
           key={panel}

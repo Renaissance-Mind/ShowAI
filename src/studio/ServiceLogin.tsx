@@ -124,9 +124,11 @@ export default function ServiceLogin({
   if (!methods.some((method) => ["github", "google", "email"].includes(method)))
     return null;
   return (
-    <div className="sync-form">
-      {connectionId && (
+    <div className="sync-oauth">
+      {connectionId ? (
         <p className="settings-help">{t("login.addMethodHelp")}</p>
+      ) : (
+        <p className="sync-divider">{t("login.otherMethods")}</p>
       )}
       {error && (
         <p role="alert" className="sync-error">
@@ -168,12 +170,10 @@ export default function ServiceLogin({
         </p>
       )}
       {flow?.url && confirming && (
-        <>
-          <p className="settings-help">
-            {t("login.completeHelp")}
-          </p>
-          <label>
-            {t("login.completionCode")}
+        <div className="sync-inline-field">
+          <p className="settings-help">{t("login.completeHelp")}</p>
+          <label className="sync-field">
+            <span>{t("login.completionCode")}</span>
             <input
               autoComplete="one-time-code"
               maxLength={9}
@@ -199,12 +199,12 @@ export default function ServiceLogin({
           >
             {t("login.complete")}
           </button>
-        </>
+        </div>
       )}
       {methods.includes("email") && !flow && (
-        <>
-          <label>
-            {t("login.email")}
+        <div className="sync-inline-field">
+          <label className="sync-field">
+            <span>{t("login.email")}</span>
             <input
               type="email"
               value={email}
@@ -220,12 +220,12 @@ export default function ServiceLogin({
           >
             {t("login.sendCode")}
           </button>
-        </>
+        </div>
       )}
       {flow?.provider === "email" && (
-        <>
-          <label>
-            {t("login.code")}
+        <div className="sync-inline-field">
+          <label className="sync-field">
+            <span>{t("login.code")}</span>
             <input
               inputMode="numeric"
               autoComplete="one-time-code"
@@ -248,12 +248,12 @@ export default function ServiceLogin({
           >
             {t("login.confirmEmail")}
           </button>
-        </>
+        </div>
       )}
       {flow && (
         <button
           type="button"
-          className="settings-button"
+          className="sync-text-button"
           onClick={() => {
             setFlow(null);
             setCode("");
