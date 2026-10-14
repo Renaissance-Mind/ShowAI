@@ -745,7 +745,7 @@
 .page-surface .surface-object.is-region {
   border-color: var(--line, var(--border));
 }
-.page-surface .surface-object.is-hovered {
+.page-surface .surface-object.is-hovered:not(.is-drawing) {
   outline: calc(1px * var(--board-inv, 1)) solid #467de380;
   outline-offset: calc(2px * var(--board-inv, 1));
 }
