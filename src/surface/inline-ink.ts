@@ -23,7 +23,7 @@ export interface InkFrame {
   viewport: number[];
   camera: { x: number; y: number; scale: number };
   cameraVersion: number;
-  poses: Record<string, number[]>;
+  poses?: Record<string, number[]>;
   holes: { x: number; y: number; width: number; height: number }[];
 }
 export interface InkCommand {

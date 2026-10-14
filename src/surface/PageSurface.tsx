@@ -175,7 +175,12 @@ export default function PageSurface({
     onTool: (value) => {
       if (value === "settings") {
         if (writingSettings.current) writingSettings.current.open = true;
-      } else if (value === "eraser" || value === "pen") onToolChange?.(value);
+      } else if (
+        value === "eraser" ||
+        value === "pen" ||
+        value === "highlighter"
+      )
+        onToolChange?.(value);
     },
   });
   const board = useBoardInteraction({
