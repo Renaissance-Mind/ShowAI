@@ -340,6 +340,76 @@ test("workbench project creation accepts empty, emoji and embedded image icons a
   expect(projects.find((item) => item.id === created.id)?.icon).toBe("");
 });
 
+test("workbench folder actions accept, keep, replace, clear and reject folder icons", async () => {
+  const project = await invoke<{ id: string }>("projects:create", {
+    name: "Folder icon actions",
+  });
+  const folder = await invoke<{ id: string; icon?: string }>("folders:create", {
+    projectId: project.id,
+    name: "Iconic",
+    icon: "📚",
+  });
+  expect(folder.icon).toBe("📚");
+  const plain = await invoke<{ id: string; icon?: string }>("folders:create", {
+    projectId: project.id,
+    name: "Plain",
+  });
+  expect(plain.icon).toBeUndefined();
+  const listIcon = async (id: string) =>
+    (
+      await invoke<{ id: string; icon?: string }[]>("folders:list", {
+        projectId: project.id,
+      })
+    ).find((item) => item.id === id)?.icon;
+  await invoke("folders:rename", {
+    projectId: project.id,
+    folderId: folder.id,
+    name: "Renamed only",
+  });
+  expect(await listIcon(folder.id)).toBe("📚");
+  await invoke("folders:rename", {
+    projectId: project.id,
+    folderId: folder.id,
+    name: "Image",
+    icon: "https://example.com/folder.png",
+  });
+  expect(await listIcon(folder.id)).toBe("https://example.com/folder.png");
+  for (const icon of ["javascript:alert(1)", "x".repeat(65), 7]) {
+    const result = await request("invoke", {
+      action: "folders:rename",
+      args: {
+        projectId: project.id,
+        folderId: folder.id,
+        name: "Bad",
+        icon,
+      },
+    });
+    expect(result.ok).toBe(false);
+    const created = await request("invoke", {
+      action: "folders:create",
+      args: { projectId: project.id, name: "Bad", icon },
+    });
+    expect(created.ok).toBe(false);
+  }
+  expect(await listIcon(folder.id)).toBe("https://example.com/folder.png");
+  await invoke("folders:rename", {
+    projectId: project.id,
+    folderId: folder.id,
+    name: "Cleared",
+    icon: "",
+  });
+  expect(await listIcon(folder.id)).toBe("");
+  expect(
+    (
+      await invoke<{ name: string }[]>("folders:list", {
+        projectId: project.id,
+      })
+    )
+      .map((item) => item.name)
+      .sort(),
+  ).toEqual(["Cleared", "Plain"]);
+});
+
 test("browser workbench, standalone CLI and a second client share real files and preserve conflicts", async () => {
   const info = await invoke<DesktopInfo>("app:info");
   expect(info.mode).toBe("browser");

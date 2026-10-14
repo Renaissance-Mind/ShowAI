@@ -819,13 +819,23 @@ export function createWorkbench(
       case "folders:create":
         return store.createFolder(projectId(args), {
           name: required(args, "name"),
+          icon:
+            args.icon === undefined
+              ? undefined
+              : validatePageIcon(args.icon, "folder.icon"),
           parentId: parentFolder(args),
         });
       case "folders:rename":
         return store.updateFolder(
           projectId(args),
           assertId(required(args, "folderId")),
-          { name: required(args, "name") },
+          {
+            name: required(args, "name"),
+            icon:
+              args.icon === undefined
+                ? undefined
+                : validatePageIcon(args.icon, "folder.icon"),
+          },
         );
       case "folders:pin":
         return store.updateFolder(

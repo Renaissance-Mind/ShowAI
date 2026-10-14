@@ -337,7 +337,7 @@ try {
   await nameDialog("名称", "Renamed page");
   await choose(nested.id, "置顶");
   await choose(folderB.id, "重命名");
-  await nameDialog("名称", "Renamed folder");
+  await nameDialog("文件夹名称", "Renamed folder");
   await choose(folderB.id, "置顶");
   await poll(
     pageDocuments,

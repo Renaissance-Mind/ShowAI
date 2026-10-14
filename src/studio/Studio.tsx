@@ -196,7 +196,13 @@ type DialogState =
       parentId: string | null;
       templates: TemplateMetadata[];
     }
-  | { type: "folder"; projectId: string; parentId: string | null }
+  | {
+      type: "folder";
+      projectId: string;
+      parentId: string | null;
+      /** Present when editing an existing folder's name and icon. */
+      target?: LibraryTarget;
+    }
   | {
       type: "pageIcon";
       target: LibraryTarget;
@@ -1130,6 +1136,7 @@ export default function Studio() {
     projectId,
     id: item.id,
     title: item.name,
+    icon: item.icon,
     pinned: !!item.pinned,
     parentId: item.parentId ?? null,
   });
@@ -1474,7 +1481,7 @@ export default function Studio() {
   });
   async function updateTarget(
     target: LibraryTarget,
-    change: { name?: string; pinned?: boolean },
+    change: { name?: string; icon?: string; pinned?: boolean },
   ) {
     if (!(await page.flush())) {
       setView("page");
@@ -2182,7 +2189,11 @@ export default function Studio() {
                   openTargetClick(folderTarget(item, selectedProject!), event)
                 }
               >
-                <Folder size={16} aria-hidden="true" />
+                <PageIcon
+                  value={item.icon}
+                  size={16}
+                  fallback={<Folder size={16} />}
+                />
                 <span>{item.name}</span>
               </button>
             </span>
@@ -2868,7 +2879,11 @@ export default function Studio() {
                               >
                                 <span className="studio-page-list-icon">
                                   {target.kind === "folder" ? (
-                                    <Folder size={19} />
+                                    <PageIcon
+                                      value={target.icon}
+                                      size={19}
+                                      fallback={<Folder size={19} />}
+                                    />
                                   ) : (
                                     <PageIcon
                                       value={
@@ -3124,7 +3139,14 @@ export default function Studio() {
                         setDialog(
                           currentProject
                             ? { type: "project", project: currentProject }
-                            : { type: "rename", target: contextMenu.target },
+                            : contextMenu.target.kind === "folder"
+                              ? {
+                                  type: "folder",
+                                  projectId: contextMenu.target.projectId,
+                                  parentId: contextMenu.target.parentId,
+                                  target: contextMenu.target,
+                                }
+                              : { type: "rename", target: contextMenu.target },
                         );
                       },
                     },
@@ -3402,11 +3424,15 @@ export default function Studio() {
           />
         )}
         {dialog?.type === "folder" && (
-          <NameDialog
-            title={t("newFolder")}
-            inputLabel={t("folderName")}
+          <FolderDialog
+            folder={dialog.target}
             onClose={closeDialog}
-            onSave={async (name) => {
+            onSave={async (name, icon) => {
+              if (dialog.target) {
+                if (await updateTarget(dialog.target, { name, icon }))
+                  setDialog(null);
+                return;
+              }
               if (!(await page.flush())) return;
               const folder = await desktop.invoke<FolderMetadata>(
                 "folders:create",
@@ -3414,6 +3440,7 @@ export default function Studio() {
                   projectId: dialog.projectId,
                   parentId: dialog.parentId,
                   name,
+                  ...(icon ? { icon } : {}),
                 },
               );
               setExpandedFolders((current) => ({
@@ -3755,22 +3782,89 @@ function ProjectDialog({
 }) {
   const t = useTranslator(studioMessages);
   const tc = useTranslator(commonMessages);
-  const [name, setName] = useState(project?.name ?? "");
-  const [icon, setIcon] = useState(project?.icon ?? "");
+  return (
+    <DirectoryDialog
+      title={project ? t("projectSettings") : t("newProjectTitle")}
+      inputLabel={t("projectName")}
+      placeholder={t("projectNamePlaceholder")}
+      iconButtonLabel={t("setProjectIcon")}
+      iconDialogTitle={t("projectIcon")}
+      submitLabel={project ? tc("save") : t("createProject")}
+      initialName={project?.name}
+      initialIcon={project?.icon}
+      onClose={onClose}
+      onSave={onSave}
+    />
+  );
+}
+
+function FolderDialog({
+  folder,
+  onClose,
+  onSave,
+}: {
+  folder?: LibraryTarget;
+  onClose: () => void;
+  onSave: (name: string, icon: string) => Promise<void>;
+}) {
+  const t = useTranslator(studioMessages);
+  const tc = useTranslator(commonMessages);
+  return (
+    <DirectoryDialog
+      title={folder ? t("folderSettings") : t("newFolder")}
+      inputLabel={t("folderName")}
+      iconButtonLabel={t("setFolderIcon")}
+      iconDialogTitle={t("folderIcon")}
+      submitLabel={folder ? tc("save") : tc("create")}
+      initialName={folder?.title}
+      initialIcon={folder?.icon}
+      onClose={onClose}
+      onSave={onSave}
+    />
+  );
+}
+
+/** Projects and folders share one name-and-icon form with a folder glyph fallback. */
+function DirectoryDialog({
+  title,
+  inputLabel,
+  placeholder,
+  iconButtonLabel,
+  iconDialogTitle,
+  submitLabel,
+  initialName = "",
+  initialIcon = "",
+  onClose,
+  onSave,
+}: {
+  title: string;
+  inputLabel: string;
+  placeholder?: string;
+  iconButtonLabel: string;
+  iconDialogTitle: string;
+  submitLabel: string;
+  initialName?: string;
+  initialIcon?: string;
+  onClose: () => void;
+  onSave: (name: string, icon: string) => Promise<void>;
+}) {
+  const t = useTranslator(studioMessages);
+  const tc = useTranslator(commonMessages);
+  const [name, setName] = useState(initialName);
+  const [icon, setIcon] = useState(initialIcon);
   const [choosingIcon, setChoosingIcon] = useState(false);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   return (
     <>
-      <Dialog
-        title={project ? t("projectSettings") : t("newProjectTitle")}
-        onClose={onClose}
-      >
+      <Dialog title={title} onClose={onClose}>
         <form
           className="studio-form"
           onSubmit={(event) => {
             event.preventDefault();
+            if (!name.trim() || busy) return;
             setBusy(true);
+            setError("");
             void onSave(name.trim(), icon)
               .catch((reason) => setError(errorMessage(reason)))
               .finally(() => setBusy(false));
@@ -3779,8 +3873,8 @@ function ProjectDialog({
           <label>
             {t("name")}
             <input
-              aria-label={t("projectName")}
-              placeholder={t("projectNamePlaceholder")}
+              aria-label={inputLabel}
+              placeholder={placeholder}
               value={name}
               onChange={(event) => setName(event.target.value)}
               maxLength={1000}
@@ -3791,7 +3885,7 @@ function ProjectDialog({
             className="studio-button studio-project-icon-choice"
             disabled={busy}
             onClick={() => setChoosingIcon(true)}
-            aria-label={t("setProjectIcon")}
+            aria-label={iconButtonLabel}
           >
             <PageIcon value={icon} size={28} fallback={<Folder size={28} />} />
             <span>{t("setIconButton")}</span>
@@ -3810,14 +3904,14 @@ function ProjectDialog({
               disabled={!name.trim() || busy}
             >
               {busy ? <Loader2 size={15} className="studio-spin" /> : null}
-              {project ? tc("save") : t("createProject")}
+              {submitLabel}
             </button>
           </footer>
         </form>
       </Dialog>
       {choosingIcon && (
         <PageIconDialog
-          title={t("projectIcon")}
+          title={iconDialogTitle}
           value={icon}
           fallback={<Folder size={56} />}
           onClose={() => setChoosingIcon(false)}

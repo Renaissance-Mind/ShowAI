@@ -84,6 +84,72 @@ describe("file-first project store", () => {
     ).toEqual(page.document);
   });
 
+  it("persists folder icons, preserves them on rename and pin, rejects invalid icons and validates stored metadata", async () => {
+    const project = await store.createProject({ name: "Folder icons" });
+    const folder = await store.createFolder(project.id, {
+      name: "Notes",
+      icon: "📁",
+    });
+    expect(folder.icon).toBe("📁");
+    const plain = await store.createFolder(project.id, { name: "Plain" });
+    expect(plain).not.toHaveProperty("icon");
+    const child = await store.createFolder(project.id, {
+      name: "Child",
+      icon: "https://example.com/folder.png",
+      parentId: folder.id,
+    });
+    const reopened = new FileStore(store.root);
+    const listed = await reopened.listFolders(project.id);
+    expect(listed.find((item) => item.id === folder.id)?.icon).toBe("📁");
+    expect(listed.find((item) => item.id === child.id)?.icon).toBe(
+      "https://example.com/folder.png",
+    );
+    await reopened.updateFolder(project.id, folder.id, { name: "Renamed" });
+    await reopened.updateFolder(project.id, folder.id, { pinned: true });
+    expect(
+      (await reopened.readProject(project.id)).folders?.find(
+        (item) => item.id === folder.id,
+      ),
+    ).toMatchObject({ name: "Renamed", icon: "📁", pinned: true });
+    await reopened.updateFolder(project.id, folder.id, { icon: "🗂️" });
+    expect(
+      (await new FileStore(store.root).listFolders(project.id)).find(
+        (item) => item.id === folder.id,
+      )?.icon,
+    ).toBe("🗂️");
+    await expect(
+      reopened.updateFolder(project.id, folder.id, {
+        icon: "javascript:alert(1)",
+      }),
+    ).rejects.toThrow("folder.icon");
+    await expect(
+      reopened.createFolder(project.id, { name: "Bad", icon: "x".repeat(65) }),
+    ).rejects.toThrow("folder.icon");
+    await expect(
+      reopened.createFolder(project.id, {
+        name: "Bad",
+        icon: 42 as unknown as string,
+      }),
+    ).rejects.toThrow("folder.icon");
+    expect(
+      (await reopened.listFolders(project.id)).map((item) => item.name).sort(),
+    ).toEqual(["Child", "Plain", "Renamed"]);
+    await reopened.updateFolder(project.id, folder.id, { icon: "" });
+    expect(
+      (await reopened.readProject(project.id)).folders?.find(
+        (item) => item.id === folder.id,
+      )?.icon,
+    ).toBe("");
+
+    const path = join(store.projectPath(project.id), "project.json");
+    const metadata = JSON.parse(await readFile(path, "utf8"));
+    metadata.folders[0].icon = "data:text/html,<script>alert(1)</script>";
+    await writeFile(path, JSON.stringify(metadata));
+    await expect(
+      new FileStore(store.root).readProject(project.id),
+    ).rejects.toThrow("folder.icon");
+  });
+
   it("uses stable harness/session bindings independently of cwd and project names", async () => {
     const first = await store.createProject({
       name: "First",

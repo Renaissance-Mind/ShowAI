@@ -94,6 +94,8 @@ export function readNavigationCache(
                 !folder ||
                 typeof folder.id !== "string" ||
                 typeof folder.name !== "string" ||
+                (folder.icon !== undefined &&
+                  typeof folder.icon !== "string") ||
                 (folder.parentId !== null &&
                   typeof folder.parentId !== "string") ||
                 typeof folder.pinned !== "boolean" ||

@@ -140,8 +140,7 @@ function LibraryRowView({
           }
         }}
       >
-        {target.kind === "page" ||
-        (target.kind === "project" && target.icon) ? (
+        {target.kind === "page" || target.icon ? (
           <PageIcon value={target.icon} size={15} />
         ) : (
           <Icon size={15} aria-hidden="true" />

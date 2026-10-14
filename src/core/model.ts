@@ -39,6 +39,7 @@ export interface ProjectMetadata extends DirectoryPreferences {
 export interface FolderMetadata extends DirectoryPreferences {
   id: string;
   name: string;
+  icon?: string;
   parentId: string | null;
   pinned: boolean;
   archived: boolean;
