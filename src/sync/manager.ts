@@ -1126,11 +1126,19 @@ export class SyncManager {
     await this.cacheRecord(connection, project, record);
     return record;
   }
+  /** The last decoded state per binding; a revision's content never changes. */
+  private decoded = new Map<
+    string,
+    { revision: string; files: Map<string, Buffer> }
+  >();
   private async files(
     connection: ServerConnection,
     project: ProjectConnection,
     record: SnapshotRecord,
   ) {
+    const memoKey = `${this.cacheKey(connection, project)}:${project.projectId}`;
+    const memo = this.decoded.get(memoKey);
+    if (memo?.revision === record.revision) return memo.files;
     const files = await decodeSnapshot(
       record,
       async (digest) => {
@@ -1161,11 +1169,8 @@ export class SyncManager {
           await atomicLibraryFile(this.home, path, legacy);
           return legacy;
         }
-        if (cached) {
-          if (hash(cached) !== digest)
-            throw new CoreError("INVALID_DATA", t("cache.corrupt"));
-          return cached;
-        }
+        // decodeSnapshot verifies every object digest, including cached ones.
+        if (cached) return cached;
         const response = await fetch(
           `${connection.url}/api/projects/${project.remoteProjectId}/objects/${digest}`,
           {
@@ -1186,7 +1191,17 @@ export class SyncManager {
       },
       project.remoteProjectId,
     );
-    return remapProjectFiles(files, project.remoteProjectId, project.projectId);
+    const decoded = remapProjectFiles(
+      files,
+      project.remoteProjectId,
+      project.projectId,
+    );
+    let size = 0;
+    for (const bytes of decoded.values()) size += bytes.length;
+    if (size <= 64 * 1024 * 1024)
+      this.decoded.set(memoKey, { revision: record.revision, files: decoded });
+    else this.decoded.delete(memoKey);
+    return decoded;
   }
   private async upload(
     connection: ServerConnection,
@@ -1249,14 +1264,16 @@ export class SyncManager {
         this.objectPath(digest, this.cacheKey(connection, project)),
         bytes,
         digest,
+        true,
       );
     const ids = [...captured.objects.keys()];
+    // Objects of the expected current state are already on the server.
+    const baseline = expected
+      ? await this.record(connection, project, expected)
+      : undefined;
+    const known = new Set(Object.values(baseline?.snapshot.files ?? {}));
+    const changed = ids.filter((digest) => !known.has(digest));
     if (connection.capabilities?.includes(inlineRevisionCapability)) {
-      const baseline = expected
-        ? await this.record(connection, project, expected)
-        : undefined;
-      const known = new Set(Object.values(baseline?.snapshot.files ?? {}));
-      const changed = ids.filter((digest) => !known.has(digest));
       const total = changed.reduce(
         (sum, digest) => sum + captured.objects.get(digest)!.length,
         0,
@@ -1295,107 +1312,123 @@ export class SyncManager {
         }
       }
     }
-    for (let offset = 0; offset < ids.length; offset += 500) {
-      const { missing } = await this.request<{ missing: string[] }>(
-        connection,
-        `/api/projects/${project.remoteProjectId}/objects/check`,
-        "POST",
-        { digests: ids.slice(offset, offset + 500) },
-      );
-      let next = 0;
-      const send = async () => {
-        while (next < missing.length) {
-          const digest = missing[next++];
-          if (!captured.objects.has(digest))
-            throw new CoreError("INVALID_DATA", t("upload.foreignObject"));
-          const bytes = captured.objects.get(digest)!;
-          if (
-            connection.capabilities?.includes("resumable-objects-v1") &&
-            bytes.length >= 5 * 1024 * 1024
-          ) {
-            await resumableUpload(
-              `${connection.url}/api/projects/${project.remoteProjectId}/objects`,
-              connection.token,
-              digest,
-              bytes,
-            );
+    const send = async (digests: string[]) => {
+      for (let offset = 0; offset < digests.length; offset += 500) {
+        const { missing } = await this.request<{ missing: string[] }>(
+          connection,
+          `/api/projects/${project.remoteProjectId}/objects/check`,
+          "POST",
+          { digests: digests.slice(offset, offset + 500) },
+        );
+        let next = 0;
+        const send = async () => {
+          while (next < missing.length) {
+            const digest = missing[next++];
+            if (!captured.objects.has(digest))
+              throw new CoreError("INVALID_DATA", t("upload.foreignObject"));
+            const bytes = captured.objects.get(digest)!;
+            if (
+              connection.capabilities?.includes("resumable-objects-v1") &&
+              bytes.length >= 5 * 1024 * 1024
+            ) {
+              await resumableUpload(
+                `${connection.url}/api/projects/${project.remoteProjectId}/objects`,
+                connection.token,
+                digest,
+                bytes,
+              );
+              await atomicLibraryFile(
+                this.home,
+                this.objectPath(digest, this.cacheKey(connection, project)),
+                bytes,
+              );
+              continue;
+            }
+            await retryUpload(async () => {
+              const response = await fetch(
+                `${connection.url}/api/projects/${project.remoteProjectId}/objects/${digest}`,
+                {
+                  method: "PUT",
+                  body: (() => {
+                    let offset = 0;
+                    return new ReadableStream<Uint8Array>({
+                      pull(controller) {
+                        if (offset === bytes.length) {
+                          controller.close();
+                          return;
+                        }
+                        const count = Math.min(
+                          64 * 1024,
+                          bytes.length - offset,
+                        );
+                        controller.enqueue(
+                          new Uint8Array(
+                            bytes.buffer,
+                            bytes.byteOffset + offset,
+                            count,
+                          ),
+                        );
+                        offset += count;
+                      },
+                    });
+                  })(),
+                  duplex: "half",
+                  headers: {
+                    authorization: `Bearer ${connection.token}`,
+                    "content-length": String(bytes.length),
+                  },
+                  signal: AbortSignal.timeout(60_000),
+                } as RequestInit,
+              );
+              if ([502, 503, 504].includes(response.status)) {
+                await response.body?.cancel();
+                throw new SyncError(
+                  response.status,
+                  "UPLOAD_UNAVAILABLE",
+                  t("upload.unavailable"),
+                );
+              }
+              if (!response.ok) {
+                const value = await response.json();
+                throw new SyncError(
+                  response.status,
+                  value.error?.code ?? "UPLOAD_FAILED",
+                  value.error?.message ?? t("upload.resourceFailed"),
+                );
+              }
+            });
             await atomicLibraryFile(
               this.home,
               this.objectPath(digest, this.cacheKey(connection, project)),
               bytes,
             );
-            continue;
           }
-          await retryUpload(async () => {
-            const response = await fetch(
-              `${connection.url}/api/projects/${project.remoteProjectId}/objects/${digest}`,
-              {
-                method: "PUT",
-                body: (() => {
-                  let offset = 0;
-                  return new ReadableStream<Uint8Array>({
-                    pull(controller) {
-                      if (offset === bytes.length) {
-                        controller.close();
-                        return;
-                      }
-                      const count = Math.min(64 * 1024, bytes.length - offset);
-                      controller.enqueue(
-                        new Uint8Array(
-                          bytes.buffer,
-                          bytes.byteOffset + offset,
-                          count,
-                        ),
-                      );
-                      offset += count;
-                    },
-                  });
-                })(),
-                duplex: "half",
-                headers: {
-                  authorization: `Bearer ${connection.token}`,
-                  "content-length": String(bytes.length),
-                },
-                signal: AbortSignal.timeout(60_000),
-              } as RequestInit,
-            );
-            if ([502, 503, 504].includes(response.status)) {
-              await response.body?.cancel();
-              throw new SyncError(
-                response.status,
-                "UPLOAD_UNAVAILABLE",
-                t("upload.unavailable"),
-              );
-            }
-            if (!response.ok) {
-              const value = await response.json();
-              throw new SyncError(
-                response.status,
-                value.error?.code ?? "UPLOAD_FAILED",
-                value.error?.message ?? t("upload.resourceFailed"),
-              );
-            }
-          });
-          await atomicLibraryFile(
-            this.home,
-            this.objectPath(digest, this.cacheKey(connection, project)),
-            bytes,
-          );
-        }
-      };
-      const completed = await Promise.allSettled(
-        Array.from({ length: Math.min(2, missing.length) }, send),
-      );
-      const failure = completed.find((item) => item.status === "rejected");
-      if (failure?.status === "rejected") throw failure.reason;
-    }
+        };
+        const completed = await Promise.allSettled(
+          Array.from({ length: Math.min(2, missing.length) }, send),
+        );
+        const failure = completed.find((item) => item.status === "rejected");
+        if (failure?.status === "rejected") throw failure.reason;
+      }
+    };
+    await send(changed);
     await this.cacheRecord(connection, project, captured, "candidate");
-    return this.request<{ revision: string; head: string; published: boolean }>(
-      connection,
-      `/api/projects/${project.remoteProjectId}/snapshot`,
-      "POST",
-      { snapshot: captured.snapshot, expected, publish },
-    );
+    const publishCaptured = () =>
+      this.request<{ revision: string; head: string; published: boolean }>(
+        connection,
+        `/api/projects/${project.remoteProjectId}/snapshot`,
+        "POST",
+        { snapshot: captured.snapshot, expected, publish },
+      );
+    try {
+      return await publishCaptured();
+    } catch (error) {
+      // A server that lost part of its current state receives every object.
+      if (!(error instanceof SyncError && error.code === "MISSING_OBJECT"))
+        throw error;
+      await send(ids);
+      return publishCaptured();
+    }
   }
   private conflictPath(projectId: string) {
     return join(this.root, "conflicts", `${assertId(projectId)}.json`);
@@ -1569,6 +1602,8 @@ export class SyncManager {
             project.projectId,
           ).projectFiles(project.projectId, localHead)
         : new Map<string, Buffer>();
+    // The files at localHead; merges below replace localFiles with new maps.
+    const actual = localFiles;
     this.trace("local-files-read", phaseStarted);
     const unfinishedSave = (await new WorkspaceProtection(library).list()).find(
       (item) =>
@@ -1631,7 +1666,10 @@ export class SyncManager {
     let remoteRecord: SnapshotRecord | undefined;
     if (remote.head) {
       remoteRecord = await this.record(connection, project, remote.head);
-      remoteFiles = await this.files(connection, project, remoteRecord);
+      remoteFiles =
+        remote.head === project.remoteHead
+          ? baseline
+          : await this.files(connection, project, remoteRecord);
       if (
         remoteRecord.snapshot.change.deviceId === deviceId &&
         (
@@ -1667,13 +1705,6 @@ export class SyncManager {
     } else if (project.remoteHead) {
       throw new CoreError("CONFLICT", t("server.contentMissing"));
     }
-    const actual =
-      localExists && localHead
-        ? await new LibraryOperations(
-            this.home,
-            project.projectId,
-          ).projectFiles(project.projectId, localHead)
-        : new Map<string, Buffer>();
     const changes = new Map<string, Buffer | null>(
       [...localFiles].filter(
         ([path, bytes]) => !actual.get(path)?.equals(bytes),
@@ -1739,6 +1770,7 @@ export class SyncManager {
         remote.head ? [remote.head] : [],
         project.remoteProjectId,
         deviceId,
+        mergedHead === localHead ? actual : undefined,
       );
       const result = await this.upload(
         connection,

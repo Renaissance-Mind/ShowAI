@@ -1,5 +1,6 @@
 import { CAPACITY } from "../portable/capacity.mjs";
 import {
+  canonical,
   digestId,
   hash,
   identifier,
@@ -1176,10 +1177,15 @@ export function createSyncServer(options: ServerOptions) {
       const expected =
         input.expected === null ? null : digestId(input.expected);
       const snapshot: ProjectSnapshot = validateSnapshot(
-          input.snapshot,
-          projectId,
-        ),
-        revision = await snapshotRevision(snapshot);
+        input.snapshot,
+        projectId,
+      );
+      // The current format's revision is the manifest digest; serialize once.
+      const serialized =
+        snapshot.format === syncProtocol ? canonical(snapshot) : undefined;
+      const revision = serialized
+        ? await hash(serialized)
+        : await snapshotRevision(snapshot);
       if (project.head === revision) {
         await revisions.activateCurrent(projectId);
         await revisions.retainCurrent(projectId, revision);
@@ -1301,7 +1307,14 @@ export function createSyncServer(options: ServerOptions) {
             "Only project administrators can archive or restore a project.",
           );
       }
-      const unique = [...new Set(Object.values(snapshot.files))];
+      // Objects of the verified current head already exist; check only new ones.
+      const current = await revisions
+        .current(projectId, project.head)
+        .catch(() => undefined);
+      const known = new Set(Object.values(current?.files ?? {}));
+      const unique = [...new Set(Object.values(snapshot.files))].filter(
+        (digest) => !known.has(digest),
+      );
       for (let index = 0; index < unique.length; index += 80) {
         const chunk = unique.slice(index, index + 80);
         const count = (
@@ -1352,7 +1365,11 @@ export function createSyncServer(options: ServerOptions) {
           return bytes;
         },
       );
-      const stored = await revisions.prepare(projectId, snapshot),
+      const stored = await revisions.prepare(
+          projectId,
+          snapshot,
+          serialized ? { serialized, digest: revision } : undefined,
+        ),
         gate = writeGate(user, projectId);
       const reservation = await quotas.reserve(
         projectId,
@@ -1447,6 +1464,7 @@ export function createSyncServer(options: ServerOptions) {
           { head: current.head, revision },
         );
       }
+      revisions.remember(projectId, revision, snapshot, stored.bytes);
       // The new head is durable; a failed notification must not report the
       // publication as failed. Peers catch up through heads on their next cycle.
       await events

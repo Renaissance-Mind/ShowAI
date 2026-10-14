@@ -29,11 +29,41 @@ export const manifestMaximum = CAPACITY.syncManifestBytes;
 export function manifestKey(projectId: string, digest: string) {
   return `projects/${identifier(projectId)}/manifests/${digestId(digest)}`;
 }
+/** Verified manifests kept in memory; a revision's manifest never changes. */
+const parsedBudget = 32 * 1024 * 1024;
 export class Revisions {
+  private parsed = new Map<
+    string,
+    { snapshot: ProjectSnapshot; bytes: number }
+  >();
+  private parsedBytes = 0;
   constructor(
     readonly db: MetadataStore,
     readonly objects: ObjectStore,
   ) {}
+  /** Callers treat cached snapshots as immutable. */
+  remember(
+    projectId: string,
+    revision: string,
+    snapshot: ProjectSnapshot,
+    bytes: number,
+  ) {
+    const key = `${projectId}:${revision}`;
+    if (bytes > parsedBudget / 2 || this.parsed.has(key)) return;
+    this.parsed.set(key, { snapshot, bytes });
+    this.parsedBytes += bytes;
+    for (const [oldest, entry] of this.parsed) {
+      if (this.parsedBytes <= parsedBudget) break;
+      this.parsed.delete(oldest);
+      this.parsedBytes -= entry.bytes;
+    }
+  }
+  /** The verified manifest of a project's current head, when it is readable. */
+  async current(projectId: string, head: string | null) {
+    if (!head) return undefined;
+    const row = await this.row(projectId, head);
+    return row ? this.snapshot(projectId, row) : undefined;
+  }
   /** Existing records are retained as a frozen archive; new publications replace state. */
   async activateCurrent(projectId: string) {
     await this.db.run(
@@ -71,8 +101,12 @@ export class Revisions {
         await this.objects.remove(row.manifest_key);
     }
   }
-  async prepare(projectId: string, snapshot: ProjectSnapshot) {
-    const serialized = canonical(snapshot),
+  async prepare(
+    projectId: string,
+    snapshot: ProjectSnapshot,
+    known?: { serialized: string; digest: string },
+  ) {
+    const serialized = known?.serialized ?? canonical(snapshot),
       bytes = encoder.encode(serialized);
     if (bytes.byteLength > manifestMaximum)
       throw new SyncError(
@@ -80,7 +114,7 @@ export class Revisions {
         "TOO_LARGE",
         "The project manifest exceeds 16 MiB.",
       );
-    const digest = await hash(bytes),
+    const digest = known?.digest ?? (await hash(bytes)),
       key = manifestKey(projectId, digest);
     return { key, digest, bytes: bytes.byteLength, content: bytes };
   }
@@ -104,6 +138,8 @@ export class Revisions {
     projectId: string,
     row: RevisionRow,
   ): Promise<ProjectSnapshot> {
+    const cached = this.parsed.get(`${projectId}:${row.revision}`);
+    if (cached) return cached.snapshot;
     let serialized = row.manifest;
     if (row.manifest_key) {
       if (
@@ -143,6 +179,7 @@ export class Revisions {
         "CORRUPT_MANIFEST",
         "Project manifest identity does not match.",
       );
+    this.remember(projectId, row.revision, snapshot, row.manifest_bytes);
     return snapshot;
   }
   summary(row: RevisionRow) {
