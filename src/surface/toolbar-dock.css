@@ -158,6 +158,7 @@
     .board-stroke-slider input[type="range"],
     .board-stroke-value-rail
   ) {
+  position: absolute;
   inset: auto;
   width: 80px;
   height: 24px;
