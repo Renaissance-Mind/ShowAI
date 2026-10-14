@@ -9,6 +9,8 @@ import type { ComponentSource } from "../components/custom/types";
 import { componentAuthoringContent } from "./component-authoring-content";
 import { errorMessage } from "./bridge";
 import "./component-authoring-guides.css";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/catalog";
 
 export default function ComponentAuthoringGuides({
   entry,
@@ -17,6 +19,7 @@ export default function ComponentAuthoringGuides({
   entry: string;
   loadSource?: () => Promise<ComponentSource>;
 }) {
+  const t = useTranslator(messages);
   const [source, setSource] = useState<ComponentSource>(),
     [selected, setSelected] = useState(""),
     [error, setError] = useState(""),
@@ -24,7 +27,7 @@ export default function ComponentAuthoringGuides({
   if (!source)
     return (
       <div className="component-authoring-guides">
-        <p>查看原项目的制作流程、类型规范、输入示例和原版工具。</p>
+        <p>{t("authoring.intro")}</p>
         <button
           type="button"
           disabled={loading || !loadSource}
@@ -45,7 +48,7 @@ export default function ComponentAuthoringGuides({
               .finally(() => setLoading(false));
           }}
         >
-          {loading ? "正在读取指南…" : "打开原版制作指南"}
+          {loading ? t("authoring.loading") : t("authoring.open")}
         </button>
         {error && <p role="alert">{error}</p>}
       </div>
@@ -55,9 +58,9 @@ export default function ComponentAuthoringGuides({
   return (
     <div className="component-authoring-guides">
       <label>
-        制作指南
+        {t("authoring.guide")}
         <select
-          aria-label="制作指南"
+          aria-label={t("authoring.guide")}
           value={selected}
           onChange={(event) => setSelected(event.target.value)}
         >
@@ -74,19 +77,16 @@ export default function ComponentAuthoringGuides({
       <p>
         {guide.url ? (
           <a href={guide.url} target="_blank" rel="noreferrer">
-            原文与来源版本
+            {t("authoring.source")}
           </a>
         ) : (
-          "本地制作指南"
+          t("authoring.local")
         )}{" "}
         · {index.commit?.slice(0, 8) ?? guide.sha256.slice(0, 8)}
       </p>
       <details>
-        <summary>制作工具与输入规范</summary>
-        <p>
-          组件源码包内保留原版文件。按指南选择输入与类型，运行制作工具后导入生成的
-          SVG 或 HTML。选择“原版”显示可核对完整布局。
-        </p>
+        <summary>{t("authoring.tools")}</summary>
+        <p>{t("authoring.toolsHelp")}</p>
         <div className="component-authoring-downloads">
           {[
             index.kit,
@@ -119,7 +119,11 @@ export default function ComponentAuthoringGuides({
       <Widget
         kind="text"
         data={{
-          content: componentAuthoringContent(guide.markdown, guide.url),
+          content: componentAuthoringContent(
+            guide.markdown,
+            guide.url,
+            t("authoring.image"),
+          ),
           format: "richtext",
         }}
         readOnly

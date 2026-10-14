@@ -87,7 +87,7 @@ export default function ComponentDocumentationView({
   if (documentation.version === 2 && documentation.authoring)
     sections.push({
       id: "authoring",
-      title: "原版制作指南",
+      title: t("authoring.title"),
       content: (
         <ComponentAuthoringGuides
           entry={documentation.authoring.entry}

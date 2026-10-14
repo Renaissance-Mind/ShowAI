@@ -223,7 +223,7 @@ function ExternalDiagramBlock({
       </BlockHeader>
       {presentation.notes === "details" && captions.notes.length > 0 && (
         <details className="sb-diagram-notes">
-          <summary>补充说明</summary>
+          <summary>{t("presentation.notes")}</summary>
           {captions.notes.map((note, i) => (
             <p key={i}>{note}</p>
           ))}
@@ -261,9 +261,9 @@ function ExternalDiagramBlock({
               if (event.key === "Escape") setEditing(false);
             }}
           >
-            <Field label="图形呈现">
+            <Field label={t("presentation.label")}>
               <select
-                aria-label="图形呈现"
+                aria-label={t("presentation.label")}
                 value={
                   JSON.stringify(diagramPresentation(draft)) ===
                   JSON.stringify(originalDiagramPresentation)
@@ -284,21 +284,21 @@ function ExternalDiagramBlock({
                     }));
                 }}
               >
-                <option value="compact">简洁：标题与说明放在图外</option>
-                <option value="original">原版：保留上游完整图形</option>
-                <option value="custom">自定义显示</option>
+                <option value="compact">{t("presentation.compact")}</option>
+                <option value="original">{t("presentation.original")}</option>
+                <option value="custom">{t("presentation.custom")}</option>
               </select>
             </Field>
             <div className="sb-diagram-display-settings">
               {(
                 [
-                  ["title", "标题"],
-                  ["description", "说明"],
+                  ["title", "presentation.titlePosition"],
+                  ["description", "presentation.descriptionPosition"],
                 ] as const
               ).map(([key, label]) => (
-                <Field key={key} label={`${label}位置`}>
+                <Field key={key} label={t(label)}>
                   <select
-                    aria-label={`${label}位置`}
+                    aria-label={t(label)}
                     value={diagramPresentation(draft)[key]}
                     onChange={(event) =>
                       setDraft((current) => ({
@@ -310,15 +310,15 @@ function ExternalDiagramBlock({
                       }))
                     }
                   >
-                    <option value="outside">放在图外</option>
-                    <option value="inside">保留在图内</option>
-                    <option value="hidden">隐藏</option>
+                    <option value="outside">{t("presentation.outside")}</option>
+                    <option value="inside">{t("presentation.inside")}</option>
+                    <option value="hidden">{t("presentation.hidden")}</option>
                   </select>
                 </Field>
               ))}
-              <Field label="补充说明">
+              <Field label={t("presentation.notes")}>
                 <select
-                  aria-label="补充说明显示"
+                  aria-label={t("presentation.notesDisplay")}
                   value={diagramPresentation(draft).notes}
                   onChange={(event) =>
                     setDraft((current) => ({
@@ -330,20 +330,20 @@ function ExternalDiagramBlock({
                     }))
                   }
                 >
-                  <option value="hidden">隐藏</option>
-                  <option value="details">折叠到图外</option>
-                  <option value="inline">保留原位置</option>
+                  <option value="hidden">{t("presentation.hidden")}</option>
+                  <option value="details">{t("presentation.details")}</option>
+                  <option value="inline">{t("presentation.inline")}</option>
                 </select>
               </Field>
               {(
                 [
-                  ["legend", "显示图例"],
-                  ["controls", "显示阅读控件"],
+                  ["legend", "presentation.legend"],
+                  ["controls", "presentation.controls"],
                 ] as const
               ).map(([key, label]) => (
                 <label key={key} className="sb-diagram-toggle">
                   <input
-                    aria-label={label}
+                    aria-label={t(label)}
                     type="checkbox"
                     checked={diagramPresentation(draft)[key]}
                     onChange={(event) =>
@@ -356,7 +356,7 @@ function ExternalDiagramBlock({
                       }))
                     }
                   />
-                  {label}
+                  {t(label)}
                 </label>
               ))}
             </div>

@@ -83,6 +83,7 @@ export function diagramExportDocument(
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;");
   if (!title && !description && !notes.length) return html;
+  // i18n-exempt: caption markup saved into the diagram source
   const caption = `<section style="max-width:1120px;margin:20px auto;font-family:system-ui,sans-serif">${title ? `<h2>${escape(title)}</h2>` : ""}${description ? `<p>${escape(description)}</p>` : ""}${notes.length ? `<details><summary>补充说明</summary>${notes.map((note) => `<p>${escape(note)}</p>`).join("")}</details>` : ""}</section>`;
   return /<body\b[^>]*>/i.test(html)
     ? html.replace(/<body\b[^>]*>/i, (body) => body + caption)
