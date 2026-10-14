@@ -10,7 +10,9 @@
 
 Chat is a poor interface for real work. Agents can analyze a market, plan a project or explain a system, but the result arrives as a long block of text you can only reply to. ShowAI lets the agent answer with an interactive page instead, one that you and the agent keep working on together.
 
-[![ShowAI project examples: research, personal management, and development planning](docs/showai-projects.png)](https://showai.renaissancemind.ai/)
+https://github.com/user-attachments/assets/ecdccdec-1def-45a9-811f-121a7d07b906
+
+<sub>Ask a question in any agent conversation and get back an interface you can use, edit together and share. Try the examples at [showai.renaissancemind.ai](https://showai.renaissancemind.ai/).</sub>
 
 ![For Agents: A way to communicate and collaborate with humans, turning information and analysis into content people can understand, use, and give feedback on. — For Humans: A way to participate in AI work, bringing your understanding and judgment into shared creation through reading, exploration, and editing.](docs/showai-audience.svg)
 
