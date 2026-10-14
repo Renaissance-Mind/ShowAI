@@ -6,7 +6,7 @@ Plan reader goals with [plan-presentation](skills/plan-presentation/SKILL.md), d
 
 Read [use-showai](skills/use-showai/SKILL.md) for connection identity, project selection and task routing. Formal content is saved in the selected project before presentation. Explicitly standalone work uses render_document and reports that no personal project was saved.
 
-The local launcher uses the selected library's registered ShowAI runtime. It requires Node.js 22.12+ and runtime capability `showai-mcp-v1`; installing skills does not upgrade the software. Configure SHOWAI_HOME, optional SHOWAI_PROJECT_ID and optional SHOWAI_PRESENTATION_DIR in the host. The launcher does not silently search for another library or runtime after a failure. See [connection setup](skills/use-showai/references/runtime.md).
+The local launcher uses the selected library's registered ShowAI runtime. It requires Node.js 22.12+ and runtime capability `showai-mcp-v1`; installing skills does not upgrade the software. Configure SHOWAI_HOME, optional SHOWAI_PROJECT_ID, optional SHOWAI_TEMPLATES (requires SHOWAI_PROJECT_ID) and optional SHOWAI_PRESENTATION_DIR in the host. The launcher does not silently search for another library or runtime after a failure. See [connection setup](skills/use-showai/references/runtime.md).
 
 `page_present` returns full HTML/source and an optional selected inline preview. The host displays the attached MCP Apps reader, uses a local Codex visualization reference, opens the full HTML, or reports the saved Page when it has no display surface. Output locations are owned by the host/runtime, not chosen by the model. See [delivery](skills/show-document/references/conversation-display.md).
 

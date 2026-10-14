@@ -57,8 +57,8 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 修改前读完整 Page，保留 `hash`、`revision` 和节点 ID。`page_save` / `page_apply` 同时传 `baseHash` 与 `baseRevision`。`operationId` 只用于重试同一请求；message、groupId 标记修改目的与批次。
 
-同设备 CONFLICT / saveFailed 表示保存失败：比较旧基线、当前内容和尝试稿，明确合并或放弃。不能只换成新版本参数原样覆盖。跨设备同步合并失败可能返回带来源的可见副本，后续沿用实际 document.id。阅读探索与临时预览不自动保存正文。
+同设备 CONFLICT / saveFailed 表示保存失败：按回执的 recovery/nextStep，用 `page_merge_preview({projectId,pageId,baseRevision,document})` 以原基线比较当前页面与尝试稿，处理冲突后用 `page_merge_save` 同时传 baseRevision 与 currentRevision 提交审阅过的合并结果，或明确放弃。需要查看自本轮读取以来的改动时用 `page_diff({projectId,pageId,sinceHash})`。不能只换成新版本参数原样覆盖。本机外部文件改动用 `workspace_conflicts` 列出、`workspace_conflict` 读取，再以 `workspace_resolve` 明确选择 discard、import 或 merge；细节查 `guide({topic:"recovery"})`。跨设备同步合并失败可能返回带来源的可见副本，后续沿用实际 document.id。阅读探索与临时预览不自动保存正文。
 
 正式内容保存后核对结果；需要展示时调用 `page_present`，沿 [对话展示](../show-document/references/conversation-display.md) 使用真实 delivery。工具成功不等于已经显示。远程同步另看 synchronization.state/error/remoteHead；本机保存不证明远端已收到。
 
-页面历史查看、比较和恢复已移除。页面同步只传当前内容、组件依赖与资源；阅读和导出按需生成 HTML。保存冲突保留尝试稿，以实际返回的基线和当前内容明确处理。
+页面内容历史、历史预览和版本恢复已移除；`page_diff` 只比较当前页面与本轮持有的 hash。页面同步只传当前内容、组件依赖与资源；阅读和导出按需生成 HTML。保存冲突保留尝试稿，以实际返回的基线和当前内容明确处理。
