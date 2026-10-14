@@ -87,13 +87,12 @@ afterEach(() => {
 });
 
 function fixture() {
-  (globalThis as Record<string, unknown>).WebSocketRequestResponsePair =
-    class {
-      constructor(
-        readonly request: string,
-        readonly response: string,
-      ) {}
-    };
+  (globalThis as Record<string, unknown>).WebSocketRequestResponsePair = class {
+    constructor(
+      readonly request: string,
+      readonly response: string,
+    ) {}
+  };
   const database = new DatabaseSync(":memory:"),
     sockets: FakeSocket[] = [];
   const env = {
@@ -139,7 +138,9 @@ test("a reset Durable Object releases write admissions left by the previous inst
   const second = f.start();
   expect((await request(second.server, "/api/info")).status).toBe(200);
   expect(
-    f.database.prepare("SELECT COUNT(*) AS count FROM server_write_leases").get(),
+    f.database
+      .prepare("SELECT COUNT(*) AS count FROM server_write_leases")
+      .get(),
   ).toEqual({ count: 0 });
 });
 
@@ -195,4 +196,188 @@ test("hibernated sockets keep subscriptions outside their attachment and pings n
       .prepare("SELECT COUNT(*) AS count FROM _showai_event_subscriptions")
       .get(),
   ).toEqual({ count: 0 });
+});
+
+/** R2 as the Worker uses it, kept in memory. */
+function memoryBucket() {
+  const items = new Map<string, Uint8Array>();
+  const bytesOf = async (value: Uint8Array | ReadableStream<Uint8Array>) =>
+    value instanceof Uint8Array
+      ? value.slice()
+      : new Uint8Array(await new Response(value).arrayBuffer());
+  const binding = {
+    async head(key: string) {
+      const item = items.get(key);
+      return item ? { size: item.length, uploaded: new Date() } : null;
+    },
+    async list() {
+      return {
+        objects: [...items].map(([key, item]) => ({
+          key,
+          size: item.length,
+          uploaded: new Date(),
+        })),
+        truncated: false,
+      };
+    },
+    async get(key: string) {
+      const item = items.get(key);
+      return item
+        ? {
+            size: item.length,
+            body: new Blob([new Uint8Array(item)]).stream(),
+            arrayBuffer: async () => item.slice().buffer,
+          }
+        : null;
+    },
+    async put(key: string, value: Uint8Array | ReadableStream<Uint8Array>) {
+      items.set(key, await bytesOf(value));
+    },
+    async delete(key: string) {
+      items.delete(key);
+    },
+    async createMultipartUpload(key: string) {
+      const parts = new Map<number, Uint8Array>();
+      return {
+        async uploadPart(index: number, bytes: Uint8Array) {
+          parts.set(index, bytes.slice());
+          return { partNumber: index, etag: String(index) };
+        },
+        async complete(list: { partNumber: number }[]) {
+          items.set(
+            key,
+            Buffer.concat(list.map((part) => parts.get(part.partNumber)!)),
+          );
+        },
+        async abort() {},
+      };
+    },
+  };
+  return { items, binding };
+}
+
+test("large objects stream between the Worker and R2 while the Durable Object keeps authority", async () => {
+  // Workers provide DigestStream; node:crypto stands in for it here.
+  const { createHash } = await import("node:crypto");
+  class DigestStream extends WritableStream<Uint8Array> {
+    digest: Promise<ArrayBuffer>;
+    constructor() {
+      const hash = createHash("sha256");
+      let done!: (value: ArrayBuffer) => void;
+      const digest = new Promise<ArrayBuffer>((resolve) => (done = resolve));
+      super({
+        write: (chunk) => void hash.update(chunk),
+        close: () => done(new Uint8Array(hash.digest()).buffer),
+      });
+      this.digest = digest;
+    }
+  }
+  Object.defineProperty(globalThis.crypto, "DigestStream", {
+    value: DigestStream,
+    configurable: true,
+  });
+  const worker = (await import("./worker")).default;
+  const f = fixture();
+  const bucket = memoryBucket();
+  const seen: (string | null)[] = [];
+  const env = {
+    SHOWAI_SERVER_URL: "https://cloud.test/cloud",
+    SHOWAI_REGISTRATION_KEY: "contract-key",
+    SHOWAI_VAULT_KEY: token(),
+    SHOWAI_METADATA_DRIVER: "durable",
+    CONTENT: bucket.binding,
+  } as unknown as WorkerEnvironment;
+  const ctx = durableState(f.database, f.sockets);
+  const server = new ShowAIServer(ctx as never, env);
+  (env as unknown as { SERVER: unknown }).SERVER = {
+    idFromName: () => "server",
+    get: () => ({
+      fetch: (request: Request) => {
+        seen.push(request.headers.get("x-showai-transfer"));
+        return server.fetch(request);
+      },
+    }),
+  };
+  const call = (path: string, init: RequestInit & { token?: string } = {}) =>
+    worker.fetch(
+      new Request(`https://cloud.test/cloud${path}`, {
+        ...init,
+        headers: {
+          ...(init.token ? { authorization: `Bearer ${init.token}` } : {}),
+          ...(init.headers as Record<string, string>),
+        },
+      }),
+      env,
+    );
+  const account = await (
+    await call("/api/auth/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "owner",
+        password: "test-password",
+        registrationKey: "contract-key",
+      }),
+    })
+  ).json();
+  const id = crypto.randomUUID();
+  expect(
+    (
+      await call("/api/projects", {
+        method: "POST",
+        token: account.token,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id, name: "Transfer" }),
+      })
+    ).status,
+  ).toBe(201);
+  const bytes = new Uint8Array(300 * 1024).map((_, index) => index % 251);
+  const digest = createHash("sha256").update(bytes).digest("hex");
+  seen.length = 0;
+  const stored = await call(`/api/projects/${id}/objects/${digest}`, {
+    method: "PUT",
+    token: account.token,
+    headers: { "content-length": String(bytes.length) },
+    body: bytes,
+  });
+  expect(stored.status).toBe(200);
+  expect(seen).toEqual(["admit", "commit"]);
+  expect(bucket.items.get(`projects/${id}/objects/${digest}`)).toEqual(bytes);
+  const count = (sql: string) =>
+    (f.database.prepare(sql).get() as { count: number }).count;
+  expect(count("SELECT COUNT(*) AS count FROM _showai_hot_objects")).toBe(0);
+  expect(count("SELECT COUNT(*) AS count FROM server_write_leases")).toBe(0);
+  expect(count("SELECT COUNT(*) AS count FROM storage_reservations")).toBe(0);
+  seen.length = 0;
+  const read = await call(`/api/projects/${id}/objects/${digest}`, {
+    token: account.token,
+  });
+  expect(read.status).toBe(200);
+  expect(new Uint8Array(await read.arrayBuffer())).toEqual(bytes);
+  expect(seen).toEqual(["read"]);
+  // A body that does not match its digest is refused and releases capacity.
+  const wrong = new Uint8Array(bytes.length).fill(9);
+  const refused = await call(`/api/projects/${id}/objects/${"a".repeat(64)}`, {
+    method: "PUT",
+    token: account.token,
+    headers: { "content-length": String(wrong.length) },
+    body: wrong,
+  });
+  expect(refused.status).toBe(400);
+  expect((await refused.json()).error.code).toBe("DIGEST_MISMATCH");
+  expect(count("SELECT COUNT(*) AS count FROM server_write_leases")).toBe(0);
+  expect(count("SELECT COUNT(*) AS count FROM storage_reservations")).toBe(0);
+  // Clients cannot speak the internal protocol themselves.
+  seen.length = 0;
+  const forged = await call(`/api/projects/${id}/objects/${digest}`, {
+    method: "POST",
+    token: account.token,
+    headers: {
+      "x-showai-transfer": "commit",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ reservation: "x", lease: "y", length: 1 }),
+  });
+  expect(seen).toEqual([null]);
+  expect(forged.status).toBe(404);
 });

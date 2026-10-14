@@ -71,6 +71,7 @@ export class ShowAIServer {
       metadata: this.metadata,
       objects: this.objects,
       metadataDriver: "durable-sqlite",
+      objectTransfer: true,
       name: env.SHOWAI_SERVER_NAME,
       publicUrl: env.SHOWAI_SERVER_URL,
       registrationKey: env.SHOWAI_REGISTRATION_KEY,

@@ -24,6 +24,8 @@ const unavailable = () =>
     "SERVER_READ_ONLY",
     "The server is frozen for a consistent backup. Local changes are retained.",
   );
+/** Far longer than a transfer body deadline plus its storage commit. */
+export const transferLeaseMs = 15 * 60_000;
 export class ServerMaintenance {
   budgetSummary?: () => Promise<unknown>;
   private expected: Promise<string> | undefined;
@@ -38,17 +40,30 @@ export class ServerMaintenance {
       );
   }
   async state(): Promise<MaintenanceState> {
+    await this.expireTransfers();
     const rows = await this.db.all<MaintenanceState>(
       "SELECT o.*,(SELECT COUNT(*) FROM server_write_leases) AS activeWrites FROM server_operations o WHERE id=1",
     );
     if (!rows[0]) throw new Error("Missing operations migration.");
     return rows[0];
   }
-  async enterWrite(kind: "object" | "metadata" = "object") {
+  /**
+   * A transfer admission outlives its request while a front end streams the
+   * object to storage. Its body has a two-minute deadline, so an admission
+   * older than this can no longer describe a live write.
+   */
+  private async expireTransfers() {
+    await this.db.run(
+      "DELETE FROM server_write_leases WHERE kind='transfer' AND started_at<?",
+      [new Date(Date.now() - transferLeaseMs).toISOString()],
+    );
+  }
+  async enterWrite(kind: "object" | "metadata" | "transfer" = "object") {
+    if (kind === "transfer") await this.expireTransfers();
     const id = crypto.randomUUID();
     const result = await this.db.run(
       "INSERT INTO server_write_leases(id,started_at,kind) SELECT ?,?,? WHERE (SELECT state FROM server_operations WHERE id=1)='running' AND (SELECT COUNT(*) FROM server_write_leases WHERE kind=?)<?",
-      [id, new Date().toISOString(), kind, kind, kind === "object" ? 64 : 256],
+      [id, new Date().toISOString(), kind, kind, kind === "metadata" ? 256 : 64],
     );
     if (!result.changes) {
       if ((await this.state()).state === "frozen") throw unavailable();

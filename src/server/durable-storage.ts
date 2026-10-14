@@ -50,7 +50,7 @@ interface HotObject {
   content: ArrayBuffer;
   used_at: number;
 }
-const hotLimit = 256 * 1024;
+export const hotLimit = 256 * 1024;
 const hotBudget = 128 * 1024 * 1024;
 
 /** Small immutable edit objects are durable before acknowledgement. R2 remains
@@ -174,6 +174,9 @@ export class DurableObjects implements ObjectStore {
   }
   digest() {
     return this.cold.digest();
+  }
+  async location(key: string) {
+    return this.hot(key) ? ("inline" as const) : ("remote" as const);
   }
   async putVerified(
     key: string,

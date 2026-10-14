@@ -76,6 +76,11 @@ export interface ServerOptions extends ExternalLoginOptions {
   storagePolicy?: Partial<StoragePolicy>;
   eventPeers?: () => Iterable<EventPeer>;
   metadataDriver?: "sqlite" | "d1" | "durable-sqlite";
+  /**
+   * Honor x-showai-transfer from the Cloudflare front end, which streams
+   * object bytes to and from storage itself. Public requests never carry it.
+   */
+  objectTransfer?: boolean;
 }
 interface Member {
   id: string;
@@ -987,21 +992,34 @@ export function createSyncServer(options: ServerOptions) {
       throw new SyncError(404, "NOT_FOUND", "Unknown upload endpoint.");
     }
     const object = resource.match(/^objects\/([a-f0-9]{64})$/);
+    const transfer = options.objectTransfer
+      ? request.headers.get("x-showai-transfer")
+      : null;
     if (object && method === "GET") {
-      if (
-        !(
-          await db.all(
-            "SELECT 1 FROM objects WHERE project_id=? AND digest=?",
-            [projectId, object[1]],
-          )
-        ).length
-      )
+      const ready = (
+        await db.all<{ bytes: number }>(
+          "SELECT bytes FROM objects WHERE project_id=? AND digest=?",
+          [projectId, object[1]],
+        )
+      )[0];
+      if (!ready)
         throw new SyncError(
           404,
           "MISSING_OBJECT",
           "Content object is missing.",
         );
-      const stored = await objects.open(objectKey(projectId, object[1]));
+      const key = objectKey(projectId, object[1]);
+      // The front end streams remote bytes itself once access is charged here.
+      if (
+        transfer === "read" &&
+        (await objects.location?.(key)) === "remote"
+      ) {
+        await requestBudgets.consumeRead(user.id, ready.bytes);
+        const response = json({ key, bytes: ready.bytes });
+        response.headers.set("x-showai-transfer", "read");
+        return response;
+      }
+      const stored = await objects.open(key);
       if (!stored)
         throw new SyncError(
           404,
@@ -1030,6 +1048,128 @@ export function createSyncServer(options: ServerOptions) {
           },
         },
       );
+    }
+    if (object && method === "PUT" && transfer === "admit") {
+      // Admission for a front end that writes the bytes to storage itself: the
+      // reservation and a transfer lease stay held until commit or abort.
+      await projectFor(user.id, projectId, "editor");
+      const declared = Number(request.headers.get("x-showai-length"));
+      if (
+        !Number.isSafeInteger(declared) ||
+        declared < 0 ||
+        declared > CAPACITY.syncObjectBytes
+      )
+        throw new SyncError(413, "TOO_LARGE", "Object exceeds 64 MiB.");
+      const reservation = await quotas.reserve(
+        projectId,
+        user.id,
+        "object",
+        object[1],
+        declared,
+        writeGate(user, projectId),
+      );
+      if (!reservation) return json({ ok: true, alreadyPresent: true });
+      let lease: string;
+      try {
+        lease = await maintenance.enterWrite("transfer");
+      } catch (error) {
+        await quotas.release(reservation);
+        throw error;
+      }
+      const response = json({
+        key: objectKey(projectId, object[1]),
+        reservation: reservation.id,
+        lease,
+      });
+      response.headers.set("x-showai-transfer", "admit");
+      return response;
+    }
+    if (
+      object &&
+      method === "POST" &&
+      (transfer === "commit" || transfer === "abort")
+    ) {
+      const input = await body(request);
+      const lease = plainText(input.lease, 100);
+      const row = (
+        await db.all<{ id: string; bytes: number; created_at: string }>(
+          "SELECT id,bytes,created_at FROM storage_reservations WHERE id=? AND project_id=? AND user_id=? AND kind='object' AND digest=?",
+          [plainText(input.reservation, 100), projectId, user.id, object[1]],
+        )
+      )[0];
+      try {
+        if (transfer === "abort") {
+          // Bytes that might already be stored keep their reservation for recovery.
+          if (row && input.possible !== true)
+            await quotas.release({
+              id: row.id,
+              projectId,
+              userId: user.id,
+              kind: "object",
+              digest: object[1],
+              bytes: row.bytes,
+              day: row.created_at.slice(0, 10),
+            });
+          return json({ ok: true });
+        }
+        const length = Number(input.length);
+        if (!row || !Number.isSafeInteger(length) || length > row.bytes)
+          throw new SyncError(
+            409,
+            "UPLOAD_INTERRUPTED",
+            "Upload reservation changed before publication; retry.",
+          );
+        const gate = writeGate(user, projectId);
+        await db.batch([
+          {
+            sql: `INSERT OR IGNORE INTO objects(project_id,digest,bytes,uploaded_by,uploaded_at) SELECT ?,?,?,?,? WHERE EXISTS(${gate.sql}) AND EXISTS(SELECT 1 FROM storage_reservations WHERE id=? AND bytes>=?)`,
+            values: [
+              projectId,
+              object[1],
+              length,
+              user.id,
+              new Date().toISOString(),
+              ...gate.values,
+              row.id,
+              length,
+            ],
+          },
+          {
+            sql: "DELETE FROM storage_reservations WHERE id=? AND EXISTS(SELECT 1 FROM objects WHERE project_id=? AND digest=?)",
+            values: [row.id, projectId, object[1]],
+          },
+          quotas.unusedBudgetStatement(
+            {
+              id: row.id,
+              projectId,
+              userId: user.id,
+              kind: "object",
+              digest: object[1],
+              bytes: row.bytes,
+              day: row.created_at.slice(0, 10),
+            },
+            length,
+          ),
+        ]);
+      } finally {
+        await maintenance.leaveWrite(lease);
+      }
+      await authenticate(request);
+      await projectFor(user.id, projectId, "editor");
+      if (
+        !(
+          await db.all(
+            "SELECT 1 FROM objects WHERE project_id=? AND digest=?",
+            [projectId, object[1]],
+          )
+        ).length
+      )
+        throw new SyncError(
+          409,
+          "UPLOAD_INTERRUPTED",
+          "Upload reservation changed before publication; retry.",
+        );
+      return json({ ok: true });
     }
     if (object && method === "PUT") {
       await projectFor(user.id, projectId, "editor");
