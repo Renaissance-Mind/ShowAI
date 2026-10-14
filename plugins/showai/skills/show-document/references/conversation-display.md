@@ -4,17 +4,17 @@
 
 ## 宿主适配
 
-所有宿主遵循同一规则：能放下本地阅读器就离线交付，放不下才在线加载阅读器。
+所有宿主遵循同一规则：能放下本地阅读器就离线交付，放不下才在线加载阅读器。同一宿主有多种方式时，优先能交付文件的方式（MCP Apps、inline 路径引用、发布 delivery.html），最后才是由模型写出 HTML。
 
 | 实际能力 | 使用结果 |
 | --- | --- |
 | MCP Apps | 工具附带reader资源，宿主把结果交给阅读器；不必先下载HTML |
 | Codex本机可视化 | delivery.inline是本机可访问路径时，在最终回复使用下面的引用 |
-| 宿主要求模型在回复中直接写出 HTML（如 Claude 的可视化工具） | 读取 delivery.compact 的完整文本原样交给该工具（几 KB，打开时在线加载阅读器）；没有 compact 时改为交付 delivery.html 文件，不把大段 HTML 写进回复 |
+| 宿主要求模型在回复中直接写出 HTML（如 Claude 的可视化工具） | 读取 delivery.compact 的完整文本原样交给该工具：inline 通常有几百 KB，不适合逐字写进回复，compact 只带页面数据，通常几 KB，打开时在线加载阅读器。没有 compact，或 compact 因内嵌大图等仍有几十 KB 以上时，改为交付 delivery.html 文件 |
 | 宿主能打开或发布本地文件（文件预览、Claude Artifact 等） | 使用 delivery.html：离线完整页，打开不需要联网 |
 | 无内嵌显示 | 交付项目、Page、版本、保存/同步结果；需要时附文件链接 |
 
-delivery.inline 优先携带压缩后的本地阅读器与本页组件，多数页面几百 KB，打开不联网；只有压缩后仍超出聊天预算时才改为在线片段。delivery.html 始终是离线完整文件。delivery.compact 与 delivery.online 只带页面数据、内嵌图片和自定义组件，阅读器依次从 ShowAI 阅读器源、jsDelivr、unpkg 加载：每个来源等待 1.5 秒后启动下一个，先完成者挂载，15 秒仍未完成显示错误。online 只用于需要分享、在联网环境打开的小体积完整文件。display 中的 inlineAvailable、compactAvailable、onlineAvailable 只表示文件是否存在，不代表是否联网。
+delivery.inline 优先携带压缩后的本地阅读器与本页组件，多数页面几百 KB，打开不联网；只有压缩后仍超出聊天预算时才改为在线片段。delivery.html 始终是离线完整文件。delivery.compact 与 delivery.online 只带页面数据、内嵌图片和自定义组件：compact 是放进对话的片段，online 是可单独打开的完整网页文件。两者的阅读器依次从 ShowAI 阅读器源（reader.showai.renaissancemind.ai）、jsDelivr、unpkg 加载：每个来源等待 1.5 秒后启动下一个，先完成者挂载，15 秒仍未完成显示错误。online 只用于需要分享、在联网环境打开的小体积完整文件。display 中的 inlineAvailable、compactAvailable、onlineAvailable 只表示文件是否存在，不代表是否联网。
 
 显式 page_export 的 reader:"cdn" 写在线页，reader:"bundled" 强制离线。加载错误可能来自网络、宿主策略或阅读器异常；没有控制台证据时不直接断言来源被拦截，改为交付 delivery.html。安装插件只更新连接与技能，不更新软件运行时，也不能预热对话宿主的浏览器缓存。
 

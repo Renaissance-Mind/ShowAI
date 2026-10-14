@@ -21,7 +21,7 @@
 
 ## 展示与同步
 
-按宿主实际能力选择展示方式，适配表与 delivery.inline / online / html 的区别以 [对话展示](../../show-document/references/conversation-display.md) 为准。
+按宿主实际能力选择展示方式，适配表与 delivery.inline / compact / online / html 的区别以 [对话展示](../../show-document/references/conversation-display.md) 为准。
 
 page_present 的 blockIds只限制 inline预览，完整 HTML/source保留整个页面。page_export是明确文件导出的低层工具，其选区源码本身可以是局部；不得拿它覆盖整页。显示成功、保存成功与同步成功分别核实。
 
