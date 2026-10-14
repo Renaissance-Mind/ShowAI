@@ -16,6 +16,7 @@ import {
   readToolbarDock,
   snapToolbar,
   toolbarCenter,
+  toolbarPropertiesReserve,
   type DockEdge,
   type ToolbarDock,
 } from "./toolbar-dock";
@@ -26,10 +27,14 @@ export const useToolbarDock = () => useContext(ToolbarDockContext);
 
 export function DockableBoardToolbar({
   children,
+  actions,
+  properties,
   root,
   enabled,
 }: {
   children: ReactNode;
+  actions?: ReactNode;
+  properties?: ReactNode;
   root: RefObject<HTMLDivElement | null>;
   enabled: boolean;
 }) {
@@ -50,7 +55,7 @@ export function DockableBoardToolbar({
     y: number;
     edge: DockEdge;
   } | null>(null);
-  const toolbar = useRef<HTMLDivElement>(null);
+  const primary = useRef<HTMLDivElement>(null);
   const drag = useRef<{
     id: number;
     x: number;
@@ -59,7 +64,7 @@ export function DockableBoardToolbar({
   } | null>(null);
   useEffect(() => {
     const surface = root.current!,
-      element = toolbar.current!;
+      element = primary.current!;
     const measure = () => {
       setBounds({ width: surface.clientWidth, height: surface.clientHeight });
       setSize({ width: element.offsetWidth, height: element.offsetHeight });
@@ -69,8 +74,9 @@ export function DockableBoardToolbar({
     observer.observe(element);
     measure();
     return () => observer.disconnect();
-  }, [root]);
-  const center = toolbarCenter(dock, bounds, size);
+  }, [root, dock.edge]);
+  const reserve = toolbarPropertiesReserve(dock.edge);
+  const center = toolbarCenter(dock, bounds, size, reserve);
   const save = (next: ToolbarDock) => {
     setDock(next);
     try {
@@ -100,7 +106,27 @@ export function DockableBoardToolbar({
   };
   const finish = (event: PointerEvent<HTMLButtonElement>, cancel = false) => {
     if (drag.current?.id !== event.pointerId) return;
-    if (!cancel) save(snapToolbar(localPointer(event), bounds));
+    if (!cancel) {
+      const target = snapToolbar(localPointer(event), bounds);
+      const location = localDelta(event);
+      const horizontal = target.edge === "top" || target.edge === "bottom";
+      save({
+        edge: target.edge,
+        position: Math.max(
+          0,
+          Math.min(
+            1,
+            horizontal
+              ? location.x / Math.max(1, bounds.width)
+              : location.y /
+                  Math.max(
+                    1,
+                    bounds.height - toolbarPropertiesReserve(target.edge),
+                  ),
+          ),
+        ),
+      });
+    }
     drag.current = null;
     setPoint(null);
     if (event.currentTarget.hasPointerCapture(event.pointerId))
@@ -117,7 +143,6 @@ export function DockableBoardToolbar({
         />
       )}
       <div
-        ref={toolbar}
         className="surface-toolbar board-dockable-toolbar"
         data-dock={dock.edge}
         data-dragging={!!point || undefined}
@@ -130,61 +155,75 @@ export function DockableBoardToolbar({
             top: (point ?? center).y,
             bottom: "auto",
             "--board-toolbar-height": `${bounds.height}px`,
+            "--board-toolbar-width": `${bounds.width}px`,
+            "--board-properties-reserve": `${reserve}px`,
           } as CSSProperties
         }
       >
-        {enabled && (
-          <button
-            type="button"
-            className="board-toolbar-grip"
-            aria-label={t("board.moveToolbar")}
-            title={t("board.moveToolbarTitle")}
-            onPointerDown={(event) => {
-              if (event.button !== 0) return;
-              event.preventDefault();
-              event.stopPropagation();
-              drag.current = {
-                id: event.pointerId,
-                x: event.clientX,
-                y: event.clientY,
-                origin: center,
-              };
-              event.currentTarget.setPointerCapture(event.pointerId);
-              setPoint({ ...center, edge: dock.edge });
-            }}
-            onPointerMove={(event) => {
-              if (drag.current?.id === event.pointerId) {
+        <div ref={primary} className="board-toolbar-primary">
+          {enabled && (
+            <button
+              type="button"
+              className="board-toolbar-grip"
+              aria-label={t("board.moveToolbar")}
+              title={t("board.moveToolbarTitle")}
+              onPointerDown={(event) => {
+                if (event.button !== 0) return;
                 event.preventDefault();
                 event.stopPropagation();
-                setPoint({
-                  ...localDelta(event),
-                  edge: snapToolbar(localPointer(event), bounds).edge,
-                });
-              }
-            }}
-            onPointerUp={(event) => finish(event)}
-            onPointerCancel={(event) => finish(event, true)}
-            onLostPointerCapture={(event) => finish(event, true)}
-            onKeyDown={(event) => {
-              const edge = (
-                {
-                  ArrowUp: "top",
-                  ArrowDown: "bottom",
-                  ArrowLeft: "left",
-                  ArrowRight: "right",
-                } as Record<string, DockEdge>
-              )[event.key];
-              if (edge) {
-                event.preventDefault();
-                event.stopPropagation();
-                save({ edge, position: 0.5 });
-              }
-            }}
-          >
-            <GripVertical size={15} />
-          </button>
+                drag.current = {
+                  id: event.pointerId,
+                  x: event.clientX,
+                  y: event.clientY,
+                  origin: center,
+                };
+                event.currentTarget.setPointerCapture(event.pointerId);
+                setPoint({ ...center, edge: dock.edge });
+              }}
+              onPointerMove={(event) => {
+                if (drag.current?.id === event.pointerId) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setPoint({
+                    ...localDelta(event),
+                    edge: snapToolbar(localPointer(event), bounds).edge,
+                  });
+                }
+              }}
+              onPointerUp={(event) => finish(event)}
+              onPointerCancel={(event) => finish(event, true)}
+              onLostPointerCapture={(event) => finish(event, true)}
+              onKeyDown={(event) => {
+                const edge = (
+                  {
+                    ArrowUp: "top",
+                    ArrowDown: "bottom",
+                    ArrowLeft: "left",
+                    ArrowRight: "right",
+                  } as Record<string, DockEdge>
+                )[event.key];
+                if (edge) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  save({ edge, position: 0.5 });
+                }
+              }}
+            >
+              <GripVertical size={15} />
+            </button>
+          )}
+          {children}
+        </div>
+        {actions && (
+          <div className="board-toolbar-actions" data-surface-ui>
+            {actions}
+          </div>
         )}
-        {children}
+        {properties && (
+          <div className="board-toolbar-properties" data-surface-ui>
+            {properties}
+          </div>
+        )}
       </div>
     </ToolbarDockContext.Provider>
   );

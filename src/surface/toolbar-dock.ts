@@ -45,7 +45,9 @@ export function toolbarCenter(
   dock: ToolbarDock,
   bounds: { width: number; height: number },
   size: { width: number; height: number },
+  reserve = 0,
 ) {
+  bounds = { ...bounds, height: Math.max(1, bounds.height - reserve) };
   const horizontal = dock.edge === "top" || dock.edge === "bottom";
   const xInset = Math.min(bounds.width / 2, size.width / 2 + 12),
     yInset = Math.min(bounds.height / 2, size.height / 2 + 12);
@@ -62,3 +64,6 @@ export function toolbarCenter(
       : clamp(bounds.height * dock.position, yInset, bounds.height - yInset),
   };
 }
+
+export const toolbarPropertiesReserve = (edge: DockEdge) =>
+  edge === "left" || edge === "right" ? 264 : 108;

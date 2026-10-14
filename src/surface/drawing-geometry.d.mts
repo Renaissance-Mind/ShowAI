@@ -41,6 +41,12 @@ export function shapeIntersects(
   rect: NodeLayout,
   wrap?: boolean,
 ): boolean;
+export function shapeIntersectsPolygon(
+  node: JSONContent,
+  frame: NodeLayout,
+  polygon: Point[],
+  tolerance?: number,
+): boolean;
 
 export function snapCreation(
   points: Point[],

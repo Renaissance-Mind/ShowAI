@@ -298,7 +298,6 @@ export default function PageSurface({
       { reading: !onMove, anchorScreen: !embedded, panMode },
     );
   const [ruler, setRuler] = useState(false);
-  const writingSettings = useRef<HTMLDetailsElement>(null);
   useInlineInk({
     root: rootRef,
     world: worldRef,
@@ -336,7 +335,9 @@ export default function PageSurface({
     },
     onTool: (value) => {
       if (value === "settings") {
-        if (writingSettings.current) writingSettings.current.open = true;
+        rootRef.current
+          ?.querySelector<HTMLElement>(".board-color-picker > summary")
+          ?.click();
       } else if (
         value === "eraser" ||
         value === "pen" ||
@@ -1179,8 +1180,8 @@ export default function PageSurface({
             return;
           }
           if (shapeId && event.pointerType === "pen") {
-            // Drawing and erasing may start over a shape; selection may not.
-            if (!drawingTool && drawTool !== "eraser") {
+            // A lasso may cross a shape; a direct Pencil tap does not select it.
+            if (!drawingTool && drawTool !== "eraser" && drawTool !== "lasso") {
               event.preventDefault();
               event.stopPropagation();
             }
@@ -1605,7 +1606,7 @@ export default function PageSurface({
           const target = event.target as Element;
           if (
             target.closest(
-              'input,textarea,select,iframe,video,audio,[contenteditable=true],[data-editor-keyboard-scope],[data-surface-gesture="own"],.react-flow',
+              'input,textarea,select,iframe,video,audio,[contenteditable=true],[data-editor-keyboard-scope],[data-surface-gesture="own"],.react-flow,.surface-toolbar',
             )
           )
             return;
@@ -1954,7 +1955,6 @@ export default function PageSurface({
               tool={drawTool}
               size={drawStrokeWidth}
               board={board}
-              world={worldRef}
               onDelete={onDeleteSelection}
               onExit={() => onDrawExit?.()}
             />
@@ -1981,156 +1981,195 @@ export default function PageSurface({
         <DockableBoardToolbar
           root={rootRef}
           enabled={enabled && !locked && !printing}
-        >
-          {onTransform && !objectMenu && board.ids.size > 1 && (
-            <span className="board-selection-count" role="status">
-              {t("board.selectedCount", { count: board.ids.size })}
-            </span>
-          )}
-          {onTransform && !objectMenu && board.ids.size > 0 && (
+          actions={
             <>
-              {assistant && (
-                <button
-                  type="button"
-                  aria-label={t("board.assistant")}
-                  title={t("board.assistant")}
-                  onClick={(event) => {
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    askAssistant(selectedIds, {
-                      left: rect.left + rect.width / 2,
-                      top: rect.top,
-                      bottom: rect.bottom,
-                    });
-                  }}
-                >
-                  <Sparkles size={15} />
-                </button>
+              {onTransform && !objectMenu && board.ids.size > 1 && (
+                <span className="board-selection-count" role="status">
+                  {t("board.selectedCount", { count: board.ids.size })}
+                </span>
               )}
-              {selectedContainer && (
-                <button
-                  type="button"
-                  aria-label={t("board.expandSelected")}
-                  onClick={() => selected && onExpand?.(selected)}
-                >
-                  <Maximize2 size={15} />
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => duplicateSelection(selectedIds)}
-                aria-label={t("board.duplicateSelected")}
-                title={t("board.duplicateSelectedTitle")}
-              >
-                {t("board.duplicate")}
-              </button>
-              <button
-                type="button"
-                onClick={() => reorder(selectedIds, "front")}
-                aria-label={t("order.front")}
-                title={t("tool.withShortcut", {
-                  label: t("order.front"),
-                  key: "⇧]",
-                })}
-              >
-                <BringToFront size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => reorder(selectedIds, "back")}
-                aria-label={t("order.back")}
-                title={t("tool.withShortcut", {
-                  label: t("order.back"),
-                  key: "⇧[",
-                })}
-              >
-                <SendToBack size={15} />
-              </button>
-              {board.ids.size > 1 && (
-                <details className="surface-popover-anchor board-align-menu">
-                  <summary aria-label={t("align.menu")} title={t("align.menu")}>
-                    <AlignStartVertical size={15} />
-                  </summary>
-                  <div className="board-align-options" role="group">
-                    {alignItems.map(([mode, label, icon, shortcut]) => (
-                      <button
-                        type="button"
-                        key={mode}
-                        aria-label={label}
-                        title={t("tool.withShortcut", {
-                          label,
-                          key: shortcut,
-                        })}
-                        disabled={
-                          mode.startsWith("distribute") && board.ids.size < 3
-                        }
-                        onClick={() => align(mode)}
-                      >
-                        {icon}
-                      </button>
-                    ))}
-                  </div>
-                </details>
-              )}
-              {selectedRegion ? (
-                <button
-                  type="button"
-                  aria-label={t("region.ungroup")}
-                  title={t("tool.withShortcut", {
-                    label: t("region.ungroup"),
-                    key: "⇧⌘G",
-                  })}
-                  onClick={() => ungroup(selectedRegion)}
-                >
-                  <Ungroup size={15} />
-                </button>
-              ) : (
-                board.ids.size > 1 &&
-                onGroup && (
+              {onTransform && !objectMenu && board.ids.size > 0 && (
+                <>
+                  {assistant && (
+                    <button
+                      type="button"
+                      aria-label={t("board.assistant")}
+                      title={t("board.assistant")}
+                      onClick={(event) => {
+                        const rect =
+                          event.currentTarget.getBoundingClientRect();
+                        askAssistant(selectedIds, {
+                          left: rect.left + rect.width / 2,
+                          top: rect.top,
+                          bottom: rect.bottom,
+                        });
+                      }}
+                    >
+                      <Sparkles size={15} />
+                    </button>
+                  )}
+                  {selectedContainer && (
+                    <button
+                      type="button"
+                      aria-label={t("board.expandSelected")}
+                      onClick={() => selected && onExpand?.(selected)}
+                    >
+                      <Maximize2 size={15} />
+                    </button>
+                  )}
                   <button
                     type="button"
-                    aria-label={t("region.group")}
-                    title={t("tool.withShortcut", {
-                      label: t("region.group"),
-                      key: "⌘G",
-                    })}
-                    onClick={() => group(selectedIds)}
+                    onClick={() => duplicateSelection(selectedIds)}
+                    aria-label={t("board.duplicateSelected")}
+                    title={t("board.duplicateSelectedTitle")}
                   >
-                    <Group size={15} />
+                    {t("board.duplicate")}
                   </button>
-                )
+                  <button
+                    type="button"
+                    onClick={() => reorder(selectedIds, "front")}
+                    aria-label={t("order.front")}
+                    title={t("tool.withShortcut", {
+                      label: t("order.front"),
+                      key: "⇧]",
+                    })}
+                  >
+                    <BringToFront size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => reorder(selectedIds, "back")}
+                    aria-label={t("order.back")}
+                    title={t("tool.withShortcut", {
+                      label: t("order.back"),
+                      key: "⇧[",
+                    })}
+                  >
+                    <SendToBack size={15} />
+                  </button>
+                  {board.ids.size > 1 && (
+                    <details className="surface-popover-anchor board-align-menu">
+                      <summary
+                        aria-label={t("align.menu")}
+                        title={t("align.menu")}
+                      >
+                        <AlignStartVertical size={15} />
+                      </summary>
+                      <div className="board-align-options" role="group">
+                        {alignItems.map(([mode, label, icon, shortcut]) => (
+                          <button
+                            type="button"
+                            key={mode}
+                            aria-label={label}
+                            title={t("tool.withShortcut", {
+                              label,
+                              key: shortcut,
+                            })}
+                            disabled={
+                              mode.startsWith("distribute") &&
+                              board.ids.size < 3
+                            }
+                            onClick={() => align(mode)}
+                          >
+                            {icon}
+                          </button>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                  {selectedRegion ? (
+                    <button
+                      type="button"
+                      aria-label={t("region.ungroup")}
+                      title={t("tool.withShortcut", {
+                        label: t("region.ungroup"),
+                        key: "⇧⌘G",
+                      })}
+                      onClick={() => ungroup(selectedRegion)}
+                    >
+                      <Ungroup size={15} />
+                    </button>
+                  ) : (
+                    board.ids.size > 1 &&
+                    onGroup && (
+                      <button
+                        type="button"
+                        aria-label={t("region.group")}
+                        title={t("tool.withShortcut", {
+                          label: t("region.group"),
+                          key: "⌘G",
+                        })}
+                        onClick={() => group(selectedIds)}
+                      >
+                        <Group size={15} />
+                      </button>
+                    )
+                  )}
+                  <button
+                    type="button"
+                    aria-label={allLocked ? t("lock.unlock") : t("lock.lock")}
+                    aria-pressed={allLocked}
+                    title={t("tool.withShortcut", {
+                      label: allLocked ? t("lock.unlock") : t("lock.lock"),
+                      key: "⇧⌘L",
+                    })}
+                    onClick={() => toggleLock(selectedIds)}
+                  >
+                    {allLocked ? (
+                      <LockKeyhole size={15} />
+                    ) : (
+                      <LockKeyholeOpen size={15} />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDeleteSelection?.(selectedIds);
+                      board.select(null);
+                    }}
+                    aria-label={t("board.deleteSelected")}
+                    title={t("tool.withShortcut", {
+                      label: t("board.deleteSelected"),
+                      key: "Delete",
+                    })}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </>
               )}
-              <button
-                type="button"
-                aria-label={allLocked ? t("lock.unlock") : t("lock.lock")}
-                aria-pressed={allLocked}
-                title={t("tool.withShortcut", {
-                  label: allLocked ? t("lock.unlock") : t("lock.lock"),
-                  key: "⇧⌘L",
-                })}
-                onClick={() => toggleLock(selectedIds)}
-              >
-                {allLocked ? (
-                  <LockKeyhole size={15} />
-                ) : (
-                  <LockKeyholeOpen size={15} />
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onDeleteSelection?.(selectedIds);
-                  board.select(null);
-                }}
-                aria-label={t("board.deleteSelected")}
-                title={t("tool.withShortcut", {
-                  label: t("board.deleteSelected"),
-                  key: "Delete",
-                })}
-              >
-                <Trash2 size={15} />
-              </button>
+
+              <div
+                ref={setComponentActionsHost}
+                className="board-component-actions"
+                data-surface-ui
+              />
             </>
-          )}
+          }
+          properties={
+            onTransform && !locked && !objectMenu ? (
+              <BoardStyleControls
+                tool={selectedNodes.length ? null : drawTool}
+                style={{
+                  color: drawColor,
+                  fillColor: drawFillColor,
+                  strokeWidth: drawStrokeWidth,
+                  pressure: drawPressure,
+                }}
+                nodes={selectedNodes}
+                onChange={(patch) =>
+                  onStyleChange?.(
+                    selectedNodes
+                      .filter(
+                        (node) => node.type === "drawing" && !node.attrs?.ink,
+                      )
+                      .map((node) => node.attrs!.id),
+                    patch,
+                  )
+                }
+              />
+            ) : null
+          }
+        >
           {!mobile && (
             <details
               ref={navigation}
@@ -2151,6 +2190,43 @@ export default function PageSurface({
                 <List size={16} />
               </summary>
               <div className="surface-navigation">
+                <div className="board-view-controls">
+                  <button
+                    type="button"
+                    aria-label={t("board.fit")}
+                    disabled={locked}
+                    title={t("board.fitTitle")}
+                    onClick={() => focusAfterMount()}
+                  >
+                    <Maximize2 size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={t("board.locate")}
+                    title={t("board.locateTitle")}
+                    disabled={locked || !selectedIds.length}
+                    onClick={focusSelection}
+                  >
+                    <Focus size={15} />
+                  </button>
+                  <span className="surface-toolbar-divider" />
+                  <ZoomControls
+                    scale={scale}
+                    controls={controls}
+                    locked={locked}
+                  />
+                  {!embedded && !printing && (
+                    <button
+                      type="button"
+                      aria-label={t("board.minimap")}
+                      aria-pressed={minimap}
+                      title={t("board.minimap")}
+                      onClick={toggleMinimap}
+                    >
+                      <MapIcon size={15} />
+                    </button>
+                  )}
+                </div>
                 <strong>{t("nav.regionsAndContent")}</strong>
                 {nodes.map((node) => (
                   <div className="surface-navigation-row" key={node.id}>
@@ -2273,41 +2349,6 @@ export default function PageSurface({
               </div>
             </details>
           )}
-          {!mobile && (
-            <>
-              <button
-                type="button"
-                aria-label={t("board.fit")}
-                disabled={locked}
-                title={t("board.fitTitle")}
-                onClick={() => focusAfterMount()}
-              >
-                <Maximize2 size={15} />
-              </button>
-              <button
-                type="button"
-                aria-label={t("board.locate")}
-                title={t("board.locateTitle")}
-                disabled={locked || !selectedIds.length}
-                onClick={focusSelection}
-              >
-                <Focus size={15} />
-              </button>
-              <span className="surface-toolbar-divider" />
-              <ZoomControls scale={scale} controls={controls} locked={locked} />
-              {!embedded && !printing && (
-                <button
-                  type="button"
-                  aria-label={t("board.minimap")}
-                  aria-pressed={minimap}
-                  title={t("board.minimap")}
-                  onClick={toggleMinimap}
-                >
-                  <MapIcon size={15} />
-                </button>
-              )}
-            </>
-          )}
           <fieldset className="surface-extra-actions" disabled={locked}>
             {extraActions}
           </fieldset>
@@ -2322,79 +2363,6 @@ export default function PageSurface({
               >
                 <Ruler size={15} />
               </button>
-              {window.showai?.inlineInk && (
-                <details ref={writingSettings}>
-                  <summary
-                    aria-label={t("tool.writingSettings")}
-                    title={t("tool.writingSettings")}
-                  >
-                    <Settings2 size={15} />
-                  </summary>
-                  <div data-surface-ui>
-                    <label>
-                      <input
-                        type="checkbox"
-                        defaultChecked={
-                          document.documentElement.dataset.fingerDrawing ===
-                          "true"
-                        }
-                        onChange={async (e) => {
-                          const fingerDrawing = e.currentTarget.checked;
-                          await window.showai!.invoke(
-                            "native:boardPreferences",
-                            { fingerDrawing },
-                          );
-                          document.documentElement.dataset.fingerDrawing =
-                            String(fingerDrawing);
-                          document.dispatchEvent(
-                            new Event("showai-board-preferences"),
-                          );
-                        }}
-                      />
-                      {t("tool.fingerDrawing")}
-                    </label>
-                  </div>
-                </details>
-              )}
-            </div>
-          )}
-          {onTransform && !locked && (
-            <div className="board-settings-controls" hidden={!!objectMenu}>
-              {board.ids.size > 0 && (
-                <button
-                  type="button"
-                  aria-label={t("board.objectSettings")}
-                  title={t("board.objectSettingsTitle")}
-                  onClick={() => selected && onInspect?.(selected)}
-                >
-                  <Settings2 size={15} />
-                </button>
-              )}
-              <div
-                ref={setComponentActionsHost}
-                className="board-component-actions"
-                data-surface-ui
-              />
-              {!objectMenu && (
-                <BoardStyleControls
-                  tool={drawTool}
-                  style={{
-                    color: drawColor,
-                    fillColor: drawFillColor,
-                    strokeWidth: drawStrokeWidth,
-                    pressure: drawPressure,
-                  }}
-                  nodes={
-                    drawingTool || drawTool === "eraser" ? [] : selectedNodes
-                  }
-                  onChange={(patch) =>
-                    onStyleChange?.(
-                      drawingTool || drawTool === "eraser" ? [] : selectedIds,
-                      patch,
-                    )
-                  }
-                />
-              )}
             </div>
           )}
         </DockableBoardToolbar>

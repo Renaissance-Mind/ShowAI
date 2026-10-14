@@ -109,8 +109,11 @@ export function BoardStyleControls({
   const color = value("color"),
     fill = value("fillColor"),
     width = value("strokeWidth");
-  const eraser = tool === "eraser";
-  const pressure = style.pressure !== false;
+  const eraser = !drawings.length && tool === "eraser";
+  const pressure = value("pressure") !== false;
+  const highlighter = drawings.length
+    ? drawings.every((node) => node.attrs!.tool === "highlighter")
+    : tool === "highlighter";
   return (
     <div
       className="board-style-controls"
@@ -158,7 +161,7 @@ export function BoardStyleControls({
           <StrokeWidthSlider
             width={eraser ? style.strokeWidth : width}
             min={eraser ? 4 : 0.5}
-            max={eraser ? 64 : tool === "highlighter" ? 20 : 12}
+            max={eraser ? 64 : highlighter ? 20 : 12}
             label={
               eraser
                 ? t("style.eraserSize")
@@ -170,7 +173,11 @@ export function BoardStyleControls({
           />
           {width === undefined && <small>{t("style.mixed")}</small>}
         </label>
-        {(tool === "pen" || tool === "highlighter") && (
+        {(drawings.length
+          ? drawings.every((node) =>
+              ["pen", "highlighter"].includes(node.attrs!.tool),
+            )
+          : tool === "pen" || tool === "highlighter") && (
           <button
             type="button"
             className="board-pressure-toggle"

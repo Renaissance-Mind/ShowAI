@@ -8,6 +8,90 @@ import {
   pointsBounds,
   rotatePoint,
 } from "./geometry.mjs";
+import { polygonContains } from "./lasso.mjs";
+
+/** A lasso selects enclosed paint and any contour touched by its trace. */
+export function shapeIntersectsPolygon(node, frame, polygon, tolerance = 0) {
+  if (polygon.length < 2) return false;
+  const center = {
+    x: frame.x + frame.width / 2,
+    y: frame.y + frameHeight(frame) / 2,
+  };
+  const drawing = node.type === "drawing";
+  const vertices = drawing
+    ? drawingOutline(node, frame).vertices.map((p) =>
+        rotatePoint(
+          { x: p.x + frame.x, y: p.y + frame.y },
+          center,
+          frame.rotation,
+        ),
+      )
+    : [
+        { x: 0, y: 0 },
+        { x: frame.width, y: 0 },
+        { x: frame.width, y: frameHeight(frame) },
+        { x: 0, y: frameHeight(frame) },
+        { x: 0, y: 0 },
+      ].map((p) =>
+        rotatePoint(
+          { x: p.x + frame.x, y: p.y + frame.y },
+          center,
+          frame.rotation,
+        ),
+      );
+  const radius =
+    tolerance +
+    (drawing
+      ? ((node.attrs.strokeWidth ?? 0) *
+          Math.max(
+            frame.width / node.attrs.extent[0],
+            frameHeight(frame) / node.attrs.extent[1],
+          )) /
+        2
+      : 0);
+  if (polygon.length >= 3 && vertices.some((p) => polygonContains(polygon, p)))
+    return true;
+  if (
+    polygon.some((p) => {
+      const hit = shapeHit(node, frame, p);
+      return hit.distance <= radius || (hit.inside && hit.solid);
+    })
+  )
+    return true;
+  const cross = (a, b, c) =>
+    (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  const intersects = (a, b, c, d) => {
+    const c1 = cross(a, b, c),
+      c2 = cross(a, b, d),
+      c3 = cross(c, d, a),
+      c4 = cross(c, d, b);
+    if (
+      ((c1 > 0 && c2 < 0) || (c1 < 0 && c2 > 0)) &&
+      ((c3 > 0 && c4 < 0) || (c3 < 0 && c4 > 0))
+    )
+      return true;
+    return (
+      Math.min(
+        segmentDistance(a, c, d),
+        segmentDistance(b, c, d),
+        segmentDistance(c, a, b),
+        segmentDistance(d, a, b),
+      ) <= radius
+    );
+  };
+  return vertices.some(
+    (b, i) =>
+      i > 0 &&
+      polygon.some((d, j) =>
+        intersects(
+          vertices[i - 1],
+          b,
+          polygon[(j + polygon.length - 1) % polygon.length],
+          d,
+        ),
+      ),
+  );
+}
 
 /** Geometry is the painted centerline, independent of SVG viewport padding. */
 export function drawingBounds(node) {

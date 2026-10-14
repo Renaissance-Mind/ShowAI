@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type { JSONContent } from "@tiptap/core";
 import type { BoardInteraction } from "./useBoardInteraction";
 import { fingerNavigatesBoard } from "./board-input.mjs";
-import { polygonContains } from "./lasso";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";
 
@@ -12,14 +12,12 @@ export function BoardGestureInput({
   tool,
   size,
   board,
-  world,
   onDelete,
   onExit,
 }: {
   tool: "eraser" | "lasso";
   size: number;
   board: BoardInteraction;
-  world: React.RefObject<HTMLDivElement | null>;
   onDelete: (ids: string[]) => void;
   onExit: () => void;
 }) {
@@ -101,33 +99,15 @@ export function BoardGestureInput({
     gesture.current = null;
     setPreview([]);
     if (tool === "eraser") {
-      if (value.erased.size) onDelete([...value.erased]);
+      if (value.erased.size)
+        flushSync(() => {
+          board.selectIds([...board.ids].filter((id) => !value.erased.has(id)));
+          onDelete([...value.erased]);
+        });
       restore(value);
       return;
     }
-    if (value.points.length < 3) return;
-    const selected: string[] = [];
-    for (const element of world.current?.querySelectorAll<HTMLElement>(
-      ".surface-object[data-surface-id]",
-    ) ?? []) {
-      if (
-        element.closest(".page-surface") !==
-          world.current?.closest(".page-surface") ||
-        (value.pointerType === "pen" && element.dataset.boardShape === "true")
-      )
-        continue;
-      const rect = element.getBoundingClientRect();
-      const samples = [
-        { x: rect.left, y: rect.top },
-        { x: rect.right, y: rect.top },
-        { x: rect.right, y: rect.bottom },
-        { x: rect.left, y: rect.bottom },
-        { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 },
-      ];
-      if (samples.some((p) => polygonContains(value.points, p)))
-        selected.push(element.dataset.surfaceId!);
-    }
-    board.selectIds(selected);
+    if (value.points.length >= 2) board.selectIds(board.lassoHit(value.points));
   };
   return (
     <svg

@@ -935,8 +935,6 @@ function ContainerView({
     eraser: { color: "#252629", fillColor: "none", strokeWidth: 24 },
   });
   const styleKey = tool === "pen" || tool === "highlighter" || tool === "eraser" ? tool : "shape";
-  const drawingTool =
-    !!tool && !["pan", "eraser", "lasso", "text"].includes(tool);
   const style = styles[styleKey];
   const chooseTool = async (next: BoardTool | null) => {
     await window.showai?.inlineInk?.flush();
@@ -1342,8 +1340,8 @@ function ContainerView({
                 findSurfaceNode(runtime.current.current, nodeId)?.node.type ===
                 "drawing",
             );
-            // With a tool active, style changes set up the next drawing only.
-            if (drawingTool || tool === "eraser" || !drawings.length) {
+            // A current selection takes precedence over the active drawing tool.
+            if (!drawings.length) {
               setStyles((before) => ({
                 ...before,
                 [styleKey]: { ...before[styleKey], ...patch },

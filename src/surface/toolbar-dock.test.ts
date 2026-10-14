@@ -44,3 +44,25 @@ it("keeps the toolbar within small and resized viewports including near corners"
     }),
   ).toEqual({ x: 313, y: 378 });
 });
+
+it("anchors only the fixed primary strip and reserves space for properties below it", () => {
+  const bounds = { width: 1000, height: 800 },
+    primary = { width: 54, height: 420 };
+  const center = toolbarCenter(
+    { edge: "left", position: 0.5 },
+    bounds,
+    primary,
+    240,
+  );
+  expect(center.y - primary.height / 2).toBeGreaterThanOrEqual(12);
+  expect(center.y + primary.height / 2 + 240).toBeLessThanOrEqual(
+    bounds.height - 12,
+  );
+  const row = toolbarCenter(
+    { edge: "bottom", position: 0.5 },
+    bounds,
+    { width: 700, height: 44 },
+    108,
+  );
+  expect(row.y).toBe(658);
+});

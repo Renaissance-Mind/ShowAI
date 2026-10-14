@@ -4,6 +4,7 @@ import {
   frameFromGeometry,
   pickShape,
   shapeIntersects,
+  shapeIntersectsPolygon,
 } from "./drawing-geometry.mjs";
 import { canCommitBoardGesture, boardSelectionScope } from "./board-commands";
 import type { SurfaceGeometryStore } from "./geometry-store";
@@ -65,6 +66,7 @@ export interface BoardInteraction {
   select: (id: string | null, additive?: boolean) => void;
   selectAll: () => void;
   selectIds: (ids: string[]) => void;
+  lassoHit: (points: Point[]) => string[];
   nudge: (x: number, y: number) => void;
   /** Visual bounds in the selection's coordinate layer, including measured heights. */
   measured: (
@@ -514,6 +516,48 @@ export function useBoardInteraction({
   };
   return {
     ids,
+    lassoHit(points) {
+      const root = world.current,
+        source = current.current.document;
+      if (!root || !source) return [];
+      const found: string[] = [];
+      for (const element of root.querySelectorAll<HTMLElement>(
+        ".surface-object[data-surface-id]",
+      )) {
+        if (element.closest(".page-surface") !== root.closest(".page-surface"))
+          continue;
+        const id = element.dataset.surfaceId!,
+          entry = selectionIndex.get(id),
+          frame = source.layout?.[id];
+        if (
+          !entry ||
+          !frame ||
+          !boardSelectionScope(selectionIndex, source.layout, containerId, id)
+        )
+          continue;
+        const layer = element.parentElement!,
+          box = layer.getBoundingClientRect();
+        const surface = root.closest<HTMLElement>(".page-surface")!;
+        const outer =
+          surface.getBoundingClientRect().width / surface.clientWidth || 1;
+        const scale =
+          box.width / layer.offsetWidth || camera.current.scale * outer;
+        const polygon = points.map((p) => ({
+          x: (p.x - box.left) / scale,
+          y: (p.y - box.top) / scale,
+        }));
+        if (
+          shapeIntersectsPolygon(
+            entry.node,
+            measureFrame(frame, element),
+            polygon,
+            1 / scale,
+          )
+        )
+          found.push(id);
+      }
+      return found;
+    },
     selectionHit(x, y) {
       if (!currentIds.current.size) return null;
       if (

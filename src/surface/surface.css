@@ -12,7 +12,7 @@
   height: 100%;
   min-height: 0;
   flex: 1;
-  overflow: hidden;
+  overflow: clip;
   isolation: isolate;
   background: var(--paper, var(--bg));
   outline-offset: -3px;
