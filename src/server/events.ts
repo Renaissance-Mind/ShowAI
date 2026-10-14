@@ -211,17 +211,31 @@ export class ProjectEvents {
     }
   }
   async published(projectId: string, previousHead?: string | null) {
+    await (
+      await this.prepare(projectId, previousHead)
+    )();
+  }
+  /**
+   * Reads everything a publication notice needs while the publication's state
+   * is current, and returns the per-peer delivery to run after responding.
+   * The publishing session gets only the new head: it already has the content.
+   */
+  async prepare(
+    projectId: string,
+    previousHead?: string | null,
+    publisherSession?: string,
+  ): Promise<() => Promise<void>> {
     const targets = [...this.peers()].filter((peer) =>
       peer.identity().projects.includes(projectId),
     );
-    if (!targets.length) return;
+    if (!targets.length) return async () => {};
     const head = (
       await this.db.all<{ head: string | null }>(
         "SELECT head FROM projects WHERE id=?",
         [projectId],
       )
     )[0]?.head;
-    if (!head) return this.recheck();
+    if (!head) return () => this.recheck();
     const row = await this.revisions.row(projectId, head);
     if (!row)
       throw new Error("A published project head is missing its revision.");
@@ -260,37 +274,45 @@ export class ProjectEvents {
         size += inline[digest].length + digest.length + 8;
       }
     }
-    for (const peer of targets) {
-      const projects = await this.projects(peer.identity());
-      if (!projects) {
-        peer.close(4001, "The device session is no longer valid.");
-        continue;
-      }
-      const project = projects.find((item) => item.id === projectId);
-      if (!project) {
+    return async () => {
+      for (const peer of targets) {
+        const projects = await this.projects(peer.identity());
+        if (!projects) {
+          peer.close(4001, "The device session is no longer valid.");
+          continue;
+        }
+        const project = projects.find((item) => item.id === projectId);
+        if (!project) {
+          await this.deliver(
+            peer,
+            { type: "heads", serverId: await this.serverId(), projects },
+            projects,
+          );
+          continue;
+        }
+        // The head can advance while objects are read. Never attach an older record
+        // to a newer notification; the next verified current-state request catches up.
         await this.deliver(
           peer,
-          { type: "heads", serverId: await this.serverId(), projects },
+          {
+            type: "revision",
+            serverId: await this.serverId(),
+            project,
+            ...(size < maximumEventBytes / 2 &&
+            project.head === head &&
+            peer.identity().sessionDigest !== publisherSession
+              ? {
+                  record,
+                  objects: inline,
+                  previousHead,
+                  sequence: row.sequence,
+                  previousSequence,
+                }
+              : {}),
+          },
           projects,
         );
-        continue;
       }
-      // The head can advance while objects are read. Never attach an older record
-      // to a newer notification; the next verified current-state request catches up.
-      await this.deliver(peer, {
-        type: "revision",
-        serverId: await this.serverId(),
-        project,
-        ...(size < maximumEventBytes / 2 && project.head === head
-          ? {
-              record,
-              objects: inline,
-              previousHead,
-              sequence: row.sequence,
-              previousSequence,
-            }
-          : {}),
-      }, projects);
-    }
+    };
   }
 }

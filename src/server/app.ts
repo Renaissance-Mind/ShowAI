@@ -1467,12 +1467,14 @@ export function createSyncServer(options: ServerOptions) {
       revisions.remember(projectId, revision, snapshot, stored.bytes);
       // The new head is durable; a failed notification must not report the
       // publication as failed. Peers catch up through heads on their next cycle.
-      await events
-        ?.published(projectId, expected)
-        .catch((error: unknown) =>
-          console.error("Project event fan-out failed", error),
-        );
+      const fanOut = (error: unknown) =>
+        console.error("Project event fan-out failed", error);
+      const notify = await events
+        ?.prepare(projectId, expected, user.session_digest)
+        .catch(fanOut);
       await revisions.retainCurrent(projectId, revision);
+      // Deliveries run after the response so the publisher never waits for peers.
+      if (notify) void notify().catch(fanOut);
       return json({ revision, head: revision, published: true });
     }
     throw new SyncError(404, "NOT_FOUND", "Unknown project endpoint.");
