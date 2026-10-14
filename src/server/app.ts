@@ -53,6 +53,7 @@ import {
   type AuthUser,
 } from "./accounts";
 import { validatePackageClosure } from "../sync/dependency-validation";
+import { applySnapshotDelta, snapshotDeltaCapability } from "../sync/delta";
 import {
   serverBaseUrl,
   serverEndpoint,
@@ -367,6 +368,7 @@ export function createSyncServer(options: ServerOptions) {
           "storage-quotas-v1",
           "resumable-objects-v1",
           "batch-heads-v1",
+          snapshotDeltaCapability,
           ...(accounts.cipher.enabled ? [accountCapability] : []),
           ...(events ? [eventCapability] : []),
           ...(options.metadataDriver === "sqlite" ||
@@ -1176,6 +1178,26 @@ export function createSyncServer(options: ServerOptions) {
         );
       const expected =
         input.expected === null ? null : digestId(input.expected);
+      if (input.delta !== undefined) {
+        // Changes are applied to the verified current head the client expected.
+        if (expected === null || expected !== project.head)
+          throw new SyncError(
+            409,
+            "CONFLICT",
+            "The project has newer changes. Retry synchronization.",
+            { head: project.head },
+          );
+        const base = await revisions
+          .current(projectId, project.head)
+          .catch(() => undefined);
+        if (!base || base.format !== syncProtocol)
+          throw new SyncError(
+            409,
+            "DELTA_BASE_UNAVAILABLE",
+            "Publish the complete project snapshot.",
+          );
+        input.snapshot = applySnapshotDelta(base, input.delta, projectId);
+      }
       const snapshot: ProjectSnapshot = validateSnapshot(
         input.snapshot,
         projectId,
@@ -1186,6 +1208,12 @@ export function createSyncServer(options: ServerOptions) {
       const revision = serialized
         ? await hash(serialized)
         : await snapshotRevision(snapshot);
+      if (input.delta !== undefined && input.revision !== revision)
+        throw new SyncError(
+          409,
+          "DELTA_MISMATCH",
+          "Publish the complete project snapshot.",
+        );
       if (project.head === revision) {
         await revisions.activateCurrent(projectId);
         await revisions.retainCurrent(projectId, revision);

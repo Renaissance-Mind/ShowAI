@@ -19,6 +19,11 @@ import { AccountManager } from "./account-manager";
 import { serverFetch as fetch, closeServerTransport } from "./server-fetch";
 import { accountCapability } from "./accounts";
 import {
+  applySnapshotDelta,
+  snapshotDelta,
+  snapshotDeltaCapability,
+} from "./delta";
+import {
   eventCapability,
   inlineRevisionCapability,
   maximumEventProjects,
@@ -279,14 +284,47 @@ export class SyncManager {
         (project.head !== null && !/^[a-f0-9]{64}$/.test(project.head))
       )
         throw new CoreError("INVALID_DATA", t("event.invalidProject"));
-    if (event.type === "revision" && event.record) {
-      if (event.record.revision !== event.project.head)
+    let record = event.type === "revision" ? event.record : undefined;
+    if (
+      event.type === "revision" &&
+      !record &&
+      event.delta &&
+      event.project.head &&
+      typeof event.previousHead === "string" &&
+      /^[a-f0-9]{64}$/.test(event.previousHead)
+    ) {
+      // Rebuild from the cached previous state; without it the head alone
+      // starts a normal synchronization that downloads the snapshot.
+      const binding = bindings.find(
+        (item) => item.remoteProjectId === event.project.id,
+      );
+      const base =
+        binding &&
+        (await this.cachedRecord(connection, binding, event.previousHead));
+      if (base?.snapshot.format === syncProtocol)
+        try {
+          const rebuilt: SnapshotRecord = {
+            revision: event.project.head,
+            source: event.delta.source,
+            snapshot: applySnapshotDelta(
+              base.snapshot,
+              event.delta,
+              event.project.id,
+            ),
+          };
+          if (await validSnapshotRecord(rebuilt)) record = rebuilt;
+        } catch {
+          // A malformed change set is ignored like a head-only notice.
+        }
+    }
+    if (event.type === "revision" && record) {
+      if (record.revision !== event.project.head)
         throw new CoreError("INVALID_DATA", t("event.revisionMismatch"));
       for (const binding of bindings.filter(
         (item) => item.remoteProjectId === event.project.id,
       )) {
-        await this.cacheRecord(connection, binding, event.record);
-        const ids = new Set(Object.values(event.record.snapshot.files));
+        await this.cacheRecord(connection, binding, record);
+        const ids = new Set(Object.values(record.snapshot.files));
         for (const [digest, value] of Object.entries(event.objects ?? {})) {
           if (!ids.has(digest) || typeof value !== "string")
             throw new CoreError("INVALID_DATA", t("event.foreignObject"));
@@ -309,18 +347,14 @@ export class SyncManager {
         Number.isSafeInteger(event.previousSequence) &&
         event.sequence! === event.previousSequence! + 1 &&
         ((event.previousHead === null &&
-          event.record.snapshot.parents.length === 0) ||
+          record.snapshot.parents.length === 0) ||
           (typeof event.previousHead === "string" &&
             /^[a-f0-9]{64}$/.test(event.previousHead) &&
-            event.record.snapshot.parents.includes(event.previousHead)))
+            record.snapshot.parents.includes(event.previousHead)))
       ) {
         this.announced.set(
-          this.announcedKey(
-            connection,
-            event.project.id,
-            event.record.revision,
-          ),
-          { previous: event.previousHead, record: event.record },
+          this.announcedKey(connection, event.project.id, record.revision),
+          { previous: event.previousHead, record: record },
         );
         while (this.announced.size > 200)
           this.announced.delete(this.announced.keys().next().value!);
@@ -1106,6 +1140,22 @@ export class SyncManager {
     project: ProjectConnection,
     revision: string,
   ) {
+    const cached = await this.cachedRecord(connection, project, revision);
+    if (cached) return cached;
+    const record = await this.request<SnapshotRecord>(
+      connection,
+      `/api/projects/${project.remoteProjectId}/snapshot?revision=${revision}`,
+    );
+    if (record.revision !== revision)
+      throw new CoreError("INVALID_DATA", t("snapshot.wrongRevision"));
+    await this.cacheRecord(connection, project, record);
+    return record;
+  }
+  private async cachedRecord(
+    connection: ServerConnection,
+    project: ProjectConnection,
+    revision: string,
+  ) {
     for (const path of [
       ...["baseline", "previous", "candidate", "incoming"].map((slot) =>
         this.currentCachePath(connection, project, slot),
@@ -1117,14 +1167,7 @@ export class SyncManager {
       validateSnapshot(cached.snapshot, project.remoteProjectId);
       if (await validSnapshotRecord(cached)) return cached;
     }
-    const record = await this.request<SnapshotRecord>(
-      connection,
-      `/api/projects/${project.remoteProjectId}/snapshot?revision=${revision}`,
-    );
-    if (record.revision !== revision)
-      throw new CoreError("INVALID_DATA", t("snapshot.wrongRevision"));
-    await this.cacheRecord(connection, project, record);
-    return record;
+    return undefined;
   }
   /** The last decoded state per binding; a revision's content never changes. */
   private decoded = new Map<
@@ -1273,6 +1316,48 @@ export class SyncManager {
       : undefined;
     const known = new Set(Object.values(baseline?.snapshot.files ?? {}));
     const changed = ids.filter((digest) => !known.has(digest));
+    // A server with the delta capability rebuilds the snapshot from its head.
+    const deltaBase =
+      baseline?.snapshot.format === syncProtocol &&
+      captured.snapshot.format === syncProtocol &&
+      connection.capabilities?.includes(snapshotDeltaCapability)
+        ? baseline.snapshot
+        : undefined;
+    const body = (full: boolean, objects?: Record<string, string>) => ({
+      ...(!full && deltaBase
+        ? {
+            revision: captured.revision,
+            delta: snapshotDelta(deltaBase, captured.snapshot),
+          }
+        : { snapshot: captured.snapshot }),
+      expected,
+      publish,
+      ...(objects ? { objects } : {}),
+    });
+    const post = async (objects?: Record<string, string>) => {
+      const publishWith = (full: boolean) =>
+        this.request<{ revision: string; head: string; published: boolean }>(
+          connection,
+          `/api/projects/${project.remoteProjectId}/snapshot`,
+          "POST",
+          body(full, objects),
+        );
+      try {
+        return await publishWith(false);
+      } catch (error) {
+        if (
+          deltaBase &&
+          error instanceof SyncError &&
+          [
+            "DELTA_MISMATCH",
+            "DELTA_BASE_UNAVAILABLE",
+            "INVALID_DELTA",
+          ].includes(error.code)
+        )
+          return publishWith(true);
+        throw error;
+      }
+    };
     if (connection.capabilities?.includes(inlineRevisionCapability)) {
       const total = changed.reduce(
         (sum, digest) => sum + captured.objects.get(digest)!.length,
@@ -1291,24 +1376,12 @@ export class SyncManager {
             captured.objects.get(digest)!.toString("base64"),
           ]),
         );
-        const input = {
-          snapshot: captured.snapshot,
-          expected,
-          publish,
-          objects,
-        };
-        if (Buffer.byteLength(JSON.stringify(input)) <= 512 * 1024) {
+        if (
+          Buffer.byteLength(JSON.stringify(body(false, objects))) <=
+          512 * 1024
+        ) {
           await this.cacheRecord(connection, project, captured, "candidate");
-          return this.request<{
-            revision: string;
-            head: string;
-            published: boolean;
-          }>(
-            connection,
-            `/api/projects/${project.remoteProjectId}/snapshot`,
-            "POST",
-            input,
-          );
+          return post(objects);
         }
       }
     }
@@ -1413,13 +1486,7 @@ export class SyncManager {
     };
     await send(changed);
     await this.cacheRecord(connection, project, captured, "candidate");
-    const publishCaptured = () =>
-      this.request<{ revision: string; head: string; published: boolean }>(
-        connection,
-        `/api/projects/${project.remoteProjectId}/snapshot`,
-        "POST",
-        { snapshot: captured.snapshot, expected, publish },
-      );
+    const publishCaptured = () => post();
     try {
       return await publishCaptured();
     } catch (error) {

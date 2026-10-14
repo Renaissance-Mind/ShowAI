@@ -10,10 +10,14 @@ import {
   hash,
   identifier,
   SyncError,
+  syncProtocol,
   type SyncProject,
   type SnapshotRecord,
 } from "../sync/protocol";
 import type { MetadataStore, ObjectStore } from "./storage";
+import { revisionDeltaFeature, snapshotDelta } from "../sync/delta";
+
+const knownFeatures = [revisionDeltaFeature];
 import type { RequestBudgets } from "./request-budget";
 import type { Revisions } from "./revisions";
 
@@ -180,6 +184,9 @@ export class ProjectEvents {
           "Subscribe to at most 1000 projects.",
         );
       identity.projects = [...new Set<string>(input.ids.map(identifier))];
+      identity.features = Array.isArray(input.features)
+        ? knownFeatures.filter((feature) => input.features.includes(feature))
+        : [];
       peer.remember(identity);
     } else
       throw new SyncError(
@@ -241,7 +248,7 @@ export class ProjectEvents {
       throw new Error("A published project head is missing its revision.");
     const record = await this.revisions.record(projectId, row);
     const inline: Record<string, string> = {};
-    let size = encoder.encode(JSON.stringify(record)).length;
+    const recordSize = encoder.encode(JSON.stringify(record)).length;
     let previous: SnapshotRecord | undefined;
     let previousSequence: number | undefined =
       previousHead === null ? 0 : undefined;
@@ -252,7 +259,22 @@ export class ProjectEvents {
         previousSequence = row.sequence;
       }
     }
-    if (size < maximumEventBytes / 2) {
+    // Subscribers that keep the previous state receive only what changed.
+    const delta =
+      previous &&
+      previous.snapshot.format === syncProtocol &&
+      record.snapshot.format === syncProtocol
+        ? {
+            ...snapshotDelta(previous.snapshot, record.snapshot),
+            source: record.source,
+          }
+        : undefined;
+    const deltaSize = delta
+      ? encoder.encode(JSON.stringify(delta)).length
+      : Infinity;
+    const budget = maximumEventBytes / 2;
+    let size = Math.min(recordSize, deltaSize);
+    if (size < budget) {
       const seen = new Set<string>();
       for (const [path, digest] of Object.entries(record.snapshot.files)) {
         if (previous?.snapshot.files[path] === digest || seen.has(digest))
@@ -265,7 +287,7 @@ export class ProjectEvents {
         if (
           !info ||
           info.bytes > 64 * 1024 ||
-          size + Math.ceil((info.bytes * 4) / 3) > maximumEventBytes / 2
+          size + Math.ceil((info.bytes * 4) / 3) > budget
         )
           continue;
         const bytes = await this.objects.get(key, 64 * 1024);
@@ -274,6 +296,21 @@ export class ProjectEvents {
         size += inline[digest].length + digest.length + 8;
       }
     }
+    const inlineSize = size - Math.min(recordSize, deltaSize);
+    const content = (peer: EventPeer) => {
+      if (peer.identity().sessionDigest === publisherSession) return {};
+      const order = { previousHead, sequence: row.sequence, previousSequence };
+      if (
+        delta &&
+        peer.identity().features?.includes(revisionDeltaFeature) &&
+        deltaSize + inlineSize < budget
+      )
+        return { ...order, delta, objects: inline };
+      if (recordSize + inlineSize < budget)
+        return { ...order, record, objects: inline };
+      if (recordSize < budget) return { ...order, record };
+      return {};
+    };
     return async () => {
       for (const peer of targets) {
         const projects = await this.projects(peer.identity());
@@ -298,17 +335,7 @@ export class ProjectEvents {
             type: "revision",
             serverId: await this.serverId(),
             project,
-            ...(size < maximumEventBytes / 2 &&
-            project.head === head &&
-            peer.identity().sessionDigest !== publisherSession
-              ? {
-                  record,
-                  objects: inline,
-                  previousHead,
-                  sequence: row.sequence,
-                  previousSequence,
-                }
-              : {}),
+            ...(project.head === head ? content(peer) : {}),
           },
           projects,
         );

@@ -1,4 +1,5 @@
 import type { SnapshotRecord, SyncProject } from "./protocol";
+import type { SnapshotDelta } from "./delta";
 
 export const eventProtocol = "showai-project-events-v1";
 export const eventCapability = "project-events-v1";
@@ -18,6 +19,8 @@ export type ProjectEvent =
       sequence?: number;
       previousSequence?: number;
       record?: SnapshotRecord;
+      /** Changes from previousHead, sent to subscribers with the delta feature. */
+      delta?: SnapshotDelta;
       objects?: Record<string, string>;
     }
   | { type: "pong" }
@@ -27,6 +30,7 @@ export interface EventIdentity {
   userId: string;
   sessionDigest: string;
   projects: string[];
+  features?: string[];
 }
 
 /** The credential stays in an encrypted handshake header, never in the URL. */

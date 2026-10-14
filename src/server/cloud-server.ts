@@ -17,6 +17,7 @@ interface SocketAttachment {
   userId: string;
   sessionDigest: string;
   socketId: string;
+  features?: string[];
   /** Sockets accepted by an earlier deployment kept subscriptions here. */
   projects?: string[];
 }
@@ -95,7 +96,10 @@ export class ShowAIServer {
     // spending request budget; every delivery still rechecks the session.
     const Pair = (
       globalThis as unknown as {
-        WebSocketRequestResponsePair?: new (request: string, response: string) => unknown;
+        WebSocketRequestResponsePair?: new (
+          request: string,
+          response: string,
+        ) => unknown;
       }
     ).WebSocketRequestResponsePair;
     if (Pair && ctx.setWebSocketAutoResponse)
@@ -109,10 +113,14 @@ export class ShowAIServer {
         "CREATE TABLE IF NOT EXISTS _showai_event_subscriptions(socket_id TEXT PRIMARY KEY,projects TEXT NOT NULL)",
       );
       const live = new Set(
-        ctx.getWebSockets().map((socket) => socket.deserializeAttachment().socketId),
+        ctx
+          .getWebSockets()
+          .map((socket) => socket.deserializeAttachment().socketId),
       );
       for (const row of ctx.storage.sql
-        .exec<{ socket_id: string }>("SELECT socket_id FROM _showai_event_subscriptions")
+        .exec<{ socket_id: string }>(
+          "SELECT socket_id FROM _showai_event_subscriptions",
+        )
         .toArray())
         if (!live.has(row.socket_id))
           ctx.storage.sql.exec(
@@ -153,19 +161,18 @@ export class ShowAIServer {
           projects: attachment.socketId
             ? this.subscribed(attachment.socketId)
             : (attachment.projects ?? []),
+          features: attachment.features,
         };
       },
       remember: (value) => {
         const attachment = socket.deserializeAttachment();
-        let socketId = attachment.socketId;
-        if (!socketId) {
-          socketId = crypto.randomUUID();
-          socket.serializeAttachment({
-            userId: attachment.userId,
-            sessionDigest: attachment.sessionDigest,
-            socketId,
-          });
-        }
+        const socketId = attachment.socketId ?? crypto.randomUUID();
+        socket.serializeAttachment({
+          userId: attachment.userId,
+          sessionDigest: attachment.sessionDigest,
+          socketId,
+          features: value.features,
+        });
         this.subscribed(socketId);
         this.subscriptions!.set(socketId, value.projects);
         this.ctx.storage.sql.exec(
