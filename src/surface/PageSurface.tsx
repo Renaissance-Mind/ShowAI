@@ -308,6 +308,28 @@ export default function PageSurface({
     ruler,
     enabled: enabled && !locked && !!onDraw && !printing,
     onCamera: (value, final) => controls.current.navigateTo(value, final),
+    onShapeGesture: (value) => {
+      const point = {
+        clientX: value.x,
+        clientY: value.y,
+        altKey: false,
+        shiftKey: false,
+      };
+      if (value.phase === "began") {
+        board.select(value.id);
+        if (board.start(value.id, "move", point))
+          controls.current.objectGesture(true);
+      } else if (value.phase === "cancelled") {
+        board.cancel();
+        controls.current.objectGesture(false);
+      } else {
+        board.update(point);
+        if (value.phase === "ended") {
+          board.finish();
+          controls.current.objectGesture(false);
+        }
+      }
+    },
     onTool: (value) => {
       if (value === "settings") {
         if (writingSettings.current) writingSettings.current.open = true;
@@ -1095,7 +1117,13 @@ export default function PageSurface({
         onPointerDownCapture={(event) => {
           const target = event.target as Element;
           if (target.closest(".page-surface") !== event.currentTarget) return;
-          if (target.closest("[data-surface-ui]") && !target.closest(".board-resize-handle,.surface-object-rotate,.board-arrow-endpoint")) return;
+          if (
+            target.closest("[data-surface-ui]") &&
+            !target.closest(
+              ".board-resize-handle,.surface-object-rotate,.board-arrow-endpoint",
+            )
+          )
+            return;
           // Secondary contacts belong to the viewport's two-finger gesture.
           if (event.pointerType === "touch" && !event.isPrimary) return;
           const hit = board.hitTest(event.clientX, event.clientY);

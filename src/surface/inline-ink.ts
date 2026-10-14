@@ -36,6 +36,12 @@ export interface InkCommand {
   navigating?: boolean;
   tool?: string;
   error?: string;
+  shapeGesture?: {
+    id: string;
+    phase: "began" | "changed" | "ended" | "cancelled";
+    x: number;
+    y: number;
+  };
 }
 export interface InlineInkBridge {
   bind(
