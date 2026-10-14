@@ -1,5 +1,7 @@
 import { useId, useRef, useState, type ReactNode } from "react";
 import type { ComponentDocumentation } from "../components/custom/documentation";
+import type { ComponentSource } from "../components/custom/types";
+import ComponentAuthoringGuides from "./ComponentAuthoringGuides";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/catalog";
 const List = ({ items }: { items: string[] }) => (
@@ -11,8 +13,10 @@ const List = ({ items }: { items: string[] }) => (
 );
 export default function ComponentDocumentationView({
   documentation,
+  loadSource,
 }: {
   documentation?: ComponentDocumentation;
+  loadSource?: () => Promise<ComponentSource>;
 }) {
   const t = useTranslator(messages);
   const id = useId(),
@@ -36,7 +40,7 @@ export default function ComponentDocumentationView({
       id: "recipes",
       title: t("doc.recipes"),
       content: usage.recipes.map((recipe) => (
-              <details key={recipe.title} open>
+        <details key={recipe.title}>
           <summary>{recipe.title}</summary>
           <List items={recipe.steps} />
         </details>
@@ -80,6 +84,17 @@ export default function ComponentDocumentationView({
       ),
     },
   ];
+  if (documentation.version === 2 && documentation.authoring)
+    sections.push({
+      id: "authoring",
+      title: "原版制作指南",
+      content: (
+        <ComponentAuthoringGuides
+          entry={documentation.authoring.entry}
+          loadSource={loadSource}
+        />
+      ),
+    });
   return (
     <div className="catalog-reading-workspace">
       <article className="catalog-reading-main catalog-component-guide">

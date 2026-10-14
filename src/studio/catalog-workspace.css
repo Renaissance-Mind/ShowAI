@@ -23,7 +23,7 @@
 }
 .catalog-component-dialog .studio-modal-title h2,
 .catalog-template-dialog .studio-modal-title h2 {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 600;
   letter-spacing: -0.3px;
   white-space: nowrap;
@@ -57,7 +57,7 @@
   padding: 0 4px;
   border-radius: 0;
   border-bottom: 3px solid transparent;
-  font-size: 15px;
+  font-size: 16px;
   color: var(--muted);
   white-space: nowrap;
   flex-shrink: 0;
@@ -98,12 +98,12 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  font-size: 14px;
+  font-size: 16px;
   background: var(--paper);
 }
 .catalog-info-panel h3 {
   margin: 0 0 16px;
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 600;
 }
 .catalog-info-panel .catalog-reference-section + .catalog-reference-section {
@@ -112,7 +112,7 @@
   border-top: 1px solid var(--line);
 }
 .catalog-info-panel .catalog-reference-section li {
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.8;
   margin-bottom: 12px;
 }
@@ -132,7 +132,7 @@
   gap: 12px;
   align-items: baseline;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.8;
   margin: 12px 0;
 }
@@ -355,7 +355,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
 }
 .catalog-info-panel input,
@@ -368,7 +368,7 @@
   padding: 10px 12px;
   background: var(--paper);
   color: var(--text);
-  font-size: 14px;
+  font-size: 15px;
 }
 .catalog-info-panel .studio-form-row {
   display: grid;
@@ -398,9 +398,12 @@
 .catalog-parameter-table {
   background: var(--paper);
 }
+.catalog-parameters-main .catalog-parameter-table table {
+  font-size: 15px;
+}
 .catalog-parameter-fact {
   margin: 12px 0;
-  font-size: 13px;
+  font-size: 15px;
   overflow-wrap: anywhere;
 }
 .catalog-parameter-fact p {
@@ -420,7 +423,7 @@
 }
 .catalog-reading-main h3 {
   margin: 0 0 10px;
-  font-size: 19px;
+  font-size: 22px;
   font-weight: 600;
 }
 .catalog-reading-main section {
@@ -430,7 +433,7 @@
 .catalog-reading-main p,
 .catalog-reading-main li,
 .catalog-reading-main td {
-  font-size: 14px;
+  font-size: 16px;
   color: var(--muted);
   line-height: 1.9;
 }
@@ -446,7 +449,7 @@
 .catalog-reading-main td {
   border: 1px solid var(--line);
   padding: 12px 16px;
-  font-size: 14px;
+  font-size: 16px;
 }
 .catalog-reading-main th {
   background: var(--surface);
@@ -456,7 +459,7 @@
   text-align: left;
   padding: 12px 16px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 15px;
   border-left: 2px solid transparent;
   border-radius: 0;
 }
@@ -480,7 +483,7 @@
   margin: 0 0 28px;
 }
 .template-guide-content h3 {
-  font-size: 23px;
+  font-size: 28px;
   display: flex;
   gap: 20px;
   align-items: center;
@@ -491,7 +494,7 @@
   font-weight: 400;
 }
 .template-guide-content .sb-rich-text {
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.9;
 }
 .template-workflow-view .sb-rich-text > h1:first-child {
@@ -507,7 +510,7 @@
   display: flex;
   gap: 12px;
   align-items: center;
-  font-size: 14px;
+  font-size: 16px;
   border-left: 2px solid transparent;
   border-radius: 0 5px 5px 0;
 }
@@ -691,7 +694,7 @@
   gap: 18px;
 }
 .catalog-view .studio-component-card h3 {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
 }
 .catalog-view .component-card-copy {
@@ -822,12 +825,12 @@
 }
 .catalog-adjustments p {
   color: var(--muted);
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.9;
   margin: 8px 0;
 }
 .catalog-component-dialog .catalog-preview-content > .sb-text {
-  font-size: 16px;
+  font-size: 18px;
 }
 .catalog-component-dialog .catalog-preview-content > .sb-text .sb-rich-text {
   font-size: inherit;

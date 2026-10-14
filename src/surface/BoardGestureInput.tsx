@@ -10,12 +10,14 @@ type Point = { x: number; y: number };
 /** Common stroke eraser and freeform selection for every Board renderer. */
 export function BoardGestureInput({
   tool,
+  size,
   board,
   world,
   onDelete,
   onExit,
 }: {
   tool: "eraser" | "lasso";
+  size: number;
   board: BoardInteraction;
   world: React.RefObject<HTMLDivElement | null>;
   onDelete: (ids: string[]) => void;
@@ -23,6 +25,7 @@ export function BoardGestureInput({
 }) {
   const t = useTranslator(messages),
     [preview, setPreview] = useState<Point[]>([]);
+  const [cursor, setCursor] = useState<Point | null>(null);
   const svg = useRef<SVGSVGElement>(null);
   const local = (p: Point) => {
     const m = svg.current?.getScreenCTM();
@@ -61,7 +64,7 @@ export function BoardGestureInput({
     };
   }, []);
   const erase = (p: Point) => {
-    const hit = board.hitTest(p.x, p.y);
+    const hit = board.hitTest(p.x, p.y, false, size / 2);
     const value = gesture.current;
     if (
       value &&
@@ -166,6 +169,7 @@ export function BoardGestureInput({
         else setPreview([p]);
       }}
       onPointerMove={(e) => {
+        if (tool === "eraser") setCursor({ x: e.clientX, y: e.clientY });
         if (gesture.current?.id === e.pointerId) {
           e.preventDefault();
           add({ x: e.clientX, y: e.clientY });
@@ -179,6 +183,9 @@ export function BoardGestureInput({
       }}
       onPointerCancel={cancel}
       onLostPointerCapture={cancel}
+      onPointerLeave={() => {
+        if (!gesture.current) setCursor(null);
+      }}
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.preventDefault();
@@ -188,6 +195,14 @@ export function BoardGestureInput({
         }
       }}
     >
+      {tool === "eraser" && cursor && (
+        <circle
+          className="board-eraser-cursor"
+          cx={local(cursor).x}
+          cy={local(cursor).y}
+          r={size / 2}
+        />
+      )}
       {preview.length > 1 && (
         <path
           d={

@@ -4,22 +4,27 @@ import type { BoardTool, DrawingStyle } from "./types";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";
 import { useToolbarDock } from "./DockableBoardToolbar";
+import { BoardColorPicker } from "./BoardColorPicker";
 
 function StrokeWidthSlider({
   width,
   label,
   onChange,
+  min = 0.5,
+  max = 12,
 }: {
   width: number | undefined;
   label: string;
   onChange: (patch: Partial<DrawingStyle>) => void;
+  min?: number;
+  max?: number;
 }) {
   const t = useTranslator(messages);
   const dock = useToolbarDock();
   const vertical = dock === "left" || dock === "right";
   const [active, setActive] = useState(false);
-  const current = width ?? 2.5;
-  const position = ((current - 0.5) / 39.5) * 100;
+  const current = Math.min(max, Math.max(min, width ?? 2.5));
+  const position = ((current - min) / (max - min)) * 100;
   return (
     <span className="board-stroke-slider" data-active={active || undefined}>
       <svg
@@ -38,8 +43,8 @@ function StrokeWidthSlider({
         aria-orientation={vertical ? "vertical" : "horizontal"}
         aria-label={label}
         aria-valuetext={width === undefined ? t("style.mixed") : undefined}
-        min={0.5}
-        max={40}
+        min={min}
+        max={max}
         step={0.5}
         value={current}
         onPointerDown={(event) => {
@@ -78,10 +83,7 @@ export function BoardStyleControls({
   );
   if (!drawings.length && nodes.some((node) => node.attrs?.ink))
     return <span className="board-style-controls">{t("style.inkNotice")}</span>;
-  if (
-    !drawings.length &&
-    (!tool || ["region", "pan", "eraser", "lasso"].includes(tool))
-  )
+  if (!drawings.length && (!tool || ["region", "pan", "lasso"].includes(tool)))
     return null;
   const value = (key: keyof DrawingStyle) => {
     if (!drawings.length) return style[key];
@@ -107,6 +109,8 @@ export function BoardStyleControls({
   const color = value("color"),
     fill = value("fillColor"),
     width = value("strokeWidth");
+  const eraser = tool === "eraser";
+  const pressure = style.pressure !== false;
   return (
     <div
       className="board-style-controls"
@@ -114,26 +118,27 @@ export function BoardStyleControls({
       role="group"
       aria-label={drawings.length ? t("style.selection") : t("style.drawing")}
     >
-      <label title={color === undefined ? t("style.colorsDiffer") : undefined}>
-        {filled ? t("style.border") : t("style.color")}
-        <input
-          type="color"
-          aria-label={filled ? t("style.borderColor") : t("style.penColor")}
-          value={color ?? "#252629"}
-          onInput={(event) => onChange({ color: event.currentTarget.value })}
-        />
-        {color === undefined && <small>{t("style.mixed")}</small>}
-      </label>
-      {filled && (
-        <label>
+      {!eraser && (
+        <div
+          className="board-style-section"
+          title={color === undefined ? t("style.colorsDiffer") : undefined}
+        >
+          {filled ? t("style.border") : t("style.color")}
+          <BoardColorPicker
+            label={filled ? t("style.borderColor") : t("style.penColor")}
+            value={color ?? "#252629"}
+            onChange={(color) => onChange({ color })}
+          />
+          {color === undefined && <small>{t("style.mixed")}</small>}
+        </div>
+      )}
+      {!eraser && filled && (
+        <div className="board-style-section">
           {t("style.fill")}
-          <input
-            type="color"
-            aria-label={t("style.fillColor")}
+          <BoardColorPicker
+            label={t("style.fillColor")}
             value={fill && fill !== "none" ? fill : "#ffffff"}
-            onInput={(event) =>
-              onChange({ fillColor: event.currentTarget.value })
-            }
+            onChange={(fillColor) => onChange({ fillColor })}
           />
           <button
             type="button"
@@ -145,17 +150,69 @@ export function BoardStyleControls({
             {t("style.none")}
           </button>
           {fill === undefined && <small>{t("style.mixed")}</small>}
-        </label>
+        </div>
       )}
-      <label>
-        {t("style.weight")}
-        <StrokeWidthSlider
-          width={width}
-          label={filled ? t("style.borderWeight") : t("style.penWeight")}
-          onChange={onChange}
-        />
-        {width === undefined && <small>{t("style.mixed")}</small>}
-      </label>
+      <div className="board-style-section board-width-controls">
+        <label>
+          {t(eraser ? "style.eraserSize" : "style.weight")}
+          <StrokeWidthSlider
+            width={eraser ? style.strokeWidth : width}
+            min={eraser ? 4 : 0.5}
+            max={eraser ? 64 : tool === "highlighter" ? 20 : 12}
+            label={
+              eraser
+                ? t("style.eraserSize")
+                : filled
+                  ? t("style.borderWeight")
+                  : t("style.penWeight")
+            }
+            onChange={onChange}
+          />
+          {width === undefined && <small>{t("style.mixed")}</small>}
+        </label>
+        {(tool === "pen" || tool === "highlighter") && (
+          <div
+            className="board-pressure-options"
+            role="group"
+            aria-label={t("style.pressure")}
+          >
+            <span>{t("style.pressure")}</span>
+            <div className="board-pressure-toggle">
+              <button
+                type="button"
+                aria-label={t("style.fixedWidth")}
+                title={t("style.fixedWidth")}
+                aria-pressed={!pressure}
+                onClick={() => onChange({ pressure: false })}
+              >
+                <svg viewBox="0 0 24 20" aria-hidden="true">
+                  <path
+                    d="M3 14 C8 2 16 18 21 6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+              <button
+                type="button"
+                aria-label={t("style.pressureWidth")}
+                title={t("style.pressureWidth")}
+                aria-pressed={pressure}
+                onClick={() => onChange({ pressure: true })}
+              >
+                <svg viewBox="0 0 24 20" aria-hidden="true">
+                  <path
+                    d="M3 14 C7 2 13 7 17 9 C19 10 20 8 21 6 C20 13 16 16 12 11 C8 7 6 7 3 14 Z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

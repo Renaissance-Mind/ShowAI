@@ -129,6 +129,35 @@ export function readerKinds(documents) {
   for (const document of documents) visit(document.content);
   return [...kinds].filter((k) => typeof k === "string").sort();
 }
+const MATH_TEXT = /\$|\\\(|\\\[/;
+/**
+ * Optional reader capabilities a page does not need. KaTeX (code and fonts) is
+ * a third of a page reader, so it stays out unless the page has formulas or
+ * Markdown-like text that may still become one.
+ */
+export function readerOmissions(documents) {
+  let math = false;
+  const visit = (value) => {
+    if (math || value === null || value === undefined) return;
+    if (typeof value === "string") {
+      if (MATH_TEXT.test(value)) math = true;
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (typeof value === "object") {
+      if (value.type === "mathInline" || value.type === "mathBlock") {
+        math = true;
+        return;
+      }
+      Object.values(value).forEach(visit);
+    }
+  };
+  for (const document of documents) visit(document.content);
+  return math ? [] : ["math"];
+}
 const removeRanges = (source, ranges) => {
   for (const { start, end } of [...ranges].sort((a, b) => b.start - a.start))
     source = source.slice(0, start) + source.slice(end);
@@ -141,6 +170,7 @@ const compilerIdentity = createHash("sha256")
       compileReader.toString(),
       removeRanges.toString(),
       readerKinds.toString(),
+      readerOmissions.toString(),
     ]),
   )
   .digest("hex");
@@ -165,21 +195,25 @@ export async function bundleReader(archivePath, documents) {
     }
   }
   const kinds = readerKinds(documents);
+  const omits = readerOmissions(documents);
   const key = createHash("sha256")
-    .update(JSON.stringify([archive.integrity, kinds, compilerIdentity]))
+    .update(JSON.stringify([archive.integrity, kinds, omits, compilerIdentity]))
     .digest("hex");
   if (cache.has(key)) return cache.get(key);
   const job = archive.vendorIntegrity
-    ? persistentReader(key, () => compileReader(archivePath, archive, kinds))
-    : compileReader(archivePath, archive, kinds);
+    ? persistentReader(key, () =>
+        compileReader(archivePath, archive, kinds, omits),
+      )
+    : compileReader(archivePath, archive, kinds, omits);
   cache.set(key, job);
   if (cache.size > 16) cache.delete(cache.keys().next().value);
   job.catch(() => cache.delete(key));
   return job;
 }
 
-async function compileReader(archivePath, archive, kinds) {
+async function compileReader(archivePath, archive, kinds, omits = []) {
   const selected = new Set(kinds);
+  const omitMath = omits.includes("math");
   const catalogKinds = (name) =>
     JSON.parse(archive.files[`resources/catalog/${name}.json`]).map(
       (item) => item.kind,
@@ -238,6 +272,18 @@ async function compileReader(archivePath, archive, kinds) {
   const plugin = {
     name: "showai-page-reader",
     setup(builder) {
+      if (omitMath) {
+        // Never reached without formulas; the stub keeps text visible if it is.
+        builder.onResolve({ filter: /^katex(?:\/.*)?$/ }, () => ({
+          path: "katex",
+          namespace: "reader-omitted",
+        }));
+        builder.onLoad({ filter: /.*/, namespace: "reader-omitted" }, () => ({
+          contents:
+            "export default { renderToString: (source) => String(source).replace(/[&<>\"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' })[c]) };",
+          loader: "js",
+        }));
+      }
       builder.onResolve({ filter: /^showai-reader-entry$/ }, () => ({
         path: "src/portable/main.tsx",
         namespace: "reader",
@@ -275,6 +321,15 @@ async function compileReader(archivePath, archive, kinds) {
         () => ({ contents: vendorCore, loader: "js" }),
       );
       builder.onLoad({ filter: /.*/, namespace: "reader" }, (args) => {
+        if (omitMath && args.path === "src/components/blocks/katex.css")
+          return { contents: "", loader: "css" };
+        // Readers never edit: rich text renders through its static view, so
+        // the lazily loaded ProseMirror editor would only add weight.
+        if (args.path === "src/components/rich-text/RichTextEditor.tsx")
+          return {
+            contents: "export default function RichTextEditor() { return null; }",
+            loader: "tsx",
+          };
         let source = archive.files[args.path];
         if (args.path === "src/components/blocks/registry.ts")
           source = removeRanges(
@@ -395,5 +450,5 @@ async function compileReader(archivePath, archive, kinds) {
     .replaceAll('"', "&quot;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ShowAI document</title><meta name="showai-reader-kinds" content="${kindAttribute}"><script type="module">${escaped}</script><style>${css.replace(/<\/style/gi, "<\\/style")}</style></head><body><div id="root"></div><script id="showai-data" type="application/json">null</script></body></html>`;
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ShowAI document</title><meta name="showai-reader-kinds" content="${kindAttribute}">${omits.length ? `<meta name="showai-reader-omits" content="${omits.join(" ")}">` : ""}<script type="module">${escaped}</script><style>${css.replace(/<\/style/gi, "<\\/style")}</style></head><body><div id="root"></div><script id="showai-data" type="application/json">null</script></body></html>`;
 }

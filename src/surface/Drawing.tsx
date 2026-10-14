@@ -6,6 +6,7 @@ import {
   snapCreation,
 } from "./drawing-geometry.mjs";
 import { finishBoardDrawing } from "./board-drawing.mjs";
+import { pressureOutline } from "./pressure-stroke";
 import { fingerNavigatesBoard } from "./board-input.mjs";
 import { flushSync } from "react-dom";
 import { ObjectContext } from "./SurfaceObject";
@@ -22,7 +23,7 @@ import type { Camera } from "./model";
 import "./native-ink.css";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";
-type Point = { x: number; y: number };
+type Point = { x: number; y: number; pressure?: number };
 export function Drawing({
   node,
   frame,
@@ -137,6 +138,14 @@ export function Drawing({
                 />
               )}
             </>
+          ) : node.attrs!.pressure !== false &&
+            (tool === "pen" || tool === "highlighter") &&
+            points.some((p) => p.pressure !== undefined) ? (
+            <path
+              d={pressureOutline(points, strokeWidth)}
+              fill={color}
+              stroke="none"
+            />
           ) : tool === "rectangle" ? (
             <rect
               x={Math.min(first.x, last.x)}
@@ -289,6 +298,7 @@ export function DrawingInput({
   color,
   fillColor = "none",
   strokeWidth = 2.5,
+  pressure = true,
   camera,
   panHeld,
   ruler = false,
@@ -302,6 +312,7 @@ export function DrawingInput({
   color: string;
   fillColor?: string;
   strokeWidth?: number;
+  pressure?: boolean;
   camera: { current: Camera };
   panHeld: { current: boolean };
   ruler?: boolean;
@@ -337,8 +348,24 @@ export function DrawingInput({
     if (id !== undefined && surface.current?.hasPointerCapture(id))
       surface.current.releasePointerCapture(id);
   };
-  const latest = useRef({ tool, color, fillColor, strokeWidth, point, onDraw });
-  latest.current = { tool, color, fillColor, strokeWidth, point, onDraw };
+  const latest = useRef({
+    tool,
+    color,
+    fillColor,
+    strokeWidth,
+    pressure,
+    point,
+    onDraw,
+  });
+  latest.current = {
+    tool,
+    color,
+    fillColor,
+    strokeWidth,
+    pressure,
+    point,
+    onDraw,
+  };
   const scaleNow = () =>
     camera.current.scale *
     (surface.current!.getBoundingClientRect().width /
@@ -346,10 +373,11 @@ export function DrawingInput({
   const finish = (release?: Point, modifiers?: Modifiers) => {
     const current = pending.current;
     if (!current) return;
-    const { tool, color, fillColor, strokeWidth, onDraw } = latest.current;
+    const { tool, color, fillColor, strokeWidth, pressure, onDraw } =
+      latest.current;
     const result = finishBoardDrawing(
       tool,
-      { color, fillColor, strokeWidth },
+      { color, fillColor, strokeWidth, pressure },
       {
         ...current,
         release: release ?? current.cursor,
@@ -429,6 +457,11 @@ export function DrawingInput({
     for (const sample of samples) {
       const next = point(sample.clientX, sample.clientY),
         last = current.points.at(-1)!;
+      if (freehand)
+        next.pressure =
+          sample.pointerType === "pen" && sample.pressure > 0
+            ? sample.pressure
+            : 1;
       current.cursor = next;
       current.moved ||=
         Math.hypot(next.x - current.origin.x, next.y - current.origin.y) *
@@ -462,6 +495,7 @@ export function DrawingInput({
             color,
             fillColor,
             strokeWidth,
+            pressure,
             extent: [1, 1],
           },
         }
@@ -483,6 +517,11 @@ export function DrawingInput({
         event.currentTarget.focus({ preventScroll: true });
         event.currentTarget.setPointerCapture(event.pointerId);
         const start = point(event.clientX, event.clientY);
+        if (freehand)
+          start.pressure =
+            event.pointerType === "pen" && event.pressure > 0
+              ? event.pressure
+              : 1;
         pending.current = {
           id: event.pointerId,
           points: [start],
@@ -501,7 +540,11 @@ export function DrawingInput({
         if (!current || current.id !== event.pointerId) return;
         event.preventDefault();
         event.stopPropagation();
-        finish(point(event.clientX, event.clientY), modifiersOf(event));
+        const release = point(event.clientX, event.clientY);
+        if (freehand)
+          release.pressure =
+            current.cursor.pressure ?? current.points.at(-1)?.pressure ?? 1;
+        finish(release, modifiersOf(event));
         if (tool === "arrow") onTarget?.(NaN, NaN);
       }}
       onPointerCancel={(event) => {

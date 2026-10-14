@@ -79,6 +79,7 @@ import type {
   TemplateMetadata,
   TemplateRecord,
   CatalogReadOptions,
+  ComponentSource,
 } from "../components/custom/types";
 import { PageWorkspace } from "./PageWorkspace";
 import {
@@ -129,7 +130,6 @@ import {
 import TemplateThumbnail from "./TemplateThumbnail";
 import RecentPages, { recentPages } from "./RecentPages";
 import AutoHideSidebar from "./AutoHideSidebar";
-import SaveState from "./SaveState";
 import WorkspaceTabs, { WorkspaceHistory } from "./WorkspaceTabs";
 import { useWorkspaceTabs } from "./useWorkspaceTabs";
 import {
@@ -2599,7 +2599,6 @@ export default function Studio() {
                   : null
               }
             />
-            <SaveState sessions={page.sessions} />
             <button
               className="studio-icon"
               aria-label={t("revealPageFile")}
@@ -3682,6 +3681,20 @@ export default function Studio() {
             }
             builtin={dialog.builtin}
             custom={dialog.custom}
+            loadSource={() =>
+              desktop.invoke<ComponentSource>(
+                "components:source",
+                dialog.builtin
+                  ? { scope: "builtin", id: dialog.builtin.kind }
+                  : {
+                      id: dialog.custom!.id,
+                      version: dialog.custom!.version,
+                      scope: dialog.custom!.scope,
+                      integrity: dialog.custom!.integrity,
+                      projectId: dialog.projectId,
+                    },
+              )
+            }
             canInsert={
               !!page.draft &&
               page.projectId === selectedProject &&

@@ -2,6 +2,7 @@ import type { JSONContent } from "@tiptap/core";
 import type { NodeLayout } from "./types";
 import type { Camera } from "./model";
 export interface Point {
+  pressure?: number;
   x: number;
   y: number;
 }

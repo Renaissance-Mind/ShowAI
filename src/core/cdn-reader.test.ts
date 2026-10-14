@@ -48,8 +48,8 @@ describe("CDN reader resolution", () => {
     expect(await cdnReaderUrls()).toBeUndefined();
   });
 
-  it("uses the CDN for conversation fragments and keeps files offline by default", async () => {
-    expect((await chooseReader("inline")).mode).toBe("cdn");
+  it("starts conversation fragments and files offline unless CDN loading is requested", async () => {
+    expect((await chooseReader("inline")).mode).toBe("bundled");
     expect((await chooseReader("html")).mode).toBe("bundled");
     expect((await chooseReader("html", "cdn")).mode).toBe("cdn");
     expect((await chooseReader("inline", "bundled")).mode).toBe("bundled");

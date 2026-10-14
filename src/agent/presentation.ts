@@ -22,9 +22,9 @@ import {
   getTemplate,
   instantiateTemplateRecord,
 } from "../core/catalog";
-import { toInlineFragment } from "../portable/inline.mjs";
-import { toCdnFragment, toCdnPage } from "../portable/cdn-fragment.mjs";
-import { chooseReader } from "../core/cdn-reader";
+import { toCdnPage } from "../portable/cdn-fragment.mjs";
+import { cdnReaderUrls } from "../core/cdn-reader";
+import { conversationPreview } from "../core/conversation-preview";
 import {
   serializeArtifact,
   validateDocument,
@@ -446,21 +446,16 @@ export async function renderPresentation(raw: PresentationInput) {
 }
 
 /**
- * The conversation preview: a CDN fragment that carries only the page when
- * this runtime has a CDN reader, otherwise the bundled reader fragment.
+ * The conversation preview carries its local reader when it fits the host;
+ * a published CDN reader is used only when the compressed bundle is too large.
  */
 export async function inlinePresentation(html: string): Promise<{
   inline?: string;
   inlineError?: string;
 }> {
-  const reader = await chooseReader("inline");
   try {
-    return {
-      inline:
-        reader.mode === "cdn"
-          ? toCdnFragment(html, { readerUrls: reader.urls })
-          : toInlineFragment(html),
-    };
+    const { inline } = await conversationPreview(html);
+    return { inline };
   } catch (error) {
     if (
       !(error instanceof CapacityError) ||
@@ -468,17 +463,15 @@ export async function inlinePresentation(html: string): Promise<{
     )
       throw error;
     return {
-      inlineError: `${error.message} This is the conversation host budget${reader.mode === "cdn" ? "; the CDN preview carries only page data, embedded images and custom components" : " after compression"}. The complete HTML and source are available. Select independently readable blockIds. If a single selected node still exceeds the budget, use the complete HTML delivery. Page saving and file export use separate budgets.`,
+      inlineError: `${error.message} This is the conversation host budget; bundled previews are measured after compression and CDN previews carry page data, embedded images and custom components. The complete HTML and source are available. Select independently readable blockIds. If a single selected node still exceeds the budget, use the complete HTML delivery. Page saving and file export use separate budgets.`,
     };
   }
 }
 
 /** A complete page that loads the CDN reader, or undefined without one. */
 export async function onlinePresentation(html: string) {
-  const reader = await chooseReader("inline");
-  return reader.mode === "cdn"
-    ? toCdnPage(html, { readerUrls: reader.urls })
-    : undefined;
+  const urls = await cdnReaderUrls();
+  return urls ? toCdnPage(html, { readerUrls: urls }) : undefined;
 }
 
 export async function writePresentation(

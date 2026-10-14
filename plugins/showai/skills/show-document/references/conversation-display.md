@@ -12,7 +12,9 @@
 | 文件/网页预览 | 联网阅读优先打开delivery.online；需要离线或宿主不能联网时打开delivery.html。两者都是阅读快照，不自动回写项目 |
 | 无内嵌显示 | 交付项目、Page、版本、保存/同步结果；需要时附文件链接 |
 
-运行时带有已发布的 CDN 阅读器时，delivery.inline 与 delivery.online 只携带页面数据、内嵌图片和自定义组件，阅读器与内置组件从 jsDelivr（失败时 unpkg）按需加载，体积通常只有几 KB 到几百 KB，打开时需要联网。delivery.html 始终是离线完整文件。display.onlineAvailable 为 false 时没有在线版，此时 delivery.inline 是离线打包片段，仍按上表使用；文件预览改用 delivery.html。宿主显示“无法加载 ShowAI 阅读器”说明它拦截了 jsDelivr／unpkg：该宿主不能显示 CDN 片段，也不要把完整 delivery.html 粘进回复，改为交付 delivery.html 文件或链接，并说明需要宿主放行这两个来源，或由宿主设 SHOWAI_READER_CDN=off 重新连接以取得离线片段。
+对话预览优先把本地阅读器及所需组件压缩到 delivery.inline，打开时无需下载阅读器。压缩后仍超出聊天预算且运行时有已发布 CDN 阅读器时，才使用较小的在线片段。显式 page_export 的 reader:"cdn" 也会使用在线阅读器，reader:"bundled" 强制离线打包。运行时随软件安装本地阅读器并缓存按页面依赖编译的结果；安装插件只更新连接与技能，不更新软件运行时，也不能预热对话宿主的浏览器缓存。
+
+delivery.online 是另行提供的在线完整页，阅读器与内置组件从 jsDelivr／unpkg 按需加载；delivery.html 始终是离线完整文件。display.onlineAvailable 只表示是否有在线版，不能据此判断 inline 是否联网。CDN 加载在首个来源等待 1.5 秒后启动备用来源，先完成者挂载，15 秒仍未完成则显示错误。加载错误可能来自网络、宿主策略或阅读器异常；没有控制台证据时不直接断言 CDN 被拦截。必要时交付 delivery.html 文件或链接，不把完整 HTML 粘进对话，也不通过插件重装声称已经修复运行时。
 
 Codex当前引用契约：
 

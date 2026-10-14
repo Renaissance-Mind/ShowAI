@@ -121,8 +121,9 @@
   user-select: none;
 }
 .surface-object[data-erasing="true"] {
-  opacity: 0 !important;
+  opacity: 0.35 !important;
 }
+.board-eraser-cursor { fill: #64748b18; stroke: #64748b; stroke-width: 1; pointer-events: none; }
 .surface-object-content {
   padding: 18px 28px 26px;
   min-width: 0;
@@ -193,7 +194,7 @@
 }
 .surface-toolbar {
   position: absolute;
-  z-index: 20;
+  z-index: 80;
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);

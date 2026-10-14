@@ -1,6 +1,6 @@
 # ShowAI Cloud
 
-The official server base URL is **https://showai.renaissancemind.ai/cloud**. Enter this address in **Settings → Servers and synchronization → Add server account**. The base URL includes `/cloud` and excludes `/api`.
+The official server base URL is **https://showai.renaissancemind.ai/cloud**. Enter this address in **Settings → Server & sync → Server accounts → Add server account**. Without a registration key, ask a project admin for an invite link and paste it under **Project sync → Join a shared project**; registering through an invite needs no key. The base URL includes `/cloud` and excludes `/api`.
 
 ## Accounts and bound services
 
@@ -8,17 +8,17 @@ Sign in with an existing Token or account/password. Private servers can register
 
 After GitHub or Google authorization, the browser shows a one-time completion code and an **Open in ShowAI** link. The server resolves the account only after the ShowAI window that started the login returns that code, so a forwarded authorization link cannot sign in another person's account.
 
-To add or remove GitHub, Google or email login on an existing account, open **Account and devices** for that server. Adding or removing a login method and creating a personal Token require a direct sign-in to that server within the last 15 minutes; sessions restored through a bound server cannot do this. Complete verification and, for GitHub or Google, confirm the account binding in the browser and enter the completion code in ShowAI. Subsequent sign-ins use the same account and retain its projects and server bindings. Accounts created through a provider keep at least one login method.
+To add or remove GitHub, Google or email login on an existing account, open **Account & devices** on that server's card. Adding or removing a login method and creating a personal Token require a direct sign-in to that server within the last 15 minutes; sessions restored through a bound server cannot do this. Complete verification and, for GitHub or Google, confirm the account binding in the browser and enter the completion code in ShowAI. Subsequent sign-ins use the same account and retain its projects and server bindings. Accounts created through a provider keep at least one login method.
 
-Sign in to each service once, then select the accounts in **Account bindings**. A new device can subsequently sign in to any member and restore the other bound services. Each service issues its own expiring device session from a short-lived, signed authorization; original login Tokens are not distributed between servers. Inspect or revoke sessions in **Account and devices**. **Sign out all devices** also signs out the bound servers this device is connected to and lists any it could not reach. Removing a connection ends its server session. Bound servers never restore an account that was signed out or revoked; only naturally expired sessions are restored. Personal Tokens expire after one year; normal and restored device sessions expire after 30 days.
+Sign in to each service once, then link them under **Account linking**. A new device can subsequently sign in to any member and restore the other bound services. Each service issues its own expiring device session from a short-lived, signed authorization; original login Tokens are not distributed between servers. Inspect or revoke sessions in **Account & devices**. **Sign out all devices** also signs out the bound servers this device is connected to and lists any it could not reach. Removing a connection ends its server session. Bound servers never restore an account that was signed out or revoked; only naturally expired sessions are restored. Personal Tokens expire after one year; normal and restored device sessions expire after 30 days.
 
 Binding grants access to the selected accounts, including their projects and model resources. Bind only services you trust to hold this authority. Unbinding revokes device sessions issued through that peer. Offline services retain a pending revocation until they are reachable and authorized again; revocation is complete only after every target confirms it.
 
 ## Projects and model resources
 
-Add remote projects from the server project list, or connect an existing local project through its storage/synchronization settings. Administrators manage editor/viewer permissions and invitations in the project panel. Local copies support offline editing and resume synchronization after authentication and network recovery.
+Add remote projects from **Projects on server** on an account card, or expand a local project under **Project sync** and choose **Upload to server**. Administrators manage editor/viewer permissions and invitations under **Members & invites**. Local copies support offline editing and resume synchronization after authentication and network recovery.
 
-**Projects shown on this device** controls the local navigation and recent-page list independently on each device. Hiding a project retains its content and server membership.
+The **Show on this device** switch in an expanded project controls the local navigation and recent-page list independently on each device. Hiding a project retains its content and server membership.
 
 In **Settings → Agent**, retrieve server model resources. Each API Key or ChatGPT authorization shows its source server and account. Select a resource to use it, or save an existing local source to a chosen server. The source server encrypts the credential and supplies it to authenticated devices when needed. ChatGPT refresh remains owned by that source server. An unavailable source is reported explicitly; credentials are not replicated across the bound group.
 

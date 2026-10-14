@@ -9,13 +9,26 @@ import { createServer } from "node:http";
  */
 export async function startCdnHost(outdir: string) {
   const pages = new Map<string, string>();
+  const delayed = new Map<ReturnType<typeof setTimeout>, () => void>();
   const server = createServer(async (request, response) => {
-    const path = new URL(request.url!, "http://host").pathname;
+    const url = new URL(request.url!, "http://host");
+    const path = url.pathname;
     if (pages.has(path)) {
       response.setHeader("Content-Type", "text/html; charset=utf-8");
       return response.end(pages.get(path));
     }
     try {
+      const delay = Number(url.searchParams.get("delay") ?? 0);
+      if (!Number.isInteger(delay) || delay < 0 || delay > 30_000)
+        throw new Error("Invalid test response delay");
+      if (delay)
+        await new Promise<void>((done) => {
+          const timer = setTimeout(() => {
+            delayed.delete(timer);
+            done();
+          }, delay);
+          delayed.set(timer, done);
+        });
       const file = normalize(join(outdir, path));
       if (!file.startsWith(outdir)) throw new Error("outside");
       response.setHeader("Content-Type", "text/javascript");
@@ -49,6 +62,13 @@ export async function startCdnHost(outdir: string) {
       pages.set(path, html);
       return `${origin}${path}`;
     },
-    close: () => new Promise((done) => server.close(done)),
+    close: () => {
+      for (const [timer, done] of delayed) {
+        clearTimeout(timer);
+        done();
+      }
+      delayed.clear();
+      return new Promise((done) => server.close(done));
+    },
   };
 }

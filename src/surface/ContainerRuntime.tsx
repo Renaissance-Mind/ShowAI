@@ -932,8 +932,9 @@ function ContainerView({
     pen: { color: "#252629", fillColor: "none", strokeWidth: 2.5 },
     highlighter: { color: "#facc15", fillColor: "none", strokeWidth: 16 },
     shape: { color: "#252629", fillColor: "none", strokeWidth: 2.5 },
+    eraser: { color: "#252629", fillColor: "none", strokeWidth: 24 },
   });
-  const styleKey = tool === "pen" || tool === "highlighter" ? tool : "shape";
+  const styleKey = tool === "pen" || tool === "highlighter" || tool === "eraser" ? tool : "shape";
   const drawingTool =
     !!tool && !["pan", "eraser", "lasso", "text"].includes(tool);
   const style = styles[styleKey];
@@ -1334,6 +1335,7 @@ function ContainerView({
           drawColor={style.color}
           drawFillColor={style.fillColor}
           drawStrokeWidth={style.strokeWidth}
+          drawPressure={style.pressure !== false}
           onStyleChange={(ids, patch) => {
             const drawings = ids.filter(
               (nodeId) =>
@@ -1341,7 +1343,7 @@ function ContainerView({
                 "drawing",
             );
             // With a tool active, style changes set up the next drawing only.
-            if (drawingTool || !drawings.length) {
+            if (drawingTool || tool === "eraser" || !drawings.length) {
               setStyles((before) => ({
                 ...before,
                 [styleKey]: { ...before[styleKey], ...patch },

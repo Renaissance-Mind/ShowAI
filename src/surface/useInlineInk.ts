@@ -3,6 +3,7 @@ import type { RefObject } from "react";
 import type { ShowDocument } from "../types";
 import { findSurfaceNode } from "./document.mjs";
 import { inkNodes } from "./inline-ink";
+import type { InkCommand } from "./inline-ink";
 import type { Camera } from "./model";
 
 /** WebKit's SVG screen matrix omits ancestor CSS scales. Read the CSS basis
@@ -59,10 +60,12 @@ export function useInlineInk({
   tool,
   color,
   width,
+  pressure,
   ruler,
   enabled,
   onCamera,
   onTool,
+  onShapeGesture,
 }: {
   root: RefObject<HTMLDivElement | null>;
   world: RefObject<HTMLDivElement | null>;
@@ -72,6 +75,7 @@ export function useInlineInk({
   tool: string | null | undefined;
   color: string;
   width: number;
+  pressure: boolean;
   ruler: boolean;
   enabled: boolean;
   onCamera: (
@@ -79,14 +83,17 @@ export function useInlineInk({
     final: boolean,
   ) => void;
   onTool: (tool: string) => void;
+  onShapeGesture: (value: NonNullable<InkCommand["shapeGesture"]>) => void;
 }) {
   const current = useRef({
     source,
     color,
     width,
+    pressure,
     ruler,
     onCamera,
     onTool,
+    onShapeGesture,
     tool,
   });
   const cameraRevision = useRef(0),
@@ -94,12 +101,24 @@ export function useInlineInk({
   const invalidate = useRef<(() => void) | null>(null);
   const navigating = useRef(false);
   if (tool === "pen" || tool === "highlighter") previousInk.current = tool;
-  current.current = { source, color, width, ruler, onCamera, onTool, tool };
+  current.current = {
+    source,
+    color,
+    width,
+    pressure,
+    ruler,
+    onCamera,
+    onTool,
+    onShapeGesture,
+    tool,
+  };
   useEffect(() => {
     const bridge = window.showai?.inlineInk;
     if (!bridge || !enabled || !source) return;
     return bridge.onCommand((value) => {
       if (value.pageId !== source.id || value.boardId !== boardId) return;
+      if (value.shapeGesture)
+        current.current.onShapeGesture(value.shapeGesture);
       if (value.camera) {
         navigating.current = !!value.navigating;
         cameraRevision.current = value.cameraVersion ?? cameraRevision.current;
@@ -120,7 +139,7 @@ export function useInlineInk({
   }, [enabled, source?.id, boardId]);
   useEffect(() => {
     invalidate.current?.();
-  }, [source, color, width, ruler]);
+  }, [source, color, width, pressure, ruler]);
   useEffect(() => {
     const bridge = window.showai?.inlineInk;
     if (
@@ -208,7 +227,6 @@ export function useInlineInk({
       ]
         .filter(
           (element) =>
-            !content.contains(element) &&
             element.getClientRects().length &&
             getComputedStyle(element).pointerEvents !== "none" &&
             getComputedStyle(element).visibility !== "hidden",
@@ -224,6 +242,7 @@ export function useInlineInk({
         tool: tool as "pen" | "highlighter",
         color: current.current.color,
         width: current.current.width,
+        pressure: current.current.pressure,
         ruler: current.current.ruler,
         dark: document.documentElement.dataset.theme === "dark",
         widthPx: surface.clientWidth,
@@ -245,6 +264,7 @@ export function useInlineInk({
           .map((element) => {
             const r = element.getBoundingClientRect();
             return {
+              id: element.dataset.surfaceId!,
               x: r.x - 8,
               y: r.y - 8,
               width: r.width + 16,

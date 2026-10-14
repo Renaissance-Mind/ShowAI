@@ -7,7 +7,7 @@ import {
   findViewerTemplate,
   readerFileExists,
 } from "./reader-template";
-import { readerKinds } from "../portable/reader-bundle.mjs";
+import { readerKinds, readerOmissions } from "../portable/reader-bundle.mjs";
 import { CoreError } from "./model";
 import type { ShowDocument } from "../types";
 import type { FileChanges } from "./history-model";
@@ -27,6 +27,8 @@ export interface ReaderManifest {
   appVersion: string;
   sourceArchiveHash: string | null;
   kinds: string[];
+  /** Optional capabilities left out of this reader; absent on older full readers. */
+  omits?: string[];
 }
 type Read = (path: string) => Promise<Buffer>;
 const hash = (bytes: Buffer | string) =>
@@ -92,7 +94,8 @@ export async function captureReader(
   // Dependencies are frozen in the emitted HTML; even a prebuilt viewer is fingerprinted.
   const fullHash = sourceArchiveHash ?? hash(await readFile(viewer));
   const kinds = readerKinds([document]),
-    key = JSON.stringify([fullHash, kinds, appVersion]);
+    omits = readerOmissions([document]),
+    key = JSON.stringify([fullHash, kinds, omits, appVersion]);
   let job = prepared.get(key);
   if (!job) {
     job = (async () => {
@@ -106,6 +109,7 @@ export async function captureReader(
         appVersion,
         sourceArchiveHash,
         kinds,
+        ...(omits.length ? { omits } : {}),
       };
       const integrity = hash(JSON.stringify(payload)),
         manifest: ReaderManifest = { ...payload, integrity };
@@ -164,7 +168,10 @@ export async function readArchivedReader(pagePath: string, read: Read) {
     manifest.htmlHash !== hash(htmlBytes) ||
     manifest.htmlBytes !== htmlBytes.length ||
     !Array.isArray(manifest.kinds) ||
-    manifest.kinds.some((kind) => typeof kind !== "string")
+    manifest.kinds.some((kind) => typeof kind !== "string") ||
+    (manifest.omits !== undefined &&
+      (!Array.isArray(manifest.omits) ||
+        manifest.omits.some((item) => typeof item !== "string")))
   )
     throw new CoreError(
       "INVALID_DATA",
@@ -207,14 +214,16 @@ export async function completePageReaders(changes: FileChanges, read: Read) {
           );
         return staged ?? read(path);
       });
+      const needed = readerOmissions([artifact.document]);
       if (
         readerKinds([artifact.document]).some(
           (kind) => !reader.manifest.kinds.includes(kind),
-        )
+        ) ||
+        (reader.manifest.omits ?? []).some((item) => !needed.includes(item))
       )
         throw new CoreError(
           "INVALID_DATA",
-          "The selected archived reader does not contain every page component kind.",
+          "The selected archived reader does not contain every page component kind or capability.",
         );
     } else await stageReader(changes, pagePath, artifact.document);
   }

@@ -134,6 +134,7 @@ interface Props {
   drawColor?: string;
   drawFillColor?: string;
   drawStrokeWidth?: number;
+  drawPressure?: boolean;
   onStyleChange?: (ids: string[], patch: Partial<DrawingStyle>) => void;
   onAddComponent?: (
     kind: string,
@@ -254,6 +255,7 @@ export default function PageSurface({
   drawColor = "#252629",
   drawFillColor = "none",
   drawStrokeWidth = 2.5,
+  drawPressure = true,
   onStyleChange,
   onAddComponent,
   onOpenComponents,
@@ -306,9 +308,32 @@ export default function PageSurface({
     tool: drawTool,
     color: drawColor,
     width: drawStrokeWidth,
+    pressure: drawPressure,
     ruler,
     enabled: enabled && !locked && !!onDraw && !printing,
     onCamera: (value, final) => controls.current.navigateTo(value, final),
+    onShapeGesture: (value) => {
+      const point = {
+        clientX: value.x,
+        clientY: value.y,
+        altKey: false,
+        shiftKey: false,
+      };
+      if (value.phase === "began") {
+        board.select(value.id);
+        if (board.start(value.id, "move", point))
+          controls.current.objectGesture(true);
+      } else if (value.phase === "cancelled") {
+        board.cancel();
+        controls.current.objectGesture(false);
+      } else {
+        board.update(point);
+        if (value.phase === "ended") {
+          board.finish();
+          controls.current.objectGesture(false);
+        }
+      }
+    },
     onTool: (value) => {
       if (value === "settings") {
         if (writingSettings.current) writingSettings.current.open = true;
@@ -477,6 +502,7 @@ export default function PageSurface({
     wasSelected: boolean;
     additive: boolean;
     preserveSelection: boolean;
+    touch: boolean;
     /** A click on the selected text object starts editing at the pointer. */
     enterEdit: HTMLElement | null;
     /** A click inside a multi-selection narrows it to the object under the pointer. */
@@ -608,8 +634,11 @@ export default function PageSurface({
       clearHover();
     };
     window.addEventListener("blur", cancel);
+    const root = rootRef.current;
+    root?.addEventListener("showai-board-pinch", cancel);
     return () => {
       window.removeEventListener("blur", cancel);
+      root?.removeEventListener("showai-board-pinch", cancel);
       cancel();
     };
   }, []);
@@ -1118,6 +1147,13 @@ export default function PageSurface({
         onPointerDownCapture={(event) => {
           const target = event.target as Element;
           if (target.closest(".page-surface") !== event.currentTarget) return;
+          if (
+            target.closest("[data-surface-ui]") &&
+            !target.closest(
+              ".board-resize-handle,.surface-object-rotate,.board-arrow-endpoint",
+            )
+          )
+            return;
           // Secondary contacts belong to the viewport's two-finger gesture.
           if (event.pointerType === "touch" && !event.isPrimary) return;
           const hit = board.hitTest(event.clientX, event.clientY);
@@ -1125,12 +1161,14 @@ export default function PageSurface({
             ? hit!.id
             : target.closest<HTMLElement>('[data-board-shape="true"]')?.dataset
                 .surfaceId;
+          const fingerShape = !!shapeId && event.pointerType === "touch";
           if (
             shapeId &&
             event.pointerType === "touch" &&
             event.button === 0 &&
             onTransform &&
             !locked &&
+            !board.ids.has(shapeId) &&
             !target.closest("[data-surface-ui]")
           ) {
             event.preventDefault();
@@ -1150,11 +1188,13 @@ export default function PageSurface({
           }
           if (
             ["pan", "eraser"].includes(drawTool ?? "") &&
+            !fingerShape &&
             !target.closest("[data-surface-ui]")
           )
             return;
           if (
             fingerNavigatesBoard(event.pointerType) &&
+            !fingerShape &&
             !target.closest(
               "[data-surface-ui],button,input,textarea,select,iframe,[contenteditable=true]",
             )
@@ -1166,6 +1206,7 @@ export default function PageSurface({
           if (!target.closest("[data-surface-ui]")) setObjectMenu(null);
           if (
             boardMode === "text" &&
+            !fingerShape &&
             editable &&
             event.button === 0 &&
             !spaceHeld.current &&
@@ -1231,13 +1272,14 @@ export default function PageSurface({
             locked ||
             // Drawing tools never grab the selection; the lasso moves its own.
             (drawTool &&
+              !fingerShape &&
               !quickSelect &&
               !handle &&
               !(drawTool === "lasso" && selectionId)) ||
             event.button !== 0 ||
-            (event.pointerType === "touch" && !handle) ||
-            spaceHeld.current ||
-            panMode.current ||
+            (event.pointerType === "touch" && !handle && !fingerShape) ||
+            (spaceHeld.current && !fingerShape) ||
+            (panMode.current && !fingerShape) ||
             (!handle && target.closest("[data-surface-handle]")) ||
             (!handle && target.closest("[data-surface-ui]")) ||
             (!handle && target.closest(controlSelector))
@@ -1251,6 +1293,7 @@ export default function PageSurface({
               handle.dataset.groupTarget ??
               handle.closest<HTMLElement>("[data-surface-id]")?.dataset
                 .surfaceId;
+          else if (fingerShape) moveId = shapeId;
           else if (!forceBrush && !event.shiftKey && selectionId)
             moveId = selectionId;
           else if (quickSelect) moveId = edge?.id;
@@ -1287,7 +1330,7 @@ export default function PageSurface({
           }
           if (moveId && (!forceBrush || handle)) {
             event.preventDefault();
-            event.stopPropagation();
+            if (!fingerShape) event.stopPropagation();
             controls.current.cancel();
             cancelMarquee();
             clearHover();
@@ -1331,6 +1374,7 @@ export default function PageSurface({
               wasSelected,
               additive: event.shiftKey,
               preserveSelection: !!handle || (!!selectionId && !event.shiftKey),
+              touch: event.pointerType === "touch",
               enterEdit,
               groupClick,
               input: event,
@@ -1375,7 +1419,7 @@ export default function PageSurface({
           const pointer = pointing.current;
           if (pointer?.pointer === event.pointerId) {
             event.preventDefault();
-            event.stopPropagation();
+            if (!pointer.touch) event.stopPropagation();
             pointer.moved ||=
               Math.hypot(
                 event.clientX - pointer.x,
@@ -1458,7 +1502,7 @@ export default function PageSurface({
           const pointer = pointing.current;
           if (pointer?.pointer === event.pointerId) {
             event.preventDefault();
-            event.stopPropagation();
+            if (!pointer.touch) event.stopPropagation();
             pointing.current = null;
             stopAutoPan();
             pointer.moved ||=
@@ -1861,6 +1905,7 @@ export default function PageSurface({
               color={drawColor}
               fillColor={drawFillColor}
               strokeWidth={drawStrokeWidth}
+              pressure={drawPressure}
               camera={camera}
               point={(x, y) => controls.current.point(x, y)}
               onTarget={(x, y) => highlightTarget(x, y)}
@@ -1868,7 +1913,10 @@ export default function PageSurface({
                 // A region drawn around objects takes them in, like a frame.
                 let adopt;
                 if (node.type === "region" && containerId && boardDocument) {
-                  const index = findSurfaceNode(boardDocument, containerId)?.node;
+                  const index = findSurfaceNode(
+                    boardDocument,
+                    containerId,
+                  )?.node;
                   const siblings = (index?.content ?? [])
                     .map((child) => child.attrs?.id as string)
                     .filter((id) => id && !layoutOf(id)?.locked);
@@ -1904,6 +1952,7 @@ export default function PageSurface({
             <BoardGestureInput
               key={drawTool}
               tool={drawTool}
+              size={drawStrokeWidth}
               board={board}
               world={worldRef}
               onDelete={onDeleteSelection}
@@ -1998,10 +2047,7 @@ export default function PageSurface({
               </button>
               {board.ids.size > 1 && (
                 <details className="surface-popover-anchor board-align-menu">
-                  <summary
-                    aria-label={t("align.menu")}
-                    title={t("align.menu")}
-                  >
+                  <summary aria-label={t("align.menu")} title={t("align.menu")}>
                     <AlignStartVertical size={15} />
                   </summary>
                   <div className="board-align-options" role="group">
@@ -2336,10 +2382,16 @@ export default function PageSurface({
                     color: drawColor,
                     fillColor: drawFillColor,
                     strokeWidth: drawStrokeWidth,
+                    pressure: drawPressure,
                   }}
-                  nodes={drawingTool ? [] : selectedNodes}
+                  nodes={
+                    drawingTool || drawTool === "eraser" ? [] : selectedNodes
+                  }
                   onChange={(patch) =>
-                    onStyleChange?.(drawingTool ? [] : selectedIds, patch)
+                    onStyleChange?.(
+                      drawingTool || drawTool === "eraser" ? [] : selectedIds,
+                      patch,
+                    )
                   }
                 />
               )}

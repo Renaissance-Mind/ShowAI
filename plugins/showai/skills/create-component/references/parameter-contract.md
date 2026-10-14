@@ -17,6 +17,6 @@ usage.rules 支持以下声明，使用字段路径引用本组件数据：
 
 保存时，v2检查路径、覆盖、可选字段遗漏行为、回退值/来源样例、派生来源路径、schema、defaultData和所有例子。关系规则检查实际页面写入、组件编辑和生成的离线校验器。框架只校验已声明规则，不能自动推断所有业务关系。根据内容补齐规则，并在真实Page检查初始/空态、选择、错误、恢复、键盘、窄屏、只读与编辑边界。
 
-选用时，catalog_describe({kind:"component",id,scope,version,integrity,view:"parameters",parameterPath?})返回字段含义、约束、遗漏行为、样例和相关规则。默认20项、上限50，按nextPage继续；knownHash用于已持有的相同页。大样例会给出显式省略信息，必要时读取对应真实例子；源码只用于开发。guide给任务用法，development给修改边界，两者不代替参数参考。
+选用时，catalog_describe({kind:"component",id,scope,version,integrity,view:"parameters",parameterPath?})返回字段含义、约束、遗漏行为、样例和相关规则。默认20项、上限50，按nextPage继续；knownHash用于已持有的相同页。大样例会给出显式省略信息，必要时读取对应真实例子；实现源码用于开发，guide 返回的 authoringReference 所指制作资源用于正常组件使用。guide给任务用法，development给修改边界，两者不代替参数参考。
 
 无选择状态可在 reference/index 规则显式声明 sentinelValues，例如 index 的 [-1] 或 reference 的 [null]；字段schema也必须允许这些值，说明它们的实际意义。普通索引仍为零起始。未声明的负值、无效ID与歧义目标继续拒绝。

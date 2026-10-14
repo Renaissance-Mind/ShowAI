@@ -16,6 +16,7 @@ export interface InkFrame {
   tool: "pen" | "highlighter";
   color: string;
   width: number;
+  pressure?: boolean;
   ruler: boolean;
   dark: boolean;
   widthPx: number;
@@ -35,6 +36,12 @@ export interface InkCommand {
   navigating?: boolean;
   tool?: string;
   error?: string;
+  shapeGesture?: {
+    id: string;
+    phase: "began" | "changed" | "ended" | "cancelled";
+    x: number;
+    y: number;
+  };
 }
 export interface InlineInkBridge {
   bind(

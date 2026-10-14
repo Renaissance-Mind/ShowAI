@@ -86,7 +86,8 @@
     [data-dock="right"]
   )
   .board-tool-stack {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-height: 72px;
   width: auto;
   max-height: max(
     72px,
@@ -121,6 +122,7 @@
     [data-dock="right"]
   )
   .board-style-controls {
+  flex-shrink: 0;
   flex-direction: column;
   gap: 4px;
   border: 0;
@@ -138,6 +140,7 @@
     [data-dock="right"]
   )
   .board-writing-options {
+  flex-shrink: 0;
   flex-direction: column;
   gap: 4px;
 }
@@ -235,7 +238,10 @@
   bottom: auto;
   top: calc(100% + 12px);
 }
-.surface-toolbar.board-dockable-toolbar:is([data-dock="left"], [data-dock="right"])
+.surface-toolbar.board-dockable-toolbar:is(
+    [data-dock="left"],
+    [data-dock="right"]
+  )
   .board-align-options {
   bottom: auto;
   top: 0;
@@ -244,7 +250,8 @@
 .surface-toolbar.board-dockable-toolbar[data-dock="left"] .board-align-options {
   left: calc(100% + 12px);
 }
-.surface-toolbar.board-dockable-toolbar[data-dock="right"] .board-align-options {
+.surface-toolbar.board-dockable-toolbar[data-dock="right"]
+  .board-align-options {
   left: auto;
   right: calc(100% + 12px);
 }
@@ -252,4 +259,40 @@
   .board-toolbar-dock-preview {
     display: none;
   }
+}
+.board-dockable-toolbar:is([data-dock="left"], [data-dock="right"])
+  .board-style-section {
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+}
+.board-dockable-toolbar:is([data-dock="left"], [data-dock="right"])
+  .board-style-section
+  + .board-style-section {
+  border-inline-start: 0;
+  border-top: 1px solid var(--line, var(--border));
+  padding-inline-start: 0;
+  padding-top: 6px;
+  width: 36px;
+}
+.board-dockable-toolbar:is([data-dock="left"], [data-dock="right"]):has(
+    .board-pressure-options
+  ) {
+  --toolbar-reserve: 320px;
+}
+.board-dockable-toolbar[data-dock="top"] .board-color-menu {
+  bottom: auto;
+  top: calc(100% + 12px);
+}
+.board-dockable-toolbar[data-dock="left"] .board-color-menu {
+  bottom: auto;
+  top: 0;
+  right: auto;
+  left: calc(100% + 12px);
+}
+.board-dockable-toolbar[data-dock="right"] .board-color-menu {
+  bottom: auto;
+  top: 0;
+  left: auto;
+  right: calc(100% + 12px);
 }

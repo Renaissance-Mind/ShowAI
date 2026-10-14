@@ -16,6 +16,10 @@ import {
   upgradeDocument,
 } from "../surface/document.mjs";
 import { createHash, randomUUID } from "node:crypto";
+import {
+  componentAuthoringIndex,
+  componentAuthoringGuide,
+} from "../components/custom/authoring";
 import { createRequire } from "node:module";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import {
@@ -54,6 +58,7 @@ import { validateComponentDocumentation } from "../components/custom/documentati
 import { builtinSources, builtinExports } from "./builtin-sources";
 import { componentSandboxPolicy } from "../components/custom/sandbox-policy.mjs";
 import { diagramSourceFiles } from "../components/blocks/diagrams/templates";
+import { diagramAuthoringFiles } from "./diagram-authoring-files";
 import {
   diagramTemplates,
   type DiagramFamily,
@@ -178,7 +183,10 @@ export default function Component({ data, onChange, readOnly }) {
     files: {
       "index.tsx": source,
       ...(Object.hasOwn(diagramTemplates, kind)
-        ? diagramSourceFiles(kind as DiagramFamily)
+        ? {
+            ...diagramSourceFiles(kind as DiagramFamily),
+            ...diagramAuthoringFiles(kind as DiagramFamily),
+          }
         : {}),
     },
   };
@@ -189,6 +197,7 @@ const SOURCE_EXTENSIONS = new Set([
   ".tsx",
   ".js",
   ".jsx",
+  ".mjs",
   ".json",
   ".css",
   ".png",
@@ -204,6 +213,7 @@ const TEXT_EXTENSIONS = new Set([
   ".tsx",
   ".js",
   ".jsx",
+  ".mjs",
   ".json",
   ".css",
 ]);
@@ -1556,6 +1566,28 @@ async function compilePackage(
   const root = await realpath(directory);
   if (!files.has(manifest.entry.replace(/^\.\//, "")))
     throw new Error("The component entry does not exist inside the package.");
+  if (
+    manifest.documentation?.version === 2 &&
+    manifest.documentation.authoring
+  ) {
+    const textFiles = Object.fromEntries(
+      [...files].map(([path, value]) => [path, value.toString("utf8")]),
+    );
+    const index = componentAuthoringIndex(
+      textFiles,
+      manifest.documentation.authoring.entry,
+    );
+    for (const ref of index.guides) {
+      const guide = componentAuthoringGuide(textFiles, index, ref.id);
+      if (
+        createHash("sha256").update(guide.markdown).digest("hex") !==
+        guide.sha256
+      )
+        throw new Error(
+          `Authoring guide hash does not match: ${guide.sourcePath}`,
+        );
+    }
+  }
   const ajv = new Ajv({
     strict: true,
     allowUnionTypes: true,

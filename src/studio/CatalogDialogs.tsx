@@ -5,6 +5,7 @@ import { componentWidgetData } from "../components/custom/contract";
 import type {
   BuiltinComponentMetadata,
   CompiledComponent,
+  ComponentSource,
   RelatedPackage,
   TemplateRecord,
 } from "../components/custom/types";
@@ -224,12 +225,14 @@ export function ComponentDialog({
   canInsert,
   onInsert,
   onClose,
+  loadSource,
 }: {
   builtin?: BuiltinComponentMetadata;
   custom?: CompiledComponent;
   canInsert: boolean;
   onInsert: (kind: string, data: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
+  loadSource?: () => Promise<ComponentSource>;
 }) {
   const t = useTranslator(messages);
   const panelId = useId();
@@ -310,7 +313,10 @@ export function ComponentDialog({
         )}
       >
         {tab === "guide" && (
-          <ComponentDocumentationView documentation={item.documentation} />
+          <ComponentDocumentationView
+            documentation={item.documentation}
+            loadSource={loadSource}
+          />
         )}
         {tab === "about" && (
           <div className="catalog-preview-workspace">

@@ -512,6 +512,7 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
             "color",
             "fillColor",
             "strokeWidth",
+            "pressure",
             "extent",
             "points",
             "bindings",
