@@ -13,7 +13,7 @@ COPY scripts ./scripts
 COPY resources ./resources
 COPY public ./public
 COPY deployments/cloudflare/mcp-worker.mjs deployments/cloudflare/mcp-state-broker.mjs ./deployments/cloudflare/
-COPY vite.portable.config.ts tsconfig.json index.html portable.html ./
+COPY vite.portable.config.ts tsconfig.json index.html portable.html LICENSE ./
 # The CDN reader manifest lets oversized previews fall back to ShowAI's reader source.
 RUN npm run build:portable && npm run build:cdn && node scripts/build-cloud-mcp.mjs
 
