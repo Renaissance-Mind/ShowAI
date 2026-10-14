@@ -172,9 +172,10 @@ export function useBoardInteraction({
     const outline = document ? window.document.createElement("div") : null;
     if (!outline) return;
     outline.className = "board-group-outline";
-    const drawings = [...ids].every(
-      (id) => selectionIndex.get(id)?.node.type === "drawing",
-    );
+    const drawings = [...ids].every((id) => {
+      const node = selectionIndex.get(id)?.node;
+      return node?.type === "drawing" || !!node?.attrs?.data?.nativeInk;
+    });
     outline.dataset.drawingSelection = String(drawings);
     // Drawing selections use edge handles without surrounding their contours.
     const fixed = [...ids].some(
@@ -516,9 +517,10 @@ export function useBoardInteraction({
     selectionHit(x, y) {
       if (!currentIds.current.size) return null;
       if (
-        [...currentIds.current].every(
-          (id) => selectionIndex.get(id)?.node.type === "drawing",
-        )
+        [...currentIds.current].every((id) => {
+          const node = selectionIndex.get(id)?.node;
+          return node?.type === "drawing" || !!node?.attrs?.data?.nativeInk;
+        })
       ) {
         const hit = this.hitTest(x, y);
         return hit && currentIds.current.has(hit.id) ? hit.id : null;
