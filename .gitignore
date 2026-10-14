@@ -70,6 +70,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins-kimi/showai/README.md
 !/plugins-kimi/showai/skills/showai/SKILL.md
 !/plugins/showai/README.md
+!/plugins/dsh-showai-preview/README.md
 !/plugins/showai/skills/create-component/SKILL.md
 !/plugins/showai/skills/create-component/references/component-authoring.md
 !/plugins/showai/skills/create-template/SKILL.md
