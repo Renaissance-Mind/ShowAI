@@ -23,6 +23,6 @@ MiB 为 1,048,576 bytes。除与宿主和同步对象对齐的边界外，这些
 
 容量错误包含对象类型、实际字节与预算；CLI/MCP 返回 `CAPACITY_EXCEEDED` 及 `kind/actualBytes/limitBytes`。规范 data URI 必须是完整字符串且使用无空白的规范 base64。代码、HTML 或 Markdown 字符串中的内嵌 URL 尚未被存储提取为独立资源，会计入该字符串的结构或编译预算。
 
-正式页面先保存，再调用 `page_present`。其完整 HTML 和 source 按文件预算生成，`blockIds` 仅控制 inline。聊天超限不会降低页面保存或完整文件预算；根据真实节点 ID 选择独立可读的区域。单个选中节点仍超限时交付完整文件；当前 blockIds 仅选择节点，不提供替换素材的专用预览参数。文件自身超限时减少嵌入依赖、使用已验证的远程组件或按用户要求导出网站；不能用局部源内容覆盖完整 Page。
+正式页面先保存，再调用 `page_present`。其完整 HTML 和 source 按文件预算生成，`blockIds` 仅控制 inline。聊天超限不会降低页面保存或完整文件预算；根据真实节点 ID 选择独立可读的区域。单个选中节点仍超限时交付完整文件；当前 blockIds 仅选择节点，不提供替换素材的专用预览参数。文件自身超限时减少嵌入依赖；明确导出文件时可用 `page_export` 的 `reader:"cdn"` 写出从 CDN 加载阅读器的在线页（打开需联网），或 `components:"remote"`（需要已验证的组件地址）；也可按用户要求导出网站；不能用局部源内容覆盖完整 Page。
 
 stdio 服务端同样接受 256 MiB 创作请求。客户端与宿主还可能有独立的消息缓冲预算（MCP SDK 默认 10 MiB）；返回的文本与 structuredContent 也会占用消息空间。读取大量资源时优先使用 outline、blockIds、单文件源码与完整交付路径；完整大消息需要客户端相应配置 maxBufferSize 或使用 HTTP MCP。运行时预算不代表宿主已放宽自己的消息预算。

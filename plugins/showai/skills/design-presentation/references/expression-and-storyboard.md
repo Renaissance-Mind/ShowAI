@@ -43,7 +43,7 @@
 
 ## 保存分镜
 
-在理解规划的 scenes 中，逐段记录 id、nodes（理解节点 id）、form（图形表达类型）、composition（对象、相对位置、箭头或尺度、准确标签、阅读顺序与文字落点）、visualReason（为什么这种表达能支持当前任务）、static、narrow、check。有交互时增加 interaction={trigger,change,reset}；可另记录素材来源、候选资源和缺口。
+在理解规划的 scenes 中，逐段记录 id、nodes（理解节点 id）、form（图形表达类型）、composition（对象、相对位置、箭头或尺度、准确标签、阅读顺序与文字落点）、visualReason（为什么这种表达能支持当前任务）、static、narrow、check。有交互时增加 interaction={trigger,change,reset}；可另记录素材来源、候选资源和缺口。制作完成后为每段填 blockIds（源页面中实现该段的真实节点 ID），供评审校验引用。
 
 这些字段应让另一位制作者能画出或实现同一画面。“文字＋关系图”“白底简洁”等不能单独成为 composition。正文承担精确论证时说明必要性；适合空间、变化或比较表达的关系，优先通过图形组织。首屏包含核心回答、必要范围和可理解的视觉总览，背景按需移到对应位置。不要先写完整长文再给各章附一张概括图。
 
