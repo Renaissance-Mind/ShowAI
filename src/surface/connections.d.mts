@@ -40,3 +40,8 @@ export function transformedBindings(
   bindings: ArrowBindings,
   transformedIds: Set<string>,
 ): ArrowBindings;
+export function connectionAnchor(
+  frame: NodeLayout,
+  point: { x: number; y: number },
+  snap?: number,
+): { x: number; y: number };

@@ -12,5 +12,10 @@ export function finishBoardDrawing(
     moved: boolean;
     snap?: SnapIndex;
   },
-  modifiers?: { shiftKey?: boolean; altKey?: boolean },
+  modifiers?: {
+    shiftKey?: boolean;
+    altKey?: boolean;
+    ctrlKey?: boolean;
+    metaKey?: boolean;
+  },
 ): { node: JSONContent; frame: NodeLayout };

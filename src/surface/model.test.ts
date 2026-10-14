@@ -47,7 +47,7 @@ describe("shared camera coordinates", () => {
   it("keeps the world point under the zoom anchor and clamps the scale", () => {
     const camera = { x: -270, y: -830, scale: 0.7 };
     const anchor = { x: 320, y: 200 };
-    for (const scale of [0.01, 0.5, 1, 5]) {
+    for (const scale of [0.01, 0.5, 1, 9]) {
       const next = zoomAt(camera, anchor, scale);
       expect((anchor.x - next.x) / next.scale).toBeCloseTo(
         (anchor.x - camera.x) / camera.scale,
@@ -55,8 +55,8 @@ describe("shared camera coordinates", () => {
       expect((anchor.y - next.y) / next.scale).toBeCloseTo(
         (anchor.y - camera.y) / camera.scale,
       );
-      expect(next.scale).toBeGreaterThanOrEqual(0.25);
-      expect(next.scale).toBeLessThanOrEqual(2);
+      expect(next.scale).toBeGreaterThanOrEqual(0.1);
+      expect(next.scale).toBeLessThanOrEqual(4);
     }
   });
 });

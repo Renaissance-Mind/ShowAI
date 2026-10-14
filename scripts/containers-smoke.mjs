@@ -85,7 +85,9 @@ const result = {
 };
 let browser, page, application;
 try {
-  browser = await chromium.launch();
+  browser = await chromium.launch({
+    executablePath: process.env.SHOWAI_BROWSER_EXECUTABLE,
+  });
   if (desktop) {
     application = await _electron.launch({
       executablePath:

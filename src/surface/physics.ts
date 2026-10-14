@@ -52,13 +52,11 @@ export function panFrom(
   delta: { x: number; y: number },
   anchor: SurfaceAnchor | null,
 ) {
+  // Free panning tracks the input exactly; resistance only exists around a
+  // reading anchor.
   if (!anchor)
     return {
-      camera: {
-        ...origin,
-        x: origin.x + delta.x * HORIZONTAL_GAIN,
-        y: origin.y + delta.y,
-      },
+      camera: { ...origin, x: origin.x + delta.x, y: origin.y + delta.y },
       released: true,
     };
   const startY = clamp(origin.y, anchor.minY, anchor.maxY);

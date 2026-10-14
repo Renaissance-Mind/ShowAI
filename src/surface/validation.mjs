@@ -292,10 +292,13 @@ function validateResource(document) {
             "mode",
             "columns",
             "gap",
+            "locked",
           ].includes(key),
       )
     )
       throw new Error("Unsupported layout field.");
+    if (frame.locked !== undefined && frame.locked !== true)
+      throw new Error("layout.locked must be true when present.");
     if (frame.contentSize !== undefined) {
       object(frame.contentSize, "layout.contentSize");
       if (

@@ -4,8 +4,8 @@ export interface Camera {
   scale: number;
 }
 
-export const MIN_ZOOM = 0.25;
-export const MAX_ZOOM = 2;
+export const MIN_ZOOM = 0.1;
+export const MAX_ZOOM = 4;
 export const GESTURE_IDLE = 220;
 
 export function normalizedWheel(

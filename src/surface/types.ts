@@ -3,6 +3,8 @@ export type PageWidthMode = "standard" | "wide" | "full";
 export type DrawingTool =
   "pen" | "highlighter" | "rectangle" | "ellipse" | "arrow";
 export type BoardTool = DrawingTool | "region";
+/** Board modes that are not drawings: panning and placing text. */
+export type BoardMode = BoardTool | "hand" | "text";
 export interface DrawingStyle {
   color: string;
   fillColor: string;
@@ -21,6 +23,8 @@ export interface NodeLayout {
   mode?: LayoutMode;
   columns?: number;
   gap?: number;
+  /** Protects the frame from pointer moves and resizes in the editor. */
+  locked?: true;
 }
 export interface SavedView {
   id: string;

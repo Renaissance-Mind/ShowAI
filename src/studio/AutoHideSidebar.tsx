@@ -43,6 +43,8 @@ export default function AutoHideSidebar({
     "docked",
   );
   const [hovered, setHovered] = useState(false);
+  // Hiding reflows the document; never do it under an ongoing drag.
+  const [pressed, setPressed] = useState(false);
   const pointer = useRef<{ x: number; y: number } | null>(null);
   const [keyboardFocus, setKeyboardFocus] = useState(false);
   const [preferredWidth, setPreferredWidth] = useState<number | null>(() => {
@@ -102,13 +104,23 @@ export default function AutoHideSidebar({
     const exit = () => {
       pointer.current = null;
       setHovered(false);
+      setPressed(false);
     };
+    const press = (event: globalThis.PointerEvent) =>
+      event.pointerType !== "touch" && setPressed(true);
+    const release = () => setPressed(false);
     document.addEventListener("pointermove", move, true);
     document.addEventListener("pointerleave", leave);
+    document.addEventListener("pointerdown", press, true);
+    document.addEventListener("pointerup", release, true);
+    document.addEventListener("pointercancel", release, true);
     window.addEventListener("blur", exit);
     return () => {
       document.removeEventListener("pointermove", move, true);
       document.removeEventListener("pointerleave", leave);
+      document.removeEventListener("pointerdown", press, true);
+      document.removeEventListener("pointerup", release, true);
+      document.removeEventListener("pointercancel", release, true);
       window.removeEventListener("blur", exit);
     };
   }, [automatic, hidden, width]);
@@ -156,6 +168,7 @@ export default function AutoHideSidebar({
       hovered ||
       keyboardFocus ||
       interactionHeld ||
+      pressed ||
       hidden ||
       resizing
     )
@@ -174,6 +187,7 @@ export default function AutoHideSidebar({
     hovered,
     keyboardFocus,
     interactionHeld,
+    pressed,
     hidden,
     resizing,
     width,
