@@ -159,7 +159,9 @@ test("public CLI and stdio render customized content without creating a personal
   }
 }, 60_000);
 
-test("CLI prepares and activates an old library, and MCP restores an imported checkpoint with project scope and retry identity", async () => {
+// Content history and checkpoint restore were replaced by current-state
+// storage; importing and activating an old library remains supported.
+test("CLI prepares and activates an old library and the bound MCP reads it within project scope", async () => {
   const old = join(home, "legacy-import-source"),
     target = join(home, "legacy-import-target");
   await new FileStore(old).createProject({ name: "Legacy import fixture" });
@@ -200,56 +202,13 @@ test("CLI prepares and activates an old library, and MCP restores an imported ch
     target,
   );
   expect(current.revision).toBeTruthy();
+  expect(current.document.title).toBe(original.document.title);
   expect(await readFile(original.path)).toEqual(originalBytes);
-  expect((await new GitLibrary(target).history())[0].actor).toMatchObject({
-    kind: "agent",
-    harness: "codex",
-    sessionId: "import-api-session",
-  });
-  const snapshots = await local(
-    [
-      "history",
-      "imported",
-      "--project",
-      project.id,
-      "--page",
-      original.document.id,
-    ],
-    target,
-  );
-  expect(snapshots.length).toBeGreaterThan(0);
-  expect(snapshots[0].editTime).toBeNull();
-  const readSnapshot = await local(
-    [
-      "history",
-      "snapshot",
-      original.document.id,
-      "--project",
-      project.id,
-      "--import",
-      report.id,
-      "--snapshot",
-      snapshots[0].id,
-    ],
-    target,
-  );
-  expect(readSnapshot.document.title).toBe(original.document.title);
   const client = new Client({ name: "import-api-client", version: "1.0.0" });
   await client.connect(
     new StdioClientTransport({
       command: process.execPath,
-      args: [
-        cli,
-        "mcp",
-        "--home",
-        target,
-        "--project",
-        project.id,
-        "--harness",
-        "codex",
-        "--session",
-        "import-mcp-session",
-      ],
+      args: [cli, "mcp", "--home", target, "--project", project.id],
       env: Object.fromEntries(
         Object.entries(environment()).filter(
           (entry): entry is [string, string] => typeof entry[1] === "string",
@@ -260,37 +219,19 @@ test("CLI prepares and activates an old library, and MCP restores an imported ch
   const unpack = (result: unknown) =>
     JSON.parse((result as { content: { text: string }[] }).content[0].text);
   try {
-    const inputs = {
-      pageId: original.document.id,
-      importId: report.id,
-      snapshotId: snapshots[0].id,
-      baseRevision: current.revision,
-      operationId: "import-restore-retry",
-    };
-    const restored = unpack(
+    const read = unpack(
       await client.callTool({
-        name: "history_restore_imported_snapshot",
-        arguments: inputs,
+        name: "page_read",
+        arguments: {
+          projectId: project.id,
+          pageId: original.document.id,
+          response: "source",
+          rendered: false,
+        },
       }),
     );
-    expect(restored.ok).toBe(true);
-    expect(
-      unpack(
-        await client.callTool({
-          name: "history_restore_imported_snapshot",
-          arguments: inputs,
-        }),
-      ),
-    ).toEqual(restored);
-    const entries = await new GitLibrary(target).history();
-    expect(entries[0].actor).toMatchObject({
-      kind: "agent",
-      sessionId: "import-mcp-session",
-    });
-    expect(entries[0].restoredSnapshot).toEqual({
-      importId: report.id,
-      snapshotId: snapshots[0].id,
-    });
+    expect(read.ok).toBe(true);
+    expect(JSON.stringify(read.data)).toContain("旧的可恢复内容");
     const other = await local(
       ["projects", "create", "--name", "Foreign project"],
       target,
@@ -302,12 +243,8 @@ test("CLI prepares and activates an old library, and MCP restores an imported ch
     expect(
       unpack(
         await client.callTool({
-          name: "history_imported_page",
-          arguments: {
-            pageId: foreign.document.id,
-            importId: report.id,
-            snapshotId: snapshots[0].id,
-          },
+          name: "page_read",
+          arguments: { projectId: other.id, pageId: foreign.document.id },
         }),
       ).ok,
     ).toBe(false);
@@ -1580,6 +1517,7 @@ test("progressive CLI discovery is paginated and keeps detailed content opt-in",
 });
 
 test("real catalog versions promote explicitly, fork and resolve an immutable source merge", async () => {
+  // The value-slider fixture is at 1.2.0; both revisions must be newer.
   const project = await run([
     "projects",
     "create",
@@ -1658,8 +1596,8 @@ test("real catalog versions promote explicitly, fork and resolve an immutable so
     await writeFile(path, JSON.stringify(revision));
     return run(["catalog", "save", "--project", project.id, "--input", path]);
   };
-  const ours = await makeRevision("1.2.0", 24);
-  const theirs = await makeRevision("1.3.0", 28);
+  const ours = await makeRevision("1.3.0", 24);
+  const theirs = await makeRevision("1.4.0", 28);
   const input = { base: imported.ref, ours: ours.ref, theirs: theirs.ref };
   const inputPath = join(home, "merge-input.json");
   const previewPath = join(home, "merge-candidate.json");
@@ -1691,7 +1629,7 @@ test("real catalog versions promote explicitly, fork and resolve an immutable so
   const resolutionPath = join(home, "merge-resolution.json");
   await writeFile(
     resolutionPath,
-    JSON.stringify({ ...input, version: "1.4.0", resolved }),
+    JSON.stringify({ ...input, version: "1.5.0", resolved }),
   );
   const merged = await run([
     "catalog",
@@ -1702,7 +1640,7 @@ test("real catalog versions promote explicitly, fork and resolve an immutable so
     "--input",
     resolutionPath,
   ]);
-  expect(merged).toMatchObject({ scope: "project", version: "1.4.0" });
+  expect(merged).toMatchObject({ scope: "project", version: "1.5.0" });
   const code = await run([
     "catalog",
     "describe",
@@ -1712,7 +1650,7 @@ test("real catalog versions promote explicitly, fork and resolve an immutable so
     "--scope",
     "project",
     "--version",
-    "1.4.0",
+    "1.5.0",
     "--view",
     "source",
   ]);
@@ -1726,7 +1664,7 @@ test("real catalog versions promote explicitly, fork and resolve an immutable so
     "--scope",
     "project",
     "--version",
-    "1.4.0",
+    "1.5.0",
     "--view",
     "dependencies",
   ]);
@@ -1756,7 +1694,7 @@ test("real catalog versions promote explicitly, fork and resolve an immutable so
       "--project",
       project.id,
       "--input",
-      join(home, "revision-1.2.0.json"),
+      join(home, "revision-1.3.0.json"),
       "--json",
     ],
     { env: environment() },
@@ -2188,7 +2126,15 @@ test("catalog search indexes descriptive examples while returning only summaries
   expect(runtimeOnly.items).toHaveLength(0);
   const builtin = await run(["catalog", "describe", "playground"]);
   expect(Object.keys(builtin.next).sort()).toEqual(
-    ["guide", "development", "schema", "examples", "dependencies", "source"].sort(),
+    [
+      "guide",
+      "development",
+      "parameters",
+      "schema",
+      "examples",
+      "dependencies",
+      "source",
+    ].sort(),
   );
   const unavailable = await run([
     "catalog",
@@ -2201,7 +2147,9 @@ test("catalog search indexes descriptive examples while returning only summaries
   expect(unavailable.next).toHaveProperty("source");
 });
 
-test("versioned CLI and MCP propagate identities, conditional revisions and replay completed requests", async () => {
+// Session identities were recorded in content history, which current-state
+// storage removed; conditional revisions and request replay remain.
+test("versioned CLI and MCP enforce conditional revisions and replay completed requests", async () => {
   const root = await mkdtemp(join(home, "versioned-cli-"));
   const workspace = await mkdtemp(join(home, "versioned-workspace-"));
   const library = new GitLibrary(root);
@@ -2230,7 +2178,8 @@ test("versioned CLI and MCP propagate identities, conditional revisions and repl
   const initial = await runHere(create);
   const project = (await runHere(["projects", "current"])).project;
   expect(initial.revision).toBeTruthy();
-  expect(await library.history()).toHaveLength(1);
+  // A retry before newer edits returns the original response.
+  expect(await runHere(create)).toEqual(initial);
   const operations = join(home, "versioned-edit.json");
   await writeFile(
     operations,
@@ -2251,9 +2200,11 @@ test("versioned CLI and MCP propagate identities, conditional revisions and repl
     "versioned-two",
   );
   expect(edited.revision).not.toBe(initial.revision);
-  expect(await runHere(create)).toEqual(initial);
+  // After newer edits a retry is refused instead of replaying stale content.
+  await expect(runHere(create)).rejects.toThrow(
+    "already completed before newer edits",
+  );
   expect(await runHere(["pages", "list"])).toHaveLength(1);
-  expect((await library.history())[0].actor.sessionId).toBe("versioned-two");
   const read = await runHere([
     "pages",
     "read",
@@ -2316,11 +2267,6 @@ test("versioned CLI and MCP propagate identities, conditional revisions and repl
     expect(
       unpack(await client.callTool({ name: "page_apply", arguments: input })),
     ).toEqual(saved);
-    expect((await library.history())[0]).toMatchObject({
-      actor: { kind: "agent", harness: "codex", sessionId: "mcp-versioned" },
-      channel: "mcp",
-      message: "Update title",
-    });
     expect(
       unpack(
         await client.callTool({
@@ -2337,20 +2283,22 @@ test("versioned CLI and MCP propagate identities, conditional revisions and repl
   }
 });
 
-test("versioned history/search/merge/restore are reachable from CLI and project-bound MCP", async () => {
-  const root = await mkdtemp(join(home, "history-api-"));
+// Current-state storage keeps search, storage maintenance and conflict
+// listing; page history, comparison and restore were removed.
+test("search, storage maintenance and conflicts are reachable from CLI and project-bound MCP", async () => {
+  const root = await mkdtemp(join(home, "storage-api-"));
   const local = (args: string[]) => run(args, { home: root });
   await local(["library", "init"]);
-  const project = await local(["projects", "create", "--name", "History API"]);
+  const project = await local(["projects", "create", "--name", "Storage API"]);
   const first = await local([
     "pages",
     "create",
     "--project",
     project.id,
     "--title",
-    "Historical report",
+    "Searchable report",
   ]);
-  const ops = join(home, "history-body.json");
+  const ops = join(home, "storage-body.json");
   await writeFile(
     ops,
     JSON.stringify([
@@ -2361,7 +2309,7 @@ test("versioned history/search/merge/restore are reachable from CLI and project-
       },
     ]),
   );
-  const second = await local([
+  await local([
     "pages",
     "apply",
     first.document.id,
@@ -2378,104 +2326,16 @@ test("versioned history/search/merge/restore are reachable from CLI and project-
     (await local(["search", "--query", "图表", "--project", project.id]))
       .items[0].blockId,
   ).toBe(first.document.content.content[0].content[0].attrs.id);
-  const history = await local([
-    "history",
-    "list",
-    "--project",
-    project.id,
-    "--page",
-    first.document.id,
-  ]);
-  expect(history.items).toHaveLength(2);
-  const comparison = await local([
-    "history",
-    "compare",
-    "--project",
-    project.id,
-    "--page",
-    first.document.id,
-    "--before",
-    first.revision,
-    "--after",
-    second.revision,
-  ]);
-  expect(comparison.changes.length).toBeGreaterThan(0);
-  expect(
-    (
-      await local([
-        "history",
-        "read",
-        first.document.id,
-        "--project",
-        project.id,
-        "--revision",
-        first.revision,
-      ])
-    ).document,
-  ).toEqual(first.document);
-  const html = await local([
-    "history",
-    "read",
-    first.document.id,
-    "--project",
-    project.id,
-    "--revision",
-    first.revision,
-    "--view",
-    "html",
-  ]);
-  expect(html.reader.integrity).toMatch(/^[a-f0-9]{64}$/);
-  expect(html.html).toContain("showai-data");
-  const historicOut = join(root, "historical-reader-export.html");
-  await local([
-    "export",
-    "--project",
-    project.id,
-    "--page",
-    first.document.id,
-    "--revision",
-    first.revision,
-    "--format",
-    "html",
-    "--out",
-    historicOut,
-  ]);
-  expect(await readFile(historicOut, "utf8")).toContain("Historical report");
   const stats = await local(["library", "stats"]);
   expect(stats.categories.repository.bytes).toBeGreaterThan(0);
-  const currentHead = await new GitLibrary(root).head();
   await local(["library", "compact"]);
-  expect(await new GitLibrary(root).head()).toBe(currentHead);
   const cleanPlan = await local(["library", "cleanup-plan"]);
   await local(["library", "cleanup", cleanPlan.id]);
-  const restoreArgs = [
-    "history",
-    "restore",
-    first.document.id,
-    "--project",
-    project.id,
-    "--revision",
-    first.revision,
-    "--base-revision",
-    second.revision,
-    "--operation-id",
-    "restore-history-api",
-  ];
-  const restored = await local(restoreArgs);
-  expect(await local(restoreArgs)).toEqual(restored);
   expect(
-    (
-      await local([
-        "history",
-        "list",
-        "--project",
-        project.id,
-        "--page",
-        first.document.id,
-      ])
-    ).items[0].restoredFrom,
-  ).toBe(first.revision);
-  const client = new Client({ name: "history-api-client", version: "1.0.0" });
+    (await local(["pages", "read", first.document.id, "--project", project.id]))
+      .document.content.content[0].content[0].content[0].text,
+  ).toBe("论文图表检索证据");
+  const client = new Client({ name: "storage-api-client", version: "1.0.0" });
   await client.connect(
     new StdioClientTransport({
       command: process.execPath,
@@ -2493,38 +2353,17 @@ test("versioned history/search/merge/restore are reachable from CLI and project-
     expect(
       unpack(
         await client.callTool({
-          name: "history_list",
-          arguments: { pageId: first.document.id },
-        }),
-      ).data.items,
-    ).toHaveLength(3);
-    expect(
-      unpack(
-        await client.callTool({
-          name: "history_page",
-          arguments: { pageId: first.document.id, revision: second.revision },
-        }),
-      ).data.document.content.content[0].content[0].content[0].text,
-    ).toBe("论文图表检索证据");
-    const rendered = unpack(
-      await client.callTool({
-        name: "history_html",
-        arguments: { pageId: first.document.id, revision: second.revision },
-      }),
-    ).data;
-    expect(rendered.html).toContain("论文图表检索证据");
-    expect(rendered.reader.integrity).toMatch(/^[a-f0-9]{64}$/);
-    expect(
-      unpack(
-        await client.callTool({
           name: "library_search",
-          arguments: { query: "图表" },
+          arguments: { projectId: project.id, query: "图表" },
         }),
-      ).data.items,
-    ).toEqual([]);
+      ).data.items[0].blockId,
+    ).toBe(first.document.content.content[0].content[0].attrs.id);
     expect(
       unpack(
-        await client.callTool({ name: "workspace_conflicts", arguments: {} }),
+        await client.callTool({
+          name: "workspace_conflicts",
+          arguments: { projectId: project.id },
+        }),
       ).data,
     ).toEqual([]);
   } finally {

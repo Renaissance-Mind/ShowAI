@@ -35,13 +35,14 @@ export function DockableBoardToolbar({
 }) {
   const t = useTranslator(messages);
   const preference = `showai:board-toolbar:${typeof document !== "undefined" && document.documentElement.dataset.native === "ios" ? "mobile" : "desktop"}`;
-  const [dock, setDock] = useState(() =>
-    readToolbarDock(
-      typeof localStorage === "undefined"
-        ? null
-        : localStorage.getItem(preference),
-    ),
-  );
+  const [dock, setDock] = useState(() => {
+    // Sandboxed previews (no allow-same-origin) throw on any storage access.
+    try {
+      return readToolbarDock(localStorage.getItem(preference));
+    } catch {
+      return readToolbarDock(null);
+    }
+  });
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [bounds, setBounds] = useState({ width: 0, height: 0 });
   const [point, setPoint] = useState<{
@@ -72,7 +73,11 @@ export function DockableBoardToolbar({
   const center = toolbarCenter(dock, bounds, size);
   const save = (next: ToolbarDock) => {
     setDock(next);
-    localStorage.setItem(preference, `${next.edge}:${next.position}`);
+    try {
+      localStorage.setItem(preference, `${next.edge}:${next.position}`);
+    } catch {
+      /* A personal preference; the toolbar still docks for this view. */
+    }
   };
   const localDelta = (event: PointerEvent) => {
     const start = drag.current!,

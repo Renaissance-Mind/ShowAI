@@ -493,7 +493,7 @@ describe("publication and component delivery", () => {
       await button.click();
       expect(await button.innerText()).toContain("8");
       expect(await page.locator("iframe").getAttribute("sandbox")).toBe(
-        "allow-scripts allow-forms",
+        "allow-scripts allow-forms allow-downloads",
       );
       expect(await page.locator("iframe").getAttribute("srcdoc")).toContain(
         "form-action 'none'",
