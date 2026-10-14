@@ -276,7 +276,7 @@
   width: 36px;
 }
 .board-dockable-toolbar:is([data-dock="left"], [data-dock="right"]):has(
-    .board-pressure-options
+    .board-pressure-toggle
   ) {
   --toolbar-reserve: 320px;
 }

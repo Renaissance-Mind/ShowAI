@@ -171,46 +171,31 @@ export function BoardStyleControls({
           {width === undefined && <small>{t("style.mixed")}</small>}
         </label>
         {(tool === "pen" || tool === "highlighter") && (
-          <div
-            className="board-pressure-options"
-            role="group"
+          <button
+            type="button"
+            className="board-pressure-toggle"
             aria-label={t("style.pressure")}
+            title={t(pressure ? "style.pressureWidth" : "style.fixedWidth")}
+            aria-pressed={pressure}
+            onClick={() => onChange({ pressure: !pressure })}
           >
-            <span>{t("style.pressure")}</span>
-            <div className="board-pressure-toggle">
-              <button
-                type="button"
-                aria-label={t("style.fixedWidth")}
-                title={t("style.fixedWidth")}
-                aria-pressed={!pressure}
-                onClick={() => onChange({ pressure: false })}
-              >
-                <svg viewBox="0 0 24 20" aria-hidden="true">
-                  <path
-                    d="M3 14 C8 2 16 18 21 6"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </button>
-              <button
-                type="button"
-                aria-label={t("style.pressureWidth")}
-                title={t("style.pressureWidth")}
-                aria-pressed={pressure}
-                onClick={() => onChange({ pressure: true })}
-              >
-                <svg viewBox="0 0 24 20" aria-hidden="true">
-                  <path
-                    d="M3 14 C7 2 13 7 17 9 C19 10 20 8 21 6 C20 13 16 16 12 11 C8 7 6 7 3 14 Z"
-                    fill="currentColor"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
+            <svg viewBox="0 0 24 20" aria-hidden="true">
+              {pressure ? (
+                <path
+                  d="M3 14 C7 2 13 7 17 9 C19 10 20 8 21 6 C20 13 16 16 12 11 C8 7 6 7 3 14 Z"
+                  fill="currentColor"
+                />
+              ) : (
+                <path
+                  d="M3 14 C8 2 16 18 21 6"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              )}
+            </svg>
+          </button>
         )}
       </div>
     </div>
