@@ -47,6 +47,10 @@ const ExperimentTrackerBlock = /* @__PURE__ */ lazy(() =>
     default: module.ExperimentTrackerBlock,
   })),
 );
+import { validateScene3dData } from "./scene3d-contract.mjs";
+const Scene3DBlock = /* @__PURE__ */ lazy(() =>
+  import("./Scene3D").then((module) => ({ default: module.Scene3DBlock })),
+);
 import { parseChartData } from "./helpers";
 import g2Metadata from "../../../resources/catalog/g2.json";
 const G2ChartBlock = /* @__PURE__ */ lazy(() =>
@@ -517,5 +521,17 @@ registerBlock({
   renderer: ExperimentTrackerBlock,
   validate: (data) => {
     validateAnalysisData("experiment-tracker", data);
+  },
+});
+registerBlock({
+  kind: "scene-3d",
+  title: "3D 场景",
+  description: "可旋转的三维模型，带标注、坐标箭头与参数驱动的动作",
+  icon: "◈",
+  defaultData: componentMetadata.find((item) => item.kind === "scene-3d")!
+    .defaultData as BlockData,
+  renderer: Scene3DBlock,
+  validate: (data) => {
+    validateScene3dData(data);
   },
 });

@@ -89,6 +89,7 @@ export {
   Pencil,
   Pin,
   PinOff,
+  Play,
   Plus,
   Printer,
   Puzzle,

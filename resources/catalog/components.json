@@ -2503,7 +2503,7 @@
                 ],
                 "lr": [
                   0.007, 1.471, 2.714, 2.382, 1.964, 1.5, 1.036, 0.618, 0.286,
-                  0.073, 0.0
+                  0.073, 0
                 ]
               }
             }
@@ -2532,6 +2532,626 @@
     "effects": [
       "阶梯状最优前沿显示研究随时间的推进，越低越好的指标会自动翻转坐标。",
       "侧栏筛选与勾选运行，小图同步显示同一训练步的数值。"
+    ]
+  },
+  {
+    "kind": "scene-3d",
+    "name": "3D 场景",
+    "description": "用 Three.js 渲染可旋转的三维模型：基本形体、分组、坐标箭头、线条与标注，滑块可驱动物体的平移、旋转与缩放，并可自动演示。",
+    "scenarios": [
+      "解释空间中的机制或姿态，例如飞机的俯仰、横滚、偏航，或机械部件的转动关系。",
+      "展示分子、晶体、几何体等三维结构，让读者旋转视角、调整参数观察变化。",
+      "需要读者通过亲手转动和拖动建立空间直觉，而平面示意图难以表达时。"
+    ],
+    "defaultData": {
+      "title": "3D 场景",
+      "parameters": [
+        {
+          "id": "turn",
+          "label": "转动",
+          "min": -180,
+          "max": 180,
+          "step": 1,
+          "value": 30,
+          "unit": "°",
+          "demo": true
+        }
+      ],
+      "objects": [
+        {
+          "type": "group",
+          "id": "shapes",
+          "bindings": [
+            {
+              "parameter": "turn",
+              "property": "rotation.y"
+            }
+          ],
+          "children": [
+            {
+              "type": "box",
+              "size": [1.2, 1.2, 1.2],
+              "position": [0, 0.6, 0],
+              "color": "#4f7cac",
+              "label": "立方体"
+            },
+            {
+              "type": "sphere",
+              "radius": 0.6,
+              "position": [1.9, 0.6, 0],
+              "color": "#d1784c",
+              "label": "球体"
+            },
+            {
+              "type": "cone",
+              "radius": 0.6,
+              "height": 1.3,
+              "position": [-1.9, 0.65, 0],
+              "color": "#5a9a78",
+              "label": "圆锥"
+            }
+          ]
+        }
+      ]
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "height": {
+          "type": "number",
+          "minimum": 200,
+          "maximum": 900
+        },
+        "background": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "grid": {
+          "type": "boolean"
+        },
+        "axes": {
+          "type": "boolean"
+        },
+        "camera": {
+          "type": "object",
+          "properties": {
+            "position": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "target": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "fov": {
+              "type": "number",
+              "minimum": 10,
+              "maximum": 120
+            },
+            "autoRotate": {
+              "type": "boolean"
+            }
+          }
+        },
+        "parameters": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "min": {
+                "type": "number"
+              },
+              "max": {
+                "type": "number"
+              },
+              "step": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "value": {
+                "type": "number"
+              },
+              "unit": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "demo": {
+                "type": "boolean"
+              }
+            },
+            "required": ["id", "label", "min", "max", "value"]
+          }
+        },
+        "objects": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 300,
+          "items": {
+            "$ref": "#/$defs/object"
+          }
+        }
+      },
+      "required": ["objects"],
+      "$defs": {
+        "object": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "type": {
+              "enum": [
+                "group",
+                "box",
+                "sphere",
+                "cylinder",
+                "cone",
+                "torus",
+                "plane",
+                "arrow",
+                "line",
+                "label"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "labelOffset": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "position": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "rotation": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "rotationOrder": {
+              "enum": ["XYZ", "XZY", "YXZ", "YZX", "ZXY", "ZYX"]
+            },
+            "scale": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "minItems": 3,
+                  "maxItems": 3
+                }
+              ]
+            },
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "wireframe": {
+              "type": "boolean"
+            },
+            "size": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "minItems": 2,
+              "maxItems": 3
+            },
+            "radius": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "radiusTop": {
+              "type": "number",
+              "minimum": 0
+            },
+            "radiusBottom": {
+              "type": "number",
+              "minimum": 0
+            },
+            "height": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "tube": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "from": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "to": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "points": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 500,
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3
+              }
+            },
+            "closed": {
+              "type": "boolean"
+            },
+            "text": {
+              "type": "string",
+              "minLength": 1
+            },
+            "bindings": {
+              "type": "array",
+              "maxItems": 10,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "parameter": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "property": {
+                    "enum": [
+                      "position.x",
+                      "position.y",
+                      "position.z",
+                      "rotation.x",
+                      "rotation.y",
+                      "rotation.z",
+                      "scale",
+                      "scale.x",
+                      "scale.y",
+                      "scale.z"
+                    ]
+                  },
+                  "factor": {
+                    "type": "number"
+                  }
+                },
+                "required": ["parameter", "property"]
+              }
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/object"
+              }
+            }
+          },
+          "required": ["type"]
+        }
+      }
+    },
+    "examples": [
+      {
+        "name": "飞机的俯仰、横滚与偏航",
+        "request": "做一个可交互的 3D 飞机，解释 pitch、roll、yaw 三个轴，每个轴有滑块和演示按钮。",
+        "data": {
+          "title": "俯仰、横滚与偏航",
+          "description": "拖动滑块或点击演示，观察飞机绕三条机体轴的转动。这是概念模型，不是飞行模拟。",
+          "height": 440,
+          "camera": {
+            "position": [6.2, 3.6, 7.2],
+            "target": [0, 0.2, 0]
+          },
+          "parameters": [
+            {
+              "id": "pitch",
+              "label": "俯仰 Pitch",
+              "min": -30,
+              "max": 30,
+              "step": 1,
+              "value": 0,
+              "unit": "°",
+              "demo": true,
+              "description": "绕横轴（翼展方向）转动：机头抬起或压低。"
+            },
+            {
+              "id": "roll",
+              "label": "横滚 Roll",
+              "min": -45,
+              "max": 45,
+              "step": 1,
+              "value": 0,
+              "unit": "°",
+              "demo": true,
+              "description": "绕纵轴（机身方向）转动：一侧机翼抬起、另一侧下沉。"
+            },
+            {
+              "id": "yaw",
+              "label": "偏航 Yaw",
+              "min": -45,
+              "max": 45,
+              "step": 1,
+              "value": 0,
+              "unit": "°",
+              "demo": true,
+              "description": "绕竖轴转动：机头向左或向右。"
+            }
+          ],
+          "objects": [
+            {
+              "type": "group",
+              "id": "yaw",
+              "bindings": [
+                {
+                  "parameter": "yaw",
+                  "property": "rotation.y",
+                  "factor": -1
+                }
+              ],
+              "children": [
+                {
+                  "type": "group",
+                  "id": "pitch",
+                  "bindings": [
+                    {
+                      "parameter": "pitch",
+                      "property": "rotation.z"
+                    }
+                  ],
+                  "children": [
+                    {
+                      "type": "group",
+                      "id": "roll",
+                      "bindings": [
+                        {
+                          "parameter": "roll",
+                          "property": "rotation.x"
+                        }
+                      ],
+                      "children": [
+                        {
+                          "type": "cylinder",
+                          "id": "fuselage",
+                          "radius": 0.32,
+                          "height": 4,
+                          "rotation": [0, 0, 90],
+                          "color": "#dfe4ea"
+                        },
+                        {
+                          "type": "cone",
+                          "id": "nose",
+                          "radius": 0.32,
+                          "height": 0.8,
+                          "position": [2.4, 0, 0],
+                          "rotation": [0, 0, -90],
+                          "color": "#dfe4ea"
+                        },
+                        {
+                          "type": "cone",
+                          "id": "tail-cone",
+                          "radius": 0.32,
+                          "height": 0.6,
+                          "position": [-2.3, 0, 0],
+                          "rotation": [0, 0, 90],
+                          "color": "#dfe4ea"
+                        },
+                        {
+                          "type": "sphere",
+                          "id": "cockpit",
+                          "radius": 0.28,
+                          "position": [1.25, 0.24, 0],
+                          "scale": [1.5, 0.8, 0.9],
+                          "color": "#5b8db8",
+                          "opacity": 0.9
+                        },
+                        {
+                          "type": "box",
+                          "id": "wings",
+                          "size": [1.1, 0.08, 5],
+                          "position": [0.2, -0.05, 0],
+                          "color": "#4f7cac"
+                        },
+                        {
+                          "type": "box",
+                          "id": "stabilizer",
+                          "size": [0.6, 0.06, 1.8],
+                          "position": [-1.75, 0.05, 0],
+                          "color": "#4f7cac"
+                        },
+                        {
+                          "type": "box",
+                          "id": "fin",
+                          "size": [0.7, 0.9, 0.06],
+                          "position": [-1.75, 0.5, 0],
+                          "color": "#4f7cac"
+                        },
+                        {
+                          "type": "arrow",
+                          "id": "roll-axis",
+                          "from": [-3.2, 0, 0],
+                          "to": [3.6, 0, 0],
+                          "color": "#d1574c",
+                          "label": "纵轴 · 横滚"
+                        },
+                        {
+                          "type": "arrow",
+                          "id": "pitch-axis",
+                          "from": [0, 0, -3.3],
+                          "to": [0, 0, 3.3],
+                          "color": "#3f9a63",
+                          "label": "横轴 · 俯仰"
+                        },
+                        {
+                          "type": "arrow",
+                          "id": "yaw-axis",
+                          "from": [0, -1.4, 0],
+                          "to": [0, 2, 0],
+                          "color": "#4a6fd6",
+                          "label": "竖轴 · 偏航"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "水分子的键角",
+        "request": "用 3D 模型展示水分子，并能调整 H–O–H 键角。",
+        "data": {
+          "title": "水分子的键角",
+          "description": "改变 H–O–H 键角，比较实际的 104.5° 与正四面体角 109.5°。",
+          "height": 360,
+          "grid": false,
+          "camera": {
+            "position": [0, 0.2, 4.6],
+            "target": [0, -0.45, 0]
+          },
+          "parameters": [
+            {
+              "id": "angle",
+              "label": "键角",
+              "min": 90,
+              "max": 120,
+              "step": 0.5,
+              "value": 104.5,
+              "unit": "°",
+              "demo": true,
+              "description": "两对孤对电子排斥成键电子，使键角小于 109.5°。"
+            }
+          ],
+          "objects": [
+            {
+              "type": "sphere",
+              "id": "oxygen",
+              "radius": 0.5,
+              "color": "#d1574c",
+              "label": "O"
+            },
+            {
+              "type": "group",
+              "id": "bond-left",
+              "bindings": [
+                {
+                  "parameter": "angle",
+                  "property": "rotation.z",
+                  "factor": -0.5
+                }
+              ],
+              "children": [
+                {
+                  "type": "cylinder",
+                  "radius": 0.07,
+                  "height": 0.98,
+                  "position": [0, -0.49, 0],
+                  "color": "#9aa3ad"
+                },
+                {
+                  "type": "sphere",
+                  "id": "h-left",
+                  "radius": 0.3,
+                  "position": [0, -0.98, 0],
+                  "color": "#c9d2dc",
+                  "label": "H"
+                }
+              ]
+            },
+            {
+              "type": "group",
+              "id": "bond-right",
+              "bindings": [
+                {
+                  "parameter": "angle",
+                  "property": "rotation.z",
+                  "factor": 0.5
+                }
+              ],
+              "children": [
+                {
+                  "type": "cylinder",
+                  "radius": 0.07,
+                  "height": 0.98,
+                  "position": [0, -0.49, 0],
+                  "color": "#9aa3ad"
+                },
+                {
+                  "type": "sphere",
+                  "id": "h-right",
+                  "radius": 0.3,
+                  "position": [0, -0.98, 0],
+                  "color": "#c9d2dc",
+                  "label": "H"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "version": "1.0.0",
+    "effects": [
+      "解锁视角后可拖动旋转、滚轮缩放、右键平移；重置恢复初始参数与视角。",
+      "滑块按绑定实时改变物体的位置、角度或缩放；演示按钮平滑扫过参数范围，减少动态效果时隐藏。",
+      "标注跟随物体投影到画面上；WebGL 不可用时显示错误、参数与标注列表，打印时输出当前视角静态图。"
     ]
   }
 ]

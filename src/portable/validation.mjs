@@ -12,6 +12,7 @@ import {
 import { validateG2Data } from "../components/blocks/g2/contract.mjs";
 import { validatePresentationData } from "../components/blocks/presentation-contract.mjs";
 import { validateAnalysisData } from "../components/blocks/analysis-contract.mjs";
+import { validateScene3dData } from "../components/blocks/scene3d-contract.mjs";
 import { validateResearchData } from "../components/blocks/research-contract.mjs";
 // Shared by the browser importer and the dependency-free artifact command.
 import { validateRemoteComponents } from "./remote.mjs";
@@ -287,6 +288,10 @@ function validateWidgetData(kind, data, path) {
   }
   if (kind === "flowchart") {
     validateFlowchartData(data);
+    return;
+  }
+  if (kind === "scene-3d") {
+    validateScene3dData(data);
     return;
   }
   if (

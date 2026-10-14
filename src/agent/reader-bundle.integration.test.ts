@@ -230,6 +230,10 @@ test("small block selections export inline with only their renderers", async () 
         type: "widget",
         attrs: { id: "ov-flow", kind: "flowchart", data: builtin("flowchart") },
       },
+      {
+        type: "widget",
+        attrs: { id: "ov-scene", kind: "scene-3d", data: builtin("scene-3d") },
+      },
       // Unselected heavy renderers must not reach the selection's reader.
       ...diagrams.map((item) => ({
         type: "widget",
@@ -271,14 +275,16 @@ test("small block selections export inline with only their renderers", async () 
         html: await readFile(out + "-full.html", "utf8"),
       };
     };
-    for (const [name, blockIds, budget] of [
-      ["chart", ["mon-metrics", "mon-entropy"], 600_000],
-      ["flowchart", ["ov-flow"], 750_000],
+    // Three.js alone is about 570 KB minified, so the 3D scene gets a larger full-HTML budget.
+    for (const [name, blockIds, budget, htmlBudget] of [
+      ["chart", ["mon-metrics", "mon-entropy"], 600_000, 1_500_000],
+      ["flowchart", ["ov-flow"], 750_000, 1_500_000],
+      ["scene", ["ov-scene"], 750_000, 1_900_000],
     ] as const) {
       const { inline, html } = await exportSelection(name, [...blockIds]);
       expect(Buffer.byteLength(inline), name).toBeLessThan(budget);
       expect(Buffer.byteLength(inline), name).toBeLessThan(CAPACITY.chatBytes);
-      expect(Buffer.byteLength(html), name).toBeLessThan(1_500_000);
+      expect(Buffer.byteLength(html), name).toBeLessThan(htmlBudget);
       expect(html, name).not.toContain('"g2-sankey"');
       pages.set("/selection-" + name, inline);
     }
@@ -289,6 +295,8 @@ test("small block selections export inline with only their renderers", async () 
     await reader.getByText("0.42", { exact: true }).waitFor();
     await reader.goto(address + "/selection-flowchart");
     await reader.getByText("明确问题").first().waitFor();
+    await reader.goto(address + "/selection-scene");
+    await reader.getByRole("slider", { name: "转动" }).waitFor();
     expect(errors).toEqual([]);
     await reader.close();
   } finally {

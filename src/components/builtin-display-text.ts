@@ -67,6 +67,11 @@ export const builtinEnglish: BuiltinDisplayText = {
     description:
       "Branches balance naturally around a central topic, or use a one-sided layout. Supports keyboard editing, collapsing and undo.",
   },
+  "scene-3d": {
+    name: "3D scene",
+    description:
+      "A rotatable 3D model with labels, axis arrows and parameter-driven motion, rendered with Three.js.",
+  },
   flowchart: {
     name: "Interactive flowchart",
     description:
