@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { SQLiteMetadata, startSyncServer } from "./node";
 import { hash, syncProtocol, type ProjectSnapshot } from "../sync/protocol";
 
-test("large manifests live in object storage and bounded summary/legacy histories retain stable cursors", async () => {
+test("large manifests live in object storage and only the current state is retained", async () => {
   const home = await mkdtemp(join(tmpdir(), "showai-capacity-"));
   const server = process.env.SHOWAI_SYNC_TEST_URL
     ? undefined
@@ -98,7 +98,6 @@ test("large manifests live in object storage and bounded summary/legacy historie
       2_000_000,
     );
     let head: string | null = null;
-    const expected: string[] = [];
     for (let index = 0; index < 3; index++) {
       const current = {
         ...snapshot,
@@ -106,59 +105,32 @@ test("large manifests live in object storage and bounded summary/legacy historie
         change: { ...snapshot.change, operationId: `large-${index}` },
       };
       const result = await request(
-        `/api/projects/${id}/revisions`,
+        `/api/projects/${id}/snapshot`,
         "POST",
         { snapshot: current, expected: head },
         token,
       );
       expect(result.status).toBe(200);
       head = result.value.head;
-      expected.push(head!);
     }
-    const summary = await request(
-      `/api/projects/${id}/revisions?summary=1&limit=2`,
+    const current = await request(
+      `/api/projects/${id}/snapshot`,
       "GET",
       undefined,
       token,
     );
-    expect(
-      summary.value.entries.map(
-        (entry: { revision: string }) => entry.revision,
-      ),
-    ).toEqual(expected.slice(0, 2));
-    expect(
-      summary.value.entries.every(
-        (entry: { snapshot?: unknown }) => !entry.snapshot,
-      ),
-    ).toBe(true);
-    expect(Buffer.byteLength(JSON.stringify(summary.value))).toBeLessThan(4096);
-    const last = await request(
-      `/api/projects/${id}/revisions?summary=1&after=${summary.value.next}`,
-      "GET",
-      undefined,
-      token,
-    );
-    expect(
-      last.value.entries.map((entry: { revision: string }) => entry.revision),
-    ).toEqual(expected.slice(2));
-    const legacy = await request(
-      `/api/projects/${id}/revisions`,
-      "GET",
-      undefined,
-      token,
-    );
-    expect(legacy.value.entries).toHaveLength(1);
-    expect(legacy.value.next).toBe(expected[0]);
+    expect(current.value.revision).toBe(head);
+    expect(current.value.snapshot.files).toEqual(files);
     expect(
       (
         await request(
-          `/api/projects/${id}/revisions/${head}`,
+          `/api/projects/${id}/revisions?summary=1`,
           "GET",
           undefined,
           token,
         )
-      ).value.snapshot.files,
-    ).toEqual(files);
+      ).value.error.code,
+    ).toBe("HISTORY_REMOVED");
     if (server) {
       const db = new SQLiteMetadata(join(home, "metadata.sqlite"));
       try {
@@ -171,15 +143,14 @@ test("large manifests live in object storage and bounded summary/legacy historie
           "SELECT manifest,manifest_key,manifest_bytes,sequence FROM revisions WHERE project_id=? ORDER BY sequence",
           [id],
         );
-        expect(
-          rows.every(
-            (row) =>
-              row.manifest === "" &&
-              row.manifest_key.startsWith(`projects/${id}/manifests/`) &&
-              row.manifest_bytes > 2_000_000,
-          ),
-        ).toBe(true);
-        expect(rows.map((row) => row.sequence)).toEqual([1, 2, 3]);
+        // Replaced manifests are reclaimed; the current one lives in object storage.
+        expect(rows).toHaveLength(1);
+        expect(rows[0].manifest).toBe("");
+        expect(rows[0].manifest_key.startsWith(`projects/${id}/manifests/`)).toBe(
+          true,
+        );
+        expect(rows[0].manifest_bytes).toBeGreaterThan(2_000_000);
+        expect(rows[0].sequence).toBe(3);
       } finally {
         db.close();
       }

@@ -9,7 +9,7 @@ import {
   maximumEventInput,
   type EventIdentity,
 } from "../sync/events";
-import { SyncError, token } from "../sync/protocol";
+import { hash, SyncError, token } from "../sync/protocol";
 import type { EventPeer } from "./events";
 import { serverBaseUrl } from "../sync/server-url";
 import { serverPrefixes, matchedPrefix } from "./base-path";
@@ -32,6 +32,8 @@ export async function startSyncServer(
     host?: string;
     port?: number;
     realtime?: boolean;
+    /** Key a trusted proxy presents when it reports the client address. */
+    trustedProxyKey?: string;
   },
 ): Promise<{ server: Server; url: string; close(): Promise<void> }> {
   const home = resolve(options.home);
@@ -95,11 +97,36 @@ export async function startSyncServer(
     metadataDriver: "sqlite",
   });
   await app.initialize();
+  if (
+    options.trustedProxyKey !== undefined &&
+    !/^[a-f0-9]{64}$/.test(options.trustedProxyKey)
+  )
+    throw new Error(
+      "The trusted proxy key requires 64 lowercase hexadecimal characters.",
+    );
+  const proxyDigest =
+    options.trustedProxyKey && (await hash(options.trustedProxyKey));
+  async function clientSource(
+    headers: Record<string, string | string[] | undefined>,
+    address: string | undefined,
+  ) {
+    const key = headers["x-showai-proxy-key"],
+      client = headers["x-showai-client-ip"];
+    if (
+      proxyDigest &&
+      typeof key === "string" &&
+      typeof client === "string" &&
+      /^[0-9A-Fa-f:.]{2,45}$/.test(client) &&
+      (await hash(key)) === proxyDigest
+    )
+      return `proxy:${client}`;
+    return address ?? "unknown";
+  }
   const server = createServer(async (incoming, outgoing) => {
     try {
       const headers = new Headers();
       for (const [name, value] of Object.entries(incoming.headers))
-        if (value)
+        if (value && name !== "x-showai-proxy-key")
           headers.set(name, Array.isArray(value) ? value.join(",") : value);
       const method = incoming.method ?? "GET";
       const response = await app.fetch(
@@ -116,7 +143,7 @@ export async function startSyncServer(
               : {}),
           },
         ),
-        { source: incoming.socket.remoteAddress ?? "unknown" },
+        { source: await clientSource(incoming.headers, incoming.socket.remoteAddress) },
       );
       outgoing.writeHead(response.status, Object.fromEntries(response.headers));
       if (response.body)

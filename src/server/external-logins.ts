@@ -4,7 +4,13 @@ import { AccountCipher, base64url, unbase64url } from "./account-crypto";
 import type { AccountSession } from "./account-hub";
 import type { AccountOptions, AuthUser } from "./accounts";
 import { Sessions } from "./sessions";
-import { audit, liveSession, passwordHash, rateLimit } from "./security";
+import {
+  audit,
+  liveSession,
+  passwordHash,
+  rateLimit,
+  requireRecentSignIn,
+} from "./security";
 import type { MetadataStore } from "./storage";
 
 export interface ExternalLoginOptions extends AccountOptions {
@@ -46,11 +52,13 @@ export function configuredLogins(env: LoginEnvironment): ExternalLoginOptions {
             clientSecret: env.SHOWAI_GITHUB_CLIENT_SECRET,
           }
         : undefined,
+    // A relayed deployment never exchanges codes itself, so it needs no secret.
     googleLogin:
-      env.SHOWAI_GOOGLE_CLIENT_ID && env.SHOWAI_GOOGLE_CLIENT_SECRET
+      env.SHOWAI_GOOGLE_CLIENT_ID &&
+      (env.SHOWAI_GOOGLE_CLIENT_SECRET || env.SHOWAI_GOOGLE_RELAY_URL)
         ? {
             clientId: env.SHOWAI_GOOGLE_CLIENT_ID,
-            clientSecret: env.SHOWAI_GOOGLE_CLIENT_SECRET,
+            clientSecret: env.SHOWAI_GOOGLE_CLIENT_SECRET ?? "",
           }
         : undefined,
     emailLogin:
@@ -83,6 +91,7 @@ interface FlowSecret {
   error?: string;
   externalIdentity?: ExternalIdentity;
   confirmDigest?: string;
+  completionDigest?: string;
 }
 interface ExternalIdentity {
   subject: string;
@@ -90,6 +99,55 @@ interface ExternalIdentity {
   email?: string;
 }
 const encoder = new TextEncoder();
+const completionAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+/** A short code the browser hands back to the window that started the login. */
+function completionCode() {
+  return Array.from(
+    crypto.getRandomValues(new Uint8Array(8)),
+    (byte) => completionAlphabet[byte % completionAlphabet.length],
+  ).join("");
+}
+function completionInput(value: unknown) {
+  const code =
+    typeof value === "string" ? value.toUpperCase().replace(/[\s-]/g, "") : "";
+  return /^[A-HJ-NP-Z2-9]{8}$/.test(code) ? code : undefined;
+}
+function escapeHtml(value: string) {
+  return value.replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[character]!,
+  );
+}
+function completionLink(id: string, code: string) {
+  const link = new URL("showai://login");
+  link.searchParams.set("flow", id);
+  link.searchParams.set("code", code);
+  return link.href;
+}
+const pageHeaders = {
+  "content-type": "text/html; charset=utf-8",
+  "cache-control": "no-store, no-transform",
+};
+const completionWarning =
+  "<p style='color:#8a3b12'>不要把完成码告诉任何人。如果这次登录不是你本人刚刚在自己的 ShowAI 中发起的，请直接关闭此页面。</p>";
+function completionPage(
+  id: string,
+  code: string,
+  identity: string,
+  device: string,
+) {
+  return new Response(
+    `<!doctype html><html lang=zh><meta charset=utf-8><meta name=viewport content="width=device-width"><title>完成 ShowAI 登录</title><body style='font:18px system-ui;max-width:600px;margin:12vh auto;padding:32px'><h1>完成登录</h1><p>${escapeHtml(identity)} 已授权设备「${escapeHtml(device)}」登录 ShowAI。请在发起登录的 ShowAI 窗口中输入完成码：</p><p style='font:600 32px ui-monospace,monospace;letter-spacing:4px'>${code.slice(0, 4)}-${code.slice(4)}</p><p><a href="${escapeHtml(completionLink(id, code))}">在 ShowAI 中完成登录</a></p>${completionWarning}</body></html>`,
+    { headers: pageHeaders },
+  );
+}
 export async function providerJson(url: string, options: RequestInit = {}) {
   const response = await fetch(url, {
     ...options,
@@ -184,7 +242,10 @@ export class ExternalLogins {
     return `showai-login:${id}`;
   }
   async relayGoogle(input: Record<string, unknown>, source: string) {
-    if (!this.options.googleLogin || this.options.googleRelay)
+    if (
+      !this.options.googleLogin?.clientSecret ||
+      this.options.googleRelay
+    )
       throw new SyncError(503, "LOGIN_NOT_CONFIGURED", "Google 登录转发未启用。");
     await rateLimit(this.db, {
       scope: "external-login:google-relay",
@@ -243,6 +304,8 @@ export class ExternalLogins {
       maximum: 20,
       windowMs: 60_000,
     });
+    // A new login method outlives every session, so only a fresh sign-in may add one.
+    if (link) await requireRecentSignIn(this.db, link);
     await this.db.run(
       "DELETE FROM login_flows WHERE id IN(SELECT id FROM login_flows WHERE expires_at<=? LIMIT 100)",
       [Date.now()],
@@ -273,9 +336,15 @@ export class ExternalLogins {
       if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email))
         throw new SyncError(400, "INVALID_EMAIL", "请输入有效的邮箱地址。");
       await rateLimit(this.db, {
+        scope: "external-login:email-source",
+        identity: JSON.stringify([email, source]),
+        maximum: 5,
+        windowMs: 3600_000,
+      });
+      await rateLimit(this.db, {
         scope: "external-login:email",
         identity: email,
-        maximum: 5,
+        maximum: 20,
         windowMs: 3600_000,
       });
       let random = crypto.getRandomValues(new Uint32Array(1))[0];
@@ -346,6 +415,20 @@ export class ExternalLogins {
     }
     return { id, pollSecret, url, provider, expiresAt };
   }
+  private async assertRegistration(flow: FlowSecret) {
+    if (
+      this.options.registrationMode !== "open" &&
+      (!this.options.registrationKey ||
+        typeof flow.registrationKey !== "string" ||
+        (await hash(flow.registrationKey)) !==
+          (await hash(this.options.registrationKey)))
+    )
+      throw new SyncError(
+        403,
+        "REGISTRATION_KEY_REQUIRED",
+        "新账号需要注册密钥；已有账号请使用原登录方式，再绑定此登录方式。",
+      );
+  }
   private async externalUser(
     provider: string,
     identity: ExternalIdentity,
@@ -403,18 +486,7 @@ export class ExternalLogins {
           [bound.user_id],
         )
       )[0];
-    if (
-      this.options.registrationMode !== "open" &&
-      (!this.options.registrationKey ||
-        typeof flow.registrationKey !== "string" ||
-        (await hash(flow.registrationKey)) !==
-          (await hash(this.options.registrationKey)))
-    )
-      throw new SyncError(
-        403,
-        "REGISTRATION_KEY_REQUIRED",
-        "新账号需要注册密钥；已有账号请使用原登录方式，再绑定此登录方式。",
-      );
+    await this.assertRegistration(flow);
     const id = crypto.randomUUID(),
       salt = token(),
       password = await passwordHash(token(), salt),
@@ -571,45 +643,43 @@ export class ExternalLogins {
           keys.keys as (JsonWebKey & { kid?: string })[],
         );
       }
+      secret.externalIdentity = identity;
+      const label = identity.email ?? identity.name;
       if (secret.link) {
         const confirm = token();
-        secret.externalIdentity = identity;
         secret.confirmDigest = await hash(confirm);
         await this.db.run(
           "UPDATE login_flows SET status='confirming',secret=? WHERE id=? AND status='processing'",
           [await this.cipher.seal(this.context(row.id), secret), row.id],
         );
-        const escape = (value: string) =>
-          value.replace(
-            /[&<>"']/g,
-            (character) =>
-              ({
-                "&": "&amp;",
-                "<": "&lt;",
-                ">": "&gt;",
-                '"': "&quot;",
-                "'": "&#39;",
-              })[character]!,
-          );
         const endpoint = secret.redirectUri.replace(
           /\/callback\/(github|google)$/,
           "/confirm-link",
         );
         return new Response(
-          `<!doctype html><html lang=zh><meta charset=utf-8><title>确认 ShowAI 登录绑定</title><body style='font:18px system-ui;max-width:600px;margin:12vh auto;padding:32px'><h1>确认添加登录方式</h1><p>将 ${escape(identity.email ?? identity.name)} 的 ${escape(provider)} 登录绑定到 ShowAI 账号「${escape(secret.link.name)}」。以后使用这份第三方账号会登录到该 ShowAI 账号。</p><button id=confirm>确认绑定</button><p id=result role=status></p><script>document.getElementById('confirm').onclick=async function(){this.disabled=true;const response=await fetch(${JSON.stringify(endpoint)},{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:${JSON.stringify(row.id)},confirmToken:${JSON.stringify(confirm)}})});document.getElementById('result').textContent=response.ok?'已绑定，请返回 ShowAI。':'绑定未完成，请返回 ShowAI 重试。';};</script></body></html>`,
-          {
-            headers: {
-              "content-type": "text/html; charset=utf-8",
-              "cache-control": "no-store, no-transform",
-            },
-          },
+          `<!doctype html><html lang=zh><meta charset=utf-8><meta name=viewport content="width=device-width"><title>确认 ShowAI 登录绑定</title><body style='font:18px system-ui;max-width:600px;margin:12vh auto;padding:32px'><h1>确认添加登录方式</h1><p>将 ${escapeHtml(label)} 的 ${escapeHtml(provider)} 登录绑定到 ShowAI 账号「${escapeHtml(secret.link.name)}」。以后使用这份第三方账号会登录到该 ShowAI 账号。</p><button id=confirm>确认绑定</button><div id=result role=status></div>${completionWarning}<script>document.getElementById('confirm').onclick=async function(){this.disabled=true;const result=document.getElementById('result');const response=await fetch(${JSON.stringify(endpoint)},{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:${JSON.stringify(row.id)},confirmToken:${JSON.stringify(confirm)}})});if(!response.ok){result.textContent='绑定未完成，请返回 ShowAI 重试。';return;}const value=await response.json();const intro=document.createElement('p');intro.textContent='请在发起绑定的 ShowAI 窗口中输入完成码：';const code=document.createElement('p');code.style.font='600 32px ui-monospace,monospace';code.style.letterSpacing='4px';code.textContent=value.completionCode.slice(0,4)+'-'+value.completionCode.slice(4);const open=document.createElement('a');open.href=value.link;open.textContent='在 ShowAI 中完成绑定';result.replaceChildren(intro,code,open);};</script></body></html>`,
+          { headers: pageHeaders },
         );
       }
-      secret.user = await this.externalUser(provider, identity, secret);
+      // Reject unknown accounts here so the browser explains a closed registration.
+      if (
+        !(
+          await this.db.all(
+            "SELECT 1 FROM login_identities WHERE provider=? AND subject=?",
+            [provider, identity.subject],
+          )
+        ).length
+      )
+        await this.assertRegistration(secret);
+      // The account is resolved only after the starting window returns this code,
+      // so a forwarded authorization link cannot sign in someone else's device.
+      const completion = completionCode();
+      secret.completionDigest = await hash(`${row.id}:${completion}`);
       await this.db.run(
         "UPDATE login_flows SET status='completed',secret=? WHERE id=? AND status='processing'",
         [await this.cipher.seal(this.context(row.id), secret), row.id],
       );
+      return completionPage(row.id, completion, label, secret.device);
     } catch (error) {
       secret.error =
         error instanceof SyncError
@@ -621,15 +691,55 @@ export class ExternalLogins {
       );
       throw error;
     }
-    return new Response(
-      "<!doctype html><html lang=zh><meta charset=utf-8><title>ShowAI 登录</title><body style='font:18px system-ui;padding:48px'><h1>已完成授权</h1><p>请返回发起登录的 ShowAI 窗口。</p></body></html>",
-      {
-        headers: {
-          "content-type": "text/html; charset=utf-8",
-          "cache-control": "no-store, no-transform",
-        },
-      },
+  }
+  async identities(user: AccountSession) {
+    return this.db.all<{
+      provider: string;
+      subject: string;
+      email: string | null;
+      created_at: string;
+    }>(
+      "SELECT provider,subject,email,created_at FROM login_identities WHERE user_id=? ORDER BY created_at",
+      [user.id],
     );
+  }
+  async removeIdentity(user: AccountSession, input: Record<string, unknown>) {
+    const recent = await requireRecentSignIn(this.db, user);
+    const provider = plainText(input.provider, 30),
+      subject = plainText(input.subject, 254);
+    // Accounts created through a provider have no password their owner knows,
+    // so they keep at least one external login method.
+    const result = await this.db.batch([
+      {
+        sql: `DELETE FROM login_identities WHERE provider=? AND subject=? AND user_id=? AND EXISTS(${recent.sql}) AND (NOT EXISTS(SELECT 1 FROM audit_events WHERE user_id=? AND event='account.external-register') OR EXISTS(SELECT 1 FROM audit_events WHERE user_id=? AND event='account.password-change') OR (SELECT COUNT(*) FROM login_identities WHERE user_id=?)>1)`,
+        values: [
+          provider,
+          subject,
+          user.id,
+          ...recent.values!,
+          user.id,
+          user.id,
+          user.id,
+        ],
+      },
+      audit(
+        "account.login-remove",
+        user.id,
+        null,
+        { provider },
+        {
+          sql: "SELECT 1 WHERE NOT EXISTS(SELECT 1 FROM login_identities WHERE provider=? AND subject=? AND user_id=?)",
+          values: [provider, subject, user.id],
+        },
+      ),
+    ]);
+    if (!result[0].changes)
+      throw new SyncError(
+        409,
+        "LOGIN_REMOVAL_REFUSED",
+        "无法移除这种登录方式：它不存在，或是此账号唯一可用的登录方式。",
+      );
+    return { ok: true };
   }
   async confirmLink(input: Record<string, unknown>) {
     const id = plainText(input.id, 100),
@@ -652,33 +762,36 @@ export class ExternalLogins {
       !secret.externalIdentity
     )
       throw new SyncError(401, "INVALID_LOGIN_CONFIRMATION", "绑定确认无效。");
-    const acquired = await this.db.run(
-      "UPDATE login_flows SET status='processing' WHERE id=? AND status='confirming' AND expires_at>?",
-      [id, Date.now()],
+    const completion = completionCode();
+    secret.completionDigest = await hash(`${id}:${completion}`);
+    const confirmed = await this.db.run(
+      "UPDATE login_flows SET status='completed',secret=? WHERE id=? AND status='confirming' AND expires_at>?",
+      [await this.cipher.seal(this.context(id), secret), id, Date.now()],
     );
-    if (!acquired.changes)
+    if (!confirmed.changes)
       throw new SyncError(409, "LOGIN_ALREADY_USED", "绑定确认已被处理。");
-    secret.user = await this.externalUser(
-      row.provider,
-      secret.externalIdentity,
-      secret,
-    );
-    await this.db.run(
-      "UPDATE login_flows SET status='completed',secret=? WHERE id=? AND status='processing'",
-      [await this.cipher.seal(this.context(id), secret), id],
-    );
-    return { ok: true };
+    return {
+      ok: true,
+      completionCode: completion,
+      link: completionLink(id, completion),
+    };
   }
   async finish(input: Record<string, unknown>, source: string) {
+    const id = plainText(input.id, 100);
     await rateLimit(this.db, {
       scope: "external-login:finish",
       identity: source,
-      maximum: 120,
+      maximum: 600,
       windowMs: 60_000,
     });
-    const id = plainText(input.id, 100),
-      poll = await hash(plainText(input.pollSecret, 100));
-    let row = (
+    await rateLimit(this.db, {
+      scope: "external-login:finish-flow",
+      identity: id,
+      maximum: 60,
+      windowMs: 60_000,
+    });
+    const poll = await hash(plainText(input.pollSecret, 100));
+    const row = (
       await this.db.all<FlowRow>(
         "SELECT * FROM login_flows WHERE id=? AND poll_digest=? AND expires_at>?",
         [id, poll, Date.now()],
@@ -690,91 +803,89 @@ export class ExternalLogins {
       this.context(id),
       row.secret,
     );
-    if (
-      row.provider === "email" &&
-      row.status === "pending" &&
-      input.code !== undefined
-    ) {
-      const code = plainText(input.code, 8);
-      if (
-        !/^\d{8}$/.test(code) ||
-        row.claimed >= 5 ||
-        (await hash(`${id}:${code}`)) !== secret.codeDigest
-      ) {
-        await this.db.run(
-          "UPDATE login_flows SET claimed=claimed+1,status=CASE WHEN claimed>=4 THEN 'failed' ELSE status END WHERE id=? AND status='pending'",
-          [id],
-        );
-        throw new SyncError(
-          401,
-          "INVALID_EMAIL_CODE",
-          "验证码无效或尝试次数已达上限，请重新发起登录。",
-        );
-      }
-      const acquired = await this.db.run(
-        "UPDATE login_flows SET status='processing' WHERE id=? AND status='pending' AND claimed<5 AND expires_at>?",
-        [id, Date.now()],
-      );
-      if (acquired.changes) {
-        try {
-          secret.user = await this.externalUser(
-            "email",
-            {
-              subject: secret.email!,
-              name: secret.email!,
-              email: secret.email!,
-            },
-            secret,
-          );
-          await this.db.run(
-            "UPDATE login_flows SET status='completed',secret=? WHERE id=? AND status='processing'",
-            [await this.cipher.seal(this.context(id), secret), id],
-          );
-        } catch (error) {
-          await this.db.run(
-            "UPDATE login_flows SET status='failed' WHERE id=?",
-            [id],
-          );
-          throw error;
-        }
-      }
-      row = (
-        await this.db.all<FlowRow>("SELECT * FROM login_flows WHERE id=?", [id])
-      )[0];
-    }
     if (row.status === "failed")
       throw new SyncError(
         401,
         "LOGIN_FAILED",
         secret.error ?? "登录未完成，请重新发起登录。",
       );
-    if (row.status === "ready")
-      return {
-        status: "completed",
-        ...(await this.cipher.open<FlowSecret>(this.context(id), row.secret))
-          .result,
-      };
-    if (row.status !== "completed") return { status: "pending" };
+    if (row.status === "ready") return { status: "completed", ...secret.result };
+    // Email codes are entered while pending; browser completion codes follow the provider callback.
+    const email = row.provider === "email",
+      awaiting = email ? "pending" : "completed";
+    if (row.status !== awaiting) return { status: "pending" };
+    const supplied = email ? input.code : input.completionCode;
+    if (supplied === undefined)
+      return { status: email ? "pending" : "confirm" };
+    // Count the attempt before comparing so concurrent guesses share the limit.
+    const counted = await this.db.run(
+      "UPDATE login_flows SET claimed=claimed+1 WHERE id=? AND status=? AND claimed<5",
+      [id, awaiting],
+    );
+    const code = email
+      ? typeof supplied === "string" && /^\d{8}$/.test(supplied)
+        ? supplied
+        : undefined
+      : completionInput(supplied);
+    if (
+      !counted.changes ||
+      !code ||
+      (await hash(`${id}:${code}`)) !==
+        (email ? secret.codeDigest : secret.completionDigest)
+    ) {
+      await this.db.run(
+        "UPDATE login_flows SET status='failed' WHERE id=? AND status=? AND claimed>=5",
+        [id, awaiting],
+      );
+      throw email
+        ? new SyncError(
+            401,
+            "INVALID_EMAIL_CODE",
+            "验证码无效或尝试次数已达上限，请重新发起登录。",
+          )
+        : new SyncError(
+            401,
+            "INVALID_COMPLETION_CODE",
+            "完成码无效或尝试次数已达上限，请重新发起登录。",
+          );
+    }
     const acquired = await this.db.run(
-      "UPDATE login_flows SET status='issuing' WHERE id=? AND status='completed' AND expires_at>?",
-      [id, Date.now()],
+      "UPDATE login_flows SET status='issuing' WHERE id=? AND status=? AND expires_at>?",
+      [id, awaiting, Date.now()],
     );
     if (!acquired.changes) return { status: "pending" };
-    const completed = await this.cipher.open<FlowSecret>(
-      this.context(id),
-      row.secret,
-    );
-    if (!completed.user)
-      throw new Error("Completed login is missing its account.");
-    completed.result = await this.sessions.create(
-      completed.user,
-      completed.device,
-      completed.link ? { condition: liveSession(completed.link) } : {},
-    );
-    await this.db.run(
-      "UPDATE login_flows SET status='ready',secret=? WHERE id=? AND status='issuing'",
-      [await this.cipher.seal(this.context(id), completed), id],
-    );
-    return { status: "completed", ...completed.result };
+    try {
+      const identity = email
+        ? { subject: secret.email!, name: secret.email!, email: secret.email! }
+        : secret.externalIdentity;
+      if (!identity) throw new Error("Completed login is missing its identity.");
+      secret.user = await this.externalUser(row.provider, identity, secret);
+      secret.result = await this.sessions.create(
+        secret.user,
+        secret.device,
+        secret.link ? { condition: liveSession(secret.link) } : {},
+      );
+      // Retain the issued credential only long enough to repeat a lost response.
+      await this.db.run(
+        "UPDATE login_flows SET status='ready',secret=?,expires_at=MIN(expires_at,?) WHERE id=? AND status='issuing'",
+        [
+          await this.cipher.seal(this.context(id), secret),
+          Date.now() + 60_000,
+          id,
+        ],
+      );
+      return { status: "completed", ...secret.result };
+    } catch (error) {
+      secret.error =
+        error instanceof SyncError
+          ? error.message
+          : "登录未完成，请重新发起登录。";
+      delete secret.result;
+      await this.db.run(
+        "UPDATE login_flows SET status='failed',secret=? WHERE id=?",
+        [await this.cipher.seal(this.context(id), secret), id],
+      );
+      throw error;
+    }
   }
 }

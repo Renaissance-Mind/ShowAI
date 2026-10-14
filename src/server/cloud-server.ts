@@ -6,22 +6,33 @@ import {
   type DurableStorage,
 } from "./durable-storage";
 import { workerObjects, type WorkerEnvironment } from "./worker";
-import { eventProtocol, type EventIdentity } from "../sync/events";
+import { eventProtocol } from "../sync/events";
 import type { EventPeer } from "./events";
 import { hash, SyncError } from "../sync/protocol";
 import { schemaVersion } from "./migrations";
 import { configuredLogins } from "./external-logins";
 
+/** Hibernation attachments are small, so subscriptions live in SQLite. */
+interface SocketAttachment {
+  userId: string;
+  sessionDigest: string;
+  socketId: string;
+  /** Sockets accepted by an earlier deployment kept subscriptions here. */
+  projects?: string[];
+}
 interface EventSocket extends WebSocket {
-  serializeAttachment(value: EventIdentity): void;
-  deserializeAttachment(): EventIdentity;
+  serializeAttachment(value: SocketAttachment): void;
+  deserializeAttachment(): SocketAttachment;
 }
 interface DurableState {
   storage: DurableStorage;
   acceptWebSocket(socket: EventSocket): void;
   getWebSockets(): EventSocket[];
   blockConcurrencyWhile<T>(run: () => Promise<T>): Promise<T>;
+  setWebSocketAutoResponse?(pair: unknown): void;
 }
+const ping = JSON.stringify({ type: "ping" }),
+  pong = JSON.stringify({ type: "pong" });
 interface Bootstrap {
   serverId: string;
   epoch: string;
@@ -47,6 +58,7 @@ export class ShowAIServer {
   readonly objects: DurableObjects;
   readonly app: ReturnType<typeof createSyncServer>;
   private ready: Promise<string>;
+  private subscriptions?: Map<string, string[]>;
   constructor(
     readonly ctx: DurableState,
     readonly env: WorkerEnvironment,
@@ -79,12 +91,89 @@ export class ShowAIServer {
       requirePublicOrigin: true,
       eventPeers: () => ctx.getWebSockets().map((socket) => this.peer(socket)),
     });
-    this.ready = ctx.blockConcurrencyWhile(() => this.app.initialize());
+    // Heartbeats are answered by the runtime without waking the object or
+    // spending request budget; every delivery still rechecks the session.
+    const Pair = (
+      globalThis as unknown as {
+        WebSocketRequestResponsePair?: new (request: string, response: string) => unknown;
+      }
+    ).WebSocketRequestResponsePair;
+    if (Pair && ctx.setWebSocketAutoResponse)
+      ctx.setWebSocketAutoResponse(new Pair(ping, pong));
+    this.ready = ctx.blockConcurrencyWhile(async () => {
+      const id = await this.app.initialize();
+      // A new instance means every earlier request has ended, so admission
+      // records left by a reset or deploy can no longer describe a live write.
+      await this.metadata.run("DELETE FROM server_write_leases");
+      ctx.storage.sql.exec(
+        "CREATE TABLE IF NOT EXISTS _showai_event_subscriptions(socket_id TEXT PRIMARY KEY,projects TEXT NOT NULL)",
+      );
+      const live = new Set(
+        ctx.getWebSockets().map((socket) => socket.deserializeAttachment().socketId),
+      );
+      for (const row of ctx.storage.sql
+        .exec<{ socket_id: string }>("SELECT socket_id FROM _showai_event_subscriptions")
+        .toArray())
+        if (!live.has(row.socket_id))
+          ctx.storage.sql.exec(
+            "DELETE FROM _showai_event_subscriptions WHERE socket_id=?",
+            row.socket_id,
+          );
+      return id;
+    });
+  }
+  private subscribed(socketId: string) {
+    if (!this.subscriptions)
+      this.subscriptions = new Map(
+        this.ctx.storage.sql
+          .exec<{ socket_id: string; projects: string }>(
+            "SELECT socket_id,projects FROM _showai_event_subscriptions",
+          )
+          .toArray()
+          .map((row) => [row.socket_id, JSON.parse(row.projects) as string[]]),
+      );
+    return this.subscriptions.get(socketId) ?? [];
+  }
+  private forget(socket: EventSocket) {
+    const { socketId } = socket.deserializeAttachment();
+    if (!socketId) return;
+    this.subscriptions?.delete(socketId);
+    this.ctx.storage.sql.exec(
+      "DELETE FROM _showai_event_subscriptions WHERE socket_id=?",
+      socketId,
+    );
   }
   private peer(socket: EventSocket): EventPeer {
     return {
-      identity: () => socket.deserializeAttachment(),
-      remember: (value) => socket.serializeAttachment(value),
+      identity: () => {
+        const attachment = socket.deserializeAttachment();
+        return {
+          userId: attachment.userId,
+          sessionDigest: attachment.sessionDigest,
+          projects: attachment.socketId
+            ? this.subscribed(attachment.socketId)
+            : (attachment.projects ?? []),
+        };
+      },
+      remember: (value) => {
+        const attachment = socket.deserializeAttachment();
+        let socketId = attachment.socketId;
+        if (!socketId) {
+          socketId = crypto.randomUUID();
+          socket.serializeAttachment({
+            userId: attachment.userId,
+            sessionDigest: attachment.sessionDigest,
+            socketId,
+          });
+        }
+        this.subscribed(socketId);
+        this.subscriptions!.set(socketId, value.projects);
+        this.ctx.storage.sql.exec(
+          "INSERT OR REPLACE INTO _showai_event_subscriptions(socket_id,projects) VALUES(?,?)",
+          socketId,
+          JSON.stringify(value.projects),
+        );
+      },
       send: (value) => {
         if (socket.readyState === 1) socket.send(value);
       },
@@ -354,7 +443,11 @@ export class ShowAIServer {
           }
         ).WebSocketPair;
         const pair = new Pair();
-        pair[1].serializeAttachment(identity);
+        pair[1].serializeAttachment({
+          userId: identity.userId,
+          sessionDigest: identity.sessionDigest,
+          socketId: crypto.randomUUID(),
+        });
         this.ctx.acceptWebSocket(pair[1]);
         return new Response(null, {
           status: 101,
@@ -406,8 +499,14 @@ export class ShowAIServer {
       );
     }
   }
-  webSocketClose(socket: EventSocket, code: number, reason: string) {
+  async webSocketClose(socket: EventSocket, code: number, reason: string) {
+    await this.ready;
+    this.forget(socket);
     socket.close(code === 1005 || code === 1006 ? 1000 : code, reason);
+  }
+  async webSocketError(socket: EventSocket) {
+    await this.ready;
+    this.forget(socket);
   }
   async alarm() {
     await this.ready;

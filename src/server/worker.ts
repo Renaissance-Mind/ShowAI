@@ -210,7 +210,9 @@ export function workerObjects(env: WorkerEnvironment): ObjectStore {
       await env.CONTENT.put(key, bytes);
     },
     async putVerified(key, body, expected, maximum) {
-      if (activeUploads >= 2)
+      // Each streaming upload buffers one 5 MiB part; six stay well inside the
+      // isolate's memory while letting several devices upload at once.
+      if (activeUploads >= 6)
         throw new SyncError(
           429,
           "BUSY",

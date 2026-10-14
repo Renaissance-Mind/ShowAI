@@ -44,6 +44,8 @@ interface FederationState {
   version: 1;
   pending: PendingBinding[];
   errors: Record<string, string>;
+  /** Accounts signed out on this device; bound servers must not restore them. */
+  signedOut?: string[];
 }
 const label = () => `ShowAI · ${hostname().slice(0, 180)}`;
 export async function accountRequest<T>(
@@ -68,9 +70,16 @@ export async function accountRequest<T>(
       response.status,
       value.error?.code ?? "SERVER_ERROR",
       value.error?.message ?? `服务器返回 ${response.status}`,
+      value.error?.details,
     );
   return value as T;
 }
+export const accountKey = (serverId: string, userId: string) =>
+  `${serverId}:${userId}`;
+const revoked = (error: unknown) =>
+  error instanceof SyncError &&
+  error.status === 401 &&
+  (error.details as { reason?: string } | undefined)?.reason === "revoked";
 export class AccountManager {
   private work?: Promise<unknown>;
   private timer?: ReturnType<typeof setTimeout>;
@@ -289,6 +298,22 @@ export class AccountManager {
     await this.reconcileGroup();
     return this.status();
   }
+  async signOut(serverId: string, userId: string) {
+    const key = accountKey(serverId, userId);
+    await this.update((state) => {
+      state.signedOut = [
+        ...new Set([...(state.signedOut ?? []), key]),
+      ].slice(-256);
+    });
+  }
+  async signedIn(serverId: string, userId: string) {
+    const key = accountKey(serverId, userId);
+    if (!(await this.state()).signedOut?.includes(key)) return;
+    await this.update((state) => {
+      state.signedOut = state.signedOut?.filter((item) => item !== key);
+      delete state.errors[key];
+    });
+  }
   async restore(connectionId: string) {
     return this.exclusive(() => this.restoreLogin(connectionId));
   }
@@ -297,7 +322,8 @@ export class AccountManager {
     visited = new Set<string>(),
   ) {
     const initial = await this.connection(connectionId),
-      config = await this.adapter.configuration();
+      config = await this.adapter.configuration(),
+      signedOut = new Set((await this.state()).signedOut ?? []);
     const queue = [initial],
       restored: string[] = [],
       maximum = visited.size + 32;
@@ -327,7 +353,7 @@ export class AccountManager {
         identifier(identity.serverId);
         identifier(identity.user.id);
         serverBaseUrl(identity.url);
-        if (visited.has(peerKey)) continue;
+        if (visited.has(peerKey) || signedOut.has(peerKey)) continue;
         try {
           let existing = (await this.adapter.configuration()).connections.find(
             (item) =>
@@ -339,6 +365,7 @@ export class AccountManager {
               serverId: string;
               user: { id: string };
             }>(existing, "/api/me").catch((error: unknown) => {
+              if (revoked(error)) throw error;
               if (error instanceof SyncError && error.status === 401)
                 return undefined;
               throw error;
@@ -396,6 +423,15 @@ export class AccountManager {
             delete state.errors[`${identity.serverId}:${identity.user.id}`];
           });
         } catch (error) {
+          if (revoked(error)) {
+            // Respect a sign-out made on that server instead of undoing it.
+            await this.signOut(identity.serverId, identity.user.id);
+            await this.update((state) => {
+              state.errors[peerKey] =
+                "此设备在该服务器上的登录已被注销，请重新登录。";
+            });
+            continue;
+          }
           await this.update((state) => {
             state.errors[peerKey] =
               error instanceof Error ? error.message : String(error);

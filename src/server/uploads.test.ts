@@ -428,3 +428,80 @@ test("daily upload and project creation budgets persist across server instances"
     db.close();
   }
 });
+
+test("a crashed upload's reservation and an abandoned resumable task stop blocking other uploaders", async () => {
+  const f = await fixture();
+  const editor = await f.register("second-uploader");
+  const invite = await f.request(
+    "/api/projects/project/invites",
+    "POST",
+    { role: "editor" },
+    f.owner.token,
+  );
+  await f.request(
+    "/api/invites/accept",
+    "POST",
+    { invite: invite.value.invite },
+    editor.token,
+  );
+  const db = new SQLiteMetadata(join(f.home, "metadata.sqlite"));
+  cleanups.push(async () => db.close());
+  const crashed = Buffer.from("left behind by a reset"),
+    crashedDigest = await hash(crashed);
+  // A reset between admission and publication leaves only the reservation.
+  await db.run(
+    "INSERT INTO storage_reservations(id,project_id,user_id,kind,digest,bytes,created_at) VALUES('stale',?,?,'object',?,?,?)",
+    [
+      "project",
+      f.owner.user.id,
+      crashedDigest,
+      crashed.length,
+      new Date(Date.now() - 20 * 60_000).toISOString(),
+    ],
+  );
+  const uploaded = await f.put(
+    `/api/projects/project/objects/${crashedDigest}`,
+    crashed,
+    editor.token,
+  );
+  expect(uploaded.status).toBe(200);
+  await uploaded.arrayBuffer();
+  // Another account abandoned a resumable task for the same object a day ago.
+  const large = Buffer.alloc(uploadPartBytes + 1, 7),
+    largeDigest = await hash(large);
+  const begun = await f.request(
+    "/api/projects/project/objects/uploads",
+    "POST",
+    { digest: largeDigest, bytes: large.length },
+    f.owner.token,
+  );
+  expect(begun.status).toBe(200);
+  const blocked = await f.request(
+    "/api/projects/project/objects/uploads",
+    "POST",
+    { digest: largeDigest, bytes: large.length },
+    editor.token,
+  );
+  expect(blocked.value.error.code).toBe("UPLOAD_IN_PROGRESS");
+  await db.run("UPDATE object_uploads SET created_at=? WHERE id=?", [
+    new Date(Date.now() - 25 * 3600_000).toISOString(),
+    begun.value.id,
+  ]);
+  await resumableUpload(
+    f.url() + "/api/projects/project/objects",
+    editor.token,
+    largeDigest,
+    large,
+  );
+  expect(
+    await db.all("SELECT user_id FROM object_uploads WHERE digest=?", [
+      largeDigest,
+    ]),
+  ).toEqual([{ user_id: editor.user.id }]);
+  const visible = await fetch(
+    f.url() + `/api/projects/project/objects/${largeDigest}`,
+    { headers: { authorization: `Bearer ${f.owner.token}` } },
+  );
+  expect(visible.status).toBe(200);
+  expect(Buffer.from(await visible.arrayBuffer()).equals(large)).toBe(true);
+});

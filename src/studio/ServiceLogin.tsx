@@ -23,6 +23,7 @@ export default function ServiceLogin({
     [flow, setFlow] = useState<Flow | null>(null);
   const [email, setEmail] = useState(""),
     [code, setCode] = useState(""),
+    [confirming, setConfirming] = useState(false),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -46,7 +47,10 @@ export default function ServiceLogin({
       clearTimeout(timer);
     };
   }, [url]);
-  async function finish(current: Flow, emailCode?: string) {
+  async function finish(
+    current: Flow,
+    entered?: { code?: string; completionCode?: string },
+  ) {
     const result = await desktop.invoke<{
       status: string;
       connection?: { id: string };
@@ -54,13 +58,15 @@ export default function ServiceLogin({
       url: current.serverUrl,
       id: current.id,
       pollSecret: current.pollSecret,
-      code: emailCode,
+      ...entered,
     });
     if (result.status === "completed" && result.connection) {
       setFlow(null);
+      setConfirming(false);
       await onConnected(result.connection.id);
       return true;
     }
+    if (result.status === "confirm") setConfirming(true);
     return false;
   }
   useEffect(() => {
@@ -95,6 +101,7 @@ export default function ServiceLogin({
     setBusy(true);
     setError("");
     setCode("");
+    setConfirming(false);
     try {
       setFlow(
         await desktop.invoke<Flow>("sync:beginLogin", {
@@ -149,13 +156,47 @@ export default function ServiceLogin({
           )}
         </div>
       )}
-      {flow?.url && (
+      {flow?.url && !confirming && (
         <p className="settings-help">
           <a href={flow.url} target="_blank" rel="noopener noreferrer">
             打开 {flow.provider === "github" ? "GitHub" : "Google"} 授权页面
           </a>
           ，完成后返回这里。正在等待登录…
         </p>
+      )}
+      {flow?.url && confirming && (
+        <>
+          <p className="settings-help">
+            授权已完成。点击浏览器页面中的「在 ShowAI 中完成」，或输入页面显示的完成码。
+          </p>
+          <label>
+            完成码
+            <input
+              autoComplete="one-time-code"
+              maxLength={9}
+              value={code}
+              onChange={(event) => setCode(event.target.value.toUpperCase())}
+            />
+          </label>
+          <button
+            type="button"
+            className="settings-button"
+            disabled={busy || code.replace(/[\s-]/g, "").length !== 8}
+            onClick={() => {
+              setBusy(true);
+              setError("");
+              void finish(flow, { completionCode: code })
+                .catch((error) => {
+                  setError(errorMessage(error));
+                  setFlow(null);
+                  setConfirming(false);
+                })
+                .finally(() => setBusy(false));
+            }}
+          >
+            完成登录
+          </button>
+        </>
       )}
       {methods.includes("email") && !flow && (
         <>
@@ -197,7 +238,7 @@ export default function ServiceLogin({
             onClick={() => {
               setBusy(true);
               setError("");
-              void finish(flow, code)
+              void finish(flow, { code })
                 .catch((error) => setError(errorMessage(error)))
                 .finally(() => setBusy(false));
             }}
@@ -213,6 +254,7 @@ export default function ServiceLogin({
           onClick={() => {
             setFlow(null);
             setCode("");
+            setConfirming(false);
           }}
         >
           取消本次登录

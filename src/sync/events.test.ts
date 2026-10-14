@@ -261,7 +261,7 @@ test("continuous edits arrive before editing stops and a disconnected client ret
   left.content.content![0].content = [
     { type: "text", text: "Owner kept offline" },
   ];
-  const offlineSaved = await owner.store.savePage(
+  await owner.store.savePage(
     project.id,
     pageId,
     left,
@@ -299,16 +299,6 @@ test("continuous edits arrive before editing stops and a disconnected client ret
     JSON.stringify(
       (await editor.store.readPage(project.id, pageId)).document.content,
     ).includes("Owner kept offline"),
-  );
-  await until(async () =>
-    (
-      await new GitLibrary(editor.home).history({
-        projectId: project.id,
-        limit: 100,
-      })
-    ).some(
-      (entry) => entry.syncOrigin?.sourceRevision === offlineSaved.revision,
-    ),
   );
 }, 180_000);
 

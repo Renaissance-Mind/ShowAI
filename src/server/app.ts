@@ -42,6 +42,7 @@ import {
   readBounded,
   secureResponse,
   liveSession,
+  requireRecentSignIn,
 } from "./security";
 import {
   registerAccount,
@@ -160,8 +161,36 @@ export function createSyncServer(options: ServerOptions) {
     options.requestPolicy,
   );
   maintenance.budgetSummary = () => requestBudgets.usage();
-  let activeManifests = 0;
-  const manifestWaiters: (() => void)[] = [];
+  // Manifest work is bounded by weight rather than one global slot: ordinary
+  // publications run side by side, while a large body takes every slot so the
+  // isolate never parses several multi-megabyte manifests at once.
+  const manifestCapacity = 4;
+  let manifestWeight = 0;
+  const manifestWaiters: { weight: number; admit: () => void }[] = [];
+  const admitManifests = () => {
+    while (
+      manifestWaiters.length &&
+      manifestWeight + manifestWaiters[0].weight <= manifestCapacity
+    ) {
+      const next = manifestWaiters.shift()!;
+      manifestWeight += next.weight;
+      next.admit();
+    }
+  };
+  // Package objects are immutable and content-addressed, so a verified copy can
+  // serve later publications without another storage read and digest pass.
+  const verifiedPackages = new Map<string, Uint8Array>();
+  let verifiedPackageBytes = 0;
+  const rememberPackage = (key: string, bytes: Uint8Array) => {
+    if (bytes.length > 4 * 1024 * 1024) return;
+    verifiedPackages.set(key, bytes);
+    verifiedPackageBytes += bytes.length;
+    for (const [oldest, value] of verifiedPackages) {
+      if (verifiedPackageBytes <= 16 * 1024 * 1024) break;
+      verifiedPackages.delete(oldest);
+      verifiedPackageBytes -= value.length;
+    }
+  };
   let initialization: Promise<string> | undefined;
   async function initialize() {
     await prepareMetadata(db, options.autoMigrate !== false);
@@ -197,12 +226,22 @@ export function createSyncServer(options: ServerOptions) {
       "SELECT u.id,u.name,u.auth_version,s.digest AS session_digest FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.digest=? AND s.revoked=0 AND s.auth_version=u.auth_version AND s.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')",
       [digest],
     );
-    if (!rows[0])
+    if (!rows[0]) {
+      // Clients may restore an expired login from a bound server, but never one
+      // its owner revoked here.
+      const revoked = (
+        await db.all(
+          "SELECT 1 FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.digest=? AND (s.revoked=1 OR s.auth_version<>u.auth_version)",
+          [digest],
+        )
+      ).length;
       throw new SyncError(
         401,
         "UNAUTHORIZED",
         "The token has expired or was revoked.",
+        revoked ? { reason: "revoked" } : undefined,
       );
+    }
     return rows[0];
   }
   async function projectFor(
@@ -254,12 +293,23 @@ export function createSyncServer(options: ServerOptions) {
   async function publicLimitsAccount(
     kind: "login" | "register",
     name: unknown,
+    source: string,
   ) {
+    const account = plainText(name, 100),
+      windowMs = kind === "login" ? 60_000 : 3600_000;
+    // The tight limit follows one source so others cannot lock the owner out;
+    // the account-wide ceiling still bounds distributed guessing.
+    await rateLimit(db, {
+      scope: `${kind}:account-source`,
+      identity: JSON.stringify([account, source]),
+      maximum: kind === "login" ? 12 : 6,
+      windowMs,
+    });
     await rateLimit(db, {
       scope: `${kind}:account`,
-      identity: plainText(name, 100),
-      maximum: kind === "login" ? 12 : 6,
-      windowMs: kind === "login" ? 60_000 : 3600_000,
+      identity: account,
+      maximum: kind === "login" ? 60 : 30,
+      windowMs,
     });
   }
   async function handle(
@@ -334,7 +384,7 @@ export function createSyncServer(options: ServerOptions) {
         options.registrationLimit,
       );
       const input = await body(request);
-      await publicLimitsAccount("register", input.name);
+      await publicLimitsAccount("register", input.name, source);
       return json(
         await sessions.create(
           await registerAccount(
@@ -353,7 +403,7 @@ export function createSyncServer(options: ServerOptions) {
     if (path === "/api/auth/login" && method === "POST") {
       await publicLimits(db, "login", source);
       const input = await body(request);
-      await publicLimitsAccount("login", input.name);
+      await publicLimitsAccount("login", input.name, source);
       return json(await session(await loginAccount(db, input), input.device));
     }
     if (path === "/api/auth/exchange" && method === "POST")
@@ -449,13 +499,19 @@ export function createSyncServer(options: ServerOptions) {
     if (path === "/api/account/grants" && method === "POST")
       return json(await accounts.grant(user, await body(request)));
     if (path === "/api/account/tokens" && method === "POST")
+      // A year-long token may only come from a direct sign-in, never a federated
+      // session, so it cannot extend a stolen credential or outlive an unbinding.
       return json(
         await sessions.create(user, (await body(request)).device, {
           kind: "personal",
-          condition: liveSession(user),
+          condition: await requireRecentSignIn(db, user),
         }),
         201,
       );
+    if (path === "/api/account/logins" && method === "GET")
+      return json(await logins.identities(user));
+    if (path === "/api/account/logins" && method === "DELETE")
+      return json(await logins.removeIdentity(user, await body(request)));
     if (path === "/api/account/resources" && method === "GET")
       return json(await resources.list(user, url.origin + basePath));
     if (path === "/api/account/resources" && method === "PUT")
@@ -1278,16 +1334,21 @@ export function createSyncServer(options: ServerOptions) {
         Object.keys(snapshot.files),
         projectId,
         async (path) => {
-          const bytes = await objects.get(
-            objectKey(projectId, snapshot.files[path]),
-            CAPACITY.syncObjectBytes,
-          );
+          const key = objectKey(projectId, snapshot.files[path]);
+          const cached = verifiedPackages.get(key);
+          if (cached) {
+            verifiedPackages.delete(key);
+            verifiedPackages.set(key, cached);
+            return cached;
+          }
+          const bytes = await objects.get(key, CAPACITY.syncObjectBytes);
           if (!bytes || (await hash(bytes)) !== snapshot.files[path])
             throw new SyncError(
               400,
               "INVALID_DEPENDENCY",
               "A package object is absent or corrupt.",
             );
+          rememberPackage(key, bytes);
           return bytes;
         },
       );
@@ -1386,7 +1447,13 @@ export function createSyncServer(options: ServerOptions) {
           { head: current.head, revision },
         );
       }
-      await events?.published(projectId, expected);
+      // The new head is durable; a failed notification must not report the
+      // publication as failed. Peers catch up through heads on their next cycle.
+      await events
+        ?.published(projectId, expected)
+        .catch((error: unknown) =>
+          console.error("Project event fan-out failed", error),
+        );
       await revisions.retainCurrent(projectId, revision);
       return json({ revision, head: revision, published: true });
     }
@@ -1415,9 +1482,18 @@ export function createSyncServer(options: ServerOptions) {
         /\/(?:revisions|snapshot)(?:\/|$)/.test(requestPath) ||
         (request.method === "PATCH" &&
           /\/api\/projects\/[^/]+\/?$/.test(requestPath));
+      const declared = Number(request.headers.get("content-length") ?? 0);
+      const weight = heavy
+        ? declared > 2 * 1024 * 1024
+          ? manifestCapacity
+          : 1
+        : 0;
       if (heavy) {
-        if (activeManifests >= 1) {
-          if (manifestWaiters.length >= 8) {
+        if (
+          manifestWaiters.length ||
+          manifestWeight + weight > manifestCapacity
+        ) {
+          if (manifestWaiters.length >= 32) {
             const response = json(
               {
                 error: {
@@ -1431,8 +1507,10 @@ export function createSyncServer(options: ServerOptions) {
             response.headers.set("retry-after", "1");
             return secure(response);
           }
-          await new Promise<void>((resolve) => manifestWaiters.push(resolve));
-        } else activeManifests++;
+          await new Promise<void>((admit) =>
+            manifestWaiters.push({ weight, admit }),
+          );
+        } else manifestWeight += weight;
       }
       let writeLease: string | undefined;
       let transfer: ReturnType<typeof deadlineBody> | undefined;
@@ -1560,9 +1638,8 @@ export function createSyncServer(options: ServerOptions) {
             if (writeLease) await maintenance.leaveWrite(writeLease);
           } finally {
             if (heavy) {
-              const next = manifestWaiters.shift();
-              if (next) next();
-              else activeManifests--;
+              manifestWeight -= weight;
+              admitManifests();
             }
           }
         }

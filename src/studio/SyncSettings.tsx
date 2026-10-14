@@ -9,6 +9,7 @@ import SyncDashboard, {
 } from "./SyncDashboard";
 import AccountBindings from "./AccountBindings";
 import ServiceLogin from "./ServiceLogin";
+import LoginMethods from "./LoginMethods";
 import { conflictPreview } from "./sync-conflict-preview";
 import type { ProjectSummary } from "../core/model";
 import type {
@@ -91,6 +92,7 @@ export default function SyncSettings() {
       ),
     [conflict],
   );
+  const [loginMethodsRevision, setLoginMethodsRevision] = useState(0);
   const [sessions, setSessions] = useState<
     | {
         digest: string;
@@ -566,8 +568,13 @@ export default function SyncSettings() {
                     connectionId: sessionConnectionId,
                   }),
                 );
+                setLoginMethodsRevision((value) => value + 1);
                 setMessage("已添加登录方式，可用它登录当前账号。");
               }}
+            />
+            <LoginMethods
+              connectionId={sessionConnectionId}
+              revision={loginMethodsRevision}
             />
             {status.connections
               .find((connection) => connection.id === sessionConnectionId)
@@ -649,7 +656,9 @@ export default function SyncSettings() {
                 </button>
                 {confirmSignOut && (
                   <div role="group" aria-label="确认退出所有设备">
-                    <p>所有设备包括本设备都会退出登录。项目与本地内容保留。</p>
+                    <p>
+                      此账号及其绑定服务器上的所有设备（包括本设备）都会退出登录。项目与本地内容保留。
+                    </p>
                     <button
                       className="settings-button"
                       disabled={busy}
@@ -662,7 +671,9 @@ export default function SyncSettings() {
                       disabled={busy}
                       onClick={() =>
                         void run(async () => {
-                          await desktop.invoke("sync:revokeAllTokens", {
+                          const result = await desktop.invoke<{
+                            unreachable: string[];
+                          }>("sync:revokeAllTokens", {
                             connectionId: sessionConnectionId,
                           });
                           setSessions(null);
@@ -680,7 +691,11 @@ export default function SyncSettings() {
                             mode: "login",
                           });
                           setShowConnect(true);
-                          setMessage("所有设备已退出，请重新登录。");
+                          setMessage(
+                            result.unreachable.length
+                              ? `所有设备已退出，请重新登录。以下绑定服务器未能退出，请分别登录后再操作：${result.unreachable.join("、")}`
+                              : "所有设备已退出，请重新登录。",
+                          );
                         })
                       }
                     >

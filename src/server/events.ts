@@ -93,10 +93,15 @@ export class ProjectEvents {
     }
     return projects;
   }
-  private async deliver(peer: EventPeer, event: ProjectEvent) {
+  private async deliver(
+    peer: EventPeer,
+    event: ProjectEvent,
+    authority?: SyncProject[],
+  ) {
     // Permission changes can interleave with object reads and budget accounting.
-    // Re-read authority immediately before constructing the delivered payload.
-    const current = await this.projects(peer.identity());
+    // Re-read authority immediately before constructing the delivered payload,
+    // unless the caller has just done so.
+    const current = authority ?? (await this.projects(peer.identity()));
     if (!current) {
       peer.close(4001, "The device session is no longer valid.");
       return;
@@ -159,6 +164,11 @@ export class ProjectEvents {
         "INVALID_EVENT",
         "A project event request is required.",
       );
+    // Heartbeats only keep the transport alive; deliveries recheck the session.
+    if (input.type === "ping") {
+      peer.send(JSON.stringify({ type: "pong" }));
+      return;
+    }
     const identity = peer.identity();
     await this.budgets.consume();
     await this.budgets.consume(identity.userId);
@@ -171,7 +181,7 @@ export class ProjectEvents {
         );
       identity.projects = [...new Set<string>(input.ids.map(identifier))];
       peer.remember(identity);
-    } else if (input.type !== "ping")
+    } else
       throw new SyncError(
         400,
         "INVALID_EVENT",
@@ -182,13 +192,11 @@ export class ProjectEvents {
       peer.close(4001, "The device session is no longer valid.");
       return;
     }
-    if (input.type === "ping") peer.send(JSON.stringify({ type: "pong" }));
-    else
-      await this.deliver(peer, {
-        type: "heads",
-        serverId: await this.serverId(),
-        projects,
-      });
+    await this.deliver(peer, {
+      type: "heads",
+      serverId: await this.serverId(),
+      projects,
+    });
   }
   async recheck() {
     for (const peer of this.peers()) {
@@ -235,6 +243,8 @@ export class ProjectEvents {
       for (const [path, digest] of Object.entries(record.snapshot.files)) {
         if (previous?.snapshot.files[path] === digest || seen.has(digest))
           continue;
+        // Bound storage lookups when nothing previous is known, as on a first publish.
+        if (seen.size >= 256) break;
         seen.add(digest);
         const key = `projects/${projectId}/objects/${digest}`;
         const info = await this.objects.stat(key);
@@ -258,11 +268,11 @@ export class ProjectEvents {
       }
       const project = projects.find((item) => item.id === projectId);
       if (!project) {
-        await this.deliver(peer, {
-          type: "heads",
-          serverId: await this.serverId(),
+        await this.deliver(
+          peer,
+          { type: "heads", serverId: await this.serverId(), projects },
           projects,
-        });
+        );
         continue;
       }
       // The head can advance while objects are read. Never attach an older record
@@ -280,7 +290,7 @@ export class ProjectEvents {
               previousSequence,
             }
           : {}),
-      });
+      }, projects);
     }
   }
 }

@@ -445,26 +445,45 @@ export class SyncManager {
     method = "GET",
     data?: unknown,
   ): Promise<T> {
-    const response = await fetch(serverEndpoint(connection.url, path), {
-      method,
-      headers: {
-        ...(connection.token
-          ? { authorization: `Bearer ${connection.token}` }
-          : {}),
-        ...(data === undefined ? {} : { "content-type": "application/json" }),
-      },
-      body: data === undefined ? undefined : JSON.stringify(data),
-      signal: AbortSignal.timeout(30_000),
-    });
-    const value = await response.json();
-    if (!response.ok)
+    for (let attempt = 0; ; attempt++) {
+      const response = await fetch(serverEndpoint(connection.url, path), {
+        method,
+        headers: {
+          ...(connection.token
+            ? { authorization: `Bearer ${connection.token}` }
+            : {}),
+          ...(data === undefined ? {} : { "content-type": "application/json" }),
+        },
+        body: data === undefined ? undefined : JSON.stringify(data),
+        signal: AbortSignal.timeout(30_000),
+      });
+      const value = await response.json();
+      if (response.ok) return value as T;
+      // BUSY is returned before the server performs any work, so waiting and
+      // repeating the same request is safe for every endpoint.
+      const retryAfter = Number(value.error?.details?.retryAfter ?? 1);
+      if (
+        response.status === 429 &&
+        value.error?.code === "BUSY" &&
+        attempt < 3
+      ) {
+        await new Promise((resolve) =>
+          setTimeout(
+            resolve,
+            Math.min(5, Math.max(1, retryAfter)) *
+              1000 *
+              (0.8 + Math.random() * 0.4),
+          ),
+        );
+        continue;
+      }
       throw new SyncError(
         response.status,
         value.error?.code ?? "SERVER_ERROR",
         value.error?.message ?? `服务器返回 ${response.status}`,
         value.error?.details,
       );
-    return value as T;
+    }
   }
   async status() {
     const config = await this.configuration();
@@ -573,6 +592,7 @@ export class SyncManager {
       );
       next.connections.push(connection);
     });
+    await this.accounts.signedIn(connection.serverId, connection.user.id);
     this.start();
     if (
       input.restoreBindings !== false &&
@@ -617,18 +637,38 @@ export class SyncManager {
       serverUrl: connection.url,
     };
   }
+  /** Completion codes the browser delivered through a showai://login link. */
+  private readonly loginCompletions = new Map<string, string>();
+  deliverLoginCompletion(flowId: string, code: string) {
+    identifier(flowId);
+    if (!/^[A-Za-z0-9-]{8,9}$/.test(code))
+      throw new CoreError("INVALID_DATA", "登录完成链接无效。");
+    if (this.loginCompletions.size >= 16) this.loginCompletions.clear();
+    this.loginCompletions.set(flowId, code);
+  }
   async finishLogin(input: {
     url: string;
     id: string;
     pollSecret: string;
     code?: string;
+    completionCode?: string;
   }) {
+    const completionCode =
+      input.completionCode || this.loginCompletions.get(input.id);
     const result = await this.request<{ status: string; token?: string }>(
       { url: serverBaseUrl(input.url), token: "" },
       "/api/auth/finish",
       "POST",
-      input,
-    );
+      {
+        id: input.id,
+        pollSecret: input.pollSecret,
+        code: input.code,
+        completionCode,
+      },
+    ).finally(() => {
+      if (completionCode) this.loginCompletions.delete(input.id);
+    });
+    if (result.status === "confirm") return { status: "confirm" };
     if (result.status !== "completed" || !result.token)
       return { status: "pending" };
     return {
@@ -667,6 +707,21 @@ export class SyncManager {
     return this.status();
   }
   async disconnect(connectionId: string) {
+    const removed = (await this.configuration()).connections.find(
+      (connection) => connection.id === connectionId,
+    );
+    if (
+      removed &&
+      !(await this.configuration()).projects.some(
+        (project) => project.connectionId === connectionId,
+      )
+    ) {
+      // End the server session too, and keep bound servers from restoring it.
+      await this.request(removed, "/api/auth/logout", "POST").catch(
+        () => undefined,
+      );
+      await this.accounts.signOut(removed.serverId, removed.user.id);
+    }
     await this.update((config) => {
       if (
         config.projects.some((project) => project.connectionId === connectionId)
@@ -783,12 +838,54 @@ export class SyncManager {
       { digest },
     );
   }
-  async revokeAllTokens(connectionId: string) {
+  async loginMethods(connectionId: string) {
     return this.request(
       await this.connection(connectionId),
-      "/api/sessions/revoke-all",
-      "POST",
+      "/api/account/logins",
     );
+  }
+  async removeLoginMethod(
+    connectionId: string,
+    provider: string,
+    subject: string,
+  ) {
+    return this.request(
+      await this.connection(connectionId),
+      "/api/account/logins",
+      "DELETE",
+      { provider, subject },
+    );
+  }
+  async revokeAllTokens(connectionId: string) {
+    const connection = await this.connection(connectionId);
+    // Bound servers sign each other in, so a sign-out must reach the whole group.
+    const peers = await this.accounts
+      .profile(connectionId)
+      .then((profile) =>
+        profile.peers
+          .filter((binding) => binding.state === "active")
+          .map((binding) => binding.descriptor.identity),
+      )
+      .catch(() => []);
+    await this.request(connection, "/api/sessions/revoke-all", "POST");
+    await this.accounts.signOut(connection.serverId, connection.user.id);
+    const connections = (await this.configuration()).connections,
+      unreachable: string[] = [];
+    for (const peer of peers) {
+      await this.accounts.signOut(peer.serverId, peer.user.id);
+      const local = connections.find(
+        (item) =>
+          item.serverId === peer.serverId && item.user.id === peer.user.id,
+      );
+      const revoked =
+        local &&
+        (await this.request(local, "/api/sessions/revoke-all", "POST").then(
+          () => true,
+          () => false,
+        ));
+      if (!revoked) unreachable.push(peer.url);
+    }
+    return { ok: true, unreachable };
   }
   async changePassword(
     connectionId: string,

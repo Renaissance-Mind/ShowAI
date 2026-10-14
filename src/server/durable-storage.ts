@@ -74,6 +74,26 @@ export class DurableObjects implements ObjectStore {
       .exec<HotObject>("SELECT * FROM _showai_hot_objects WHERE key=?", key)
       .toArray()[0];
   }
+  /** Running hot-tier size, so a write never sums the whole table. */
+  private hotBytes?: number;
+  private hotTotal() {
+    this.hotBytes ??= this.storage.sql
+      .exec<{ bytes: number }>(
+        "SELECT COALESCE(SUM(bytes),0) AS bytes FROM _showai_hot_objects",
+      )
+      .one().bytes;
+    return this.hotBytes;
+  }
+  private hotSize(key: string) {
+    return (
+      this.storage.sql
+        .exec<{ bytes: number }>(
+          "SELECT bytes FROM _showai_hot_objects WHERE key=?",
+          key,
+        )
+        .toArray()[0]?.bytes ?? 0
+    );
+  }
   private writable() {
     return (
       this.storage.sql
@@ -89,6 +109,7 @@ export class DurableObjects implements ObjectStore {
     at = new Date().toISOString(),
   ) {
     if (bytes.length > hotLimit) return;
+    const total = this.hotTotal() - this.hotSize(key) + bytes.length;
     this.storage.sql.exec(
       "INSERT OR REPLACE INTO _showai_hot_objects VALUES(?,?,?,?,?)",
       key,
@@ -97,11 +118,7 @@ export class DurableObjects implements ObjectStore {
       bytes.slice().buffer,
       Date.now(),
     );
-    const total = this.storage.sql
-      .exec<{ bytes: number }>(
-        "SELECT COALESCE(SUM(bytes),0) AS bytes FROM _showai_hot_objects",
-      )
-      .one().bytes;
+    this.hotBytes = total;
     if (total > hotBudget) await this.storage.setAlarm(Date.now() + 1000);
   }
   async stat(key: string) {
@@ -219,7 +236,9 @@ export class DurableObjects implements ObjectStore {
   }
   async remove(key: string) {
     await this.cold.remove(key);
+    const removed = this.hotSize(key);
     this.storage.sql.exec("DELETE FROM _showai_hot_objects WHERE key=?", key);
+    if (this.hotBytes !== undefined) this.hotBytes -= removed;
   }
   async list(cursor?: string, maximum = 100) {
     const state: { tier: "hot" | "cold"; after?: string } = cursor
@@ -293,11 +312,9 @@ export class DurableObjects implements ObjectStore {
           row.used_at,
         );
     }
-    const total = this.storage.sql
-      .exec<{ bytes: number }>(
-        "SELECT COALESCE(SUM(bytes),0) AS bytes FROM _showai_hot_objects",
-      )
-      .one().bytes;
+    // Archival runs from an alarm, so it can afford an exact recount.
+    this.hotBytes = undefined;
+    const total = this.hotTotal();
     if (total > hotBudget * 0.75)
       await this.storage.setAlarm(Date.now() + 1000);
   }
