@@ -4,28 +4,34 @@ import { inlineStyleSheet, scopeReaderCss } from "./inline-style.mjs";
 // styles of lazily loaded blocks arrive with their chunk and reach every
 // mounted reader.
 const sheets: string[] = [];
-const roots = new Set<HTMLElement>();
+type Target = { root: HTMLElement; scoped: boolean };
+const targets = new Set<Target>();
 
-function append(root: HTMLElement, css: string) {
+function append({ root, scoped }: Target, css: string) {
   const style = root.ownerDocument.createElement("style");
-  style.dataset.showaiReaderStyle = "";
-  style.textContent = inlineStyleSheet(root.id, scopeReaderCss(css));
-  root.append(style);
+  style.dataset.showaiReaderStyle = root.id;
+  style.textContent = scoped
+    ? inlineStyleSheet(root.id, scopeReaderCss(css))
+    : css;
+  // An inline root keeps its styles inside itself; a standalone page owns the
+  // document, so its styles go to <head> like the bundled reader's.
+  (scoped ? root : root.ownerDocument.head).append(style);
 }
 
 export function registerStyle(css: string) {
   sheets.push(css);
-  for (const root of roots) append(root, css);
+  for (const target of targets) append(target, css);
 }
 
-/** Applies every registered and future stylesheet inside `root`. */
-export function attachStyles(root: HTMLElement) {
-  roots.add(root);
-  for (const css of sheets) append(root, css);
+/** Applies every registered and future stylesheet for the reader in `root`. */
+export function attachStyles(root: HTMLElement, { scoped = true } = {}) {
+  const target = { root, scoped };
+  targets.add(target);
+  for (const css of sheets) append(target, css);
   return () => {
-    roots.delete(root);
-    root
-      .querySelectorAll(":scope > style[data-showai-reader-style]")
+    targets.delete(target);
+    root.ownerDocument
+      .querySelectorAll(`style[data-showai-reader-style="${root.id}"]`)
       .forEach((style) => style.remove());
   };
 }

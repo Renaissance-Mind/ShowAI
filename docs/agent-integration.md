@@ -6,10 +6,10 @@ Local library MCP uses explicit `projectId` per operation. Use `projects_list` f
 
 ShowAI 0.9 provides independent presentations and shared-project work. **Display and synchronization are separate choices**:
 
-| Host display | No synchronization | Shared project |
-| --- | --- | --- |
-| Inline or MCP Apps | Customize public components/templates, render, deliver HTML/inline/source. | Read/write the authorized project, confirm sync, optionally present it. |
-| Text only | Deliver files, or write a same-machine local project. | Read/write and return a synchronization receipt. People see the result in their ShowAI workbench. |
+| Host display       | No synchronization                                                         | Shared project                                                                                    |
+| ------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Inline or MCP Apps | Customize public components/templates, render, deliver HTML/inline/source. | Read/write the authorized project, confirm sync, optionally present it.                           |
+| Text only          | Deliver files, or write a same-machine local project.                      | Read/write and return a synchronization receipt. People see the result in their ShowAI workbench. |
 
 The page model, component compiler, authoring service, revision checks, export reader and sync protocol are shared. Hosts adapt how they invoke tools and show results. Supporting MCP alone does not imply HTML display support. Claude, pi, dsh and other hosts can use the documented CLI or MCP interfaces according to their actual capabilities; host-specific live acceptance is recorded separately.
 
@@ -66,7 +66,7 @@ OAuth supports discovery, dynamic client registration, authorization code with S
 
 In ChatGPT's plugin directory, add a custom MCP server using the `/mcp` URL and choose **OAuth or no authentication**. Anonymous tools remain available without linking; private calls request the appropriate project scopes. Test the tools in the host before publishing.
 
-MCP Apps resources use `text/html;profile=mcp-app` and `_meta.ui.resourceUri`, with the ChatGPT compatibility alias. The reader receives the bundled inline page through tool result metadata and runs it inside the host sandbox. No network dependencies or nested custom-component iframes are needed. Text-only hosts can ignore the UI and use project receipts or HTML/source downloads. HTTP preview downloads expire after one hour and are capability URLs; retain the source or save into an authorized project for durable work.
+MCP Apps resources use `text/html;profile=mcp-app` and `_meta.ui.resourceUri`, with the ChatGPT compatibility alias. The reader receives the inline page through tool result metadata and runs it inside the host sandbox without nested custom-component iframes. With a published CDN reader the inline page carries only page data and imports the reader from jsDelivr or unpkg, whose origins the resource declares in its CSP; `SHOWAI_READER_CDN=off` returns to the offline bundled page. Text-only hosts can ignore the UI and use project receipts or HTML/source downloads. HTTP preview downloads expire after one hour and are capability URLs; retain the source or save into an authorized project for durable work.
 
 The same skill source supports local and remote connections. For a remote package:
 

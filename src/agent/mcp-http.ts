@@ -66,6 +66,7 @@ const oauth = (write: boolean) => [
 type StoredArtifact = {
   html: string;
   inline?: string;
+  online?: string;
   source: string;
   expires: number;
   publicSource: boolean;
@@ -135,6 +136,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
     artifacts.set(key, {
       html: value.html,
       inline: value.inline,
+      online: value.online,
       source: value.source,
       expires,
       publicSource,
@@ -144,6 +146,9 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
       html: `${origin}/artifacts/${key}/page.html`,
       ...(value.inline
         ? { inline: `${origin}/artifacts/${key}/inline.html` }
+        : {}),
+      ...(value.online
+        ? { online: `${origin}/artifacts/${key}/online.html` }
         : {}),
       source: `${origin}/artifacts/${key}/page.showai.json`,
       expiresAt: new Date(expires).toISOString(),
@@ -273,7 +278,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                   const preview =
                     args.format === "inline"
                       ? { inline: output }
-                      : inlinePresentation(output);
+                      : await inlinePresentation(output);
                   const delivery = await storePresentation({
                     title: String(data.title ?? "ShowAI"),
                     document: {} as Presentation["document"],
@@ -292,6 +297,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                       inline: preview.inline
                         ? Buffer.byteLength(preview.inline)
                         : null,
+                      online: null,
                     },
                   });
                   data.delivery = delivery;
@@ -448,7 +454,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
       const auth = await authorization.fetch(request);
       if (auth) return auth;
       const asset = target.pathname.match(
-        /^\/artifacts\/([A-Za-z0-9_-]{43})\/(page\.html|inline\.html|page\.showai\.json)$/,
+        /^\/artifacts\/([A-Za-z0-9_-]{43})\/(page\.html|inline\.html|online\.html|page\.showai\.json)$/,
       );
       if (asset && ["GET", "HEAD"].includes(request.method)) {
         const value = artifacts.get(asset[1]);
@@ -462,7 +468,9 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
             ? value.html
             : asset[2] === "inline.html"
               ? value.inline
-              : value.source;
+              : asset[2] === "online.html"
+                ? value.online
+                : value.source;
         if (!content)
           return json(
             {

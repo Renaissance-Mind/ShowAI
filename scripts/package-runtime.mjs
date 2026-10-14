@@ -36,6 +36,11 @@ await copyFile(
   join(root, "dist-portable/reader-source.json"),
   join(runtime, "assets/reader-source.json"),
 );
+// Names the published CDN reader that conversation previews import.
+await copyFile(
+  join(root, "dist-cdn/manifest.json"),
+  join(runtime, "assets/cdn-manifest.json"),
+);
 await rm(join(runtime, "assets/inline-core-viewer.html"), { force: true });
 await copyFile(
   join(root, "dist-agent/cli.mjs"),

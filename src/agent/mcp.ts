@@ -489,19 +489,29 @@ export function createMcpServer(options: {
     "page_export",
     {
       description:
-        "Build HTML, a conversation fragment or a static site. Select page blocks with blockIds for partial HTML/inline display; partial exports default to reading layout. Bundled is offline; remote needs verified locators. Inline requires bundled. This does not upload a site.",
+        'Build HTML, a conversation fragment or a static site. Select page blocks with blockIds for partial HTML/inline display; partial exports default to reading layout. Bundled components are offline; remote needs verified locators. Inline requires bundled components. reader: HTML defaults to the offline bundled reader and reader:"cdn" writes a small online page; inline uses the CDN reader when available. This does not upload a site.',
       inputSchema: {
         pageId: z.string().optional(),
         blockIds: z.array(z.string().min(1)).min(1).optional(),
         format: z.enum(["html", "inline", "site"]),
         presentation: z.enum(["spatial", "reading"]).optional(),
         components: z.enum(["bundled", "remote"]).optional(),
+        reader: z.enum(["bundled", "cdn"]).optional(),
         out: z.string().min(1),
         overwrite: z.boolean().optional(),
       },
       annotations: write,
     },
-    ({ pageId, blockIds, format, components, out, overwrite, presentation }) =>
+    ({
+      pageId,
+      blockIds,
+      format,
+      components,
+      reader,
+      out,
+      overwrite,
+      presentation,
+    }) =>
       call(() =>
         service.export({
           projectId,
@@ -509,6 +519,7 @@ export function createMcpServer(options: {
           blockIds,
           format,
           components,
+          reader,
           out,
           overwrite,
           presentation,
@@ -987,6 +998,7 @@ export function createMcpServer(options: {
             display: {
               resourceAttached: true,
               inlineAvailable: !!value.inline,
+              onlineAvailable: !!value.online,
               fullPageAvailable: true,
               ...(blockIds ? { blockIds } : {}),
             },

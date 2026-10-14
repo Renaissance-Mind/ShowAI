@@ -1470,6 +1470,7 @@ export class AgentService {
     overwrite?: boolean;
     components?: "bundled" | "remote";
     presentation?: "spatial" | "reading";
+    reader?: "bundled" | "cdn";
     revision?: string;
     importedSnapshot?: { importId: string; snapshotId: string };
   }) {

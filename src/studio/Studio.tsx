@@ -1077,6 +1077,7 @@ export default function Studio() {
     format: "html" | "json" | "inline",
     components: "bundled" | "remote" = "bundled",
     presentation?: "spatial" | "reading",
+    reader?: "bundled" | "cdn",
   ) {
     if (!selectedProject || !page.draft || !(await page.flush())) return;
     setBusy(true);
@@ -1090,6 +1091,7 @@ export default function Studio() {
           format,
           components,
           presentation,
+          reader,
         },
       );
       if (result) setNotice(t("pageExported"));
@@ -3266,6 +3268,17 @@ export default function Studio() {
                             icon: <ArrowUpRight size={15} />,
                             onSelect: () =>
                               void exportPage("html", "bundled", "reading"),
+                          },
+                          {
+                            label: t("exportOnlinePage"),
+                            icon: <Globe size={15} />,
+                            onSelect: () =>
+                              void exportPage(
+                                "html",
+                                "bundled",
+                                "reading",
+                                "cdn",
+                              ),
                           },
                         ]
                       : []),

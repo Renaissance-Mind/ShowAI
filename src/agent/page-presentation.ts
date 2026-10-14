@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { withLibrarySnapshot } from "../core/library-runtime";
 import { AgentService } from "./service";
-import { inlinePresentation } from "./presentation";
+import { inlinePresentation, onlinePresentation } from "./presentation";
 
 /** One captured source revision, a complete reader and an optional focused preview. */
 export async function presentPage(input: {
@@ -45,9 +45,10 @@ export async function presentPage(input: {
             out: join(directory, "selection.html"),
           })
         : undefined;
-      const preview = inlinePresentation(
+      const preview = await inlinePresentation(
         selected ? await readFile(selected.path, "utf8") : html,
       );
+      const online = await onlinePresentation(html);
       return {
         title: record.document.title,
         document: record.document,
@@ -58,11 +59,13 @@ export async function presentPage(input: {
         html,
         source,
         ...preview,
+        ...(online ? { online } : {}),
         // This operation never initiates synchronization. HTTP adds its verified receipt.
         persistence: { savedToProject: true, synchronized: false },
         bytes: {
           html: Buffer.byteLength(html),
           inline: preview.inline ? Buffer.byteLength(preview.inline) : null,
+          online: online ? Buffer.byteLength(online) : null,
         },
       };
     });

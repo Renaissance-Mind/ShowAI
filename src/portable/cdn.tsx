@@ -8,37 +8,46 @@ export interface CdnMountOptions {
   artifact: string | object;
   /** Reader options such as `{ "theme": "dark" }`. */
   options?: { theme?: "dark" | "light"; draft?: boolean };
+  /**
+   * The reader owns the whole document, like an exported HTML page: styles
+   * apply to the page, the theme is set on <html> and the page menu is shown.
+   * Otherwise `section` is an inline root inside a host page.
+   */
+  standalone?: boolean;
 }
 
 /**
- * Mounts a ShowAI page into `section` without a bundled reader. The section
- * becomes an inline root: page styles are scoped to it, custom components run
- * in its shadow roots, and the theme is set on it.
+ * Mounts a ShowAI page into `section` without a bundled reader. As an inline
+ * root, page styles are scoped to the section, custom components run in its
+ * shadow roots, and the theme is set on it.
  */
 export function mount(
   section: HTMLElement,
-  { artifact, options }: CdnMountOptions,
+  { artifact, options, standalone = false }: CdnMountOptions,
 ) {
   if (!section.id) section.id = `showai-cdn-${++count}`;
   if (!/^[A-Za-z][\w-]*$/.test(section.id))
     throw new Error("The ShowAI root needs a simple id.");
-  section.setAttribute("data-showai-inline-root", "");
+  if (!standalone) section.setAttribute("data-showai-inline-root", "");
   section
     .querySelectorAll(":scope > [data-showai-placeholder]")
     .forEach((placeholder) => placeholder.remove());
   const target = section.ownerDocument.createElement("div");
   target.id = `${section.id}-root`;
   section.append(target);
-  const detachStyles = attachStyles(section);
+  const detachStyles = attachStyles(section, { scoped: !standalone });
   const raw =
     typeof artifact === "string" ? artifact : JSON.stringify(artifact);
   const readOptions = options ? JSON.stringify(options) : null;
   const unmount = mountReader(target, {
-    inlineHost: section,
+    inlineHost: standalone ? null : section,
     readArtifact: () => raw,
     readOptions: () => readOptions,
     setTheme: (theme) => {
-      section.dataset.theme = theme;
+      (standalone
+        ? section.ownerDocument.documentElement
+        : section
+      ).dataset.theme = theme;
     },
   });
   return () => {

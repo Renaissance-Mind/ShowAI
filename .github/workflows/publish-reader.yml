@@ -1,0 +1,44 @@
+name: Publish CDN reader
+# Conversation previews and online pages import the reader a runtime was built
+# with. Its version carries the build's content hash, so every reader change on
+# main gets its own immutable version; unchanged builds are skipped.
+# Publishing uses npm Trusted Publishing: configure showai-reader on npmjs.com
+# to trust this repository and this workflow file. No token is stored.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "resources/**"
+      - "scripts/build-cdn-reader.mjs"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          registry-url: "https://registry.npmjs.org"
+      # Trusted Publishing needs npm 11.5 or later.
+      - run: npm install -g npm@11
+      - run: npm ci
+      - run: npm run build:cdn
+      - name: Publish unless this build is already on npm
+        run: |
+          name=$(node -p 'require("./dist-cdn/manifest.json").name')
+          version=$(node -p 'require("./dist-cdn/manifest.json").version')
+          if npm view "$name@$version" version >/dev/null 2>&1; then
+            echo "$name@$version is already published."
+          else
+            npm publish ./dist-cdn --access public --provenance --tag latest
+          fi

@@ -267,6 +267,14 @@ function componentDelivery(
     throw new CoreError("INVALID_DATA", "Choose bundled or remote components.");
   return args.components;
 }
+function readerDelivery(
+  args: Record<string, unknown>,
+): "bundled" | "cdn" | undefined {
+  if (args.reader === undefined) return undefined;
+  if (args.reader !== "bundled" && args.reader !== "cdn")
+    throw new CoreError("INVALID_DATA", "Choose the bundled or cdn reader.");
+  return args.reader;
+}
 
 export interface OpenDialogOptions {
   title: string;
@@ -1335,7 +1343,8 @@ export function createWorkbench(
           defaultPath: `${filename(record.document.title)}${format === "json" ? ".showai.json" : ".html"}`,
           filters: [
             {
-              name: format === "json" ? tf("filter.pageSource") : tf("filter.html"),
+              name:
+                format === "json" ? tf("filter.pageSource") : tf("filter.html"),
               extensions: [format === "json" ? "json" : "html"],
             },
           ],
@@ -1359,6 +1368,7 @@ export function createWorkbench(
           components: componentDelivery(args),
           presentation: text(args, "presentation", true) as
             "spatial" | "reading" | undefined,
+          reader: readerDelivery(args),
           out: selection.filePath,
           overwrite: true,
         });

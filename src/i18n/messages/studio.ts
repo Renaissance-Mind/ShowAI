@@ -115,6 +115,7 @@ export default defineMessages("studio", {
     exportWithPublished: "引用已发布组件导出",
     exportSnippet: "导出会话片段",
     exportReading: "导出阅读网页",
+    exportOnlinePage: "导出在线网页 · 联网加载阅读器",
     iconKeptInDraft: "图标保留在本机草稿中，请处理页面保存错误或冲突。",
     libraryUpgraded: "内容库已升级，原始文件已保留",
     mergeSaved: "合并版本已保存",
@@ -285,6 +286,7 @@ export default defineMessages("studio", {
     exportWithPublished: "Export with published components",
     exportSnippet: "Export chat snippet",
     exportReading: "Export reading page",
+    exportOnlinePage: "Export online page · loads the reader from a CDN",
     iconKeptInDraft:
       "The icon is kept in the local draft. Resolve the page's save error or conflict.",
     libraryUpgraded: "Library upgraded. Original files are kept.",

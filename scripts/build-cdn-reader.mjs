@@ -106,9 +106,15 @@ export async function buildCdnReader(outdir = join(root, "dist-cdn")) {
   );
   const bytes = await readFile(resolve(root, entryPath));
   const app = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
+  // The version carries the entry's content hash, so a runtime always names
+  // exactly the reader it was built with, even between app releases.
+  const hash = entry.match(/-([A-Z0-9]+)\.js$/)?.[1]?.toLowerCase();
+  if (!hash) throw new Error(`Unexpected CDN reader entry name: ${entry}`);
+  const version = `${app.version}-reader.${hash}`;
   const manifest = {
     format: "showai-cdn-reader",
-    version: app.version,
+    name: packageName,
+    version,
     entry,
     integrity: `sha256-${createHash("sha256").update(bytes).digest("base64")}`,
     files: outputs.length,
@@ -127,7 +133,7 @@ export async function buildCdnReader(outdir = join(root, "dist-cdn")) {
     JSON.stringify(
       {
         name: packageName,
-        version: app.version,
+        version,
         description:
           "ShowAI page reader as code-split ES modules, for inline pages loaded from a CDN.",
         type: "module",
@@ -148,7 +154,7 @@ export async function buildCdnReader(outdir = join(root, "dist-cdn")) {
 The [ShowAI](${app.homepage}) page reader, built from ShowAI ${app.version} as code-split ES modules. Inline conversation pages written by \`render-artifact --cdn\` import it and load each component's code only when the page uses it.
 
 \`\`\`js
-const { mount } = await import("https://cdn.jsdelivr.net/npm/${packageName}@${app.version}/index.js");
+const { mount } = await import("https://cdn.jsdelivr.net/npm/${packageName}@${version}/index.js");
 mount(document.getElementById("page"), { artifact });
 \`\`\`
 

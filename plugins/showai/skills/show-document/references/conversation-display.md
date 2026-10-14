@@ -8,8 +8,11 @@
 | --- | --- |
 | MCP Apps | 工具附带reader资源，宿主把结果交给阅读器；不必先下载HTML |
 | Codex本机可视化 | delivery.inline是本机可访问路径时，在最终回复使用下面的引用 |
-| 文件/网页预览 | 打开delivery.html；它是阅读快照，不自动回写项目 |
+| 宿主要求模型在回复中直接写出 HTML（如 Claude 的 HTML/可视化工具） | 读取 delivery.inline 文件的完整文本，原样交给该工具；不改写、不截断 |
+| 文件/网页预览 | 联网阅读优先打开delivery.online；需要离线或宿主不能联网时打开delivery.html。两者都是阅读快照，不自动回写项目 |
 | 无内嵌显示 | 交付项目、Page、版本、保存/同步结果；需要时附文件链接 |
+
+运行时带有已发布的 CDN 阅读器时，delivery.inline 与 delivery.online 只携带页面数据、内嵌图片和自定义组件，阅读器与内置组件从 jsDelivr（失败时 unpkg）按需加载，体积通常只有几 KB 到几百 KB，打开时需要联网。delivery.html 始终是离线完整文件。display.onlineAvailable 为 false 时没有在线版，按原方式使用 delivery.html；宿主显示“无法加载 ShowAI 阅读器”时同样改用 delivery.html。
 
 Codex当前引用契约：
 
