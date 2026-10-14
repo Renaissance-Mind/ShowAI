@@ -87,6 +87,7 @@ export {
   ListOrdered,
   ListTree,
   Loader2,
+  LocateFixed,
   LockKeyhole,
   LockKeyholeOpen,
   MapIcon,

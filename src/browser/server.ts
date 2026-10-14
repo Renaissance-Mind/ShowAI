@@ -187,6 +187,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   const agentHost = new AgentHost({
     resources: new ModelResourceClient(() => store.root),
     root: join(dirname(options.settingsPath), "agent-host"),
+    workspaceRoot: process.env.SHOWAI_AGENT_WORKSPACES || undefined,
     library: () => store,
     cli: () => info().cli,
     pluginRoot: () =>

@@ -52,6 +52,15 @@ export default defineMessages("agentHost", {
     "isolation.skillsFailed": "独立运行时 Skill 隔离验证失败。",
     "isolation.configFailed": "独立运行时配置失败",
     "task.interrupted": "上次运行已中断，可以继续会话或重新执行。",
+    "conversation.notFound": "对话记录不存在。",
+    "conversation.stopFirst": "请先停止正在执行的一轮。",
+    "conversation.busy": "这个对话正在执行，请等它完成或停止后再发送。",
+    "conversation.sourceMissing": "这个对话使用的模型来源已移除，请新建对话。",
+    "conversation.recapped":
+      "这个 Agent 不支持续接会话，已把前几轮摘要附在请求中。",
+    "turn.undoUnavailable": "这一轮没有可撤销的页面修改。",
+    "turn.undoChanged": "页面在这一轮之后又被修改过，不能直接撤销。",
+    "turn.undoRunning": "这一轮仍在执行，停止后才能撤销。",
     "task.connectionTest": "连接测试",
     "task.checkingModel": "正在检验真实模型调用…",
     "task.connecting": "正在连接 Agent…",
@@ -170,6 +179,18 @@ export default defineMessages("agentHost", {
     "isolation.configFailed": "Couldn't set up the isolated runtime",
     "task.interrupted":
       "The last run was interrupted. You can continue the session or run it again.",
+    "conversation.notFound": "Conversation not found.",
+    "conversation.stopFirst": "Stop the running turn first.",
+    "conversation.busy":
+      "This conversation is still running. Wait for it to finish or stop it before sending.",
+    "conversation.sourceMissing":
+      "The model source used by this conversation was removed. Start a new conversation.",
+    "conversation.recapped":
+      "This Agent can't resume sessions, so a summary of earlier turns was included.",
+    "turn.undoUnavailable": "This turn didn't change the page.",
+    "turn.undoChanged":
+      "The page changed after this turn, so it can't be undone directly.",
+    "turn.undoRunning": "This turn is still running. Stop it before undoing.",
     "task.connectionTest": "Connection test",
     "task.checkingModel": "Testing a real model call…",
     "task.connecting": "Connecting to Agent…",

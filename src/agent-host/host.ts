@@ -33,13 +33,23 @@ import type { ModelResources } from "../sync/model-resources";
 import type { ResolvedResource } from "../sync/accounts";
 import { withLibraryLock } from "../core/library-lock";
 import type {
+  AgentConversation,
   AgentHostStatus,
   AgentId,
   AgentSettings,
   AgentTask,
+  AgentTurn,
   LocalAgent,
   ModelSource,
 } from "./types";
+import {
+  ConversationStore,
+  parseTarget,
+  recap,
+  summary,
+  targetInstructions,
+} from "./conversations";
+import { diffDocuments } from "../core/diff";
 import { translator } from "../i18n";
 import agentHostMessages from "../i18n/messages/agentHost";
 
@@ -152,7 +162,9 @@ export class AgentHost {
   private installationVersion?: string;
   private permissions = new Map<string, (option: string | null) => void>();
   private loaded?: Promise<void>;
+  readonly conversations: ConversationStore;
   constructor(readonly options: AgentHostOptions) {
+    this.conversations = new ConversationStore(options.root);
     this.installer = new SdkInstaller(join(options.root, "runtime"));
     this.chatgpt = new ChatGptConnection(
       options.root,
@@ -711,6 +723,38 @@ export class AgentHost {
     });
     if (task.events.length > 400)
       task.events.splice(0, task.events.length - 400);
+    this.touch(task);
+  }
+  /** Running conversation turns persist their events incrementally. */
+  private touch(task: AgentTask) {
+    const conversation =
+      "conversationId" in task
+        ? this.conversations.owner(task as AgentTurn)
+        : undefined;
+    if (!conversation) return;
+    conversation.updatedAt = new Date().toISOString();
+    this.conversations.schedule(conversation);
+  }
+  private persist(task: AgentTask) {
+    const conversation =
+      "conversationId" in task
+        ? this.conversations.owner(task as AgentTurn)
+        : undefined;
+    return conversation
+      ? this.conversations.save(conversation)
+      : writeProtected(
+          join(this.options.root, "tasks", task.id + ".json"),
+          task,
+        );
+  }
+  private instructions(
+    projectId: string,
+    focus: string,
+    workspace: string,
+    componentCatalog: unknown,
+    revision?: string,
+  ) {
+    return `You are working inside ShowAI. The host has supplied these verified selections: projectId=${projectId}${focus}. Operate only that project${focus ? " and focused page" : ""}. Use project_context with knownCatalogRevision=${revision} to confirm the MCP binding without repeating the supplied index, then read the chosen page. Use the connected ShowAI MCP tools for all library reads and writes. Do not invoke authoring CLI commands or switch connections if MCP fails. Read current hash/revision before saving; preserve conflicting drafts. Do not edit raw library files. Work files belong in ${workspace}. This host displays text and file links, without inline HTML rendering. For a requested preview, use page_present with the requested stable block IDs and return its delivery file link; do not claim it is displayed in the conversation. Read the ShowAI authoring guide before editing. For status-only requests query project_sync_status; do not run project_sync unless the user requests synchronization. Component directory (complete; reuse this index until its revision changes): ${JSON.stringify(componentCatalog)}\nFor page work read selected component guides; for component work read development guidance before source.`;
   }
   private async loadTasks() {
     if (!this.loaded)
@@ -814,7 +858,7 @@ export class AgentHost {
     const cli = this.options.cli();
     const instructions = test
       ? prompt
-      : `You are working inside ShowAI. The host has supplied these verified selections: projectId=${projectId}${pageId ? `, pageId=${pageId}` : ""}. Operate only that project and focused page. Use project_context with knownCatalogRevision=${componentCatalog?.revision} to confirm the MCP binding without repeating the supplied index, then read the chosen page. Use the connected ShowAI MCP tools for all library reads and writes. Do not invoke authoring CLI commands or switch connections if MCP fails. Read current hash/revision before saving; preserve conflicting drafts. Do not edit raw library files. Work files belong in ${workspace}. This host displays text and file links, without inline HTML rendering. For a requested preview, use page_present with the requested stable block IDs and return its delivery file link; do not claim it is displayed in the conversation. Read the ShowAI authoring guide before editing. For status-only requests query project_sync_status; do not run project_sync unless the user requests synchronization. Component directory (complete; reuse this index until its revision changes): ${JSON.stringify(componentCatalog)}\nFor page work read selected component guides; for component work read development guidance before source. The user explicitly requests:\n${prompt}`;
+      : `${this.instructions(projectId, pageId ? `, pageId=${pageId}` : "", workspace, componentCatalog, componentCatalog?.revision)} The user explicitly requests:\n${prompt}`;
     const resume = args.taskId
       ? this.tasks.find(
           (item) =>
@@ -899,6 +943,228 @@ export class AgentHost {
         );
       });
     return task;
+  }
+  /** Backends that continue their own session receive only the new request. */
+  private resumable(conversation: AgentConversation) {
+    return (
+      !!conversation.threadId &&
+      (conversation.mode === "api" ||
+        conversation.localAgent === "codex" ||
+        conversation.localAgent === "claude")
+    );
+  }
+  async send(args: {
+    projectId?: unknown;
+    conversationId?: unknown;
+    prompt?: unknown;
+    target?: unknown;
+  }): Promise<AgentConversation> {
+    const projectId = assertId(z.string().parse(args.projectId));
+    const prompt = z.string().trim().min(1).max(24000).parse(args.prompt);
+    const target = parseTarget(args.target);
+    const library = this.options.library();
+    await library.listPages(projectId);
+    const now = new Date().toISOString();
+    let conversation: AgentConversation;
+    if (args.conversationId) {
+      conversation = await this.conversations.get(
+        projectId,
+        z.string().uuid().parse(args.conversationId),
+      );
+      if (conversation.turns.some((turn) => turn.state === "running"))
+        throw new Error(t("conversation.busy"));
+    } else {
+      const settings = await this.settings();
+      const id = randomUUID();
+      conversation = {
+        id,
+        projectId,
+        title: prompt.replace(/\s+/g, " ").slice(0, 60),
+        mode: settings.mode,
+        sourceId: settings.mode === "api" ? settings.sourceId : undefined,
+        localAgent: settings.mode === "local" ? settings.localAgent : undefined,
+        workspace: join(this.workspaceRoot, projectId, id),
+        createdAt: now,
+        updatedAt: now,
+        turns: [],
+      };
+    }
+    const source =
+      conversation.mode === "api"
+        ? await this.source(conversation.sourceId ?? "").catch(() => {
+            throw new Error(t("conversation.sourceMissing"));
+          })
+        : undefined;
+    const page = target.pageId
+      ? await library.readPage(projectId, target.pageId, { checkpoint: false })
+      : undefined;
+    const componentCatalog = await new AgentService({
+      root: library.root,
+    }).componentContext(projectId);
+    await mkdir(conversation.workspace, { recursive: true, mode: 0o700 });
+    const turn: AgentTurn = {
+      id: randomUUID(),
+      conversationId: conversation.id,
+      projectId,
+      pageId: target.pageId,
+      label: prompt.slice(0, 100),
+      mode: conversation.mode,
+      sourceId: conversation.sourceId,
+      localAgent: conversation.localAgent,
+      state: "running",
+      startedAt: now,
+      workspace: conversation.workspace,
+      threadId: conversation.threadId,
+      events: [],
+      prompt,
+      target,
+      pageTitle: page?.document.title,
+      baseHash: page?.hash,
+    };
+    if (page) await this.conversations.saveBase(turn, projectId, page.document);
+    const resumable = this.resumable(conversation);
+    const header =
+      resumable && conversation.catalogRevision === componentCatalog.revision
+        ? `Continue this ShowAI conversation in projectId=${projectId}. The MCP binding, work directory ${conversation.workspace}, component directory revision ${componentCatalog.revision} and earlier ShowAI rules are unchanged.`
+        : this.instructions(
+            projectId,
+            "",
+            conversation.workspace,
+            componentCatalog,
+            componentCatalog.revision,
+          );
+    const history =
+      !resumable && conversation.turns.length
+        ? recap(conversation, turn.id)
+        : "";
+    const instructions = `${header}\n${targetInstructions(target, page?.document.title)}\n${history}The user explicitly requests:\n${prompt}`;
+    conversation.catalogRevision = componentCatalog.revision;
+    conversation.turns.push(turn);
+    conversation.updatedAt = now;
+    this.conversations.add(conversation);
+    const controller = new AbortController();
+    this.controllers.set(turn.id, controller);
+    this.emit(turn, "status", t("task.connecting"));
+    if (history) this.emit(turn, "status", t("conversation.recapped"));
+    await this.conversations.save(conversation);
+    const cli = this.options.cli();
+    const run =
+      conversation.mode === "api"
+        ? this.runSdk(
+            turn,
+            instructions,
+            cli,
+            controller.signal,
+            conversation.threadId,
+            false,
+            source!,
+          )
+        : this.runLocal(
+            turn,
+            conversation.localAgent ?? "codex",
+            instructions,
+            cli,
+            controller.signal,
+            false,
+            resumable ? conversation.threadId : undefined,
+          );
+    // Record the page result before the state leaves "running"; pollers stop at that point.
+    void run
+      .then(
+        () =>
+          controller.signal.aborted ? new Error(t("task.stopped")) : undefined,
+        (error: Error) => error,
+      )
+      .then(async (failure) => {
+        if (page)
+          await library
+            .readPage(projectId, page.document.id, { checkpoint: false })
+            .then((current) => {
+              turn.resultHash = current.hash;
+              if (current.hash !== page.hash)
+                turn.changedBlockIds = [
+                  ...new Set(
+                    diffDocuments(page.document, current.document).flatMap(
+                      (change) =>
+                        "blockId" in change && change.type !== "block.removed"
+                          ? [change.blockId]
+                          : [],
+                    ),
+                  ),
+                ].slice(0, 200);
+            })
+            .catch((error: Error) =>
+              console.error("ShowAI Agent turn result:", error.message),
+            );
+        turn.finishedAt = new Date().toISOString();
+        if (turn.threadId) conversation.threadId = turn.threadId;
+        conversation.updatedAt = turn.finishedAt;
+        if (!failure) {
+          this.emit(turn, "status", t("task.completed"));
+          turn.state = "completed";
+        } else {
+          turn.error = controller.signal.aborted
+            ? t("task.stopped")
+            : failure.message;
+          if (
+            conversation.mode === "local" &&
+            /Authentication required|login_required|Failed to authenticate|OAuth session expired/i.test(
+              `${turn.error}\n${turn.events.map((event) => event.text).join("\n")}`,
+            )
+          )
+            turn.error = t("task.signInRequired");
+          this.emit(turn, "error", turn.error);
+          turn.state = controller.signal.aborted ? "cancelled" : "failed";
+        }
+        this.controllers.delete(turn.id);
+        await this.conversations.save(conversation);
+      })
+      .catch((error: Error) =>
+        console.error("ShowAI Agent conversation persistence:", error.message),
+      );
+    return conversation;
+  }
+  /** Restore the focused page to its state before this turn, if nothing changed since. */
+  async undoTurn(projectId: string, conversationId: string, turnId: string) {
+    const conversation = await this.conversations.get(
+      projectId,
+      conversationId,
+    );
+    const turn = conversation.turns.find((item) => item.id === turnId);
+    if (turn?.state === "running") throw new Error(t("turn.undoRunning"));
+    if (
+      !turn?.pageId ||
+      !turn.baseHash ||
+      !turn.resultHash ||
+      turn.baseHash === turn.resultHash ||
+      turn.undone
+    )
+      throw new Error(t("turn.undoUnavailable"));
+    const library = this.options.library();
+    const current = await library.readPage(projectId, turn.pageId, {
+      checkpoint: false,
+    });
+    if (current.hash !== turn.resultHash)
+      throw new Error(t("turn.undoChanged"));
+    const base = await this.conversations.readBase(
+      projectId,
+      conversationId,
+      turnId,
+    );
+    if (!base) throw new Error(t("turn.undoUnavailable"));
+    await new AgentService({ root: library.root }).savePage(
+      projectId,
+      turn.pageId,
+      base,
+      current.hash,
+      undefined,
+      undefined,
+      current.revision,
+    );
+    turn.undone = true;
+    conversation.updatedAt = new Date().toISOString();
+    await this.conversations.save(conversation);
+    return conversation;
   }
   private markTest(id: AgentId, callable: boolean) {
     const item = this.agents.find((item) => item.id === id);
@@ -998,10 +1264,7 @@ export class AgentHost {
       for await (const event of turn.events) {
         if (event.type === "thread.started") {
           task.threadId = event.thread_id;
-          await writeProtected(
-            join(this.options.root, "tasks", task.id + ".json"),
-            task,
-          );
+          await this.persist(task);
         }
         if (event.type === "turn.completed") complete = true;
         if (event.type === "error" || event.type === "turn.failed")
@@ -1041,6 +1304,7 @@ export class AgentHost {
     cli: ReturnType<AgentHostOptions["cli"]>,
     signal: AbortSignal,
     test: boolean,
+    threadId?: string,
   ) {
     let agent = this.agents.find((item) => item.id === agentId);
     if (!agent) {
@@ -1049,27 +1313,36 @@ export class AgentHost {
     }
     if (!agent?.path) throw new Error(t("task.agentMissing"));
     if (agentId === "codex") {
-      const args = [
-        "exec",
-        "--json",
-        "--skip-git-repo-check",
-        "--sandbox",
-        "workspace-write",
-        "--cd",
-        task.workspace,
-        "-c",
-        "project_root_markers=[]",
-        "-c",
-        'web_search="disabled"',
-      ];
+      // `exec resume` takes no --sandbox/--cd; the same settings go through config and cwd.
+      const args = threadId
+        ? [
+            "exec",
+            "resume",
+            "--json",
+            "--skip-git-repo-check",
+            "-c",
+            'sandbox_mode="workspace-write"',
+          ]
+        : [
+            "exec",
+            "--json",
+            "--skip-git-repo-check",
+            "--sandbox",
+            "workspace-write",
+            "--cd",
+            task.workspace,
+          ];
+      args.push("-c", "project_root_markers=[]", "-c", 'web_search="disabled"');
       if (!test)
         args.push(
           "-c",
           `mcp_servers.showai=${tomlTable(this.mcp(cli, task.projectId))}`,
         );
+      if (threadId) args.push(threadId);
       args.push(prompt);
       let complete = false;
       const result = await execute(agent.path, args, {
+        cwd: task.workspace,
         signal,
         timeout: test ? 120000 : 15 * 60 * 1000,
         onLine: (line) => {
@@ -1097,7 +1370,16 @@ export class AgentHost {
         "--output-format",
         "stream-json",
         "--verbose",
+        "--include-partial-messages",
       ];
+      // Claude Code stores sessions per cwd; a conversation keeps one workspace.
+      if (!test) {
+        if (threadId) args.push("--resume", threadId);
+        else {
+          task.threadId = randomUUID();
+          args.push("--session-id", task.threadId);
+        }
+      }
       if (!test)
         args.push(
           "--mcp-config",
@@ -1108,17 +1390,60 @@ export class AgentHost {
           "mcp__showai__*",
         );
       let complete = false;
+      let replied = false;
+      let opening = false;
+      let streamed = false;
       const result = await execute(agent.path, args, {
         cwd: task.workspace,
         signal,
         timeout: test ? 120000 : 15 * 60 * 1000,
         onLine: (line) => {
           const event = JSON.parse(line);
+          if (event.type === "stream_event") {
+            const part = event.event;
+            if (
+              part?.type === "content_block_start" &&
+              part.content_block?.type === "text"
+            )
+              opening = true;
+            else if (
+              part?.type === "content_block_delta" &&
+              part.delta?.type === "text_delta" &&
+              part.delta.text
+            ) {
+              streamed = replied = true;
+              const last = task.events.at(-1);
+              if (!opening && last?.type === "message") {
+                last.text = (last.text + part.delta.text).slice(0, 32000);
+                this.touch(task);
+              } else this.emit(task, "message", part.delta.text);
+              opening = false;
+            }
+          } else if (event.type === "assistant")
+            for (const block of event.message?.content ?? []) {
+              if (block.type === "text" && !streamed && block.text) {
+                replied = true;
+                this.emit(task, "message", block.text);
+              } else if (block.type === "tool_use")
+                this.emit(task, "tool", toolLabel(block.name));
+            }
+          else if (event.type === "user")
+            for (const block of event.message?.content ?? [])
+              if (block.type === "tool_result" && block.is_error)
+                this.emit(
+                  task,
+                  "tool",
+                  String(
+                    typeof block.content === "string"
+                      ? block.content
+                      : JSON.stringify(block.content),
+                  ).slice(0, 2000),
+                );
           if (event.type === "result") {
             if (event.is_error) this.emit(task, "error", event.result);
             else {
               complete = true;
-              this.emit(task, "message", event.result);
+              if (!replied) this.emit(task, "message", event.result);
             }
           }
         },
@@ -1240,7 +1565,9 @@ export class AgentHost {
   }
   async readTaskFile(id: string, path: string) {
     await this.loadTasks();
-    const task = this.tasks.find((item) => item.id === id);
+    const task =
+      this.tasks.find((item) => item.id === id) ??
+      this.conversations.findTurn(id);
     if (!task) throw new Error(t("task.notFound"));
     const root = await realpath(task.workspace),
       file = await realpath(resolve(root, path));
@@ -1322,6 +1649,40 @@ export class AgentHost {
         return this.status();
       case "agent:start":
         return this.start(args);
+      case "agent:send":
+        return this.send(args);
+      case "agent:conversations":
+        return (
+          await this.conversations.list(
+            assertId(z.string().parse(args.projectId)),
+          )
+        ).map(summary);
+      case "agent:conversation":
+        return this.conversations.get(
+          assertId(z.string().parse(args.projectId)),
+          z.string().uuid().parse(args.id),
+        );
+      case "agent:turn": {
+        const conversation = await this.conversations.get(
+          assertId(z.string().parse(args.projectId)),
+          z.string().uuid().parse(args.conversationId),
+        );
+        const turn = conversation.turns.find((item) => item.id === args.id);
+        if (!turn) throw new Error(t("conversation.notFound"));
+        return { turn, threadId: conversation.threadId };
+      }
+      case "agent:undo":
+        return this.undoTurn(
+          assertId(z.string().parse(args.projectId)),
+          z.string().uuid().parse(args.conversationId),
+          z.string().uuid().parse(args.id),
+        );
+      case "agent:deleteConversation":
+        await this.conversations.remove(
+          assertId(z.string().parse(args.projectId)),
+          z.string().uuid().parse(args.id),
+        );
+        return null;
       case "agent:cancel":
         this.cancel(z.string().uuid().parse(args.id));
         return this.status();
@@ -1333,7 +1694,10 @@ export class AgentHost {
       case "agent:permission": {
         const id = z.string().uuid().parse(args.id),
           option = args.option === null ? null : z.string().parse(args.option);
-        const approval = this.tasks
+        const approval = [
+          ...this.tasks,
+          ...this.conversations.running().flatMap((item) => item.turns),
+        ]
           .flatMap((task) => task.approvals ?? [])
           .find((item) => item.id === id);
         if (
@@ -1342,7 +1706,7 @@ export class AgentHost {
         )
           throw new Error(t("task.approvalExpired"));
         this.permissions.get(id)?.(option);
-        return this.status();
+        return args.conversation ? null : this.status();
       }
       default:
         throw new Error(`Unknown Agent action: ${action}`);
@@ -1364,10 +1728,21 @@ export const agentActions = new Set([
   "agent:cancelAuth",
   "agent:disconnect",
   "agent:start",
+  "agent:send",
+  "agent:conversations",
+  "agent:conversation",
+  "agent:turn",
+  "agent:undo",
+  "agent:deleteConversation",
   "agent:cancel",
   "agent:readFile",
   "agent:permission",
 ]);
+/** `mcp__showai__page_apply` reads as `showai · page_apply`. */
+function toolLabel(name: string) {
+  const match = /^mcp__([^_]+(?:_[^_]+)*?)__(.+)$/.exec(name);
+  return match ? `${match[1]} · ${match[2]}` : name;
+}
 function tomlTable(value: unknown): string {
   if (typeof value === "string") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(tomlTable).join(",")}]`;

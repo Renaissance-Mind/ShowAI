@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
 import {
   Bot,
   Check,
@@ -19,52 +18,13 @@ import type {
   ModelSource,
 } from "../agent-host/types";
 import { sourcePresets } from "../agent-host/types";
-import type { PageSummary, ProjectSummary } from "../core/model";
 import AgentBrandIcon from "./AgentBrandIcon";
 import ServerResources from "./ServerResources";
-import { getLocale } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import strings from "../i18n/messages/agentSettings";
 import common from "../i18n/messages/common";
+import { downloadAgentFile, messageLinks } from "./assistant/message-links";
 import "./agent-settings.css";
-
-function messageLinks(
-  text: string,
-  download: (path: string) => void,
-): ReactNode[] {
-  const output: ReactNode[] = [];
-  let position = 0;
-  for (const match of text.matchAll(
-    /\[([^\]\n]+)\]\((?:<([^>]+)>|([^\)\n]+))\)/g,
-  )) {
-    output.push(text.slice(position, match.index));
-    const href = match[2] ?? match[3];
-    if (/^https?:\/\//i.test(href))
-      output.push(
-        <a key={match.index} href={href} target="_blank" rel="noreferrer">
-          {match[1]}
-        </a>,
-      );
-    else if (
-      href.startsWith("/") ||
-      href.startsWith("./") ||
-      /^[A-Za-z]:[\\/]/.test(href)
-    )
-      output.push(
-        <button
-          key={match.index}
-          className="agent-file-link"
-          onClick={() => download(href)}
-        >
-          {match[1]}
-        </button>,
-      );
-    else output.push(match[0]);
-    position = match.index! + match[0].length;
-  }
-  output.push(text.slice(position));
-  return output;
-}
 
 function TaskResult({
   task,
@@ -143,11 +103,7 @@ function TaskResult({
   );
 }
 
-export default function AgentSettings({
-  contextProjectId,
-}: {
-  contextProjectId?: string;
-}) {
+export default function AgentSettings() {
   const t = useTranslator(strings);
   const tc = useTranslator(common);
   // Built-in presets carry Chinese names; show and seed them in the UI language.
@@ -164,13 +120,7 @@ export default function AgentSettings({
   const [editing, setEditing] = useState<ModelSource | null>(null),
     [key, setKey] = useState("");
   const [models, setModels] = useState<{ id: string; name: string }[]>([]);
-  const [projects, setProjects] = useState<ProjectSummary[]>([]),
-    [pages, setPages] = useState<PageSummary[]>([]);
-  const [projectId, setProjectId] = useState(contextProjectId ?? ""),
-    [pageId, setPageId] = useState(""),
-    [prompt, setPrompt] = useState("");
-  const [taskId, setTaskId] = useState(""),
-    [continueTask, setContinueTask] = useState(false);
+  const [taskId, setTaskId] = useState("");
   const mounted = useRef(true),
     settingsRef = useRef<Configuration | null>(null);
   const taskRef = useRef("");
@@ -203,10 +153,6 @@ export default function AgentSettings({
       .invoke<AgentHostStatus>("agent:scan")
       .then(update)
       .catch((error) => setError(errorMessage(error)));
-    void desktop
-      .invoke<ProjectSummary[]>("projects:list")
-      .then(setProjects)
-      .catch((error) => setError(errorMessage(error)));
     const timer = setInterval(
       () => void refresh().catch((error) => setError(errorMessage(error))),
       1200,
@@ -216,15 +162,6 @@ export default function AgentSettings({
       clearInterval(timer);
     };
   }, [refresh, update]);
-  useEffect(() => {
-    setPageId("");
-    setPages([]);
-    if (projectId)
-      void desktop
-        .invoke<PageSummary[]>("pages:list", { projectId })
-        .then(setPages)
-        .catch((error) => setError(errorMessage(error)));
-  }, [projectId]);
   const action = (work: () => Promise<void>) => async () => {
     setBusy(true);
     setError("");
@@ -826,175 +763,32 @@ export default function AgentSettings({
       )}
       <section className="settings-group" aria-labelledby="agent-task-title">
         <h2 id="agent-task-title">{t("runInShowAI")}</h2>
-        <form
-          className="agent-task-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void action(async () => {
-              const task = await desktop.invoke<AgentTask>("agent:start", {
-                projectId,
-                ...(pageId ? { pageId } : {}),
-                prompt,
-                ...(continueTask && activeTask
-                  ? { taskId: activeTask.id }
-                  : {}),
-              });
-              setTaskId(task.id);
-              setPrompt("");
-              await refresh();
-            })();
-          }}
-        >
-          <div className="agent-target">
-            <label>
-              {t("project")}
-              <select
-                required
-                value={projectId}
-                onChange={(event) => setProjectId(event.target.value)}
-              >
-                <option value="">{t("chooseProject")}</option>
-                {projects
-                  .filter((project) => !project.archived)
-                  .map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <label>
-              {t("page")}
-              <select
-                value={pageId}
-                disabled={!projectId}
-                onChange={(event) => setPageId(event.target.value)}
-              >
-                <option value="">{t("wholeProject")}</option>
-                {pages.map((page) => (
-                  <option key={page.id} value={page.id}>
-                    {page.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <label htmlFor="agent-prompt">{t("prompt")}</label>
-          <textarea
-            id="agent-prompt"
-            required
-            value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
-            placeholder={t("promptPlaceholder")}
-            rows={4}
+        <p className="settings-help">{t("inPageHelp")}</p>
+        {taskId && activeTask && (
+          <TaskResult
+            task={activeTask}
+            onFile={(path) =>
+              void action(() =>
+                downloadAgentFile(desktop.invoke, activeTask.id, path),
+              )()
+            }
+            onPermission={(id, option) =>
+              void action(async () =>
+                update(
+                  await desktop.invoke("agent:permission", { id, option }),
+                ),
+              )()
+            }
+            onCancel={() =>
+              void action(async () =>
+                update(
+                  await desktop.invoke("agent:cancel", {
+                    id: activeTask.id,
+                  }),
+                ),
+              )()
+            }
           />
-          <div className="agent-form-actions">
-            <button
-              className="settings-button agent-run"
-              type="submit"
-              disabled={
-                busy ||
-                hasRunning ||
-                !projectId ||
-                !prompt.trim() ||
-                (status.settings.mode === "api" &&
-                  (status.runtime.state !== "ready" || !apiReady))
-              }
-            >
-              <Bot size={14} />
-              {t("runTask")}
-            </button>
-            {activeTask?.threadId &&
-              status.settings.mode === "api" &&
-              activeTask.projectId === projectId && (
-                <label className="agent-continue">
-                  <input
-                    type="checkbox"
-                    checked={continueTask}
-                    onChange={(event) => setContinueTask(event.target.checked)}
-                  />
-                  {t("continueSession")}
-                </label>
-              )}
-          </div>
-        </form>
-        {status.tasks.length > 0 && (
-          <>
-            <div className="agent-task-picker">
-              <select
-                aria-label={t("taskHistory")}
-                value={activeTask?.id ?? ""}
-                onChange={(event) => setTaskId(event.target.value)}
-              >
-                {status.tasks.map((task) => (
-                  <option key={task.id} value={task.id}>
-                    {new Date(task.startedAt).toLocaleTimeString(getLocale())} ·{" "}
-                    {task.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {activeTask && (
-              <TaskResult
-                task={activeTask}
-                onFile={(path) =>
-                  void action(async () => {
-                    const file = await desktop.invoke<{
-                      name: string;
-                      mime: string;
-                      base64: string;
-                    }>("agent:readFile", { id: activeTask.id, path });
-                    const bytes = Uint8Array.from(
-                      atob(file.base64),
-                      (character) => character.charCodeAt(0),
-                    );
-                    const url = URL.createObjectURL(
-                      new Blob([bytes], { type: file.mime }),
-                    );
-                    const link = document.createElement("a");
-                    link.href = url;
-                    link.download = file.name;
-                    link.click();
-                    setTimeout(() => URL.revokeObjectURL(url), 30000);
-                  })()
-                }
-                onPermission={(id, option) =>
-                  void action(async () =>
-                    update(
-                      await desktop.invoke("agent:permission", { id, option }),
-                    ),
-                  )()
-                }
-                onCancel={() =>
-                  void action(async () =>
-                    update(
-                      await desktop.invoke("agent:cancel", {
-                        id: activeTask.id,
-                      }),
-                    ),
-                  )()
-                }
-              />
-            )}
-            {activeTask?.projectId && activeTask.state === "completed" && (
-              <button
-                className="settings-button"
-                onClick={action(async () => {
-                  await desktop.openWindow(
-                    {
-                      projectId: activeTask.projectId,
-                      ...(activeTask.pageId
-                        ? { pageId: activeTask.pageId }
-                        : {}),
-                    },
-                    async () => true,
-                  );
-                })}
-              >
-                {t("openTaskProject")}
-              </button>
-            )}
-          </>
         )}
       </section>
       <details className="agent-storage">

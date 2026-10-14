@@ -1,4 +1,5 @@
 import { RichTextEnvironment } from "../rich-text/environment";
+import { AssistantContext } from "../assistant-context";
 import {
   useComponentCatalog,
   RegisterComponentContext,
@@ -102,6 +103,7 @@ export const Widget = memo(function Widget({
   host,
 }: BlockProps & { kind: string }) {
   const registerComponent = useContext(RegisterComponentContext);
+  const assistant = useContext(AssistantContext);
   const environment = useMemo(
     () => ({
       useCatalog: useComponentCatalog,
@@ -109,8 +111,9 @@ export const Widget = memo(function Widget({
       renderWidget: (props: BlockProps & { kind: string }) => (
         <Widget {...props} />
       ),
+      assistant: readOnly ? null : assistant,
     }),
-    [registerComponent],
+    [registerComponent, assistant, readOnly],
   );
   useSyncExternalStore(
     subscribeToBlocks,
