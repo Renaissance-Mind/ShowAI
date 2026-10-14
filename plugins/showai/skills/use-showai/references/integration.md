@@ -21,12 +21,7 @@
 
 ## 展示与同步
 
-| 实际宿主能力 | 展示方式 |
-| --- | --- |
-| MCP Apps | 使用工具附带的阅读器资源与结果 |
-| Codex本机 HTML 可视化 | 用返回的 delivery.inline 文件路径生成宿主引用 |
-| 浏览器 / 文件预览 | 打开完整 HTML文件或下载链接 |
-| 无内嵌显示 | 交付项目、页面、版本与同步结果；需要文件时交付链接 |
+按宿主实际能力选择展示方式，适配表与 delivery.inline / online / html 的区别以 [对话展示](../../show-document/references/conversation-display.md) 为准。
 
 page_present 的 blockIds只限制 inline预览，完整 HTML/source保留整个页面。page_export是明确文件导出的低层工具，其选区源码本身可以是局部；不得拿它覆盖整页。显示成功、保存成功与同步成功分别核实。
 

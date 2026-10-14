@@ -21,8 +21,10 @@ export async function retainCachedObject(
   path: string,
   bytes: Buffer,
   expected: string,
+  /** The caller derived `expected` from these exact bytes. */
+  trusted = false,
 ) {
-  if (createHash("sha256").update(bytes).digest("hex") !== expected)
+  if (!trusted && createHash("sha256").update(bytes).digest("hex") !== expected)
     throw new CoreError("INVALID_DATA", t("cache.inputDigestMismatch"));
   await safeLibraryPath(home, path);
   const info = await lstat(path).catch((error: NodeJS.ErrnoException) => {

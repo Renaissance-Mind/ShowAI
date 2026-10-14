@@ -32,6 +32,8 @@ export interface ObjectStore {
     maximum: number,
   ): Promise<number>;
   digest(): StreamDigest;
+  /** Where a stored object's bytes live, when a front end can read them itself. */
+  location?(key: string): Promise<"inline" | "remote">;
   remove(key: string): Promise<void>;
 }
 export const legacyDataTables = [

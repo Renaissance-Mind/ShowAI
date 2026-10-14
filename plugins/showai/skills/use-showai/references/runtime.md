@@ -17,6 +17,10 @@
 | SHOWAI_PROJECT_ID | 可选，锁定一个已存在的项目；省略则由工具显式选择项目 |
 | SHOWAI_PRESENTATION_DIR | 可选，宿主允许的绝对展示输出目录；否则由运行时分配预览目录 |
 
+项目绑定连接还可设置 `SHOWAI_TEMPLATES`（格式 `ID[@VERSION],ID`）作为该会话的默认模板选择，必须同时设置 `SHOWAI_PROJECT_ID`；内容库连接在每次任务用 template_context 显式选择模板。
+
+运行时带有 CDN 阅读器时，对话预览与在线页从 jsDelivr／unpkg 加载阅读器。宿主可设 `SHOWAI_READER_CDN=off` 改回离线打包预览，或设为逗号分隔的镜像基础地址（支持 `{name}`、`{version}` 占位）。
+
 不修改系统 HOME，也不直接编辑库里的正式文件。运行期间库位置保持固定；要换库，宿主停止并重连另一个配置，再查 capabilities/context。
 
 ## 自定义 Agent / 服务器 runner

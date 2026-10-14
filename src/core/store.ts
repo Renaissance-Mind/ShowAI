@@ -33,7 +33,7 @@ import { withLibraryLock } from "./library-lock";
 const projectionReads = new AsyncLocalStorage<string>();
 import { pageSummaries } from "./page-summaries";
 import { WorkspaceProtection } from "./workspace-conflicts";
-import { orderSidebarItems, placeSidebarItem } from "./sidebar-order";
+import { orderSidebarProjects, placeSidebarItem } from "./sidebar-order";
 import {
   directoryEntries,
   isDirectorySortBy,
@@ -508,11 +508,10 @@ export class FileStore {
         !sidebar.groups.some((group) => group.id === sectionId)
       )
         throw new CoreError("NOT_FOUND", "Project group is missing.");
-      const projects = orderSidebarItems(
-        await this.listProjects(),
-        sidebar.projectOrder,
+      const projects = await this.listProjects({ includeArchived: true });
+      const project = projects.find(
+        (item) => item.id === projectId && !item.archived,
       );
-      const project = projects.find((item) => item.id === projectId);
       if (!project)
         throw new CoreError("NOT_FOUND", "Project is missing or archived.");
       const section = (item: ProjectSummary) =>
@@ -521,7 +520,10 @@ export class FileStore {
         relativeId &&
         (relativeId === projectId ||
           !projects.some(
-            (item) => item.id === relativeId && section(item) === sectionId,
+            (item) =>
+              item.id === relativeId &&
+              !item.archived &&
+              section(item) === sectionId,
           ))
       )
         throw new CoreError(
@@ -529,7 +531,7 @@ export class FileStore {
           "The destination project is not in this section.",
         );
       const siblings = projects
-        .filter((item) => section(item) === sectionId)
+        .filter((item) => !item.archived && section(item) === sectionId)
         .map((item) => item.id);
       const ordered = placeSidebarItem(
         siblings,
@@ -546,7 +548,8 @@ export class FileStore {
       if (sectionId === "projects") delete sidebar.projectGroups[projectId];
       else if (sectionId !== "pinned")
         sidebar.projectGroups[projectId] = sectionId;
-      await this.updateProject(projectId, { pinned: sectionId === "pinned" });
+      if (!!project.pinned !== (sectionId === "pinned"))
+        await this.updateProject(projectId, { pinned: sectionId === "pinned" });
       await this.atomicWrite(
         join(workspaceRoot(this.root), "sidebar.json"),
         JSON.stringify(sidebar, null, 2),
@@ -838,10 +841,9 @@ export class FileStore {
         pageCount: pages.length,
       });
     }
-    return projects.sort(
-      (left, right) =>
-        Number(!!right.pinned) - Number(!!left.pinned) ||
-        right.updatedAt.localeCompare(left.updatedAt),
+    return orderSidebarProjects(
+      projects,
+      (await this.readSidebar()).projectOrder,
     );
   }
 
@@ -915,6 +917,12 @@ export class FileStore {
     sourceDirectory?: string,
     icon?: string,
   ): Promise<ProjectSummary> {
+    // Freeze all existing ranks before publishing the new project, including
+    // legacy and archived projects. New projects always append to this order.
+    const sidebar = await this.readSidebar();
+    const projectOrder = (
+      await this.listProjects({ includeArchived: true })
+    ).map((project) => project.id);
     const now = new Date().toISOString();
     const project: ProjectMetadata = {
       format: "showai-project",
@@ -934,6 +942,14 @@ export class FileStore {
       await this.atomicWrite(
         join(this.projectPath(project.id), "project.json"),
         JSON.stringify(project, null, 2),
+      );
+      await this.atomicWrite(
+        join(workspaceRoot(this.root), "sidebar.json"),
+        JSON.stringify(
+          { ...sidebar, projectOrder: [...projectOrder, project.id] },
+          null,
+          2,
+        ),
       );
       return { ...project, pageCount: 0 };
     }
@@ -960,6 +976,14 @@ export class FileStore {
       await this.safePath(destination);
       await atomicRename(staging, destination);
       await syncDirectory(dirname(destination));
+      await this.atomicWrite(
+        join(workspaceRoot(this.root), "sidebar.json"),
+        JSON.stringify(
+          { ...sidebar, projectOrder: [...projectOrder, project.id] },
+          null,
+          2,
+        ),
+      );
       return { ...project, pageCount: 0 };
     } finally {
       await rm(staging, { recursive: true, force: true });

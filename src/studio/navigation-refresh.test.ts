@@ -94,8 +94,8 @@ it("scoped refreshes preserve unrelated project identities and remove missing sc
     [{ ...a, updatedAt: "2026-04-01" }],
     new Set(["a", "c"]),
   );
-  expect(next.map((project) => project.id)).toEqual(["a", "b"]);
-  expect(next[1]).toBe(b);
+  expect(next.map((project) => project.id)).toEqual(["b", "a"]);
+  expect(next[0]).toBe(b);
   expect(retainEqual(previous, next)).toBe(next);
 });
 
@@ -163,7 +163,7 @@ it("applies an own save to loaded navigation and keeps unchanged values", () => 
     "project",
     document.updatedAt,
   );
-  expect(resorted.map((item) => item.id)).toEqual(["project", "older"]);
+  expect(resorted.map((item) => item.id)).toEqual(["older", "project"]);
   expect(withSavedProjectTime(resorted, "project", summary.updatedAt)).toBe(
     resorted,
   );

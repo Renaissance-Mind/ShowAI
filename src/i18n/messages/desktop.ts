@@ -3,6 +3,7 @@ import { defineMessages } from "../index";
 // Electron main-process menus and native dialogs.
 export default defineMessages("desktop", {
   "zh-CN": {
+    "login.libraryClosed": "请先打开 ShowAI 内容库，再完成登录。",
     "menu.about": "关于 ShowAI",
     "menu.services": "服务",
     "menu.hide": "隐藏 ShowAI",
@@ -41,6 +42,7 @@ export default defineMessages("desktop", {
     previewTimeout: "组件预览加载超时。",
   },
   en: {
+    "login.libraryClosed": "Open a ShowAI library before finishing sign-in.",
     "menu.about": "About ShowAI",
     "menu.services": "Services",
     "menu.hide": "Hide ShowAI",

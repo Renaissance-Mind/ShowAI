@@ -11,7 +11,7 @@ import type {
   ProjectSummary,
   SidebarOrganization,
 } from "../core/model";
-import { orderSidebarItems } from "../core/sidebar-order";
+import { orderSidebarProjects } from "../core/sidebar-order";
 import { useLibraryDrag } from "./LibraryDrag";
 import { useTranslator } from "../i18n/react";
 import commonMessages from "../i18n/messages/common";
@@ -45,7 +45,7 @@ export default function ProjectSidebar({
   const t = useTranslator(sidebarMessages);
   const tc = useTranslator(commonMessages);
   const drag = useLibraryDrag();
-  projects = orderSidebarItems(projects, organization.projectOrder);
+  projects = orderSidebarProjects(projects, organization.projectOrder);
   const selected = projects.find((item) => item.id === selectedProject);
   const selectedSection =
     selected && !selected.pinned

@@ -17,7 +17,7 @@ Agent使用已连接的ShowAI MCP工具操作文档。宿主负责本机或远�
 
 ## Kimi 展示适配
 
-若当前宿主提供Widget及其使用说明，按实际契约将delivery.html完整阅读文件用于Widget，并执行宿主的显示动作。更新时复用已有展示入口。局部展示若宿主只接受完整HTML文件，可用可用的page_export获取明确的选区HTML，同时保留page_present的完整交付。
+若当前宿主提供Widget及其使用说明，按实际契约将阅读文件用于Widget，并执行宿主的显示动作：有 delivery.online 时优先使用这个小体积在线页（阅读器与内置组件从 jsDelivr/unpkg 加载，需联网）；没有在线版、Widget 不能联网或显示“无法加载 ShowAI 阅读器”时，改用 delivery.html 离线完整文件。更新时复用已有展示入口。局部展示若宿主只接受完整HTML文件，可用 page_export（format:"html"，需要小体积时 reader:"cdn"）获取明确的选区HTML，同时保留page_present的完整交付。
 
 没有Widget能力时交付页面身份与完整HTML文件/下载链接，不伪造显示。不要使用Codex的visualize引用语法，不在正文粘贴整段HTML，不为显示限额拆分正式源Page。用户要求只保存、只交付文件或后台运行时遵循指定。
 

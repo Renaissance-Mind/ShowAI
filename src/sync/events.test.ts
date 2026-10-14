@@ -131,6 +131,7 @@ async function fixture() {
   return {
     root,
     url,
+    server,
     clients,
     owner,
     editor,
@@ -140,6 +141,39 @@ async function fixture() {
     diagnostics,
   };
 }
+
+test("pushed revisions arrive as changes that receivers rebuild without downloading the snapshot", async () => {
+  const { server, owner, editor, viewer, project, pageId } = await fixture();
+  if (!server) return;
+  let snapshotReads = 0;
+  server.server.on("request", (request) => {
+    if (
+      request.method === "GET" &&
+      request.url?.includes(`/projects/${project.id}/snapshot`)
+    )
+      snapshotReads++;
+  });
+  for (let index = 0; index < 5; index++) {
+    const record = await owner.store.readPage(project.id, pageId),
+      title = `Delta ${index}`;
+    await owner.store.savePage(
+      project.id,
+      pageId,
+      { ...record.document, title },
+      record.hash,
+      record.revision,
+    );
+    owner.manager.wake([project.id]);
+    await until(
+      async () =>
+        (await editor.store.readPage(project.id, pageId)).document.title ===
+          title &&
+        (await viewer.store.readPage(project.id, pageId)).document.title ===
+          title,
+    );
+  }
+  expect(snapshotReads).toBe(0);
+}, 180_000);
 
 test("existing saved connections negotiate the new push capability on startup", async () => {
   const { editor } = await fixture();
@@ -261,7 +295,7 @@ test("continuous edits arrive before editing stops and a disconnected client ret
   left.content.content![0].content = [
     { type: "text", text: "Owner kept offline" },
   ];
-  const offlineSaved = await owner.store.savePage(
+  await owner.store.savePage(
     project.id,
     pageId,
     left,
@@ -300,16 +334,12 @@ test("continuous edits arrive before editing stops and a disconnected client ret
       (await editor.store.readPage(project.id, pageId)).document.content,
     ).includes("Owner kept offline"),
   );
-  await until(async () =>
-    (
-      await new GitLibrary(editor.home).history({
-        projectId: project.id,
-        limit: 100,
-      })
-    ).some(
-      (entry) => entry.syncOrigin?.sourceRevision === offlineSaved.revision,
-    ),
-  );
+  expect(
+    (await editor.store.readPage(project.id, pageId)).document.content,
+  ).toEqual((await owner.store.readPage(project.id, pageId)).document.content);
+  expect(
+    await new GitLibrary(editor.home).history({ projectId: project.id }),
+  ).toEqual([]);
 }, 180_000);
 
 test("open sockets hide private projects and revoke project access and device sessions", async () => {

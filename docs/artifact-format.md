@@ -113,15 +113,15 @@ The built-in data shapes below are **plain JSON**. Optional fields are marked wi
 
 Basic components use the same widget envelope, with these kinds and data fields:
 
-| Kind      | Data                                                                     |
-| --------- | ------------------------------------------------------------------------ |
-| `text`    | `content: string`, `format?: "markdown" \| "plain"` |
+| Kind      | Data                                                                                 |
+| --------- | ------------------------------------------------------------------------------------ |
+| `text`    | `content: string`, `format?: "markdown" \| "plain"`                                  |
 | `image`   | `src: string`, `alt?`, `caption?`, `width?`, `height?`, `fit?: "contain" \| "cover"` |
-| `table`   | `title?`, `columns: string[]`, `rows: (string \| number \| boolean)[][]` |
-| `callout` | `title?`, `content: string` (Markdown)                                   |
-| `toggle`  | `summary: string`, `content: string` (Markdown), `open?: boolean`        |
-| `divider` | `color?: string`                                                         |
-| `code`    | `content: string`, `language?: string`                                   |
+| `table`   | `title?`, `columns: string[]`, `rows: (string \| number \| boolean)[][]`             |
+| `callout` | `title?`, `content: string` (Markdown)                                               |
+| `toggle`  | `summary: string`, `content: string` (Markdown), `open?: boolean`                    |
+| `divider` | `color?: string`                                                                     |
+| `code`    | `content: string`, `language?: string`                                               |
 
 Appearance fields include `color`, `backgroundColor`, `fontSize`, `align`, `padding`, and `radius`. Tables have 1–100 columns and up to 1,000 rectangular rows. Image URLs and Markdown images must be embedded for offline delivery. Browser export embeds image component URLs and inline/reference Markdown images. Builtins are discoverable by Agent and expose a source wrapper for creating a project variant. Existing editor-native nodes remain readable in the same artifact format.
 
@@ -236,6 +236,16 @@ Software builds ship a fingerprinted reader source archive. HTML and inline expo
 For inline fragments of 128 KB or more, the exporter losslessly gzip-compresses its reader modules, scoped styles and artifact together when this reduces the emitted size. A small local bootstrap restores the exact JSON and styles before starting the reader; custom component HTML, inline code and integrity remain intact. The companion `.showai.json` remains complete editable source. No network request is required to unpack or render. Reader templates are cached by source fingerprint and sorted component kinds; page data is inserted afterwards, so cached readers never contain another page's contents.
 
 The 1 MB limit applies to the **final emitted UTF-8 fragment**, after compression. A standalone HTML file larger than 1 MB can still fit in conversation. If the compressed fragment remains too large, export meaningful selected blocks and link the full HTML; the error reports the actual compressed byte count. Large media and incompressible data can still exceed the host limit.
+
+### CDN reader fragments
+
+Conversation previews and online HTML pages load the reader from a CDN instead of carrying it. `npm run build:cdn` builds the reader as code-split ES modules in `dist-cdn/`, an npm package named `showai-reader` whose version is the app version plus the entry's content hash (for example `0.9.0-reader.hpmvkaf2`), so a runtime always names exactly the reader it was built with. Packaged runtimes ship its manifest as `assets/cdn-manifest.json`.
+
+With that manifest, `inline` exports and the `inline` delivery of `page_present`/`render_document` become fragments that carry only page data, embedded images and custom components, plus a one-line loader that imports the reader from jsDelivr and falls back to unpkg. `page_present` and `render_document` also deliver `online`, a complete small HTML page with the same loader; `delivery.html` stays the offline bundled file. HTML exports stay offline unless `reader: "cdn"` (CLI `--reader cdn`, Studio “Export online page”) asks for the online page. Site exports keep their bundled shared assets.
+
+The reader mounts into a fragment root like an inline page: styles are scoped to it, custom components use their `inline` runtimes, and each built-in block's code and styles load with its own chunk, so a page fetches only the kinds it uses. An online page mounts as a standalone reader with the page menu. The MCP Apps reader resource declares the CDN origins in its CSP. These outputs need network access to the CDN; `SHOWAI_READER_CDN=off` returns to bundled previews, and `SHOWAI_READER_CDN` may instead list base URLs with `{name}` and `{version}` placeholders, for example a mirror reachable from mainland China or a local server while developing an unpublished reader. `scripts/render-artifact.mjs page.showai.json out.html --cdn READER_URL` writes a fragment against an explicit reader entry.
+
+Publish each new reader before releasing a runtime that names it: `npm run build:cdn && npm publish ./dist-cdn --access public`, or the `publish-reader` workflow.
 
 ### Application-level block registration
 

@@ -1,4 +1,5 @@
 import { COMPONENT_PARAMETER_CAPABILITIES } from "../portable/component-parameters.mjs";
+import { cdnReaderOrigins, cdnReaderUrls } from "../core/cdn-reader";
 import { CAPACITY } from "../portable/capacity.mjs";
 import { TEMPLATE_WORKFLOW_CAPABILITIES } from "../portable/template-bundle.mjs";
 import { TEMPLATE_STAGES } from "../portable/template-bundle.mjs";
@@ -104,25 +105,34 @@ export function registerPresentationTools(
     "showai-reader",
     readerResourceUri,
     { mimeType: "text/html;profile=mcp-app" },
-    async () => ({
-      contents: [
-        {
-          uri: readerResourceUri,
-          mimeType: "text/html;profile=mcp-app",
-          text: mcpReaderHtml,
-          _meta: {
-            ui: {
-              prefersBorder: false,
-              csp: { connectDomains: [], resourceDomains: [] },
-              ...(options.widgetDomain ? { domain: options.widgetDomain } : {}),
+    async () => {
+      // Conversation previews import the CDN reader; hosts block other origins.
+      const domains = cdnReaderOrigins(await cdnReaderUrls());
+      return {
+        contents: [
+          {
+            uri: readerResourceUri,
+            mimeType: "text/html;profile=mcp-app",
+            text: mcpReaderHtml,
+            _meta: {
+              ui: {
+                prefersBorder: false,
+                csp: { connectDomains: [], resourceDomains: domains },
+                ...(options.widgetDomain
+                  ? { domain: options.widgetDomain }
+                  : {}),
+              },
+              "openai/widgetDescription":
+                "Interactive ShowAI page. Read, explore and compare the supplied content.",
+              "openai/widgetCSP": {
+                connect_domains: [],
+                resource_domains: domains,
+              },
             },
-            "openai/widgetDescription":
-              "Interactive ShowAI page. Read, explore and compare the supplied content.",
-            "openai/widgetCSP": { connect_domains: [], resource_domains: [] },
           },
-        },
-      ],
-    }),
+        ],
+      };
+    },
   );
   server.registerTool(
     "showai_capabilities",
@@ -254,6 +264,7 @@ export function registerPresentationTools(
             display: {
               resourceAttached: true,
               inlineAvailable: !!presentation.inline,
+              onlineAvailable: !!presentation.online,
               note: "The host displays the attached MCP Apps reader directly. Download URLs are for file delivery. If the execution sandbox cannot download them, use presentation_source when available.",
             },
             ...(presentation.inlineError

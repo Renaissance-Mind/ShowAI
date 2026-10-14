@@ -5,6 +5,13 @@ import {
   transformObjects,
   duplicateObjects,
   removeObjects,
+  copyObjects,
+  pasteObjects,
+  reorderObjects,
+  groupObjects,
+  ungroupRegion,
+  adoptIntoRegion,
+  setObjectsLocked,
 } from "./board-commands";
 import {
   reconcileConnections,
@@ -32,20 +39,7 @@ import {
   type RefObject,
 } from "react";
 import type { JSONContent } from "@tiptap/core";
-import {
-  ArrowLeft,
-  ChevronRight,
-  LayoutDashboard,
-  MousePointer2,
-  Pencil,
-  Highlighter,
-  PanelsTopLeft,
-  Square,
-  Circle,
-  ArrowUpRight,
-  LockKeyhole,
-  X,
-} from "../ui/icons";
+import { ArrowLeft, ChevronRight, LayoutDashboard, X } from "../ui/icons";
 import type { ContainerDocument, ShowDocument } from "../types";
 import type {
   BoardTool,
@@ -77,18 +71,21 @@ import "./containers.css";
 import PageIcon from "../components/PageIcon";
 import PageIconDialog from "../studio/PageIconDialog";
 import { PageWidthSwitch } from "./PageWidthSwitch";
+import { BoardTools } from "./BoardTools";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";
 
+/** Text placed on a Board starts as a note-sized box rather than a page column. */
+const boardTextWidth = 320;
 interface Runtime {
   geometry: SurfaceGeometryStore;
   document: ContainerDocument;
   current: RefObject<ContainerDocument>;
-  commit: (next: ShowDocument) => void;
+  /** Commits sharing a group within a short interval form one undo step. */
+  commit: (next: ShowDocument, group?: string) => void;
   readOnly: boolean;
   printing: boolean;
   pageWidthModes: boolean;
-  onHandwriting?: (boardId: string, document: ShowDocument, tool?: string) => Promise<void>;
   selected: string | null;
   select: (id: string | null) => void;
   inspect: (id: string | null) => void;
@@ -133,11 +130,10 @@ export function ContainerRuntime({
   onControlsChange,
   retainedState,
   inspectorHost,
-  onHandwriting,
 }: {
   document: ContainerDocument;
   geometry?: SurfaceGeometryStore;
-  onChange?: (next: ShowDocument) => void;
+  onChange?: (next: ShowDocument, group?: string) => void;
   renderContent: ContentRenderer;
   header?: ReactNode;
   revealId?: string | null;
@@ -156,7 +152,6 @@ export function ContainerRuntime({
   onControlsChange?: (controls: EditorControls | null) => void;
   retainedState?: ContainerViewState;
   inspectorHost?: HTMLElement | null;
-  onHandwriting?: (boardId: string, document: ShowDocument, tool?: string) => Promise<void>;
 }) {
   const t = useTranslator(messages);
   const document = useMemo(
@@ -348,7 +343,7 @@ export function ContainerRuntime({
     geometry,
     document,
     current,
-    commit: (next) => {
+    commit: (next, group) => {
       const measured = reconcileSurface(
         {
           ...geometry.materialize(next),
@@ -357,12 +352,11 @@ export function ContainerRuntime({
         { clone: false },
       );
       current.current = measured as ContainerDocument;
-      onChange?.(measured);
+      onChange?.(measured, group);
     },
     readOnly: !onChange,
     printing,
     pageWidthModes,
-    onHandwriting,
     selected,
     select,
     inspect,
@@ -931,10 +925,8 @@ function ContainerView({
     id = node.attrs!.id,
     kind = surfaceKind(node),
     readOnly = runtime.readOnly;
-  const t = useTranslator(messages);
   const viewport = useRef<SurfaceHandle>(null),
     page = useRef<HTMLDivElement>(null);
-  const [toolLocked, setToolLocked] = useState(false);
   const [tool, setTool] = useState<BoardTool | null>(null);
   const [styles, setStyles] = useState<Record<string, DrawingStyle>>({
     pen: { color: "#252629", fillColor: "none", strokeWidth: 2.5 },
@@ -942,15 +934,14 @@ function ContainerView({
     shape: { color: "#252629", fillColor: "none", strokeWidth: 2.5 },
   });
   const styleKey = tool === "pen" || tool === "highlighter" ? tool : "shape";
+  const drawingTool =
+    !!tool && !["pan", "eraser", "lasso", "text"].includes(tool);
   const style = styles[styleKey];
-  const chooseTool = (next: BoardTool | null) => {
+  const chooseTool = async (next: BoardTool | null) => {
+    await window.showai?.inlineInk?.flush();
     runtime.activate(id);
     runtime.select(null);
     runtime.inspect(null);
-    if (runtime.onHandwriting && next && ["pen", "highlighter", "rectangle", "ellipse", "arrow"].includes(next)) {
-      void runtime.onHandwriting(id, runtime.geometry.materialize(runtime.current.current), next);
-      return;
-    }
     setTool(next);
   };
   const enabled = root || runtime.active === id;
@@ -1118,26 +1109,142 @@ function ContainerView({
           onTransform={
             readOnly
               ? undefined
-              : (frames) =>
+              : (frames, group) =>
                   runtime.commit(
                     transformObjects(
                       runtime.geometry.materialize(runtime.current.current),
                       frames,
                     ),
+                    group,
                   )
           }
           onDuplicate={
             readOnly
               ? undefined
-              : (ids) => {
+              : (ids, offset) => {
                   const copied = duplicateObjects(
                     runtime.geometry.materialize(runtime.current.current),
                     ids,
+                    offset,
                   );
                   runtime.commit(copied.document);
                   runtime.select(copied.ids[0] ?? null);
                   return copied.ids;
                 }
+          }
+          onCopyObjects={(ids) =>
+            copyObjects(
+              runtime.geometry.materialize(runtime.current.current),
+              ids,
+            )
+          }
+          onPasteObjects={
+            readOnly
+              ? undefined
+              : (paste, point) => {
+                  const source = runtime.geometry.materialize(
+                    runtime.current.current,
+                  );
+                  if ("text" in paste) {
+                    const inserted = insertComponent(source, id, "text", {
+                      format: "richtext",
+                      content: {
+                        type: "doc",
+                        content: paste.text
+                          .split(/\r?\n/)
+                          .slice(0, 500)
+                          .map((line) => ({
+                            type: "paragraph",
+                            ...(line
+                              ? { content: [{ type: "text", text: line }] }
+                              : {}),
+                          })),
+                      },
+                    });
+                    Object.assign(inserted.document.layout[inserted.nodeId], {
+                      width: boardTextWidth,
+                      ...point,
+                    });
+                    runtime.commit(inserted.document);
+                    runtime.select(inserted.nodeId);
+                    return [inserted.nodeId];
+                  }
+                  const roots = paste.clip.nodes
+                    .map((node) => paste.clip.layout[node.attrs!.id])
+                    .filter(Boolean);
+                  // Paste centers the copy under the pointer when it is over
+                  // the Board; otherwise it lands slightly offset.
+                  const offset =
+                    point && roots.length
+                      ? {
+                          x:
+                            point.x -
+                            (Math.min(...roots.map((f) => f.x)) +
+                              Math.max(...roots.map((f) => f.x + f.width))) /
+                              2,
+                          y: point.y - Math.min(...roots.map((f) => f.y)),
+                        }
+                      : { x: 24, y: 24 };
+                  const pasted = pasteObjects(source, id, paste.clip, offset);
+                  runtime.commit(pasted.document);
+                  runtime.select(pasted.ids[0] ?? null);
+                  return pasted.ids;
+                }
+          }
+          onReorder={
+            readOnly
+              ? undefined
+              : (ids, order) =>
+                  runtime.commit(
+                    reorderObjects(
+                      runtime.geometry.materialize(runtime.current.current),
+                      ids,
+                      order,
+                    ),
+                  )
+          }
+          onGroup={
+            readOnly
+              ? undefined
+              : (ids, bounds, offset) => {
+                  const grouped = groupObjects(
+                    runtime.geometry.materialize(runtime.current.current),
+                    ids,
+                    bounds,
+                    offset,
+                  );
+                  if (!grouped) return null;
+                  runtime.commit(grouped.document);
+                  runtime.select(grouped.id);
+                  return grouped.id;
+                }
+          }
+          onUngroup={
+            readOnly
+              ? undefined
+              : (regionId, offset) => {
+                  const result = ungroupRegion(
+                    runtime.geometry.materialize(runtime.current.current),
+                    regionId,
+                    offset,
+                  );
+                  if (!result) return [];
+                  runtime.commit(result.document);
+                  runtime.select(result.ids[0] ?? null);
+                  return result.ids;
+                }
+          }
+          onLock={
+            readOnly
+              ? undefined
+              : (ids, locked) =>
+                  runtime.commit(
+                    setObjectsLocked(
+                      runtime.geometry.materialize(runtime.current.current),
+                      ids,
+                      locked,
+                    ),
+                  )
           }
           onDeleteSelection={
             readOnly
@@ -1158,7 +1265,7 @@ function ContainerView({
             id: child.attrs!.id,
             name: nodeName(child),
           }))}
-          layoutKey={JSON.stringify(runtime.document.layout)}
+          layoutKey={runtime.document.layout}
           paths={nodePaths({ ...runtime.document, content: node })}
           views={surfaceViews(runtime.document, node)}
           header={root ? heading : undefined}
@@ -1233,12 +1340,8 @@ function ContainerView({
                 findSurfaceNode(runtime.current.current, nodeId)?.node.type ===
                 "drawing",
             );
-            if (tool && tool !== "region" && drawings.length)
-              setStyles((before) => ({
-                ...before,
-                [styleKey]: { ...before[styleKey], ...patch },
-              }));
-            if (!drawings.length) {
+            // With a tool active, style changes set up the next drawing only.
+            if (drawingTool || !drawings.length) {
               setStyles((before) => ({
                 ...before,
                 [styleKey]: { ...before[styleKey], ...patch },
@@ -1253,7 +1356,8 @@ function ContainerView({
                   delete applicable.fillColor;
                 node.attrs = { ...node.attrs, ...applicable };
               }) as ContainerDocument;
-            runtime.commit(next);
+            // Dragging a slider or color picker is one undo step.
+            runtime.commit(next, `style:${[...drawings].sort().join(",")}`);
           }}
           onAddComponent={
             readOnly
@@ -1275,11 +1379,13 @@ function ContainerView({
                   );
                   Object.assign(
                     inserted.document.layout[inserted.nodeId],
+                    kind === "text" ? { width: boardTextWidth } : {},
                     point,
                   );
                   runtime.commit(inserted.document);
                   runtime.select(inserted.nodeId);
                   setTool(null);
+                  return inserted.nodeId;
                 }
           }
           onOpenComponents={
@@ -1292,7 +1398,7 @@ function ContainerView({
           onDraw={
             readOnly
               ? undefined
-              : (drawing, frame) => {
+              : (drawing, frame, adopt) => {
                   if (drawing.attrs?.tool === "arrow") {
                     const endpoints = arrowEndpoints(drawing, frame);
                     const start = bindingAtPoint(
@@ -1313,15 +1419,23 @@ function ContainerView({
                         ...(end ? { end } : {}),
                       };
                   }
-                  runtime.commit(
-                    addNode(runtime.current.current, drawing, frame, id),
+                  let next = addNode(
+                    runtime.current.current,
+                    drawing,
+                    frame,
+                    id,
                   );
-                  if (window.document.documentElement.dataset.native === "ios") {
-                    runtime.select(null);
-                  } else {
-                    runtime.select(drawing.attrs!.id);
-                    if (tool !== "pen" && tool !== "highlighter" && !toolLocked) setTool(null);
-                  }
+                  if (adopt)
+                    next = adoptIntoRegion(
+                      next,
+                      drawing.attrs!.id,
+                      adopt.ids,
+                      adopt.offset,
+                    );
+                  runtime.commit(next);
+                  // Keep drawing: the tool stays active and the next stroke
+                  // must not grab what was just drawn.
+                  runtime.select(null);
                 }
           }
           extraActions={
@@ -1329,61 +1443,7 @@ function ContainerView({
               {!readOnly && (
                 <>
                   <span className="surface-toolbar-divider" />
-                  <button
-                    type="button"
-                    aria-label={t("tool.select")}
-                    aria-pressed={!tool}
-                    onClick={() => chooseTool(null)}
-                  >
-                    <MousePointer2 size={15} />
-                  </button>
-                  {(
-                    [
-                      ["pen", t("tool.pen"), Pencil],
-                      ["highlighter", t("tool.highlighter"), Highlighter],
-                      ["rectangle", t("tool.rectangle"), Square],
-                      ["ellipse", t("tool.ellipse"), Circle],
-                      ["arrow", t("tool.arrow"), ArrowUpRight],
-                      ["region", t("tool.region"), PanelsTopLeft],
-                    ] as const
-                  ).map(([value, label, Icon]) => (
-                    <button
-                      type="button"
-                      key={value}
-                      aria-label={label}
-                      title={t(
-                        value === "pen" || value === "highlighter"
-                          ? "tool.withShortcut"
-                          : "tool.shapeWithShortcut",
-                        {
-                          label,
-                          key: {
-                            pen: "P",
-                            highlighter: "H",
-                            rectangle: "R",
-                            ellipse: "E",
-                            arrow: "A",
-                            region: "F",
-                          }[value],
-                        },
-                      )}
-                      aria-pressed={tool === value}
-                      onClick={() => {
-                        chooseTool(value);
-                      }}
-                    >
-                      <Icon size={15} />
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    aria-label={t("tool.continuous")}
-                    aria-pressed={toolLocked}
-                    title={t("tool.continuousTitle")}
-                    onClick={() => setToolLocked((value) => !value)}
-                  >
-                    <LockKeyhole size={15} />
-                  </button>
+                  <BoardTools tool={tool} onChange={chooseTool} />
                 </>
               )}
             </>

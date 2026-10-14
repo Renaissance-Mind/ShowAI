@@ -85,7 +85,8 @@ Discover only what you need:
   catalog describe ID --view parameters [--parameter-path PATH --parameter-offset N --parameter-limit N --known-hash HASH]
 
 Display a full page or selected blocks:
-  export --project PROJECT --page PAGE [--blocks ID,ID] --format html|inline --out PATH
+  export --project PROJECT --page PAGE [--blocks ID,ID] --format html|inline --out PATH [--reader bundled|cdn]
+    html defaults to an offline page; --reader cdn writes a small online page. inline uses the CDN reader when available.
 
 Read one Page through structured data, an image or interactive HTML:
   boards read PAGE --project PROJECT [--board BOARD_NODE] [--state OPTIONS.json]
@@ -344,6 +345,12 @@ function componentMode(args: Arguments): "bundled" | "remote" {
   const mode = option(args, "components") ?? "bundled";
   if (mode !== "bundled" && mode !== "remote")
     throw new Error("--components must be bundled or remote.");
+  return mode;
+}
+function readerMode(args: Arguments): "bundled" | "cdn" | undefined {
+  const mode = option(args, "reader");
+  if (mode !== undefined && mode !== "bundled" && mode !== "cdn")
+    throw new Error("--reader must be bundled or cdn.");
   return mode;
 }
 function resultLimit(args: Arguments): number | undefined {
@@ -883,6 +890,7 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
         out: option(args, "out", true)!,
         overwrite: !!args.options.overwrite,
         components: componentMode(args),
+        reader: readerMode(args),
         revision: option(args, "revision"),
         ...(option(args, "import") || option(args, "snapshot")
           ? {

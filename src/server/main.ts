@@ -39,6 +39,7 @@ if (
     allowedOrigins:
       process.env.SHOWAI_ALLOWED_ORIGINS?.split(",").filter(Boolean),
     operationsKey: process.env.SHOWAI_OPERATIONS_KEY,
+    trustedProxyKey: process.env.SHOWAI_TRUSTED_PROXY_KEY,
   });
   console.log(
     JSON.stringify({

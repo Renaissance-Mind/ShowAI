@@ -48,3 +48,11 @@ export function snapCreation(
   scale: number,
   keepAspect?: boolean,
 ): { points: Point[]; guides: SnapGuide[] };
+
+export function arrowHeadLength(
+  a: Point,
+  b: Point,
+  strokeWidth?: number,
+): number;
+export function arrowPath(a: Point, b: Point, strokeWidth?: number): string;
+export function smoothPath(points: Point[]): string;

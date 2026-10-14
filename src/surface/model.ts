@@ -4,8 +4,8 @@ export interface Camera {
   scale: number;
 }
 
-export const MIN_ZOOM = 0.25;
-export const MAX_ZOOM = 2;
+export const MIN_ZOOM = 0.1;
+export const MAX_ZOOM = 4;
 export const GESTURE_IDLE = 220;
 
 export function normalizedWheel(
@@ -26,8 +26,9 @@ export function zoomAt(
   camera: Camera,
   point: { x: number; y: number },
   scale: number,
+  maximum = MAX_ZOOM,
 ): Camera {
-  const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, scale));
+  const next = Math.max(MIN_ZOOM, Math.min(maximum, scale));
   return {
     x: point.x - ((point.x - camera.x) * next) / camera.scale,
     y: point.y - ((point.y - camera.y) * next) / camera.scale,

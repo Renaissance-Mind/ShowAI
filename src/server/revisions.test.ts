@@ -71,7 +71,9 @@ test("explicit inline conversion preserves revision, source, parent order and se
     const path = join(objects.root, first.manifest_key!);
     const bytes = await readFile(path);
     await writeFile(path, "corrupt manifest");
-    await expect(store.snapshot("project", first)).rejects.toMatchObject({
+    // Verified manifests stay cached in memory; a cold reader re-verifies storage.
+    const cold = new Revisions(db, objects);
+    await expect(cold.snapshot("project", first)).rejects.toMatchObject({
       code: "CORRUPT_MANIFEST",
     });
     await writeFile(path, bytes);

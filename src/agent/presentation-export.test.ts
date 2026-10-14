@@ -27,6 +27,7 @@ test.each([
   "comparison-matrix",
   "status-tree",
   "experiment-tracker",
+  "scene-3d",
 ])(
   "portable reader mounts %s without requiring unused component metadata",
   async (kind) => {

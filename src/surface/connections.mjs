@@ -1,6 +1,7 @@
 import { pickShape } from "./drawing-geometry.mjs";
 import {
   frameAnchor,
+  frameHeight,
   bindingParent,
   normalizedAnchor,
   objectCapabilities,
@@ -139,8 +140,33 @@ export function bindingAtPoint(
   });
   const hit = pickShape(candidates);
   return hit
-    ? { targetId: hit.id, anchor: normalizedAnchor(hit.frame, point) }
+    ? { targetId: hit.id, anchor: connectionAnchor(hit.frame, point) }
     : null;
+}
+
+/**
+ * Endpoints near an edge's middle, or dropped deep inside the target, attach
+ * to that edge midpoint so connections line up instead of landing anywhere.
+ */
+export function connectionAnchor(frame, point, snap = 16) {
+  const anchor = normalizedAnchor(frame, point),
+    width = frame.width,
+    height = frameHeight(frame);
+  if (!width || !height) return anchor;
+  const local = { x: anchor.x * width, y: anchor.y * height };
+  const midpoints = [
+    { x: 0.5, y: 0 },
+    { x: 1, y: 0.5 },
+    { x: 0.5, y: 1 },
+    { x: 0, y: 0.5 },
+  ];
+  const distance = (m) =>
+    Math.hypot(m.x * width - local.x, m.y * height - local.y);
+  const nearest = midpoints.reduce((best, m) =>
+    distance(m) < distance(best) ? m : best,
+  );
+  const edge = Math.min(local.x, width - local.x, local.y, height - local.y);
+  return distance(nearest) <= snap || edge > snap ? nearest : anchor;
 }
 
 /** A transform retains only relationships whose targets participate in the same command. */

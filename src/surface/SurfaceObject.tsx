@@ -21,7 +21,13 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { GripHorizontal, Settings2, Trash2, Maximize2 } from "../ui/icons";
+import {
+  GripHorizontal,
+  LockKeyhole,
+  Settings2,
+  Trash2,
+  Maximize2,
+} from "../ui/icons";
 import type { NodeLayout } from "./types";
 
 export interface ObjectActions {
@@ -36,6 +42,8 @@ export interface ObjectActions {
     point: { x: number; y: number },
   ) => void;
   select: (id: string | null, additive?: boolean) => void;
+  /** Mark the object an arrow endpoint at this client point would bind to; null clears. */
+  highlightTarget?: (x: number | null, y?: number, exclude?: string) => void;
   inspect?: (id: string | null) => void;
   expand?: (id: string) => void;
   remove?: (id: string) => void;
@@ -346,11 +354,14 @@ export function SurfaceObject({
       : undefined;
   const chrome =
     visible || moving || (board?.ids.has(id) ?? actions.selected === id);
+  // A multi-selection shares one set of handles on its group outline.
+  const single = !board || board.ids.size <= 1;
+  const locked = !!frame?.locked;
   return (
     <section
       ref={element}
       style={style}
-      className={`surface-object${region ? " is-region" : ""}${container ? " is-container" : ""}${drawing ? " is-drawing" : ""}${moving ? " is-moving" : ""}${(board?.ids.has(id) ?? actions.selected === id) ? " is-selected" : ""}`}
+      className={`surface-object${region ? " is-region" : ""}${container ? " is-container" : ""}${drawing ? " is-drawing" : ""}${moving ? " is-moving" : ""}${locked ? " is-locked" : ""}${(board?.ids.has(id) ?? actions.selected === id) ? " is-selected" : ""}`}
       data-surface-id={id}
       data-board-drawing={(drawing && positioned && !!board) || undefined}
       data-surface-mounted={mount}
@@ -387,8 +398,20 @@ export function SurfaceObject({
             aria-hidden="true"
           />
         )}
+      {locked && positioned && board?.ids.has(id) && (
+        <span
+          className="board-lock-badge"
+          data-surface-ui
+          aria-label={t("board.lockedBadge", { name })}
+          title={t("board.lockedBadgeTitle")}
+        >
+          <LockKeyhole size={11} aria-hidden="true" />
+        </span>
+      )}
       {rotatable &&
         positioned &&
+        single &&
+        !locked &&
         !actions.readOnly &&
         (board?.ids.has(id) ?? actions.selected === id) && (
           <button
@@ -502,6 +525,8 @@ export function SurfaceObject({
       </div>
       {resizable &&
         chrome &&
+        single &&
+        !locked &&
         !actions.readOnly &&
         positioned &&
         board &&

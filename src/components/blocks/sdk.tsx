@@ -39,3 +39,4 @@ export {
 export { ComparisonMatrixBlock as ComparisonMatrix } from "./ComparisonMatrix";
 export { StatusTreeBlock as StatusTree } from "./StatusTree";
 export { ExperimentTrackerBlock as ExperimentTracker } from "./ExperimentTracker";
+export { Scene3DBlock as Scene3D } from "./Scene3D";

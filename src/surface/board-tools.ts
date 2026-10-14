@@ -6,19 +6,34 @@ export const boardTools: {
   tool: BoardTool | null;
   label: MessageKey<typeof messages>;
   key: string;
-  alias: string;
+  aliases: string[];
 }[] = [
-  { tool: null, label: "tool.select", key: "1", alias: "v" },
-  { tool: "pen", label: "tool.pen", key: "2", alias: "p" },
-  { tool: "highlighter", label: "tool.highlighter", key: "3", alias: "h" },
-  { tool: "rectangle", label: "tool.rectangle", key: "4", alias: "r" },
-  { tool: "ellipse", label: "tool.ellipse", key: "5", alias: "e" },
-  { tool: "arrow", label: "tool.arrow", key: "6", alias: "a" },
-  { tool: "region", label: "tool.region", key: "7", alias: "f" },
+  { tool: null, label: "tool.select", key: "1", aliases: ["v"] },
+  { tool: "pen", label: "tool.pen", key: "2", aliases: ["p"] },
+  { tool: "highlighter", label: "tool.highlighter", key: "3", aliases: ["h"] },
+  { tool: "rectangle", label: "tool.rectangle", key: "4", aliases: ["r"] },
+  { tool: "ellipse", label: "tool.ellipse", key: "5", aliases: ["e", "o"] },
+  { tool: "arrow", label: "tool.arrow", key: "6", aliases: ["a"] },
+  { tool: "region", label: "tool.region", key: "7", aliases: ["f"] },
+  { tool: "pan", label: "tool.pan", key: "8", aliases: ["m"] },
+  { tool: "eraser", label: "tool.eraser", key: "9", aliases: ["x"] },
+  { tool: "lasso", label: "tool.lasso", key: "L", aliases: ["l"] },
+  { tool: "text", label: "tool.text", key: "T", aliases: ["t"] },
 ];
 
 export function boardToolForKey(key: string) {
+  const lower = key.toLowerCase();
   return boardTools.find(
-    (entry) => entry.key === key || entry.alias === key.toLowerCase(),
+    (entry) => entry.key === key || entry.aliases.includes(lower),
   );
+}
+
+/** Tooltip shortcut text, e.g. "P / 2". */
+export function boardToolShortcut(tool: BoardTool | null) {
+  const entry = boardTools.find((item) => item.tool === tool);
+  return entry
+    ? [...entry.aliases.map((alias) => alias.toUpperCase()), entry.key].join(
+        " / ",
+      )
+    : "";
 }

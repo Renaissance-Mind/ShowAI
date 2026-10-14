@@ -10,10 +10,14 @@ import {
   hash,
   identifier,
   SyncError,
+  syncProtocol,
   type SyncProject,
   type SnapshotRecord,
 } from "../sync/protocol";
 import type { MetadataStore, ObjectStore } from "./storage";
+import { revisionDeltaFeature, snapshotDelta } from "../sync/delta";
+
+const knownFeatures = [revisionDeltaFeature];
 import type { RequestBudgets } from "./request-budget";
 import type { Revisions } from "./revisions";
 
@@ -93,10 +97,15 @@ export class ProjectEvents {
     }
     return projects;
   }
-  private async deliver(peer: EventPeer, event: ProjectEvent) {
+  private async deliver(
+    peer: EventPeer,
+    event: ProjectEvent,
+    authority?: SyncProject[],
+  ) {
     // Permission changes can interleave with object reads and budget accounting.
-    // Re-read authority immediately before constructing the delivered payload.
-    const current = await this.projects(peer.identity());
+    // Re-read authority immediately before constructing the delivered payload,
+    // unless the caller has just done so.
+    const current = authority ?? (await this.projects(peer.identity()));
     if (!current) {
       peer.close(4001, "The device session is no longer valid.");
       return;
@@ -159,6 +168,11 @@ export class ProjectEvents {
         "INVALID_EVENT",
         "A project event request is required.",
       );
+    // Heartbeats only keep the transport alive; deliveries recheck the session.
+    if (input.type === "ping") {
+      peer.send(JSON.stringify({ type: "pong" }));
+      return;
+    }
     const identity = peer.identity();
     await this.budgets.consume();
     await this.budgets.consume(identity.userId);
@@ -170,8 +184,11 @@ export class ProjectEvents {
           "Subscribe to at most 1000 projects.",
         );
       identity.projects = [...new Set<string>(input.ids.map(identifier))];
+      identity.features = Array.isArray(input.features)
+        ? knownFeatures.filter((feature) => input.features.includes(feature))
+        : [];
       peer.remember(identity);
-    } else if (input.type !== "ping")
+    } else
       throw new SyncError(
         400,
         "INVALID_EVENT",
@@ -182,13 +199,11 @@ export class ProjectEvents {
       peer.close(4001, "The device session is no longer valid.");
       return;
     }
-    if (input.type === "ping") peer.send(JSON.stringify({ type: "pong" }));
-    else
-      await this.deliver(peer, {
-        type: "heads",
-        serverId: await this.serverId(),
-        projects,
-      });
+    await this.deliver(peer, {
+      type: "heads",
+      serverId: await this.serverId(),
+      projects,
+    });
   }
   async recheck() {
     for (const peer of this.peers()) {
@@ -203,23 +218,37 @@ export class ProjectEvents {
     }
   }
   async published(projectId: string, previousHead?: string | null) {
+    await (
+      await this.prepare(projectId, previousHead)
+    )();
+  }
+  /**
+   * Reads everything a publication notice needs while the publication's state
+   * is current, and returns the per-peer delivery to run after responding.
+   * The publishing session gets only the new head: it already has the content.
+   */
+  async prepare(
+    projectId: string,
+    previousHead?: string | null,
+    publisherSession?: string,
+  ): Promise<() => Promise<void>> {
     const targets = [...this.peers()].filter((peer) =>
       peer.identity().projects.includes(projectId),
     );
-    if (!targets.length) return;
+    if (!targets.length) return async () => {};
     const head = (
       await this.db.all<{ head: string | null }>(
         "SELECT head FROM projects WHERE id=?",
         [projectId],
       )
     )[0]?.head;
-    if (!head) return this.recheck();
+    if (!head) return () => this.recheck();
     const row = await this.revisions.row(projectId, head);
     if (!row)
       throw new Error("A published project head is missing its revision.");
     const record = await this.revisions.record(projectId, row);
     const inline: Record<string, string> = {};
-    let size = encoder.encode(JSON.stringify(record)).length;
+    const recordSize = encoder.encode(JSON.stringify(record)).length;
     let previous: SnapshotRecord | undefined;
     let previousSequence: number | undefined =
       previousHead === null ? 0 : undefined;
@@ -230,18 +259,35 @@ export class ProjectEvents {
         previousSequence = row.sequence;
       }
     }
-    if (size < maximumEventBytes / 2) {
+    // Subscribers that keep the previous state receive only what changed.
+    const delta =
+      previous &&
+      previous.snapshot.format === syncProtocol &&
+      record.snapshot.format === syncProtocol
+        ? {
+            ...snapshotDelta(previous.snapshot, record.snapshot),
+            source: record.source,
+          }
+        : undefined;
+    const deltaSize = delta
+      ? encoder.encode(JSON.stringify(delta)).length
+      : Infinity;
+    const budget = maximumEventBytes / 2;
+    let size = Math.min(recordSize, deltaSize);
+    if (size < budget) {
       const seen = new Set<string>();
       for (const [path, digest] of Object.entries(record.snapshot.files)) {
         if (previous?.snapshot.files[path] === digest || seen.has(digest))
           continue;
+        // Bound storage lookups when nothing previous is known, as on a first publish.
+        if (seen.size >= 256) break;
         seen.add(digest);
         const key = `projects/${projectId}/objects/${digest}`;
         const info = await this.objects.stat(key);
         if (
           !info ||
           info.bytes > 64 * 1024 ||
-          size + Math.ceil((info.bytes * 4) / 3) > maximumEventBytes / 2
+          size + Math.ceil((info.bytes * 4) / 3) > budget
         )
           continue;
         const bytes = await this.objects.get(key, 64 * 1024);
@@ -250,37 +296,50 @@ export class ProjectEvents {
         size += inline[digest].length + digest.length + 8;
       }
     }
-    for (const peer of targets) {
-      const projects = await this.projects(peer.identity());
-      if (!projects) {
-        peer.close(4001, "The device session is no longer valid.");
-        continue;
-      }
-      const project = projects.find((item) => item.id === projectId);
-      if (!project) {
-        await this.deliver(peer, {
-          type: "heads",
-          serverId: await this.serverId(),
+    const inlineSize = size - Math.min(recordSize, deltaSize);
+    const content = (peer: EventPeer) => {
+      if (peer.identity().sessionDigest === publisherSession) return {};
+      const order = { previousHead, sequence: row.sequence, previousSequence };
+      if (
+        delta &&
+        peer.identity().features?.includes(revisionDeltaFeature) &&
+        deltaSize + inlineSize < budget
+      )
+        return { ...order, delta, objects: inline };
+      if (recordSize + inlineSize < budget)
+        return { ...order, record, objects: inline };
+      if (recordSize < budget) return { ...order, record };
+      return {};
+    };
+    return async () => {
+      for (const peer of targets) {
+        const projects = await this.projects(peer.identity());
+        if (!projects) {
+          peer.close(4001, "The device session is no longer valid.");
+          continue;
+        }
+        const project = projects.find((item) => item.id === projectId);
+        if (!project) {
+          await this.deliver(
+            peer,
+            { type: "heads", serverId: await this.serverId(), projects },
+            projects,
+          );
+          continue;
+        }
+        // The head can advance while objects are read. Never attach an older record
+        // to a newer notification; the next verified current-state request catches up.
+        await this.deliver(
+          peer,
+          {
+            type: "revision",
+            serverId: await this.serverId(),
+            project,
+            ...(project.head === head ? content(peer) : {}),
+          },
           projects,
-        });
-        continue;
+        );
       }
-      // The head can advance while objects are read. Never attach an older record
-      // to a newer notification; the next verified current-state request catches up.
-      await this.deliver(peer, {
-        type: "revision",
-        serverId: await this.serverId(),
-        project,
-        ...(size < maximumEventBytes / 2 && project.head === head
-          ? {
-              record,
-              objects: inline,
-              previousHead,
-              sequence: row.sequence,
-              previousSequence,
-            }
-          : {}),
-      });
-    }
+    };
   }
 }

@@ -1,5 +1,7 @@
 interface PrivateProxyEnvironment {
   PRIVATE_ORIGIN: string;
+  /** Shared with the Linux server's SHOWAI_TRUSTED_PROXY_KEY to vouch for client addresses. */
+  PROXY_KEY?: string;
 }
 
 /** Only the explicitly routed private-service prefix reaches the tunnel. The
@@ -34,6 +36,15 @@ export default {
     origin.search = source.search;
     const headers = new Headers(request.headers);
     headers.delete("host");
+    headers.delete("x-showai-client-ip");
+    headers.delete("x-showai-proxy-key");
+    // Every request reaches the tunnel from this proxy, so the origin needs the
+    // visitor's address to keep per-source limits per person.
+    const client = request.headers.get("cf-connecting-ip");
+    if (env.PROXY_KEY && client) {
+      headers.set("x-showai-client-ip", client);
+      headers.set("x-showai-proxy-key", env.PROXY_KEY);
+    }
     return fetch(
       new Request(origin.href, {
         method: request.method,

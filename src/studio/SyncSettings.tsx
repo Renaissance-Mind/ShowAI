@@ -9,6 +9,7 @@ import SyncDashboard, {
 } from "./SyncDashboard";
 import AccountBindings from "./AccountBindings";
 import ServiceLogin from "./ServiceLogin";
+import LoginMethods from "./LoginMethods";
 import { conflictPreview } from "./sync-conflict-preview";
 import type { ProjectSummary } from "../core/model";
 import type {
@@ -99,6 +100,7 @@ export default function SyncSettings() {
       ),
     [conflict],
   );
+  const [loginMethodsRevision, setLoginMethodsRevision] = useState(0);
   const [sessions, setSessions] = useState<
     | {
         digest: string;
@@ -572,8 +574,13 @@ export default function SyncSettings() {
                     connectionId: sessionConnectionId,
                   }),
                 );
+                setLoginMethodsRevision((value) => value + 1);
                 setMessage(t("toast.loginMethodAdded"));
               }}
+            />
+            <LoginMethods
+              connectionId={sessionConnectionId}
+              revision={loginMethodsRevision}
             />
             {status.connections
               .find((connection) => connection.id === sessionConnectionId)
@@ -666,7 +673,9 @@ export default function SyncSettings() {
                       disabled={busy}
                       onClick={() =>
                         void run(async () => {
-                          await desktop.invoke("sync:revokeAllTokens", {
+                          const result = await desktop.invoke<{
+                            unreachable: string[];
+                          }>("sync:revokeAllTokens", {
                             connectionId: sessionConnectionId,
                           });
                           setSessions(null);
@@ -684,7 +693,13 @@ export default function SyncSettings() {
                             mode: "login",
                           });
                           setShowConnect(true);
-                          setMessage(t("toast.signedOutAll"));
+                          setMessage(
+                            result.unreachable.length
+                              ? t("toast.signedOutAllPartial", {
+                                  servers: result.unreachable.join(", "),
+                                })
+                              : t("toast.signedOutAll"),
+                          );
                         })
                       }
                     >

@@ -28,6 +28,12 @@ import type { PublishedComponentLocator } from "../portable/publication-types";
 import type { CompiledComponent } from "../components/custom/types";
 import { assertOfflineImages } from "../portable/assets.mjs";
 import { toInlineFragment } from "../portable/inline.mjs";
+import { toCdnFragment, toCdnPage } from "../portable/cdn-fragment.mjs";
+import {
+  CDN_PAGE_TEMPLATE,
+  chooseReader,
+  type ReaderMode,
+} from "../core/cdn-reader";
 import { buildReaderTemplate } from "../core/reader-template";
 export {
   buildReaderTemplate,
@@ -55,6 +61,8 @@ export interface ExportOptions {
   overwrite?: boolean;
   components?: "bundled" | "remote";
   presentation?: "spatial" | "reading";
+  /** html defaults to the offline bundled reader, inline to the CDN reader when available. */
+  reader?: ReaderMode;
 }
 export interface ExportResult {
   format: ExportFormat;
@@ -65,6 +73,7 @@ export interface ExportResult {
   sourcePaths: string[];
   bytes: number;
   components: "bundled" | "remote";
+  reader: ReaderMode;
   requiresNetwork: boolean;
 }
 
@@ -108,7 +117,6 @@ export async function buildPageHtml(
     ),
   );
 }
-
 
 /** Exported documents pin what was actually resolved, without mutating authoring files. */
 function lockedDocument(
@@ -255,6 +263,7 @@ export async function exportPage(
     throw new Error(
       "Inline exports must bundle components because the conversation host blocks remote requests.",
     );
+  const reader = await chooseReader(options.format, options.reader);
   const out = resolve(options.out);
   if (
     (options.revision || options.importedSnapshot) &&
@@ -313,9 +322,16 @@ export async function exportPage(
       remoteComponents,
       presentation,
       selection,
-      undefined,
+      reader.mode === "cdn" ? CDN_PAGE_TEMPLATE : undefined,
     );
-    const result = options.format === "inline" ? toInlineFragment(html) : html;
+    const result =
+      reader.mode === "cdn"
+        ? options.format === "inline"
+          ? toCdnFragment(html, { readerUrls: reader.urls })
+          : toCdnPage(html, { readerUrls: reader.urls })
+        : options.format === "inline"
+          ? toInlineFragment(html)
+          : html;
     const sourcePath =
       out.slice(0, out.length - extname(out).length) + ".showai.json";
     if (sourcePath === out)
@@ -349,7 +365,8 @@ export async function exportPage(
       sourcePaths: [sourcePath],
       bytes: Buffer.byteLength(result),
       components: componentMode,
-      requiresNetwork: remoteComponents.length > 0,
+      reader: reader.mode,
+      requiresNetwork: reader.mode === "cdn" || remoteComponents.length > 0,
     };
   }
 
@@ -582,6 +599,7 @@ export async function exportPage(
     sourcePaths,
     bytes,
     components: componentMode,
+    reader: "bundled",
     requiresNetwork: allRemote.length > 0,
   };
 }

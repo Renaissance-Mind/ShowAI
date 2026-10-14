@@ -45,6 +45,9 @@ import statusTree from "../components/blocks/StatusTree.tsx?raw";
 import experimentTracker from "../components/blocks/ExperimentTracker.tsx?raw";
 import analysisCss from "../components/blocks/analysis.css?raw";
 import analysisContract from "../components/blocks/analysis-contract.mjs?raw";
+import scene3d from "../components/blocks/Scene3D.tsx?raw";
+import scene3dCss from "../components/blocks/scene3d.css?raw";
+import scene3dContract from "../components/blocks/scene3d-contract.mjs?raw";
 import chart from "../components/blocks/Chart.tsx?raw";
 import database from "../components/blocks/Database.tsx?raw";
 import metrics from "../components/blocks/Metrics.tsx?raw";
@@ -100,6 +103,7 @@ import i18n_resourceEditor from "../i18n/messages/resourceEditor.ts?raw";
 import i18n_richText from "../i18n/messages/richText.ts?raw";
 import i18n_search from "../i18n/messages/search.ts?raw";
 import i18n_analysis from "../i18n/messages/analysis.ts?raw";
+import i18n_scene3d from "../i18n/messages/scene3d.ts?raw";
 
 const sources: Record<string, string> = {
   ...g2BuiltinSources,
@@ -149,6 +153,9 @@ const sources: Record<string, string> = {
   "ExperimentTracker.tsx": experimentTracker,
   "analysis.css": analysisCss,
   "analysis-contract.mjs": analysisContract,
+  "Scene3D.tsx": scene3d,
+  "scene3d.css": scene3dCss,
+  "scene3d-contract.mjs": scene3dContract,
   "Chart.tsx": chart,
   "Database.tsx": database,
   "Metrics.tsx": metrics,
@@ -204,6 +211,7 @@ const sources: Record<string, string> = {
   "i18n/messages/richText.ts": i18n_richText,
   "i18n/messages/search.ts": i18n_search,
   "i18n/messages/analysis.ts": i18n_analysis,
+  "i18n/messages/scene3d.ts": i18n_scene3d,
 };
 // Package the shared icon module inside the trusted SDK's virtual filesystem.
 // User component packages retain the existing package-local import boundary.
@@ -262,6 +270,7 @@ export const builtinExports: Record<string, string> = {
   "comparison-matrix": "ComparisonMatrix",
   "status-tree": "StatusTree",
   "experiment-tracker": "ExperimentTracker",
+  "scene-3d": "Scene3D",
   chart: "Chart",
   mindmap: "Mindmap",
   flowchart: "Flowchart",

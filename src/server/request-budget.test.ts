@@ -6,7 +6,7 @@ import { startSyncServer } from "./node";
 import { createHash } from "node:crypto";
 import { canonical, hash, syncProtocol } from "../sync/protocol";
 
-test("legacy full history and individual manifests share the download budget while summaries remain readable", async () => {
+test("current snapshot downloads share the daily read budget and removed history stays unavailable", async () => {
   const root = await mkdtemp(join(tmpdir(), "showai-history-budget-"));
   const projectId = crypto.randomUUID();
   const metadata = Buffer.from(
@@ -62,7 +62,7 @@ test("legacy full history and individual manifests share the download budget whi
     expect(object.status).toBe(200);
     await object.arrayBuffer();
     const published = await fetch(
-      server.url + `/api/projects/${projectId}/revisions`,
+      server.url + `/api/projects/${projectId}/snapshot`,
       {
         method: "POST",
         headers: { ...headers, "content-type": "application/json" },
@@ -70,33 +70,27 @@ test("legacy full history and individual manifests share the download budget whi
       },
     );
     expect(published.status).toBe(200);
-    const { revision } = await published.json();
-    const full = await fetch(
-      server.url + `/api/projects/${projectId}/revisions`,
-      { headers },
-    );
-    expect(full.status).toBe(200);
-    expect((await full.json()).entries[0].snapshot).toEqual(snapshot);
-    const single = await fetch(
-      server.url + `/api/projects/${projectId}/revisions/${revision}`,
-      { headers },
-    );
-    expect(single.status).toBe(200);
-    await single.arrayBuffer();
+    await published.arrayBuffer();
+    for (let read = 0; read < 2; read++) {
+      const current = await fetch(
+        server.url + `/api/projects/${projectId}/snapshot`,
+        { headers },
+      );
+      expect(current.status).toBe(200);
+      expect((await current.json()).snapshot).toEqual(snapshot);
+    }
     const denied = await fetch(
-      server.url + `/api/projects/${projectId}/revisions`,
+      server.url + `/api/projects/${projectId}/snapshot`,
       { headers },
     );
     expect(denied.status).toBe(429);
     expect((await denied.json()).error.code).toBe("READ_BUDGET_EXCEEDED");
-    const summary = await fetch(
+    const history = await fetch(
       server.url + `/api/projects/${projectId}/revisions?summary=1`,
       { headers },
     );
-    expect(summary.status).toBe(200);
-    const entries = (await summary.json()).entries;
-    expect(entries).toHaveLength(1);
-    expect(entries[0].snapshot).toBeUndefined();
+    expect(history.status).toBe(410);
+    expect((await history.json()).error.code).toBe("HISTORY_REMOVED");
   } finally {
     await server.close();
     await rm(root, { recursive: true, force: true });

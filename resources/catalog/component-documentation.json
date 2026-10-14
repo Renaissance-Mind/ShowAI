@@ -8613,5 +8613,148 @@
         "检查真实 Page、深色主题、越低越好的指标、窄屏和离线导出。"
       ]
     }
+  },
+  "scene-3d": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": [
+        "内容由实例提供；视角、参数和演示只改变当前视图，不写回页面。"
+      ]
+    },
+    "usage": {
+      "purpose": "用声明式数据描述三维场景，让读者旋转视角、拖动参数，理解空间结构与运动关系。",
+      "structure": [
+        "objects 是场景树；group 通过 children 组合部件，变换按父到子叠加。",
+        "parameters 定义滑块；物体的 bindings 把参数线性映射到 position、rotation（角度制）或 scale：当前值 = 静态值 + factor × 参数值。",
+        "坐标系为右手系，Y 轴向上；圆柱和圆锥默认沿 Y 轴，平面默认位于 XY 平面。"
+      ],
+      "inputs": [
+        {
+          "path": "objects[].type",
+          "meaning": "group、box、sphere、cylinder、cone、torus、plane、arrow、line 或 label。"
+        },
+        {
+          "path": "objects[].position / rotation / scale",
+          "meaning": "相对父级的位置、以度为单位的旋转（默认顺序 XYZ，可用 rotationOrder 改）与缩放（数字或三元组）。"
+        },
+        {
+          "path": "objects[].size / radius / height / tube",
+          "meaning": "形体尺寸：box 用 size [x,y,z]，plane 用 size [x,y]，cylinder 可用 radiusTop 与 radiusBottom，torus 用 radius 与 tube。"
+        },
+        {
+          "path": "objects[].from / to / points",
+          "meaning": "arrow 的起点与终点；line 的折线点，closed 为 true 时闭合。"
+        },
+        {
+          "path": "objects[].label / text / labelOffset",
+          "meaning": "标注文字；label 类型用 text。标注默认在形体上方或箭头末端，labelOffset 为局部坐标偏移。"
+        },
+        {
+          "path": "objects[].color / opacity / wireframe",
+          "meaning": "外观；group 的设置由未单独设置的子物体继承。"
+        },
+        {
+          "path": "objects[].bindings",
+          "meaning": "{parameter, property, factor}：property 取 position.x/y/z、rotation.x/y/z、scale 或 scale.x/y/z。"
+        },
+        {
+          "path": "parameters",
+          "meaning": "滑块 id、label、min、max、value，可选 step、unit、description；demo 为 true 时显示演示按钮。"
+        },
+        {
+          "path": "camera",
+          "meaning": "可选初始视角 position、target、fov 与 autoRotate；省略时根据场景范围自动取景。"
+        },
+        {
+          "path": "grid / axes / background / height",
+          "meaning": "地面网格（默认开）、世界坐标轴（默认关）、背景色与画布高度。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "解释姿态或转动",
+          "steps": [
+            "把需要独立转动的部分放进嵌套 group，外层到内层依次对应先后施加的转动。",
+            "每个转动轴配一个参数和带标注的 arrow，箭头放在会随物体一起转动的最内层 group。",
+            "核对正负方向：绕 +Z 正转使 +X 转向 +Y；必要时用 factor: -1 让滑块方向符合直觉。"
+          ],
+          "exampleIndex": 0
+        },
+        {
+          "title": "展示结构并调整一个量",
+          "steps": [
+            "先放置中心物体，再用 group 包住连杆与端点，以 group 原点作为转动中心。",
+            "用 factor 0.5 和 -0.5 让一个参数对称地驱动两侧部件。"
+          ],
+          "exampleIndex": 1
+        }
+      ],
+      "interactions": [
+        {
+          "action": "拖动滑块",
+          "effect": "按 bindings 实时改变物体的位置、旋转或缩放。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击演示",
+          "effect": "参数从当前值平滑扫到最大、最小再回到当前值。",
+          "persistence": "view"
+        },
+        {
+          "action": "解锁后拖动、滚轮或右键拖动",
+          "effect": "旋转、缩放或平移视角。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击重置",
+          "effect": "恢复初始参数与视角。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "最多 300 个物体、8 层嵌套、8 个参数；每条折线最多 500 个点。",
+        "只支持内置基本形体，不加载外部模型或贴图。",
+        "物体 id 在整个场景内唯一；bindings 只能引用已定义的参数。"
+      ],
+      "editing": {
+        "data": ["修改实例数据后经宿主页面保存。"],
+        "implementation": [
+          "新增形体或绑定属性需要同步 scene3d-contract.mjs、schema、SDK 与验证。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/components/blocks/Scene3D.tsx",
+          "purpose": "软件内置实现位置；source 视图返回 SDK 包装起点。"
+        },
+        {
+          "path": "src/components/blocks/scene3d-contract.mjs",
+          "purpose": "工作台、CLI 与离线阅读器共用的数据校验。"
+        },
+        {
+          "path": "index.tsx",
+          "purpose": "可编辑 SDK 包装入口，通过 showai:components 组合已有能力。"
+        }
+      ],
+      "architecture": [
+        "每个区块持有一个 WebGLRenderer、相机与 OrbitControls；场景内容在数据变化时重建，参数变化只更新绑定物体的变换。",
+        "按需渲染：只有视角、参数或演示变化时请求下一帧，离开视口时暂停。",
+        "标注是投影到画面上的 HTML 元素，跟随主题配色。"
+      ],
+      "extensionPoints": [
+        "新增形体时在 geometry() 与契约中同时添加，并保留 WebGL 不可用时的文字阅读。"
+      ],
+      "invariants": [
+        "渲染期间不访问 WebGL 或 window；初始化放在 effect 中，以支持服务端渲染与缩略图。",
+        "视角与参数不调用 onChange。",
+        "卸载时释放几何体、材质、控制器与渲染器。"
+      ],
+      "verification": [
+        "检查真实 Page、深色主题、窄屏、锁定与解锁视角、减少动态效果、打印和离线导出。"
+      ]
+    }
   }
 }

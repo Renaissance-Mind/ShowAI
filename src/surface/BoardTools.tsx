@@ -8,6 +8,10 @@ import {
   ArrowUpRight,
   PanelsTopLeft,
   ChevronDown,
+  Hand,
+  Eraser,
+  Lasso,
+  Type,
 } from "../ui/icons";
 import { boardTools } from "./board-tools";
 import type { BoardTool } from "./types";
@@ -23,6 +27,10 @@ const icons = [
   Circle,
   ArrowUpRight,
   PanelsTopLeft,
+  Hand,
+  Eraser,
+  Lasso,
+  Type,
 ];
 
 export function BoardTools({
@@ -34,8 +42,17 @@ export function BoardTools({
 }) {
   const t = useTranslator(messages);
   const [expanded, setExpanded] = useState(true);
+  const mobile =
+    typeof document !== "undefined" &&
+    document.documentElement.dataset.native === "ios";
+  const entries = boardTools
+    .map((entry, index) => ({ ...entry, Icon: icons[index] }))
+    .filter((entry) => !mobile || entry.tool !== "region");
   return (
-    <div className="board-tool-stack">
+    <div
+      className="board-tool-stack"
+      style={{ "--board-tool-count": entries.length } as React.CSSProperties}
+    >
       <div className="board-tool-shortcuts">
         <button
           type="button"
@@ -53,15 +70,14 @@ export function BoardTools({
         </button>
         {expanded && (
           <div className="board-tool-keys" aria-hidden="true">
-            {boardTools.map(({ key }) => (
+            {entries.map(({ key }) => (
               <kbd key={key}>{key}</kbd>
             ))}
           </div>
         )}
       </div>
       <div className="board-tool-buttons">
-        {boardTools.map(({ tool: value, label, key }, index) => {
-          const Icon = icons[index];
+        {entries.map(({ tool: value, label, key, Icon }) => {
           return (
             <button
               type="button"

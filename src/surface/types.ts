@@ -2,7 +2,9 @@ export type SurfaceKind = "page" | "board";
 export type PageWidthMode = "standard" | "wide" | "full";
 export type DrawingTool =
   "pen" | "highlighter" | "rectangle" | "ellipse" | "arrow";
-export type BoardTool = DrawingTool | "region";
+export type BoardDrawingTool = DrawingTool | "region";
+/** Board modes: drawing tools plus navigation, erasing, lasso and text placement. */
+export type BoardTool = BoardDrawingTool | "pan" | "eraser" | "lasso" | "text";
 export interface DrawingStyle {
   color: string;
   fillColor: string;
@@ -21,6 +23,8 @@ export interface NodeLayout {
   mode?: LayoutMode;
   columns?: number;
   gap?: number;
+  /** Protects the frame from pointer moves and resizes in the editor. */
+  locked?: true;
 }
 export interface SavedView {
   id: string;

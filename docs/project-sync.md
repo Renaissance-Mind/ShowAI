@@ -44,9 +44,11 @@ Linux 启动时按版本执行尚未应用的事务迁移，保留旧服务的�
 
 支持账号密码、已有 Token 和注册时直接签发个人 Token；配置后可使用 GitHub、Google 或邮箱验证码登录。新建或修改密码需 12 至 1024 个字符，保留首尾空格；密码使用独立盐和有版本标记的 PBKDF2 摘要。旧账号可继续使用原密码登录，原有首尾空格处理方式保留；成功登录后升级摘要格式标记。这个过程不会提高旧密码本身的强度。
 
-已有账号在「服务器与同步 → 账号与设备」添加 GitHub、Google 或邮箱登录方式。完成验证后，GitHub 和 Google 还需在浏览器确认绑定到当前账号；以后使用该方式登录仍访问同一账号的项目和服务器绑定。
+GitHub 和 Google 授权完成后，浏览器页面显示一次性完成码和「在 ShowAI 中完成登录」链接。只有发起登录的 ShowAI 窗口收到完成码后，服务器才确定账号并签发设备会话，因此转发给他人的授权链接无法登录对方的账号。完成码最多尝试 5 次。
 
-新设备会话有效期为 30 天，每个账号最多 100 个同时有效会话。服务器仅保存随机 Token 的摘要。原有会话保留原有效期，仍可撤销。在「服务器与同步 → 账号与设备」查看到期时间、撤销单个设备、退出所有设备或修改密码。修改密码撤销旧会话并保留本设备的新会话。登录到期时，本地编辑保留，重新登录后继续同步。个人 Token 有效期为一年，可独立撤销；普通和绑定恢复的设备会话为 30 天。GitHub、Google 和邮箱验证码入口由服务端配置启用，成功后使用同一套设备 Token 协议；客户端输出隐藏连接 Token。
+已有账号在「服务器与同步 → 账号与设备」添加 GitHub、Google 或邮箱登录方式，或移除已绑定的方式。添加、移除登录方式和生成个人 Token 需要最近 15 分钟内直接登录本服务器；绑定服务器恢复的会话不能执行这些操作。完成验证后，GitHub 和 Google 还需在浏览器确认绑定并在 App 中输入完成码；以后使用该方式登录仍访问同一账号的项目和服务器绑定。通过第三方登录创建的账号至少保留一种登录方式。
+
+新设备会话有效期为 30 天，每个账号最多 100 个同时有效会话。服务器仅保存随机 Token 的摘要。原有会话保留原有效期，仍可撤销。在「服务器与同步 → 账号与设备」查看到期时间、撤销单个设备、退出所有设备或修改密码。修改密码撤销旧会话并保留本设备的新会话。退出所有设备会同时退出本设备已登录的绑定服务器；未能连接的绑定服务器会列出，需要分别处理。移除连接会注销该连接的服务器会话。被注销或撤销的账号不会再由绑定服务器自动恢复，需要重新登录；仅自然到期的会话仍可自动恢复。登录到期时，本地编辑保留，重新登录后继续同步。个人 Token 有效期为一年，可独立撤销；普通和绑定恢复的设备会话为 30 天。GitHub、Google 和邮箱验证码入口由服务端配置启用，成功后使用同一套设备 Token 协议；客户端输出隐藏连接 Token。
 
 ### 多服务器账号绑定与模型资源
 
@@ -58,11 +60,11 @@ Linux 启动时按版本执行尚未应用的事务迁移，保留旧服务的�
 
 Linux 数据目录自动创建权限 0600 的 `vault.key`；Cloudflare 必须设置独立的 `SHOWAI_VAULT_KEY`。已有加密账号数据恢复后必须提供原保险库密钥。GitHub 使用 `SHOWAI_GITHUB_CLIENT_ID` / `SHOWAI_GITHUB_CLIENT_SECRET`，Google 使用 `SHOWAI_GOOGLE_CLIENT_ID` / `SHOWAI_GOOGLE_CLIENT_SECRET`，邮箱验证码使用 Resend 的 `SHOWAI_EMAIL_API_KEY` / `SHOWAI_EMAIL_FROM`。回调地址分别为服务器基址下的 `/api/auth/callback/github` 与 `/api/auth/callback/google`。
 
-Linux 需要访问第三方登录服务的外网接口。出网受限时，可在可信的 Cloudflare 或 Linux 服务配置 `SHOWAI_GOOGLE_RELAY_KEY`（独立的 64 位十六进制随机密钥）和 `SHOWAI_GOOGLE_RELAY_REDIRECTS`（允许的 Google 回调地址，逗号分隔）；受限服务设置相同密钥及 `SHOWAI_GOOGLE_RELAY_URL`（转发服务的 HTTPS 基址）。两端使用同一个 Google 客户端 ID。转发只处理 Google 授权码交换和公开签名密钥，拒绝未授权请求及未列入允许列表的回调；最终身份、nonce 校验和设备 Token 签发在发起登录的服务完成。正常出网的部署直接连接 Google。
+Linux 需要访问第三方登录服务的外网接口。出网受限时，可在可信的 Cloudflare 或 Linux 服务配置 `SHOWAI_GOOGLE_RELAY_KEY`（独立的 64 位十六进制随机密钥）和 `SHOWAI_GOOGLE_RELAY_REDIRECTS`（允许的 Google 回调地址，逗号分隔）；受限服务设置相同密钥及 `SHOWAI_GOOGLE_RELAY_URL`（转发服务的 HTTPS 基址），不需要 `SHOWAI_GOOGLE_CLIENT_SECRET`。两端使用同一个 Google 客户端 ID。转发只处理 Google 授权码交换和公开签名密钥，拒绝未授权请求及未列入允许列表的回调；最终身份、nonce 校验和设备 Token 签发在发起登录的服务完成。正常出网的部署直接连接 Google。
 
 ### 访问限制与审计
 
-登录、注册、邀请预览与领取通过数据库中的原子计数按来源、账号和全局预算限流，返回 429 与 `Retry-After`。Linux 来源取连接地址，忽略客户端伪造的转发头；反向代理后的客户端共享代理来源预算。Worker 使用 Cloudflare 的来源地址。默认每来源每小时最多 20 次注册尝试，可通过 `SHOWAI_REGISTRATION_LIMIT` 调整；staging 为受控验收设为 120。服务默认最多 10000 个账号，可通过 `SHOWAI_ACCOUNT_LIMIT` 调整。新增账号达到容量时返回明确失败，邀请注册失败不会留下账号或消耗领取名额。设置 `SHOWAI_ALLOWED_ORIGINS` 可允许明确的浏览器源（逗号分隔的完整 origin）；桌面、CLI 与浏览器工作台的后台连接使用 Bearer Token。关键账号、会话、邀请和成员变更写入不含密码、Token 与正文的审计记录。
+登录、注册、邀请预览与领取通过数据库中的原子计数按来源、账号和全局预算限流，返回 429 与 `Retry-After`。Linux 来源取连接地址，忽略客户端伪造的转发头。经 Cloudflare 私有代理访问时，在 Linux 设置 `SHOWAI_TRUSTED_PROXY_KEY`（64 位十六进制随机密钥），并用 `wrangler secret put PROXY_KEY` 给代理设置相同值；代理转交访客地址，Linux 只在密钥匹配时采用。未配置时，代理后的客户端共享代理来源预算。账号密码和邮箱验证码的严格限流按「账号＋来源」计算，账号级另有较宽的上限，他人无法单独锁定你的登录。Worker 使用 Cloudflare 的来源地址。默认每来源每小时最多 20 次注册尝试，可通过 `SHOWAI_REGISTRATION_LIMIT` 调整；staging 为受控验收设为 120。服务默认最多 10000 个账号，可通过 `SHOWAI_ACCOUNT_LIMIT` 调整。新增账号达到容量时返回明确失败，邀请注册失败不会留下账号或消耗领取名额。设置 `SHOWAI_ALLOWED_ORIGINS` 可允许明确的浏览器源（逗号分隔的完整 origin）；桌面、CLI 与浏览器工作台的后台连接使用 Bearer Token。关键账号、会话、邀请和成员变更写入不含密码、Token 与正文的审计记录。
 
 ### 项目角色与邀请
 

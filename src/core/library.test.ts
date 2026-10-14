@@ -141,11 +141,13 @@ describe("persistent project, folder, and page organization", () => {
     expect(await reopened.readSidebar()).toEqual({
       groups: [{ id: group.id, name: "Reading" }],
       projectGroups: { [project.id]: group.id },
+      projectOrder: [project.id],
     });
     await reopened.updateProjectGroup(group.id, null);
     expect(await store.readSidebar()).toEqual({
       groups: [],
       projectGroups: {},
+      projectOrder: [project.id],
     });
     expect((await store.listProjects())[0].pinned).toBe(true);
     expect((await store.readPage(project.id, page.document.id)).hash).toBe(

@@ -494,7 +494,7 @@
 .board-object-outline {
   position: absolute;
   pointer-events: none;
-  outline: 1px solid #467de3;
+  outline: calc(1.5px * var(--board-inv, 1)) solid #467de3;
   opacity: 0.65;
 }
 .surface-object.is-drawing.is-hovered:not(.is-selected) .board-drawing {
@@ -508,4 +508,12 @@
 
 .page-surface.has-drawing-hit {
   cursor: move;
+}
+
+/* The workspace Board fills the window; a focus ring around all of it only
+   adds noise. Embedded Boards keep their ring. */
+.container-board.is-root
+  > .container-board-scene
+  > .page-surface:focus-visible {
+  outline: none;
 }

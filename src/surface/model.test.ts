@@ -13,6 +13,20 @@ import {
 } from "../portable/validation.mjs";
 import { normalizedWheel, zoomAt } from "./model";
 
+it("keeps the same mobile zoom range and contact anchor when switching Board input tools", () => {
+  const camera = { x: -500, y: -300, scale: 3 };
+  const point = { x: 300, y: 200 };
+  const next = zoomAt(camera, point, 4, 4);
+  expect(next.scale).toBe(4);
+  expect((point.x - next.x) / next.scale).toBeCloseTo(
+    (point.x - camera.x) / camera.scale,
+  );
+  expect((point.y - next.y) / next.scale).toBeCloseTo(
+    (point.y - camera.y) / camera.scale,
+  );
+  expect(zoomAt(camera, point, 5, 4).scale).toBe(4);
+});
+
 const paragraph = (text: string): JSONContent => ({
   type: "paragraph",
   attrs: { id: `p-${text}` },
@@ -47,7 +61,7 @@ describe("shared camera coordinates", () => {
   it("keeps the world point under the zoom anchor and clamps the scale", () => {
     const camera = { x: -270, y: -830, scale: 0.7 };
     const anchor = { x: 320, y: 200 };
-    for (const scale of [0.01, 0.5, 1, 5]) {
+    for (const scale of [0.01, 0.5, 1, 9]) {
       const next = zoomAt(camera, anchor, scale);
       expect((anchor.x - next.x) / next.scale).toBeCloseTo(
         (anchor.x - camera.x) / camera.scale,
@@ -55,8 +69,8 @@ describe("shared camera coordinates", () => {
       expect((anchor.y - next.y) / next.scale).toBeCloseTo(
         (anchor.y - camera.y) / camera.scale,
       );
-      expect(next.scale).toBeGreaterThanOrEqual(0.25);
-      expect(next.scale).toBeLessThanOrEqual(2);
+      expect(next.scale).toBeGreaterThanOrEqual(0.1);
+      expect(next.scale).toBeLessThanOrEqual(4);
     }
   });
 });

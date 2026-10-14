@@ -23,6 +23,8 @@ import {
   instantiateTemplateRecord,
 } from "../core/catalog";
 import { toInlineFragment } from "../portable/inline.mjs";
+import { toCdnFragment, toCdnPage } from "../portable/cdn-fragment.mjs";
+import { chooseReader } from "../core/cdn-reader";
 import {
   serializeArtifact,
   validateDocument,
@@ -413,12 +415,14 @@ export async function renderPresentation(raw: PresentationInput) {
           { blockIds: input.blockIds! },
         )
       : html;
-    const preview = inlinePresentation(inlineHtml);
+    const preview = await inlinePresentation(inlineHtml);
+    const online = await onlinePresentation(html);
     return {
       title: document.title,
       document,
       html,
       ...preview,
+      ...(online ? { online } : {}),
       source: JSON.stringify(
         {
           ...JSON.parse(serializeArtifact(document, components, [], "reading")),
@@ -433,6 +437,7 @@ export async function renderPresentation(raw: PresentationInput) {
       bytes: {
         html: Buffer.byteLength(html),
         inline: preview.inline ? Buffer.byteLength(preview.inline) : null,
+        online: online ? Buffer.byteLength(online) : null,
       },
     };
   } finally {
@@ -440,22 +445,40 @@ export async function renderPresentation(raw: PresentationInput) {
   }
 }
 
-export function inlinePresentation(html: string): {
+/**
+ * The conversation preview: a CDN fragment that carries only the page when
+ * this runtime has a CDN reader, otherwise the bundled reader fragment.
+ */
+export async function inlinePresentation(html: string): Promise<{
   inline?: string;
   inlineError?: string;
-} {
+}> {
+  const reader = await chooseReader("inline");
   try {
-    return { inline: toInlineFragment(html) };
+    return {
+      inline:
+        reader.mode === "cdn"
+          ? toCdnFragment(html, { readerUrls: reader.urls })
+          : toInlineFragment(html),
+    };
   } catch (error) {
     if (
       !(error instanceof CapacityError) ||
-      error.kind !== "Compressed chat preview"
+      !["Compressed chat preview", "CDN chat preview"].includes(error.kind)
     )
       throw error;
     return {
-      inlineError: `${error.message} This is the conversation host budget after compression. The complete HTML and source are available. Select independently readable blockIds. If a single selected node still exceeds the budget, use the complete HTML delivery. Page saving and file export use separate budgets.`,
+      inlineError: `${error.message} This is the conversation host budget${reader.mode === "cdn" ? "; the CDN preview carries only page data, embedded images and custom components" : " after compression"}. The complete HTML and source are available. Select independently readable blockIds. If a single selected node still exceeds the budget, use the complete HTML delivery. Page saving and file export use separate budgets.`,
     };
   }
+}
+
+/** A complete page that loads the CDN reader, or undefined without one. */
+export async function onlinePresentation(html: string) {
+  const reader = await chooseReader("inline");
+  return reader.mode === "cdn"
+    ? toCdnPage(html, { readerUrls: reader.urls })
+    : undefined;
 }
 
 export async function writePresentation(
@@ -468,11 +491,13 @@ export async function writePresentation(
     throw new Error("Choose an .html output path.");
   const stem = html.slice(0, -5),
     inline = value.inline ? stem + ".inline.html" : undefined,
+    online = value.online ? stem + ".online.html" : undefined,
     source = stem + ".showai.json";
   const outputs: [string, string][] = [
     [html, value.html],
     [source, value.source],
     ...(inline ? [[inline, value.inline!] as [string, string]] : []),
+    ...(online ? [[online, value.online!] as [string, string]] : []),
   ];
   await mkdir(dirname(html), { recursive: true });
   // Fail before writing if any output already exists; replacement is explicit.
@@ -495,7 +520,12 @@ export async function writePresentation(
     });
   return {
     title: value.title,
-    delivery: { html, ...(inline ? { inline } : {}), source },
+    delivery: {
+      html,
+      ...(inline ? { inline } : {}),
+      ...(online ? { online } : {}),
+      source,
+    },
     bytes: value.bytes,
     persistence: value.persistence,
     ...(value.inlineError ? { inlineError: value.inlineError } : {}),

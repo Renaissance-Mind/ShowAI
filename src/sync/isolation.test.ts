@@ -47,7 +47,7 @@ async function fixture() {
   const one = await store.createProject({ name: "Untrusted shared project" });
   const two = await store.createProject({ name: "Private unrelated project" });
   const page = await store.createPage(two.id, { title: "Private content" });
-  const [entry] = await library.history({ projectId: one.id, limit: 1 });
+  const entry = await library.entryAt((await library.head())!);
   const captured = await captureProject(home, one.id, entry, []);
   const files = await decodeSnapshot(
     captured,
@@ -106,51 +106,33 @@ test("a late hostile import rejects the complete sequence before modifying histo
   }
 });
 
-test("shared reader overwrite and unreferenced reader injection fail fingerprint and closure verification", async () => {
+test("current-state snapshots refuse shared readers and foreign project decoding", async () => {
   const f = await fixture();
-  const victim = await new LibraryOperations(f.home, f.two.id).projectFiles(
-    f.two.id,
-    (await f.library.head())!,
-  );
-  const viewer = [...victim.keys()].find((path) =>
-    path.endsWith("/viewer.html"),
-  )!;
   const bytes = Buffer.from("<script>hostile code</script>");
   const digest = await hash(bytes);
+  // Readers are rebuilt locally and never travel with current-state content.
+  const reader = `runtimes/readers/${"b".repeat(64)}/viewer.html`;
   const snapshot = {
     ...f.captured.snapshot,
-    files: { ...f.captured.snapshot.files, [viewer]: digest },
+    files: { ...f.captured.snapshot.files, [reader]: digest },
   };
-  const record = { snapshot, revision: await snapshotRevision(snapshot) };
+  const owned = await f.store.createPage(f.one.id, { title: "Owned reader" });
   await expect(
     decodeSnapshot(
-      record,
+      { snapshot, revision: await snapshotRevision(snapshot) },
       async (id) => (id === digest ? bytes : f.captured.objects.get(id)!),
       f.one.id,
     ),
-  ).rejects.toThrow("unreferenced");
-  const owned = await f.store.createPage(f.one.id, { title: "Owned reader" });
-  const [entry] = await f.library.history({ projectId: f.one.id, limit: 1 });
-  const captured = await captureProject(f.home, f.one.id, entry, []);
-  const ownViewer = Object.keys(captured.snapshot.files).find((path) =>
-    path.endsWith("/viewer.html"),
-  )!;
-  const poisoned = {
-    ...captured.snapshot,
-    files: { ...captured.snapshot.files, [ownViewer]: digest },
-  };
-  await expect(
-    decodeSnapshot(
-      { snapshot: poisoned, revision: await snapshotRevision(poisoned) },
-      async (id) => (id === digest ? bytes : captured.objects.get(id)!),
-      f.one.id,
-    ),
-  ).rejects.toThrow("fingerprint");
+  ).rejects.toThrow("unreferenced shared reader");
   expect(
     (await f.store.readPage(f.one.id, owned.document.id)).document.title,
   ).toBe("Owned reader");
   await expect(
-    decodeSnapshot(captured, async (id) => captured.objects.get(id)!, f.two.id),
+    decodeSnapshot(
+      f.captured,
+      async (id) => f.captured.objects.get(id)!,
+      f.two.id,
+    ),
   ).rejects.toThrow("snapshot");
 });
 
@@ -186,7 +168,7 @@ test("new server publications cannot install global dependencies", async () => {
     },
   };
   const response = await fetch(
-    server.url + `/api/projects/${f.one.id}/revisions`,
+    server.url + `/api/projects/${f.one.id}/snapshot`,
     {
       method: "POST",
       headers,
@@ -444,7 +426,9 @@ test("a package's foreign project locator cannot pull private source files into 
   await expect(
     new LibraryOperations(f.home, f.one.id).projectFiles(f.one.id, head!),
   ).rejects.toThrow("missing");
-  expect(await f.library.readFile(path)).toEqual(
-    await f.library.readFile(path, current!),
+  // Current-state storage keeps no earlier revision; the victim's package
+  // record itself must be unchanged.
+  expect(JSON.parse((await f.library.readFile(path)).toString())).toEqual(
+    record,
   );
 });

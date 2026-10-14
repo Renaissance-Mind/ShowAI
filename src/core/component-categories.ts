@@ -34,6 +34,7 @@ const builtinCategories: Record<string, ComponentCategory> = {
   "comparison-matrix": "table",
   "status-tree": "flow",
   "experiment-tracker": "data",
+  "scene-3d": "image",
   flowchart: "flow",
   archify: "flow",
   "diagram-design": "flow",

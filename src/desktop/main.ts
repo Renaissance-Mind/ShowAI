@@ -616,6 +616,18 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
 
 async function openDeepLink(source: string): Promise<void> {
   const url = new URL(source);
+  if (url.protocol === "showai:" && url.hostname === "login") {
+    // The browser returns the login completion code to the window polling for it.
+    if (!store) throw new CoreError("NOT_FOUND", t("login.libraryClosed"));
+    syncManager(store.root).deliverLoginCompletion(
+      url.searchParams.get("flow") ?? "",
+      url.searchParams.get("code") ?? "",
+    );
+    const window = [...windows][0];
+    window?.show();
+    window?.focus();
+    return;
+  }
   if (url.protocol === "showai:" && url.hostname === "join") {
     const link = deepLinkInvitation(source);
     await createWindow({ invite: link.toString() });

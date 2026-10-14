@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { BoardTool, DrawingStyle } from "./types";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";
+import { useToolbarDock } from "./DockableBoardToolbar";
 
 function StrokeWidthSlider({
   width,
@@ -14,6 +15,8 @@ function StrokeWidthSlider({
   onChange: (patch: Partial<DrawingStyle>) => void;
 }) {
   const t = useTranslator(messages);
+  const dock = useToolbarDock();
+  const vertical = dock === "left" || dock === "right";
   const [active, setActive] = useState(false);
   const current = width ?? 2.5;
   const position = ((current - 0.5) / 39.5) * 100;
@@ -32,6 +35,7 @@ function StrokeWidthSlider({
       </span>
       <input
         type="range"
+        aria-orientation={vertical ? "vertical" : "horizontal"}
         aria-label={label}
         aria-valuetext={width === undefined ? t("style.mixed") : undefined}
         min={0.5}
@@ -74,7 +78,11 @@ export function BoardStyleControls({
   );
   if (!drawings.length && nodes.some((node) => node.attrs?.ink))
     return <span className="board-style-controls">{t("style.inkNotice")}</span>;
-  if (!drawings.length && (!tool || tool === "region")) return null;
+  if (
+    !drawings.length &&
+    (!tool || ["region", "pan", "eraser", "lasso"].includes(tool))
+  )
+    return null;
   const value = (key: keyof DrawingStyle) => {
     if (!drawings.length) return style[key];
     const applicable =
@@ -102,6 +110,7 @@ export function BoardStyleControls({
   return (
     <div
       className="board-style-controls"
+      data-filled={filled || undefined}
       role="group"
       aria-label={drawings.length ? t("style.selection") : t("style.drawing")}
     >

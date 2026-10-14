@@ -1,5 +1,6 @@
 import { CAPACITY } from "../portable/capacity.mjs";
 import {
+  canonical,
   digestId,
   hash,
   identifier,
@@ -42,6 +43,7 @@ import {
   readBounded,
   secureResponse,
   liveSession,
+  requireRecentSignIn,
 } from "./security";
 import {
   registerAccount,
@@ -51,6 +53,7 @@ import {
   type AuthUser,
 } from "./accounts";
 import { validatePackageClosure } from "../sync/dependency-validation";
+import { applySnapshotDelta, snapshotDeltaCapability } from "../sync/delta";
 import {
   serverBaseUrl,
   serverEndpoint,
@@ -73,6 +76,11 @@ export interface ServerOptions extends ExternalLoginOptions {
   storagePolicy?: Partial<StoragePolicy>;
   eventPeers?: () => Iterable<EventPeer>;
   metadataDriver?: "sqlite" | "d1" | "durable-sqlite";
+  /**
+   * Honor x-showai-transfer from the Cloudflare front end, which streams
+   * object bytes to and from storage itself. Public requests never carry it.
+   */
+  objectTransfer?: boolean;
 }
 interface Member {
   id: string;
@@ -160,8 +168,36 @@ export function createSyncServer(options: ServerOptions) {
     options.requestPolicy,
   );
   maintenance.budgetSummary = () => requestBudgets.usage();
-  let activeManifests = 0;
-  const manifestWaiters: (() => void)[] = [];
+  // Manifest work is bounded by weight rather than one global slot: ordinary
+  // publications run side by side, while a large body takes every slot so the
+  // isolate never parses several multi-megabyte manifests at once.
+  const manifestCapacity = 4;
+  let manifestWeight = 0;
+  const manifestWaiters: { weight: number; admit: () => void }[] = [];
+  const admitManifests = () => {
+    while (
+      manifestWaiters.length &&
+      manifestWeight + manifestWaiters[0].weight <= manifestCapacity
+    ) {
+      const next = manifestWaiters.shift()!;
+      manifestWeight += next.weight;
+      next.admit();
+    }
+  };
+  // Package objects are immutable and content-addressed, so a verified copy can
+  // serve later publications without another storage read and digest pass.
+  const verifiedPackages = new Map<string, Uint8Array>();
+  let verifiedPackageBytes = 0;
+  const rememberPackage = (key: string, bytes: Uint8Array) => {
+    if (bytes.length > 4 * 1024 * 1024) return;
+    verifiedPackages.set(key, bytes);
+    verifiedPackageBytes += bytes.length;
+    for (const [oldest, value] of verifiedPackages) {
+      if (verifiedPackageBytes <= 16 * 1024 * 1024) break;
+      verifiedPackages.delete(oldest);
+      verifiedPackageBytes -= value.length;
+    }
+  };
   let initialization: Promise<string> | undefined;
   async function initialize() {
     await prepareMetadata(db, options.autoMigrate !== false);
@@ -197,12 +233,22 @@ export function createSyncServer(options: ServerOptions) {
       "SELECT u.id,u.name,u.auth_version,s.digest AS session_digest FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.digest=? AND s.revoked=0 AND s.auth_version=u.auth_version AND s.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')",
       [digest],
     );
-    if (!rows[0])
+    if (!rows[0]) {
+      // Clients may restore an expired login from a bound server, but never one
+      // its owner revoked here.
+      const revoked = (
+        await db.all(
+          "SELECT 1 FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.digest=? AND (s.revoked=1 OR s.auth_version<>u.auth_version)",
+          [digest],
+        )
+      ).length;
       throw new SyncError(
         401,
         "UNAUTHORIZED",
         "The token has expired or was revoked.",
+        revoked ? { reason: "revoked" } : undefined,
       );
+    }
     return rows[0];
   }
   async function projectFor(
@@ -254,12 +300,23 @@ export function createSyncServer(options: ServerOptions) {
   async function publicLimitsAccount(
     kind: "login" | "register",
     name: unknown,
+    source: string,
   ) {
+    const account = plainText(name, 100),
+      windowMs = kind === "login" ? 60_000 : 3600_000;
+    // The tight limit follows one source so others cannot lock the owner out;
+    // the account-wide ceiling still bounds distributed guessing.
+    await rateLimit(db, {
+      scope: `${kind}:account-source`,
+      identity: JSON.stringify([account, source]),
+      maximum: kind === "login" ? 12 : 6,
+      windowMs,
+    });
     await rateLimit(db, {
       scope: `${kind}:account`,
-      identity: plainText(name, 100),
-      maximum: kind === "login" ? 12 : 6,
-      windowMs: kind === "login" ? 60_000 : 3600_000,
+      identity: account,
+      maximum: kind === "login" ? 60 : 30,
+      windowMs,
     });
   }
   async function handle(
@@ -316,6 +373,7 @@ export function createSyncServer(options: ServerOptions) {
           "storage-quotas-v1",
           "resumable-objects-v1",
           "batch-heads-v1",
+          snapshotDeltaCapability,
           ...(accounts.cipher.enabled ? [accountCapability] : []),
           ...(events ? [eventCapability] : []),
           ...(options.metadataDriver === "sqlite" ||
@@ -334,7 +392,7 @@ export function createSyncServer(options: ServerOptions) {
         options.registrationLimit,
       );
       const input = await body(request);
-      await publicLimitsAccount("register", input.name);
+      await publicLimitsAccount("register", input.name, source);
       return json(
         await sessions.create(
           await registerAccount(
@@ -353,7 +411,7 @@ export function createSyncServer(options: ServerOptions) {
     if (path === "/api/auth/login" && method === "POST") {
       await publicLimits(db, "login", source);
       const input = await body(request);
-      await publicLimitsAccount("login", input.name);
+      await publicLimitsAccount("login", input.name, source);
       return json(await session(await loginAccount(db, input), input.device));
     }
     if (path === "/api/auth/exchange" && method === "POST")
@@ -449,13 +507,19 @@ export function createSyncServer(options: ServerOptions) {
     if (path === "/api/account/grants" && method === "POST")
       return json(await accounts.grant(user, await body(request)));
     if (path === "/api/account/tokens" && method === "POST")
+      // A year-long token may only come from a direct sign-in, never a federated
+      // session, so it cannot extend a stolen credential or outlive an unbinding.
       return json(
         await sessions.create(user, (await body(request)).device, {
           kind: "personal",
-          condition: liveSession(user),
+          condition: await requireRecentSignIn(db, user),
         }),
         201,
       );
+    if (path === "/api/account/logins" && method === "GET")
+      return json(await logins.identities(user));
+    if (path === "/api/account/logins" && method === "DELETE")
+      return json(await logins.removeIdentity(user, await body(request)));
     if (path === "/api/account/resources" && method === "GET")
       return json(await resources.list(user, url.origin + basePath));
     if (path === "/api/account/resources" && method === "PUT")
@@ -928,21 +992,34 @@ export function createSyncServer(options: ServerOptions) {
       throw new SyncError(404, "NOT_FOUND", "Unknown upload endpoint.");
     }
     const object = resource.match(/^objects\/([a-f0-9]{64})$/);
+    const transfer = options.objectTransfer
+      ? request.headers.get("x-showai-transfer")
+      : null;
     if (object && method === "GET") {
-      if (
-        !(
-          await db.all(
-            "SELECT 1 FROM objects WHERE project_id=? AND digest=?",
-            [projectId, object[1]],
-          )
-        ).length
-      )
+      const ready = (
+        await db.all<{ bytes: number }>(
+          "SELECT bytes FROM objects WHERE project_id=? AND digest=?",
+          [projectId, object[1]],
+        )
+      )[0];
+      if (!ready)
         throw new SyncError(
           404,
           "MISSING_OBJECT",
           "Content object is missing.",
         );
-      const stored = await objects.open(objectKey(projectId, object[1]));
+      const key = objectKey(projectId, object[1]);
+      // The front end streams remote bytes itself once access is charged here.
+      if (
+        transfer === "read" &&
+        (await objects.location?.(key)) === "remote"
+      ) {
+        await requestBudgets.consumeRead(user.id, ready.bytes);
+        const response = json({ key, bytes: ready.bytes });
+        response.headers.set("x-showai-transfer", "read");
+        return response;
+      }
+      const stored = await objects.open(key);
       if (!stored)
         throw new SyncError(
           404,
@@ -971,6 +1048,128 @@ export function createSyncServer(options: ServerOptions) {
           },
         },
       );
+    }
+    if (object && method === "PUT" && transfer === "admit") {
+      // Admission for a front end that writes the bytes to storage itself: the
+      // reservation and a transfer lease stay held until commit or abort.
+      await projectFor(user.id, projectId, "editor");
+      const declared = Number(request.headers.get("x-showai-length"));
+      if (
+        !Number.isSafeInteger(declared) ||
+        declared < 0 ||
+        declared > CAPACITY.syncObjectBytes
+      )
+        throw new SyncError(413, "TOO_LARGE", "Object exceeds 64 MiB.");
+      const reservation = await quotas.reserve(
+        projectId,
+        user.id,
+        "object",
+        object[1],
+        declared,
+        writeGate(user, projectId),
+      );
+      if (!reservation) return json({ ok: true, alreadyPresent: true });
+      let lease: string;
+      try {
+        lease = await maintenance.enterWrite("transfer");
+      } catch (error) {
+        await quotas.release(reservation);
+        throw error;
+      }
+      const response = json({
+        key: objectKey(projectId, object[1]),
+        reservation: reservation.id,
+        lease,
+      });
+      response.headers.set("x-showai-transfer", "admit");
+      return response;
+    }
+    if (
+      object &&
+      method === "POST" &&
+      (transfer === "commit" || transfer === "abort")
+    ) {
+      const input = await body(request);
+      const lease = plainText(input.lease, 100);
+      const row = (
+        await db.all<{ id: string; bytes: number; created_at: string }>(
+          "SELECT id,bytes,created_at FROM storage_reservations WHERE id=? AND project_id=? AND user_id=? AND kind='object' AND digest=?",
+          [plainText(input.reservation, 100), projectId, user.id, object[1]],
+        )
+      )[0];
+      try {
+        if (transfer === "abort") {
+          // Bytes that might already be stored keep their reservation for recovery.
+          if (row && input.possible !== true)
+            await quotas.release({
+              id: row.id,
+              projectId,
+              userId: user.id,
+              kind: "object",
+              digest: object[1],
+              bytes: row.bytes,
+              day: row.created_at.slice(0, 10),
+            });
+          return json({ ok: true });
+        }
+        const length = Number(input.length);
+        if (!row || !Number.isSafeInteger(length) || length > row.bytes)
+          throw new SyncError(
+            409,
+            "UPLOAD_INTERRUPTED",
+            "Upload reservation changed before publication; retry.",
+          );
+        const gate = writeGate(user, projectId);
+        await db.batch([
+          {
+            sql: `INSERT OR IGNORE INTO objects(project_id,digest,bytes,uploaded_by,uploaded_at) SELECT ?,?,?,?,? WHERE EXISTS(${gate.sql}) AND EXISTS(SELECT 1 FROM storage_reservations WHERE id=? AND bytes>=?)`,
+            values: [
+              projectId,
+              object[1],
+              length,
+              user.id,
+              new Date().toISOString(),
+              ...gate.values,
+              row.id,
+              length,
+            ],
+          },
+          {
+            sql: "DELETE FROM storage_reservations WHERE id=? AND EXISTS(SELECT 1 FROM objects WHERE project_id=? AND digest=?)",
+            values: [row.id, projectId, object[1]],
+          },
+          quotas.unusedBudgetStatement(
+            {
+              id: row.id,
+              projectId,
+              userId: user.id,
+              kind: "object",
+              digest: object[1],
+              bytes: row.bytes,
+              day: row.created_at.slice(0, 10),
+            },
+            length,
+          ),
+        ]);
+      } finally {
+        await maintenance.leaveWrite(lease);
+      }
+      await authenticate(request);
+      await projectFor(user.id, projectId, "editor");
+      if (
+        !(
+          await db.all(
+            "SELECT 1 FROM objects WHERE project_id=? AND digest=?",
+            [projectId, object[1]],
+          )
+        ).length
+      )
+        throw new SyncError(
+          409,
+          "UPLOAD_INTERRUPTED",
+          "Upload reservation changed before publication; retry.",
+        );
+      return json({ ok: true });
     }
     if (object && method === "PUT") {
       await projectFor(user.id, projectId, "editor");
@@ -1119,11 +1318,42 @@ export function createSyncServer(options: ServerOptions) {
         );
       const expected =
         input.expected === null ? null : digestId(input.expected);
+      if (input.delta !== undefined) {
+        // Changes are applied to the verified current head the client expected.
+        if (expected === null || expected !== project.head)
+          throw new SyncError(
+            409,
+            "CONFLICT",
+            "The project has newer changes. Retry synchronization.",
+            { head: project.head },
+          );
+        const base = await revisions
+          .current(projectId, project.head)
+          .catch(() => undefined);
+        if (!base || base.format !== syncProtocol)
+          throw new SyncError(
+            409,
+            "DELTA_BASE_UNAVAILABLE",
+            "Publish the complete project snapshot.",
+          );
+        input.snapshot = applySnapshotDelta(base, input.delta, projectId);
+      }
       const snapshot: ProjectSnapshot = validateSnapshot(
-          input.snapshot,
-          projectId,
-        ),
-        revision = await snapshotRevision(snapshot);
+        input.snapshot,
+        projectId,
+      );
+      // The current format's revision is the manifest digest; serialize once.
+      const serialized =
+        snapshot.format === syncProtocol ? canonical(snapshot) : undefined;
+      const revision = serialized
+        ? await hash(serialized)
+        : await snapshotRevision(snapshot);
+      if (input.delta !== undefined && input.revision !== revision)
+        throw new SyncError(
+          409,
+          "DELTA_MISMATCH",
+          "Publish the complete project snapshot.",
+        );
       if (project.head === revision) {
         await revisions.activateCurrent(projectId);
         await revisions.retainCurrent(projectId, revision);
@@ -1245,7 +1475,14 @@ export function createSyncServer(options: ServerOptions) {
             "Only project administrators can archive or restore a project.",
           );
       }
-      const unique = [...new Set(Object.values(snapshot.files))];
+      // Objects of the verified current head already exist; check only new ones.
+      const current = await revisions
+        .current(projectId, project.head)
+        .catch(() => undefined);
+      const known = new Set(Object.values(current?.files ?? {}));
+      const unique = [...new Set(Object.values(snapshot.files))].filter(
+        (digest) => !known.has(digest),
+      );
       for (let index = 0; index < unique.length; index += 80) {
         const chunk = unique.slice(index, index + 80);
         const count = (
@@ -1278,20 +1515,29 @@ export function createSyncServer(options: ServerOptions) {
         Object.keys(snapshot.files),
         projectId,
         async (path) => {
-          const bytes = await objects.get(
-            objectKey(projectId, snapshot.files[path]),
-            CAPACITY.syncObjectBytes,
-          );
+          const key = objectKey(projectId, snapshot.files[path]);
+          const cached = verifiedPackages.get(key);
+          if (cached) {
+            verifiedPackages.delete(key);
+            verifiedPackages.set(key, cached);
+            return cached;
+          }
+          const bytes = await objects.get(key, CAPACITY.syncObjectBytes);
           if (!bytes || (await hash(bytes)) !== snapshot.files[path])
             throw new SyncError(
               400,
               "INVALID_DEPENDENCY",
               "A package object is absent or corrupt.",
             );
+          rememberPackage(key, bytes);
           return bytes;
         },
       );
-      const stored = await revisions.prepare(projectId, snapshot),
+      const stored = await revisions.prepare(
+          projectId,
+          snapshot,
+          serialized ? { serialized, digest: revision } : undefined,
+        ),
         gate = writeGate(user, projectId);
       const reservation = await quotas.reserve(
         projectId,
@@ -1386,8 +1632,17 @@ export function createSyncServer(options: ServerOptions) {
           { head: current.head, revision },
         );
       }
-      await events?.published(projectId, expected);
+      revisions.remember(projectId, revision, snapshot, stored.bytes);
+      // The new head is durable; a failed notification must not report the
+      // publication as failed. Peers catch up through heads on their next cycle.
+      const fanOut = (error: unknown) =>
+        console.error("Project event fan-out failed", error);
+      const notify = await events
+        ?.prepare(projectId, expected, user.session_digest)
+        .catch(fanOut);
       await revisions.retainCurrent(projectId, revision);
+      // Deliveries run after the response so the publisher never waits for peers.
+      if (notify) void notify().catch(fanOut);
       return json({ revision, head: revision, published: true });
     }
     throw new SyncError(404, "NOT_FOUND", "Unknown project endpoint.");
@@ -1415,9 +1670,18 @@ export function createSyncServer(options: ServerOptions) {
         /\/(?:revisions|snapshot)(?:\/|$)/.test(requestPath) ||
         (request.method === "PATCH" &&
           /\/api\/projects\/[^/]+\/?$/.test(requestPath));
+      const declared = Number(request.headers.get("content-length") ?? 0);
+      const weight = heavy
+        ? declared > 2 * 1024 * 1024
+          ? manifestCapacity
+          : 1
+        : 0;
       if (heavy) {
-        if (activeManifests >= 1) {
-          if (manifestWaiters.length >= 8) {
+        if (
+          manifestWaiters.length ||
+          manifestWeight + weight > manifestCapacity
+        ) {
+          if (manifestWaiters.length >= 32) {
             const response = json(
               {
                 error: {
@@ -1431,8 +1695,10 @@ export function createSyncServer(options: ServerOptions) {
             response.headers.set("retry-after", "1");
             return secure(response);
           }
-          await new Promise<void>((resolve) => manifestWaiters.push(resolve));
-        } else activeManifests++;
+          await new Promise<void>((admit) =>
+            manifestWaiters.push({ weight, admit }),
+          );
+        } else manifestWeight += weight;
       }
       let writeLease: string | undefined;
       let transfer: ReturnType<typeof deadlineBody> | undefined;
@@ -1560,9 +1826,8 @@ export function createSyncServer(options: ServerOptions) {
             if (writeLease) await maintenance.leaveWrite(writeLease);
           } finally {
             if (heavy) {
-              const next = manifestWaiters.shift();
-              if (next) next();
-              else activeManifests--;
+              manifestWeight -= weight;
+              admitManifests();
             }
           }
         }

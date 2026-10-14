@@ -62,9 +62,9 @@ describe("unified whiteboard resistance", () => {
     expect(edge.camera.y).toBeLessThan(snap.anchor.maxY + 40);
     expect(edge.released).toBe(false);
   });
-  it("retains horizontal drag resistance between regions", () => {
+  it("pans freely 1:1 between regions", () => {
     const moved = panFrom(origin, { x: 100, y: 100 }, null);
-    expect(moved.camera.x).toBe(72);
+    expect(moved.camera.x).toBe(100);
     expect(moved.camera.y).toBe(-200);
   });
   it("continues an interrupted spring at its actual position", () => {

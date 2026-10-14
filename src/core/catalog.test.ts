@@ -298,6 +298,7 @@ describe("compiled React packages", () => {
       "comparison-matrix",
       "status-tree",
       "experiment-tracker",
+      "scene-3d",
       "archify",
       "diagram-design",
       "fireworks-tech-graph",

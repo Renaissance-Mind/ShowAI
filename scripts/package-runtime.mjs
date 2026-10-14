@@ -36,6 +36,11 @@ await copyFile(
   join(root, "dist-portable/reader-source.json"),
   join(runtime, "assets/reader-source.json"),
 );
+// Names the published CDN reader that conversation previews import.
+await copyFile(
+  join(root, "dist-cdn/manifest.json"),
+  join(runtime, "assets/cdn-manifest.json"),
+);
 await rm(join(runtime, "assets/inline-core-viewer.html"), { force: true });
 await copyFile(
   join(root, "dist-agent/cli.mjs"),
@@ -94,6 +99,7 @@ for (const name of [
   "d3-interpolate",
   "d3-regression",
   "topojson-client",
+  "three",
 ])
   await copyPackage(name);
 const compilerPackages = await readdir(join(root, "node_modules/@esbuild"));

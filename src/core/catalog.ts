@@ -1626,6 +1626,7 @@ async function compilePackage(
     "d3-interpolate",
     "d3-regression",
     "topojson-client",
+    "three",
   ].forEach(includeRuntime);
   const trusted = [...runtimeRoots.values()];
   const lucideRoot = dirname(require.resolve("lucide-react/package.json"));
@@ -1831,6 +1832,8 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
               "d3-interpolate",
               "d3-regression",
               "topojson-client",
+              "three",
+              "three/examples/jsm/controls/OrbitControls.js",
             ].includes(args.path))
         ) {
           return {
