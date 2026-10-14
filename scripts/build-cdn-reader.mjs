@@ -3,13 +3,15 @@
 // Inline conversation fragments then carry only page data and import the
 // reader from that host; each block's code and styles load with its chunk.
 import { build, transform } from "esbuild";
-import { readFile, rm, writeFile, mkdir } from "node:fs/promises";
+import { copyFile, readFile, rm, writeFile, mkdir } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const styles = join(root, "src/portable/cdn-styles.ts");
+// Override with SHOWAI_CDN_PACKAGE to publish under another npm name.
+const packageName = process.env.SHOWAI_CDN_PACKAGE || "showai-reader";
 
 /** Stylesheets become modules that register their CSS with the mounted readers. */
 const cssModules = {
@@ -103,10 +105,10 @@ export async function buildCdnReader(outdir = join(root, "dist-cdn")) {
     "/",
   );
   const bytes = await readFile(resolve(root, entryPath));
+  const app = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
   const manifest = {
     format: "showai-cdn-reader",
-    version: JSON.parse(await readFile(join(root, "package.json"), "utf8"))
-      .version,
+    version: app.version,
     entry,
     integrity: `sha256-${createHash("sha256").update(bytes).digest("base64")}`,
     files: outputs.length,
@@ -117,6 +119,43 @@ export async function buildCdnReader(outdir = join(root, "dist-cdn")) {
     join(outdir, "manifest.json"),
     JSON.stringify(manifest, null, 2) + "\n",
   );
+  // The directory doubles as an npm package, so registry CDNs such as
+  // jsDelivr and unpkg can serve it at an immutable versioned URL.
+  await writeFile(join(outdir, "index.js"), `export * from "./${entry}";\n`);
+  await writeFile(
+    join(outdir, "package.json"),
+    JSON.stringify(
+      {
+        name: packageName,
+        version: app.version,
+        description:
+          "ShowAI page reader as code-split ES modules, for inline pages loaded from a CDN.",
+        type: "module",
+        exports: { ".": "./index.js", "./manifest.json": "./manifest.json" },
+        license: app.license,
+        homepage: app.homepage,
+        repository: app.repository,
+        bugs: app.bugs,
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+  await writeFile(
+    join(outdir, "README.md"),
+    `# ${packageName}
+
+The [ShowAI](${app.homepage}) page reader, built from ShowAI ${app.version} as code-split ES modules. Inline conversation pages written by \`render-artifact --cdn\` import it and load each component's code only when the page uses it.
+
+\`\`\`js
+const { mount } = await import("https://cdn.jsdelivr.net/npm/${packageName}@${app.version}/index.js");
+mount(document.getElementById("page"), { artifact });
+\`\`\`
+
+\`manifest.json\` records the entry module and its integrity. Third-party licenses are listed in the \`*.LEGAL.txt\` files next to each module.
+`,
+  );
+  await copyFile(join(root, "LICENSE"), join(outdir, "LICENSE"));
   return { manifest, metafile: result.metafile };
 }
 
