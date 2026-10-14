@@ -78,14 +78,14 @@ export function cdnReaderOrigins(urls: string[] = []) {
 
 /**
  * Carries only the page data: a CDN page or fragment imports its reader, so
- * building the bundled reader for it would be wasted work.
+ * explicit online exports do not need to build a bundled reader.
  */
 export const CDN_PAGE_TEMPLATE = `<!doctype html><html lang="zh-CN"><head><title>ShowAI document</title></head><body><script id="showai-data" type="application/json">null</script></body></html>`;
 
 /**
- * Chooses the reader for an export. Conversation fragments use the CDN reader
- * whenever this runtime has one; HTML files stay offline unless `requested`
- * asks for an online page. Site exports keep their shared bundled assets.
+ * Chooses the initial reader for an export. Conversation previews start with
+ * the local bundle and may use a CDN if the compressed fragment is oversized.
+ * Explicit online pages use the CDN; site exports share bundled assets.
  */
 export async function chooseReader(
   format: "html" | "inline" | "site",
@@ -106,7 +106,7 @@ export async function chooseReader(
     throw new Error(
       "The CDN reader is unavailable. Build it with npm run build:cdn, or unset SHOWAI_READER_CDN=off.",
     );
-  return urls && (requested === "cdn" || format === "inline")
+  return urls && requested === "cdn"
     ? { mode: "cdn", urls }
     : { mode: "bundled" };
 }

@@ -489,7 +489,7 @@ export function createMcpServer(options: {
     "page_export",
     {
       description:
-        'Build HTML, a conversation fragment or a static site. Select page blocks with blockIds for partial HTML/inline display; partial exports default to reading layout. Bundled components are offline; remote needs verified locators. Inline requires bundled components. reader: HTML defaults to the offline bundled reader and reader:"cdn" writes a small online page; inline uses the CDN reader when available. This does not upload a site.',
+        'Build HTML, a conversation fragment or a static site. Select page blocks with blockIds for partial HTML/inline display; partial exports default to reading layout. Bundled components are offline; remote needs verified locators. Inline requires bundled components. reader: HTML defaults offline; inline prefers the compressed local reader with CDN as a size fallback. reader:"bundled" forces offline and reader:"cdn" requests online loading. This does not upload a site.',
       inputSchema: {
         pageId: z.string().optional(),
         blockIds: z.array(z.string().min(1)).min(1).optional(),

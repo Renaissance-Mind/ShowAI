@@ -40,14 +40,18 @@ function pageData(html) {
 /**
  * A classic script that imports the first reachable reader and mounts the
  * page. Classic scripts with import() run in hosts that accept only classic
- * inline scripts while still loading the reader's ES modules. Each source
- * serves the same build, so its chunks load from wherever the entry did.
+ * inline scripts while still loading the reader's ES modules. A delayed
+ * backup races a slow primary; only the winning module mounts the page.
+ * The total wait is bounded, and pending startup timers are cleared.
  */
 function loader(id, data, urls, lang, standalone) {
   const failed = lang?.startsWith("zh")
     ? "无法加载 ShowAI 阅读器："
     : "The ShowAI reader could not load: ";
-  return `(async()=>{const root=document.getElementById(${JSON.stringify(id)});const artifact=${data};let failure;for(const url of ${JSON.stringify(urls)}){let reader;try{reader=await import(url)}catch(error){failure=error;continue}reader.mount(root,{artifact${standalone ? ",standalone:true" : ""}});return}root.textContent=${JSON.stringify(failed)}+(failure&&failure.message||failure);})();`;
+  const timeout = lang?.startsWith("zh")
+    ? "加载超过 15 秒，请重试或打开完整离线页面。"
+    : "Loading exceeded 15 seconds. Retry or open the complete offline page.";
+  return `(async()=>{const root=document.getElementById(${JSON.stringify(id)});const artifact=${data};const timers=[];const wait=(ms,start)=>new Promise((resolve,reject)=>{timers.push(setTimeout(()=>Promise.resolve().then(start).then(resolve,reject),ms))});try{const readers=${JSON.stringify(urls)}.map((url,index)=>index?wait(index*1500,()=>import(url)):import(url));const reader=await Promise.race([Promise.any(readers),wait(15000,()=>{throw new Error(${JSON.stringify(timeout)})})]);reader.mount(root,{artifact${standalone ? ",standalone:true" : ""}});}catch(error){const reason=error instanceof AggregateError?error.errors.map(e=>e&&e.message||String(e)).join("; "):error&&error.message||String(error);root.textContent=${JSON.stringify(failed)}+reason;}finally{timers.forEach(clearTimeout)}})();`;
 }
 
 const placeholder = (lang) =>

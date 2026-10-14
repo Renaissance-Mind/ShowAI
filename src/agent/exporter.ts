@@ -27,8 +27,8 @@ import { publicationRefKey } from "../portable/remote.mjs";
 import type { PublishedComponentLocator } from "../portable/publication-types";
 import type { CompiledComponent } from "../components/custom/types";
 import { assertOfflineImages } from "../portable/assets.mjs";
-import { toInlineFragment } from "../portable/inline.mjs";
-import { toCdnFragment, toCdnPage } from "../portable/cdn-fragment.mjs";
+import { toCdnPage } from "../portable/cdn-fragment.mjs";
+import { conversationPreview } from "../core/conversation-preview";
 import {
   CDN_PAGE_TEMPLATE,
   chooseReader,
@@ -61,7 +61,7 @@ export interface ExportOptions {
   overwrite?: boolean;
   components?: "bundled" | "remote";
   presentation?: "spatial" | "reading";
-  /** html defaults to the offline bundled reader, inline to the CDN reader when available. */
+  /** Inline prefers the compressed local reader, with CDN as a size fallback. */
   reader?: ReaderMode;
 }
 export interface ExportResult {
@@ -324,14 +324,16 @@ export async function exportPage(
       selection,
       reader.mode === "cdn" ? CDN_PAGE_TEMPLATE : undefined,
     );
+    const preview =
+      options.format === "inline"
+        ? await conversationPreview(html, options.reader)
+        : undefined;
     const result =
-      reader.mode === "cdn"
-        ? options.format === "inline"
-          ? toCdnFragment(html, { readerUrls: reader.urls })
-          : toCdnPage(html, { readerUrls: reader.urls })
-        : options.format === "inline"
-          ? toInlineFragment(html)
-          : html;
+      preview?.inline ??
+      (reader.mode === "cdn"
+        ? toCdnPage(html, { readerUrls: reader.urls })
+        : html);
+    const deliveredReader = preview?.reader ?? reader.mode;
     const sourcePath =
       out.slice(0, out.length - extname(out).length) + ".showai.json";
     if (sourcePath === out)
@@ -365,8 +367,8 @@ export async function exportPage(
       sourcePaths: [sourcePath],
       bytes: Buffer.byteLength(result),
       components: componentMode,
-      reader: reader.mode,
-      requiresNetwork: reader.mode === "cdn" || remoteComponents.length > 0,
+      reader: deliveredReader,
+      requiresNetwork: deliveredReader === "cdn" || remoteComponents.length > 0,
     };
   }
 

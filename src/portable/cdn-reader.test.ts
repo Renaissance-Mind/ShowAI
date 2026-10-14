@@ -36,7 +36,7 @@ describe("CDN fragment", () => {
       id: "showai-test",
     });
     expect(fragment).toContain(
-      'for(const url of ["https://cdn.example.com/showai/reader-ABC.js"])',
+      '["https://cdn.example.com/showai/reader-ABC.js"].map',
     );
     expect(fragment).toContain("reader.mount(root,{artifact})");
     expect(fragment).toContain(
@@ -44,11 +44,11 @@ describe("CDN fragment", () => {
     );
     // The page title cannot close the loader script.
     expect(fragment.match(/<\/script>/g)).toHaveLength(1);
-    const data = fragment.match(/const artifact=(\{.*?\});let failure/s)![1];
+    const data = fragment.match(/const artifact=(\{.*?\});const timers/s)![1];
     expect(JSON.parse(data)).toEqual(artifact);
   });
 
-  it("tries each reader source in order", () => {
+  it("starts delayed backups and bounds the total reader wait", () => {
     const fragment = toCdnFragment(page(JSON.stringify(artifact)), {
       readerUrls: [
         "https://cdn.jsdelivr.net/npm/showai-reader@1.0.0/reader-A.js",
@@ -56,8 +56,11 @@ describe("CDN fragment", () => {
       ],
     });
     expect(fragment).toContain(
-      'for(const url of ["https://cdn.jsdelivr.net/npm/showai-reader@1.0.0/reader-A.js","https://unpkg.com/showai-reader@1.0.0/reader-A.js"])',
+      '["https://cdn.jsdelivr.net/npm/showai-reader@1.0.0/reader-A.js","https://unpkg.com/showai-reader@1.0.0/reader-A.js"].map',
     );
+    expect(fragment).toContain("Promise.any(readers)");
+    expect(fragment).toContain("wait(15000");
+    expect(fragment).toContain("timers.forEach(clearTimeout)");
   });
 
   it("writes a complete online page that mounts as a standalone reader", () => {
@@ -228,18 +231,36 @@ describe("CDN reader", () => {
         format: "inline",
         out: join(home, "exports", "inline.html"),
       });
-      expect(inline.reader).toBe("cdn");
-      expect(await readFile(inline.path, "utf8")).toContain(`import(url)`);
-      // page_present keeps the offline file and adds the CDN preview and online page.
+      expect(inline).toMatchObject({
+        reader: "bundled",
+        requiresNetwork: false,
+      });
+      expect(await readFile(inline.path, "utf8")).not.toContain(`import(url)`);
+      // page_present carries its local reader and keeps a separate online page.
       const presented = await presentPage({
         root: home,
         projectId: project.id,
         pageId,
       });
       expect(presented.inline).toContain("data-showai-inline-root");
-      expect(presented.inline).toContain(host.origin);
+      expect(presented.inline).not.toContain(host.origin);
       expect(presented.online).toContain("standalone:true");
       expect(presented.html).not.toContain(host.origin);
+
+      // Execute the bundled fragment with the same sandbox and verify that
+      // neither the entry nor any component chunk is requested from the CDN.
+      const bundledTab = await browser.newPage();
+      const bundledRequests: string[] = [];
+      bundledTab.on("request", (request) =>
+        bundledRequests.push(request.url()),
+      );
+      await bundledTab.goto(host.host("/bundled-preview", presented.inline!));
+      await bundledTab
+        .frameLocator('iframe[title="Host"]')
+        .getByRole("slider", { name: "转动" })
+        .waitFor();
+      expect(bundledRequests).toEqual([`${host.origin}/bundled-preview`]);
+      await bundledTab.close();
 
       // The online page is an ordinary standalone reader with its page menu.
       const tab = await browser.newPage();
@@ -260,4 +281,41 @@ describe("CDN reader", () => {
       process.env = saved;
     }
   }, 300_000);
+
+  it("uses the backup while the primary is still downloading", async () => {
+    const doc = createResource(blankDocument());
+    doc.title = "Backup reader";
+    const fragment = toCdnFragment(await buildPageHtml(doc), {
+      readerUrls: [
+        `${host.origin}/${entry}?delay=20000`,
+        `${host.origin}/${entry}?backup=1`,
+      ],
+    });
+    const tab = await browser.newPage();
+    const began = performance.now();
+    await tab.goto(host.host("/slow-primary", fragment));
+    const frame = tab.frameLocator('iframe[title="Host"]');
+    await frame
+      .getByText("Backup reader", { exact: true })
+      .waitFor({ timeout: 10000 });
+    expect(performance.now() - began).toBeLessThan(10000);
+    expect(await frame.locator("[data-showai-placeholder]").count()).toBe(0);
+    expect(await frame.locator("[data-showai-inline-root] > div").count()).toBe(
+      1,
+    );
+    await tab.close();
+  }, 30000);
+
+  it("reports a deadline instead of leaving the loading placeholder indefinitely", async () => {
+    const doc = createResource(blankDocument());
+    const fragment = toCdnFragment(await buildPageHtml(doc), {
+      readerUrl: `${host.origin}/${entry}?delay=22000`,
+    });
+    const tab = await browser.newPage();
+    await tab.goto(host.host("/reader-deadline", fragment));
+    const frame = tab.frameLocator('iframe[title="Host"]');
+    await frame.getByText(/加载超过 15 秒/).waitFor({ timeout: 18000 });
+    expect(await frame.locator("[data-showai-placeholder]").count()).toBe(0);
+    await tab.close();
+  }, 30000);
 });

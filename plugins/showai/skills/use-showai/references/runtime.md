@@ -19,7 +19,7 @@
 
 项目绑定连接还可设置 `SHOWAI_TEMPLATES`（格式 `ID[@VERSION],ID`）作为该会话的默认模板选择，必须同时设置 `SHOWAI_PROJECT_ID`；内容库连接在每次任务用 template_context 显式选择模板。
 
-运行时带有 CDN 阅读器时，对话预览与在线页从 jsDelivr／unpkg 加载阅读器。宿主可设 `SHOWAI_READER_CDN=off` 改回离线打包预览，或设为逗号分隔的镜像基础地址（支持 `{name}`、`{version}` 占位）。
+对话预览默认携带压缩的本地阅读器；超出聊天预算时，才回退到已发布的 CDN 阅读器。在线页和显式 `reader:"cdn"` 导出从 jsDelivr／unpkg 加载阅读器。宿主可设 `SHOWAI_READER_CDN=off` 禁用 CDN 回退与在线版，或设为逗号分隔的镜像基础地址（支持 `{name}`、`{version}` 占位）。插件安装不会更新独立的软件运行时，也不能预热对话宿主的浏览器缓存；核对实际运行时和生成的交付物，详见[对话展示](../../show-document/references/conversation-display.md)。
 
 不修改系统 HOME，也不直接编辑库里的正式文件。运行期间库位置保持固定；要换库，宿主停止并重连另一个配置，再查 capabilities/context。
 
