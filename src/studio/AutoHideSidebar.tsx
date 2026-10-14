@@ -238,18 +238,18 @@ export default function AutoHideSidebar({
   if (nativeTouch) return (
     <div className="studio-workspace" data-mobile-sidebar={mode} inert={switchingTab} aria-busy={switchingTab}>
       {!nativeLayout.docked && <div className="studio-mobile-navigation-tools">
-        <button type="button" aria-label="项目导航" aria-controls="studio-project-navigation" aria-expanded={nativeOpen} onClick={() => setNativeOpen(value => !value)}><PanelLeft size={20} aria-hidden="true" /></button>
+        <button type="button" aria-label={t("projectNavigation")} aria-controls="studio-project-navigation" aria-expanded={nativeOpen} onClick={() => setNativeOpen(value => !value)}><PanelLeft size={20} aria-hidden="true" /></button>
         {history}
       </div>}
       <div className="studio-sidebar-shell" data-sidebar-mode={mode} style={{ "--navigation-width": `${width}px` } as CSSProperties}>
-        <aside ref={sidebar} id="studio-project-navigation" className="studio-sidebar" aria-label="项目导航" inert={hidden}
+        <aside ref={sidebar} id="studio-project-navigation" className="studio-sidebar" aria-label={t("projectNavigation")} inert={hidden}
           onKeyDown={event => { if (event.key === "Escape") setNativeOpen(false); }}
           onClickCapture={event => { if (!nativeLayout.docked && (event.target as Element).closest('.studio-tree-main')) setNativeOpen(false); }}>
           <div className="studio-mobile-sidebar-brand"><img src={appIcon} alt="" /><strong>ShowAI</strong></div>
           {navigation}
         </aside>
       </div>
-      {nativeOpen && !nativeLayout.docked && <button className="studio-mobile-sidebar-scrim" aria-label="关闭项目导航" onClick={() => setNativeOpen(false)} />}
+      {nativeOpen && !nativeLayout.docked && <button className="studio-mobile-sidebar-scrim" aria-label={t("collapseSidebar")} onClick={() => setNativeOpen(false)} />}
       {children}
       {!nativeLayout.docked && !nativeOpen && <div className="studio-mobile-sidebar-edge" aria-hidden="true"
         onPointerDown={event => { if (event.pointerType !== "touch") return; swipe.current = { id: event.pointerId, x: event.clientX, y: event.clientY }; event.currentTarget.setPointerCapture(event.pointerId); }}
