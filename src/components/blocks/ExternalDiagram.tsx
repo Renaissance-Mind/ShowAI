@@ -20,12 +20,15 @@ import {
   type DiagramFamily,
 } from "./diagrams/contract.mjs";
 import type { BlockData, BlockProps } from "./types";
+import type { MessageKey } from "../../i18n";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/diagram";
 import "./external-diagram.css";
 
-const names: Record<DiagramFamily, string> = {
-  archify: "Archify 交互架构图",
-  "diagram-design": "Diagram Design 图形",
-  "fireworks-tech-graph": "Fireworks 技术图",
+const names: Record<DiagramFamily, MessageKey<typeof messages>> = {
+  archify: "family.archify",
+  "diagram-design": "family.diagramDesign",
+  "fireworks-tech-graph": "family.fireworks",
 };
 
 function ExternalDiagramBlock({
@@ -34,6 +37,8 @@ function ExternalDiagramBlock({
   onChange,
   readOnly,
 }: BlockProps & { family: DiagramFamily }) {
+  const t = useTranslator(messages);
+  const name = t(names[family]);
   const templates = useMemo(() => listDiagramTemplates(family), [family]);
   const source = useMemo(() => diagramSource(family, data), [family, data]);
   const html = useMemo(() => diagramDocument(family, source), [family, source]);
@@ -83,7 +88,7 @@ function ExternalDiagramBlock({
   };
   const upload = async (file: File) => {
     if (file.size > 8 * 1024 * 1024) {
-      setError("请选择 8 MiB 以内的 HTML 或 SVG 文件。");
+      setError(t("fileTooLarge"));
       return;
     }
     try {
@@ -101,7 +106,7 @@ function ExternalDiagramBlock({
   };
   const save = () => {
     if (JSON.stringify(data) !== baseline.current) {
-      setError("图形已被其他修改更新。草稿已保留，请重新读取并合并后保存。");
+      setError(t("changedElsewhere"));
       return;
     }
     try {
@@ -138,15 +143,15 @@ function ExternalDiagramBlock({
     <section
       ref={lock.ref}
       className="sb-block sb-external-diagram"
-      aria-label={text(data.title, names[family])}
+      aria-label={text(data.title, name)}
       data-diagram-family={family}
       data-viewport-lock-scope={`diagram-${family}`}
       data-viewport-locked={lock.locked}
       data-diagram-ready={ready}
     >
       <BlockHeader
-        title={text(data.title, names[family])}
-        defaultTitle={names[family]}
+        title={text(data.title, name)}
+        defaultTitle={name}
         description={text(data.description)}
         editable={editable}
         editing={editing}
@@ -155,8 +160,8 @@ function ExternalDiagramBlock({
         <button
           type="button"
           className="sb-icon-button"
-          aria-label="下载图形 SVG"
-          title="下载图形 SVG"
+          aria-label={t("downloadSvg")}
+          title={t("downloadSvg")}
           onClick={exportSvg}
         >
           <Download size={16} />
@@ -164,8 +169,8 @@ function ExternalDiagramBlock({
         <button
           type="button"
           className="sb-icon-button"
-          aria-label="下载完整图形 HTML"
-          title="下载完整图形 HTML"
+          aria-label={t("downloadHtml")}
+          title={t("downloadHtml")}
           onClick={() => downloadFile(html, `${family}.html`, "text/html")}
         >
           HTML
@@ -173,11 +178,11 @@ function ExternalDiagramBlock({
       </BlockHeader>
       <ViewportLockButton
         {...lock}
-        label="图形"
-        unlockDescription="操作图形内的探索、缩放和滚动"
+        label={t("diagram")}
+        unlockDescription={t("unlockDescription")}
       />
       <iframe
-        title={text(data.title, names[family])}
+        title={text(data.title, name)}
         className="sb-diagram-frame"
         sandbox="allow-scripts allow-downloads"
         referrerPolicy="no-referrer"
@@ -203,9 +208,9 @@ function ExternalDiagramBlock({
               if (event.key === "Escape") setEditing(false);
             }}
           >
-            <Field label="模板">
+            <Field label={t("template")}>
               <select
-                aria-label="图形模板"
+                aria-label={t("diagramTemplate")}
                 value={text(draft.template)}
                 onChange={(event) => selectTemplate(event.target.value)}
               >
@@ -214,13 +219,13 @@ function ExternalDiagramBlock({
                     {item.name}
                   </option>
                 ))}
-                <option value="custom">导入或自定义图形</option>
+                <option value="custom">{t("customTemplate")}</option>
               </select>
             </Field>
             <div className="sb-diagram-fields">
-              <Field label="标题">
+              <Field label={t("title")}>
                 <input
-                  aria-label="图形标题"
+                  aria-label={t("diagramTitle")}
                   value={text(draft.title)}
                   onChange={(event) =>
                     setDraft((current) => ({
@@ -230,9 +235,9 @@ function ExternalDiagramBlock({
                   }
                 />
               </Field>
-              <Field label="高度">
+              <Field label={t("height")}>
                 <input
-                  aria-label="图形高度"
+                  aria-label={t("diagramHeight")}
                   type="number"
                   min={240}
                   max={1200}
@@ -246,9 +251,9 @@ function ExternalDiagramBlock({
                 />
               </Field>
             </div>
-            <Field label="说明">
+            <Field label={t("description")}>
               <textarea
-                aria-label="图形说明"
+                aria-label={t("diagramDescription")}
                 rows={2}
                 value={text(draft.description)}
                 onChange={(event) =>
@@ -260,12 +265,15 @@ function ExternalDiagramBlock({
               />
             </Field>
             <details className="sb-diagram-labels">
-              <summary>图中文字（{labels.length}）</summary>
+              <summary>{t("labelsSummary", { count: labels.length })}</summary>
               <div>
                 {labels.map((label, index) => (
-                  <Field key={index} label={`文字 ${index + 1}`}>
+                  <Field
+                    key={index}
+                    label={t("labelField", { index: index + 1 })}
+                  >
                     <input
-                      aria-label={`图中文字 ${index + 1}`}
+                      aria-label={t("labelInput", { index: index + 1 })}
                       value={label}
                       onChange={(event) => {
                         setLabels((current) =>
@@ -281,9 +289,9 @@ function ExternalDiagramBlock({
               </div>
             </details>
             <details>
-              <summary>图形源码</summary>
+              <summary>{t("source")}</summary>
               <textarea
-                aria-label="图形源码"
+                aria-label={t("source")}
                 className="sb-diagram-source"
                 rows={12}
                 spellCheck={false}
@@ -302,15 +310,15 @@ function ExternalDiagramBlock({
                 className="sb-button"
                 onClick={() => readLabels(text(draft.source))}
               >
-                读取图中文字
+                {t("readLabels")}
               </button>
             </details>
             <label className="sb-button sb-diagram-upload">
               <Upload size={14} />
-              导入 HTML / SVG
+              {t("importFile")}
               <input
                 type="file"
-                aria-label="导入图形文件"
+                aria-label={t("importFileInput")}
                 accept=".html,.htm,.svg,text/html,image/svg+xml"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
@@ -326,14 +334,14 @@ function ExternalDiagramBlock({
             )}
             <div className="sb-editor-footer">
               <button type="button" className="sb-button" onClick={save}>
-                保存图形
+                {t("save")}
               </button>
               <button
                 type="button"
                 className="sb-button"
                 onClick={() => setEditing(false)}
               >
-                取消
+                {t("cancel")}
               </button>
             </div>
           </div>

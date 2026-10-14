@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { Camera } from "./model";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/surface";
 
 type Box = { x: number; y: number; width: number; height: number };
 const WIDTH = 180,
@@ -19,6 +21,7 @@ export function BoardMinimap({
   layoutKey: unknown;
   onNavigate: (camera: Camera) => void;
 }) {
+  const t = useTranslator(messages);
   const [state, setState] = useState<{ boxes: Box[]; view: Box } | null>(null);
   const frame = useRef(0);
   const measure = () => {
@@ -98,7 +101,7 @@ export function BoardMinimap({
       width={WIDTH}
       height={HEIGHT}
       role="img"
-      aria-label="小地图"
+      aria-label={t("board.minimap")}
       onPointerDown={(event) => {
         event.currentTarget.setPointerCapture(event.pointerId);
         navigate(event);

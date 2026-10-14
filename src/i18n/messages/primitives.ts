@@ -1,0 +1,43 @@
+import { defineMessages } from "../index";
+
+// Basic blocks: image, table, callout, toggle and code.
+export default defineMessages("primitives", {
+  "zh-CN": {
+    imageFrame: "图像框",
+    addImage: "添加图片",
+    editImage: "编辑图片",
+    imageSrc: "图片地址",
+    imageAlt: "替代文字",
+    imageCaption: "图注",
+    table: "基础表格",
+    scrollTable: "{title}：左右滚动查看全部列",
+    comparisonTable: "对照表",
+    columnName: "列 {column} 名称",
+    cell: "第 {row} 行第 {column} 列",
+    addRow: "添加行",
+    removeLastRow: "移除末行",
+    callout: "提示框",
+    toggleSummary: "展开内容",
+    code: "代码块",
+    codeContent: "代码内容",
+  },
+  en: {
+    imageFrame: "Image frame",
+    addImage: "Add image",
+    editImage: "Edit image",
+    imageSrc: "Image URL",
+    imageAlt: "Alt text",
+    imageCaption: "Caption",
+    table: "Basic table",
+    scrollTable: "{title}: scroll sideways to see all columns",
+    comparisonTable: "Comparison table",
+    columnName: "Column {column} name",
+    cell: "Row {row}, column {column}",
+    addRow: "Add row",
+    removeLastRow: "Remove last row",
+    callout: "Callout",
+    toggleSummary: "Show content",
+    code: "Code block",
+    codeContent: "Code",
+  },
+});

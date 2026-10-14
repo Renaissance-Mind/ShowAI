@@ -8,6 +8,10 @@ import {
   type HTMLAttributes,
 } from "react";
 import type { LibraryTarget } from "./LibraryNavigation";
+import { translator } from "../i18n";
+import sidebarMessages from "../i18n/messages/sidebar";
+
+const t = translator(sidebarMessages);
 
 export interface LibraryDrop {
   source: LibraryTarget;
@@ -304,7 +308,7 @@ export function useLibraryDragController(options: {
     ): HTMLAttributes<HTMLDivElement> => {
       rows.current.set(target.id, { target, expanded, toggle });
       return {
-        "aria-description": "拖动调整顺序，拖到项目或文件夹中移动页面",
+        "aria-description": t("dragHint"),
         "data-library-draggable": true,
         "data-dragging": dragging === target.id || undefined,
         "data-drop-position":

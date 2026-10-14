@@ -4,6 +4,10 @@ import { CoreError } from "../core/model";
 import type { AccountResource, ResolvedResource } from "./accounts";
 import type { ModelSource } from "../agent-host/types";
 import type { HostedCredentialBroker } from "../agent-host/storage";
+import { translator } from "../i18n";
+import syncEngineMessages from "../i18n/messages/syncEngine";
+
+const t = translator(syncEngineMessages);
 export interface HostedSource {
   connectionId: string;
   resourceId: string;
@@ -33,10 +37,7 @@ export class ModelResourceClient implements ModelResources {
       await syncManager(this.home()).configuration()
     ).connections.find((item) => item.id === id);
     if (!connection)
-      throw new CoreError(
-        "NOT_FOUND",
-        "资源来源服务器尚未登录，请恢复绑定服务。",
-      );
+      throw new CoreError("NOT_FOUND", t("resources.serverSignedOut"));
     return connection;
   }
   async resolve(source: HostedSource) {
@@ -47,11 +48,7 @@ export class ModelResourceClient implements ModelResources {
         "/api/account/resources",
       )
     ).find((item) => item.id === source.resourceId);
-    if (!resource)
-      throw new CoreError(
-        "NOT_FOUND",
-        "这份服务器资源已移除，请刷新资源列表。",
-      );
+    if (!resource) throw new CoreError("NOT_FOUND", t("resources.removed"));
     return resource;
   }
   async token(source: HostedSource, expected: ModelSource, force = false) {
@@ -62,10 +59,7 @@ export class ModelResourceClient implements ModelResources {
       resource.protocol !== expected.protocol ||
       resource.credential !== expected.credential
     )
-      throw new CoreError(
-        "CONFLICT",
-        "资源来源配置已变化，请重新从服务器添加该资源。",
-      );
+      throw new CoreError("CONFLICT", t("resources.configChanged"));
     return accountRequest<{ token: string; expiresAt: number }>(
       await this.connection(source.connectionId),
       `/api/account/resources/${source.resourceId}/access`,

@@ -1,5 +1,8 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useSyncExternalStore } from "react";
 import { EditorViewScope } from "../editor/view-scope";
+import { translator } from "../i18n";
+import messages from "../i18n/messages/surface";
+import { fingerNavigatesBoard } from "./board-input.mjs";
 import {
   GESTURE_IDLE,
   MAX_ZOOM,
@@ -15,6 +18,35 @@ import {
   type SurfaceAnchor,
   type SurfaceRegion,
 } from "./physics";
+
+const t = translator(messages);
+
+/** Zoom changes every gesture frame; only the zoom controls subscribe to it. */
+export interface ViewportScale {
+  get(): number;
+  subscribe(listener: () => void): () => void;
+}
+function viewportScale(): ViewportScale & { set(value: number): void } {
+  let value = 1;
+  const listeners = new Set<() => void>();
+  return {
+    get: () => value,
+    set(next) {
+      if (next === value) return;
+      value = next;
+      for (const listener of listeners) listener();
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+}
+export function useViewportScale(scale: ViewportScale) {
+  return useSyncExternalStore(scale.subscribe, scale.get, scale.get);
+}
 
 const editable = (target: EventTarget | null) =>
   target instanceof Element &&
@@ -131,9 +163,9 @@ export function useSurfaceViewport(
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const worldRef = useRef<HTMLDivElement>(null);
-  const scaleLabelRef = useRef<HTMLElement>(null);
   const camera = useRef<Camera>({ x: 0, y: 0, scale: 1 });
-  const [scale, setScale] = useState(1);
+  const scaleRef = useRef<ReturnType<typeof viewportScale> | null>(null);
+  const scale = (scaleRef.current ??= viewportScale());
   const controls = useRef({
     fit: (_ids?: string[], _immediate?: boolean) => {},
     focus: (_id: string, _immediate?: boolean) => {},
@@ -183,8 +215,7 @@ export function useSurfaceViewport(
     const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0,
       springFrame = 0,
-      idle = 0,
-      scaleTimer = 0;
+      idle = 0;
     let anchor: SurfaceAnchor | null = null;
     let objectGesture = false;
     let gesture: PanGesture | null = null;
@@ -228,7 +259,7 @@ export function useSurfaceViewport(
           const rect = element.getBoundingClientRect();
           return {
             id: element.dataset.surfaceId!,
-            label: element.dataset.surfaceName || "内容区域",
+            label: element.dataset.surfaceName || t("node.region"),
             x: (rect.left - base.left) / scale,
             y: (rect.top - base.top) / scale,
             width: rect.width / scale,
@@ -316,7 +347,7 @@ export function useSurfaceViewport(
         scale = camera.current.scale * outerScale();
       return {
         id,
-        label: "内容",
+        label: t("node.content"),
         x: (rect.left - base.left) / scale,
         y: (rect.top - base.top) / scale,
         width: rect.width / scale,
@@ -343,12 +374,8 @@ export function useSurfaceViewport(
         "--board-grid-position",
         `${c.x % grid}px ${c.y % grid}px`,
       );
-      if (scaleLabelRef.current)
-        scaleLabelRef.current.textContent = `${Math.round(c.scale * 100)}%`;
-      // React only needs the settled scale; per-frame state would re-render
-      // every object during zoom.
-      clearTimeout(scaleTimer);
-      scaleTimer = window.setTimeout(() => setScale(camera.current.scale), 120);
+      // Only the zoom controls subscribe; objects read the camera directly.
+      scale.set(c.scale);
     };
     const paint = () => {
       cancelAnimationFrame(frame);
@@ -671,8 +698,10 @@ export function useSurfaceViewport(
       if (
         !ownsInput(event.target) ||
         event.defaultPrevented ||
-        (event.target as Element).closest('[data-drawing-active="true"]') ||
+        (!fingerNavigatesBoard(event.pointerType) &&
+          (event.target as Element).closest('[data-drawing-active="true"]')) ||
         ((event.target as Element).closest("[data-board-drawing-input]") &&
+          !fingerNavigatesBoard(event.pointerType) &&
           event.button !== 1 &&
           !hand)
       )
@@ -1013,7 +1042,6 @@ export function useSurfaceViewport(
       cancelAnimationFrame(frame);
       cancelAnimationFrame(springFrame);
       clearTimeout(idle);
-      clearTimeout(scaleTimer);
       root.removeEventListener("wheel", wheel);
       root.removeEventListener("pointerdown", down);
       root.removeEventListener("pointermove", move);
@@ -1039,7 +1067,6 @@ export function useSurfaceViewport(
     rootRef,
     scrollRef,
     worldRef,
-    scaleLabelRef,
     scale,
     camera,
     controls,

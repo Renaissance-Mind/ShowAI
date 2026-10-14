@@ -6,6 +6,9 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { chromium, _electron } from "playwright";
+
+// The smoke checks select controls by their Chinese labels.
+process.env.SHOWAI_LANGUAGE ??= "zh-CN";
 const root = resolve(import.meta.dirname, "..");
 await mkdir(join(root, "output/playwright"), { recursive: true });
 const output = await mkdtemp(join(root, "output/playwright/containers-"));
@@ -108,7 +111,10 @@ try {
   } else {
     const { url } = await startup;
     clearTimeout(startupTimer);
-    page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
+    page = await browser.newPage({
+      locale: "zh-CN",
+      viewport: { width: 1440, height: 960 },
+    });
     await page.goto(url);
   }
   page.setDefaultTimeout(12000);
@@ -664,6 +670,7 @@ try {
     assert.equal(source.version, 3);
     assert.equal(source.document.content.attrs.kind, "page");
     const reader = await browser.newPage({
+      locale: "zh-CN",
       viewport: { width: 1280, height: 900 },
     });
     reader.on("pageerror", (error) => result.errors.push(error.message));

@@ -173,9 +173,51 @@ export async function readLibraryFile(
   );
 }
 
-export async function libraryPaths(
-  home: string,
-): Promise<string[] | undefined> {
+interface PathIndex {
+  list: readonly string[];
+  files: ReadonlySet<string>;
+  directories: ReadonlySet<string>;
+  objects: ReadonlyMap<string, string>;
+}
+const emptyIndex: PathIndex = {
+  list: [],
+  files: new Set(),
+  directories: new Set(),
+  objects: new Map(),
+};
+/** Trees of committed revisions never change; most path checks reuse one index. */
+const pathIndexes = new Map<string, Promise<PathIndex>>();
+function revisionIndex(library: GitLibrary, head: string | null) {
+  if (!head) return Promise.resolve(emptyIndex);
+  const key = `${library.root}\0${head}`;
+  let index = pathIndexes.get(key);
+  if (index) {
+    pathIndexes.delete(key);
+    pathIndexes.set(key, index);
+    return index;
+  }
+  index = library.tree(head).then((entries) => {
+    const objects = new Map(entries.map((entry) => [entry.path, entry.oid]));
+    const list = entries
+      .map((entry) => entry.path)
+      .filter((path) => !/\/pages\/[^/]+\/nodes\//.test(path));
+    const directories = new Set<string>();
+    for (const path of list)
+      for (
+        let end = path.indexOf("/");
+        end > 0;
+        end = path.indexOf("/", end + 1)
+      )
+        directories.add(path.slice(0, end));
+    return { list, files: new Set(list), directories, objects };
+  });
+  index.catch(() => pathIndexes.delete(key));
+  pathIndexes.set(key, index);
+  while (pathIndexes.size > 4)
+    pathIndexes.delete(pathIndexes.keys().next().value!);
+  return index;
+}
+async function currentPaths(home: string) {
   const library = versionedLibrary(home);
   if (!library) return undefined;
   const state = libraryMutations.getStore();
@@ -186,18 +228,46 @@ export async function libraryPaths(
       : snapshot?.root === library.root
         ? snapshot.revision
         : await library.head();
-  const paths = new Set(
-    head
-      ? (await library.tree(head))
-          .map((entry) => entry.path)
-          .filter((path) => !/\/pages\/[^/]+\/nodes\//.test(path))
-      : [],
-  );
-  if (state?.root === library.root)
-    for (const [path, bytes] of state.changes) {
-      if (bytes === null) paths.delete(path);
-      else paths.add(path);
-    }
+  return {
+    index: await revisionIndex(library, head),
+    changes: state?.root === library.root ? state.changes : undefined,
+  };
+}
+
+/**
+ * Stored object identity of a file while a read snapshot or mutation pins the
+ * revision; undefined when unpinned or when the mutation staged a new version.
+ */
+export async function pinnedFileIdentity(
+  home: string,
+  path: string,
+): Promise<string | undefined> {
+  const library = versionedLibrary(home);
+  if (!library) return undefined;
+  const state = libraryMutations.getStore();
+  const snapshot = libraryReadSnapshot.getStore();
+  const pinned =
+    state?.root === library.root
+      ? { head: state.head, changes: state.changes }
+      : snapshot?.root === library.root
+        ? { head: snapshot.revision, changes: undefined }
+        : undefined;
+  const name = logicalPath(home, path);
+  if (!pinned || !name || pinned.changes?.has(name)) return undefined;
+  return (await revisionIndex(library, pinned.head)).objects.get(name);
+}
+
+export async function libraryPaths(
+  home: string,
+): Promise<string[] | undefined> {
+  const current = await currentPaths(home);
+  if (!current) return undefined;
+  if (!current.changes?.size) return [...current.index.list];
+  const paths = new Set(current.index.list);
+  for (const [path, bytes] of current.changes) {
+    if (bytes === null) paths.delete(path);
+    else paths.add(path);
+  }
   return [...paths];
 }
 
@@ -226,20 +296,25 @@ export async function listLibraryDirectory(
 export async function libraryFileInfo(
   home: string,
   path: string,
-): Promise<{ file: boolean; directory: boolean; size: number } | undefined> {
+): Promise<{ file: boolean; directory: boolean } | undefined> {
   const name = logicalPath(home, path);
   if (!name) return undefined;
-  const paths = (await libraryPaths(home))!;
-  if (paths.includes(name))
-    return {
-      file: true,
-      directory: false,
-      size: (await readLibraryFile(home, path))!.length,
-    };
-  if (
-    paths.some((entry) => entry.startsWith(name + "/")) ||
-    dirname(path) === workspaceRoot(home)
-  )
-    return { file: false, directory: true, size: 0 };
+  const { index, changes } = (await currentPaths(home))!;
+  const staged = changes?.get(name);
+  if (staged !== undefined ? staged !== null : index.files.has(name))
+    return { file: true, directory: false };
+  const prefix = `${name}/`;
+  let directory = false;
+  if (changes?.size) {
+    for (const [path, bytes] of changes)
+      if (bytes !== null && path.startsWith(prefix)) directory = true;
+    // Staged deletions may remove every committed file below this directory.
+    if (!directory && index.directories.has(name))
+      directory = index.list.some(
+        (path) => path.startsWith(prefix) && changes.get(path) !== null,
+      );
+  } else directory = index.directories.has(name);
+  if (directory || dirname(path) === workspaceRoot(home))
+    return { file: false, directory: true };
   return undefined;
 }

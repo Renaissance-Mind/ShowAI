@@ -9,9 +9,10 @@ import {
   readFile,
   readdir,
   rm,
+  utimes,
   writeFile,
 } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { tmpdir, uptime } from "node:os";
 import { join, resolve } from "node:path";
 import { withLibraryLock } from "./library-lock";
 
@@ -129,5 +130,44 @@ describe("cross-process library leases", () => {
     expect(await withLibraryLock(path, async () => "directory recovered")).toBe(
       "directory recovered",
     );
+  });
+
+  it("hands the lease between holders in this process in order without overlap", async () => {
+    const path = join(root, "local-queue");
+    await mkdir(path);
+    let inside = 0;
+    const order: number[] = [];
+    const started = performance.now();
+    await Promise.all(
+      Array.from({ length: 20 }, (_, index) =>
+        withLibraryLock(path, async () => {
+          inside++;
+          expect(inside).toBe(1);
+          await new Promise((done) => setTimeout(done, 1));
+          order.push(index);
+          inside--;
+        }),
+      ),
+    );
+    expect(order).toEqual(Array.from({ length: 20 }, (_, index) => index));
+    // Polling for each waiter would take at least 20 × 25 ms.
+    expect(performance.now() - started).toBeLessThan(500);
+    expect(await readdir(join(path, "local"))).not.toContain("writer.lock");
+  });
+
+  it("reclaims an incomplete lease left before this boot but rejects a current one", async () => {
+    const path = join(root, "interrupted");
+    await mkdir(join(path, "local"), { recursive: true });
+    const lock = join(path, "local", "writer.lock");
+    await writeFile(lock, "");
+    await expect(
+      withLibraryLock(path, async () => "current"),
+    ).rejects.toMatchObject({ code: "INVALID_DATA" });
+    const beforeBoot = (Date.now() - uptime() * 1000 - 60_000) / 1000;
+    await utimes(lock, beforeBoot, beforeBoot);
+    await expect(withLibraryLock(path, async () => "recovered")).resolves.toBe(
+      "recovered",
+    );
+    expect(await readdir(join(path, "local"))).not.toContain("writer.lock");
   });
 });

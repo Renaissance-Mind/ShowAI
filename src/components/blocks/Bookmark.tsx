@@ -4,8 +4,11 @@ import { Bookmark, Check, ExternalLink, Link2 } from "../../ui/icons";
 import { safeImageUrl, safeUrl, text } from "./helpers";
 import { BlockHeader, EmptyState, Field } from "./shared";
 import type { BlockProps } from "./types";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/references";
 
 export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
+  const t = useTranslator(messages);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({
     title: "",
@@ -30,11 +33,11 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
   };
   const save = () => {
     if (!safeUrl(draft.url.trim())) {
-      setError("请输入完整的 http 或 https 网址。");
+      setError(t("bookmark.invalidUrl"));
       return;
     }
     if (draft.image.trim() && !safeImageUrl(draft.image.trim())) {
-      setError("封面需要 http、https 或内嵌图片地址。");
+      setError(t("bookmark.invalidImage"));
       return;
     }
     onChange?.({
@@ -48,7 +51,7 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
   return (
     <section
       className="sb-block sb-bookmark"
-      aria-label={text(data.title) || "来源书签"}
+      aria-label={text(data.title) || t("bookmark.label")}
     >
       <BlockHeader
         icon={<Bookmark size={16} />}
@@ -59,7 +62,7 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
       {editing && (
         <BlockSettings>
           <div className="sb-editor-panel">
-            <Field label="网址">
+            <Field label={t("bookmark.url")}>
               <input
                 type="url"
                 placeholder="https://…"
@@ -72,9 +75,9 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
                 }
               />
             </Field>
-            <Field label="标题">
+            <Field label={t("bookmark.title")}>
               <input
-                placeholder="来源的名称"
+                placeholder={t("bookmark.titlePlaceholder")}
                 value={draft.title}
                 onChange={(event) =>
                   setDraft((current) => ({
@@ -84,7 +87,7 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
                 }
               />
             </Field>
-            <Field label="摘要">
+            <Field label={t("bookmark.summary")}>
               <textarea
                 rows={3}
                 value={draft.description}
@@ -96,7 +99,7 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
                 }
               />
             </Field>
-            <Field label="封面图片地址（可选）">
+            <Field label={t("bookmark.image")}>
               <input
                 type="url"
                 value={draft.image}
@@ -120,7 +123,7 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
                 onClick={save}
               >
                 <Check size={14} />
-                保存书签
+                {t("bookmark.save")}
               </button>
             </div>
           </div>
@@ -154,12 +157,12 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
       ) : (
         <EmptyState
           icon={<Bookmark size={27} strokeWidth={1.4} />}
-          title="为结论留下出处"
+          title={t("bookmark.emptyTitle")}
           action={
             editable && !editing ? (
               <button type="button" className="sb-button" onClick={openEditor}>
                 <Link2 size={14} />
-                添加来源
+                {t("bookmark.add")}
               </button>
             ) : undefined
           }

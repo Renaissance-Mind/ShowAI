@@ -35,7 +35,7 @@ const uuid = (seed: string) => {
   return `${value.slice(0, 8)}-${value.slice(8, 12)}-5${value.slice(13, 16)}-a${value.slice(17, 20)}-${value.slice(20, 32)}`;
 };
 function label(source: ConflictSource) {
-  return `${source.account} · 设备 ${source.deviceId === "unknown" ? "未知" : source.deviceId.slice(0, 8)}${source.label ? ` · ${source.label}` : ""}`;
+  return `${source.account} · 设备 ${source.deviceId === "unknown" ? "未知" : source.deviceId.slice(0, 8)}${source.label ? ` · ${source.label}` : ""}`; // i18n-exempt: label written into retained conflict pages
 }
 function note(id: string, title: string, text: string): ShowDocument {
   return {
@@ -129,13 +129,13 @@ export function retainSyncConflicts(input: {
           ? parseArtifact(JSON.parse(bytes.toString())).document
           : null;
       const name = original?.title || conflict.path.split("/").at(-1)!;
-      const title = `${name}（来源：${label(source)}${bytes ? "" : "，已删除"}）`;
+      const title = `${name}（来源：${label(source)}${bytes ? "" : "，已删除"}）`; // i18n-exempt: retained conflict page title saved into the project
       const document = original
         ? { ...original, id: pageId, title }
         : note(
             pageId,
             title,
-            `${bytes ? "此文件的合并失败，原始内容已完整保留。" : "此来源删除了文件；另一来源的修改也已保留。"}\n原文件：${conflict.path}\n来源：${label(source)}\n来源版本：${source.revision ?? "未知"}\n记录：${root}record.json\n${bytes ? `原始内容：${preservedPath}` : ""}`,
+            `${bytes ? "此文件的合并失败，原始内容已完整保留。" : "此来源删除了文件；另一来源的修改也已保留。"}\n原文件：${conflict.path}\n来源：${label(source)}\n来源版本：${source.revision ?? "未知"}\n记录：${root}record.json\n${bytes ? `原始内容：${preservedPath}` : ""}`, // i18n-exempt: retained conflict note saved into the project
           );
       const path = `${prefix}pages/${pageId}.json`;
       files.set(path, Buffer.from(serializeArtifact(document)));

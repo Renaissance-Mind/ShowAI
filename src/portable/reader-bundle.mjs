@@ -58,7 +58,7 @@ async function readerCacheFile(key) {
 }
 async function persistentReader(key, buildReader) {
   const prepared = await readerCacheFile(key).catch((error) => {
-    console.warn("阅读器缓存不可用，将直接生成", error.message);
+    console.warn("Reader cache unavailable; building directly", error.message);
     return undefined;
   });
   if (!prepared) return buildReader();
@@ -80,7 +80,7 @@ async function persistentReader(key, buildReader) {
   }
   const html = await buildReader();
   await writeReaderCache(directory, path, key, html).catch((error) =>
-    console.warn("无法保存阅读器缓存", error.message),
+    console.warn("Couldn't save the reader cache", error.message),
   );
   return html;
 }

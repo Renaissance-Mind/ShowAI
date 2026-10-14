@@ -21,6 +21,9 @@ import {
 } from "./board-commands";
 import { MAX_ZOOM, MIN_ZOOM } from "./model";
 import { flushSync } from "react-dom";
+import { fingerNavigatesBoard } from "./board-input.mjs";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/surface";
 import {
   useEffect,
   useLayoutEffect,
@@ -66,7 +69,11 @@ import {
   MapIcon,
   CheckSquare,
 } from "../ui/icons";
-import { useSurfaceViewport } from "./useSurfaceViewport";
+import {
+  useSurfaceViewport,
+  useViewportScale,
+  type ViewportScale,
+} from "./useSurfaceViewport";
 import {
   useViewportLock,
   ViewportLockButton,
@@ -246,6 +253,7 @@ export default function PageSurface({
   onDrawExit,
   onToolChange,
 }: Props) {
+  const t = useTranslator(messages);
   const [localSelection, setLocalSelection] = useState<string | null>(null);
   const capture = useRef(readingCapture()).current;
   const [componentActionsHost, setComponentActionsHost] =
@@ -260,20 +268,13 @@ export default function PageSurface({
   const locked = embedded && lock.locked;
   const panMode = useRef(false);
   panMode.current = boardMode === "hand";
-  const {
-    rootRef,
-    scrollRef,
-    worldRef,
-    scaleLabelRef,
-    camera,
-    controls,
-    scale,
-  } = useSurfaceViewport(
-    layoutKey,
-    onMove ? `showai.viewport.v3:${pageId}` : undefined,
-    enabled && !locked,
-    { reading: !onMove, anchorScreen: !embedded, panMode },
-  );
+  const { rootRef, scrollRef, worldRef, camera, controls, scale } =
+    useSurfaceViewport(
+      layoutKey,
+      onMove ? `showai.viewport.v3:${pageId}` : undefined,
+      enabled && !locked,
+      { reading: !onMove, anchorScreen: !embedded, panMode },
+    );
   const board = useBoardInteraction({
     geometry,
     document: boardDocument,
@@ -787,21 +788,21 @@ export default function PageSurface({
       ? focusAfterMount(selectedIds, true)
       : focusAfterMount(selectedIds));
   const alignItems: [AlignMode, string, ReactNode, string][] = [
-    ["left", "左对齐", <AlignStartVertical size={14} />, "⌥A"],
-    ["center", "水平居中", <AlignCenterVertical size={14} />, "⌥H"],
-    ["right", "右对齐", <AlignEndVertical size={14} />, "⌥D"],
-    ["top", "顶部对齐", <AlignStartHorizontal size={14} />, "⌥W"],
-    ["middle", "垂直居中", <AlignCenterHorizontal size={14} />, "⌥V"],
-    ["bottom", "底部对齐", <AlignEndHorizontal size={14} />, "⌥S"],
+    ["left", t("align.left"), <AlignStartVertical size={14} />, "⌥A"],
+    ["center", t("align.center"), <AlignCenterVertical size={14} />, "⌥H"],
+    ["right", t("align.right"), <AlignEndVertical size={14} />, "⌥D"],
+    ["top", t("align.top"), <AlignStartHorizontal size={14} />, "⌥W"],
+    ["middle", t("align.middle"), <AlignCenterHorizontal size={14} />, "⌥V"],
+    ["bottom", t("align.bottom"), <AlignEndHorizontal size={14} />, "⌥S"],
     [
       "distribute-x",
-      "水平等距分布",
+      t("align.distributeX"),
       <AlignHorizontalDistributeCenter size={14} />,
       "⌥⇧H",
     ],
     [
       "distribute-y",
-      "垂直等距分布",
+      t("align.distributeY"),
       <AlignVerticalDistributeCenter size={14} />,
       "⌥⇧V",
     ],
@@ -816,46 +817,48 @@ export default function PageSurface({
       layoutOf(id)?.mode === "free";
     const items: LibraryContextMenuItem[] = [
       {
-        label: many ? `复制 ${ids.length} 个对象` : "复制对象",
+        label: many
+          ? t("menu.duplicateMany", { count: ids.length })
+          : t("menu.duplicate"),
         icon: <Copy size={14} />,
         shortcut: "⌘D",
         onSelect: () => duplicateSelection(ids),
       },
       {
-        label: "拷贝",
+        label: t("menu.copy"),
         icon: <Clipboard size={14} />,
         shortcut: "⌘C",
         disabled: !onCopyObjects,
         onSelect: () => copySelection(ids),
       },
       {
-        label: "剪切",
+        label: t("menu.cut"),
         icon: <Scissors size={14} />,
         shortcut: "⌘X",
         disabled: !onCopyObjects,
         onSelect: () => copySelection(ids, true),
       },
       {
-        label: "置于顶层",
+        label: t("order.front"),
         icon: <BringToFront size={14} />,
         shortcut: "⇧]",
         separatorBefore: true,
         onSelect: () => reorder(ids, "front"),
       },
       {
-        label: "上移一层",
+        label: t("order.forward"),
         icon: <ChevronUp size={14} />,
         shortcut: "]",
         onSelect: () => reorder(ids, "forward"),
       },
       {
-        label: "下移一层",
+        label: t("order.backward"),
         icon: <ChevronDown size={14} />,
         shortcut: "[",
         onSelect: () => reorder(ids, "backward"),
       },
       {
-        label: "置于底层",
+        label: t("order.back"),
         icon: <SendToBack size={14} />,
         shortcut: "⇧[",
         onSelect: () => reorder(ids, "back"),
@@ -874,14 +877,14 @@ export default function PageSurface({
         : []),
       region
         ? {
-            label: "解除区域",
+            label: t("region.ungroup"),
             icon: <Ungroup size={14} />,
             shortcut: "⇧⌘G",
             separatorBefore: true,
             onSelect: () => ungroup(id),
           }
         : {
-            label: "放入区域",
+            label: t("region.group"),
             icon: <Group size={14} />,
             shortcut: "⌘G",
             separatorBefore: true,
@@ -889,7 +892,7 @@ export default function PageSurface({
             onSelect: () => group(ids),
           },
       {
-        label: lockedNow ? "解锁" : "锁定",
+        label: lockedNow ? t("lock.unlock") : t("lock.lock"),
         icon: lockedNow ? (
           <LockKeyholeOpen size={14} />
         ) : (
@@ -899,21 +902,23 @@ export default function PageSurface({
         onSelect: () => toggleLock(ids),
       },
       {
-        label: "对象设置",
+        label: t("menu.settings"),
         icon: <Settings2 size={14} />,
         onSelect: () => onInspect?.(id),
       },
       ...(container
         ? [
             {
-              label: "展开容器",
+              label: t("menu.expand"),
               icon: <Maximize2 size={14} />,
               onSelect: () => onExpand?.(id),
             },
           ]
         : []),
       {
-        label: many ? `删除 ${ids.length} 个对象` : "删除对象",
+        label: many
+          ? t("menu.deleteMany", { count: ids.length })
+          : t("menu.delete"),
         icon: <Trash2 size={14} />,
         danger: true,
         separatorBefore: true,
@@ -928,7 +933,10 @@ export default function PageSurface({
   const objectContext = useMemo<ObjectActions>(
     () => ({
       componentActionsHost,
-      scale,
+      // Read live so zoom frames do not re-render every object.
+      get scale() {
+        return camera.current.scale;
+      },
       geometry,
       selected,
       select: onTransform ? board.select : onSelect,
@@ -947,7 +955,6 @@ export default function PageSurface({
     // the part objects read.
     [
       componentActionsHost,
-      scale,
       geometry,
       selected,
       [...board.ids].join(":"),
@@ -1039,6 +1046,14 @@ export default function PageSurface({
         }}
         onPointerDownCapture={(event) => {
           const target = event.target as Element;
+          // On iPad a finger navigates while the Pencil draws.
+          if (
+            fingerNavigatesBoard(event.pointerType) &&
+            !target.closest(
+              "[data-surface-ui],button,input,textarea,select,iframe,[contenteditable=true]",
+            )
+          )
+            return;
           if (target.closest(".page-surface") !== event.currentTarget) return;
           if (!target.closest(".surface-popover-anchor") && navigation.current)
             navigation.current.open = false;
@@ -1606,7 +1621,7 @@ export default function PageSurface({
             board.select(null);
         }}
         role="region"
-        aria-label="白板"
+        aria-label={t("board")}
         tabIndex={0}
         onKeyDown={(event) => {
           const target = event.target as Element;
@@ -1637,35 +1652,35 @@ export default function PageSurface({
         }}
         aria-description={
           locked
-            ? "视图已锁定。可以点击内容，滚动用于外层页面阅读；右上角解锁后可缩放和移动。"
+            ? t("board.descriptionLocked")
             : onTransform
-              ? "单击选择对象，拖动移动，再次单击编辑文字；拖动空白处框选；空格、中键或 H 抓手拖动画布；双击空白处写文字。V 选择，P 画笔，M 荧光笔，R 矩形，E 椭圆，A 箭头，F 区域，T 文字；⇧1 总览，⇧2 定位所选，⇧0 回到 100%；Escape 取消当前操作。"
-              : "在白板上滚动或拖动空白处浏览。方向键浏览，0 总览；Escape 取消当前操作。"
+              ? t("board.descriptionEdit")
+              : t("board.descriptionRead")
         }
       >
         {objectMenu && (
           <LibraryContextMenu
             anchor={objectMenu.anchor}
             point={objectMenu.point}
-            label="对象操作"
+            label={t("menu.objectActions")}
             onClose={() => setObjectMenu(null)}
             items={
               objectMenu.insertion
                 ? [
                     {
-                      label: "添加 Page",
+                      label: t("menu.addPage"),
                       icon: <PanelTop size={14} />,
                       onSelect: () =>
                         onAddComponent?.("page", objectMenu.insertion!),
                     },
                     {
-                      label: "添加文字",
+                      label: t("menu.addText"),
                       icon: <FileText size={14} />,
                       shortcut: "T",
                       onSelect: () => addText(objectMenu.insertion!),
                     },
                     {
-                      label: "添加组件…",
+                      label: t("menu.addComponent"),
                       icon: <Plus size={14} />,
                       onSelect: () =>
                         onOpenComponents?.(
@@ -1674,7 +1689,7 @@ export default function PageSurface({
                         ),
                     },
                     {
-                      label: "粘贴",
+                      label: t("menu.paste"),
                       icon: <Clipboard size={14} />,
                       shortcut: "⌘V",
                       separatorBefore: true,
@@ -1684,7 +1699,7 @@ export default function PageSurface({
                         paste({ clip: lastClip }, objectMenu.insertion!),
                     },
                     {
-                      label: "全选",
+                      label: t("menu.selectAll"),
                       icon: <CheckSquare size={14} />,
                       shortcut: "⌘A",
                       disabled: !nodes.length,
@@ -1699,7 +1714,9 @@ export default function PageSurface({
             }
           />
         )}
-        {embedded && <ViewportLockButton {...lock} label="白板" />}
+        {embedded && (
+          <ViewportLockButton {...lock} label={t("board.lockTarget")} />
+        )}
         <div className="surface-metadata" data-surface-ui>
           {header}
         </div>
@@ -1753,12 +1770,12 @@ export default function PageSurface({
         )}
         {!nodes.length && !drawTool && !onMove && (
           <div className="surface-empty" data-surface-ui>
-            <p>这块白板还没有内容</p>
+            <p>{t("board.empty")}</p>
           </div>
         )}
         {!nodes.length && !drawTool && !boardMode && editable && !embedded && (
           <div className="surface-empty is-hint" aria-hidden="true">
-            <p>双击空白处写文字，按 / 或右键添加组件，P 画笔、R 矩形</p>
+            <p>{t("board.emptyHint")}</p>
           </div>
         )}
         {minimap && !embedded && !printing && boardDocument && containerId && (
@@ -1775,11 +1792,11 @@ export default function PageSurface({
             className="board-selection-bar"
             data-surface-ui
             role="toolbar"
-            aria-label="所选对象"
+            aria-label={t("board.selection")}
           >
             {board.ids.size > 1 && (
               <span className="board-selection-count" role="status">
-                已选 {board.ids.size} 项
+                {t("board.selectedCount", { count: board.ids.size })}
               </span>
             )}
             {board.ids.size > 0 && (
@@ -1787,8 +1804,8 @@ export default function PageSurface({
                 {selectedContainer && (
                   <button
                     type="button"
-                    aria-label="展开选中容器"
-                    title="展开容器"
+                    aria-label={t("board.expandSelected")}
+                    title={t("menu.expand")}
                     onClick={() => selected && onExpand?.(selected)}
                   >
                     <Maximize2 size={15} />
@@ -1797,30 +1814,39 @@ export default function PageSurface({
                 <button
                   type="button"
                   onClick={() => duplicateSelection(selectedIds)}
-                  aria-label="复制选中对象"
-                  title="复制选中对象（⌘/Ctrl D，或按住 Alt 拖动）"
+                  aria-label={t("board.duplicateSelected")}
+                  title={t("board.duplicateSelectedTitle")}
                 >
                   <Copy size={15} />
                 </button>
                 <button
                   type="button"
                   onClick={() => reorder(selectedIds, "front")}
-                  aria-label="置于顶层"
-                  title="置于顶层（⇧]）；] 上移一层"
+                  aria-label={t("order.front")}
+                  title={t("tool.withShortcut", {
+                    label: t("order.front"),
+                    key: "⇧]",
+                  })}
                 >
                   <BringToFront size={15} />
                 </button>
                 <button
                   type="button"
                   onClick={() => reorder(selectedIds, "back")}
-                  aria-label="置于底层"
-                  title="置于底层（⇧[）；[ 下移一层"
+                  aria-label={t("order.back")}
+                  title={t("tool.withShortcut", {
+                    label: t("order.back"),
+                    key: "⇧[",
+                  })}
                 >
                   <SendToBack size={15} />
                 </button>
                 {board.ids.size > 1 && (
                   <details className="surface-popover-anchor board-align-menu">
-                    <summary aria-label="对齐与分布" title="对齐与分布">
+                    <summary
+                      aria-label={t("align.menu")}
+                      title={t("align.menu")}
+                    >
                       <AlignStartVertical size={15} />
                     </summary>
                     <div className="board-align-options" role="group">
@@ -1844,8 +1870,11 @@ export default function PageSurface({
                 {selectedRegion ? (
                   <button
                     type="button"
-                    aria-label="解除区域"
-                    title="解除区域（⇧⌘G）"
+                    aria-label={t("region.ungroup")}
+                    title={t("tool.withShortcut", {
+                      label: t("region.ungroup"),
+                      key: "⇧⌘G",
+                    })}
                     onClick={() => ungroup(selectedRegion)}
                   >
                     <Ungroup size={15} />
@@ -1855,8 +1884,11 @@ export default function PageSurface({
                   onGroup && (
                     <button
                       type="button"
-                      aria-label="放入区域"
-                      title="放入区域（⌘G）"
+                      aria-label={t("region.group")}
+                      title={t("tool.withShortcut", {
+                        label: t("region.group"),
+                        key: "⌘G",
+                      })}
                       onClick={() => group(selectedIds)}
                     >
                       <Group size={15} />
@@ -1865,9 +1897,12 @@ export default function PageSurface({
                 )}
                 <button
                   type="button"
-                  aria-label={allLocked ? "解锁" : "锁定"}
+                  aria-label={allLocked ? t("lock.unlock") : t("lock.lock")}
                   aria-pressed={allLocked}
-                  title={`${allLocked ? "解锁" : "锁定"}（⇧⌘L）`}
+                  title={t("tool.withShortcut", {
+                    label: allLocked ? t("lock.unlock") : t("lock.lock"),
+                    key: "⇧⌘L",
+                  })}
                   onClick={() => toggleLock(selectedIds)}
                 >
                   {allLocked ? (
@@ -1878,8 +1913,8 @@ export default function PageSurface({
                 </button>
                 <button
                   type="button"
-                  aria-label="选中对象设置"
-                  title="对象布局设置：名称、尺寸与所属容器"
+                  aria-label={t("board.objectSettings")}
+                  title={t("board.objectSettingsTitle")}
                   onClick={() => selected && onInspect?.(selected)}
                 >
                   <Settings2 size={15} />
@@ -1890,8 +1925,11 @@ export default function PageSurface({
                     onDeleteSelection?.(selectedIds);
                     board.select(null);
                   }}
-                  aria-label="删除选中对象"
-                  title="删除（Delete）"
+                  aria-label={t("board.deleteSelected")}
+                  title={t("tool.withShortcut", {
+                    label: t("board.deleteSelected"),
+                    key: "Delete",
+                  })}
                 >
                   <Trash2 size={15} />
                 </button>
@@ -1920,7 +1958,7 @@ export default function PageSurface({
           className="surface-toolbar"
           data-surface-ui
           role="group"
-          aria-label="白板工具"
+          aria-label={t("board.tools")}
         >
           <details
             ref={navigation}
@@ -1934,11 +1972,14 @@ export default function PageSurface({
               }
             }}
           >
-            <summary aria-label="区域与视图" title="区域与视图">
+            <summary
+              aria-label={t("nav.regionsAndViews")}
+              title={t("nav.regionsAndViews")}
+            >
               <List size={16} />
             </summary>
             <div className="surface-navigation">
-              <strong>区域与内容</strong>
+              <strong>{t("nav.regionsAndContent")}</strong>
               {nodes.map((node) => (
                 <div className="surface-navigation-row" key={node.id}>
                   <button
@@ -1957,7 +1998,7 @@ export default function PageSurface({
                     <>
                       <button
                         type="button"
-                        aria-label={`前移 ${node.name} 阅读顺序`}
+                        aria-label={t("nav.moveEarlier", { name: node.name })}
                         disabled={views.readingOrder.indexOf(node.id) < 1}
                         onClick={() => {
                           const order = [...views.readingOrder],
@@ -1976,7 +2017,7 @@ export default function PageSurface({
                 </div>
               ))}
 
-              <strong>命名视图</strong>
+              <strong>{t("nav.namedViews")}</strong>
               {views.saved.map((view) => (
                 <div className="surface-navigation-row" key={view.id}>
                   <button
@@ -1994,7 +2035,7 @@ export default function PageSurface({
                     <>
                       <button
                         type="button"
-                        aria-label={`设为初始视图 ${view.name}`}
+                        aria-label={t("nav.setInitial", { name: view.name })}
                         aria-pressed={views.initial === view.id}
                         onClick={() =>
                           onViews({
@@ -2007,7 +2048,7 @@ export default function PageSurface({
                       </button>
                       <button
                         type="button"
-                        aria-label={`删除视图 ${view.name}`}
+                        aria-label={t("nav.deleteView", { name: view.name })}
                         onClick={() =>
                           onViews({
                             ...views,
@@ -2033,11 +2074,13 @@ export default function PageSurface({
                   }}
                 >
                   <input
-                    aria-label="视图名称"
+                    aria-label={t("nav.viewName")}
                     placeholder={
                       selected
-                        ? `${names.get(selected) || "所选内容"}的视图`
-                        : "当前可见内容的视图"
+                        ? names.get(selected)
+                          ? t("nav.viewOf", { name: names.get(selected)! })
+                          : t("nav.viewOfSelection")
+                        : t("nav.viewOfVisible")
                     }
                     maxLength={200}
                     value={viewName}
@@ -2048,7 +2091,7 @@ export default function PageSurface({
                     disabled={!viewName.trim() || !viewTargets.length}
                   >
                     <BookmarkPlus size={14} />
-                    保存视图
+                    {t("nav.saveView")}
                   </button>
                 </form>
               )}
@@ -2056,60 +2099,33 @@ export default function PageSurface({
           </details>
           <button
             type="button"
-            aria-label="总览"
+            aria-label={t("board.fit")}
             disabled={locked}
-            title="总览全部内容（⇧1）"
+            title={t("board.fitTitle")}
             onClick={() => focusAfterMount()}
           >
             <Maximize2 size={15} />
           </button>
           <button
             type="button"
-            aria-label="定位所选"
-            title="定位所选内容（⇧2）"
+            aria-label={t("board.locate")}
+            title={t("board.locateTitle")}
             disabled={locked || !selectedIds.length}
             onClick={focusSelection}
           >
             <Focus size={15} />
           </button>
           <span className="surface-toolbar-divider" />
-          <button
-            type="button"
-            aria-label="缩小白板"
-            title="缩小（-）"
-            disabled={locked || scale <= MIN_ZOOM}
-            onClick={() => controls.current.zoom(camera.current.scale / 1.2)}
-          >
-            <Minus size={15} />
-          </button>
-          <button
-            type="button"
-            className="surface-zoom"
-            aria-label="重置缩放"
-            title="回到 100%（⇧0）"
-            disabled={locked}
-            onClick={() => controls.current.zoom(1)}
-          >
-            <span ref={scaleLabelRef}>{Math.round(scale * 100)}%</span>
-          </button>
-          <button
-            type="button"
-            aria-label="放大白板"
-            title="放大（+）"
-            disabled={locked || scale >= MAX_ZOOM}
-            onClick={() => controls.current.zoom(camera.current.scale * 1.2)}
-          >
-            <Plus size={15} />
-          </button>
+          <ZoomControls scale={scale} controls={controls} locked={locked} />
           <fieldset className="surface-extra-actions" disabled={locked}>
             {extraActions}
           </fieldset>
           {!embedded && !printing && (
             <button
               type="button"
-              aria-label="小地图"
+              aria-label={t("board.minimap")}
               aria-pressed={minimap}
-              title="小地图"
+              title={t("board.minimap")}
               onClick={toggleMinimap}
             >
               <MapIcon size={15} />
@@ -2118,6 +2134,52 @@ export default function PageSurface({
         </div>
       </div>
     </ObjectContext.Provider>
+  );
+}
+
+/** Only the zoom controls re-render while zooming. */
+function ZoomControls({
+  scale: store,
+  controls,
+  locked,
+}: {
+  scale: ViewportScale;
+  controls: ReturnType<typeof useSurfaceViewport>["controls"];
+  locked: boolean;
+}) {
+  const scale = useViewportScale(store);
+  const t = useTranslator(messages);
+  return (
+    <>
+      <button
+        type="button"
+        aria-label={t("board.zoomOut")}
+        title={t("tool.withShortcut", { label: t("board.zoomOut"), key: "-" })}
+        disabled={locked || scale <= MIN_ZOOM}
+        onClick={() => controls.current.zoom(scale / 1.2)}
+      >
+        <Minus size={15} />
+      </button>
+      <button
+        type="button"
+        className="surface-zoom"
+        aria-label={t("board.resetZoom")}
+        title={t("board.resetZoomTitle")}
+        disabled={locked}
+        onClick={() => controls.current.zoom(1)}
+      >
+        {Math.round(scale * 100)}%
+      </button>
+      <button
+        type="button"
+        aria-label={t("board.zoomIn")}
+        title={t("tool.withShortcut", { label: t("board.zoomIn"), key: "+" })}
+        disabled={locked || scale >= MAX_ZOOM}
+        onClick={() => controls.current.zoom(scale * 1.2)}
+      >
+        <Plus size={15} />
+      </button>
+    </>
   );
 }
 

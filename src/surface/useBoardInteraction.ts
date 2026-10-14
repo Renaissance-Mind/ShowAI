@@ -33,6 +33,10 @@ import {
   type Point,
 } from "./geometry.mjs";
 import { boundEndpoints, indexSurfaceTree } from "./connections.mjs";
+import { translator } from "../i18n";
+import messages from "../i18n/messages/surface";
+
+const t = translator(messages);
 
 export type BoardGesture = "move" | "resize" | `resize-${string}` | "rotate";
 export interface BoardGestureInput {
@@ -188,7 +192,10 @@ export function useBoardInteraction({
       handle.dataset.resizeDirection = direction;
       handle.dataset.groupTarget = [...ids][0];
       handle.tabIndex = -1;
-      handle.setAttribute("aria-label", `调整所选 ${ids.size} 个对象`);
+      handle.setAttribute(
+        "aria-label",
+        t("board.groupHandles", { count: ids.size }),
+      );
       outline.append(handle);
     }
     first.parentElement.append(outline);

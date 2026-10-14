@@ -21,25 +21,31 @@ import {
 import { downloadFile } from "./helpers";
 import type { BlockProps } from "./types";
 import "./block.css";
+import { translator } from "../../i18n";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/widget";
+
+const widgetMessages = translator(messages);
 
 function UnavailableBlock({
   kind,
   data,
   error,
 }: BlockProps & { kind: string; error?: string }) {
+  const t = useTranslator(messages);
   return (
-    <section className="sb-block sb-unavailable" aria-label="区块暂时无法显示">
+    <section className="sb-block sb-unavailable" aria-label={t("unavailable")}>
       <div className="sb-unavailable-heading">
         <Puzzle size={20} />
         <div>
           <strong>
-            {error ? "区块数据需要检查" : `尚未注册「${kind}」区块`}
+            {error ? t("needsCheck") : t("notRegistered", { kind })}
           </strong>
-          <p>{error || "原始数据已保留。注册对应的 React 组件后即可显示。"}</p>
+          <p>{error || t("dataKept")}</p>
         </div>
       </div>
       <details className="sb-data-details">
-        <summary>查看区块数据</summary>
+        <summary>{t("viewData")}</summary>
         <pre>{JSON.stringify(data, null, 2)}</pre>
       </details>
       <button
@@ -54,7 +60,7 @@ function UnavailableBlock({
         }
       >
         <FileJson size={14} />
-        下载区块数据
+        {t("downloadData")}
       </button>
     </section>
   );
@@ -66,7 +72,7 @@ class BlockBoundary extends Component<
 > {
   state = { error: null as string | null };
   static getDerivedStateFromError(error: Error) {
-    return { error: error.message || "组件渲染失败。" };
+    return { error: error.message || widgetMessages("renderFailed") };
   }
   componentDidUpdate(previous: { data: BlockProps["data"]; kind: string }) {
     if (
@@ -111,6 +117,7 @@ export const Widget = memo(function Widget({
     getRegistryRevision,
     getRegistryRevision,
   );
+  const t = useTranslator(messages);
   const definition = getBlockDefinition(kind);
   if (!definition) return <UnavailableBlock kind={kind} data={data} />;
   if (definition.validate) {
@@ -121,9 +128,7 @@ export const Widget = memo(function Widget({
         <UnavailableBlock
           kind={kind}
           data={data}
-          error={
-            error instanceof Error ? error.message : "区块数据格式不正确。"
-          }
+          error={error instanceof Error ? error.message : t("invalidData")}
         />
       );
     }
@@ -146,7 +151,7 @@ export const Widget = memo(function Widget({
                     : 180,
             }}
           >
-            正在加载组件…
+            {t("loading")}
           </section>
         }
       >

@@ -1,6 +1,8 @@
 import "./selection-toolbar.css";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/editor";
 
 /** One selection menu container; object-specific actions append to its children. */
 export function SelectionToolbar({
@@ -9,7 +11,7 @@ export function SelectionToolbar({
   anchorElement,
   children,
   onEscape,
-  label = "选中文字格式",
+  label,
   keyboardScope,
   viewportTop = 8,
 }: {
@@ -22,6 +24,7 @@ export function SelectionToolbar({
   children: ReactNode;
   onEscape: () => void;
 }) {
+  const t = useTranslator(messages);
   const menu = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState(anchor);
   useLayoutEffect(() => {
@@ -86,7 +89,7 @@ export function SelectionToolbar({
       data-editor-menu-trigger="selection"
       data-editor-keyboard-scope={keyboardScope}
       role="toolbar"
-      aria-label={label}
+      aria-label={label ?? t("selectionToolbar")}
       style={position}
       onMouseDown={(event) => {
         if (!(event.target as Element).closest("input,select,textarea"))

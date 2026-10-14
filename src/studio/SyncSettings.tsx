@@ -17,25 +17,33 @@ import type {
   ProjectRole,
 } from "../sync/protocol";
 import type { SyncConflict } from "../sync/manager";
+import { getLocale, type MessageKey } from "../i18n";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/sync";
+import common from "../i18n/messages/common";
 import "./sync-settings.css";
 type Status = Omit<SyncConfiguration, "connections"> & {
   connections: Omit<SyncConfiguration["connections"][number], "token">[];
   running: boolean;
 };
-const roles: Record<ProjectRole, string> = {
-  admin: "管理员",
-  editor: "编辑者",
-  viewer: "查看者",
+type SyncKey = MessageKey<typeof messages>;
+const roleKeys: Record<ProjectRole, SyncKey> = {
+  admin: "role.admin",
+  editor: "role.editor",
+  viewer: "role.viewer",
 };
-const states = {
-  pending: "等待同步",
-  synced: "已同步",
-  "save-failed": "本机保存失败，请处理冲突",
-  offline: "连接中断",
-  conflict: "需要处理冲突",
-  revoked: "需要重新登录或加入",
-};
+const stateKeys = {
+  pending: "state.pending",
+  synced: "state.synced",
+  "save-failed": "state.save-failed",
+  offline: "state.offline",
+  conflict: "state.conflict",
+  revoked: "state.revoked",
+} satisfies Record<string, SyncKey>;
 export default function SyncSettings() {
+  const t = useTranslator(messages);
+  const tc = useTranslator(common);
+  const role = (value: ProjectRole) => t(roleKeys[value]);
   const [status, setStatus] = useState<Status | null>(null),
     [localProjects, setLocalProjects] = useState<ProjectSummary[]>([]);
   const [busy, setBusy] = useState(false),
@@ -266,14 +274,14 @@ export default function SyncSettings() {
       });
       setPreview(null);
       setInviteLink("");
-      setMessage("已加入项目，正在下载当前项目内容。");
+      setMessage(t("toast.joinedDownloading"));
     }
     await loadServer(connection.id);
   }
   const connectionSelect = (
     value: string,
     change: (value: string) => void,
-    empty = "选择服务器账号",
+    empty = t("chooseServerAccount"),
   ) => (
     <select
       value={value}
@@ -288,7 +296,7 @@ export default function SyncSettings() {
       ))}
     </select>
   );
-  if (!status) return <p className="settings-help">正在读取服务器连接…</p>;
+  if (!status) return <p className="settings-help">{t("readingConnections")}</p>;
   return (
     <div className="sync-settings" aria-busy={busy}>
       {error && !panel && (
@@ -302,13 +310,11 @@ export default function SyncSettings() {
         </p>
       )}
       <section className="settings-group">
-        <h2>默认存储</h2>
+        <h2>{t("defaultStorage")}</h2>
         <div className="settings-row">
           <div className="settings-row-text">
-            <h3>新项目保存位置</h3>
-            <p>
-              新项目会自动加入所选服务器，当前账号成为项目管理员。本地保留离线副本。
-            </p>
+            <h3>{t("newProjectLocation")}</h3>
+            <p>{t("newProjectLocationDetail")}</p>
           </div>
           {connectionSelect(
             status.defaultConnectionId ?? "",
@@ -316,12 +322,12 @@ export default function SyncSettings() {
               void run(() =>
                 desktop.invoke("sync:default", { connectionId: value || null }),
               ),
-            "仅保存在本机",
+            t("localOnly"),
           )}
         </div>
       </section>
       <section className="settings-group">
-        <h2>服务器与账号</h2>
+        <h2>{t("serversAndAccounts")}</h2>
         {status.connections.map((connection) => (
           <div className="sync-connection" key={connection.id}>
             <div className="settings-row-text">
@@ -335,14 +341,14 @@ export default function SyncSettings() {
               disabled={busy}
               onClick={() => void run(() => loadServer(connection.id))}
             >
-              查看项目
+              {t("viewProjects")}
             </button>
             <button
               className="settings-button"
               disabled={busy}
               onClick={() => void run(() => loadDashboard(connection.id))}
             >
-              项目管理
+              {t("manageProjects")}
             </button>
             <button
               className="settings-button"
@@ -361,7 +367,7 @@ export default function SyncSettings() {
                 })
               }
             >
-              账号与设备
+              {t("accountAndDevices")}
             </button>
             <button
               className="settings-button"
@@ -379,7 +385,7 @@ export default function SyncSettings() {
                 )
               }
             >
-              移除连接
+              {t("removeConnection")}
             </button>
           </div>
         ))}
@@ -391,7 +397,7 @@ export default function SyncSettings() {
           }}
           disabled={busy}
         >
-          {showConnect ? "收起连接设置" : "添加服务器账号"}
+          {showConnect ? t("hideConnect") : t("addServerAccount")}
         </button>
         {showConnect && (
           <form
@@ -402,7 +408,7 @@ export default function SyncSettings() {
             }}
           >
             <label>
-              服务器地址
+              {t("serverUrl")}
               <input
                 required
                 type="url"
@@ -414,22 +420,22 @@ export default function SyncSettings() {
               />
             </label>
             <label>
-              连接方式
+              {t("connectMethod")}
               <select
                 value={form.mode}
                 onChange={(event) =>
                   setForm({ ...form, mode: event.target.value })
                 }
               >
-                <option value="login">账号密码登录</option>
-                <option value="register">注册账号</option>
-                <option value="personal">注册并生成个人 Token</option>
-                <option value="token">使用已有 Token</option>
+                <option value="login">{t("mode.login")}</option>
+                <option value="register">{t("mode.register")}</option>
+                <option value="personal">{t("mode.personal")}</option>
+                <option value="token">{t("mode.token")}</option>
               </select>
             </label>
             {form.mode === "token" ? (
               <label>
-                Token
+                {t("token")}
                 <input
                   required
                   type="password"
@@ -443,7 +449,7 @@ export default function SyncSettings() {
             ) : (
               <>
                 <label>
-                  账号
+                  {t("account")}
                   <input
                     required
                     autoComplete="username"
@@ -455,13 +461,13 @@ export default function SyncSettings() {
                 </label>
                 {form.mode !== "personal" && (
                   <label>
-                    密码
+                    {t("password")}
                     <input
                       required
                       minLength={form.mode === "register" ? 12 : 1}
                       maxLength={1024}
                       placeholder={
-                        form.mode === "register" ? "至少 12 个字符" : undefined
+                        form.mode === "register" ? t("passwordMinLength") : undefined
                       }
                       type="password"
                       autoComplete={
@@ -478,7 +484,7 @@ export default function SyncSettings() {
                 )}
                 {["register", "personal"].includes(form.mode) && !preview && (
                   <label>
-                    注册密钥（服务器要求时填写）
+                    {t("registrationKey")}
                     <input
                       type="password"
                       autoComplete="off"
@@ -495,7 +501,7 @@ export default function SyncSettings() {
               </>
             )}
             <button className="settings-button" type="submit" disabled={busy}>
-              连接服务器{preview ? "并加入项目" : ""}
+              {preview ? t("connectAndJoin") : t("connectServer")}
             </button>
           </form>
         )}
@@ -513,7 +519,7 @@ export default function SyncSettings() {
         {issuedToken && (
           <div className="sync-form">
             <label>
-              新生成的个人 Token
+              {t("newPersonalToken")}
               <input
                 type="password"
                 readOnly
@@ -529,27 +535,27 @@ export default function SyncSettings() {
                 )
               }
             >
-              复制个人 Token
+              {t("copyPersonalToken")}
             </button>
             <button
               className="settings-button"
               onClick={() => setIssuedToken("")}
             >
-              已保存
+              {t("tokenSaved")}
             </button>
           </div>
         )}
         {sessions && (
           <div className="sync-dashboard-list">
             <h3>
-              {
-                status.connections.find(
-                  (connection) => connection.id === sessionConnectionId,
-                )?.user.name
-              }{" "}
-              的设备会话
+              {t("deviceSessions", {
+                name:
+                  status.connections.find(
+                    (connection) => connection.id === sessionConnectionId,
+                  )?.user.name ?? "",
+              })}
             </h3>
-            <p>会话到期后请重新登录。撤销设备不会删除其已下载的本地内容。</p>
+            <p>{t("deviceSessionsHelp")}</p>
             <ServiceLogin
               key={sessionConnectionId}
               url={
@@ -566,7 +572,7 @@ export default function SyncSettings() {
                     connectionId: sessionConnectionId,
                   }),
                 );
-                setMessage("已添加登录方式，可用它登录当前账号。");
+                setMessage(t("toast.loginMethodAdded"));
               }}
             />
             {status.connections
@@ -574,8 +580,8 @@ export default function SyncSettings() {
               ?.capabilities?.includes("account-security-v1") && (
               <>
                 <details>
-                  <summary>修改密码</summary>
-                  <p>修改后其他设备会退出，本设备保持登录。</p>
+                  <summary>{t("changePassword")}</summary>
+                  <p>{t("changePasswordHelp")}</p>
                   <form
                     className="sync-connect-form"
                     onSubmit={(event) => {
@@ -592,14 +598,12 @@ export default function SyncSettings() {
                             connectionId: sessionConnectionId,
                           }),
                         );
-                        setMessage(
-                          "密码已修改，其他设备会话已撤销。本设备保持登录。",
-                        );
+                        setMessage(t("toast.passwordChanged"));
                       });
                     }}
                   >
                     <label>
-                      当前密码
+                      {t("currentPassword")}
                       <input
                         type="password"
                         required
@@ -614,13 +618,13 @@ export default function SyncSettings() {
                       />
                     </label>
                     <label>
-                      新密码
+                      {t("newPassword")}
                       <input
                         type="password"
                         required
                         minLength={12}
                         maxLength={1024}
-                        placeholder="至少 12 个字符"
+                        placeholder={t("passwordMinLength")}
                         autoComplete="new-password"
                         value={passwords.next}
                         onChange={(event) =>
@@ -636,7 +640,7 @@ export default function SyncSettings() {
                       disabled={busy}
                       type="submit"
                     >
-                      保存新密码
+                      {t("saveNewPassword")}
                     </button>
                   </form>
                 </details>
@@ -645,17 +649,17 @@ export default function SyncSettings() {
                   disabled={busy}
                   onClick={() => setConfirmSignOut(true)}
                 >
-                  退出所有设备
+                  {t("signOutAll")}
                 </button>
                 {confirmSignOut && (
-                  <div role="group" aria-label="确认退出所有设备">
-                    <p>所有设备包括本设备都会退出登录。项目与本地内容保留。</p>
+                  <div role="group" aria-label={t("confirmSignOutAll")}>
+                    <p>{t("signOutAllHelp")}</p>
                     <button
                       className="settings-button"
                       disabled={busy}
                       onClick={() => setConfirmSignOut(false)}
                     >
-                      取消
+                      {tc("cancel")}
                     </button>
                     <button
                       className="settings-button"
@@ -680,11 +684,11 @@ export default function SyncSettings() {
                             mode: "login",
                           });
                           setShowConnect(true);
-                          setMessage("所有设备已退出，请重新登录。");
+                          setMessage(t("toast.signedOutAll"));
                         })
                       }
                     >
-                      确认退出所有设备
+                      {t("confirmSignOutAll")}
                     </button>
                   </div>
                 )}
@@ -695,13 +699,17 @@ export default function SyncSettings() {
                 <div className="settings-row-text">
                   <h3>{session.device}</h3>
                   <p>
-                    {new Date(session.created_at).toLocaleString()} ·{" "}
+                    {new Date(session.created_at).toLocaleString(getLocale())} ·{" "}
                     {session.revoked
-                      ? "已撤销"
+                      ? t("session.revoked")
                       : new Date(session.expires_at).getTime() <= Date.now()
-                        ? "已到期"
-                        : `有效至 ${new Date(session.expires_at).toLocaleString()}`}
-                    {session.current ? " · 本设备" : ""}
+                        ? t("session.expired")
+                        : t("session.validUntil", {
+                            date: new Date(session.expires_at).toLocaleString(
+                              getLocale(),
+                            ),
+                          })}
+                    {session.current ? ` · ${t("session.thisDevice")}` : ""}
                   </p>
                 </div>
                 <button
@@ -719,7 +727,7 @@ export default function SyncSettings() {
                       });
                       if (session.current) {
                         setSessions(null);
-                        setMessage("本设备会话已撤销，请重新登录。");
+                        setMessage(t("toast.sessionRevoked"));
                       } else
                         setSessions(
                           await desktop.invoke("sync:sessions", {
@@ -729,7 +737,7 @@ export default function SyncSettings() {
                     })
                   }
                 >
-                  撤销 Token
+                  {t("revokeToken")}
                 </button>
               </div>
             ))}
@@ -743,7 +751,7 @@ export default function SyncSettings() {
         refresh={refresh}
       />
       <section className="settings-group">
-        <h2>加入共享项目</h2>
+        <h2>{t("joinShared")}</h2>
         <form
           className="sync-inline-form"
           onSubmit={(event) => {
@@ -768,8 +776,8 @@ export default function SyncSettings() {
           <input
             type="url"
             required
-            aria-label="项目邀请链接"
-            placeholder="粘贴项目邀请链接"
+            aria-label={t("inviteLinkLabel")}
+            placeholder={t("pasteInviteLink")}
             value={inviteLink}
             onChange={(event) => {
               setInviteLink(event.target.value);
@@ -777,15 +785,15 @@ export default function SyncSettings() {
             }}
           />
           <button className="settings-button" disabled={busy}>
-            查看邀请
+            {t("viewInvite")}
           </button>
         </form>
         {preview && (
           <div className="sync-invitation">
             <h3>{preview.name}</h3>
             <p>
-              {preview.serverName} · {preview.url} · 加入后为
-              {roles[preview.role]}
+              {preview.serverName} · {preview.url} ·{" "}
+              {t("joinAsRole", { role: role(preview.role) })}
             </p>
             {status.connections.some(
               (connection) => connection.serverId === preview.serverId,
@@ -816,23 +824,21 @@ export default function SyncSettings() {
                       });
                       setPreview(null);
                       setInviteLink("");
-                      setMessage("已加入项目，正在同步当前内容。");
+                      setMessage(t("toast.joinedSyncing"));
                     })
                   }
                 >
-                  确认加入项目
+                  {t("confirmJoin")}
                 </button>
               </div>
             ) : (
-              <p className="settings-help">
-                请在上方注册或登录此服务器，再确认加入。
-              </p>
+              <p className="settings-help">{t("signInBeforeJoin")}</p>
             )}
           </div>
         )}
       </section>
       <section className="settings-group">
-        <h2>项目存储与同步</h2>
+        <h2>{t("projectStorage")}</h2>
         {localProjects.map((project) => {
           const binding = status.projects.find(
               (item) => item.projectId === project.id,
@@ -849,8 +855,8 @@ export default function SyncSettings() {
                   <h3>{project.name}</h3>
                   <p>
                     {connection
-                      ? `${connection.name} · ${connection.user.name} · ${roles[binding!.role]} · ${states[binding!.status]}`
-                      : "保存在本机"}
+                      ? `${connection.name} · ${connection.user.name} · ${role(binding!.role)} · ${t(stateKeys[binding!.status])}`
+                      : t("storedLocally")}
                   </p>
                   {binding?.error && (
                     <p className="sync-error">{binding.error}</p>
@@ -859,7 +865,7 @@ export default function SyncSettings() {
                 {binding ? (
                   <>
                     <select
-                      aria-label={`${project.name}的同步账号`}
+                      aria-label={t("syncAccountFor", { name: project.name })}
                       value={binding.connectionId}
                       disabled={busy}
                       onChange={(event) =>
@@ -890,7 +896,7 @@ export default function SyncSettings() {
                         )
                       }
                     >
-                      立即同步
+                      {t("syncNow")}
                     </button>
                     {binding.role === "admin" && (
                       <button
@@ -905,7 +911,7 @@ export default function SyncSettings() {
                           )
                         }
                       >
-                        管理成员
+                        {t("manageMembers")}
                       </button>
                     )}
                     <button
@@ -919,7 +925,7 @@ export default function SyncSettings() {
                         )
                       }
                     >
-                      解除同步
+                      {t("detach")}
                     </button>
                   </>
                 ) : (
@@ -934,7 +940,7 @@ export default function SyncSettings() {
                           }),
                         );
                     },
-                    "连接到服务器",
+                    t("connectToServer"),
                   )
                 )}
               </div>
@@ -955,16 +961,14 @@ export default function SyncSettings() {
                     })
                   }
                 >
-                  查看双方修改
+                  {t("compareChanges")}
                 </button>
               )}
             </div>
           );
         })}
         {!localProjects.length && (
-          <p className="settings-help">
-            新建项目，或通过邀请加入项目后，会在这里显示存储连接。
-          </p>
+          <p className="settings-help">{t("noLocalProjects")}</p>
         )}
       </section>
       {panel && (
@@ -972,10 +976,10 @@ export default function SyncSettings() {
           key={panel}
           title={
             panel === "projects"
-              ? "服务器上的项目"
+              ? t("dialog.projects")
               : panel === "dashboard"
-                ? "项目管理"
-                : "查看双方修改"
+                ? t("manageProjects")
+                : t("compareChanges")
           }
           wide
           onClose={() => setPanel(null)}
@@ -998,7 +1002,7 @@ export default function SyncSettings() {
             )}
             {busy && (
               <p className="settings-help" role="status">
-                正在处理…
+                {t("processing")}
               </p>
             )}
             {panel === "projects" && (
@@ -1017,15 +1021,15 @@ export default function SyncSettings() {
                   }
                 </p>
                 {!busy && !error && !remote.length && (
-                  <p className="settings-help">该账号在服务器上还没有项目。</p>
+                  <p className="settings-help">{t("noRemoteProjects")}</p>
                 )}
                 {remote.map((project) => (
                   <div className="sync-connection" key={project.id}>
                     <div className="settings-row-text">
                       <h3>{project.name}</h3>
                       <p>
-                        {roles[project.role]}
-                        {project.archived ? " · 已归档" : ""}
+                        {role(project.role)}
+                        {project.archived ? ` · ${t("archived")}` : ""}
                       </p>
                     </div>
                     <button
@@ -1052,8 +1056,8 @@ export default function SyncSettings() {
                           binding.connectionId === server &&
                           binding.remoteProjectId === project.id,
                       )
-                        ? "已加入本地"
-                        : "加入本地"}
+                        ? t("addedLocally")
+                        : t("addLocally")}
                     </button>
                     {project.role === "admin" && (
                       <button
@@ -1063,7 +1067,7 @@ export default function SyncSettings() {
                           void run(() => loadDashboard(server, project.id))
                         }
                       >
-                        管理成员
+                        {t("manageMembers")}
                       </button>
                     )}
                   </div>
@@ -1094,14 +1098,17 @@ export default function SyncSettings() {
                       { connectionId: dashboard, name },
                     );
                     await loadDashboard(dashboard, project.id);
-                    setMessage(`已创建项目“${name}”。`);
+                    setMessage(t("toast.projectCreated", { name }));
                   })
                 }
-                onRole={(member, role) => {
+                onRole={(member, next) => {
                   void run(async () => {
-                    await manage("member", { userId: member.id, role });
+                    await manage("member", { userId: member.id, role: next });
                     setMessage(
-                      `已将 ${member.name} 的权限设为${roles[role]}。`,
+                      t("toast.roleChanged", {
+                        name: member.name,
+                        role: role(next),
+                      }),
                     );
                   });
                 }}
@@ -1112,7 +1119,7 @@ export default function SyncSettings() {
                       role: null,
                       revokeInvites,
                     });
-                    setMessage(`已将 ${member.name} 移出项目。`);
+                    setMessage(t("toast.memberRemoved", { name: member.name }));
                   })
                 }
                 onInviteRole={setInviteRole}
@@ -1131,10 +1138,10 @@ export default function SyncSettings() {
                     setGeneratedInviteExpiresAt(invitation.expiresAt);
                     setGeneratedInvitePolicy(
                       invitation.targetName
-                        ? `仅限账号 ${invitation.targetName}`
+                        ? t("policy.target", { name: invitation.targetName })
                         : invitation.maxUses != null
-                          ? `最多 ${invitation.maxUses} 个账号`
-                          : "不限账号数",
+                          ? t("policy.maxUses", { count: invitation.maxUses })
+                          : t("policy.unlimited"),
                     );
                   });
                 }}
@@ -1143,36 +1150,34 @@ export default function SyncSettings() {
                     await desktop.invoke("clipboard:write", {
                       text: generatedInvite,
                     });
-                    setMessage("邀请链接已复制。");
+                    setMessage(t("toast.inviteCopied"));
                   })
                 }
                 onRevoke={(digest) => {
                   void run(async () => {
                     await manage("revokeInvite", { digest });
-                    setMessage("邀请已撤销。");
+                    setMessage(t("toast.inviteRevoked"));
                   });
                 }}
                 onArchive={(archived) =>
                   run(async () => {
                     await manage("project", { archived });
                     setMessage(
-                      archived ? "项目已归档，可以随时恢复。" : "项目已恢复。",
+                      archived
+                        ? t("toast.projectArchived")
+                        : t("toast.projectRestored"),
                     );
                   })
                 }
               />
             )}
             {panel === "conflict" && !conflict && !busy && !error && (
-              <p className="settings-help">
-                当前项目已经没有待处理的同步冲突。
-              </p>
+              <p className="settings-help">{t("noConflicts")}</p>
             )}
             {panel === "conflict" && conflict && (
               <section className="settings-group sync-conflict">
-                <h2>处理同步冲突</h2>
-                <p className="settings-help">
-                  双方修改均已保留。为每个冲突选择保留的内容，然后发布合并版本。
-                </p>
+                <h2>{t("resolveConflicts")}</h2>
+                <p className="settings-help">{t("resolveConflictsHelp")}</p>
                 {conflict.files.map((file) => (
                   <div key={file.path}>
                     <h3>{file.path}</h3>
@@ -1193,10 +1198,10 @@ export default function SyncSettings() {
                               }
                             />
                             {side === "local"
-                              ? "保留本地"
+                              ? t("keepLocal")
                               : conflict.recovery
-                                ? "使用保留的合并草稿"
-                                : "使用服务器版本"}
+                                ? t("useMergeDraft")
+                                : t("useServerVersion")}
                           </label>
                           <pre>{conflictPreviews.get(file.path)?.[side]}</pre>
                         </div>
@@ -1221,13 +1226,13 @@ export default function SyncSettings() {
                       })
                     }
                   >
-                    保存合并并同步
+                    {t("saveMergeAndSync")}
                   </button>
                   <button
                     className="settings-button"
                     onClick={() => setPanel(null)}
                   >
-                    稍后处理
+                    {t("resolveLater")}
                   </button>
                 </div>
               </section>

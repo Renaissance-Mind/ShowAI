@@ -1,36 +1,51 @@
 import { createPortal } from "react-dom";
 import { useTableHover, tableControlPositions } from "./table-hover";
 import { AlignCenter, AlignLeft, AlignRight } from "../../ui/icons";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/blockHelpers";
 
 export type TableAlignment = "left" | "center" | "right";
+
+/**
+ * "table" for the whole table, a zero-based column index for one column. Any
+ * other string is an already translated scope name.
+ */
+export type AlignmentScope = "table" | number | string;
+
+const alignments = [
+  ["left", "Left", AlignLeft],
+  ["center", "Center", AlignCenter],
+  ["right", "Right", AlignRight],
+] as const;
 
 export function AlignmentButtons({
   scope,
   value,
   onChange,
 }: {
-  scope: string;
+  scope: AlignmentScope;
   value: string | null;
   onChange: (alignment: TableAlignment) => void;
 }) {
+  const t = useTranslator(messages);
+  const label = (suffix: "Group" | "Left" | "Center" | "Right") =>
+    scope === "table"
+      ? t(`align.table${suffix}`)
+      : typeof scope === "number"
+        ? t(`align.column${suffix}`, { column: scope + 1 })
+        : t(`align.scope${suffix}`, { scope });
   return (
     <div
       className="table-alignment-buttons"
       role="group"
-      aria-label={`${scope}对齐`}
+      aria-label={label("Group")}
     >
-      {(
-        [
-          ["left", "左对齐", AlignLeft],
-          ["center", "居中", AlignCenter],
-          ["right", "右对齐", AlignRight],
-        ] as const
-      ).map(([alignment, label, Icon]) => (
+      {alignments.map(([alignment, suffix, Icon]) => (
         <button
           key={alignment}
           type="button"
-          aria-label={`${scope}${label}`}
-          title={`${scope}${label}`}
+          aria-label={label(suffix)}
+          title={label(suffix)}
           aria-pressed={value === alignment}
           onMouseDown={(event) => event.preventDefault()}
           onClick={(event) => {
@@ -54,6 +69,7 @@ export function BasicTableControls({
   getAlignment: (column: number | null) => string | null;
   onChange: (column: number | null, value: TableAlignment) => void;
 }) {
+  const t = useTranslator(messages);
   const { target, setTarget, owner } = useTableHover(root);
   if (!target?.table.isConnected) return null;
   const positions = tableControlPositions(target, 98);
@@ -68,10 +84,10 @@ export function BasicTableControls({
         data-table-controls-owner={owner}
         style={positions.global}
         role={target.context ? "dialog" : undefined}
-        aria-label="表格对齐设置"
+        aria-label={t("align.settings")}
       >
         <AlignmentButtons
-          scope="表格"
+          scope="table"
           value={getAlignment(null)}
           onChange={(value) => align(null, value)}
         />
@@ -83,7 +99,7 @@ export function BasicTableControls({
           style={positions.column}
         >
           <AlignmentButtons
-            scope={`第 ${target.cell.cellIndex + 1} 列`}
+            scope={target.cell.cellIndex}
             value={getAlignment(target.cell.cellIndex)}
             onChange={(value) => align(target.cell!.cellIndex, value)}
           />

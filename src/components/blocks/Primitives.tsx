@@ -4,6 +4,9 @@ import "./katex.css";
 import "./research-media.css";
 import { safeImageUrl, text } from "./helpers";
 import type { BlockProps } from "./types";
+import { type MessageKey } from "../../i18n";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/primitives";
 
 import {
   validatePrimitiveData,
@@ -27,7 +30,14 @@ const appearance = (data: Record<string, unknown>): CSSProperties => ({
 export { RichText as TextBlock } from "../rich-text/RichText";
 import { RichText as TextBlock } from "../rich-text/RichText";
 
+const imageFields: [string, MessageKey<typeof messages>][] = [
+  ["src", "imageSrc"],
+  ["alt", "imageAlt"],
+  ["caption", "imageCaption"],
+];
+
 export function ImageBlock({ data, onChange, readOnly }: BlockProps) {
+  const t = useTranslator(messages);
   validatePrimitiveData("image", data);
   if (data.nativeInk)
     return (
@@ -40,7 +50,7 @@ export function ImageBlock({ data, onChange, readOnly }: BlockProps) {
     <figure
       className="sb-primitive sb-image"
       style={appearance(data)}
-      aria-label={text(data.alt) || "图像框"}
+      aria-label={text(data.alt) || t("imageFrame")}
     >
       {src ? (
         <img
@@ -55,17 +65,17 @@ export function ImageBlock({ data, onChange, readOnly }: BlockProps) {
           }}
         />
       ) : (
-        <div className="sb-image-empty">添加图片</div>
+        <div className="sb-image-empty">{t("addImage")}</div>
       )}
       {text(data.caption) && <figcaption>{text(data.caption)}</figcaption>}
       {!readOnly && onChange && (
         <details className="sb-primitive-editor">
-          <summary>编辑图片</summary>
-          {["src", "alt", "caption"].map((key, i) => (
+          <summary>{t("editImage")}</summary>
+          {imageFields.map(([key, label]) => (
             <label key={key}>
-              {["图片地址", "替代文字", "图注"][i]}
+              {t(label)}
               <input
-                aria-label={["图片地址", "替代文字", "图注"][i]}
+                aria-label={t(label)}
                 value={text(data[key])}
                 onChange={(event) =>
                   onChange({ ...data, [key]: event.target.value })
@@ -80,6 +90,7 @@ export function ImageBlock({ data, onChange, readOnly }: BlockProps) {
 }
 
 export function TableBlock({ data, onChange, readOnly }: BlockProps) {
+  const t = useTranslator(messages);
   validatePrimitiveData("table", data);
   const columns = (data.columns ?? []) as string[];
   const rows = (data.rows ?? []) as (string | number | boolean)[][];
@@ -105,7 +116,7 @@ export function TableBlock({ data, onChange, readOnly }: BlockProps) {
       ref={setTableRoot}
       className={`sb-primitive sb-table${editable ? " is-editable" : ""}`}
       style={appearance(data)}
-      aria-label={text(data.title) || "基础表格"}
+      aria-label={text(data.title) || t("table")}
     >
       {text(data.title) && <h3>{text(data.title)}</h3>}
       <div className="sb-table-frame">
@@ -115,7 +126,9 @@ export function TableBlock({ data, onChange, readOnly }: BlockProps) {
           role={minimumWidth ? "region" : undefined}
           aria-label={
             minimumWidth
-              ? `${text(data.title) || "对照表"}：左右滚动查看全部列`
+              ? t("scrollTable", {
+                  title: text(data.title) || t("comparisonTable"),
+                })
               : undefined
           }
         >
@@ -131,7 +144,7 @@ export function TableBlock({ data, onChange, readOnly }: BlockProps) {
                       column
                     ) : (
                       <input
-                        aria-label={`列 ${i + 1} 名称`}
+                        aria-label={t("columnName", { column: i + 1 })}
                         value={column}
                         onChange={(event) =>
                           onChange({
@@ -159,7 +172,7 @@ export function TableBlock({ data, onChange, readOnly }: BlockProps) {
                         String(cell)
                       ) : (
                         <input
-                          aria-label={`第 ${i + 1} 行第 ${j + 1} 列`}
+                          aria-label={t("cell", { row: i + 1, column: j + 1 })}
                           value={String(cell)}
                           onChange={(event) => edit(i, j, event.target.value)}
                         />
@@ -196,13 +209,13 @@ export function TableBlock({ data, onChange, readOnly }: BlockProps) {
               onChange({ ...data, rows: [...rows, columns.map(() => "")] })
             }
           >
-            添加行
+            {t("addRow")}
           </button>
           <button
             disabled={!rows.length}
             onClick={() => onChange({ ...data, rows: rows.slice(0, -1) })}
           >
-            移除末行
+            {t("removeLastRow")}
           </button>
         </div>
       )}
@@ -211,6 +224,7 @@ export function TableBlock({ data, onChange, readOnly }: BlockProps) {
 }
 
 export function CalloutBlock({ data, onChange, readOnly }: BlockProps) {
+  const t = useTranslator(messages);
   return (
     <aside
       className="sb-primitive sb-callout"
@@ -220,7 +234,7 @@ export function CalloutBlock({ data, onChange, readOnly }: BlockProps) {
         padding: "14px 18px",
         ...appearance(data),
       }}
-      aria-label={text(data.title) || "提示框"}
+      aria-label={text(data.title) || t("callout")}
     >
       {text(data.title) && <strong>{text(data.title)}</strong>}
       <TextBlock
@@ -239,13 +253,14 @@ export function CalloutBlock({ data, onChange, readOnly }: BlockProps) {
   );
 }
 export function ToggleBlock({ data, onChange, readOnly }: BlockProps) {
+  const t = useTranslator(messages);
   return (
     <details
       className="sb-primitive sb-toggle"
       style={appearance(data)}
       open={data.open === true || undefined}
     >
-      <summary>{text(data.summary) || "展开内容"}</summary>
+      <summary>{text(data.summary) || t("toggleSummary")}</summary>
       <TextBlock
         data={{
           content: data.content,
@@ -274,11 +289,12 @@ export function DividerBlock({ data }: BlockProps) {
   );
 }
 export function CodeBlock({ data, onChange, readOnly }: BlockProps) {
+  const t = useTranslator(messages);
   return (
     <section
       className="sb-primitive sb-code"
       style={appearance(data)}
-      aria-label="代码块"
+      aria-label={t("code")}
     >
       <pre>
         <code
@@ -291,7 +307,7 @@ export function CodeBlock({ data, onChange, readOnly }: BlockProps) {
       </pre>
       {!readOnly && onChange && (
         <textarea
-          aria-label="代码内容"
+          aria-label={t("codeContent")}
           value={text(data.content)}
           onChange={(event) =>
             onChange({ ...data, content: event.target.value })

@@ -1,6 +1,10 @@
 import { chooseLocalPath, type FileDialogOptions } from "./FileDialog";
 import type { DesktopChange, DesktopResponse } from "../desktop/bridge";
 import type { LoadedPage } from "../studio/usePage";
+import { translator } from "../i18n";
+import messages from "../i18n/messages/files";
+
+const t = translator(messages);
 
 declare global {
   interface Window {
@@ -14,6 +18,8 @@ export function installBrowserBridge() {
   const listeners = new Set<(change: DesktopChange) => void>();
   const closeListeners = new Set<() => Promise<boolean>>();
   let dirty = false;
+  // Lets the server skip echoing this tab's own saves back to it.
+  const client = crypto.randomUUID();
   async function request<T>(
     route: string,
     args: Record<string, unknown>,
@@ -23,6 +29,7 @@ export function installBrowserBridge() {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${config!.token}`,
+        "X-ShowAI-Client": client,
       },
       body: JSON.stringify(args),
     });
@@ -32,7 +39,7 @@ export function installBrowserBridge() {
         true
     )
       throw new Error(
-        `本地服务请求失败（${response.status}），请确认 ShowAI 服务仍在运行。`,
+        t("requestFailed", { status: response.status }),
       );
     const result = (await response.json()) as DesktopResponse<T>;
     if (!result.ok) throw result.error;
@@ -50,7 +57,7 @@ export function installBrowserBridge() {
       "popup,width=1120,height=880",
     );
     if (!opened)
-      throw new Error("新窗口被浏览器拦截，请允许此站点打开弹出式窗口后重试。");
+      throw new Error(t("popupBlocked"));
     opened.opener = null;
     try {
       if (prepare && !(await prepare())) {
@@ -58,7 +65,7 @@ export function installBrowserBridge() {
         return null;
       }
       const result = await request<T>("invoke", { action, args });
-      if (opened.closed) throw new Error("新窗口已关闭，请重新打开。");
+      if (opened.closed) throw new Error(t("popupClosed"));
       opened.location.replace((result as { url: string }).url);
       return result;
     } catch (error) {
@@ -80,18 +87,18 @@ export function installBrowserBridge() {
       return (await openWindow<T>(action, args)) as T;
     const dialogs: Record<string, FileDialogOptions> = {
       "dialog:openPage": {
-        title: "导入 ShowAI 页面",
+        title: t("title.importPage"),
         kind: "file",
         extensions: ["json", "html", "htm", "md", "markdown", "txt"],
       },
-      "components:import": { title: "选择组件源码目录", kind: "directory" },
+      "components:import": { title: t("title.componentSource"), kind: "directory" },
       "catalog:preparePublish": {
-        title: "选择发布包保存位置",
+        title: t("title.publishPackage"),
         kind: "directory",
       },
-      "export:site": { title: "选择网站输出目录", kind: "directory" },
+      "export:site": { title: t("title.siteOutput"), kind: "directory" },
       "settings:chooseHome": {
-        title: "选择 ShowAI 数据目录",
+        title: t("title.dataDirectory"),
         kind: "directory",
       },
     };
@@ -104,7 +111,7 @@ export function installBrowserBridge() {
         .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
         .slice(0, 100);
       dialogs[action] = {
-        title: "导出页面",
+        title: t("title.exportPage"),
         kind: "save",
         defaultName: `${name}${args.format === "json" ? ".showai.json" : ".html"}`,
       };
@@ -127,7 +134,7 @@ export function installBrowserBridge() {
   // frame would exhaust the browser's connections to this loopback host.
   if (!new URLSearchParams(location.search).has("componentPreview")) {
     const events = new EventSource(
-      `/api/events?token=${encodeURIComponent(config.token)}`,
+      `/api/events?token=${encodeURIComponent(config.token)}&client=${client}`,
     );
     events.onmessage = (event) => {
       const change = JSON.parse(event.data) as DesktopChange;
@@ -157,6 +164,9 @@ export function installBrowserBridge() {
       return (await openWindow("app:openWindow", args, prepare)) !== null;
     },
     invoke,
+    async setLocale(locale) {
+      await request("locale", { locale });
+    },
     onChange(listener) {
       listeners.add(listener);
       return () => {

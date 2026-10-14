@@ -3,6 +3,9 @@ import { createRoot } from "react-dom/client";
 import { ArrowUp, File, Folder, Loader2, Plus } from "../ui/icons";
 import Dialog from "../studio/Dialog";
 import { errorMessage } from "../studio/bridge";
+import messages from "../i18n/messages/files";
+import common from "../i18n/messages/common";
+import { useTranslator } from "../i18n/react";
 import "./browser.css";
 
 interface Entry {
@@ -14,7 +17,7 @@ interface Listing {
   path: string;
   parent: string;
   separator: string;
-  shortcuts: { name: string; path: string }[];
+  shortcuts: { id?: "home" | "library" | "downloads"; name: string; path: string }[];
   entries: Entry[];
 }
 export interface FileDialogOptions {
@@ -57,6 +60,8 @@ function FileDialog({
   request: LocalRequest;
   finish: (path: string | null) => void;
 }) {
+  const t = useTranslator(messages);
+  const tc = useTranslator(common);
   const [listing, setListing] = useState<Listing | null>(null);
   const [pathInput, setPathInput] = useState(options.initialPath ?? "");
   const [name, setName] = useState(options.defaultName ?? "");
@@ -118,12 +123,12 @@ function FileDialog({
         name === "." ||
         name === ".."
       ) {
-        setError("请填写文件名，文件名中不能包含路径分隔符。");
+        setError(t("invalidFileName"));
         return;
       }
       const existing = listing.entries.find((entry) => entry.name === name);
       if (existing?.directory) {
-        setError("这个名称已用于文件夹，请使用其他文件名。");
+        setError(t("nameUsedByFolder"));
         return;
       }
       if (existing && !overwrite) {
@@ -151,21 +156,21 @@ function FileDialog({
           <button
             className="studio-icon"
             type="button"
-            aria-label="上一级目录"
+            aria-label={t("parentDirectory")}
             disabled={!listing || loading || listing.path === listing.parent}
             onClick={() => void navigate(listing!.parent)}
           >
             <ArrowUp size={16} />
           </button>
           <input
-            aria-label="本地目录路径"
+            aria-label={t("directoryPath")}
             disabled={loading}
             value={pathInput}
             onChange={(event) => setPathInput(event.target.value)}
-            placeholder="输入本地目录路径"
+            placeholder={t("directoryPathPlaceholder")}
           />
           <button className="studio-button small" disabled={loading}>
-            前往
+            {t("go")}
           </button>
         </form>
         <div className="local-file-shortcuts">
@@ -176,7 +181,7 @@ function FileDialog({
               disabled={loading}
               onClick={() => void navigate(item.path)}
             >
-              {item.name}
+              {item.id ? t(`shortcut.${item.id}`) : item.name}
             </button>
           ))}
           <button
@@ -185,7 +190,7 @@ function FileDialog({
             onClick={() => setNewFolder("")}
           >
             <Plus size={13} />
-            新建文件夹
+            {t("newFolder")}
           </button>
         </div>
         {newFolder !== null && (
@@ -209,7 +214,7 @@ function FileDialog({
             }}
           >
             <input
-              aria-label="新文件夹名称"
+              aria-label={t("newFolderName")}
               autoFocus
               value={newFolder}
               onChange={(event) => setNewFolder(event.target.value)}
@@ -218,26 +223,26 @@ function FileDialog({
               className="studio-button small"
               disabled={!newFolder.trim() || loading}
             >
-              创建
+              {tc("create")}
             </button>
             <button
               className="studio-button small"
               type="button"
               onClick={() => setNewFolder(null)}
             >
-              取消
+              {tc("cancel")}
             </button>
           </form>
         )}
         <div
           className="local-file-entries"
-          aria-label="本地文件列表"
+          aria-label={t("fileList")}
           aria-busy={loading}
         >
           {loading ? (
             <div className="local-file-empty">
               <Loader2 size={20} className="studio-spin" />
-              正在读取目录
+              {t("readingDirectory")}
             </div>
           ) : entries.length ? (
             entries.map((entry) => (
@@ -264,16 +269,16 @@ function FileDialog({
           ) : (
             <p className="local-file-empty">
               {options.kind === "directory"
-                ? "没有子文件夹，可以选择当前目录"
-                : "没有符合类型的文件"}
+                ? t("noSubfolders")
+                : t("noMatchingFiles")}
             </p>
           )}
         </div>
         {options.kind === "save" && (
           <label className="local-file-name">
-            文件名
+            {t("fileName")}
             <input
-              aria-label="导出文件名"
+              aria-label={t("exportFileName")}
               value={name}
               onChange={(event) => {
                 setName(event.target.value);
@@ -292,7 +297,7 @@ function FileDialog({
         )}
         {overwrite && (
           <p role="alert" className="studio-form-error">
-            「{name}」已存在。继续保存将覆盖这个文件。
+            {t("overwriteWarning", { name })}
           </p>
         )}
         <footer className="local-file-footer">
@@ -302,7 +307,7 @@ function FileDialog({
               : selected?.name}
           </span>
           <button className="studio-button" onClick={cancel}>
-            取消
+            {tc("cancel")}
           </button>
           <button
             className="studio-button primary"
@@ -315,12 +320,12 @@ function FileDialog({
             onClick={confirm}
           >
             {overwrite
-              ? "覆盖并保存"
+              ? t("overwriteAndSave")
               : options.kind === "save"
-                ? "保存"
+                ? tc("save")
                 : options.kind === "directory"
-                  ? "选择目录"
-                  : "打开"}
+                  ? t("chooseDirectory")
+                  : tc("open")}
           </button>
         </footer>
       </div>

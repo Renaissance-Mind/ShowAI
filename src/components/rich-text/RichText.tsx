@@ -5,6 +5,8 @@ import type { RichTextEditorProps } from "./RichTextEditor";
 const RichTextEditor = /* @__PURE__ */ lazy(() => import("./RichTextEditor"));
 import { RichTextNode } from "./RichTextView";
 import { RichTextEnvironment } from "./environment";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/richText";
 import {
   richTextDocument,
   validateRichTextData,
@@ -33,6 +35,7 @@ export function RichText({
   readOnly,
   host,
 }: BlockProps & { host?: RichTextHost }) {
+  const t = useTranslator(messages);
   validateRichTextData(data);
   const content = useMemo(
     () =>
@@ -48,11 +51,11 @@ export function RichText({
     <section
       className="sb-primitive sb-text rich-text-component"
       data-component-kind="text"
-      aria-label="富文本"
+      aria-label={t("region")}
       style={style}
     >
       {editable ? (
-        <Suspense fallback={<div role="status">正在打开富文本…</div>}>
+        <Suspense fallback={<div role="status">{t("opening")}</div>}>
           <RichTextEditor
             {...host}
             trailingNode={!host?.continuousPage}

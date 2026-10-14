@@ -425,7 +425,7 @@ export function groupObjects<T extends ShowDocument>(
   ids: string[],
   bounds: Box,
   contentOffset: { x: number; y: number },
-  name = "区域",
+  name = "区域", // i18n-exempt: default region name saved into documents
 ): { document: T; id: string } | null {
   const index = indexSurfaceTree(source.content),
     roots = selectionRoots(index, ids),

@@ -9,8 +9,11 @@ import {
   Trash2,
 } from "../../ui/icons";
 import { finite, text } from "./helpers";
-import { BlockHeader, EmptyState, Field } from "./shared";
+import { BlockHeader, EmptyState, Field, blockLabel } from "./shared";
 import type { BlockProps } from "./types";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/metrics";
+import common from "../../i18n/messages/common";
 
 interface Metric {
   label: string;
@@ -20,6 +23,8 @@ interface Metric {
   trend?: number;
 }
 export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
+  const t = useTranslator(messages);
+  const tc = useTranslator(common);
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftItems, setDraftItems] = useState<Metric[]>([]);
@@ -39,11 +44,11 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
   return (
     <section
       className="sb-block sb-metrics"
-      aria-label={text(data.title) || "关键指标"}
+      aria-label={blockLabel(data.title, t("metrics"))}
     >
       <BlockHeader
         title={text(data.title)}
-        defaultTitle="关键指标"
+        defaultTitle={t("metrics")}
         icon={<Gauge size={17} />}
         editable={editable}
         editing={editing}
@@ -52,7 +57,7 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
       {editing && (
         <BlockSettings>
           <div className="sb-editor-panel">
-            <Field label="标题">
+            <Field label={t("title")}>
               <input
                 value={draftTitle}
                 onChange={(event) => setDraftTitle(event.target.value)}
@@ -62,7 +67,7 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
               {draftItems.map((item, index) => (
                 <div className="sb-metric-editor" key={index}>
                   <div className="sb-form-row">
-                    <Field label="名称">
+                    <Field label={t("name")}>
                       <input
                         value={item.label}
                         onChange={(event) =>
@@ -70,7 +75,7 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
                         }
                       />
                     </Field>
-                    <Field label="数值">
+                    <Field label={t("value")}>
                       <input
                         value={item.value}
                         onChange={(event) =>
@@ -78,7 +83,7 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
                         }
                       />
                     </Field>
-                    <Field label="单位">
+                    <Field label={t("unit")}>
                       <input
                         value={item.unit ?? ""}
                         onChange={(event) =>
@@ -88,7 +93,7 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
                     </Field>
                   </div>
                   <div className="sb-form-row">
-                    <Field label="说明">
+                    <Field label={t("detail")}>
                       <input
                         value={item.detail ?? ""}
                         onChange={(event) =>
@@ -96,7 +101,7 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
                         }
                       />
                     </Field>
-                    <Field label="变化率 %（可留空）">
+                    <Field label={t("trend")}>
                       <input
                         type="number"
                         value={item.trend ?? ""}
@@ -113,7 +118,7 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
                     <button
                       type="button"
                       className="sb-icon-button sb-danger"
-                      aria-label={`删除指标${item.label}`}
+                      aria-label={t("deleteMetric", { label: item.label })}
                       onClick={() =>
                         setDraftItems((current) =>
                           current.filter(
@@ -135,12 +140,12 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
                 onClick={() =>
                   setDraftItems((current) => [
                     ...current,
-                    { label: "新指标", value: "" },
+                    { label: t("newMetric"), value: "" },
                   ])
                 }
               >
                 <Plus size={14} />
-                添加指标
+                {t("addMetric")}
               </button>
               <button
                 type="button"
@@ -160,7 +165,7 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
                 }}
               >
                 <Check size={14} />
-                保存
+                {tc("save")}
               </button>
             </div>
           </div>
@@ -196,12 +201,12 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
       ) : (
         <EmptyState
           icon={<Gauge size={28} strokeWidth={1.4} />}
-          title="把关键数字放在眼前"
+          title={t("emptyTitle")}
           action={
             editable && !editing ? (
               <button type="button" className="sb-button" onClick={openEditor}>
                 <Plus size={14} />
-                添加指标
+                {t("addMetric")}
               </button>
             ) : undefined
           }

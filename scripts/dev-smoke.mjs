@@ -17,6 +17,9 @@ import { promisify } from "node:util";
 import { chromium } from "playwright";
 import { releaseTestFixtures } from "./test-fixtures.mjs";
 
+// The smoke checks select controls by their Chinese labels.
+process.env.SHOWAI_LANGUAGE ??= "zh-CN";
+
 const root = resolve(import.meta.dirname, "..");
 const parent = join(root, "output/playwright");
 await mkdir(parent, { recursive: true });
@@ -148,7 +151,7 @@ try {
   let page =
     mode === "desktop"
       ? browser.contexts()[0].pages()[0]
-      : await browser.newPage();
+      : await browser.newPage({ locale: "zh-CN" });
   debugPage = page;
   page.on("pageerror", (error) => {
     logs += `\nRenderer error: ${error.message}\n`;
@@ -262,7 +265,7 @@ try {
   }
   if (mode === "desktop") {
     observer = await chromium.launch({ headless: true });
-    const tab = await observer.newPage();
+    const tab = await observer.newPage({ locale: "zh-CN" });
     await tab.goto(original.url);
     await tab.locator("[data-showai-development]").waitFor();
     assert.equal(await tab.evaluate(() => typeof window.showai), "undefined");
@@ -770,7 +773,7 @@ try {
   const warmPage =
     mode === "desktop"
       ? browser.contexts()[0].pages()[0]
-      : await browser.newPage();
+      : await browser.newPage({ locale: "zh-CN" });
   debugPage = warmPage;
   if (mode === "browser") await warmPage.goto(warm.url);
   await warmPage.waitForFunction(() => !!window.showai);

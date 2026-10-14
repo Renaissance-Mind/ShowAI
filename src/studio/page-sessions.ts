@@ -1,11 +1,18 @@
 import type { DesktopChange } from "../desktop/bridge";
 import {
   createPageSession,
+  type LoadedPage,
   type PageSession,
   type PageSessionOptions,
 } from "./page-session";
 import type { SurfaceEditorState } from "../surface/SurfaceEditor";
 import type { WorkspaceEditorState } from "../editor/workspace-editor";
+import { translator } from "../i18n";
+import commonMessages from "../i18n/messages/common";
+import pageSessionMessages from "../i18n/messages/pageSession";
+
+const t = translator(pageSessionMessages);
+const common = translator(commonMessages);
 
 export interface PageViewSession {
   key: string;
@@ -35,6 +42,9 @@ export class PageSessions {
   private pages = new Map<string, PageSession>();
   private viewStates = new Map<string, PageViewSession>();
   private listeners = new Set<() => void>();
+  private savedListeners = new Set<
+    (projectId: string, record: LoadedPage) => void
+  >();
   private stale = new Map<PageSession, number>();
   private changedComponents = new Set<PageSession>();
   private refreshTimer?: ReturnType<typeof setTimeout>;
@@ -61,6 +71,15 @@ export class PageSessions {
       this.listeners.delete(listener);
     };
   };
+  /** Every retained page reports its successful saves, including background tabs. */
+  subscribeSaved = (
+    listener: (projectId: string, record: LoadedPage) => void,
+  ) => {
+    this.savedListeners.add(listener);
+    return () => {
+      this.savedListeners.delete(listener);
+    };
+  };
   private publish(patch: Partial<WorkspaceSnapshot> = {}) {
     if (this.disposed) return;
     const issues = [...new Set(this.pages.values())].flatMap((session) => {
@@ -70,7 +89,7 @@ export class PageSessions {
             {
               projectId: state.projectId,
               pageId: state.draft.id,
-              title: state.draft.title || "无标题",
+              title: state.draft.title || common("untitled"),
               error: state.error,
             },
           ]
@@ -91,7 +110,7 @@ export class PageSessions {
         (session) => session.isDirty() && !session.isDurable(),
       )
     )
-      throw new Error("切换内容库前需要可靠保留所有页面草稿。");
+      throw new Error(t("keepDraftsBeforeSwitch"));
     for (const session of new Set(this.pages.values())) session.dispose();
     this.pages.clear();
     this.viewStates.clear();
@@ -202,6 +221,10 @@ export class PageSessions {
       const home = this.home;
       session = createPageSession({
         ...this.options,
+        onSaved: (projectId, record) => {
+          for (const listener of this.savedListeners)
+            listener(projectId, record);
+        },
         invoke: (action, args) =>
           this.options.invoke(action, { ...args, expectedHome: home }),
       });

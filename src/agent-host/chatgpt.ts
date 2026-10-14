@@ -13,6 +13,10 @@ import {
   writeProtected,
   type HostedCredentialBroker,
 } from "./storage";
+import { translator, getLocale } from "../i18n";
+import agentHostMessages from "../i18n/messages/agentHost";
+
+const t = translator(agentHostMessages);
 
 const issuer = "https://auth.openai.com",
   resource = "https://api.openai.com/v1";
@@ -94,7 +98,9 @@ async function tokenRequest(params: URLSearchParams) {
   const data = (await response.json()) as Record<string, any>;
   if (!response.ok || typeof data.access_token !== "string")
     throw new Error(
-      `ChatGPT 授权失败：${data.error_description ?? data.error ?? response.status}`,
+      t("chatgpt.authFailed", {
+        reason: data.error_description ?? data.error ?? response.status,
+      }),
     );
   return data;
 }
@@ -117,11 +123,10 @@ export class ChatGptConnection {
     return readOptional<SavedCredentials>(this.path(id));
   }
   async start(id: string) {
-    if (this.listener)
-      throw new Error("已有 ChatGPT 授权正在进行，请完成或取消后重试。");
+    if (this.listener) throw new Error(t("chatgpt.inProgress"));
     const saved = await this.credentials(id);
     if (saved?.refreshOwner === "server")
-      throw new Error("这份授权由服务器管理，请在服务器连接中重新授权。");
+      throw new Error(t("chatgpt.serverManaged"));
     let host = await readOptional<{ id: string }>(
       join(this.root, "chatgpt-host.json"),
     );
@@ -153,7 +158,7 @@ export class ChatGptConnection {
         if (error)
           throw new Error(
             error === "access_denied"
-              ? "已取消 ChatGPT 授权。"
+              ? t("chatgpt.cancelled")
               : `ChatGPT authorization failed: ${error}`,
           );
         const code = callback.searchParams.get("code"),
@@ -189,7 +194,7 @@ export class ChatGptConnection {
           nonce,
         );
         if (saved && saved.subject !== identity.subject)
-          throw new Error("授权账号与已选择的连接不一致。");
+          throw new Error(t("chatgpt.accountMismatch"));
         const credentials: ChatGptCredentials = {
           refreshOwner: "local",
           clientId,
@@ -214,7 +219,7 @@ export class ChatGptConnection {
             "default-src 'none'; style-src 'unsafe-inline'",
         });
         response.end(
-          "<!doctype html><html lang=zh><meta charset=utf-8><title>ShowAI</title><body style='font:18px system-ui;padding:48px'><h1>已连接 ChatGPT</h1><p>可以关闭此页面，返回 ShowAI。</p></body></html>",
+          `<!doctype html><html lang=${getLocale()}><meta charset=utf-8><title>ShowAI</title><body style='font:18px system-ui;padding:48px'><h1>${t("chatgpt.connectedTitle")}</h1><p>${t("chatgpt.connectedBody")}</p></body></html>`,
         );
       };
       void complete()
@@ -224,7 +229,7 @@ export class ChatGptConnection {
             "content-type": "text/plain; charset=utf-8",
             "cache-control": "no-store",
           });
-          response.end("授权未完成，请返回 ShowAI 查看原因并重试。");
+          response.end(t("chatgpt.callbackFailed"));
         })
         .finally(() => this.close());
     });
@@ -238,7 +243,7 @@ export class ChatGptConnection {
     redirectUri = `http://127.0.0.1:${address.port}/auth/callback`;
     this.timeout = setTimeout(
       () => {
-        this.state = { state: "failed", error: "授权等待已超时，请重新连接。" };
+        this.state = { state: "failed", error: t("chatgpt.timedOut") };
         this.close();
       },
       5 * 60 * 1000,
@@ -272,13 +277,13 @@ export class ChatGptConnection {
   }
   async accessToken(id: string, force = false): Promise<string> {
     const saved = await this.credentials(id);
-    if (!saved) throw new Error("请先连接 ChatGPT 账号。");
+    if (!saved) throw new Error(t("chatgpt.connectFirst"));
     if (saved.refreshOwner === "server") {
-      if (!this.broker) throw new Error("服务器凭据管理尚未连接。");
+      if (!this.broker) throw new Error(t("credentials.notConnected"));
       return (await this.broker.accessToken(saved.connectionId, force)).token;
     }
     if (!saved.scopes.includes("chatgpt.tokens.use.direct"))
-      throw new Error("请重新连接 ChatGPT 并授权使用套餐。");
+      throw new Error(t("chatgpt.reauthorizePlan"));
     if (!force && saved.expiresAt > Date.now() + 60000)
       return saved.accessToken;
     let active = this.refreshing.get(id);
@@ -295,9 +300,9 @@ export class ChatGptConnection {
       this.root,
       async () => {
         const latest = await this.credentials(id);
-        if (!latest) throw new Error("ChatGPT 连接已断开。");
+        if (!latest) throw new Error(t("chatgpt.disconnected"));
         if (latest.refreshOwner === "server") {
-          if (!this.broker) throw new Error("服务器凭据管理尚未连接。");
+          if (!this.broker) throw new Error(t("credentials.notConnected"));
           return (await this.broker.accessToken(latest.connectionId)).token;
         }
         if (
@@ -306,8 +311,7 @@ export class ChatGptConnection {
         )
           return latest.accessToken;
         saved = latest;
-        if (!saved.refreshToken)
-          throw new Error("ChatGPT 授权已过期，请重新连接。");
+        if (!saved.refreshToken) throw new Error(t("chatgpt.expired"));
         const data = await tokenRequest(
           new URLSearchParams({
             grant_type: "refresh_token",
@@ -336,15 +340,14 @@ export class ChatGptConnection {
     const saved = await this.credentials(id);
     if (!saved) return;
     if (saved.refreshOwner === "server") {
-      if (!this.broker) throw new Error("服务器凭据管理尚未连接。");
+      if (!this.broker) throw new Error(t("credentials.notConnected"));
       await this.broker.disconnect(saved.connectionId);
     } else if (saved.refreshToken) {
       const discovery = await fetch(
         issuer + "/.well-known/openid-configuration",
         { signal: AbortSignal.timeout(30000) },
       );
-      if (!discovery.ok)
-        throw new Error("无法获取 ChatGPT 撤销入口，请稍后重试。");
+      if (!discovery.ok) throw new Error(t("chatgpt.revocationUnavailable"));
       const document = (await discovery.json()) as {
         revocation_endpoint?: string;
       };
@@ -363,7 +366,7 @@ export class ChatGptConnection {
         signal: AbortSignal.timeout(30000),
       });
       if (!response.ok)
-        throw new Error(`ChatGPT 撤销授权失败：HTTP ${response.status}`);
+        throw new Error(t("chatgpt.revokeFailed", { status: response.status }));
     }
     await writeProtected(this.path(id), null);
   }

@@ -1,5 +1,5 @@
 import { BlockActions, BlockSettings } from "./action-host";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, Download } from "../../ui/icons";
 import { BlockHeader, Field } from "./shared";
 import { GestureBoundary } from "./GestureBoundary";
@@ -9,7 +9,20 @@ import { createG2Context } from "./g2/engine.js";
 import { validateG2Data } from "./g2/contract.mjs";
 import licenses from "./g2/licenses.json";
 import type { BlockProps } from "./types";
+import type { MessageKey } from "../../i18n";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/g2";
 import "./g2-chart.css";
+
+const interactions: [string, MessageKey<typeof messages>][] = [
+  ["tooltip", "interaction.tooltip"],
+  ["elementHighlight", "interaction.elementHighlight"],
+  ["elementSelect", "interaction.elementSelect"],
+  ["brushHighlight", "interaction.brushHighlight"],
+  ["brushFilter", "interaction.brushFilter"],
+  ["legendFilter", "interaction.legendFilter"],
+];
+const licenseAttribute = JSON.stringify(licenses);
 
 export function G2ChartBlock({
   chartType,
@@ -17,6 +30,7 @@ export function G2ChartBlock({
   onChange,
   readOnly,
 }: BlockProps & { chartType: string }) {
+  const t = useTranslator(messages);
   const plot = useRef<HTMLDivElement>(null);
   const lock = useViewportLock("g2");
   const [error, setError] = useState("");
@@ -51,7 +65,7 @@ export function G2ChartBlock({
     : ["#120A8F", "#6653CF", "#9A89ED", "#EA8A3B", "#53A7A1"];
   const updateDraft = (next: Record<string, unknown>) => {
     if (!draftValue) {
-      setDraftError("请先修正 JSON 格式，再调整设置。");
+      setDraftError(t("fixJsonFirst"));
       return;
     }
     setDraft(JSON.stringify({ ...draftValue, ...next }, null, 2));
@@ -123,6 +137,11 @@ export function G2ChartBlock({
       current?.destroy();
     };
   }, [chartType, data, theme, lock.locked]);
+  // Editor commits re-render every block; serialize the raw view only on data changes.
+  const rawData = useMemo(
+    () => JSON.stringify(data.datasets, null, 2),
+    [data.datasets],
+  );
   const open = () => {
     baseline.current = JSON.stringify(data);
     setDraft(JSON.stringify(data, null, 2));
@@ -131,9 +150,7 @@ export function G2ChartBlock({
   };
   const save = () => {
     if (JSON.stringify(data) !== baseline.current) {
-      setDraftError(
-        "图表已被其他修改更新。草稿已保留，请关闭设置后重新读取并合并。",
-      );
+      setDraftError(t("changedElsewhere"));
       return;
     }
     let next: Record<string, unknown>;
@@ -142,7 +159,7 @@ export function G2ChartBlock({
       validateG2Data(next);
     } catch (caught) {
       setDraftError(
-        caught instanceof Error ? caught.message : "数据格式不正确。",
+        caught instanceof Error ? caught.message : t("invalidData"),
       );
       return;
     }
@@ -171,12 +188,12 @@ export function G2ChartBlock({
       data-viewport-lock-scope="g2"
       data-viewport-locked={hasViewportInteraction && lock.locked}
       className={"sb-block sb-g2-chart" + (theme === "dark" ? " is-dark" : "")}
-      aria-label={text(data.title, "图表")}
+      aria-label={text(data.title, t("chart"))}
       data-g2-type={chartType}
-      data-third-party-licenses={JSON.stringify(licenses)}
+      data-third-party-licenses={licenseAttribute}
     >
       <BlockHeader
-        title={text(data.title, "图表")}
+        title={text(data.title)}
         description={text(data.description)}
         icon={<BarChart3 size={18} />}
         editable={editable}
@@ -186,8 +203,8 @@ export function G2ChartBlock({
         <button
           type="button"
           className="sb-icon-button"
-          aria-label="下载图表 SVG"
-          title="下载图表 SVG"
+          aria-label={t("downloadSvg")}
+          title={t("downloadSvg")}
           disabled={!ready}
           onClick={exportSvg}
         >
@@ -197,26 +214,26 @@ export function G2ChartBlock({
       {hasViewportInteraction && (
         <ViewportLockButton
           {...lock}
-          label="图表"
-          unlockDescription="允许框选、拖动等图表交互"
+          label={t("chart")}
+          unlockDescription={t("unlockDescription")}
         />
       )}
       <BlockActions>
         <div className="sb-g2-toolbar">
           <label>
-            主题{" "}
+            {t("theme")}{" "}
             <select
-              aria-label="图表主题"
+              aria-label={t("chartTheme")}
               value={theme}
               disabled={editing}
               onChange={(e) => changeTheme(e.target.value)}
             >
-              <option value="indigo">ShowAI 靛蓝</option>
-              <option value="classic">经典</option>
-              <option value="dark">深色</option>
+              <option value="indigo">{t("theme.indigo")}</option>
+              <option value="classic">{t("theme.classic")}</option>
+              <option value="dark">{t("theme.dark")}</option>
             </select>
           </label>
-          {editable && <span>数据与样式可在设置中修改</span>}
+          {editable && <span>{t("editInSettings")}</span>}
         </div>
       </BlockActions>
       {editing && (
@@ -225,16 +242,16 @@ export function G2ChartBlock({
             {draftValue && (
               <>
                 <div className="sb-g2-settings">
-                  <Field label="标题">
+                  <Field label={t("title")}>
                     <input
-                      aria-label="图表标题"
+                      aria-label={t("chartTitle")}
                       value={draftValue.title ?? ""}
                       onChange={(e) => updateDraft({ title: e.target.value })}
                     />
                   </Field>
-                  <Field label="高度">
+                  <Field label={t("height")}>
                     <input
-                      aria-label="图表高度"
+                      aria-label={t("chartHeight")}
                       type="number"
                       min={200}
                       max={900}
@@ -244,9 +261,9 @@ export function G2ChartBlock({
                       }
                     />
                   </Field>
-                  <Field label="字号">
+                  <Field label={t("fontSize")}>
                     <input
-                      aria-label="图表字号"
+                      aria-label={t("chartFontSize")}
                       type="number"
                       min={8}
                       max={32}
@@ -261,9 +278,9 @@ export function G2ChartBlock({
                       }
                     />
                   </Field>
-                  <Field label="线宽">
+                  <Field label={t("lineWidth")}>
                     <input
-                      aria-label="图表线宽"
+                      aria-label={t("chartLineWidth")}
                       type="number"
                       min={0}
                       max={12}
@@ -281,12 +298,12 @@ export function G2ChartBlock({
                   </Field>
                 </div>
                 <div className="sb-g2-palette">
-                  <span>调色板</span>
+                  <span>{t("palette")}</span>
                   {draftPalette.map((color: string, index: number) => (
                     <input
                       key={index}
                       type="color"
-                      aria-label={`图表颜色 ${index + 1}`}
+                      aria-label={t("chartColor", { index: index + 1 })}
                       value={color}
                       onChange={(e) => {
                         const palette = [...draftPalette];
@@ -307,7 +324,7 @@ export function G2ChartBlock({
                         updateDraft({ legend: e.target.checked })
                       }
                     />
-                    显示图例
+                    {t("showLegend")}
                   </label>
                   <label>
                     <input
@@ -317,16 +334,9 @@ export function G2ChartBlock({
                         updateDraft({ animation: e.target.checked })
                       }
                     />
-                    动画
+                    {t("animation")}
                   </label>
-                  {Object.entries({
-                    tooltip: "悬停提示",
-                    elementHighlight: "悬停高亮",
-                    elementSelect: "点击选择",
-                    brushHighlight: "框选高亮",
-                    brushFilter: "框选过滤",
-                    legendFilter: "图例筛选",
-                  }).map(([key, label]) => (
+                  {interactions.map(([key, label]) => (
                     <label key={key}>
                       <input
                         type="checkbox"
@@ -343,17 +353,17 @@ export function G2ChartBlock({
                           })
                         }
                       />
-                      {label}
+                      {t(label)}
                     </label>
                   ))}
                 </div>
               </>
             )}
             <details className="sb-data-details" open>
-              <summary>数据与高级参数</summary>
-              <Field label="数据、字段对应及样式参数">
+              <summary>{t("dataAndAdvanced")}</summary>
+              <Field label={t("dataFieldsStyle")}>
                 <textarea
-                  aria-label="图表参数 JSON"
+                  aria-label={t("parametersJson")}
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   spellCheck={false}
@@ -366,14 +376,14 @@ export function G2ChartBlock({
               </p>
             )}
             <button type="button" className="sb-button" onClick={save}>
-              保存图表设置
+              {t("saveSettings")}
             </button>
           </div>
         </BlockSettings>
       )}
       {error && (
         <p role="alert" className="sb-error">
-          图表绘制失败：{error}
+          {t("renderFailed", { error })}
         </p>
       )}
       <GestureBoundary
@@ -383,13 +393,13 @@ export function G2ChartBlock({
           ref={plot}
           className="sb-g2-plot"
           style={{ height: Number(data.height ?? 320) }}
-          aria-label="图表绘图区"
+          aria-label={t("plotArea")}
           aria-busy={!ready && !error}
         />
       </GestureBoundary>
       <details className="sb-data-details">
-        <summary>查看原始数据</summary>
-        <pre>{JSON.stringify(data.datasets, null, 2)}</pre>
+        <summary>{t("viewRawData")}</summary>
+        <pre>{rawData}</pre>
       </details>
     </section>
   );

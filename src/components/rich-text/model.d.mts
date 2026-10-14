@@ -6,7 +6,7 @@ export const richTextAlignments: readonly [
   "right",
   "justify",
 ];
-export const richTextFonts: { label: string; value: string }[];
+export const richTextFonts: { value: string }[];
 export function markdownToRichText(
   source: string,
   options?: { allowComponentBlocks?: boolean },

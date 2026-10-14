@@ -1,6 +1,8 @@
 import type { JSONContent } from "@tiptap/core";
 import { useState } from "react";
 import type { BoardTool, DrawingStyle } from "./types";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/surface";
 
 function StrokeWidthSlider({
   width,
@@ -11,6 +13,7 @@ function StrokeWidthSlider({
   label: string;
   onChange: (patch: Partial<DrawingStyle>) => void;
 }) {
+  const t = useTranslator(messages);
   const [active, setActive] = useState(false);
   const current = width ?? 2.5;
   const position = ((current - 0.5) / 39.5) * 100;
@@ -30,7 +33,7 @@ function StrokeWidthSlider({
       <input
         type="range"
         aria-label={label}
-        aria-valuetext={width === undefined ? "混合" : undefined}
+        aria-valuetext={width === undefined ? t("style.mixed") : undefined}
         min={0.5}
         max={40}
         step={0.5}
@@ -65,15 +68,12 @@ export function BoardStyleControls({
   nodes: JSONContent[];
   onChange: (patch: Partial<DrawingStyle>) => void;
 }) {
+  const t = useTranslator(messages);
   const drawings = nodes.filter(
     (node) => node.type === "drawing" && !node.attrs?.ink,
   );
   if (!drawings.length && nodes.some((node) => node.attrs?.ink))
-    return (
-      <span className="board-style-controls">
-        手写笔迹 · 在 iPad 上编辑笔迹
-      </span>
-    );
+    return <span className="board-style-controls">{t("style.inkNotice")}</span>;
   if (!drawings.length && (!tool || tool === "region")) return null;
   const value = (key: keyof DrawingStyle) => {
     if (!drawings.length) return style[key];
@@ -103,24 +103,24 @@ export function BoardStyleControls({
     <div
       className="board-style-controls"
       role="group"
-      aria-label={drawings.length ? "选中对象样式" : "绘制设置"}
+      aria-label={drawings.length ? t("style.selection") : t("style.drawing")}
     >
-      <label title={color === undefined ? "选中对象颜色不同" : undefined}>
-        {filled ? "边框" : "颜色"}
+      <label title={color === undefined ? t("style.colorsDiffer") : undefined}>
+        {filled ? t("style.border") : t("style.color")}
         <input
           type="color"
-          aria-label={filled ? "边框颜色" : "画笔颜色"}
+          aria-label={filled ? t("style.borderColor") : t("style.penColor")}
           value={color ?? "#252629"}
           onInput={(event) => onChange({ color: event.currentTarget.value })}
         />
-        {color === undefined && <small>混合</small>}
+        {color === undefined && <small>{t("style.mixed")}</small>}
       </label>
       {filled && (
         <label>
-          内部
+          {t("style.fill")}
           <input
             type="color"
-            aria-label="内部颜色"
+            aria-label={t("style.fillColor")}
             value={fill && fill !== "none" ? fill : "#ffffff"}
             onInput={(event) =>
               onChange({ fillColor: event.currentTarget.value })
@@ -128,24 +128,24 @@ export function BoardStyleControls({
           />
           <button
             type="button"
-            aria-label="透明填充"
+            aria-label={t("style.transparentFill")}
             aria-pressed={fill === "none"}
-            title="透明填充"
+            title={t("style.transparentFill")}
             onClick={() => onChange({ fillColor: "none" })}
           >
-            空
+            {t("style.none")}
           </button>
-          {fill === undefined && <small>混合</small>}
+          {fill === undefined && <small>{t("style.mixed")}</small>}
         </label>
       )}
       <label>
-        粗细
+        {t("style.weight")}
         <StrokeWidthSlider
           width={width}
-          label={filled ? "边框粗细" : "画笔粗细"}
+          label={filled ? t("style.borderWeight") : t("style.penWeight")}
           onChange={onChange}
         />
-        {width === undefined && <small>混合</small>}
+        {width === undefined && <small>{t("style.mixed")}</small>}
       </label>
     </div>
   );

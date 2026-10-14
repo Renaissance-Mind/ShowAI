@@ -1,6 +1,11 @@
 // Adapted from https://github.com/antvis/G2/blob/v5/site/docs/charts/distributioncurve.en.mdx
 // License notices: resources/licenses/g2-runtime.json.
 
+import { translator } from "../../../../i18n";
+import messages from "../../../../i18n/messages/g2";
+
+const t = translator(messages);
+
 export default async function draw(context) {
   const { Chart, asset, fetch } = context;
   const G2 = { Chart };
@@ -35,7 +40,7 @@ export default async function draw(context) {
             const values = data.map((d) => d.value).filter((v) => !isNaN(v));
 
             // Calculate data range
-            if(!values.length)throw new Error('分布曲线需要 value 数值字段。');
+            if(!values.length)throw new Error(t('error.distributionValue'));
             const low=Math.min(...values), high=Math.max(...values);
             const min = low===high ? low-0.5 : low;
             const max = low===high ? high+0.5 : high;

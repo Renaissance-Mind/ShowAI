@@ -3,13 +3,16 @@ import type {
   DesktopChange,
   DesktopWindowState,
 } from "../desktop/bridge";
+import type { Locale } from "../i18n";
 import type { TabCommand } from "../workbench/tab-shortcuts";
 export interface DesktopBridge {
+  handwrite?(args: { projectId: string; pageId: string; boardId: string; tool?: string }): Promise<import("../types").ShowDocument>;
   openWindow?(
     args: Record<string, unknown>,
     prepare: () => Promise<boolean>,
   ): Promise<boolean>;
   setAppearance?(appearance: DesktopAppearance): Promise<void>;
+  setLocale?(locale: Locale): Promise<void>;
   getWindowState?(): Promise<DesktopWindowState>;
   onWindowStateChange?(
     listener: (state: DesktopWindowState) => void,

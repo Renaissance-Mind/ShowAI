@@ -13,6 +13,10 @@ import {
   parseArtifact,
   serializeArtifact,
 } from "./validation.mjs";
+import { translator, withHtmlLanguage } from "../i18n";
+import messages from "../i18n/messages/reader";
+
+const t = translator(messages);
 
 export function loadCanvasArtifact(
   storage: Pick<Storage, "getItem">,
@@ -56,7 +60,9 @@ export async function materializeCanvasArtifact(
   for (const ref of collectCustomComponentRefs(artifact.document)) {
     if (!findComponent(index, ref))
       throw new Error(
-        `缺少页面锁定的组件 ${ref.componentId}@${ref.version}，原页面未被替换。`,
+        t("lockedComponentMissing", {
+          component: `${ref.componentId}@${ref.version}`,
+        }),
       );
   }
   return {
@@ -76,9 +82,11 @@ export async function buildCanvasArtifactHtml(
     throw new Error(
       "The HTML viewer is unavailable. Run npm run build:portable, then try again.",
     );
-  return injectArtifactIntoHtml(
-    await response.text(),
-    await embedDocumentImages(artifact.document),
-    artifact.components,
+  return withHtmlLanguage(
+    injectArtifactIntoHtml(
+      await response.text(),
+      await embedDocumentImages(artifact.document),
+      artifact.components,
+    ),
   );
 }

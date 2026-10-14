@@ -1,11 +1,14 @@
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import { parseMarkdown } from "../lib/markdown";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/templates";
 export default function TemplateOutline({
   document,
 }: {
   document: ShowDocument;
 }) {
+  const t = useTranslator(messages);
   const titles: string[] = [];
   const text = (node: JSONContent): string =>
     node.text ?? node.content?.map(text).join("") ?? "";
@@ -27,6 +30,6 @@ export default function TemplateOutline({
       ))}
     </ol>
   ) : (
-    <p>{document.title || "页面内容"}</p>
+    <p>{document.title || t("pageContent")}</p>
   );
 }

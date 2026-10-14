@@ -474,7 +474,7 @@ describe("publication and component delivery", () => {
       headless: true,
     });
     try {
-      const context = await browser.newContext();
+      const context = await browser.newContext({ locale: "zh-CN" });
       await context.addCookies([
         {
           name: "publication-session",
@@ -583,7 +583,7 @@ describe("publication and component delivery", () => {
       headless: true,
     });
     try {
-      const context = await browser.newContext();
+      const context = await browser.newContext({ locale: "zh-CN" });
       const page = await context.newPage();
       await page.goto(`http://127.0.0.1:${address.port}`);
       await page

@@ -8,26 +8,30 @@ import {
 import { Widget } from "../components/blocks/Widget";
 import { parseMarkdown } from "../lib/markdown";
 import { templateStageLabels } from "./template-catalog-model";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/templates";
 export default function TemplateWorkflowView({
   bundle,
 }: {
   bundle: TemplateBundleSource;
 }) {
+  const t = useTranslator(messages);
   const [stage, setStage] = useState<TemplateStage>("intent");
+  const stageLabel = t(templateStageLabels[stage]);
   const parsed = parseTemplateBundle(bundle),
     guide = parsed.guides[stage];
   return (
     <div className="template-workflow-view">
       <section
         className="template-guide-content"
-        aria-label={`${templateStageLabels[stage]}指南`}
+        aria-label={t("stageGuide", { stage: stageLabel })}
       >
         <header>
           <h3>
             <span className="catalog-stage-number">
               {String(TEMPLATE_STAGES.indexOf(stage) + 1).padStart(2, "0")}
             </span>
-            {templateStageLabels[stage]}
+            {stageLabel}
           </h3>
         </header>
         {guide ? (
@@ -40,12 +44,12 @@ export default function TemplateWorkflowView({
             readOnly
           />
         ) : (
-          <p>沿用系统呈现规则的{templateStageLabels[stage]}指南。</p>
+          <p>{t("stageGuideFallback", { stage: stageLabel })}</p>
         )}
       </section>
       <aside className="catalog-info-panel">
-        <h3>阶段</h3>
-        <nav className="template-stage-nav" aria-label="模板阶段">
+        <h3>{t("stages")}</h3>
+        <nav className="template-stage-nav" aria-label={t("templateStages")}>
           {TEMPLATE_STAGES.map((id, index) => (
             <button
               key={id}
@@ -53,7 +57,7 @@ export default function TemplateWorkflowView({
               onClick={() => setStage(id)}
             >
               <span>{String(index + 1).padStart(2, "0")}</span>
-              {templateStageLabels[id]}
+              {t(templateStageLabels[id])}
             </button>
           ))}
         </nav>

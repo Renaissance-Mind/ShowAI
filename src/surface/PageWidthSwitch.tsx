@@ -1,8 +1,10 @@
 import type { PageWidthMode } from "./types";
 import "./page-width.css";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/surface";
 
 const modes = ["standard", "wide", "full"] as const;
-const labels = ["标准", "更宽", "全宽"] as const;
+const labels = ["width.standard", "width.wide", "width.full"] as const;
 
 export function PageWidthSwitch({
   value,
@@ -11,6 +13,7 @@ export function PageWidthSwitch({
   value: PageWidthMode;
   onChange: (mode: PageWidthMode) => void;
 }) {
+  const t = useTranslator(messages);
   const position = modes.indexOf(value);
   return (
     <div className="page-width-switch">
@@ -22,7 +25,7 @@ export function PageWidthSwitch({
       <div className="page-width-switch-labels" aria-hidden="true">
         {labels.map((label, index) => (
           <span key={label} data-active={index === position}>
-            {label}
+            {t(label)}
           </span>
         ))}
       </div>
@@ -32,8 +35,8 @@ export function PageWidthSwitch({
         max={2}
         step={1}
         value={position}
-        aria-label="页面宽度"
-        aria-valuetext={labels[position]}
+        aria-label={t("pageWidth")}
+        aria-valuetext={t(labels[position])}
         onChange={(event) => onChange(modes[Number(event.target.value)])}
         onKeyDown={(event) => {
           if (

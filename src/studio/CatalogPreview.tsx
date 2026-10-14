@@ -8,6 +8,8 @@ import {
 import { Search, Focus, Expand } from "../ui/icons";
 import { previewFit, previewZoom } from "./preview-geometry";
 import { errorMessage } from "./bridge";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/catalog";
 
 export default function CatalogPreview({
   children,
@@ -26,6 +28,7 @@ export default function CatalogPreview({
   thumbnail?: boolean;
   minHeight?: number;
 }) {
+  const t = useTranslator(messages);
   const stage = useRef<HTMLDivElement>(null),
     viewport = useRef<HTMLDivElement>(null),
     content = useRef<HTMLDivElement>(null);
@@ -121,7 +124,7 @@ export default function CatalogPreview({
         <div
           className="catalog-preview-tools"
           role="group"
-          aria-label="预览操作"
+          aria-label={t("previewActions")}
         >
           <div
             className="catalog-zoom-menu"
@@ -136,8 +139,8 @@ export default function CatalogPreview({
             <button
               className="studio-icon"
               type="button"
-              aria-label="调整预览缩放"
-              title="缩放"
+              aria-label={t("adjustPreviewZoom")}
+              title={t("zoom")}
               aria-expanded={zoomOpen}
               onClick={() => setZoomOpen(!zoomOpen)}
             >
@@ -150,7 +153,7 @@ export default function CatalogPreview({
                   min="5"
                   max="300"
                   step="5"
-                  aria-label="预览缩放"
+                  aria-label={t("previewZoom")}
                   value={Math.round(scale * 100)}
                   onChange={(event) =>
                     setManual(previewZoom(Number(event.target.value) / 100))
@@ -163,8 +166,8 @@ export default function CatalogPreview({
           <button
             className="studio-icon"
             type="button"
-            aria-label="适应预览画面"
-            title="适应画面"
+            aria-label={t("fitPreview")}
+            title={t("fit")}
             onClick={() => {
               setManual(null);
               setZoomOpen(false);
@@ -176,8 +179,8 @@ export default function CatalogPreview({
           <button
             className="studio-icon"
             type="button"
-            aria-label="全屏预览"
-            title="全屏"
+            aria-label={t("fullscreenPreview")}
+            title={t("fullscreen")}
             onClick={() => {
               setError("");
               void (

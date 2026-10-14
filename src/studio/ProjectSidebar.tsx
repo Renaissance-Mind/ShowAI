@@ -13,6 +13,9 @@ import type {
 } from "../core/model";
 import { orderSidebarItems } from "../core/sidebar-order";
 import { useLibraryDrag } from "./LibraryDrag";
+import { useTranslator } from "../i18n/react";
+import commonMessages from "../i18n/messages/common";
+import sidebarMessages from "../i18n/messages/sidebar";
 
 export default function ProjectSidebar({
   projects,
@@ -39,6 +42,8 @@ export default function ProjectSidebar({
   onMenu: (anchor: HTMLElement) => void;
   onGroupMenu: (group: ProjectGroup, anchor: HTMLElement) => void;
 }) {
+  const t = useTranslator(sidebarMessages);
+  const tc = useTranslator(commonMessages);
   const drag = useLibraryDrag();
   projects = orderSidebarItems(projects, organization.projectOrder);
   const selected = projects.find((item) => item.id === selectedProject);
@@ -101,8 +106,10 @@ export default function ProjectSidebar({
           {id !== "pinned" && (
             <button
               className="studio-row-menu"
-              aria-label={group ? `在${name}中新建项目` : "新建项目"}
-              title="新建项目"
+              aria-label={
+                group ? t("newProjectIn", { name }) : t("createProject")
+              }
+              title={t("createProject")}
               onClick={() => onCreate(group?.id)}
             >
               <Plus size={16} />
@@ -111,7 +118,9 @@ export default function ProjectSidebar({
           {id !== "pinned" && (
             <button
               className="studio-row-menu"
-              aria-label={group ? `${name}的分组操作` : "项目列表操作"}
+              aria-label={
+                group ? t("groupActions", { name }) : t("projectListActions")
+              }
               aria-haspopup="menu"
               onClick={(event) =>
                 group
@@ -133,7 +142,7 @@ export default function ProjectSidebar({
         >
           {items.map(renderProject)}
           {!items.length && group && (
-            <div className="studio-group-empty">暂无项目</div>
+            <div className="studio-group-empty">{t("noProjects")}</div>
           )}
         </div>
       )}
@@ -145,18 +154,18 @@ export default function ProjectSidebar({
         className="studio-new-project"
         type="button"
         disabled={onAddContent ? addDisabled : false}
-        aria-label={onAddContent ? "添加内容" : "新项目"}
+        aria-label={onAddContent ? t("addContent") : t("newProject")}
         aria-haspopup={onAddContent ? "menu" : undefined}
-        title={onAddContent ? "添加文件夹、页面或白板" : undefined}
+        title={onAddContent ? t("addContentHint") : undefined}
         onClick={(event) =>
           onAddContent ? onAddContent(event.currentTarget) : onCreate()
         }
       >
         <Plus size={17} aria-hidden="true" />
-        <span>{onAddContent ? "添加" : "新项目"}</span>
+        <span>{onAddContent ? tc("add") : t("newProject")}</span>
       </button>
-      {!!pinned.length && section("pinned", "置顶", pinned)}
-      {section("projects", "项目", ungrouped)}
+      {!!pinned.length && section("pinned", t("section.pinned"), pinned)}
+      {section("projects", t("section.projects"), ungrouped)}
       {organization.groups.map((group) =>
         section(
           group.id,

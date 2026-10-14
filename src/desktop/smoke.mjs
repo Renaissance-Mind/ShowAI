@@ -10,6 +10,9 @@ import { promisify } from "node:util";
 import electron from "electron";
 import { stopTestProcess } from "../../scripts/stop-test-process.mjs";
 
+// The smoke checks select controls by their Chinese labels.
+process.env.SHOWAI_LANGUAGE ??= "zh-CN";
+
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const temporary = await mkdtemp(join(tmpdir(), "showai-desktop-smoke-"));
 const packagedExecutable = process.argv[2]

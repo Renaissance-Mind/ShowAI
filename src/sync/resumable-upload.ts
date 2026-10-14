@@ -2,6 +2,10 @@ import { createHash } from "node:crypto";
 import { SyncError } from "./protocol";
 import { retryUpload } from "./upload-retry";
 import { serverFetch as fetch } from "./server-fetch";
+import { translator } from "../i18n";
+import syncEngineMessages from "../i18n/messages/syncEngine";
+
+const t = translator(syncEngineMessages);
 
 interface UploadStatus {
   id: string | null;
@@ -36,7 +40,7 @@ export async function resumableUpload(
         throw new SyncError(
           response.status,
           "UPLOAD_UNAVAILABLE",
-          "上传服务暂时不可用。",
+          t("upload.unavailable"),
         );
       }
       const value = await response.json();
@@ -44,7 +48,7 @@ export async function resumableUpload(
       throw new SyncError(
         response.status,
         value.error?.code ?? "UPLOAD_FAILED",
-        value.error?.message ?? "上传失败。",
+        value.error?.message ?? t("upload.failed"),
         value.error?.details,
       );
     });
@@ -83,11 +87,7 @@ export async function resumableUpload(
     const previous = retained.get(index);
     if (previous) {
       if (previous.digest !== name || previous.bytes !== block.length)
-        throw new SyncError(
-          409,
-          "PART_CONFLICT",
-          "保留的上传分片与本地内容不同。",
-        );
+        throw new SyncError(409, "PART_CONFLICT", t("upload.partMismatch"));
       continue;
     }
     await request(

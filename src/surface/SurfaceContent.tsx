@@ -15,25 +15,31 @@ import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import { ObjectContext, SurfaceObject } from "./SurfaceObject";
 import { orderedSurfaceNodes } from "./document.mjs";
+import { translator } from "../i18n";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/surface";
+
+const translate = translator(messages);
 
 export function nodeName(node: JSONContent) {
+  const t = translate;
   return String(
     node.attrs?.name ||
       node.attrs?.data?.title ||
       (
         {
-          region: "内容区域",
+          region: t("node.region"),
           surface: node.attrs?.kind === "board" ? "Board" : "Page",
-          drawing: "绘画",
-          richText: "文本",
-          image: "图片",
-          paragraph: "文本",
-          heading: "标题",
-          table: "表格",
-          widget: node.attrs?.kind || "组件",
+          drawing: t("node.drawing"),
+          richText: t("node.text"),
+          image: t("node.image"),
+          paragraph: t("node.text"),
+          heading: t("node.heading"),
+          table: t("node.table"),
+          widget: node.attrs?.kind || t("node.component"),
         } as Record<string, string>
       )[node.type ?? ""] ||
-      "内容",
+      t("node.content"),
   );
 }
 export interface ContentRenderProps {
@@ -271,15 +277,16 @@ const ContentNode = memo(
   },
 );
 function AddToRegion({ id }: { id: string }) {
+  const t = useTranslator(messages);
   const actions = useContext(ObjectContext);
   return actions.readOnly ? null : (
     <div
       tabIndex={0}
       className="surface-empty-region"
       data-component-container={id}
-      aria-label="空白区域"
+      aria-label={t("region.empty")}
     >
-      按 / 插入内容
+      {t("region.emptyHint")}
     </div>
   );
 }

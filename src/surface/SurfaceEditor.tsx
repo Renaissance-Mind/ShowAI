@@ -54,6 +54,7 @@ function SurfaceEditor({
   onControlsChange,
   retainedState,
   inspectorHost,
+  onHandwriting,
 }: {
   document: ShowDocument;
   onChange: (document: ShowDocument) => void;
@@ -65,6 +66,11 @@ function SurfaceEditor({
   onControlsChange?: (controls: EditorControls | null) => void;
   retainedState?: SurfaceEditorState;
   inspectorHost?: HTMLElement | null;
+  onHandwriting?: (
+    boardId: string,
+    document: ShowDocument,
+    tool?: string,
+  ) => Promise<void>;
 }) {
   const document = useMemo(
     () => (isResource(input) ? input : upgradeResource(input)),
@@ -341,7 +347,7 @@ function SurfaceEditor({
                     });
                   else {
                     node.type = "richText";
-                    node.attrs = { id: parentId, name: "文本" };
+                    node.attrs = { id: parentId, name: "文本" }; // i18n-exempt: default node name saved into documents
                     node.content = values.map((child) =>
                       child.attrs?.id === parentId
                         ? {
@@ -413,6 +419,7 @@ function SurfaceEditor({
         onControlsChange={onControlsChange}
         retainedState={retainedState?.runtime}
         inspectorHost={inspectorHost}
+        onHandwriting={onHandwriting}
         canUndo={!!history.current.past.length}
         canRedo={!!history.current.future.length}
       />

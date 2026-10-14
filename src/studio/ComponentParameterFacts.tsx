@@ -1,9 +1,12 @@
 import type { JsonSchema } from "../components/custom/types";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/catalog";
 export default function ComponentParameterFacts({
   schema,
 }: {
   schema: JsonSchema;
 }) {
+  const t = useTranslator(messages);
   const properties =
     typeof schema === "object" &&
     schema.properties &&
@@ -27,7 +30,7 @@ export default function ComponentParameterFacts({
     <>
       {options.length > 0 && (
         <section className="catalog-reference-section">
-          <h3>可选值</h3>
+          <h3>{t("allowedValues")}</h3>
           {options.slice(0, 4).map(([name, field]) => (
             <div className="catalog-parameter-fact" key={name}>
               <code>{name}</code>
@@ -42,7 +45,7 @@ export default function ComponentParameterFacts({
       )}
       {ranges.length > 0 && (
         <section className="catalog-reference-section">
-          <h3>数据范围</h3>
+          <h3>{t("valueRanges")}</h3>
           <dl>
             {ranges.slice(0, 8).map(([name, value]) => {
               const field = value as Record<string, unknown>;
