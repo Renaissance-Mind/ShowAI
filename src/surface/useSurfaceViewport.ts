@@ -13,6 +13,8 @@ import {
 } from "./model";
 import {
   nearestSnap,
+  momentumStep,
+  PanVelocity,
   panFrom,
   springStep,
   type SurfaceAnchor,
@@ -234,6 +236,7 @@ export function useSurfaceViewport(
       started: boolean;
       touch: boolean;
       gesture: PanGesture;
+      velocity: PanVelocity;
     } | null = null;
     const touches = new Map<number, { x: number; y: number }>();
     let pinch: {
@@ -486,6 +489,33 @@ export function useSurfaceViewport(
       stopSpring();
       gesture = null;
     };
+    const coast = (velocity: { x: number; y: number }) => {
+      if (reducedMotion.matches || Math.hypot(velocity.x, velocity.y) < 40)
+        return false;
+      interrupt();
+      setAnchor(null);
+      cancelAnimationFrame(frame);
+      paintNow();
+      root.dataset.settling = "true";
+      let previous = performance.now();
+      const step = (time: number) => {
+        const next = momentumStep(velocity, (time - previous) / 1000);
+        previous = time;
+        velocity = next.velocity;
+        camera.current = {
+          ...camera.current,
+          x: camera.current.x + next.x,
+          y: camera.current.y + next.y,
+        };
+        paintNow();
+        if (Math.hypot(velocity.x, velocity.y) < 20) {
+          stopSpring();
+          remember();
+        } else springFrame = requestAnimationFrame(step);
+      };
+      springFrame = requestAnimationFrame(step);
+      return true;
+    };
     const beginPan = (): PanGesture => {
       interrupt();
       return {
@@ -715,6 +745,11 @@ export function useSurfaceViewport(
       };
     };
     const captureTouch = (event: PointerEvent) => {
+      if (ownsInput(event.target) && springFrame) {
+        interrupt();
+        paintNow();
+        remember();
+      }
       if (
         !ownsInput(event.target) ||
         event.pointerType !== "touch" ||
@@ -815,7 +850,9 @@ export function useSurfaceViewport(
         touch,
         started: !touch,
         gesture: beginPan(),
+        velocity: new PanVelocity(),
       };
+      drag.velocity.add(0, 0, event.timeStamp);
       if (!touch) root.classList.add("is-panning");
     };
     const move = (event: PointerEvent) => {
@@ -848,6 +885,7 @@ export function useSurfaceViewport(
         root.classList.add("is-panning");
       }
       drag.gesture.delta = { x: dx, y: dy };
+      drag.velocity.add(dx, dy, event.timeStamp);
       pan(drag.gesture);
     };
     const finish = (event?: PointerEvent, cancelled = false) => {
@@ -876,14 +914,25 @@ export function useSurfaceViewport(
             setAnchor(initial.gesture.anchor);
             springTo(initial.gesture.origin);
           } else {
-            gesture = initial.gesture;
-            settle();
+            if (!(
+              initial.touch &&
+              !cancelled &&
+              coast(
+                initial.velocity.release(event?.timeStamp ?? performance.now()),
+              )
+            )) {
+              gesture = initial.gesture;
+              settle();
+            }
           }
         }
       }
       root.classList.remove("is-panning");
     };
-    const up = (event: PointerEvent) => finish(event);
+    const up = (event: PointerEvent) => {
+      if (drag?.touch && drag.id === event.pointerId) move(event);
+      finish(event);
+    };
     const captureMove = (event: PointerEvent) => {
       if (!pinch) return;
       event.preventDefault();
@@ -1005,6 +1054,17 @@ export function useSurfaceViewport(
       root.classList.remove("is-hand");
       finish(undefined, true);
       if (gesture) settle();
+      if (springFrame) {
+        interrupt();
+        paintNow();
+        remember();
+      }
+    };
+    const visibility = () => {
+      if (document.visibilityState === "hidden") {
+        controls.current.cancel();
+        remember();
+      }
     };
     const nativeScroll = () => {
       if (matchMedia("print").matches) return;
@@ -1098,6 +1158,7 @@ export function useSurfaceViewport(
     window.addEventListener("keydown", windowKeydown);
     window.addEventListener("keyup", keyup);
     window.addEventListener("blur", blur);
+    document.addEventListener("visibilitychange", visibility);
     refreshLayout();
     return () => {
       remember();
@@ -1122,6 +1183,7 @@ export function useSurfaceViewport(
       window.removeEventListener("keydown", windowKeydown);
       window.removeEventListener("keyup", keyup);
       window.removeEventListener("blur", blur);
+      document.removeEventListener("visibilitychange", visibility);
     };
   }, []);
   useEffect(() => {

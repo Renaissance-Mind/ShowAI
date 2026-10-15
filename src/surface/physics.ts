@@ -2,6 +2,42 @@ import type { Camera } from "./model";
 
 export const RELEASE_DISTANCE = 240;
 export const HORIZONTAL_GAIN = 0.72;
+// UIScrollView's normal deceleration: retain 99.8% of speed per millisecond.
+const PAN_FRICTION = -Math.log(0.998) * 1000;
+export class PanVelocity {
+  private samples: { x: number; y: number; time: number }[] = [];
+  add(x: number, y: number, time: number) {
+    const last = this.samples.at(-1);
+    if (last && (time <= last.time || (x === last.x && y === last.y))) return;
+    this.samples.push({ x, y, time });
+    while (this.samples.length > 2 && time - this.samples[0].time > 100)
+      this.samples.shift();
+  }
+  release(time: number) {
+    const first = this.samples[0],
+      last = this.samples.at(-1);
+    if (!first || !last || time - last.time > 80 || last.time - first.time < 8)
+      return { x: 0, y: 0 };
+    const elapsed = (last.time - first.time) / 1000;
+    const x = (last.x - first.x) / elapsed,
+      y = (last.y - first.y) / elapsed;
+    const limit = Math.min(1, 3000 / Math.hypot(x, y));
+    return { x: x * limit, y: y * limit };
+  }
+}
+/** Integrate exponential drag exactly, so 60 Hz and 120 Hz travel equally far. */
+export function momentumStep(
+  velocity: { x: number; y: number },
+  elapsed: number,
+) {
+  const decay = Math.exp(-PAN_FRICTION * Math.max(0, Math.min(0.064, elapsed)));
+  const distance = (1 - decay) / PAN_FRICTION;
+  return {
+    x: velocity.x * distance,
+    y: velocity.y * distance,
+    velocity: { x: velocity.x * decay, y: velocity.y * decay },
+  };
+}
 export interface SurfaceRegion {
   id: string;
   label: string;

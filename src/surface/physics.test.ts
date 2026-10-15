@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   elasticDisplacement,
+  momentumStep,
+  PanVelocity,
   nearestSnap,
   panFrom,
   snapRegion,
@@ -25,6 +27,52 @@ const card = {
   height: 240,
 };
 const origin = { x: 0, y: -300, scale: 1 };
+
+describe("touch pan momentum", () => {
+  it("uses the latest movement and stops when the finger pauses before release", () => {
+    const velocity = new PanVelocity();
+    velocity.add(0, 0, 0);
+    velocity.add(10, 0, 100);
+    velocity.add(70, -30, 120);
+    velocity.add(130, -60, 140);
+    const released = velocity.release(140);
+    expect(released.x).toBeGreaterThan(2000);
+    expect(released.y).toBeLessThan(-1000);
+    expect(Math.hypot(released.x, released.y)).toBeCloseTo(3000);
+    expect(velocity.release(250)).toEqual({ x: 0, y: 0 });
+    const tap = new PanVelocity();
+    tap.add(0, 0, 100);
+    expect(tap.release(101)).toEqual({ x: 0, y: 0 });
+  });
+  it("slows continuously in the release direction at both display refresh rates", () => {
+    const travel = (hz: number) => {
+      let velocity = { x: 1200, y: -600 },
+        x = 0,
+        y = 0;
+      for (let frame = 0; frame < hz * 2; frame++) {
+        const next = momentumStep(velocity, 1 / hz);
+        expect(next.x).toBeGreaterThan(0);
+        expect(next.y).toBeLessThan(0);
+        expect(Math.hypot(next.velocity.x, next.velocity.y)).toBeLessThan(
+          Math.hypot(velocity.x, velocity.y),
+        );
+        x += next.x;
+        y += next.y;
+        velocity = next.velocity;
+      }
+      return { x, y };
+    };
+    const sixty = travel(60),
+      oneTwenty = travel(120);
+    expect(sixty.x).toBeCloseTo(oneTwenty.x, 6);
+    expect(sixty.y).toBeCloseTo(oneTwenty.y, 6);
+    expect(momentumStep({ x: 0, y: 0 }, 0.016)).toEqual({
+      x: 0,
+      y: 0,
+      velocity: { x: 0, y: 0 },
+    });
+  });
+});
 
 describe("unified whiteboard resistance", () => {
   it("moves visibly under small input, resisting symmetrically without a position discontinuity", () => {
