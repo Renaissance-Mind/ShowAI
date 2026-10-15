@@ -1,5 +1,14 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { BlockProps } from "./types";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  FileText,
+  Layers,
+  Pencil,
+  RotateCcw,
+} from "../../ui/icons";
 import type { MessageKey } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/presentation";
@@ -15,12 +24,18 @@ type State = {
   id: string;
   value: string;
   status: "changed" | "retained" | "fixed";
+  tokens?: string[];
 };
 type Frame = {
   id: string;
   title: string;
   explanation: string;
   condition?: string;
+  headline?: string;
+  inputSummary?: string;
+  outputSummary?: string;
+  actionLabel?: string;
+  nextHint?: string;
   states: State[];
   links: { from: string; to: string; label: string }[];
   sources?: Source[];
@@ -29,6 +44,7 @@ type Mechanism = {
   title: string;
   introduction?: string;
   parts: Part[];
+  initialStates?: State[];
   frames: Frame[];
 };
 type Evidence = {
@@ -74,42 +90,177 @@ function Sources({ sources = [] }: { sources?: Source[] }) {
     </p>
   ) : null;
 }
-function FrameView({ frame, parts }: { frame: Frame; parts: Part[] }) {
-  const t = useTranslator(messages);
+function MechanismState({
+  part,
+  state,
+  output = false,
+}: {
+  part: Part;
+  state?: State;
+  output?: boolean;
+}) {
   return (
-    <article className="sp-frame">
-      <h3>{frame.title}</h3>
-      <div
-        className="sp-parts"
-        style={{
-          gridTemplateColumns: `repeat(${Math.min(parts.length, 4)}, minmax(0, 1fr))`,
-        }}
-      >
-        {parts.map((part) => {
-          const state = frame.states.find((s) => s.id === part.id)!;
+    <div
+      className={`ms-state${output && state?.status === "changed" ? " is-changed" : ""}`}
+    >
+      <h4>{part.label}</h4>
+      {state && <p>{state.value}</p>}
+      {!!state?.tokens?.length && (
+        <ul className="ms-tokens" aria-label={part.label}>
+          {state.tokens.map((token, i) => (
+            <li key={i}>{token}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function MechanismScene({
+  parts,
+  states = [],
+  links = [],
+  output = false,
+}: {
+  parts: Part[];
+  states?: State[];
+  links?: Frame["links"];
+  output?: boolean;
+}) {
+  const t = useTranslator(messages);
+  const linked = new Set(links.flatMap((link) => [link.from, link.to]));
+  return (
+    <>
+      {!!links.length && (
+        <div className="ms-relations" aria-label={t("links")}>
+          {links.map((link, i) => (
+            <div className="ms-relation" key={i}>
+              <MechanismState
+                part={parts.find((p) => p.id === link.from)!}
+                state={states.find((s) => s.id === link.from)}
+                output={output}
+              />
+              <div className="ms-relation-arrow">
+                <span>{link.label}</span>
+                <ArrowRight aria-hidden="true" />
+              </div>
+              <MechanismState
+                part={parts.find((p) => p.id === link.to)!}
+                state={states.find((s) => s.id === link.to)}
+                output={output}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="ms-scene-states">
+        {parts
+          .filter((part) => !linked.has(part.id))
+          .map((part) => (
+            <MechanismState
+              key={part.id}
+              part={part}
+              state={states.find((s) => s.id === part.id)}
+              output={output}
+            />
+          ))}
+      </div>
+    </>
+  );
+}
+
+function FrameView({ model, index }: { model: Mechanism; index: number }) {
+  const t = useTranslator(messages);
+  const frame = model.frames[index];
+  const previous = model.frames[index - 1];
+  const focusIds = new Set([
+    ...frame.states.filter((s) => s.status !== "fixed").map((s) => s.id),
+    ...frame.links.flatMap((link) => [link.from, link.to]),
+  ]);
+  const parts = focusIds.size
+    ? model.parts.filter((p) => focusIds.has(p.id))
+    : model.parts;
+  const groups = (["changed", "retained", "fixed"] as const)
+    .map((status) => ({
+      status,
+      parts: model.parts.filter(
+        (part) => frame.states.find((s) => s.id === part.id)?.status === status,
+      ),
+    }))
+    .filter((group) => group.parts.length);
+  const icons = { changed: Pencil, retained: FileText, fixed: Layers };
+  return (
+    <article className="sp-frame ms-frame" data-mechanism-step={frame.id}>
+      <header className="ms-frame-heading">
+        <p className="ms-step-count">
+          {t("mechanism.progress", {
+            current: index + 1,
+            total: model.frames.length,
+          })}
+        </p>
+        <h3>{frame.headline ?? frame.title}</h3>
+        <p className="ms-explanation">{frame.explanation}</p>
+      </header>
+      <div className="ms-transition">
+        <section
+          className="ms-scene ms-before"
+          aria-label={t("mechanism.before")}
+        >
+          <h4 className="ms-scene-title">{t("mechanism.before")}</h4>
+          <p className="ms-scene-summary">
+            {frame.inputSummary ??
+              previous?.outputSummary ??
+              previous?.title ??
+              t("mechanism.startingObjects")}
+          </p>
+          <MechanismScene
+            parts={parts}
+            states={previous?.states ?? model.initialStates}
+          />
+        </section>
+        <div className="ms-action">
+          <span>{frame.actionLabel ?? frame.title}</span>
+          <ArrowRight aria-hidden="true" />
+        </div>
+        <section
+          className="ms-scene ms-after"
+          aria-label={t("mechanism.after")}
+        >
+          <h4 className="ms-scene-title">{t("mechanism.after")}</h4>
+          <p className="ms-scene-summary">
+            {frame.outputSummary ?? frame.title}
+          </p>
+          <MechanismScene
+            parts={parts}
+            states={frame.states}
+            links={frame.links}
+            output
+          />
+        </section>
+      </div>
+      <dl className="ms-summary">
+        {groups.map(({ status, parts }) => {
+          const Icon = icons[status];
           return (
-            <div className={`sp-part sp-${state.status}`} key={part.id}>
-              <div className="sp-state">{t(statusNames[state.status])}</div>
-              <h4>{part.label}</h4>
-              <p>{state.value}</p>
+            <div className={`ms-summary-group is-${status}`} key={status}>
+              <Icon aria-hidden="true" />
+              <div>
+                <dt>{t(statusNames[status])}</dt>
+                <dd>{parts.map((p) => p.label).join(" / ")}</dd>
+                {status === "fixed" && (
+                  <p>
+                    {parts
+                      .map(
+                        (p) => frame.states.find((s) => s.id === p.id)!.value,
+                      )
+                      .join(" · ")}
+                  </p>
+                )}
+              </div>
             </div>
           );
         })}
-      </div>
-      {frame.links.length > 0 && (
-        <ol className="sp-links" aria-label={t("links")}>
-          {frame.links.map((l, i) => (
-            <li key={i}>
-              <strong>{parts.find((p) => p.id === l.from)?.label}</strong>
-              <span aria-hidden="true"> → </span>
-              <span>{l.label}</span>
-              <span aria-hidden="true"> → </span>
-              <strong>{parts.find((p) => p.id === l.to)?.label}</strong>
-            </li>
-          ))}
-        </ol>
-      )}
-      <p className="sp-explanation">{frame.explanation}</p>
+      </dl>
       {frame.condition && (
         <p className="sp-boundary">
           <strong>{t("condition")}</strong>
@@ -126,94 +277,139 @@ export function MechanismStepsBlock({ data }: BlockProps) {
   const model = data as unknown as Mechanism;
   const [selected, setSelected] = useState(model.frames[0]?.id ?? "");
   const [all, setAll] = useState(false);
+  const stepButtons = useRef<(HTMLButtonElement | null)[]>([]);
   const uid = useId();
   const index = Math.max(
     0,
     model.frames.findIndex((f) => f.id === selected),
   );
+  const active = model.frames[index];
+  const next = model.frames[index + 1];
   useEffect(() => {
     if (!model.frames.some((f) => f.id === selected))
       setSelected(model.frames[0]?.id ?? "");
   }, [model.frames, selected]);
+  function selectStep(i: number) {
+    setSelected(model.frames[i].id);
+    setAll(false);
+  }
   return (
     <section className="sp-block sp-mechanism" aria-label={model.title}>
       <header>
         <h2>{model.title}</h2>
         {model.introduction && <p>{model.introduction}</p>}
       </header>
-      {!model.frames.length ? (
+      {!active ? (
         <p className="sp-empty">{t("mechanism.empty")}</p>
       ) : (
         <>
-          <nav className="sp-controls" aria-label={t("mechanism.steps")}>
-            <div className="sp-step-list">
+          <nav className="ms-controls" aria-label={t("mechanism.steps")}>
+            <ol className="ms-step-list">
               {model.frames.map((frame, i) => (
-                <button
-                  type="button"
+                <li
                   key={frame.id}
-                  aria-pressed={selected === frame.id}
-                  aria-controls={uid}
-                  onClick={() => {
-                    setSelected(frame.id);
-                    setAll(false);
-                  }}
+                  className={
+                    i < index ? "is-complete" : i === index ? "is-current" : ""
+                  }
                 >
-                  <span>{String(i + 1).padStart(2, "0")}</span>
-                  {frame.title}
-                </button>
+                  <button
+                    type="button"
+                    ref={(el) => {
+                      stepButtons.current[i] = el;
+                    }}
+                    aria-current={i === index ? "step" : undefined}
+                    aria-pressed={i === index}
+                    aria-controls={uid}
+                    onClick={() => selectStep(i)}
+                    onKeyDown={(event) => {
+                      const target =
+                        event.key === "ArrowRight"
+                          ? Math.min(i + 1, model.frames.length - 1)
+                          : event.key === "ArrowLeft"
+                            ? Math.max(i - 1, 0)
+                            : event.key === "Home"
+                              ? 0
+                              : event.key === "End"
+                                ? model.frames.length - 1
+                                : undefined;
+                      if (target === undefined) return;
+                      event.preventDefault();
+                      selectStep(target);
+                      stepButtons.current[target]?.focus();
+                    }}
+                  >
+                    <span className="ms-step-dot">
+                      {i < index ? <Check aria-hidden="true" /> : i + 1}
+                    </span>
+                    <span>{frame.title}</span>
+                  </button>
+                </li>
               ))}
-            </div>
-            <div className="sp-buttons">
-              <button
-                type="button"
-                disabled={index === 0}
-                onClick={() => {
-                  setSelected(model.frames[index - 1].id);
-                  setAll(false);
-                }}
-              >
-                {t("previousStep")}
-              </button>
-              <button
-                type="button"
-                disabled={index === model.frames.length - 1}
-                onClick={() => {
-                  setSelected(model.frames[index + 1].id);
-                  setAll(false);
-                }}
-              >
-                {t("nextStep")}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelected(model.frames[0].id);
-                  setAll(false);
-                }}
-              >
-                {t("backToStart")}
-              </button>
-              <button
-                type="button"
-                aria-pressed={all}
-                onClick={() => setAll(!all)}
-              >
-                {all ? t("readStepByStep") : t("expandAllSteps")}
-              </button>
-            </div>
+            </ol>
           </nav>
           <div
             id={uid}
             className={all ? "sp-current sp-all" : "sp-current"}
             aria-live="polite"
           >
-            {(all ? model.frames : [model.frames[index]]).map((frame) => (
-              <FrameView key={frame.id} frame={frame} parts={model.parts} />
+            {(all ? model.frames.map((_, i) => i) : [index]).map((i) => (
+              <FrameView key={model.frames[i].id} model={model} index={i} />
             ))}
           </div>
+          <footer className="ms-footer">
+            <div className="ms-footer-secondary">
+              <button
+                type="button"
+                className="ms-text-action"
+                disabled={index === 0}
+                onClick={() => selectStep(index - 1)}
+              >
+                <ArrowLeft aria-hidden="true" />
+                {t("previousStep")}
+              </button>
+              <button
+                type="button"
+                className="ms-text-action"
+                aria-pressed={all}
+                onClick={() => setAll(!all)}
+              >
+                {all ? t("readStepByStep") : t("expandAllSteps")}
+              </button>
+              {index > 0 && (
+                <button
+                  type="button"
+                  className="ms-reset"
+                  aria-label={t("backToStart")}
+                  title={t("backToStart")}
+                  onClick={() => selectStep(0)}
+                >
+                  <RotateCcw aria-hidden="true" />
+                </button>
+              )}
+            </div>
+            <p className="ms-next-hint">
+              {active.nextHint ??
+                (next
+                  ? t("mechanism.nextHint", { title: next.title })
+                  : t("mechanism.complete"))}
+            </p>
+            <button
+              type="button"
+              className="ms-next"
+              disabled={!next && !all}
+              onClick={() => (all ? setAll(false) : selectStep(index + 1))}
+            >
+              {all
+                ? t("readStepByStep")
+                : next
+                  ? t("mechanism.next", { title: next.title })
+                  : t("mechanism.complete")}
+              <ArrowRight aria-hidden="true" />
+            </button>
+          </footer>
           <div className="sp-print">
-            {model.frames.map((frame) => (
-              <FrameView key={frame.id} frame={frame} parts={model.parts} />
+            {model.frames.map((frame, i) => (
+              <FrameView key={frame.id} model={model} index={i} />
             ))}
           </div>
         </>

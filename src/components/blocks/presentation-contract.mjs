@@ -26,6 +26,28 @@ function sources(value = []) {
       fail("Sources require an http(s) URL.");
   }
 }
+function mechanismStates(value, partIds, label) {
+  const states = items(value, label, 8);
+  if (
+    states.size !== partIds.size ||
+    [...states].some((id) => !partIds.has(id))
+  )
+    fail("Each frame must describe every stable part exactly once.");
+  for (const state of value) {
+    string(state.value, "state.value");
+    if (!["changed", "retained", "fixed"].includes(state.status))
+      fail("State status must be changed, retained or fixed.");
+    if (state.tokens !== undefined) {
+      if (!Array.isArray(state.tokens) || state.tokens.length > 12)
+        fail("state.tokens must be an array of at most 12 labels.");
+      for (const token of state.tokens) {
+        string(token, "state.tokens item");
+        if (token.length > 80)
+          fail("state.tokens labels must fit 80 characters.");
+      }
+    }
+  }
+}
 export function validatePresentationData(kind, data) {
   if (!data || typeof data !== "object")
     fail("Presentation data must be an object.");
@@ -33,21 +55,26 @@ export function validatePresentationData(kind, data) {
   if (kind === "mechanism-steps") {
     const partIds = items(data.parts, "parts", 8);
     for (const part of data.parts) string(part.label, "part.label");
+    if (data.initialStates !== undefined)
+      mechanismStates(data.initialStates, partIds, "initialStates");
     items(data.frames, "frames", 16);
     for (const frame of data.frames) {
       string(frame.title, "frame.title");
       string(frame.explanation, "frame.explanation");
-      const states = items(frame.states, "states", 8);
-      if (
-        states.size !== partIds.size ||
-        [...states].some((id) => !partIds.has(id))
-      )
-        fail("Each frame must describe every stable part exactly once.");
-      for (const state of frame.states) {
-        string(state.value, "state.value");
-        if (!["changed", "retained", "fixed"].includes(state.status))
-          fail("State status must be changed, retained or fixed.");
+      for (const key of [
+        "headline",
+        "inputSummary",
+        "outputSummary",
+        "actionLabel",
+        "nextHint",
+      ]) {
+        if (frame[key] !== undefined) {
+          string(frame[key], `frame.${key}`);
+          if (frame[key].length > 240)
+            fail(`frame.${key} must fit 240 characters.`);
+        }
       }
+      mechanismStates(frame.states, partIds, "states");
       if (!Array.isArray(frame.links)) fail("frame.links must be an array.");
       for (const link of frame.links) {
         if (!partIds.has(link.from) || !partIds.has(link.to))

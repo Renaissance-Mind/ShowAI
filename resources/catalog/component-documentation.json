@@ -8172,27 +8172,58 @@
       "boundaries": ["内容与证据由实例提供；阅读操作只改变当前视图。"]
     },
     "usage": {
-      "purpose": "固定对象位置，逐步比较什么改变、什么保留，以及改变如何传递。",
+      "purpose": "用当前步骤的前后状态对照，解释变化原因、承接内容与下一步。",
       "structure": [
-        "机制、算法、实验或流程的逐步状态变化。",
-        "比较每轮变化、继承位置和外部固定条件。"
+        "顶部进度导航选择步骤，中心展示进入本步前、处理动作和完成本步后。",
+        "输入状态来自上一帧；第一帧可以提供 initialStates。省略初始状态时展示对象名称，不编造初始值。",
+        "本步改变、承接保留、保持固定按 states.status 汇总；固定对象的值保持可读，关系从 links 展示。"
       ],
       "inputs": [
         {
           "path": "parts",
-          "meaning": "2–8 个稳定对象，顺序就是画面中的空间顺序。"
+          "meaning": "稳定对象的 id 与名称；所有状态及关系通过 id 对齐。最多 8 个。"
         },
         {
           "path": "frames",
-          "meaning": "每步写全同一组对象的状态，解释箭头的作用与成立条件。"
+          "meaning": "最多 16 个步骤。每步 states 必须恰好覆盖所有 parts.id，保留 explanation、links、condition 和 sources。"
+        },
+        {
+          "path": "initialStates",
+          "meaning": "可选第一步输入状态，结构与 frames[].states 相同。未提供时不推断对象的初始值。"
+        },
+        {
+          "path": "frames[].inputSummary",
+          "meaning": "进入本步前的短说明，最多 240 字符；省略时使用上一帧的输出说明或标题。"
+        },
+        {
+          "path": "frames[].outputSummary",
+          "meaning": "完成本步后的短说明，最多 240 字符；省略时使用本步标题。"
+        },
+        {
+          "path": "frames[].actionLabel",
+          "meaning": "前后对照之间的处理动作，最多 240 字符；省略时使用本步标题。"
+        },
+        {
+          "path": "frames[].nextHint",
+          "meaning": "下一步提示，最多 240 字符；省略时使用下一步标题，末步显示完成提示。"
+        },
+        {
+          "path": "frames[].states[].tokens",
+          "meaning": "可选的候选或对象标签，最多 12 项，每项最多 80 字符；value 仍然提供完整状态描述。"
+        },
+        {
+          "path": "frames[].headline",
+          "meaning": "可选的本步讲解标题，最多 240 字符；title 用作简短的步骤导航。"
         }
       ],
       "recipes": [
         {
           "title": "从理解任务填入真实材料",
           "steps": [
-            "保持稳定对象和共同比较维度，将重要条件与来源就近写入。",
-            "检查初始视图、主要操作、重置和全部内容的连续阅读。"
+            "先确定跨步骤保持身份一致的 parts，再逐帧填写完整 states、explanation 和 links。",
+            "如需要第一步前后对比，提供覆盖所有对象的 initialStates。",
+            "用 inputSummary、outputSummary、actionLabel 简洁说明状态怎样转换；tokens 只承载明确给出的对象标签。",
+            "核对上一帧到当前帧的连续性、关键变化、成立条件与来源，使用下一步、回到起点和展开全部检查完整机制。"
           ],
           "exampleIndex": 0
         }
@@ -8200,18 +8231,19 @@
       "interactions": [
         {
           "action": "选择步骤、上一步或下一步",
-          "effect": "相同位置展示该步状态、关系、说明与来源。",
+          "effect": "以相同对象身份对照上一帧与当前帧，并展示处理动作、状态分组、条件和来源；方向键及 Home/End 可切换导航步骤。",
           "persistence": "view"
         },
         {
           "action": "回到起点或展开全部步骤",
-          "effect": "恢复初始状态，或连续对照所有步骤；打印自动展开。",
+          "effect": "恢复初始步骤，或连续阅读所有步骤的前后对照；打印自动展开全部。",
           "persistence": "view"
         }
       ],
       "constraints": [
         "每个 frame.states 必须恰好覆盖所有 parts.id；状态不得靠颜色单独表达。",
-        "图示由作者定义，不能把概念关系冒充实测因果。"
+        "图示由作者定义，不能把概念关系冒充实测因果。",
+        "changed 表示本步改变，retained 表示承接保留，fixed 表示本步固定；不能把 fixed 自动解释为尚未执行。"
       ],
       "editing": {
         "data": ["修改实例数据后经宿主页面保存。"],

@@ -1132,8 +1132,8 @@
   {
     "kind": "mechanism-steps",
     "name": "机制分镜",
-    "description": "固定对象位置，逐步比较什么改变、什么保留，以及改变如何传递。",
-    "version": "1.0.0",
+    "description": "通过前后状态对照，逐步讲清每一步改变什么、保留什么，以及结果如何传到下一步。",
+    "version": "1.1.0",
     "scenarios": [
       "机制、算法、实验或流程的逐步状态变化。",
       "比较每轮变化、继承位置和外部固定条件。"
@@ -1208,6 +1208,16 @@
                     },
                     "status": {
                       "enum": ["changed", "retained", "fixed"]
+                    },
+                    "tokens": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "maxItems": 12,
+                      "description": "可选的对象或候选标签，作为可读的状态标记展示。"
                     }
                   },
                   "required": ["id", "value", "status"],
@@ -1256,12 +1266,75 @@
                   "additionalProperties": false
                 },
                 "maxItems": 80
+              },
+              "inputSummary": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 240,
+                "description": "进入本步前的简要状态说明。"
+              },
+              "outputSummary": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 240,
+                "description": "完成本步后的简要结果说明。"
+              },
+              "actionLabel": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 240,
+                "description": "前后状态之间的处理动作。"
+              },
+              "nextHint": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 240,
+                "description": "本步结束后需要继续关注的内容。"
+              },
+              "headline": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 240,
+                "description": "可选的本步讲解标题；title 保持适合导航的短标题。"
               }
             },
             "required": ["id", "title", "explanation", "states", "links"],
             "additionalProperties": false
           },
           "maxItems": 16
+        },
+        "initialStates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "enum": ["changed", "retained", "fixed"]
+              },
+              "tokens": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "maxItems": 12,
+                "description": "可选的对象或候选标签，作为可读的状态标记展示。"
+              }
+            },
+            "required": ["id", "value", "status"],
+            "additionalProperties": false
+          },
+          "maxItems": 8,
+          "description": "可选的第一步输入状态；每个 parts.id 恰好出现一次。省略时先介绍对象，不假设初始值。"
         }
       },
       "required": ["title", "parts", "frames"],
@@ -1307,7 +1380,10 @@
                   "to": "d",
                   "label": "组成 2/4"
                 }
-              ]
+              ],
+              "inputSummary": "观察原始分子和分母。",
+              "outputSummary": "原始比例为 2 / 4。",
+              "actionLabel": "记录原始比例"
             },
             {
               "id": "after",
@@ -1332,7 +1408,22 @@
                   "to": "d",
                   "label": "组成 1/2"
                 }
-              ]
+              ],
+              "inputSummary": "分子和分母来自同一个比例。",
+              "outputSummary": "同时除以 2，得到 1 / 2。",
+              "actionLabel": "同时除以 2"
+            }
+          ],
+          "initialStates": [
+            {
+              "id": "n",
+              "value": "2",
+              "status": "fixed"
+            },
+            {
+              "id": "d",
+              "value": "4",
+              "status": "fixed"
             }
           ]
         }
