@@ -98,7 +98,7 @@ The local browser edition supports macOS, Linux, and Windows. It can also be pac
 
 ## 🤖 Connect an agent
 
-ShowAI provides plugins for Codex and Claude Code. After installing a plugin and connecting to the ShowAI runtime, you can ask for content directly:
+ShowAI connects to ChatGPT on the web through the hosted MCP server, and to Codex and Claude Code through local plugins. Ask for what you want to create:
 
 > Create a model research report in the current project, with sources, a comparison table, and conclusions on the same page.
 
@@ -106,7 +106,30 @@ ShowAI provides plugins for Codex and Claude Code. After installing a plugin and
 
 > Turn this page into a reusable template and create an example that uses it.
 
-### Install a plugin
+### ChatGPT on the web
+
+Connect the hosted ShowAI MCP server to create, save, and edit interactive pages in regular chats on [chatgpt.com](https://chatgpt.com). After account setup, everyday web use needs no local ShowAI process or separate Skill installation. Your ChatGPT account must support custom MCP servers, subject to workspace permissions.
+
+1. **Get a ShowAI Cloud account.** Registration is currently controlled: ask a project administrator for an invitation link or the Cloud operator for a registration key ([account access inquiries](https://github.com/Renaissance-Mind/ShowAI/issues)). Complete initial registration in the ShowAI desktop or local browser workbench: with a key, open **Settings → Servers and sync → Server accounts → Add server account**, enter `https://showai.renaissancemind.ai/cloud`, and register with an account name and a password of at least 12 characters. With an invitation, paste it into **Project sync → Join shared project**, then register in the invitation card; no registration key is needed. Existing Cloud accounts can skip this step.
+2. **Add the connection.** Open [ChatGPT Plugins](https://chatgpt.com/plugins), select **+ → Add custom MCP server**, and use the settings below. Create it as a plugin, then install it.
+3. **Sign in and authorize.** Use your ShowAI account and password, or GitHub/Google already linked to that account. Social sign-in opens another tab; copy its 8-character completion code back into the original ShowAI authorization tab and continue. To create projects, authorize **all projects this account can access now and in the future** and check that consent includes **project creation**, reading, and editing. A single-project grant covers only that existing project. Member permissions still apply.
+4. **Try it.** Start a new chat, type `@`, select **ShowAI**, and ask: “List my ShowAI projects. Then create a project called My Interactive Notes, make an interactive page about opportunity cost, save it, confirm sync status, and present it here.” Review write actions when ChatGPT prompts you. You can later find and edit the saved page by project and page name.
+
+| Setting | Value |
+| --- | --- |
+| Name | `ShowAI` |
+| Server URL | `https://agent.showai.renaissancemind.ai/mcp` |
+| Authentication | **OAuth or no authentication** |
+| OAuth client registration, if prompted | **Dynamic Client Registration (DCR)** |
+| Client ID / Client Secret | Leave blank; DCR registers automatically |
+
+The MCP URL ends in `/mcp`; the workbench account/sync URL ends in `/cloud`. Public components, templates, and temporary rendering work without sign-in. Private project access requires a ShowAI account. Projects stored only on your computer must be synced to the same Cloud account first. Workflow guides are served through MCP from the shared Skill sources.
+
+**Updates:** ShowAI maintainers deploy server and guide updates; later calls use the deployed version. Start a new chat to load current guidance. When tools, parameters, authentication metadata, or preview resources change, open **ChatGPT Plugins → your ShowAI connection → Refresh**, then start a new chat and select `@ShowAI` again. Expired sign-in or a broader project scope requires reauthorization. No ZIP download is needed. Share this guide and the MCP URL with others; each person adds and authorizes their own connection.
+
+See the [complete ChatGPT web guide](https://showai.renaissancemind.ai/en/doc/chatgpt) for account setup, the completion-code flow, permission troubleshooting, and preview retry steps. ChatGPT UI labels and availability can vary; see [OpenAI's custom MCP instructions](https://developers.openai.com/api/docs/guides/custom-mcp-server#how-to-use).
+
+### Install a local plugin
 
 **Codex**: Requires the [Codex CLI](https://github.com/openai/codex) on your `PATH`. Run in the repository directory:
 
@@ -208,6 +231,7 @@ See [Content library](docs/versioned-library.md) and [Project server and synchro
 
 | Document | Contents |
 | --- | --- |
+| [ChatGPT web guide](https://showai.renaissancemind.ai/en/doc/chatgpt) | Account setup, MCP connection, OAuth, and updates |
 | [Quick start](docs/quick-start.md) *(Chinese)* | First project, first page, and agent connection |
 | [Page and Board](docs/page-surface.md) *(Chinese)* | Pages, boards, and interaction |
 | [Agent guide](docs/agent-usage.md) | CLI, MCP, authoring, and export |

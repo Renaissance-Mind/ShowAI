@@ -98,7 +98,7 @@ npm run desktop
 
 ## 🤖 连接 Agent
 
-ShowAI 提供 Codex 与 Claude Code 插件。安装插件并连接 ShowAI 运行时后，可以直接提出创作需求：
+ShowAI 通过官方 MCP 接入网页版 ChatGPT，也提供 Codex 与 Claude Code 本机插件。连接后可以直接提出创作需求：
 
 > 在当前项目中做一份模型调研报告，把来源、对比表和结论组织在同一页。
 
@@ -106,7 +106,30 @@ ShowAI 提供 Codex 与 Claude Code 插件。安装插件并连接 ShowAI 运行
 
 > 把这页整理成可复用模板，并生成一个应用示例。
 
-### 安装插件
+### 网页版 ChatGPT
+
+在 [chatgpt.com](https://chatgpt.com) 添加官方 ShowAI MCP，就能在普通网页对话里创建、保存和续改交互页面。完成账号开通后，日常网页使用无需运行本机 ShowAI 或另装 Skills。ChatGPT 账号需具备添加自定义 MCP 的功能，并满足工作区权限要求。
+
+1. **开通 ShowAI Cloud 账号。** 当前为受控注册：向项目管理员索取邀请链接，或向 Cloud 维护者索取注册密钥（[开通咨询](https://github.com/Renaissance-Mind/ShowAI/issues)）。首次注册使用 ShowAI 桌面版或本地浏览器工作台。有密钥时，在「设置 → 服务器与同步 → 服务器账号 → 添加服务器账号」填写 `https://showai.renaissancemind.ai/cloud`，选择注册，设置账号及至少 12 位密码；有邀请时，在「项目同步 → 加入共享项目」粘贴邀请，在邀请卡片中注册，不需要注册密钥。已有 Cloud 账号可跳过。
+2. **添加 MCP 连接。** 打开 [ChatGPT 插件页面](https://chatgpt.com/plugins)，点击「+ → Add custom MCP server」，按下表配置。创建为插件后，安装刚创建的 ShowAI。
+3. **登录并授权。** 使用 ShowAI 账号密码，或已绑定到该账号的 GitHub / Google。第三方登录会打开新标签页；将最后显示的 8 位完成码填回最初的 ShowAI 授权页，点击继续。需要新建项目时，选择「授权这个账号当前及今后有权限的所有项目」，并核对授权页包含新建、读取及编辑权限。只授权一个项目时，仅能访问该已有项目。各项目的成员权限仍然有效。
+4. **试做一页。** 新开普通网页对话，输入 `@` 选择 **ShowAI**，发送：「列出我的 ShowAI 项目。然后新建项目『我的交互笔记』，做一页带互动示例的机会成本讲解，保存、确认同步状态，再在对话中展示。」按 ChatGPT 提示核对写入操作；以后可以按项目名和页面名找到它并继续修改。
+
+| 配置项 | 填写内容 |
+| --- | --- |
+| 名称 | `ShowAI` |
+| Server URL | `https://agent.showai.renaissancemind.ai/mcp` |
+| 认证方式 | **OAuth or no authentication（OAuth 或无认证）** |
+| OAuth 客户端注册（如出现） | **Dynamic Client Registration（DCR）** |
+| Client ID / Client Secret | 留空，由 DCR 自动注册 |
+
+MCP 地址以 `/mcp` 结尾，工作台账号与同步地址以 `/cloud` 结尾。公开组件、模板和临时渲染可匿名使用；私有项目需要 ShowAI 账号。只保存在电脑上的项目，要先同步到同一 Cloud 账号。创作指南由 MCP 从共用 Skill 源文件按需提供。
+
+**更新方式：** ShowAI 维护者部署服务和指南更新后，后续调用使用已部署版本，建议新开对话读取最新指南。工具、参数、认证声明或预览资源变化时，打开「ChatGPT 插件 → 你的 ShowAI 连接 → Refresh / 刷新工具」，再新开对话并重新选择 `@ShowAI`。登录到期或要扩大项目范围时需要重新授权。无需重新下载 ZIP。把本教程和 MCP 地址发给其他人，每个人添加连接、登录自己的账号即可。
+
+账号开通、完成码、权限排查和预览重试详见[网页版 ChatGPT 完整接入教程](https://showai.renaissancemind.ai/zh/doc/chatgpt)。ChatGPT 的入口名称和可用性可能随账号而变化，参见 [OpenAI 自定义 MCP 说明](https://developers.openai.com/api/docs/guides/custom-mcp-server#how-to-use)。
+
+### 安装本机插件
 
 **Codex**：需要先安装 [Codex CLI](https://github.com/openai/codex) 并确保其在 `PATH` 中。在仓库目录中执行：
 
@@ -208,6 +231,7 @@ node dist-runtime/scripts/cli.mjs export \
 
 | 文档 | 内容 |
 | --- | --- |
+| [网页版 ChatGPT 接入](https://showai.renaissancemind.ai/zh/doc/chatgpt) | 账号开通、MCP 配置、登录授权和更新 |
 | [快速开始](../quick-start.md) | 第一个项目、第一份页面与 Agent 接入 |
 | [Page 与 Board](../page-surface.md) | 页面、白板与交互 |
 | [Agent 使用说明](../agent-usage.md)（英文） | CLI、MCP、创作与导出 |
