@@ -704,11 +704,26 @@ export class AgentHost {
       const enabled = verified.data
         .flatMap((item: any) => item.skills)
         .filter((skill: any) => skill.enabled);
+      const expectedSkills = new Set(
+        await Promise.all(
+          (
+            await readdir(join(installedPath, "skills"), {
+              withFileTypes: true,
+            })
+          )
+            .filter((entry) => entry.isDirectory())
+            .map((entry) =>
+              realpath(join(installedPath, "skills", entry.name, "SKILL.md")),
+            ),
+        ),
+      );
+      const enabledPaths = await Promise.all(
+        enabled.map((skill: any) => realpath(String(skill.path))),
+      );
       if (
-        enabled.length !== 4 ||
-        enabled.some(
-          (skill: any) => !String(skill.path).startsWith(installedPath),
-        )
+        expectedSkills.size === 0 ||
+        enabledPaths.length !== expectedSkills.size ||
+        enabledPaths.some((path) => !expectedSkills.has(path))
       )
         throw new Error(t("isolation.skillsFailed"));
       await writeProtected(join(root, "isolation.json"), {
