@@ -129,6 +129,8 @@ export default function AgentSettings() {
   const mounted = useRef(true),
     settingsRef = useRef<Configuration | null>(null);
   const taskRef = useRef("");
+  const latestStatus = useRef<AgentHostStatus | null>(null);
+  const nextRemotePoll = useRef(0);
   taskRef.current = taskId;
   const choiceFocusRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
@@ -141,6 +143,7 @@ export default function AgentSettings() {
   const update = useCallback((next: AgentHostStatus) => {
     if (!mounted.current) return;
     settingsRef.current = next.settings;
+    latestStatus.current = next;
     setStatus(next);
   }, []);
   const refresh = useCallback(
@@ -158,10 +161,22 @@ export default function AgentSettings() {
       .invoke<AgentHostStatus>("agent:scan")
       .then(update)
       .catch((error) => setError(errorMessage(error)));
-    const timer = setInterval(
-      () => void refresh().catch((error) => setError(errorMessage(error))),
-      1200,
-    );
+    const timer = setInterval(() => {
+      const current = latestStatus.current;
+      if (
+        remoteExecution() &&
+        (Date.now() < nextRemotePoll.current ||
+          !current ||
+          (current.authorization.state !== "pending" &&
+            current.runtime.state !== "installing" &&
+            !current.tasks.some((task) => task.state === "running")))
+      )
+        return;
+      void refresh().catch((error) => {
+        nextRemotePoll.current = Date.now() + 30000;
+        setError(errorMessage(error));
+      });
+    }, 1200);
     return () => {
       mounted.current = false;
       clearInterval(timer);

@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { readOptional, writeProtected } from "./storage";
 import { AgentHost, type AgentHostOptions } from "./host";
+import type { AgentHostStatus } from "./types";
 import { FileStore } from "../core/store";
 import { openLibrary } from "../core/open-library";
 import { syncManager } from "../sync/manager";
@@ -240,8 +241,26 @@ export class RemoteAgentEngine {
       action === "agent:settings" ||
       action === "agent:source"
     ) {
-      const status = value as Record<string, unknown>;
-      value = { ...status, workspaceRoot: "", credentialRoot: "", tasks: [] };
+      const status = value as AgentHostStatus;
+      const mappings = (await syncManager(this.options.library).configuration())
+        .projects;
+      const allowed = new Set(
+        mappings
+          .filter(
+            (p) =>
+              !this.options.projectIds ||
+              this.options.projectIds.includes(p.remoteProjectId),
+          )
+          .map((p) => p.projectId),
+      );
+      value = {
+        ...status,
+        workspaceRoot: "",
+        credentialRoot: "",
+        tasks: status.tasks.filter(
+          (task) => !this.options.host || allowed.has(task.projectId),
+        ),
+      };
     }
     // Only successful replies are memoized; a timed-out caller retries with the same id.
     if (!remoteReadActionsForEngine.has(action))

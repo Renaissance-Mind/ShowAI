@@ -24,7 +24,7 @@ import type {
   AgentTurn,
 } from "../../agent-host/types";
 import { desktop, errorMessage } from "../bridge";
-import { AgentExecutionPicker } from "../AgentExecution";
+import { AgentExecutionPicker, remoteExecution } from "../AgentExecution";
 import type { Translator } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import strings from "../../i18n/messages/assistant";
@@ -474,31 +474,34 @@ export default function AssistantWorkbench({
   useEffect(() => {
     if (!conversation || !running) return;
     let stopped = false;
-    const timer = setInterval(() => {
-      void desktop
-        .invoke<{ turn: AgentTurn; threadId?: string }>("agent:turn", {
-          projectId: conversation.projectId,
-          conversationId: conversation.id,
-          id: running.id,
-        })
-        .then(({ turn, threadId }) => {
-          if (stopped) return;
-          setConversation((current) =>
-            current?.id === conversation.id
-              ? {
-                  ...current,
-                  threadId,
-                  turns: current.turns.map((item) =>
-                    item.id === turn.id ? turn : item,
-                  ),
-                }
-              : current,
-          );
-          if (turn.state !== "running")
-            void loadSummaries(conversation.projectId);
-        })
-        .catch((reason) => !stopped && setError(errorMessage(reason)));
-    }, 700);
+    const timer = setInterval(
+      () => {
+        void desktop
+          .invoke<{ turn: AgentTurn; threadId?: string }>("agent:turn", {
+            projectId: conversation.projectId,
+            conversationId: conversation.id,
+            id: running.id,
+          })
+          .then(({ turn, threadId }) => {
+            if (stopped) return;
+            setConversation((current) =>
+              current?.id === conversation.id
+                ? {
+                    ...current,
+                    threadId,
+                    turns: current.turns.map((item) =>
+                      item.id === turn.id ? turn : item,
+                    ),
+                  }
+                : current,
+            );
+            if (turn.state !== "running")
+              void loadSummaries(conversation.projectId);
+          })
+          .catch((reason) => !stopped && setError(errorMessage(reason)));
+      },
+      remoteExecution() ? 2000 : 700,
+    );
     return () => {
       stopped = true;
       clearInterval(timer);

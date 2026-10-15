@@ -219,7 +219,7 @@ test("relay refuses unauthorized projects and host filesystem actions", async ()
   ).toBe(400);
   expect(
     (await request("/destinations", { token: "revoked-session" })).status,
-  ).toBe(400);
+  ).toBe(401);
 });
 test("disabling sharing removes the Mac without opening any inbound listener", async () => {
   const status = await connector.status();

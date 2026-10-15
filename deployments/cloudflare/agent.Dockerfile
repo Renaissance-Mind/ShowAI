@@ -5,7 +5,7 @@ ENV DUGITE_CACHE_DIR=/tmp/showai-dugite-cache
 COPY package.json package-lock.json ./
 COPY scripts/download-cloud-git.mjs ./scripts/
 COPY deployments/cloudflare/dugite-git-assets.json ./deployments/cloudflare/
-RUN node scripts/download-cloud-git.mjs && npm ci
+RUN --mount=type=cache,target=/root/.npm node scripts/download-cloud-git.mjs && npm ci --maxsockets=4 --fetch-retries=5 --fetch-retry-mintimeout=2000 --fetch-retry-maxtimeout=30000
 FROM --platform=$BUILDPLATFORM node:24-bookworm-slim AS build
 WORKDIR /build
 ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
@@ -13,7 +13,7 @@ ENV DUGITE_CACHE_DIR=/tmp/showai-dugite-cache
 COPY package.json package-lock.json ./
 COPY scripts/download-cloud-git.mjs ./scripts/
 COPY deployments/cloudflare/dugite-git-assets.json ./deployments/cloudflare/
-RUN node scripts/download-cloud-git.mjs && npm ci
+RUN --mount=type=cache,target=/root/.npm node scripts/download-cloud-git.mjs && npm ci --maxsockets=4 --fetch-retries=5 --fetch-retry-mintimeout=2000 --fetch-retry-maxtimeout=30000
 COPY src ./src
 COPY scripts ./scripts
 COPY resources ./resources

@@ -35,7 +35,17 @@ async function identity(input, env) {
     redirect: "manual",
     signal: AbortSignal.timeout(15000),
   });
-  if (!response.ok) throw new Error("Sign in to the content server again.");
+  if (!response.ok) {
+    const details = await response.json().catch(() => ({}));
+    const error = new Error(
+      details.error?.message ??
+        `Content server request failed (${response.status}).`,
+    );
+    error.status = response.status;
+    error.code = details.error?.code;
+    error.retryAfter = response.headers.get("retry-after");
+    throw error;
+  }
   const me = await response.json();
   if (!me.user?.id || !me.serverId) throw new Error("Invalid server identity.");
   const tenant = await derived(
@@ -375,7 +385,13 @@ export default {
         new Request(request.url, { method: "POST", headers, body }),
       );
     } catch (error) {
-      return json({ ok: false, error: { message: error.message } }, 400);
+      const response = json(
+        { ok: false, error: { code: error.code, message: error.message } },
+        error.status ?? 400,
+      );
+      if (error.retryAfter)
+        response.headers.set("retry-after", error.retryAfter);
+      return response;
     }
   },
 };
