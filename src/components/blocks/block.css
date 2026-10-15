@@ -1656,6 +1656,7 @@
 .sb-table-scroll { overflow-x: auto; }
 .sb-table table, .sb-rich-text table { width: 100%; border-collapse: collapse; font-size: inherit; }
 .sb-table th, .sb-table td, .sb-rich-text th, .sb-rich-text td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #dce1d7; }
+.sb-table th, .sb-table td { border: 1px solid var(--line, var(--border, #e8ece5)); }
 .sb-table th, .sb-rich-text th { background: #f1f3ef; font-weight: 600; }
 .sb-table input { width: 100%; min-width: 70px; color: inherit; background: transparent; border: 0; font: inherit; }
 .sb-table-actions { display: flex; gap: 12px; margin-top: 10px; font-size: 12px; }
