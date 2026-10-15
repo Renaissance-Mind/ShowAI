@@ -6,6 +6,7 @@ import {
   Link2,
   Plus,
   RefreshCw,
+  Search,
   Upload,
   X,
 } from "../ui/icons";
@@ -121,6 +122,7 @@ export default function SyncSettings({
     "projects" | "dashboard" | "conflict" | "upload" | null
   >(null);
   const panelBody = useRef<HTMLDivElement>(null);
+  const panelTrigger = useRef<HTMLElement | null>(null);
   const actionFocus = useRef<HTMLElement | null>(null);
   const [remote, setRemote] = useState<SyncProject[]>([]),
     [dashboard, setDashboard] = useState<string | null>(null),
@@ -250,6 +252,8 @@ export default function SyncSettings({
       target.offsetParent !== null &&
       !target.matches(":disabled")
         ? target
+        : panel === "projects"
+          ? panelBody.current?.closest<HTMLElement>(".sync-dialog")
         : [
             ...(panelBody.current?.querySelectorAll<HTMLElement>(
               "input:not([disabled]),select:not([disabled]),button:not([disabled])",
@@ -260,6 +264,8 @@ export default function SyncSettings({
   }, [panel, busy]);
   async function run(action: () => Promise<unknown>) {
     const active = document.activeElement;
+    if (!panel && active instanceof HTMLElement && active !== document.body)
+      panelTrigger.current = active;
     actionFocus.current =
       active instanceof HTMLElement && active.closest(".sync-dialog")
         ? active
@@ -289,7 +295,11 @@ export default function SyncSettings({
         await desktop.invoke<SyncProject[]>("sync:projects", { connectionId }),
       );
   }
-  async function loadDashboard(connectionId: string, projectId?: string, focused = !!projectId) {
+  async function loadDashboard(
+    connectionId: string,
+    projectId?: string,
+    focused = !!projectId,
+  ) {
     setDashboardFocused(focused);
     const previousId = dashboard === connectionId ? managedProject : "";
     setPanel("dashboard");
@@ -507,7 +517,23 @@ export default function SyncSettings({
                     : t("noProjectsSyncing")}
                 </span>
               </div>
-              {connection.signedOut ? <div className="sync-server-actions"><span>{f("signedOut")}</span><button className="settings-button" onClick={() => openConnect({ url: connection.url, account: connection.user.name })}>{f("signIn")}</button></div> : <div className="sync-server-actions">
+              {connection.signedOut ? (
+                <div className="sync-server-actions">
+                  <span>{f("signedOut")}</span>
+                  <button
+                    className="settings-button"
+                    onClick={() =>
+                      openConnect({
+                        url: connection.url,
+                        account: connection.user.name,
+                      })
+                    }
+                  >
+                    {f("signIn")}
+                  </button>
+                </div>
+              ) : (
+                <div className="sync-server-actions">
                 <button
                   className="settings-button"
                   disabled={busy}
@@ -536,7 +562,8 @@ export default function SyncSettings({
                     aria-hidden="true"
                   />
                 </button>
-              </div>}
+                </div>
+              )}
               {!connection.signedOut && open && (
                 <SyncAccountPanel
                   connection={connection}
@@ -599,10 +626,22 @@ export default function SyncSettings({
               url={form.url}
               registrationKey={form.registrationKey}
               invite={preview?.invite}
-              onMethods={(methods) => setPasswordExpanded(!methods.some((method) => ["github", "google", "email"].includes(method)))}
+              onMethods={(methods) =>
+                setPasswordExpanded(
+                  !methods.some((method) =>
+                    ["github", "google", "email"].includes(method),
+                  ),
+                )
+              }
               onConnected={(id) => run(() => connected(id)).then(() => {})}
             />
-            <details className="sync-account-disclosure" open={passwordExpanded} onToggle={(event) => setPasswordExpanded(event.currentTarget.open)}>
+            <details
+              className="sync-account-disclosure"
+              open={passwordExpanded}
+              onToggle={(event) =>
+                setPasswordExpanded(event.currentTarget.open)
+              }
+            >
               <summary>{f("passwordMethod")}</summary>
               <p className="settings-help">{f("passwordHelp")}</p>
               <form
@@ -1065,12 +1104,16 @@ export default function SyncSettings({
                               {t("uploadAccount")}
                             </label>
                             <p className="settings-help">
-                              {status.connections.filter((item) => !item.signedOut).length
+                              {status.connections.filter(
+                                (item) => !item.signedOut,
+                              ).length
                                 ? t("uploadHelp")
                                 : t("needAccountFirst")}
                             </p>
                           </div>
-                          {!!status.connections.some((item) => !item.signedOut) && (
+                          {!!status.connections.some(
+                            (item) => !item.signedOut,
+                          ) && (
                             <div className="sync-detail-controls">
                               <select
                                 id={`sync-upload-${project.id}`}
@@ -1212,6 +1255,8 @@ export default function SyncSettings({
       {panel && (
         <Dialog
           key={panel}
+          initialFocus={panel === "projects" ? "container" : "auto"}
+          returnFocus={panelTrigger.current}
           title={
             panel === "upload"
               ? f("uploadTitle")
@@ -1340,93 +1385,154 @@ export default function SyncSettings({
               </section>
             )}
             {panel === "projects" && (
-              <section className="settings-group">
-                <p className="settings-help">
-                  {
-                    status.connections.find(
-                      (connection) => connection.id === server,
-                    )?.name
-                  }{" "}
-                  ·{" "}
-                  {
-                    status.connections.find(
-                      (connection) => connection.id === server,
-                    )?.user.name
-                  }
-                </p>
-                {!busy && !error && !remote.length && (
-                  <p className="settings-help">{t("noRemoteProjects")}</p>
-                )}
-                <input
-                  className="sync-project-search"
-                  aria-label={f("projectSearch")}
-                  placeholder={f("projectSearch")}
-                  value={projectQuery}
-                  onChange={(event) => setProjectQuery(event.target.value)}
-                />
-                {remote
-                  .filter((project) =>
-                    project.name
-                      .toLocaleLowerCase()
-                      .includes(projectQuery.toLocaleLowerCase()),
-                  )
-                  .map((project) => {
-                    const binding = status.projects.find(
-                      (item) =>
-                        item.connectionId === server &&
-                        item.remoteProjectId === project.id,
-                    );
-                    return (
-                  <div className="sync-connection" key={project.id}>
-                    <div className="settings-row-text">
-                      <h3>{project.name}</h3>
-                      <p>
-                        {role(project.role)}
-                        {project.archived ? ` · ${t("archived")}` : ""}
-                      </p>
-                    </div>
-                        {binding && (
-                          <label className="sync-check">
-                            <input
-                              type="checkbox"
-                              checked={!hidden.has(binding.projectId)}
-                              disabled={busy}
-                              onChange={(event) => {
-                                const visible = event.target.checked;
-                                void run(() =>
-                                  desktop.invoke("sync:projectVisibility", {
-                                    projectId: binding.projectId,
-                                    visible,
-                                  }),
-                                );
-                              }}
-                            />
-                            {f("showing")}
-                          </label>
-                        )}
-                    <button
-                      className="settings-button"
-                          disabled={busy}
-                      onClick={() =>
-                            void run(() => openRemote(server, project.id))
-                      }
-                    >
-                          {binding ? f("openProject") : f("download")}
-                    </button>
-                    {project.role === "admin" && (
-                      <button
-                        className="settings-button"
-                        disabled={busy}
-                        onClick={() =>
-                          void run(() => loadDashboard(server, project.id))
-                        }
-                      >
-                            {f("manageMembers")}
-                      </button>
-                    )}
-                  </div>
-                    );
-                  })}
+              <section className="sync-project-browser">
+                <div className="sync-project-browser-toolbar">
+                  <p className="sync-project-account">
+                    {connectionLabel(server)}
+                  </p>
+                  <label className="sync-project-search-field">
+                    <Search size={14} aria-hidden="true" />
+                    <input
+                      type="search"
+                      className="sync-project-search"
+                      aria-label={f("projectSearch")}
+                      placeholder={f("projectSearch")}
+                      value={projectQuery}
+                      onChange={(event) => setProjectQuery(event.target.value)}
+                    />
+                  </label>
+                </div>
+                <table className="sync-project-table">
+                  <colgroup>
+                    <col />
+                    <col className="sync-project-role-column" />
+                    <col className="sync-project-visibility-column" />
+                    <col className="sync-project-actions-column" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th scope="col">{f("projectColumn")}</th>
+                      <th scope="col" className="sync-project-role">
+                        {f("roleColumn")}
+                      </th>
+                      <th scope="col" className="sync-project-visibility">
+                        {f("showing")}
+                      </th>
+                      <th scope="col" className="sync-project-row-actions">
+                        {f("actionsColumn")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {remote
+                      .filter((project) =>
+                        project.name
+                          .toLocaleLowerCase()
+                          .includes(projectQuery.toLocaleLowerCase()),
+                      )
+                      .map((project) => {
+                        const binding = status.projects.find(
+                          (item) =>
+                            item.connectionId === server &&
+                            item.remoteProjectId === project.id,
+                        );
+                        return (
+                          <tr key={project.id}>
+                            <th scope="row" className="sync-project-row-name">
+                              <div className="sync-project-title">
+                                <span>{project.name}</span>
+                                {project.archived && (
+                                  <small>{t("archived")}</small>
+                                )}
+                              </div>
+                            </th>
+                            <td className="sync-project-role">
+                              {role(project.role)}
+                            </td>
+                            <td className="sync-project-visibility">
+                              {binding ? (
+                                <label className="sync-project-visibility-control">
+                                  <input
+                                    type="checkbox"
+                                    aria-label={f("showProject", {
+                                      name: project.name,
+                                    })}
+                                    checked={!hidden.has(binding.projectId)}
+                                    disabled={busy}
+                                    onChange={(event) => {
+                                      const visible = event.target.checked;
+                                      void run(() =>
+                                        desktop.invoke(
+                                          "sync:projectVisibility",
+                                          {
+                                            projectId: binding.projectId,
+                                            visible,
+                                          },
+                                        ),
+                                      );
+                                    }}
+                                  />
+                                  <span className="sync-project-visibility-caption">
+                                    {f("showing")}
+                                  </span>
+                                </label>
+                              ) : (
+                                <span className="sync-project-not-downloaded">
+                                  {f("notDownloaded")}
+                                </span>
+                              )}
+                            </td>
+                            <td className="sync-project-row-actions">
+                              <div>
+                                <button
+                                  className="settings-button sync-project-row-button"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void run(() =>
+                                      openRemote(server, project.id),
+                                    )
+                                  }
+                                >
+                                  {binding ? f("openCompact") : f("download")}
+                                </button>
+                                {project.role === "admin" && (
+                                  <button
+                                    className="settings-button sync-project-row-button"
+                                    disabled={busy}
+                                    onClick={() =>
+                                      void run(() =>
+                                        loadDashboard(server, project.id),
+                                      )
+                                    }
+                                  >
+                                    {f("shareCompact")}
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    {!busy &&
+                      !error &&
+                      !remote.some((project) =>
+                        project.name
+                          .toLocaleLowerCase()
+                          .includes(projectQuery.toLocaleLowerCase()),
+                      ) && (
+                        <tr>
+                          <td
+                            colSpan={4}
+                            className="sync-project-browser-empty"
+                          >
+                            {remote.length
+                              ? t("noMatchingProjects")
+                              : t("noRemoteProjects")}
+                          </td>
+                        </tr>
+                      )}
+                  </tbody>
+                </table>
               </section>
             )}
             {panel === "dashboard" && dashboard && (
@@ -1445,7 +1551,9 @@ export default function SyncSettings({
                 generatedInviteExpiresAt={generatedInviteExpiresAt}
                 generatedInvitePolicy={generatedInvitePolicy}
                 onSelect={(id) => {
-                  void run(() => loadDashboard(dashboard, id, dashboardFocused));
+                  void run(() =>
+                    loadDashboard(dashboard, id, dashboardFocused),
+                  );
                 }}
                 onCreate={(name) =>
                   run(async () => {
@@ -1453,7 +1561,11 @@ export default function SyncSettings({
                       "sync:createProject",
                       { connectionId: dashboard, name },
                     );
-                    await loadDashboard(dashboard, project.id, dashboardFocused);
+                    await loadDashboard(
+                      dashboard,
+                      project.id,
+                      dashboardFocused,
+                    );
                     setMessage(t("toast.projectCreated", { name }));
                   })
                 }

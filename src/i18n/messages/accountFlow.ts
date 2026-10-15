@@ -1,6 +1,13 @@
 import { defineMessages } from "../index";
 export default defineMessages("accountFlow", {
   "zh-CN": {
+    projectColumn: "项目",
+    roleColumn: "身份",
+    actionsColumn: "操作",
+    openCompact: "打开",
+    shareCompact: "共享",
+    notDownloaded: "未下载",
+    showProject: "在本设备显示“{name}”",
     verifyToJoin: "验证身份后即可加入这个项目。",
     signOut: "退出此设备的账号",
     signOutHelp: "暂停此账号的同步，本机内容和项目显示选择保留。",
@@ -58,6 +65,13 @@ export default defineMessages("accountFlow", {
     accountAdvanced: "账号绑定与高级设置",
   },
   en: {
+    projectColumn: "Project",
+    roleColumn: "Role",
+    actionsColumn: "Actions",
+    openCompact: "Open",
+    shareCompact: "Share",
+    notDownloaded: "Not downloaded",
+    showProject: "Show “{name}” on this device",
     verifyToJoin: "Verify your identity to join this project.",
     signOut: "Sign out on this device",
     signOutHelp:

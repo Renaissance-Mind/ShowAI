@@ -724,7 +724,7 @@
   font-weight: 600;
 }
 .sync-dialog .settings-button,
-.sync-dialog input:not([type="radio"]),
+.sync-dialog input:not([type="radio"], [type="checkbox"]),
 .sync-dialog select {
   min-height: 38px;
   font-size: 13px;
@@ -1293,14 +1293,230 @@
 .sync-management.sync-management-focused {
   grid-template-columns: minmax(0, 1fr);
 }
-.sync-project-search {
+.sync-projects-dialog.wide {
+  width: min(980px, 100%);
+}
+.sync-projects-dialog:focus {
+  outline: none;
+}
+.sync-projects-dialog > header {
+  padding: 14px 20px;
+}
+.sync-projects-dialog .sync-dialog-body {
+  padding: 14px 20px 16px;
+}
+.sync-project-browser-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+.sync-project-account {
+  margin: 0;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sync-project-search-field {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 1 240px;
+  min-width: 140px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  background: var(--paper);
+}
+.sync-project-search-field > svg {
+  flex-shrink: 0;
+}
+.sync-projects-dialog input.sync-project-search {
   width: 100%;
-  padding: 9px 12px;
-  margin-bottom: 12px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--bg);
-  color: inherit;
+  height: 30px;
+  min-height: 30px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  font-size: 12px;
+}
+.sync-projects-dialog input.sync-project-search:focus-visible {
+  outline: none;
+}
+.sync-project-search-field:has(input:focus-visible) {
+  outline: 1px solid var(--muted);
+  outline-offset: 2px;
+}
+.sync-project-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  text-align: left;
+}
+.sync-project-role-column {
+  width: 72px;
+}
+.sync-project-visibility-column {
+  width: 116px;
+}
+.sync-project-actions-column {
+  width: 164px;
+}
+.sync-project-table thead th {
+  height: 30px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+.sync-project-table tbody :is(th, td) {
+  height: 44px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+  font-size: 13px;
+  font-weight: 400;
+}
+.sync-project-table :is(th, td):first-child {
+  padding-left: 0;
+}
+.sync-project-table :is(th, td):last-child {
+  padding-right: 0;
+}
+.sync-project-table .sync-project-role {
+  text-align: right;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.sync-project-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+.sync-project-title > span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.sync-project-title > small {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.sync-project-table .sync-project-visibility {
+  text-align: center;
+}
+.sync-project-visibility-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  gap: 6px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.sync-projects-dialog .sync-project-visibility-control input {
+  display: block;
+  width: 14px;
+  height: 14px;
+  min-height: 14px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--brand-accent, var(--accent));
+}
+.sync-project-visibility-caption {
+  display: none;
+}
+.sync-project-not-downloaded {
+  color: var(--muted);
+  font-size: 12px;
+}
+.sync-project-row-actions {
+  text-align: right;
+}
+.sync-project-row-actions > div {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.sync-projects-dialog .sync-project-row-button {
+  min-height: 28px;
+  height: 28px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  line-height: 20px;
+  background: var(--paper);
+}
+.sync-project-row-button:hover:not(:disabled) {
+  background: var(--surface);
+}
+.sync-project-table .sync-project-browser-empty {
+  height: 64px;
+  color: var(--muted);
+  text-align: center;
+}
+@media (pointer: coarse) {
+  .sync-projects-dialog .sync-project-row-button,
+  .sync-project-visibility-control {
+    min-height: 36px;
+  }
+}
+@media (max-width: 600px) {
+  .sync-project-browser-toolbar {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .sync-project-search-field {
+    flex-basis: 100%;
+  }
+  .sync-project-table colgroup,
+  .sync-project-table thead {
+    display: none;
+  }
+  .sync-project-table tbody {
+    display: block;
+  }
+  .sync-project-table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 4px 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .sync-project-table tbody :is(th, td) {
+    height: auto;
+    padding: 0;
+    border: 0;
+  }
+  .sync-project-table .sync-project-visibility {
+    text-align: left;
+  }
+  .sync-project-visibility-caption {
+    display: inline;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .sync-project-browser-empty {
+    grid-column: 1 / -1;
+  }
 }
 .sync-upload-dialog .sync-field {
   margin: 18px 0;

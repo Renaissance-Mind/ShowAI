@@ -13,6 +13,8 @@ export default function Dialog({
   headerContent,
   headerActions,
   dismissible = true,
+  initialFocus = "auto",
+  returnFocus,
 }: {
   title: string;
   children: ReactNode;
@@ -23,6 +25,8 @@ export default function Dialog({
   headerContent?: ReactNode;
   headerActions?: ReactNode;
   dismissible?: boolean;
+  initialFocus?: "auto" | "container";
+  returnFocus?: HTMLElement | null;
 }) {
   const t = useTranslator(studioMessages);
   const panel = useRef<HTMLDivElement>(null);
@@ -30,12 +34,13 @@ export default function Dialog({
   close.current = dismissible ? onClose : () => {};
   useEffect(() => {
     const previous = document.activeElement as HTMLElement;
-    (
-      panel.current?.querySelector<HTMLElement>(
-        className.includes("catalog-")
-          ? '[role="tab"][aria-selected="true"]'
-          : "input:not([disabled]),textarea:not([disabled]),select:not([disabled])",
-      ) ?? panel.current?.querySelector<HTMLElement>("button")
+    (initialFocus === "container"
+      ? panel.current
+      : (panel.current?.querySelector<HTMLElement>(
+          className.includes("catalog-")
+            ? '[role="tab"][aria-selected="true"]'
+            : "input:not([disabled]),textarea:not([disabled]),select:not([disabled])",
+        ) ?? panel.current?.querySelector<HTMLElement>("button"))
     )?.focus();
     const handle = (event: KeyboardEvent) => {
       // A local file picker can sit above a component or publication dialog.
@@ -65,7 +70,10 @@ export default function Dialog({
         );
         const first = items[0],
           last = items.at(-1);
-        if (!panel.current?.contains(document.activeElement)) {
+        if (
+          document.activeElement === panel.current ||
+          !panel.current?.contains(document.activeElement)
+        ) {
           event.preventDefault();
           (event.shiftKey ? last : first)?.focus();
           return;
@@ -83,7 +91,9 @@ export default function Dialog({
     document.addEventListener("keydown", handle);
     return () => {
       document.removeEventListener("keydown", handle);
-      previous?.focus();
+      (returnFocus?.isConnected ? returnFocus : previous)?.focus({
+        preventScroll: true,
+      });
     };
   }, []);
   return (
@@ -98,6 +108,7 @@ export default function Dialog({
         role="dialog"
         aria-modal="true"
         aria-label={title}
+        tabIndex={-1}
         className={`studio-modal ${wide ? "wide" : ""} ${className}`}
       >
         <header>
