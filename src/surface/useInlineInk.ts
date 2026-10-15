@@ -309,7 +309,10 @@ export function useInlineInk({
           (change) =>
             !(
               navigating.current &&
-              change.target === content &&
+              (change.target === content ||
+                change.target === surface ||
+                (change.target instanceof Element &&
+                  change.target.classList.contains("surface-grid"))) &&
               change.attributeName === "style"
             ),
         )

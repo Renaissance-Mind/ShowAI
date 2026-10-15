@@ -1885,6 +1885,7 @@ export default function PageSurface({
           {header}
         </div>
         <div ref={scrollRef} className="surface-scroll">
+          <div className="surface-grid" aria-hidden="true" />
           <div ref={worldRef} className="surface-world">
             {children}
           </div>

@@ -189,6 +189,9 @@ export function useSurfaceViewport(
     const root = rootRef.current!,
       scroll = scrollRef.current!,
       world = worldRef.current!;
+    const gridLayer = scroll.querySelector<HTMLElement>(
+      ":scope > .surface-grid",
+    );
     const ownsInput = (target: EventTarget | null) =>
       enabledRef.current &&
       (!(target instanceof Element) ||
@@ -373,13 +376,16 @@ export function useSurfaceViewport(
         );
       world.style.transform = transform;
       // Selection chrome and the dot grid read these to stay screen-sized.
-      root.style.setProperty("--board-zoom", String(c.scale));
+      if (root.style.getPropertyValue("--board-zoom") !== String(c.scale))
+        root.style.setProperty("--board-zoom", String(c.scale));
       const grid = gridSpacing(c.scale);
-      root.style.setProperty("--board-grid-size", `${grid}px`);
-      root.style.setProperty(
-        "--board-grid-position",
-        `${c.x % grid}px ${c.y % grid}px`,
-      );
+      if (gridLayer) {
+        if (
+          gridLayer.style.getPropertyValue("--board-grid-size") !== `${grid}px`
+        )
+          gridLayer.style.setProperty("--board-grid-size", `${grid}px`);
+        gridLayer.style.transform = `translate3d(${c.x % grid}px, ${c.y % grid}px, 0)`;
+      }
       // Only the zoom controls subscribe; objects read the camera directly.
       scale.set(c.scale);
     };

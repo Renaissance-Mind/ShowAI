@@ -123,7 +123,12 @@
 .surface-object[data-erasing="true"] {
   opacity: 0.35 !important;
 }
-.board-eraser-cursor { fill: #64748b18; stroke: #64748b; stroke-width: 1; pointer-events: none; }
+.board-eraser-cursor {
+  fill: #64748b18;
+  stroke: #64748b;
+  stroke-width: 1;
+  pointer-events: none;
+}
 .surface-object-content {
   padding: 18px 28px 26px;
   min-width: 0;
@@ -925,15 +930,23 @@ body:has([data-showai-development]) .surface-toolbar {
   pointer-events: auto;
 }
 
-/* A dot grid that pans and zooms with the editing Board. */
-.page-surface.has-board-grid > .surface-scroll {
+/* Move one composited texture while panning instead of repainting the viewport. */
+.surface-grid {
+  display: none;
+}
+.page-surface.has-board-grid > .surface-scroll > .surface-grid {
+  display: block;
+  position: absolute;
+  inset: calc(0px - var(--board-grid-size, 24px));
+  pointer-events: none;
+  contain: strict;
+  will-change: transform;
   background-image: radial-gradient(
     circle,
     color-mix(in srgb, var(--text, #252629) 18%, transparent) 1px,
     transparent 1.4px
   );
   background-size: var(--board-grid-size, 24px) var(--board-grid-size, 24px);
-  background-position: var(--board-grid-position, 0 0);
 }
 
 .page-surface.is-hand .surface-world *,
@@ -1022,7 +1035,7 @@ body:has([data-showai-development]) .board-minimap {
   .board-lock-badge {
     display: none !important;
   }
-  .page-surface.has-board-grid > .surface-scroll {
-    background: none;
+  .page-surface.has-board-grid > .surface-scroll > .surface-grid {
+    display: none;
   }
 }

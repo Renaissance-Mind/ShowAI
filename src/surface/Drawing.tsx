@@ -457,12 +457,15 @@ export function DrawingInput({
     const root = surface.current?.closest(".page-surface");
     root?.addEventListener("showai-board-pinch", cancel);
     // Panning while drawing keeps the preview attached to the content.
-    root?.addEventListener("showai:viewport-change", repaint);
+    const viewportChanged = () => {
+      if (pending.current) repaint();
+    };
+    root?.addEventListener("showai:viewport-change", viewportChanged);
     window.addEventListener("blur", blur);
     return () => {
       window.removeEventListener("blur", blur);
       root?.removeEventListener("showai-board-pinch", cancel);
-      root?.removeEventListener("showai:viewport-change", repaint);
+      root?.removeEventListener("showai:viewport-change", viewportChanged);
     };
   }, []);
   const modifiersOf = (event: Modifiers): Modifiers => ({
