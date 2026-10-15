@@ -85,6 +85,8 @@ export interface AgentTurn extends AgentTask {
   pageTitle?: string;
   baseHash?: string;
   resultHash?: string;
+  /** Whether this turn's MCP actually wrote the focused page. */
+  wrotePage?: boolean;
   changedBlockIds?: string[];
   undone?: boolean;
 }

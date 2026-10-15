@@ -13,6 +13,8 @@ import type { AgentConversation, AgentTurn } from "./types";
 import { FileStore } from "../core/store";
 import { openLibrary } from "../core/open-library";
 import { AgentService } from "../agent/service";
+import { pageWriteCapture, type PageWrite } from "../core/page-write-capture";
+import { savePageWrites } from "./page-undo";
 
 let directory: string, library: FileStore, host: AgentHost, log: string;
 
@@ -179,15 +181,19 @@ test("undo restores the page only while it still matches the turn result", async
   ).rejects.toThrow();
   // Simulate the Agent's write, then record it as the turn result.
   const current = await library.readPage(project.id, page.document.id);
-  const saved = await new AgentService({ root: library.root }).savePage(
-    project.id,
-    page.document.id,
-    { ...current.document, title: "After" },
-    current.hash,
-    undefined,
-    undefined,
-    current.revision,
+  const writes: PageWrite[] = [];
+  const saved = await pageWriteCapture.run(writes, () =>
+    new AgentService({ root: library.root }).savePage(
+      project.id,
+      page.document.id,
+      { ...current.document, title: "After" },
+      current.hash,
+      undefined,
+      undefined,
+      current.revision,
+    ),
   );
+  await savePageWrites(host.conversations.writesPath(turn), writes);
   turn.resultHash = saved.hash;
   const undone = await host.undoTurn(project.id, conversation.id, turn.id);
   expect(undone.turns[0].undone).toBe(true);

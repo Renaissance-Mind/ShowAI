@@ -29,6 +29,7 @@ import {
   useWorkspaceEditor,
 } from "../../editor/workspace-editor";
 import { editorNodeJSON } from "../../editor/node-json";
+import { selectionBlockIds } from "./assistant-selection";
 import type { Editor, JSONContent, Extensions } from "@tiptap/core";
 import { NodeSelection, Selection, TextSelection } from "@tiptap/pm/state";
 import { clearWidgetSelection } from "./widget-selection";
@@ -184,19 +185,6 @@ function safeLinkUrl(value: string) {
 function isSyntheticId(id: string) {
   return id.startsWith("page-tail-");
 }
-/** The innermost id-carrying text blocks touched by a selection, else its top-level blocks. */
-function selectionBlockIds(editor: Editor, from: number, to: number) {
-  const inner: string[] = [];
-  const outer: string[] = [];
-  editor.state.doc.nodesBetween(from, to, (node, _pos, parent) => {
-    const id = node.attrs?.id;
-    if (typeof id !== "string" || isSyntheticId(id)) return;
-    if (node.isTextblock) inner.push(id);
-    else if (parent === editor.state.doc) outer.push(id);
-  });
-  return [...new Set(inner.length ? inner : outer)].slice(0, 100);
-}
-
 function menuPosition(editor: Editor, from: number) {
   const rect = editor.view.coordsAtPos(
     Math.min(from, editor.state.doc.content.size),
@@ -1837,7 +1825,7 @@ export default function RichTextEditor({
                   setBubble(null);
                   assistant.open({
                     kind: "text",
-                    blockIds: selectionBlockIds(editor, from, to),
+                    blockIds: selectionBlockIds(editor.state.doc, from, to),
                     text: editor.state.doc.textBetween(from, to, "\n"),
                     anchor,
                   });

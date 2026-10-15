@@ -50,6 +50,7 @@ import {
   targetInstructions,
 } from "./conversations";
 import { diffDocuments } from "../core/diff";
+import { readPageWrites, undoBaseline } from "./page-undo";
 import { translator } from "../i18n";
 import agentHostMessages from "../i18n/messages/agentHost";
 
@@ -1020,6 +1021,7 @@ export class AgentHost {
       target,
       pageTitle: page?.document.title,
       baseHash: page?.hash,
+      wrotePage: false,
     };
     if (page) await this.conversations.saveBase(turn, projectId, page.document);
     const resumable = this.resumable(conversation);
@@ -1079,23 +1081,34 @@ export class AgentHost {
         if (page)
           await library
             .readPage(projectId, page.document.id, { checkpoint: false })
-            .then((current) => {
+            .then(async (current) => {
               turn.resultHash = current.hash;
-              if (current.hash !== page.hash)
+              const writes = (
+                await readPageWrites(this.conversations.writesPath(turn))
+              ).filter(
+                (write) =>
+                  write.projectId === projectId &&
+                  write.pageId === page.document.id,
+              );
+              turn.wrotePage = writes.length > 0;
+              if (writes.length)
                 turn.changedBlockIds = [
                   ...new Set(
-                    diffDocuments(page.document, current.document).flatMap(
-                      (change) =>
+                    writes
+                      .flatMap((write) =>
+                        diffDocuments(write.before, write.after),
+                      )
+                      .flatMap((change) =>
                         "blockId" in change && change.type !== "block.removed"
                           ? [change.blockId]
                           : [],
-                    ),
+                      ),
                   ),
                 ].slice(0, 200);
             })
-            .catch((error: Error) =>
-              console.error("ShowAI Agent turn result:", error.message),
-            );
+            .catch((error: Error) => {
+              failure ??= error;
+            });
         turn.finishedAt = new Date().toISOString();
         if (turn.threadId) conversation.threadId = turn.threadId;
         conversation.updatedAt = turn.finishedAt;
@@ -1136,7 +1149,6 @@ export class AgentHost {
       !turn?.pageId ||
       !turn.baseHash ||
       !turn.resultHash ||
-      turn.baseHash === turn.resultHash ||
       turn.undone
     )
       throw new Error(t("turn.undoUnavailable"));
@@ -1146,12 +1158,14 @@ export class AgentHost {
     });
     if (current.hash !== turn.resultHash)
       throw new Error(t("turn.undoChanged"));
-    const base = await this.conversations.readBase(
-      projectId,
-      conversationId,
-      turnId,
+    const writes = (
+      await readPageWrites(this.conversations.writesPath(turn))
+    ).filter(
+      (write) => write.projectId === projectId && write.pageId === turn.pageId,
     );
-    if (!base) throw new Error(t("turn.undoUnavailable"));
+    if (!writes.length) throw new Error(t("turn.undoUnavailable"));
+    const base = undoBaseline(writes, current.hash);
+    if (!base) throw new Error(t("turn.undoChanged"));
     await new AgentService({ root: library.root }).savePage(
       projectId,
       turn.pageId,
@@ -1174,11 +1188,24 @@ export class AgentHost {
       if (callable) item.auth = "ready";
     }
   }
-  private mcp(cli: ReturnType<AgentHostOptions["cli"]>, projectId: string) {
+  private mcp(
+    cli: ReturnType<AgentHostOptions["cli"]>,
+    projectId: string,
+    task?: AgentTask,
+  ) {
     return {
       command: cli.command,
       args: [...cli.args, "mcp", "--project", projectId],
-      env: cli.env,
+      env: {
+        ...cli.env,
+        ...(task && "conversationId" in task
+          ? {
+              SHOWAI_AGENT_PAGE_WRITES: this.conversations.writesPath(
+                task as AgentTurn,
+              ),
+            }
+          : {}),
+      },
       required: true,
       tools: Object.fromEntries(
         [
@@ -1244,7 +1271,7 @@ export class AgentHost {
           memories: { generate_memories: false },
           ...(test
             ? {}
-            : { mcp_servers: { showai: this.mcp(cli, task.projectId) } }),
+            : { mcp_servers: { showai: this.mcp(cli, task.projectId, task) } }),
         },
       });
       const options = {
@@ -1336,7 +1363,7 @@ export class AgentHost {
       if (!test)
         args.push(
           "-c",
-          `mcp_servers.showai=${tomlTable(this.mcp(cli, task.projectId))}`,
+          `mcp_servers.showai=${tomlTable(this.mcp(cli, task.projectId, task))}`,
         );
       if (threadId) args.push(threadId);
       args.push(prompt);
@@ -1384,7 +1411,7 @@ export class AgentHost {
         args.push(
           "--mcp-config",
           JSON.stringify({
-            mcpServers: { showai: this.mcp(cli, task.projectId) },
+            mcpServers: { showai: this.mcp(cli, task.projectId, task) },
           }),
           "--allowedTools",
           "mcp__showai__*",
@@ -1529,7 +1556,7 @@ export class AgentHost {
         clientCapabilities: {},
         clientInfo: { name: "showai", version: "0.9.0" },
       });
-      const mcp = this.mcp(cli, task.projectId);
+      const mcp = this.mcp(cli, task.projectId, task);
       const session = await rpc.request("session/new", {
         cwd: task.workspace,
         mcpServers: test

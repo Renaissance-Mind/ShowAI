@@ -43,6 +43,8 @@ import { TEMPLATE_STAGES } from "../portable/template-bundle.mjs";
 import type { TemplateSelection } from "./template-workflow";
 import { compactMcpResult } from "./mcp-response";
 import { boardReadSchema, type BoardReadResult } from "./board-reading";
+import { pageWriteCapture, type PageWrite } from "../core/page-write-capture";
+import { savePageWrites } from "../agent-host/page-undo";
 
 const scopeSchema = z.enum([
   "builtin",
@@ -71,6 +73,7 @@ export function createMcpServer(options: {
   presentationDirectory?: string;
   sessionTemplates?: TemplateSelection[];
   projectAccess?: "library" | "project";
+  pageWriteDirectory?: string;
   storeProjectPresentation?: (
     value: Presentation,
   ) => Promise<import("./presentation-tools").PresentationDelivery>;
@@ -95,12 +98,19 @@ export function createMcpServer(options: {
       const original = tool.handler as ToolCallback<z.ZodRawShape>;
       tool.update({
         paramsSchema: { ...shape, projectId: z.string().min(1).optional() },
-        callback: ({ projectId: selected, ...args }, extra) => {
+        callback: async ({ projectId: selected, ...args }, extra) => {
           if (selected !== undefined && selected !== projectId)
             return mcpFailure(
               new Error("This MCP connection is bound to another project."),
             );
-          return original(args, extra);
+          if (!options.pageWriteDirectory) return original(args, extra);
+          const writes: PageWrite[] = [];
+          const result = await pageWriteCapture.run(writes, () =>
+            original(args, extra),
+          );
+          if (!result.isError)
+            await savePageWrites(options.pageWriteDirectory, writes);
+          return result;
         },
       });
     }
@@ -1050,7 +1060,10 @@ export async function startMcp(options: {
 }): Promise<void> {
   const service = new AgentService(options);
   await service.listPages(service.requireProject(options.projectId));
-  await createMcpServer(options).connect(
+  await createMcpServer({
+    ...options,
+    pageWriteDirectory: process.env.SHOWAI_AGENT_PAGE_WRITES,
+  }).connect(
     new StdioServerTransport(process.stdin, process.stdout, {
       maxBufferSize: CAPACITY.authoringRequestBytes,
     }),

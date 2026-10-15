@@ -2,6 +2,7 @@ import richTextTableAlignment from "../components/rich-text/table-alignment.ts?r
 import richTextTableSelection from "../components/rich-text/table-selection.ts?raw";
 import richTextExternalContent from "../components/rich-text/external-content.ts?raw";
 import richTextWidgetSelection from "../components/rich-text/widget-selection.ts?raw";
+import richTextAssistantSelection from "../components/rich-text/assistant-selection.ts?raw";
 import richTextDropCursor from "../components/rich-text/drop-cursor-cleanup.ts?raw";
 import richTextInsertion from "../components/rich-text/component-insertion.ts?raw";
 import richTextNodeViews from "../components/rich-text/NodeViews.tsx?raw";
@@ -112,6 +113,7 @@ const sources: Record<string, string> = {
   "rich-text/table-selection.ts": richTextTableSelection,
   "rich-text/external-content.ts": richTextExternalContent,
   "rich-text/widget-selection.ts": richTextWidgetSelection,
+  "rich-text/assistant-selection.ts": richTextAssistantSelection,
   "rich-text/drop-cursor-cleanup.ts": richTextDropCursor,
   "rich-text/component-insertion.ts": richTextInsertion,
   "rich-text/NodeViews.tsx": richTextNodeViews,

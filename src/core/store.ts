@@ -29,6 +29,7 @@ import {
 import { CoreError } from "./model";
 import { atomicRename } from "./atomic-rename";
 import { libraryMutations, legacyMutations } from "./history-context";
+import { pageWriteCapture } from "./page-write-capture";
 import { withLibraryLock } from "./library-lock";
 const projectionReads = new AsyncLocalStorage<string>();
 import { pageSummaries } from "./page-summaries";
@@ -1583,6 +1584,14 @@ export class FileStore {
     await this.atomicWrite(record.path, serializeArtifact(document));
     if (document.favorite !== current.document.favorite)
       await this.repositionPinnedEntry(projectId, pageId, document.favorite);
+    pageWriteCapture.getStore()?.push({
+      projectId,
+      pageId,
+      before: structuredClone(current.document),
+      beforeHash: current.hash,
+      after: structuredClone(document),
+      afterHash: hash,
+    });
     return record;
   }
 

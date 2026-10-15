@@ -97,7 +97,8 @@ function TurnView({
   const tools = turn.events.filter((event) => event.type === "tool");
   const changed = turn.changedBlockIds ?? [];
   const pageChanged =
-    !!turn.resultHash && !!turn.baseHash && turn.resultHash !== turn.baseHash;
+    turn.wrotePage ??
+    (!!turn.resultHash && !!turn.baseHash && turn.resultHash !== turn.baseHash);
   return (
     <article className="assistant-turn" aria-label={turn.label}>
       <div className="assistant-user">

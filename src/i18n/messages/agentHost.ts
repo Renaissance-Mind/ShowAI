@@ -59,7 +59,7 @@ export default defineMessages("agentHost", {
     "conversation.recapped":
       "这个 Agent 不支持续接会话，已把前几轮摘要附在请求中。",
     "turn.undoUnavailable": "这一轮没有可撤销的页面修改。",
-    "turn.undoChanged": "页面在这一轮之后又被修改过，不能直接撤销。",
+    "turn.undoChanged": "页面包含本轮之外的修改，不能直接撤销。",
     "turn.undoRunning": "这一轮仍在执行，停止后才能撤销。",
     "task.connectionTest": "连接测试",
     "task.checkingModel": "正在检验真实模型调用…",
@@ -189,7 +189,7 @@ export default defineMessages("agentHost", {
       "This Agent can't resume sessions, so a summary of earlier turns was included.",
     "turn.undoUnavailable": "This turn didn't change the page.",
     "turn.undoChanged":
-      "The page changed after this turn, so it can't be undone directly.",
+      "The page contains changes from outside this turn, so it can't be undone directly.",
     "turn.undoRunning": "This turn is still running. Stop it before undoing.",
     "task.connectionTest": "Connection test",
     "task.checkingModel": "Testing a real model call…",

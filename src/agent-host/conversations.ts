@@ -127,6 +127,13 @@ export class ConversationStore {
       assertId(turnId) + ".json",
     );
   }
+  writesPath(turn: Pick<AgentTurn, "projectId" | "conversationId" | "id">) {
+    return join(
+      this.directory(turn.projectId),
+      assertId(turn.conversationId) + ".bases",
+      assertId(turn.id) + ".writes",
+    );
+  }
   private recover(conversation: AgentConversation): AgentConversation {
     for (const turn of conversation.turns)
       if (turn.state === "running") {
