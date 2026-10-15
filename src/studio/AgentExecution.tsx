@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { desktop } from "./bridge";
 import type { AgentDestination } from "../agent-host/remote-protocol";
 import type { ConnectorSettings } from "../agent-host/remote-connector";
@@ -13,7 +13,7 @@ export function AgentExecutionPicker({
   disabled = false,
 }: {
   projectId?: string | null;
-  onChange?: () => void;
+  onChange?: (changed?: boolean) => void;
   disabled?: boolean;
 }) {
   const [context, setContext] = useState<{
@@ -21,23 +21,39 @@ export function AgentExecutionPicker({
     connectionId: string;
     destinationId: string;
     destinations: AgentDestination[];
+    error?: string;
   } | null>(null);
   const [error, setError] = useState("");
-  const load = () =>
-    desktop
+  const loadGeneration = useRef(0),
+    selectionGeneration = useRef(0);
+  const load = () => {
+    const generation = ++loadGeneration.current;
+    return desktop
       .invoke<NonNullable<typeof context>>("agent:execution", { projectId })
-      .then(setContext)
-      .catch((reason) => setError(reason.message));
+      .then((next) => {
+        if (generation === loadGeneration.current) {
+          setContext(next);
+          setError(next.error ?? "");
+        }
+      })
+      .catch((reason) => {
+        if (generation === loadGeneration.current) setError(reason.message);
+      });
+  };
   useEffect(() => {
     if (remoteExecution()) void load();
   }, [projectId]);
   if (!remoteExecution()) return null;
   const change = async (value: Record<string, string>) => {
+    const generation = ++selectionGeneration.current;
+    loadGeneration.current++;
     setError("");
     try {
       await desktop.invoke("agent:selectExecution", { projectId, ...value });
+      if (generation !== selectionGeneration.current) return;
       await load();
-      onChange?.();
+      if (generation !== selectionGeneration.current) return;
+      onChange?.(true);
       window.dispatchEvent(new Event("showai-agent-execution-change"));
     } catch (reason) {
       setError((reason as Error).message);
@@ -73,13 +89,21 @@ export function AgentExecutionPicker({
                 id: "cloud",
                 name: "ShowAI Cloud",
                 kind: "cloud",
-                online: true,
+                online: false,
               },
             ]
           ).map((d) => (
             <option key={d.id} value={d.id} disabled={!d.online}>
               {d.name}
-              {d.online ? "" : chinese() ? " · 离线" : " · Offline"}
+              {d.online
+                ? ""
+                : d.kind === "cloud"
+                  ? chinese()
+                    ? " · 暂不可用"
+                    : " · Unavailable"
+                  : chinese()
+                    ? " · 离线"
+                    : " · Offline"}
             </option>
           ))}
         </select>
@@ -88,7 +112,7 @@ export function AgentExecutionPicker({
         type="button"
         className="settings-button"
         disabled={disabled}
-        onClick={() => void load().then(() => onChange?.())}
+        onClick={() => void load().then(() => onChange?.(false))}
       >
         {chinese() ? "刷新设备" : "Refresh devices"}
       </button>

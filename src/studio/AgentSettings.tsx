@@ -132,6 +132,8 @@ export default function AgentSettings() {
   const latestStatus = useRef<AgentHostStatus | null>(null);
   const nextRemotePoll = useRef(0);
   const remoteStartUntil = useRef(0);
+  const executionGeneration = useRef(0);
+  const statusErrorText = useRef("");
   const statusError = useCallback((error: unknown) => {
     const code = (error as { code?: string }).code;
     if (code === "AGENT_STARTING") {
@@ -142,7 +144,8 @@ export default function AgentSettings() {
       remoteStartUntil.current = 0;
       nextRemotePoll.current = Date.now() + 30000;
     }
-    setError(errorMessage(error));
+    statusErrorText.current = errorMessage(error);
+    setError(statusErrorText.current);
   }, []);
   taskRef.current = taskId;
   const choiceFocusRef = useRef<HTMLElement | null>(null);
@@ -158,23 +161,34 @@ export default function AgentSettings() {
     settingsRef.current = next.settings;
     latestStatus.current = next;
     remoteStartUntil.current = 0;
+    const previousError = statusErrorText.current;
+    statusErrorText.current = "";
+    if (previousError)
+      setError((current) => (current === previousError ? "" : current));
     setStatus(next);
   }, []);
-  const refresh = useCallback(
-    async () =>
-      update(
-        await desktop.invoke<AgentHostStatus>("agent:status", {
-          taskId: taskRef.current || undefined,
-        }),
-      ),
-    [update],
-  );
+  const refresh = useCallback(async () => {
+    const generation = executionGeneration.current;
+    try {
+      const next = await desktop.invoke<AgentHostStatus>("agent:status", {
+        taskId: taskRef.current || undefined,
+      });
+      if (generation === executionGeneration.current) update(next);
+    } catch (error) {
+      if (generation === executionGeneration.current) throw error;
+    }
+  }, [update]);
   useEffect(() => {
     mounted.current = true;
+    const generation = executionGeneration.current;
     void desktop
       .invoke<AgentHostStatus>("agent:scan")
-      .then(update)
-      .catch(statusError);
+      .then((next) => {
+        if (generation === executionGeneration.current) update(next);
+      })
+      .catch((reason) => {
+        if (generation === executionGeneration.current) statusError(reason);
+      });
     const timer = setInterval(() => {
       const current = latestStatus.current;
       if (
@@ -258,8 +272,17 @@ export default function AgentSettings() {
         /^(?:http:\/\/)?(?:127\.0\.0\.1|localhost|\[::1\])(?::|\/)/.test(
           selected.baseUrl,
         ));
-  const executionChanged = () => {
+  const executionChanged = (changed = true) => {
+    if (changed) {
+      executionGeneration.current++;
+      setEditing(null);
+      setKey("");
+      setModels([]);
+      setTaskId("");
+      setNotice("");
+    }
     latestStatus.current = null;
+    settingsRef.current = null;
     remoteStartUntil.current = 0;
     nextRemotePoll.current = 0;
     setStatus(null);
@@ -268,11 +291,7 @@ export default function AgentSettings() {
   if (!status)
     return (
       <div className="agent-settings">
-        <AgentExecutionPicker
-          onChange={() => {
-            executionChanged();
-          }}
-        />
+        <AgentExecutionPicker onChange={executionChanged} disabled={busy} />
         <p role="status">{t("reading")}</p>
         {error && (
           <p role="alert" className="agent-error">
@@ -284,11 +303,7 @@ export default function AgentSettings() {
   if (remoteExecution() && status.executionKind === "mac")
     return (
       <div className="agent-settings">
-        <AgentExecutionPicker
-          onChange={() => {
-            executionChanged();
-          }}
-        />
+        <AgentExecutionPicker onChange={executionChanged} disabled={busy} />
         <p className="settings-help">{t("remoteMacHelp")}</p>
         {error && (
           <p role="alert" className="agent-error">
@@ -299,11 +314,7 @@ export default function AgentSettings() {
     );
   return (
     <div className="agent-settings">
-      <AgentExecutionPicker
-        onChange={() => {
-          executionChanged();
-        }}
-      />
+      <AgentExecutionPicker onChange={executionChanged} disabled={busy} />
       <RemoteDeviceSettings />
       <section className="settings-group" aria-labelledby="agent-mode-title">
         <h2 id="agent-mode-title">{t("mode")}</h2>
