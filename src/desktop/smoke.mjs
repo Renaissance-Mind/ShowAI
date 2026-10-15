@@ -165,6 +165,9 @@ try {
     if(!window.showai) throw new Error('Desktop preload is missing.');
     const api={invoke:(action,...args)=>{console.info('desktop-smoke',action);return window.showai.invoke(action,...args);}};
     const info=await api.invoke('app:info');
+    const remoteDevice=await api.invoke('agent:remoteDevice');
+    if(remoteDevice.settings.enabled!==false || remoteDevice.online!==false)
+      throw new Error('Fresh desktop unexpectedly enables remote Agent access.');
     const project=await api.invoke('projects:create',{name:'Desktop smoke'});
     const page=await api.invoke('pages:create',{projectId:project.id,title:'Page'});
     let saved=await api.invoke('pages:save',{projectId:project.id,pageId:page.document.id,baseHash:page.hash,baseRevision:page.revision,document:{...page.document,title:'Saved'}});
@@ -358,6 +361,7 @@ try {
           "component binary assets survive source saves",
           "sandboxed React under desktop CSP",
           "action allowlist",
+          "remote Agent settings through native IPC remain disabled by default",
           "native close cancellation",
           "app quit cancellation",
           "CLI using bundled Electron runtime",

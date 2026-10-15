@@ -29,7 +29,10 @@ import { deepLinkInvitation } from "../sync/server-url";
 import { openLibrary } from "../core/open-library";
 import { registerRuntime } from "../agent/runtime";
 import { AgentHost, agentActions } from "../agent-host/host";
-import { RemoteMacConnector } from "../agent-host/remote-connector";
+import {
+  RemoteMacConnector,
+  remoteDeviceActions,
+} from "../agent-host/remote-connector";
 import { assertId, CoreError, FileStore } from "../core/store";
 import {
   createWorkbench,
@@ -819,7 +822,9 @@ else {
             const window = trustedSender(event);
             if (
               typeof action !== "string" ||
-              (!actions.has(action) && !agentActions.has(action))
+              (!actions.has(action) &&
+                !agentActions.has(action) &&
+                !remoteDeviceActions.has(action))
             )
               throw new CoreError("INVALID_DATA", "Unknown desktop action.");
             if (!args || typeof args !== "object" || Array.isArray(args))
