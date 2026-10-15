@@ -37,7 +37,8 @@ export function verifyArchive(bytes: Buffer, integrity: string) {
 }
 /** Extract npm archives without lifecycle scripts, shell interpolation, links or path traversal. */
 export async function extractPackage(archive: Buffer, root: string) {
-  const tar = gunzipSync(archive, { maxOutputLength: 400 * 1024 * 1024 });
+  // Official Linux packages include several native executables and exceed 400 MiB.
+  const tar = gunzipSync(archive, { maxOutputLength: 1024 * 1024 * 1024 });
   let pax: Record<string, string> = {};
   for (let offset = 0; offset + 512 <= tar.length;) {
     const header = tar.subarray(offset, offset + 512);

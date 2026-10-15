@@ -27,6 +27,7 @@
     "build": "tsc -b && npm run build:portable && npm run build:cdn && vite build && npm run build:agent && npm run package:runtime && npm run package:plugin && npm run desktop:build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run --maxWorkers=4 --testTimeout=30000 --hookTimeout=30000",
+    "build:remote-agent": "npm run build:portable && node scripts/build-remote-agent.mjs",
     "build:cloud-mcp": "npm run build:portable && npm run build:cdn && node scripts/build-cloud-mcp.mjs",
     "test:cloud-mcp": "vitest run src/agent/mcp-http.integration.test.ts src/agent/cloud-state.test.ts --maxWorkers=2 --testTimeout=30000 --hookTimeout=60000",
     "build:server": "node scripts/build-server.mjs",

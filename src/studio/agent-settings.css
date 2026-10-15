@@ -419,3 +419,34 @@
     gap: 12px;
   }
 }
+.agent-execution-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+  padding: 8px 0;
+  font-size: 12px;
+  min-width: 0;
+}
+.agent-execution-picker label {
+  display: grid;
+  gap: 4px;
+  min-width: 100px;
+  flex: 1;
+}
+.agent-execution-picker select {
+  width: 100%;
+  max-width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 6px;
+  background: var(--surface, #fff);
+  color: inherit;
+  padding: 4px 8px;
+}
+.assistant-header:has(.agent-execution-picker) {
+  flex-wrap: wrap;
+}
+.assistant-header .agent-execution-picker {
+  flex-basis: 100%;
+}

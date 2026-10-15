@@ -1,0 +1,31 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "showai-agent",
+  "main": "agent-worker.mjs",
+  "compatibility_date": "2026-10-13",
+  "workers_dev": false,
+  "vars": {
+    "SHOWAI_AGENT_URL": "https://run.showai.renaissancemind.ai",
+    "SHOWAI_AGENT_SYNC_SERVERS": "https://showai.renaissancemind.ai/cloud",
+  },
+  "routes": [
+    { "pattern": "run.showai.renaissancemind.ai", "custom_domain": true },
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "AGENTS", "class_name": "ShowAIAgentGateway" }],
+  },
+  "migrations": [
+    { "tag": "agent-v1", "new_sqlite_classes": ["ShowAIAgentGateway"] },
+  ],
+  "containers": [
+    {
+      "class_name": "ShowAIAgentGateway",
+      "image": "./agent.Dockerfile",
+      "image_build_context": "../..",
+      "instance_type": "standard-1",
+      "max_instances": 10,
+    },
+  ],
+  "r2_buckets": [{ "binding": "STATE", "bucket_name": "showai-agent-state" }],
+  "observability": { "enabled": true },
+}

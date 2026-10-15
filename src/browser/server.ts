@@ -20,6 +20,7 @@ import { watch } from "chokidar";
 import { version } from "../../package.json";
 import { AgentService, errorResult } from "../agent/service";
 import { AgentHost, agentActions } from "../agent-host/host";
+import { RemoteMacConnector } from "../agent-host/remote-connector";
 import { MaintenanceScheduler } from "../core/maintenance-scheduler";
 import { syncManager } from "../sync/manager";
 import { openLibrary } from "../core/open-library";
@@ -195,6 +196,10 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         ? join(process.cwd(), "plugins/showai")
         : resolve(dirname(options.cliEntry), "../assets/agent-plugin"),
   });
+  const remoteConnector = new RemoteMacConnector(agentHost, () => store.root);
+  void remoteConnector
+    .start()
+    .catch((error) => console.error("Remote Agent connector:", error.message));
   async function selectedPath(
     args: Record<string, unknown>,
     directory: boolean,
@@ -212,6 +217,16 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     return resolved;
   }
   async function invoke(action: string, args: Record<string, unknown>) {
+    if (action === "agent:remoteDevice") return remoteConnector.status();
+    if (action === "agent:approveRemoteClient")
+      return remoteConnector.approveClient(
+        String(args.id),
+        args.approve === true,
+      );
+    if (action === "agent:shareDevice")
+      return remoteConnector.save(
+        args.settings as Parameters<RemoteMacConnector["save"]>[0],
+      );
     if (agentActions.has(action)) return agentHost.action(action, args);
     maintenance?.markActivity();
     return createWorkbench(store, service, {
@@ -559,6 +574,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     throw error;
   }
   async function close() {
+    remoteConnector.close();
     agentHost.close();
     await syncManager(store.root).stop();
     if (closed) return;

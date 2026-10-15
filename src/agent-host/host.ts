@@ -108,6 +108,10 @@ const definitions: {
 ];
 export interface AgentHostOptions {
   root: string;
+  runtimeRoot?: string;
+  oauthRedirectUrl?: string;
+  afterAuthorization?: () => Promise<void>;
+  afterTurn?: (projectId: string) => Promise<void>;
   workspaceRoot?: string;
   library: () => FileStore;
   cli: () => { command: string; args: string[]; env: Record<string, string> };
@@ -166,10 +170,14 @@ export class AgentHost {
   readonly conversations: ConversationStore;
   constructor(readonly options: AgentHostOptions) {
     this.conversations = new ConversationStore(options.root);
-    this.installer = new SdkInstaller(join(options.root, "runtime"));
+    this.installer = new SdkInstaller(
+      options.runtimeRoot ?? join(options.root, "runtime"),
+    );
     this.chatgpt = new ChatGptConnection(
       options.root,
       options.broker ?? options.resources,
+      options.oauthRedirectUrl,
+      options.afterAuthorization,
     );
     this.workspaceRoot =
       options.workspaceRoot ??
@@ -1109,6 +1117,11 @@ export class AgentHost {
             .catch((error: Error) => {
               failure ??= error;
             });
+        if (this.options.afterTurn) {
+          await this.options.afterTurn(projectId).catch((error: Error) => {
+            failure ??= error;
+          });
+        }
         turn.finishedAt = new Date().toISOString();
         if (turn.threadId) conversation.threadId = turn.threadId;
         conversation.updatedAt = turn.finishedAt;
@@ -1145,12 +1158,7 @@ export class AgentHost {
     );
     const turn = conversation.turns.find((item) => item.id === turnId);
     if (turn?.state === "running") throw new Error(t("turn.undoRunning"));
-    if (
-      !turn?.pageId ||
-      !turn.baseHash ||
-      !turn.resultHash ||
-      turn.undone
-    )
+    if (!turn?.pageId || !turn.baseHash || !turn.resultHash || turn.undone)
       throw new Error(t("turn.undoUnavailable"));
     const library = this.options.library();
     const current = await library.readPage(projectId, turn.pageId, {

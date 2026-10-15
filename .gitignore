@@ -17,6 +17,7 @@ plugins/showai/skills/show-document/examples/
 
 dist-agent/
 dist-server/
+dist-remote-agent/
 showai-server-data/
 deployments/server/data/
 deployments/server/.env

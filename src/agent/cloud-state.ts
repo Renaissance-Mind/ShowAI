@@ -4,8 +4,18 @@ import {
   createHash,
   randomBytes,
 } from "node:crypto";
-import { mkdir, open, readdir, rename, stat } from "node:fs/promises";
+import {
+  mkdir,
+  open,
+  readdir,
+  rename,
+  stat,
+  mkdtemp,
+  rm,
+} from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { DatabaseSync, backup } from "node:sqlite";
 
 const chunkSize = 8 * 1024 * 1024;
 interface FileEntry {
@@ -43,6 +53,10 @@ export class CloudState {
     readonly root: string,
     readonly objects: ObjectStore,
     key: string,
+    readonly options: {
+      ignore?: (path: string) => boolean;
+      snapshotSqlite?: boolean;
+    } = {},
   ) {
     if (!/^[a-f0-9]{64}$/.test(key))
       throw new Error(
@@ -137,6 +151,7 @@ export class CloudState {
     const visit = async (directory: string, prefix = "") => {
       for (const entry of await readdir(directory, { withFileTypes: true })) {
         const path = prefix + entry.name;
+        if (this.options.ignore?.(path)) continue;
         if (!validPath(path)) throw new Error("Invalid state path.");
         if (entry.isSymbolicLink())
           throw new Error("Cloud state cannot contain symbolic links.");
@@ -148,7 +163,23 @@ export class CloudState {
           throw new Error("Cloud state cannot contain special files.");
         // SQLite reconstructs shared-memory coordination from its database and WAL.
         if (entry.name.endsWith(".sqlite-shm")) continue;
-        const handle = await open(join(directory, entry.name), "r"),
+        if (this.options.snapshotSqlite && entry.name.endsWith(".sqlite-wal"))
+          continue;
+        let sourcePath = join(directory, entry.name),
+          temporary: string | undefined;
+        if (this.options.snapshotSqlite && entry.name.endsWith(".sqlite")) {
+          temporary = await mkdtemp(
+            join(tmpdir(), "showai-sqlite-checkpoint-"),
+          );
+          const database = new DatabaseSync(sourcePath, { readOnly: true });
+          try {
+            sourcePath = join(temporary, "snapshot.sqlite");
+            await backup(database, sourcePath);
+          } finally {
+            database.close();
+          }
+        }
+        const handle = await open(sourcePath, "r"),
           chunks: string[] = [];
         let size = 0;
         try {
@@ -169,10 +200,11 @@ export class CloudState {
             chunks.push(hash);
             size += bytesRead;
           }
-          if ((await stat(join(directory, entry.name))).size !== size)
+          if ((await stat(sourcePath)).size !== size)
             throw new Error("State changed during checkpoint.");
         } finally {
           await handle.close();
+          if (temporary) await rm(temporary, { recursive: true, force: true });
         }
         files.push({ path, size, chunks });
         if (files.length > 100000)

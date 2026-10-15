@@ -24,6 +24,7 @@ import type {
   AgentTurn,
 } from "../../agent-host/types";
 import { desktop, errorMessage } from "../bridge";
+import { AgentExecutionPicker } from "../AgentExecution";
 import type { Translator } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import strings from "../../i18n/messages/assistant";
@@ -396,6 +397,19 @@ export default function AssistantWorkbench({
   const [error, setError] = useState("");
   const [status, setStatus] = useState<AgentHostStatus | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [executionRevision, setExecutionRevision] = useState(0);
+  const executionGeneration = useRef(0);
+  useEffect(() => {
+    const change = () => {
+      executionGeneration.current++;
+      setConversation(null);
+      setFresh(true);
+      setExecutionRevision((v) => v + 1);
+    };
+    window.addEventListener("showai-agent-execution-change", change);
+    return () =>
+      window.removeEventListener("showai-agent-execution-change", change);
+  }, []);
   const [width, setWidth] = useState(() => {
     const value = Number(localStorage.getItem(widthPreference));
     return Number.isFinite(value) && value >= 300 ? Math.min(value, 640) : 380;
@@ -405,19 +419,26 @@ export default function AssistantWorkbench({
   project.current = projectId;
 
   const loadSummaries = useCallback(async (id: string) => {
+    const generation = executionGeneration.current;
     const next = await desktop.invoke<AgentConversationSummary[]>(
       "agent:conversations",
       { projectId: id },
     );
-    if (project.current === id) setSummaries(next);
+    if (project.current !== id || executionGeneration.current !== generation)
+      return [];
+    setSummaries(next);
     return next;
   }, []);
   const select = useCallback(async (projectKey: string, id: string) => {
+    const generation = executionGeneration.current;
     const next = await desktop.invoke<AgentConversation>("agent:conversation", {
       projectId: projectKey,
       id,
     });
-    if (project.current === projectKey) {
+    if (
+      project.current === projectKey &&
+      executionGeneration.current === generation
+    ) {
       setConversation(next);
       setFresh(false);
     }
@@ -432,14 +453,22 @@ export default function AssistantWorkbench({
     void loadSummaries(projectId)
       .then((items) => items[0] && select(projectId, items[0].id))
       .catch((reason) => setError(errorMessage(reason)));
-  }, [projectId, open, loadSummaries, select]);
+  }, [projectId, open, loadSummaries, select, executionRevision]);
   useEffect(() => {
     if (!open && !composer) return;
+    let stopped = false;
     void desktop
-      .invoke<AgentHostStatus>("agent:status")
-      .then(setStatus)
-      .catch(() => setStatus(null));
-  }, [open, !!composer]);
+      .invoke<AgentHostStatus>("agent:status", { projectId })
+      .then((value) => {
+        if (!stopped) setStatus(value);
+      })
+      .catch(() => {
+        if (!stopped) setStatus(null);
+      });
+    return () => {
+      stopped = true;
+    };
+  }, [open, !!composer, projectId, executionRevision]);
 
   const running = conversation?.turns.find((turn) => turn.state === "running");
   useEffect(() => {
@@ -630,6 +659,10 @@ export default function AssistantWorkbench({
             onPointerDown={resize}
           />
           <header className="assistant-header">
+            <AgentExecutionPicker
+              projectId={projectId}
+              disabled={!!running || busy}
+            />
             <select
               aria-label={t("panel.conversations")}
               value={fresh || !conversation ? "" : conversation.id}

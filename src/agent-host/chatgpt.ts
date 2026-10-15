@@ -1,4 +1,10 @@
-import { createServer, type Server } from "node:http";
+import {
+  createServer,
+  type Server,
+  type RequestListener,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http";
 import {
   createHash,
   randomBytes,
@@ -110,11 +116,14 @@ export class ChatGptConnection {
     error?: string;
   } = { state: "idle" };
   private listener?: Server;
+  private callback?: RequestListener;
   private timeout?: ReturnType<typeof setTimeout>;
   private refreshing = new Map<string, Promise<string>>();
   constructor(
     readonly root: string,
     readonly broker?: HostedCredentialBroker,
+    readonly redirectUrl?: string,
+    readonly afterAuthorization?: () => Promise<void>,
   ) {}
   private path(id: string) {
     return join(this.root, "credentials", id + ".json");
@@ -123,7 +132,7 @@ export class ChatGptConnection {
     return readOptional<SavedCredentials>(this.path(id));
   }
   async start(id: string) {
-    if (this.listener) throw new Error(t("chatgpt.inProgress"));
+    if (this.callback) throw new Error(t("chatgpt.inProgress"));
     const saved = await this.credentials(id);
     if (saved?.refreshOwner === "server")
       throw new Error(t("chatgpt.serverManaged"));
@@ -140,9 +149,12 @@ export class ChatGptConnection {
     let redirectUri = "",
       used = false;
     this.state = { state: "pending" };
-    this.listener = createServer((request, response) => {
+    this.callback = (request, response) => {
       const callback = new URL(request.url ?? "/", redirectUri);
-      if (request.method !== "GET" || callback.pathname !== "/auth/callback") {
+      if (
+        request.method !== "GET" ||
+        callback.pathname !== new URL(redirectUri).pathname
+      ) {
         response.writeHead(404);
         response.end();
         return;
@@ -210,6 +222,7 @@ export class ChatGptConnection {
         if (!Number.isFinite(credentials.expiresAt))
           throw new Error("Missing token expiration.");
         await writeProtected(this.path(id), credentials);
+        await this.afterAuthorization?.();
         this.state = { state: "completed" };
         response.writeHead(200, {
           "content-type": "text/html; charset=utf-8",
@@ -232,15 +245,20 @@ export class ChatGptConnection {
           response.end(t("chatgpt.callbackFailed"));
         })
         .finally(() => this.close());
-    });
-    await new Promise<void>((resolve, reject) => {
-      this.listener!.once("error", reject);
-      this.listener!.listen(0, "127.0.0.1", resolve);
-    });
-    const address = this.listener.address();
-    if (!address || typeof address === "string")
+    };
+    if (!this.redirectUrl) {
+      this.listener = createServer(this.callback);
+      await new Promise<void>((resolve, reject) => {
+        this.listener!.once("error", reject);
+        this.listener!.listen(0, "127.0.0.1", resolve);
+      });
+    }
+    const address = this.listener?.address();
+    if (!this.redirectUrl && (!address || typeof address === "string"))
       throw new Error("Missing OAuth callback address.");
-    redirectUri = `http://127.0.0.1:${address.port}/auth/callback`;
+    redirectUri =
+      this.redirectUrl ??
+      `http://127.0.0.1:${(address as { port: number }).port}/auth/callback`;
     this.timeout = setTimeout(
       () => {
         this.state = { state: "failed", error: t("chatgpt.timedOut") };
@@ -274,6 +292,15 @@ export class ChatGptConnection {
     clearTimeout(this.timeout);
     this.listener?.close();
     this.listener = undefined;
+    this.callback = undefined;
+  }
+  handleCallback(request: IncomingMessage, response: ServerResponse) {
+    if (!this.callback) {
+      response.writeHead(410);
+      response.end("Authorization expired. Start again in ShowAI.");
+      return;
+    }
+    this.callback(request, response);
   }
   async accessToken(id: string, force = false): Promise<string> {
     const saved = await this.credentials(id);

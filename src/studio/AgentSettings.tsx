@@ -25,6 +25,11 @@ import strings from "../i18n/messages/agentSettings";
 import common from "../i18n/messages/common";
 import { downloadAgentFile, messageLinks } from "./assistant/message-links";
 import "./agent-settings.css";
+import {
+  AgentExecutionPicker,
+  RemoteDeviceSettings,
+  remoteExecution,
+} from "./AgentExecution";
 
 function TaskResult({
   task,
@@ -229,7 +234,30 @@ export default function AgentSettings() {
   if (!status)
     return (
       <div className="agent-settings">
+        <AgentExecutionPicker
+          onChange={() => {
+            setStatus(null);
+            void refresh().catch((reason) => setError(errorMessage(reason)));
+          }}
+        />
         <p role="status">{t("reading")}</p>
+        {error && (
+          <p role="alert" className="agent-error">
+            {error}
+          </p>
+        )}
+      </div>
+    );
+  if (remoteExecution() && status.executionKind === "mac")
+    return (
+      <div className="agent-settings">
+        <AgentExecutionPicker
+          onChange={() => {
+            setStatus(null);
+            void refresh().catch((reason) => setError(errorMessage(reason)));
+          }}
+        />
+        <p className="settings-help">{t("remoteMacHelp")}</p>
         {error && (
           <p role="alert" className="agent-error">
             {error}
@@ -239,6 +267,13 @@ export default function AgentSettings() {
     );
   return (
     <div className="agent-settings">
+      <AgentExecutionPicker
+        onChange={() => {
+          setStatus(null);
+          void refresh().catch((reason) => setError(errorMessage(reason)));
+        }}
+      />
+      <RemoteDeviceSettings />
       <section className="settings-group" aria-labelledby="agent-mode-title">
         <h2 id="agent-mode-title">{t("mode")}</h2>
         <div
@@ -264,7 +299,12 @@ export default function AgentSettings() {
               key={mode.id}
               role="radio"
               aria-checked={status.settings.mode === mode.id}
-              disabled={busy}
+              disabled={
+                busy ||
+                (remoteExecution() &&
+                  status.executionKind === "cloud" &&
+                  mode.id === "local")
+              }
               onClick={(event) => {
                 choiceFocusRef.current = event.currentTarget;
                 void action(() => change({ mode: mode.id }))();
@@ -314,7 +354,11 @@ export default function AgentSettings() {
               {t("rescan")}
             </button>
           </div>
-          <div className="agent-list" role="group" aria-label={t("chooseLocalAgent")}>
+          <div
+            className="agent-list"
+            role="group"
+            aria-label={t("chooseLocalAgent")}
+          >
             {status.agents.map((agent) => (
               <article
                 className="agent-card"

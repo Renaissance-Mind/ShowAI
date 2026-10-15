@@ -71,6 +71,34 @@ test("encrypted checkpoints restore a real SQLite authorization database, artifa
     new CloudState(await directory(), objects, "b".repeat(64)).restore(),
   ).rejects.toThrow();
 });
+test("Agent checkpoints capture a live WAL database and exclude process locks", async () => {
+  const root = await directory(),
+    objects = await store(),
+    key = "d".repeat(64);
+  const db = new DatabaseSync(join(root, "running.sqlite"));
+  db.exec(
+    "PRAGMA journal_mode=WAL; CREATE TABLE turns(id INTEGER); INSERT INTO turns VALUES(1)",
+  );
+  await mkdir(join(root, ".locks"));
+  await writeFile(join(root, ".locks", "writer"), "process-local owner");
+  const state = new CloudState(root, objects, key, {
+    snapshotSqlite: true,
+    ignore: (path) => path.startsWith(".locks"),
+  });
+  await state.save();
+  db.exec("INSERT INTO turns VALUES(2)");
+  const restored = await directory();
+  await new CloudState(restored, objects, key).restore();
+  const saved = new DatabaseSync(join(restored, "running.sqlite"));
+  expect(
+    saved.prepare("SELECT COUNT(*) AS count FROM turns").get()?.count,
+  ).toBe(1);
+  await expect(
+    readFile(join(restored, ".locks", "writer")),
+  ).rejects.toMatchObject({ code: "ENOENT" });
+  saved.close();
+  db.close();
+});
 test("failed checkpoints never acknowledge success and are retried before a later mutation", async () => {
   const root = await directory(),
     objects = await store(),

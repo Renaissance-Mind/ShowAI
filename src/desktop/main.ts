@@ -29,6 +29,7 @@ import { deepLinkInvitation } from "../sync/server-url";
 import { openLibrary } from "../core/open-library";
 import { registerRuntime } from "../agent/runtime";
 import { AgentHost, agentActions } from "../agent-host/host";
+import { RemoteMacConnector } from "../agent-host/remote-connector";
 import { assertId, CoreError, FileStore } from "../core/store";
 import {
   createWorkbench,
@@ -62,6 +63,7 @@ const appearanceIcons = new Map<DesktopAppearance, NativeImage>();
 let store: FileStore;
 let service: AgentService;
 let agentHost: AgentHost;
+let remoteConnector: RemoteMacConnector;
 let watcher: FSWatcher | undefined;
 let maintenance: MaintenanceScheduler | undefined;
 let notification: ReturnType<typeof setTimeout> | undefined;
@@ -411,6 +413,16 @@ async function handle(
   window: BrowserWindow,
 ): Promise<unknown> {
   maintenance?.markActivity();
+  if (action === "agent:remoteDevice") return remoteConnector.status();
+  if (action === "agent:approveRemoteClient")
+    return remoteConnector.approveClient(
+      String(args.id),
+      args.approve === true,
+    );
+  if (action === "agent:shareDevice")
+    return remoteConnector.save(
+      args.settings as Parameters<RemoteMacConnector["save"]>[0],
+    );
   if (agentActions.has(action)) return agentHost!.action(action, args);
   const result = await createWorkbench(store, service, {
     preferencesChanged: () =>
@@ -663,7 +675,10 @@ else {
       ) {
         if ("url" in message && typeof message.url === "string")
           void openDeepLink(message.url).catch((error) =>
-            dialog.showErrorBox(t("openPageFailed"), errorResult(error).message),
+            dialog.showErrorBox(
+              t("openPageFailed"),
+              errorResult(error).message,
+            ),
           );
         else {
           const window = [...windows][0];
@@ -673,7 +688,10 @@ else {
             window.focus();
           } else
             void createWindow().catch((error) =>
-              dialog.showErrorBox(t("openWindowFailed"), errorResult(error).message),
+              dialog.showErrorBox(
+                t("openWindowFailed"),
+                errorResult(error).message,
+              ),
             );
         }
       }
@@ -747,6 +765,12 @@ else {
             : join(runtimePath(), "assets/agent-plugin"),
         openUrl: (url) => shell.openExternal(url),
       });
+      remoteConnector = new RemoteMacConnector(agentHost, () => store.root);
+      void remoteConnector
+        .start()
+        .catch((error) =>
+          console.error("Remote Agent connector:", error.message),
+        );
       if (app.isPackaged) app.setAsDefaultProtocolClient("showai");
       buildApplicationMenu();
       ipcMain.handle("showai:set-locale", async (event, locale: unknown) => {
@@ -844,6 +868,7 @@ else {
         return;
       }
       allowedQuit = true;
+      remoteConnector?.close();
       agentHost?.close();
       clearTimeout(notification);
       await watcher?.close();

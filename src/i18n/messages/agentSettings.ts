@@ -3,6 +3,8 @@ import { defineMessages } from "../index";
 // Agent settings: local Agents, model sources, the built-in runtime and tasks.
 export default defineMessages("agentSettings", {
   "zh-CN": {
+    remoteMacHelp:
+      "在所选 Mac 的 ShowAI 设置中配置 Agent 和模型来源。iPad 使用该 Mac 的现有配置。",
     "state.running": "执行中",
     "state.completed": "已完成",
     "state.failed": "失败",
@@ -19,7 +21,8 @@ export default defineMessages("agentSettings", {
     "mode.api.title": "提供 LLM API",
     "mode.api.text": "连接模型来源，由独立 Codex SDK 执行",
     availableAgents: "可用 Agent",
-    localHelp: "复用本机登录。连接测试会发送一条简短请求，确认模型能够返回结果。",
+    localHelp:
+      "复用本机登录。连接测试会发送一条简短请求，确认模型能够返回结果。",
     rescan: "重新探测",
     chooseLocalAgent: "选择本机 Agent",
     notInstalled: "未安装",
@@ -73,14 +76,16 @@ export default defineMessages("agentSettings", {
     "runtime.update": "检查并安装新版",
     "runtime.installing": "正在安装",
     "runtime.install": "一键安装 Codex SDK",
-    runtimeHelp: "按需下载官方 SDK 与运行时，使用独立账号、会话和 ShowAI 插件。",
+    runtimeHelp:
+      "按需下载官方 SDK 与运行时，使用独立账号、会话和 ShowAI 插件。",
     runInShowAI: "在页面中使用",
     inPageHelp:
       "在页面中选中文字、打开内容块菜单或右键白板对象，选择「让 AI 处理」；点顶栏的 AI 按钮查看项目的全部对话。这里的执行方式和模型来源用于新对话。",
     storage: "存储与运行位置",
     taskWorkspace: "任务工作区：",
     credentialRoot: "账号与运行时：",
-    storageHelp: "页面通过 ShowAI 工具保存到选定项目，工作区用于任务材料和中间文件。",
+    storageHelp:
+      "页面通过 ShowAI 工具保存到选定项目，工作区用于任务材料和中间文件。",
     "toast.sourceSaved": "模型来源已保存",
     "toast.modelsLoaded": "模型列表已更新，可以选择模型",
 
@@ -106,6 +111,8 @@ export default defineMessages("agentSettings", {
     "resources.saved": "已保存到来源服务器，其他绑定设备现在可以检索使用。",
   },
   en: {
+    remoteMacHelp:
+      "Configure the Agent and model source in ShowAI on the selected Mac. iPad uses that Mac's configuration.",
     "state.running": "Running",
     "state.completed": "Completed",
     "state.failed": "Failed",
@@ -120,7 +127,8 @@ export default defineMessages("agentSettings", {
     "mode.local.title": "Local Agent",
     "mode.local.text": "Use an installed Agent's sign-in and models",
     "mode.api.title": "Bring an LLM API",
-    "mode.api.text": "Connect a model source and run it with the standalone Codex SDK",
+    "mode.api.text":
+      "Connect a model source and run it with the standalone Codex SDK",
     availableAgents: "Available Agents",
     localHelp:
       "Reuses sign-ins on this device. The connection test sends a short request to confirm the model responds.",
@@ -159,7 +167,8 @@ export default defineMessages("agentSettings", {
     apiKeyKeep: "Saved. Leave blank to keep the current key",
     apiKeyEnter: "Enter the API key for this source",
     modelName: "Model",
-    modelPlaceholder: "Choose from the list or enter a model ID from the service",
+    modelPlaceholder:
+      "Choose from the list or enter a model ID from the service",
     saveSource: "Save source",
     fetchModels: "Fetch model list",
     chatgptHelp:
