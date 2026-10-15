@@ -128,7 +128,6 @@ export async function acceptInvitation(
         user.id,
       ])
     ).length > 0;
-  if (member) return invitation.project_id;
   if (existing) {
     if (
       !(
@@ -182,7 +181,8 @@ export async function acceptInvitation(
         "SELECT 1 FROM invite_acceptances WHERE digest=? AND user_id=?",
         [digest, user.id],
       )
-    ).length
+    ).length &&
+    !member
   )
     throw new SyncError(
       410,

@@ -412,6 +412,12 @@ test("single-use registration claims are atomic, directed claims are scoped, and
     ).status,
   ).toBe(200);
   expect(
+    await f.metadata.all(
+      "SELECT 1 FROM invite_acceptances WHERE digest=? AND user_id=?",
+      [await hash(shared.value.invite), target.user.id],
+    ),
+  ).toHaveLength(1);
+  expect(
     (
       await f.request(
         "/api/projects/project/members",
