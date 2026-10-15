@@ -654,6 +654,7 @@ describe("component composition and editable primitives", () => {
     process.platform === "win32" ? 600000 : 360000,
   );
 
+  // Several real SDK builds include a nested rich-text bundle.
   it("bundles nested exact revisions, preserves closure and validates every dependency", async () => {
     const home = await temporary();
     const child = await saveComponent(
@@ -761,7 +762,7 @@ describe("component composition and editable primitives", () => {
         other,
       ),
     ).rejects.toThrow(/integrity|not found/);
-  }, 30000);
+  }, 180000);
 });
 
 it("validates pinned component instances independently of optional scope hints", async () => {

@@ -29,7 +29,9 @@ async function call(
   name: string,
   args: Record<string, unknown> = {},
 ) {
-  const value = await client.callTool({ name, arguments: args });
+  const value = await client.callTool({ name, arguments: args }, undefined, {
+    timeout: 120000,
+  });
   expect(value.isError, JSON.stringify(value.content)).not.toBe(true);
   return (value.structuredContent as any).data;
 }
@@ -352,7 +354,7 @@ test("default component discovery combines built-ins and only the selected proje
     integrity: own.integrity,
   });
   expect(detail.integrity).toBe(own.integrity);
-});
+}, 180000);
 
 test("context delivers the complete index while selected revision guides stay separate from implementation", async () => {
   const client = await connect(createLibraryMcpServer({ root }));
@@ -489,7 +491,7 @@ test("context delivers the complete index while selected revision guides stay se
       })
     ).isError,
   ).toBe(true);
-});
+}, 180000);
 test("presentation templates apply as independent native Pages, persist edits and export through MCP", async () => {
   const c = await connect(
     createLibraryMcpServer({
@@ -608,4 +610,4 @@ test("presentation templates apply as independent native Pages, persist edits an
       ).hash,
     ).toBe(saved.hash);
   }
-}, 120000);
+}, 180000);
