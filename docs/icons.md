@@ -1,13 +1,13 @@
-# 应用图标
+# Application icons
 
-在 ShowAI 中打开**「设置 → 图标」**浏览应用图标。可以搜索英文图标名称或中文分类，选择图标后比较尺寸、线宽、颜色和浅深背景，复制名称或 SVG，也可以下载当前预览的 SVG。
+**Language:** English | [简体中文](i18n/icons.zh-CN.md) · [Documentation](README.md)
 
-## 共享图标来源
+Open **Settings → Icons** to browse the application icon catalog. Search by English name or Chinese category, compare size, stroke, color and light/dark backgrounds, then copy the name or SVG or download the preview.
 
-图标预览参数作用于浏览页和导出的 SVG。应用的图标来源统一保存在 `src/ui/icons.ts`。新增图标时，在这个文件添加 Lucide 的命名导出，使用方从该模块导入。浏览页直接枚举**共享模块**的导出，开发时随保存更新，发行版在构建时更新，不需要维护另一份展示清单。替换某个图标时，可以在共享模块中使用命名别名，保留使用方的名称。
+## Shared source
 
-## 开发与验证
+`src/ui/icons.ts` is the application's shared Lucide export module. Add named exports there and import application icons through it. The browser enumerates that module directly; development saves and release builds update it. A named alias can preserve a caller's existing import when an icon changes.
 
-分类规则位于 `src/studio/IconViewer.tsx`。图标覆盖检查位于 `src/ui/icons.test.ts`，会检查应用没有绕过共享模块导入图标，并验证每个导出都能渲染 SVG。内置组件独立编译时，`src/core/builtin-sources.ts` 会把**同一图标源码**装入 SDK 虚拟文件目录，保持离线导出与应用一致。
+Preview settings affect the browser and exported SVG. `src/studio/IconViewer.tsx` defines categories. `src/ui/icons.test.ts` checks imports and verifies SVG rendering. Built-in component compilation embeds the same icon source in the SDK virtual files through `src/core/builtin-sources.ts`.
 
-应用菜单使用图标和操作名称，紧凑工具栏使用图标与**可访问名称、悬停提示**。内容中的图表、用户自定义组件内部的图标，以及数据选项不属于应用图标目录。
+Menus pair icons with labels. Compact icon controls need accessible names; hover help should remain useful without duplicating a visible label. Content visuals, icons inside custom components and data options are outside the application icon catalog.

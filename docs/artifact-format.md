@@ -1,5 +1,7 @@
 # ShowAI artifact format, version 3
 
+**Language:** English | [简体中文](i18n/artifact-format.zh-CN.md) · [Documentation](README.md)
+
 Version 3 stores recursively nested Page and Board surfaces. A Page is ordered content; a Board is a local spatial workspace. Both may be the root or an embedded module. **New resources default to Page**. Versions 1 (doc) and 2 (legacy whiteboard) remain readable.
 
 ## Envelope and containers
@@ -78,7 +80,7 @@ Content follows the editor's JSON tree. Every block uses `{type, attrs?, content
 | `toggle`                    | One or more blocks; `attrs.title`, `attrs.open`                                                           |
 | `widget`                    | No content; `attrs.kind` and `attrs.data`                                                                 |
 
-Text marks are `bold`, `italic`, `underline`, `strike`, `code`, `highlight`, and `link`. A link has `attrs.href` with an HTTP(S), `mailto:`, `tel:`, or anchor URL; a highlight can use `attrs.color`. JavaScript URLs and arbitrary HTML are rejected.
+Text marks are `bold`, `italic`, `underline`, `strike`, `code`, `highlight`, and `link`. A link has `attrs.href` with an HTTP(S), `mailto:`, `tel:`, or anchor URL; a highlight can use `attrs.color` and `attrs.mode` (`lower` or `full`). `textStyle` carries supported text styling such as color. JavaScript URLs and arbitrary HTML are rejected.
 
 ```json
 {
@@ -237,15 +239,15 @@ For inline fragments of 128 KB or more, the exporter losslessly gzip-compresses 
 
 The 1 MB limit applies to the **final emitted UTF-8 fragment**, after compression. A standalone HTML file larger than 1 MB can still fit in conversation. If the compressed fragment remains too large, export meaningful selected blocks and link the full HTML; the error reports the actual compressed byte count. Large media and incompressible data can still exceed the host limit.
 
-### CDN reader fragments
+### Local and online reader delivery
 
-Conversation previews and online HTML pages load the reader from a CDN instead of carrying it. `npm run build:cdn` builds the reader as code-split ES modules in `dist-cdn/`, an npm package named `showai-reader` whose version is the app version plus the entry's content hash (for example `0.9.0-reader.hpmvkaf2`), so a runtime always names exactly the reader it was built with. Packaged runtimes ship its manifest as `assets/cdn-manifest.json`.
+Conversation presentation prefers a bundled reader and selected dependencies, compressed losslessly to fit the host budget. If it remains too large, a published reader can provide an online fallback. `page_present` and `render_document` still return complete offline HTML/source; selected `blockIds` affect the inline preview only. Low-level partial exports produce partial source.
 
-With that manifest, `inline` exports and the `inline` delivery of `page_present`/`render_document` become fragments that carry only page data, embedded images and custom components, plus a one-line loader that imports the reader from jsDelivr and falls back to unpkg. `page_present` and `render_document` also deliver `online`, a complete small HTML page with the same loader; `delivery.html` stays the offline bundled file. HTML exports stay offline unless `reader: "cdn"` (CLI `--reader cdn`, Studio “Export online page”) asks for the online page. Site exports keep their bundled shared assets.
+`npm run build:cdn` builds code-split ES modules in `dist-cdn/`, packaged as `showai-reader` with the app version plus reader content hash. Packaged runtimes carry `assets/cdn-manifest.json`, pinning the exact reader. Online delivery loads from ShowAI's reader origin, then jsDelivr and unpkg; it starts a backup after 1.5 seconds and reports failure after 15 seconds. A successful fallback mounts only once. Reader resources declare these origins in their host CSP.
 
-The reader mounts into a fragment root like an inline page: styles are scoped to it, custom components use their `inline` runtimes, and each built-in block's code and styles load with its own chunk, so a page fetches only the kinds it uses. An online page mounts as a standalone reader with the page menu. The MCP Apps reader resource declares the CDN origins in its CSP. These outputs need network access to the CDN; `SHOWAI_READER_CDN=off` returns to bundled previews, and `SHOWAI_READER_CDN` may instead list base URLs with `{name}` and `{version}` placeholders, for example a mirror reachable from mainland China or a local server while developing an unpublished reader. `scripts/render-artifact.mjs page.showai.json out.html --cdn READER_URL` writes a fragment against an explicit reader entry.
+`reader: "cdn"` (CLI `--reader cdn`) explicitly selects online delivery; `reader: "bundled"` or `SHOWAI_READER_CDN=off` prevents CDN fallback. HTML stays bundled by default. Static sites use shared bundled assets. Online fragments carry page data, embedded images and custom component inline runtimes. They need network access. `SHOWAI_READER_CDN` can specify mirror base URLs with `{name}` and `{version}` placeholders.
 
-Publish each new reader before releasing a runtime that names it: `npm run build:cdn && npm publish ./dist-cdn --access public`, or the `publish-reader` workflow.
+Publish the exact reader before distributing a runtime that names it: `npm run build:cdn`, then `npm publish ./dist-cdn --access public`, or use the `publish-reader` workflow. Publication is a separate release action.
 
 ### Application-level block registration
 
@@ -272,9 +274,9 @@ From the ShowAI browser application, HTML export downloads external images and e
 For project pages, use the shared CLI rather than reading authoring files by hand:
 
 ```sh
-node dist-agent/cli.mjs export --project PROJECT_ID --page PAGE_ID --format html --out ./report.html
-node dist-agent/cli.mjs export --project PROJECT_ID --page PAGE_ID --format inline --out ./report-inline.html
-node dist-agent/cli.mjs export --project PROJECT_ID --format site --out ./site
+node dist-runtime/scripts/cli.mjs export --project PROJECT_ID --page PAGE_ID --format html --out ./report.html
+node dist-runtime/scripts/cli.mjs export --project PROJECT_ID --page PAGE_ID --format inline --out ./report-inline.html
+node dist-runtime/scripts/cli.mjs export --project PROJECT_ID --format site --out ./site
 ```
 
 The standalone renderer also accepts `--inline`. Its output is an HTML fragment for a host-supported display surface; direct browser test wrappers must declare UTF-8. A static site uses external shared reader assets and should be served over HTTP or deployed to a static host. Only the single-file HTML is intended for direct offline opening.
@@ -283,7 +285,7 @@ The standalone renderer also accepts `--inline`. Its output is an HTML fragment 
 
 Page structure allows 16 MiB of UTF-8 JSON, excluding binary bodies of complete canonical base64 data URLs. Each decoded resource allows 64 MiB; distinct complete resource URLs total at most 128 MiB per page. Artifact JSON and final standalone HTML each allow 256 MiB, including encoded resources, bundled components and the reader. The compressed conversation fragment has a separate 1,000,000-byte host budget. Current values are exposed in `showai_capabilities.capacities`; see [capacity rules](../plugins/showai/skills/show-document/references/capacity.md) for component, transport and synchronization boundaries.
 
-The 12,000-node and 48-level JSON nesting constraints still apply. Built-in widgets also have the semantic limits described above. Invalid trees, unsupported node types, malformed marks, unsafe URLs, non**finite numbers**, and prototype-pollution keys are rejected before creating the editor. Unknown widget kinds preserve **plain JSON** data.
+The 12,000-node and 48-level JSON nesting constraints still apply. Built-in widgets also have the semantic limits described above. Invalid trees, unsupported node types, malformed marks, unsafe URLs, nonfinite numbers, and prototype-pollution keys are rejected before creating the editor. Unknown widget kinds preserve **plain JSON** data.
 
 The generated file escapes embedded JSON and the HTML title. Paragraph text and data remain escaped. Custom components are executable code supplied through the explicit component-package mechanism and run in the rendering boundary described above. The reader has no telemetry, background API, or account connection. Image embedding makes network requests only during browser export; ordinary source links navigate when activated.
 

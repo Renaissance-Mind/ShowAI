@@ -1,54 +1,50 @@
-# 思维导图
+# Mind maps
 
-在 Page 或 Board 的插入菜单中搜索“思维导图”，也可以在文本中输入 `/思维导图`。中心主题的分支按内容量自然分配到两侧，自动排布；**每张导图最多包含 500 个节点**。
+**Language:** English | [简体中文](i18n/mindmap.zh-CN.md) · [Documentation](README.md)
 
-## 布局与方向
+Find **Mind map** in the Page/Board insertion menu or type `/` and search for it. Maps support up to **500 nodes**, with automatic layout and balanced branches.
 
-鼠标移入导图区域，右上角显示两个布局图标：四周展开、单向展开。四周模式按子树大小自然平衡两侧分支。单向模式默认向右，再点同一图标改为向左。布局模式和方向随页面保存，**切换保留节点层级、文字和折叠状态**；只读页中的切换只用于本次阅读。
+## Layout and editing
 
-## 编辑与快捷键
+Hover over the map to choose radial or one-sided layout. Radial balances subtrees across both sides. One-sided starts to the right; clicking it again switches left. Layout/direction persist with the Page while retaining hierarchy, labels and collapsed states. Read-only switching changes only the current view.
 
-**点击节点后使用快捷键**。新增节点会立即进入名称输入框，Enter 保存名称，Escape 取消名称编辑。节点操作沿用编辑器的选中菜单，页面外的键盘操作不会触发导图编辑。
+Select a node before using shortcuts. New nodes enter name editing immediately; Enter saves and Escape cancels the name edit. Node actions use the editor's selection menu.
 
-| 快捷键                  | 操作                                                |
-| ----------------------- | --------------------------------------------------- |
-| Tab                     | 新建子节点                                          |
-| Enter                   | 在当前节点后新建同级节点；中心主题上创建子节点      |
-| Shift+Enter             | 在当前节点前新建同级节点                            |
-| Shift+Tab               | 将节点及其分支提升一级                              |
-| F2 / 双击               | 编辑节点名称                                        |
-| 左 / 右方向键           | 选择父节点 / 第一个子节点；右方向键也可展开折叠分支 |
-| 上 / 下方向键           | 选择前一个 / 后一个同级节点                         |
-| 空格                    | 折叠或展开分支                                      |
-| Delete / Backspace      | 删除节点及其所有后代；中心主题受保护                |
-| ⌘/Ctrl+Z                | 撤销本次打开导图后的操作                            |
-| Shift+⌘/Ctrl+Z / Ctrl+Y | 重做                                                |
-| Escape                  | 退出节点选中菜单                                    |
+| Shortcut                   | Action                                                      |
+| -------------------------- | ----------------------------------------------------------- |
+| Tab                        | Add child                                                   |
+| Enter / Shift+Enter        | Add following / preceding sibling; Enter on root adds child |
+| Shift+Tab                  | Promote node and subtree                                    |
+| F2 / double-click          | Edit name                                                   |
+| Left / Right               | Parent / first child; Right can expand                      |
+| Up / Down                  | Previous / next sibling                                     |
+| Space                      | Collapse or expand                                          |
+| Delete / Backspace         | Delete subtree; root is protected                           |
+| Cmd/Ctrl+Z                 | Undo changes since opening the map                          |
+| Shift+Cmd/Ctrl+Z or Ctrl+Y | Redo                                                        |
+| Escape                     | Leave the node menu                                         |
 
-## 阅读与缩放
+Zoom and fit controls appear below the map. Large maps can scroll. Read-only navigation, collapse and zoom do not write to the source.
 
-缩放与“显示完整思维导图”位于导图下方。大图可以滚动查看。名称、层级、同级顺序与折叠状态随页面保存。只读页面仍可使用方向键、空格和缩放查看导图；**阅读中的折叠变化不修改源文件**。
+## Agent data
 
-## Agent 数据接口
-
-Agent 从共享组件目录查询 `mindmap` 的 schema 和示例，使用已有的组件插入或页面写入入口。节点数据是平面的树，**唯一根节点**的 `parentId` 为 `null`，其他节点的 `parentId` 指向父节点；同一父节点下的顺序由数组顺序决定。
+Read `mindmap` in the catalog. Nodes form a flat tree with exactly one root (`parentId: null`). Other parents must exist; sibling order follows array order.
 
 ```json
 {
   "kind": "mindmap",
   "data": {
-    "title": "研究计划",
+    "title": "Research plan",
     "height": 460,
     "layout": "radial",
     "direction": "right",
     "nodes": [
-      { "id": "root", "parentId": null, "label": "研究计划" },
-      { "id": "question", "parentId": "root", "label": "研究问题" },
-      { "id": "method", "parentId": "root", "label": "研究方法" },
+      { "id": "root", "parentId": null, "label": "Research plan" },
+      { "id": "question", "parentId": "root", "label": "Question" },
       {
-        "id": "interview",
-        "parentId": "method",
-        "label": "访谈",
+        "id": "method",
+        "parentId": "root",
+        "label": "Method",
         "collapsed": false
       }
     ]
@@ -56,4 +52,4 @@ Agent 从共享组件目录查询 `mindmap` 的 schema 和示例，使用已有�
 }
 ```
 
-节点 ID 和名称均限制为 200 个字符。校验拒绝重复 ID、缺失父节点、循环和多个根节点。**HTML 导出保留交互式导图**，并隐藏编辑菜单与名称输入控件。
+IDs and labels allow up to 200 characters each. Validation rejects duplicate IDs, missing parents, cycles and multiple roots. HTML exports retain reading interactions and hide editing menus/inputs.

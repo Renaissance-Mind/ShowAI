@@ -1,5 +1,7 @@
 # Versioned component parameter references
 
+**Language:** English | [简体中文](i18n/component-parameters.zh-CN.md) · [Documentation](README.md)
+
 Component parameters have one source of truth: `props.schema.json` for machine structure, versioned `manifest.documentation.usage.inputs` for meaning and omission behavior, and actual `defaultData/examples` for sample values. `catalog_describe(view:"parameters")` generates the readable reference. No second handwritten parameter table is required.
 
 ## Authoring version 2
@@ -13,7 +15,7 @@ Keep the existing reuse, recipes, interactions, constraints, editing and develop
   "omission": {
     "behavior": "fallback",
     "description": "When omitted, the renderer selects the first actual slide.",
-    "from": {"path":"slides[].id", "selection":"first"}
+    "from": { "path": "slides[].id", "selection": "first" }
   }
 }
 ```
@@ -30,10 +32,15 @@ Check showai_capabilities.componentParameters.protocol for showai-component-para
 
 ```json
 {
-  "projectId":"PROJECT", "kind":"component", "id":"COMPONENT",
-  "scope":"project", "version":"1.0.0", "integrity":"sha256-…",
-  "view":"parameters", "parameterPath":"slides[].regions[].box",
-  "parameterLimit":20
+  "projectId": "PROJECT",
+  "kind": "component",
+  "id": "COMPONENT",
+  "scope": "project",
+  "version": "1.0.0",
+  "integrity": "sha256-…",
+  "view": "parameters",
+  "parameterPath": "slides[].regions[].box",
+  "parameterLimit": 20
 }
 ```
 
@@ -45,4 +52,4 @@ Local MCP, authorized HTTP MCP and anonymous public component queries share the 
 
 A validated v2 definition establishes schema/documentation consistency and declared relation checks. It does not prove every renderer uses documented fallbacks, every business constraint has been declared, or that readers understand the visualization. Check actual data changes, invalid edits, initial/empty states, reset, keyboard, narrow views and export separately. Template instructions choose and combine components; parameter meanings remain with the exact component revision.
 
-无选择状态可在 reference/index 规则显式声明 sentinelValues，例如 index 的 [-1] 或 reference 的 [null]；字段schema也必须允许这些值，说明它们的实际意义。普通索引仍为零起始。未声明的负值、无效ID与歧义目标继续拒绝。
+For no-selection states, reference/index rules can explicitly declare sentinelValues, such as [-1] for an index or [null] for a reference. The field schema must permit those values and document their meaning. Ordinary indexes remain zero-based; undeclared negatives, invalid IDs and ambiguous targets are rejected.

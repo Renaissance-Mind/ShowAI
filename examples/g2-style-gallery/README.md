@@ -1,4 +1,24 @@
-# G2 图表样式图谱
+# G2 chart style gallery
+
+**Language:** [English](#english) | [简体中文](#简体中文)
+
+## English
+
+This standalone example renders 43 representative G2 5.4.8 charts with indigo, classic and dark themes, category/search filtering, enlarged views and SVG downloads.
+
+```sh
+npm ci --prefix examples/g2-style-gallery
+npm run dev --prefix examples/g2-style-gallery
+npm run build --prefix examples/g2-style-gallery
+```
+
+The development address is http://127.0.0.1:5175 with strictPort; an occupied port fails. Serve the generated dist directory over HTTP. Chart datasets/images are bundled locally.
+
+src/samples adapts official examples and retains source links; src/runtime.js handles layout. Kagi combines line marks with official candlestick closing data and a 2% reversal threshold. Sunburst uses @antv/g2-extension-plot. data-cache.json retains original URLs. Theme switching fixes example random seeds; word-cloud placement still follows G2 layout. Thumbnails hide dense labels/legends; enlarged charts retain them.
+
+See [G2's catalog](https://g2.antv.antgroup.com/en/charts/overview) and UPSTREAM-LICENSE.txt for upstream example code. Cached datasets/images retain their owners' rights and are not relicensed under the repository MIT license. Check original terms before reusing them. This example does not add dependencies to the main ShowAI runtime.
+
+## 简体中文
 
 用 G2 5.4.8 实际绘制官方目录中的 43 类代表图表。支持 ShowAI 靛蓝、G2 经典和深色主题，以及分类、搜索、大图查看和 SVG 下载。
 

@@ -1,61 +1,49 @@
-# 在 Codex 中使用 ShowAI
+# Use ShowAI with Codex
 
-ShowAI 插件提供七个 Skill 和本机 MCP 启动入口。Agent 通过 MCP 创建、读取、修改和展示内容；正式页面保存到所选 ShowAI 项目。ShowAI 软件提供存储、阅读器与组件编译能力，**需要与插件分别安装**。
+**Language:** English | [简体中文](i18n/codex.zh-CN.md) · [Documentation](README.md)
 
-## 安装与连接
+The local ShowAI plugin contains seven Skills and a stdio MCP launcher. Codex uses MCP to read, create, edit and present content saved in the selected project. The ShowAI application or standalone runtime provides storage, compilation and the reader; install it separately from the plugin.
 
-本机需要 **Node.js 22.12+**、Codex 和支持 `showai-mcp-v1` 的 ShowAI 运行时。ShowAI 启动或 `runtime register` 会在目标内容库中登记 `agent-runtime.json`。
+## Install and connect
 
-在源码仓库中首次安装：
+Use Node.js 22.12+, Codex CLI on `PATH`, and a runtime supporting `showai-mcp-v1`. Start ShowAI once, or run `runtime register --json` with the actual runtime, to record `agent-runtime.json` in the target library.
 
-```sh
-npm run plugin:install
-```
-
-拉取新代码后刷新已安装的插件：
+From the repository:
 
 ```sh
-npm run plugin:update
+npm run plugin:install -- --json
 ```
 
-安装器使用官方 Codex 插件命令，并核验版本、启用状态和文件指纹；加 `-- --json` 可输出机器可读的结果。
+After pulling an update:
 
-安装后重新打开 Codex 会话，**确认 ShowAI MCP 工具可见**，再调用 `showai_capabilities` 和 `project_context`。已打开的会话不会自动加载新安装的插件。
+```sh
+npm run plugin:update -- --json
+```
 
-### 选择内容库与项目
+The installer uses official Codex plugin commands and checks installed bytes, version and enabled state. See [Plugin documentation](../plugins/showai/README.md).
 
-| 配置 | 用途 |
-| --- | --- |
-| `SHOWAI_HOME` | 本地内容库；未指定时使用当前用户的 `~/.showai` |
-| `SHOWAI_PROJECT_ID` | 可选，将连接锁定到指定项目 |
-| `SHOWAI_PRESENTATION_DIR` | 宿主可读取的展示目录 |
+Installation, host refresh and a conversation loading current tools are separate steps. Use the host's supported refresh/restart procedure, then start a new conversation and confirm the ShowAI tools and seven Skills are visible. An existing conversation may retain older definitions. Call `guide()`, then `showai_capabilities` and `project_context` to establish the actual connection.
 
-配置必须在启动时明确，**运行期间不切换内容库**。旧运行时或连接失败会明确报错，不自动改用其他库或独立 HTML。
+## Select a library and project
 
-只有远程连接时，使用已授权的 HTTP MCP 地址与项目，不读取本机配置。完整接入说明见 [Agent 接入](agent-integration.md)。
+| Setting                   | Purpose                                              |
+| ------------------------- | ---------------------------------------------------- |
+| `SHOWAI_HOME`             | Library; defaults to `~/.showai`                     |
+| `SHOWAI_PROJECT_ID`       | Optional project binding                             |
+| `SHOWAI_TEMPLATES`        | Optional startup templates; requires a bound project |
+| `SHOWAI_PRESENTATION_DIR` | Output directory accessible to the host              |
 
-## 文档工作流
+Configure these before starting the MCP process. The local launcher probes only its selected library's registered runtime and reports incompatible versions or connection failures. For HTTP MCP, use the authorized endpoint and returned project identities. See [Agent integration](agent-integration.md).
 
-### 1. 找到内容
+## Create and continue work
 
-已有内容：`projects_list` 或绑定的 `project_context` → `pages_list` / `library_search` → `page_read`。
+1. **Find the content.** Use `projects_list` or bound `project_context`, then `pages_list`, `library_search` and `page_read`. Read-only lookup does not create projects. For new formal work, respect the user's project; a local library connection may use `project_resolve` with a trusted host directory.
+2. **Read the relevant guidance.** `show-document` coordinates a complete page; template stage guides cover intent, evidence, understanding, design, authoring and review. Query component guides and exact parameter references before preparing data.
+3. **Save deliberately.** Read the complete Page and keep stable node IDs. Pass its current hash and revision to `page_apply` or `page_save`. Inspect the receipt. A conflict requires comparison and an intentional merge.
+4. **Present the saved Page.** `page_present` returns full HTML/source plus an inline preview. A Codex visualization must reference the actual returned `delivery.inline` path. Compatible hosts may display the MCP Apps reader directly.
 
-新正式内容：用户指定的项目优先；本机 library 连接可用 `project_resolve` 根据可信宿主工作目录定位项目。远程和项目绑定连接使用已有授权项目。
+Exports are snapshots; later Page edits do not update earlier files. When a preview is too large, present meaningful selected blocks and retain the full Page delivery. Use `render_document` for explicitly standalone work.
 
-### 2. 修改并保存
+## Diagnostics
 
-**读取完整 Page** → 携带 hash/revision 调用 `page_apply` 或 `page_save` → 核对回执。
-
-**冲突必须比较与处理**，不刷新版本后直接覆盖。
-
-### 3. 展示结果
-
-保存后 `page_present` 返回完整 HTML/source 和 inline 预览。MCP Apps 由宿主显示；Codex 文件式可视化使用实际 `delivery.inline` 路径。
-
-HTML 导出位置与源 Page 归属不同，源页面后续修改不会自动更新旧导出文件。
-
-**用户明确只要独立文件时**才用 `render_document`。普通文档任务不因连接或显示失败改为不入库交付。
-
-## CLI 的职责
-
-CLI 用于运行时登记、服务启动、诊断、运维与脚本，具体命令见 [脚本参考](agent-usage.md)。它不是 Agent 每次操作文档时的第二套决策路径。例如宿主运行 `showai mcp --home /ABSOLUTE_LIBRARY` 启动连接后，Agent 通过 MCP 调用页面工具。
+Use Settings' actual runtime launch configuration, or the selected library's `agent-runtime.json`. CLI covers registration, startup, diagnostics, scripts and administration; agent document operations follow MCP. The [CLI reference](agent-usage.md) provides commands. Keep local plugin, application runtime and hosted MCP versions distinct when reporting an issue.

@@ -1,6 +1,8 @@
 # One ShowAI workflow across Agent hosts
 
-**Agent document operations use MCP** in every host. Local plugins include a stdio launcher; remote packages provide an HTTP endpoint. CLI examples below configure services or support scripts and operators. They are not an alternate Agent authoring workflow.
+**Language:** English | [简体中文](i18n/agent-integration.zh-CN.md) · [Documentation](README.md)
+
+**Agent document operations use MCP** in every host. Start with `guide()` for the shared entrypoint, then inspect `showai_capabilities` and the selected project context. Local plugins include a stdio launcher; remote packages provide an HTTP endpoint. CLI examples below configure services or support scripts and operators. They are not an alternate Agent authoring workflow.
 
 Local library MCP uses explicit `projectId` per operation. Use `projects_list` for read-only discovery, `project_resolve` with a trusted absolute `sourceDirectory` for new formal content, or a project-bound connection. New formal work is **saved before** `page_present`; `render_document` is for explicitly standalone deliverables. **Connection failure** does not change the destination or persistence mode.
 
@@ -72,6 +74,8 @@ OAuth supports discovery, dynamic client registration, authorization code with S
 
 ## ChatGPT and other display hosts
 
+For the official endpoint, account setup, consent and connection updates, see [ChatGPT web setup](chatgpt.md). Template-stage guidance and exact parameter queries are described in [template folders](template-bundles.md) and [component parameters](component-parameters.md).
+
 In ChatGPT's plugin directory, add a custom MCP server using the `/mcp` URL and choose **OAuth or no authentication**. Anonymous tools remain available without linking; private calls request the appropriate project scopes. Test the tools in the host before publishing.
 
 MCP Apps resources use `text/html;profile=mcp-app` and `_meta.ui.resourceUri`, with the ChatGPT compatibility alias. The reader receives the inline page through tool result metadata and runs it inside the host sandbox without nested custom-component iframes. Conversation previews prefer the compressed local reader and selected dependencies. If that exceeds the chat budget, a published reader can carry only page data and import the reader from ShowAI's reader source (`reader.showai.renaissancemind.ai`, copied on demand from the npm release), jsDelivr or unpkg, whose origins the resource declares in its CSP. `delivery.compact` is the same few-kilobyte fragment for hosts where the model writes the HTML. Explicit `reader:"cdn"` exports stay online; `reader:"bundled"` and `SHOWAI_READER_CDN=off` prevent CDN fallback. Online loading starts a backup after 1.5 seconds, mounts only the first available reader and reports a failure after 15 seconds. Installing the plugin does not update the separate software runtime or populate the conversation host's browser cache. Text-only hosts can ignore the UI and use project receipts or HTML/source downloads. HTTP preview downloads expire after one hour and are capability URLs; retain the source or save into an authorized project for durable work.
@@ -82,7 +86,7 @@ The same skill source supports local and remote connections. For a remote packag
 npm run package:plugin -- --mcp-url https://agent.example.com/mcp --out /absolute/new/showai-plugin
 ```
 
-The output replaces the local `mcp.json` to the same manifest, skills and assets. Archive that directory for the target host's plugin upload or public submission. Local installation continues using `npm run plugin:update -- --json`; it does not force every local Agent through a remote service. Public publication, organization verification and review are separate from local or personal-plugin testing.
+The output creates a `showai-cloud` package from the same Skills/assets, with HTTP/OAuth configuration instead of the local launcher. Archive that directory for the target host's plugin upload or public submission. Local installation continues using `npm run plugin:update -- --json`; it does not force every local Agent through a remote service. Public publication, organization verification and review are separate from local or personal-plugin testing.
 
 ## Saved-page presentation contract
 

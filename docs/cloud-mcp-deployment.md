@@ -1,5 +1,7 @@
 # ShowAI MCP on Cloudflare
 
+**Language:** English | [简体中文](i18n/cloud-mcp-deployment.zh-CN.md) · [Documentation](README.md)
+
 This deploys the MCP gateway entirely on Cloudflare, alongside the existing ShowAI Cloud content server. The runtime uses Workers, a single Container and encrypted R2 checkpoints. It is separate from `deployments/cloudflare/wrangler.jsonc` and does not replace the content server.
 
 In the prepared terminal workflow, Docker on the administrator's computer builds a native verification image, then Wrangler builds and uploads the production AMD64 image. The computer does not host the deployed service. Once deployment and acceptance succeed, the computer can shut down. Cloudflare Workers Builds can also build Dockerfile images from a connected production Git branch, so local Docker is a choice of build workflow rather than a hosting requirement: https://developers.cloudflare.com/containers/guides/deploy/ .
@@ -14,7 +16,7 @@ The gateway bundle and reader assets do not depend on the CPU, so the Dockerfile
 - Node.js 24 and repository dependencies, or the Docker build environment.
 - Existing ShowAI Cloud accounts. GitHub/Google login must be configured on that content server, and each existing user must bind the selected identity to their account.
 
-The proposed public endpoint is `https://agent.showai.renaissancemind.ai/mcp`. It is not an assertion that this endpoint has been published or verified. Change both `SHOWAI_MCP_URL` and the custom-domain route together if a different origin is used.
+The repository configures `https://agent.showai.renaissancemind.ai/mcp`. User connection steps are in [ChatGPT web setup](chatgpt.md); verify the actual deployment with the checks below. Change both `SHOWAI_MCP_URL` and the custom-domain route together if a different origin is used.
 
 ## Shared Skills through remote MCP
 

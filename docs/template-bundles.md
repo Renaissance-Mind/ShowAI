@@ -1,5 +1,7 @@
 # Template folders and staged presentation
 
+**Language:** English | [简体中文](i18n/template-bundles.zh-CN.md) · [Documentation](README.md)
+
 ShowAI templates package a reusable method, an optional page skeleton and optional custom components. The runtime supplies the mandatory system presentation baseline; the selected template adds instructions for the current stage. The same contract serves local Codex/Claude Code connections and authorized HTTP MCP clients.
 
 ## Folder format
@@ -35,18 +37,20 @@ README.md begins with JSON frontmatter between `---` lines, followed by a short 
   "version": "1.0.0",
   "description": "Explain a mechanism with visible objects and feedback.",
   "scenarios": ["Read a mechanism and its evidence."],
-  "guides": {
-    "intent": "guides/01-intent.md",
-    "evidence": "guides/02-evidence.md",
-    "understanding": "guides/03-understanding.md",
-    "design": "guides/04-design",
-    "authoring": "guides/05-authoring.md",
-    "review": "guides/06-review.md"
-  },
+  "guides":
+    {
+      "intent": "guides/01-intent.md",
+      "evidence": "guides/02-evidence.md",
+      "understanding": "guides/03-understanding.md",
+      "design": "guides/04-design",
+      "authoring": "guides/05-authoring.md",
+      "review": "guides/06-review.md",
+    },
   "components": [],
-  "page": null
+  "page": null,
 }
 ---
+
 # My template
 
 Describe the reusable task and the materials supplied by each instance.

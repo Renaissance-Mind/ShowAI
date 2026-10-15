@@ -1,5 +1,9 @@
 # ShowAI page preview for DeepSeek Harness
 
+**Language:** [English](#english) | [简体中文](#简体中文)
+
+## English
+
 A Harness bundle that renders a presented ShowAI page **inside the conversation**
 instead of collapsing it into the generic JSON tool card.
 
@@ -63,3 +67,19 @@ That links the package into the active profile, adds it to
 - Reloading plugin code needs a fresh process generation: a Harness restart
   loads a changed JavaScript module, while `client.js` changes reach an open
   page through the client HMR path.
+
+## 简体中文
+
+此 Harness bundle 将 ShowAI page_present 与 render_document 的结果呈现在对话中，提供刷新、展开、新标签页与完整 HTML 操作。
+
+ShowAI 返回 delivery.inline/html 文件路径与 MCP _meta.showai.inline。Harness 桥保留文字但不传递 _meta，因此本 bundle 在工具结果完成后把 HTML 复制到 $DSH_HOME/cache/showai-page/<callId>.html，并从独立随机 loopback origin 提供。该 origin 无法读取 Harness DOM、会话或 /api，同时可使用自己的存储与 worker。
+
+Harness 同源 /showai-page-preview/<callId>.html 用于 HEAD 可用性检查，真正导航以 302 转向独立预览 origin；浏览器没有跨域读取权限。client.js 为两个工具注册 tool.call.toolview，使用 sandbox iframe 显示。缓存保留最近 40 页，进程重启后旧对话仍可读取。
+
+安装到 Harness profile：
+
+```text
+plugin_manager install_bundle target=/absolute/path/to/plugins/dsh-showai-preview
+```
+
+安装注册 dsh.profile.bundles 与 cordis.patch.yml 的 showai-preview 行，无需构建或额外依赖。需要 profile 的 webServer；超过 12 MiB 的预览不缓存，退回文件操作。Host 代码更新需新进程，client.js 可由 HMR 更新。此包提供展示，不替代 MCP 连接、项目保存或同步。

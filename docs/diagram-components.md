@@ -1,12 +1,14 @@
 # Diagram components
 
+**Language:** English | [简体中文](i18n/diagram-components.zh-CN.md) · [Documentation](README.md)
+
 ShowAI includes three diagram families in the Flow component category. Insert them through `/` in Page or Board, or use `component.insert` with their built-in `kind`.
 
-| Kind | Templates | Original project |
-| --- | --- | --- |
-| `archify` | Workflow, architecture, sequence, dataflow and lifecycle | [Archify](https://github.com/tt-a1i/archify) |
-| `diagram-design` | 45 editorial diagram types | [Diagram Design](https://github.com/cathrynlavery/diagram-design) |
-| `fireworks-tech-graph` | 12 technical diagram styles | [Fireworks Tech Graph](https://github.com/yizhiyanhua-ai/fireworks-tech-graph) |
+| Kind                   | Templates                                                                                                 | Original project                                                               |
+| ---------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `archify`              | 10 types: workflow, architecture, sequence, dataflow, lifecycle, ERD, class, tree, timeline and waterfall | [Archify](https://github.com/tt-a1i/archify)                                   |
+| `diagram-design`       | 45 editorial diagram types                                                                                | [Diagram Design](https://github.com/cathrynlavery/diagram-design)              |
+| `fireworks-tech-graph` | 12 technical diagram styles                                                                               | [Fireworks Tech Graph](https://github.com/yizhiyanhua-ai/fireworks-tech-graph) |
 
 Each component displays the original SVG or HTML. Archify retains its interactive reader, including node search, path exploration, visual presets and export. Diagram Design retains its editorial layout and CSS. Fireworks retains its original SVG geometry and semantic connections. The included templates are editable examples; use the task's own facts when making a document.
 
@@ -26,7 +28,7 @@ The component's usage guide contains an Original authoring guides section. It in
 
 For Agents, `catalog_describe` with `view: "guide"` returns `authoringReference`. Follow that exact scoped reference to `authoring/index.json`, then read the selected guide files through the source view. `authoring/schemas.json`, `authoring/examples.json` and `diagram-templates.json` provide the original inputs and examples. The kit contains the complete production source and assets at the recorded upstream revision, including Diagram Design's alternate templates and production checks.
 
-Save `authoring/kit.json`, `authoring/run.mjs`, `authoring/diagram-authoring-fonts.mjs` and `authoring/font-licenses.json` together. The index lists the commands. Archify's five JSON types execute the unchanged Node renderers; Fireworks' eleven generated styles execute its unchanged Python generator. The runner writes a separate output, preserves the input and returns `data` ready for the ShowAI component. Choose a new work directory for extraction. The originals and their licenses remain in that directory for inspection and upstream checks. Browser review uses the host's supported browser tools.
+Save `authoring/kit.json`, `authoring/run.mjs`, `authoring/diagram-authoring-fonts.mjs` and `authoring/font-licenses.json` together. The index lists the commands. Archify's ten JSON types execute the unchanged Node renderers; Fireworks' eleven generated styles execute its unchanged Python generator. The runner writes a separate output, preserves the input and returns `data` ready for the ShowAI component. Choose a new work directory for extraction. The originals and their licenses remain in that directory for inspection and upstream checks. Browser review uses the host's supported browser tools.
 
 Diagram Design and Fireworks style 8 are authored SVG/HTML workflows. Follow their full original guides, then import the resulting artifact. The same authored source produces the same geometry; independent free-form Agent drawings can vary. Choose Original presentation when comparing with the upstream output. `--embed-fonts` downloads the original public font families and embeds locally selected glyph subsets for offline rendering. Font requests contain no document text. The bundled Diagram Design examples already contain offline copies of their original fonts.
 

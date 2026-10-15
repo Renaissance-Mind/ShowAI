@@ -11,7 +11,7 @@
 
 **Language:** English | [简体中文](docs/i18n/README.zh-CN.md)
 
-[Documentation](docs/README.md) · [Quick start](docs/quick-start.md) · [Use with Codex](docs/codex.md) (Chinese)
+[Documentation](docs/README.md) · [Quick start](docs/quick-start.md) · [Use with Codex](docs/codex.md)
 
 **Your agent answers with a UI, not a wall of text.**
 
@@ -35,7 +35,7 @@ https://github.com/user-attachments/assets/ecdccdec-1def-45a9-811f-121a7d07b906
 
 - **Works with ChatGPT and local agents**: In ChatGPT, pages render right inside the conversation through a custom MCP connector. Claude Code and Codex connect through the ShowAI plugin, and other MCP clients can use the stdio entry point.
 
-  The ShowAI App also has a built-in agent that can use your ChatGPT plan, OpenRouter, DeepSeek, and other model providers.
+  The ShowAI App also has a [built-in agent](docs/agent-host.md) for local agents and API-backed models, with Cloud execution and paired Mac runners for remote devices where configured. ChatGPT plan access depends on account authorization.
 
 - **One workspace across devices**: Sign in to ShowAI Cloud or your own ShowAI Server to sync projects, components, and assets between devices. Keep editing offline; changes catch up when you reconnect, and conflicting edits from different devices are both preserved.
 
@@ -43,7 +43,9 @@ https://github.com/user-attachments/assets/ecdccdec-1def-45a9-811f-121a7d07b906
 
 When the work is done, export it as standalone HTML that works offline, or as a static site. See [Share pages and sites](#-share-pages-and-sites).
 
-> **Language note:** The workbench interface is available in English and Simplified Chinese. It follows your system language by default (Chinese system languages use Simplified Chinese, all others use English); change it in **Settings → Appearance → Language**. Exported pages show their reader controls in the language used when they were exported. Documents marked *(Chinese)* below are available in Chinese only; the remaining reference documents are in English.
+> **Versions:** These docs follow application **0.9.0**, plugin **0.16.1** and artifact format **v3** on `main`. Software, plugins and hosted services update independently. Check [Releases](https://github.com/Renaissance-Mind/ShowAI/releases) for available downloads and [the documentation index](docs/README.md) for paired English/Chinese guides.
+
+The workbench supports English and Simplified Chinese. Change it in **Settings → Appearance → Language**; exported reader controls use the export language.
 
 ## 🧩 Design
 
@@ -101,7 +103,7 @@ npm run desktop
 
 The default content library is `~/.showai`; you can change it in settings. The desktop app, browser workbench, and CLI read and write the same projects when they point to the same library.
 
-The local browser edition supports macOS, Linux, and Windows. It can also be packaged with a bundled Node runtime. See [Local browser edition](docs/local-browser.md) *(Chinese)* for the launcher and platform requirements.
+The local browser edition supports macOS, Linux, and Windows. It can also be packaged with a bundled Node runtime. See [Local browser edition](docs/local-browser.md) for the launcher and platform requirements.
 
 ## 🤖 Connect an agent
 
@@ -115,26 +117,15 @@ ShowAI connects to ChatGPT on the web through the hosted MCP server, and to Code
 
 ### ChatGPT on the web
 
-Connect the hosted ShowAI MCP server to create, save, and edit interactive pages in regular chats on [chatgpt.com](https://chatgpt.com). After account setup, everyday web use needs no local ShowAI process or separate Skill installation. Your ChatGPT account must support custom MCP servers, subject to workspace permissions.
+Add a custom MCP connection in [ChatGPT Plugins](https://chatgpt.com/plugins) with **OAuth or no authentication**:
 
-1. **Get a ShowAI Cloud account.** Registration is currently controlled: ask a project administrator for an invitation link or the Cloud operator for a registration key ([account access inquiries](https://github.com/Renaissance-Mind/ShowAI/issues)). Complete initial registration in the ShowAI desktop or local browser workbench: with a key, open **Settings → Servers and sync → Server accounts → Add server account**, enter `https://showai.renaissancemind.ai/cloud`, and register with an account name and a password of at least 12 characters. With an invitation, paste it into **Project sync → Join shared project**, then register in the invitation card; no registration key is needed. Existing Cloud accounts can skip this step.
-2. **Add the connection.** Open [ChatGPT Plugins](https://chatgpt.com/plugins), select **+ → Add custom MCP server**, and use the settings below. Create it as a plugin, then install it.
-3. **Sign in and authorize.** Use your ShowAI account and password, or GitHub/Google already linked to that account. Social sign-in opens another tab; copy its 8-character completion code back into the original ShowAI authorization tab and continue. To create projects, authorize **all projects this account can access now and in the future** and check that consent includes **project creation**, reading, and editing. A single-project grant covers only that existing project. Member permissions still apply.
-4. **Try it.** Start a new chat, type `@`, select **ShowAI**, and ask: “List my ShowAI projects. Then create a project called My Interactive Notes, make an interactive page about opportunity cost, save it, confirm sync status, and present it here.” Review write actions when ChatGPT prompts you. You can later find and edit the saved page by project and page name.
+```text
+https://agent.showai.renaissancemind.ai/mcp
+```
 
-| Setting | Value |
-| --- | --- |
-| Name | `ShowAI` |
-| Server URL | `https://agent.showai.renaissancemind.ai/mcp` |
-| Authentication | **OAuth or no authentication** |
-| OAuth client registration, if prompted | **Dynamic Client Registration (DCR)** |
-| Client ID / Client Secret | Leave blank; DCR registers automatically |
+Use a ShowAI Cloud account and authorize the intended projects. Creating new projects needs account-wide access and `projects.create` consent. Accounts/synchronization use `https://showai.renaissancemind.ai/cloud`; registration needs an operator key or a valid project invitation. Everyday web use needs no local ShowAI process or separate Skill installation.
 
-The MCP URL ends in `/mcp`; the workbench account/sync URL ends in `/cloud`. Public components, templates, and temporary rendering work without sign-in. Private project access requires a ShowAI account. Projects stored only on your computer must be synced to the same Cloud account first. Workflow guides are served through MCP from the shared Skill sources.
-
-**Updates:** ShowAI maintainers deploy server and guide updates; later calls use the deployed version. Start a new chat to load current guidance. When tools, parameters, authentication metadata, or preview resources change, open **ChatGPT Plugins → your ShowAI connection → Refresh**, then start a new chat and select `@ShowAI` again. Expired sign-in or a broader project scope requires reauthorization. No ZIP download is needed. Share this guide and the MCP URL with others; each person adds and authorizes their own connection.
-
-See the [complete ChatGPT web guide](https://showai.renaissancemind.ai/en/doc/chatgpt) for account setup, the completion-code flow, permission troubleshooting, and preview retry steps. ChatGPT UI labels and availability can vary; see [OpenAI's custom MCP instructions](https://developers.openai.com/api/docs/guides/custom-mcp-server#how-to-use).
+Follow the [complete ChatGPT web guide](docs/chatgpt.md) for registration, provider completion codes, permissions, connection refresh and troubleshooting. Each person adds and authorizes their own connection.
 
 ### Install a local plugin
 
@@ -144,7 +135,7 @@ See the [complete ChatGPT web guide](https://showai.renaissancemind.ai/en/doc/ch
 npm run plugin:install
 ```
 
-Use `npm run plugin:update` to refresh an installed plugin after pulling new changes. Start the ShowAI app once (or run `npm run runtime:register`, below) so the plugin can find the runtime in your content library.
+Use `npm run plugin:update` to refresh an installed plugin after pulling new changes. Build and start the ShowAI app once (or run `npm run runtime:register`, below) so the plugin can find the runtime in your content library.
 
 **Claude Code**: Run in the repository directory:
 
@@ -153,17 +144,17 @@ claude plugin marketplace add ./
 claude plugin install showai@renaissance-mind
 ```
 
-The plugin includes seven skills:
+After installation, refresh the host as supported and confirm the current MCP tools and Skills in a new conversation. The plugin includes seven skills:
 
-| Skill | Purpose |
-| --- | --- |
-| `use-showai` | Basic usage, runtime connection, finding and reading content |
-| `plan-presentation` | Plan reader goals, evidence and a layered understanding path |
+| Skill                 | Purpose                                                                |
+| --------------------- | ---------------------------------------------------------------------- |
+| `use-showai`          | Basic usage, runtime connection, finding and reading content           |
+| `plan-presentation`   | Plan reader goals, evidence and a layered understanding path           |
 | `design-presentation` | Design visual expression, layout, interactions and static alternatives |
-| `review-presentation` | Evaluate clarity and reader tasks, revise and verify |
-| `show-document` | Create, edit, display, and export pages; apply existing templates |
-| `create-component` | Create or adapt reusable React components |
-| `create-template` | Create and edit templates, or extract them from existing pages |
+| `review-presentation` | Evaluate clarity and reader tasks, revise and verify                   |
+| `show-document`       | Create, edit, display, and export pages; apply existing templates      |
+| `create-component`    | Create or adapt reusable React components                              |
+| `create-template`     | Create and edit templates, or extract them from existing pages         |
 
 The plugin supplies authoring workflows and reference material. The ShowAI app or a standalone runtime package supplies the executable runtime. Desktop users can find startup configuration in Settings → Connect Agent (「设置 → 连接 Agent」). For a standalone runtime built from source, run:
 
@@ -193,11 +184,11 @@ Other agent clients can connect through the optional stdio MCP entry point. See 
 
 ## 📦 Share pages and sites
 
-| Export format | Use |
-| --- | --- |
-| **Standalone HTML** | Sharing, offline reading, and archiving |
+| Export format       | Use                                              |
+| ------------------- | ------------------------------------------------ |
+| **Standalone HTML** | Sharing, offline reading, and archiving          |
 | **inline fragment** | Display in agent conversations that support HTML |
-| **Static site** | Multiple-page navigation and static hosting |
+| **Static site**     | Multiple-page navigation and static hosting      |
 
 Standalone HTML supports offline interactions such as switching charts, collapsing content, and calculating local parameters. External source links require a network connection. Images must be embedded for offline exports.
 
@@ -230,28 +221,21 @@ The static site directory can be deployed to your own server or a hosting servic
 
 Project content is stored locally in transactional SQLite and can be backed up or migrated. Saves update current content and check resource tokens to prevent overwriting concurrent edits. Local drafts and conflict recovery preserve unfinished work.
 
-For collaboration across devices or with other people, connect to a self-hosted ShowAI Server to synchronize current pages, component dependencies and assets by project. Administrator, editor and viewer roles control access. HTML previews and exports are generated on demand.
+For collaboration across devices or with other people, connect to ShowAI Cloud or a self-hosted ShowAI Server to synchronize current pages, component dependencies and assets by project. Administrator, editor and viewer roles control access. HTML previews and exports are generated on demand.
 
-See [Content library](docs/versioned-library.md) and [Project server and synchronization](docs/project-sync.md) *(Chinese)*.
+See [Content library](docs/versioned-library.md) and [Project server and synchronization](docs/project-sync.md).
 
 ## 📚 Documentation
 
-| Document | Contents |
-| --- | --- |
-| [ChatGPT web guide](https://showai.renaissancemind.ai/en/doc/chatgpt) | Account setup, MCP connection, OAuth, and updates |
-| [Quick start](docs/quick-start.md) *(Chinese)* | First project, first page, and agent connection |
-| [Page and Board](docs/page-surface.md) *(Chinese)* | Pages, boards, and interaction |
-| [Agent guide](docs/agent-usage.md) | CLI, MCP, authoring, and export |
-| [Agent integration](docs/agent-integration.md) | MCP entry points and host configuration |
-| [Plugin documentation](plugins/showai/README.md) | Skill responsibilities and installation |
-| [Use with Codex](docs/codex.md) *(Chinese)* | Codex plugin setup and document workflow |
-| [Data charts](docs/g2-components.md) *(Chinese)* | Chart types, data interfaces, and settings |
-| [Components and templates](docs/catalog-lifecycle.md) *(Chinese)* | Catalogs, versions, dependencies, and reuse |
-| [Content library](docs/versioned-library.md) | Storage, drafts, merging, and recovery |
-| [Local browser edition](docs/local-browser.md) *(Chinese)* | Launcher, packaging, and platform requirements |
-| [Project server and synchronization](docs/project-sync.md) *(Chinese)* | Server deployment, project permissions, and synchronization |
-| [Server operations](docs/server-operations.md) | Backup, restore, and migration |
-| [Page data format](docs/artifact-format.md) | Page structure and data conventions |
+All user and technical guides have paired English and Simplified Chinese editions with language switches. Browse the [complete English index](docs/README.md) or [中文文档目录](docs/i18n/index.zh-CN.md).
+
+| Start here                             | Build and integrate                                   | Store and share                                |
+| -------------------------------------- | ----------------------------------------------------- | ---------------------------------------------- |
+| [Quick start](docs/quick-start.md)     | [Components and templates](docs/catalog-lifecycle.md) | [Content library](docs/versioned-library.md)   |
+| [ChatGPT web](docs/chatgpt.md)         | [Template folders](docs/template-bundles.md)          | [Cloud and accounts](docs/cloud.md)            |
+| [Codex plugin](docs/codex.md)          | [Component parameters](docs/component-parameters.md)  | [Project sync](docs/project-sync.md)           |
+| [Page and Board](docs/page-surface.md) | [Agent integration](docs/agent-integration.md)        | [Server operations](docs/server-operations.md) |
+| [Built-in agent](docs/agent-host.md)   | [Artifact format v3](docs/artifact-format.md)         | [MCP deployment](docs/cloud-mcp-deployment.md) |
 
 ## 🛠️ Development and contributions
 

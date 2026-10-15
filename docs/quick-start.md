@@ -1,10 +1,12 @@
-# 快速上手
+# Quick start
 
-ShowAI 将文字、图表和交互组件组织在**同一份可编辑的页面**中。你可以独立使用工作台整理笔记，也可以让 Agent 创建和修改内容，再在工作台中继续编辑。本指南带你启动 ShowAI、创建第一个项目，并导出一份可以分享的页面。
+**Language:** English | [简体中文](i18n/quick-start.zh-CN.md) · [Documentation](README.md)
 
-## 启动 ShowAI
+ShowAI combines text, charts and interactive components in an editable Page. Work directly in the desktop or local browser workbench, or connect an agent to create and revise the same content.
 
-从源码运行需要 Git、**Node.js 22.12 或更高版本**，以及 npm。在终端执行：
+## Run ShowAI
+
+Source builds require Git, **Node.js 22.12+** and npm. The standalone content server requires Node.js 24.
 
 ```sh
 git clone https://github.com/Renaissance-Mind/ShowAI.git
@@ -14,78 +16,55 @@ npm run build:browser
 npm run browser
 ```
 
-服务启动后会自动打开本地浏览器工作台。若浏览器没有打开，复制终端显示的地址到浏览器。**使用期间保持终端运行**，结束后按 `Ctrl+C` 停止服务。
-
-如果希望使用桌面工作台，在同一个仓库目录中执行：
+Keep the terminal running. Open the printed local URL if the browser does not open automatically; press `Ctrl+C` to stop the service. To build and launch Electron from the same checkout:
 
 ```sh
 npm run build
 npm run desktop
 ```
 
-已有本地浏览器发行包的用户可以直接使用包内启动器，无需重复克隆与构建。各平台的启动方法见[本地浏览器版](local-browser.md)。
+If you already have a browser distribution, use its included launcher. See [Local browser edition](local-browser.md). The source version in `package.json` and the version of an available release artifact can differ; check [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases) for published downloads.
 
-## 创建项目和页面
+## Create a project and Page
 
-项目用于归集相关页面、文件夹、组件与模板。例如，可以为个人笔记、某项研究或一个软件项目分别建立项目。
+1. Choose **New project**, then name it.
+2. Create a **Page** for ordered reading or a **Board** for a spatial workspace.
+3. Type `/` to find and insert text, images, tables, charts and other components. You can also start from a template.
+4. Check that the save indicator says **Saved**. `Cmd+S` on macOS or `Ctrl+S` on Windows/Linux saves explicitly.
 
-1. 在工作台中点击「新建项目」，输入项目名称。
-2. 在该项目中新建页面，输入标题。一般文章选择 Page；需要自由摆放内容时选择 Board。
-3. 在页面空白处开始输入。输入 `/` 可以搜索并插入 Markdown、图片、表格、图表等组件。
-4. 编辑完成后检查顶部保存状态，**确认显示「已保存」**。也可以使用 `Cmd+S`（macOS）或 `Ctrl+S`（Windows/Linux）保存。
+Pages and Boards can nest. An article can include an analysis Board, and a Board can contain a readable Page. See [Page and Board](page-surface.md).
 
-Page 按阅读顺序排版，适合笔记、报告和文档。Board 提供可以平移、缩放的空间，适合关系整理和方案比较。两者可以嵌套，例如在研究文章中放入一块分析白板。详见 [Page 与 Board](page-surface.md)。
+For a research note, start with the question, findings and source links. Compare methods in a table, show verified measurements in a chart, and use diagrams for relationships. Replace example data with your own evidence. Templates supply organization; they still need the task's actual material.
 
-## 做一份研究笔记
+## Work with an agent
 
-以「文献阅读」项目中的一篇笔记为例，可以按以下顺序组织内容：
+[ChatGPT web](chatgpt.md) connects to the hosted MCP endpoint. [Codex](codex.md) and Claude Code use the local plugin and registered runtime. The [built-in agent](agent-host.md) edits from the workbench and can use local execution, Cloud execution or a paired Mac where available.
 
-| 内容 | 适合的表达 |
-| --- | --- |
-| 研究问题、主要结论和来源 | Markdown，保留可访问的原文链接 |
-| 不同方法的条件与结果 | 表格或数据库 |
-| 实验数据和变化趋势 | 图表，并写明指标及单位 |
-| 方法之间的关系 | 流程图或 Board |
-| 需要读者探索的参数 | 交互组件 |
+Try a request such as:
 
-组件库可以查看组件说明和预览；模板库提供已经组织好的内容结构。应用模板后得到独立页面，可以继续填写材料和调整布局。需要新的表达方式时，可以让 Agent 组合现有组件，或创建可复用组件。
+> In my Literature Review project, create an attention-mechanism note from the supplied sources. Include the research question, evidence, a method comparison and unresolved points. Save it and present it here.
 
-## 和 Agent 一起编辑
+Continue with the same project and Page:
 
-安装 ShowAI 插件并连接运行时后，在 Codex 中描述目标、材料和保存位置：
+> Add an adjustable example to the methods section. Keep my revised conclusion and source links.
 
-> 在 ShowAI 的「文献阅读」项目中创建「注意力机制阅读笔记」。根据我提供的材料整理问题、方法、证据和待确认事项，保留来源链接，加入一张方法比较表。
+Use project/Page IDs when names are ambiguous. An agent reads current content and saves with its hash and revision. If a concurrent write conflicts, compare the edits before retrying.
 
-后续可以继续要求修改同一份页面：
+## Share the result
 
-> 在这篇笔记的方法部分补充一个可以调整参数的示例。保留我已经修改的结论和来源。
+| Format          | Use                                                      |
+| --------------- | -------------------------------------------------------- |
+| Standalone HTML | Share a single page, read offline or archive             |
+| Inline fragment | Present a page or selection in a compatible conversation |
+| Static site     | Navigate multiple pages through static hosting           |
+| ShowAI JSON     | Import and continue editing                              |
 
-Agent 与工作台可以读写同一个内容库。让 Agent 更新已有内容时，提供项目和页面名称；同名页面较多时，提供页面 ID 或完整归属。安装和连接步骤见 [Codex 使用指南](codex.md)，其他客户端接入见 [Agent 接入](agent-integration.md)。
+The page's export menu creates standalone HTML. Use bundled components and embedded images for offline delivery. Links and online services still need a network. HTML/inline exports also write a `.showai.json` companion. Static sites are intended for HTTP hosting.
 
-## 导出和分享
+## Storage and recovery
 
-页面顶部的「导出」可以生成独立 HTML。读者可以直接在浏览器中打开，无需安装 ShowAI。图表提示、折叠区域和组件中的本地计算等交互可以继续使用；外部链接或在线服务仍需要网络。
+The default library is `~/.showai`. Choose another in **Settings → General → Content library**, or specify `--home` for a CLI process. Workbench and agent connections see the same projects only when they use the same library.
 
-| 交付方式 | 用途 |
-| --- | --- |
-| 独立 HTML | 分享单页、离线阅读或归档 |
-| inline 片段 | 在支持 HTML 展示的 Agent 对话中预览整页或选定部分 |
-| 静态网站 | 将一个项目的多页内容组织成带导航的网站 |
-| ShowAI JSON | 保存可重新导入的页面源数据 |
+Check save failures and retained drafts before closing. Current content is stored in transactional SQLite; original migration material and recovery data are retained. See [Content library](versioned-library.md). Cross-device editing uses [ShowAI Cloud](cloud.md) or a [self-hosted server](project-sync.md).
 
-**需要完全离线阅读时**，使用内嵌组件，并将图片内嵌到页面。HTML 和 inline 导出会同时保存 `.showai.json` 源文件，便于以后重新导入工作台编辑。静态网站可以部署到自己的静态托管服务。
-
-## 内容保存在哪里
-
-桌面工作台和本地浏览器版默认使用 `~/.showai` 内容库。可以在「设置 → 通用 → 内容库」中选择其他位置；独立 CLI 也可以通过 `--home` 指定位置。几个入口指向**相同内容库**时，才能看到同一批项目。
-
-工作台自动保存页面。若出现「保存失败」或冲突提示，先查看提示并处理当前草稿，**确认保存成功后再关闭页面**。版本历史可以比较内容变化，也可以将旧版本恢复为一个新版本。详见[内容库与历史](versioned-library.md)。
-
-需要跨设备或多人使用时，可以连接自部署的 ShowAI Server，按项目同步内容并分配访问权限。部署与连接方法见[项目服务器与同步](project-sync.md)。
-
-## 继续阅读
-
-- [Codex 使用指南](codex.md)：安装插件、连接内容库、创建和续改页面。
-- [组件与模板](catalog-lifecycle.md)：查找、复用和管理资源版本。
-- [数据图表](g2-components.md)：图表类型、数据结构和设置。
-- [文档目录](README.md)：浏览全部使用与开发文档。
+Continue with the [documentation index](README.md) for components, authoring and operations.

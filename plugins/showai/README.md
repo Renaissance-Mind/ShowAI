@@ -1,19 +1,75 @@
 # ShowAI Agent plugin
 
-ShowAI Agents use MCP for page, component, template and presentation operations. The local package includes seven skills and a stdio MCP launcher. Remote packaging uses the same skills with an authorized HTTP endpoint. CLI remains available for service startup, diagnostics, scripts and explicit administration.
+**Language:** English | [简体中文](README.zh-CN.md) · [Documentation](../../docs/README.md)
 
-Plan reader goals with [plan-presentation](skills/plan-presentation/SKILL.md), design expression and interaction with [design-presentation](skills/design-presentation/SKILL.md), and evaluate understanding with [review-presentation](skills/review-presentation/SKILL.md). Page creation continues through show-document; templates reuse narrative structure and components reuse expression capabilities.
+The local **0.16.1** plugin supplies seven Skills and a stdio MCP launcher for reading, creating, revising and presenting ShowAI content. The application/runtime is installed separately. The repository's application source version is **0.9.0**; runtime capabilities determine compatibility.
 
-Read [use-showai](skills/use-showai/SKILL.md) for connection identity, project selection and task routing. Formal content is saved in the selected project before presentation. Explicitly standalone work uses render_document and reports that no personal project was saved.
+## Install locally
 
-The local launcher uses the selected library's registered ShowAI runtime. It requires Node.js 22.12+ and runtime capability `showai-mcp-v1`; installing skills does not upgrade the software. Configure SHOWAI_HOME, optional SHOWAI_PROJECT_ID, optional SHOWAI_TEMPLATES (requires SHOWAI_PROJECT_ID) and optional SHOWAI_PRESENTATION_DIR in the host. The launcher does not silently search for another library or runtime after a failure. See [connection setup](skills/use-showai/references/runtime.md).
+Use Node.js 22.12+ and Codex CLI on PATH. Build/start ShowAI, or register an installed standalone runtime, so the selected library has an agent-runtime.json. From this repository:
 
-`page_present` returns full offline HTML/source and an inline preview that carries the local reader whenever it fits the chat budget. With a published reader it also returns a few-kilobyte `delivery.compact` fragment for hosts where the model writes the HTML, and a small online page (`delivery.online`); both load the reader from ShowAI's reader source, then jsDelivr, then unpkg. Set SHOWAI_READER_CDN=off to stay fully offline. The host displays the attached MCP Apps reader, uses a local Codex visualization reference, opens the full HTML, or reports the saved Page when it has no display surface. Output locations are owned by the host/runtime, not chosen by the model. See [delivery](skills/show-document/references/conversation-display.md).
+```sh
+npm run plugin:install -- --json
+# After pulling an update:
+npm run plugin:update -- --json
+```
 
-To install into Codex, run `npm run plugin:install` from the source repository (requires the Codex CLI on `PATH`); run `npm run plugin:update` to refresh it later. Both use the official Codex plugin commands and verify the installed files. Start a new Codex conversation afterwards and confirm the ShowAI MCP tools are visible; an already open conversation does not reload its tools.
+The installer uses official Codex plugin commands and verifies enabled state, version and file fingerprints. It records artifacts/codex-plugin-install.json. Installation, host capability refresh and a conversation loading current tools/Skills are separate steps. Use the host's supported refresh procedure and confirm the current tools in a new conversation.
 
-For Claude Code, run `claude plugin marketplace add ./` and `claude plugin install showai@renaissance-mind` from the repository root.
+For Claude Code, from the repository root:
 
-For a remote package, run `npm run package:plugin -- --mcp-url HTTPS_MCP_URL --out NEW_DIRECTORY`. It copies the same skills into `showai-cloud` without the local launcher and declares the endpoint with OAuth (dynamic client registration). Add `--chatgpt-app asdk_app_ID` to reach the server through a connection registered in ChatGPT instead. To install it beside the local plugin, run `node scripts/install-codex-plugin.mjs --remote-url HTTPS_MCP_URL --marketplace-root DIRECTORY [--chatgpt-app asdk_app_ID]`; it uses its own marketplace and verifies the installed files. No credentials enter the bundle. Publication and production deployment are separate operations.
+```sh
+claude plugin marketplace add ./
+claude plugin install showai@renaissance-mind
+```
 
-An embedded ShowAI Agent receives its project-bound MCP from AgentHost. Its task-private skill package omits the external library launcher, so the embedded runner does not gain another library-wide connection.
+## Skills and task routing
+
+| Skill                                                      | Purpose                                             |
+| ---------------------------------------------------------- | --------------------------------------------------- |
+| [use-showai](skills/use-showai/SKILL.md)                   | Connection identity, discovery, reading and routing |
+| [plan-presentation](skills/plan-presentation/SKILL.md)     | Reader goals, evidence and understanding path       |
+| [design-presentation](skills/design-presentation/SKILL.md) | Visual objects, layout, states and interaction      |
+| [show-document](skills/show-document/SKILL.md)             | Create, continue, save, present and export Pages    |
+| [review-presentation](skills/review-presentation/SKILL.md) | Assess understanding, revise and verify             |
+| [create-component](skills/create-component/SKILL.md)       | Reusable React expression capabilities              |
+| [create-template](skills/create-template/SKILL.md)         | Reusable template folders and methods               |
+
+Agent document operations use MCP. Begin with guide() and capability/project discovery. Formal work is saved in the selected project before page_present. render_document serves explicitly standalone delivery. Detailed methods remain in the canonical Skills; this README is the installation entrypoint.
+
+## Runtime and library
+
+The launcher resolves only the selected library's registered runtime and requires showai-mcp-v1 plus the relevant workflow capabilities. It reports incompatibility instead of switching libraries. Configure these in the host before startup:
+
+| Setting                 | Purpose                                        |
+| ----------------------- | ---------------------------------------------- |
+| SHOWAI_HOME             | Library root; default ~/.showai                |
+| SHOWAI_PROJECT_ID       | Optional project binding                       |
+| SHOWAI_TEMPLATES        | Startup templates, requiring SHOWAI_PROJECT_ID |
+| SHOWAI_PRESENTATION_DIR | Presentation directory accessible to the host  |
+
+See [runtime setup](skills/use-showai/references/runtime.md). Updating the plugin does not upgrade the application or an already running MCP server. The embedded ShowAI Agent receives project-bound MCP from AgentHost and omits the external library launcher from its private package.
+
+## Presentation
+
+page_present returns complete offline HTML/source plus a conversation preview. The preview uses a local reader when it fits; a published reader can supply an online fallback. delivery.compact and delivery.online use the pinned published reader. SHOWAI_READER_CDN=off keeps reader delivery offline.
+
+The host displays MCP Apps, uses the actual local Codex visualization path or offers the full HTML/source. Display support depends on the host. Runtime-owned paths and HTTP preview URLs are snapshots, while the saved project remains editable. See [conversation display](skills/show-document/references/conversation-display.md).
+
+## ChatGPT web and remote packages
+
+For regular ChatGPT web use, add the hosted MCP connection and read workflows through guide; a local Skill installation or ZIP is unnecessary. Follow [ChatGPT setup](../../docs/chatgpt.md).
+
+Operators can generate an HTTP/OAuth package from the same Skills:
+
+```sh
+npm run package:plugin -- --mcp-url HTTPS_MCP_URL --out NEW_DIRECTORY
+```
+
+The output is showai-cloud without the local launcher. It uses OAuth dynamic client registration. Add --chatgpt-app asdk_app_ID when using an existing registered ChatGPT connection. To install beside the local plugin:
+
+```sh
+node scripts/install-codex-plugin.mjs --remote-url HTTPS_MCP_URL --marketplace-root DIRECTORY
+```
+
+The installer uses a separate marketplace and verifies its installed files. No credentials enter the package. Deployment and public submission remain separate release operations. See [Agent integration](../../docs/agent-integration.md).

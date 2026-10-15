@@ -1,0 +1,143 @@
+# 项目服务器与同步
+
+**语言：** [English](../project-sync.md) | 简体中文 · [文档目录](index.zh-CN.md)
+
+ShowAI Server 按项目管理共享内容。每个项目使用**管理员、编辑者、查看者**三个角色，创建者是管理员，项目始终保留至少一位管理员。一个用户可以管理自己的项目，同时加入其他服务器上的项目。账号和设备 Token 属于服务器；项目成员记录决定权限。没有服务器管理员或所有者角色。
+
+设置中的「服务器与同步」分为三部分：「项目同步」列出本机每个项目的同步状态、所用账号和新项目的默认保存位置，展开项目可以上传到服务器、切换同步账号、在本设备隐藏或解除同步；「服务器账号」添加账号并管理各服务器的登录方式与设备；「账号绑定」连接不同服务器上的账号。管理员通过项目或服务器账号的「成员与邀请」管理成员和邀请。改变默认保存位置只影响随后新建的项目，已有项目通过「上传到服务器」明确上传；解除同步和移除连接都需要再次确认。**解除同步保留本地内容**；移出成员阻止后续服务器访问，已下载副本仍由对方设备持有。
+
+## 部署
+
+两种部署使用 `src/server/app.ts` 中相同的 HTTP 请求处理器和 `src/sync/protocol.ts` 中相同的协议。Linux 使用 Node.js 24、SQLite 和磁盘对象存储；Cloudflare Workers 使用 SQLite Durable Object 和私有 R2，并用有界热对象存储降低小型编辑的读取耗时。D1 保留为旧部署的迁移来源。客户端不依赖后端类型。服务器只存储、验证和分发内容，**不执行上传的组件代码**。
+
+```sh
+node scripts/build-server.mjs
+SHOWAI_SERVER_HOME=/absolute/private/data SHOWAI_SERVER_PORT=8788 node dist-server/server.mjs
+```
+
+Linux 环境变量：`SHOWAI_SERVER_HOST`（默认 `127.0.0.1`）、`SHOWAI_SERVER_PORT`（默认 `8788`）、`SHOWAI_SERVER_HOME`、`SHOWAI_SERVER_NAME`、`SHOWAI_SERVER_URL`、`SHOWAI_REGISTRATION_KEY`。URL 未配置时，邀请使用请求的服务器地址。**默认受控注册**：配置注册密钥供首位用户通过 App 自行注册，随后也可通过有效项目邀请注册。Linux 可明确设置 `SHOWAI_REGISTRATION_MODE=open`；官方 Worker 始终受控注册。服务数据目录应仅供服务进程读写。
+
+`SHOWAI_SERVER_URL` 和客户端连接地址支持根地址与子路径基址，例如 `https://example.com/cloud`。**基址不包含 `/api`**，末尾斜杠统一移除；请求、邀请和桌面加入链接保留该前缀。配置前缀后，服务仅处理该前缀内的路径。反向代理应保留完整前缀转发，外部邀请使用配置地址。
+
+Linux 服务迁入 HTTPS 子路径时，可以显式配置 `SHOWAI_SERVER_PATH_ALIASES='[""]'` 保留旧根路径的 HTTP 与 WebSocket 入口；新的邀请和账号绑定身份使用 `SHOWAI_SERVER_URL` 中的首选地址。没有配置别名时，服务仍仅处理自己的部署前缀。切换地址保留服务器身份、用户、会话、项目与保险库密钥。
+
+`deployments/server/Dockerfile` 和 `compose.yml` 使用相同构建结果。挂载数据目录的 UID 需要允许容器内 UID 1000 写入。用户级 systemd 模板在 `deployments/server/showai-project-sync.service`，示例安装目录是 `~/services/showai-project-server`，运行时放在其中的 `runtime/`，服务配置放在权限为 0600 的 `server.env`。独立运行时不会替换系统 Node.js。
+
+Cloudflare 部署：
+
+```sh
+npx wrangler@4.148.0 d1 create showai-cloud
+npx wrangler@4.148.0 r2 bucket create showai-cloud-content
+# 将返回的数据库 ID 写入 deployments/cloudflare/wrangler.jsonc。
+npx wrangler@4.148.0 d1 migrations apply DB --remote --config deployments/cloudflare/wrangler.jsonc
+npx wrangler@4.148.0 secret put SHOWAI_REGISTRATION_KEY --config deployments/cloudflare/wrangler.jsonc
+npx wrangler@4.148.0 secret put SHOWAI_OPERATIONS_KEY --config deployments/cloudflare/wrangler.jsonc
+npx wrangler@4.148.0 secret put SHOWAI_VAULT_KEY --config deployments/cloudflare/wrangler.jsonc
+npx wrangler@4.148.0 deploy --config deployments/cloudflare/wrangler.jsonc --var SHOWAI_METADATA_DRIVER:d1
+# 按 server-operations.md 停写并完成 metadata-bootstrap，然后使用默认 durable 配置发布。
+npx wrangler@4.148.0 deploy --config deployments/cloudflare/wrangler.jsonc
+```
+
+Linux 启动时按版本执行尚未应用的事务迁移，保留旧服务的身份与会话。Durable Object 启动时更新自己的 SQLite 结构；旧 D1 迁移来源须先构建服务生成 `dist-server/migrations/`，使用 Wrangler 显式应用迁移，再按运行维护指南停写、导入和核验，最后切换 durable 配置。配置中的 `staging` 环境绑定独立的测试 D1/R2，相关命令追加 `--env staging`。本地 Cloudflare 验收先执行 `d1 migrations apply DB --local`，再运行 `wrangler dev --local`，使用真实 D1/R2 本地实现。
+
+## 账户与项目权限
+
+### 登录与设备会话
+
+支持账号密码、已有 Token 和注册时直接签发个人 Token；配置后可使用 GitHub、Google 或邮箱验证码登录。新建或修改密码需 12 至 1024 个字符，保留首尾空格；密码使用独立盐和有版本标记的 PBKDF2 摘要。旧账号可继续使用原密码登录，原有首尾空格处理方式保留；成功登录后升级摘要格式标记。这个过程不会提高旧密码本身的强度。
+
+GitHub 和 Google 授权完成后，浏览器页面显示一次性完成码和「在 ShowAI 中完成登录」链接。只有发起登录的 ShowAI 窗口收到完成码后，服务器才确定账号并签发设备会话，因此转发给他人的授权链接无法登录对方的账号。完成码最多尝试 5 次。
+
+已有账号在「服务器与同步 → 服务器账号 → 账号与设备」添加 GitHub、Google 或邮箱登录方式，或移除已绑定的方式。添加、移除登录方式和生成个人 Token 需要最近 15 分钟内直接登录本服务器；绑定服务器恢复的会话不能执行这些操作。完成验证后，GitHub 和 Google 还需在浏览器确认绑定并在 App 中输入完成码；以后使用该方式登录仍访问同一账号的项目和服务器绑定。通过第三方登录创建的账号至少保留一种登录方式。
+
+新设备会话有效期为 30 天，每个账号最多 100 个同时有效会话。服务器仅保存随机 Token 的摘要。原有会话保留原有效期，仍可撤销。在「服务器账号 → 账号与设备」查看到期时间、撤销单个设备、退出所有设备或修改密码。修改密码撤销旧会话并保留本设备的新会话。退出所有设备会同时退出本设备已登录的绑定服务器；未能连接的绑定服务器会列出，需要分别处理。移除连接会注销该连接的服务器会话。被注销或撤销的账号不会再由绑定服务器自动恢复，需要重新登录；仅自然到期的会话仍可自动恢复。登录到期时，本地编辑保留，重新登录后继续同步。个人 Token 有效期为一年，可独立撤销；普通和绑定恢复的设备会话为 30 天。GitHub、Google 和邮箱验证码入口由服务端配置启用，成功后使用同一套设备 Token 协议；客户端输出隐藏连接 Token。
+
+### 多服务器账号绑定与模型资源
+
+先分别登录各服务，再在「账号绑定」选择两个账号建立绑定。绑定信息包含服务器身份、账号、签名公钥和变更版本，并在已绑定组内传播。新设备登录任意成员后，通过一分钟内有效且指定目标的签名授权，向其他服务获取独立设备 Token。重放、错误目标、变更的签名身份和已解除的绑定会被拒绝。原始 Token 不在服务器间复制。
+
+解除一个成员时，客户端向整组发送撤销，并保留未完成请求。离线成员需恢复连接和授权后才能确认撤销；尚未确认时设置会明确显示待完成状态。账号绑定意味着各服务可以为组内账号签发访问授权，应选择可信的部署。
+
+展开项目后的「在本设备显示」开关独立保存本机选择，控制项目导航与最近页面，保留内容和成员权限。在「Agent」设置检索所有已登录服务的模型资源，来源服务器、账号和地址会一起展示。来源服务器使用 AES-GCM 加密 API Key 和 ChatGPT 授权，在经过账号鉴权的访问接口提供凭据；客户端验证模型资源的地址和协议，防止修改配置后将密钥发往其他地址。ChatGPT 刷新由来源服务器独占，设备转交时停止本地刷新并保留可重试的转交记录。离线来源不能提供新凭据。
+
+Linux 数据目录自动创建权限 0600 的 `vault.key`；Cloudflare 必须设置独立的 `SHOWAI_VAULT_KEY`。已有加密账号数据恢复后必须提供原保险库密钥。GitHub 使用 `SHOWAI_GITHUB_CLIENT_ID` / `SHOWAI_GITHUB_CLIENT_SECRET`，Google 使用 `SHOWAI_GOOGLE_CLIENT_ID` / `SHOWAI_GOOGLE_CLIENT_SECRET`，邮箱验证码使用 Resend 的 `SHOWAI_EMAIL_API_KEY` / `SHOWAI_EMAIL_FROM`。回调地址分别为服务器基址下的 `/api/auth/callback/github` 与 `/api/auth/callback/google`。
+
+Linux 需要访问第三方登录服务的外网接口。出网受限时，可在可信的 Cloudflare 或 Linux 服务配置 `SHOWAI_GOOGLE_RELAY_KEY`（独立的 64 位十六进制随机密钥）和 `SHOWAI_GOOGLE_RELAY_REDIRECTS`（允许的 Google 回调地址，逗号分隔）；受限服务设置相同密钥及 `SHOWAI_GOOGLE_RELAY_URL`（转发服务的 HTTPS 基址），不需要 `SHOWAI_GOOGLE_CLIENT_SECRET`。两端使用同一个 Google 客户端 ID。转发只处理 Google 授权码交换和公开签名密钥，拒绝未授权请求及未列入允许列表的回调；最终身份、nonce 校验和设备 Token 签发在发起登录的服务完成。正常出网的部署直接连接 Google。
+
+### 访问限制与审计
+
+登录、注册、邀请预览与领取通过数据库中的原子计数按来源、账号和全局预算限流，返回 429 与 `Retry-After`。Linux 来源取连接地址，忽略客户端伪造的转发头。经 Cloudflare 私有代理访问时，在 Linux 设置 `SHOWAI_TRUSTED_PROXY_KEY`（64 位十六进制随机密钥），并用 `wrangler secret put PROXY_KEY` 给代理设置相同值；代理转交访客地址，Linux 只在密钥匹配时采用。未配置时，代理后的客户端共享代理来源预算。账号密码和邮箱验证码的严格限流按「账号＋来源」计算，账号级另有较宽的上限，他人无法单独锁定你的登录。Worker 使用 Cloudflare 的来源地址。默认每来源每小时最多 20 次注册尝试，可通过 `SHOWAI_REGISTRATION_LIMIT` 调整；staging 为受控验收设为 120。服务默认最多 10000 个账号，可通过 `SHOWAI_ACCOUNT_LIMIT` 调整。新增账号达到容量时返回明确失败，邀请注册失败不会留下账号或消耗领取名额。设置 `SHOWAI_ALLOWED_ORIGINS` 可允许明确的浏览器源（逗号分隔的完整 origin）；桌面、CLI 与浏览器工作台的后台连接使用 Bearer Token。关键账号、会话、邀请和成员变更写入不含密码、Token 与正文的审计记录。
+
+### 项目角色与邀请
+
+项目管理员可以邀请成员、改变权限、移出成员和归档项目；编辑者可以写入项目内容；查看者可以读取和下载当前内容。服务端每次访问检查会话与当前成员权限。**最后一位管理员不能退出或降级**。所有已登录用户都可以创建自己的项目。
+
+邀请默认有效七天，默认最多 25 个账号领取，可以选择单次、其他人数上限、不限人数或指定已注册账号。API 可设置 1 至 30 天有效期。已有邀请继续沿用不限人数，领取记录保留。领取上限和注册加入在数据库事务中检查，同一账号重复确认不重复消耗名额或改变已分配权限；已加入账号登录后可以预览和重复使用已领满的邀请。被移出的成员不能通过已经使用过的链接重新加入。移出成员时，可同时撤销该成员创建或领取过的仍有效邀请；App 默认勾选此动作。
+
+持有有效的非定向邀请的人可以注册新账号并加入。用户名、领取次数和成员移除无法证明两个账号是否属于同一个人。管理员可以通过定向邀请和关联邀请撤销控制后续加入。邀请页面提供 `showai://join` 入口，也可以在「项目同步 → 加入共享项目」粘贴链接。App 先展示服务器、项目和角色；本设备还没有该服务器账号时，邀请卡片提供登录或注册入口，通过邀请注册不需要注册密钥。用户确认并登录或注册后加入；加入不自动授予其他项目权限。服务器、桌面或账号维护者的身份不自动授予其他项目权限；云基础设施管理员的资源访问与项目管理员的产品权限分别管理。
+
+邀请链接同时携带服务器身份。接收设备已经连接该服务器时，会使用自己保存的地址预览和加入，并核对服务器身份，因此同一服务器通过不同域名、局域网地址或 SSH 转发端口访问时，也能使用邀请。新设备尚未建立连接时，仍需能访问链接中的服务器地址；对外邀请应配置可达的 `SHOWAI_SERVER_URL`。
+
+## 当前内容同步
+
+### 同步时机与版本身份
+
+协议传输当前项目的页面数据、组件源码与编译依赖、图片等资源。新设备下载当前快照，已连接设备通过 WebSocket 接收变化通知，小型更新可直接传入；HTTP 用于重连和大型传输。相同内容按摘要复用。本地保存成功后，使用 `sync status` 的状态、错误和 remoteHead 核对服务器发布。
+
+支持 `batch-heads-v1` 的服务器按当前账号批量返回项目头和实时权限，每个请求最多 400 个 ID。无权限和不存在的项目均省略。旧服务器保留逐项目查询。后台通过已观察的本地内容版本和项目版本跳过未变化项目的完整扫描；手动同步继续完整检查。同步在同一内容库内单次运行，期间到达的唤醒合并为下一轮。对象上传并发最多两个，按不可变对象或任务身份重试暂时性网络错误。`sync status` 中的 `scheduler` 提供本进程的轮次、扫描、跳过及下一次检查时间。
+
+事件连接正常时，空闲接收端也会被远端变更唤醒。事件连接不可用时，接收端使用下一次调度检查补偿。公网延迟需单独测量。可用真实后端复测调度指标：
+
+```sh
+SHOWAI_SCHEDULER_MEASURE=1 npx vitest run src/sync/scheduler.test.ts --maxWorkers=1
+```
+
+当前传输协议为 `showai-project-sync-v2`，服务器通过 `current-state-v1` 声明当前状态同步能力。键排序采用语言无关的 UTF-16 顺序。客户端和服务端需要同时支持当前状态同步；保存的连接会在首次同步时刷新服务器能力。
+
+每个当前快照带有来源设备、操作信息和用于条件发布的基线 token。云端使用 `GET /api/projects/:id/snapshot` 读取当前快照，以 POST 同一路径发布。读取可携带 revision 参数核对当前 token；并发变化返回冲突，客户端重新合并。
+
+### 发布、清单与传输
+
+服务器先验证对象和依赖，再条件更新当前项目 head。客户端只发布当前状态，断线期间的多次编辑合并为一次上传。设备在 `local/sync/` 保留同步基线、上传回执和中断恢复稿，支持重试与跨设备合并。
+
+当前清单存储于 R2／磁盘对象存储，数据库保存摘要、位置、字节数与序号。新发布完成后移除被替代的新清单记录和文件。升级前的既有记录与原始字节保留。单份清单上限为 16 MiB，普通资源对象上限为 64 MiB。
+
+Linux 内嵌清单可显式迁移，操作可分批续做并校验存储字节：
+
+```sh
+node scripts/build-server.mjs
+node scripts/migrate-server-manifests.mjs --home /absolute/server/data --batch 50
+node scripts/migrate-server-manifests.mjs --home /absolute/server/data --project PROJECT_ID --rollback
+```
+
+回退仅针对仍保留内嵌正文的旧版本；新清单使用对象存储。[停写备份和恢复工具](server-operations.zh-CN.md)保存完整账号、会话、权限、上传任务、历史和对象集合，恢复后保留服务器身份。内嵌清单迁移与整份服务恢复分别核验。
+
+对象上传和下载使用流式传输与增量摘要校验。Linux 在发布前刷新临时文件，Worker 使用有界 R2 分片、私有请求临时键和原生流式摘要。失败的当前请求临时键会回滚清理，已经发布的历史和旧孤立对象不在这一清理范围内。客户端下载先写入临时文件并校验，再替换缓存，单对象支持 64 MiB。
+
+支持 `resumable-objects-v1` 的客户端对至少 5 MiB 的对象使用持久上传任务。任务按项目和上传账号隔离，已验证分片可跨请求和服务重启保留。完成时重新计算整对象摘要并检查实时权限，然后发布对象记录。被移出成员无法读取任务状态或继续上传；已保存的本地内容保留。旧客户端继续使用整对象流式上传。
+
+### 配额与上传预算
+
+存储配额通过数据库事务预留，计算已保存的对象、清单和正在上传的空间。默认每项目 1 GiB、每上传账号 2 GiB、全站 64 GiB；每日上传字节预算分别为每账号 1 GiB、全站 16 GiB，每日新上传次数分别为每账号 50000、全站 250000。新项目默认每创建账号最多 50 个，全站最多 10000 个。旧项目的创建者和旧对象的上传者保持未知，仍计入项目及全站容量。
+
+`SHOWAI_STORAGE_POLICY` 可配置上述策略的 JSON 字段：`projectBytes`、`accountBytes`、`serviceBytes`、`accountDailyBytes`、`serviceDailyBytes`、`accountDailyUploads`、`serviceDailyUploads`、`accountProjects`、`serviceProjects`。配额拒绝返回明确错误，**本地修改继续保留**。已写入存储但尚未发布记录的恢复预留会继续占用配额，避免失败写入绕过计量；它们应通过运行维护中的核验和 dry-run 清理流程处理。上传预算保护不等于 Cloudflare 账单硬封顶。
+
+### 中断恢复与冲突处理
+
+应用远端修改前保存完整的合并恢复稿与内容摘要，再以当前内容事务写入。进程中断后从恢复稿重新合并和发布，成功后清除该稿。已有待恢复内容时，解除连接会提示先处理恢复稿。
+
+不同字段的页面修改通过现有结构化合并处理。跨设备合并失败时，**两份内容自动作为正常页面保留**，标题标注账号和设备来源，项目继续同步。共享记录保存在项目的 `conflicts/<ID>/record.json`，包含原文件、双方来源版本、原始字节摘要和副本页面 ID；`sync retained PROJECT --json` 可以查询。删除与编辑发生冲突时，保留编辑内容和标明删除来源的记录。非页面文件保留双方完整原始字节，并生成可见的来源说明页面。已同步过的同一输入不重复生成副本。
+
+**同设备上的窗口、Agent 或外部工具发生保存冲突时，本次操作明确失败**。Agent 接口返回 `CONFLICT`、`saveFailed: true`、当前版本与 recovery/nextStep；必须比较后修改并重新保存，或放弃本次修改，不能仅刷新基础 hash 强行覆盖。App 即时打开冲突处理界面，保留未保存草稿，支持返回正常编辑页面修改后明确重新保存，或放弃修改并载入当前版本。自动保存不会把待检查的合并草稿当作保存成功。App 未保存的草稿遇到已导入的另一设备版本时，按跨设备规则合并或保留带来源的副本。
+
+本机存在未处理的文件保存冲突时，相关项目暂停发布并显示 `save-failed`。冲突副本先写入恢复稿，再保存到当前内容并发布；期间的新修改继续参与合并。未完成的事务准备目录保留到本机草稿区。
+
+共用同一内容库的 App 与 CLI 按项目协调同步，取得锁后重新读取连接和基线。服务器接受上传而本地尚未记录结果时，客户端通过保存的完整上传快照回执核验当前远端 token，补记进度后继续上传后续编辑。
+
+目录路径与 Agent 目录绑定保存在设备上。不同服务器中的相同项目 ID 映射为不同本地 ID；同一服务器项目切换账号复用已有本地项目。
+
+### 同步范围与导入核验
+
+项目同步包括当前页面、所需组件依赖和资源。编辑器草稿与活动编辑基线保存在所属设备。全局侧栏组织、其他项目、设备凭据与本机配置由各设备维护。
+
+导入校验远端项目身份、资源摘要、文件路径和组件依赖。外来组件包存放在项目自己的依赖目录。设备绑定、其他项目路径、内部同步路径和文件系统路径别名会被拒绝。当前状态传输校验直接处理数据与组件依赖。

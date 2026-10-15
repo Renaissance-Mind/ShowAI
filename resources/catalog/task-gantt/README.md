@@ -1,4 +1,28 @@
-# 任务管理甘特图
+# Task Gantt component
+
+**Language:** [English](#english) | [简体中文](#简体中文)
+
+## English
+
+Version 1.3.0 is an independent React package receiving `{data,onChange,readOnly}`. Its named readData export returns derived dates, progress, state and leaf-task statistics by task ID in the browser sandbox.
+
+Data includes title, optional description/columns and up to 200 tasks. Each task needs unique id, title, YYYY-MM-DD start/end and integer progress 0–100. Optional fields are owner, phase, dependencies, milestone, parentId and color. Dates include the end day and the project span is limited to ten years. Task colors are blue (default), purple, amber, rose and slate; color does not replace completion state.
+
+Rows default to 32 px and bars to 26 px. Ordered columns start with title and may include owner/status/phase/progress/start/end; defaults are task, owner and status. Editing persists selection/order; read-only changes remain local. Narrow views retain the task tree and show details on selection.
+
+Parent tasks aggregate dates and progress over all leaf descendants equally, counting each leaf once. Moving a parent shifts descendants; its aggregate dates/progress cannot be edited independently. Reparenting rejects self, descendants and milestones. Deleting a parent promotes direct children while retaining deeper structure.
+
+Reading supports search, status filters, overview/day/week scales, navigation and details. Editing adds create/edit/delete, child tasks, completion, drag/resizing and accessible date forms. Milestones use one day. Dependencies must finish before the task starts; overlap displays a conflict, and cyclic dependencies/nesting cannot save. Deletion clears references to the removed task. Successors do not move automatically. Milestones count in leaf progress. All persistent edits use onChange(nextData).
+
+```sh
+showai catalog import --project PROJECT --input resources/catalog/task-gantt --json
+node scripts/preview-task-gantt.mjs /absolute/path/task-gantt.html
+npx vitest run src/core/task-gantt.test.ts
+```
+
+Preview output includes conversation and standalone HTML using the same component code. Data lives in examples/task-gantt/data.json. Formal Pages persist through ShowAI; conversation preview edits belong to that visualization state.
+
+## 简体中文
 
 独立 React 组件包，入口接收 `{ data, onChange, readOnly }`。版本 `1.3.0`。命名导出 `readData` 返回按任务 ID 对应的派生日期、进度、状态和叶子任务统计，由 ShowAI 在浏览器沙箱中读取。
 

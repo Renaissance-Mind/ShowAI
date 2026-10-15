@@ -1,6 +1,8 @@
 # Contributing to ShowAI
 
-Thanks for helping improve ShowAI. This guide covers the local development setup, tests, and what we expect in a pull request. 中文读者可参考 [中文 README](docs/i18n/README.zh-CN.md) 的「开发与贡献」一节；本文的命令同样适用。
+**Language:** English | [简体中文](docs/i18n/CONTRIBUTING.zh-CN.md)
+
+This guide covers development setup, relevant verification and pull requests. Product and integration guides are indexed in [Documentation](docs/README.md).
 
 ## Prerequisites
 
@@ -30,10 +32,10 @@ The development launcher builds the app with hot reload. Frontend changes update
 By default an instance uses port 5173 and the content library `.showai-dev/library`. Give each parallel instance its own port, content library, and (for desktop) settings directory so they cannot write to each other's data:
 
 ```sh
-mkdir -p /tmp/showai-dev-a/profile
-SHOWAI_USER_DATA=/tmp/showai-dev-a/profile \
-  npm run dev:open -- --port 5180 --home /tmp/showai-dev-a/library
-npm run dev:status -- --port 5180 --home /tmp/showai-dev-a/library
+mkdir -p /absolute/showai-dev-a/profile /absolute/showai-dev-a/tmp
+SHOWAI_USER_DATA=/absolute/showai-dev-a/profile TMPDIR=/absolute/showai-dev-a/tmp \
+  npm run dev:open -- --port 5180 --home /absolute/showai-dev-a/library --no-focus
+npm run dev:status -- --port 5180 --home /absolute/showai-dev-a/library
 ```
 
 - `--home` must be an absolute path. An instance keeps its port and library for its whole lifetime.
@@ -41,6 +43,8 @@ npm run dev:status -- --port 5180 --home /tmp/showai-dev-a/library
 - `--no-focus` (with `dev:open`) or `--no-open` (with `dev:desktop` / `dev:browser`) starts the instance without bringing a window forward, which is useful for automated runs.
 - Build output and launcher records for each instance live in `.showai-dev/<mode>-<port>/`. Do not move or delete them while the instance is running.
 - Do not point a development instance at your everyday content library (`~/.showai`) when testing changes that write data.
+
+Stop task-owned processes before deleting temporary libraries/profiles. Retain needed source material and verification evidence; never treat another running instance as a cache.
 
 The development badge in the bottom-right corner shows the source directory, branch, and commit the instance was started from.
 
@@ -63,6 +67,7 @@ Depending on what you changed, also run:
 | Development launcher and hot reload | `npm run test:dev`, `npm run test:dev -- desktop`            |
 | Browser edition server              | `npm run test:browser`                                       |
 | Sync server                         | `npm run test:server`                                        |
+| HTTP MCP gateway                    | `npm run test:cloud-mcp`                                     |
 
 Tests use real file I/O and real component compilation; please avoid adding mocks where a real temporary library works. On Windows, file-symlink tests are skipped when Developer Mode or symlink privileges are unavailable.
 
@@ -76,7 +81,7 @@ The Codex / Claude Code plugin lives in `plugins/showai/`. After changing a skil
 npm run plugin:update   # reinstall into Codex and verify the installed files
 ```
 
-Then start a new agent conversation to load the updated skills. If you change a CLI command, its arguments, or its output, check whether the skills that describe it need the same update.
+Check the installer JSON/receipt for success, enabled state, version, installed path, verified files and tree digest. Refresh the host using its supported procedure, then confirm the current tools and Skills in a new conversation. Installation and host refresh are separate checks. If you change a CLI command, its arguments, or its output, check whether the skills that describe it need the same update.
 
 ## Pull requests
 
@@ -85,7 +90,9 @@ Then start a new agent conversation to load the updated skills. If you change a 
 - When adding a feature, extend existing entry points and menus (selection, context, and hover menus) before adding a new toolbar or button.
 - Handle errors at real boundaries (I/O, processes, user input) and surface the cause; do not swallow failures.
 - Markdown files are ignored by default. To add a new public `.md` file, add its exact path to the allowlist in `.gitignore`.
-- User-facing documents are maintained in English and Simplified Chinese. Update `README.md` and `docs/i18n/README.zh-CN.md` together.
+- Maintain English and Simplified Chinese together: `README.md` ↔ `docs/i18n/README.zh-CN.md`, `docs/TOPIC.md` ↔ `docs/i18n/TOPIC.zh-CN.md`, and both documentation indexes. Keep language switches and relative links valid.
+- Verify documented commands against the owning implementation. Distinguish source versions, installed runtime/plugin versions, deployed service state and published release artifacts.
+- Keep internal plans, credentials, machine-specific state, test logs and acceptance evidence outside public documentation.
 
 ## Reporting issues
 

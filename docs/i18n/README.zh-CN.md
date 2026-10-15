@@ -5,13 +5,13 @@
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/License-MIT-22A06B?style=flat&amp;labelColor=30343B" alt="MIT 许可证"></a>
   <a href="#cli-与-mcp"><img src="https://img.shields.io/badge/MCP-compatible-0891B2?style=flat&amp;labelColor=30343B" alt="兼容 MCP"></a>
   <a href="#网页版-chatgpt"><img src="https://img.shields.io/badge/ChatGPT-Web-10A37F?style=flat&amp;labelColor=30343B" alt="ChatGPT 网页版接入"></a>
-  <a href="../codex.md"><img src="https://img.shields.io/badge/Codex-Plugin-6366F1?style=flat&amp;labelColor=30343B" alt="Codex 插件"></a>
-  <a href="../../plugins/showai/README.md"><img src="https://img.shields.io/badge/Claude_Code-Plugin-E48149?style=flat&amp;labelColor=30343B" alt="Claude Code 插件"></a>
+  <a href="codex.zh-CN.md"><img src="https://img.shields.io/badge/Codex-Plugin-6366F1?style=flat&amp;labelColor=30343B" alt="Codex 插件"></a>
+  <a href="../../plugins/showai/README.zh-CN.md"><img src="https://img.shields.io/badge/Claude_Code-Plugin-E48149?style=flat&amp;labelColor=30343B" alt="Claude Code 插件"></a>
 </p>
 
 **语言:** [English](../../README.md) | 简体中文
 
-[文档](../README.md) · [快速开始](../quick-start.md) · [在 Codex 中使用](../codex.md)
+[文档](index.zh-CN.md) · [快速开始](quick-start.zh-CN.md) · [在 Codex 中使用](codex.zh-CN.md)
 
 **让 Agent 用界面回答，而不是一大段文字。**
 
@@ -35,7 +35,7 @@ https://github.com/user-attachments/assets/375d6ff3-fe3e-47c2-b6a4-d69df1b86b20
 
 - **支持 ChatGPT 与本地 Agent**：在 ChatGPT 中通过自定义 MCP 连接，页面直接显示在对话里。Claude Code 和 Codex 通过 ShowAI 插件接入，其他 MCP 客户端可以使用 stdio 入口。
 
-  ShowAI App 也内置了 Agent，可以使用 ChatGPT 套餐、OpenRouter、DeepSeek 等模型来源。
+  ShowAI App 的[内置 Agent](agent-host.zh-CN.md) 支持本机 Agent 与 API 模型；配置后可使用云端执行及配对 Mac 处理远程设备任务。ChatGPT 套餐使用取决于实际账号授权。
 
 - **工作区多端同步**：登录 ShowAI Cloud 或自部署的 ShowAI Server，即可在设备之间同步项目、组件和资源。离线时照常编辑，联网后自动补齐；不同设备上的冲突修改会同时保留。
 
@@ -43,7 +43,9 @@ https://github.com/user-attachments/assets/375d6ff3-fe3e-47c2-b6a4-d69df1b86b20
 
 完成后可以导出为离线可用的独立 HTML 或静态网站，详见[分享页面与 Site](#-分享页面与-site)。
 
-> **语言说明：** 工作台界面支持简体中文和英文，默认跟随系统语言（中文系统使用简体中文，其他语言使用英文），可在 **设置 → 外观 → 语言** 中切换。导出页面的阅读器控件使用导出时的界面语言。下方标注「（英文）」的参考文档暂时只有英文版本。
+> **版本：** 本文档对应 main 分支的应用 **0.9.0**、插件 **0.16.1** 和页面格式 **v3**。软件、插件与托管服务独立更新；可下载文件以 [Releases](https://github.com/Renaissance-Mind/ShowAI/releases) 为准。全部公开使用与技术指南提供中英文版本，见[文档目录](index.zh-CN.md)。
+
+工作台支持英文和简体中文，在「设置 → 外观 → 语言」切换；导出阅读器使用导出时的界面语言。
 
 ## 🧩 设计逻辑
 
@@ -51,7 +53,7 @@ https://github.com/user-attachments/assets/375d6ff3-fe3e-47c2-b6a4-d69df1b86b20
 
 1. **组件：按需要表达信息。** 文本、图片、表格、图表、流程图和滑块提供不同的表达与交互方式。Agent 可以选择已有组件，也可以根据任务创建并加入新组件，例如让读者调整参数、观察计算结果的控件。
 
-2. **内容（模板）：组织内容，复用结构。** 组件组合成可阅读、可操作的内容。[Page](../page-surface.md) 按顺序组织文章与报告，Board 用空间布局组织关系与方案。常用的内容结构和组件组合可以保存为模板：应用模板填入新材料，或从完成的内容中提炼模板，供后续创作复用。详见[组件与模板说明](../catalog-lifecycle.md)。
+2. **内容（模板）：组织内容，复用结构。** 组件组合成可阅读、可操作的内容。[Page](page-surface.zh-CN.md) 按顺序组织文章与报告，Board 用空间布局组织关系与方案。常用的内容结构和组件组合可以保存为模板：应用模板填入新材料，或从完成的内容中提炼模板，供后续创作复用。详见[组件与模板说明](catalog-lifecycle.zh-CN.md)。
 
 3. **共同创作：在聊天与 App 中参与。** 在支持页面展示的 Agent 会话中，内容直接呈现在聊天里。人可以查看图表、操作控件，再通过后续对话让 Agent 继续分析和修改。
 
@@ -101,7 +103,7 @@ npm run desktop
 
 默认内容库为 `~/.showai`，可在设置中更改。桌面应用、浏览器工作台与 CLI 指向同一内容库时，共同读写其中的项目。
 
-本地浏览器版支持 macOS、Linux 和 Windows，也可以打包为自带 Node 运行时的发行包。启动器与平台要求见[本地浏览器版说明](../local-browser.md)。
+本地浏览器版支持 macOS、Linux 和 Windows，也可以打包为自带 Node 运行时的发行包。启动器与平台要求见[本地浏览器版说明](local-browser.zh-CN.md)。
 
 ## 🤖 连接 Agent
 
@@ -115,26 +117,15 @@ ShowAI 通过官方 MCP 接入网页版 ChatGPT，也提供 Codex 与 Claude Cod
 
 ### 网页版 ChatGPT
 
-在 [chatgpt.com](https://chatgpt.com) 添加官方 ShowAI MCP，就能在普通网页对话里创建、保存和续改交互页面。完成账号开通后，日常网页使用无需运行本机 ShowAI 或另装 Skills。ChatGPT 账号需具备添加自定义 MCP 的功能，并满足工作区权限要求。
+在 [ChatGPT Plugins](https://chatgpt.com/plugins) 添加自定义 MCP 连接，认证选择 **OAuth or no authentication**：
 
-1. **开通 ShowAI Cloud 账号。** 当前为受控注册：向项目管理员索取邀请链接，或向 Cloud 维护者索取注册密钥（[开通咨询](https://github.com/Renaissance-Mind/ShowAI/issues)）。首次注册使用 ShowAI 桌面版或本地浏览器工作台。有密钥时，在「设置 → 服务器与同步 → 服务器账号 → 添加服务器账号」填写 `https://showai.renaissancemind.ai/cloud`，选择注册，设置账号及至少 12 位密码；有邀请时，在「项目同步 → 加入共享项目」粘贴邀请，在邀请卡片中注册，不需要注册密钥。已有 Cloud 账号可跳过。
-2. **添加 MCP 连接。** 打开 [ChatGPT 插件页面](https://chatgpt.com/plugins)，点击「+ → Add custom MCP server」，按下表配置。创建为插件后，安装刚创建的 ShowAI。
-3. **登录并授权。** 使用 ShowAI 账号密码，或已绑定到该账号的 GitHub / Google。第三方登录会打开新标签页；将最后显示的 8 位完成码填回最初的 ShowAI 授权页，点击继续。需要新建项目时，选择「授权这个账号当前及今后有权限的所有项目」，并核对授权页包含新建、读取及编辑权限。只授权一个项目时，仅能访问该已有项目。各项目的成员权限仍然有效。
-4. **试做一页。** 新开普通网页对话，输入 `@` 选择 **ShowAI**，发送：「列出我的 ShowAI 项目。然后新建项目『我的交互笔记』，做一页带互动示例的机会成本讲解，保存、确认同步状态，再在对话中展示。」按 ChatGPT 提示核对写入操作；以后可以按项目名和页面名找到它并继续修改。
+```text
+https://agent.showai.renaissancemind.ai/mcp
+```
 
-| 配置项 | 填写内容 |
-| --- | --- |
-| 名称 | `ShowAI` |
-| Server URL | `https://agent.showai.renaissancemind.ai/mcp` |
-| 认证方式 | **OAuth or no authentication（OAuth 或无认证）** |
-| OAuth 客户端注册（如出现） | **Dynamic Client Registration（DCR）** |
-| Client ID / Client Secret | 留空，由 DCR 自动注册 |
+使用 ShowAI Cloud 账号并授权所需项目。新建项目需要账号范围与 projects.create 权限。账号/同步基址是 `https://showai.renaissancemind.ai/cloud`，注册需要运营者密钥或有效项目邀请。日常网页使用无需本机 ShowAI 进程或单独安装 Skill。
 
-MCP 地址以 `/mcp` 结尾，工作台账号与同步地址以 `/cloud` 结尾。公开组件、模板和临时渲染可匿名使用；私有项目需要 ShowAI 账号。只保存在电脑上的项目，要先同步到同一 Cloud 账号。创作指南由 MCP 从共用 Skill 源文件按需提供。
-
-**更新方式：** ShowAI 维护者部署服务和指南更新后，后续调用使用已部署版本，建议新开对话读取最新指南。工具、参数、认证声明或预览资源变化时，打开「ChatGPT 插件 → 你的 ShowAI 连接 → Refresh / 刷新工具」，再新开对话并重新选择 `@ShowAI`。登录到期或要扩大项目范围时需要重新授权。无需重新下载 ZIP。把本教程和 MCP 地址发给其他人，每个人添加连接、登录自己的账号即可。
-
-账号开通、完成码、权限排查和预览重试详见[网页版 ChatGPT 完整接入教程](https://showai.renaissancemind.ai/zh/doc/chatgpt)。ChatGPT 的入口名称和可用性可能随账号而变化，参见 [OpenAI 自定义 MCP 说明](https://developers.openai.com/api/docs/guides/custom-mcp-server#how-to-use)。
+参见[完整 ChatGPT 网页指南](chatgpt.zh-CN.md)，了解注册、第三方登录完成码、权限、连接刷新与排查。每个人独立添加并授权连接。
 
 ### 安装本机插件
 
@@ -153,17 +144,17 @@ claude plugin marketplace add ./
 claude plugin install showai@renaissance-mind
 ```
 
-插件包含七个 Skill：
+安装后通过宿主支持的方式刷新能力，再在新会话确认工具与 Skill 可见。插件包含七个 Skill：
 
-| Skill | 用途 |
-| --- | --- |
-| `use-showai` | 基础用法、连接运行时、查找和阅读内容 |
-| `plan-presentation` | 明确认知起点、证据范围与多级理解路径 |
-| `design-presentation` | 设计视觉表达、布局、交互分镜与静态方式 |
-| `review-presentation` | 检查读者任务、定位问题并按授权修订 |
-| `show-document` | 创建、修改、展示和导出页面，应用已有模板 |
-| `create-component` | 创建或改造可复用的 React 组件 |
-| `create-template` | 创建、修改模板，或从已有页面提炼模板 |
+| Skill                 | 用途                                     |
+| --------------------- | ---------------------------------------- |
+| `use-showai`          | 基础用法、连接运行时、查找和阅读内容     |
+| `plan-presentation`   | 明确认知起点、证据范围与多级理解路径     |
+| `design-presentation` | 设计视觉表达、布局、交互分镜与静态方式   |
+| `review-presentation` | 检查读者任务、定位问题并按授权修订       |
+| `show-document`       | 创建、修改、展示和导出页面，应用已有模板 |
+| `create-component`    | 创建或改造可复用的 React 组件            |
+| `create-template`     | 创建、修改模板，或从已有页面提炼模板     |
 
 插件提供创作流程与参考说明，运行程序由 ShowAI 应用或独立运行包提供。桌面用户可在「设置 → 连接 Agent」中取得启动配置；从源码构建的独立运行包可执行：
 
@@ -171,7 +162,7 @@ claude plugin install showai@renaissance-mind
 npm run runtime:register
 ```
 
-安装与接入步骤见[插件说明](../../plugins/showai/README.md)。
+安装与接入步骤见[插件说明](../../plugins/showai/README.zh-CN.md)。
 
 ### CLI 与 MCP
 
@@ -189,15 +180,15 @@ node dist-runtime/scripts/cli.mjs catalog list \
 node dist-runtime/scripts/cli.mjs guide authoring --json
 ```
 
-其他 Agent 客户端也可以通过可选的 stdio MCP 入口接入。完整命令、编辑协议与配置见 [Agent 使用说明](../agent-usage.md)。
+其他 Agent 客户端也可以通过可选的 stdio MCP 入口接入。完整命令、编辑协议与配置见 [Agent 使用说明](agent-usage.zh-CN.md)。
 
 ## 📦 分享页面与 Site
 
-| 导出格式 | 适用场景 |
-| --- | --- |
-| **独立 HTML** | 分享、离线阅读和归档 |
+| 导出格式        | 适用场景                            |
+| --------------- | ----------------------------------- |
+| **独立 HTML**   | 分享、离线阅读和归档                |
 | **inline 片段** | 在支持 HTML 展示的 Agent 对话中呈现 |
-| **静态网站** | 多页面导航与静态托管 |
+| **静态网站**    | 多页面导航与静态托管                |
 
 独立 HTML 支持图表切换、折叠内容和本地参数计算等离线交互；外部来源链接需要联网。离线导出要求图片已内嵌。
 
@@ -224,34 +215,27 @@ node dist-runtime/scripts/cli.mjs export \
 
 使用 `--blocks ID,ID` 可以导出选定的组件或区域。HTML 与 inline 导出同时保存 `.showai.json` 源文件，便于重新导入和继续编辑。
 
-静态网站目录可部署到自己的服务器或托管服务。导出格式与选项见 [Agent 使用说明](../agent-usage.md)。
+静态网站目录可部署到自己的服务器或托管服务。导出格式与选项见 [Agent 使用说明](agent-usage.zh-CN.md)。
 
 ## 🔒 内容与同步
 
 项目内容保存在本机的 SQLite 内容库，支持备份与迁移。保存更新当前内容，通过页面 hash 和资源 token 检查并发修改；本地草稿与冲突恢复保留未完成的工作。
 
-跨设备或与他人协作时，连接自部署的 ShowAI Server，按项目同步当前页面、组件依赖和资源。管理员、编辑者与查看者角色管理访问权限。HTML 预览与导出按需生成。
+跨设备或与他人协作时，连接 ShowAI Cloud 或自部署的 ShowAI Server，按项目同步当前页面、组件依赖和资源。管理员、编辑者与查看者角色管理访问权限。HTML 预览与导出按需生成。
 
-[内容库](../versioned-library.md)（英文） · [项目服务器与同步](../project-sync.md)。
+[内容库](versioned-library.zh-CN.md) · [项目服务器与同步](project-sync.zh-CN.md)。
 
 ## 📚 文档
 
-| 文档 | 内容 |
-| --- | --- |
-| [网页版 ChatGPT 接入](https://showai.renaissancemind.ai/zh/doc/chatgpt) | 账号开通、MCP 配置、登录授权和更新 |
-| [快速开始](../quick-start.md) | 第一个项目、第一份页面与 Agent 接入 |
-| [Page 与 Board](../page-surface.md) | 页面、白板与交互 |
-| [Agent 使用说明](../agent-usage.md)（英文） | CLI、MCP、创作与导出 |
-| [Agent 接入](../agent-integration.md)（英文） | MCP 入口与宿主配置 |
-| [插件说明](../../plugins/showai/README.md)（英文） | Skill 分工与安装 |
-| [在 Codex 中使用](../codex.md) | Codex 插件配置与文档工作流 |
-| [数据图表](../g2-components.md) | 图表类型、数据接口与设置 |
-| [组件与模板](../catalog-lifecycle.md) | 目录、版本、依赖与复用 |
-| [内容库](../versioned-library.md)（英文） | SQLite · 内容与同步 |
-| [本地浏览器版](../local-browser.md) | 启动器、打包与平台要求 |
-| [项目服务器与同步](../project-sync.md) | 服务部署、项目权限与同步 |
-| [服务器运维](../server-operations.md)（英文） | 备份、恢复与迁移 |
-| [页面数据格式](../artifact-format.md)（英文） | 页面结构与数据约定 |
+全部使用与技术指南均有中英文版本及语言切换。浏览[中文文档目录](index.zh-CN.md)或 [English index](../README.md)。
+
+| 开始使用                               | 创作与集成                                  | 保存与分享                                |
+| -------------------------------------- | ------------------------------------------- | ----------------------------------------- |
+| [快速上手](quick-start.zh-CN.md)       | [组件与模板](catalog-lifecycle.zh-CN.md)    | [内容库](versioned-library.zh-CN.md)      |
+| [网页版 ChatGPT](chatgpt.zh-CN.md)     | [模板文件夹](template-bundles.zh-CN.md)     | [Cloud 与账号](cloud.zh-CN.md)            |
+| [Codex 插件](codex.zh-CN.md)           | [组件参数](component-parameters.zh-CN.md)   | [项目同步](project-sync.zh-CN.md)         |
+| [Page 与 Board](page-surface.zh-CN.md) | [Agent 接入](agent-integration.zh-CN.md)    | [服务器运维](server-operations.zh-CN.md)  |
+| [内置 Agent](agent-host.zh-CN.md)      | [页面数据格式 v3](artifact-format.zh-CN.md) | [MCP 部署](cloud-mcp-deployment.zh-CN.md) |
 
 ## 🛠️ 开发与贡献
 
@@ -269,7 +253,7 @@ npm run dev:open
 npm run dev:status
 ```
 
-浏览器开发版使用 `npm run dev:browser`。默认开发内容库位于 `.showai-dev/library`，可以通过启动参数指定其他目录。隔离的开发实例、端口与测试说明见 [CONTRIBUTING.md](../../CONTRIBUTING.md)。
+浏览器开发版使用 `npm run dev:browser`。默认开发内容库位于 `.showai-dev/library`，可以通过启动参数指定其他目录。隔离的开发实例、端口与测试说明见 [贡献指南](CONTRIBUTING.zh-CN.md)。
 
 提交改动前执行：
 

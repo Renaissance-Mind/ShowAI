@@ -1,5 +1,7 @@
 # ShowAI Cloud
 
+**Language:** English | [简体中文](i18n/cloud.zh-CN.md) · [Documentation](README.md)
+
 The official server base URL is **https://showai.renaissancemind.ai/cloud**. Enter this address in **Settings → Server & sync → Server accounts → Add server account**. Without a registration key, ask a project admin for an invite link and paste it under **Project sync → Join a shared project**; registering through an invite needs no key. The base URL includes `/cloud` and excludes `/api`.
 
 ## Accounts and bound services

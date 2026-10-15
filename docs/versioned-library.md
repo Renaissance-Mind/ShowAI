@@ -1,5 +1,7 @@
 # Content library
 
+**Language:** English | [简体中文](i18n/versioned-library.zh-CN.md) · [Documentation](README.md)
+
 ShowAI stores current project content in transactional SQLite, alongside a readable workspace, local editing drafts and rebuildable search indexes. Projects resolve from the host directory; explicit project selection takes precedence.
 
 ## Storage contract
@@ -25,6 +27,8 @@ Failed transactions preserve incoming edits. External file changes are captured 
 ## Synchronization
 
 Each device transfers current page data, component dependencies and assets. A device retains its last synchronized baseline and bounded recovery inputs for concurrent or interrupted work. The server checks the expected current token before publication. See [Project server and synchronization](project-sync.md).
+
+Content history browsing, historical previews and Page version restoration are unavailable. Editor undo, retained drafts/conflicts and migration archives serve their specific recovery purposes. `page_diff` can compare only a still-retained read/draft baseline; a missing baseline returns `MISSING_BASELINE`.
 
 ## Existing libraries and maintenance
 

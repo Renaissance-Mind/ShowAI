@@ -1,5 +1,7 @@
 # Server backup and migration
 
+**Language:** English | [简体中文](i18n/server-operations.zh-CN.md) · [Documentation](README.md)
+
 Linux and Cloudflare use the same operations protocol and application metadata. **A consistent backup** contains all accounts, password formats, device session digests and expiry/revocation state, account binding identities and peers, encrypted model resources, external login identities and pending flows, memberships, invitation claims, quota reservations, upload tasks, complete revision graphs and the private object inventory. Infrastructure secrets stay in the deployment environment. The **server identity remains unchanged on restore**.
 
 Set `SHOWAI_OPERATIONS_KEY` to 32 random bytes encoded as 64 lowercase hexadecimal characters. It is an infrastructure credential independent of user passwords and sessions. Without it, operations endpoints return 404. Keep its source file private; use HTTPS for remote access or a loopback connection through SSH. Cloudflare environments need independent keys installed with Wrangler secrets. The [R2 Workers API](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/#bucket-method-definitions) supplies the paginated object inventory.
@@ -14,8 +16,8 @@ Build the current server and explicitly name a new absolute backup directory:
 
 ```sh
 npm run build:server
-node scripts/server-backup.mjs export --url https://showai.example.com/cloud --key-file /secure/source-operations.key --destination /secure/backups/showai-2026-10-09
-node scripts/server-backup.mjs verify --backup /secure/backups/showai-2026-10-09
+node scripts/server-backup.mjs export --url https://showai.example.com/cloud --key-file /secure/source-operations.key --destination /secure/backups/showai-backup
+node scripts/server-backup.mjs verify --backup /secure/backups/showai-backup
 ```
 
 Export freezes the source and waits for admitted object/manifest writes to finish. Database triggers reject subsequent application writes, including writes started before the freeze. Physical object writes have durable admission records. Objects and metadata are copied only after those records drain to zero. The **source remains frozen after completion or failure**. The JSON receipt reports its `serverId`, counts and verified bytes; the complete generation and per-file digests are in `backup.json`.
@@ -25,7 +27,7 @@ Table export uses stable cursors with bounded pages. Large retained inline manif
 An interrupted export can reuse the original generation and verified files:
 
 ```sh
-node scripts/server-backup.mjs export --url https://showai.example.com/cloud --key-file /secure/source-operations.key --destination /secure/backups/showai-2026-10-09 --resume
+node scripts/server-backup.mjs export --url https://showai.example.com/cloud --key-file /secure/source-operations.key --destination /secure/backups/showai-backup --resume
 ```
 
 Resume fails when the source was reopened, its schema changed or the frozen generation changed. Active admission records are never expired by time. A new Cloudflare Durable Object instance clears the records left by its previous instance, because a reset or deploy ends every request that instance admitted. On Linux, if export still reports draining after its deadline, inspect the isolated runtime and retained records before recovering it; a timeout alone does not prove that an object write stopped. Public request bodies have a two-minute transfer deadline. Object writes have 64 admission slots and metadata mutations have 256; both drain before exclusive maintenance. Read-only budget credit grants also participate in the metadata fence. Version 6 and 7 backups remain verifiable and restore with an explicit offline upgrade to the current schema.
@@ -35,7 +37,7 @@ Resume fails when the source was reopened, its schema changed or the frozen gene
 Copy the complete backup to the target Linux host, then restore into a **new directory**:
 
 ```sh
-node scripts/server-backup.mjs restore --backup /secure/backups/showai-2026-10-09 --home /srv/showai/restored-data
+node scripts/server-backup.mjs restore --backup /secure/backups/showai-backup --home /srv/showai/restored-data
 ```
 
 The tool refuses an existing destination, verifies the archive, creates and checks the copied objects and metadata, and publishes the new directory after completion.
@@ -68,7 +70,7 @@ A route rollback to the frozen D1 source alone is insufficient after new edits. 
 A **dry-run** can report old, unreferenced objects from a verified frozen backup:
 
 ```sh
-node scripts/server-backup.mjs plan-cleanup --backup /secure/backups/showai-2026-10-09 --destination /secure/backups/cleanup-plan.ndjson --retention-days 30
+node scripts/server-backup.mjs plan-cleanup --backup /secure/backups/showai-backup --destination /secure/backups/cleanup-plan.ndjson --retention-days 30
 ```
 
 The report identifies its backup digest and frozen generation. It protects files from every revision, including unpublished and archived history, all manifest pointers, quota reservations and upload tasks/parts. Objects without a usable age remain protected; the minimum retention is 30 days. The reporting command **deletes zero objects**.
@@ -76,7 +78,7 @@ The report identifies its backup digest and frozen generation. It protects files
 Live cleanup defaults to another **dry-run**. Add `--apply` to remove eligible object/manifest candidates, at most twenty per operation:
 
 ```sh
-node scripts/server-backup.mjs cleanup --url https://target.example/cloud --key-file /secure/target-operations.key --backup /secure/backups/showai-2026-10-09 --plan /secure/backups/cleanup-plan.ndjson --epoch CURRENT_FROZEN_GENERATION
+node scripts/server-backup.mjs cleanup --url https://target.example/cloud --key-file /secure/target-operations.key --backup /secure/backups/showai-backup --plan /secure/backups/cleanup-plan.ndjson --epoch CURRENT_FROZEN_GENERATION
 ```
 
 The server independently checks age, exact recorded metadata, complete digest and live references. All project history is inspected, including unpublished versions. Online proof is bounded to 100 revisions and 16 MiB of total manifests per project; candidates exceeding that budget remain protected. Upload task parts remain outside this deletion command. Applying any maintenance operation rotates the frozen generation, so a previous plan cannot be replayed after changes. Regenerate the backup/report for subsequent batches. Ordinary metadata requests and competing exports cannot enter an exclusive maintenance operation.

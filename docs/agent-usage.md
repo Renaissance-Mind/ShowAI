@@ -1,10 +1,12 @@
 # CLI reference for scripts and operators
 
+**Language:** English | [简体中文](i18n/agent-usage.zh-CN.md) · [Documentation](README.md)
+
 **Agent document workflows use MCP**; see [Agent integration](agent-integration.md). This reference retains CLI commands for scripts, service configuration, diagnostics and compatibility.
 
 ShowAI's Node.js CLI and optional MCP server operate on the same project files as the desktop workbench. The CLI runs one command and exits; the desktop window can be closed and no Core daemon is required. It is built from `src/agent/cli.ts` and packaged at `dist-runtime/scripts/cli.mjs`, and included in the desktop application under `Resources/runtime/`. A Python Agent can invoke it with `subprocess` or an MCP client.
 
-The skills-only plugin resolves the installed software from `agent-runtime.json` in the selected content directory, then verifies it with `runtime info --json`. Desktop startup records its bundled launch; standalone runtime users run `runtime register --json`.
+The local plugin with its stdio MCP launcher resolves the installed software from `agent-runtime.json` in the selected content directory, then verifies it with `runtime info --json`. Desktop startup records its bundled launch; standalone runtime users run `runtime register --json`.
 
 In the examples below, `showai` means the **verified external command prefix**, for example `node /absolute/path/to/dist-runtime/scripts/cli.mjs`. Do not assume a global npm command exists. Standalone use requires Node.js 22.12+. The desktop application's **Settings → Agent → Local connection** panel provides its bundled executable, CLI path and environment for use without a separate Node installation.
 
@@ -28,7 +30,7 @@ Every successful `--json` command returns `{ "ok": true, "data": ... }`. Failure
 
 New resources use artifact v3 and default to Page. Use `pages create --kind board` for a spatial workspace. `showai guide containers --json` describes recursive surfaces, parent-owned frames, per-surface views and drawing nodes. Content lives in the tree, frames in layout and saved views in surfaceViews. The project folder parentId differs from a content operation's container parentId.
 
-Page and Board are native entries in the component catalog. Read `catalog read page --view guide` or the Board equivalent. `component.insert` takes kind, data and optional parentId for both ordinary and native components; native insertion preserves the surface node and recursively remaps content and views. Native containers are customized through content/layout and templates.
+Page and Board are native entries in the component catalog. Read `catalog describe page --view guide` or the Board equivalent. `component.insert` takes kind, data and optional parentId for both ordinary and native components; native insertion preserves the surface node and recursively remaps content and views. Native containers are customized through content/layout and templates.
 
 `surface.create` inserts a Page or Board, and `surface.wrap` wraps an existing surface while preserving its identity and descendants. Block operations edit the tree; surface.layout.set changes frames; view and reading-order operations accept a surfaceId. Supply the current base hash and, for versioned libraries, the resource revision. surface.upgrade adapts older sources and the first managed save preserves original bytes and snapshots.
 
@@ -101,7 +103,7 @@ showai pages apply PAGE --project PROJECT --input operations.json --base-hash CU
 showai pages save PAGE --project PROJECT --input revised.showai.json --base-hash CURRENT_HASH --base-revision CURRENT_REVISION --json
 ```
 
-Read before writing, retain stable block ids and inspect user changes against the previous checkpoint. On `CONFLICT`, read again and merge deliberately; do not reuse an old full-document replacement with a newer hash. The authoring guide gives operation shapes, while the document guide covers the JSON tree. An input path of `-` reads JSON from stdin.
+Read before writing, retain stable block ids and inspect user changes against the retained read/draft baseline. On `CONFLICT`, read again and merge deliberately; do not reuse an old full-document replacement with a newer hash. The authoring guide gives operation shapes, while the document guide covers the JSON tree. An input path of `-` reads JSON from stdin.
 
 Custom references are locked to exact version and integrity when pages are written. Importing an artifact's bundled or remotely verified runtimes installs them into the selected project and rebinds matching references there; it does not change shared libraries.
 
@@ -190,6 +192,8 @@ Composition is compiled into the parent's runtime and works in desktop, offline 
 
 ## Templates and composition
 
+New reusable workflows use [template folders](template-bundles.md), with strict README metadata, six stage guides and optional components/page skeleton. Scripts can use `template import`, `template export`, `template context` and `template guide`. The legacy definition/composition operations below remain supported.
+
 A template can be saved from an existing page or from explicit metadata and composition:
 
 ```sh
@@ -213,11 +217,11 @@ showai export --project PROJECT --page PAGE --blocks PROGRESS_BLOCK_ID --format 
 showai export --project PROJECT --format site --components remote --out ./site --json
 ```
 
-Full-page export defaults to `--presentation spatial`. Use `--presentation reading` for a responsive document-style projection in reading order. Both full-page modes retain the same complete v2 editable source.
+Full-page export defaults to `--presentation spatial`. Use `--presentation reading` for a responsive document-style projection in reading order. Both full-page modes retain the same complete v3 editable source.
 
 For partial visualization, pass `--blocks ID,ID` with html or inline. IDs identify page node instances (`attrs.id` from `pages read`), rather than catalog packages or children internal to component code. A selected region includes its descendants; multiple selections preserve page order and necessary ancestor containers without duplicates. Partial exports default to reading presentation and hide the page title. Explicit spatial presentation retains whiteboard positioning. Only selected content and its referenced runtimes enter the HTML and companion JSON. The stored page is unchanged; the partial JSON must not replace it. Site export rejects block selection.
 
-After creating, organizing or revising a ShowAI page, save the complete page using its current hash and revision, export inline, and include the host's actual display reference in the final reply by default. This applies to standalone-page tasks as well. Codex uses its current visualize fragment/path/output-reference contract with the returned absolute path; ShowAI defines the delivery step. Open a preview for verification and optionally provide the full HTML link. See [conversation display](../plugins/showai/skills/show-document/references/conversation-display.md). For focused revision results or automated progress updates, export the relevant stable block IDs. MCP `page_export` accepts the equivalent `blockIds` array.
+After creating, organizing or revising a ShowAI page, MCP Agents save with its current hash/revision and call page_present. Scripts can export inline and use the host's actual display reference. This applies to standalone-page tasks as well. Codex uses its current visualize fragment/path/output-reference contract with the returned absolute path; ShowAI defines the delivery step. Open a preview for verification and optionally provide the full HTML link. See [conversation display](../plugins/showai/skills/show-document/references/conversation-display.md). For focused revision results or automated progress updates, export the relevant stable block IDs. MCP `page_export` accepts the equivalent `blockIds` array.
 
 Bundled is the default. The reader, content and exact custom runtimes travel together; raster images must be embedded for offline delivery. HTML and inline exports also save editable source JSON. A static site includes relative navigation, source files and shared reader assets, and is intended for HTTP/static hosting. Whole-project export omits archived pages.
 
@@ -252,7 +256,7 @@ npm run plugin:install
 npm run plugin:update
 ```
 
-These validate and install the skills-only plugin through official Codex commands, compare installed skill bytes and confirm it is enabled. The runtime is built and installed separately. The receipt is `artifacts/codex-plugin-install.json`. Start a new Codex conversation after success. No desktop rebuild, Git pull, automatic uninstall or application restart is performed. See [the plugin README](../plugins/showai/README.md) for release bundles.
+These validate and install the local plugin with its stdio MCP launcher through official Codex commands, compare installed skill bytes and confirm it is enabled. The runtime is built and installed separately. The receipt is `artifacts/codex-plugin-install.json`. Refresh host capabilities using the supported host procedure, then start a new conversation and confirm the current tools and Skills. No desktop rebuild, Git pull, automatic uninstall or application restart is performed. See [the plugin README](../plugins/showai/README.md) for release bundles.
 
 Claude Code uses the repository's marketplace after `npm run build`:
 
@@ -261,7 +265,7 @@ claude plugin marketplace add ./
 claude plugin install showai@renaissance-mind
 ```
 
-The optional MCP server is a subprocess fixed to one existing project:
+The plugin already provides a library MCP launcher. The following is an alternative manual, project-bound connection; avoid installing a duplicate connection for the same purpose:
 
 ```sh
 codex mcp add showai-PROJECT -- node /absolute/path/ShowAI/dist-runtime/scripts/cli.mjs mcp --project PROJECT
@@ -299,15 +303,14 @@ New empty homes initialize versioned storage automatically. Existing file librar
 
 Keep `hash`, `revision` and stable node IDs from a full read. Supply both `--base-hash` and `--base-revision` for save/apply and template insertion. Use `--operation-id` only when retrying the same request; `--message` and `--group` describe purpose and continuous edits. Agent attribution uses the actual harness/session when available (including `CODEX_THREAD_ID`); missing provenance is explicitly unknown.
 
-`workspace merge` compares an active draft baseline with current content. `workspace conflicts` lists retained external edits for explicit resolution. `search --query` searches current bodies, nested containers, component/template descriptions and sources. Reading and export generate HTML using the installed renderer.
+Page history browsing and version restoration are unavailable. `pages diff --since` needs a still-retained read/draft baseline; otherwise it returns `MISSING_BASELINE`. `workspace merge` compares an active draft baseline with current content. `workspace conflicts` lists retained external edits for explicit resolution. `search --query` searches current bodies, nested containers, component/template descriptions and sources. Reading and export generate HTML using the installed renderer.
 
 `workspace conflicts` discovers external files. `workspace recover-package CONFLICT_ID --project PROJECT` retains edited source/schema/assets as an editable draft and restores the immutable package projection. Repair the draft and publish a new version. `library stats/compact/cleanup-plan/cleanup/rebuild-index/archive/verify-archive/policy` exposes space accounting and verified maintenance; cleanup protects current content, original archives and recovery drafts.
-
 
 ## Versioned component documentation
 
 Project context includes the full compact component index and its revision for both page and component tasks. A caller already retaining that complete index may pass `knownCatalogRevision`; an `unchanged` receipt omits repeated items and instructs the caller to reuse the previous index. Without the previous full index, omit this parameter. Component lists show one recommended revision per ID and scope; use `--versions all` for available component versions. Page references remain pinned. Each entry discloses reuse (`general`, `domain`, `content-specific`, or `unclassified`) and documentation status.
 
-`catalog describe --view guide` provides the authored use contract, schema and a compact example. Large example payloads return an explicit examples-view reference. `--view development` returns the implementation guide without code; source remains explicit. Read `guide component` for the exact `manifest.documentation` schema. New MCP authoring requires this contract; legacy package imports remain readable and visibly unclassified until a new documented revision is created.
+`catalog describe --view guide` provides the authored use contract, schema and a compact example. Large example payloads return an explicit examples-view reference. `--view development` returns the implementation guide without code; source remains explicit. Read `guide catalog` for the exact `manifest.documentation` schema. New MCP authoring requires this contract; legacy package imports remain readable and visibly unclassified until a new documented revision is created.
 
 The workbench component dialog displays the same use and development guides and saves documentation with customized versions. Documentation validation checks its structure and example references; actual rendering, interaction and independent Agent understanding require separate verification.

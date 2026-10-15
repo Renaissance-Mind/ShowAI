@@ -155,3 +155,33 @@ plugins/showai/scripts/cli.mjs
 
 /dist-cloud-mcp/
 !/docs/cloud-mcp-deployment.md
+
+# Paired public guides in Simplified Chinese.
+!/docs/i18n/CODE_OF_CONDUCT.zh-CN.md
+!/docs/i18n/CONTRIBUTING.zh-CN.md
+!/docs/i18n/agent-host.zh-CN.md
+!/docs/i18n/agent-integration.zh-CN.md
+!/docs/i18n/agent-usage.zh-CN.md
+!/docs/i18n/artifact-format.zh-CN.md
+!/docs/i18n/branding.zh-CN.md
+!/docs/i18n/catalog-lifecycle.zh-CN.md
+!/docs/i18n/chatgpt.zh-CN.md
+!/docs/i18n/cloud-mcp-deployment.zh-CN.md
+!/docs/i18n/cloud.zh-CN.md
+!/docs/i18n/codex.zh-CN.md
+!/docs/i18n/component-parameters.zh-CN.md
+!/docs/i18n/diagram-components.zh-CN.md
+!/docs/i18n/g2-components.zh-CN.md
+!/docs/i18n/icons.zh-CN.md
+!/docs/i18n/index.zh-CN.md
+!/docs/i18n/local-browser.zh-CN.md
+!/docs/i18n/mindmap.zh-CN.md
+!/docs/i18n/page-surface.zh-CN.md
+!/docs/i18n/project-sync.zh-CN.md
+!/docs/i18n/quick-start.zh-CN.md
+!/docs/i18n/server-operations.zh-CN.md
+!/docs/i18n/skills.zh-CN.md
+!/docs/i18n/template-bundles.zh-CN.md
+!/docs/i18n/versioned-library.zh-CN.md
+!/docs/chatgpt.md
+!/plugins/showai/README.zh-CN.md

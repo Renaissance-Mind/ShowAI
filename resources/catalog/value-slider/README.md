@@ -1,4 +1,16 @@
-# 数值滑块组件
+# Value slider component
+
+**Language:** [English](#english) | [简体中文](#简体中文)
+
+## English
+
+This is an importable React component package. manifest.json defines its exact version, scenarios, default data and examples; props.schema.json uses JSON Schema draft-07; index.tsx exports the component.
+
+The component receives `{data,onChange?,readOnly}`. Editing calls onChange(nextData); read-only exploration uses local React state. The workbench also validates JSON property edits against the schema before saving.
+
+Package-local JS/TS/CSS, images and fonts use relative imports. React/React DOM are supplied by ShowAI. Ordinary rendering uses a browser sandbox with no filesystem or desktop bridge; package install scripts do not run. Increase the manifest version after source changes. Imported revisions remain immutable and Pages pin exact references.
+
+## 简体中文
 
 这个目录是一个可直接导入 ShowAI 的 React 组件包。
 

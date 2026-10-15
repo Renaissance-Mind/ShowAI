@@ -13,4 +13,4 @@
 
 ## Notes
 
-<!-- Docs updated in both README.md and docs/i18n/README.zh-CN.md if user-facing; plugin reinstalled if skills changed. -->
+<!-- Update paired English/Chinese guides and both documentation indexes; reinstall and verify the plugin when its packaged files change. -->

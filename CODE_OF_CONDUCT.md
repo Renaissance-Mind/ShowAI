@@ -1,5 +1,7 @@
 # Code of Conduct
 
+**Language:** English | [简体中文](docs/i18n/CODE_OF_CONDUCT.zh-CN.md)
+
 ShowAI follows the spirit of the [Contributor Covenant, version 2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/). We want participation in this project to be welcoming, respectful, and free of harassment for everyone, regardless of background or identity.
 
 ## Expected behavior
