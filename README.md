@@ -1,11 +1,13 @@
 ![ShowAI — An interface between humans and agents.](docs/showai-banner.svg)
 
-[![ShowAI website](https://img.shields.io/badge/Website-ShowAI-2563EB?style=flat&labelColor=30343B)](https://showai.renaissancemind.ai/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-22A06B?style=flat&labelColor=30343B)](LICENSE)
-[![MCP compatible](https://img.shields.io/badge/MCP-compatible-0891B2?style=flat&labelColor=30343B)](#cli-and-mcp)
-[![ChatGPT web integration](https://img.shields.io/badge/ChatGPT-Web-10A37F?style=flat&labelColor=30343B)](#chatgpt-on-the-web)
-[![Codex plugin](https://img.shields.io/badge/Codex-Plugin-6366F1?style=flat&labelColor=30343B)](docs/codex.md)
-[![Claude Code plugin](https://img.shields.io/badge/Claude_Code-Plugin-E48149?style=flat&labelColor=30343B)](plugins/showai/README.md)
+<p align="center">
+  <a href="https://showai.renaissancemind.ai/"><img src="https://img.shields.io/badge/Website-ShowAI-2563EB?style=flat&amp;labelColor=30343B" alt="ShowAI website"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-22A06B?style=flat&amp;labelColor=30343B" alt="License: MIT"></a>
+  <a href="#cli-and-mcp"><img src="https://img.shields.io/badge/MCP-compatible-0891B2?style=flat&amp;labelColor=30343B" alt="MCP compatible"></a>
+  <a href="#chatgpt-on-the-web"><img src="https://img.shields.io/badge/ChatGPT-Web-10A37F?style=flat&amp;labelColor=30343B" alt="ChatGPT web integration"></a>
+  <a href="docs/codex.md"><img src="https://img.shields.io/badge/Codex-Plugin-6366F1?style=flat&amp;labelColor=30343B" alt="Codex plugin"></a>
+  <a href="plugins/showai/README.md"><img src="https://img.shields.io/badge/Claude_Code-Plugin-E48149?style=flat&amp;labelColor=30343B" alt="Claude Code plugin"></a>
+</p>
 
 **Language:** English | [简体中文](docs/i18n/README.zh-CN.md)
 

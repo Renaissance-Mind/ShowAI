@@ -1,11 +1,13 @@
 ![ShowAI — 构建人与 Agent 之间的 Interface。](showai-banner.zh-CN.svg)
 
-[![ShowAI 官网](https://img.shields.io/badge/Website-ShowAI-2563EB?style=flat&labelColor=30343B)](https://showai.renaissancemind.ai/)
-[![MIT 许可证](https://img.shields.io/badge/License-MIT-22A06B?style=flat&labelColor=30343B)](../../LICENSE)
-[![兼容 MCP](https://img.shields.io/badge/MCP-compatible-0891B2?style=flat&labelColor=30343B)](#cli-与-mcp)
-[![ChatGPT 网页版接入](https://img.shields.io/badge/ChatGPT-Web-10A37F?style=flat&labelColor=30343B)](#网页版-chatgpt)
-[![Codex 插件](https://img.shields.io/badge/Codex-Plugin-6366F1?style=flat&labelColor=30343B)](../codex.md)
-[![Claude Code 插件](https://img.shields.io/badge/Claude_Code-Plugin-E48149?style=flat&labelColor=30343B)](../../plugins/showai/README.md)
+<p align="center">
+  <a href="https://showai.renaissancemind.ai/"><img src="https://img.shields.io/badge/Website-ShowAI-2563EB?style=flat&amp;labelColor=30343B" alt="ShowAI 官网"></a>
+  <a href="../../LICENSE"><img src="https://img.shields.io/badge/License-MIT-22A06B?style=flat&amp;labelColor=30343B" alt="MIT 许可证"></a>
+  <a href="#cli-与-mcp"><img src="https://img.shields.io/badge/MCP-compatible-0891B2?style=flat&amp;labelColor=30343B" alt="兼容 MCP"></a>
+  <a href="#网页版-chatgpt"><img src="https://img.shields.io/badge/ChatGPT-Web-10A37F?style=flat&amp;labelColor=30343B" alt="ChatGPT 网页版接入"></a>
+  <a href="../codex.md"><img src="https://img.shields.io/badge/Codex-Plugin-6366F1?style=flat&amp;labelColor=30343B" alt="Codex 插件"></a>
+  <a href="../../plugins/showai/README.md"><img src="https://img.shields.io/badge/Claude_Code-Plugin-E48149?style=flat&amp;labelColor=30343B" alt="Claude Code 插件"></a>
+</p>
 
 **语言:** [English](../../README.md) | 简体中文
 
