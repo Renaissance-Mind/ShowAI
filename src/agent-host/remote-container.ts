@@ -7,12 +7,16 @@ import { RemoteAgentEngine } from "./remote-engine";
 import { SdkInstaller } from "./installer";
 import { checkCloudBrowser } from "../agent/cloud-browser-check";
 import { withLibraryLock } from "../core/library-lock";
+import { execute } from "./process";
 import type { RemoteActor } from "./remote-protocol";
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const runtimeRoot = process.env.SHOWAI_AGENT_RUNTIME ?? "/runtime";
 if (process.argv.includes("--install-runtime")) {
-  const installer = new SdkInstaller(runtimeRoot);
+  const installer = new SdkInstaller(runtimeRoot, {
+    cacheRoot: process.env.SHOWAI_AGENT_DOWNLOAD_CACHE,
+    version: process.env.SHOWAI_AGENT_SDK_VERSION,
+  });
   installer.start();
   await installer.wait();
 } else {
@@ -79,6 +83,20 @@ if (process.argv.includes("--install-runtime")) {
     pluginRoot: () => join(directory, "../assets/agent-plugin"),
     oauthRedirectUrl: `${origin}/oauth/${tenant}/auth/callback`,
   });
+  const runtimePaths = await engine.host.installer.paths();
+  await engine.host.prepareRuntime();
+  const sandboxResult = await execute(
+    runtimePaths.binary,
+    ["sandbox", "-c", 'sandbox_mode="workspace-write"', "--", "/bin/true"],
+    { cwd: "/tmp", timeout: 10000 },
+  );
+  const sandbox = {
+    passed: sandboxResult.code === 0,
+    detail:
+      sandboxResult.code === 0
+        ? undefined
+        : sandboxResult.stderr.slice(0, 1000),
+  };
   const authorized = (value: string) =>
     value.length === key.length &&
     timingSafeEqual(Buffer.from(value), Buffer.from(key));
@@ -91,6 +109,7 @@ if (process.argv.includes("--install-runtime")) {
             service: "showai-agent-container",
             runtime: (await engine.host.installer.status()).state,
             browserRendering,
+            sandbox,
           }),
         );
         return;
@@ -124,9 +143,17 @@ if (process.argv.includes("--install-runtime")) {
     };
     void run().catch((error) => {
       if (!response.headersSent)
-        response.writeHead(400, { "content-type": "application/json" });
+        response.writeHead(error.status ?? 400, {
+          "content-type": "application/json",
+          ...(error.details?.retryAfter
+            ? { "retry-after": String(error.details.retryAfter) }
+            : {}),
+        });
       response.end(
-        JSON.stringify({ ok: false, error: { message: error.message } }),
+        JSON.stringify({
+          ok: false,
+          error: { code: error.code, message: error.message },
+        }),
       );
     });
   });
@@ -134,7 +161,7 @@ if (process.argv.includes("--install-runtime")) {
   const timer = setInterval(() => {
     void (async () => {
       await checkpoint();
-      if (engine.host.conversations.running().length) {
+      if (engine.turns.running || engine.host.conversations.running().length) {
         const response = await fetch(`${origin}/activity/${tenant}`, {
           method: "POST",
           headers: { authorization: `Bearer ${key}` },

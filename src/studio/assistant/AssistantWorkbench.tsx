@@ -474,8 +474,13 @@ export default function AssistantWorkbench({
   useEffect(() => {
     if (!conversation || !running) return;
     let stopped = false;
+    let nextPoll = 0,
+      failures = 0,
+      polling = false;
     const timer = setInterval(
       () => {
+        if (polling || Date.now() < nextPoll) return;
+        polling = true;
         void desktop
           .invoke<{ turn: AgentTurn; threadId?: string }>("agent:turn", {
             projectId: conversation.projectId,
@@ -483,6 +488,7 @@ export default function AssistantWorkbench({
             id: running.id,
           })
           .then(({ turn, threadId }) => {
+            failures = 0;
             if (stopped) return;
             setConversation((current) =>
               current?.id === conversation.id
@@ -498,7 +504,14 @@ export default function AssistantWorkbench({
             if (turn.state !== "running")
               void loadSummaries(conversation.projectId);
           })
-          .catch((reason) => !stopped && setError(errorMessage(reason)));
+          .catch((reason) => {
+            nextPoll =
+              Date.now() + Math.min(60000, 2000 * 2 ** Math.min(++failures, 5));
+            if (!stopped) setError(errorMessage(reason));
+          })
+          .finally(() => {
+            polling = false;
+          });
       },
       remoteExecution() ? 2000 : 700,
     );

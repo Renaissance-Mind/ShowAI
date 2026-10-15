@@ -197,6 +197,9 @@ test("a real outbound WebSocket requires Mac confirmation before returning an ac
 });
 test("relay refuses unauthorized projects and host filesystem actions", async () => {
   expect(
+    (await fetch(gateway + "/_operations/health", { method: "POST" })).status,
+  ).toBe(404);
+  expect(
     (
       await request("/invoke", {
         action: "agent:conversations",

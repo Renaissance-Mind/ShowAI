@@ -8,6 +8,7 @@ await build({
     container: "src/agent-host/remote-container.ts",
     cli: "src/agent/cli.ts",
     "index-worker": "src/core/index-worker.ts",
+    "content-check": "src/agent/cloud-content-check-entry.ts",
   },
   outdir: "dist-remote-agent/scripts",
   outExtension: { ".js": ".mjs" },

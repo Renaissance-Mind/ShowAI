@@ -28,8 +28,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends chromium fonts-
 ENV SHOWAI_BROWSER_EXECUTABLE=/usr/lib/chromium/chromium
 COPY --from=build /build/dist-remote-agent /app
 COPY --from=deps /build/node_modules /app/node_modules
-RUN mkdir /state /runtime && chown node:node /state /runtime
+RUN mkdir /state /runtime /download-cache && chown node:node /state /runtime /download-cache
 USER node
-RUN node /app/scripts/container.mjs --install-runtime
+ARG SHOWAI_AGENT_SDK_VERSION=0.162.1
+RUN --mount=type=cache,id=showai-agent-sdk-v1,target=/download-cache,uid=1000,gid=1000 SHOWAI_AGENT_SDK_VERSION=${SHOWAI_AGENT_SDK_VERSION} SHOWAI_AGENT_DOWNLOAD_CACHE=/download-cache node /app/scripts/container.mjs --install-runtime && node /app/scripts/content-check.mjs
 EXPOSE 8790
 CMD ["node","/app/scripts/container.mjs"]

@@ -131,6 +131,19 @@ export default function AgentSettings() {
   const taskRef = useRef("");
   const latestStatus = useRef<AgentHostStatus | null>(null);
   const nextRemotePoll = useRef(0);
+  const remoteStartUntil = useRef(0);
+  const statusError = useCallback((error: unknown) => {
+    const code = (error as { code?: string }).code;
+    if (code === "AGENT_STARTING") {
+      if (!remoteStartUntil.current)
+        remoteStartUntil.current = Date.now() + 120000;
+      nextRemotePoll.current = Date.now() + 5000;
+    } else {
+      remoteStartUntil.current = 0;
+      nextRemotePoll.current = Date.now() + 30000;
+    }
+    setError(errorMessage(error));
+  }, []);
   taskRef.current = taskId;
   const choiceFocusRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
@@ -144,6 +157,7 @@ export default function AgentSettings() {
     if (!mounted.current) return;
     settingsRef.current = next.settings;
     latestStatus.current = next;
+    remoteStartUntil.current = 0;
     setStatus(next);
   }, []);
   const refresh = useCallback(
@@ -160,28 +174,26 @@ export default function AgentSettings() {
     void desktop
       .invoke<AgentHostStatus>("agent:scan")
       .then(update)
-      .catch((error) => setError(errorMessage(error)));
+      .catch(statusError);
     const timer = setInterval(() => {
       const current = latestStatus.current;
       if (
         remoteExecution() &&
         (Date.now() < nextRemotePoll.current ||
-          !current ||
-          (current.authorization.state !== "pending" &&
-            current.runtime.state !== "installing" &&
-            !current.tasks.some((task) => task.state === "running")))
+          (Date.now() > remoteStartUntil.current &&
+            (!current ||
+              (current.authorization.state !== "pending" &&
+                current.runtime.state !== "installing" &&
+                !current.tasks.some((task) => task.state === "running")))))
       )
         return;
-      void refresh().catch((error) => {
-        nextRemotePoll.current = Date.now() + 30000;
-        setError(errorMessage(error));
-      });
+      void refresh().catch(statusError);
     }, 1200);
     return () => {
       mounted.current = false;
       clearInterval(timer);
     };
-  }, [refresh, update]);
+  }, [refresh, update, statusError]);
   const action = (work: () => Promise<void>) => async () => {
     setBusy(true);
     setError("");
@@ -246,13 +258,19 @@ export default function AgentSettings() {
         /^(?:http:\/\/)?(?:127\.0\.0\.1|localhost|\[::1\])(?::|\/)/.test(
           selected.baseUrl,
         ));
+  const executionChanged = () => {
+    latestStatus.current = null;
+    remoteStartUntil.current = 0;
+    nextRemotePoll.current = 0;
+    setStatus(null);
+    void refresh().catch(statusError);
+  };
   if (!status)
     return (
       <div className="agent-settings">
         <AgentExecutionPicker
           onChange={() => {
-            setStatus(null);
-            void refresh().catch((reason) => setError(errorMessage(reason)));
+            executionChanged();
           }}
         />
         <p role="status">{t("reading")}</p>
@@ -268,8 +286,7 @@ export default function AgentSettings() {
       <div className="agent-settings">
         <AgentExecutionPicker
           onChange={() => {
-            setStatus(null);
-            void refresh().catch((reason) => setError(errorMessage(reason)));
+            executionChanged();
           }}
         />
         <p className="settings-help">{t("remoteMacHelp")}</p>
@@ -284,8 +301,7 @@ export default function AgentSettings() {
     <div className="agent-settings">
       <AgentExecutionPicker
         onChange={() => {
-          setStatus(null);
-          void refresh().catch((reason) => setError(errorMessage(reason)));
+          executionChanged();
         }}
       />
       <RemoteDeviceSettings />

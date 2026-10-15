@@ -236,9 +236,16 @@ export class ShowAIAgentGateway extends DurableObject {
     await container.setInactivityTimeout(15 * 60 * 1000);
     const port = container.getTcpPort(8790);
     let ready = false;
-    for (let i = 0; i < 80; i++) {
+    const deadline = Date.now() + 10000;
+    while (Date.now() < deadline) {
       try {
-        if ((await port.fetch("http://container/health")).ok) {
+        if (
+          (
+            await port.fetch("http://container/health", {
+              signal: AbortSignal.timeout(1000),
+            })
+          ).ok
+        ) {
           ready = true;
           break;
         }
@@ -247,11 +254,19 @@ export class ShowAIAgentGateway extends DurableObject {
       }
       await new Promise((r) => setTimeout(r, 250));
     }
-    if (!ready)
-      return json(
-        { error: { message: "Cloud Agent is starting. Retry shortly." } },
+    if (!ready) {
+      const response = json(
+        {
+          error: {
+            code: "AGENT_STARTING",
+            message: "Cloud Agent is starting. Retry shortly.",
+          },
+        },
         503,
       );
+      response.headers.set("retry-after", "5");
+      return response;
+    }
     const headers = new Headers(request.headers);
     headers.set("x-showai-internal", key);
     const target = new URL(request.url);
@@ -338,6 +353,38 @@ export default {
           protocol: 1,
           revision: env.SHOWAI_AGENT_REVISION,
         });
+      if (
+        ["/_operations/health", "/_operations/relay-ticket"].includes(
+          url.pathname,
+        )
+      ) {
+        if (
+          request.headers.get("authorization") !==
+          `Bearer ${env.SHOWAI_AGENT_KEY}`
+        )
+          return new Response(null, { status: 404 });
+        const tenant = await derived(env.SHOWAI_AGENT_KEY, "deployment-health");
+        const relay = url.pathname.endsWith("relay-ticket");
+        const target = new URL(relay ? "/devices/ticket" : "/health", url);
+        return env.AGENTS.get(env.AGENTS.idFromName(tenant)).fetch(
+          new Request(target, {
+            method: relay ? "POST" : "GET",
+            headers: {
+              "x-showai-tenant": tenant,
+              "content-type": "application/json",
+            },
+            ...(relay
+              ? {
+                  body: JSON.stringify({
+                    deviceId: crypto.randomUUID(),
+                    name: "Deployment verification",
+                    projectIds: [],
+                  }),
+                }
+              : {}),
+          }),
+        );
+      }
       const activity = url.pathname.match(/^\/activity\/([a-f0-9]{64})$/);
       if (activity) {
         if (

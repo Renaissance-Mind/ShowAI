@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { readOptional, writeProtected } from "./storage";
 import { AgentHost, type AgentHostOptions } from "./host";
 import type { AgentHostStatus } from "./types";
+import { RemoteTurns } from "./remote-turns";
 import { FileStore } from "../core/store";
 import { openLibrary } from "../core/open-library";
 import { syncManager } from "../sync/manager";
@@ -20,6 +21,7 @@ import {
 /** One cloud account per engine/container; desktop engines retain their configured host. */
 export class RemoteAgentEngine {
   readonly host: AgentHost;
+  readonly turns: RemoteTurns;
   private queue: Promise<unknown> = Promise.resolve();
   constructor(
     readonly options: {
@@ -51,6 +53,7 @@ export class RemoteAgentEngine {
           await this.publish(projectId);
         },
       });
+    this.turns = new RemoteTurns(options.root, options.library, this.host);
   }
   private async publish(projectId: string) {
     const manager = syncManager(this.options.library);
@@ -118,8 +121,10 @@ export class RemoteAgentEngine {
     if (this.options.host && !remoteTaskActions.has(action))
       throw new Error("Configure this Mac's Agent on the Mac.");
     const connection = await this.connection(actor);
-    // Recheck the server session on every operation, including reads after reconnect.
-    await accountRequest(connection, "/api/me");
+    await this.turns.ready();
+    // Cloud requests have already passed the gateway's live session check.
+    // A Mac also validates its own separate server session before executing.
+    if (this.options.host) await accountRequest(connection, "/api/me");
     const fingerprint = createHash("sha256")
       .update(
         JSON.stringify({
@@ -167,7 +172,7 @@ export class RemoteAgentEngine {
       if (project.role === "viewer" && !remoteReadActionsForEngine.has(action))
         throw new Error("This project is read only.");
       const manager = syncManager(this.options.library);
-      if (["agent:send", "agent:undo"].includes(action)) {
+      if (action === "agent:undo") {
         await manager.subscribe(connection.id, request.projectId);
         await manager.stop();
       }
@@ -176,28 +181,21 @@ export class RemoteAgentEngine {
           p.connectionId === connection.id &&
           p.remoteProjectId === request.projectId,
       );
-      if (!mapping)
+      if (
+        !mapping &&
+        !(action === "agent:send" && !this.options.host) &&
+        !this.turns.hasProject(request.projectId)
+      )
         throw new Error(
           "Synchronize this project on the execution device first.",
         );
-      localId = mapping.projectId;
+      localId = mapping?.projectId ?? request.projectId;
       args.projectId = localId;
       if (
-        action === "agent:send" &&
-        args.expectedHash &&
-        args.target &&
-        typeof args.target === "object"
-      ) {
-        const pageId = (args.target as { pageId?: string }).pageId;
-        if (
-          pageId &&
-          (await new FileStore(this.options.library).readPage(localId, pageId))
-            .hash !== args.expectedHash
-        )
-          throw new Error(
-            "The page changed after synchronization. Refresh the page before sending again.",
-          );
-      }
+        action === "agent:cancel" &&
+        (await this.turns.cancel(localId, String(args.id)))
+      )
+        return null;
       // A remote task/file/approval must belong to the explicitly authorized project.
       if (
         ["agent:cancel", "agent:readFile", "agent:permission"].includes(action)
@@ -233,7 +231,29 @@ export class RemoteAgentEngine {
       await this.host.save({ ...(await this.host.settings()), mode: "api" });
     if (!remoteReadActionsForEngine.has(action))
       await writeProtected(receiptPath, { fingerprint, state: "started" });
-    let value: unknown = await this.host.action(action, args);
+    let value: unknown;
+    if (action === "agent:send")
+      value = await this.turns.send(
+        localId!,
+        request.projectId!,
+        connection.id,
+        args,
+      );
+    else if (action === "agent:conversations")
+      value = await this.turns.list(localId!);
+    else if (action === "agent:conversation")
+      value = await this.turns.conversation(localId!, String(args.id));
+    else if (action === "agent:turn") {
+      const conversation = await this.turns.conversation(
+        localId!,
+        String(args.conversationId),
+      );
+      const turn = conversation.turns.find((t) => t.id === args.id);
+      if (!turn) throw new Error("Task does not belong to this conversation.");
+      value = { turn, threadId: conversation.threadId };
+    } else if (action === "agent:deleteConversation")
+      value = await this.turns.remove(localId!, String(args.id));
+    else value = await this.host.action(action, args);
     if (action === "agent:undo" && localId) await this.publish(localId);
     if (
       action === "agent:status" ||

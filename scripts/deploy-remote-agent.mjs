@@ -151,6 +151,79 @@ for (let attempt = 0; attempt < 20; attempt++) {
 }
 if (health?.service !== "showai-agent" || health.revision !== revision)
   throw new Error("Deployment was uploaded but HTTPS health has not passed.");
+const operationsKey = (await optional(keyFile))?.SHOWAI_AGENT_KEY;
+if (!operationsKey)
+  throw new Error(
+    "HTTPS is ready. Keep the original secret backup available to verify the actual Container runtime.",
+  );
+let container;
+for (let attempt = 0; attempt < 24; attempt++) {
+  try {
+    const response = await fetch(origin + "/_operations/health", {
+      method: "POST",
+      headers: { authorization: `Bearer ${operationsKey}` },
+      signal: AbortSignal.timeout(20000),
+      redirect: "error",
+    });
+    if (response.ok) {
+      container = await response.json();
+      break;
+    }
+    if (response.status !== 503)
+      throw new Error(`Container readiness failed (${response.status}).`);
+  } catch (error) {
+    if (!(error instanceof TypeError) && error.name !== "TimeoutError")
+      throw error;
+  }
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+}
+if (
+  container?.runtime !== "ready" ||
+  !container.browserRendering?.passed ||
+  container.browserRendering.architecture !== "x64" ||
+  !container.sandbox?.passed
+)
+  throw new Error(
+    "The deployed Linux runtime, browser or sandbox has not passed readiness checks: " +
+      JSON.stringify(container),
+  );
+const ticketResponse = await fetch(origin + "/_operations/relay-ticket", {
+  method: "POST",
+  headers: { authorization: `Bearer ${operationsKey}` },
+  redirect: "error",
+});
+if (!ticketResponse.ok) throw new Error("WSS readiness ticket was not issued.");
+const relayTicket = await ticketResponse.json();
+await new Promise((resolve, reject) => {
+  const socket = new WebSocket(
+    origin.replace(/^https:/, "wss:") +
+      `/devices/connect/${relayTicket.tenant}?ticket=${relayTicket.ticket}`,
+  );
+  let passed = false;
+  const timer = setTimeout(() => {
+    socket.close();
+    reject(new Error("WSS relay readiness timed out."));
+  }, 15000);
+  socket.onopen = () => socket.send(JSON.stringify({ type: "ping" }));
+  socket.onmessage = (event) => {
+    if (JSON.parse(String(event.data)).type === "pong") {
+      passed = true;
+      clearTimeout(timer);
+      socket.close(1000, "Verified");
+      resolve();
+    }
+  };
+  socket.onerror = () => {
+    clearTimeout(timer);
+    reject(new Error("WSS relay connection failed."));
+  };
+  socket.onclose = () => {
+    if (!passed) {
+      clearTimeout(timer);
+      reject(new Error("WSS relay closed before verification."));
+    }
+  };
+});
 await writeFile(
   join(release, "deployment-result.json"),
   JSON.stringify(
@@ -159,6 +232,8 @@ await writeFile(
       sourceHash,
       origin,
       health,
+      container,
+      wssRelay: true,
       verifiedAt: new Date().toISOString(),
       modelInvocationVerified: false,
     },

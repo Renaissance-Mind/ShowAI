@@ -85,6 +85,7 @@ beforeAll(async () => {
 }, 60000);
 afterAll(async () => {
   engine?.host.close();
+  await engine?.turns.settled();
   await stopSyncManagers();
   await server?.close();
   if (directory) await rm(directory, { recursive: true, force: true });
@@ -109,18 +110,52 @@ test("account identity and current project membership are checked before opening
   ).rejects.toThrow();
 });
 test("pulls a real server project and refuses a stale page before model execution", async () => {
-  await expect(
-    engine.invoke(
-      request("agent:send", {
-        prompt: "Explain this page",
-        target: { kind: "page", pageId },
-        expectedHash: "stale",
-      }),
-      actor,
-    ),
-  ).rejects.toThrow("page changed");
+  await engine.host.saveSource({
+    id: randomUUID(),
+    name: "Unconnected source for version checks",
+    provider: "openai",
+    baseUrl: "https://api.openai.com/v1",
+    model: "gpt-4.1",
+    protocol: "responses",
+    credential: "api-key",
+  });
+  const conversation = (await engine.invoke(
+    request("agent:send", {
+      prompt: "Explain this page",
+      target: { kind: "page", pageId },
+      expectedHash: "stale",
+    }),
+    actor,
+  )) as { id: string; turns: { id: string; state: string; error?: string }[] };
+  expect(conversation.id).toBeTruthy();
+  await engine.turns.settled();
+  const result = (await engine.invoke(
+    request("agent:turn", {
+      conversationId: conversation.id,
+      id: conversation.turns[0].id,
+    }),
+    actor,
+  )) as { turn: { state: string; error: string } };
+  expect(result.turn.state).toBe("failed");
+  expect(result.turn.error).toContain("page changed");
+  expect((await engine.host.installer.status()).state).toBe("absent");
   const list = await engine.invoke(request("agent:conversations"), actor);
-  expect(list).toEqual([]);
+  expect(list).toHaveLength(1);
+});
+test("cancellation during project preparation survives reopening and never starts the model runtime", async () => {
+  const connection = await engine.connection(actor);
+  const queued = await engine.turns.send(projectId, projectId, connection.id, {
+    prompt: "Explain this page",
+    target: { kind: "page", pageId },
+    expectedHash: "stale",
+  });
+  await engine.turns.cancel(projectId, queued.turns[0].id);
+  await engine.turns.settled();
+  const resumed = new RemoteAgentEngine(engine.options);
+  const restored = await resumed.turns.conversation(projectId, queued.id);
+  expect(restored.turns.at(-1)?.state).toBe("cancelled");
+  expect((await resumed.host.installer.status()).state).toBe("absent");
+  resumed.host.close();
 });
 test("mutation receipts survive engine recreation and reject request ID reuse", async () => {
   const id = randomUUID(),

@@ -591,6 +591,9 @@ export class AgentHost {
       });
     return this.pluginSetup;
   }
+  async prepareRuntime() {
+    await this.prepareIsolation();
+  }
   private async installPlugin(binary: string) {
     const root = join(this.options.root, "embedded"),
       env = isolatedEnvironment(root, this.workspaceRoot);
@@ -962,12 +965,15 @@ export class AgentHost {
         conversation.localAgent === "claude")
     );
   }
-  async send(args: {
-    projectId?: unknown;
-    conversationId?: unknown;
-    prompt?: unknown;
-    target?: unknown;
-  }): Promise<AgentConversation> {
+  async send(
+    args: {
+      projectId?: unknown;
+      conversationId?: unknown;
+      prompt?: unknown;
+      target?: unknown;
+    },
+    reserved?: { turnId: string },
+  ): Promise<AgentConversation> {
     const projectId = assertId(z.string().parse(args.projectId));
     const prompt = z.string().trim().min(1).max(24000).parse(args.prompt);
     const target = parseTarget(args.target);
@@ -1012,7 +1018,7 @@ export class AgentHost {
     }).componentContext(projectId);
     await mkdir(conversation.workspace, { recursive: true, mode: 0o700 });
     const turn: AgentTurn = {
-      id: randomUUID(),
+      id: reserved ? z.string().uuid().parse(reserved.turnId) : randomUUID(),
       conversationId: conversation.id,
       projectId,
       pageId: target.pageId,

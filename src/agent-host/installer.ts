@@ -1,6 +1,14 @@
 import { createHash, timingSafeEqual, randomUUID } from "node:crypto";
 import { gunzipSync } from "node:zlib";
-import { mkdir, writeFile, chmod, rename, rm, stat } from "node:fs/promises";
+import {
+  mkdir,
+  writeFile,
+  readFile,
+  chmod,
+  rename,
+  rm,
+  stat,
+} from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { execute } from "./process";
 import { readOptional, writeProtected } from "./storage";
@@ -99,14 +107,56 @@ export async function extractPackage(archive: Buffer, root: string) {
     } else throw new Error(`Unsupported package entry type ${type}.`);
   }
 }
-async function download(metadata: PackageMetadata, root: string) {
+async function download(
+  metadata: PackageMetadata,
+  root: string,
+  cacheRoot?: string,
+) {
   const url = new URL(metadata.dist.tarball);
   if (url.protocol !== "https:" || url.hostname !== "registry.npmjs.org")
     throw new Error("Unexpected package download origin.");
-  const response = await fetch(url, { signal: AbortSignal.timeout(180000) });
-  if (!response.ok)
-    throw new Error(`Package download failed: HTTP ${response.status}`);
-  const bytes = Buffer.from(await response.arrayBuffer());
+  const cache = cacheRoot
+    ? join(
+        cacheRoot,
+        createHash("sha256").update(metadata.dist.integrity).digest("hex") +
+          ".tgz",
+      )
+    : undefined;
+  let bytes = cache
+    ? await readFile(cache).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return undefined;
+        throw error;
+      })
+    : undefined;
+  if (!bytes) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const response = await fetch(url, {
+          signal: AbortSignal.timeout(600000),
+        });
+        if (!response.ok)
+          throw new Error(`Package download failed: HTTP ${response.status}`);
+        bytes = Buffer.from(await response.arrayBuffer());
+        break;
+      } catch (error) {
+        const transient =
+          error instanceof TypeError ||
+          (error as Error).name === "TimeoutError";
+        if (!transient || attempt === 2) throw error;
+        await new Promise((resolve) =>
+          setTimeout(resolve, 1000 * 2 ** attempt),
+        );
+      }
+    }
+    if (!bytes) throw new Error("Package download did not finish.");
+    verifyArchive(bytes, metadata.dist.integrity);
+    if (cache) {
+      await mkdir(cacheRoot!, { recursive: true });
+      const temporary = cache + "." + randomUUID() + ".tmp";
+      await writeFile(temporary, bytes, { mode: 0o600 });
+      await rename(temporary, cache);
+    }
+  }
   verifyArchive(bytes, metadata.dist.integrity);
   await extractPackage(bytes, root);
 }
@@ -130,7 +180,10 @@ export function targetTriple(
 export class SdkInstaller {
   state: RuntimeStatus;
   private active?: Promise<void>;
-  constructor(readonly root: string) {
+  constructor(
+    readonly root: string,
+    readonly options: { cacheRoot?: string; version?: string } = {},
+  ) {
     this.state = { state: "absent", progress: t("runtime.notInstalled"), root };
   }
   async status() {
@@ -196,7 +249,10 @@ export class SdkInstaller {
     if (this.state.state === "failed") throw new Error(this.state.error);
   }
   private async install() {
-    const sdk = await npmMetadata("@openai/codex-sdk", "latest");
+    const sdk = await npmMetadata(
+      "@openai/codex-sdk",
+      this.options.version ?? "latest",
+    );
     const version = sdk.dependencies?.["@openai/codex"];
     if (!version || !/^\d+\.\d+\.\d+$/.test(version) || version !== sdk.version)
       throw new Error(
@@ -242,8 +298,8 @@ export class SdkInstaller {
     try {
       this.state.progress = t("runtime.downloading", { version });
       await Promise.all([
-        download(sdk, join(staging, "sdk")),
-        download(native, join(staging, "native")),
+        download(sdk, join(staging, "sdk"), this.options.cacheRoot),
+        download(native, join(staging, "native"), this.options.cacheRoot),
       ]);
       await chmod(this.binary(staging), 0o755);
       this.state.progress = t("runtime.verifying");

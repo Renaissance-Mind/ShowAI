@@ -88,7 +88,7 @@ export function AgentExecutionPicker({
         type="button"
         className="settings-button"
         disabled={disabled}
-        onClick={() => void load()}
+        onClick={() => void load().then(() => onChange?.())}
       >
         {chinese() ? "刷新设备" : "Refresh devices"}
       </button>

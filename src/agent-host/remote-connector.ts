@@ -35,6 +35,8 @@ export class RemoteMacConnector {
   private sharedHome?: string;
   private remoteTurns = new Set<string>();
   private pendingClients = new Map<string, string>();
+  private engine?: RemoteAgentEngine;
+  private engineKey = "";
   constructor(
     readonly host: AgentHost,
     readonly home: () => string,
@@ -88,6 +90,11 @@ export class RemoteMacConnector {
     await writeProtected(this.path, settings);
     this.settings = settings;
     if (!approve) {
+      void this.engine?.turns
+        .stopAll()
+        .catch((error) =>
+          console.error("Remote task cancellation:", error.message),
+        );
       for (const turn of this.remoteTurns) this.host.cancel(turn);
       this.remoteTurns.clear();
     }
@@ -138,6 +145,7 @@ export class RemoteMacConnector {
     if (!settings.enabled) return;
     this.stopped = false;
     const generation = ++this.generation;
+    let retryDelay = 10000;
     const connect = async () => {
       const sharedHome = this.home();
       const connection = (
@@ -157,6 +165,10 @@ export class RemoteMacConnector {
         signal: AbortSignal.timeout(20000),
       });
       const ticket = await response.json();
+      const retryAfter = Number(response.headers.get("retry-after"));
+      retryDelay = response.ok
+        ? 10000
+        : Math.max(10000, Math.min(86400000, retryAfter * 1000 || 10000));
       if (!response.ok || !ticket.ticket)
         throw new Error(ticket.error?.message ?? "Device registration failed.");
       if (this.stopped || generation !== this.generation) return;
@@ -165,15 +177,25 @@ export class RemoteMacConnector {
           "The content library changed. Reconnect remote execution.",
         );
       this.sharedHome = sharedHome;
-      const engine = new RemoteAgentEngine({
-        root: this.host.options.root,
-        library: this.home(),
-        cli: this.host.options.cli,
-        pluginRoot: this.host.options.pluginRoot,
-        host: this.host,
-        connectionId: settings.connectionId,
-        projectIds: settings.projectIds,
-      });
+      const engineKey = JSON.stringify([
+        sharedHome,
+        settings.connectionId,
+        settings.projectIds,
+      ]);
+      const engine =
+        this.engineKey === engineKey && this.engine
+          ? this.engine
+          : new RemoteAgentEngine({
+              root: this.host.options.root,
+              library: this.home(),
+              cli: this.host.options.cli,
+              pluginRoot: this.host.options.pluginRoot,
+              host: this.host,
+              connectionId: settings.connectionId,
+              projectIds: settings.projectIds,
+            });
+      this.engine = engine;
+      this.engineKey = engineKey;
       this.host.options.afterTurn = async (projectId) => {
         const manager = syncManager(sharedHome);
         const mapping = (await manager.configuration()).projects.find(
@@ -277,7 +299,7 @@ export class RemoteMacConnector {
       if (!this.stopped && generation === this.generation)
         this.retry = setTimeout(() => {
           void connect().catch(failed);
-        }, 10000);
+        }, retryDelay);
     };
     await connect().catch(failed);
   }
@@ -289,6 +311,11 @@ export class RemoteMacConnector {
     clearInterval(this.heartbeat);
     this.socket?.close();
     this.online = false;
+    void this.engine?.turns
+      .stopAll()
+      .catch((error) =>
+        console.error("Remote task cancellation:", error.message),
+      );
     for (const id of this.remoteTurns) this.host.cancel(id);
     this.remoteTurns.clear();
   }
