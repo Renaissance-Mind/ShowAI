@@ -137,6 +137,7 @@ export default defineMessages("surface", {
     "style.fullPalette": "完整调色盘",
     "style.eraserSize": "橡皮大小",
     "style.pressure": "压感",
+    "style.pressureLabel": "按压",
     "style.fixedWidth": "固定粗细",
     "style.pressureWidth": "按压力度改变粗细",
 
@@ -376,6 +377,7 @@ export default defineMessages("surface", {
     "style.fullPalette": "Full color palette",
     "style.eraserSize": "Eraser size",
     "style.pressure": "Pressure",
+    "style.pressureLabel": "Pressure",
     "style.fixedWidth": "Fixed width",
     "style.pressureWidth": "Pressure-sensitive width",
 

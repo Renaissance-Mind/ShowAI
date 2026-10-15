@@ -173,11 +173,14 @@ export function BoardStyleControls({
           />
           {width === undefined && <small>{t("style.mixed")}</small>}
         </label>
-        {(drawings.length
-          ? drawings.every((node) =>
-              ["pen", "highlighter"].includes(node.attrs!.tool),
-            )
-          : tool === "pen" || tool === "highlighter") && (
+      </div>
+      {(drawings.length
+        ? drawings.every((node) =>
+            ["pen", "highlighter"].includes(node.attrs!.tool),
+          )
+        : tool === "pen" || tool === "highlighter") && (
+        <div className="board-style-section board-pressure-controls">
+          <span>{t("style.pressureLabel")}</span>
           <button
             type="button"
             className="board-pressure-toggle"
@@ -203,8 +206,8 @@ export function BoardStyleControls({
               )}
             </svg>
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

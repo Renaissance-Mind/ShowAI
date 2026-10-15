@@ -111,8 +111,12 @@
   border-inline-start: 1px solid var(--line, var(--border));
   padding-inline-start: 8px;
 }
-.board-width-controls {
+.board-width-controls,
+.board-width-controls > label,
+.board-pressure-controls {
+  display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 4px;
 }
 .board-color-picker {
