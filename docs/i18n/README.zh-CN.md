@@ -1,11 +1,11 @@
 ![ShowAI — 构建人与 Agent 之间的 Interface。](showai-banner.zh-CN.svg)
 
-[![ShowAI 官网](https://img.shields.io/badge/Website-ShowAI-CDE5FC?style=flat&labelColor=E9EEF3)](https://showai.renaissancemind.ai/)
-[![MIT 许可证](https://img.shields.io/badge/License-MIT-DCEDE0?style=flat&labelColor=E9EEF3)](../../LICENSE)
-[![兼容 MCP](https://img.shields.io/badge/MCP-compatible-D4EEEE?style=flat&labelColor=E9EEF3)](#cli-与-mcp)
-[![ChatGPT 网页版接入](https://img.shields.io/badge/ChatGPT-Web-DDEDE7?style=flat&labelColor=E9EEF3)](#网页版-chatgpt)
-[![Codex 插件](https://img.shields.io/badge/Codex-Plugin-E0E5F5?style=flat&labelColor=E9EEF3)](../codex.md)
-[![Claude Code 插件](https://img.shields.io/badge/Claude_Code-Plugin-F4E1D5?style=flat&labelColor=E9EEF3)](../../plugins/showai/README.md)
+[![ShowAI 官网](https://img.shields.io/badge/Website-ShowAI-2563EB?style=flat&labelColor=30343B)](https://showai.renaissancemind.ai/)
+[![MIT 许可证](https://img.shields.io/badge/License-MIT-22A06B?style=flat&labelColor=30343B)](../../LICENSE)
+[![兼容 MCP](https://img.shields.io/badge/MCP-compatible-0891B2?style=flat&labelColor=30343B)](#cli-与-mcp)
+[![ChatGPT 网页版接入](https://img.shields.io/badge/ChatGPT-Web-10A37F?style=flat&labelColor=30343B)](#网页版-chatgpt)
+[![Codex 插件](https://img.shields.io/badge/Codex-Plugin-6366F1?style=flat&labelColor=30343B)](../codex.md)
+[![Claude Code 插件](https://img.shields.io/badge/Claude_Code-Plugin-E48149?style=flat&labelColor=30343B)](../../plugins/showai/README.md)
 
 **语言:** [English](../../README.md) | 简体中文
 
