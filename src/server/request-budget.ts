@@ -11,7 +11,7 @@ export interface RequestPolicy {
 }
 const defaults: RequestPolicy = {
   serviceDailyRequests: 2_000_000,
-  accountDailyRequests: 50_000,
+  accountDailyRequests: 100_000,
   grantRequests: 32,
   accountDailyReadBytes: 2 * 1024 ** 3,
   serviceDailyReadBytes: 64 * 1024 ** 3,
