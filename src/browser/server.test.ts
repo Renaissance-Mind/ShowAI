@@ -33,6 +33,23 @@ import type { LoadedPage } from "../studio/usePage";
 import { blankDocument } from "../core/catalog";
 import type { CompiledComponent } from "../components/custom/types";
 import type { ProjectMetadata } from "../core/model";
+import type { ConnectorSettings } from "../agent-host/remote-connector";
+
+test("remote device settings pass through the authenticated browser boundary", async () => {
+  const status = await invoke<{
+    settings: ConnectorSettings;
+    online: boolean;
+    connections: unknown[];
+  }>("agent:remoteDevice");
+  expect(status.settings.enabled).toBe(false);
+  expect(status.online).toBe(false);
+  expect(status.connections).toEqual([]);
+  await expect(
+    invoke("agent:shareDevice", {
+      settings: { ...status.settings, enabled: true },
+    }),
+  ).rejects.toThrow("Choose a signed-in server account");
+});
 
 test("project manual order survives workbench page and board saves and appends newly created projects", async () => {
   const a = await invoke<{ id: string }>("projects:create", { name: "First" });
@@ -113,82 +130,89 @@ test("directory sort choices persist through the real workbench action at the se
   ).rejects.toMatchObject({ code: "INVALID_DATA" });
 });
 
-test("sidebar moves preserve project-local components and export after a cross-project move", async () => {
-  const a = await invoke<{ id: string }>("projects:create", {
-    name: "Drag source",
-  });
-  const b = await invoke<{ id: string }>("projects:create", {
-    name: "Drag destination",
-  });
-  const component = await invoke<CompiledComponent>(
-    "components:createExample",
-    { projectId: a.id },
-  );
-  const compiled = await invoke<CompiledComponent>("components:get", {
-    projectId: a.id,
-    id: component.id,
-    version: component.version,
-  });
-  const document = { ...blankDocument(), title: "Portable dependency" };
-  document.content.content!.push({
-    type: "widget",
-    attrs: {
-      id: "custom-widget",
-      kind: "custom",
-      data: {
-        componentId: compiled.id,
-        version: compiled.version,
-        integrity: compiled.integrity,
-        scope: "project",
-        props: compiled.defaultData,
+test(
+  "sidebar moves preserve project-local components and export after a cross-project move",
+  async () => {
+    const a = await invoke<{ id: string }>("projects:create", {
+      name: "Drag source",
+    });
+    const b = await invoke<{ id: string }>("projects:create", {
+      name: "Drag destination",
+    });
+    const component = await invoke<CompiledComponent>(
+      "components:createExample",
+      { projectId: a.id },
+    );
+    const compiled = await invoke<CompiledComponent>("components:get", {
+      projectId: a.id,
+      id: component.id,
+      version: component.version,
+    });
+    const document = { ...blankDocument(), title: "Portable dependency" };
+    document.content.content!.push({
+      type: "widget",
+      attrs: {
+        id: "custom-widget",
+        kind: "custom",
+        data: {
+          componentId: compiled.id,
+          version: compiled.version,
+          integrity: compiled.integrity,
+          scope: "project",
+          props: compiled.defaultData,
+        },
       },
-    },
-  });
-  const page = await invoke<LoadedPage>("pages:create", {
-    projectId: a.id,
-    document,
-  });
-  await invoke("sidebar:moveProject", {
-    projectId: a.id,
-    sectionId: "projects",
-    relativeId: b.id,
-  });
-  const group = (
-    await invoke<{ groups: { id: string }[] }>("groups:create", {
-      name: "Drag group",
-    })
-  ).groups[0];
-  await invoke("sidebar:moveProject", { projectId: a.id, sectionId: group.id });
-  const folder = await invoke<{ id: string }>("folders:create", {
-    projectId: b.id,
-    name: "Pages",
-  });
-  await invoke("sidebar:moveEntry", {
-    kind: "page",
-    projectId: a.id,
-    id: page.document.id,
-    destinationProjectId: b.id,
-    parentId: folder.id,
-    baseHash: page.hash,
-    baseRevision: page.revision,
-  });
-  const moved = await invoke<LoadedPage>("pages:get", {
-    projectId: b.id,
-    pageId: page.document.id,
-  });
-  expect(moved.document.id).toBe(page.document.id);
-  expect(moved.document.parentId).toBe(folder.id);
-  expect(moved.components[0].integrity).toBe(compiled.integrity);
-  expect(await invoke("pages:list", { projectId: a.id })).toEqual([]);
-  const output = join(home, "moved.html");
-  await invoke("export:page", {
-    projectId: b.id,
-    pageId: page.document.id,
-    format: "html",
-    selectedPath: output,
-  });
-  expect(await readFile(output, "utf8")).toContain("custom-widget");
-}, process.platform === "win32" ? 60000 : 15000);
+    });
+    const page = await invoke<LoadedPage>("pages:create", {
+      projectId: a.id,
+      document,
+    });
+    await invoke("sidebar:moveProject", {
+      projectId: a.id,
+      sectionId: "projects",
+      relativeId: b.id,
+    });
+    const group = (
+      await invoke<{ groups: { id: string }[] }>("groups:create", {
+        name: "Drag group",
+      })
+    ).groups[0];
+    await invoke("sidebar:moveProject", {
+      projectId: a.id,
+      sectionId: group.id,
+    });
+    const folder = await invoke<{ id: string }>("folders:create", {
+      projectId: b.id,
+      name: "Pages",
+    });
+    await invoke("sidebar:moveEntry", {
+      kind: "page",
+      projectId: a.id,
+      id: page.document.id,
+      destinationProjectId: b.id,
+      parentId: folder.id,
+      baseHash: page.hash,
+      baseRevision: page.revision,
+    });
+    const moved = await invoke<LoadedPage>("pages:get", {
+      projectId: b.id,
+      pageId: page.document.id,
+    });
+    expect(moved.document.id).toBe(page.document.id);
+    expect(moved.document.parentId).toBe(folder.id);
+    expect(moved.components[0].integrity).toBe(compiled.integrity);
+    expect(await invoke("pages:list", { projectId: a.id })).toEqual([]);
+    const output = join(home, "moved.html");
+    await invoke("export:page", {
+      projectId: b.id,
+      pageId: page.document.id,
+      format: "html",
+      selectedPath: output,
+    });
+    expect(await readFile(output, "utf8")).toContain("custom-widget");
+  },
+  process.platform === "win32" ? 60000 : 15000,
+);
 
 const execute = promisify(execFile);
 const repository = resolve(import.meta.dirname, "../..");

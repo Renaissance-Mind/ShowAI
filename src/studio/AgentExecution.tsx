@@ -162,7 +162,27 @@ export function RemoteDeviceSettings() {
     }, 5000);
     return () => clearInterval(timer);
   }, []);
-  if (remoteExecution() || !state) return null;
+  if (remoteExecution()) return null;
+  if (!state)
+    return (
+      <section className="settings-group agent-device-settings">
+        <h2>
+          {chinese() ? "让 iPad 使用这台电脑" : "Use this computer from iPad"}
+        </h2>
+        {error ? (
+          <p role="alert" className="agent-error">
+            {error}
+          </p>
+        ) : (
+          <p role="status">
+            {chinese() ? "正在读取设备连接…" : "Reading device connection…"}
+          </p>
+        )}
+        <button className="settings-button" onClick={() => void refresh()}>
+          {chinese() ? "刷新" : "Refresh"}
+        </button>
+      </section>
+    );
   const change = (value: Partial<ConnectorSettings>) =>
     setState({ ...state, settings: { ...state.settings, ...value } });
   const save = async () => {
@@ -178,7 +198,7 @@ export function RemoteDeviceSettings() {
     }
   };
   return (
-    <section className="settings-group">
+    <section className="settings-group agent-device-settings">
       <h2>
         {chinese() ? "让 iPad 使用这台电脑" : "Use this computer from iPad"}
       </h2>
@@ -220,6 +240,17 @@ export function RemoteDeviceSettings() {
       </label>
       <fieldset>
         <legend>{chinese() ? "允许访问的项目" : "Allowed projects"}</legend>
+        {!state.projects.some(
+          (p) => p.connectionId === state.settings.connectionId,
+        ) && (
+          <p className="settings-help">
+            {chinese()
+              ? state.settings.connectionId
+                ? "请先在这台电脑同步需要的项目。"
+                : "选择账号后显示已同步的项目。"
+              : "Choose an account with projects synchronized on this computer."}
+          </p>
+        )}
         {state.projects
           .filter((p) => p.connectionId === state.settings.connectionId)
           .map((p) => (

@@ -20,7 +20,10 @@ import { watch } from "chokidar";
 import { version } from "../../package.json";
 import { AgentService, errorResult } from "../agent/service";
 import { AgentHost, agentActions } from "../agent-host/host";
-import { RemoteMacConnector } from "../agent-host/remote-connector";
+import {
+  RemoteMacConnector,
+  remoteDeviceActions,
+} from "../agent-host/remote-connector";
 import { MaintenanceScheduler } from "../core/maintenance-scheduler";
 import { syncManager } from "../sync/manager";
 import { openLibrary } from "../core/open-library";
@@ -476,7 +479,9 @@ export async function startBrowserServer(options: BrowserServerOptions) {
           const { action, args } = input;
           if (
             typeof action !== "string" ||
-            (!workbenchActions.has(action) && !agentActions.has(action)) ||
+            (!workbenchActions.has(action) &&
+              !agentActions.has(action) &&
+              !remoteDeviceActions.has(action)) ||
             !args ||
             typeof args !== "object" ||
             Array.isArray(args)

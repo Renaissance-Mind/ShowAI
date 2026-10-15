@@ -450,3 +450,66 @@
 .assistant-header .agent-execution-picker {
   flex-basis: 100%;
 }
+.agent-device-settings .settings-row {
+  justify-content: flex-start;
+  gap: 10px;
+}
+.agent-device-settings label.settings-row:has(> input[type="checkbox"]) {
+  gap: 10px;
+  font-size: 13px;
+  padding: 12px 0;
+}
+.agent-device-settings label.settings-row:not(:has(> input[type="checkbox"])) {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  align-items: center;
+  gap: 20px;
+  font-size: 13px;
+}
+.agent-device-settings input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.agent-device-settings input:not([type="checkbox"]),
+.agent-device-settings select {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 440px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+}
+.agent-device-settings fieldset {
+  min-width: 0;
+  margin: 18px 0;
+  padding: 8px 16px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.agent-device-settings legend {
+  padding: 0 5px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.agent-device-settings fieldset .settings-help {
+  margin: 8px 0 0;
+}
+.agent-device-settings .settings-row > span[role="status"] {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+@media (max-width: 640px) {
+  .agent-device-settings
+    label.settings-row:not(:has(> input[type="checkbox"])) {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}

@@ -292,6 +292,7 @@ export default function AgentSettings() {
     return (
       <div className="agent-settings">
         <AgentExecutionPicker onChange={executionChanged} disabled={busy} />
+        <RemoteDeviceSettings />
         <p role="status">{t("reading")}</p>
         {error && (
           <p role="alert" className="agent-error">

@@ -21,6 +21,11 @@ export interface ConnectorSettings {
   name: string;
   trustedClients?: { id: string; name: string }[];
 }
+export const remoteDeviceActions = new Set([
+  "agent:remoteDevice",
+  "agent:shareDevice",
+  "agent:approveRemoteClient",
+]);
 /** Outbound only. The desktop keeps its own model credentials and project grants. */
 export class RemoteMacConnector {
   private socket?: WebSocket;
