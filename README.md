@@ -1,6 +1,11 @@
 ![ShowAI — An interface between humans and agents.](docs/showai-banner.svg)
 
-[![ShowAI website](https://img.shields.io/badge/Website-showai.renaissancemind.ai-120A8F?style=flat-square)](https://showai.renaissancemind.ai/)
+[![ShowAI website](https://img.shields.io/badge/Website-ShowAI-120A8F?style=flat&labelColor=30343B)](https://showai.renaissancemind.ai/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-287A55?style=flat&labelColor=30343B)](LICENSE)
+[![MCP compatible](https://img.shields.io/badge/MCP-compatible-167C80?style=flat&labelColor=30343B)](#cli-and-mcp)
+[![ChatGPT web integration](https://img.shields.io/badge/ChatGPT-Web-187765?style=flat&labelColor=30343B)](#chatgpt-on-the-web)
+[![Codex plugin](https://img.shields.io/badge/Codex-Plugin-475569?style=flat&labelColor=30343B)](docs/codex.md)
+[![Claude Code plugin](https://img.shields.io/badge/Claude_Code-Plugin-B96547?style=flat&labelColor=30343B)](plugins/showai/README.md)
 
 **Language:** English | [简体中文](docs/i18n/README.zh-CN.md)
 

@@ -1,6 +1,11 @@
 ![ShowAI — 构建人与 Agent 之间的 Interface。](showai-banner.zh-CN.svg)
 
-[![ShowAI 官网](https://img.shields.io/badge/Website-showai.renaissancemind.ai-120A8F?style=flat-square)](https://showai.renaissancemind.ai/)
+[![ShowAI 官网](https://img.shields.io/badge/Website-ShowAI-120A8F?style=flat&labelColor=30343B)](https://showai.renaissancemind.ai/)
+[![MIT 许可证](https://img.shields.io/badge/License-MIT-287A55?style=flat&labelColor=30343B)](../../LICENSE)
+[![兼容 MCP](https://img.shields.io/badge/MCP-compatible-167C80?style=flat&labelColor=30343B)](#cli-与-mcp)
+[![ChatGPT 网页版接入](https://img.shields.io/badge/ChatGPT-Web-187765?style=flat&labelColor=30343B)](#网页版-chatgpt)
+[![Codex 插件](https://img.shields.io/badge/Codex-Plugin-475569?style=flat&labelColor=30343B)](../codex.md)
+[![Claude Code 插件](https://img.shields.io/badge/Claude_Code-Plugin-B96547?style=flat&labelColor=30343B)](../../plugins/showai/README.md)
 
 **语言:** [English](../../README.md) | 简体中文
 
