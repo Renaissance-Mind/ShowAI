@@ -169,7 +169,11 @@ for (let attempt = 0; attempt < 24; attempt++) {
       container = await response.json();
       break;
     }
-    if (response.status !== 503)
+    if (response.status === 503) {
+      const startup = await response.json();
+      if (startup.runtime === "failed")
+        throw new Error("Container startup failed: " + JSON.stringify(startup));
+    } else if (![500, 502, 504].includes(response.status))
       throw new Error(`Container readiness failed (${response.status}).`);
   } catch (error) {
     if (!(error instanceof TypeError) && error.name !== "TimeoutError")

@@ -239,15 +239,30 @@ export class ShowAIAgentGateway extends DurableObject {
     const deadline = Date.now() + 10000;
     while (Date.now() < deadline) {
       try {
-        if (
-          (
-            await port.fetch("http://container/health", {
-              signal: AbortSignal.timeout(1000),
-            })
-          ).ok
-        ) {
+        const health = await port.fetch("http://container/health", {
+          signal: AbortSignal.timeout(1000),
+        });
+        // Only the operator health route can reach this path. Preserve startup
+        // diagnostics there; user requests receive the public readiness error.
+        if (new URL(request.url).pathname === "/health") return health;
+        if (health.ok) {
+          await health.body?.cancel();
           ready = true;
           break;
+        }
+        const status = await health.json();
+        if (status.runtime === "failed") {
+          const response = json(
+            {
+              error: {
+                code: "AGENT_UNAVAILABLE",
+                message: "Cloud Agent could not start. Please retry later.",
+              },
+            },
+            503,
+          );
+          response.headers.set("retry-after", "60");
+          return response;
         }
       } catch {
         /* Container is still booting. */
