@@ -11,6 +11,7 @@ import {
   richTextDocument,
   createRichTextNode,
   markdownToRichText,
+  validateRichTextData,
 } from "./model.mjs";
 import { createResource } from "../../surface/containers.mjs";
 import { insertComponent } from "../../surface/component-insertion";
@@ -47,7 +48,7 @@ const data = {
             text: "统一格式",
             marks: [
               { type: "underline" },
-              { type: "highlight", attrs: { color: "#e8eed0" } },
+              { type: "highlight", attrs: { color: "#e8eed0", mode: "full" } },
               {
                 type: "textStyle",
                 attrs: {
@@ -101,11 +102,38 @@ describe("shared rich-text component", () => {
       "font-family:serif",
       "font-size:20px",
       "--showai-highlight-color:#e8eed0",
+      'data-highlight-mode="full"',
     ])
       expect(html).toContain(part);
     expect(html).not.toContain("选中文字格式");
     expect(html).not.toContain("<textarea");
   });
+  it.each(["upper", "", true, 1, {}])(
+    "rejects unsupported highlight modes at component and page boundaries (%s)",
+    (mode) => {
+      const content = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                text: "Highlight",
+                marks: [{ type: "highlight", attrs: { mode } }],
+              },
+            ],
+          },
+        ],
+      };
+      expect(() =>
+        validateRichTextData({ format: "richtext", content }),
+      ).toThrow("lower");
+      expect(() => validateDocument({ ...blankDocument(), content })).toThrow(
+        "lower",
+      );
+    },
+  );
   it("imports Markdown, math and images into editable schema nodes without flattening formulas", () => {
     const doc = richTextDocument({
       content:

@@ -42,6 +42,7 @@ function markedText(node: JSONContent): ReactNode {
           <mark
             {...props}
             data-color={mark.attrs?.color ?? mark.attrs?.backgroundColor}
+            data-highlight-mode={mark.attrs?.mode ?? "lower"}
             style={
               {
                 "--showai-highlight-color":

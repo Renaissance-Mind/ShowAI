@@ -91,15 +91,26 @@
 :is(.document-content, .portable-editor .tiptap, .portable-content)
   mark:not(:where(.sb-block *, .showai-custom-block *)),
 .sb-text .sb-rich-text mark {
+  --showai-highlight-start: 43%;
   color: inherit;
   background: linear-gradient(
-    transparent 43%,
-    var(--showai-highlight-color, var(--reading-highlight)) 43%
+    transparent var(--showai-highlight-start),
+    var(--showai-highlight-color, var(--reading-highlight))
+      var(--showai-highlight-start)
   );
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   padding: 0 1px;
   border-radius: 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  mark[data-highlight-mode="full"] {
+  --showai-highlight-start: 0%;
 }
 :is(.document-content, .portable-editor .tiptap, .portable-content)
   strong:not(:where(.sb-block *, .showai-custom-block *)),
@@ -125,13 +136,13 @@
   )
   mark {
   background-image: linear-gradient(
-    transparent 43%,
+    transparent var(--showai-highlight-start, 43%),
     color-mix(
         in srgb,
         var(--showai-highlight-color, var(--reading-highlight)) 22%,
         transparent
       )
-      43%
+      var(--showai-highlight-start, 43%)
   );
 }
 :is(

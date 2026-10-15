@@ -24,33 +24,41 @@ function render(content: JSONContent[]) {
 }
 
 describe("portable read-only content", () => {
-  it("retains the selected highlight colour in editor and exported markup", () => {
-    const schema = getSchema([
-      StarterKit,
-      ReadingHighlight.configure({ multicolor: true }),
-    ]);
-    const colour = "#f8c9dd";
-    const mark = schema.marks.highlight.create({ color: colour });
-    const output = schema.marks.highlight.spec.toDOM!(mark, true) as [
-      string,
-      Record<string, string>,
-      number,
-    ];
-    expect(output[0]).toBe("mark");
-    expect(output[1]["data-color"]).toBe(colour);
-    expect(output[1].style).toBe(`--showai-highlight-color: ${colour}`);
-    const html = render([
-      {
-        type: "paragraph",
-        content: [
-          { type: "text", text: "保留所选颜色", marks: [mark.toJSON()] },
-        ],
-      },
-    ]);
-    expect(html).toContain(`data-color="${colour}"`);
-    expect(html).toContain(`--showai-highlight-color:${colour}`);
-    expect(html).not.toContain("background-color:");
-  });
+  it.each([undefined, "lower", "full"])(
+    "retains highlight colour and coverage in editor and exported markup (%s)",
+    (mode) => {
+      const schema = getSchema([
+        StarterKit,
+        ReadingHighlight.configure({ multicolor: true }),
+      ]);
+      const colour = "#f8c9dd";
+      const mark = schema.marks.highlight.create({
+        color: colour,
+        ...(mode ? { mode } : {}),
+      });
+      const output = schema.marks.highlight.spec.toDOM!(mark, true) as [
+        string,
+        Record<string, string>,
+        number,
+      ];
+      expect(output[0]).toBe("mark");
+      expect(output[1]["data-color"]).toBe(colour);
+      expect(output[1]["data-highlight-mode"]).toBe(mode ?? "lower");
+      expect(output[1].style).toBe(`--showai-highlight-color: ${colour}`);
+      const html = render([
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "保留所选颜色", marks: [mark.toJSON()] },
+          ],
+        },
+      ]);
+      expect(html).toContain(`data-color="${colour}"`);
+      expect(html).toContain(`data-highlight-mode="${mode ?? "lower"}"`);
+      expect(html).toContain(`--showai-highlight-color:${colour}`);
+      expect(html).not.toContain("background-color:");
+    },
+  );
 
   it("preserves all supported inline formats, line breaks, block alignment and escaped content", () => {
     const html = render([

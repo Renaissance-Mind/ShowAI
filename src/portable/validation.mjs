@@ -108,6 +108,7 @@ const markAttributes = new Set([
   "backgroundColor",
   "fontFamily",
   "fontSize",
+  "mode",
 ]);
 
 function object(value, path) {
@@ -586,6 +587,12 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
         throw new Error(`Unsupported text mark: ${String(mark.type)}.`);
       if (mark.attrs !== undefined)
         validateAttrs(mark.attrs, `${path}.marks[${i}].attrs`, markAttributes);
+      if (
+        mark.attrs?.mode != null &&
+        (mark.type !== "highlight" ||
+          !["lower", "full"].includes(mark.attrs.mode))
+      )
+        throw new Error("Highlight mode must be lower or full.");
       if (mark.type === "link" && !isSafeUrl(mark.attrs?.href))
         throw new Error("Links require a safe href.");
     }

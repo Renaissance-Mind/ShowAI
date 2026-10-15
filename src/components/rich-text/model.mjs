@@ -274,6 +274,12 @@ export function validateRichTextData(data) {
     for (const mark of node.marks ?? []) {
       if (!richTextFormats.includes(mark.type))
         throw Error("无效的富文本格式。");
+      if (
+        mark.attrs?.mode != null &&
+        (mark.type !== "highlight" ||
+          !["lower", "full"].includes(mark.attrs.mode))
+      )
+        throw Error("高亮模式必须是 lower 或 full。");
       for (const key of [
         "color",
         "fontFamily",

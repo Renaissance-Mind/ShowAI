@@ -1208,7 +1208,14 @@ export default function RichTextEditor({
         label={t("format.highlight")}
         active={editor.isActive("highlight")}
         onClick={() =>
-          editor.chain().focus().toggleHighlight({ color: "#e8eed0" }).run()
+          editor
+            .chain()
+            .focus()
+            .toggleMark("highlight", {
+              color: editor.getAttributes("highlight").color ?? "#e8eed0",
+              mode: editor.getAttributes("highlight").mode ?? "lower",
+            })
+            .run()
         }
       >
         <Highlighter size={16} />
@@ -1242,6 +1249,25 @@ export default function RichTextEditor({
           }
         />
       </label>
+      <select
+        aria-label={t("format.highlightMode")}
+        value={editor.getAttributes("highlight").mode ?? "lower"}
+        onChange={(e) =>
+          editor
+            .chain()
+            .focus()
+            .setMark("highlight", {
+              mode: e.target.value,
+              ...(editor.getAttributes("highlight").color === undefined
+                ? { color: "#e8eed0" }
+                : {}),
+            })
+            .run()
+        }
+      >
+        <option value="lower">{t("format.highlightLower")}</option>
+        <option value="full">{t("format.highlightFull")}</option>
+      </select>
       <select
         aria-label={t("format.alignment")}
         value={
