@@ -12,6 +12,7 @@ import { SdkInstaller } from "./installer";
 import { checkCloudBrowser } from "../agent/cloud-browser-check";
 import { withLibraryLock } from "../core/library-lock";
 import { execute } from "./process";
+import { ignoreRemoteAgentState } from "./remote-state";
 import type { RemoteActor } from "./remote-protocol";
 
 const directory = dirname(fileURLToPath(import.meta.url));
@@ -109,11 +110,7 @@ if (process.argv.includes("--install-runtime")) {
       key,
       {
         snapshotSqlite: true,
-        ignore: (path) =>
-          path.split("/").some((part) => [".locks", "tmp"].includes(part)) ||
-          path.endsWith(".tmp") ||
-          path.startsWith("agent-host/embedded/showai-marketplace/") ||
-          path.startsWith("agent-host/embedded/codex/plugins/"),
+        ignore: ignoreRemoteAgentState,
       },
     );
     await state.restore();

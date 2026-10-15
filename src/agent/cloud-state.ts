@@ -119,6 +119,9 @@ export class CloudState {
       )
         throw new Error("Invalid cloud state file.");
       paths.add(file.path);
+      // Process leases and other ephemeral files from older checkpoints must
+      // also be excluded on restore, even if a container reuses the same PID.
+      if (this.options.ignore?.(file.path)) continue;
       const path = join(this.root, file.path);
       await mkdir(resolve(path, ".."), { recursive: true, mode: 0o700 });
       const handle = await open(path + ".restore", "wx", 0o600);

@@ -11,6 +11,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CloudState, type ObjectStore } from "./cloud-state";
 import { DatabaseSync } from "node:sqlite";
+import { withLibraryLock } from "../core/library-lock";
+import { ignoreRemoteAgentState } from "../agent-host/remote-state";
 const directories: string[] = [];
 async function directory() {
   const value = await mkdtemp(join(tmpdir(), "showai-cloud-state-"));
@@ -98,6 +100,49 @@ test("Agent checkpoints capture a live WAL database and exclude process locks", 
   ).rejects.toMatchObject({ code: "ENOENT" });
   saved.close();
   db.close();
+});
+test("Agent restore discards legacy live-PID leases and checkpoints exclude held library locks", async () => {
+  const root = await directory(),
+    objects = await store(),
+    key = "e".repeat(64);
+  const library = join(root, "library");
+  await mkdir(join(library, "local", "leases"), { recursive: true });
+  await writeFile(join(library, "content"), "retained project");
+  const owner = JSON.stringify({
+    pid: process.pid,
+    token: "previous-container",
+  });
+  for (const path of [
+    "writer.lock",
+    "writer.lock.recover-previous-container",
+    "leases/writer-previous-container.json",
+  ])
+    await writeFile(join(library, "local", path), owner);
+  // A previous release saved these leases, and the new container may reuse its PID.
+  await new CloudState(root, objects, key).save();
+  const restored = await directory();
+  const state = new CloudState(restored, objects, key, {
+    ignore: ignoreRemoteAgentState,
+  });
+  await state.restore();
+  for (const path of [
+    "writer.lock",
+    "writer.lock.recover-previous-container",
+    "leases/writer-previous-container.json",
+  ])
+    await expect(
+      readFile(join(restored, "library", "local", path)),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+  await withLibraryLock(join(restored, "library"), () => state.save());
+  const restarted = await directory();
+  // Verify the saved checkpoint itself is clean without relying on a restore filter.
+  await new CloudState(restarted, objects, key).restore();
+  expect(await readFile(join(restarted, "library", "content"), "utf8")).toBe(
+    "retained project",
+  );
+  await expect(
+    readFile(join(restarted, "library", "local", "writer.lock")),
+  ).rejects.toMatchObject({ code: "ENOENT" });
 });
 test("failed checkpoints never acknowledge success and are retried before a later mutation", async () => {
   const root = await directory(),
