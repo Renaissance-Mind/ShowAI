@@ -14,6 +14,6 @@ To install into Codex, run `npm run plugin:install` from the source repository (
 
 For Claude Code, run `claude plugin marketplace add ./` and `claude plugin install showai@renaissance-mind` from the repository root.
 
-For a remote package, run `npm run package:plugin -- --mcp-url HTTPS_MCP_URL --out NEW_DIRECTORY`. This replaces the local mcp.json with the chosen remote endpoint. No credentials enter the bundle. Publication and production deployment are separate operations.
+For a remote package, run `npm run package:plugin -- --mcp-url HTTPS_MCP_URL --out NEW_DIRECTORY`. It copies the same skills into `showai-cloud` without the local launcher and declares the endpoint with OAuth (dynamic client registration). Add `--chatgpt-app asdk_app_ID` to reach the server through a connection registered in ChatGPT instead. To install it beside the local plugin, run `node scripts/install-codex-plugin.mjs --remote-url HTTPS_MCP_URL --marketplace-root DIRECTORY [--chatgpt-app asdk_app_ID]`; it uses its own marketplace and verifies the installed files. No credentials enter the bundle. Publication and production deployment are separate operations.
 
 An embedded ShowAI Agent receives its project-bound MCP from AgentHost. Its task-private skill package omits the external library launcher, so the embedded runner does not gain another library-wide connection.

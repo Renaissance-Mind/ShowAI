@@ -17,9 +17,12 @@ const plugin = join(root, "plugins/showai");
 const args = process.argv.slice(2);
 const settings = {};
 for (let i = 0; i < args.length; i += 2) {
-  if (!["--mcp-url", "--out"].includes(args[i]) || !args[i + 1])
+  if (
+    !["--mcp-url", "--out", "--name", "--chatgpt-app"].includes(args[i]) ||
+    !args[i + 1]
+  )
     throw new Error(
-      "Usage: package-plugin.mjs [--mcp-url HTTPS_MCP_URL --out NEW_PACKAGE_DIRECTORY]",
+      "Usage: package-plugin.mjs [--mcp-url HTTPS_MCP_URL --out NEW_PACKAGE_DIRECTORY [--name PLUGIN_NAME] [--chatgpt-app asdk_app_ID]]",
     );
   settings[args[i]] = args[i + 1];
 }
@@ -186,19 +189,85 @@ if (settings["--mcp-url"] || settings["--out"]) {
       !relativeDestination.startsWith(".." + sep))
   )
     throw new Error("Package outside the source plugin.");
+  const name = settings["--name"] ?? `${manifest.name}-cloud`;
+  if (!/^[a-z0-9][a-z0-9_-]*$/.test(name))
+    throw new Error("Use a lowercase plugin name such as showai-cloud.");
+  const app = settings["--chatgpt-app"];
+  if (app !== undefined && !/^asdk_app_[A-Za-z0-9]+$/.test(app))
+    throw new Error(
+      "--chatgpt-app takes the asdk_app_… ID of the ChatGPT connection.",
+    );
   await mkdir(destination, { recursive: false });
-  await cp(plugin, destination, { recursive: true, errorOnExist: true });
+  // The local stdio launcher does not belong in a package for a remote server.
+  await cp(plugin, destination, {
+    recursive: true,
+    errorOnExist: true,
+    filter: (source) => relative(plugin, source).split(sep)[0] !== "mcp",
+  });
+  // A distinct name lets the remote package sit beside the local plugin.
+  const remote = structuredClone(manifest);
+  remote.name = name;
+  const openai = remote.extensions["com.openai"];
+  Object.assign(openai.interface, {
+    displayName: `${openai.interface.displayName} Cloud`,
+    shortDescription: "Create and present ShowAI pages in your cloud projects",
+    longDescription:
+      "Operate ShowAI through its remote MCP server. Sign in with a ShowAI Server account to read, create and present pages in authorized cloud projects; public components, templates and standalone rendering need no account.",
+  });
+  // Replace the local stdio server declaration copied from the source plugin.
+  await rm(join(destination, "mcp.json"));
+  if (app) {
+    // ChatGPT reaches the server through its registered connection.
+    openai.apps = "./.app.json";
+    await writeFile(
+      join(destination, ".app.json"),
+      JSON.stringify({ apps: { [name]: { id: app } } }, null, 2) + "\n",
+    );
+  } else
+    await writeFile(
+      join(destination, "mcp.json"),
+      JSON.stringify(
+        {
+          $schema: "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+          mcpServers: {
+            showai: {
+              type: "streamable-http",
+              url: url.href,
+              // Public tools work anonymously; private projects use OAuth with
+              // dynamic client registration.
+              extensions: {
+                "com.openai": {
+                  auth: { type: "mixed", client: { mode: "dcr" } },
+                },
+              },
+            },
+          },
+        },
+        null,
+        2,
+      ) + "\n",
+    );
   await writeFile(
-    join(destination, "mcp.json"),
-    JSON.stringify(
-      {
-        $schema: "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
-        mcpServers: { showai: { type: "streamable-http", url: url.href } },
-      },
-      null,
-      2,
-    ) + "\n",
-    { flag: "w" },
+    join(destination, "plugin.json"),
+    JSON.stringify(remote, null, 2) + "\n",
+  );
+  await writeFile(
+    join(destination, "README.md"),
+    `# ShowAI Cloud plugin
+
+This package connects the ShowAI skills to the remote MCP server at ${url.href}. It has no local launcher and reads no content library on this computer.
+
+Public components, templates and standalone rendering work without an account. Private projects require signing in with an existing ShowAI Server account (GitHub, Google or account password) and granting access to one project or to every project the account can reach. Projects created on a computer appear here after they synchronize to the same server account.
+
+${app ? `ChatGPT reaches the server through its registered connection \`${app}\`.` : "Hosts connect to the server directly and use OAuth with dynamic client registration."} Read [use-showai](skills/use-showai/SKILL.md) for connection identity, project selection and task routing; the remote rules are in [connection setup](skills/use-showai/references/runtime.md#远程). No credentials enter the bundle.
+`,
+  );
+  const claude = JSON.parse(
+    await readFile(join(destination, ".claude-plugin/plugin.json"), "utf8"),
+  );
+  await writeFile(
+    join(destination, ".claude-plugin/plugin.json"),
+    JSON.stringify({ ...claude, name }, null, 2) + "\n",
   );
   await writeFile(
     join(destination, ".mcp.json"),

@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import {
   lstat,
   mkdir,
+  rm,
   readFile,
   readdir,
   readlink,
@@ -16,7 +17,15 @@ import { promisify } from "node:util";
 
 const execute = promisify(execFile);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const flags = new Set(process.argv.slice(2));
+const options = new Map();
+const flags = new Set();
+for (let i = 2; i < process.argv.length; i++) {
+  const arg = process.argv[i];
+  if (["--remote-url", "--marketplace-root", "--chatgpt-app"].includes(arg)) {
+    if (!process.argv[i + 1]) throw new Error(`${arg} requires a value.`);
+    options.set(arg, process.argv[++i]);
+  } else flags.add(arg);
+}
 const json = flags.has("--json");
 const log = (message) =>
   (json ? process.stderr : process.stdout).write(message + "\n");
@@ -91,35 +100,80 @@ async function install() {
       throw new Error(`Unknown option ${flag}.`);
   if (flags.has("--help")) {
     log(
-      "Usage: node scripts/install-codex-plugin.mjs [--update] [--json]\nValidates the MCP plugin, then uses official Codex commands to install or refresh it. The ShowAI software runtime is installed separately. Verifies installed bytes and enabled status.",
+      "Usage: node scripts/install-codex-plugin.mjs [--update] [--json]\n       node scripts/install-codex-plugin.mjs --remote-url HTTPS_MCP_URL --marketplace-root DIRECTORY [--chatgpt-app asdk_app_ID] [--update] [--json]\nValidates the MCP plugin, then uses official Codex commands to install or refresh it. The remote form generates showai-cloud from the same skills in its own marketplace beside the local plugin. The ShowAI software runtime is installed separately. Verifies installed bytes and enabled status.",
     );
     return;
   }
+  const remoteUrl = options.get("--remote-url");
+  if (!remoteUrl !== !options.get("--marketplace-root"))
+    throw new Error("--remote-url and --marketplace-root are used together.");
+  if (options.get("--chatgpt-app") && !remoteUrl)
+    throw new Error("--chatgpt-app applies to the remote plugin.");
+  const marketplaceRoot = remoteUrl
+    ? resolve(options.get("--marketplace-root"))
+    : root;
+  const pluginRoot = remoteUrl
+    ? join(marketplaceRoot, "plugins/showai-cloud")
+    : join(root, "plugins/showai");
+  if (remoteUrl) {
+    // Regenerate the remote package; only a previously generated copy is replaced.
+    const previous = await readFile(
+      join(pluginRoot, "plugin.json"),
+      "utf8",
+    ).then(
+      (text) => JSON.parse(text).name,
+      (error) => {
+        if (error.code === "ENOENT") return undefined;
+        throw error;
+      },
+    );
+    if (previous !== undefined && previous !== "showai-cloud")
+      throw new Error(
+        `${pluginRoot} holds another plugin; nothing was changed.`,
+      );
+    if (previous) await rm(pluginRoot, { recursive: true });
+    await mkdir(dirname(pluginRoot), { recursive: true });
+    await mkdir(join(marketplaceRoot, ".agents/plugins"), { recursive: true });
+    await writeFile(
+      join(marketplaceRoot, ".agents/plugins/marketplace.json"),
+      JSON.stringify(
+        {
+          name: "renaissance-mind-cloud",
+          interface: { displayName: "Renaissance Mind Cloud" },
+          plugins: [
+            {
+              name: "showai-cloud",
+              source: { source: "local", path: "./plugins/showai-cloud" },
+              policy: { installation: "AVAILABLE", authentication: "ON_USE" },
+              category: "Productivity",
+            },
+          ],
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+  }
 
   const marketplace = JSON.parse(
-    await readFile(join(root, ".agents/plugins/marketplace.json"), "utf8"),
+    await readFile(
+      join(marketplaceRoot, ".agents/plugins/marketplace.json"),
+      "utf8",
+    ),
   );
-  const pluginRoot = join(root, "plugins/showai");
-  const manifest = JSON.parse(
-    await readFile(join(pluginRoot, "plugin.json"), "utf8"),
-  );
-  if (
-    !/^[a-z0-9][a-z0-9_-]*$/.test(marketplace.name) ||
-    !/^[a-z0-9][a-z0-9_-]*$/.test(manifest.name)
-  )
-    throw new Error("Invalid local marketplace or plugin name.");
-  const entry = marketplace.plugins?.find(
-    (item) => item.name === manifest.name,
-  );
+  const pluginName = remoteUrl ? "showai-cloud" : "showai";
+  if (!/^[a-z0-9][a-z0-9_-]*$/.test(marketplace.name))
+    throw new Error("Invalid local marketplace name.");
+  const entry = marketplace.plugins?.find((item) => item.name === pluginName);
   if (
     entry?.source?.source !== "local" ||
-    resolve(root, entry.source.path) !== pluginRoot
+    resolve(marketplaceRoot, entry.source.path) !== pluginRoot
   )
     throw new Error(
-      "This installer requires the repository marketplace to point at ./plugins/showai.",
+      `This installer requires the marketplace to point at ./plugins/${pluginName}.`,
     );
-  const identity = `${manifest.name}@${marketplace.name}`;
-  const canonicalRoot = await realpath(root);
+  const identity = `${pluginName}@${marketplace.name}`;
+  const canonicalRoot = await realpath(marketplaceRoot);
 
   // Refuse a name collision before any official command could replace a source.
   const considered = await codex(["marketplace", "list"]);
@@ -149,12 +203,30 @@ async function install() {
   log("Preparing the ShowAI skills…");
   const packaged = await command(process.execPath, [
     join(root, "scripts/package-plugin.mjs"),
+    ...(remoteUrl
+      ? [
+          "--mcp-url",
+          remoteUrl,
+          "--out",
+          pluginRoot,
+          "--name",
+          pluginName,
+          ...(options.get("--chatgpt-app")
+            ? ["--chatgpt-app", options.get("--chatgpt-app")]
+            : []),
+        ]
+      : []),
   ]);
   if (packaged.stdout.trim()) log(packaged.stdout.trim());
+  const manifest = JSON.parse(
+    await readFile(join(pluginRoot, "plugin.json"), "utf8"),
+  );
+  if (manifest.name !== pluginName)
+    throw new Error(`The packaged plugin is not ${pluginName}.`);
   const expected = await fingerprint(pluginRoot);
 
   log(`Registering the local marketplace and refreshing ${identity}…`);
-  await codex(["marketplace", "add", root]);
+  await codex(["marketplace", "add", marketplaceRoot]);
   const added = await codex(["add", identity]);
   if (
     typeof added.installedPath !== "string" ||
@@ -198,14 +270,19 @@ async function install() {
     throw new Error(
       `Installed version ${installed.version} differs from the bundle version ${manifest.version}.`,
     );
-  const receiptPath = join(root, "artifacts/codex-plugin-install.json");
+  const receiptPath = remoteUrl
+    ? join(marketplaceRoot, "codex-plugin-install.json")
+    : join(root, "artifacts/codex-plugin-install.json");
   const receipt = {
     ok: true,
     action: flags.has("--update") ? "update" : "install",
     pluginId: identity,
     version: manifest.version,
     enabled: true,
-    marketplaceRoot: root,
+    marketplaceRoot,
+    ...(remoteUrl
+      ? { mcpUrl: remoteUrl, chatgptApp: options.get("--chatgpt-app") ?? null }
+      : {}),
     sourcePath: pluginRoot,
     installedPath,
     verifiedFiles: actual.files,
