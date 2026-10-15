@@ -7,6 +7,9 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { AccountCipher } from "../server/account-crypto";
 import { hash } from "../sync/protocol";
+import { createServer } from "node:http";
+import { chromium } from "playwright-core";
+import { readingBrowserExecutable } from "./reading-renderer";
 import { SQLiteMetadata } from "../server/node-storage";
 import { startSyncServer } from "../server/node";
 import { AgentService } from "./service";
@@ -1112,6 +1115,86 @@ test("social login resumes a completed upstream account flow without exposing it
     expect(consent).not.toContain(user.token);
   } finally {
     db.close();
+    await gateway.close();
+    await social.close();
+  }
+});
+
+test("a real browser completes provider start and password consent back to the client redirect", async () => {
+  const root = join(directory, "browser-auth-server");
+  const social = await startSyncServer({
+    home: root,
+    port: 0,
+    vaultKey: "f".repeat(64),
+    githubLogin: { clientId: "test-client", clientSecret: "test-secret" },
+    registrationKey: "browser-test-register",
+  });
+  const gateway = await startMcpHttpServer({
+    stateDirectory: join(directory, "browser-auth-gateway"),
+    syncServers: [social.url],
+    port: 0,
+  });
+  // The registered client redirect is a separate origin, like chatgpt.com.
+  const received: string[] = [];
+  const callback = createServer((request, response) => {
+    received.push(request.url!);
+    response.end("returned");
+  });
+  await new Promise<void>((done) => callback.listen(0, "127.0.0.1", done));
+  const address = callback.address();
+  if (!address || typeof address === "string")
+    throw new Error("Callback server unavailable");
+  const redirect = `http://localhost:${address.port}/callback`;
+  const browser = await chromium.launch({
+    executablePath: await readingBrowserExecutable(),
+  });
+  try {
+    await post(social.url + "/api/auth/register", {
+      name: "browser-user",
+      password: "browser-test-password-123",
+      registrationKey: "browser-test-register",
+    });
+    const registration = await post(gateway.url + "/oauth/register", {
+      client_name: "Browser client",
+      redirect_uris: [redirect],
+      token_endpoint_auth_method: "none",
+    });
+    const query = new URLSearchParams({
+      client_id: registration.client_id,
+      response_type: "code",
+      redirect_uri: redirect,
+      code_challenge: createHash("sha256")
+        .update("browser-verifier")
+        .digest("base64url"),
+      code_challenge_method: "S256",
+      scope: "projects.read projects.write",
+      state: "browser-state",
+    });
+    const page = await browser.newPage();
+    await page.goto(gateway.url + "/oauth/authorize?" + query);
+    // Browser form posts carry the page's real Origin header.
+    await page.getByRole("button", { name: "使用 GitHub 登录" }).click();
+    await page.getByLabel("完成码").waitFor();
+    expect(
+      await page
+        .getByRole("link", { name: "打开登录页面" })
+        .getAttribute("href"),
+    ).toContain("https://github.com/login/oauth/authorize");
+    await page.getByRole("button", { name: "重新选择登录方式" }).click();
+    await page.getByLabel("账号").fill("browser-user");
+    await page.getByLabel("密码").fill("browser-test-password-123");
+    await page.getByRole("button", { name: "使用账号密码登录" }).click();
+    // The consent redirect leaves for the client's origin after the form post.
+    await Promise.all([
+      page.waitForURL((url) => url.href.startsWith(redirect)),
+      page.getByRole("button", { name: "确认授权" }).click(),
+    ]);
+    const returned = new URL(received.at(-1)!, redirect);
+    expect(returned.searchParams.get("state")).toBe("browser-state");
+    expect(returned.searchParams.get("code")).toBeTruthy();
+  } finally {
+    await browser.close();
+    await new Promise<void>((done) => callback.close(() => done()));
     await gateway.close();
     await social.close();
   }

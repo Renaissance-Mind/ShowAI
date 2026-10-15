@@ -308,8 +308,12 @@ export class McpAuthorization {
         headers: {
           "content-type": "text/html; charset=utf-8",
           "cache-control": "no-store",
-          "referrer-policy": "no-referrer",
-          "content-security-policy": `default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'`,
+          // Same-origin keeps the real Origin on these form posts (no-referrer
+          // makes browsers send Origin: null) without leaking a Referer elsewhere.
+          "referrer-policy": "same-origin",
+          // form-action also governs the redirect after consent, so allow the
+          // client's registered redirect origin alongside this page.
+          "content-security-policy": `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${new URL(flow.redirect).origin}; frame-ancestors 'none'`,
           "set-cookie": `showai_oauth=${flowId}; Path=/oauth; HttpOnly; SameSite=Lax; Max-Age=600${this.url.startsWith("https:") ? "; Secure" : ""}`,
         },
       },
