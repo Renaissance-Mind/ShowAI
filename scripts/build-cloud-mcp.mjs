@@ -7,6 +7,9 @@ await build({
   entryPoints: {
     gateway: "src/agent/cloud-entry.ts",
     "browser-check": "src/agent/cloud-browser-check-entry.ts",
+    // Project reads and indexing run in this worker beside the gateway.
+    "index-worker": "src/core/index-worker.ts",
+    "content-check": "src/agent/cloud-content-check-entry.ts",
   },
   outdir: "dist-cloud-mcp/scripts",
   outExtension: { ".js": ".mjs" },

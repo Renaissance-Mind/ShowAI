@@ -42,5 +42,7 @@ RUN mkdir /state && chown node:node /state
 USER node
 # Project history needs Git; verify the actual runtime binary and shared libraries.
 RUN node --input-type=module -e 'import { exec } from "dugite"; const r = await exec(["--version"], "/app"); if (r.exitCode !== 0) throw new Error(r.stderr); console.log(r.stdout);'
+# Create, list and search a page with the bundled files, including the content worker.
+RUN node /app/scripts/content-check.mjs
 EXPOSE 8789
 CMD ["node", "/app/scripts/gateway.mjs"]
