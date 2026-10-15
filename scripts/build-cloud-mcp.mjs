@@ -1,6 +1,8 @@
 import { build } from "esbuild";
 import { mkdir, copyFile } from "node:fs/promises";
 import { rawSourcePlugin } from "./raw-source-plugin.mjs";
+import { generateMcpSkillSource } from "./mcp-skill-source.mjs";
+await generateMcpSkillSource();
 await mkdir("dist-cloud-mcp/scripts", { recursive: true });
 await mkdir("dist-cloud-mcp/assets", { recursive: true });
 await build({

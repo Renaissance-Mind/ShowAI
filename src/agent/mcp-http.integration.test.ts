@@ -178,6 +178,68 @@ afterAll(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 
+test("remote guide delivers the full shared Skill workflow anonymously and retains runtime topics", async () => {
+  const anonymous = await client();
+  expect(anonymous.getInstructions()).toContain(
+    "Start every ShowAI task by calling guide()",
+  );
+  const tools = await anonymous.listTools();
+  const guide = tools.tools.find((tool) => tool.name === "guide")!;
+  expect(guide.inputSchema.properties).toHaveProperty("skill");
+  expect(guide.annotations?.readOnlyHint).toBe(true);
+  const entry = data(
+    await anonymous.callTool({ name: "guide", arguments: {} }),
+  );
+  expect(entry.protocol).toBe("showai-remote-skills-v1");
+  expect(entry.markdown).toContain("根据任务继续");
+  expect(entry.skills).toHaveLength(7);
+  for (const skill of entry.skills as { name: string }[]) {
+    const detail = data(
+      await anonymous.callTool({
+        name: "guide",
+        arguments: { skill: skill.name },
+      }),
+    );
+    expect(detail.source).toMatchObject({
+      path: `plugins/showai/skills/${skill.name}/SKILL.md`,
+    });
+    expect(detail.markdown).toBeTruthy();
+    expect(
+      data(
+        await anonymous.callTool({
+          name: "guide",
+          arguments: { skill: skill.name, knownHash: detail.hash },
+        }),
+      ).unchanged,
+    ).toBe(true);
+  }
+  const reference = data(
+    await anonymous.callTool({
+      name: "guide",
+      arguments: {
+        skill: "create-template",
+        file: "references/template-creation.md",
+      },
+    }),
+  );
+  expect(reference.markdown).toContain("template");
+  const presentation = data(
+    await anonymous.callTool({
+      name: "guide",
+      arguments: { topic: "presentation", stage: "design" },
+    }),
+  );
+  expect(presentation.stage).toBe("design");
+  for (const args of [
+    { skill: "use-showai", file: "../package.json" },
+    { skill: "use-showai", topic: "reading" },
+    { file: "SKILL.md" },
+  ]) {
+    const result = await anonymous.callTool({ name: "guide", arguments: args });
+    expect(result.isError).toBe(true);
+  }
+});
+
 test("authorized Board reads deliver overlapping images without exposing local cache paths", async () => {
   const tokens = await authorize();
   const remote = await client(tokens.access_token);

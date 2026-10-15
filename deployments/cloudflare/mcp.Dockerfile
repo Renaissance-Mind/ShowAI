@@ -24,6 +24,7 @@ RUN node scripts/download-cloud-git.mjs && npm ci && rm -rf /tmp/showai-dugite-c
 COPY src ./src
 COPY scripts ./scripts
 COPY resources ./resources
+COPY plugins/showai/skills ./plugins/showai/skills
 COPY public ./public
 COPY deployments/cloudflare/mcp-worker.mjs deployments/cloudflare/mcp-state-broker.mjs ./deployments/cloudflare/
 COPY vite.portable.config.ts tsconfig.json index.html portable.html LICENSE ./

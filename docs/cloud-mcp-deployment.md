@@ -16,6 +16,16 @@ The gateway bundle and reader assets do not depend on the CPU, so the Dockerfile
 
 The proposed public endpoint is `https://agent.showai.renaissancemind.ai/mcp`. It is not an assertion that this endpoint has been published or verified. Change both `SHOWAI_MCP_URL` and the custom-domain route together if a different origin is used.
 
+## Shared Skills through remote MCP
+
+The HTTP gateway provides the workflows from `plugins/showai/skills` through its existing `guide` tool. A ChatGPT web user can add the remote MCP connection without installing a Skill package. The gateway's initialization instructions direct the model to `guide()` for the connection entrypoint and the seven workflow routes. This is tool-delivered guidance; it does not register native Skills in the host.
+
+Use `guide({skill:"show-document"})` to read a workflow, and `guide({skill:"use-showai",file:"references/runtime.md",section:"远程"})` to read a referenced file. Relative Markdown links are returned as callable `guide` references. A section hint identifies a heading in the complete file. Each response includes the original source path and SHA256, the delivered text hash, and the available reference files. Pass `knownHash` only for the exact text already held in the current conversation. The existing `topic` and presentation `stage` parameters still read operation and template guidance; do not combine them with `skill`/`file`.
+
+`npm run build:cloud-mcp` generates the import index directly from the canonical Skill and reference files, then embeds those files into the gateway bundle. It does not modify or install the local plugin. The Docker build and release integrity inventory include these source files. Remote context rules select the HTTP/OAuth branches of shared instructions: local library configuration, unavailable tools and shell commands do not become remote capabilities. Scripts are available as reference text; a host without script execution uses the documented manual checks.
+
+Refresh the custom MCP connection in ChatGPT after a gateway update, then start a new chat. Verify the plugin contains only the MCP app, inspect actual tool calls for guide loading, and check read-only lookup, page creation and continuation, selected-block display, component/template workflows and unavailable library/history operations. Installation, model guideline selection, saved content, synchronization and visible presentation require separate evidence.
+
 ## Build and verify
 
 ```sh

@@ -3,7 +3,7 @@ import { lstat, readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 
 const inputPaths = [
-  "package.json", "package-lock.json", "src", "scripts", "resources", "public",
+  "package.json", "package-lock.json", "src", "scripts", "resources", "public", "plugins/showai/skills",
   "vite.portable.config.ts", "tsconfig.json", "index.html", "portable.html", "LICENSE",
   "deployments/cloudflare/mcp.Dockerfile", "deployments/cloudflare/mcp.Dockerfile.dockerignore",
   "deployments/cloudflare/mcp-worker.mjs", "deployments/cloudflare/mcp-state-broker.mjs",

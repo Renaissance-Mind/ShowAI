@@ -30,6 +30,12 @@ import {
 import { inlinePresentation } from "./presentation";
 import { serverBaseUrl } from "../sync/server-url";
 import type { CloudBrowserCheck } from "./cloud-browser-check";
+import { getMcpGuide } from "./mcp-guides";
+import {
+  mcpSkillGuide,
+  mcpSkillNames,
+  remoteSkillInstructions,
+} from "./mcp-skill-guides";
 
 const writeTools = new Set([
   "project_create",
@@ -203,8 +209,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         actor: { kind: "external", label: "MCP client" },
         channel: "mcp",
       },
-      instructions:
-        "Use ShowAI MCP for Agent document operations. Formal content is saved in an authorized project before page_present; render_document is only for explicitly standalone output. Connection failure must not change the project or persistence mode. Public catalogs and standalone rendering require no login. Private project tools require OAuth and an explicit projectId from projects_list. Account-wide grants discover current and future accessible projects; selected-project grants stay limited. When the user explicitly requests a new project, use project_create with a retained operationId and projects.create authorization, then use the returned server project id. Local projects become remotely visible after synchronization. Read the current page/hash/revision before modifying it. A successful shared write includes synchronization state. HTML display is optional; tools work in text-only harnesses. Use page_present only when the user wants a preview.",
+      instructions: remoteSkillInstructions,
       presentation: {
         transport: "http",
         storePresentation: (value) => storePresentation(value, true),
@@ -217,7 +222,43 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           return;
         }
         if (name === "guide") {
-          tool.update({ _meta: { securitySchemes: [{ type: "noauth" }] } });
+          const shape = getObjectShape(tool.inputSchema);
+          if (!shape) throw new Error("Missing guide input schema.");
+          const original = tool.handler as ToolCallback<z.ZodRawShape>;
+          tool.update({
+            description:
+              "Start every ShowAI task with guide() to read the shared Skill entrypoint and task routes. Then use skill to read one workflow, or skill/file to read an exact referenced file. No installed plugin or local files are needed. topic still reads runtime operation guides; stage applies to topic presentation. knownHash is only for exact content already held this turn.",
+            paramsSchema: {
+              ...shape,
+              skill: z.enum(mcpSkillNames).optional(),
+              file: z.string().min(1).max(500).optional(),
+              section: z.string().min(1).max(500).optional(),
+            },
+            _meta: { securitySchemes: [{ type: "noauth" }] },
+            callback: async (args, extra) => {
+              if ("topic" in args && args.topic) {
+                if (args.skill || args.file || args.section)
+                  return mcpFailure(
+                    new Error("Choose either topic or skill/file, not both."),
+                  );
+                return original(args, extra);
+              }
+              if ("stage" in args && args.stage)
+                return mcpFailure(
+                  new Error("stage requires topic presentation."),
+                );
+              if ((args.file || args.section) && !args.skill)
+                return mcpFailure(new Error("file and section require skill."));
+              try {
+                return mcpSuccess({
+                  ...mcpSkillGuide(args),
+                  ...(!args.skill ? { operationGuides: getMcpGuide() } : {}),
+                });
+              } catch (error) {
+                return mcpFailure(error);
+              }
+            },
+          });
           return;
         }
         const shape = getObjectShape(tool.inputSchema);

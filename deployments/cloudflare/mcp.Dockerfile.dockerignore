@@ -7,6 +7,10 @@
 !scripts/**
 !resources/
 !resources/**
+!plugins/
+!plugins/showai/
+!plugins/showai/skills/
+!plugins/showai/skills/**
 !public/
 !public/**
 !deployments/
