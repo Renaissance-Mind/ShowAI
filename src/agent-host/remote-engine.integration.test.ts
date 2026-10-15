@@ -98,6 +98,18 @@ test("wire validation strips transport credentials and rejects arbitrary host ac
     "Invalid Agent request",
   );
 });
+test("cloud ChatGPT authorization requires the local registration and server source path", async () => {
+  await expect(
+    engine.invoke(
+      {
+        ...request("agent:authorize", { id: randomUUID() }),
+        projectId: undefined,
+      },
+      actor,
+    ),
+  ).rejects.toThrow("OpenAI requires a local callback");
+  expect(engine.host.chatgpt.state.state).toBe("idle");
+});
 test("account identity and current project membership are checked before opening a replica", async () => {
   await expect(
     engine.invoke(request("agent:status"), { ...actor, userId: randomUUID() }),

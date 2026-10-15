@@ -162,6 +162,17 @@ export class ShowAIAgentGateway extends DurableObject {
     if (url.pathname === "/invoke") {
       const input = await request.clone().json();
       const call = invocation(input);
+      if (call.destination === "cloud" && call.action === "agent:authorize")
+        return json(
+          {
+            error: {
+              code: "LOCAL_CHATGPT_AUTH_REQUIRED",
+              message:
+                "Authorize ChatGPT on your Mac and publish it to your server, then select that server model source for Cloud execution. OpenAI requires a local callback.",
+            },
+          },
+          409,
+        );
       if (call.destination !== "cloud") {
         if (!remoteTaskActions.has(call.action))
           return json(

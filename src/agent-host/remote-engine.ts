@@ -219,6 +219,10 @@ export class RemoteAgentEngine {
       }
     } else if (remoteTaskActions.has(action) && action !== "agent:status")
       throw new Error("A project is required.");
+    if (!this.options.host && action === "agent:authorize")
+      throw new Error(
+        "Authorize ChatGPT on your Mac and publish it to your server, then select that server model source for Cloud execution. OpenAI requires a local callback.",
+      );
     if (
       !this.options.host &&
       action === "agent:settings" &&

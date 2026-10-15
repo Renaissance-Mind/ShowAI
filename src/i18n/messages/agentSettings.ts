@@ -61,6 +61,8 @@ export default defineMessages("agentSettings", {
     modelPlaceholder: "从列表选择，或填写服务提供的模型 ID",
     saveSource: "保存来源",
     fetchModels: "获取模型列表",
+    cloudChatgptHelp:
+      "使用 ChatGPT 套餐：先在 Mac 的 Agent 设置中完成授权并发布到服务器，再从下方的服务器模型来源添加。OpenAI 授权需要本机回调。",
     chatgptHelp:
       "先保存来源，再连接 ChatGPT。使用套餐额度需在授权页允许；可用模型以账号返回的列表为准。",
     reauthorizeChatgpt: "重新授权 ChatGPT",
@@ -171,6 +173,8 @@ export default defineMessages("agentSettings", {
       "Choose from the list or enter a model ID from the service",
     saveSource: "Save source",
     fetchModels: "Fetch model list",
+    cloudChatgptHelp:
+      "To use your ChatGPT plan, authorize it in Agent settings on your Mac and publish it to your server, then add it from the server model sources below. OpenAI authorization requires a local callback.",
     chatgptHelp:
       "Save the source first, then connect ChatGPT. To use your plan's quota, allow it on the authorization page. Available models depend on what your account returns.",
     reauthorizeChatgpt: "Reauthorize ChatGPT",

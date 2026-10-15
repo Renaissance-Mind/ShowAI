@@ -264,7 +264,7 @@ export class ChatGptConnection {
         this.state = { state: "failed", error: t("chatgpt.timedOut") };
         this.close();
       },
-      5 * 60 * 1000,
+      15 * 60 * 1000,
     );
     const query = new URLSearchParams({
       client_id: saved?.clientId ?? "dynamic_agent_client",

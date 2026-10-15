@@ -158,6 +158,16 @@ afterAll(async () => {
     await rm(directory, { recursive: true, force: true });
   }
 });
+test("cloud OAuth returns the supported local-registration path before starting a container", async () => {
+  const result = await request("/invoke", {
+    destination: "cloud",
+    requestId: randomUUID(),
+    action: "agent:authorize",
+    args: { id: randomUUID() },
+  });
+  expect(result.status).toBe(409);
+  expect(result.value.error.code).toBe("LOCAL_CHATGPT_AUTH_REQUIRED");
+});
 test("a real outbound WebSocket requires Mac confirmation before returning an actual Agent status", async () => {
   const destinations = await request("/destinations");
   expect(destinations.value).toContainEqual(

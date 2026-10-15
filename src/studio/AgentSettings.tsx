@@ -301,6 +301,7 @@ export default function AgentSettings() {
         )}
       </div>
     );
+  const cloudExecution = remoteExecution() && status.executionKind === "cloud";
   if (remoteExecution() && status.executionKind === "mac")
     return (
       <div className="agent-settings">
@@ -526,28 +527,38 @@ export default function AgentSettings() {
               </div>
             )}
             <div className="agent-presets" aria-label={t("addModelSource")}>
-              {sourcePresets.map((preset) => (
-                <button
-                  className="agent-preset"
-                  key={preset.provider}
-                  disabled={busy}
-                  onClick={() => add(preset.provider)}
-                >
-                  <AgentBrandIcon brand={preset.provider} />
-                  <span>
-                    <strong>{presetName(preset.provider, preset.name)}</strong>
-                    <small>
-                      {preset.credential === "chatgpt"
-                        ? t("presetHint.account")
-                        : preset.provider === "custom"
-                          ? t("presetHint.custom")
-                          : t("presetHint.apiKey")}
-                    </small>
-                  </span>
-                  <Plus size={14} aria-hidden="true" />
-                </button>
-              ))}
+              {sourcePresets
+                .filter(
+                  (preset) =>
+                    !cloudExecution || preset.credential !== "chatgpt",
+                )
+                .map((preset) => (
+                  <button
+                    className="agent-preset"
+                    key={preset.provider}
+                    disabled={busy}
+                    onClick={() => add(preset.provider)}
+                  >
+                    <AgentBrandIcon brand={preset.provider} />
+                    <span>
+                      <strong>
+                        {presetName(preset.provider, preset.name)}
+                      </strong>
+                      <small>
+                        {preset.credential === "chatgpt"
+                          ? t("presetHint.account")
+                          : preset.provider === "custom"
+                            ? t("presetHint.custom")
+                            : t("presetHint.apiKey")}
+                      </small>
+                    </span>
+                    <Plus size={14} aria-hidden="true" />
+                  </button>
+                ))}
             </div>
+            {cloudExecution && (
+              <p className="settings-help">{t("cloudChatgptHelp")}</p>
+            )}
             <ServerResources
               selected={selected}
               disabled={busy || !!hasRunning}
@@ -698,62 +709,66 @@ export default function AgentSettings() {
                   )}
                 </div>
                 {editing.credential === "chatgpt" && (
-                  <p className="settings-help">{t("chatgptHelp")}</p>
+                  <p className="settings-help">
+                    {t(cloudExecution ? "cloudChatgptHelp" : "chatgptHelp")}
+                  </p>
                 )}
               </form>
             )}
             {selected && (
               <div className="agent-form-actions">
-                {selected.credential === "chatgpt" && !selected.hosted && (
-                  <>
-                    <button
-                      className="settings-button"
-                      disabled={
-                        busy || status.authorization.state === "pending"
-                      }
-                      onClick={action(async () => {
-                        const result = await desktop.invoke<{ url?: string }>(
-                          "agent:authorize",
-                          { id: selected.id },
-                        );
-                        if (result.url)
-                          window.open(
-                            result.url,
-                            "_blank",
-                            "noopener,noreferrer",
-                          );
-                        await refresh();
-                      })}
-                    >
-                      {selected.connected
-                        ? t("reauthorizeChatgpt")
-                        : t("continueWithChatgpt")}
-                    </button>
-                    {selected.connected && (
+                {selected.credential === "chatgpt" &&
+                  !selected.hosted &&
+                  !cloudExecution && (
+                    <>
                       <button
                         className="settings-button"
-                        disabled={busy || hasRunning}
+                        disabled={
+                          busy || status.authorization.state === "pending"
+                        }
                         onClick={action(async () => {
-                          update(
-                            await desktop.invoke("agent:disconnect", {
-                              id: selected.id,
-                            }),
+                          const result = await desktop.invoke<{ url?: string }>(
+                            "agent:authorize",
+                            { id: selected.id },
                           );
+                          if (result.url)
+                            window.open(
+                              result.url,
+                              "_blank",
+                              "noopener,noreferrer",
+                            );
+                          await refresh();
                         })}
                       >
-                        {t("disconnect")}
+                        {selected.connected
+                          ? t("reauthorizeChatgpt")
+                          : t("continueWithChatgpt")}
                       </button>
-                    )}
-                    <a
-                      className="settings-button"
-                      href="https://chatgpt.com/settings/usage"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {t("managePlanUsage")}
-                    </a>
-                  </>
-                )}
+                      {selected.connected && (
+                        <button
+                          className="settings-button"
+                          disabled={busy || hasRunning}
+                          onClick={action(async () => {
+                            update(
+                              await desktop.invoke("agent:disconnect", {
+                                id: selected.id,
+                              }),
+                            );
+                          })}
+                        >
+                          {t("disconnect")}
+                        </button>
+                      )}
+                      <a
+                        className="settings-button"
+                        href="https://chatgpt.com/settings/usage"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {t("managePlanUsage")}
+                      </a>
+                    </>
+                  )}
                 <button
                   className="settings-button"
                   disabled={
