@@ -7,6 +7,7 @@
   "vars": {
     "SHOWAI_AGENT_URL": "https://run.showai.renaissancemind.ai",
     "SHOWAI_AGENT_SYNC_SERVERS": "https://showai.renaissancemind.ai/cloud",
+    "SHOWAI_AGENT_SYNC_SERVICE_URL": "https://showai.renaissancemind.ai/cloud",
   },
   "routes": [
     { "pattern": "run.showai.renaissancemind.ai", "custom_domain": true },
@@ -27,5 +28,6 @@
     },
   ],
   "r2_buckets": [{ "binding": "STATE", "bucket_name": "showai-agent-state" }],
+  "services": [{ "binding": "CONTENT_SERVER", "service": "showai-cloud" }],
   "observability": { "enabled": true },
 }

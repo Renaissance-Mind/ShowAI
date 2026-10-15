@@ -30,11 +30,15 @@ async function identity(input, env) {
     input.token.length > 16000
   )
     throw new Error("The content server or session is not authorized.");
-  const response = await fetch(serverUrl + "/api/me", {
+  const identityRequest = new Request(serverUrl + "/api/me", {
     headers: { authorization: `Bearer ${input.token}` },
     redirect: "manual",
     signal: AbortSignal.timeout(15000),
   });
+  const response =
+    env.CONTENT_SERVER && serverUrl === env.SHOWAI_AGENT_SYNC_SERVICE_URL
+      ? await env.CONTENT_SERVER.fetch(identityRequest)
+      : await fetch(identityRequest);
   if (!response.ok) {
     const details = await response.json().catch(() => ({}));
     const error = new Error(
