@@ -100,6 +100,7 @@ export function useInlineInk({
     previousInk = useRef("pen");
   const invalidate = useRef<(() => void) | null>(null);
   const navigating = useRef(false);
+  const inking = tool === "pen" || tool === "highlighter";
   if (tool === "pen" || tool === "highlighter") previousInk.current = tool;
   current.current = {
     source,
@@ -139,14 +140,14 @@ export function useInlineInk({
   }, [enabled, source?.id, boardId]);
   useEffect(() => {
     invalidate.current?.();
-  }, [source, color, width, pressure, ruler]);
+  }, [source, color, width, pressure, ruler, tool]);
   useEffect(() => {
     const bridge = window.showai?.inlineInk;
     if (
       !bridge ||
       !enabled ||
       !source ||
-      (tool !== "pen" && tool !== "highlighter") ||
+      !inking ||
       !root.current ||
       !world.current
     )
@@ -239,7 +240,7 @@ export function useInlineInk({
         token,
         pageId: documentValue.id,
         boardId,
-        tool: tool as "pen" | "highlighter",
+        tool: current.current.tool as "pen" | "highlighter",
         color: current.current.color,
         width: current.current.width,
         pressure: current.current.pressure,
@@ -279,6 +280,8 @@ export function useInlineInk({
       }
       pending = true;
       try {
+        if (surface.dataset.nativeInkToken !== token)
+          surface.dataset.nativeInkToken = token;
         await bridge.frame({
           ...packet,
           ...(lastPoses !== poses ? { poses } : {}),
@@ -378,5 +381,5 @@ export function useInlineInk({
         }
       });
     };
-  }, [enabled, source?.id, boardId, tool, root, world, viewCamera]);
+  }, [enabled, source?.id, boardId, inking, root, world, viewCamera]);
 }
