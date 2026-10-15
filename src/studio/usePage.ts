@@ -156,17 +156,25 @@ export function usePage(home?: string) {
       sessions.getSnapshot().active?.editContent(content),
     [sessions],
   );
+  const flush = useCallback(async () => {
+    // Finish native input while its editor and save listener still belong
+    // to the outgoing page. React cleanup runs after navigation changes it.
+    await window.showai?.inlineInk?.flush();
+    return sessions.getSnapshot().active?.flush() ?? true;
+  }, [sessions]);
   const open = useCallback(
-    (projectId: string, pageId: string, tabId?: string) =>
-      sessions.open(projectId, pageId, tabId),
-    [sessions],
+    async (projectId: string, pageId: string, tabId?: string) =>
+      (await flush()) && sessions.open(projectId, pageId, tabId),
+    [sessions, flush],
   );
-  const flush = useCallback(
-    () => sessions.getSnapshot().active?.flush() ?? Promise.resolve(true),
-    [sessions],
+  const leave = useCallback(
+    async () => (await flush()) && sessions.leave(),
+    [sessions, flush],
   );
-  const leave = useCallback(() => sessions.leave(), [sessions]);
-  const clear = useCallback(() => sessions.clear(), [sessions]);
+  const clear = useCallback(
+    async () => (await flush()) && sessions.clear(),
+    [sessions, flush],
+  );
   const reload = useCallback(
     () => sessions.getSnapshot().active?.reload() ?? Promise.resolve(),
     [sessions],
