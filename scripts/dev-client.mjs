@@ -34,6 +34,7 @@ if (!new URLSearchParams(location.search).has("componentPreview")) {
   if (info.mode === "desktop" && !window.showai)
     badge.textContent = "请打开 Applications/ShowAI.app 使用桌面实时测试版";
   hello();
+  window.addEventListener("load", hello, { once: true });
   import.meta.hot.on("vite:ws:connect", hello);
   import.meta.hot.on("showai:status", (status) => {
     message = status.message;

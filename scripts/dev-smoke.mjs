@@ -21,7 +21,9 @@ import { releaseTestFixtures } from "./test-fixtures.mjs";
 process.env.SHOWAI_LANGUAGE ??= "zh-CN";
 
 const root = resolve(import.meta.dirname, "..");
-const parent = join(root, "output/playwright");
+const parent = resolve(
+  process.env.SHOWAI_DEV_SMOKE_OUTPUT ?? join(root, "output/playwright"),
+);
 await mkdir(parent, { recursive: true });
 const output = await mkdtemp(join(parent, "development-"));
 const fixture = join(output, "checkout");
@@ -29,6 +31,7 @@ await mkdir(fixture);
 for (const path of [
   "src",
   "resources",
+  "plugins/showai",
   "scripts",
   "public",
   "index.html",
@@ -292,9 +295,11 @@ try {
   record("CSS updates through HMR without restarting the backend");
 
   const studio = join(fixture, "src/studio/Studio.tsx");
+  const studioSource = await readFile(studio, "utf8");
+  assert.ok(studioSource.includes('t("newProject")'));
   await writeFile(
     studio,
-    (await readFile(studio, "utf8")).replaceAll("新建项目", "新建项目热更新"),
+    studioSource.replaceAll('t("newProject")', 't("newProject") + "热更新"'),
   );
   await page
     .getByRole("button", { name: "新建项目热更新", exact: true })
@@ -347,38 +352,47 @@ try {
     "all",
   );
   assert.equal(
-    await page
-      .getByRole("button", { name: "新建组件", exact: true })
-      .isEnabled(),
-    false,
+    await page.getByRole("button", { name: "新建组件", exact: true }).count(),
+    0,
   );
   assert.equal(
-    await page
-      .getByRole("button", { name: "导入组件", exact: true })
-      .isEnabled(),
-    false,
+    await page.getByRole("button", { name: "导入组件", exact: true }).count(),
+    0,
   );
   if (mode === "desktop") {
-    await page.waitForFunction(
-      () =>
-        document.querySelectorAll(
-          '.component-category[aria-label="文本组件"] .component-card-preview img',
-        ).length === 3,
-      undefined,
-      { timeout: 60000 },
-    );
+    const textCard = page.locator(".studio-component-card").filter({
+      has: page.getByRole("heading", { name: "富文本", exact: true }),
+    });
+    await textCard.scrollIntoViewIfNeeded();
+    await textCard
+      .locator(".component-card-preview img")
+      .waitFor({ timeout: 60000 });
     assert.equal(await page.locator(".component-preview-error").count(), 0);
     record("desktop component thumbnails render without a packaged index.html");
   }
+  await page.evaluate(
+    (projectId) =>
+      window.showai.invoke("components:createExample", { projectId }),
+    project.id,
+  );
   await page.getByLabel("目录项目", { exact: true }).selectOption(project.id);
-  await page.getByRole("button", { name: "新建组件", exact: true }).click();
+  await page
+    .locator(".studio-component-card")
+    .filter({
+      has: page.getByRole("heading", { name: "计数器", exact: true }),
+    })
+    .click();
   const componentDialog = page.getByRole("dialog", {
     name: "计数器",
     exact: true,
   });
   const counter = componentDialog.frameLocator("iframe");
-  await counter.getByRole("button", { name: "增加", exact: true }).click();
-  assert.equal(await counter.locator("output").innerText(), "1");
+  await counter.locator("output").waitFor();
+  assert.equal(await counter.locator("output").innerText(), "0");
+  assert.equal(
+    await componentDialog.getByLabel("组件源码", { exact: true }).count(),
+    0,
+  );
   await componentDialog
     .getByRole("button", { name: "关闭弹窗", exact: true })
     .click();
@@ -389,7 +403,7 @@ try {
   );
   assert.equal(packages.length, 1);
   record(
-    "project selection enables component creation and the new component preview works",
+    "a real compiled project component appears in the read-only catalog and its preview works",
   );
   if (mode === "browser") {
     const componentSource = await page.evaluate(
@@ -419,7 +433,10 @@ try {
       join(importedDirectory, componentSource.manifest.entry),
       componentSource.source,
     );
-    await page.getByRole("button", { name: "导入组件", exact: true }).click();
+    const importing = page.evaluate(
+      (projectId) => window.showai.invoke("components:import", { projectId }),
+      project.id,
+    );
     const fileDialog = page.getByRole("dialog", {
       name: "选择组件源码目录",
       exact: true,
@@ -434,7 +451,7 @@ try {
     await fileDialog
       .getByRole("button", { name: "选择目录", exact: true })
       .click();
-    await page.getByText("组件已安装", { exact: true }).waitFor();
+    await importing;
     assert.equal(
       (
         await page.evaluate(
@@ -466,7 +483,14 @@ try {
   const editor = page.getByRole("textbox", { name: "文档内容", exact: true });
   await editor.waitFor();
   await editor.fill("Draft survives a backend update.");
-  await page.locator(".studio-save-state.saved").waitFor();
+  await poll(
+    () => cli("pages", "read", created.document.id, "--project", project.id),
+    (value) =>
+      JSON.stringify(value.document.content).includes(
+        "Draft survives a backend update.",
+      ),
+    "editor saves the real page before a backend update",
+  );
   const searchAt = performance.now();
   const search = await page.evaluate(
     (projectId) =>
@@ -536,16 +560,14 @@ try {
     "a real file conflict blocks automatic restart and keeps the draft editable",
   );
   if (mode === "desktop") {
-    child.kill("SIGTERM");
-    await poll(
-      () => logs,
-      (value) => value.includes("开发服务继续运行"),
-      "save-aware desktop shutdown",
+    assert.equal(
+      await page.evaluate(() => window.showai.prepareReload()),
+      false,
     );
     assert.equal(child.exitCode, null);
     assert.equal((await receipt()).backendPid, original.backendPid);
     record(
-      "desktop shutdown with a conflict keeps the app and development service running",
+      "desktop development reload refuses unresolved formal-save conflicts",
     );
   }
   if (info.libraryVersion === 2) {
@@ -574,7 +596,11 @@ try {
       .click();
   } else
     await page.getByRole("button", { name: "保留为副本", exact: true }).click();
-  await page.locator(".studio-save-state.saved").waitFor();
+  await poll(
+    () => cli("pages", "list", "--project", project.id),
+    (value) => value.length === 2,
+    "conflict resolution retains both real pages",
+  );
   const saved = await cli("pages", "list", "--project", project.id);
   assert.equal(saved.length, 2);
   await page.locator("[data-showai-development]").click();
@@ -820,7 +846,11 @@ try {
   child.kill("SIGTERM");
   await exited;
   await writeFile(join(output, "development.log"), logs);
-  const fixturesRetained = await releaseTestFixtures(output, [fixture, home]);
+  const fixturesRetained = await releaseTestFixtures(output, [
+    fixture,
+    home,
+    join(output, "import-source"),
+  ]);
   await writeFile(
     join(output, "result.json"),
     JSON.stringify({ mode, checks, fixturesRetained }, null, 2),

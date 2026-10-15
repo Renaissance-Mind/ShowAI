@@ -9,6 +9,7 @@ import type {
 
 if (process.isMainFrame) {
   const closeListeners = new Set<() => Promise<boolean>>();
+  const reloadListeners = new Set<() => Promise<boolean>>();
   ipcRenderer.on("showai:before-close", async (_event, requestId: string) => {
     let allow = false;
     try {
@@ -89,10 +90,18 @@ if (process.isMainFrame) {
     },
     ...(process.env.SHOWAI_DEV_URL
       ? {
+          onBeforeReload(listener: () => Promise<boolean>) {
+            reloadListeners.add(listener);
+            return () => {
+              reloadListeners.delete(listener);
+            };
+          },
           async prepareReload() {
             return (
               await Promise.all(
-                [...closeListeners].map((listener) => listener()),
+                [...closeListeners, ...reloadListeners].map((listener) =>
+                  listener(),
+                ),
               )
             ).every(Boolean);
           },

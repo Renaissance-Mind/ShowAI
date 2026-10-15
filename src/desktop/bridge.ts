@@ -59,6 +59,7 @@ export interface ShowAIBridge {
   onTabCommand?(listener: (command: TabCommand) => void): () => void;
   onRefreshPage?(listener: () => void): () => void;
   onBeforeClose(listener: () => Promise<boolean>): () => void;
+  onBeforeReload?(listener: () => Promise<boolean>): () => void;
   prepareReload?(): Promise<boolean>;
 }
 

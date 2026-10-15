@@ -507,10 +507,12 @@ async function rebuild(backend = true) {
   backendRequested ||= backend;
   if (rebuilding || stopping) return;
   rebuilding = true;
+  let attemptedBackend = false;
   try {
     while (requested && !stopping) {
       requested = false;
       const restartBackend = backendRequested;
+      attemptedBackend = restartBackend;
       backendRequested = false;
       vite.ws.send("showai:status", {
         message: restartBackend ? "正在构建本地服务" : "正在更新阅读器",
@@ -547,6 +549,7 @@ async function rebuild(backend = true) {
       vite.ws.send("showai:status", { message: "已更新" });
     }
   } catch (error) {
+    if (requested) backendRequested ||= attemptedBackend;
     console.error("ShowAI 开发更新失败：", error);
     vite.ws.send("showai:restart-cancelled", {});
     vite.ws.send("showai:status", {
@@ -554,6 +557,8 @@ async function rebuild(backend = true) {
     });
   } finally {
     rebuilding = false;
+    // A source fix queued during a failed compilation must still be rebuilt.
+    if (requested && !stopping) void rebuild(backendRequested);
   }
 }
 async function stop() {

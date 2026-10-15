@@ -25,6 +25,7 @@ export interface DesktopBridge {
   onTabCommand?(listener: (command: TabCommand) => void): () => void;
   onRefreshPage?(listener: () => void): () => void;
   onBeforeClose(listener: () => Promise<boolean>): () => void;
+  onBeforeReload?(listener: () => Promise<boolean>): () => void;
   setDirty?(dirty: boolean): void;
   prepareReload?(): Promise<boolean>;
 }
@@ -65,6 +66,9 @@ export const desktop = {
   },
   onBeforeClose(listener: () => Promise<boolean>) {
     return window.showai?.onBeforeClose(listener) ?? (() => {});
+  },
+  onBeforeReload(listener: () => Promise<boolean>) {
+    return window.showai?.onBeforeReload?.(listener) ?? (() => {});
   },
 };
 

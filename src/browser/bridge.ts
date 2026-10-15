@@ -17,6 +17,7 @@ export function installBrowserBridge() {
   if (!config || window.showai) return;
   const listeners = new Set<(change: DesktopChange) => void>();
   const closeListeners = new Set<() => Promise<boolean>>();
+  const reloadListeners = new Set<() => Promise<boolean>>();
   let dirty = false;
   // Lets the server skip echoing this tab's own saves back to it.
   const client = crypto.randomUUID();
@@ -184,10 +185,18 @@ export function installBrowserBridge() {
     },
     ...(import.meta.env.DEV
       ? {
+          onBeforeReload(listener: () => Promise<boolean>) {
+            reloadListeners.add(listener);
+            return () => {
+              reloadListeners.delete(listener);
+            };
+          },
           async prepareReload() {
             return (
               await Promise.all(
-                [...closeListeners].map((listener) => listener()),
+                [...closeListeners, ...reloadListeners].map((listener) =>
+                  listener(),
+                ),
               )
             ).every(Boolean);
           },

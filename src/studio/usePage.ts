@@ -110,6 +110,10 @@ export function usePage(home?: string) {
     () => desktop.onBeforeClose(() => sessions.prepareClose()),
     [sessions],
   );
+  useEffect(
+    () => desktop.onBeforeReload(() => sessions.flushAll()),
+    [sessions],
+  );
   useEffect(() => {
     const report = () =>
       window.showai?.setDirty?.(sessions.hasUnretainedChanges());
