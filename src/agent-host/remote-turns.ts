@@ -30,6 +30,9 @@ export class RemoteTurns {
   get running() {
     return [...this.jobs.values()].some((job) => job.turn.state === "running");
   }
+  owns(id: string) {
+    return this.jobs.has(id);
+  }
   private file(id: string) {
     return join(this.root, "remote-turns", id + ".json");
   }

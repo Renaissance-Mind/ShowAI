@@ -95,7 +95,7 @@ if (process.argv.includes("--install-runtime")) {
     detail:
       sandboxResult.code === 0
         ? undefined
-        : sandboxResult.stderr.slice(0, 1000),
+        : sandboxResult.stderr.replaceAll(key, "[redacted]").slice(0, 1000),
   };
   const authorized = (value: string) =>
     value.length === key.length &&

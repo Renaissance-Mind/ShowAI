@@ -33,14 +33,16 @@ export class RemoteMacConnector {
   private error = "";
   private online = false;
   private sharedHome?: string;
-  private remoteTurns = new Set<string>();
+  private originalAfterTurn: AgentHost["options"]["afterTurn"];
   private pendingClients = new Map<string, string>();
   private engine?: RemoteAgentEngine;
   private engineKey = "";
   constructor(
     readonly host: AgentHost,
     readonly home: () => string,
-  ) {}
+  ) {
+    this.originalAfterTurn = host.options.afterTurn;
+  }
   private get path() {
     return join(this.host.options.root, "remote-device.json");
   }
@@ -95,8 +97,6 @@ export class RemoteMacConnector {
         .catch((error) =>
           console.error("Remote task cancellation:", error.message),
         );
-      for (const turn of this.remoteTurns) this.host.cancel(turn);
-      this.remoteTurns.clear();
     }
     this.pendingClients.delete(id);
     return this.status();
@@ -196,7 +196,9 @@ export class RemoteMacConnector {
             });
       this.engine = engine;
       this.engineKey = engineKey;
-      this.host.options.afterTurn = async (projectId) => {
+      this.host.options.afterTurn = async (projectId, turn) => {
+        await this.originalAfterTurn?.(projectId, turn);
+        if (!turn || !engine.turns.owns(turn.id)) return;
         const manager = syncManager(sharedHome);
         const mapping = (await manager.configuration()).projects.find(
           (p) =>
@@ -258,10 +260,6 @@ export class RemoteMacConnector {
               );
             }
             const data = await engine.invoke(input);
-            if (input.action === "agent:send") {
-              const conversation = data as { turns: { id: string }[] };
-              this.remoteTurns.add(conversation.turns.at(-1)!.id);
-            }
             reply = { ok: true, data };
           } catch (error) {
             reply = { ok: false, error: { message: (error as Error).message } };
@@ -316,7 +314,5 @@ export class RemoteMacConnector {
       .catch((error) =>
         console.error("Remote task cancellation:", error.message),
       );
-    for (const id of this.remoteTurns) this.host.cancel(id);
-    this.remoteTurns.clear();
   }
 }

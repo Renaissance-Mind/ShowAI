@@ -111,7 +111,7 @@ export interface AgentHostOptions {
   runtimeRoot?: string;
   oauthRedirectUrl?: string;
   afterAuthorization?: () => Promise<void>;
-  afterTurn?: (projectId: string) => Promise<void>;
+  afterTurn?: (projectId: string, turn?: AgentTurn) => Promise<void>;
   workspaceRoot?: string;
   library: () => FileStore;
   cli: () => { command: string; args: string[]; env: Record<string, string> };
@@ -1124,9 +1124,11 @@ export class AgentHost {
               failure ??= error;
             });
         if (this.options.afterTurn) {
-          await this.options.afterTurn(projectId).catch((error: Error) => {
-            failure ??= error;
-          });
+          await this.options
+            .afterTurn(projectId, turn)
+            .catch((error: Error) => {
+              failure ??= error;
+            });
         }
         turn.finishedAt = new Date().toISOString();
         if (turn.threadId) conversation.threadId = turn.threadId;
