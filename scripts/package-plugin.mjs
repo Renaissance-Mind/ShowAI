@@ -262,20 +262,28 @@ Public components, templates and standalone rendering work without an account. P
 ${app ? `ChatGPT reaches the server through its registered connection \`${app}\`.` : "Hosts connect to the server directly and use OAuth with dynamic client registration."} Read [use-showai](skills/use-showai/SKILL.md) for connection identity, project selection and task routing; the remote rules are in [connection setup](skills/use-showai/references/runtime.md#远程). No credentials enter the bundle.
 `,
   );
-  const claude = JSON.parse(
-    await readFile(join(destination, ".claude-plugin/plugin.json"), "utf8"),
-  );
-  await writeFile(
-    join(destination, ".claude-plugin/plugin.json"),
-    JSON.stringify({ ...claude, name }, null, 2) + "\n",
-  );
-  await writeFile(
-    join(destination, ".mcp.json"),
-    JSON.stringify(
-      { mcpServers: { showai: { type: "http", url: url.href } } },
-      null,
-      2,
-    ) + "\n",
-  );
+  if (app) {
+    // A ChatGPT package reaches the server only through the registered
+    // connection; ChatGPT treats any server it would have to run itself as
+    // desktop-only. The Claude Code manifests do not apply there.
+    await rm(join(destination, ".claude-plugin"), { recursive: true });
+    await rm(join(destination, ".mcp.json"));
+  } else {
+    const claude = JSON.parse(
+      await readFile(join(destination, ".claude-plugin/plugin.json"), "utf8"),
+    );
+    await writeFile(
+      join(destination, ".claude-plugin/plugin.json"),
+      JSON.stringify({ ...claude, name }, null, 2) + "\n",
+    );
+    await writeFile(
+      join(destination, ".mcp.json"),
+      JSON.stringify(
+        { mcpServers: { showai: { type: "http", url: url.href } } },
+        null,
+        2,
+      ) + "\n",
+    );
+  }
   console.log(`Prepared remote plugin from the same skills: ${destination}`);
 }
