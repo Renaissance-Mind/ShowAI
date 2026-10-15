@@ -18,11 +18,17 @@ const args = process.argv.slice(2);
 const settings = {};
 for (let i = 0; i < args.length; i += 2) {
   if (
-    !["--mcp-url", "--out", "--name", "--chatgpt-app"].includes(args[i]) ||
+    ![
+      "--mcp-url",
+      "--out",
+      "--name",
+      "--display-name",
+      "--chatgpt-app",
+    ].includes(args[i]) ||
     !args[i + 1]
   )
     throw new Error(
-      "Usage: package-plugin.mjs [--mcp-url HTTPS_MCP_URL --out NEW_PACKAGE_DIRECTORY [--name PLUGIN_NAME] [--chatgpt-app asdk_app_ID]]",
+      "Usage: package-plugin.mjs [--mcp-url HTTPS_MCP_URL --out NEW_PACKAGE_DIRECTORY [--name PLUGIN_NAME] [--display-name NAME] [--chatgpt-app asdk_app_ID]]",
     );
   settings[args[i]] = args[i + 1];
 }
@@ -209,7 +215,8 @@ if (settings["--mcp-url"] || settings["--out"]) {
   remote.name = name;
   const openai = remote.extensions["com.openai"];
   Object.assign(openai.interface, {
-    displayName: `${openai.interface.displayName} Cloud`,
+    displayName:
+      settings["--display-name"] ?? `${openai.interface.displayName} Cloud`,
     shortDescription: "Create and present ShowAI pages in your cloud projects",
     longDescription:
       "Operate ShowAI through its remote MCP server. Sign in with a ShowAI Server account to read, create and present pages in authorized cloud projects; public components, templates and standalone rendering need no account.",
