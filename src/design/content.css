@@ -89,9 +89,9 @@
   margin: 0 0 17px;
 }
 :is(.document-content, .portable-editor .tiptap, .portable-content)
-  :is(strong, mark):not(:where(.sb-block *, .showai-custom-block *)),
-.sb-text .sb-rich-text :is(strong, mark) {
-  color: var(--reading-accent);
+  mark:not(:where(.sb-block *, .showai-custom-block *)),
+.sb-text .sb-rich-text mark {
+  color: inherit;
   background: linear-gradient(
     transparent 43%,
     var(--showai-highlight-color, var(--reading-highlight)) 43%
@@ -115,28 +115,6 @@
   mark {
   /* Legacy HTML may still carry an inline full-height background. */
   background-color: transparent !important;
-}
-/* Bold + highlight use one inset regardless of the renderer's mark order. */
-:is(
-    .document-content,
-    .portable-editor .tiptap,
-    .portable-content,
-    .sb-rich-text
-  )
-  mark
-  strong {
-  background: none;
-  padding: 0;
-}
-:is(
-    .document-content,
-    .portable-editor .tiptap,
-    .portable-content,
-    .sb-rich-text
-  )
-  strong
-  mark {
-  padding: 0;
 }
 :root[data-theme="dark"]
   :is(
