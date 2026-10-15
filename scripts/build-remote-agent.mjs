@@ -9,6 +9,7 @@ await build({
     cli: "src/agent/cli.ts",
     "index-worker": "src/core/index-worker.ts",
     "content-check": "src/agent/cloud-content-check-entry.ts",
+    "install-runtime": "src/agent-host/runtime-installer-entry.ts",
   },
   outdir: "dist-remote-agent/scripts",
   outExtension: { ".js": ".mjs" },
