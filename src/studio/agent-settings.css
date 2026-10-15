@@ -444,11 +444,10 @@
   color: inherit;
   padding: 4px 8px;
 }
-.assistant-header:has(.agent-execution-picker) {
-  flex-wrap: wrap;
-}
-.assistant-header .agent-execution-picker {
-  flex-basis: 100%;
+.assistant-panel > .agent-execution-picker {
+  flex: 0 0 auto;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
 }
 .agent-device-settings .settings-row {
   justify-content: flex-start;

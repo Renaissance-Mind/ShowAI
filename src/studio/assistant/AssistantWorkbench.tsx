@@ -674,11 +674,11 @@ export default function AssistantWorkbench({
             aria-label={t("panel.resize")}
             onPointerDown={resize}
           />
+          <AgentExecutionPicker
+            projectId={projectId}
+            disabled={!!running || busy}
+          />
           <header className="assistant-header">
-            <AgentExecutionPicker
-              projectId={projectId}
-              disabled={!!running || busy}
-            />
             <select
               aria-label={t("panel.conversations")}
               value={fresh || !conversation ? "" : conversation.id}
