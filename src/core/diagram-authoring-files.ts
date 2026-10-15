@@ -7,7 +7,10 @@ import fireworksGuides from "../../resources/catalog/diagram-authoring/fireworks
 import fonts from "../../resources/catalog/diagram-authoring/font-licenses.json";
 import runner from "./diagram-authoring-runner.js?raw";
 import fontRunner from "./diagram-authoring-fonts.js?raw";
-import type { DiagramFamily } from "../components/blocks/diagrams/contract.mjs";
+import {
+  diagramTemplates,
+  type DiagramFamily,
+} from "../components/blocks/diagrams/contract.mjs";
 
 export function diagramAuthoringFiles(
   family: DiagramFamily,
@@ -36,13 +39,10 @@ export function diagramAuthoringFiles(
     examples: "authoring/examples.json",
     commands:
       family === "archify"
-        ? [
-            {
-              type: "workflow",
-              command:
-                "node authoring/run.mjs --kit authoring/kit.json --type workflow --input input.json --out diagram.html --work-dir NEW_DIRECTORY --result component-data.json",
-            },
-          ]
+        ? diagramTemplates.archify.map((type) => ({
+            type,
+            command: `node authoring/run.mjs --kit authoring/kit.json --type ${type} --input input.json --out diagram.html --work-dir NEW_DIRECTORY --result component-data.json`,
+          }))
         : family === "fireworks-tech-graph"
           ? [
               {

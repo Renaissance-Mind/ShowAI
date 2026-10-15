@@ -283,7 +283,7 @@ export const builtinEnglish: BuiltinDisplayText = {
   archify: {
     name: "Archify interactive diagram",
     description:
-      "Workflow, system architecture, sequence, data flow and lifecycle diagrams in Archify's native HTML/SVG reader, with node search, path exploration, themes and export.",
+      "Ten Archify 3.1 diagram types: workflow, architecture, sequence, data flow, lifecycle, ERD, class/interface, tree, timeline and waterfall, with node search, path exploration, motion controls and export.",
   },
   "diagram-design": {
     name: "Diagram Design graphic",

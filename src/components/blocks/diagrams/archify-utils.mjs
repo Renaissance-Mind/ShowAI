@@ -8,7 +8,10 @@ import {
 
 export { esc };
 
-export function renderDefinitions() {
+// `extra` appends type-owned definitions (the entity renderer's cardinality
+// markers) inside the same <defs>. Callers that pass nothing keep the exact
+// bytes the five longer-standing renderers already emit.
+export function renderDefinitions(extra = '') {
   return `        <!-- Definitions -->
         <defs>
           <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
@@ -25,7 +28,7 @@ export function renderDefinitions() {
           </marker>
           <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
             <path d="M 40 0 L 0 0 0 40" class="c-grid" stroke-width="0.5"/>
-          </pattern>
+          </pattern>${extra}
         </defs>`;
 }
 
@@ -73,10 +76,13 @@ const SIGIL_SHAPE = {
             <path d="m7 5.4 3.6 2.6L7 10.6Z" class="sigil-fill"/>`,
   active: `<path d="M2 8h3l1.5-3.5L9 12l1.6-4H14"/>`,
   waiting: `<path d="M4 2.5h8M4 13.5h8M5 3c0 2.8 2 3.2 3 5-1 1.8-3 2.2-3 5M11 3c0 2.8-2 3.2-3 5 1 1.8 3 2.2 3 5"/>`,
+  decision: `<path d="M8 2.2 13.8 8 8 13.8 2.2 8Z"/>`,
   success: `<circle cx="8" cy="8" r="5.3"/>
             <path d="m5.2 8 1.8 1.8 3.8-4"/>`,
   failure: `<circle cx="8" cy="8" r="5.3"/>
             <path d="m5.7 5.7 4.6 4.6m0-4.6-4.6 4.6"/>`,
+  stop: `<circle cx="8" cy="8" r="5.3"/>
+            <rect x="6.1" y="6.1" width="3.8" height="3.8" rx=".5" class="sigil-fill"/>`,
   neutral: `<rect x="3" y="3" width="10" height="10" rx="2"/>
             <circle cx="8" cy="8" r="1.2" class="sigil-fill"/>`,
 };

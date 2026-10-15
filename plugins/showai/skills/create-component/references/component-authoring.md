@@ -10,7 +10,7 @@
 
 组件需要专门的制作流程时，先读 `catalog_describe(view="guide")` 返回的 `authoringReference`。它沿用该组件的 scope、version、integrity，并指向源码包中的制作索引。documentation.version=2 可用 `authoring.entry` 声明索引文件；索引、完整指南及制作文件随组件版本保存，引用和指南 SHA-256 在保存时校验；索引与指南的完整结构由 guide component 的 authoringIndexSchema、authoringGuideSchema 返回。本地自编说明可省略上游来源和渲染程序字段，不编造仓库或提交。按索引逐份读取共享规范、所选类型或风格指南、输入 Schema 和例子，避免仅替换模板文字后就宣称完成了新的图形内容。
 
-Archify、Diagram Design 和 Fireworks 技术图带有固定上游提交的完整制作指南与原版制作包。读取它们的 `authoring/index.json` 后，按所选流程保存 `authoring/kit.json`、`authoring/run.mjs`、`authoring/diagram-authoring-fonts.mjs` 和 `authoring/font-licenses.json`，使用索引中的实际命令。Archify 的五类 JSON 输入与 Fireworks 的十一种生成风格使用包内原版渲染程序；Diagram Design 和 Fireworks style 8 按原版绘图规范制作 SVG/HTML。将结果的 data 写入组件或导入输出文件；完整原稿保存在 source，presentation 仅控制标题、说明、图例与阅读控件的显示。比较上游结果时使用原版呈现。字体与图标按原规范本地嵌入；字体辅助程序只查询字体家族，内容字形在本地选择。原项目的浏览器检查命令属于参考流程，界面交互仍遵循当前宿主的官方浏览器入口；程序校验与实际视觉检查分别记录。
+Archify、Diagram Design 和 Fireworks 技术图带有固定上游提交的完整制作指南与原版制作包。读取它们的 `authoring/index.json` 后，按所选流程保存 `authoring/kit.json`、`authoring/run.mjs`、`authoring/diagram-authoring-fonts.mjs` 和 `authoring/font-licenses.json`，使用索引中的实际命令。Archify 3.1 的十类 JSON 输入（architecture、workflow、sequence、dataflow、lifecycle、erd、class、tree、timeline、waterfall）与 Fireworks 的十一种生成风格使用包内原版渲染程序；Diagram Design 和 Fireworks style 8 按原版绘图规范制作 SVG/HTML。将结果的 data 写入组件或导入输出文件；完整原稿保存在 source，presentation 仅控制标题、说明、图例与阅读控件的显示。比较上游结果时使用原版呈现。字体与图标按原规范本地嵌入；字体辅助程序只查询字体家族，内容字形在本地选择。原项目的浏览器检查命令属于参考流程，界面交互仍遵循当前宿主的官方浏览器入口；程序校验与实际视觉检查分别记录。
 
 组件有汇总或计算字段时，可在 manifest 声明 `reader: "readData"`，并从入口命名导出同步 `readData(props)`。返回不超过 64 KiB 的 JSON，以稳定 ID 对应源数据并标明派生字段。它与组件使用同一份计算逻辑，在浏览器沙箱中执行；数据读取不访问文件或服务。Agent 的 structured 视图保留原始 props 与 computed.data，image/html 使用同一固定版本。增加或修改读取模型后用 component_save 保存新版本，并验证原始字段与计算值一致。
 

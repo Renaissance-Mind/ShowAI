@@ -130,8 +130,6 @@ const scanned = [
 const exemptFiles: Record<string, string> = {
   "src/portable/cdn-fragment.mjs":
     "standalone reader bootstrap selects bilingual text from the page language before i18n is loaded",
-  "src/components/blocks/diagrams/archify-i18n.mjs":
-    "Archify's own bilingual diagram catalog",
   "src/components/blocks/registry.ts":
     "built-in catalog titles, saved defaults and validation shared with the CLI/MCP",
   "src/components/blocks/g2/catalog.js":

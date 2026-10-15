@@ -1,5 +1,16 @@
 export const diagramTemplates = Object.freeze({
-  archify: ["workflow", "architecture", "sequence", "dataflow", "lifecycle"],
+  archify: [
+    "workflow",
+    "architecture",
+    "sequence",
+    "dataflow",
+    "lifecycle",
+    "erd",
+    "class",
+    "tree",
+    "timeline",
+    "waterfall",
+  ],
   "diagram-design": [
     "architecture",
     "architecture-delta",

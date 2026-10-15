@@ -13,6 +13,11 @@ import {
 } from "../components/custom/authoring";
 import { listDiagramTemplates } from "../components/blocks/diagrams/templates";
 import { CAPACITY } from "../portable/capacity.mjs";
+import {
+  applyTemplate,
+  renderCards,
+} from "../components/blocks/diagrams/archify-utils.mjs";
+import archifyShell from "../components/blocks/diagrams/archify-shell.json";
 
 const execute = promisify(execFile);
 const sha = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -85,7 +90,7 @@ test("same authored HTML or SVG is preserved exactly by the design and style-8 a
   }
 });
 
-test("all five Archify types and eleven Fireworks generation styles match directly executing the unchanged original renderer", async () => {
+test("all ten Archify types and eleven Fireworks generation styles match directly executing the unchanged original renderer", async () => {
   const parent = process.env.SHOWAI_TEST_OUTPUT_DIR ?? tmpdir();
   await mkdir(parent, { recursive: true });
   const root = await mkdtemp(join(parent, "diagram-renderers-"));
@@ -93,6 +98,20 @@ test("all five Archify types and eleven Fireworks generation styles match direct
     for (const family of ["archify", "fireworks-tech-graph"] as const) {
       const source = readBuiltinComponentSource(family),
         kit = JSON.parse(source.files["authoring/kit.json"]);
+      if (family === "archify") {
+        expect(listDiagramTemplates(family).map((item) => item.id)).toEqual([
+          "workflow",
+          "architecture",
+          "sequence",
+          "dataflow",
+          "lifecycle",
+          "erd",
+          "class",
+          "tree",
+          "timeline",
+          "waterfall",
+        ]);
+      }
       const reference = join(root, `${family}-reference`),
         kitPath = join(root, `${family}.json`);
       await writeFile(kitPath, source.files["authoring/kit.json"]);
@@ -164,6 +183,46 @@ test("all five Archify types and eleven Fireworks generation styles match direct
         expect(result.originalSourceSha256).toBe(result.sourceSha256);
         expect(result.input).toEqual(inputData);
         expect(resolve(result.path)).not.toBe(resolve(input));
+        if (family === "archify") {
+          // Built-in samples must retain the original renderer's complete output,
+          // including SVG semantics, motion and the viewer's embedded resources.
+          await writeFile(input, JSON.stringify(template.input));
+          const render = join(
+            reference,
+            kit.root,
+            "renderers",
+            type,
+            `render-${type}.mjs`,
+          );
+          await execute(process.execPath, [render, input, direct]);
+          expect(template.source, `builtin/${type}`).toBe(
+            await readFile(direct, "utf8"),
+          );
+          // The browser replaces filesystem locale loading with bundled JSON.
+          // Check it against the untouched renderer, including locale casing.
+          const localized = structuredClone(template.input) as any;
+          localized.meta.locale = ["zh-CN", "zh-TW", "es", "ko", "zh-cn"][
+            listDiagramTemplates(family).findIndex((item) => item.id === type) %
+              5
+          ];
+          await writeFile(input, JSON.stringify(localized));
+          await execute(process.execPath, [render, input, direct]);
+          const rendered = await readFile(direct, "utf8");
+          const svg = rendered.match(
+            /^[ \t]*<svg\b[^>]*aria-labelledby="archify-diagram-title archify-diagram-description"[\s\S]*?<\/svg>/m,
+          )![0];
+          expect(
+            applyTemplate(archifyShell.html, {
+              title: localized.meta.title,
+              subtitle: localized.meta.subtitle,
+              locale: localized.meta.locale,
+              visualPreset: localized.meta.visual_preset || "classic",
+              svg,
+              cards: renderCards(localized.cards ?? []),
+            }),
+            `locale/${type}`,
+          ).toBe(rendered);
+        }
       }
     }
   } finally {
@@ -187,7 +246,7 @@ test("Agents discover the scoped production files through the normal use guide",
       expect(guide.authoringReference.arguments).toMatchObject({
         id: family,
         scope: "builtin",
-        version: "1.1.0",
+        version: family === "archify" ? "1.2.0" : "1.1.0",
         view: "source",
         file: "authoring/index.json",
       });

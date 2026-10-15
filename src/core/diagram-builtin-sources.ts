@@ -7,6 +7,7 @@ import shell from "../components/blocks/diagrams/archify-shell.json?raw";
 import archify from "../components/blocks/diagrams/archify-samples.json?raw";
 import utils from "../components/blocks/diagrams/archify-utils.mjs?raw";
 import i18n from "../components/blocks/diagrams/archify-i18n.mjs?raw";
+import locales from "../components/blocks/diagrams/archify-locales.json?raw";
 import design from "../components/blocks/diagrams/design-samples.json?raw";
 import fireworks from "../components/blocks/diagrams/fireworks-samples.json?raw";
 import licenses from "../components/blocks/diagrams/licenses.json?raw";
@@ -23,6 +24,7 @@ export const diagramBuiltinSources: Record<string, string> = {
   "diagrams/archify-samples.json": archify,
   "diagrams/archify-utils.mjs": utils,
   "diagrams/archify-i18n.mjs": i18n,
+  "diagrams/archify-locales.json": locales,
   "diagrams/design-samples.json": design,
   "diagrams/fireworks-samples.json": fireworks,
   "diagrams/licenses.json": licenses,

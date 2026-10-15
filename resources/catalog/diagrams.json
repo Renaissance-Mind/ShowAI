@@ -2,8 +2,8 @@
   {
     "kind": "archify",
     "name": "Archify 交互架构图",
-    "version": "1.1.0",
-    "description": "保留 Archify 原生 HTML/SVG 阅读器的工作流、系统架构、时序、数据流和生命周期图，支持节点查找、路径探索、主题与导出。",
+    "version": "1.2.0",
+    "description": "保留 Archify 3.1 原生阅读器的十类交互图：工作流、系统架构、时序、数据流、生命周期、实体关系、类与接口、树形结构、时间线和瀑布追踪，支持节点查找、路径探索、动静切换与导出。",
     "scenarios": [
       "解释系统模块的职责、调用路径和状态变化。",
       "让读者在同一图形中查找节点、追踪路径和切换视觉样式。"
@@ -37,6 +37,11 @@
             "sequence",
             "dataflow",
             "lifecycle",
+            "erd",
+            "class",
+            "tree",
+            "timeline",
+            "waterfall",
             "custom"
           ]
         },
@@ -187,6 +192,81 @@
         "request": "使用 Archify 交互架构图 的生命周期模板组织图形，再替换为任务提供的内容。",
         "data": {
           "template": "lifecycle",
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
+        }
+      },
+      {
+        "name": "实体关系（原版示例）",
+        "request": "使用 Archify 的实体关系模板组织图形，再替换为任务提供的内容。",
+        "data": {
+          "template": "erd",
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
+        }
+      },
+      {
+        "name": "类与接口（原版示例）",
+        "request": "使用 Archify 的类与接口模板组织图形，再替换为任务提供的内容。",
+        "data": {
+          "template": "class",
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
+        }
+      },
+      {
+        "name": "树形结构（原版示例）",
+        "request": "使用 Archify 的树形结构模板组织图形，再替换为任务提供的内容。",
+        "data": {
+          "template": "tree",
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
+        }
+      },
+      {
+        "name": "时间线（原版示例）",
+        "request": "使用 Archify 的时间线模板组织图形，再替换为任务提供的内容。",
+        "data": {
+          "template": "timeline",
+          "height": 560,
+          "presentation": {
+            "title": "outside",
+            "description": "outside",
+            "notes": "hidden",
+            "legend": true,
+            "controls": true
+          }
+        }
+      },
+      {
+        "name": "瀑布追踪（原版示例）",
+        "request": "使用 Archify 的瀑布追踪模板组织图形，再替换为任务提供的内容。",
+        "data": {
+          "template": "waterfall",
           "height": 560,
           "presentation": {
             "title": "outside",

@@ -95,6 +95,11 @@ export async function generateDiagram(options) {
         "sequence",
         "dataflow",
         "lifecycle",
+        "erd",
+        "class",
+        "tree",
+        "timeline",
+        "waterfall",
       ].includes(options.type)
     )
       throw new Error("Choose an Archify diagram type.");
