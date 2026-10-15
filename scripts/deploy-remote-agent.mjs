@@ -22,14 +22,14 @@ async function run(command, args, { cwd = source, allowFailure = false } = {}) {
     child.stdout.on("data", (value) => (stdout += value));
     child.stderr.on("data", (value) => (stderr += value));
     child.on("error", fail);
-    child.on("exit", (code) => {
-      if (code && !allowFailure)
+    child.on("exit", (code, signal) => {
+      if (code !== 0 && !allowFailure)
         fail(
           new Error(
-            `${command} ${args[0]} failed (${code}): ${stderr || stdout}`,
+            `${command} ${args[0]} failed (${signal ?? code}): ${stderr || stdout}`,
           ),
         );
-      else done({ code, stdout, stderr });
+      else done({ code: code ?? 1, stdout, stderr });
     });
   });
 }
