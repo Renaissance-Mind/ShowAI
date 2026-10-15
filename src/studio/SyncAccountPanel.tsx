@@ -8,6 +8,7 @@ import { getLocale } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/sync";
 import common from "../i18n/messages/common";
+import flowMessages from "../i18n/messages/accountFlow";
 
 type Session = {
   digest: string;
@@ -37,6 +38,7 @@ export default function SyncAccountPanel({
   onRemoved: () => void;
 }) {
   const t = useTranslator(messages);
+  const f = useTranslator(flowMessages);
   const tc = useTranslator(common);
   const [sessions, setSessions] = useState<Session[] | null>(null);
   const [passwords, setPasswords] = useState({ current: "", next: "" });
@@ -70,6 +72,14 @@ export default function SyncAccountPanel({
       role="region"
       aria-label={t("accountPanelFor", { name: connection.user.name })}
     >
+      <section className="sync-account-block">
+        <p className="settings-help">{f("signOutHelp")}</p>
+        <button className="settings-button" disabled={busy} onClick={() => void run(async () => {
+          await desktop.invoke("sync:signOut", { connectionId: connection.id });
+          onRemoved();
+          notify(f("signedOut"));
+        })}>{f("signOut")}</button>
+      </section>
       <section className="sync-account-block">
         <h4>{t("account.methods")}</h4>
         <LoginMethods connectionId={connection.id} revision={methodsRevision} />

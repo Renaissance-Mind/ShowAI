@@ -15,6 +15,27 @@ import { plainText } from "../lib/document";
 import { importComponent, resolveDocumentComponents } from "../core/catalog";
 import { syncProtocol } from "./protocol";
 const actions: (() => Promise<unknown>)[] = [];
+
+it("signing out preserves project identity, drafts and device visibility when signing back in", async () => {
+  const { alice, server, project, page } = await fixture();
+  await alice.manager.setDefault(alice.connection.id);
+  await alice.manager.setProjectVisibility(project.id, false);
+  await alice.manager.signOut(alice.connection.id);
+  const paused = await alice.manager.status();
+  expect(paused.defaultConnectionId).toBeNull();
+  expect(paused.connections[0].signedOut).toBe(true);
+  expect(paused.hiddenProjectIds).toContain(project.id);
+  expect(paused.projects[0].projectId).toBe(project.id);
+  expect((await alice.store.readPage(project.id, page.document.id)).document.title).toBe("Original page");
+  const signedIn = await alice.manager.connect({ url: server.url, account: alice.connection.user.name, password: "test-password", continue: true });
+  expect(signedIn.id).toBe(alice.connection.id);
+  await alice.manager.run(project.id);
+  const resumed = await alice.manager.status();
+  expect(resumed.projects).toHaveLength(1);
+  expect(resumed.projects[0].status).toBe("synced");
+  expect(resumed.connections[0].signedOut).toBeUndefined();
+  expect(resumed.hiddenProjectIds).toContain(project.id);
+});
 vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
 afterEach(async () => {
   for (const action of actions.splice(0).reverse()) await action();

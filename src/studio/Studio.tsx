@@ -1,3 +1,5 @@
+import type { ProjectSyncRequest } from "./SyncSettings";
+import accountFlowMessages from "../i18n/messages/accountFlow";
 import { coalescedTask } from "../lib/coalesced-task";
 import {
   emptyNavigationScope,
@@ -251,6 +253,10 @@ function Scope({ value }: { value: string }) {
 }
 
 export default function Studio() {
+  const receivingInvite = useRef(false);
+  const [syncNavigationKey, setSyncNavigationKey] = useState(0);
+  const accountFlow = useTranslator(accountFlowMessages);
+  const [syncRequest, setSyncRequest] = useState<ProjectSyncRequest>();
   const t = useTranslator(studioMessages);
   const tc = useTranslator(commonMessages);
   const ta = useTranslator(assistantMessages);
@@ -365,6 +371,26 @@ export default function Studio() {
   const [settingsSection, setSettingsSection] = useState<SettingsSection>(() =>
     new URLSearchParams(location.search).has("invite") ? "sync" : "general",
   );
+  useEffect(() => {
+    const host = window as Window & { showaiPendingInvite?: string };
+    const receive = (event?: Event) => {
+      const link = event instanceof CustomEvent ? event.detail : host.showaiPendingInvite;
+      if (typeof link !== "string" || !link || receivingInvite.current) return;
+      receivingInvite.current = true;
+      void (async () => {
+        if (!(await page.flush())) return;
+        localStorage.setItem("showai:pending-invitation", link);
+        delete host.showaiPendingInvite;
+        setSyncRequest(undefined);
+        setSettingsSection("sync");
+        setSyncNavigationKey((value) => value + 1);
+        await navigate("settings");
+      })().catch(report).finally(() => { receivingInvite.current = false; });
+    };
+    window.addEventListener("showai:invitation", receive);
+    receive();
+    return () => window.removeEventListener("showai:invitation", receive);
+  });
   const [templates, setTemplates] = useState<TemplateMetadata[]>([]);
   const [showTemplateVersions, setShowTemplateVersions] = useState(false);
   const [templateType, setTemplateType] = useState<TemplateType>("all");
@@ -2845,7 +2871,9 @@ export default function Studio() {
                     onClick={action(() => page.recoverDraft(item.id))}
                   >
                     {t("restoreDraft", {
-                      time: new Date(item.savedAt).toLocaleString(getLocale()),
+                        time: new Date(item.savedAt).toLocaleString(
+                          getLocale(),
+                        ),
                     })}
                   </button>
                 ))}
@@ -2875,7 +2903,13 @@ export default function Studio() {
               )}
               {view === "settings" ? (
                 <SettingsPanel
+                  key={syncNavigationKey}
                   section={settingsSection}
+                    syncRequest={syncRequest}
+                    onOpenProject={async (id) => {
+                      await refresh();
+                      await openProject(id);
+                    }}
                   info={info}
                   dark={dark}
                   onDarkChange={setDark}
@@ -2923,7 +2957,10 @@ export default function Studio() {
                       pages={recent}
                       query={query}
                       onOpen={(item, event) =>
-                        openTargetClick(pageTarget(item, item.projectId), event)
+                          openTargetClick(
+                            pageTarget(item, item.projectId),
+                            event,
+                          )
                       }
                       onMenu={(item, anchor, point) =>
                         showMenu(
@@ -3287,6 +3324,44 @@ export default function Studio() {
                     ...projectOrderMenuItems(contextMenu.target),
                     ...(contextMenu.target.kind === "project"
                       ? [
+                          ...(["sync", "share"] as const).map((intent) => ({
+                            label: accountFlow(
+                              intent === "share" ? "share" : "useOnDevices",
+                            ),
+                            icon:
+                              intent === "share" ? (
+                                <Globe size={15} />
+                              ) : (
+                                <Upload size={15} />
+                              ),
+                            onSelect: action(async () => {
+                              const projectId = contextMenu.target.projectId;
+                              if (!(await page.flush())) return;
+                              setSyncRequest({
+                                projectId,
+                                intent,
+                                key: Date.now(),
+                              });
+                              setSettingsSection("sync");
+                              await navigate("settings");
+                            }),
+                          })),
+                          {
+                            label: accountFlow("hide"),
+                            icon: <FolderMinus size={15} />,
+                            onSelect: action(async () => {
+                              if (!(await page.flush())) return;
+                              await desktop.invoke("sync:projectVisibility", {
+                                projectId: contextMenu.target.projectId,
+                                visible: false,
+                              });
+                              if (
+                                selectedProject === contextMenu.target.projectId
+                              )
+                                await navigate("projects");
+                              await refresh();
+                            }),
+                          },
                           {
                             label: t("moveToGroup"),
                             icon: <Folder size={15} />,
@@ -3911,6 +3986,28 @@ function ProjectDialog({
 }) {
   const t = useTranslator(studioMessages);
   const tc = useTranslator(commonMessages);
+  const f = useTranslator(accountFlowMessages);
+  const [locationName, setLocationName] = useState("");
+  const [locationError, setLocationError] = useState("");
+  useEffect(() => {
+    if (project) return;
+    void desktop
+      .invoke<{
+        defaultConnectionId: string | null;
+        connections: { id: string; name: string; user: { name: string } }[];
+      }>("sync:status")
+      .then((status) => {
+        const connection = status.connections.find(
+          (item) => item.id === status.defaultConnectionId,
+        );
+        setLocationName(
+          connection
+            ? `${connection.name} · ${connection.user.name}`
+            : f("localLocation"),
+        );
+      })
+      .catch((reason) => setLocationError(errorMessage(reason)));
+  }, [project]);
   return (
     <DirectoryDialog
       title={project ? t("projectSettings") : t("newProjectTitle")}
@@ -3923,7 +4020,14 @@ function ProjectDialog({
       initialIcon={project?.icon}
       onClose={onClose}
       onSave={onSave}
-    />
+    >
+      {!project && (
+        <p className={locationError ? "studio-form-error" : "settings-help"}>
+          {locationError ||
+            (locationName && f("savingTo", { name: locationName }))}
+        </p>
+      )}
+    </DirectoryDialog>
   );
 }
 
@@ -3965,7 +4069,9 @@ function DirectoryDialog({
   initialIcon = "",
   onClose,
   onSave,
+  children,
 }: {
+  children?: ReactNode;
   title: string;
   inputLabel: string;
   placeholder?: string;
@@ -4019,6 +4125,7 @@ function DirectoryDialog({
             <PageIcon value={icon} size={28} fallback={<Folder size={28} />} />
             <span>{t("setIconButton")}</span>
           </button>
+          {children}
           {error && (
             <p className="studio-form-error" role="alert">
               {error}

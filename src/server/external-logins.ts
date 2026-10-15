@@ -83,6 +83,7 @@ interface FlowSecret {
   redirectUri: string;
   device: string;
   registrationKey?: string;
+  invite?: string;
   link?: AccountSession;
   email?: string;
   codeDigest?: string;
@@ -227,7 +228,9 @@ export class ExternalLogins {
     this.cipher = new AccountCipher(options.vaultKey);
     for (const key of [options.googleRelayKey, options.googleRelay?.key])
       if (key !== undefined && !/^[a-f0-9]{64}$/.test(key))
-        throw new Error("Google login relay keys require 64 lowercase hexadecimal characters.");
+        throw new Error(
+          "Google login relay keys require 64 lowercase hexadecimal characters.",
+        );
   }
   get available() {
     return this.cipher.enabled
@@ -242,11 +245,12 @@ export class ExternalLogins {
     return `showai-login:${id}`;
   }
   async relayGoogle(input: Record<string, unknown>, source: string) {
-    if (
-      !this.options.googleLogin?.clientSecret ||
-      this.options.googleRelay
-    )
-      throw new SyncError(503, "LOGIN_NOT_CONFIGURED", "Google 登录转发未启用。");
+    if (!this.options.googleLogin?.clientSecret || this.options.googleRelay)
+      throw new SyncError(
+        503,
+        "LOGIN_NOT_CONFIGURED",
+        "Google 登录转发未启用。",
+      );
     await rateLimit(this.db, {
       scope: "external-login:google-relay",
       identity: source,
@@ -262,7 +266,11 @@ export class ExternalLogins {
       input.clientId !== this.options.googleLogin.clientId ||
       !this.options.googleRelayRedirects?.includes(redirectUri)
     )
-      throw new SyncError(403, "INVALID_LOGIN_TARGET", "未允许此登录回调地址。");
+      throw new SyncError(
+        403,
+        "INVALID_LOGIN_TARGET",
+        "未允许此登录回调地址。",
+      );
     return providerJson("https://oauth2.googleapis.com/token", {
       method: "POST",
       body: new URLSearchParams({
@@ -275,13 +283,23 @@ export class ExternalLogins {
       }),
     });
   }
-  private googleRelay(operation: string, parameters: Record<string, string> = {}) {
+  private googleRelay(
+    operation: string,
+    parameters: Record<string, string> = {},
+  ) {
     const relay = this.options.googleRelay!;
     if (new URL(relay.url).protocol !== "https:")
-      throw new SyncError(400, "INVALID_LOGIN_TARGET", "Google 登录转发需要 HTTPS。");
+      throw new SyncError(
+        400,
+        "INVALID_LOGIN_TARGET",
+        "Google 登录转发需要 HTTPS。",
+      );
     return providerJson(serverEndpoint(relay.url, "/api/auth/google-relay"), {
       method: "POST",
-      headers: { authorization: `Bearer ${relay.key}`, "content-type": "application/json" },
+      headers: {
+        authorization: `Bearer ${relay.key}`,
+        "content-type": "application/json",
+      },
       body: JSON.stringify({ operation, ...parameters }),
     });
   }
@@ -325,8 +343,13 @@ export class ExternalLogins {
           ? plainText(input.device, 200)
           : "ShowAI",
       link,
+      invite:
+        typeof input.invite === "string" && input.invite
+          ? plainText(input.invite, 200)
+          : undefined,
       registrationKey:
-        typeof input.registrationKey === "string" && input.registrationKey !== ""
+        typeof input.registrationKey === "string" &&
+        input.registrationKey !== ""
           ? plainText(input.registrationKey, 200)
           : undefined,
     };
@@ -416,6 +439,19 @@ export class ExternalLogins {
     return { id, pollSecret, url, provider, expiresAt };
   }
   private async assertRegistration(flow: FlowSecret) {
+    if (flow.invite) {
+      const available = await this.db.all(
+        "SELECT 1 FROM invites i WHERE i.digest=? AND i.revoked=0 AND i.expires_at>? AND i.target_name IS NULL AND (i.max_uses IS NULL OR (SELECT COUNT(*) FROM invite_acceptances a WHERE a.digest=i.digest)<i.max_uses)",
+        [await hash(flow.invite), new Date().toISOString()],
+      );
+      if (!available.length)
+        throw new SyncError(
+          410,
+          "INVITE_UNAVAILABLE",
+          "邀请已失效、已领满，或需要使用指定账号登录。",
+        );
+      return;
+    }
     if (
       this.options.registrationMode !== "open" &&
       (!this.options.registrationKey ||
@@ -500,9 +536,12 @@ export class ExternalLogins {
       await this.db.all("SELECT 1 FROM users WHERE name=?", [baseName])
     ).length;
     const name = exists ? `${baseName} · ${id.slice(0, 8)}` : baseName;
+    const invitation = flow.invite ? await hash(flow.invite) : null;
+    const availableInvite =
+      "SELECT 1 FROM invites i WHERE i.digest=? AND i.revoked=0 AND i.expires_at>? AND i.target_name IS NULL AND (i.max_uses IS NULL OR (SELECT COUNT(*) FROM invite_acceptances a WHERE a.digest=i.digest)<i.max_uses)";
     await this.db.batch([
       {
-        sql: "INSERT OR IGNORE INTO users(id,name,password_salt,password_hash,created_at) SELECT ?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM login_identities WHERE provider=? AND subject=?) AND (SELECT COUNT(*) FROM users)<?",
+        sql: `INSERT OR IGNORE INTO users(id,name,password_salt,password_hash,created_at) SELECT ?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM login_identities WHERE provider=? AND subject=?) AND (SELECT COUNT(*) FROM users)<?${invitation ? ` AND EXISTS(${availableInvite})` : ""}`,
         values: [
           id,
           name,
@@ -512,8 +551,21 @@ export class ExternalLogins {
           provider,
           identity.subject,
           this.options.accountLimit ?? 10000,
+          ...(invitation ? [invitation, at] : []),
         ],
       },
+      ...(invitation
+        ? [
+            {
+              sql: "INSERT INTO members(project_id,user_id,role) SELECT i.project_id,?,i.role FROM invites i WHERE i.digest=? AND EXISTS(SELECT 1 FROM users WHERE id=?)",
+              values: [id, invitation, id],
+            },
+            {
+              sql: "INSERT INTO invite_acceptances(digest,user_id) SELECT ?,? WHERE EXISTS(SELECT 1 FROM users WHERE id=?)",
+              values: [invitation, id, id],
+            },
+          ]
+        : []),
       {
         sql: "INSERT OR IGNORE INTO login_identities(provider,subject,user_id,email,created_at) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM users WHERE id=?)",
         values: [

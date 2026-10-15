@@ -13,11 +13,15 @@ type Flow = {
 export default function ServiceLogin({
   url,
   registrationKey,
+  invite,
+  onMethods,
   connectionId,
   onConnected,
 }: {
   url: string;
   registrationKey: string;
+  invite?: string;
+  onMethods?: (methods: string[]) => void;
   connectionId?: string;
   onConnected: (id: string) => Promise<void>;
 }) {
@@ -39,17 +43,24 @@ export default function ServiceLogin({
       void desktop
         .invoke<{ auth: string[] }>("sync:serverInfo", { url })
         .then((info) => {
-          if (!cancelled) setMethods(info.auth);
+          if (!cancelled) {
+            setMethods(info.auth);
+            onMethods?.(info.auth);
+          }
         })
-        .catch(() => {
-          if (!cancelled) setMethods([]);
+        .catch((reason) => {
+          if (!cancelled) {
+            setMethods([]);
+            setError(errorMessage(reason));
+            onMethods?.([]);
+          }
         });
     }, 400);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [url]);
+  }, [url, invite, connectionId]);
   async function finish(
     current: Flow,
     entered?: { code?: string; completionCode?: string },
@@ -112,6 +123,7 @@ export default function ServiceLogin({
           provider,
           email,
           registrationKey,
+          invite,
           connectionId,
         }),
       );
@@ -122,7 +134,11 @@ export default function ServiceLogin({
     }
   }
   if (!methods.some((method) => ["github", "google", "email"].includes(method)))
-    return null;
+    return error ? (
+      <p role="alert" className="sync-error">
+        {error}
+      </p>
+    ) : null;
   return (
     <div className="sync-oauth">
       {connectionId ? (

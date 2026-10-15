@@ -1,3 +1,4 @@
+import { invitationPage } from "./invitation-page";
 import { CAPACITY } from "../portable/capacity.mjs";
 import {
   canonical,
@@ -368,6 +369,7 @@ export function createSyncServer(options: ServerOptions) {
         capabilities: [
           "account-security-v1",
           "invite-controls-v1",
+          "account-continue-v1",
           "current-state-v1",
           "object-manifests-v1",
           "storage-quotas-v1",
@@ -414,6 +416,27 @@ export function createSyncServer(options: ServerOptions) {
       await publicLimitsAccount("login", input.name, source);
       return json(await session(await loginAccount(db, input), input.device));
     }
+    if (path === "/api/auth/continue" && method === "POST") {
+      await publicLimits(db, "login", source);
+      const input = await body(request);
+      await publicLimitsAccount("login", input.name, source);
+      const name = plainText(input.name, 100);
+      const exists = (await db.all("SELECT 1 FROM users WHERE name=?", [name]))
+        .length;
+      if (exists)
+        return json(await session(await loginAccount(db, input), input.device));
+      await publicLimits(
+        db,
+        "register",
+        source,
+        undefined,
+        options.registrationLimit,
+      );
+      return json(
+        await session(await registerAccount(db, input, options), input.device),
+        201,
+      );
+    }
     if (path === "/api/auth/exchange" && method === "POST")
       return json(await accounts.exchange(await body(request), source));
     if (path === "/api/auth/google-relay" && method === "POST") {
@@ -447,15 +470,12 @@ export function createSyncServer(options: ServerOptions) {
     if (loginCallback && method === "GET")
       return logins.callback(loginCallback[1], url);
     if (path === "/join" && method === "GET") {
-      return new Response(
-        `<!doctype html><html lang="zh"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>加入 ShowAI 项目</title><body style="font-family:system-ui;max-width:560px;margin:15vh auto;padding:24px"><h1>加入 ShowAI 项目</h1><p>打开 ShowAI，确认项目与权限后，使用你在此服务器上的账号加入。</p><a id="open" style="display:inline-block;padding:12px 18px;background:#343b36;color:white;border-radius:8px;text-decoration:none">在 ShowAI 中打开</a><p>也可以在「设置 → 服务器与同步」中粘贴当前邀请链接。</p><script>const invite=new URLSearchParams(location.hash.slice(1)).get('invite');if(invite&&/^[a-f0-9]{64}$/.test(invite)){const target=new URL('showai://join');target.searchParams.set('server',${JSON.stringify(publicBase)}??location.origin);target.searchParams.set('invite',invite);const serverId=new URLSearchParams(location.hash.slice(1)).get('server');if(serverId)target.searchParams.set('serverId',serverId);document.getElementById('open').href=target.href;}else{document.getElementById('open').textContent='邀请链接无效';}</script></body></html>`,
-        {
+      return new Response(invitationPage(publicBase ?? url.origin + basePath), {
           headers: {
             "content-type": "text/html; charset=utf-8",
             "referrer-policy": "no-referrer",
           },
-        },
-      );
+      });
     }
     if (path === "/api/invites/preview" && method === "POST") {
       await publicLimits(db, "preview", source);
@@ -470,7 +490,7 @@ export function createSyncServer(options: ServerOptions) {
           expires_at: string;
           name: string;
         }>(
-          "SELECT i.project_id,i.role,i.expires_at,i.max_uses,i.target_name,p.name FROM invites i JOIN projects p ON p.id=i.project_id WHERE i.digest=? AND i.revoked=0 AND i.expires_at>? AND (i.max_uses IS NULL OR (SELECT COUNT(*) FROM invite_acceptances a WHERE a.digest=i.digest)<i.max_uses OR EXISTS(SELECT 1 FROM invite_acceptances a JOIN members m ON m.project_id=i.project_id AND m.user_id=a.user_id WHERE a.digest=i.digest AND a.user_id=?))",
+          "SELECT i.project_id,i.role,i.expires_at,i.max_uses,i.target_name,p.name,u.name AS invitedBy FROM invites i JOIN projects p ON p.id=i.project_id JOIN users u ON u.id=i.created_by WHERE i.digest=? AND i.revoked=0 AND i.expires_at>? AND (i.max_uses IS NULL OR (SELECT COUNT(*) FROM invite_acceptances a WHERE a.digest=i.digest)<i.max_uses OR EXISTS(SELECT 1 FROM members m WHERE m.project_id=i.project_id AND m.user_id=?))",
           [
             await hash(plainText(input.invite, 200)),
             new Date().toISOString(),
@@ -486,6 +506,7 @@ export function createSyncServer(options: ServerOptions) {
         );
       return json({
         ...invitation,
+        joined: !!previewUser && (await db.all("SELECT 1 FROM members WHERE project_id=? AND user_id=?", [invitation.project_id, previewUser.id])).length > 0,
         serverId: await serverId(),
         serverName: options.name ?? "ShowAI Server",
       });
@@ -898,10 +919,43 @@ export function createSyncServer(options: ServerOptions) {
     }
     if (resource === "invites" && method === "GET") {
       await projectFor(user.id, projectId, "admin");
-      return json(
-        await db.all(
+      const invitations = await db.all<{
+        digest: string;
+        revoked: number;
+        expires_at: string;
+      }>(
           "SELECT i.digest,i.role,i.expires_at,i.max_uses,i.target_name,i.accepted_by,i.revoked,(SELECT COUNT(*) FROM invite_acceptances a WHERE a.digest=i.digest) AS accepted_count FROM invites i WHERE i.project_id=? ORDER BY i.expires_at DESC",
           [projectId],
+      );
+      return json(
+        await Promise.all(
+          invitations.map(async (invitation) => {
+            if (
+              !accounts.cipher.enabled ||
+              invitation.revoked ||
+              invitation.expires_at <= new Date().toISOString()
+            )
+              return invitation;
+            const saved = (
+              await db.all<{ value: string }>(
+                "SELECT value FROM settings WHERE key=?",
+                [`invite-link:${invitation.digest}`],
+              )
+            )[0];
+            if (!saved) return invitation;
+            const secret = await accounts.cipher.open<string>(
+              `invite:${projectId}:${invitation.digest}`,
+              saved.value,
+            );
+            return {
+              ...invitation,
+              url: invitationUrl(
+                publicBase ?? url.origin + basePath,
+                secret,
+                await serverId(),
+              ).toString(),
+            };
+          }),
         ),
       );
     }
@@ -912,6 +966,7 @@ export function createSyncServer(options: ServerOptions) {
         user,
         projectId,
         await body(request),
+        accounts.cipher,
       );
       const link = invitationUrl(
         publicBase ?? url.origin,

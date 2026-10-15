@@ -23,7 +23,7 @@ import messages from "../i18n/messages/settings";
 import "./settings.css";
 import LibrarySpace from "./LibrarySpace";
 import IconViewer from "./IconViewer";
-import SyncSettings from "./SyncSettings";
+import SyncSettings, { type ProjectSyncRequest } from "./SyncSettings";
 import AgentSettings from "./AgentSettings";
 
 const sections = [
@@ -118,6 +118,8 @@ function ThemePreview({ theme }: { theme: "light" | "dark" }) {
 }
 
 export function SettingsPanel({
+  syncRequest,
+  onOpenProject,
   section,
   info,
   dark,
@@ -127,6 +129,8 @@ export function SettingsPanel({
   onCopyConfig,
   onMigrate,
 }: {
+  syncRequest?: ProjectSyncRequest;
+  onOpenProject?: (projectId: string) => Promise<void>;
   section: SettingsSection;
   info: DesktopInfo | null;
   dark: boolean;
@@ -145,7 +149,9 @@ export function SettingsPanel({
         <h2>{t(current.label)}</h2>
       </header>
       {section === "icons" && <IconViewer />}
-      {section === "sync" && <SyncSettings />}
+      {section === "sync" && (
+        <SyncSettings request={syncRequest} onOpenProject={onOpenProject} />
+      )}
       {section === "general" && (
         <section
           className="settings-group"

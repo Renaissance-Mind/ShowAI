@@ -10,6 +10,7 @@ import {
 import type { MetadataStore } from "./storage";
 import type { AuthUser } from "./accounts";
 import { audit, liveSession } from "./security";
+import type { AccountCipher } from "./account-crypto";
 interface Invite {
   project_id: string;
   role: ProjectRole;
@@ -24,6 +25,7 @@ export async function createInvitation(
   user: AuthUser & { session_digest: string },
   projectId: string,
   input: Record<string, unknown>,
+  cipher?: AccountCipher,
 ) {
   const maxUses = input.maxUses === null ? null : Number(input.maxUses ?? 25);
   const days = Number(input.days ?? 7);
@@ -56,6 +58,7 @@ export async function createInvitation(
     expiresAt = new Date(Date.now() + days * 86400_000).toISOString(),
     inviteRole = role(input.role);
   const permission = liveSession(user);
+  const encrypted = cipher?.enabled ? await cipher.seal(`invite:${projectId}:${digest}`, invite) : null;
   const result = await db.batch([
     {
       sql: `INSERT INTO invites(digest,project_id,role,created_by,expires_at,max_uses,target_name) SELECT ?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM members WHERE project_id=? AND user_id=? AND role='admin') AND EXISTS(${permission.sql})`,
@@ -72,6 +75,7 @@ export async function createInvitation(
         ...permission.values!,
       ],
     },
+    ...(encrypted ? [{ sql: "INSERT INTO settings(key,value) SELECT ?,? WHERE EXISTS(SELECT 1 FROM invites WHERE digest=?)", values: [`invite-link:${digest}`, encrypted, digest] }] : []),
     audit(
       "invite.create",
       user.id,
@@ -117,6 +121,14 @@ export async function acceptInvitation(
         [digest, user.id],
       )
     ).length > 0;
+  const member =
+    (
+      await db.all("SELECT 1 FROM members WHERE project_id=? AND user_id=?", [
+        invitation.project_id,
+        user.id,
+      ])
+    ).length > 0;
+  if (member) return invitation.project_id;
   if (existing) {
     if (
       !(

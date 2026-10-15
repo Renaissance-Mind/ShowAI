@@ -1290,3 +1290,21 @@
     width: 100px;
   }
 }
+.sync-management.sync-management-focused {
+  grid-template-columns: minmax(0, 1fr);
+}
+.sync-project-search {
+  width: 100%;
+  padding: 9px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: inherit;
+}
+.sync-upload-dialog .sync-field {
+  margin: 18px 0;
+}
+.sync-connect .sync-account-disclosure {
+  margin: 16px 0;
+}

@@ -19,9 +19,11 @@ import { getLocale, type MessageKey } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/sync";
 import common from "../i18n/messages/common";
+import flowMessages from "../i18n/messages/accountFlow";
 
 export type SyncMember = { id: string; name: string; role: ProjectRole };
 export type SyncInvite = {
+  url?: string;
   digest: string;
   role: ProjectRole;
   expires_at: string;
@@ -57,6 +59,7 @@ function withStrong(template: string, name: string) {
 }
 
 export default function SyncDashboard({
+  focused = false,
   connection,
   projects,
   selectedId,
@@ -77,6 +80,7 @@ export default function SyncDashboard({
   onRevoke,
   onArchive,
 }: {
+  focused?: boolean;
   connection?: Omit<ServerConnection, "token">;
   projects: SyncProject[];
   selectedId: string;
@@ -92,12 +96,20 @@ export default function SyncDashboard({
   onRole: (member: SyncMember, role: ProjectRole) => void;
   onRemove: (member: SyncMember, revokeInvites: boolean) => Promise<boolean>;
   onInviteRole: (role: ProjectRole) => void;
-  onInvite: (options: { maxUses: number | null; targetName?: string }) => void;
-  onCopy: () => Promise<boolean>;
+  onInvite: (options: {
+    maxUses: number | null;
+    targetName?: string;
+    role?: ProjectRole;
+    days?: number;
+  }) => void;
+  onCopy: (url?: string) => Promise<boolean>;
   onRevoke: (digest: string) => void;
   onArchive: (archived: boolean) => Promise<boolean>;
 }) {
   const t = useTranslator(messages);
+  const f = useTranslator(flowMessages);
+  const [advanced, setAdvanced] = useState(false);
+  const [days, setDays] = useState("7");
   const tc = useTranslator(common);
   const expiry = (date: string) =>
     new Date(date).toLocaleString(getLocale(), {
@@ -128,7 +140,7 @@ export default function SyncDashboard({
   const confirmationTrigger = useRef<HTMLButtonElement | null>(null);
   const project = projects.find((item) => item.id === selectedId);
   const managed = projects.filter((item) => item.role === "admin");
-  const pendingInvites = invites.filter((item) => !item.revoked);
+  const pendingInvites = invites;
   const admins = members.filter((member) => member.role === "admin").length;
   useEffect(() => {
     setRemove(null);
@@ -152,8 +164,14 @@ export default function SyncDashboard({
   }
 
   return (
-    <div className="sync-management">
-      <aside className="sync-management-sidebar" aria-label={t("managedProjects")}>
+    <div
+      className={`sync-management ${focused ? "sync-management-focused" : ""}`}
+    >
+      {!focused && (
+        <aside
+          className="sync-management-sidebar"
+          aria-label={t("managedProjects")}
+        >
         <div className="sync-server-identity">
           <Database size={18} aria-hidden="true" />
           <div>
@@ -194,7 +212,9 @@ export default function SyncDashboard({
         <nav className="sync-managed-projects" aria-label={t("projectList")}>
           {managed
             .filter((item) =>
-              item.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
+                item.name
+                  .toLocaleLowerCase()
+                  .includes(query.toLocaleLowerCase()),
             )
             .map((item) => (
               <button
@@ -215,10 +235,10 @@ export default function SyncDashboard({
           )}
           {query &&
             !managed.some((item) =>
-              item.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
-            ) && (
-              <p className="sync-empty-note">{t("noMatchingProjects")}</p>
-            )}
+                item.name
+                  .toLocaleLowerCase()
+                  .includes(query.toLocaleLowerCase()),
+              ) && <p className="sync-empty-note">{t("noMatchingProjects")}</p>}
         </nav>
         <div className={`sync-create-project ${showCreate ? "is-open" : ""}`}>
           {showCreate ? (
@@ -275,6 +295,7 @@ export default function SyncDashboard({
           )}
         </div>
       </aside>
+      )}
       <main ref={content} className="sync-management-content">
         {project ? (
           <>
@@ -287,6 +308,7 @@ export default function SyncDashboard({
                 )}
               </h2>
               <p>{t("adminOverview", { count: members.length })}</p>
+              <p>{f("scope")}</p>
             </header>
             <section
               className="sync-management-section"
@@ -453,9 +475,32 @@ export default function SyncDashboard({
                       onInviteRole(event.target.value as ProjectRole)
                     }
                   >
-                    {roleOptions}
+                    {roleOptions.filter((item) => advanced || inviteRole === "admin" || item.key !== "admin")}
                   </select>
                 </label>
+                <button
+                  className="settings-button sync-primary"
+                  disabled={busy}
+                  onClick={() =>
+                    onInvite({
+                      maxUses:
+                        inviteUses === "unlimited" ? null : Number(inviteUses),
+                      days: Number(days),
+                      ...(inviteTarget.trim()
+                        ? { targetName: inviteTarget.trim() }
+                        : {}),
+                    })
+                  }
+                >
+                  {f("createCopy")}
+                </button>
+              </div>
+              <details
+                className="sync-account-disclosure"
+                open={advanced}
+                onToggle={(event) => setAdvanced(event.currentTarget.open)}
+              >
+                <summary>{f("inviteAdvanced")}</summary>
                 {controlledInvites && (
                   <>
                     <label>
@@ -491,22 +536,21 @@ export default function SyncDashboard({
                     </label>
                   </>
                 )}
-                <button
-                  className="settings-button sync-primary"
-                  disabled={busy}
-                  onClick={() =>
-                    onInvite({
-                      maxUses:
-                        inviteUses === "unlimited" ? null : Number(inviteUses),
-                      ...(inviteTarget.trim()
-                        ? { targetName: inviteTarget.trim() }
-                        : {}),
-                    })
-                  }
-                >
-                  {t("createInviteLink")}
-                </button>
-              </div>
+                <label className="sync-field">
+                  <span>{f("days")}</span>
+                  <select
+                    value={days}
+                    disabled={busy}
+                    onChange={(event) => setDays(event.target.value)}
+                  >
+                    {[1, 7, 14, 30].map((count) => (
+                      <option key={count} value={count}>
+                        {f("dayCount", { count })}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </details>
               <p className="sync-permission-note">
                 {t(permissions[inviteRole])}
               </p>
@@ -553,6 +597,10 @@ export default function SyncDashboard({
                   {pendingInvites.map((invite) => {
                     const expired =
                       new Date(invite.expires_at).getTime() <= Date.now();
+                    const full =
+                      invite.max_uses != null &&
+                      (invite.accepted_count ?? 0) >= invite.max_uses;
+                    const active = !expired && !invite.revoked && !full;
                     return (
                       <div className="sync-invite-row" key={invite.digest}>
                         <div>
@@ -571,13 +619,41 @@ export default function SyncDashboard({
                               ? ` · ${t("invite.target", { name: invite.target_name })}`
                               : ""}{" "}
                             ·{" "}
-                            {expired
+                            {invite.revoked
+                              ? f("stopped")
+                              : full
+                                ? f("full")
+                                : expired
                               ? t("invite.expired")
                               : t("expiresAt", {
                                   date: expiry(invite.expires_at),
                                 })}
                           </span>
                         </div>
+                        {active && (
+                          <button
+                            className="settings-button"
+                            disabled={busy}
+                            title={
+                              invite.url ? undefined : f("unavailableLink")
+                            }
+                            onClick={() => {
+                              if (invite.url) void onCopy(invite.url);
+                              else
+                                onInvite({
+                                  role: invite.role,
+                                  maxUses: invite.max_uses ?? null,
+                                  ...(invite.target_name
+                                    ? { targetName: invite.target_name }
+                                    : {}),
+                                  days: Number(days),
+                                });
+                            }}
+                          >
+                            {invite.url ? t("copyLink") : f("regenerate")}
+                          </button>
+                        )}
+                        {!invite.revoked && (
                         <button
                           className="sync-text-button sync-danger"
                           disabled={busy}
@@ -585,13 +661,17 @@ export default function SyncDashboard({
                         >
                           {t("revokeInvite")}
                         </button>
+                        )}
                       </div>
                     );
                   })}
                 </details>
               )}
             </section>
-            <section className="sync-archive-section" aria-label={t("projectArchive")}>
+            <section
+              className="sync-archive-section"
+              aria-label={t("projectArchive")}
+            >
               <div>
                 <h3>
                   {project.archived ? t("restoreProject") : t("archiveProject")}

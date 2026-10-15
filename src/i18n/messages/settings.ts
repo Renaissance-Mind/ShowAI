@@ -4,7 +4,7 @@ export default defineMessages("settings", {
   "zh-CN": {
     title: "设置",
     categories: "设置分类",
-    "section.sync": "服务器与同步",
+    "section.sync": "账号与同步",
     "section.general": "通用",
     "section.appearance": "外观",
     "section.agent": "Agent",
@@ -40,7 +40,7 @@ export default defineMessages("settings", {
   en: {
     title: "Settings",
     categories: "Settings categories",
-    "section.sync": "Server & sync",
+    "section.sync": "Account & sync",
     "section.general": "General",
     "section.appearance": "Appearance",
     "section.agent": "Agent",

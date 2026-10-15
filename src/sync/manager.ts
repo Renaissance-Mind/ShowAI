@@ -206,6 +206,7 @@ export class SyncManager {
     const enabled = new Set<string>();
     this.pushEligible = true;
     for (const connection of config.connections) {
+      if (connection.signedOut) continue;
       const projects = config.projects.filter(
         (project) =>
           project.connectionId === connection.id && !project.pendingCreation,
@@ -547,6 +548,7 @@ export class SyncManager {
     token?: string;
     register?: boolean;
     invite?: string;
+    continue?: boolean;
     restoreBindings?: boolean;
     personalToken?: boolean;
   }) {
@@ -582,7 +584,11 @@ export class SyncManager {
           token: string;
         }>(
           { url, token: "" },
-          input.register ? "/api/auth/register" : "/api/auth/login",
+          input.continue && info.capabilities?.includes("account-continue-v1")
+            ? "/api/auth/continue"
+            : input.register
+              ? "/api/auth/register"
+              : "/api/auth/login",
           "POST",
           {
             name: input.account,
@@ -651,6 +657,7 @@ export class SyncManager {
     provider: string;
     email?: string;
     registrationKey?: string;
+    invite?: string;
     connectionId?: string;
   }) {
     const connection = input.connectionId
@@ -667,6 +674,7 @@ export class SyncManager {
         provider: input.provider,
         email: input.email,
         registrationKey: input.registrationKey || undefined,
+        invite: input.invite || undefined,
         device: `ShowAI · ${hostname().slice(0, 180)}`,
       })),
       serverUrl: connection.url,
@@ -767,6 +775,23 @@ export class SyncManager {
       );
       if (config.defaultConnectionId === connectionId)
         config.defaultConnectionId = null;
+    });
+    return this.status();
+  }
+  async signOut(connectionId: string) {
+    if (this.running) await this.running;
+    const connection = await this.connection(connectionId);
+    if (!connection.signedOut) await this.request(connection, "/api/auth/logout", "POST");
+    await this.accounts.signOut(connection.serverId, connection.user.id);
+    await this.update((config) => {
+      const saved = config.connections.find((item) => item.id === connectionId)!;
+      saved.token = "";
+      saved.signedOut = true;
+      if (config.defaultConnectionId === connectionId) config.defaultConnectionId = null;
+      for (const project of config.projects.filter((item) => item.connectionId === connectionId)) {
+        project.status = "offline";
+        delete project.error;
+      }
     });
     return this.status();
   }
@@ -1914,6 +1939,7 @@ export class SyncManager {
     let changed = false,
       failed = false;
     for (const connection of config.connections) {
+      if (connection.signedOut) continue;
       const projects = selected.filter(
         (item) => item.connectionId === connection.id,
       );
@@ -2134,6 +2160,7 @@ export class SyncManager {
     this.capabilityRefresh = this.configuration().then(async (config) => {
       if (this.options.events !== false)
         for (const connection of config.connections) {
+          if (connection.signedOut) continue;
           if (
             !config.projects.some(
               (project) => project.connectionId === connection.id,

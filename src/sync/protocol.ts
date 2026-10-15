@@ -249,6 +249,7 @@ export async function snapshotRevision(
 }
 
 export interface ServerConnection {
+  signedOut?: boolean;
   id: string;
   serverId: string;
   name: string;

@@ -86,6 +86,7 @@ export const workbenchActions = new Set([
   "sync:connect",
   "sync:default",
   "sync:disconnect",
+  "sync:signOut",
   "sync:projects",
   "sync:attach",
   "sync:subscribe",
@@ -486,6 +487,8 @@ export function createWorkbench(
           );
         case "sync:disconnect":
           return sync.disconnect(required(args, "connectionId"));
+        case "sync:signOut":
+          return sync.signOut(required(args, "connectionId"));
         case "sync:projects":
           return sync.remoteProjects(required(args, "connectionId"));
         case "sync:attach":
