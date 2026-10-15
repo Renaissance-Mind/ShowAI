@@ -31,13 +31,22 @@ export default function PageHeading({
     };
     resize();
     let width = element.getBoundingClientRect().width;
+    let scheduled = 0;
     const observer = new ResizeObserver(([entry]) => {
       if (entry.contentRect.width === width) return;
       width = entry.contentRect.width;
-      resize();
+      // Height writes inside this observer can trigger WebKit's resize loop check.
+      if (!scheduled)
+        scheduled = requestAnimationFrame(() => {
+          scheduled = 0;
+          resize();
+        });
     });
     observer.observe(element);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(scheduled);
+    };
   }, [title, readOnly]);
 
   return (
