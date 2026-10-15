@@ -21,7 +21,12 @@ import {
   AuthorizationError,
   type ProjectGrant,
 } from "./mcp-auth";
-import { RemoteWorkspaces } from "./mcp-workspace";
+import { RemoteWorkspaces, type RemoteWorkspaceContext } from "./mcp-workspace";
+import {
+  organizationWriteTools,
+  sidebarTools,
+  draftTools,
+} from "./mcp-organization";
 import {
   mcpSuccess,
   mcpFailure,
@@ -29,6 +34,7 @@ import {
 } from "./presentation-tools";
 import { inlinePresentation } from "./presentation";
 import { serverBaseUrl } from "../sync/server-url";
+import { FileStore } from "../core/store";
 import type { CloudBrowserCheck } from "./cloud-browser-check";
 import { getMcpGuide } from "./mcp-guides";
 import {
@@ -38,6 +44,7 @@ import {
 } from "./mcp-skill-guides";
 
 const writeTools = new Set([
+  ...organizationWriteTools,
   "project_create",
   "page_create",
   "page_save",
@@ -198,7 +205,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
   async function execute(
     request: Request,
     body: Record<string, unknown>,
-    context?: { root: string; projectId: string },
+    context?: RemoteWorkspaceContext,
     grant?: ProjectGrant,
   ) {
     const remoteTools = new Set([
@@ -209,6 +216,8 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
     const server = createMcpServer({
       root: context?.root ?? join(state, "public"),
       projectId: context?.projectId ?? "unselected",
+      projectAccess: "library",
+      workspaceProjectIds: context?.projectIds ?? [],
       storeProjectPresentation: (value) => storePresentation(value, false),
       sourceContext: {
         actor: { kind: "external", label: "MCP client" },
@@ -276,7 +285,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         const shape = getObjectShape(tool.inputSchema);
         if (!shape) throw new Error(`Missing tool input schema: ${name}`);
         const original = tool.handler as ToolCallback<z.ZodRawShape>;
-        const paramsSchema = {
+        const paramsSchema: Record<string, z.ZodRawShape[string]> = {
           ...shape,
           projectId: z
             .string()
@@ -286,7 +295,31 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
             ),
         };
         if ("out" in paramsSchema) delete paramsSchema.out;
+        if (name === "page_export")
+          paramsSchema.format = z.enum(["html", "inline"]);
+        if (name === "page_create" || name === "page_save") {
+          delete paramsSchema.components;
+          delete paramsSchema.remoteComponents;
+        }
         tool.update({
+          ...(name === "page_export"
+            ? {
+                description:
+                  "Export one page or selected blocks as downloadable HTML or inline HTML. format is html or inline; remote whole-site export is unavailable. Component references must already resolve in this project.",
+              }
+            : {}),
+          ...(name === "page_create"
+            ? {
+                description:
+                  "Create a page/board in this authorized project, optionally in parentId. Save custom component source with component_save first, then use exact page references. Compiled components and external publication imports are unavailable on this connection.",
+              }
+            : {}),
+          ...(name === "page_save"
+            ? {
+                description:
+                  "Save a page with its read baseHash/baseRevision. Custom components must already be saved in this project; compiled component and external publication imports are unavailable.",
+              }
+            : {}),
           paramsSchema,
           _meta: {
             ...tool._meta,
@@ -295,6 +328,18 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           callback: async (input, extra) => {
             const { projectId: _projectId, ...rest } = input;
             const args: Record<string, unknown> = rest;
+            for (const key of ["destinationProjectId", "relativeProjectId"]) {
+              if (typeof args[key] === "string") {
+                const local = context?.projectMap[args[key] as string];
+                if (!local)
+                  return mcpFailure(
+                    new Error(
+                      "The participating project is not authorized in this operation.",
+                    ),
+                  );
+                args[key] = local;
+              }
+            }
             if (
               args.remoteComponents &&
               Array.isArray(args.remoteComponents) &&
@@ -346,7 +391,81 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                 const data = {
                   ...(result.structuredContent.data as Record<string, unknown>),
                 };
-                if ("projectId" in data) data.projectId = _projectId;
+                const reverse = Object.fromEntries(
+                  Object.entries(context?.projectMap ?? {}).map(
+                    ([remote, local]) => [local, remote],
+                  ),
+                );
+                const sanitize = (value: unknown, key = ""): unknown => {
+                  if (typeof value === "string") {
+                    if (
+                      [
+                        "projectId",
+                        "sourceProjectId",
+                        "destinationProjectId",
+                        "projectOrder",
+                      ].includes(key)
+                    )
+                      return reverse[value] ?? value;
+                    for (const [local, remote] of Object.entries(reverse))
+                      if (value.startsWith(`projects/${local}/`))
+                        return `projects/${remote}/${value.slice(`projects/${local}/`.length)}`;
+                    return value;
+                  }
+                  // Page bodies, draft payloads and editable package source are
+                  // authored JSON. Metadata cleanup must never alter their keys.
+                  if (
+                    [
+                      "document",
+                      "content",
+                      "baseContent",
+                      "source",
+                      "schema",
+                      "manifest",
+                      "files",
+                      "assets",
+                      "documentation",
+                      "examples",
+                    ].includes(key)
+                  )
+                    return value;
+                  if (Array.isArray(value))
+                    return value.map((item) => sanitize(item, key));
+                  if (!value || typeof value !== "object") return value;
+                  if (
+                    "format" in value &&
+                    value.format === "showai-project" &&
+                    "id" in value &&
+                    typeof value.id === "string"
+                  )
+                    value = { ...value, id: reverse[value.id] ?? value.id };
+                  return Object.fromEntries(
+                    Object.entries(value as Record<string, unknown>)
+                      .filter(
+                        ([name, item]) =>
+                          ![
+                            "root",
+                            "home",
+                            "sourceDirectory",
+                            "binding",
+                            "bindings",
+                            "sourcePaths",
+                            "metadataPath",
+                          ].includes(name) &&
+                          !(
+                            name === "path" &&
+                            typeof item === "string" &&
+                            item.startsWith("/")
+                          ),
+                      )
+                      .map(([name, item]) => [
+                        ["projectGroups", "entryOrder"].includes(key)
+                          ? (reverse[name] ?? name)
+                          : name,
+                        sanitize(item, name),
+                      ]),
+                  );
+                };
                 if (name === "board_read" && Array.isArray(data.images))
                   data.images = data.images.map((value) => {
                     const image = { ...(value as Record<string, unknown>) };
@@ -405,7 +524,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                   delete data[key];
                 result.structuredContent = {
                   ...result.structuredContent,
-                  data,
+                  data: sanitize(data),
                 };
                 let rewritten = false;
                 result.content = result.content.map((item) =>
@@ -418,6 +537,42 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                       }
                     : item,
                 );
+              }
+              if (
+                name === "drafts_list" &&
+                Array.isArray(result.structuredContent?.data)
+              ) {
+                const reverse = Object.fromEntries(
+                  Object.entries(context?.projectMap ?? {}).map(
+                    ([remote, local]) => [local, remote],
+                  ),
+                );
+                const data = result.structuredContent.data.map(
+                  (record: Record<string, unknown>) => ({
+                    ...record,
+                    projectId:
+                      typeof record.projectId === "string"
+                        ? (reverse[record.projectId] ?? record.projectId)
+                        : record.projectId,
+                    path:
+                      typeof record.path === "string" &&
+                      typeof record.projectId === "string" &&
+                      reverse[record.projectId] &&
+                      record.path.startsWith(`projects/${record.projectId}/`)
+                        ? `projects/${reverse[record.projectId]}/${record.path.slice(`projects/${record.projectId}/`.length)}`
+                        : record.path,
+                  }),
+                );
+                result.structuredContent = {
+                  ...result.structuredContent,
+                  data,
+                };
+                result.content = [
+                  {
+                    type: "text",
+                    text: JSON.stringify(result.structuredContent),
+                  },
+                ];
               }
               return result;
             } finally {
@@ -485,7 +640,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
       {
         description:
           "List projects explicitly authorized for this connection, with current permissions. Does not require HTML display. Pass the selected id as projectId to project tools.",
-        inputSchema: {},
+        inputSchema: { includeArchived: z.boolean().optional() },
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,
@@ -493,9 +648,9 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         },
         _meta: { securitySchemes: oauth(false) },
       },
-      async () =>
+      async ({ includeArchived }) =>
         grant
-          ? mcpSuccess(await workspaces.projects(grant))
+          ? mcpSuccess(await workspaces.projects(grant, includeArchived))
           : mcpFailure(new Error("Sign in to ShowAI.")),
     );
     server.registerTool(
@@ -709,20 +864,105 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           );
           if (name === "projects_list" || name === "project_create")
             return execute(request, body, undefined, grant);
+          if (
+            (name === "page_create" || name === "page_save") &&
+            ["components", "remoteComponents"].some(
+              (key) => params?.arguments?.[key] !== undefined,
+            )
+          )
+            return toolError(
+              new Error(
+                "This connection accepts saved component references. Use component_save before page creation/saving; components and remoteComponents are not supported parameters.",
+              ),
+            );
           const project = params?.arguments?.projectId;
           if (typeof project !== "string" || !project)
             return toolError(new Error("Pass projectId from projects_list."));
-          const { value, synchronization } = await workspaces.withProject(
-            grant,
-            project,
-            writeTools.has(name),
-            (context) => execute(request, body, context, grant),
-          );
+          const participants = [project];
+          for (const key of ["destinationProjectId", "relativeProjectId"])
+            if (typeof params?.arguments?.[key] === "string")
+              participants.push(params.arguments[key] as string);
+          if (sidebarTools.has(name))
+            participants.push(
+              ...(await workspaces.projects(grant, true)).map((p) => p.id),
+            );
+          const { value, synchronization, synchronizations } =
+            await workspaces.withProjects(
+              grant,
+              participants,
+              writeTools.has(name),
+              (context) => execute(request, body, context, grant),
+              {
+                administrator:
+                  name === "project_update" &&
+                  typeof params?.arguments?.archived === "boolean"
+                    ? project
+                    : undefined,
+                synchronizeWrites:
+                  !draftTools.has(name) &&
+                  !["sidebar_group_create", "sidebar_group_update"].includes(
+                    name,
+                  ),
+                writeProjectIds: writeTools.has(name)
+                  ? [
+                      project,
+                      ...(name === "entry_move" &&
+                      typeof params?.arguments?.destinationProjectId ===
+                        "string"
+                        ? [params.arguments.destinationProjectId]
+                        : []),
+                    ]
+                  : [],
+                afterSynchronization: async (response, context) => {
+                  const result = await response.json();
+                  const data = result.result?.structuredContent?.data;
+                  if (result.result && !result.result.isError && data) {
+                    const store = new FileStore(context.root);
+                    const refresh = async (
+                      record: {
+                        document?: { id?: string };
+                        hash?: string;
+                        revision?: string;
+                      },
+                      remoteId: string,
+                    ) => {
+                      if (!record?.document?.id || !record.hash) return;
+                      const current = await store.readPage(
+                        context.projectMap[remoteId],
+                        record.document.id,
+                      );
+                      if (record.hash === current.hash)
+                        record.revision = current.revision;
+                    };
+                    if (data.document) await refresh(data, project);
+                    if (data.page)
+                      await refresh(
+                        data.page,
+                        typeof params?.arguments?.destinationProjectId ===
+                          "string"
+                          ? params.arguments.destinationProjectId
+                          : project,
+                      );
+                  }
+                  return json(result, response.status);
+                },
+              },
+            );
           const result = await value.json();
           if (result.result && !result.result.isError) {
             result.result.structuredContent = {
               ...(result.result.structuredContent ?? {}),
               synchronization,
+              ...(synchronizations.length > 1 ? { synchronizations } : {}),
+              ...(draftTools.has(name) || sidebarTools.has(name)
+                ? {
+                    workspace: {
+                      scope: "connection",
+                      draftsSynchronized: false,
+                      sidebarOrganizationSynchronized: false,
+                    },
+                  }
+                : {}),
             };
             const data = result.result.structuredContent.data;
             if (data && typeof data === "object" && data.persistence) {

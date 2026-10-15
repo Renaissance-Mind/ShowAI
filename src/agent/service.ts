@@ -123,10 +123,16 @@ const projectSummary = (project: {
   pageCount: number;
   binding?: ProjectBinding;
   sourceDirectory?: string;
+  icon?: string;
+  pinned?: boolean;
+  archived?: boolean;
 }) => ({
   id: project.id,
   name: project.name,
   pageCount: project.pageCount,
+  icon: project.icon,
+  pinned: !!project.pinned,
+  archived: !!project.archived,
   ...(project.binding ? { binding: project.binding } : {}),
   ...(project.sourceDirectory
     ? { sourceDirectory: project.sourceDirectory }
@@ -222,8 +228,8 @@ export class AgentService {
         "A project-bound connection cannot use another project's revision for a catalog mutation.",
       );
   }
-  async listProjects() {
-    const projects = await this.store.listProjects();
+  async listProjects(includeArchived = false) {
+    const projects = await this.store.listProjects({ includeArchived });
     return projects
       .filter((project) => !this.projectId || project.id === this.projectId)
       .map(projectSummary);
@@ -1311,6 +1317,7 @@ export class AgentService {
     input: {
       title?: string;
       kind?: "page" | "board";
+      parentId?: string | null;
       document?: ShowDocument;
       components?: CompiledComponent[];
       remoteComponents?: PublishedComponentLocator[];

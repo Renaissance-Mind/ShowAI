@@ -83,6 +83,7 @@ export async function runtimeInfo(home: string) {
         entry: "mcp",
         libraryProjects: true,
         pagePresent: true,
+        workspaceManagement: "showai-workspace-management-v1",
       },
       remoteAuthentication: "oauth2-project-grants",
     },

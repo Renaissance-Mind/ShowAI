@@ -19,7 +19,7 @@ description: 通过 ShowAI MCP 创建或改造可复用 React 组件。先查目
 
 保存编译成功后，把组件放入真实Page，读取源数据、检查图像与实际交互，再重新读取确认保存。仅声明readData不证明计算结果正确；按稳定ID核对原始值与派生值。独立结果用render_document验证传入源码，交付可编辑输入及HTML/source。连接或编译失败时保留材料并报告，不转用CLI或未保存网页假装成功。
 
-新版本保存后，已有页面仍引用旧版本。用 `library_search({projectId,query:页面中实际的componentId,kind:"page"})` 找到引用节点（按 cursor 取完全部结果），只在用户授权的页面上用 page_apply 改为新回执的 componentId、version、integrity；其他页面保留旧引用。其他组件通过 showai:component/ID 固定依赖旧版本时，需各自发布声明新依赖的版本后，其页面才会用上新版。组件任务完成后继续整体文档任务。交付精确版本与指纹，正式Page通过 [show-document](../show-document/SKILL.md)保存与展示；仅完成组件登记不等于交付了用户页面。
+新版本保存后，已有页面仍引用旧版本。用 `catalog_references({projectId,kind:"component",id:实际的componentId,version:旧版本,integrity:旧指纹})` 反查引用路径与节点；需要正文或源码搜索时再用 library_search，只在用户授权的页面上用 page_apply 改为新回执的 componentId、version、integrity；其他页面保留旧引用。其他组件通过 showai:component/ID 固定依赖旧版本时，需各自发布声明新依赖的版本后，其页面才会用上新版。组件任务完成后继续整体文档任务。交付精确版本与指纹，正式Page通过 [show-document](../show-document/SKILL.md)保存与展示；仅完成组件登记不等于交付了用户页面。
 
 ## 模板内组件
 

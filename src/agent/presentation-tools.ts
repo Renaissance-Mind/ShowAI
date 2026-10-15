@@ -169,6 +169,41 @@ export function registerPresentationTools(
           },
         },
         capacities: { unit: "bytes", ...CAPACITY },
+        management: {
+          protocol: "showai-workspace-management-v1",
+          folders: options.privateProjects !== false,
+          projectMetadata: options.privateProjects !== false,
+          directorySort: options.privateProjects !== false,
+          references: options.privateProjects !== false,
+          crossProjectPageMove:
+            options.privateProjects !== false &&
+            (options.transport === "http" ||
+              options.projectAccess === "library"),
+          sidebar: {
+            available:
+              options.privateProjects !== false &&
+              (options.transport === "http" ||
+                options.projectAccess === "library"),
+            scope: options.transport === "http" ? "connection" : "library",
+            synchronized: false,
+          },
+          drafts: {
+            available: options.privateProjects !== false,
+            scope:
+              options.transport === "http"
+                ? "connection-project"
+                : "library-project",
+            synchronized: false,
+          },
+          exportFormats:
+            options.transport === "http"
+              ? ["html", "inline"]
+              : ["html", "inline", "site"],
+          componentInput:
+            options.transport === "http"
+              ? "saved-source-references"
+              : "source-or-compiled-packages",
+        },
         transport: options.transport,
         presentation: {
           publicResources: true,

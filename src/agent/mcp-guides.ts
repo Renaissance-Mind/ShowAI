@@ -18,6 +18,16 @@ const tools: Record<GuideTopic, string[]> = {
     "project_create",
     "pages_list",
     "library_search",
+    "folders_list",
+    "folder_create",
+    "folder_update",
+    "project_update",
+    "entry_move",
+    "directory_sort",
+    "sidebar_read",
+    "sidebar_group_create",
+    "sidebar_group_update",
+    "sidebar_project_move",
   ],
   authoring: [
     "page_read",
@@ -39,7 +49,12 @@ const tools: Record<GuideTopic, string[]> = {
     "page_save",
   ],
   whiteboard: ["board_read", "page_read", "page_apply", "page_save"],
-  catalog: ["catalog_list", "catalog_describe", "component_save"],
+  catalog: [
+    "catalog_list",
+    "catalog_describe",
+    "catalog_references",
+    "component_save",
+  ],
   component: [
     "catalog_list",
     "catalog_describe",
@@ -73,6 +88,11 @@ const tools: Record<GuideTopic, string[]> = {
     "workspace_conflicts",
     "workspace_conflict",
     "workspace_resolve",
+    "drafts_list",
+    "draft_read",
+    "draft_save",
+    "draft_remove",
+    "draft_complete",
   ],
   sync: ["project_context", "project_sync_status", "project_sync"],
   export: ["page_present", "page_export"],
@@ -88,6 +108,8 @@ const rules: Partial<Record<GuideTopic, string[]>> = {
   workspace: [
     "For read-only lookup use projects_list or the bound project_context; do not create projects. For new formal content on a library connection, project_resolve takes an absolute trusted host sourceDirectory. It may create the directory mapping. Use project_create only when the user wants a separately named project.",
     "The connection owns its content library. Switching libraries requires the host to reconnect with another explicit configuration. Project-bound and HTTP connections cannot resolve local directories.",
+    "Folders are real project metadata, not Pages. Use folders_list/folder_create/folder_update; entry_move moves folders only within a project, or pages with component dependencies across authorized projects. Page moves require their read hash/revision; reorderOnly changes sibling order. directory_sort sets direct-child sorting. project_update changes name/icon/pin/archive; remote archive/restore needs admin permission. projects_list includeArchived:true discovers archived projects.",
+    "Library and remote connections expose sidebar groups/order; project-bound connections do not. Sidebar organization belongs to this connection workspace and does not synchronize to other devices. Remote cross-project moves require edit permission on both projects; inspect every synchronization receipt. Publication is destination-first with durable retry, not a cross-project server transaction.",
   ],
   authoring: [
     "Read the full Page and keep hash, revision and stable node IDs. page_save/page_apply take projectId, pageId, baseHash and baseRevision. Never use a partial view as a full replacement.",
@@ -116,6 +138,9 @@ const rules: Partial<Record<GuideTopic, string[]>> = {
   sync: [
     "Local project_sync_status reads status; project_sync is the explicit project synchronization operation. Remote HTTP project calls return synchronization.state/error/remoteHead after pull/operation/push. A retained local write with failed synchronization is not remote success.",
     "Server connection, account login and invitation management are host settings operations. Missing administrative tools do not authorize switching the Agent workflow to raw files or shell commands.",
+  ],
+  recovery: [
+    "drafts_list/draft_read inspect retained project-scoped editor drafts. draft_save retains unsaved content, not a formal Page. Drafts stay in this library/remote connection and do not synchronize to other devices. draft_remove requires the read generation; draft_complete requires that generation and a committed page revision with matching content. Newer or different drafts are retained with CONFLICT. These operations do not replace external conflict handling or page merge.",
   ],
   publish: [
     "Publication is separate from page saving and presentation. Only invoke available tools within their project scope. Global promotion, hosting and administrative registration require the explicit host/operator flow; do not invent a missing MCP tool.",

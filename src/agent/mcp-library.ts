@@ -77,6 +77,7 @@ export function createLibraryMcpServer(options: {
             bound = createMcpServer({
               ...options,
               projectId,
+              projectAccess: "library",
               decorateTool: (key, value) => {
                 if (key === name) operation = value;
               },
@@ -108,10 +109,10 @@ export function createLibraryMcpServer(options: {
     {
       description:
         "List existing projects in this fixed local library. Does not create a project.",
-      inputSchema: {},
+      inputSchema: { includeArchived: z.boolean().optional() },
       annotations: readOnly,
     },
-    () => call(() => service.listProjects()),
+    ({ includeArchived }) => call(() => service.listProjects(includeArchived)),
   );
   server.registerTool(
     "project_resolve",

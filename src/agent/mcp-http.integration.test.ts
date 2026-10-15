@@ -25,6 +25,13 @@ let account: { token: string; user: { id: string; name: string } },
   projectId: string,
   local: AgentService;
 const clients: Client[] = [];
+let managementToken: string | undefined;
+async function managementClient() {
+  managementToken ??= (
+    await authorize("projects.read projects.write projects.create", "account")
+  ).access_token;
+  return client(managementToken);
+}
 async function post(url: string, value: unknown, token?: string) {
   const response = await fetch(url, {
     method: "POST",
@@ -1019,6 +1026,386 @@ test("account authorization discovers future projects and creates synchronized c
     ).isError,
   ).toBe(true);
 });
+
+test("remote management persists real folders, dependencies, sidebar preferences and scoped drafts", async () => {
+  const manager = syncManager(local.store.root);
+  const a = await local.createProject("Remote workspace source"),
+    b = await local.createProject("Remote workspace destination");
+  const connection = (await manager.configuration()).connections[0];
+  for (const p of [a, b]) {
+    await manager.attach(connection.id, p.id);
+    await manager.stop();
+  }
+  const c = await managementClient();
+  const call = async (name: string, args: Record<string, unknown> = {}) =>
+    data(
+      await c.callTool({ name, arguments: { projectId: a.id, ...args } }),
+    ) as any;
+  const tools = (await c.listTools()).tools;
+  expect(
+    (
+      tools.find((t) => t.name === "page_export")!.inputSchema.properties!
+        .format as any
+    ).enum,
+  ).toEqual(["html", "inline"]);
+  for (const name of ["page_create", "page_save"]) {
+    expect(
+      tools.find((t) => t.name === name)!.inputSchema.properties,
+    ).not.toHaveProperty("components");
+    expect(
+      tools.find((t) => t.name === name)!.inputSchema.properties,
+    ).not.toHaveProperty("remoteComponents");
+  }
+  const folder = await call("folder_create", { name: "Promotion", icon: "📁" });
+  const child = await call("folder_create", {
+    name: "Sources",
+    parentId: folder.id,
+  });
+  await call("folder_update", {
+    folderId: folder.id,
+    name: "Launch",
+    pinned: true,
+    archived: true,
+  });
+  expect(await call("folders_list")).toEqual([]);
+  expect(await call("folders_list", { includeArchived: true })).toHaveLength(2);
+  await call("folder_update", { folderId: folder.id, archived: false });
+  await call("entry_move", { kind: "folder", id: child.id, parentId: null });
+  await call("directory_sort", { parentId: null, sortBy: "name" });
+  const source = parameterComponent("workspace-move-reader");
+  const component = await call("component_save", { source });
+  const page = await call("page_create", {
+    title: "Move dependencies",
+    parentId: folder.id,
+    document: {
+      id: "transfer-input",
+      title: "Move dependencies",
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "widget",
+            attrs: {
+              id: "transfer-widget",
+              kind: "custom",
+              data: {
+                componentId: component.id,
+                version: component.version,
+                integrity: component.integrity,
+                props: source.manifest.defaultData,
+              },
+            },
+          },
+        ],
+      },
+    },
+  });
+  const refs = await call("catalog_references", {
+    kind: "component",
+    id: component.id,
+    version: component.version,
+  });
+  expect(
+    refs.items.some((item: any) => item.blockId === "transfer-widget"),
+  ).toBe(true);
+  expect(
+    refs.items.every((item: any) =>
+      item.source.startsWith(`projects/${a.id}/`),
+    ),
+  ).toBe(true);
+  const selected = await client((await authorize()).access_token);
+  expect(
+    (
+      await selected.callTool({
+        name: "entry_move",
+        arguments: {
+          projectId,
+          destinationProjectId: b.id,
+          kind: "page",
+          id: "unread-page",
+          parentId: null,
+          baseHash: "invalid",
+        },
+      })
+    ).isError,
+  ).toBe(true);
+  const movedResult = await c.callTool({
+    name: "entry_move",
+    arguments: {
+      projectId: a.id,
+      destinationProjectId: b.id,
+      kind: "page",
+      id: page.document.id,
+      parentId: null,
+      baseHash: page.hash,
+      baseRevision: page.revision,
+    },
+  });
+  const moved = data(movedResult) as any;
+  expect(
+    (movedResult.structuredContent as any).synchronizations.map(
+      (s: any) => s.state,
+    ),
+  ).toEqual(["synced", "synced"]);
+  expect(moved.page.revision).toMatch(/^[a-f0-9]+$/);
+  expect(moved.page).not.toHaveProperty("path");
+  expect(await call("pages_list")).toEqual([]);
+  expect(
+    await call("catalog_describe", {
+      projectId: b.id,
+      kind: "component",
+      id: component.id,
+      version: component.version,
+      integrity: component.integrity,
+    }),
+  ).toBeTruthy();
+  expect(
+    (
+      await call("catalog_references", {
+        projectId: b.id,
+        kind: "component",
+        id: component.id,
+      })
+    ).items.some((item: any) => item.blockId === "transfer-widget"),
+  ).toBe(true);
+  const sidebar = await call("sidebar_group_create", { name: "Research" });
+  const group = sidebar.groups.find((g: any) => g.name === "Research");
+  await call("sidebar_project_move", { sectionId: group.id });
+  await call("sidebar_project_move", {
+    projectId: b.id,
+    sectionId: group.id,
+    relativeProjectId: a.id,
+    placement: "before",
+  });
+  expect((await call("sidebar_read")).projectGroups[a.id]).toBe(group.id);
+  await call("sidebar_group_update", {
+    sidebarGroupId: group.id,
+    name: "Active research",
+  });
+  const draft = await call("draft_save", {
+    projectId: b.id,
+    kind: "page",
+    resourceId: page.document.id,
+    clientId: "remote-editor",
+    sequence: 1,
+    content: moved.page.document,
+    baseRevision: moved.page.revision,
+    baseContent: moved.page.document,
+  });
+  expect(
+    (await call("draft_read", { projectId: b.id, draftId: draft.id })).content
+      .id,
+  ).toBe(page.document.id);
+  expect(
+    (
+      await c.callTool({
+        name: "draft_read",
+        arguments: { projectId: a.id, draftId: draft.id },
+      })
+    ).isError,
+  ).toBe(true);
+  expect((await call("drafts_list", { projectId: b.id }))[0].id).toBe(draft.id);
+  await call("draft_complete", {
+    projectId: b.id,
+    draftId: draft.id,
+    generation: draft.generation,
+    revision: moved.page.revision,
+  });
+  const payload = {
+    root: "authored root",
+    home: "authored home",
+    binding: { sourceDirectory: "authored data" },
+  };
+  const packageDraft = await call("draft_save", {
+    kind: "component",
+    resourceId: "authored-metadata-keys",
+    clientId: "remote-editor",
+    content: payload,
+  });
+  expect(
+    (await call("draft_read", { draftId: packageDraft.id })).content,
+  ).toEqual(payload);
+  await call("draft_remove", {
+    draftId: packageDraft.id,
+    generation: packageDraft.generation,
+  });
+  await call("project_update", {
+    name: "Managed remotely",
+    icon: "🧠",
+    pinned: true,
+    archived: true,
+  });
+  expect(
+    (await c.callTool({ name: "projects_list", arguments: {} }))
+      .structuredContent,
+  ).toBeTruthy();
+  const archived = data(
+    await c.callTool({
+      name: "projects_list",
+      arguments: { includeArchived: true },
+    }),
+  ) as unknown as any[];
+  expect(archived.find((p) => p.id === a.id)).toMatchObject({
+    name: "Managed remotely",
+    archived: true,
+  });
+  await call("project_update", { archived: false });
+  await manager.run(a.id);
+  await manager.run(b.id);
+  await manager.stop();
+  expect(await local.store.readProject(a.id)).toMatchObject({
+    name: "Managed remotely",
+    pinned: true,
+    icon: "🧠",
+    sortBy: "name",
+  });
+  expect(
+    (await local.store.listFolders(a.id)).find((f) => f.id === child.id)!
+      .parentId,
+  ).toBe(null);
+  expect(await local.store.readPage(b.id, page.document.id)).toBeTruthy();
+  const readOnly = await client(
+    (await authorize("projects.read", "account")).access_token,
+  );
+  for (const name of [
+    "folder_create",
+    "project_update",
+    "directory_sort",
+    "draft_save",
+    "sidebar_group_create",
+  ])
+    expect(
+      (
+        await readOnly.callTool({
+          name,
+          arguments: { projectId: a.id, name: "Denied" },
+        })
+      ).isError,
+    ).toBe(true);
+  expect(
+    (
+      await c.callTool({
+        name: "page_create",
+        arguments: {
+          projectId: a.id,
+          title: "Rejected opaque input",
+          components: [],
+        },
+      })
+    ).isError,
+  ).toBe(true);
+  expect(
+    (
+      await c.callTool({
+        name: "page_export",
+        arguments: {
+          projectId: b.id,
+          pageId: page.document.id,
+          format: "site",
+        },
+      })
+    ).isError,
+  ).toBe(true);
+}, 120000);
+
+test("remote management rechecks viewer/editor membership and administrator-only archive changes", async () => {
+  const c = await managementClient();
+  const p = data(
+    await c.callTool({
+      name: "project_create",
+      arguments: { name: "Membership boundary" },
+    }),
+  ) as any;
+  const id = p.project.id;
+  const backup = await post(sync.url + "/api/auth/register", {
+    name: "management-backup-admin",
+    password: "management-backup-password",
+    registrationKey: "isolated-integration-registration-key",
+  });
+  const invitation = await post(
+    sync.url + `/api/projects/${id}/invites`,
+    { role: "admin" },
+    account.token,
+  );
+  await post(
+    sync.url + "/api/invites/accept",
+    { invite: invitation.invite },
+    backup.token,
+  );
+  const changeRole = async (role: string) => {
+    const response = await fetch(sync.url + `/api/projects/${id}/members`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${backup.token}`,
+      },
+      body: JSON.stringify({ userId: account.user.id, role }),
+    });
+    expect(response.ok, await response.text()).toBe(true);
+  };
+  await changeRole("viewer");
+  expect(
+    (
+      await c.callTool({
+        name: "folder_create",
+        arguments: { projectId: id, name: "Denied viewer write" },
+      })
+    ).isError,
+  ).toBe(true);
+  expect(
+    (
+      await c.callTool({
+        name: "entry_move",
+        arguments: {
+          projectId,
+          destinationProjectId: id,
+          kind: "page",
+          id: "unread",
+          parentId: null,
+        },
+      })
+    ).isError,
+  ).toBe(true);
+  await changeRole("editor");
+  data(
+    await c.callTool({
+      name: "folder_create",
+      arguments: { projectId: id, name: "Allowed editor write" },
+    }),
+  );
+  expect(
+    (
+      await c.callTool({
+        name: "project_update",
+        arguments: { projectId: id, archived: true },
+      })
+    ).isError,
+  ).toBe(true);
+  expect(
+    data(
+      await c.callTool({ name: "folders_list", arguments: { projectId: id } }),
+    ) as unknown as any[],
+  ).toHaveLength(1);
+  data(
+    await c.callTool({
+      name: "project_update",
+      arguments: { projectId: id, name: "Editor renamed content" },
+    }),
+  );
+  await changeRole("admin");
+  data(
+    await c.callTool({
+      name: "project_update",
+      arguments: { projectId: id, archived: true },
+    }),
+  );
+  data(
+    await c.callTool({
+      name: "project_update",
+      arguments: { projectId: id, archived: false },
+    }),
+  );
+}, 60000);
 
 test("third-party login rejects CSRF and reports unconfigured providers without leaking polling credentials", async () => {
   const redirect = "http://127.0.0.1:12345/callback";

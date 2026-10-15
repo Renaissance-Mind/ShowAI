@@ -541,10 +541,16 @@ export class EditorDrafts {
             "INVALID_DATA",
             "Completing a page draft requires a committed page revision.",
           );
-        const bytes = await new GitLibrary(this.root).readFile(
-          `projects/${record.projectId}/pages/${record.resourceId}.json`,
-          revision,
-        );
+        const library = new GitLibrary(this.root);
+        const path = `projects/${record.projectId}/pages/${record.resourceId}.json`;
+        if ((await library.resourceRevision(path)) !== revision)
+          throw new CoreError(
+            "CONFLICT",
+            "The saved page revision changed. Read its current revision before completing the draft.",
+          );
+        // Resource revisions remain stable across unrelated writes. The current-state
+        // library does not retain the old global snapshot carrying that identifier.
+        const bytes = await library.readFile(path);
         const committed = JSON.parse(bytes.toString("utf8"))
           .document as ShowDocument;
         if (

@@ -141,6 +141,7 @@ describe("persistent local editor drafts", () => {
       current.hash,
       current.revision,
     );
+    await store.createFolder(input.projectId!, { name: "Unrelated directory" });
     expect(
       await drafts.completePage(second.id, second.generation, saved.revision!),
     ).toBe(true);

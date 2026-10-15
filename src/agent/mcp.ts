@@ -45,6 +45,8 @@ import { compactMcpResult } from "./mcp-response";
 import { boardReadSchema, type BoardReadResult } from "./board-reading";
 import { pageWriteCapture, type PageWrite } from "../core/page-write-capture";
 import { savePageWrites } from "../agent-host/page-undo";
+import { WorkspaceService } from "./workspace-service";
+import { registerOrganizationTools } from "./mcp-organization";
 
 const scopeSchema = z.enum([
   "builtin",
@@ -73,6 +75,7 @@ export function createMcpServer(options: {
   presentationDirectory?: string;
   sessionTemplates?: TemplateSelection[];
   projectAccess?: "library" | "project";
+  workspaceProjectIds?: string[];
   pageWriteDirectory?: string;
   storeProjectPresentation?: (
     value: Presentation,
@@ -175,6 +178,15 @@ export function createMcpServer(options: {
     destructiveHint: false,
     openWorldHint: false,
   };
+
+  registerOrganizationTools(
+    register,
+    new WorkspaceService(service.store.root, projectId, {
+      libraryAccess: options.projectAccess === "library",
+      projectIds: options.workspaceProjectIds,
+    }),
+    call,
+  );
 
   register(
     "guide",
@@ -282,7 +294,7 @@ export function createMcpServer(options: {
     },
     ({ knownCatalogRevision }) =>
       call(async () => ({
-        project: (await service.listProjects())[0],
+        project: await service.store.readProject(projectId),
         root: service.store.root,
         componentCatalog: await service.componentContext(
           projectId,
@@ -296,10 +308,11 @@ export function createMcpServer(options: {
     {
       description:
         "List page titles, identities and current hashes in the bound project.",
-      inputSchema: {},
+      inputSchema: { includeArchived: z.boolean().optional() },
       annotations: readOnly,
     },
-    () => call(() => service.listPages(projectId)),
+    ({ includeArchived }) =>
+      call(() => service.store.listPages(projectId, { includeArchived })),
   );
   register(
     "page_read",
@@ -395,18 +408,28 @@ export function createMcpServer(options: {
         ...changeSchema,
         title: z.string().optional(),
         kind: z.enum(["page", "board"]).optional(),
+        parentId: z.string().min(1).nullable().optional(),
         document: jsonObject.optional(),
         components: z.array(jsonObject).max(100).optional(),
         remoteComponents: z.array(jsonObject).max(100).optional(),
       },
       annotations: { ...write, openWorldHint: true },
     },
-    ({ title, kind, document, components, remoteComponents, ...metadata }) =>
+    ({
+      title,
+      kind,
+      parentId,
+      document,
+      components,
+      remoteComponents,
+      ...metadata
+    }) =>
       call(
         () =>
           service.createPage(projectId, {
             title,
             kind,
+            parentId,
             ...(document ? { document: validateDocument(document) } : {}),
             components: components as unknown as
               CompiledComponent[] | undefined,
