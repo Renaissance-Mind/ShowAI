@@ -201,6 +201,11 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
     context?: { root: string; projectId: string },
     grant?: ProjectGrant,
   ) {
+    const remoteTools = new Set([
+      ...publicTools,
+      "projects_list",
+      "project_create",
+    ]);
     const server = createMcpServer({
       root: context?.root ?? join(state, "public"),
       projectId: context?.projectId ?? "unselected",
@@ -221,6 +226,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           tool.remove();
           return;
         }
+        remoteTools.add(name);
         if (name === "guide") {
           const shape = getObjectShape(tool.inputSchema);
           if (!shape) throw new Error("Missing guide input schema.");
@@ -252,6 +258,12 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
               try {
                 return mcpSuccess({
                   ...mcpSkillGuide(args),
+                  connection: {
+                    mcpUrl: `${origin}/mcp`,
+                    tools: [...remoteTools].sort(),
+                    discovery:
+                      "These tools are exposed by this exact MCP server. The host may load only a subset initially. Use its tool discovery for the selected connection to load a listed tool before declaring it missing. Never substitute a similarly named connection. A listed tool does not imply the account has its required OAuth scope or project permission.",
+                  },
                   ...(!args.skill ? { operationGuides: getMcpGuide() } : {}),
                 });
               } catch (error) {
