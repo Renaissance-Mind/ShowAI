@@ -8,6 +8,7 @@ export {
   AlignEndVertical,
   AlignHorizontalDistributeCenter,
   AlignLeft,
+  AlignJustify,
   AlignRight,
   AlignStartHorizontal,
   AlignStartVertical,

@@ -1,6 +1,5 @@
 import { CAPACITY, formatBytes } from "../../portable/capacity.mjs";
-import { richTextFonts } from "./model.mjs";
-import { translator, type MessageKey } from "../../i18n";
+import { translator } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/richText";
 import ExpandableSearch from "../ExpandableSearch";
@@ -47,12 +46,10 @@ import {
   AlignRight,
   ArrowDown,
   ArrowUp,
-  Bold,
   Check,
   CheckSquare,
   ChevronDown,
   ChevronRight,
-  Code,
   CodeXml,
   Copy,
   ExternalLink,
@@ -61,9 +58,7 @@ import {
   Heading1,
   Heading2,
   Heading3,
-  Highlighter,
   ImagePlus,
-  Italic,
   Link2,
   List,
   ListOrdered,
@@ -74,27 +69,20 @@ import {
   Quote,
   Redo2,
   Sparkles,
-  Strikethrough,
   Table2,
   Trash2,
   Type,
-  Underline,
   Undo2,
   Upload,
   X,
 } from "../../ui/icons";
 import { TableControls } from "./TableControls";
+import { FormatControls } from "./FormatControls";
 import { createExtensions } from "./extensions";
 import "./editor.css";
 
 const initialSelections = new WeakSet<Editor>();
 const translate = translator(messages);
-const fontLabels = {
-  "": "format.fontDefault",
-  "sans-serif": "format.fontSans",
-  serif: "format.fontSerif",
-  monospace: "format.fontMono",
-} as const satisfies Record<string, MessageKey<typeof messages>>;
 export interface RichTextEditorProps {
   content: JSONContent;
   onChange: (
@@ -1111,187 +1099,7 @@ export default function RichTextEditor({
     ? t("block.heading", { level: editor.getAttributes("heading").level })
     : t("block.text");
   const formatButtons = (!minimal || bubble) && (
-    <>
-      <select
-        aria-label={t("format.textStyle")}
-        value={
-          editor.isActive("heading")
-            ? String(editor.getAttributes("heading").level)
-            : "paragraph"
-        }
-        onChange={(event) => {
-          const value = event.target.value;
-          if (value === "paragraph")
-            editor.chain().focus().setParagraph().run();
-          else
-            editor
-              .chain()
-              .focus()
-              .setHeading({ level: Number(value) as 1 | 2 | 3 | 4 | 5 | 6 })
-              .run();
-        }}
-      >
-        <option value="paragraph">{t("block.text")}</option>
-        {[1, 2, 3, 4, 5, 6].map((level) => (
-          <option key={level} value={level}>
-            {t("block.heading", { level })}
-          </option>
-        ))}
-      </select>
-      <select
-        aria-label={t("format.font")}
-        value={editor.getAttributes("textStyle").fontFamily ?? ""}
-        onChange={(e) =>
-          editor
-            .chain()
-            .focus()
-            .setMark("textStyle", { fontFamily: e.target.value || null })
-            .run()
-        }
-      >
-        {richTextFonts.map((font) => (
-          <option key={font.value} value={font.value}>
-            {t(
-              fontLabels[font.value as keyof typeof fontLabels] ??
-                "format.fontDefault",
-            )}
-          </option>
-        ))}
-      </select>
-      <select
-        aria-label={t("format.fontSize")}
-        value={editor.getAttributes("textStyle").fontSize ?? ""}
-        onChange={(e) =>
-          editor
-            .chain()
-            .focus()
-            .setMark("textStyle", { fontSize: e.target.value || null })
-            .run()
-        }
-      >
-        <option value="">{t("format.fontSizeDefault")}</option>
-        {[12, 14, 16, 18, 20, 24, 28, 32, 40, 48].map((size) => (
-          <option key={size} value={`${size}px`}>
-            {size}
-          </option>
-        ))}
-      </select>
-      <ToolButton
-        label={t("format.bold")}
-        active={editor.isActive("bold")}
-        onClick={() => editor.chain().focus().toggleBold().run()}
-      >
-        <Bold size={16} />
-      </ToolButton>
-      <ToolButton
-        label={t("format.italic")}
-        active={editor.isActive("italic")}
-        onClick={() => editor.chain().focus().toggleItalic().run()}
-      >
-        <Italic size={16} />
-      </ToolButton>
-      <ToolButton
-        label={t("format.underline")}
-        active={editor.isActive("underline")}
-        onClick={() => editor.chain().focus().toggleUnderline().run()}
-      >
-        <Underline size={16} />
-      </ToolButton>
-      <ToolButton
-        label={t("format.strike")}
-        active={editor.isActive("strike")}
-        onClick={() => editor.chain().focus().toggleStrike().run()}
-      >
-        <Strikethrough size={16} />
-      </ToolButton>
-      <ToolButton
-        label={t("format.highlight")}
-        active={editor.isActive("highlight")}
-        onClick={() =>
-          editor
-            .chain()
-            .focus()
-            .toggleMark("highlight", {
-              color: editor.getAttributes("highlight").color ?? "#e8eed0",
-              mode: editor.getAttributes("highlight").mode ?? "lower",
-            })
-            .run()
-        }
-      >
-        <Highlighter size={16} />
-      </ToolButton>
-      <ToolButton
-        label={t("format.inlineCode")}
-        active={editor.isActive("code")}
-        onClick={() => editor.chain().focus().toggleCode().run()}
-      >
-        <Code size={16} />
-      </ToolButton>
-      <label className="rich-text-color" title={t("format.textColor")}>
-        {t("format.textColorShort")}
-        <input
-          type="color"
-          aria-label={t("format.textColor")}
-          value={editor.getAttributes("textStyle").color ?? "#292733"}
-          onChange={(e) =>
-            editor.chain().setMark("textStyle", { color: e.target.value }).run()
-          }
-        />
-      </label>
-      <label className="rich-text-color" title={t("format.highlightColor")}>
-        {t("format.highlightColorShort")}
-        <input
-          type="color"
-          aria-label={t("format.highlightColor")}
-          value={editor.getAttributes("highlight").color ?? "#e8eed0"}
-          onChange={(e) =>
-            editor.chain().setMark("highlight", { color: e.target.value }).run()
-          }
-        />
-      </label>
-      <select
-        aria-label={t("format.highlightMode")}
-        value={editor.getAttributes("highlight").mode ?? "lower"}
-        onChange={(e) =>
-          editor
-            .chain()
-            .focus()
-            .setMark("highlight", {
-              mode: e.target.value,
-              ...(editor.getAttributes("highlight").color === undefined
-                ? { color: "#e8eed0" }
-                : {}),
-            })
-            .run()
-        }
-      >
-        <option value="lower">{t("format.highlightLower")}</option>
-        <option value="full">{t("format.highlightFull")}</option>
-      </select>
-      <select
-        aria-label={t("format.alignment")}
-        value={
-          editor.getAttributes(
-            editor.isActive("heading") ? "heading" : "paragraph",
-          ).textAlign ?? "left"
-        }
-        onChange={(e) =>
-          editor.chain().focus().setTextAlign(e.target.value).run()
-        }
-      >
-        <option value="left">{t("format.alignLeft")}</option>
-        <option value="center">{t("format.alignCenter")}</option>
-        <option value="right">{t("format.alignRight")}</option>
-        <option value="justify">{t("format.alignJustify")}</option>
-      </select>
-      <ToolButton
-        label={t("format.addLink")}
-        active={editor.isActive("link")}
-        onClick={() => openDialog("link")}
-      >
-        <Link2 size={16} />
-      </ToolButton>
-    </>
+    <FormatControls editor={editor} onLink={() => openDialog("link")} />
   );
 
   return (
@@ -1814,12 +1622,19 @@ export default function RichTextEditor({
       {bubble && !readOnly && (
         <SelectionToolbar
           id={selectionMenuId}
+          className="rich-text-selection-toolbar"
           anchor={bubble}
           viewportTop={
-            (wrapperRef.current
-              ?.closest(".studio")
-              ?.querySelector(".studio-window-topbar")
-              ?.getBoundingClientRect().bottom ?? 0) + 8
+            Math.max(
+              0,
+              ...Array.from(
+                wrapperRef.current
+                  ?.closest(".studio")
+                  ?.querySelectorAll(".studio-window-topbar, .studio-topbar") ??
+                  [],
+                (element) => element.getBoundingClientRect().bottom,
+              ),
+            ) + 8
           }
           onEscape={() => {
             selectionMenuInteracting.current = false;

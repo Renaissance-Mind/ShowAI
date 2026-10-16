@@ -8,6 +8,8 @@ import richTextInsertion from "../components/rich-text/component-insertion.ts?ra
 import richTextNodeViews from "../components/rich-text/NodeViews.tsx?raw";
 import richTextComponent from "../components/rich-text/RichText.tsx?raw";
 import richTextEditor from "../components/rich-text/RichTextEditor.tsx?raw";
+import richTextFormatControls from "../components/rich-text/FormatControls.tsx?raw";
+import richTextFormatCss from "../components/rich-text/format-controls.css?raw";
 import richTextView from "../components/rich-text/RichTextView.tsx?raw";
 import richTextTableControls from "../components/rich-text/TableControls.tsx?raw";
 import richTextTableActions from "../components/rich-text/TableSelectionActions.tsx?raw";
@@ -119,6 +121,8 @@ const sources: Record<string, string> = {
   "rich-text/NodeViews.tsx": richTextNodeViews,
   "rich-text/RichText.tsx": richTextComponent,
   "rich-text/RichTextEditor.tsx": richTextEditor,
+  "rich-text/FormatControls.tsx": richTextFormatControls,
+  "rich-text/format-controls.css": richTextFormatCss,
   "rich-text/RichTextView.tsx": richTextView,
   "rich-text/TableControls.tsx": richTextTableControls,
   "rich-text/TableSelectionActions.tsx": richTextTableActions,

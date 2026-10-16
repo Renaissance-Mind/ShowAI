@@ -14,12 +14,14 @@ export function SelectionToolbar({
   label,
   keyboardScope,
   viewportTop = 8,
+  className,
 }: {
   id: string;
   label?: string;
   keyboardScope?: string;
   anchor: { left: number; top: number; bottom?: number };
   viewportTop?: number;
+  className?: string;
   anchorElement?: HTMLElement | null;
   children: ReactNode;
   onEscape: () => void;
@@ -85,7 +87,7 @@ export function SelectionToolbar({
     <div
       ref={menu}
       id={id}
-      className="editor-bubble"
+      className={`editor-bubble${className ? ` ${className}` : ""}`}
       data-editor-menu-trigger="selection"
       data-editor-keyboard-scope={keyboardScope}
       role="toolbar"

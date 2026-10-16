@@ -49,6 +49,11 @@ export default defineMessages("richText", {
     "block.tableKeywords": "表格",
 
     "format.textStyle": "文字样式",
+    "format.characterStyle": "字符格式",
+    "format.fontCompact": "字体",
+    "format.sizeCompact": "字号",
+    "format.colors": "颜色与高亮",
+    "format.customColor": "自定义颜色",
     "format.font": "文字字体",
     "format.fontDefault": "默认字体",
     "format.fontSans": "无衬线",
@@ -195,6 +200,11 @@ export default defineMessages("richText", {
     "block.tableKeywords": "grid",
 
     "format.textStyle": "Text style",
+    "format.characterStyle": "Character formatting",
+    "format.fontCompact": "Font",
+    "format.sizeCompact": "Size",
+    "format.colors": "Colors and highlight",
+    "format.customColor": "Custom color",
     "format.font": "Font",
     "format.fontDefault": "Default font",
     "format.fontSans": "Sans serif",
