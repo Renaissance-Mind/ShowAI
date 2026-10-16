@@ -2,7 +2,7 @@
 
 **语言：** [English](../skills.md) | 简体中文 · [文档目录](index.zh-CN.md)
 
-ShowAI 插件提供七个 Skill，覆盖连接阅读、理解规划、表达设计、页面制作、呈现评审、模板和组件。运行时提供存储、原生容器、目录、编译与渲染；Plugin 分发技能、指南与连接配置。CLI 用于启动、诊断与脚本，Agent 的文档操作统一使用 MCP。
+ShowAI 插件提供八个 Skill，覆盖连接阅读、理解规划、表达设计、页面制作、呈现评审、模板和组件。运行时提供存储、原生容器、目录、编译与渲染；Plugin 分发技能、指南与连接配置。CLI 用于启动、诊断与脚本，Agent 的文档操作统一使用 MCP。
 
 | Skill                                                                           | 何时使用                             | 产物                                       |
 | ------------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------ |
@@ -13,6 +13,7 @@ ShowAI 插件提供七个 Skill，覆盖连接阅读、理解规划、表达设�
 | [review-presentation](../../plugins/showai/skills/review-presentation/SKILL.md) | 检查效果、诊断难理解处、按目标重做   | 可定位的问题、修订与复核范围               |
 | [create-template](../../plugins/showai/skills/create-template/SKILL.md)         | 建立或提炼可重复使用的内容结构       | 模板、填写约定与应用验证                   |
 | [create-component](../../plugins/showai/skills/create-component/SKILL.md)       | 既有数据调整和组合无法满足表达需求   | 精确版本的组件、契约与真实页面实例         |
+| [collaborate-canvas](../../plugins/showai/skills/collaborate-canvas/SKILL.md) | 多端配对、边写边画与位置参考 | 明确保存边界的协作画布 |
 
 ## 从用户任务开始
 

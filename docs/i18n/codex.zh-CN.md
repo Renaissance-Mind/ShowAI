@@ -2,7 +2,7 @@
 
 **语言：** [English](../codex.md) | 简体中文 · [文档目录](index.zh-CN.md)
 
-ShowAI 插件提供七个 Skill 和本机 MCP 启动入口。Agent 通过 MCP 创建、读取、修改和展示内容；正式页面保存到所选 ShowAI 项目。ShowAI 软件提供存储、阅读器与组件编译能力，**需要与插件分别安装**。
+ShowAI 插件提供八个 Skill 和本机 MCP 启动入口。Agent 通过 MCP 创建、读取、修改和展示内容；正式页面保存到所选 ShowAI 项目。ShowAI 软件提供存储、阅读器与组件编译能力，**需要与插件分别安装**。
 
 ## 安装与连接
 

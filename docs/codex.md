@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](i18n/codex.zh-CN.md) · [Documentation](README.md)
 
-The local ShowAI plugin contains seven Skills and a stdio MCP launcher. Codex uses MCP to read, create, edit and present content saved in the selected project. The ShowAI application or standalone runtime provides storage, compilation and the reader; install it separately from the plugin.
+The local ShowAI plugin contains eight Skills and a stdio MCP launcher. Codex uses MCP to read, create, edit and present content saved in the selected project. The ShowAI application or standalone runtime provides storage, compilation and the reader; install it separately from the plugin.
 
 ## Install and connect
 
@@ -26,7 +26,7 @@ npm run plugin:update -- --json
 
 The installer uses official Codex plugin commands and checks installed bytes, version and enabled state. See [Plugin documentation](../plugins/showai/README.md).
 
-Installation, host refresh and a conversation loading current tools are separate steps. Use the host's supported refresh/restart procedure, then start a new conversation and confirm the ShowAI tools and seven Skills are visible. An existing conversation may retain older definitions. Call `guide()`, then `showai_capabilities` and `project_context` to establish the actual connection.
+Installation, host refresh and a conversation loading current tools are separate steps. Use the host's supported refresh/restart procedure, then start a new conversation and confirm the ShowAI tools and eight Skills are visible. An existing conversation may retain older definitions. Call `guide()`, then `showai_capabilities` and `project_context` to establish the actual connection.
 
 ## Select a library and project
 

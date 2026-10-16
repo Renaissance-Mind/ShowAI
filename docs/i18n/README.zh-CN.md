@@ -144,7 +144,7 @@ claude plugin marketplace add ./
 claude plugin install showai@renaissance-mind
 ```
 
-安装后通过宿主支持的方式刷新能力，再在新会话确认工具与 Skill 可见。插件包含七个 Skill：
+安装后通过宿主支持的方式刷新能力，再在新会话确认工具与 Skill 可见。插件包含八个 Skill：
 
 | Skill                 | 用途                                     |
 | --------------------- | ---------------------------------------- |
@@ -155,6 +155,7 @@ claude plugin install showai@renaissance-mind
 | `show-document`       | 创建、修改、展示和导出页面，应用已有模板 |
 | `create-component`    | 创建或改造可复用的 React 组件            |
 | `create-template`     | 创建、修改模板，或从已有页面提炼模板     |
+| `collaborate-canvas` | 设备配对、边写边画、多对话与可选位置参考 |
 
 插件提供创作流程与参考说明，运行程序由 ShowAI 应用或独立运行包提供。桌面用户可在「设置 → 连接 Agent」中取得启动配置；从源码构建的独立运行包可执行：
 

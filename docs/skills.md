@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](i18n/skills.zh-CN.md) · [Documentation](README.md)
 
-The ShowAI plugin provides seven Skills. The runtime owns storage, native containers, catalog, compilation and rendering; the plugin supplies methods, references and connection configuration. Agent document operations use MCP. CLI supports startup, diagnostics and scripts.
+The ShowAI plugin provides eight Skills. The runtime owns storage, native containers, catalog, compilation and rendering; the plugin supplies methods, references and connection configuration. Agent document operations use MCP. CLI supports startup, diagnostics and scripts.
 
 | Skill                                                                        | Task                                                | Result                                                         |
 | ---------------------------------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------- |
@@ -13,6 +13,7 @@ The ShowAI plugin provides seven Skills. The runtime owns storage, native contai
 | [review-presentation](../plugins/showai/skills/review-presentation/SKILL.md) | Assess clarity and revise                           | Located issues, repairs and verified scope                     |
 | [create-template](../plugins/showai/skills/create-template/SKILL.md)         | Create/extract reusable organization                | Template folder, instructions and applied example              |
 | [create-component](../plugins/showai/skills/create-component/SKILL.md)       | Add a missing expression capability                 | Versioned React component, contract and real instance          |
+| [collaborate-canvas](../plugins/showai/skills/collaborate-canvas/SKILL.md) | Concurrent editing, paired devices and spatial references | Saved content with clear synchronization and edit boundaries |
 
 ## Start from the request
 

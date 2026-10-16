@@ -146,7 +146,7 @@ claude plugin marketplace add ./
 claude plugin install showai@renaissance-mind
 ```
 
-After installation, refresh the host as supported and confirm the current MCP tools and Skills in a new conversation. The plugin includes seven skills:
+After installation, refresh the host as supported and confirm the current MCP tools and Skills in a new conversation. The plugin includes eight skills:
 
 | Skill                 | Purpose                                                                |
 | --------------------- | ---------------------------------------------------------------------- |
@@ -157,6 +157,7 @@ After installation, refresh the host as supported and confirm the current MCP to
 | `show-document`       | Create, edit, display, and export pages; apply existing templates      |
 | `create-component`    | Create or adapt reusable React components                              |
 | `create-template`     | Create and edit templates, or extract them from existing pages         |
+| `collaborate-canvas` | Pair devices, keep editing during Agent work, and use optional canvas references |
 
 The plugin supplies authoring workflows and reference material. The ShowAI app or a standalone runtime package supplies the executable runtime. Desktop users can find startup configuration in Settings → Connect Agent (「设置 → 连接 Agent」). For a standalone runtime built from source, run:
 
