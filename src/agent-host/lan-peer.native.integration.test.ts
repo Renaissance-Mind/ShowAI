@@ -93,7 +93,6 @@ test.skipIf(!process.env.SHOWAI_NATIVE_LAN_TEST_ROOT)(
         if (text && text !== last) {
           last = text;
           const cmd = JSON.parse(text);
-          if (cmd.action === "stop") done();
           if (cmd.action === "pause") await peer.close();
           if (cmd.action === "resume") await peer.start();
           if (cmd.action === "edit") {
@@ -121,6 +120,7 @@ test.skipIf(!process.env.SHOWAI_NATIVE_LAN_TEST_ROOT)(
               online: peer.status.online,
             }),
           );
+          if (cmd.action === "stop") done();
         }
       } catch (error) {
         console.error(error);
