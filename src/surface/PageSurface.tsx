@@ -1020,7 +1020,10 @@ export default function PageSurface({
       {
         label: t("menu.settings"),
         icon: <Settings2 size={14} />,
-        onSelect: () => onInspect?.(id),
+        onSelect: () => {
+          board.selectIds([id]);
+          onInspect?.(id);
+        },
       },
       ...(container
         ? [
