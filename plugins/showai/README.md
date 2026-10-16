@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](README.zh-CN.md) · [Documentation](../../docs/README.md)
 
-The local **0.17.0** plugin supplies seven Skills and a stdio MCP launcher for reading, creating, revising and presenting ShowAI content. The application/runtime is installed separately. The repository's application source version is **0.9.0**; runtime capabilities determine compatibility.
+The local **0.18.0** plugin supplies eight Skills and a stdio MCP launcher for reading, creating, revising and presenting ShowAI content. The application/runtime is installed separately. The repository's application source version is **0.9.0**; runtime capabilities determine compatibility.
 
 ## Install locally
 
@@ -75,3 +75,5 @@ node scripts/install-codex-plugin.mjs --remote-url HTTPS_MCP_URL --marketplace-r
 ```
 
 The installer uses a separate marketplace and verifies its installed files. No credentials enter the package. Deployment and public submission remain separate release operations. See [Agent integration](../../docs/agent-integration.md).
+
+Collaborative canvas work, optional spatial references, and iPad/Mac pairing are described in [collaborate-canvas](skills/collaborate-canvas/SKILL.md).

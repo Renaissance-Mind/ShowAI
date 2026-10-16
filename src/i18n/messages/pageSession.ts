@@ -20,6 +20,7 @@ export default defineMessages("pageSession", {
       "读取草稿期间又有新的编辑，当前编辑已保留。请再次选择草稿。",
     draftNotForPage: "草稿不属于当前页面。",
     selectedDraftRestored: "已恢复选中的本机草稿",
+    linksRepaired: "已修复无法保存的链接格式，文字和原始草稿均已保留。",
     fileChangedElsewhere:
       "文件已被其他工具修改。请选择保留本地草稿，或载入文件版本。",
     editedWhileReadingFile:
@@ -50,6 +51,8 @@ export default defineMessages("pageSession", {
       "New edits were made while the draft was loading. Your current edits are kept. Choose the draft again.",
     draftNotForPage: "This draft doesn't belong to the current page.",
     selectedDraftRestored: "Restored the selected local draft",
+    linksRepaired:
+      "Unusable link formatting was repaired. All text and the original draft were kept.",
     fileChangedElsewhere:
       "The file was changed by another tool. Keep your local draft, or load the file version.",
     editedWhileReadingFile:

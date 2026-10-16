@@ -198,7 +198,7 @@
   min-width: 0;
 }
 .assistant-message {
-  white-space: pre-wrap;
+  white-space: normal;
   overflow-wrap: anywhere;
 }
 .assistant-message a {
@@ -467,4 +467,172 @@
 .studio-icon.is-active {
   color: var(--accent);
   background: var(--accent-soft);
+}
+.assistant-reference-button {
+  flex: 0 0 32px;
+  align-self: flex-end;
+  margin-bottom: 3px;
+}
+
+.assistant-markdown {
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.assistant-markdown > :first-child {
+  margin-top: 0;
+}
+.assistant-markdown > :last-child {
+  margin-bottom: 0;
+}
+.assistant-markdown p,
+.assistant-markdown ul,
+.assistant-markdown ol {
+  margin: 0.6em 0;
+}
+.assistant-markdown h3 {
+  font-size: 1.05em;
+  margin: 1.1em 0 0.4em;
+}
+.assistant-markdown code {
+  font-size: 0.92em;
+  background: var(--panel);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+.assistant-markdown pre {
+  overflow: auto;
+  max-width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.assistant-markdown pre code {
+  padding: 0;
+  background: none;
+}
+.assistant-markdown blockquote {
+  margin: 8px 0;
+  padding: 0 12px;
+  border-left: 2px solid var(--line);
+  color: var(--muted);
+}
+.assistant-table-scroll {
+  overflow-x: auto;
+}
+.assistant-markdown table {
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+.assistant-markdown th,
+.assistant-markdown td {
+  border: 1px solid var(--line);
+  padding: 5px 8px;
+  text-align: left;
+}
+.assistant-steps summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.assistant-steps li pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 4px 0 10px;
+  font: inherit;
+}
+.assistant-steps li[data-state="failed"] {
+  color: var(--danger);
+}
+.assistant-message,
+.assistant-approval,
+.assistant-user {
+  animation: assistant-appear 160ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .assistant-message,
+  .assistant-approval,
+  .assistant-user {
+    animation: none;
+  }
+}
+
+.lan-pairing-dialog {
+  max-width: 460px;
+}
+.lan-pairing-dialog p {
+  line-height: 1.65;
+}
+.lan-pair-code {
+  text-align: center;
+  padding: 18px;
+  margin: 18px 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.lan-pair-code strong {
+  font: 600 32px var(--font-mono);
+  letter-spacing: 0.18em;
+  color: var(--accent);
+}
+.lan-pair-code p {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 0;
+}
+.lan-device {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.lan-device small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.lan-pair-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.assistant-threads {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.assistant-threads button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 160px;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 5px 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--muted);
+  background: none;
+  font-size: 11px;
+  cursor: pointer;
+}
+.assistant-threads button[aria-current] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.assistant-thread-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent);
 }

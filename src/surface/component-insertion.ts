@@ -89,6 +89,28 @@ export function insertComponent(
     };
     frame = { x: 0, y: 0, width: 640 };
   }
+  const free =
+    (parent.type === "surface" && surfaceKind(parent) === "board") ||
+    (parent.type === "region" &&
+      document.layout[parent.attrs!.id]?.mode === "free");
+  if (free && !definition?.insertion) {
+    const child = node;
+    node = createSurface(
+      "page",
+      typeof data.title === "string" && data.title.trim()
+        ? data.title
+        : (definition?.name ?? "Page"),
+    );
+    node.content = [child];
+    document.layout[child.attrs!.id] = { x: 0, y: 0, width: frame.width };
+    frame = {
+      x: 0,
+      y: 0,
+      width: frame.width + 48,
+      height: 360,
+      heightMode: "auto",
+    };
+  }
   const siblings = parent.content ?? [];
   if (
     (parent.type === "surface" && surfaceKind(parent) === "board") ||

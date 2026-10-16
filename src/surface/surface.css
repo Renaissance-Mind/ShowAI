@@ -38,6 +38,60 @@
   will-change: transform;
   --board-inv-outer: var(--board-inv);
 }
+.agent-reference-picker {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  cursor: crosshair;
+  touch-action: none;
+}
+.agent-reference-hint {
+  position: absolute;
+  top: 54px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  border-radius: 9px;
+  background: var(--paper, #fff);
+  border: 1px solid var(--line, #ddd);
+  box-shadow: 0 3px 18px #0001;
+  font-size: 12px;
+  pointer-events: none;
+}
+.agent-reference-marquee {
+  position: absolute;
+  border: 1.5px dashed #4585ed;
+  background: #4585ed12;
+  pointer-events: none;
+}
+.agent-reference-preview {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 30;
+}
+.agent-reference-preview rect,
+.agent-reference-preview circle,
+.agent-reference-preview path {
+  fill: #4585ed0b;
+  stroke: #4585ed;
+  stroke-width: 1.5px;
+  stroke-dasharray: 5 4;
+}
+.surface-object.is-container:has(
+    > .surface-object-content > .container-page[data-frameless="true"]
+  ) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.container-page[data-frameless="true"] {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
 .surface-metadata {
   position: absolute;
   left: 22px;

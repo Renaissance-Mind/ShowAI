@@ -22,7 +22,7 @@ const context = {
 export const remoteSkillInstructions =
   'Start every ShowAI task by calling guide() for the shared Skill entrypoint and task routes, even when no plugin Skills are installed. Then read guide({skill:"NAME"}) and referenced files as needed. Read-only lookup stays read-only; complete page requests continue through creation, review, saving and presentation. This is the authorized remote connection; do not use local paths or CLI. Private project IDs come from projects_list; create a project only when requested. ' +
   "The host may defer tool definitions. The guide response lists this connection's actual tools and MCP URL. If a required tool is listed but not currently loaded, use the host's tool discovery scoped to this selected connection before claiming it is unavailable. Do not switch to another similarly named ShowAI connection. Tool availability and OAuth scope are separate; report the actual discovery or authorization error. " +
-  "The seven workflows cover connection/lookup/reading/recovery (use-showai), page creation/editing/partial presentation/export (show-document), understanding plans (plan-presentation), visual/interaction design (design-presentation), review (review-presentation), reusable components (create-component), and reusable templates (create-template). Read guide topic presentation and current template stage when directed. OAuth is required for private projects; public catalogs and guides need no login. Read the current page/hash/revision before editing. Check saving, synchronization and presentation separately. Unavailable historical snapshots or local library switching must be reported, not simulated. Login codes and credentials are entered by the user in the authorization UI, never requested in chat.";
+  "The eight workflows cover connection/lookup/reading/recovery (use-showai), page creation/editing/partial presentation/export (show-document), understanding plans (plan-presentation), visual/interaction design (design-presentation), review (review-presentation), reusable components (create-component), reusable templates (create-template), and collaborative canvas/paired-device workflows (collaborate-canvas). Read guide topic presentation and current template stage when directed. OAuth is required for private projects; public catalogs and guides need no login. Read the current page/hash/revision before editing. Check saving, synchronization and presentation separately. Unavailable historical snapshots or local library switching must be reported, not simulated. Login codes and credentials are entered by the user in the authorization UI, never requested in chat.";
 
 function metadata(name: string) {
   const source = mcpSkillSources[`${name}/SKILL.md`];
@@ -127,6 +127,10 @@ export function mcpSkillGuide(
           entrypoint: true,
           skills: mcpSkillNames.map(metadata),
           routing: [
+            {
+              task: "Collaborate with a person who keeps drawing or editing; optional spatial references, multiple Agent conversations, iPad/Mac pairing and disconnect recovery",
+              skill: "collaborate-canvas",
+            },
             {
               task: "Read-only connection, project/page search, reading, catalog lookup, conflicts, unavailable history or library switching",
               skill: "use-showai",

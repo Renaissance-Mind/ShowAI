@@ -47,6 +47,8 @@ export interface AgentEvent {
   sequence: number;
   type: "message" | "tool" | "status" | "error";
   text: string;
+  itemId?: string;
+  state?: "running" | "completed" | "failed";
 }
 export interface AgentTask {
   id: string;
@@ -76,6 +78,7 @@ export interface AgentTarget {
   surfaceId?: string;
   blockIds?: string[];
   text?: string;
+  reference?: import("../surface/agent-reference").CanvasReference;
 }
 /** One user request and the Agent run that answered it. */
 export interface AgentTurn extends AgentTask {

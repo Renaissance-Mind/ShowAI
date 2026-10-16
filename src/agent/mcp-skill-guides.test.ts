@@ -34,7 +34,7 @@ describe("remote shared Skill guides", () => {
     }
   });
 
-  it("routes all seven workflows and reads the connection entry without a plugin", () => {
+  it("routes all shared workflows and reads the connection entry without a plugin", () => {
     const result = mcpSkillGuide();
     expect(result.entrypoint).toBe(true);
     expect(result.markdown).toContain("首次实际操作");

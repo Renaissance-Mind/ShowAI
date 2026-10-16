@@ -658,6 +658,26 @@ export function ContainerRuntime({
                         />
                       </label>
                     )}
+                  {selectedEntry.node.type === "surface" &&
+                    surfaceKind(selectedEntry.node) === "page" && (
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={!!selectedEntry.node.attrs?.frameless}
+                          onChange={(event) =>
+                            runtime.commit(
+                              editNode(current.current, inspecting!, (node) => {
+                                node.attrs = {
+                                  ...node.attrs,
+                                  frameless: event.target.checked,
+                                };
+                              }),
+                            )
+                          }
+                        />
+                        {t("container.frameless")}
+                      </label>
+                    )}
                   {selectedEntry.node.type === "region" && (
                     <label>
                       {t("inspector.arrange")}
@@ -934,7 +954,10 @@ function ContainerView({
     shape: { color: "#252629", fillColor: "none", strokeWidth: 2.5 },
     eraser: { color: "#252629", fillColor: "none", strokeWidth: 24 },
   });
-  const styleKey = tool === "pen" || tool === "highlighter" || tool === "eraser" ? tool : "shape";
+  const styleKey =
+    tool === "pen" || tool === "highlighter" || tool === "eraser"
+      ? tool
+      : "shape";
   const style = styles[styleKey];
   const chooseTool = async (next: BoardTool | null) => {
     await window.showai?.inlineInk?.flush();
@@ -1054,6 +1077,7 @@ function ContainerView({
           ref={page}
           className={`container-page${root ? " is-root" : ""}${reading ? " is-reading-projection" : ""}`}
           data-container-root={id}
+          data-frameless={node.attrs?.frameless || undefined}
           data-width-mode={
             runtime.pageWidthModes && kind === "page"
               ? (node.attrs?.widthMode ?? "standard")

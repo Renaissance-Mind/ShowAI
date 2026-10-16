@@ -370,10 +370,7 @@ export function useSurfaceViewport(
     const paintNow = () => {
       const c = camera.current;
       const transform = `translate3d(${c.x}px, ${c.y}px, 0) scale(${c.scale})`;
-      if (world.style.transform && world.style.transform !== transform)
-        root.dispatchEvent(
-          new Event("showai:viewport-change", { bubbles: true }),
-        );
+      const changed = world.style.transform !== transform;
       world.style.transform = transform;
       // Selection chrome and the dot grid read these to stay screen-sized.
       if (root.style.getPropertyValue("--board-zoom") !== String(c.scale))
@@ -388,6 +385,11 @@ export function useSurfaceViewport(
       }
       // Only the zoom controls subscribe; objects read the camera directly.
       scale.set(c.scale);
+      // Followers measure the committed transform in this frame, not the previous camera.
+      if (changed)
+        root.dispatchEvent(
+          new Event("showai:viewport-change", { bubbles: true }),
+        );
     };
     const paint = () => {
       cancelAnimationFrame(frame);

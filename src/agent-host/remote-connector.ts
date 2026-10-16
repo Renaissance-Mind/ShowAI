@@ -10,6 +10,7 @@ import {
   type AgentInvocation,
 } from "./remote-protocol";
 import type { AgentHost } from "./host";
+import { LanPeerServer } from "./lan-peer";
 import { FileStore } from "../core/store";
 
 export interface ConnectorSettings {
@@ -28,6 +29,7 @@ export const remoteDeviceActions = new Set([
 ]);
 /** Outbound only. The desktop keeps its own model credentials and project grants. */
 export class RemoteMacConnector {
+  readonly lan: LanPeerServer;
   private socket?: WebSocket;
   private retry?: ReturnType<typeof setTimeout>;
   private heartbeat?: ReturnType<typeof setInterval>;
@@ -46,6 +48,7 @@ export class RemoteMacConnector {
     readonly host: AgentHost,
     readonly home: () => string,
   ) {
+    this.lan = new LanPeerServer(host, home, () => this.settings);
     this.originalAfterTurn = host.options.afterTurn;
   }
   private get path() {
@@ -67,12 +70,13 @@ export class RemoteMacConnector {
     const projects = await new FileStore(this.home()).listProjects();
     return {
       settings,
+      lan: this.lan.status,
       online: this.online,
       error: this.error,
-      pendingClients: [...this.pendingClients].map(([id, name]) => ({
-        id,
-        name,
-      })),
+      pendingClients: [
+        ...this.lan.status.pending,
+        ...[...this.pendingClients].map(([id, name]) => ({ id, name })),
+      ],
       connections: config.connections
         .filter((c) => !c.signedOut)
         .map((c) => ({ id: c.id, name: `${c.name} · ${c.user.name}` })),
@@ -85,6 +89,10 @@ export class RemoteMacConnector {
     };
   }
   async approveClient(id: string, approve: boolean) {
+    if (id.startsWith("lan:")) {
+      await this.lan.approve(id.slice(4), approve);
+      return this.status();
+    }
     const { settings } = await this.status(),
       name =
         this.pendingClients.get(id) ??
@@ -142,12 +150,16 @@ export class RemoteMacConnector {
     await writeProtected(this.path, input);
     this.settings = input;
     this.close();
+    await this.lan.close();
     if (input.enabled) await this.start();
     return this.status();
   }
   async start() {
     const { settings } = await this.status();
     if (!settings.enabled) return;
+    await this.lan.start().catch((error) => {
+      this.lan.error = error.message;
+    });
     this.stopped = false;
     const generation = ++this.generation;
     let retryDelay = 10000;
@@ -307,6 +319,9 @@ export class RemoteMacConnector {
     await connect().catch(failed);
   }
   close() {
+    void this.lan
+      .close()
+      .catch((error) => console.error("Local sharing:", error.message));
     this.stopped = true;
     this.generation++;
     clearTimeout(this.retry);

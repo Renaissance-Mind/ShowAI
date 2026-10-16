@@ -10,6 +10,7 @@ import type {
   AgentTurn,
 } from "./types";
 import type { ShowDocument } from "../types";
+import { referenceInstructions } from "../surface/agent-reference";
 import { translator } from "../i18n";
 import agentHostMessages from "../i18n/messages/agentHost";
 
@@ -25,6 +26,16 @@ export const targetSchema = z.object({
   surfaceId: blockId.optional(),
   blockIds: z.array(blockId).max(100).optional(),
   text: z.string().max(20000).optional(),
+  reference: z
+    .object({
+      surfaceId: blockId,
+      kind: z.enum(["point", "region"]),
+      x: z.number().finite().min(-1000000).max(1000000),
+      y: z.number().finite().min(-1000000).max(1000000),
+      width: z.number().finite().min(0).max(2000000).optional(),
+      height: z.number().finite().min(0).max(2000000).optional(),
+    })
+    .optional(),
 });
 
 export function parseTarget(value: unknown): AgentTarget {
@@ -37,6 +48,7 @@ export function parseTarget(value: unknown): AgentTarget {
     ...(target.surfaceId ? { surfaceId: target.surfaceId } : {}),
     ...(blockIds.length ? { blockIds } : {}),
     ...(target.text?.trim() ? { text: target.text.slice(0, 4000) } : {}),
+    ...(target.reference ? { reference: target.reference } : {}),
   };
 }
 
@@ -62,7 +74,7 @@ export function targetInstructions(target: AgentTarget, pageTitle?: string) {
     target.kind === "page"
       ? ""
       : " Read them with page_read using blockIds before editing. Change only those objects (and their children) with page_apply unless the user asks for wider changes; if a wider change is needed, explain it in the reply first. For explanations or questions, reply in text without writing the page.";
-  return scope + limits + quote;
+  return scope + limits + quote + referenceInstructions(target.reference);
 }
 
 /** Backends without native session resume receive the previous turns as context. */

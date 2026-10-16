@@ -34,6 +34,7 @@ import type { ResolvedResource } from "../sync/accounts";
 import { withLibraryLock } from "../core/library-lock";
 import type {
   AgentConversation,
+  AgentEvent,
   AgentHostStatus,
   AgentId,
   AgentSettings,
@@ -1330,29 +1331,48 @@ export class AgentHost {
             event.message ?? event.error?.message ?? t("task.agentFailed"),
           );
         if (event.type === "item.completed" || event.type === "item.updated")
-          this.codexEvent(task, event.item);
+          this.codexEvent(task, event.item, event.type === "item.completed");
       }
       if (!complete) throw new Error(t("task.turnIncomplete"));
     } finally {
       gateway.close();
     }
   }
-  private codexEvent(task: AgentTask, item: any) {
-    if (item.type === "agent_message") this.emit(task, "message", item.text);
+  private codexEvent(task: AgentTask, item: any, completed = true) {
+    const event = (type: AgentEvent["type"], text: string) => {
+      if (typeof text !== "string" || !text) return;
+      const existing =
+        typeof item.id === "string"
+          ? [...task.events].reverse().find((value) => value.itemId === item.id)
+          : undefined;
+      const state =
+        item.status === "failed"
+          ? "failed"
+          : completed || item.status === "completed"
+            ? "completed"
+            : "running";
+      if (existing) {
+        existing.text = text.slice(0, 32000);
+        existing.state = state;
+        this.touch(task);
+      } else {
+        this.emit(task, type, text);
+        const saved = task.events.at(-1);
+        if (saved) {
+          saved.itemId = item.id;
+          saved.state = state;
+        }
+      }
+    };
+    if (item.type === "agent_message") event("message", item.text);
     else if (item.type === "mcp_tool_call")
-      this.emit(
-        task,
+      event(
         "tool",
         `${item.server} · ${item.tool} · ${item.status}${item.error?.message ? "\n" + item.error.message : ""}${item.result?.isError ? "\n" + JSON.stringify(item.result.content) : ""}`,
       );
     else if (item.type === "command_execution")
-      this.emit(
-        task,
-        "tool",
-        `${item.command}\n${item.aggregated_output ?? ""}`,
-      );
-    else if (item.type === "file_change")
-      this.emit(task, "tool", t("task.filesUpdated"));
+      event("tool", `${item.command}\n${item.aggregated_output ?? ""}`);
+    else if (item.type === "file_change") event("tool", t("task.filesUpdated"));
     else if (item.type === "error") this.emit(task, "status", item.message);
   }
   private async runLocal(
@@ -1413,8 +1433,8 @@ export class AgentHost {
               "error",
               event.message ?? event.error?.message ?? t("task.agentFailed"),
             );
-          if (event.type === "item.completed")
-            this.codexEvent(task, event.item);
+          if (event.type === "item.completed" || event.type === "item.updated")
+            this.codexEvent(task, event.item, event.type === "item.completed");
         },
       });
       if (result.code !== 0 || !complete)

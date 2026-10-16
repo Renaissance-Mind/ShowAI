@@ -2,7 +2,7 @@
 
 **语言：** [English](README.md) | 简体中文 · [文档目录](../../docs/i18n/index.zh-CN.md)
 
-本机 **0.17.0** 插件提供七个 Skill 与 stdio MCP launcher，用于读取、创建、续改和展示 ShowAI 内容。应用/运行时独立安装，仓库应用源码版本为 **0.9.0**，兼容性以实际运行时能力为准。
+本机 **0.18.0** 插件提供八个 Skill 与 stdio MCP launcher，用于读取、创建、续改和展示 ShowAI 内容。应用/运行时独立安装，仓库应用源码版本为 **0.9.0**，兼容性以实际运行时能力为准。
 
 ## 本机安装
 
@@ -75,3 +75,5 @@ node scripts/install-codex-plugin.mjs --remote-url HTTPS_MCP_URL --marketplace-r
 ```
 
 安装器使用独立 marketplace 并核验文件，包内不包含凭据。部署与公开提交是独立发行操作。参见 [Agent 接入](../../docs/i18n/agent-integration.zh-CN.md)。
+
+边写边画、位置参考和 iPad/Mac 配对见 [collaborate-canvas](skills/collaborate-canvas/SKILL.md)。

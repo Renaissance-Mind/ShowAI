@@ -8,6 +8,8 @@ import { errorCode, errorMessage } from "./bridge";
 import { translator } from "../i18n";
 import commonMessages from "../i18n/messages/common";
 import pageSessionMessages from "../i18n/messages/pageSession";
+import { repairEditorLinks } from "../surface/editor-links.mjs";
+import { mergePageContent } from "../core/page-merge-model";
 
 const t = translator(pageSessionMessages);
 const common = translator(commonMessages);
@@ -345,11 +347,46 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     if (!current.current || !projectRef.current || blocked.current)
       return !blocked.current;
     const run = async () => {
+      let mergeAttempts = 0;
+      let repairedLinks = false;
       while (
         revision.current > savedRevision.current &&
         current.current &&
         projectRef.current
       ) {
+        const repaired = repairEditorLinks(current.current);
+        if (repaired.repairs.length) {
+          // Retain the exact incoming version before making its links saveable.
+          try {
+            const recovery = await options.invoke<EditorDraftRecord>(
+              "drafts:save",
+              {
+                input: {
+                  kind: "page",
+                  clientId: `${clientId.current}:link-recovery:${crypto.randomUUID()}`,
+                  resourceId: current.current.id,
+                  projectId: projectRef.current,
+                  baseRevision: draftBase.current,
+                  baseContent: recordRef.current?.document,
+                  title: current.current.title,
+                  content: current.current,
+                  sequence: revision.current,
+                },
+              },
+            );
+            setAvailableDrafts((items) => [recovery, ...items]);
+          } catch (reason) {
+            blocked.current = true;
+            setStatus("error");
+            setError(errorMessage(reason));
+            setSaveFailureAttempt((value) => value + 1);
+            return false;
+          }
+          current.current = repaired.document;
+          revision.current++;
+          setDraft(repaired.document);
+          repairedLinks = true;
+        }
         const editingSource = current.current;
         const source = structuredClone(editingSource);
         const sequence = revision.current;
@@ -469,9 +506,48 @@ export function createPageSession(options: PageSessionOptions): PageSession {
           setReviewingConflict(false);
           setError("");
           setConflictId(undefined);
-          setDraftNotice("");
+          setDraftNotice(repairedLinks ? t("linksRepaired") : "");
           if (!settle) break;
         } catch (reason) {
+          if (
+            errorCode(reason) === "CONFLICT" &&
+            !resolution.current &&
+            recordRef.current &&
+            current.current &&
+            mergeAttempts++ < 3
+          ) {
+            try {
+              const remote = await options.invoke<LoadedPage>("pages:get", {
+                projectId: projectRef.current,
+                pageId: source.id,
+              });
+              if (
+                !remote.workspaceConflicts?.length &&
+                current.current.id === source.id
+              ) {
+                const merged = mergePageContent(
+                  recordRef.current.document,
+                  current.current,
+                  remote.document,
+                );
+                if (!merged.conflicts.length) {
+                  recordRef.current = remote;
+                  base.current = remote.hash;
+                  baseRevision.current = remote.revision;
+                  draftBase.current = remote.revision;
+                  setMergeBase(remote.revision);
+                  current.current = merged.document;
+                  revision.current++;
+                  setDraft(merged.document);
+                  setRecord(remote);
+                  continue;
+                }
+              }
+            } catch (refreshError) {
+              reason = refreshError;
+            }
+          }
+
           setReviewingConflict(false);
           setSaveFailureAttempt((value) => value + 1);
           if (reason && typeof reason === "object" && "conflictId" in reason)
@@ -772,6 +848,31 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         revision.current > savedRevision.current ||
         loaded.workspaceConflicts?.length
       ) {
+        if (
+          !loaded.workspaceConflicts?.length &&
+          !blocked.current &&
+          recordRef.current
+        ) {
+          const merged = mergePageContent(
+            recordRef.current.document,
+            current.current,
+            loaded.document,
+          );
+          if (!merged.conflicts.length) {
+            recordRef.current = loaded;
+            base.current = loaded.hash;
+            baseRevision.current = loaded.revision;
+            draftBase.current = loaded.revision;
+            setMergeBase(loaded.revision);
+            current.current = merged.document;
+            revision.current++;
+            setDraft(merged.document);
+            setRecord(loaded);
+            scheduleDraft();
+            scheduleSave();
+            return;
+          }
+        }
         if (
           loaded.incomingCrossDevice &&
           !loaded.workspaceConflicts?.length &&

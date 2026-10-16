@@ -91,6 +91,7 @@ import {
 import { ObjectContext, type ObjectActions } from "./SurfaceObject";
 import type { NodeLayout, PageViews, SavedView } from "./types";
 import "./surface.css";
+import { CanvasReferencePicker } from "./CanvasReferencePicker";
 
 export interface SurfaceHandle {
   insertPosition: () => NodeLayout;
@@ -778,16 +779,30 @@ export default function PageSurface({
     if (initial) focusAfterMount(initial.targets, false, true);
     else if (nodes[0]) focusAfterMount([nodes[0].id], true, true);
   }, []);
+  const editingFocus = useRef<{ cancel(): void } | null>(null);
+  useEffect(() => () => editingFocus.current?.cancel(), []);
   const editObject = (id: string) => {
-    // The new object renders on the next frame; edit once its editor exists.
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        const element = worldRef.current?.querySelector<HTMLElement>(
-          `[data-surface-id="${CSS.escape(id)}"]`,
-        );
-        if (element) enterEditing(element);
-      }),
-    );
+    editingFocus.current?.cancel();
+    const world = worldRef.current;
+    if (!world) return;
+    let stopped = false;
+    const stop = () => {
+      stopped = true;
+      observer.disconnect();
+      clearTimeout(timer);
+    };
+    const attempt = () => {
+      if (stopped) return;
+      const element = world.querySelector<HTMLElement>(
+        `[data-surface-id="${CSS.escape(id)}"]`,
+      );
+      if (element && enterEditing(element)) stop();
+    };
+    const observer = new MutationObserver(attempt);
+    const timer = setTimeout(stop, 5000);
+    observer.observe(world, { childList: true, subtree: true });
+    editingFocus.current = { cancel: stop };
+    requestAnimationFrame(attempt);
   };
   useImperativeHandle(ref, () => ({
     scale: () =>
@@ -1890,6 +1905,14 @@ export default function PageSurface({
             {children}
           </div>
         </div>
+        <CanvasReferencePicker
+          pageId={boardDocument?.id ?? pageId}
+          surfaceId={containerId ?? pageId}
+          enabled={enabled && !printing && !locked}
+          root={rootRef}
+          world={worldRef}
+          point={(x, y) => controls.current.point(x, y)}
+        />
         {drawingTool &&
           !(
             window.showai?.inlineInk &&

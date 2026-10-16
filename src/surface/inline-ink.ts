@@ -50,6 +50,19 @@ export interface InlineInkBridge {
     listener: (value: InkUpdate) => Promise<boolean>,
   ): () => void;
   frame(value: InkFrame): Promise<void>;
+  viewport?(
+    value: Pick<
+      InkFrame,
+      | "token"
+      | "pageId"
+      | "boardId"
+      | "widthPx"
+      | "heightPx"
+      | "viewport"
+      | "camera"
+      | "cameraVersion"
+    >,
+  ): Promise<void>;
   hide(pageId: string, boardId: string, token: string): Promise<void>;
   flush(): Promise<void>;
   onCommand(listener: (value: InkCommand) => void): () => void;

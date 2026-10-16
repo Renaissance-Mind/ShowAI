@@ -89,6 +89,62 @@ describe("workspace sessions against the real loopback workbench", () => {
     await sessions.open(project, first.document.id, "a");
     return a;
   }
+  it("saves nested unusable links as text while keeping the exact original recovery draft", async () => {
+    const view = await warm();
+    const content = structuredClone(view.getSnapshot().draft!.content);
+    const find = (node: JSONContent): JSONContent | undefined =>
+      node.type === "paragraph" ? node : node.content?.map(find).find(Boolean);
+    find(content)!.content = [
+      {
+        type: "text",
+        text: "Preserve every word",
+        marks: [{ type: "link", attrs: { href: "javascript:alert(1)" } }],
+      },
+    ];
+    view.editContent(content);
+    expect(await view.flush()).toBe(true);
+    const saved = await invoke<LoadedPage>("pages:get", {
+      projectId: project,
+      pageId: first.document.id,
+    });
+    expect(JSON.stringify(saved.document)).toContain("Preserve every word");
+    expect(JSON.stringify(saved.document)).not.toContain("javascript:");
+    const drafts = view.getSnapshot().availableDrafts;
+    const recovery = drafts.find((item) =>
+      item.clientId.includes(":link-recovery:"),
+    )!;
+    expect(recovery).toBeDefined();
+    const original = await invoke<{ content: unknown }>("drafts:read", {
+      id: recovery.id,
+    });
+    expect(JSON.stringify(original.content)).toContain("javascript:alert(1)");
+  });
+  it("merges independent live Agent changes with human typing without stopping the editor", async () => {
+    const view = await warm();
+    const content = structuredClone(view.getSnapshot().draft!.content);
+    const find = (node: JSONContent): JSONContent | undefined =>
+      node.type === "paragraph" ? node : node.content?.map(find).find(Boolean);
+    find(content)!.content = [{ type: "text", text: "Human typing continues" }];
+    view.editContent(content);
+    await invoke("pages:save", {
+      projectId: project,
+      pageId: first.document.id,
+      document: { ...first.document, title: "Agent updated the title" },
+      baseHash: first.hash,
+      baseRevision: first.revision,
+    });
+    await view.refresh();
+    expect(await view.flush()).toBe(true);
+    const saved = await invoke<LoadedPage>("pages:get", {
+      projectId: project,
+      pageId: first.document.id,
+    });
+    expect(saved.document.title).toBe("Agent updated the title");
+    expect(JSON.stringify(saved.document.content)).toContain(
+      "Human typing continues",
+    );
+    expect(view.getSnapshot().status).toBe("saved");
+  });
   it("switches cached views without rereading pages and bounds resident views", async () => {
     await warm();
     calls.length = 0;

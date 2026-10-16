@@ -185,3 +185,5 @@ plugins/showai/scripts/cli.mjs
 !/docs/i18n/versioned-library.zh-CN.md
 !/docs/chatgpt.md
 !/plugins/showai/README.zh-CN.md
+
+!/plugins/showai/skills/collaborate-canvas/SKILL.md

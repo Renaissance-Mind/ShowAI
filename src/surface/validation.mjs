@@ -178,6 +178,12 @@ function validateResource(document) {
         throw new Error("Page width mode must be standard, wide or full.");
       if (parent && !["surface", "region"].includes(parent.type))
         throw new Error("A surface requires a container parent.");
+      if (
+        node.attrs.frameless !== undefined &&
+        (node.attrs.kind !== "page" ||
+          typeof node.attrs.frameless !== "boolean")
+      )
+        throw new Error("Only Pages support the boolean frameless setting.");
       owner = node;
     }
     if (node.type === "drawing") {
@@ -208,7 +214,11 @@ function validateResource(document) {
         finite(value, 1, 1000000, "drawing.extent"),
       );
       finite(node.attrs.strokeWidth, 0.5, 40, "drawing.strokeWidth");
-      if (node.attrs.pressure !== undefined && typeof node.attrs.pressure !== "boolean") throw new Error("drawing.pressure must be boolean.");
+      if (
+        node.attrs.pressure !== undefined &&
+        typeof node.attrs.pressure !== "boolean"
+      )
+        throw new Error("drawing.pressure must be boolean.");
       if (
         !Array.isArray(node.attrs.points) ||
         node.attrs.points.length < 2 ||
@@ -219,7 +229,8 @@ function validateResource(document) {
         object(point, "drawing point");
         finite(point.x, -1000000, 1000000, "point.x");
         finite(point.y, -1000000, 1000000, "point.y");
-        if (point.pressure !== undefined) finite(point.pressure,0,1,"point.pressure");
+        if (point.pressure !== undefined)
+          finite(point.pressure, 0, 1, "point.pressure");
       }
     }
     for (const child of node.content ?? []) walk(child, node, owner);

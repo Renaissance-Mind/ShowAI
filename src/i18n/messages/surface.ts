@@ -187,6 +187,7 @@ export default defineMessages("surface", {
     "history.redoTitle": "重做 ⇧⌘Z / Ctrl+Shift+Z",
 
     "container.setIcon": "设置图标…",
+    "container.frameless": "无边框 Page",
     "container.setIconFor": "设置「{name}」图标…",
     "container.wrapBoard": "放入 Board",
     "container.wrapBoardFor": "将「{name}」放入 Board",
@@ -428,6 +429,7 @@ export default defineMessages("surface", {
     "history.redoTitle": "Redo ⇧⌘Z / Ctrl+Shift+Z",
 
     "container.setIcon": "Set icon…",
+    "container.frameless": "Borderless Page",
     "container.setIconFor": "Set icon for “{name}”…",
     "container.wrapBoard": "Put in a board",
     "container.wrapBoardFor": "Put “{name}” in a board",

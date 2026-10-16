@@ -4,7 +4,7 @@ import type { AssistantRequest } from "./rich-text/environment";
 export type { AssistantRequest };
 export type AssistantAnchor = AssistantRequest["anchor"];
 /** Text and blocks come from editors; board selections and the page from workbench menus. */
-export type AssistantTarget =
+export type AssistantTarget = (
   | AssistantRequest
   | {
       kind: "board";
@@ -12,7 +12,8 @@ export type AssistantTarget =
       surfaceId?: string;
       anchor: AssistantAnchor;
     }
-  | { kind: "page"; anchor?: AssistantAnchor };
+  | { kind: "page"; anchor?: AssistantAnchor }
+) & { reference?: import("../surface/agent-reference").CanvasReference };
 export interface AssistantBridge {
   open(target: AssistantTarget): void;
 }

@@ -95,6 +95,7 @@ const nodeAttributes = new Set([
   "data",
   "canvas",
   "name",
+  "frameless",
   "latex",
   "display",
 ]);
@@ -524,6 +525,13 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
           : nodeAttributes,
       node.type === "surface",
     );
+  if (
+    node.attrs?.frameless !== undefined &&
+    (node.type !== "surface" ||
+      node.attrs.kind !== "page" ||
+      typeof node.attrs.frameless !== "boolean")
+  )
+    throw new Error(`${path}.attrs.frameless requires a Page and a boolean.`);
   if (node.type === "surface" && node.attrs?.icon !== undefined)
     validatePageIcon(node.attrs.icon, `${path}.attrs.icon`);
   if (node.attrs?.canvas != null) {

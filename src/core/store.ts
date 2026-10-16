@@ -154,7 +154,10 @@ function validateDirectoryPreferences(value: DirectoryPreferences): void {
   }
 }
 
-function validateProject(value: unknown, expectedId: string): ProjectMetadata {
+export function validateProjectMetadata(
+  value: unknown,
+  expectedId: string,
+): ProjectMetadata {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new CoreError("INVALID_DATA", "Invalid project metadata.");
   const project = value as ProjectMetadata;
@@ -428,7 +431,7 @@ export class FileStore {
   }
 
   async readProject(projectId: string): Promise<ProjectMetadata> {
-    return validateProject(
+    return validateProjectMetadata(
       await this.readJson(join(this.projectPath(projectId), "project.json")),
       projectId,
     );
@@ -1159,7 +1162,7 @@ export class FileStore {
         createdAt: now,
         updatedAt: now,
       };
-      const updated = validateProject(
+      const updated = validateProjectMetadata(
         {
           ...project,
           folders: [...(project.folders ?? []), folder],

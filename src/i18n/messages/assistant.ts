@@ -3,6 +3,12 @@ import { defineMessages } from "../index";
 // In-page AI: the floating composer opened from menus and the conversation panel.
 export default defineMessages("assistant", {
   "zh-CN": {
+    "reference.pick": "标记参考位置",
+    "reference.pickHint": "点击一个位置，或拖动选择参考区域 · Esc 取消",
+    "reference.point": "参考位置",
+    "reference.region": "参考区域",
+    "reference.remove": "移除位置参考",
+    "reference.noCanvas": "请先打开白板，再标记参考位置。",
     "panel.title": "AI 对话",
     "panel.toggle": "AI 对话",
     "panel.close": "关闭 AI 对话",
@@ -24,6 +30,7 @@ export default defineMessages("assistant", {
     "panel.stop": "停止",
     "panel.steps": "执行步骤 · {count}",
     "panel.running": "正在执行…",
+    "panel.connecting": "正在连接 Agent…",
     "panel.changed": "修改了 {count} 处",
     "panel.changedPage": "页面已修改",
     "panel.locate": "定位修改",
@@ -62,6 +69,13 @@ export default defineMessages("assistant", {
       "解释所选内容的含义和要点。只在对话中回答，不要修改页面。",
   },
   en: {
+    "reference.pick": "Mark a reference location",
+    "reference.pickHint":
+      "Click a point or drag a reference area · Esc to cancel",
+    "reference.point": "Reference point",
+    "reference.region": "Reference area",
+    "reference.remove": "Remove location reference",
+    "reference.noCanvas": "Open a Board before marking a reference location.",
     "panel.title": "AI chat",
     "panel.toggle": "AI chat",
     "panel.close": "Close AI chat",
@@ -84,6 +98,7 @@ export default defineMessages("assistant", {
     "panel.stop": "Stop",
     "panel.steps": "Steps · {count}",
     "panel.running": "Working…",
+    "panel.connecting": "Connecting to Agent…",
     "panel.changed": {
       one: "Changed {count} item",
       other: "Changed {count} items",

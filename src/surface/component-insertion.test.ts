@@ -11,6 +11,27 @@ import {
 } from "../portable/validation.mjs";
 
 describe("unified component insertion", () => {
+  it("places Board components in editable Pages and reuses the selected Page for further components", () => {
+    const board = createResource(blankDocument(), "board");
+    const inserted = insertComponent(board, null, "text", {
+      content: "Editable on canvas",
+      format: "plain",
+    });
+    const page = findSurfaceNode(inserted.document, inserted.nodeId)!.node;
+    expect(page.type).toBe("surface");
+    expect(page.attrs!.kind).toBe("page");
+    expect(page.content![0].type).toBe("richText");
+    const second = insertComponent(inserted.document, inserted.nodeId, "text", {
+      content: "A related paragraph",
+      format: "plain",
+    });
+    expect(
+      findSurfaceNode(second.document, inserted.nodeId)!.node.content,
+    ).toHaveLength(2);
+    expect(() => validateDocument(second.document)).not.toThrow();
+    page.attrs!.frameless = true;
+    expect(() => validateDocument(inserted.document)).not.toThrow();
+  });
   it("discovers Page and Board alongside all normal components", () => {
     const all = listBuiltinComponents();
     for (const kind of ["page", "board"])

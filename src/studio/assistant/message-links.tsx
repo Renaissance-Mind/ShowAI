@@ -44,10 +44,11 @@ export async function downloadAgentFile(
   invoke: <T>(action: string, args?: Record<string, unknown>) => Promise<T>,
   id: string,
   path: string,
+  projectId?: string,
 ) {
   const file = await invoke<{ name: string; mime: string; base64: string }>(
     "agent:readFile",
-    { id, path },
+    { id, path, ...(projectId ? { projectId } : {}) },
   );
   const bytes = Uint8Array.from(atob(file.base64), (character) =>
     character.charCodeAt(0),

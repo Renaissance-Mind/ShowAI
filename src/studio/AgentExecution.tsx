@@ -4,6 +4,7 @@ import type { AgentDestination } from "../agent-host/remote-protocol";
 import type { ConnectorSettings } from "../agent-host/remote-connector";
 import { getLocale } from "../i18n";
 
+import { NearbyMacs } from "./LanPairing";
 const chinese = () => getLocale() === "zh-CN";
 export const remoteExecution = () =>
   document.documentElement.dataset.native === "ios";
@@ -23,6 +24,8 @@ export function AgentExecutionPicker({
     destinations: AgentDestination[];
     error?: string;
   } | null>(null);
+  const [pairing, setPairing] = useState(false);
+  const [pairId, setPairId] = useState<string>();
   const [error, setError] = useState("");
   const loadGeneration = useRef(0),
     selectionGeneration = useRef(0);
@@ -81,7 +84,10 @@ export function AgentExecutionPicker({
         <select
           disabled={disabled || !context?.connectionId}
           value={context?.destinationId ?? "cloud"}
-          onChange={(e) => void change({ destinationId: e.target.value })}
+          onChange={(e) => {
+            const id = e.target.value;
+            void change({ destinationId: id });
+          }}
         >
           {(
             context?.destinations ?? [
@@ -116,6 +122,27 @@ export function AgentExecutionPicker({
       >
         {chinese() ? "刷新设备" : "Refresh devices"}
       </button>
+      <button
+        type="button"
+        className="settings-button"
+        disabled={disabled}
+        onClick={() => {
+          setPairId(undefined);
+          setPairing(true);
+        }}
+      >
+        {chinese() ? "配对附近的 Mac" : "Pair a nearby Mac"}
+      </button>
+      {pairing && (
+        <NearbyMacs
+          initialId={pairId}
+          onClose={() => setPairing(false)}
+          onPaired={(id) => {
+            setPairing(false);
+            void change({ destinationId: id });
+          }}
+        />
+      )}
       {error && (
         <p role="alert" className="agent-error">
           {error}
@@ -129,7 +156,12 @@ export function RemoteDeviceSettings() {
     settings: ConnectorSettings;
     online: boolean;
     error: string;
-    pendingClients: { id: string; name: string }[];
+    pendingClients: { id: string; name: string; code?: string }[];
+    lan?: {
+      online: boolean;
+      error: string;
+      trusted: { id: string; name: string }[];
+    };
     connections: { id: string; name: string }[];
     projects: { id: string; name?: string; connectionId: string }[];
   } | null>(null);
@@ -154,6 +186,7 @@ export function RemoteDeviceSettings() {
                   online: next.online,
                   error: next.error,
                   pendingClients: next.pendingClients,
+                  lan: next.lan,
                 }
               : next,
           ),
@@ -273,7 +306,7 @@ export function RemoteDeviceSettings() {
       {state.pendingClients.map((client) => (
         <div className="settings-row" key={client.id}>
           <span>
-            {client.name} · {client.id.slice(-6)}
+            {client.name} · {client.code ?? client.id.slice(-6)}
           </span>
           <button
             className="settings-button"
@@ -305,7 +338,10 @@ export function RemoteDeviceSettings() {
           </button>
         </div>
       ))}
-      {state.settings.trustedClients?.map((client) => (
+      {[
+        ...(state.settings.trustedClients ?? []),
+        ...(state.lan?.trusted ?? []),
+      ].map((client) => (
         <div className="settings-row" key={client.id}>
           <span>
             {client.name} · {client.id.slice(-6)}
@@ -328,6 +364,11 @@ export function RemoteDeviceSettings() {
       ))}
       <div className="settings-row">
         <span role="status">
+          {state.lan?.online
+            ? chinese()
+              ? "局域网可发现 · "
+              : "Discoverable on LAN · "
+            : ""}
           {state.online
             ? chinese()
               ? "已连接"

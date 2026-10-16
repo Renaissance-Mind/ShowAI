@@ -341,7 +341,39 @@ export function useInlineInk({
     const resize = new ResizeObserver(schedule);
     resize.observe(surface);
     const viewportChanged = () => {
-      if (!navigating.current) schedule();
+      if (navigating.current) return;
+      cameraRevision.current++;
+      // Camera updates bypass document import and the full-frame in-flight queue.
+      // The native side rejects older revisions so an expensive import cannot rewind zoom.
+      if (bridge.viewport && surface.dataset.nativeInkActive === "true") {
+        const viewport = clientMatrix(
+          surface,
+          surface.clientWidth,
+          surface.clientHeight,
+        );
+        void bridge
+          .viewport({
+            token,
+            pageId: source.id,
+            boardId,
+            widthPx: surface.clientWidth,
+            heightPx: surface.clientHeight,
+            viewport: values(viewport),
+            camera: { ...viewCamera.current },
+            cameraVersion: cameraRevision.current,
+          })
+          .catch((error) => {
+            failed = true;
+            console.error("Native ink viewport:", error);
+            surface.dispatchEvent(
+              new CustomEvent("showai:ink-error", {
+                bubbles: true,
+                detail: String(error),
+              }),
+            );
+          });
+      }
+      schedule();
     };
     const animationStart = (event: Event) => {
       if (event.target instanceof Element && !content.contains(event.target)) {

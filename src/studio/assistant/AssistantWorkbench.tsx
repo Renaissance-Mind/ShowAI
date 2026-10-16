@@ -24,6 +24,7 @@ import type {
   AgentTurn,
 } from "../../agent-host/types";
 import { desktop, errorMessage } from "../bridge";
+import { MacPairingPrompt } from "../LanPairing";
 import { AgentExecutionPicker, remoteExecution } from "../AgentExecution";
 import type { Translator } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
@@ -40,8 +41,16 @@ import {
   Undo2,
   X,
 } from "../../ui/icons";
-import { downloadAgentFile, messageLinks } from "./message-links";
+import { downloadAgentFile } from "./message-links";
 import "./assistant.css";
+import { useAssistantDrafts } from "./useAssistantDrafts";
+import { AgentMarkdown } from "./AgentMarkdown";
+import {
+  referenceRequest,
+  referencePicked,
+  referenceDisplay,
+  type CanvasReference,
+} from "../../surface/agent-reference";
 
 const agentNames: Record<string, string> = {
   codex: "Codex",
@@ -95,7 +104,20 @@ function TurnView({
   onFile: (path: string) => void;
 }) {
   const t = useTranslator(strings);
-  const tools = turn.events.filter((event) => event.type === "tool");
+  const groups: {
+    sequence: number;
+    tools?: typeof turn.events;
+    message?: string;
+  }[] = [];
+  for (const event of turn.events) {
+    if (event.type === "message")
+      groups.push({ sequence: event.sequence, message: event.text });
+    if (event.type === "tool") {
+      const last = groups.at(-1);
+      if (last?.tools) last.tools.push(event);
+      else groups.push({ sequence: event.sequence, tools: [event] });
+    }
+  }
   const changed = turn.changedBlockIds ?? [];
   const pageChanged =
     turn.wrotePage ??
@@ -123,22 +145,28 @@ function TurnView({
         )}
       </div>
       <div className="assistant-reply">
-        {turn.events.map((event) =>
-          event.type === "message" ? (
-            <div key={event.sequence} className="assistant-message">
-              {messageLinks(event.text, onFile)}
+        {groups.map((group) =>
+          group.tools ? (
+            <details className="assistant-steps" key={group.sequence}>
+              <summary>
+                {group.tools.some((event) => event.state === "running") && (
+                  <Loader2 size={12} className="studio-spin" />
+                )}{" "}
+                {t("panel.steps", { count: group.tools.length })}
+              </summary>
+              <ol>
+                {group.tools.map((event) => (
+                  <li key={event.sequence} data-state={event.state}>
+                    <pre>{event.text}</pre>
+                  </li>
+                ))}
+              </ol>
+            </details>
+          ) : (
+            <div key={group.sequence} className="assistant-message">
+              <AgentMarkdown text={group.message ?? ""} onFile={onFile} />
             </div>
-          ) : null,
-        )}
-        {tools.length > 0 && (
-          <details className="assistant-steps">
-            <summary>{t("panel.steps", { count: tools.length })}</summary>
-            <ol>
-              {tools.map((event) => (
-                <li key={event.sequence}>{event.text}</li>
-              ))}
-            </ol>
-          </details>
+          ),
         )}
         {turn.approvals?.map((approval) => (
           <div className="assistant-approval" key={approval.id}>
@@ -166,10 +194,7 @@ function TurnView({
           <p className="assistant-status" role="status">
             <Loader2 size={13} className="studio-spin" aria-hidden="true" />
             <span>
-              {/* Agent-internal notices are not progress; show host status only before output starts. */}
-              {turn.events.some((event) => event.type !== "status")
-                ? t("panel.running")
-                : (turn.events.at(-1)?.text ?? t("panel.running"))}
+              {turn.events.length ? t("panel.running") : t("panel.connecting")}
             </span>
             <button type="button" onClick={onCancel}>
               <Square size={11} aria-hidden="true" />
@@ -391,14 +416,28 @@ export default function AssistantWorkbench({
   );
   const [fresh, setFresh] = useState(false);
   const [composer, setComposer] = useState<AssistantTarget | null>(null);
-  const [panelTarget, setPanelTarget] = useState<AssistantTarget | null>(null);
-  const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const composerKey = `${projectId ?? ""}/${fresh ? "new" : (selectedId ?? "new")}`;
+  const messageDraft = useAssistantDrafts(composerKey);
+  const draft = messageDraft.text,
+    panelTarget = messageDraft.pageId === pageId ? messageDraft.target : null,
+    reference = messageDraft.pageId === pageId ? messageDraft.reference : null;
+  const setDraft = (text: string) => messageDraft.update({ text });
+  const setPanelTarget = (target: AssistantTarget | null) =>
+    messageDraft.update({ target, pageId });
+  const setReference = (value: CanvasReference | null) =>
+    messageDraft.update({ reference: value, pageId });
+  const [sendingKeys, setSendingKeys] = useState<string[]>([]);
+  const sending = useRef(new Set<string>());
+  const busy = sendingKeys.includes(composerKey);
   const [error, setError] = useState("");
   const [status, setStatus] = useState<AgentHostStatus | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [executionRevision, setExecutionRevision] = useState(0);
   const executionGeneration = useRef(0);
+  const selectionGeneration = useRef(0);
+  const conversationCache = useRef(new Map<string, AgentConversation>());
+  const rememberedThreads = useRef(new Map<string, string>());
   useEffect(() => {
     const change = () => {
       executionGeneration.current++;
@@ -417,6 +456,35 @@ export default function AssistantWorkbench({
   const list = useRef<HTMLDivElement>(null);
   const project = useRef(projectId);
   project.current = projectId;
+  useEffect(() => {
+    const picked = (event: Event) => {
+      const value = (event as CustomEvent).detail;
+      if (value?.pageId === pageId) setReference(value.reference);
+    };
+    window.addEventListener(referencePicked, picked);
+    return () => window.removeEventListener(referencePicked, picked);
+  }, [pageId, composerKey]);
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent(referenceDisplay, { detail: { pageId, reference } }),
+    );
+    return () => {
+      window.dispatchEvent(
+        new CustomEvent(referenceDisplay, {
+          detail: { pageId, reference: null },
+        }),
+      );
+    };
+  }, [pageId, reference]);
+  const pickReference = () => {
+    if (!pageId) return;
+    const request = new CustomEvent(referenceRequest, {
+      cancelable: true,
+      detail: { id: crypto.randomUUID(), pageId },
+    });
+    window.dispatchEvent(request);
+    if (!request.defaultPrevented) setError(t("reference.noCanvas"));
+  };
 
   const loadSummaries = useCallback(async (id: string) => {
     const generation = executionGeneration.current;
@@ -430,6 +498,13 @@ export default function AssistantWorkbench({
     return next;
   }, []);
   const select = useCallback(async (projectKey: string, id: string) => {
+    const selection = ++selectionGeneration.current;
+    rememberedThreads.current.set(projectKey, id);
+    setSelectedId(id);
+    setFresh(false);
+    setConfirmDelete(false);
+    setError("");
+    setConversation(conversationCache.current.get(id) ?? null);
     const generation = executionGeneration.current;
     const next = await desktop.invoke<AgentConversation>("agent:conversation", {
       projectId: projectKey,
@@ -437,8 +512,10 @@ export default function AssistantWorkbench({
     });
     if (
       project.current === projectKey &&
-      executionGeneration.current === generation
+      executionGeneration.current === generation &&
+      selectionGeneration.current === selection
     ) {
+      conversationCache.current.set(id, next);
       setConversation(next);
       setFresh(false);
     }
@@ -446,12 +523,18 @@ export default function AssistantWorkbench({
   // Conversations belong to the project; switching projects starts from its latest one.
   useEffect(() => {
     setConversation(null);
+    setSelectedId(null);
+    selectionGeneration.current++;
     setSummaries([]);
     setFresh(false);
     setError("");
     if (!projectId || !open) return;
     void loadSummaries(projectId)
-      .then((items) => items[0] && select(projectId, items[0].id))
+      .then((items) => {
+        const remembered = rememberedThreads.current.get(projectId);
+        const item = items.find((item) => item.id === remembered) ?? items[0];
+        if (item) return select(projectId, item.id);
+      })
       .catch((reason) => setError(errorMessage(reason)));
   }, [projectId, open, loadSummaries, select, executionRevision]);
   useEffect(() => {
@@ -471,6 +554,23 @@ export default function AssistantWorkbench({
   }, [open, !!composer, projectId, executionRevision]);
 
   const running = conversation?.turns.find((turn) => turn.state === "running");
+  useEffect(() => {
+    if (!open || !projectId || !summaries.some((item) => item.running)) return;
+    let pending = false;
+    const timer = setInterval(
+      () => {
+        if (pending) return;
+        pending = true;
+        void loadSummaries(projectId)
+          .catch((reason) => setError(errorMessage(reason)))
+          .finally(() => {
+            pending = false;
+          });
+      },
+      remoteExecution() ? 4000 : 1600,
+    );
+    return () => clearInterval(timer);
+  }, [projectId, open, summaries.some((item) => item.running), loadSummaries]);
   useEffect(() => {
     if (!conversation || !running) return;
     let stopped = false;
@@ -534,9 +634,20 @@ export default function AssistantWorkbench({
   }, [lastEvent?.sequence, lastEvent?.text.length, running?.state]);
 
   const send = async (prompt: string, target: AssistantTarget | null) => {
-    if (!projectId || !prompt.trim()) return false;
-    setBusy(true);
+    if (
+      (!fresh && selectedId && !conversation) ||
+      !projectId ||
+      !prompt.trim() ||
+      sending.current.has(composerKey) ||
+      (!fresh && running)
+    )
+      return false;
+    const sentText = draft;
+    sending.current.add(composerKey);
+    setSendingKeys([...sending.current]);
     setError("");
+    const sentDraftKey = composerKey,
+      selection = selectionGeneration.current;
     try {
       if (!(await flush())) throw new Error(t("panel.saveFirst"));
       const hostTarget: AgentTarget = {
@@ -551,6 +662,7 @@ export default function AssistantWorkbench({
         ...(target?.kind === "text" && target.text
           ? { text: target.text }
           : {}),
+        ...(reference ? { reference } : {}),
       };
       const next = await desktop.invoke<AgentConversation>("agent:send", {
         projectId,
@@ -559,16 +671,26 @@ export default function AssistantWorkbench({
         target: hostTarget,
       });
       if (project.current !== projectId) return true;
+      conversationCache.current.set(next.id, next);
+      messageDraft.clear(sentDraftKey, sentText);
+      void loadSummaries(projectId);
+      if (selectionGeneration.current !== selection) return true;
+      setSelectedId(next.id);
       setConversation(next);
       setFresh(false);
       onOpenChange(true);
       void loadSummaries(projectId);
       return true;
     } catch (reason) {
-      setError(errorMessage(reason));
+      if (
+        selectionGeneration.current === selection &&
+        project.current === projectId
+      )
+        setError(errorMessage(reason));
       return false;
     } finally {
-      setBusy(false);
+      sending.current.delete(sentDraftKey);
+      setSendingKeys([...sending.current]);
     }
   };
   const act = (work: () => Promise<unknown>) => () =>
@@ -615,7 +737,13 @@ export default function AssistantWorkbench({
           : t("panel.sendToNew")}
       </span>
       {conversation && (
-        <button type="button" onClick={() => setFresh(!fresh)}>
+        <button
+          type="button"
+          onClick={() => {
+            selectionGeneration.current++;
+            setFresh(!fresh);
+          }}
+        >
           {fresh ? t("panel.useCurrent") : t("panel.useNew")}
         </button>
       )}
@@ -646,6 +774,7 @@ export default function AssistantWorkbench({
   return (
     <AssistantContext.Provider value={bridge}>
       {children}
+      {!remoteExecution() && <MacPairingPrompt />}
       {composer && bridge && (
         <Composer
           target={composer}
@@ -703,6 +832,7 @@ export default function AssistantWorkbench({
               aria-label={t("panel.new")}
               title={t("panel.new")}
               onClick={() => {
+                selectionGeneration.current++;
                 setFresh(true);
                 setConfirmDelete(false);
               }}
@@ -729,6 +859,32 @@ export default function AssistantWorkbench({
               <X size={15} />
             </button>
           </header>
+          {summaries.length > 1 && (
+            <nav
+              className="assistant-threads"
+              aria-label={t("panel.conversations")}
+            >
+              {summaries.slice(0, 6).map((item) => (
+                <button
+                  type="button"
+                  key={item.id}
+                  aria-current={
+                    !fresh && selectedId === item.id ? "true" : undefined
+                  }
+                  onClick={act(() => select(projectId!, item.id))}
+                  title={item.title}
+                >
+                  {item.running && (
+                    <span
+                      className="assistant-thread-dot"
+                      aria-label={t("panel.running")}
+                    />
+                  )}
+                  {item.title}
+                </button>
+              ))}
+            </nav>
+          )}
           {confirmDelete && conversation && (
             <div className="assistant-confirm" role="alertdialog">
               <p>{t("panel.deleteConfirm", { title: conversation.title })}</p>
@@ -770,11 +926,20 @@ export default function AssistantWorkbench({
                   onLocate={onLocate}
                   onFile={(path) =>
                     act(() =>
-                      downloadAgentFile(desktop.invoke, turn.id, path),
+                      downloadAgentFile(
+                        desktop.invoke,
+                        turn.id,
+                        path,
+                        turn.projectId,
+                      ),
                     )()
                   }
                   onCancel={act(() =>
-                    desktop.invoke("agent:cancel", { id: turn.id }),
+                    desktop.invoke("agent:cancel", {
+                      id: turn.id,
+                      projectId: turn.projectId,
+                      conversationId: turn.conversationId,
+                    }),
                   )}
                   onUndo={act(async () =>
                     setConversation(
@@ -791,6 +956,8 @@ export default function AssistantWorkbench({
                         id,
                         option,
                         conversation: true,
+                        projectId: turn.projectId,
+                        conversationId: turn.conversationId,
                       }),
                     )()
                   }
@@ -804,15 +971,26 @@ export default function AssistantWorkbench({
               event.preventDefault();
               const prompt = draft.trim();
               if (!prompt) return;
-              void send(prompt, panelTarget).then((sent) => {
-                if (sent) {
-                  setDraft("");
-                  setPanelTarget(null);
-                }
-              });
+              void send(prompt, panelTarget);
             }}
           >
             <div className="assistant-form-target">
+              {reference && (
+                <button
+                  type="button"
+                  className="assistant-chip"
+                  onClick={() => setReference(null)}
+                  title={t("reference.remove")}
+                >
+                  <LocateFixed size={12} />
+                  {t(
+                    reference.kind === "point"
+                      ? "reference.point"
+                      : "reference.region",
+                  )}{" "}
+                  <X size={12} />
+                </button>
+              )}
               <span className="assistant-chip is-static">
                 {targetLabel(t, panelTarget, pageTitle)}
               </span>
@@ -828,6 +1006,16 @@ export default function AssistantWorkbench({
               )}
             </div>
             <div className="assistant-input">
+              <button
+                type="button"
+                className="assistant-icon assistant-reference-button"
+                aria-label={t("reference.pick")}
+                title={t("reference.pick")}
+                disabled={!pageId}
+                onClick={pickReference}
+              >
+                <LocateFixed size={17} />
+              </button>
               <textarea
                 rows={3}
                 value={draft}
@@ -849,7 +1037,13 @@ export default function AssistantWorkbench({
                 type="submit"
                 className="assistant-send"
                 aria-label={t("panel.send")}
-                disabled={busy || !draft.trim() || !projectId || !pageId}
+                disabled={
+                  busy ||
+                  (!fresh && !!running) ||
+                  !draft.trim() ||
+                  !projectId ||
+                  !pageId
+                }
               >
                 {busy ? (
                   <Loader2 size={14} className="studio-spin" />
@@ -870,9 +1064,9 @@ export default function AssistantWorkbench({
                 {agentLabel || t("panel.settings")}
               </button>
             </footer>
-            {error && !composer && (
+            {(error || messageDraft.persistenceError) && !composer && (
               <p className="assistant-error" role="alert">
-                {error}
+                {error || messageDraft.persistenceError}
               </p>
             )}
           </form>
