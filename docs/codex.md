@@ -6,7 +6,11 @@ The local ShowAI plugin contains seven Skills and a stdio MCP launcher. Codex us
 
 ## Install and connect
 
-Use Node.js 22.12+, Codex CLI on `PATH`, and a runtime supporting `showai-mcp-v1`. Start ShowAI once, or run `runtime register --json` with the actual runtime, to record `agent-runtime.json` in the target library.
+In the desktop App, open **Settings → Agent → Local connection → Install the ShowAI plugin** and click **Install plugin** next to Codex. The same panel installs the Claude Code plugin. Install the host application first; its plugin-management CLI must be available. On macOS, ShowAI also checks the standard Codex app locations for its bundled CLI.
+
+The App supplies the plugin files and executable runtime, so this path requires neither the ShowAI source repository nor a separate Node.js installation. It verifies the installed files and enabled state. The connection uses the current content library; use **Update and enable** after switching libraries or moving the App. Refresh/restart the host to load the new tools. If ShowAI is already enabled from another source, disable that plugin in the host before installing the App version.
+
+For installation from source, use Node.js 22.12+, Codex CLI on `PATH`, and a runtime supporting `showai-mcp-v1`. Start ShowAI once, or run `runtime register --json` with the actual runtime, to record `agent-runtime.json` in the target library.
 
 From the repository:
 

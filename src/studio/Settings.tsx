@@ -25,6 +25,7 @@ import LibrarySpace from "./LibrarySpace";
 import IconViewer from "./IconViewer";
 import SyncSettings, { type ProjectSyncRequest } from "./SyncSettings";
 import AgentSettings from "./AgentSettings";
+import PluginInstallSettings from "./PluginInstallSettings";
 
 const sections = [
   {
@@ -287,6 +288,9 @@ export function SettingsPanel({
             aria-labelledby="settings-agent-title"
           >
             <h2 id="settings-agent-title">{t("localConnection")}</h2>
+            {info && info.mode !== "browser" && (
+              <PluginInstallSettings home={info.home} />
+            )}
             <div className="settings-row">
               <div className="settings-row-text">
                 <h3>{t("launchConfig")}</h3>

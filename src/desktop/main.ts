@@ -28,6 +28,10 @@ import { syncManager } from "../sync/manager";
 import { deepLinkInvitation } from "../sync/server-url";
 import { openLibrary } from "../core/open-library";
 import { registerRuntime } from "../agent/runtime";
+import {
+  DesktopPluginInstaller,
+  desktopPluginActions,
+} from "../plugin/desktop-install";
 import { AgentHost, agentActions } from "../agent-host/host";
 import {
   RemoteMacConnector,
@@ -66,6 +70,7 @@ const appearanceIcons = new Map<DesktopAppearance, NativeImage>();
 let store: FileStore;
 let service: AgentService;
 let agentHost: AgentHost;
+let pluginInstaller: DesktopPluginInstaller;
 let remoteConnector: RemoteMacConnector;
 let watcher: FSWatcher | undefined;
 let maintenance: MaintenanceScheduler | undefined;
@@ -416,6 +421,8 @@ async function handle(
   window: BrowserWindow,
 ): Promise<unknown> {
   maintenance?.markActivity();
+  if (action === "plugins:status") return pluginInstaller.status();
+  if (action === "plugins:install") return pluginInstaller.install(args.host);
   if (action === "agent:remoteDevice") return remoteConnector.status();
   if (action === "agent:approveRemoteClient")
     return remoteConnector.approveClient(
@@ -768,6 +775,14 @@ else {
             : join(runtimePath(), "assets/agent-plugin"),
         openUrl: (url) => shell.openExternal(url),
       });
+      pluginInstaller = new DesktopPluginInstaller({
+        root: join(app.getPath("userData"), "external-plugins"),
+        pluginRoot: () =>
+          process.env.SHOWAI_DEV_URL
+            ? join(process.cwd(), "plugins/showai")
+            : join(runtimePath(), "assets/agent-plugin"),
+        runtime: () => info(),
+      });
       remoteConnector = new RemoteMacConnector(agentHost, () => store.root);
       void remoteConnector
         .start()
@@ -824,6 +839,7 @@ else {
               typeof action !== "string" ||
               (!actions.has(action) &&
                 !agentActions.has(action) &&
+                !desktopPluginActions.has(action) &&
                 !remoteDeviceActions.has(action))
             )
               throw new CoreError("INVALID_DATA", "Unknown desktop action.");

@@ -581,3 +581,22 @@
   color: var(--muted);
   font-size: 11px;
 }
+.plugin-install-error {
+  color: var(--danger, #c43d3d);
+  overflow-wrap: anywhere;
+}
+.plugin-install-note,
+.plugin-install-result {
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.plugin-install-note {
+  opacity: 0.7;
+}
+.plugin-install-settings .settings-row-text {
+  min-width: 0;
+}
+.plugin-install-settings .settings-button {
+  flex-shrink: 0;
+}

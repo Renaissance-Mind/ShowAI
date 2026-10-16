@@ -2,11 +2,13 @@
 
 **Language:** English | [简体中文](README.zh-CN.md) · [Documentation](../../docs/README.md)
 
-The local **0.16.1** plugin supplies seven Skills and a stdio MCP launcher for reading, creating, revising and presenting ShowAI content. The application/runtime is installed separately. The repository's application source version is **0.9.0**; runtime capabilities determine compatibility.
+The local **0.17.0** plugin supplies seven Skills and a stdio MCP launcher for reading, creating, revising and presenting ShowAI content. The application/runtime is installed separately. The repository's application source version is **0.9.0**; runtime capabilities determine compatibility.
 
 ## Install locally
 
-Use Node.js 22.12+ and Codex CLI on PATH. Build/start ShowAI, or register an installed standalone runtime, so the selected library has an agent-runtime.json. From this repository:
+Desktop App users can open **Settings → Agent → Local connection** to install the plugin for Codex or Claude Code. Install the host first and make its plugin-management CLI available. The App supplies the plugin and runtime; no source checkout or separate Node.js is needed. Refresh/restart the host after installation. The connection uses the selected library; update it again after switching libraries or moving the App. Disable an enabled ShowAI plugin from another source before installing the App version.
+
+For source installation, use Node.js 22.12+ and Codex CLI on PATH. Build/start ShowAI, or register an installed standalone runtime, so the selected library has an agent-runtime.json. From this repository:
 
 ```sh
 npm run plugin:install -- --json

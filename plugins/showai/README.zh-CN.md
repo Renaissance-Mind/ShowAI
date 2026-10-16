@@ -2,11 +2,13 @@
 
 **语言：** [English](README.md) | 简体中文 · [文档目录](../../docs/i18n/index.zh-CN.md)
 
-本机 **0.16.1** 插件提供七个 Skill 与 stdio MCP launcher，用于读取、创建、续改和展示 ShowAI 内容。应用/运行时独立安装，仓库应用源码版本为 **0.9.0**，兼容性以实际运行时能力为准。
+本机 **0.17.0** 插件提供七个 Skill 与 stdio MCP launcher，用于读取、创建、续改和展示 ShowAI 内容。应用/运行时独立安装，仓库应用源码版本为 **0.9.0**，兼容性以实际运行时能力为准。
 
 ## 本机安装
 
-需要 Node.js 22.12+ 和 PATH 中的 Codex CLI。先构建/启动 ShowAI，或登记已安装的独立运行时，使目标内容库存在 agent-runtime.json。在源码仓库执行：
+桌面 App 用户打开「设置 → Agent → 本地连接」，即可给 Codex 或 Claude Code 安装插件。先安装宿主并确保其插件管理 CLI 可用。App 提供插件和运行时，无需下载源码或单独安装 Node.js；安装后刷新或重启宿主。连接使用所选内容库，切换库或移动 App 后再次更新插件。已有其他来源的 ShowAI 插件时，先在宿主中停用原插件，再安装 App 版本。
+
+源码安装需要 Node.js 22.12+ 和 PATH 中的 Codex CLI。先构建/启动 ShowAI，或登记已安装的独立运行时，使目标内容库存在 agent-runtime.json。在源码仓库执行：
 
 ```sh
 npm run plugin:install -- --json

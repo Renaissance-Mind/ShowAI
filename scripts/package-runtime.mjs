@@ -1,4 +1,6 @@
 import { frontendManifest } from "./build-info.mjs";
+// Prepare the canonical plugin before taking the copy shipped inside the App.
+import "./package-plugin.mjs";
 import { build } from "esbuild";
 import {
   copyFile,
