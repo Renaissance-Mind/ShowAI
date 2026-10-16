@@ -135,7 +135,12 @@ test.skipIf(!process.env.SHOWAI_NATIVE_LAN_TEST_ROOT)(
     host.close();
     await stopSyncManagers();
     await server.close();
-    await rm(root, { recursive: true, force: true });
+    await rm(root, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100,
+    });
   },
   900000,
 );

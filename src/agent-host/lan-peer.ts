@@ -77,6 +77,7 @@ export class LanPeerServer {
     string,
     { fingerprint: string; task: Promise<unknown> }
   >();
+  private syncWork = new Set<Promise<unknown>>();
   private syncTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private closing?: Promise<void>;
   private pin = "";
@@ -511,16 +512,19 @@ export class LanPeerServer {
     }
   }
   private queueSync(projectId: string) {
+    if (!this.server || this.closing) return;
     clearTimeout(this.syncTimers.get(projectId));
     this.syncTimers.set(
       projectId,
       setTimeout(() => {
         this.syncTimers.delete(projectId);
-        void syncManager(this.home())
+        const work = syncManager(this.home())
           .run(projectId)
           .catch((error) => {
             this.error = `Saved on Mac; server sync: ${error.message}`;
           });
+        this.syncWork.add(work);
+        void work.finally(() => this.syncWork.delete(work));
       }, 700),
     );
   }
@@ -733,6 +737,7 @@ export class LanPeerServer {
       clearTimeout(this.changes);
       for (const timer of this.syncTimers.values()) clearTimeout(timer);
       this.syncTimers.clear();
+      await Promise.allSettled([...this.syncWork]);
       for (const socket of this.clients.keys())
         socket.close(1001, "Local sharing stopped");
       this.clients.clear();
