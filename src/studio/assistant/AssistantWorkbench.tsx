@@ -633,7 +633,11 @@ export default function AssistantWorkbench({
       element.scrollTop = element.scrollHeight;
   }, [lastEvent?.sequence, lastEvent?.text.length, running?.state]);
 
-  const send = async (prompt: string, target: AssistantTarget | null) => {
+  const send = async (
+    prompt: string,
+    target: AssistantTarget | null,
+    clearDraft = true,
+  ) => {
     if (
       (!fresh && selectedId && !conversation) ||
       !projectId ||
@@ -642,7 +646,9 @@ export default function AssistantWorkbench({
       (!fresh && running)
     )
       return false;
-    const sentText = draft;
+    const sentText = draft,
+      sentAt = messageDraft.updatedAt;
+    const sentReference = clearDraft ? reference : target?.reference;
     sending.current.add(composerKey);
     setSendingKeys([...sending.current]);
     setError("");
@@ -662,7 +668,7 @@ export default function AssistantWorkbench({
         ...(target?.kind === "text" && target.text
           ? { text: target.text }
           : {}),
-        ...(reference ? { reference } : {}),
+        ...(sentReference ? { reference: sentReference } : {}),
       };
       const next = await desktop.invoke<AgentConversation>("agent:send", {
         projectId,
@@ -672,7 +678,7 @@ export default function AssistantWorkbench({
       });
       if (project.current !== projectId) return true;
       conversationCache.current.set(next.id, next);
-      messageDraft.clear(sentDraftKey, sentText);
+      if (clearDraft) messageDraft.clear(sentDraftKey, sentText, sentAt);
       void loadSummaries(projectId);
       if (selectionGeneration.current !== selection) return true;
       setSelectedId(next.id);
@@ -784,7 +790,7 @@ export default function AssistantWorkbench({
           destination={destination}
           onClose={closeComposer}
           onSend={(prompt) =>
-            void send(prompt, composer).then(
+            void send(prompt, composer, false).then(
               (sent) => sent && setComposer(null),
             )
           }

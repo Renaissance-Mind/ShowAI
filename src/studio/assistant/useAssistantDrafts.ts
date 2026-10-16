@@ -86,9 +86,14 @@ export function useAssistantDrafts(key: string) {
     ...current,
     persistenceError,
     update,
-    clear: (capturedKey = key, sentText?: string) =>
+    clear: (capturedKey = key, sentText?: string, sentAt?: number) =>
       setDrafts((before) => {
         if (sentText !== undefined && before[capturedKey]?.text !== sentText)
+          return before;
+        if (
+          sentAt !== undefined &&
+          (before[capturedKey]?.updatedAt ?? 0) !== sentAt
+        )
           return before;
         const next = { ...before };
         delete next[capturedKey];
