@@ -785,7 +785,7 @@ export default function AssistantWorkbench({
         <Composer
           target={composer}
           pageTitle={pageTitle}
-          busy={busy}
+          busy={busy || (!fresh && !!running)}
           error={error}
           destination={destination}
           onClose={closeComposer}
