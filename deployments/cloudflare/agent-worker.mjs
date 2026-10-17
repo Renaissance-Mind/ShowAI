@@ -269,10 +269,17 @@ export class ShowAIAgentGateway extends DurableObject {
 const fs=require('node:fs'),crypto=require('node:crypto');
 const source=fs.readFileSync('/app/scripts/container.mjs','utf8');
 let files=0,partial=0;function walk(path){for(const entry of fs.readdirSync(path,{withFileTypes:true})){const child=path+'/'+entry.name;if(entry.isDirectory())walk(child);else{files++;if(entry.name.endsWith('.restore'))partial++;}}}walk('/state');
-console.log(JSON.stringify({node:process.version,bundleSHA256:crypto.createHash('sha256').update(source).digest('hex'),restoreProgressFeature:source.includes('onRestoreProgress'),files,partial}));
+const directory='/state/agent-host/remote-turns',jobs=fs.existsSync(directory)?fs.readdirSync(directory).filter(name=>/^[a-f0-9-]{36}\.json$/.test(name)).slice(-100).map(name=>{const job=JSON.parse(fs.readFileSync(directory+'/'+name,'utf8'));return{id:job.id,phase:job.phase,state:job.turn?.state,pageId:job.turn?.pageId,error:job.turn?.error,startedAt:job.turn?.startedAt,marker:job.turn?.prompt?.match(/SHOWAI_[A-Z]+_[a-f0-9]{12}/)?.[0]}}):[];
+(async()=>{let localHealth,contentNetwork;try{localHealth=await fetch('http://127.0.0.1:8790/health',{signal:AbortSignal.timeout(2000)}).then(r=>r.json())}catch(error){localHealth={error:error.message}}const start=Date.now();try{const response=await fetch(process.env.SHOWAI_DIAGNOSTIC_INFO,{signal:AbortSignal.timeout(5000)});await response.arrayBuffer();contentNetwork={status:response.status,ms:Date.now()-start}}catch(error){contentNetwork={error:error.name,ms:Date.now()-start}}console.log(JSON.stringify({node:process.version,bundleSHA256:crypto.createHash('sha256').update(source).digest('hex'),restoreProgressFeature:source.includes('onRestoreProgress'),files,partial,jobs,localHealth,contentNetwork}));})();
 `,
               ],
-              { signal: AbortSignal.timeout(10000) },
+              {
+                signal: AbortSignal.timeout(10000),
+                env: {
+                  SHOWAI_DIAGNOSTIC_INFO:
+                    this.env.SHOWAI_AGENT_SYNC_SERVICE_URL + "/api/info",
+                },
+              },
             );
             const output = await process.output();
             return json({
