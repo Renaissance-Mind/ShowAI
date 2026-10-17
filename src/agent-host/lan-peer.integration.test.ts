@@ -10,6 +10,7 @@ import { AgentService } from "../agent/service";
 import { syncManager, stopSyncManagers } from "../sync/manager";
 import { AgentHost } from "./host";
 import { LanPeerServer } from "./lan-peer";
+import { RemoteMacConnector } from "./remote-connector";
 import type { ConnectorSettings } from "./remote-connector";
 import type { ShowDocument } from "../types";
 let root: string,
@@ -283,4 +284,118 @@ test("authenticated WSS delivers changes and consent survives restart; revocatio
       )
     ).value.state,
   ).toBe("pending");
+});
+
+test("nearby Mac accepts a local iPad project without any cloud account and never grants existing Mac workspaces", async () => {
+  await peer.close();
+  host.close();
+  service = new AgentService({ root: join(root, "account-free-library") });
+  host = new AgentHost({
+    root: join(root, "account-free-agent"),
+    library: () => service.store,
+    cli: () => ({ command: process.execPath, args: [], env: {} }),
+    pluginRoot: () => join(root, "plugin"),
+  });
+  const connector = new RemoteMacConnector(host, () => service.store.root);
+  const [first, second] = await Promise.all([
+    connector.status(),
+    connector.status(),
+  ]);
+  expect(first.settings.deviceId).toBe(second.settings.deviceId);
+  expect(first.settings.nearbyEnabled).toBe(true);
+  expect(first.settings.enabled).toBe(false);
+  expect(first.connections).toEqual([]);
+  settings = first.settings;
+  peer = connector.lan;
+  await connector.start();
+  certificate = await readFile(
+    join(root, "account-free-agent", "lan-peer", "identity.crt"),
+  );
+  const pair = randomUUID();
+  await post(
+    "/pair",
+    { id: pair, clientId, name: "Local iPad", secret },
+    false,
+  );
+  await peer.approve(pair, true);
+  const status = await rpc("agent:status", {}, randomUUID(), "");
+  expect(status.status).toBe(200);
+  expect(status.value.data.tasks).toEqual([]);
+  expect(status.value.data.workspaceRoot).toBe("");
+  const privateProject = await service.createProject("Mac private project");
+  const privatePage = await service.createPage(privateProject.id, {
+    title: "Mac private Page",
+  });
+  const metadata = {
+    ...(await service.store.readProject(privateProject.id)),
+    name: "iPad local project",
+    sourceDirectory: "/tmp",
+    binding: { harness: "external", sessionId: "untrusted" },
+  };
+  const wire = privateProject.id;
+  expect((await rpc("replica:index", {}, randomUUID(), wire)).status).toBe(403);
+  const attached = await rpc(
+    "replica:attach",
+    { metadata },
+    randomUUID(),
+    wire,
+  );
+  expect(attached.status).toBe(200);
+  expect(attached.value.data.serverLinked).toBe(false);
+  expect(
+    (await rpc("replica:index", {}, randomUUID(), wire)).value.data.pages,
+  ).toEqual([]);
+  const imported = (await service.store.listProjects()).find(
+    (p) => p.id !== privateProject.id,
+  )!;
+  expect(imported).toBeTruthy();
+  const original = await service.store.readProject(imported.id);
+  expect(original.binding?.harness).toBe("showai-ipad");
+  expect(original.sourceDirectory).toBeUndefined();
+  const saved = await rpc(
+    "replica:metadata",
+    { metadata, base: attached.value.data.metadata },
+    randomUUID(),
+    wire,
+  );
+  expect(saved.status).toBe(200);
+  const after = await service.store.readProject(imported.id);
+  expect(after.name).toBe("iPad local project");
+  expect(after.binding).toEqual(original.binding);
+  expect(after.sourceDirectory).toBeUndefined();
+  const document = {
+    ...privatePage.document,
+    id: randomUUID(),
+    title: "From the iPad",
+  };
+  expect(
+    (await rpc("replica:savePage", { document }, randomUUID(), wire)).status,
+  ).toBe(200);
+  expect(
+    (await service.store.listPages(privateProject.id)).map((p) => p.id),
+  ).toEqual([privatePage.document.id]);
+  expect((await service.store.listPages(imported.id)).map((p) => p.id)).toEqual(
+    [document.id],
+  );
+  await rpc("replica:attach", { metadata }, randomUUID(), wire);
+  expect((await service.store.listProjects()).length).toBe(2);
+  await peer.close();
+  await peer.start();
+  expect(
+    (await rpc("replica:page", { pageId: document.id }, randomUUID(), wire))
+      .value.data.document.title,
+  ).toBe("From the iPad");
+  expect(
+    (
+      await rpc(
+        "replica:page",
+        { pageId: privatePage.document.id },
+        randomUUID(),
+        wire,
+      )
+    ).status,
+  ).not.toBe(200);
+  await peer.approve(clientId, false);
+  expect((await rpc("replica:index", {}, randomUUID(), wire)).status).toBe(401);
+  connector.close();
 });

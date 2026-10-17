@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](README.zh-CN.md) · [Documentation](../../docs/README.md)
 
-The local **0.18.0** plugin supplies eight Skills and a stdio MCP launcher for reading, creating, revising and presenting ShowAI content. The application/runtime is installed separately. The repository's application source version is **0.9.0**; runtime capabilities determine compatibility.
+The local plugin supplies eight Skills and a stdio MCP launcher for reading, creating, revising and presenting ShowAI content. The application/runtime is installed separately. The repository's application source version is **0.9.0**; runtime capabilities determine compatibility.
 
 ## Install locally
 

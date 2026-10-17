@@ -558,46 +558,205 @@
 
 .lan-pairing-dialog {
   max-width: 460px;
+  padding: 24px;
 }
-.lan-pairing-dialog p {
-  line-height: 1.65;
+.lan-pairing-dialog > header {
+  margin-bottom: 12px;
 }
-.lan-pair-code {
-  text-align: center;
-  padding: 18px;
-  margin: 18px 0;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--panel);
-}
-.lan-pair-code strong {
-  font: 600 32px var(--font-mono);
-  letter-spacing: 0.18em;
-  color: var(--accent);
-}
-.lan-pair-code p {
-  font-size: 12px;
+.lan-intro {
   color: var(--muted);
-  margin-bottom: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0 0 20px;
+}
+.lan-device-list {
+  display: grid;
+  gap: 10px;
 }
 .lan-device {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 0;
-  border-top: 1px solid var(--line);
+  gap: 14px;
+  padding: 18px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.lan-device-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 54px;
+  height: 54px;
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+}
+.lan-device-identity {
+  flex: 1;
+  min-width: 0;
+}
+.lan-device b {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  line-height: 1.5;
 }
 .lan-device small {
-  display: block;
-  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--muted);
-  margin-top: 4px;
+  font-size: 11px;
+  margin-top: 5px;
+}
+.lan-device small i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+.lan-device small i.available {
+  background: #27a170;
+}
+.lan-device .settings-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  flex-shrink: 0;
+  border-radius: 9px;
+}
+.lan-footnote {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 16px 0 0;
+}
+.lan-empty {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px 12px;
+  text-align: center;
+}
+.lan-empty .lan-device-icon {
+  width: 76px;
+  height: 76px;
+}
+.lan-empty b {
+  font-size: 14px;
+}
+.lan-empty p {
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--muted);
+  margin: 0;
+}
+.lan-confirmation {
+  text-align: center;
+  padding: 12px 8px;
+}
+.lan-pair-illustration {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 14px 0 26px;
+  color: var(--text);
+}
+.lan-pair-illustration > :nth-child(2) {
+  color: var(--muted);
+}
+.lan-confirmation h3 {
+  font-size: 17px;
+  margin: 0 0 10px;
+}
+.lan-confirmation p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+.lan-pair-code {
+  border-radius: 12px;
+  padding: 20px 14px;
+  margin: 22px 0 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  text-align: center;
+}
+.lan-pair-code strong {
+  font: 600 34px var(--font-mono);
+  letter-spacing: 0.22em;
+  padding-left: 0.22em;
+  color: var(--text);
+}
+.lan-waiting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.lan-waiting svg,
+.lan-spin {
+  animation: lan-spin 1s linear infinite;
+}
+.lan-text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  padding: 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.lan-confirmation > .lan-text-button {
+  display: flex;
+  margin: 8px auto 0;
 }
 .lan-pair-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  margin-top: 12px;
+}
+.lan-pair-actions button {
+  min-height: 38px;
+  border-radius: 9px;
+}
+@keyframes lan-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lan-waiting svg,
+  .lan-spin {
+    animation: none;
+  }
+}
+@media (max-width: 480px) {
+  .lan-pairing-dialog {
+    padding: 20px;
+  }
+  .lan-device {
+    gap: 10px;
+    padding: 14px 10px;
+  }
+  .lan-device-icon {
+    width: 42px;
+    height: 46px;
+  }
 }
 
 .assistant-threads {

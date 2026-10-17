@@ -15,6 +15,7 @@ import { FileStore } from "../core/store";
 
 export interface ConnectorSettings {
   enabled: boolean;
+  nearbyEnabled?: boolean;
   gatewayUrl: string;
   connectionId: string;
   projectIds: string[];
@@ -37,6 +38,7 @@ export class RemoteMacConnector {
   private stopped = true;
   private generation = 0;
   private settings?: ConnectorSettings;
+  private initialization?: Promise<void>;
   private error = "";
   private online = false;
   private sharedHome?: string;
@@ -56,16 +58,23 @@ export class RemoteMacConnector {
   }
   async status() {
     if (this.online && this.sharedHome !== this.home()) this.close();
-    const settings = this.settings ??
-      (await readOptional<ConnectorSettings>(this.path)) ?? {
-        enabled: false,
-        gatewayUrl: defaultAgentGateway,
-        connectionId: "",
-        projectIds: [],
-        deviceId: randomUUID(),
-        name: hostname(),
-      };
-    this.settings = settings;
+    this.initialization ??= (async () => {
+      const saved = await readOptional<ConnectorSettings>(this.path);
+      this.settings = saved
+        ? { ...saved, nearbyEnabled: saved.nearbyEnabled ?? saved.enabled }
+        : {
+            enabled: false,
+            nearbyEnabled: true,
+            gatewayUrl: defaultAgentGateway,
+            connectionId: "",
+            projectIds: [],
+            deviceId: randomUUID(),
+            name: hostname(),
+          };
+      await writeProtected(this.path, this.settings);
+    })();
+    await this.initialization;
+    const settings = this.settings!;
     const config = await syncManager(this.home()).configuration();
     const projects = await new FileStore(this.home()).listProjects();
     return {
@@ -115,12 +124,18 @@ export class RemoteMacConnector {
     return this.status();
   }
   async save(input: ConnectorSettings) {
+    const { settings: previous } = await this.status();
     if (this.settings && this.settings.connectionId !== input.connectionId)
       input.trustedClients = [];
     secureGateway(input.gatewayUrl);
     const config = await syncManager(this.home()).configuration();
+    const grantsChanged =
+      !previous.enabled ||
+      previous.connectionId !== input.connectionId ||
+      JSON.stringify(previous.projectIds) !== JSON.stringify(input.projectIds);
     if (
       input.enabled &&
+      grantsChanged &&
       (!config.connections.some(
         (c) => c.id === input.connectionId && !c.signedOut,
       ) ||
@@ -130,6 +145,8 @@ export class RemoteMacConnector {
         "Choose a signed-in server account and at least one synchronized project.",
       );
     if (
+      input.enabled &&
+      grantsChanged &&
       input.projectIds.some(
         (id) =>
           !config.projects.some(
@@ -151,15 +168,15 @@ export class RemoteMacConnector {
     this.settings = input;
     this.close();
     await this.lan.close();
-    if (input.enabled) await this.start();
+    await this.start();
     return this.status();
   }
   async start() {
     const { settings } = await this.status();
-    if (!settings.enabled) return;
     await this.lan.start().catch((error) => {
       this.lan.error = error.message;
     });
+    if (!settings.enabled) return;
     this.stopped = false;
     const generation = ++this.generation;
     let retryDelay = 10000;

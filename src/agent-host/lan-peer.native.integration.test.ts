@@ -2,9 +2,8 @@ import { test } from "vitest";
 import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { startSyncServer } from "../server/node";
 import { AgentService } from "../agent/service";
-import { syncManager, stopSyncManagers } from "../sync/manager";
+import { stopSyncManagers } from "../sync/manager";
 import { AgentHost } from "./host";
 import { LanPeerServer } from "./lan-peer";
 test.skipIf(!process.env.SHOWAI_NATIVE_LAN_TEST_ROOT)(
@@ -12,33 +11,11 @@ test.skipIf(!process.env.SHOWAI_NATIVE_LAN_TEST_ROOT)(
   async () => {
     const task = process.env.SHOWAI_NATIVE_LAN_TEST_ROOT!;
     const root = await mkdtemp(join(task, "tmp/native-peer-"));
-    const server = await startSyncServer({
-      home: join(root, "server"),
-      port: 0,
-      registrationKey: "native-lan-test",
-    });
-    const account = await fetch(server.url + "/api/auth/register", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        name: "native-peer-owner",
-        password: "isolated-native-test-passphrase",
-        registrationKey: "native-lan-test",
-        device: "native-test",
-      }),
-    }).then((r) => r.json());
     const service = new AgentService({ root: join(root, "library") });
     const project = await service.createProject("Native LAN acceptance");
     const page = await service.createPage(project.id, {
       title: "Native shared Page",
     });
-    const manager = syncManager(service.store.root);
-    const conn = await manager.connect({
-      url: server.url,
-      token: account.token,
-    });
-    await manager.attach(conn.id, project.id);
-    await manager.stop();
     const host = new AgentHost({
       root: join(root, "agent"),
       library: () => service.store,
@@ -46,11 +23,12 @@ test.skipIf(!process.env.SHOWAI_NATIVE_LAN_TEST_ROOT)(
       pluginRoot: () => join(root, "plugin"),
     });
     const settings = {
-      enabled: true,
+      enabled: false,
+      nearbyEnabled: true,
       deviceId: randomUUID(),
       name: "ShowAI native LAN test",
-      connectionId: conn.id,
-      projectIds: [project.id],
+      connectionId: "",
+      projectIds: [],
       gatewayUrl: "https://example.com",
     };
     const peer = new LanPeerServer(
@@ -95,13 +73,17 @@ test.skipIf(!process.env.SHOWAI_NATIVE_LAN_TEST_ROOT)(
           const cmd = JSON.parse(text);
           if (cmd.action === "pause") await peer.close();
           if (cmd.action === "resume") await peer.start();
+          const target =
+            (await service.store.listProjects()).find(
+              (p) => p.id !== project.id,
+            )?.id ?? project.id;
           if (cmd.action === "edit") {
             const current = await service.store.readPage(
-              project.id,
+              target,
               page.document.id,
             );
             await service.savePage(
-              project.id,
+              target,
               page.document.id,
               { ...current.document, title: cmd.title },
               current.hash,
@@ -114,9 +96,8 @@ test.skipIf(!process.env.SHOWAI_NATIVE_LAN_TEST_ROOT)(
             join(task, "tmp/native-peer-result.json"),
             JSON.stringify({
               nonce: cmd.nonce,
-              document: (
-                await service.store.readPage(project.id, page.document.id)
-              ).document,
+              document: (await service.store.readPage(target, page.document.id))
+                .document,
               online: peer.status.online,
             }),
           );
@@ -134,7 +115,6 @@ test.skipIf(!process.env.SHOWAI_NATIVE_LAN_TEST_ROOT)(
     await peer.close();
     host.close();
     await stopSyncManagers();
-    await server.close();
     await rm(root, {
       recursive: true,
       force: true,

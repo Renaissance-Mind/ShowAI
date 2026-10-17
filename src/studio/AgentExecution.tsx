@@ -6,6 +6,7 @@ import { translator } from "../i18n";
 import messages from "../i18n/messages/agentExecution";
 
 import { NearbyMacs } from "./LanPairing";
+import { Laptop, Globe } from "../ui/icons";
 const t = translator(messages);
 export const remoteExecution = () =>
   document.documentElement.dataset.native === "ios";
@@ -26,7 +27,6 @@ export function AgentExecutionPicker({
     error?: string;
   } | null>(null);
   const [pairing, setPairing] = useState(false);
-  const [pairId, setPairId] = useState<string>();
   const [error, setError] = useState("");
   const [selecting, setSelecting] = useState(false);
   const loadGeneration = useRef(0),
@@ -86,74 +86,53 @@ export function AgentExecutionPicker({
   };
   return (
     <div className="agent-execution-picker">
-      <label>
-        {t("serverAccount")}
-        <select
-          disabled={disabled || selecting}
-          value={context?.connectionId ?? ""}
-          onChange={(e) => void change({ connectionId: e.target.value })}
-        >
-          <option value="">{t("chooseAccount")}</option>
-          {context?.connections.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        {t("runAgentOn")}
-        <select
-          disabled={disabled || selecting || !context?.connectionId}
-          value={context?.destinationId ?? "cloud"}
-          onChange={(e) => {
-            const id = e.target.value;
-            void change({ destinationId: id });
-          }}
-        >
-          {(
-            context?.destinations ?? [
-              {
-                id: "cloud",
-                name: "ShowAI Cloud",
-                kind: "cloud",
-                online: false,
-              },
-            ]
-          ).map((d) => (
-            <option key={d.id} value={d.id} disabled={!d.online}>
-              {d.name}
-              {d.online
-                ? ""
-                : d.kind === "cloud"
-                  ? t("unavailable")
-                  : t("offline")}
-            </option>
-          ))}
-        </select>
+      <label className="agent-runtime-choice">
+        <span>{t("runAgentOn")}</span>
+        <div className="agent-runtime-select">
+          {context?.destinationId && context.destinationId !== "cloud" ? (
+            <Laptop size={17} />
+          ) : (
+            <Globe size={17} />
+          )}
+          <select
+            aria-label={t("runAgentOn")}
+            disabled={disabled || selecting || !context}
+            value={context?.destinationId ?? "cloud"}
+            onChange={(e) => void change({ destinationId: e.target.value })}
+          >
+            {(
+              context?.destinations ?? [
+                {
+                  id: "cloud",
+                  name: "ShowAI Cloud",
+                  kind: "cloud",
+                  online: false,
+                },
+              ]
+            ).map((d) => (
+              <option key={d.id} value={d.id} disabled={!d.online}>
+                {d.name}
+                {!d.online
+                  ? d.kind === "cloud"
+                    ? t("unavailable")
+                    : t("offline")
+                  : ""}
+              </option>
+            ))}
+          </select>
+        </div>
       </label>
       <button
         type="button"
-        className="settings-button"
+        className="settings-button agent-connect-mac"
         disabled={disabled || selecting}
-        onClick={() => void load().then(() => onChange?.(false))}
+        onClick={() => setPairing(true)}
       >
-        {t("refreshDevices")}
-      </button>
-      <button
-        type="button"
-        className="settings-button"
-        disabled={disabled || selecting}
-        onClick={() => {
-          setPairId(undefined);
-          setPairing(true);
-        }}
-      >
-        {t("pairANearbyMac")}
+        <Laptop size={16} />
+        {selecting ? t("connecting") : t("pairANearbyMac")}
       </button>
       {pairing && (
         <NearbyMacs
-          initialId={pairId}
           onClose={() => setPairing(false)}
           onPaired={async (id) => {
             await change({ destinationId: id }, true);
@@ -232,11 +211,11 @@ export function RemoteDeviceSettings() {
     );
   const change = (value: Partial<ConnectorSettings>) =>
     setState({ ...state, settings: { ...state.settings, ...value } });
-  const save = async () => {
+  const save = async (settings = state.settings) => {
     setBusy(true);
     setError("");
     try {
-      await desktop.invoke("agent:shareDevice", { settings: state.settings });
+      await desktop.invoke("agent:shareDevice", { settings });
       await refresh();
     } catch (reason) {
       setError((reason as Error).message);
@@ -247,107 +226,140 @@ export function RemoteDeviceSettings() {
   return (
     <section className="settings-group agent-device-settings">
       <h2>{t("useThisComputerFromIPad")}</h2>
-      <p className="settings-help">
-        {t(
-          "connectThisComputerToShowAICloudOverWSSDevicesSignedIntoTheSameServerAccountCanRunTasksHereKeepShowAIRunningAndTheComputerAwake",
-        )}
-      </p>
-      <label className="settings-row">
+      <p className="settings-help">{t("nearbyHelp")}</p>
+      <label className="settings-row agent-nearby-toggle">
         <input
           type="checkbox"
-          checked={state.settings.enabled}
-          onChange={(e) => change({ enabled: e.target.checked })}
-        />
-        {t("allowRemoteExecution")}
-      </label>
-      <label className="settings-row">
-        {t("deviceName")}
-        <input
-          value={state.settings.name}
-          onChange={(e) => change({ name: e.target.value })}
-        />
-      </label>
-      <label className="settings-row">
-        {t("serverAccount")}
-        <select
-          value={state.settings.connectionId}
+          disabled={busy}
+          checked={state.settings.nearbyEnabled ?? state.settings.enabled}
           onChange={(e) =>
-            change({ connectionId: e.target.value, projectIds: [] })
+            void save({ ...state.settings, nearbyEnabled: e.target.checked })
           }
-        >
-          <option value="">{t("chooseAccount")}</option>
-          {state.connections.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+        />
+        {t("allowNearbyConnection")}
+        <span className="settings-help" role="status">
+          {state.lan?.online ? t("discoverableOnLAN") : t("nearbyOff")}
+        </span>
       </label>
-      <fieldset>
-        <legend>{t("allowedProjects")}</legend>
-        {!state.projects.some(
-          (p) => p.connectionId === state.settings.connectionId,
-        ) && (
-          <p className="settings-help">
-            {state.settings.connectionId
-              ? t("syncTheRequiredProjectsOnThisComputerFirst")
-              : t("chooseAnAccountToShowSynchronizedProjects")}
-          </p>
-        )}
-        {state.projects
-          .filter((p) => p.connectionId === state.settings.connectionId)
-          .map((p) => (
-            <label className="settings-row" key={p.id}>
-              <input
-                type="checkbox"
-                checked={state.settings.projectIds.includes(p.id)}
-                onChange={(e) =>
-                  change({
-                    projectIds: e.target.checked
-                      ? [...state.settings.projectIds, p.id]
-                      : state.settings.projectIds.filter((id) => id !== p.id),
-                  })
-                }
-              />
-              {p.name ?? p.id}
-            </label>
-          ))}
-      </fieldset>
-      {state.pendingClients.map((client) => (
-        <div className="settings-row" key={client.id}>
-          <span>
-            {client.name} · {client.code ?? client.id.slice(-6)}
+      <details className="agent-remote-advanced">
+        <summary>{t("acrossNetworks")}</summary>
+        <p className="settings-help">
+          {t(
+            "connectThisComputerToShowAICloudOverWSSDevicesSignedIntoTheSameServerAccountCanRunTasksHereKeepShowAIRunningAndTheComputerAwake",
+          )}
+        </p>
+        <label className="settings-row">
+          <input
+            type="checkbox"
+            checked={state.settings.enabled}
+            onChange={(e) => change({ enabled: e.target.checked })}
+          />
+          {t("allowRemoteExecution")}
+        </label>
+        <label className="settings-row">
+          {t("deviceName")}
+          <input
+            value={state.settings.name}
+            onChange={(e) => change({ name: e.target.value })}
+          />
+        </label>
+        <label className="settings-row">
+          {t("serverAccount")}
+          <select
+            value={state.settings.connectionId}
+            onChange={(e) =>
+              change({ connectionId: e.target.value, projectIds: [] })
+            }
+          >
+            <option value="">{t("chooseAccount")}</option>
+            {state.connections.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <fieldset>
+          <legend>{t("allowedProjects")}</legend>
+          {!state.projects.some(
+            (p) => p.connectionId === state.settings.connectionId,
+          ) && (
+            <p className="settings-help">
+              {state.settings.connectionId
+                ? t("syncTheRequiredProjectsOnThisComputerFirst")
+                : t("chooseAnAccountToShowSynchronizedProjects")}
+            </p>
+          )}
+          {state.projects
+            .filter((p) => p.connectionId === state.settings.connectionId)
+            .map((p) => (
+              <label className="settings-row" key={p.id}>
+                <input
+                  type="checkbox"
+                  checked={state.settings.projectIds.includes(p.id)}
+                  onChange={(e) =>
+                    change({
+                      projectIds: e.target.checked
+                        ? [...state.settings.projectIds, p.id]
+                        : state.settings.projectIds.filter((id) => id !== p.id),
+                    })
+                  }
+                />
+                {p.name ?? p.id}
+              </label>
+            ))}
+        </fieldset>
+        <div className="settings-row">
+          <span role="status">
+            {state.online ? t("connected") : t("disconnected")}
           </span>
           <button
+            type="button"
             className="settings-button"
-            onClick={() =>
-              void desktop
-                .invoke("agent:approveRemoteClient", {
-                  id: client.id,
-                  approve: true,
-                })
-                .then(refresh)
-                .catch((reason) => setError(reason.message))
-            }
+            disabled={busy}
+            onClick={() => void save()}
           >
-            {t("allowDevice")}
-          </button>
-          <button
-            className="settings-button"
-            onClick={() =>
-              void desktop
-                .invoke("agent:approveRemoteClient", {
-                  id: client.id,
-                  approve: false,
-                })
-                .then(refresh)
-                .catch((reason) => setError(reason.message))
-            }
-          >
-            {t("reject")}
+            {t("save")}
           </button>
         </div>
-      ))}
+      </details>
+      {state.pendingClients
+        .filter((client) => !client.id.startsWith("lan:"))
+        .map((client) => (
+          <div className="settings-row" key={client.id}>
+            <span>
+              {client.name} · {client.code ?? client.id.slice(-6)}
+            </span>
+            <button
+              className="settings-button"
+              onClick={() =>
+                void desktop
+                  .invoke("agent:approveRemoteClient", {
+                    id: client.id,
+                    approve: true,
+                  })
+                  .then(refresh)
+                  .catch((reason) => setError(reason.message))
+              }
+            >
+              {t("allowDevice")}
+            </button>
+            <button
+              className="settings-button"
+              onClick={() =>
+                void desktop
+                  .invoke("agent:approveRemoteClient", {
+                    id: client.id,
+                    approve: false,
+                  })
+                  .then(refresh)
+                  .catch((reason) => setError(reason.message))
+              }
+            >
+              {t("reject")}
+            </button>
+          </div>
+        ))}
       {[
         ...(state.settings.trustedClients ?? []),
         ...(state.lan?.trusted ?? []),
@@ -372,27 +384,6 @@ export function RemoteDeviceSettings() {
           </button>
         </div>
       ))}
-      <div className="settings-row">
-        <span role="status">
-          {state.lan?.online ? t("discoverableOnLAN") : ""}
-          {state.online ? t("connected") : t("disconnected")}
-        </span>
-        <button
-          type="button"
-          className="settings-button"
-          disabled={busy}
-          onClick={() => void save()}
-        >
-          {t("save")}
-        </button>
-        <button
-          type="button"
-          className="settings-button"
-          onClick={() => void refresh()}
-        >
-          {t("refresh")}
-        </button>
-      </div>
       {(error || state.error) && (
         <p role="alert" className="agent-error">
           {error || state.error}

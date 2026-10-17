@@ -512,3 +512,60 @@
     gap: 8px;
   }
 }
+
+.agent-execution-picker .agent-runtime-choice {
+  gap: 6px;
+  min-width: 140px;
+}
+.agent-runtime-choice > span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.agent-runtime-select {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+  padding-left: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+}
+.agent-runtime-select > svg {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.agent-runtime-select > select {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding-left: 0;
+  min-height: 36px;
+}
+.agent-execution-picker .agent-connect-mac {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  border-radius: 9px;
+}
+.agent-nearby-toggle {
+  flex-wrap: wrap;
+}
+.agent-nearby-toggle > span {
+  margin-left: auto;
+}
+.agent-remote-advanced {
+  margin: 12px 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.agent-remote-advanced > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+}
+.agent-remote-advanced > .settings-help {
+  margin-top: 14px;
+}

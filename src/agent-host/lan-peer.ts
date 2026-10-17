@@ -31,6 +31,7 @@ import {
 import {
   resolveDocumentComponents,
   lockDocumentComponents,
+  importCompiledComponents,
 } from "../core/catalog";
 import { mergePageContent } from "../core/page-merge-model";
 import { mergeValues } from "../core/catalog-merge";
@@ -80,6 +81,10 @@ export class LanPeerServer {
   private syncWork = new Set<Promise<unknown>>();
   private syncTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private closing?: Promise<void>;
+  private incoming = new Map<
+    string,
+    Promise<{ projectId: string; role: string; serverLinked: boolean }>
+  >();
   private pin = "";
   private port = 0;
   error = "";
@@ -146,7 +151,7 @@ export class LanPeerServer {
     await this.closing;
     if (this.server) return;
     const settings = this.settings();
-    if (!settings?.enabled) return;
+    if (!settings || !(settings.nearbyEnabled ?? settings.enabled)) return;
     const sharedHome = this.home();
     await mkdir(this.root, { recursive: true, mode: 0o700 });
     const keyPath = join(this.root, "identity.key"),
@@ -270,7 +275,7 @@ export class LanPeerServer {
           String(this.port),
           `id=${settings.deviceId}`,
           `fp=${this.pin}`,
-          "v=1",
+          "v=2",
         ],
         { stdio: "ignore" },
       );
@@ -294,9 +299,7 @@ export class LanPeerServer {
         socket.send(
           JSON.stringify({
             type: "changed",
-            projectIds: peer.projectIds.filter((id) =>
-              this.settings()?.projectIds.includes(id),
-            ),
+            projectIds: peer.projectIds,
           }),
         );
     }
@@ -310,7 +313,11 @@ export class LanPeerServer {
     return this.trusted.find((p) => p.id === id && equal(p.digest, hashed));
   }
   private async route(req: IncomingMessage, res: ServerResponse, home: string) {
-    if (req.headers.origin || this.home() !== home || !this.settings()?.enabled)
+    if (
+      req.headers.origin ||
+      this.home() !== home ||
+      !(this.settings()?.nearbyEnabled ?? this.settings()?.enabled)
+    )
       throw denied("Local access is unavailable.");
     const reply = (value: unknown) => {
       res.writeHead(200, {
@@ -324,7 +331,7 @@ export class LanPeerServer {
         id: this.settings()!.deviceId,
         name: this.settings()!.name,
         fingerprint: this.pin,
-        version: 1,
+        version: 2,
       });
     if (req.method !== "POST") throw new Error("Use POST.");
     let bytes = 0;
@@ -406,22 +413,37 @@ export class LanPeerServer {
       typeof body.action !== "string"
     )
       throw new Error("Invalid local request.");
-    const config = await syncManager(home).configuration();
-    if (
-      !config.connections.some(
-        (c) => c.id === this.settings()?.connectionId && !c.signedOut,
-      )
-    )
-      throw denied("The shared account is signed out.");
-    const mapping = config.projects.find(
-      (p) =>
-        p.connectionId === this.settings()?.connectionId &&
-        p.remoteProjectId === body.projectId &&
-        this.settings()?.projectIds.includes(p.remoteProjectId) &&
-        peer.projectIds.includes(p.remoteProjectId),
-    );
-    if (!mapping || mapping.status === "revoked")
-      throw denied("This project is not shared with this iPad.");
+    if (body.action === "agent:status" && !body.projectId) {
+      const status = await this.host.status();
+      return reply({
+        ok: true,
+        data: { ...status, workspaceRoot: "", credentialRoot: "", tasks: [] },
+      });
+    }
+    if (!uuid(body.projectId)) throw new Error("Invalid project identity.");
+    let mapping = await this.projectMapping(home, peer, body.projectId);
+    if (body.action === "replica:attach") {
+      if (!mapping)
+        mapping = await this.receiveProject(
+          home,
+          peer,
+          body.projectId,
+          body.args?.metadata,
+        );
+      return reply({
+        ok: true,
+        data: {
+          projectId: body.projectId,
+          serverLinked: mapping.serverLinked,
+          metadata: {
+            ...(await new FileStore(home).readProject(mapping.projectId)),
+            id: body.projectId,
+          },
+        },
+      });
+    }
+    if (!mapping)
+      throw denied("Connect this project to the Mac before running a task.");
     const read =
       remoteReadActions.has(body.action) ||
       ["replica:index", "replica:page"].includes(body.action);
@@ -493,7 +515,7 @@ export class LanPeerServer {
           completed: true,
           ...(body.action.startsWith("replica:") ? {} : { value }),
         });
-        this.queueSync(mapping.projectId);
+        if (mapping.serverLinked) this.queueSync(mapping.projectId);
         this.notify();
       }
       return value;
@@ -509,6 +531,89 @@ export class LanPeerServer {
     } finally {
       if (this.requests.get(body.requestId)?.task === task)
         this.requests.delete(body.requestId);
+    }
+  }
+  private incomingPath(home: string, peerId: string, projectId: string) {
+    return join(
+      this.root,
+      "incoming",
+      digest(home),
+      peerId,
+      projectId + ".json",
+    );
+  }
+  private async projectMapping(
+    home: string,
+    peer: TrustedPeer,
+    wireId: string,
+  ) {
+    const incoming = await readOptional<{
+      projectId: string;
+      clientId: string;
+      wireId: string;
+    }>(this.incomingPath(home, peer.id, wireId));
+    if (incoming?.clientId === peer.id && incoming.wireId === wireId) {
+      await new FileStore(home).readProject(incoming.projectId);
+      return {
+        projectId: incoming.projectId,
+        role: "admin",
+        serverLinked: false,
+      };
+    }
+    const config = await syncManager(home).configuration();
+    if (
+      !config.connections.some(
+        (c) => c.id === this.settings()?.connectionId && !c.signedOut,
+      )
+    )
+      return;
+    const existing = config.projects.find(
+      (p) =>
+        p.connectionId === this.settings()?.connectionId &&
+        p.remoteProjectId === wireId &&
+        this.settings()?.projectIds.includes(wireId) &&
+        peer.projectIds.includes(wireId) &&
+        p.status !== "revoked",
+    );
+    if (existing)
+      return {
+        projectId: existing.projectId,
+        role: existing.role,
+        serverLinked: true,
+      };
+  }
+  private async receiveProject(
+    home: string,
+    peer: TrustedPeer,
+    wireId: string,
+    input: unknown,
+  ) {
+    const metadata = validateProjectMetadata(input, wireId),
+      key = `${peer.id}/${wireId}`;
+    const prior = this.incoming.get(key);
+    if (prior) return prior;
+    // A device may supply its own project. It never names an existing Mac
+    // workspace or gains access to other projects on this computer.
+    const work = (async () => {
+      const existing = await this.projectMapping(home, peer, wireId);
+      if (existing) return existing;
+      const project = await new FileStore(home).createProject({
+        name: metadata.name,
+        icon: metadata.icon,
+        binding: { harness: "showai-ipad", sessionId: key },
+      });
+      await writeProtected(this.incomingPath(home, peer.id, wireId), {
+        projectId: project.id,
+        clientId: peer.id,
+        wireId,
+      });
+      return { projectId: project.id, role: "admin", serverLinked: false };
+    })();
+    this.incoming.set(key, work);
+    try {
+      return await work;
+    } finally {
+      if (this.incoming.get(key) === work) this.incoming.delete(key);
     }
   }
   private queueSync(projectId: string) {
@@ -568,6 +673,12 @@ export class LanPeerServer {
       };
     }
     if (action === "replica:savePage") {
+      if (Array.isArray(args.components) && args.components.length)
+        await importCompiledComponents(
+          home,
+          args.components as any[],
+          projectId,
+        );
       const local = validateDocument(args.document),
         pageId = assertId(local.id);
       return mutateLibrary(
@@ -641,7 +752,10 @@ export class LanPeerServer {
         home,
         async () => {
           const current = await store.readProject(projectId);
-          const local = { ...(args.metadata as object), id: projectId };
+          const local = {
+            ...(args.metadata as object),
+            id: projectId,
+          } as Record<string, unknown>;
           const base = args.base
             ? { ...(args.base as object), id: projectId }
             : current;
@@ -655,6 +769,19 @@ export class LanPeerServer {
             delete next.updatedAt;
             return next;
           };
+          for (const key of [
+            "sourceDirectory",
+            "binding",
+            "bindings",
+          ] as const) {
+            if (current[key] === undefined) {
+              delete local[key];
+              delete (base as any)[key];
+            } else {
+              local[key] = current[key];
+              (base as any)[key] = current[key];
+            }
+          }
           const merged = mergeValues(
             withoutTime(base),
             withoutTime(local),
@@ -666,6 +793,14 @@ export class LanPeerServer {
               "CONFLICT",
               "Project organization changed on both devices. Local changes are retained.",
             );
+          for (const key of [
+            "sourceDirectory",
+            "binding",
+            "bindings",
+          ] as const) {
+            if (current[key] === undefined) delete (merged.value as any)[key];
+            else (merged.value as any)[key] = current[key];
+          }
           const value = validateProjectMetadata(merged.value, projectId),
             path = `projects/${projectId}/project.json`;
           const revision = await versionedLibrary(home)!.resourceRevision(path);
