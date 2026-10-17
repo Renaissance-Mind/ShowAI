@@ -393,7 +393,22 @@ export default {
           `Bearer ${env.SHOWAI_AGENT_KEY}`
         )
           return new Response(null, { status: 404 });
-        const tenant = await derived(env.SHOWAI_AGENT_KEY, "deployment-health");
+        const requestedTenant = url.pathname.endsWith("/health")
+          ? request.headers.get("x-showai-tenant")
+          : null;
+        if (requestedTenant && !/^[a-f0-9]{64}$/.test(requestedTenant))
+          return json(
+            {
+              error: {
+                code: "INVALID_TENANT",
+                message: "Invalid diagnostic tenant.",
+              },
+            },
+            400,
+          );
+        const tenant =
+          requestedTenant ??
+          (await derived(env.SHOWAI_AGENT_KEY, "deployment-health"));
         const relay = url.pathname.endsWith("relay-ticket");
         const target = new URL(relay ? "/devices/ticket" : "/health", url);
         return env.AGENTS.get(env.AGENTS.idFromName(tenant)).fetch(
