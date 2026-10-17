@@ -21,7 +21,7 @@ export function overlappingPageAnnotations(
     const entry = index.get(id);
     if (!entry || measured[id].locked || moving.includes(id)) return false;
     const node = entry.node;
-    if (!(node.type === "drawing" || node.attrs?.data?.nativeInk)) return false;
+    if (!(node.type === "drawing" || (node.attrs?.nativeInk ?? node.attrs?.data?.nativeInk))) return false;
     return pages.some(
       (page) =>
         index.get(page)?.parent === entry.parent &&

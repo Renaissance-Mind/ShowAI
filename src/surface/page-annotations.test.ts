@@ -81,3 +81,21 @@ it("binds to the point inside a Page and retains that point when the Page moves"
   expect(moved.content.content![1].attrs!.bindings.end).toEqual(binding);
   expect(arrowEndpoints(moved.content.content![1], moved.layout!.arrow)[1]).toEqual({ x: 250, y: 150 });
 });
+
+it("carries canonical PencilKit image annotations as well as legacy widgets", () => {
+  const doc = {
+    content: { type: "surface", attrs: { id: "board", kind: "board" }, content: [
+      { type: "surface", attrs: { id: "page", kind: "page" }, content: [] },
+      { type: "image", attrs: { id: "ink", nativeInk: { format: "showai-pencilkit-v1" } } },
+      { type: "widget", attrs: { id: "legacy", kind: "image", data: { nativeInk: { format: "showai-pencilkit-v1" } } } },
+      { type: "image", attrs: { id: "photo", src: "photo.png" } },
+    ] },
+    layout: {
+      page: { x: 0, y: 0, width: 400, height: 400 },
+      ink: { x: 50, y: 50, width: 100, height: 30 },
+      legacy: { x: 50, y: 100, width: 100, height: 30 },
+      photo: { x: 50, y: 150, width: 100, height: 30 },
+    },
+  } as unknown as ShowDocument;
+  expect(overlappingPageAnnotations(doc, ["page"], doc.layout!)).toEqual(["ink", "legacy"]);
+});

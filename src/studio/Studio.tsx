@@ -60,6 +60,8 @@ import {
   LayoutList,
   LayoutGrid,
   Grid2X2,
+  Undo2,
+  Redo2,
   Plus,
   History,
   Upload,
@@ -1488,6 +1490,7 @@ export default function Studio() {
   const libraryUndo = useRef<{ undo: LibraryDrop; redo: LibraryDrop }[]>([]);
   const libraryRedo = useRef<{ undo: LibraryDrop; redo: LibraryDrop }[]>([]);
   const historyBusy = useRef(false);
+  const [, refreshLibraryHistory] = useState(0);
   function inverseLibraryDrop(drop: LibraryDrop): LibraryDrop {
     const source = drop.source;
     const siblings =
@@ -1542,6 +1545,7 @@ export default function Studio() {
     const entry = from.at(-1);
     if (!entry) return;
     historyBusy.current = true;
+    refreshLibraryHistory((value) => value + 1);
     try {
       if (await dropLibraryItem(redo ? entry.redo : entry.undo, false)) {
         from.pop();
@@ -1549,6 +1553,7 @@ export default function Studio() {
       }
     } finally {
       historyBusy.current = false;
+      refreshLibraryHistory((value) => value + 1);
     }
   }
   const replayLibraryRef = useRef(replayLibraryMove);
@@ -1649,6 +1654,7 @@ export default function Studio() {
       libraryUndo.current.push({ undo: inverse, redo: drop });
       if (libraryUndo.current.length > 100) libraryUndo.current.shift();
       libraryRedo.current = [];
+      refreshLibraryHistory((value) => value + 1);
     };
     if (
       drop.source.kind !== "project" &&
@@ -2676,6 +2682,16 @@ export default function Studio() {
             </ExpandableSearch>
           )}
         <div className="studio-section-actions studio-topbar-view-actions">
+          {document.documentElement.dataset.native === "ios" && (view === "project" || view === "projects") && (
+            <>
+              <button className="studio-icon" aria-label={t("libraryUndo")} title={t("libraryUndo")}
+                disabled={historyBusy.current || !libraryUndo.current.length}
+                onClick={() => void replayLibraryMove(false).catch(report)}><Undo2 size={16} /></button>
+              <button className="studio-icon" aria-label={t("libraryRedo")} title={t("libraryRedo")}
+                disabled={historyBusy.current || !libraryRedo.current.length}
+                onClick={() => void replayLibraryMove(true).catch(report)}><Redo2 size={16} /></button>
+            </>
+          )}
           {view === "project" && (
             <button
               className="studio-icon"
