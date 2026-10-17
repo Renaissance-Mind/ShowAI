@@ -133,7 +133,7 @@ test("Agent restore discards legacy live-PID leases and checkpoints exclude held
     await expect(
       readFile(join(restored, "library", "local", path)),
     ).rejects.toMatchObject({ code: "ENOENT" });
-  await withLibraryLock(join(restored, "library"), () => state.save());
+  await state.save((read) => withLibraryLock(join(restored, "library"), read));
   const restarted = await directory();
   // Verify the saved checkpoint itself is clean without relying on a restore filter.
   await new CloudState(restarted, objects, key).restore();
@@ -143,6 +143,46 @@ test("Agent restore discards legacy live-PID leases and checkpoints exclude held
   await expect(
     readFile(join(restarted, "library", "local", "writer.lock")),
   ).rejects.toMatchObject({ code: "ENOENT" });
+});
+test("network checkpoint uploads release the library lock and retain one immutable capture", async () => {
+  const root = await directory(),
+    objects = await store(),
+    key = "f".repeat(64);
+  const library = join(root, "library");
+  await mkdir(library);
+  await writeFile(join(library, "a"), "before A");
+  await writeFile(join(library, "z"), "before Z");
+  let uploaded = false;
+  const transport: ObjectStore = {
+    get: (key) => objects.get(key),
+    async put(key, bytes) {
+      await expect(
+        readFile(join(library, "local", "writer.lock")),
+      ).rejects.toMatchObject({ code: "ENOENT" });
+      if (!uploaded) {
+        uploaded = true;
+        await withLibraryLock(library, async () => {
+          await writeFile(join(library, "a"), "after A");
+          await writeFile(join(library, "z"), "after Z");
+        });
+      }
+      await objects.put(key, bytes);
+    },
+  };
+  const state = new CloudState(root, transport, key, {
+    ignore: ignoreRemoteAgentState,
+  });
+  await state.save((read) => withLibraryLock(library, read));
+  const first = await directory();
+  await new CloudState(first, objects, key).restore();
+  expect(await readFile(join(first, "library", "a"), "utf8")).toBe("before A");
+  expect(await readFile(join(first, "library", "z"), "utf8")).toBe("before Z");
+  expect(await readFile(join(library, "z"), "utf8")).toBe("after Z");
+  await state.save((read) => withLibraryLock(library, read));
+  const second = await directory();
+  await new CloudState(second, objects, key).restore();
+  expect(await readFile(join(second, "library", "a"), "utf8")).toBe("after A");
+  expect(await readFile(join(second, "library", "z"), "utf8")).toBe("after Z");
 });
 test("failed checkpoints never acknowledge success and are retried before a later mutation", async () => {
   const root = await directory(),

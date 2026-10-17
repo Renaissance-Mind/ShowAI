@@ -119,7 +119,7 @@ if (process.argv.includes("--install-runtime")) {
     let checkpointTail: Promise<unknown> = Promise.resolve();
     const checkpoint = () => {
       const next = checkpointTail.then(() =>
-        withLibraryLock("/state/library", () => state.save()),
+        state.save((read) => withLibraryLock("/state/library", read)),
       );
       checkpointTail = next.then(
         () => undefined,

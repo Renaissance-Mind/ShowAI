@@ -12,6 +12,8 @@ import {
   stat,
   mkdtemp,
   rm,
+  readFile,
+  writeFile,
 } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -33,6 +35,15 @@ export interface ObjectStore {
 }
 const digest = (bytes: Uint8Array) =>
   createHash("sha256").update(bytes).digest("hex");
+async function batches<T>(items: T[], action: (item: T) => Promise<void>) {
+  for (let offset = 0; offset < items.length; offset += 8) {
+    const results = await Promise.allSettled(
+      items.slice(offset, offset + 8).map(action),
+    );
+    const failure = results.find((result) => result.status === "rejected");
+    if (failure?.status === "rejected") throw failure.reason;
+  }
+}
 function validPath(path: string) {
   return (
     !!path &&
@@ -108,7 +119,7 @@ export class CloudState {
     )
       throw new Error("Invalid cloud state manifest.");
     const paths = new Set<string>();
-    for (const file of manifest.files) {
+    await batches(manifest.files, async (file) => {
       if (
         !validPath(file.path) ||
         paths.has(file.path) ||
@@ -121,7 +132,7 @@ export class CloudState {
       paths.add(file.path);
       // Process leases and other ephemeral files from older checkpoints must
       // also be excluded on restore, even if a container reuses the same PID.
-      if (this.options.ignore?.(file.path)) continue;
+      if (this.options.ignore?.(file.path)) return;
       const path = join(this.root, file.path);
       await mkdir(resolve(path, ".."), { recursive: true, mode: 0o700 });
       const handle = await open(path + ".restore", "wx", 0o600);
@@ -146,11 +157,13 @@ export class CloudState {
         await handle.close();
       }
       await rename(path + ".restore", path);
-    }
+    });
   }
-  async save() {
+  async save(capture?: (read: () => Promise<void>) => Promise<void>) {
     const files: FileEntry[] = [],
       referenced = new Set<string>();
+    const staging = await mkdtemp(join(tmpdir(), "showai-state-checkpoint-"));
+    const uploads = new Set<string>();
     const visit = async (directory: string, prefix = "") => {
       for (const entry of await readdir(directory, { withFileTypes: true })) {
         const path = prefix + entry.name;
@@ -197,8 +210,12 @@ export class CloudState {
             if (!bytesRead) break;
             const bytes = buffer.subarray(0, bytesRead),
               hash = digest(bytes);
-            if (!this.previous.has(hash) && !referenced.has(hash))
-              await this.objects.put(hash, this.seal(bytes, hash));
+            if (!this.previous.has(hash) && !referenced.has(hash)) {
+              await writeFile(join(staging, hash), this.seal(bytes, hash), {
+                mode: 0o600,
+              });
+              uploads.add(hash);
+            }
             referenced.add(hash);
             chunks.push(hash);
             size += bytesRead;
@@ -214,15 +231,25 @@ export class CloudState {
           throw new Error("Cloud state file limit exceeded.");
       }
     };
-    await visit(this.root);
-    await this.objects.put(
-      "head",
-      this.seal(
-        Buffer.from(JSON.stringify({ version: 1, files } satisfies Manifest)),
+    try {
+      // Capture immutable encrypted bytes while the caller holds its write lock.
+      // Object storage latency must not block edits or project synchronization.
+      if (capture) await capture(() => visit(this.root));
+      else await visit(this.root);
+      await batches([...uploads], async (hash) => {
+        await this.objects.put(hash, await readFile(join(staging, hash)));
+      });
+      await this.objects.put(
         "head",
-      ),
-    );
-    this.previous = referenced;
+        this.seal(
+          Buffer.from(JSON.stringify({ version: 1, files } satisfies Manifest)),
+          "head",
+        ),
+      );
+      this.previous = referenced;
+    } finally {
+      await rm(staging, { recursive: true, force: true });
+    }
   }
   run(operation: () => Promise<Response>, checkpoint: () => void) {
     const next = this.tail.then(async () => {
