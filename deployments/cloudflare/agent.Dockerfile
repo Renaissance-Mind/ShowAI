@@ -34,6 +34,9 @@ ARG SHOWAI_AGENT_SDK_VERSION=0.162.1
 RUN --mount=type=cache,id=showai-agent-sdk-v1,target=/download-cache,uid=1000,gid=1000 SHOWAI_AGENT_SDK_VERSION=${SHOWAI_AGENT_SDK_VERSION} SHOWAI_AGENT_DOWNLOAD_CACHE=/download-cache node /tmp/install-runtime.mjs
 COPY --from=deps /build/node_modules /app/node_modules
 COPY --from=build /build/dist-remote-agent /app
+USER root
+RUN find /app -type d ! -perm -005 -exec chmod a+rx {} + && find /app -type f ! -perm -004 -exec chmod a+r {} +
+USER node
 RUN node /app/scripts/content-check.mjs
 EXPOSE 8790
 CMD ["node","/app/scripts/container.mjs"]

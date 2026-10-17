@@ -44,7 +44,7 @@ await run("git", ["archive", "--format=tar", `--output=${archive}`, revision], {
   cwd: process.cwd(),
 });
 await mkdir(source, { recursive: true });
-await run("tar", ["-xf", archive, "-C", source], { cwd: release });
+await run("tar", ["-xpf", archive, "-C", source], { cwd: release });
 const sourceHash = createHash("sha256")
   .update(await readFile(archive))
   .digest("hex");
