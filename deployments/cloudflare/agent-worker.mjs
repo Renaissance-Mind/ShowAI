@@ -90,6 +90,33 @@ async function state(request, env, tenant, name) {
 }
 export class ShowAIAgentGateway extends DurableObject {
   pending = new Map();
+  monitoring = false;
+  constructor(ctx, env) {
+    super(ctx, env);
+    if (ctx.container?.running) {
+      void ctx.blockConcurrencyWhile(() =>
+        ctx.container.setInactivityTimeout(15 * 60 * 1000),
+      );
+      this.observeContainer();
+    }
+  }
+  observeContainer() {
+    if (this.monitoring) return;
+    this.monitoring = true;
+    this.ctx.waitUntil(
+      this.ctx.container
+        .monitor()
+        .catch((error) =>
+          console.error(
+            "Agent container stopped:",
+            String(error?.message ?? error),
+          ),
+        )
+        .finally(() => {
+          this.monitoring = false;
+        }),
+    );
+  }
   async fetch(request) {
     const url = new URL(request.url);
     const tenant = request.headers.get("x-showai-tenant");
@@ -247,6 +274,7 @@ export class ShowAIAgentGateway extends DurableObject {
           SHOWAI_AGENT_KEY: key,
         },
       });
+    this.observeContainer();
     // Running tasks renew activity themselves, even when the iPad disconnects.
     await container.setInactivityTimeout(15 * 60 * 1000);
     const port = container.getTcpPort(8790);
