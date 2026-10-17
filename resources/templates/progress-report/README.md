@@ -1,10 +1,10 @@
 ---
 {
   "format": "showai-template",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "progress-report",
   "name": "状态与进展报告",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "在明确截止时间下说明当前状态、变化、证据、风险与下一步。",
   "scenarios": [
     "汇报真实项目、实验或运行状态，帮助读者判断后续行动。",
@@ -18,8 +18,7 @@
     "authoring": "guides/05-authoring.md",
     "review": "guides/06-review.md"
   },
-  "components": [],
-  "page": "page.json"
+  "components": []
 }
 ---
 # 状态与进展报告

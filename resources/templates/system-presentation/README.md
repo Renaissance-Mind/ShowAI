@@ -1,10 +1,10 @@
 ---
 {
   "format": "showai-template",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "system-presentation",
   "name": "系统呈现规则",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "所有呈现任务必读的基础规则与六阶段指南。",
   "scenarios": [
     "ShowAI 内容的规划、设计、制作、评审与交付。"
@@ -17,8 +17,7 @@
     "authoring": "guides/05-authoring.md",
     "review": "guides/06-review.md"
   },
-  "components": [],
-  "page": null
+  "components": []
 }
 ---
 # 系统呈现规则
@@ -35,4 +34,4 @@
 
 正式作品保存 Page，保存、展示与同步分别确认；冲突保留草稿并处理。只读操作不改写正文。遵循宿主实际电脑操控规则，明确检查范围；没有真人试读不声称已证明理解效果。
 
-模板可选 page.json 骨架，并支持基础的组合定义；嵌套不是各阶段必做步骤。模板声明无自定义组件时 components/ 可为空。网页端通过 MCP 读取同一份指南和组件包，不要求访问本机路径。
+模板通过理解路径与视觉设计指南指导本次页面的内容逻辑、布局和交互。模板声明无自定义组件时 components/ 可为空。网页端通过 MCP 读取同一份指南和组件包，不要求访问本机路径。

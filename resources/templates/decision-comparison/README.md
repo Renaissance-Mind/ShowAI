@@ -1,10 +1,10 @@
 ---
 {
   "format": "showai-template",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "decision-comparison",
   "name": "方案比较与决策",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "按共同标准呈现可比事实、缺项与取舍，支持带条件的选择。",
   "scenarios": [
     "为一个明确任务比较技术路线、产品方案或研究方法。",
@@ -18,8 +18,7 @@
     "authoring": "guides/05-authoring.md",
     "review": "guides/06-review.md"
   },
-  "components": [],
-  "page": "page.json"
+  "components": []
 }
 ---
 # 方案比较与决策

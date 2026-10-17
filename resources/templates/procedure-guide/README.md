@@ -1,10 +1,10 @@
 ---
 {
   "format": "showai-template",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "procedure-guide",
   "name": "操作与问题排查",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "围绕目标状态组织真实入口、动作、预期反馈和异常恢复。",
   "scenarios": [
     "教读者完成一项操作，并知道每一步是否成功。",
@@ -18,8 +18,7 @@
     "authoring": "guides/05-authoring.md",
     "review": "guides/06-review.md"
   },
-  "components": [],
-  "page": "page.json"
+  "components": []
 }
 ---
 # 操作与问题排查

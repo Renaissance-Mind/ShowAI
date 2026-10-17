@@ -1,10 +1,10 @@
 ---
 {
   "format": "showai-template",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "exploration-map",
   "name": "探索与资料组织",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "用可定位的分类、属性与关系组织资料，支持总览、筛选和局部核对。",
   "scenarios": [
     "整理一个主题的资料、概念或候选项，让读者逐步探索。",
@@ -18,8 +18,7 @@
     "authoring": "guides/05-authoring.md",
     "review": "guides/06-review.md"
   },
-  "components": [],
-  "page": "page.json"
+  "components": []
 }
 ---
 # 探索与资料组织

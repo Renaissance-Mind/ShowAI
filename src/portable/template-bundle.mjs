@@ -91,7 +91,10 @@ export function parseTemplateReadme(source) {
     ],
     "template metadata",
   );
-  if (metadata.format !== "showai-template" || metadata.schemaVersion !== 1)
+  if (
+    metadata.format !== "showai-template" ||
+    ![1, 2].includes(metadata.schemaVersion)
+  )
     throw new Error("Unsupported template README format/schemaVersion.");
   if (!idPattern.test(metadata.id)) throw new Error("Invalid template id.");
   if (!versionPattern.test(metadata.version))
@@ -148,7 +151,12 @@ export function parseTemplateReadme(source) {
       );
     componentRoots.push(componentRoot);
   }
+  if (metadata.schemaVersion === 2 && Object.hasOwn(metadata, "page"))
+    throw new Error(
+      "Template schemaVersion 2 uses understanding/design guides; page is not supported.",
+    );
   if (
+    metadata.schemaVersion === 1 &&
     metadata.page !== null &&
     (!templateFilePath(metadata.page).endsWith(".json") ||
       metadata.page.startsWith("components/"))
@@ -279,8 +287,10 @@ export function parseTemplateBundle(input) {
       !metadata.components.some(({ path }) => name.startsWith(path + "/"))
     )
       throw new Error(`Undeclared component file: ${name}.`);
+  if (metadata.schemaVersion === 2 && Object.hasOwn(files, "page.json"))
+    throw new Error("Template schemaVersion 2 does not support page.json.");
   const document =
-    metadata.page === null
+    metadata.schemaVersion === 2 || metadata.page === null
       ? undefined
       : object(JSON.parse(read(metadata.page)), "Template page");
   return {

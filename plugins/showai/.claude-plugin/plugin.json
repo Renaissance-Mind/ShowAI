@@ -1,6 +1,6 @@
 {
   "name": "showai",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "description": "Staged template workflows, optional template component libraries and unified MCP presentation for local and web agents.",
   "author": {
     "name": "ShowAI"

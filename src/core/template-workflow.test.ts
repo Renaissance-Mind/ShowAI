@@ -167,7 +167,7 @@ test("system-only/default context, exact legacy revisions and changed-context ca
   const report = await service.templateContext(project.id, [
     { id: "evidence-report", scope: "builtin" },
   ]);
-  expect(report.context.templates[0].version).toBe("2.0.0");
+  expect(report.context.templates[0].version).toBe("2.1.0");
   const cached = await service.templateContext(
     project.id,
     report.context.templates,
@@ -310,4 +310,58 @@ test("folder templates can be forked and promoted without losing guides or compo
       },
     ]),
   ).rejects.toThrow(/not found/);
+});
+
+test("method-only templates reject page structures and apply as empty Pages", async () => {
+  const source = templateFixture("method-only", false);
+  const { metadata, body } = parseTemplateBundle(source);
+  metadata.schemaVersion = 2;
+  delete metadata.page;
+  source.files["README.md"] =
+    "---\n" + JSON.stringify(metadata) + "\n---\n" + body;
+  expect(parseTemplateBundle(source).document).toBeUndefined();
+  const invalid = structuredClone(source);
+  invalid.files["page.json"] = "{}";
+  expect(() => parseTemplateBundle(invalid)).toThrow(/page.json/);
+  invalid.files["README.md"] =
+    "---\n" +
+    JSON.stringify({ ...metadata, page: "page.json" }) +
+    "\n---\n" +
+    body;
+  expect(() => parseTemplateBundle(invalid)).toThrow(/page is not supported/);
+  const home = await temporary(),
+    service = new AgentService({ root: home });
+  const project = await service.createProject("Methods");
+  const saved = await service.saveTemplate(project.id, undefined, {
+    bundle: source,
+  });
+  const applied = await service.applyTemplate(project.id, saved.id, undefined, {
+    scope: "project",
+    version: saved.version,
+    integrity: saved.integrity,
+  });
+  expect(applied.document.content.content ?? []).toEqual([
+    expect.objectContaining({ type: "paragraph" }),
+  ]);
+  expect(JSON.stringify(applied.document.content)).not.toContain("widget");
+  for (const id of [
+    "concept-explainer",
+    "decision-comparison",
+    "evidence-report",
+    "procedure-guide",
+    "progress-report",
+    "exploration-map",
+  ]) {
+    const current = await getTemplate(home, id, project.id, {
+      scope: "builtin",
+    });
+    expect(parseTemplateBundle(current.bundle).metadata.schemaVersion).toBe(2);
+    expect(current.document.content.content ?? []).toHaveLength(0);
+    const previous = await getTemplate(home, id, project.id, {
+      scope: "builtin",
+      version: "2.0.0",
+    });
+    expect(parseTemplateBundle(previous.bundle).metadata.schemaVersion).toBe(1);
+    expect(previous.document.content.content?.length).toBeGreaterThan(0);
+  }
 });

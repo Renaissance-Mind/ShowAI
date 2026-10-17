@@ -9,7 +9,7 @@ export interface TemplateBundleSource {
 }
 export interface TemplateBundleMetadata {
   format: "showai-template";
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   id: string;
   name: string;
   version: string;
@@ -17,7 +17,8 @@ export interface TemplateBundleMetadata {
   scenarios: string[];
   guides: Record<TemplateStage, string | null>;
   components: { id: string; path: string }[];
-  page: string | null;
+  /** Legacy schemaVersion 1 only. */
+  page?: string | null;
 }
 export interface ParsedTemplateBundle {
   metadata: TemplateBundleMetadata;

@@ -17,7 +17,6 @@ import ComponentAdjustmentSummary from "./ComponentAdjustmentSummary";
 import ComponentParameterFacts from "./ComponentParameterFacts";
 import ComponentParameterSummary from "./ComponentParameterSummary";
 import ComponentDocumentationView from "./ComponentDocumentationView";
-import TemplateOutline from "./TemplateOutline";
 import TemplateWorkflowView from "./TemplateWorkflowView";
 import CatalogTabs from "./CatalogTabs";
 import CatalogPreview from "./CatalogPreview";
@@ -101,7 +100,6 @@ export function TemplateDialog({
   const t = useTranslator(messages);
   const panelId = useId();
   const [tab, setTab] = useState<"about" | "guides" | "usage">("about");
-  const systemTemplate = record.id === "system-presentation";
   return (
     <Dialog
       title={record.name}
@@ -118,7 +116,10 @@ export function TemplateDialog({
           active={tab}
           onChange={setTab}
           tabs={[
-            { id: "about", label: t("tab.preview") },
+            {
+              id: "about",
+              label: t(record.bundle ? "tab.overview" : "tab.preview"),
+            },
             ...(record.contentGuide?.length || record.examples?.length
               ? [{ id: "usage" as const, label: t("tab.usage") }]
               : []),
@@ -136,7 +137,7 @@ export function TemplateDialog({
         aria-label={t(
           (
             {
-              about: "tab.preview",
+              about: record.bundle ? "tab.overview" : "tab.preview",
               guides: "tab.guides",
               usage: "tab.usage",
             } as const
@@ -172,9 +173,11 @@ export function TemplateDialog({
           <div className="catalog-preview-workspace">
             <section
               className="catalog-live-example"
-              aria-label={t("templateExamplePreview")}
+              aria-label={t(
+                record.bundle ? "tab.overview" : "templateExamplePreview",
+              )}
             >
-              {systemTemplate ? (
+              {record.bundle ? (
                 <div className="catalog-reading-content">
                   <h3>{record.name}</h3>
                   <p>{record.description}</p>
@@ -199,11 +202,6 @@ export function TemplateDialog({
             <aside className="catalog-info-panel">
               <ReferenceSection title={t("scenarios")} icon="usage">
                 <CompactScenarios items={record.scenarios ?? []} />
-              </ReferenceSection>
-              <ReferenceSection title={t("pageStructure")} icon="content">
-                <TemplateOutline
-                  document={record.previewDocument ?? record.document}
-                />
               </ReferenceSection>
               {!!record.related?.length && (
                 <details>
