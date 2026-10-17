@@ -39,6 +39,7 @@ export class RemoteMacConnector {
   private generation = 0;
   private settings?: ConnectorSettings;
   private initialization?: Promise<void>;
+  private starting?: Promise<void>;
   private error = "";
   private online = false;
   private sharedHome?: string;
@@ -57,7 +58,7 @@ export class RemoteMacConnector {
     return join(this.host.options.root, "remote-device.json");
   }
   async status() {
-    if (this.online && this.sharedHome !== this.home()) await this.close();
+    if (this.online && this.sharedHome !== this.home()) void this.close();
     this.initialization ??= (async () => {
       const saved = await readOptional<ConnectorSettings>(this.path);
       this.settings = saved
@@ -171,6 +172,15 @@ export class RemoteMacConnector {
     return this.status();
   }
   async start() {
+    const work = this.startConnection();
+    this.starting = work;
+    try {
+      await work;
+    } finally {
+      if (this.starting === work) this.starting = undefined;
+    }
+  }
+  private async startConnection() {
     const generation = ++this.generation;
     this.stopped = false;
     const { settings } = await this.status();
@@ -337,9 +347,12 @@ export class RemoteMacConnector {
     await connect().catch(failed);
   }
   close() {
-    const local = this.lan
-      .close()
-      .catch((error) => console.error("Local sharing:", error.message));
+    const local = (async () => {
+      await this.starting?.catch((error) => {
+        this.error = error.message;
+      });
+      await this.lan.close();
+    })().catch((error) => console.error("Local sharing:", error.message));
     this.stopped = true;
     this.generation++;
     clearTimeout(this.retry);
