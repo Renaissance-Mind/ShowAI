@@ -327,7 +327,8 @@ const directory='/state/agent-host/remote-turns',jobs=fs.existsSync(directory)?f
               status.runtime === "failed" ||
               (status.runtime === "starting" &&
                 status.stage === "restore" &&
-                !status.restore)
+                (!status.restore ||
+                  status.taskAdmission !== "checkpointed-before-start"))
             ) {
               // No task can be admitted before readiness. Only reconstructed
               // cache files are discarded; the encrypted committed head remains.
