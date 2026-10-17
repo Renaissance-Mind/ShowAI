@@ -73,9 +73,16 @@ test.skipIf(!process.env.SHOWAI_NATIVE_LAN_TEST_ROOT)(
           const cmd = JSON.parse(text);
           if (cmd.action === "pause") await peer.close();
           if (cmd.action === "resume") await peer.start();
+          const projects = await service.store.listProjects();
+          const metadata = await Promise.all(
+            projects.map((p) => service.store.readProject(p.id)),
+          );
           const target =
-            (await service.store.listProjects()).find(
-              (p) => p.id !== project.id,
+            metadata.find(
+              (p) =>
+                cmd.projectId &&
+                p.binding?.harness === "showai-ipad" &&
+                p.binding.sessionId.endsWith("/" + cmd.projectId),
             )?.id ?? project.id;
           if (cmd.action === "edit") {
             const current = await service.store.readPage(
