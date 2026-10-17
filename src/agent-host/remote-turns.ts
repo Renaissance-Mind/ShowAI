@@ -164,6 +164,9 @@ export class RemoteTurns {
     this.admissions.delete(id);
     if (job?.turn.state === "running") this.enqueue(job);
   }
+  needsAdmissionCheckpoint(id: string) {
+    return this.admissions.has(id);
+  }
   async failAdmission(id: string, message: string) {
     const job = this.admissions.get(id);
     this.admissions.delete(id);

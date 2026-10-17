@@ -192,15 +192,23 @@ test("durable admission can be checkpointed before preparation and cancelled wit
       protocol: "responses",
       credential: "api-key",
     });
-    const accepted = (await deferred.invoke(
-      request("agent:send", {
-        prompt: "Admission boundary only",
-        target: { kind: "page", pageId },
-        expectedHash: "stale",
-      }),
-      actor,
-    )) as { id: string; turns: { id: string }[] };
+    const admission = request("agent:send", {
+      prompt: "Admission boundary only",
+      target: { kind: "page", pageId },
+      expectedHash: "stale",
+    });
+    const accepted = (await deferred.invoke(admission, actor)) as {
+      id: string;
+      turns: { id: string }[];
+    };
     const turn = accepted.turns.at(-1)!;
+    const duplicate = (await deferred.invoke(
+      admission,
+      actor,
+    )) as typeof accepted;
+    expect(duplicate.id).toBe(accepted.id);
+    expect(duplicate.turns.at(-1)?.id).toBe(turn.id);
+    expect(await deferred.turns.list(projectId)).toHaveLength(1);
     expect((await syncManager(library).configuration()).projects).toHaveLength(
       0,
     );

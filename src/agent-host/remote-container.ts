@@ -230,7 +230,11 @@ if (process.argv.includes("--install-runtime")) {
           ? (value as { turns: { id: string }[] }).turns.at(-1)?.id
           : undefined;
       try {
-        if (!remoteReadActions.has(call.action)) await checkpoint();
+        if (
+          !remoteReadActions.has(call.action) &&
+          (!admittedId || engine.turns.needsAdmissionCheckpoint(admittedId))
+        )
+          await checkpoint();
       } catch (error) {
         if (admittedId)
           await engine.turns.failAdmission(
