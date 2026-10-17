@@ -502,14 +502,7 @@ test("presentation templates apply as independent native Pages, persist edits an
   const projectId = (
     await call(c, "project_create", { name: "Presentation template contracts" })
   ).id;
-  const families = [
-    "concept-explainer",
-    "decision-comparison",
-    "evidence-report",
-    "procedure-guide",
-    "progress-report",
-    "exploration-map",
-  ];
+  const families = ["paper-explainer"];
   const listing = await call(c, "catalog_list", {
     projectId,
     kind: "template",
@@ -550,15 +543,37 @@ test("presentation templates apply as independent native Pages, persist edits an
         (node) => node.attrs?.id && secondIds.has(node.attrs.id),
       ),
     ).toEqual([]);
-    const paragraph = firstNodes.find(
+    // Method templates apply as empty Pages; the instance supplies its content.
+    expect(
+      firstNodes.filter(
+        (node) => node.type === "paragraph" && node.content?.length,
+      ),
+    ).toEqual([]);
+    const inserted = await call(c, "page_apply", {
+      projectId,
+      pageId: first.document.id,
+      baseHash: first.hash,
+      baseRevision: first.revision,
+      operations: [
+        {
+          type: "block.insert",
+          node: {
+            type: "paragraph",
+            attrs: { id: "intro" },
+            content: [{ type: "text", text: "Draft opening." }],
+          },
+        },
+      ],
+    });
+    const paragraph = nodes(inserted.document.content).find(
       (node) => node.type === "paragraph" && node.content?.length,
     );
     expect(paragraph?.attrs?.id).toBeTruthy();
     const saved = await call(c, "page_apply", {
       projectId,
       pageId: first.document.id,
-      baseHash: first.hash,
-      baseRevision: first.revision,
+      baseHash: inserted.hash,
+      baseRevision: inserted.revision,
       operations: [
         {
           type: "block.text.set",

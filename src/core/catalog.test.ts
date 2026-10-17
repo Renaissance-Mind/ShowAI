@@ -127,19 +127,22 @@ it("React Flow can be composed through the SDK and exported without external scr
 });
 
 describe("filesystem template catalog", () => {
-  it("provides blank, research, comparison and brief without invented findings", async () => {
+  it("provides blank plus the folder templates without invented findings", async () => {
     const home = await temporary();
     expect(
       (await listTemplates(home, project(home))).map((item) => item.id),
     ).toEqual(
-      expect.arrayContaining(["blank", "research", "comparison", "brief"]),
+      expect.arrayContaining([
+        "blank",
+        "system-presentation",
+        "paper-explainer",
+      ]),
     );
-    const research = await getTemplate(home, "research", project(home));
-    expect(research.scope).toBe("builtin");
+    const blank = await getTemplate(home, "blank", project(home));
+    expect(blank.scope).toBe("builtin");
     expect(
-      research.document.content.content?.find((node) => node.type === "widget")
-        ?.attrs?.data.rows,
-    ).toEqual([]);
+      blank.document.content.content?.some((node) => node.type === "widget"),
+    ).toBe(false);
   });
   it("saves user and project templates with project precedence and instantiates a fresh page", async () => {
     const home = await temporary(),
@@ -155,7 +158,7 @@ describe("filesystem template catalog", () => {
     const personal = await saveTemplate(
       home,
       {
-        id: "research",
+        id: "field-notes",
         name: "Personal",
         description: "Reusable",
         document,
@@ -173,20 +176,20 @@ describe("filesystem template catalog", () => {
     ).id;
     await saveTemplate(
       home,
-      { id: "research", name: "Project", description: "Local", document },
+      { id: "field-notes", name: "Project", description: "Local", document },
       projectOne,
     );
-    expect((await getTemplate(home, "research", project(home))).name).toBe(
+    expect((await getTemplate(home, "field-notes", project(home))).name).toBe(
       "Personal",
     );
-    expect((await getTemplate(home, "research", projectOne)).name).toBe(
+    expect((await getTemplate(home, "field-notes", projectOne)).name).toBe(
       "Project",
     );
     expect(
       (await listTemplates(home, projectOne)).filter(
-        (item) => item.id === "research",
+        (item) => item.id === "field-notes",
       ),
-    ).toHaveLength(3);
+    ).toHaveLength(2);
     const page = instantiateTemplate(personal.document);
     expect(page.id).not.toBe(document.id);
     expect(page.content.content?.[0].attrs?.id).not.toBe("original-block");

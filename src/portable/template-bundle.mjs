@@ -1,5 +1,16 @@
 /** Portable template contract: Markdown instructions and editable component files. */
+// Four presentation stages: understand intent, gather material, plan the
+// presentation logic, then write the design draft. Authoring and review are
+// skill operations that execute and check the draft, not template stages.
 export const TEMPLATE_STAGES = Object.freeze([
+  "intent",
+  "material",
+  "logic",
+  "design",
+]);
+export const TEMPLATE_SCHEMA_VERSION = 3;
+/** schemaVersion 1–2 bundles declared six stages; they remain readable. */
+export const LEGACY_TEMPLATE_STAGES = Object.freeze([
   "intent",
   "evidence",
   "understanding",
@@ -7,10 +18,18 @@ export const TEMPLATE_STAGES = Object.freeze([
   "authoring",
   "review",
 ]);
+const LEGACY_STAGE_SOURCE = Object.freeze({
+  intent: "intent",
+  material: "evidence",
+  logic: "understanding",
+  design: "design",
+});
 export const SYSTEM_TEMPLATE_ID = "system-presentation";
 export const TEMPLATE_WORKFLOW_CAPABILITIES = Object.freeze({
-  protocol: "showai-template-workflow-v1",
+  protocol: "showai-template-workflow-v2",
   bundleFormat: 1,
+  schemaVersion: TEMPLATE_SCHEMA_VERSION,
+  legacySchemaVersions: [1, 2],
   stages: TEMPLATE_STAGES,
   systemBaselineRequired: true,
   contextBinding: "explicit-exact-refs",
@@ -66,6 +85,16 @@ export function templateFilePath(value) {
     throw new Error("Unsafe template path key.");
   return value;
 }
+/** The declared guide for a current stage, mapping legacy six-stage bundles. */
+export function stageGuidePath(metadata, stage) {
+  if (!TEMPLATE_STAGES.includes(stage))
+    throw new Error("Unknown presentation stage.");
+  const key =
+    metadata.schemaVersion === TEMPLATE_SCHEMA_VERSION
+      ? stage
+      : LEGACY_STAGE_SOURCE[stage];
+  return metadata.guides[key] ?? null;
+}
 export function parseTemplateReadme(source) {
   text(source, "README", 16000);
   const normalized = source.replace(/\r\n/g, "\n");
@@ -93,9 +122,11 @@ export function parseTemplateReadme(source) {
   );
   if (
     metadata.format !== "showai-template" ||
-    ![1, 2].includes(metadata.schemaVersion)
+    ![1, 2, TEMPLATE_SCHEMA_VERSION].includes(metadata.schemaVersion)
   )
     throw new Error("Unsupported template README format/schemaVersion.");
+  const legacy = metadata.schemaVersion !== TEMPLATE_SCHEMA_VERSION;
+  const stages = legacy ? LEGACY_TEMPLATE_STAGES : TEMPLATE_STAGES;
   if (!idPattern.test(metadata.id)) throw new Error("Invalid template id.");
   if (!versionPattern.test(metadata.version))
     throw new Error("Template version must be exact semver.");
@@ -109,8 +140,8 @@ export function parseTemplateReadme(source) {
     throw new Error("Template scenarios must contain 1–20 entries.");
   metadata.scenarios.forEach((value) => text(value, "Template scenario", 500));
   const guides = object(metadata.guides, "Stage guides");
-  keys(guides, TEMPLATE_STAGES, "stage guide");
-  for (const stage of TEMPLATE_STAGES) {
+  keys(guides, stages, "stage guide");
+  for (const stage of stages) {
     if (!Object.hasOwn(guides, stage))
       throw new Error(
         `Missing stage declaration: ${stage}. Use null to inherit the system guide.`,
@@ -151,9 +182,9 @@ export function parseTemplateReadme(source) {
       );
     componentRoots.push(componentRoot);
   }
-  if (metadata.schemaVersion === 2 && Object.hasOwn(metadata, "page"))
+  if (metadata.schemaVersion !== 1 && Object.hasOwn(metadata, "page"))
     throw new Error(
-      "Template schemaVersion 2 uses understanding/design guides; page is not supported.",
+      "Templates guide logic and design for each instance; page skeletons exist only in legacy schemaVersion 1.",
     );
   if (
     metadata.schemaVersion === 1 &&
@@ -223,7 +254,7 @@ export function parseTemplateBundle(input) {
   const { metadata, body } = parseTemplateReadme(read("README.md"));
   const guides = {};
   for (const stage of TEMPLATE_STAGES) {
-    const path = metadata.guides[stage];
+    const path = stageGuidePath(metadata, stage);
     if (path !== null) {
       const main = path.endsWith(".md") ? path : path + "/README.md";
       const markdown = read(main);
@@ -287,10 +318,12 @@ export function parseTemplateBundle(input) {
       !metadata.components.some(({ path }) => name.startsWith(path + "/"))
     )
       throw new Error(`Undeclared component file: ${name}.`);
-  if (metadata.schemaVersion === 2 && Object.hasOwn(files, "page.json"))
-    throw new Error("Template schemaVersion 2 does not support page.json.");
+  if (metadata.schemaVersion !== 1 && Object.hasOwn(files, "page.json"))
+    throw new Error(
+      "Template page.json is only read by legacy schemaVersion 1 bundles.",
+    );
   const document =
-    metadata.schemaVersion === 2 || metadata.page === null
+    metadata.schemaVersion !== 1 || metadata.page === null
       ? undefined
       : object(JSON.parse(read(metadata.page)), "Template page");
   return {
@@ -299,6 +332,7 @@ export function parseTemplateBundle(input) {
     guides,
     components,
     document,
+    legacy: metadata.schemaVersion !== TEMPLATE_SCHEMA_VERSION,
     source: structuredClone(input),
   };
 }

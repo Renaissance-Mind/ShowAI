@@ -36,12 +36,18 @@ if (
   throw new Error(
     "This ShowAI runtime does not support the unified MCP entry. Update/register the intended ShowAI runtime, then reconnect. Skills alone cannot upgrade it.",
   );
+const templateProtocol = info.data?.capabilities?.templateWorkflow?.protocol;
 if (
-  info.data?.capabilities?.templateWorkflow?.protocol !==
-  "showai-template-workflow-v1"
+  !["showai-template-workflow-v2", "showai-template-workflow-v1"].includes(
+    templateProtocol,
+  )
 )
   throw new Error(
     "This plugin requires the staged template workflow runtime. Update/register the intended ShowAI runtime and reconnect; installing skills alone does not add template_context/template_guide.",
+  );
+if (templateProtocol === "showai-template-workflow-v1")
+  process.stderr.write(
+    "ShowAI runtime still serves the six-stage template workflow (v1); the installed skills describe the four-stage workflow (v2). Update the registered runtime to use intent/material/logic/design stages.\n",
   );
 if (
   info.data?.capabilities?.componentParameters?.protocol !==

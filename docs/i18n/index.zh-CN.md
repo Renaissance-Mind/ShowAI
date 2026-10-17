@@ -23,7 +23,7 @@ ShowAI 用可阅读、可交互、可编辑的页面承载人与 Agent 的共同
 | ----------------------------------------- | ------------------------------------ |
 | [组件与模板](catalog-lifecycle.zh-CN.md)  | 作用域、不可变版本、组合与发布       |
 | [Skills 与工作流程](skills.zh-CN.md)      | 八个 Skill 与任务分工                |
-| [模板文件夹](template-bundles.zh-CN.md)   | 元信息、六阶段指南与组件库           |
+| [模板文件夹](template-bundles.zh-CN.md)   | 元信息、四阶段指南与组件库           |
 | [组件参数](component-parameters.zh-CN.md) | 生成式参数参考、省略行为与关系校验   |
 | [G2 数据图表](g2-components.zh-CN.md)     | 43 种图表、数据源与字段映射          |
 | [思维导图](mindmap.zh-CN.md)              | 布局、快捷键、数据与导出             |

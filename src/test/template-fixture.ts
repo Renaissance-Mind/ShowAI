@@ -1,26 +1,31 @@
 import {
+  LEGACY_TEMPLATE_STAGES,
+  TEMPLATE_SCHEMA_VERSION,
   TEMPLATE_STAGES,
   type TemplateBundleSource,
 } from "../portable/template-bundle.mjs";
+/** A schemaVersion 3 folder; legacy=true builds a six-stage schemaVersion 1 bundle. */
 export function templateFixture(
   id = "guided-example",
   component = true,
+  legacy = false,
 ): TemplateBundleSource {
+  const stages = legacy ? LEGACY_TEMPLATE_STAGES : TEMPLATE_STAGES;
   const metadata = {
     format: "showai-template",
-    schemaVersion: 1,
+    schemaVersion: legacy ? 1 : TEMPLATE_SCHEMA_VERSION,
     id,
     name: "Guided explanation",
     version: "1.0.0",
     description: "Explain a sequence using persistent object labels.",
     scenarios: ["Read a two-step explanation."],
     guides: Object.fromEntries(
-      TEMPLATE_STAGES.map((stage) => [stage, `guides/${stage}.md`]),
+      stages.map((stage) => [stage, `guides/${stage}.md`]),
     ),
     components: component
       ? [{ id: "step-picker", path: "components/step-picker" }]
       : [],
-    page: null,
+    ...(legacy ? { page: null } : {}),
   };
   const files: Record<string, string> = {
     "README.md":
@@ -28,7 +33,7 @@ export function templateFixture(
       JSON.stringify(metadata, null, 2) +
       "\n---\n# Guided explanation\n\nKeep the task's objects visible while changing the selected step.\n",
   };
-  for (const stage of TEMPLATE_STAGES)
+  for (const stage of stages)
     files[`guides/${stage}.md`] =
       `# ${stage}\n\nOnly the ${stage} phase instruction.\n`;
   if (component) {

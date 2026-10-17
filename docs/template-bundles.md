@@ -2,7 +2,20 @@
 
 **Language:** English | [简体中文](i18n/template-bundles.zh-CN.md) · [Documentation](README.md)
 
-ShowAI templates package a reusable method, an optional page skeleton and optional custom components. The runtime supplies the mandatory system presentation baseline; the selected template adds instructions for the current stage. The same contract serves local Codex/Claude Code connections and authorized HTTP MCP clients.
+A ShowAI template packages a reusable presentation method for one kind of content, plus an optional component library. The runtime supplies the mandatory system presentation baseline; the selected template adds instructions for the current stage. The same contract serves local Codex/Claude Code connections and authorized HTTP MCP clients.
+
+## Four stages
+
+Every presentation task moves through four stages. Each stage produces one record that the next stage builds on; authoring implements the final record and review checks the saved Page against it.
+
+| Stage      | Question answered                                                                | Record                                                                 |
+| ---------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `intent`   | What does the reader actually want to know, know already, lack or misunderstand? | Reader brief                                                           |
+| `material` | Which raw information is needed, where does it come from, how is it checked?     | Source notes (optional for generic topics)                             |
+| `logic`    | What is explained, in what order, to what depth?                                 | Multi-level presentation plan                                          |
+| `design`   | Which environment, overall layout, visual expression and interaction?            | Scene-by-scene design draft, as specific as an image-generation prompt |
+
+The system baseline (`system-presentation`) describes each stage and the visual principles: design the whole and each part, prefer visual expression, use text as the necessary complement, keep text readable. A template adds the domain method for its content type, for example how a paper explainer collects numbers with their conditions and which scene designs have worked.
 
 ## Folder format
 
@@ -11,18 +24,15 @@ my-template/
   README.md
   guides/
     01-intent.md
-    02-evidence.md
-    03-understanding.md
+    02-material.md
+    03-logic.md
     04-design/README.md
-    04-design/detail.md
-    05-authoring.md
-    06-review.md
+    04-design/scenes.md
   components/                 # may be empty
     sequence/
       manifest.json
       props.schema.json
       index.tsx
-  page.json                   # optional
 ```
 
 README.md begins with JSON frontmatter between `---` lines, followed by a short Markdown body. JSON is used as a strict, portable frontmatter format; YAML-only syntax and unknown metadata fields are rejected. This metadata is authoritative: explicit save options must agree with it.
@@ -31,7 +41,7 @@ README.md begins with JSON frontmatter between `---` lines, followed by a short 
 ---
 {
   "format": "showai-template",
-  "schemaVersion": 1,
+  "schemaVersion": 3,
   "id": "my-template",
   "name": "My template",
   "version": "1.0.0",
@@ -40,27 +50,34 @@ README.md begins with JSON frontmatter between `---` lines, followed by a short 
   "guides":
     {
       "intent": "guides/01-intent.md",
-      "evidence": "guides/02-evidence.md",
-      "understanding": "guides/03-understanding.md",
+      "material": null,
+      "logic": "guides/03-logic.md",
       "design": "guides/04-design",
-      "authoring": "guides/05-authoring.md",
-      "review": "guides/06-review.md",
     },
   "components": [],
-  "page": null,
 }
 ---
 
 # My template
 
-Describe the reusable task and the materials supplied by each instance.
+Describe the reusable reader task, what each instance supplies, and the scene designs that have worked.
 ```
 
-Declare all six stages. A stage value is a Markdown filename, a folder with a main README.md, or `null` to inherit the system stage. The basic README body is limited to 4 KiB; a guide file to 32 KiB. Move detail into explicitly requested guide files. Component lists may be empty. A page skeleton, when present, uses the current Page/Board format; omitting it creates an empty editable Page on application.
+Declare all four stages. A stage value is a Markdown filename, a folder with a main README.md, or `null` to inherit the system stage. The basic README body is limited to 4 KiB; a guide file to 32 KiB. Move detail into explicitly requested guide files. Component lists may be empty. Applying a template always creates an empty Page: the logic and design records of the current instance decide the page structure, not a stored skeleton.
+
+Legacy `schemaVersion` 1 and 2 bundles declared six stages (intent, evidence, understanding, design, authoring, review) and could carry a `page.json` skeleton. They remain readable: their evidence and understanding guides are served as `material` and `logic`, authoring and review guides are no longer disclosed, and `template_context` marks them with `legacyStages`. New templates use `schemaVersion` 3.
 
 The system baseline is always included in task contexts and embedded in the foundational `show-document` skill from the same authoritative source. A project template cannot replace `system-presentation`. The runtime provides the baseline through `guide({topic:"presentation"})` for hosts without local skill files. Stage guides are requested when needed, not globally installed as one skill per file.
 
-Template composition remains available in the legacy definition format. It is an optional structural capability, not a required step in each stage.
+## Builtin templates
+
+| ID                    | Purpose                                                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `system-presentation` | Mandatory baseline: the four stages and the visual principles                                                            |
+| `paper-explainer`     | Interactive explanation of a paper: answer first, problem → mechanism → evidence → conditions → credibility → self-check |
+| `blank`               | Empty page for users who already have a layout in mind                                                                   |
+
+`paper-explainer` was distilled from two verified explainer pages (VideoJev, Terminal-RSI). Its design guide names the component capabilities by reader task; when a project or global copy of the template carries the matching component library, `template_context` returns exact references, otherwise the guide lists builtin alternatives.
 
 ## Component library
 
@@ -72,16 +89,17 @@ Directory import rejects symlinks, path traversal, unsafe names and case-insensi
 
 ## MCP workflow
 
-1. Check `showai_capabilities.templateWorkflow.protocol` for `showai-template-workflow-v1`; resolve the actual authorized project.
+1. Check `showai_capabilities.templateWorkflow.protocol` for `showai-template-workflow-v2`; resolve the actual authorized project.
 2. Read the system baseline, or reuse the exact baseline embedded in the loaded skill.
-3. `template_context({projectId,templates:[{id,scope,version?,integrity?}]})` returns READMEs, pinned references and a paged component index. Use `knownSystemHash` only for baseline text already read. Use `knownHash` only for an already held context. Follow `componentPage.next` when more component entries are needed.
-4. `template_guide({projectId,stage,templates:context.templates})` returns that system stage plus the selected exact-template guides. For a stage folder, use its listed filenames with `templateId` and `file` to read one subfile. Cached guide hashes can suppress repeated text.
-5. Apply a matching template with `template_apply`, or use the user's blank-page choice. Fill real content and validate the relevant states. Templates do not automatically research or bind materials.
-6. Read/edit/save using current source hash and revision, then present the saved Page. `page_read(response:"source")` returns complete source without duplicate Markdown/outline; image/identity checks and page writes can use `response:"receipt"`. The default `full` profile remains compatible. Request full/rendered information when inspecting derived values.
+3. `template_context({projectId,templates:[{id,scope,version?,integrity?}]})` returns READMEs, pinned references, the stage list and a paged component index. Use `knownSystemHash` only for baseline text already read. Use `knownHash` only for an already held context. Follow `componentPage.next` when more component entries are needed.
+4. `template_guide({projectId,stage,templates:context.templates})` returns that system stage plus the selected exact-template guides, one stage at a time. For a stage folder, use its listed filenames with `templateId` and `file` to read one subfile. Cached guide hashes can suppress repeated text.
+5. Write the stage records: reader brief, source notes, presentation plan, design draft. Complex works save the plan and draft as `presentation-plan.json` (nodes and scenes) and check them with the plan-presentation script.
+6. Apply the template with `template_apply` (an empty Page bound to the exact refs), or use the user's blank-page choice; author the Page from the design draft.
+7. Read/edit/save using current source hash and revision, then present the saved Page. `page_read(response:"source")` returns complete source without duplicate Markdown/outline; image/identity checks and page writes can use `response:"receipt"`.
 
 Template application records `Page.templateContext`, preserving exact workflow references for continued editing. Explicit page changes may set this field through `page.set`; the value contains `format`, `system` and `templates`, without a context response hash. Stored references document the workflow, not permission to access another project. Missing older template records must be reported or imported, not replaced with a guessed latest version.
 
-No library-wide current template is mutated. Templates are already registered at save/import. Local MCP startup may pin defaults for one bound project; HTTP/library clients carry explicit references on each stage call. Omitting `templates` uses that connection's startup defaults; explicit `templates:[]` clears task-template selection for the call while retaining system instructions. Changing one client's selection does not change another client's task. Known hashes never bypass authorization or exact-reference lookup.
+No library-wide current template is mutated. Templates are already registered at save/import. Local MCP startup may pin defaults for one bound project; HTTP/library clients carry explicit references on each stage call. Omitting `templates` uses that connection's startup defaults; explicit `templates:[]` clears task-template selection for the call while retaining system instructions. Known hashes never bypass authorization or exact-reference lookup.
 
 The directory-shaped network input is `template_save({projectId,input:{bundle:{format:1,files,assets?}}})`. `files` maps relative paths to UTF-8 text; `assets` maps component asset paths to base64. A web client does not pass server-local directories. Legacy document/composition/contentGuide templates and exact old revisions remain readable.
 

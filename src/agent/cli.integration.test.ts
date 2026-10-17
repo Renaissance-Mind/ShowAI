@@ -91,13 +91,15 @@ test("public CLI and stdio render customized content without creating a personal
       home: library,
     });
     expect(
-      templates.items.some((item: { id: string }) => item.id === "explainer"),
+      templates.items.some(
+        (item: { id: string }) => item.id === "paper-explainer",
+      ),
     ).toBe(true);
     const rendered = await run(
       [
         "render",
         "--template",
-        "explainer",
+        "paper-explainer",
         "--title",
         "A standalone presentation",
         "--out",
@@ -135,7 +137,10 @@ test("public CLI and stdio render customized content without creating a personal
       expect(tools.tools.map((item) => item.name)).not.toContain("page_save");
       const response = await client.callTool({
         name: "render_document",
-        arguments: { templateId: "comparison", title: "Public MCP rendering" },
+        arguments: {
+          templateId: "system-presentation",
+          title: "Public MCP rendering",
+        },
       });
       expect(response.isError).not.toBe(true);
       const receipt = (
@@ -1247,141 +1252,164 @@ test("exports stay in the selected project's output subtree and skip archived si
   ).toBe(first.hash);
 });
 
-test("directory projects are shared across sessions, canonical paths and concurrent first use", async () => {
-  const library = await mkdtemp(join(home, "directory-library-"));
-  const workspace = await mkdtemp(join(home, "directory-workspace-"));
-  const other = await mkdtemp(join(home, "other-workspace-"));
-  const nested = join(workspace, "src");
-  await mkdir(nested);
-  await execute("git", ["init", "--quiet", workspace]);
-  const runHere = (args: string[], cwd = workspace) =>
-    run(args, { home: library, cwd });
-  const firstUse = await Promise.all([
-    runHere(["projects", "current", "--harness", "codex", "--session", "one"]),
-    runHere(["projects", "current", "--harness", "codex", "--session", "two"]),
-  ]);
-  expect(firstUse[0].project.id).toBe(firstUse[1].project.id);
-  expect(firstUse.filter((item) => item.created)).toHaveLength(1);
-  const root = firstUse[0];
-  expect(root).toMatchObject({
-    bound: true,
-    resolution: "directory",
-    home: library,
-  });
-  expect((await runHere(["projects", "current"], nested)).project.id).toBe(
-    root.project.id,
-  );
-  const alias = join(home, "directory-alias");
-  await symlink(workspace, alias, process.platform === "win32" ? "junction" : "dir");
-  expect(
-    (await runHere(["projects", "current", "--source-directory", alias]))
-      .project.id,
-  ).toBe(root.project.id);
-  const exact = await runHere([
-    "projects",
-    "current",
-    "--source-directory",
-    nested,
-  ]);
-  expect(exact.project.id).not.toBe(root.project.id);
-  const elsewhere = await runHere(
-    ["projects", "current", "--harness", "codex", "--session", "one"],
-    other,
-  );
-  expect(elsewhere.project.id).not.toBe(root.project.id);
-  const page = await runHere([
-    "pages",
-    "create",
-    "--title",
-    "Directory report",
-  ]);
-  expect(
-    (await runHere(["pages", "list"], nested)).map(
-      (item: { id: string }) => item.id,
-    ),
-  ).toContain(page.document.id);
-  expect(await runHere(["pages", "list"], other)).toEqual([]);
-  const manual = await runHere([
-    "projects",
-    "create",
-    "--name",
-    "Explicit destination",
-  ]);
-  expect(
-    await runHere([
+test(
+  "directory projects are shared across sessions, canonical paths and concurrent first use",
+  async () => {
+    const library = await mkdtemp(join(home, "directory-library-"));
+    const workspace = await mkdtemp(join(home, "directory-workspace-"));
+    const other = await mkdtemp(join(home, "other-workspace-"));
+    const nested = join(workspace, "src");
+    await mkdir(nested);
+    await execute("git", ["init", "--quiet", workspace]);
+    const runHere = (args: string[], cwd = workspace) =>
+      run(args, { home: library, cwd });
+    const firstUse = await Promise.all([
+      runHere([
+        "projects",
+        "current",
+        "--harness",
+        "codex",
+        "--session",
+        "one",
+      ]),
+      runHere([
+        "projects",
+        "current",
+        "--harness",
+        "codex",
+        "--session",
+        "two",
+      ]),
+    ]);
+    expect(firstUse[0].project.id).toBe(firstUse[1].project.id);
+    expect(firstUse.filter((item) => item.created)).toHaveLength(1);
+    const root = firstUse[0];
+    expect(root).toMatchObject({
+      bound: true,
+      resolution: "directory",
+      home: library,
+    });
+    expect((await runHere(["projects", "current"], nested)).project.id).toBe(
+      root.project.id,
+    );
+    const alias = join(home, "directory-alias");
+    await symlink(
+      workspace,
+      alias,
+      process.platform === "win32" ? "junction" : "dir",
+    );
+    expect(
+      (await runHere(["projects", "current", "--source-directory", alias]))
+        .project.id,
+    ).toBe(root.project.id);
+    const exact = await runHere([
       "projects",
       "current",
+      "--source-directory",
+      nested,
+    ]);
+    expect(exact.project.id).not.toBe(root.project.id);
+    const elsewhere = await runHere(
+      ["projects", "current", "--harness", "codex", "--session", "one"],
+      other,
+    );
+    expect(elsewhere.project.id).not.toBe(root.project.id);
+    const page = await runHere([
+      "pages",
+      "create",
+      "--title",
+      "Directory report",
+    ]);
+    expect(
+      (await runHere(["pages", "list"], nested)).map(
+        (item: { id: string }) => item.id,
+      ),
+    ).toContain(page.document.id);
+    expect(await runHere(["pages", "list"], other)).toEqual([]);
+    const manual = await runHere([
+      "projects",
+      "create",
+      "--name",
+      "Explicit destination",
+    ]);
+    expect(
+      await runHere([
+        "projects",
+        "current",
+        "--project",
+        manual.id,
+        "--source-directory",
+        "/does-not-exist",
+      ]),
+    ).toMatchObject({
+      resolution: "explicit",
+      created: false,
+      project: { id: manual.id },
+    });
+    await runHere([
+      "pages",
+      "create",
       "--project",
       manual.id,
-      "--source-directory",
-      "/does-not-exist",
-    ]),
-  ).toMatchObject({
-    resolution: "explicit",
-    created: false,
-    project: { id: manual.id },
-  });
-  await runHere([
-    "pages",
-    "create",
-    "--project",
-    manual.id,
-    "--title",
-    "Explicit page",
-  ]);
-  expect(await runHere(["pages", "list"])).toHaveLength(1);
-  expect(await runHere(["pages", "list", "--project", manual.id])).toHaveLength(
-    1,
-  );
-  expect(await runHere(["projects", "list"])).toHaveLength(4);
-  const client = new Client({ name: "directory-client", version: "1.0.0" });
-  await client.connect(
-    new StdioClientTransport({
-      command: process.execPath,
-      args: [cli, "mcp"],
-      cwd: nested,
-      env: Object.fromEntries(
-        Object.entries({ ...environment(), SHOWAI_HOME: library }).filter(
-          (entry): entry is [string, string] => typeof entry[1] === "string",
-        ),
-      ),
-    }),
-  );
-  try {
-    const context = await client.callTool({
-      name: "project_context",
-      arguments: {},
-    });
-    const payload = JSON.parse(
-      (context.content as { text: string }[])[0].text,
-    ).data;
-    expect(payload.scope).toBe("library");
-    expect(payload.componentCatalog.complete).toBe(true);
-    expect(payload.root).toBe(library);
-    const selected = await client.callTool({
-      name: "project_context",
-      arguments: { projectId: root.project.id },
-    });
+      "--title",
+      "Explicit page",
+    ]);
+    expect(await runHere(["pages", "list"])).toHaveLength(1);
     expect(
-      JSON.parse((selected.content as { text: string }[])[0].text).data.project.id,
-    ).toBe(root.project.id);
-  } finally {
-    await client.close();
-  }
-  const { pageCount: _count, ...archivedProject } = (
-    await new FileStore(library).listProjects()
-  ).find((item) => item.id === root.project.id)!;
-  await new GitLibrary(library).writeFiles(
-    new Map([
-      [
-        `projects/${root.project.id}/project.json`,
-        Buffer.from(JSON.stringify({ ...archivedProject, archived: true })),
-      ],
-    ]),
-    { actor: { kind: "human" }, channel: "system" },
-  );
-  await expect(runHere(["projects", "current"])).rejects.toThrow("archived");
-}, process.platform === "win32" ? 60000 : 20000);
+      await runHere(["pages", "list", "--project", manual.id]),
+    ).toHaveLength(1);
+    expect(await runHere(["projects", "list"])).toHaveLength(4);
+    const client = new Client({ name: "directory-client", version: "1.0.0" });
+    await client.connect(
+      new StdioClientTransport({
+        command: process.execPath,
+        args: [cli, "mcp"],
+        cwd: nested,
+        env: Object.fromEntries(
+          Object.entries({ ...environment(), SHOWAI_HOME: library }).filter(
+            (entry): entry is [string, string] => typeof entry[1] === "string",
+          ),
+        ),
+      }),
+    );
+    try {
+      const context = await client.callTool({
+        name: "project_context",
+        arguments: {},
+      });
+      const payload = JSON.parse(
+        (context.content as { text: string }[])[0].text,
+      ).data;
+      expect(payload.scope).toBe("library");
+      expect(payload.componentCatalog.complete).toBe(true);
+      expect(payload.root).toBe(library);
+      const selected = await client.callTool({
+        name: "project_context",
+        arguments: { projectId: root.project.id },
+      });
+      expect(
+        JSON.parse((selected.content as { text: string }[])[0].text).data
+          .project.id,
+      ).toBe(root.project.id);
+    } finally {
+      await client.close();
+    }
+    const { pageCount: _count, ...archivedProject } = (
+      await new FileStore(library).listProjects()
+    ).find((item) => item.id === root.project.id)!;
+    await new GitLibrary(library).writeFiles(
+      new Map([
+        [
+          `projects/${root.project.id}/project.json`,
+          Buffer.from(JSON.stringify({ ...archivedProject, archived: true })),
+        ],
+      ]),
+      { actor: { kind: "human" }, channel: "system" },
+    );
+    await expect(runHere(["projects", "current"])).rejects.toThrow("archived");
+  },
+  process.platform === "win32" ? 60000 : 20000,
+);
 
 test("progressive CLI discovery is paginated and keeps detailed content opt-in", async () => {
   const project = await run([
@@ -1442,7 +1470,7 @@ test("progressive CLI discovery is paginated and keeps detailed content opt-in",
   const template = await run([
     "catalog",
     "describe",
-    "research",
+    "blank",
     "--kind",
     "template",
     "--project",
@@ -1460,7 +1488,7 @@ test("progressive CLI discovery is paginated and keeps detailed content opt-in",
   const detail = await run([
     "catalog",
     "describe",
-    "research",
+    "blank",
     "--kind",
     "template",
     "--view",
@@ -1473,7 +1501,7 @@ test("progressive CLI discovery is paginated and keeps detailed content opt-in",
   const full = await run([
     "catalog",
     "describe",
-    "research",
+    "blank",
     "--kind",
     "template",
     "--view",
@@ -1486,7 +1514,7 @@ test("progressive CLI discovery is paginated and keeps detailed content opt-in",
   const source = await run([
     "catalog",
     "describe",
-    "research",
+    "blank",
     "--kind",
     "template",
     "--view",

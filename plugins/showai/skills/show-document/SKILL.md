@@ -1,52 +1,68 @@
 ---
 name: show-document
-description: 通过 ShowAI MCP 制作、续改、展示和导出可交互报告、讲解页面与小型网站。完整作品请求（包括只给题目）使用；按当前阶段读取模板指南与组件说明。
+description: 通过 ShowAI MCP 制作、续改、展示和导出可交互报告、讲解页面与小型网站。完整作品请求（包括只给题目）使用；按理解意图、收集材料、呈现逻辑、设计稿四个阶段读取模板指南，再按设计稿制作。
 ---
 
 # 创作与展示
 
-先读取下面的系统基线；它适用于每个呈现任务。用户要求成品时持续完成制作、修订与交付。只要求对话讨论时直接回答；完整设计稿默认按用途保存，设计任务不自动实现拟议应用或组件。
+先读取下面的系统基线；它适用于每个呈现任务。用户要求成品时持续完成四个阶段、制作、评审与交付。只要求对话讨论时直接回答；只要求规划或设计稿时交付相应记录并按用途保存，不自动实现。
 
 <!-- showai-system-baseline:start -->
+
 # 系统呈现规则
 
-所有 ShowAI 呈现任务使用本系统模板。用户的明确要求优先；简单任务可合并阶段，已有有效材料可复用。
+目的是让读者理解内容、完成自己的任务，而不是把材料搬上页面。从读者的认知和真实需求出发，经过信息处理、呈现逻辑规划和视觉设计，形成易于理解、能够支持读者任务的内容。
 
-完整作品依次完成意图理解、材料处理、理解路径、视觉交互、页面制作、评审交付。每一步形成足以接续的记录，按问题回到负责它的阶段；制作请求持续完成可用成品。
+完整作品依次经过四个阶段，每个阶段形成一份可检查的记录；制作按设计稿落实到 Page，评审对照意图与设计稿检查。进入某阶段时读取该阶段的指南，不一次读完所有阶段。简单任务可以合并记录，但不跳过判断。
 
-从读者当前认知出发，关键概念、条件与证据有明确落点；复杂作品在制作前记录理解树和具体分镜。对象、空间、连接及状态承担解释工作，文字补足精确含义。首屏含核心回答、范围与可理解总览。
+1. **理解意图**：判断读者实际想知道什么。表面要求之下可能有更深层的需求，要结合上下文理解。同时判断读者已经理解了什么、缺少哪些知识、是否有误解；会影响后续理解的误解先澄清，再展开原来的问题。产出读者简报。
+2. **收集与处理材料**：按场景确定需要哪些原始信息、怎样收集和核对，为呈现提供内容基础。通用场景没有专门的采集方式时可以省略。产出材料底稿。
+3. **呈现逻辑**：从读者当下的认知出发做多级规划。第一级确定整体逻辑和每个环节的主题；第二级明确为讲清这个主题需要解释哪些内容；再按需要继续细化。逐层展开时持续判断每一部分是否符合读者认知、能否被理解、是否还要进一步解释；需要解释的概念继续展开，不只留下名称。各部分深度可以不同。产出呈现规划。
+4. **呈现设计稿**：先确定呈现环境（分辨率、长宽比、是否可交互；默认电脑全屏、可交互）。再根据呈现逻辑设计整体布局、每个部分的视觉表达和交互方式。设计稿具体描述画面中有什么、怎样组织、彼此关系，详细程度接近图像生成的文本指令。产出设计稿。
 
-标题直述主题；正文不重复 Page 标题。优先以留白、对齐和语义分组组织内容；固定中英文字体体系，按阅读场景确定基准字号，空间不足时调整结构。长文按语义分段，重点样式保持一致。
+视觉表达原则：
 
-模板 README 提供用途与会话索引；阶段指南在进入该阶段时按需读取。模板组件采用返回的固定版本与指纹，系统规则始终有效，具体模板不能关闭它。使用 template_context 指明本轮模板集合，避免共享的全局“当前模板”。
+- **整体与局部都要设计。** 既考虑整份内容的布局与阅读流，也考虑每个具体部分如何呈现。
+- **优先用视觉方式表达。** 适合用图片、图表、流程图、示意图表达的内容选相应形式；图片可来自真实素材，也可用图像生成工具制作。
+- **文字承担必要的辅助解释。** 在视觉表达基础上补充说明，保证信息完整、准确、没有歧义；图中没讲清的概念和细节用文字说明。
+- **文字排布保证可读。** 按需使用加粗、颜色等样式帮助读者辨认重点和信息层级；同类含义用同一种样式。
 
-正式作品保存 Page，保存、展示与同步分别确认；冲突保留草稿并处理。只读操作不改写正文。遵循宿主实际电脑操控规则，明确检查范围；没有真人试读不声称已证明理解效果。
+模板为某一类内容补充各阶段的具体方法，并可携带组件库；本规则始终生效，模板不能关闭它。正式作品保存 Page 后再展示；没有真人试读不声称已证明理解效果。
 
-模板通过理解路径与视觉设计指南指导本次页面的内容逻辑、布局和交互。模板声明无自定义组件时 components/ 可为空。网页端通过 MCP 读取同一份指南和组件包，不要求访问本机路径。
-
-系统基线内容哈希：`9550c29d2387c7e736013bbb11e8b5fbcb65a5a35d1e4e682759f6cd07d99b0e`。本轮已读到同一内容时，可用 knownSystemHash 避免重复返回；没有读过时不要仅凭哈希声明已知。
+系统基线内容哈希：`824caa8de90a57b3930135bf7b72ee5c518cb76d625a3dc5496fc431fce238c6`。本轮已读到同一内容时，可用 knownSystemHash 避免重复返回；没有读过时不要仅凭哈希声明已知。
 <!-- showai-system-baseline:end -->
 
-## 开始与阶段接续
+## 开始
 
-首次连接/项目归属不明时读 [use-showai](../use-showai/SKILL.md)。核对 showai_capabilities.templateWorkflow.protocol 为 showai-template-workflow-v1；老运行时不支持新参数时说明实际缺项并更新/重连，不能声称仅安装 skill 就升级了工具。
+首次连接或项目归属不明时读 [use-showai](../use-showai/SKILL.md)。核对 showai_capabilities.templateWorkflow.protocol 为 showai-template-workflow-v2；老运行时返回 v1 或不支持四阶段时说明实际缺项并更新/重连，不能声称仅安装 skill 就升级了工具。
 
-复杂新作品先查模板目录的元信息，按读者任务与材料判断适配性；匹配则应用，用户要求空白或没有匹配时从空白组装。用户指定模板优先；未指定时可沿用会话绑定。明确要求空白时在 template_context 和 template_guide 传 templates:[]，覆盖会话默认值，保留系统基线。续改从源 Page 的 templateContext 恢复精确引用；没有记录时按现有页面、材料与系统基线判断，不能猜测它原先使用的模板。
+复杂新作品先查模板目录 `catalog_list({kind:"template",projectId})`，按读者任务与材料判断适配性；匹配则选用，用户要求空白或没有匹配时只用系统基线。用户指定模板优先；未指定时可沿用会话绑定。明确要求空白时在 template_context 和 template_guide 传 templates:[]。续改从源 Page 的 templateContext 恢复精确引用；没有记录时按现有页面与系统基线判断，不猜测它原先使用的模板。
 
-调用 template_context({projectId,templates?,knownSystemHash?}) 取得系统、当前模板 README、固定引用和组件索引。保留 context.templates；组件较多时按 componentPage 分页。进入当前阶段再读 template_guide({projectId,stage,templates:context.templates})，只读相应指南，不默认读所有阶段。六阶段为 intent、evidence、understanding、design、authoring、review。knownHash 只用于本轮已持有的同一内容。
+调用 template_context({projectId,templates?,knownSystemHash?}) 取得系统基线、所选模板 README、固定引用和组件索引；保留 context.templates，组件较多时按 componentPage 分页。进入某阶段时才读 template_guide({projectId,stage,templates:context.templates})，一次一个阶段。四阶段为 intent、material、logic、design。knownSystemHash 对应系统基线正文，knownHash 对应已持有的 context 或某阶段指南响应；都只用于本轮确实读到的同一内容。
 
-指南可补充领域方法；所需事实由本次材料与检索取得。只有题目时标明合理的读者/范围假设并推进；有影响的歧义才澄清，未结束月份以实际检索日为界。目录与基础说明不会代替真实研究。
+## 四个阶段
 
-## 制作与验证
+每个阶段形成一份记录，下一阶段只依据这份记录工作。简单任务可以把记录合并写在对话里，但不跳过判断。
 
-编辑 Board 的绘画、对象属性、布局或连接时，按需读 [Board 对象编辑](references/board-authoring.md)，再以当前运行时 guide 和真实页面核对字段及操作能力。
+| 阶段                    | 记录                                                                                                               | 方法                                                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| intent 理解意图         | 读者简报：表面要求与深层需求、读者已知/缺少/误解、可检验的任务结果、环境与约束                                     | [plan-presentation](../plan-presentation/SKILL.md)                                                                         |
+| material 收集与处理材料 | 材料底稿：主张与数据、来源定位、条件、性质、缺口；通用场景可省略                                                   | 同上，模板 material 指南给出采集清单                                                                                       |
+| logic 呈现逻辑          | 呈现规划：第一级整体逻辑与环节主题，第二级每个主题要讲清的内容，按需细化，每个节点有通过条件                       | 同上，格式见 [呈现逻辑](../plan-presentation/references/presentation-logic.md)                                             |
+| design 呈现设计稿       | 设计稿：环境、整体布局、每幕的画面（具体到对象、位置、标签、颜色、阅读顺序）、文字落点、交互、静态与窄屏方式、素材 | [design-presentation](../design-presentation/SKILL.md)，格式见 [设计稿](../design-presentation/references/design-draft.md) |
 
-需要具体操作时才读 guide authoring/containers/document 等技术说明；选择组件后读其精确 guide，再按当前材料用parameters的parameterPath查字段含义、约束、遗漏行为和例子；只在需要原始结构时读schema。模板组件采用 template_context 返回的 componentId/version/integrity，不能把局部名字当内置 kind。guide 返回 authoringReference 时，沿用精确引用读取对应源码文件中的制作索引，再按所选类型读取完整流程、输入规范和制作工具；这些制作资源属于组件使用，具体流程见 [组件设计](../create-component/references/component-authoring.md)。现有数据调整或组件组合够用时复用；明确缺口进入 [create-component](../create-component/SKILL.md)。新建可复用模板进入 [create-template](../create-template/SKILL.md)。
+复杂作品把呈现规划与设计稿保存为 `presentation-plan.json`（nodes 与 scenes），制作前运行 `python3 <plan-presentation目录>/scripts/check_plan.py <规划路径>`（相对本技能为 `../plan-presentation/scripts/check_plan.py`）检查结构覆盖；宿主不能运行脚本时手工核对同样关系并说明。已有有效记录直接复用，不重做整条流程。
 
-模板应用用 template_apply，可带本轮固定 templates。空白路径用 page_create。修改前 page_read({projectId,pageId,rendered:false,response:"source"}) 读取完整源、hash/revision；局部编辑同时保留必要基线，不用局部 source 覆盖整页。优先 page_apply 的稳定节点操作，response:"receipt" 只收保存回执。修改已有组件数据用 `component.props.set`（blockId + 变化的顶层 props），不用 block.replace 重发整个节点；单次参数保持浅而短，大改动拆成几次顺序 apply，每次沿用返回的 hash/revision。嵌套过深或过长的工具参数容易让模型生成不合法的 JSON。需要新模板绑定时以 page.set.fields.templateContext 保存 template_context 返回的 format/system/templates，去掉 hash；运行时仍强制提供自身系统基线。CONFLICT 必须比较基线、当前内容和尝试稿，保留无关修改；page_apply 与 page_save 的冲突分别按 [use-showai](../use-showai/SKILL.md) 编辑与验证中的流程处理。
+## 制作
 
-复杂作品在制作前保存理解树与具体分镜；格式见 [理解规划](../plan-presentation/references/understanding-plan.md) 和 [表达与分镜](../design-presentation/references/expression-and-storyboard.md)。已有有效规划可复用。校验脚本位于 plan-presentation 技能目录的 `scripts/check_plan.py`（相对本技能为 `../plan-presentation/scripts/check_plan.py`），直接执行即可，不为使用它加载整段源码；宿主不能运行脚本时按理解规划中的同样关系手工核对并说明范围，规划的保存位置见其中对网页宿主的说明。
+制作只做一件事：把设计稿落实为 Page。应用模板用 template_apply（空白 Page，绑定本轮固定引用）；空白路径用 page_create。按设计稿的幕顺序填入真实内容：导语、图形或组件、图注与要点。每幕完成后记录实现它的 blockIds。
 
-源检查用 response:"source"；派生值/计算读模型用默认 structured 视图与 response:"full"，不要传 rendered:false（含 readData 的组件会自动渲染）。图像检查可用 response:"receipt"，图片仍返回，避免同时重复整页 DOM。实际宿主交互遵循官方操控规则；没有执行的路径明确标注。完成后读当前 review 阶段并按 [review-presentation](../review-presentation/SKILL.md) 检查真实分镜对应、画面与操作。
+选择组件后读其精确 guide，再按当前材料用 parameters 的 parameterPath 查字段含义、约束与例子；只在需要原始结构时读 schema。模板组件采用 template_context 返回的 componentId/version/integrity，不把局部名字当内置 kind。guide 返回 authoringReference 时沿用精确引用读取制作索引，流程见 [组件设计](../create-component/references/component-authoring.md)。现有数据调整或组合够用时复用；设计稿中确认的缺口进入 [create-component](../create-component/SKILL.md)。编辑 Board 的绘画、对象属性、布局或连接时读 [Board 对象编辑](references/board-authoring.md)。需要具体操作时才读 guide authoring/containers/document 等技术说明。
 
-正式保存后用 page_present，按 [对话展示](references/conversation-display.md) 展示本轮真实 delivery。容量按需读 [容量](references/capacity.md)，局部展示/临时状态读 [页面阅读](references/page-reading.md)。只有用户明确独立交付时用 render_document；连接、保存或显示失败不自动改变内容归属。
+修改前 page_read({projectId,pageId,rendered:false,response:"source"}) 读取完整源与 hash/revision；局部编辑保留必要基线，不用局部 source 覆盖整页。优先 page_apply 的稳定节点操作，response:"receipt" 只收保存回执。修改已有组件数据用 `component.props.set`（blockId 加变化的顶层 props）；单次参数保持浅而短，大改动拆成几次顺序 apply，每次沿用返回的 hash/revision。需要新模板绑定时以 page.set.fields.templateContext 保存 template_context 返回的 format/system/templates，去掉 hash。CONFLICT 必须比较基线、当前内容和尝试稿，保留无关修改；处理流程见 [use-showai](../use-showai/SKILL.md)。
+
+## 评审与交付
+
+制作完成后按 [review-presentation](../review-presentation/SKILL.md) 对照读者简报与设计稿检查：首屏、每幕的真实内容与交互、窄屏与静态、数字与来源；为最终规划填入 blockIds 并用 `check_plan.py <最终规划> --page <页面源 JSON>` 校验引用。源检查用 response:"source"；派生值与计算读默认 structured 视图与 response:"full"；图像检查可用 response:"receipt"。实际宿主交互遵循官方操控规则；没有执行的路径明确标注。
+
+正式保存后用 page_present，按 [对话展示](references/conversation-display.md) 展示本轮真实 delivery。容量按需读 [容量](references/capacity.md)，局部展示与临时状态读 [页面阅读](references/page-reading.md)。只有用户明确独立交付时用 render_document；连接、保存或显示失败不自动改变内容归属。

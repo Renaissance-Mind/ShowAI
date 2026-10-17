@@ -79,7 +79,7 @@ showai catalog merge resolve --project PROJECT --input resolved-merge.json --jso
 
 ## 模板
 
-新模板使用文件夹、严格 README 元信息、六阶段指南、可选组件库和 Page 骨架：
+新模板使用文件夹、严格 README 元信息、四阶段指南（intent、material、logic、design）和可选组件库：
 
 ```sh
 showai template import ./my-template --project PROJECT --json

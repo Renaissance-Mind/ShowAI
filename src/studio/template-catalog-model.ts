@@ -9,11 +9,9 @@ export const templateStageLabels: Record<
   MessageKey<typeof templates>
 > = {
   intent: "stage.intent",
-  evidence: "stage.evidence",
-  understanding: "stage.understanding",
+  material: "stage.material",
+  logic: "stage.logic",
   design: "stage.design",
-  authoring: "stage.authoring",
-  review: "stage.review",
 };
 
 export function latestTemplateVersions(items: TemplateMetadata[]) {

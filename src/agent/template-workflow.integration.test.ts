@@ -9,7 +9,7 @@ import { templateFixture } from "../test/template-fixture";
 import { syncManager } from "../sync/manager";
 let home: string, projectId: string;
 const clients: Client[] = [];
-async function connect(templates: string) {
+async function connect(templates?: string) {
   const client = new Client({ name: "template-stdio-test", version: "1" });
   await client.connect(
     new StdioClientTransport({
@@ -21,8 +21,7 @@ async function connect(templates: string) {
         "mcp",
         "--project",
         projectId,
-        "--templates",
-        templates,
+        ...(templates ? ["--templates", templates] : []),
       ],
       env: { PATH: process.env.PATH ?? "", TMPDIR: tmpdir() },
     }),
@@ -51,17 +50,18 @@ afterAll(async () => {
 });
 test("two real stdio sessions retain different pinned templates and stage disclosures", async () => {
   const [a, b] = await Promise.all([
-    connect("evidence-report@2.0.0"),
-    connect("concept-explainer@2.0.0"),
+    connect("paper-explainer@2.0.0"),
+    connect(),
   ]);
   const first = await call(a, "template_context"),
     second = await call(b, "template_context");
-  expect(first.context.templates[0].id).toBe("evidence-report");
-  expect(second.context.templates[0].id).toBe("concept-explainer");
+  expect(first.context.templates[0].id).toBe("paper-explainer");
+  expect(second.context.templates).toEqual([]);
   expect(first.system.required).toBe(true);
+  expect(first.stages).toEqual(["intent", "material", "logic", "design"]);
   const stage = await call(a, "template_guide", { stage: "design" });
   expect(stage.documents).toHaveLength(2);
-  expect(stage.documents[1].ref.id).toBe("evidence-report");
+  expect(stage.documents[1].ref.id).toBe("paper-explainer");
   expect(
     stage.documents.every((d: { path: string }) => d.path.includes("design")),
   ).toBe(true);
@@ -84,7 +84,7 @@ test("two real stdio sessions retain different pinned templates and stage disclo
   ).rejects.toMatchObject({ code: "ENOENT" });
 });
 test("remote-shaped bundle payload registers real components without local paths", async () => {
-  const client = await connect("evidence-report");
+  const client = await connect("paper-explainer");
   const saved = await call(client, "template_save", {
     input: { bundle: templateFixture("payload-template") },
   });
@@ -113,9 +113,9 @@ test("remote-shaped bundle payload registers real components without local paths
   expect(JSON.stringify(context)).not.toContain("index.tsx");
 });
 test("source and receipt profiles reduce text without losing saved content or revision checks", async () => {
-  const client = await connect("evidence-report");
+  const client = await connect("paper-explainer");
   const page = await call(client, "template_apply", {
-    templateId: "evidence-report",
+    templateId: "paper-explainer",
     scope: "builtin",
     version: "2.0.0",
     title: "Report",

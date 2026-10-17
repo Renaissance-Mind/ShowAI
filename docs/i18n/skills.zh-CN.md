@@ -13,7 +13,7 @@ ShowAI 插件提供八个 Skill，覆盖连接阅读、理解规划、表达设�
 | [review-presentation](../../plugins/showai/skills/review-presentation/SKILL.md) | 检查效果、诊断难理解处、按目标重做   | 可定位的问题、修订与复核范围               |
 | [create-template](../../plugins/showai/skills/create-template/SKILL.md)         | 建立或提炼可重复使用的内容结构       | 模板、填写约定与应用验证                   |
 | [create-component](../../plugins/showai/skills/create-component/SKILL.md)       | 既有数据调整和组合无法满足表达需求   | 精确版本的组件、契约与真实页面实例         |
-| [collaborate-canvas](../../plugins/showai/skills/collaborate-canvas/SKILL.md) | 多端配对、边写边画与位置参考 | 明确保存边界的协作画布 |
+| [collaborate-canvas](../../plugins/showai/skills/collaborate-canvas/SKILL.md)   | 多端配对、边写边画与位置参考         | 明确保存边界的协作画布                     |
 
 ## 从用户任务开始
 
@@ -33,9 +33,9 @@ ShowAI 插件提供八个 Skill，覆盖连接阅读、理解规划、表达设�
 
 模板复用内容结构和填写约定，组件复用数据表达与交互能力，本次事实保存在 Page 实例中。先选择适合理解任务的表达，再查当前目录；使用精确版本的 guide/schema 准备输入，开发实现时才读取 development 和必要源码。
 
-运行时提供六类原生 Page 模板：概念与机制讲解、方案比较与决策、研究与证据报告、操作与问题排查、状态与进展报告、探索与资料组织。原有空白、调研、对比和简报模板继续可用。匹配条件与组件候选见[复用选择](../../plugins/showai/skills/design-presentation/references/reuse-selection.md)。
+系统基线规定四个阶段，每阶段一份记录：理解意图（读者简报）、收集与处理材料（材料底稿）、呈现逻辑（多级呈现规划）、呈现设计稿（逐幕设计稿）；制作按设计稿落实，评审对照记录检查。运行时内置 `paper-explainer` 论文讲解方法模板与空白页；旧的六阶段模板继续可读。组件候选见[复用选择](../../plugins/showai/skills/design-presentation/references/reuse-selection.md)。
 
-新模板使用[模板文件夹](template-bundles.zh-CN.md)，声明六阶段指南、可选组件库与页面骨架。旧 document/composition/contentGuide 定义继续可读。模板由 Agent 根据真实材料填写；它不是自动变量绑定系统。缺少材料时保留缺项和结论限制，完成作品不能残留未处理的填写提示。提炼模板时保留原作品，用不同材料检查适用边界。
+新模板使用[模板文件夹](template-bundles.zh-CN.md)，声明四个阶段的指南与可选组件库；应用模板创建空白 Page，页面结构来自本次的呈现逻辑与设计稿。旧 document/composition/contentGuide 定义继续可读。模板由 Agent 根据真实材料填写；它不是自动变量绑定系统。缺少材料时保留缺项和结论限制。提炼模板时保留原作品，用不同材料检查适用边界。
 
 组件沿用现有 schema 和版本化 documentation，说明输入、图形语义、状态、保存、窄视口与静态方式。优先调整和组合已有能力；明确缺口才进入组件开发。
 

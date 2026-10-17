@@ -376,20 +376,14 @@ test("anonymous clients discover and customize public resources without a projec
   expect(catalog.synchronizationRequired).toBe(false);
   const publicIds = (catalog.items as { id: string }[]).map((item) => item.id);
   expect(publicIds).toEqual(
-    expect.arrayContaining([
-      "explainer",
-      "comparison",
-      "research-note",
-      "evidence-report",
-      "system-presentation",
-    ]),
+    expect.arrayContaining(["paper-explainer", "system-presentation"]),
   );
   expect(new Set(publicIds).size).toBe(publicIds.length);
   const folder = data(
     await anonymous.callTool({
       name: "public_catalog_describe",
       arguments: {
-        id: "evidence-report",
+        id: "paper-explainer",
         kind: "template",
         view: "guide",
         version: "2.0.0",
@@ -400,7 +394,7 @@ test("anonymous clients discover and customize public resources without a projec
     await anonymous.callTool({
       name: "public_catalog_describe",
       arguments: {
-        id: "evidence-report",
+        id: "paper-explainer",
         kind: "template",
         view: "guide",
         stage: "design",
@@ -417,7 +411,7 @@ test("anonymous clients discover and customize public resources without a projec
     await anonymous.callTool({
       name: "render_document",
       arguments: {
-        templateId: "evidence-report",
+        templateId: "paper-explainer",
         templateVersion: folder.version,
         templateIntegrity: folder.integrity,
         title: "Public folder output",
@@ -428,13 +422,7 @@ test("anonymous clients discover and customize public resources without a projec
     await fetch((folderRender.delivery as { source: string }).source)
   ).json();
   expect(folderSource.document.title).toBe("Public folder output");
-  const template = data(
-    await anonymous.callTool({
-      name: "public_catalog_describe",
-      arguments: { id: "explainer", kind: "template", view: "source" },
-    }),
-  );
-  const document = template.document as { title: string };
+  const document = folderSource.document as { title: string };
   document.title = "Customized without synchronization";
   const rendered = await anonymous.callTool({
     name: "render_document",
@@ -853,19 +841,19 @@ test("authorized HTTP clients use portable template folders, exact stage refs an
       name: "template_context",
       arguments: {
         projectId,
-        templates: [{ id: "decision-comparison", scope: "builtin" }],
+        templates: [{ id: "paper-explainer", scope: "builtin" }],
       },
     }),
   );
   expect(
     (other.context as { templates: { id: string }[] }).templates[0].id,
-  ).toBe("decision-comparison");
+  ).toBe("paper-explainer");
   const original = data(
     await remote.callTool({
       name: "template_guide",
       arguments: {
         projectId,
-        stage: "understanding",
+        stage: "logic",
         templates: binding.templates,
       },
     }),

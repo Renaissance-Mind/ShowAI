@@ -7,3 +7,7 @@ plugins/showai/scripts/
 artifacts/
 output/
 package-lock.json
+
+# Template README frontmatter is strict JSON; Prettier would add trailing commas.
+resources/templates/*/README.md
+src/agent/mcp-skill-source.generated.ts

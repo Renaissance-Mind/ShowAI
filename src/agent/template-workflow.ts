@@ -3,6 +3,7 @@ import { getTemplate } from "../core/catalog";
 import { canonicalJson } from "../core/diff";
 import {
   parseTemplateBundle,
+  stageGuidePath,
   TEMPLATE_STAGES,
   SYSTEM_TEMPLATE_ID,
   templateFilePath,
@@ -89,6 +90,7 @@ export async function templateContext(
       projectId,
       context: { ...context, hash },
       unchanged: true,
+      stages: TEMPLATE_STAGES,
       system: undefined,
       templates: undefined,
       components: undefined,
@@ -102,11 +104,16 @@ export async function templateContext(
       ...(bundle
         ? {
             readme: bundle.body,
-            stages: TEMPLATE_STAGES.map((stage) => ({
-              stage,
-              path: bundle.metadata.guides[stage],
-              inherited: bundle.metadata.guides[stage] === null,
-            })),
+            ...(bundle.legacy
+              ? {
+                  legacyStages: true,
+                  note: "Six-stage bundle: evidence and understanding guides are read as material and logic; authoring/review guides are not disclosed.",
+                }
+              : {}),
+            stages: TEMPLATE_STAGES.map((stage) => {
+              const path = stageGuidePath(bundle.metadata, stage);
+              return { stage, path, inherited: path === null };
+            }),
           }
         : {
             legacy: true,
@@ -196,12 +203,15 @@ export async function templateContext(
             },
           }),
     },
+    stages: TEMPLATE_STAGES,
     next: {
       tool: "template_guide",
       arguments: { projectId, stage: "intent", templates: context.templates },
     },
     binding:
       "Keep these exact refs for this task. No shared mutable current template or component selection is changed.",
+    workflow:
+      "Four stages produce one record each: intent → reader brief, material → source notes, logic → multi-level presentation plan, design → scene-by-scene design draft. Authoring implements the draft; review checks the saved Page against intent and draft.",
   };
   if (Buffer.byteLength(JSON.stringify(response)) > 65536)
     throw new Error(
@@ -239,7 +249,7 @@ export async function templateGuide(
       documents.push({ ref: ref(item, projectId), inherited: true });
       continue;
     }
-    const declaration = parsed.metadata.guides[stage]!;
+    const declaration = stageGuidePath(parsed.metadata, stage)!;
     const path = file ? templateFilePath(file) : main.path;
     if (
       file &&
