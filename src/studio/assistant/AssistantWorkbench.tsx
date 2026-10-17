@@ -497,6 +497,25 @@ export default function AssistantWorkbench({
     setSummaries(next);
     return next;
   }, []);
+  const refreshSummaries = useCallback(
+    (id: string) => {
+      const generation = executionGeneration.current;
+      void loadSummaries(id).catch((reason) => {
+        if (
+          project.current === id &&
+          executionGeneration.current === generation
+        )
+          setError(errorMessage(reason));
+      });
+    },
+    [loadSummaries],
+  );
+  const startNew = useCallback(() => {
+    selectionGeneration.current++;
+    setFresh(true);
+    setConfirmDelete(false);
+    setError("");
+  }, []);
   const select = useCallback(async (projectKey: string, id: string) => {
     const selection = ++selectionGeneration.current;
     rememberedThreads.current.set(projectKey, id);
@@ -529,13 +548,31 @@ export default function AssistantWorkbench({
     setFresh(false);
     setError("");
     if (!projectId || !open) return;
+    let stopped = false;
+    const selection = selectionGeneration.current;
     void loadSummaries(projectId)
       .then((items) => {
+        if (
+          stopped ||
+          project.current !== projectId ||
+          selectionGeneration.current !== selection
+        )
+          return;
         const remembered = rememberedThreads.current.get(projectId);
         const item = items.find((item) => item.id === remembered) ?? items[0];
         if (item) return select(projectId, item.id);
       })
-      .catch((reason) => setError(errorMessage(reason)));
+      .catch((reason) => {
+        if (
+          !stopped &&
+          project.current === projectId &&
+          selectionGeneration.current === selection
+        )
+          setError(errorMessage(reason));
+      });
+    return () => {
+      stopped = true;
+    };
   }, [projectId, open, loadSummaries, select, executionRevision]);
   useEffect(() => {
     if (!open && !composer) return;
@@ -577,6 +614,7 @@ export default function AssistantWorkbench({
     let nextPoll = 0,
       failures = 0,
       polling = false;
+    let pollingError = "";
     const timer = setInterval(
       () => {
         if (polling || Date.now() < nextPoll) return;
@@ -590,6 +628,12 @@ export default function AssistantWorkbench({
           .then(({ turn, threadId }) => {
             failures = 0;
             if (stopped) return;
+            const recoveredError = pollingError;
+            pollingError = "";
+            if (recoveredError)
+              setError((current) =>
+                current === recoveredError ? "" : current,
+              );
             setConversation((current) =>
               current?.id === conversation.id
                 ? {
@@ -602,12 +646,13 @@ export default function AssistantWorkbench({
                 : current,
             );
             if (turn.state !== "running")
-              void loadSummaries(conversation.projectId);
+              refreshSummaries(conversation.projectId);
           })
           .catch((reason) => {
             nextPoll =
               Date.now() + Math.min(60000, 2000 * 2 ** Math.min(++failures, 5));
-            if (!stopped) setError(errorMessage(reason));
+            pollingError = errorMessage(reason);
+            if (!stopped) setError(pollingError);
           })
           .finally(() => {
             polling = false;
@@ -619,7 +664,7 @@ export default function AssistantWorkbench({
       stopped = true;
       clearInterval(timer);
     };
-  }, [conversation?.id, running?.id, loadSummaries]);
+  }, [conversation?.id, running?.id, refreshSummaries]);
   // A new turn or conversation jumps to the end; streamed output follows only near the end.
   const lastEvent = running?.events.at(-1);
   useLayoutEffect(() => {
@@ -679,13 +724,12 @@ export default function AssistantWorkbench({
       if (project.current !== projectId) return true;
       conversationCache.current.set(next.id, next);
       if (clearDraft) messageDraft.clear(sentDraftKey, sentText, sentAt);
-      void loadSummaries(projectId);
+      refreshSummaries(projectId);
       if (selectionGeneration.current !== selection) return true;
       setSelectedId(next.id);
       setConversation(next);
       setFresh(false);
       onOpenChange(true);
-      void loadSummaries(projectId);
       return true;
     } catch (reason) {
       if (
@@ -821,7 +865,7 @@ export default function AssistantWorkbench({
                 event.target.value
                   ? projectId &&
                     act(() => select(projectId, event.target.value))()
-                  : setFresh(true)
+                  : startNew()
               }
             >
               <option value="">{t("panel.startedNew")}</option>
@@ -837,11 +881,7 @@ export default function AssistantWorkbench({
               className="assistant-icon"
               aria-label={t("panel.new")}
               title={t("panel.new")}
-              onClick={() => {
-                selectionGeneration.current++;
-                setFresh(true);
-                setConfirmDelete(false);
-              }}
+              onClick={startNew}
             >
               <Plus size={15} />
             </button>
