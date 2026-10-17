@@ -645,8 +645,22 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       const restored = await options.invoke<{
         record: EditorDraftRecord;
         content: ShowDocument;
+        baseContent?: ShowDocument;
       }>("drafts:read", { id: candidate.id });
       if (opening.current !== ticket || revision.current !== 0) return true;
+      // Retention can finish after the formal save or contain only a normalized
+      // baseline. It carries no local edit and must not replace newer content.
+      if (
+        restored.baseContent &&
+        pageContentKey(restored.content) ===
+          pageContentKey(restored.baseContent)
+      ) {
+        await options.invoke("drafts:remove", {
+          id: restored.record.id,
+          generation: restored.record.generation,
+        });
+        return true;
+      }
       const recoveredSequence = restored.record.sequence ?? 0;
       revision.current = recoveredSequence;
       savedRevision.current = recoveredSequence;

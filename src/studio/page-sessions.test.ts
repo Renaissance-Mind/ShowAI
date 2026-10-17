@@ -89,6 +89,36 @@ describe("workspace sessions against the real loopback workbench", () => {
     await sessions.open(project, first.document.id, "a");
     return a;
   }
+  it("does not restore an unchanged retained draft over a newer formal page", async () => {
+    const retained = await invoke<{ id: string }>("drafts:save", {
+      input: {
+        kind: "page",
+        clientId: "workspace-test-client",
+        projectId: project,
+        resourceId: first.document.id,
+        baseRevision: first.revision,
+        baseContent: first.document,
+        content: first.document,
+        sequence: 1,
+      },
+    });
+    const remote = await invoke<LoadedPage>("pages:save", {
+      projectId: project,
+      pageId: first.document.id,
+      document: { ...first.document, title: "New formal content" },
+      baseHash: first.hash,
+      baseRevision: first.revision,
+    });
+    await sessions.open(project, first.document.id, "a");
+    const view = sessions.getSnapshot().active!;
+    expect(view.getSnapshot().status).toBe("saved");
+    expect(view.getSnapshot().draft).toEqual(remote.document);
+    const remaining = await invoke<{ id: string }[]>("drafts:list", {
+      projectId: project,
+      resourceId: first.document.id,
+    });
+    expect(remaining.some((item) => item.id === retained.id)).toBe(false);
+  });
   it("saves nested unusable links as text while keeping the exact original recovery draft", async () => {
     const view = await warm();
     const content = structuredClone(view.getSnapshot().draft!.content);

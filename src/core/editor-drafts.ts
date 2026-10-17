@@ -401,13 +401,21 @@ export class EditorDrafts {
 
   async read(
     id: string,
-  ): Promise<{ record: EditorDraftRecord; content: unknown }> {
+  ): Promise<{
+    record: EditorDraftRecord;
+    content: unknown;
+    baseContent?: ShowDocument;
+  }> {
     return withLibraryLock(this.root, () => this.readUnlocked(id), "drafts");
   }
 
   private async readUnlocked(
     id: string,
-  ): Promise<{ record: EditorDraftRecord; content: unknown }> {
+  ): Promise<{
+    record: EditorDraftRecord;
+    content: unknown;
+    baseContent?: ShowDocument;
+  }> {
     if (!/^[a-f0-9]{64}$/.test(id))
       throw new CoreError("INVALID_PATH", "Invalid draft identity.");
     const record = (await this.list()).find((item) => item.id === id);
@@ -482,7 +490,15 @@ export class EditorDrafts {
         configurable: true,
       });
     }
-    return { record, content };
+    const baseContent =
+      record.kind === "page" && record.projectId && record.baseRevision
+        ? await this.baseline(
+            record.projectId,
+            record.resourceId,
+            record.baseRevision,
+          )
+        : undefined;
+    return { record, content, ...(baseContent ? { baseContent } : {}) };
   }
 
   async remove(id: string, expectedGeneration?: string): Promise<void> {
