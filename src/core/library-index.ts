@@ -78,6 +78,95 @@ function strings(value: unknown): string[] {
     : [];
 }
 
+// Bump when extraction changes so existing indexes rebuild once.
+const EXTRACTION_VERSION = "2";
+// Component data keys that configure identity, layout or style rather than carry reader text.
+const NON_TEXT_KEYS = new Set([
+  "id",
+  "parentId",
+  "componentId",
+  "version",
+  "integrity",
+  "format",
+  "type",
+  "kind",
+  "layout",
+  "direction",
+  "position",
+  "sourceSide",
+  "targetSide",
+  "color",
+  "backgroundColor",
+  "stroke",
+  "fill",
+  "accent",
+  "fontSize",
+  "fontFamily",
+  "fontWeight",
+  "padding",
+  "radius",
+  "height",
+  "width",
+  "widthMode",
+  "textAlign",
+  "align",
+  "tone",
+  "groupBy",
+  "theme",
+]);
+const isRichDocument = (value: unknown): value is JSONContent =>
+  !!value &&
+  typeof value === "object" &&
+  (value as JSONContent).type === "doc" &&
+  Array.isArray((value as JSONContent).content);
+/** Text of a rich-text tree, one line per block, without node types or IDs. */
+function richText(node: JSONContent): string {
+  if (node.type === "text") return node.text ?? "";
+  const children = node.content ?? [];
+  const inline = children.every((child) => child.type === "text");
+  return children.map(richText).join(inline ? "" : "\n");
+}
+/** Markdown reduced to its words, so snippets don't show markup. */
+function markdownText(value: string): string {
+  return value
+    .replace(/^\s{0,3}(?:#{1,6}\s+|>\s?|[-*+]\s+|\d+\.\s+)/gm, "")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/(\*\*|__|~~|`)/g, "");
+}
+/** Reader-visible text of component data: labels, cells, notes and links, not styling or structure. */
+function readableText(value: unknown, markdown = false): string[] {
+  if (typeof value === "string") {
+    if (/^(?:data:|asset:)/.test(value)) return [];
+    return [markdown ? markdownText(value) : value];
+  }
+  if (typeof value === "number") return [String(value)];
+  if (Array.isArray(value))
+    return value.flatMap((item) => readableText(item, markdown));
+  if (isRichDocument(value)) return [richText(value)];
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const isMarkdown = markdown || record.format === "markdown";
+    return Object.entries(record).flatMap(([key, item]) =>
+      NON_TEXT_KEYS.has(key) ? [] : readableText(item, isMarkdown),
+    );
+  }
+  return [];
+}
+/** Headings inside text data, in order; the first names the block, the last opens the next section. */
+function dataHeadings(data: unknown): string[] {
+  const content = (data as { content?: unknown } | undefined)?.content;
+  if (isRichDocument(content))
+    return (content.content ?? [])
+      .filter((node) => node.type === "heading")
+      .map(richText)
+      .filter(Boolean);
+  if (typeof content === "string")
+    return [...content.matchAll(/^\s{0,3}#{1,6}\s+(.+)$/gm)].map((match) =>
+      match[1].trim(),
+    );
+  return [];
+}
+
 /** Every table is a rebuildable projection of a named committed revision. */
 export class LibraryIndex {
   readonly library: GitLibrary;
@@ -128,7 +217,7 @@ export class LibraryIndex {
         const signaturesReady =
           db
             .prepare("SELECT value FROM metadata WHERE key='signature_version'")
-            .get()?.value === "1";
+            .get()?.value === EXTRACTION_VERSION;
         if (!force && signaturesReady && indexed === (revision ?? ""))
           return revision;
         const incremental = !force && signaturesReady;
@@ -293,8 +382,8 @@ export class LibraryIndex {
             "INSERT INTO metadata(key,value) VALUES('revision',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
           ).run(revision ?? "");
           db.prepare(
-            "INSERT INTO metadata VALUES('signature_version','1') ON CONFLICT(key) DO UPDATE SET value='1'",
-          ).run();
+            "INSERT INTO metadata VALUES('signature_version',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+          ).run(EXTRACTION_VERSION);
           db.prepare(
             "INSERT INTO metadata VALUES('last_path_count',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
           ).run(String(paths.length));
@@ -349,24 +438,36 @@ export class LibraryIndex {
     if (owner.kind === "page") {
       const document = value.document;
       add(path, "page", document.title, "", null, [document.title]);
-      const visit = (node: JSONContent, ancestors: string[]) => {
+      // `section` is the nearest preceding heading, which names unnamed native text blocks.
+      const visit = (
+        node: JSONContent,
+        ancestors: string[],
+        section?: string,
+      ) => {
         const id = node.attrs?.id;
-        const title =
-          node.attrs?.name ??
-          node.attrs?.data?.props?.title ??
-          node.attrs?.data?.title ??
-          node.type ??
-          "";
         const ownText = (node.content ?? [])
           .filter((child) => child.type === "text")
           .map((child) => child.text ?? "")
           .join("");
+        const named: string | undefined =
+          node.attrs?.name ??
+          node.attrs?.data?.props?.title ??
+          node.attrs?.data?.title ??
+          dataHeadings(node.attrs?.data)[0];
+        const title =
+          named ??
+          (node.type === "heading" ? ownText || undefined : section) ??
+          (node.type === "widget" ? node.attrs?.kind : undefined) ??
+          node.type ??
+          "";
         if (typeof id === "string")
           add(
             `${path}#${id}`,
             "page",
             String(title),
-            [ownText, ...strings(node.attrs?.data)].join("\n"),
+            [ownText, ...readableText(node.attrs?.data)]
+              .filter(Boolean)
+              .join("\n"),
             id,
             [...ancestors, String(title)],
           );
@@ -381,9 +482,19 @@ export class LibraryIndex {
             blockId: id,
           });
         }
-        for (const child of node.content ?? [])
-          if (child.type !== "text")
-            visit(child, [...ancestors, String(title)]);
+        // Lists and paragraphs don't add a location level; named containers and components do.
+        const inner =
+          named !== undefined || node.type === "widget"
+            ? [...ancestors, String(title)]
+            : ancestors;
+        let current = named !== undefined ? undefined : section;
+        for (const child of node.content ?? []) {
+          if (child.type === "text") continue;
+          if (child.type === "heading") current = richText(child) || current;
+          visit(child, inner, current);
+          if (child.type === "widget")
+            current = dataHeadings(child.attrs?.data).at(-1) ?? current;
+        }
       };
       visit(document.content, [document.title]);
     } else if (owner.kind === "component" || owner.kind === "template") {

@@ -207,6 +207,145 @@ describe("rebuildable current content index", () => {
     expect((await index.history({ query: "图表" })).items).toEqual([]);
   });
 
+  it("indexes only reader-visible text of text components and names them by heading", async () => {
+    const document = JSON.parse(source.toString()).document;
+    const changed = applyOperations(document, [
+      {
+        type: "block.insert",
+        node: {
+          type: "heading",
+          attrs: { id: "section-heading", level: 2 },
+          content: [{ type: "text", text: "背景" }],
+        },
+      },
+      {
+        type: "block.insert",
+        afterId: "section-heading",
+        node: {
+          type: "paragraph",
+          attrs: { id: "section-paragraph" },
+          content: [{ type: "text", text: "Native sentinel paragraph" }],
+        },
+      },
+      {
+        type: "block.insert",
+        afterId: "section-paragraph",
+        node: {
+          type: "widget",
+          attrs: {
+            id: "section-table",
+            kind: "table",
+            data: { columns: ["做法"], rows: [["Unnamed tablecell"]] },
+          },
+        },
+      },
+      {
+        type: "block.insert",
+        node: {
+          type: "widget",
+          attrs: {
+            id: "styled-note",
+            kind: "text",
+            data: {
+              content:
+                "## 对我们的启发\n\n- **检索**时把重要性算进来，见 [原文](https://example.com)。",
+              format: "markdown",
+              fontSize: 14,
+              color: "#3F4B44",
+              backgroundColor: "#EEF4F0",
+            },
+          },
+        },
+      },
+      {
+        type: "block.insert",
+        node: {
+          type: "widget",
+          attrs: {
+            id: "rich-note",
+            kind: "text",
+            data: {
+              format: "richtext",
+              content: {
+                type: "doc",
+                content: [
+                  {
+                    type: "heading",
+                    attrs: { id: "heading-node", level: 2 },
+                    content: [{ type: "text", text: "记忆怎么做" }],
+                  },
+                  {
+                    type: "paragraph",
+                    attrs: { id: "paragraph-node" },
+                    content: [
+                      { type: "text", text: "新近度、" },
+                      { type: "text", text: "重要性与相关性" },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+      {
+        type: "block.insert",
+        node: {
+          type: "widget",
+          attrs: {
+            id: "trailing-table",
+            kind: "table",
+            data: { columns: ["做法"], rows: [["Trailing tablecell"]] },
+          },
+        },
+      },
+    ]);
+    await library.writeFiles(
+      new Map([
+        [
+          path,
+          Buffer.from(
+            JSON.stringify({ format: "showai", version: 3, document: changed }),
+          ),
+        ],
+      ]),
+      { ...actor, message: "添加文字组件" },
+    );
+    const section = (await index.search({ query: "sentinel" })).items[0];
+    expect(section.title).toBe("背景");
+    expect(section.location).not.toContain("paragraph");
+    const table = (await index.search({ query: "tablecell" })).items[0];
+    expect(table).toMatchObject({ blockId: "section-table", title: "背景" });
+    expect((await index.search({ query: "trailing" })).items[0].title).toBe(
+      "记忆怎么做",
+    );
+    const metrics = (await index.search({ query: "准确率" })).items[0];
+    expect(metrics.title).toBe("准确率");
+    const markdown = (await index.search({ query: "重要性算进来" })).items[0];
+    expect(markdown.title).toBe("对我们的启发");
+    expect(markdown.snippet).toContain("检索");
+    expect(markdown.snippet).not.toMatch(
+      /#3F4B44|#EEF4F0|markdown|\*\*|##|example\.com/,
+    );
+    const rich = (await index.search({ query: "新近度" })).items[0];
+    expect(rich.title).toBe("记忆怎么做");
+    expect(rich.snippet).toContain("新近度、重要性与相关性");
+    expect(rich.snippet).not.toMatch(/doc|paragraph|heading-node|richtext/);
+  });
+
+  it("rebuilds an index written by an earlier extraction version", async () => {
+    await index.synchronize();
+    const db = new DatabaseSync(index.path);
+    db.exec(
+      "UPDATE metadata SET value='1' WHERE key='signature_version'; UPDATE search SET body='stale-body-text'",
+    );
+    db.close();
+    expect(
+      (await index.search({ query: "图表" })).items.length,
+    ).toBeGreaterThan(0);
+    expect((await index.search({ query: "stale" })).items).toEqual([]);
+  });
+
   it("rejects stale search cursors and updates reference edges after deleting a component instance", async () => {
     const first = await index.search({ query: "evidence", limit: 1 });
     expect(first.nextCursor).toBeTruthy();
