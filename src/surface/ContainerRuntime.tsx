@@ -952,12 +952,13 @@ function ContainerView({
     pen: { color: "#252629", fillColor: "none", strokeWidth: 2.5 },
     highlighter: { color: "#facc15", fillColor: "none", strokeWidth: 16 },
     shape: { color: "#252629", fillColor: "none", strokeWidth: 2.5 },
+    arrow: { color: "#252629", fillColor: "none", strokeWidth: 2.5 },
     eraser: { color: "#252629", fillColor: "none", strokeWidth: 24 },
   });
   const styleKey =
-    tool === "pen" || tool === "highlighter" || tool === "eraser"
+    tool === "pen" || tool === "highlighter" || tool === "eraser" || tool === "arrow"
       ? tool
-      : "shape";
+      : tool === "text" ? "pen" : "shape";
   const style = styles[styleKey];
   const chooseTool = async (next: BoardTool | null) => {
     await window.showai?.inlineInk?.flush();

@@ -21,7 +21,9 @@ export function BoardColorPicker({
   value,
   label,
   onChange,
+  allowNone = false,
 }: {
+  allowNone?: boolean;
   value: string;
   label: string;
   onChange: (color: string) => void;
@@ -33,7 +35,8 @@ export function BoardColorPicker({
       <summary
         aria-label={label}
         title={label}
-        style={{ backgroundColor: value }}
+        data-empty={value === "none" || undefined}
+        style={{ backgroundColor: value === "none" ? "#ffffff" : value }}
       />
       <div className="board-color-menu" data-surface-ui>
         <div
@@ -41,6 +44,19 @@ export function BoardColorPicker({
           role="group"
           aria-label={t("style.presets")}
         >
+          {allowNone && (
+            <button
+              type="button"
+              className="board-color-empty"
+              aria-label={t("style.none")}
+              title={t("style.none")}
+              aria-pressed={value === "none"}
+              onClick={() => {
+                onChange("none");
+                if (menu.current) menu.current.open = false;
+              }}
+            />
+          )}
           {colors.map((color) => (
             <button
               key={color}
@@ -60,7 +76,7 @@ export function BoardColorPicker({
           <input
             type="color"
             aria-label={label}
-            value={value}
+            value={value === "none" ? "#ffffff" : value}
             onInput={(event) => onChange(event.currentTarget.value)}
           />
         </label>

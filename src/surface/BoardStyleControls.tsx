@@ -130,6 +130,12 @@ export function BoardStyleControls({
           <BoardColorPicker
             label={filled ? t("style.borderColor") : t("style.penColor")}
             value={color ?? "#252629"}
+            allowNone={
+              filled &&
+              drawings.every((node) =>
+                ["rectangle", "ellipse"].includes(node.attrs!.tool),
+              )
+            }
             onChange={(color) => onChange({ color })}
           />
           {color === undefined && <small>{t("style.mixed")}</small>}
@@ -140,18 +146,10 @@ export function BoardStyleControls({
           {t("style.fill")}
           <BoardColorPicker
             label={t("style.fillColor")}
-            value={fill && fill !== "none" ? fill : "#ffffff"}
+            value={fill ?? "none"}
+            allowNone
             onChange={(fillColor) => onChange({ fillColor })}
           />
-          <button
-            type="button"
-            aria-label={t("style.transparentFill")}
-            aria-pressed={fill === "none"}
-            title={t("style.transparentFill")}
-            onClick={() => onChange({ fillColor: "none" })}
-          >
-            {t("style.none")}
-          </button>
           {fill === undefined && <small>{t("style.mixed")}</small>}
         </div>
       )}
