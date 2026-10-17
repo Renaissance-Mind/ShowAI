@@ -402,9 +402,7 @@ export class SqliteLibrary {
     return Number(row.sequence);
   }
   async tree(revision?: string): Promise<SqliteTreeEntry[]> {
-    const selected = revision ?? (await this.head());
-    if (!selected) return [];
-    return readSqlite(this.root, { kind: "tree", revision: selected });
+    return readSqlite(this.root, { kind: "tree", revision });
   }
   async readFiles(
     paths: string[],
@@ -412,10 +410,14 @@ export class SqliteLibrary {
   ): Promise<Map<string, Buffer>> {
     paths.forEach(assertPath);
     if (!paths.length) return new Map();
-    const selected = await this.revision(revision);
+    if (revision !== undefined && !oid(revision))
+      throw new CoreError(
+        "NOT_FOUND",
+        "The requested library revision is missing.",
+      );
     const files = await readSqlite<Map<string, Uint8Array>>(this.root, {
       kind: "files",
-      revision: selected,
+      revision,
       paths,
     });
     return new Map(
@@ -431,11 +433,9 @@ export class SqliteLibrary {
   ): Promise<Map<string, string | null>> {
     paths.forEach(assertPath);
     if (!paths.length) return new Map();
-    const selected = revision ?? (await this.head());
-    if (!selected) return new Map(paths.map((path) => [path, null]));
     return readSqlite(this.root, {
       kind: "revisions",
-      revision: selected,
+      revision,
       paths,
     });
   }

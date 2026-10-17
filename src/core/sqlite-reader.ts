@@ -14,9 +14,9 @@ export interface SqliteTreeEntry {
   bytes?: number;
 }
 type Request =
-  | { kind: "tree"; revision: string }
-  | { kind: "files"; revision: string; paths: string[] }
-  | { kind: "revisions"; revision: string; paths: string[] };
+  | { kind: "tree"; revision?: string }
+  | { kind: "files"; revision?: string; paths: string[] }
+  | { kind: "revisions"; revision?: string; paths: string[] };
 // Keep the bounded read cache warm between interactions, without preventing host exit.
 const worker = new BackgroundWorker(0);
 const trees = new Map<string, SqliteTreeEntry[]>();
@@ -57,7 +57,7 @@ export async function readSqlite<T>(
     : (runSqliteRead(home, request) as Promise<T>);
 }
 export async function runSqliteRead(home: string, request: Request) {
-  if (!oid(request.revision))
+  if (request.revision !== undefined && !oid(request.revision))
     throw new CoreError("INVALID_DATA", "Invalid history revision.");
   if (request.kind !== "tree") request.paths.forEach(assertSqlitePath);
   const path = join(home, "history", "content.sqlite");
@@ -65,18 +65,34 @@ export async function runSqliteRead(home: string, request: Request) {
   const db = new DatabaseSync(path, { readOnly: true });
   db.exec("PRAGMA busy_timeout=10000; BEGIN");
   try {
+    // Resolving HEAD before queuing this worker races with current-state saves,
+    // which intentionally remove superseded revisions. Pin HEAD in the same
+    // read transaction as the requested content and dependent objects.
+    const selected =
+      request.revision ??
+      (db.prepare("SELECT value FROM metadata WHERE key='head'").get()
+        ?.value as string | undefined);
+    if (!selected) {
+      if (request.kind === "tree") return [];
+      if (request.kind === "revisions")
+        return new Map(request.paths.map((path) => [path, null]));
+      throw new CoreError(
+        "NOT_FOUND",
+        "The requested library revision is missing.",
+      );
+    }
     const hasCurrentState = !!db
       .prepare("SELECT 1 FROM sqlite_master WHERE name='current_state'")
       .get();
     const state = hasCurrentState
       ? db.prepare("SELECT revision FROM current_state WHERE id=1").get()
       : undefined;
-    const stateCurrent = state?.revision === request.revision;
+    const stateCurrent = state?.revision === selected;
     const sequence = stateCurrent
       ? 1
       : db
           .prepare("SELECT sequence FROM revisions WHERE revision=?")
-          .get(request.revision)?.sequence;
+          .get(selected)?.sequence;
     if (!sequence)
       throw new CoreError(
         "NOT_FOUND",
@@ -84,9 +100,9 @@ export async function runSqliteRead(home: string, request: Request) {
       );
     const current =
       db.prepare("SELECT value FROM metadata WHERE key='head'").get()?.value ===
-      request.revision;
+      selected;
     if (request.kind === "tree") {
-      const key = `${home}:${request.revision}`;
+      const key = `${home}:${selected}`;
       let tree = trees.get(key);
       if (!tree) {
         tree = (current
