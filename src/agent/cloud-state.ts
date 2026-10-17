@@ -159,7 +159,8 @@ export class CloudState {
           this.previous.add(hash);
         }
         if (length !== file.size) throw new Error("Cloud state size mismatch.");
-        await handle.sync();
+        // The committed object-store head is authoritative. These reconstructed
+        // files are an ephemeral cache, so a per-file disk flush adds no recovery durability.
       } finally {
         await handle.close();
       }
