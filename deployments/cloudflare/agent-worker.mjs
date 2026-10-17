@@ -615,6 +615,32 @@ export default {
           `Bearer ${env.SHOWAI_AGENT_KEY}`
         )
           return new Response(null, { status: 404 });
+        if (
+          url.pathname.endsWith("/health") &&
+          request.headers.get("x-showai-oauth-probe") === "1"
+        ) {
+          const upstream = await fetch(
+            "https://auth.openai.com/api/accounts/oauth/token",
+            {
+              method: "POST",
+              body: new URLSearchParams({
+                grant_type: "refresh_token",
+                client_id: "showai-connectivity-probe",
+                refresh_token: "invalid-probe-token",
+                resource: "https://api.openai.com/v1",
+              }),
+              signal: AbortSignal.timeout(10000),
+              redirect: "manual",
+            },
+          );
+          const type = upstream.headers.get("content-type") ?? "";
+          await upstream.body?.cancel();
+          return json({
+            providerStatus: upstream.status,
+            contentType: type,
+            probe: "credential-free invalid-grant request",
+          });
+        }
         const requestedTenant = url.pathname.endsWith("/health")
           ? request.headers.get("x-showai-tenant")
           : null;

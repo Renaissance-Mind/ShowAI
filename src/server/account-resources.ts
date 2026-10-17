@@ -343,11 +343,11 @@ export class AccountResources {
           resource: "https://api.openai.com/v1",
         }),
         signal: AbortSignal.timeout(30_000),
-        redirect: "error",
+        redirect: "manual",
       },
     );
-    const data = (await response.json()) as Record<string, unknown>;
-    if (!response.ok || typeof data.access_token !== "string") {
+    if (!response.ok) {
+      await response.body?.cancel();
       // A known rejection consumed no successful response. Clearing this lease
       // still requires explicit reauthorization for invalid provider grants.
       await this.db.run(
@@ -357,9 +357,14 @@ export class AccountResources {
       throw new SyncError(
         401,
         "RESOURCE_REAUTHORIZE",
-        "ChatGPT 授权无法刷新，请在来源服务器重新授权。",
+        `ChatGPT 授权无法刷新（HTTP ${response.status}），请在来源服务器重新授权。`,
       );
     }
+    const data = (await response.json()) as Record<string, unknown>;
+    if (typeof data.access_token !== "string")
+      throw new Error(
+        "Provider returned an incomplete token response; resource needs reauthorization.",
+      );
     const expiresAt = Date.now() + Number(data.expires_in) * 1000;
     if (!Number.isFinite(expiresAt) || expiresAt <= Date.now())
       throw new Error(
