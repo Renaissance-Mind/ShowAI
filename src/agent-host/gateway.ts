@@ -340,12 +340,15 @@ export async function startModelGateway(
       const endpoint =
         source.baseUrl.replace(/\/$/, "") +
         (translated ? "/chat/completions" : "/responses");
-      const send = async (force = false) =>
-        fetch(endpoint, {
+      const credentials = new Set<string>();
+      const send = async (force = false) => {
+        const token = await credential(force);
+        credentials.add(token);
+        return fetch(endpoint, {
           method: "POST",
           headers: {
             "content-type": "application/json",
-            authorization: "Bearer " + (await credential(force)),
+            authorization: "Bearer " + token,
             ...(source.provider === "openrouter"
               ? { "X-Title": "ShowAI" }
               : {}),
@@ -359,23 +362,69 @@ export async function startModelGateway(
           ]),
           redirect: "error",
         });
+      };
       let upstream = await send();
       if (upstream.status === 401 && source.credential === "chatgpt") {
         await upstream.body?.cancel();
         upstream = await send(true);
       }
       if (!upstream.ok) {
+        // Preserve actionable provider errors without reflecting arbitrary HTML
+        // or credentials returned by a proxy/provider.
+        let detail: { message?: string; code?: string } = {};
+        if (
+          upstream.headers.get("content-type")?.includes("application/json")
+        ) {
+          const reader = upstream.body?.getReader();
+          if (reader) {
+            let body = "",
+              bytes = 0;
+            try {
+              for (;;) {
+                const chunk = await reader.read();
+                if (chunk.done) break;
+                bytes += chunk.value.byteLength;
+                if (bytes > 16384) break;
+                body += new TextDecoder().decode(chunk.value);
+              }
+              if (bytes <= 16384) {
+                const value = JSON.parse(body);
+                const error = value.error ?? value;
+                const message = error.message ?? error.detail;
+                if (typeof message === "string")
+                  detail.message = message.slice(0, 2000);
+                if (
+                  typeof error.code === "string" &&
+                  /^[a-zA-Z0-9_-]{1,100}$/.test(error.code)
+                )
+                  detail.code = error.code;
+              }
+            } catch {
+              // A malformed provider error still retains the original status.
+            } finally {
+              await reader.cancel();
+            }
+          }
+        } else await upstream.body?.cancel();
+        const redact = (text: string) => {
+          for (const token of credentials)
+            if (token) text = text.replaceAll(token, "[redacted]");
+          return text.replace(/Bearer\s+[^\s"']+/gi, "Bearer [redacted]");
+        };
         response.writeHead(upstream.status, {
           "content-type": "application/json",
+          "cache-control": "no-store",
         });
         response.end(
           JSON.stringify({
             error: {
-              message: t("gateway.rejected", { status: upstream.status }),
+              message:
+                t("gateway.rejected", { status: upstream.status }) +
+                (detail.message ? ": " + redact(detail.message) : ""),
+              ...(detail.code ? { code: redact(detail.code) } : {}),
             },
           }),
         );
-        await upstream.body?.cancel();
         return;
       }
       if (!upstream.body) throw new Error("Missing provider response body.");

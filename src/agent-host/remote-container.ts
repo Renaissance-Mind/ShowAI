@@ -250,23 +250,31 @@ if (process.argv.includes("--install-runtime")) {
       response.end(JSON.stringify({ ok: true, data: value }));
       if (admittedId) engine.turns.startAdmitted(admittedId);
     };
-    // Persist running turns and keep the Container active independently of iPad polling.
+    // Slow storage must not enqueue an unbounded chain of timer snapshots.
+    // Request checkpoints still wait for their own durable snapshot.
+    let backgroundCheckpoint: Promise<unknown> | undefined;
     const timer = setInterval(() => {
-      void (async () => {
-        await checkpoint();
-        if (
-          engine.turns.running ||
-          engine.host.conversations.running().length
-        ) {
-          const response = await fetch(`${origin}/activity/${tenant}`, {
-            method: "POST",
-            headers: { authorization: `Bearer ${key}` },
-            redirect: "error",
+      if (!backgroundCheckpoint) {
+        backgroundCheckpoint = checkpoint()
+          .catch((error) => console.error("Agent checkpoint:", error.message))
+          .finally(() => {
+            backgroundCheckpoint = undefined;
           });
-          if (!response.ok)
-            throw new Error("Container activity renewal failed.");
-        }
-      })().catch((error) => console.error("Agent checkpoint:", error.message));
+      }
+      if (engine.turns.running || engine.host.conversations.running().length) {
+        void fetch(`${origin}/activity/${tenant}`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${key}` },
+          redirect: "error",
+          signal: AbortSignal.timeout(10000),
+        })
+          .then((response) => {
+            if (!response.ok)
+              throw new Error("Container activity renewal failed.");
+            return response.body?.cancel();
+          })
+          .catch((error) => console.error("Agent activity:", error.message));
+      }
     }, 10000);
     health = {
       service: "showai-agent-container",
