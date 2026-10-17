@@ -26,7 +26,9 @@ closes that gap without changing the wire contract.
 Host half (`index.js`):
 
 1. Observes the settled `tools/result` of a ShowAI presentation tool and copies
-   the delivered HTML into `$DSH_HOME/cache/showai-page/<callId>.html`.
+   the delivered HTML into `$DSH_HOME/cache/showai-page/<callId>.html`. Both
+   root calls and PTC subcalls are handled, because both reach the same keyed
+   Client view.
 2. Turns the delivered file into a complete document. `delivery.html` is already
    complete and is kept byte-for-byte; `delivery.inline` is normally an inline
    reader **fragment**, so the cache adds a doctype, head and body shell. Without

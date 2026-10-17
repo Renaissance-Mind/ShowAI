@@ -115,6 +115,27 @@ test("the Host caches complete documents and serves legacy fragments in standard
     assert.match(cachedText, /<section lang="zh"/);
     assert.deepEqual(harness.warnings, []);
 
+    // A page presented by a PTC subcall reaches the same keyed Client view, so
+    // its result must be cached too; only the wire tool name decides.
+    listener(
+      { callId: "call_nested", name: "mcp__showai__render_document", parent: { kind: "oneOf" } },
+      {
+        isError: false,
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              ok: true,
+              data: { title: "嵌套", delivery: { inline } },
+            }),
+          },
+        ],
+      },
+    );
+    const nested = join(cache, "call_nested.html");
+    await waitForFile(nested);
+    assert.match(await readFile(nested, "utf8"), /^<!doctype html>/i);
+
     const route = harness.routes.get(PREVIEW_ROUTE);
     assert.equal(route.kind, "prefix");
 

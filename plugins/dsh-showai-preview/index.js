@@ -282,7 +282,7 @@ export function apply(ctx) {
   );
 
   ctx.on("tools/result", (exec, result) => {
-    if (exec.parent !== undefined || !PRESENTATION_TOOL.test(exec.name)) return;
+    if (!PRESENTATION_TOOL.test(exec.name)) return;
     const presentation = presentationFromResult(result);
     if (presentation === undefined) return;
     void cachePreview(exec.callId, presentation, root).catch((error) => {
