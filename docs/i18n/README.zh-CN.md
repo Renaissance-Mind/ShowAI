@@ -13,9 +13,9 @@
 
 [文档](index.zh-CN.md) · [快速开始](quick-start.zh-CN.md) · [在 Codex 中使用](codex.zh-CN.md)
 
-**让 Agent 用界面回答，而不是一大段文字。**
+**Agent-Native、Human-Friendly 的人机协作 Harness。**
 
-聊天并不适合承载真正的工作。Agent 能分析市场、规划项目、讲解系统，但结果往往是一大段文字，你能做的只有继续回复。ShowAI 让 Agent 用一个可交互的页面来回答，这个页面由你和 Agent 一起持续完善。
+Agent 能分析市场、规划项目、讲解系统，但回答往往只是一段文字，你能做的只有继续回复。ShowAI 让 Agent 的回答从文本走向可交互、可编辑、可协作的 presentation，由你和 Agent 一起持续完善，并且在对话结束之后仍然可用。
 
 https://github.com/user-attachments/assets/375d6ff3-fe3e-47c2-b6a4-d69df1b86b20
 
@@ -23,25 +23,14 @@ https://github.com/user-attachments/assets/375d6ff3-fe3e-47c2-b6a4-d69df1b86b20
 
 ![对 Agent: 获得一个面向人的表达与协作界面，把信息和分析转化为人可以理解、操作与反馈的内容。 — 对人: 获得一个参与 AI 工作的认知界面，通过阅读、探索和修改，把自己的理解与判断带入共同创作。](showai-audience.zh-CN.svg)
 
-### ✨ 核心亮点
+### ✨ Features
 
-- **智能界面（Intelligent UI）**：Agent 根据任务，从图表、流程图、思维导图、表格、滑块和交互模型等组件中组合页面。每个组件都有说明、参数结构和示例，Agent 能选择合适的表达方式，而不是每次重写一次性的 HTML。
-
-  任务需要新的表达方式时，Agent 可以用 React 编写组件，之后的页面继续复用。
-
-- **人机协作**：页面不是一次性产物。你可以在对话中，或在类似笔记软件的 ShowAI App 中查看图表、调整参数、直接修改内容。Agent 会接着你的修改继续工作，而不是从头再来。
-
-  草稿与当前内容结构化合并；并发修改发生冲突时保留双方输入，供你检查处理。
-
-- **支持 ChatGPT 与本地 Agent**：在 ChatGPT 中通过自定义 MCP 连接，页面直接显示在对话里。Claude Code 和 Codex 通过 ShowAI 插件接入，其他 MCP 客户端可以使用 stdio 入口。
-
-  ShowAI App 的[内置 Agent](agent-host.zh-CN.md) 支持本机 Agent 与 API 模型；配置后可使用云端执行及配对 Mac 处理远程设备任务。ChatGPT 套餐使用取决于实际账号授权。
-
-- **工作区多端同步**：登录 ShowAI Cloud 或自部署的 ShowAI Server，即可在设备之间同步项目、组件和资源。离线时照常编辑，联网后自动补齐；不同设备上的冲突修改会同时保留。
-
-  也可以邀请他人以编辑者或查看者身份加入项目。
-
-完成后可以导出为离线可用的独立 HTML 或静态网站，详见[分享页面与 Site](#-分享页面与-site)。
+- **Intelligent UI**：Agent 的回答直接生成为由区块、图表、画布和组件构成的可交互页面，而不是一段 Markdown；支持 Codex、Claude Code、Kimi、Gemini CLI、OpenCode、DSH 等多种 Agent 宿主。
+- **Evolving Presentation**：组件、模板和呈现方法都是显式且版本化的，Agent 缺什么表达就补什么组件，做得好的作品可提炼为模板，每一轮都在为下一轮积累。
+- **Human-Agent Brainstorming**：在同一块画布上边写边画边问，选中任意文字、单元格或画布对象就能让 Agent 展开、重组或可视化，多个对话可以并行推进同一个项目。
+- **Living Archive**：产出默认就是本地项目里的版本化文件，与源码目录自动绑定，带完整历史和冲突保护，随时可以续改、复用或拆成新素材。
+- **Cross-device**：iPad 与 Mac 配对后共用同一份内容，Agent 任务可以在本机、云端或配对的 Mac 上执行。
+- **Local-first, share when you want**：不开账号也能完整使用，需要时接自建服务器多人协作，或导出一个离线可交互的 HTML。
 
 > **版本：** 本文档对应 main 分支的应用 **0.9.0**、插件 **0.16.1** 和页面格式 **v3**。软件、插件与托管服务独立更新；可下载文件以 [Releases](https://github.com/Renaissance-Mind/ShowAI/releases) 为准。全部公开使用与技术指南提供中英文版本，见[文档目录](index.zh-CN.md)。
 

@@ -13,9 +13,9 @@
 
 [Documentation](docs/README.md) · [Quick start](docs/quick-start.md) · [Use with Codex](docs/codex.md)
 
-**Your agent answers with a UI, not a wall of text.**
+**An agent-native, human-friendly harness for working with agents.**
 
-Chat is a poor interface for real work. Agents can analyze a market, plan a project or explain a system, but the result arrives as a long block of text you can only reply to. ShowAI lets the agent answer with an interactive page instead, one that you and the agent keep working on together.
+Agents can analyze a market, plan a project or explain a system, but the answer arrives as text you can only reply to. ShowAI takes the answer beyond text: an interactive, editable, shareable presentation that you and the agent keep working on together, and that stays useful long after the conversation ends.
 
 https://github.com/user-attachments/assets/ecdccdec-1def-45a9-811f-121a7d07b906
 
@@ -23,25 +23,14 @@ https://github.com/user-attachments/assets/ecdccdec-1def-45a9-811f-121a7d07b906
 
 ![For Agents: A way to communicate and collaborate with humans, turning information and analysis into content people can understand, use, and give feedback on. — For Humans: A way to participate in AI work, bringing your understanding and judgment into shared creation through reading, exploration, and editing.](docs/showai-audience.svg)
 
-### ✨ Highlights
+### ✨ Features
 
-- **Intelligent UI**: The agent composes each page for the task at hand from components such as charts, flow diagrams, mind maps, tables, sliders, and interactive models. Every component has a description, a parameter schema, and examples, so the agent picks the right form instead of writing throwaway HTML.
-
-  When a task needs something new, the agent writes a React component that stays reusable for later pages.
-
-- **Human–agent collaboration**: The page is not a one-off output. Inspect charts, adjust parameters, and edit content directly, in the conversation or in the ShowAI App, a workbench that feels like a note-taking app. The agent picks up from your changes instead of starting over.
-
-  Drafts and current content merge structurally. Concurrent conflicts keep both inputs for you to review.
-
-- **Works with ChatGPT and local agents**: In ChatGPT, pages render right inside the conversation through a custom MCP connector. Claude Code and Codex connect through the ShowAI plugin, and other MCP clients can use the stdio entry point.
-
-  The ShowAI App also has a [built-in agent](docs/agent-host.md) for local agents and API-backed models, with Cloud execution and paired Mac runners for remote devices where configured. ChatGPT plan access depends on account authorization.
-
-- **One workspace across devices**: Sign in to ShowAI Cloud or your own ShowAI Server to sync projects, components, and assets between devices. Keep editing offline; changes catch up when you reconnect, and conflicting edits from different devices are both preserved.
-
-  Invite others to a project as editors or viewers.
-
-When the work is done, export it as standalone HTML that works offline, or as a static site. See [Share pages and sites](#-share-pages-and-sites).
+- **Intelligent UI**: The agent's answer becomes an interactive page built from blocks, charts, boards and components rather than a block of Markdown. Works with Codex, Claude Code, Kimi, Gemini CLI, OpenCode, DSH and other agent hosts.
+- **Evolving Presentation**: Components, templates and presentation methods are explicit and versioned. When an expression is missing the agent adds a component; good work can be distilled into a template, so every round builds on the last.
+- **Human–Agent Brainstorming**: Write, draw and ask on the same canvas. Select any text, cell or board object to have the agent expand, reorganize or visualize it, with several conversations advancing one project in parallel.
+- **Living Archive**: Output lands as versioned files in a local project bound to your source directory, with full history and conflict protection, ready to be continued, reused or broken into new material.
+- **Cross-device**: Pair an iPad with a Mac to share one body of content, and run agent tasks on this device, in the cloud or on the paired Mac.
+- **Local-first, share when you want**: Fully usable with no account. Connect a self-hosted server for collaboration, or export an offline, interactive HTML file.
 
 > **Versions:** These docs follow application **0.9.0**, plugin **0.16.1** and artifact format **v3** on `main`. Software, plugins and hosted services update independently. Check [Releases](https://github.com/Renaissance-Mind/ShowAI/releases) for available downloads and [the documentation index](docs/README.md) for paired English/Chinese guides.
 

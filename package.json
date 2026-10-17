@@ -4,7 +4,7 @@
   "private": true,
   "license": "MIT",
   "type": "module",
-  "description": "Offline desktop canvas with file-based projects and Agent tools.",
+  "description": "Agent-native, human-friendly harness: agents answer with interactive, editable, collaborative pages instead of text.",
   "author": "Renaissance Mind",
   "homepage": "https://showai.renaissancemind.ai",
   "repository": {
