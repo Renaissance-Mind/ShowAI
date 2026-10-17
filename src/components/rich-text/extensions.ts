@@ -215,7 +215,6 @@ export const RichTextNode = Node.create({
   defining: true,
   addAttributes: () => ({
     id: { default: null },
-    kind: { default: null },
     name: { default: "富文本" }, // i18n-exempt: default node name saved into documents
     data: {
       default: {},
@@ -406,10 +405,6 @@ const ContentAttributes = Extension.create({
         ),
       },
       { types: ["table"], attributes: { title: attribute("title") } },
-      {
-        types: ["tableCell", "tableHeader"],
-        attributes: { scalarValue: attribute("scalarValue") },
-      },
     ];
   },
 });

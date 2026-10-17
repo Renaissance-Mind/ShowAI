@@ -157,13 +157,13 @@
     "usage": {
       "purpose": "单张图像与图注，可调整尺寸、裁切和圆角。离线页面使用内嵌图像。",
       "structure": [
-        "文档、画布与 SDK 共用结构化内容节点和编辑器。旧字段输入在读取时转换；保存编辑结果使用 document 内容树。",
+        "文档、画布与 SDK 共用结构化内容节点和编辑器。旧字段在编辑或展示时单向转换；保存编辑结果使用 document 内容树。",
         "同一内容的 ID、资源、格式与子节点在兼容转换中保留。"
       ],
       "inputs": [
         {
           "path": "document",
-          "meaning": "正式编辑格式：{type:\"doc\",content:[...]}。图片为 image，代码为 codeBlock，表格为 table，提示为 callout，折叠为 toggle，分隔线为 horizontalRule；表格单元格支持富文本、合并、列宽与对齐。旧字段可继续用于导入和局部更新。"
+          "meaning": "正式编辑格式：{type:\"doc\",content:[...]}。图片为 image，代码为 codeBlock，表格为 table，提示为 callout，折叠为 toggle，分隔线为 horizontalRule；表格单元格支持富文本、合并、列宽与对齐。旧字段仅用于单向导入；转换后使用节点编辑接口。"
         },
         {
           "path": "src",
@@ -293,13 +293,13 @@
     "usage": {
       "purpose": "轻量的二维表格，支持文字、数字和布尔值，可编辑表头和单元格，并按列或整体设置对齐。",
       "structure": [
-        "文档、画布与 SDK 共用结构化内容节点和编辑器。旧字段输入在读取时转换；保存编辑结果使用 document 内容树。",
+        "文档、画布与 SDK 共用结构化内容节点和编辑器。旧字段在编辑或展示时单向转换；保存编辑结果使用 document 内容树。",
         "同一内容的 ID、资源、格式与子节点在兼容转换中保留。"
       ],
       "inputs": [
         {
           "path": "document",
-          "meaning": "正式编辑格式：{type:\"doc\",content:[...]}。图片为 image，代码为 codeBlock，表格为 table，提示为 callout，折叠为 toggle，分隔线为 horizontalRule；表格单元格支持富文本、合并、列宽与对齐。旧字段可继续用于导入和局部更新。"
+          "meaning": "正式编辑格式：{type:\"doc\",content:[...]}。图片为 image，代码为 codeBlock，表格为 table，提示为 callout，折叠为 toggle，分隔线为 horizontalRule；表格单元格支持富文本、合并、列宽与对齐。旧字段仅用于单向导入；转换后使用节点编辑接口。"
         },
         {
           "path": "title",
@@ -373,7 +373,7 @@
       ],
       "constraints": [
         "需要字段类型、筛选、排序或多种视图时使用数据库组件。",
-        "旧表格的数字和布尔值保留在单元格 scalarValue 中；修改文字后以实际编辑内容为准。",
+        "二维数组中的数字和布尔值转为显示文字，单元格内容树是唯一数据来源。",
         "选中、悬停和右键菜单共用文档表格操作；支持行列编辑、合并拆分、列宽和对齐。"
       ],
       "editing": {
@@ -423,13 +423,13 @@
     "usage": {
       "purpose": "带标题和 Markdown 正文的提示、引用或说明。",
       "structure": [
-        "文档、画布与 SDK 共用结构化内容节点和编辑器。旧字段输入在读取时转换；保存编辑结果使用 document 内容树。",
+        "文档、画布与 SDK 共用结构化内容节点和编辑器。旧字段在编辑或展示时单向转换；保存编辑结果使用 document 内容树。",
         "同一内容的 ID、资源、格式与子节点在兼容转换中保留。"
       ],
       "inputs": [
         {
           "path": "document",
-          "meaning": "正式编辑格式：{type:\"doc\",content:[...]}。图片为 image，代码为 codeBlock，表格为 table，提示为 callout，折叠为 toggle，分隔线为 horizontalRule；表格单元格支持富文本、合并、列宽与对齐。旧字段可继续用于导入和局部更新。"
+          "meaning": "正式编辑格式：{type:\"doc\",content:[...]}。图片为 image，代码为 codeBlock，表格为 table，提示为 callout，折叠为 toggle，分隔线为 horizontalRule；表格单元格支持富文本、合并、列宽与对齐。旧字段仅用于单向导入；转换后使用节点编辑接口。"
         },
         {
           "path": "title",
@@ -542,13 +542,13 @@
     "usage": {
       "purpose": "按需展开补充信息，正文支持 Markdown。",
       "structure": [
-        "文档、画布与 SDK 共用结构化内容节点和编辑器。旧字段输入在读取时转换；保存编辑结果使用 document 内容树。",
+        "文档、画布与 SDK 共用结构化内容节点和编辑器。旧字段在编辑或展示时单向转换；保存编辑结果使用 document 内容树。",
         "同一内容的 ID、资源、格式与子节点在兼容转换中保留。"
       ],
       "inputs": [
         {
           "path": "document",
-          "meaning": "正式编辑格式：{type:\"doc\",content:[...]}。图片为 image，代码为 codeBlock，表格为 table，提示为 callout，折叠为 toggle，分隔线为 horizontalRule；表格单元格支持富文本、合并、列宽与对齐。旧字段可继续用于导入和局部更新。"
+          "meaning": "正式编辑格式：{type:\"doc\",content:[...]}。图片为 image，代码为 codeBlock，表格为 table，提示为 callout，折叠为 toggle，分隔线为 horizontalRule；表格单元格支持富文本、合并、列宽与对齐。旧字段仅用于单向导入；转换后使用节点编辑接口。"
         },
         {
           "path": "summary",
@@ -666,13 +666,13 @@
     "usage": {
       "purpose": "在页面内容之间建立轻量的视觉分隔。",
       "structure": [
-        "文档、画布与 SDK 共用结构化内容节点和编辑器。旧字段输入在读取时转换；保存编辑结果使用 document 内容树。",
+        "文档、画布与 SDK 共用结构化内容节点和编辑器。旧字段在编辑或展示时单向转换；保存编辑结果使用 document 内容树。",
         "同一内容的 ID、资源、格式与子节点在兼容转换中保留。"
       ],
       "inputs": [
         {
           "path": "document",
-          "meaning": "正式编辑格式：{type:\"doc\",content:[...]}。图片为 image，代码为 codeBlock，表格为 table，提示为 callout，折叠为 toggle，分隔线为 horizontalRule；表格单元格支持富文本、合并、列宽与对齐。旧字段可继续用于导入和局部更新。"
+          "meaning": "正式编辑格式：{type:\"doc\",content:[...]}。图片为 image，代码为 codeBlock，表格为 table，提示为 callout，折叠为 toggle，分隔线为 horizontalRule；表格单元格支持富文本、合并、列宽与对齐。旧字段仅用于单向导入；转换后使用节点编辑接口。"
         },
         {
           "path": "color",
@@ -777,13 +777,13 @@
     "usage": {
       "purpose": "保留缩进与换行的代码片段，可声明语言并自定义外观。",
       "structure": [
-        "文档、画布与 SDK 共用结构化内容节点和编辑器。旧字段输入在读取时转换；保存编辑结果使用 document 内容树。",
+        "文档、画布与 SDK 共用结构化内容节点和编辑器。旧字段在编辑或展示时单向转换；保存编辑结果使用 document 内容树。",
         "同一内容的 ID、资源、格式与子节点在兼容转换中保留。"
       ],
       "inputs": [
         {
           "path": "document",
-          "meaning": "正式编辑格式：{type:\"doc\",content:[...]}。图片为 image，代码为 codeBlock，表格为 table，提示为 callout，折叠为 toggle，分隔线为 horizontalRule；表格单元格支持富文本、合并、列宽与对齐。旧字段可继续用于导入和局部更新。"
+          "meaning": "正式编辑格式：{type:\"doc\",content:[...]}。图片为 image，代码为 codeBlock，表格为 table，提示为 callout，折叠为 toggle，分隔线为 horizontalRule；表格单元格支持富文本、合并、列宽与对齐。旧字段仅用于单向导入；转换后使用节点编辑接口。"
         },
         {
           "path": "content",

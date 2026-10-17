@@ -1,4 +1,3 @@
-import { normalizeContentTree } from "../components/rich-text/model.mjs";
 import { isResource } from "../surface/containers.mjs";
 import { validatePageIcon } from "../lib/page-icon.mjs";
 import { artifactVersion, assignSurfaceIds } from "../surface/document.mjs";
@@ -103,7 +102,6 @@ const nodeAttributes = new Set([
   "caption",
   "fit",
   "nativeInk",
-  "scalarValue",
 ]);
 const markAttributes = new Set([
   "href",
@@ -587,12 +585,6 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
     );
   if (node.attrs?.nativeInk != null && node.type !== "image")
     throw new Error(`${path}.nativeInk requires an image node.`);
-  if (
-    node.attrs?.scalarValue != null &&
-    (!["tableCell", "tableHeader"].includes(node.type) ||
-      !["string", "number", "boolean"].includes(typeof node.attrs.scalarValue))
-  )
-    throw new Error(`${path}.scalarValue requires a typed table cell value.`);
   if (node.attrs?.componentStyle) {
     object(node.attrs.componentStyle, `${path}.componentStyle`);
     validatePrimitiveData("divider", node.attrs.componentStyle);
@@ -806,13 +798,6 @@ export function validateDocument(value) {
     document.surfaceViews !== undefined
   )
     throw new Error("Layout and views require a surface root.");
-  validateNode(document.content, "document.content", {
-    count: 0,
-    surface,
-    resource,
-  });
-  document.content = normalizeContentTree(document.content);
-  if (surface) assignSurfaceIds(document);
   validateNode(document.content, "document.content", {
     count: 0,
     surface,

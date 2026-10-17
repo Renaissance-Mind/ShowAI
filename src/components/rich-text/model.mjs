@@ -404,7 +404,6 @@ export function primitiveContentNode(kind, data, id) {
               ? [data.fontSize * 10 + 16]
               : null,
           textAlign: data.columnAlignments?.[column] ?? data.align ?? "left",
-          scalarValue: value,
         },
         content: [{ type: "paragraph", content: textNode(String(value)) }],
       })),
@@ -433,118 +432,14 @@ export function normalizeContentTree(input) {
       node = data.document
         ? {
             type: "richText",
-            attrs: { kind },
+            attrs: {},
             content: normalizeContentTree(data.document).content,
           }
         : primitiveContentNode(kind, data, identity.id);
       node.attrs = { ...identity, ...node.attrs };
     }
     if (Array.isArray(node.content)) node.content = node.content.map(visit);
-    if (
-      ["tableCell", "tableHeader"].includes(node.type) &&
-      node.attrs?.scalarValue != null
-    ) {
-      const plain = (value) =>
-        value.type === "text"
-          ? value.text
-          : (value.content ?? []).map(plain).join("");
-      if (plain(node) !== String(node.attrs.scalarValue))
-        node.attrs.scalarValue = plain(node);
-    }
     return node;
   };
   return visit(structuredClone(input));
-}
-
-/** Keep existing component.props.set callers working against the canonical content node. */
-export function patchPrimitiveContentNode(node, props) {
-  if (node.type === "richText" && primitiveNodeTypes[node.attrs?.kind]) {
-    if (props.document)
-      return { ...node, content: normalizeContentTree(props.document).content };
-    const next = structuredClone(node);
-    const index = next.content.findIndex(
-      (child) => child.type === primitiveNodeTypes[node.attrs.kind],
-    );
-    if (index < 0) throw new Error("The component content has been removed.");
-    next.content[index] = patchPrimitiveContentNode(next.content[index], props);
-    return next;
-  }
-  const kind = Object.keys(primitiveNodeTypes).find(
-    (key) => primitiveNodeTypes[key] === node.type,
-  );
-  if (!kind) throw new Error("Expected a basic content node.");
-  if (props.document)
-    return {
-      type: "richText",
-      attrs: { id: node.attrs?.id, kind },
-      content: normalizeContentTree(props.document).content,
-    };
-  const next = structuredClone(node);
-  next.attrs ??= {};
-  const styleKeys = [
-    "color",
-    "backgroundColor",
-    "fontSize",
-    "align",
-    "padding",
-    "radius",
-  ];
-  for (const key of styleKeys)
-    if (props[key] !== undefined)
-      next.attrs.componentStyle = {
-        ...next.attrs.componentStyle,
-        [key]: props[key],
-      };
-  const plain = (value) =>
-    value.type === "text"
-      ? value.text
-      : (value.content ?? []).map(plain).join("");
-  if (kind === "table") {
-    if (props.title !== undefined) next.attrs.title = props.title;
-    if (props.columns !== undefined || props.rows !== undefined) {
-      const columns = props.columns ?? next.content[0].content.map(plain);
-      const rows =
-        props.rows ??
-        next.content
-          .slice(1)
-          .map((row) =>
-            row.content.map((cell) => cell.attrs?.scalarValue ?? plain(cell)),
-          );
-      const converted = primitiveContentNode("table", { columns, rows });
-      next.content = converted.content.map((row, r) => ({
-        ...row,
-        attrs: next.content[r]?.attrs,
-        content: row.content.map((cell, c) => {
-          const previous = next.content[r]?.content[c];
-          return previous && plain(previous) === plain(cell)
-            ? previous
-            : { ...cell, attrs: { ...previous?.attrs, ...cell.attrs } };
-        }),
-      }));
-    }
-    if (props.align !== undefined || props.columnAlignments !== undefined)
-      next.content.forEach((row) =>
-        row.content.forEach((cell, column) => {
-          cell.attrs = {
-            ...cell.attrs,
-            textAlign:
-              props.columnAlignments?.[column] ??
-              props.align ??
-              next.attrs.componentStyle?.align ??
-              "left",
-          };
-        }),
-      );
-  } else {
-    for (const [key, value] of Object.entries(props)) {
-      if (styleKeys.includes(key)) continue;
-      if (key === "content")
-        next.content =
-          kind === "code"
-            ? textNode(value)
-            : richTextDocument({ content: value }).content;
-      else next.attrs[key === "summary" ? "title" : key] = value;
-    }
-  }
-  return normalizeContentTree(next);
 }

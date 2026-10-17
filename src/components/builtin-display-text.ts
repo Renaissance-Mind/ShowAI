@@ -15,7 +15,7 @@ export const builtinEnglish: BuiltinDisplayText = {
   table: {
     name: "Table",
     description:
-      "One table implementation with rich text cells, merging, row and column editing, column widths and alignment. Imports arrays while retaining numbers and booleans.",
+      "One table implementation with rich text cells, merging, row and column editing, column widths and alignment. Imports arrays as rich text cells.",
   },
   callout: {
     name: "Callout",

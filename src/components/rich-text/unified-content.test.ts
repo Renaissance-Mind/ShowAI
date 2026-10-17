@@ -3,11 +3,7 @@ import { getSchema } from "@tiptap/core";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { createExtensions } from "./extensions";
-import {
-  primitiveContentNode,
-  normalizeContentTree,
-  patchPrimitiveContentNode,
-} from "./model.mjs";
+import { primitiveContentNode, normalizeContentTree } from "./model.mjs";
 import {
   validateDocument,
   serializeArtifact,
@@ -83,23 +79,24 @@ describe("unified content compatibility", () => {
       expect(html).not.toContain("contenteditable");
     },
   );
-  it("retains typed table values, formatted merged cells and widths", () => {
+  it("imports table values into a single rich text representation", () => {
     const node = primitiveContentNode("table", fixtures.table);
-    expect(node.content![1].content![0].attrs!.scalarValue).toBe(42);
-    expect(node.content![1].content![1].attrs!.scalarValue).toBe(false);
-    const cell = node.content![1].content![0];
-    cell.attrs!.colwidth = [160];
-    cell.content![0].content![0].marks = [{ type: "bold" }];
-    const changed = patchPrimitiveContentNode(node, {
-      title: "Renamed",
-      rows: [[42, true]],
+    const cells = node.content![1].content!;
+    expect(cells.map((cell) => cell.content![0].content![0].text)).toEqual([
+      "42",
+      "false",
+    ]);
+    expect(cells.every((cell) => !("scalarValue" in cell.attrs!))).toBe(true);
+    cells[0].attrs!.colwidth = [160];
+    cells[0].content![0].content![0].marks = [{ type: "bold" }];
+    const parsed = getSchema(createExtensions()).nodeFromJSON({
+      type: "doc",
+      content: [node],
     });
-    expect(changed.content![1].content![0]).toEqual(cell);
-    expect(changed.content![1].content![1].attrs!.scalarValue).toBe(true);
-    cell.content![0].content![0].text = "43";
-    expect(
-      normalizeContentTree(node).content![1].content![0].attrs!.scalarValue,
-    ).toBe("43");
+    parsed.check();
+    const edited = parsed.toJSON().content[0].content[1].content[0];
+    expect(edited.attrs.colwidth).toEqual([160]);
+    expect(edited.content[0].content[0].marks).toEqual([{ type: "bold" }]);
   });
   it.each(Object.entries(fixtures))(
     "catalog insertion creates the same %s node as legacy input",
@@ -116,18 +113,27 @@ describe("unified content compatibility", () => {
       expect(() => validateDocument(inserted.document)).not.toThrow();
     },
   );
-  it("keeps old component props calls working after migration", () => {
+  it("edits native content with node operations and rejects the old props protocol", () => {
     const inserted = insertComponent(
       createResource(blankDocument()),
       null,
       "image",
       fixtures.image,
     );
+    expect(() =>
+      applyOperations(inserted.document, [
+        {
+          type: "component.props.set",
+          blockId: inserted.nodeId,
+          props: { caption: "updated" },
+        },
+      ]),
+    ).toThrow(/requires a component block/);
     const result = applyOperations(inserted.document, [
       {
-        type: "component.props.set",
+        type: "block.attrs.set",
         blockId: inserted.nodeId,
-        props: { caption: "updated" },
+        attrs: { caption: "updated" },
       },
     ]);
     expect(findSurfaceNode(result, inserted.nodeId)!.node.attrs!.caption).toBe(
@@ -182,7 +188,7 @@ describe("unified content compatibility", () => {
     };
     expect(normalizeContentTree(cell)).toEqual(cell);
   });
-  it("keeps SDK document updates editable by existing component prop callers", () => {
+  it("keeps SDK document wrappers free of legacy routing tags", () => {
     const doc = {
       type: "doc",
       content: [
@@ -190,29 +196,45 @@ describe("unified content compatibility", () => {
         { type: "paragraph", content: [{ type: "text", text: "after" }] },
       ],
     };
-    const wrapper = normalizeContentTree({
-      type: "widget",
-      attrs: { id: "sdk-code", kind: "code", data: { document: doc } },
+    const inserted = insertComponent(
+      createResource(blankDocument()),
+      null,
+      "code",
+      { document: doc },
+    );
+    const wrapper = findSurfaceNode(inserted.document, inserted.nodeId)!.node;
+    expect(wrapper.attrs).not.toHaveProperty("kind");
+    expect(wrapper.content).toMatchObject(doc.content);
+    const parsed = getSchema(createExtensions()).nodeFromJSON({
+      type: "doc",
+      content: [wrapper],
     });
-    const schema = getSchema(createExtensions());
-    const parsed = schema
-      .nodeFromJSON({ type: "doc", content: [wrapper] })
-      .toJSON();
-    const source = validateDocument({ ...blankDocument(), content: parsed });
-    const changed = applyOperations(source, [
-      {
-        type: "component.props.set",
-        blockId: "sdk-code",
-        props: { language: "typescript" },
-      },
-    ]);
-    expect(changed.content.content![0].content![0].attrs!.language).toBe(
-      "typescript",
-    );
-    expect(changed.content.content![0].content![1].content![0].text).toBe(
-      "after",
-    );
+    parsed.check();
+    expect(parsed.toJSON().content[0].attrs).not.toHaveProperty("kind");
   });
+  it.each(Object.entries(fixtures))(
+    "validates %s without migrating stored content",
+    (kind, data) => {
+      const content = {
+        type: "doc",
+        content: [{ type: "widget", attrs: { id: "legacy", kind, data } }],
+      };
+      const saved = validateDocument({ ...blankDocument(), content });
+      expect(saved.content).toEqual(content);
+      const normalized = normalizeContentTree(saved.content);
+      expect(normalized.content![0].type).toBe(
+        primitiveContentNode(kind, data).type,
+      );
+      expect(saved.content).toEqual(content);
+      expect(
+        renderToStaticMarkup(
+          createElement(RichTextNode, { node: saved.content }),
+        ),
+      ).toBe(
+        renderToStaticMarkup(createElement(RichTextNode, { node: normalized })),
+      );
+    },
+  );
   it("does not reinterpret unrelated kinds or accept misplaced ink metadata", () => {
     const node = { type: "widget", attrs: { kind: "constructor", data: {} } };
     expect(normalizeContentTree(node)).toEqual(node);

@@ -1,7 +1,3 @@
-import {
-  primitiveNodeTypes,
-  patchPrimitiveContentNode,
-} from "../components/rich-text/model.mjs";
 import { CapacityError } from "../portable/capacity.mjs";
 import { richTextDocument } from "../components/rich-text/model.mjs";
 import {
@@ -590,18 +586,6 @@ export function applyOperations(
       }
       case "component.props.set": {
         const node = locate(operation.blockId).node;
-        if (
-          (Object.values(primitiveNodeTypes).includes(node.type ?? "") ||
-            (node.type === "richText" &&
-              primitiveNodeTypes[node.attrs?.kind])) &&
-          operation.props &&
-          typeof operation.props === "object" &&
-          !Array.isArray(operation.props)
-        ) {
-          const next = patchPrimitiveContentNode(node, operation.props);
-          Object.assign(node, next);
-          break;
-        }
         const data = node.attrs?.data;
         if (
           node.type !== "widget" ||
