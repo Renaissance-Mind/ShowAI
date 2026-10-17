@@ -152,6 +152,36 @@ describe("shared rich-text component", () => {
         .content?.[0].content?.[0].text,
     ).toBe("**原样**");
   });
+  it("imports ==highlight== and every heading level as valid page content", () => {
+    const doc = markdownToRichText(
+      "#### 四级标题\n\n读 ==重点 **加粗**== 时，a == b 与 `==代码==` 保持原样。",
+    );
+    getSchema(createExtensions()).nodeFromJSON(doc).check();
+    expect(doc.content?.[0]).toMatchObject({
+      type: "heading",
+      attrs: { level: 4 },
+    });
+    const texts = doc.content?.[1].content ?? [];
+    expect(
+      texts.filter((n) => n.marks?.some((m) => m.type === "highlight")),
+    ).toEqual([
+      { type: "text", text: "重点 ", marks: [{ type: "highlight" }] },
+      {
+        type: "text",
+        text: "加粗",
+        marks: [{ type: "highlight" }, { type: "bold" }],
+      },
+    ]);
+    const plain = texts.map((n) => n.text).join("");
+    expect(plain).toContain("a == b");
+    expect(texts.find((n) => n.text === "==代码==")?.marks).toEqual([
+      { type: "code" },
+    ]);
+    // A page accepts the imported tree as its body, H4 included.
+    expect(() =>
+      validateDocument({ ...blankDocument(), content: doc }),
+    ).not.toThrow();
+  });
   it("AI component insertion creates the same native text instance and keeps child IDs patchable", () => {
     const before = createResource(blankDocument());
     const after = applyOperations(before, [

@@ -49,44 +49,45 @@ export function mathHtml(source, display = false) {
   });
 }
 
-export const mathMarkdown = new Marked({
-  extensions: [
-    {
-      name: "mathBlock",
-      level: "block",
-      start: (source) => source.search(/(?:^|\n)[ \t]*(?:\$\$|\\\[)/),
-      tokenizer(source) {
-        const trimmed = source.replace(/^[ \t]{0,3}/, "");
-        const token =
-          formula(trimmed, true, "$$") ?? formula(trimmed, true, "\\[");
-        if (
-          !token ||
-          !/^(?:[ \t]*\n|[ \t]*$)/.test(trimmed.slice(token.raw.length))
-        )
-          return;
-        token.raw = source.slice(
-          0,
-          source.length - trimmed.length + token.raw.length,
-        );
-        return token;
-      },
-      renderer: (token) =>
-        `<div class="sb-math-display">${mathHtml(token.text, true)}</div>`,
+/** Block and inline math, shared by lexers that add their own syntax. */
+export const mathExtensions = [
+  {
+    name: "mathBlock",
+    level: "block",
+    start: (source) => source.search(/(?:^|\n)[ \t]*(?:\$\$|\\\[)/),
+    tokenizer(source) {
+      const trimmed = source.replace(/^[ \t]{0,3}/, "");
+      const token =
+        formula(trimmed, true, "$$") ?? formula(trimmed, true, "\\[");
+      if (
+        !token ||
+        !/^(?:[ \t]*\n|[ \t]*$)/.test(trimmed.slice(token.raw.length))
+      )
+        return;
+      token.raw = source.slice(
+        0,
+        source.length - trimmed.length + token.raw.length,
+      );
+      return token;
     },
-    {
-      name: "mathInline",
-      level: "inline",
-      start: (source) => source.search(/\$|\\[([]/),
-      tokenizer(source) {
-        return (
-          formula(source, true, "$$") ??
-          formula(source, true, "\\[") ??
-          formula(source, false, "\\(") ??
-          formula(source, false, "$")
-        );
-      },
-      renderer: (token) =>
-        `<span class="${token.display ? "sb-math-display" : "sb-math-inline"}">${mathHtml(token.text, token.display)}</span>`,
+    renderer: (token) =>
+      `<div class="sb-math-display">${mathHtml(token.text, true)}</div>`,
+  },
+  {
+    name: "mathInline",
+    level: "inline",
+    start: (source) => source.search(/\$|\\[([]/),
+    tokenizer(source) {
+      return (
+        formula(source, true, "$$") ??
+        formula(source, true, "\\[") ??
+        formula(source, false, "\\(") ??
+        formula(source, false, "$")
+      );
     },
-  ],
-});
+    renderer: (token) =>
+      `<span class="${token.display ? "sb-math-display" : "sb-math-inline"}">${mathHtml(token.text, token.display)}</span>`,
+  },
+];
+
+export const mathMarkdown = new Marked({ extensions: mathExtensions });

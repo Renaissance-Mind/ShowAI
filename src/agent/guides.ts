@@ -300,7 +300,7 @@ const guides: Record<
       "This guide describes rich-text payloads inside regions and legacy v1 sources. New Page and Board resources use version 3; see guide containers. Explicit legacy documents remain compatible inputs.",
       "A document requires id, title and a doc content node. The store assigns the page identity and stable attrs.id values; retain existing block ids when revising.",
       "Text nodes use {type:'text',text,marks?}; empty paragraphs have content:[] rather than an empty text node.",
-      "Headings use attrs.level 1–3. Lists contain listItem children starting with a paragraph. taskList contains taskItem with attrs.checked. Tables contain tableRow then tableCell/tableHeader, each containing paragraphs/blocks.",
+      "Headings use attrs.level 1–6. Lists contain listItem children starting with a paragraph. taskList contains taskItem with attrs.checked. Tables contain tableRow then tableCell/tableHeader, each containing paragraphs/blocks.",
       "Links use a link mark with attrs.href. Code uses codeBlock with text children and optional attrs.language. Callout/toggle contain blocks; toggle attrs.title/open configure its heading.",
       "Images use attrs.src and alt; offline delivery needs an embedded raster data URI. A widget uses attrs.kind plus attrs.data. Query that component's guide/schema/examples before supplying data.",
     ],

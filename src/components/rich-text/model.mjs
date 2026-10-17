@@ -1,4 +1,26 @@
-import { mathMarkdown } from "../blocks/markdown-math.mjs";
+import { Marked } from "marked";
+import { mathExtensions } from "../blocks/markdown-math.mjs";
+
+// ==text== is the common Markdown highlight syntax (Obsidian, Typora, many AI
+// outputs). Its content must not start or end with a space, so `a == b` stays text.
+const highlightExtension = {
+  name: "highlight",
+  level: "inline",
+  start: (source) => source.indexOf("=="),
+  tokenizer(source) {
+    const match = /^==(?=\S)([\s\S]*?\S)==(?!=)/.exec(source);
+    if (match)
+      return {
+        type: "highlight",
+        raw: match[0],
+        text: match[1],
+        tokens: this.lexer.inlineTokens(match[1]),
+      };
+  },
+};
+const markdownImport = new Marked({
+  extensions: [...mathExtensions, highlightExtension],
+});
 
 export const richTextFormats = [
   "bold",
@@ -51,6 +73,7 @@ export function markdownToRichText(
         strong: "bold",
         em: "italic",
         del: "strike",
+        highlight: "highlight",
         codespan: "code",
       }[t.type];
       if (mark)
@@ -194,7 +217,7 @@ export function markdownToRichText(
       }
     });
   }
-  return { type: "doc", content: blocks(mathMarkdown.lexer(source)) };
+  return { type: "doc", content: blocks(markdownImport.lexer(source)) };
 }
 export function richTextDocument(data) {
   if (typeof data.content === "string")
