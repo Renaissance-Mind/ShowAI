@@ -19,11 +19,20 @@
  *    `HEAD` probe from the cache and `302`s a real load to the preview origin
  *    (the browser gets no CORS access to that origin, only a navigation).
  *
+ * `delivery.inline` is an *inline reader fragment*: it starts at a `<section>`
+ * and relies on the embedding host to supply the surrounding document. Framing
+ * that fragment directly puts the preview into quirks mode, which breaks KaTeX
+ * and changes layout (`document.compatMode === "BackCompat"`). The cache
+ * therefore stores a complete document: full deliveries are kept byte-for-byte,
+ * and inline fragments get a doctype, head and body shell. Legacy fragment
+ * cache entries are wrapped on read, so replaying an old transcript also
+ * renders in standards mode.
+ *
  * The preview is therefore durable across restarts: the cache survives, so
  * replaying an old transcript still renders the page it presented.
  */
 import { createServer } from "node:http";
-import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -37,6 +46,8 @@ const MAX_PREVIEWS = 40;
 const MAX_PREVIEW_BYTES = 12 * 1024 * 1024;
 /** Preview file names are opaque ids; nothing else is servable. */
 const PREVIEW_NAME = /^[A-Za-z0-9_-]{1,96}\.html$/;
+/** The fragment's own language, when it carries one. */
+const FRAGMENT_LANGUAGE = /<section\b[^>]*\blang="([A-Za-z0-9-]{1,32})"/i;
 
 /**
  * The preview cache directory.
@@ -54,6 +65,49 @@ function cacheRoot() {
  */
 function fileNameFor(callId) {
   return `${String(callId).replace(/[^A-Za-z0-9_-]/g, "_")}.html`;
+}
+
+/** Escape text that becomes document metadata. */
+function escapeHtmlText(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+/**
+ * Turn a delivered file into a complete HTML document.
+ *
+ * `delivery.html` and the compressed online reader can already be complete
+ * documents; those are returned byte-for-byte. `delivery.inline` is normally a
+ * `<section>` fragment intended for another host's document, so it gets the
+ * smallest standards-mode shell it needs. Loading it directly is what put the
+ * preview into quirks mode.
+ *
+ * @param body - the delivered HTML bytes.
+ * @param title - the presentation title, when the result carries one.
+ * @returns complete HTML bytes.
+ */
+export function completePreviewDocument(body, title) {
+  const text = Buffer.isBuffer(body) ? body.toString("utf8") : String(body);
+  const head = text.slice(0, 4096);
+  const leading = head.replace(/^\uFEFF?\s*(?:<!--[\s\S]*?-->\s*)*/i, "");
+  if (/^<!doctype\s+html/i.test(leading)) {
+    return Buffer.isBuffer(body) ? body : Buffer.from(text, "utf8");
+  }
+  if (/^<html(?:\s|>)/i.test(leading)) {
+    return Buffer.from(`<!doctype html>${text}`, "utf8");
+  }
+  const language = FRAGMENT_LANGUAGE.exec(head)?.[1] ?? "en";
+  const label = escapeHtmlText(title === undefined || title === "" ? "ShowAI page" : title);
+  return Buffer.from(
+    `<!doctype html><html lang="${language}"><head><meta charset="utf-8">` +
+      `<meta name="viewport" content="width=device-width,initial-scale=1">` +
+      `<title>${label}</title><style>html,body{margin:0;padding:0}body{min-height:100vh}</style>` +
+      `</head><body>${text}</body></html>`,
+    "utf8",
+  );
 }
 
 /**
@@ -87,7 +141,6 @@ function presentationFromResult(result) {
     return {
       source,
       title: typeof data.title === "string" ? data.title : undefined,
-      partial: typeof delivery.inline === "string",
     };
   }
   return undefined;
@@ -112,19 +165,38 @@ async function prune(root) {
 }
 
 /**
- * Copy one delivered page into the preview cache.
+ * Copy one delivered page into the preview cache as a complete document.
  * @param callId - the tool call id owning the preview.
  * @param presentation - the parsed delivery record.
  * @param root - the preview cache directory.
  */
 async function cachePreview(callId, presentation, root) {
-  const body = await readFile(presentation.source);
+  const body = completePreviewDocument(await readFile(presentation.source), presentation.title);
   if (body.byteLength === 0 || body.byteLength > MAX_PREVIEW_BYTES) {
     throw new Error(`preview is ${body.byteLength} bytes; outside the cache budget`);
   }
   await mkdir(root, { recursive: true });
-  await writeFile(join(root, fileNameFor(callId)), body);
+  const name = fileNameFor(callId);
+  const target = join(root, name);
+  const temporary = join(root, `.${name}.${process.pid}.${Date.now()}.tmp`);
+  try {
+    await writeFile(temporary, body);
+    // Publish atomically so a HEAD probe never sees a half-written document.
+    await rename(temporary, target);
+  } catch (error) {
+    await rm(temporary, { force: true }).catch(() => {});
+    throw error;
+  }
   await prune(root);
+}
+
+/**
+ * Read a cached preview as a complete document, wrapping legacy fragments.
+ * @param name - the validated cache file name.
+ * @returns the servable HTML bytes.
+ */
+async function readPreview(name) {
+  return completePreviewDocument(await readFile(join(cacheRoot(), name)));
 }
 
 /**
@@ -148,7 +220,7 @@ function startPreviewOrigin(log) {
       }
       let body;
       try {
-        body = await readFile(join(cacheRoot(), name));
+        body = await readPreview(name);
       } catch {
         response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
         response.end("not found");

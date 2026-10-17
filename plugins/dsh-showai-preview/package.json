@@ -1,9 +1,12 @@
 {
   "name": "@showai/dsh-showai-preview",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Render ShowAI page previews inline in the DeepSeek Harness Web conversation.",
+  "scripts": {
+    "test": "node --test"
+  },
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",

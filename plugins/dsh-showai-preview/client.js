@@ -117,6 +117,27 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * Whether the presentation asked for a block selection rather than the whole
+     * Page. `delivery.inline` is only the inline build, not by itself a sign of a
+     * partial render, so the call arguments are the authoritative signal.
+     * @param block - the frozen running or settled Tool call node.
+     * @returns true when the call carried a non-empty `blockIds` selection.
+     */
+    function requestedSelection(block) {
+      const raw =
+        block !== null && typeof block === "object"
+          ? (block.call?.argsRaw ?? block.argsRaw)
+          : undefined;
+      if (typeof raw !== "string" || raw.trim() === "") return false;
+      try {
+        const args = JSON.parse(raw);
+        return Array.isArray(args?.blockIds) && args.blockIds.length > 0;
+      } catch {
+        return false;
+      }
+    }
+
+    /**
      * Fold one call slice into everything the row and the frame need.
      * @param block - the frozen running or settled Tool call node.
      * @returns the presentation model.
@@ -141,12 +162,9 @@ window.__ModuleLoader__.load({
         body?.ok === true && body.data !== null && typeof body.data === "object" ? body.data : undefined;
       const delivery =
         data?.delivery !== null && typeof data?.delivery === "object" ? data.delivery : undefined;
-      const path =
-        typeof delivery?.inline === "string"
-          ? delivery.inline
-          : typeof delivery?.html === "string"
-            ? delivery.html
-            : undefined;
+      const inlinePath = typeof delivery?.inline === "string" ? delivery.inline : undefined;
+      const htmlPath = typeof delivery?.html === "string" ? delivery.html : undefined;
+      const path = inlinePath ?? htmlPath;
       const errorMessage =
         state === "error"
           ? typeof body?.error?.message === "string"
@@ -157,8 +175,9 @@ window.__ModuleLoader__.load({
         state,
         output,
         path,
+        fullPath: htmlPath ?? inlinePath,
         title: typeof data?.title === "string" ? data.title : undefined,
-        partial: typeof delivery?.inline === "string",
+        partial: requestedSelection(block),
         inlineAvailable: data?.display?.inlineAvailable === true,
         hasPage: state === "ok" && path !== undefined,
         errorMessage,
@@ -187,13 +206,44 @@ window.__ModuleLoader__.load({
           return undefined;
         }
         const controller = new AbortController();
+        let timer;
+        let wake;
+        let attempts = 0;
         setProbe("checking");
-        fetch(probeUrl, { method: "HEAD", signal: controller.signal })
-          .then((response) => setProbe(response.ok ? "ready" : "missing"))
-          .catch((error) => {
-            if (error?.name !== "AbortError") setProbe("missing");
-          });
-        return () => controller.abort();
+        const check = async () => {
+          while (!controller.signal.aborted) {
+            attempts += 1;
+            try {
+              const response = await fetch(probeUrl, {
+                method: "HEAD",
+                cache: "no-store",
+                signal: controller.signal,
+              });
+              if (response.ok) {
+                setProbe("ready");
+                return;
+              }
+            } catch (error) {
+              if (error?.name === "AbortError") return;
+            }
+            if (attempts >= 20) {
+              setProbe("missing");
+              return;
+            }
+            // The Host caches the preview asynchronously, so a page presented
+            // just now can legitimately be absent for the first probe or two.
+            await new Promise((resolve) => {
+              wake = resolve;
+              timer = setTimeout(resolve, 250);
+            });
+          }
+        };
+        void check();
+        return () => {
+          controller.abort();
+          clearTimeout(timer);
+          wake?.();
+        };
       }, [probeUrl, model.hasPage]);
 
       const status =
@@ -293,14 +343,14 @@ window.__ModuleLoader__.load({
                   tr("action.open"),
                 )
               : null,
-            model.path !== undefined && typeof openFile === "function"
+            model.fullPath !== undefined && typeof openFile === "function"
               ? h(
                   "button",
                   {
                     type: "button",
                     className: "showai-page-button",
                     title: tr("action.openFile"),
-                    onClick: () => openFile(model.path),
+                    onClick: () => openFile(model.fullPath),
                   },
                   tr("action.openFile"),
                 )
