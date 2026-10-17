@@ -259,7 +259,55 @@ export class ShowAIAgentGateway extends DurableObject {
         });
         // Only the operator health route can reach this path. Preserve startup
         // diagnostics there; user requests receive the public readiness error.
-        if (new URL(request.url).pathname === "/health") return health;
+        if (new URL(request.url).pathname === "/health") {
+          if (request.headers.get("x-showai-runtime-diagnostics") === "1") {
+            const process = await container.exec(
+              [
+                "node",
+                "-e",
+                `
+const fs=require('node:fs'),crypto=require('node:crypto');
+const source=fs.readFileSync('/app/scripts/container.mjs','utf8');
+let files=0,partial=0;function walk(path){for(const entry of fs.readdirSync(path,{withFileTypes:true})){const child=path+'/'+entry.name;if(entry.isDirectory())walk(child);else{files++;if(entry.name.endsWith('.restore'))partial++;}}}walk('/state');
+console.log(JSON.stringify({node:process.version,bundleSHA256:crypto.createHash('sha256').update(source).digest('hex'),restoreProgressFeature:source.includes('onRestoreProgress'),files,partial}));
+`,
+              ],
+              { signal: AbortSignal.timeout(10000) },
+            );
+            const output = await process.output();
+            return json({
+              exitCode: output.exitCode,
+              stdout: new TextDecoder().decode(output.stdout),
+              stderr: new TextDecoder().decode(output.stderr),
+            });
+          }
+          if (
+            request.headers.get("x-showai-recover-startup") === "1" &&
+            !health.ok
+          ) {
+            const status = await health.json();
+            if (
+              status.runtime === "failed" ||
+              (status.runtime === "starting" &&
+                status.stage === "restore" &&
+                !status.restore)
+            ) {
+              // No task can be admitted before readiness. Only reconstructed
+              // cache files are discarded; the encrypted committed head remains.
+              await container.destroy();
+              return json(
+                {
+                  service: "showai-agent-container",
+                  runtime: "restarting",
+                  previous: status,
+                },
+                202,
+              );
+            }
+            return json(status, 503);
+          }
+          return health;
+        }
         if (health.ok) {
           await health.body?.cancel();
           ready = true;
@@ -417,6 +465,12 @@ export default {
             headers: {
               "x-showai-tenant": tenant,
               "content-type": "application/json",
+              ...(request.headers.get("x-showai-runtime-diagnostics") === "1"
+                ? { "x-showai-runtime-diagnostics": "1" }
+                : {}),
+              ...(request.headers.get("x-showai-recover-startup") === "1"
+                ? { "x-showai-recover-startup": "1" }
+                : {}),
             },
             ...(relay
               ? {
