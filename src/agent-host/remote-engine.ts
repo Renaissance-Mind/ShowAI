@@ -190,6 +190,10 @@ export class RemoteAgentEngine {
       if (
         !mapping &&
         !(action === "agent:send" && !this.options.host) &&
+        !(
+          !this.options.host &&
+          ["agent:status", "agent:conversations"].includes(action)
+        ) &&
         !this.turns.hasProject(request.projectId)
       )
         throw new Error(
