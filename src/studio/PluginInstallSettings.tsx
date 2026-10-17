@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type {
+  DshPendingSteps,
   PluginHost,
   PluginInstallation,
   PluginInstallReceipt,
@@ -7,6 +8,51 @@ import type {
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/pluginInstall";
 import { desktop, errorMessage } from "./bridge";
+
+const hostNames: Record<PluginHost, string> = {
+  codex: "Codex",
+  claude: "Claude Code",
+  deepseek: "DeepSeek Harness",
+};
+
+/** Harness installs bundles itself, so the App lists the steps left in Harness. */
+function DshSteps({ steps }: { steps: DshPendingSteps }) {
+  const t = useTranslator(messages);
+  const [copied, setCopied] = useState(false);
+  const items = [
+    steps.profileMissing && t("dshOpenOnce"),
+    steps.otherSource && `${t("dshRemoveOther")} ${steps.otherSource}`,
+    ...steps.legacyBundles.map((name) => `${t("dshRemoveLegacy")} ${name}`),
+    steps.manualMcpRow && `${t("dshRemoveRow")} ${steps.manualMcpRow}`,
+    steps.shadowingSkills.length > 0 &&
+      `${t("dshRemoveSkills")} ${steps.skillRoot}: ${steps.shadowingSkills.join(", ")}`,
+    steps.add && t("dshAdd"),
+    steps.enable && t("dshEnable"),
+    t("dshRestart"),
+  ].filter((item): item is string => typeof item === "string");
+  return (
+    <div className="plugin-install-result">
+      <ol className="plugin-install-steps">
+        {items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ol>
+      <div className="plugin-install-path">
+        <code>{steps.bundlePath}</code>
+        <button
+          className="settings-button"
+          onClick={() =>
+            void desktop
+              .invoke("clipboard:write", { text: steps.bundlePath })
+              .then(() => setCopied(true))
+          }
+        >
+          {copied ? t("copied") : t("copyPath")}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function PluginInstallSettings({ home }: { home: string }) {
   const t = useTranslator(messages);
@@ -62,10 +108,12 @@ export default function PluginInstallSettings({ home }: { home: string }) {
       {hosts.map((host) => (
         <div className="settings-row" key={host.host}>
           <div className="settings-row-text">
-            <h3>{host.host === "codex" ? "Codex" : "Claude Code"}</h3>
+            <h3>{hostNames[host.host]}</h3>
             <p>
               {!host.executable
-                ? t("missing")
+                ? host.host === "deepseek"
+                  ? t("dshMissing")
+                  : t("missing")
                 : host.error
                   ? t("scanFailed")
                   : host.otherSources.length
@@ -74,7 +122,9 @@ export default function PluginInstallSettings({ home }: { home: string }) {
                       ? host.enabled
                         ? t("installed")
                         : t("disabled")
-                      : t("ready")}
+                      : host.host === "deepseek" && host.installedPath
+                        ? t("dshStaged")
+                        : t("ready")}
             </p>
             {host.otherSources.length > 0 && (
               <p>{host.otherSources.join(", ")}</p>
@@ -84,6 +134,9 @@ export default function PluginInstallSettings({ home }: { home: string }) {
               <p role="alert" className="plugin-install-error">
                 {host.error}
               </p>
+            )}
+            {host.dsh && host.installedPath && !receipt?.dsh && (
+              <DshSteps steps={host.dsh} />
             )}
           </div>
           <button
@@ -98,9 +151,13 @@ export default function PluginInstallSettings({ home }: { home: string }) {
           >
             {busy === host.host
               ? t("installing")
-              : host.installed
-                ? t("update")
-                : t("install")}
+              : host.host === "deepseek"
+                ? host.installedPath
+                  ? t("dshUpdate")
+                  : t("dshPrepare")
+                : host.installed
+                  ? t("update")
+                  : t("install")}
           </button>
         </div>
       ))}
@@ -111,8 +168,12 @@ export default function PluginInstallSettings({ home }: { home: string }) {
       )}
       {receipt && (
         <div role="status" className="plugin-install-result">
-          <p>{t("success")}</p>
-          <p>{t("refreshHost")}</p>
+          <p>{receipt.dsh ? t("dshStagedDone") : t("success")}</p>
+          {receipt.dsh ? (
+            <DshSteps steps={receipt.dsh} />
+          ) : (
+            <p>{t("refreshHost")}</p>
+          )}
           <details>
             <summary>{t("details")}</summary>
             <p>{receipt.installedPath}</p>

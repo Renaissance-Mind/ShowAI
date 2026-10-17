@@ -1,14 +1,15 @@
 {
-  "name": "@showai/dsh-showai-preview",
-  "version": "0.1.1",
+  "name": "@showai/dsh-showai",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Render ShowAI page previews inline in the DeepSeek Harness Web conversation.",
+  "description": "ShowAI for DeepSeek Harness: MCP tools, agent Skills and inline page previews.",
   "scripts": {
     "test": "node --test"
   },
   "exports": {
     ".": "./index.js",
+    "./skills": "./skills.js",
     "./client": "./client.js",
     "./package.json": "./package.json"
   },
@@ -23,8 +24,11 @@
   },
   "files": [
     "index.js",
+    "skills.js",
     "client.js",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "skills",
+    "mcp"
   ]
 }

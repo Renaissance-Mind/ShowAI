@@ -20,12 +20,14 @@ describe.skipIf(!output || !config)(
     const saved = {
       CODEX_HOME: process.env.CODEX_HOME,
       CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
+      DSH_HOME: process.env.DSH_HOME,
     };
     beforeAll(async () => {
       await mkdir(output!, { recursive: true });
       root = await mkdtemp(join(output!, "installation-"));
       process.env.CODEX_HOME = join(root, "codex");
       process.env.CLAUDE_CONFIG_DIR = join(root, "claude");
+      process.env.DSH_HOME = join(root, "dsh");
       await mkdir(process.env.CODEX_HOME, { recursive: true });
       await mkdir(process.env.CLAUDE_CONFIG_DIR, { recursive: true });
       const registered = JSON.parse(await readFile(config!, "utf8"));
@@ -40,6 +42,7 @@ describe.skipIf(!output || !config)(
       installer = new DesktopPluginInstaller({
         root: join(root, "profile/external-plugins"),
         pluginRoot: () => bundle,
+        dshBundleRoot: () => resolve("plugins/dsh-showai"),
         runtime: () => ({ home, cli }),
       });
     });
@@ -114,6 +117,70 @@ describe.skipIf(!output || !config)(
       },
       120000,
     );
+    test("deepseek stages a bundle whose MCP row starts without Node on PATH", async () => {
+      // Harness installs the bundle itself; a profile linking the staged path counts as installed.
+      const profile = join(root, "dsh/profiles/desktop");
+      await mkdir(profile, { recursive: true });
+      await writeFile(
+        join(profile, "package.json"),
+        JSON.stringify({ dsh: { profile: { bundles: [] } } }),
+      );
+      const first = await installer.install("deepseek");
+      expect(first.dsh).toMatchObject({ add: true, profileMissing: false });
+      await writeFile(
+        join(profile, "package.json"),
+        JSON.stringify({
+          dependencies: { "@showai/dsh-showai": `link:${first.installedPath}` },
+          dsh: { profile: { bundles: ["@showai/dsh-showai"] } },
+        }),
+      );
+      const [, , status] = await installer.status();
+      expect(status).toMatchObject({
+        host: "deepseek",
+        installed: true,
+        enabled: true,
+        installedPath: first.installedPath,
+      });
+      const patch = await readFile(
+        join(first.installedPath, "cordis.patch.yml"),
+        "utf8",
+      );
+      const server = {
+        command: JSON.parse(/command: (".*")/.exec(patch)![1]),
+        args: [JSON.parse(/^ {10}- (".*")$/m.exec(patch)![1])],
+        env: Object.fromEntries(
+          [...patch.matchAll(/^ {10}(".*"): (".*")$/gm)].map((match) => [
+            JSON.parse(match[1]),
+            JSON.parse(match[2]),
+          ]),
+        ),
+        cwd: JSON.parse(/cwd: (".*")/.exec(patch)![1]),
+      };
+      expect(server.command).not.toBe("node");
+      expect(server.env.SHOWAI_HOME).toBe(home);
+      const client = new Client({
+        name: "dsh-plugin-acceptance",
+        version: "1",
+      });
+      const transport = new StdioClientTransport({
+        ...server,
+        env: { ...server.env, PATH: "/usr/bin:/bin" },
+        stderr: "pipe",
+      });
+      try {
+        await client.connect(transport);
+        const tools = await client.listTools();
+        expect(tools.tools.some((tool) => tool.name === "page_apply")).toBe(
+          true,
+        );
+        await writeFile(
+          join(output!, "deepseek-result.json"),
+          JSON.stringify({ first, status, tools: tools.tools.length }, null, 2),
+        );
+      } finally {
+        await client.close();
+      }
+    }, 120000);
     test("rejects arbitrary host names", async () => {
       await expect(installer.install("sh")).rejects.toThrow(
         "Unknown plugin host",

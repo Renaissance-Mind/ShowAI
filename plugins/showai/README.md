@@ -25,6 +25,20 @@ claude plugin marketplace add ./
 claude plugin install showai@renaissance-mind
 ```
 
+### DeepSeek Harness
+
+DeepSeek Harness installs plugins itself, so ShowAI prepares one complete bundle ([dsh-showai](../dsh-showai/README.md)): the MCP tools bound to this runtime and library, these Skills, and inline page previews. In the App, open **Settings → Plugins → DeepSeek Harness → Prepare plugin**. From source, with a registered runtime:
+
+```sh
+npm run plugin:dsh
+```
+
+Then, once, in DeepSeek Harness: **Plugins → Add plugin**, paste the bundle path shown, choose **Enable now** and restart Harness. After updating ShowAI (App or source checkout), switching libraries, or changing the registered runtime, prepare again: this restages the same directory, and a Harness restart loads it without adding the plugin again. The installer lists earlier hand-made setups to remove first; `$DSH_HOME` is `~/.dsh` unless set:
+
+- an older `@showai/dsh-showai-preview` bundle: Harness **Plugins** → that bundle → **Uninstall**;
+- a hand-written `mcp-showai` entry in `$DSH_HOME/profiles/desktop/cordis.patch.yml`: delete that whole entry;
+- ShowAI Skill folders copied into `$DSH_HOME/skills`: delete them, otherwise they shadow the bundled Skills.
+
 ## Skills and task routing
 
 | Skill                                                      | Purpose                                             |
@@ -36,6 +50,7 @@ claude plugin install showai@renaissance-mind
 | [review-presentation](skills/review-presentation/SKILL.md) | Assess understanding, revise and verify             |
 | [create-component](skills/create-component/SKILL.md)       | Reusable React expression capabilities              |
 | [create-template](skills/create-template/SKILL.md)         | Reusable template folders and methods               |
+| [collaborate-canvas](skills/collaborate-canvas/SKILL.md)   | Co-editing on canvases, multi-device pairing        |
 
 Agent document operations use MCP. Begin with guide() and capability/project discovery. Formal work is saved in the selected project before page_present. render_document serves explicitly standalone delivery. Detailed methods remain in the canonical Skills; this README is the installation entrypoint.
 

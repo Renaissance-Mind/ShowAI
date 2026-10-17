@@ -25,6 +25,20 @@ claude plugin marketplace add ./
 claude plugin install showai@renaissance-mind
 ```
 
+### DeepSeek Harness
+
+DeepSeek Harness 由自己安装插件，因此 ShowAI 准备一个完整 bundle（[dsh-showai](../dsh-showai/README.md)），包含绑定当前运行时和内容库的 MCP 工具、上述 Skill 与对话内页面预览。App 中打开「设置 → 插件 → DeepSeek Harness → 准备插件」。源码方式在已登记运行时后执行：
+
+```sh
+npm run plugin:dsh
+```
+
+然后在 DeepSeek Harness 中执行一次：「插件 → 添加插件」，粘贴显示的 bundle 路径，选择「立即启用」并重启 Harness。更新 ShowAI（App 或源码）、切换内容库或登记的运行时变化后，再准备一次：它会重写同一目录，重启 Harness 即可加载，无需重新添加。安装器会列出需要先清理的旧手动配置（`$DSH_HOME` 未设置时为 `~/.dsh`）：
+
+- 旧版 `@showai/dsh-showai-preview` bundle：在 Harness「插件」中打开它并卸载；
+- `$DSH_HOME/profiles/desktop/cordis.patch.yml` 中手写的 `mcp-showai` 配置：删除整段；
+- 复制到 `$DSH_HOME/skills` 的 ShowAI Skill 文件夹：删除，否则会覆盖 bundle 自带的 Skill。
+
 ## Skill 与任务分工
 
 | Skill                                                      | 用途                             |
@@ -36,6 +50,7 @@ claude plugin install showai@renaissance-mind
 | [review-presentation](skills/review-presentation/SKILL.md) | 检查理解、修订与复核             |
 | [create-component](skills/create-component/SKILL.md)       | 可复用 React 表达能力            |
 | [create-template](skills/create-template/SKILL.md)         | 可复用模板文件夹与方法           |
+| [collaborate-canvas](skills/collaborate-canvas/SKILL.md)   | 画布协作、多端配对与保存状态     |
 
 Agent 文档操作使用 MCP，先读取 guide() 并发现能力与项目。正式成果先保存到项目再 page_present；明确独立交付使用 render_document。详细方法由同源 Skill 维护，本页用于安装与接入。
 

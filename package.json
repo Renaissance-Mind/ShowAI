@@ -45,6 +45,7 @@
     "test:desktop": "npm run build && node src/desktop/smoke.mjs && node src/desktop/ui-smoke.mjs && node src/desktop/library-ui-smoke.mjs && node src/desktop/catalog-ui-smoke.mjs",
     "plugin:install": "node scripts/install-codex-plugin.mjs",
     "plugin:update": "node scripts/install-codex-plugin.mjs --update",
+    "plugin:dsh": "node scripts/install-dsh-plugin.mjs",
     "package:runtime": "node scripts/package-runtime.mjs",
     "package:plugin": "node scripts/package-plugin.mjs",
     "runtime:register": "node dist-runtime/scripts/cli.mjs runtime register --json",

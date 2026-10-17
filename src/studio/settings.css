@@ -600,3 +600,19 @@
 .plugin-install-settings .settings-button {
   flex-shrink: 0;
 }
+.plugin-install-steps {
+  margin: 6px 0;
+  padding-left: 18px;
+}
+.plugin-install-path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.plugin-install-path code {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}

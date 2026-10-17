@@ -1,0 +1,9 @@
+# Harness profile patch for the ShowAI bundle.
+# The source bundle declares the machine-independent rows. Staging (the ShowAI
+# App's plugin settings or `npm run plugin:dsh`) adds the `showai-mcp` row with
+# this machine's ShowAI runtime and library, plus the Skills and MCP launcher.
+- insert:
+    - id: showai-preview
+      name: '@showai/dsh-showai'
+    - id: showai-skills
+      name: '@showai/dsh-showai/skills'

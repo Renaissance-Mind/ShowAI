@@ -15,7 +15,7 @@
  * or `/api`, while it keeps a real origin of its own for storage and workers.
  */
 window.__ModuleLoader__.load({
-  id: "@showai/dsh-showai-preview",
+  id: "@showai/dsh-showai",
   factory: (require) => {
     const React = require("react");
     const h = React.createElement;
@@ -90,7 +90,7 @@ window.__ModuleLoader__.load({
 .showai-page-visuallyHidden{clip:rect(0 0 0 0);white-space:nowrap;width:1px;height:1px;position:absolute;overflow:hidden}
 @media (prefers-reduced-motion:reduce){.showai-page-card[data-state=running] .showai-page-row:after{animation:none;display:none}}
 `;
-    const tagId = "@showai/dsh-showai-preview/preview.css";
+    const tagId = "@showai/dsh-showai/preview.css";
 
     /**
      * The preview file name rule shared with the Host half (`index.js`).
@@ -399,7 +399,7 @@ window.__ModuleLoader__.load({
         ctx.effect(() => {
           if (typeof document !== "undefined" && document.querySelector(`style[data-plugin-css=${JSON.stringify(tagId)}]`) === null) {
             const tag = document.createElement("style");
-            tag.dataset.plugin = "@showai/dsh-showai-preview";
+            tag.dataset.plugin = "@showai/dsh-showai";
             tag.dataset.pluginCss = tagId;
             tag.textContent = css;
             document.head.appendChild(tag);

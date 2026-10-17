@@ -18,8 +18,25 @@ import {
   findExecutable,
 } from "../agent-host/process";
 import type { RuntimeLaunch } from "../agent/runtime";
+import {
+  inspectDshProfile,
+  stageDshBundle,
+  type DshProfileState,
+} from "./dsh-stage.mjs";
 
-export type PluginHost = "codex" | "claude";
+export type PluginHost = "codex" | "claude" | "deepseek";
+/** Changes DeepSeek Harness needs from the person; ShowAI never edits its profile. */
+export interface DshPendingSteps {
+  bundlePath: string;
+  profileMissing: boolean;
+  otherSource?: string;
+  legacyBundles: string[];
+  manualMcpRow?: string;
+  shadowingSkills: string[];
+  skillRoot: string;
+  add: boolean;
+  enable: boolean;
+}
 export interface PluginInstallation {
   host: PluginHost;
   executable: string | null;
@@ -29,6 +46,8 @@ export interface PluginInstallation {
   installedPath?: string;
   otherSources: string[];
   error?: string;
+  /** DeepSeek Harness only: the staged bundle and remaining host-side steps. */
+  dsh?: DshPendingSteps;
 }
 export interface PluginInstallReceipt {
   host: PluginHost;
@@ -37,6 +56,7 @@ export interface PluginInstallReceipt {
   verifiedFiles: number;
   treeSha256: string;
   home: string;
+  dsh?: DshPendingSteps;
 }
 
 const marketplaceName = "showai-desktop";
@@ -74,7 +94,49 @@ export async function pluginFingerprint(root: string) {
   };
 }
 
+async function exists(path: string, mode = constants.F_OK) {
+  return access(path, mode).then(
+    () => true,
+    (error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT" || error.code === "EACCES") return false;
+      throw error;
+    },
+  );
+}
+
+/** Harness is detected by its Desktop app; its bundles are installed from inside Harness. */
+async function dshApplication() {
+  if (process.platform === "darwin")
+    for (const root of ["/Applications", join(homedir(), "Applications")]) {
+      const path = join(root, "DeepSeek Harness.app");
+      if (await exists(path)) return path;
+    }
+  const cli = await findExecutable("dsh");
+  if (cli) return cli;
+  const home = process.env.DSH_HOME || join(homedir(), ".dsh");
+  return (await exists(join(home, "profiles/desktop/package.json")))
+    ? home
+    : null;
+}
+
+function dshSteps(path: string, state: DshProfileState): DshPendingSteps {
+  return {
+    bundlePath: path,
+    profileMissing: !state.profileFound,
+    otherSource: state.otherSource,
+    legacyBundles: state.legacyBundles,
+    manualMcpRow: state.manualMcpRow
+      ? join(state.profile, "cordis.patch.yml")
+      : undefined,
+    shadowingSkills: state.shadowingSkills,
+    skillRoot: join(state.home, "skills"),
+    add: !state.installed,
+    enable: state.installed && !state.enabled,
+  };
+}
+
 async function hostExecutable(host: PluginHost) {
+  if (host === "deepseek") return dshApplication();
   const executable = await findExecutable(host);
   if (executable || host !== "codex" || process.platform !== "darwin")
     return executable;
@@ -85,17 +147,7 @@ async function hostExecutable(host: PluginHost) {
       "ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
     ]) {
       const path = join(root, relative);
-      if (
-        await access(path, constants.X_OK).then(
-          () => true,
-          (error: NodeJS.ErrnoException) => {
-            if (error.code === "ENOENT" || error.code === "EACCES")
-              return false;
-            throw error;
-          },
-        )
-      )
-        return path;
+      if (await exists(path, constants.X_OK)) return path;
     }
   }
   return null;
@@ -108,6 +160,7 @@ export class DesktopPluginInstaller {
     private options: {
       root: string;
       pluginRoot: () => string;
+      dshBundleRoot: () => string;
       runtime: () => { home: string; cli: RuntimeLaunch };
     },
   ) {}
@@ -135,10 +188,40 @@ export class DesktopPluginInstaller {
     return result.stdout;
   }
 
+  private dshTarget() {
+    return join(this.options.root, "deepseek/showai");
+  }
+
+  private async inspectDsh(executable: string): Promise<PluginInstallation> {
+    const target = this.dshTarget();
+    const staged = await readFile(join(target, "package.json"), "utf8").then(
+      (text) => JSON.parse(text) as { version?: string },
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return undefined;
+        throw error;
+      },
+    );
+    const state = await inspectDshProfile({
+      target,
+      skillNames: await readdir(join(this.options.pluginRoot(), "skills")),
+    });
+    return {
+      host: "deepseek",
+      executable,
+      installed: state.installed,
+      enabled: state.enabled,
+      version: staged?.version,
+      installedPath: staged ? target : undefined,
+      otherSources: state.otherSource ? [state.otherSource] : [],
+      dsh: dshSteps(target, state),
+    };
+  }
+
   private async inspect(
     host: PluginHost,
     executable: string,
   ): Promise<PluginInstallation> {
+    if (host === "deepseek") return this.inspectDsh(executable);
     const data = JSON.parse(await this.command(executable, ["list", "--json"]));
     const items = host === "codex" ? data.installed : data;
     if (!Array.isArray(items))
@@ -174,7 +257,7 @@ export class DesktopPluginInstaller {
   async status() {
     await mkdir(this.options.root, { recursive: true });
     return Promise.all(
-      (["codex", "claude"] as const).map(
+      (["codex", "claude", "deepseek"] as const).map(
         async (host): Promise<PluginInstallation> => {
           const executable = await hostExecutable(host);
           const base = {
@@ -200,16 +283,52 @@ export class DesktopPluginInstaller {
   }
 
   async install(host: unknown): Promise<PluginInstallReceipt> {
-    if (host !== "codex" && host !== "claude")
+    if (host !== "codex" && host !== "claude" && host !== "deepseek")
       throw new Error("Unknown plugin host.");
     if (this.pending)
       throw new Error("A plugin installation is already running.");
     this.pending = true;
     try {
-      return await this.installHost(host);
+      return host === "deepseek"
+        ? await this.stageDsh()
+        : await this.installHost(host);
     } finally {
       this.pending = false;
     }
+  }
+
+  /** Harness installs bundles itself; the App stages files and reports the remaining steps. */
+  private async stageDsh(): Promise<PluginInstallReceipt> {
+    const executable = await hostExecutable("deepseek");
+    if (!executable)
+      throw new Error("Install DeepSeek Harness first, then refresh.");
+    const runtime = this.options.runtime();
+    const staged = await stageDshBundle({
+      target: this.dshTarget(),
+      bundleRoot: this.options.dshBundleRoot(),
+      pluginRoot: this.options.pluginRoot(),
+      runtime: runtime.cli,
+      home: runtime.home,
+    });
+    const after = await this.inspectDsh(executable);
+    const receipt = {
+      host: "deepseek" as const,
+      version: staged.version,
+      installedPath: staged.path,
+      verifiedFiles: staged.verifiedFiles,
+      treeSha256: staged.treeSha256,
+      home: staged.home,
+      dsh: after.dsh,
+    };
+    await writeFile(
+      join(this.options.root, "deepseek-install.json"),
+      JSON.stringify(
+        { ...receipt, verifiedAt: new Date().toISOString() },
+        null,
+        2,
+      ) + "\n",
+    );
+    return receipt;
   }
 
   private async installHost(host: PluginHost): Promise<PluginInstallReceipt> {

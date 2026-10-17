@@ -781,6 +781,10 @@ else {
           process.env.SHOWAI_DEV_URL
             ? join(process.cwd(), "plugins/showai")
             : join(runtimePath(), "assets/agent-plugin"),
+        dshBundleRoot: () =>
+          process.env.SHOWAI_DEV_URL
+            ? join(process.cwd(), "plugins/dsh-showai")
+            : join(runtimePath(), "assets/dsh-plugin"),
         runtime: () => info(),
       });
       remoteConnector = new RemoteMacConnector(agentHost, () => store.root);

@@ -11,7 +11,7 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
-import { dirname, resolve, join } from "node:path";
+import { dirname, relative, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const runtime = join(root, "dist-runtime");
@@ -24,6 +24,14 @@ await rm(join(runtime, "assets/agent-plugin"), {
 await cp(join(root, "plugins/showai"), join(runtime, "assets/agent-plugin"), {
   recursive: true,
   verbatimSymlinks: true,
+});
+// The DeepSeek Harness bundle source; the App stages it with this runtime's paths.
+await rm(join(runtime, "assets/dsh-plugin"), { recursive: true, force: true });
+const dshBundle = join(root, "plugins/dsh-showai");
+await cp(dshBundle, join(runtime, "assets/dsh-plugin"), {
+  recursive: true,
+  filter: (source) =>
+    !/^(?:test|node_modules)(?:[\\/]|$)/.test(relative(dshBundle, source)),
 });
 await rm(join(runtime, "web"), { recursive: true, force: true });
 await cp(join(root, "dist"), join(runtime, "web"), {
