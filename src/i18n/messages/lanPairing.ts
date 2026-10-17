@@ -8,7 +8,7 @@ export default defineMessages("lanPairing", {
       "核对 Mac 显示的数字，并在 Mac 上确认。两分钟内有效。",
     requestEndedYouCanPairAgain: "请求已结束，可重新发起配对。",
     searchingAllowShowAIToAccessYourLocalNetwork:
-      "正在查找…请允许 ShowAI 使用本地网络。",
+      "正在查找…未发现设备时，请在 iPad「设置 → 隐私与安全性 → 本地网络」中打开 ShowAI。",
     connectedLAN: "已连接 · 局域网",
     rememberedPairAgain: "已记住，可重新配对",
     nearbyMac: "附近的 Mac",
@@ -32,7 +32,7 @@ export default defineMessages("lanPairing", {
       "Match this code on the Mac and approve within two minutes.",
     requestEndedYouCanPairAgain: "Request ended. You can pair again.",
     searchingAllowShowAIToAccessYourLocalNetwork:
-      "Searching… Allow ShowAI to access your local network.",
+      "Searching… If no devices appear, enable ShowAI in iPad Settings → Privacy & Security → Local Network.",
     connectedLAN: "Connected · LAN",
     rememberedPairAgain: "Remembered · pair again",
     nearbyMac: "Nearby Mac",
