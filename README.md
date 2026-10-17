@@ -129,7 +129,7 @@ Follow the [complete ChatGPT web guide](docs/chatgpt.md) for registration, provi
 
 ### Install a local plugin
 
-**Desktop App**: Open **Settings → Agent → Local connection**, then install the ShowAI plugin for Codex or Claude Code. The App supplies the plugin and runtime; no source checkout or separate Node.js installation is needed. Install the target host first, then refresh/restart it after plugin installation. See [installation details](docs/codex.md).
+**Desktop App**: Open **Settings → Plugins**, then install the ShowAI plugin for Codex or Claude Code. The App supplies the plugin and runtime; no source checkout or separate Node.js installation is needed. Install the target host first, then refresh/restart it after plugin installation. See [installation details](docs/codex.md).
 
 **Codex**: Requires the [Codex CLI](https://github.com/openai/codex) on your `PATH`. Run in the repository directory:
 

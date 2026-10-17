@@ -8,6 +8,9 @@ export default defineMessages("settings", {
     "section.general": "通用",
     "section.appearance": "外观",
     "section.agent": "Agent",
+    "section.plugins": "插件",
+    pluginsDesktopOnly:
+      "请在 ShowAI 桌面 App 的「设置 → 插件」中安装 Codex 或 Claude Code 插件。",
     "section.icons": "图标",
     "section.about": "关于",
     library: "内容库",
@@ -44,6 +47,9 @@ export default defineMessages("settings", {
     "section.general": "General",
     "section.appearance": "Appearance",
     "section.agent": "Agent",
+    "section.plugins": "Plugins",
+    pluginsDesktopOnly:
+      "Install the Codex or Claude Code plugin in the ShowAI desktop App under Settings → Plugins.",
     "section.icons": "Icons",
     "section.about": "About",
     library: "Content library",

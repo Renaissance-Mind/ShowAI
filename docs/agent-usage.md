@@ -8,7 +8,7 @@ ShowAI's Node.js CLI and optional MCP server operate on the same project files a
 
 The local plugin with its stdio MCP launcher resolves the installed software from `agent-runtime.json` in the selected content directory, then verifies it with `runtime info --json`. Desktop startup records its bundled launch; standalone runtime users run `runtime register --json`.
 
-In the examples below, `showai` means the **verified external command prefix**, for example `node /absolute/path/to/dist-runtime/scripts/cli.mjs`. Do not assume a global npm command exists. Standalone use requires Node.js 22.12+. The desktop application's **Settings → Agent → Local connection** panel provides its bundled executable, CLI path and environment for use without a separate Node installation.
+In the examples below, `showai` means the **verified external command prefix**, for example `node /absolute/path/to/dist-runtime/scripts/cli.mjs`. Do not assume a global npm command exists. Standalone use requires Node.js 22.12+. The desktop application's **Settings → Plugins** panel provides its bundled executable, CLI path and environment for use without a separate Node installation.
 
 For independent public rendering, HTTP MCP, OAuth and host-specific display, see [cross-host Agent integration](agent-integration.md). These capabilities share the same content model and authoring service; synchronization does not depend on inline display.
 

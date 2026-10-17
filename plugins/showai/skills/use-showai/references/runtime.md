@@ -10,7 +10,7 @@
 
 启动器只用 CLI 做 runtime info 能力探测和启动 MCP。运行时必须声明 `capabilities.agentOperations.protocol=showai-mcp-v1`。缺少时需要更新并登记目标 ShowAI 软件；更新 Skill 不会更新软件。插件本身不包含文档编译运行时。
 
-桌面 App 可在「设置 → Agent → 本地连接」给 Codex 或 Claude Code 安装插件。先安装目标宿主及其可用的插件管理 CLI；macOS 也会检测常见 Codex App 位置的内置 CLI。App 复制自带插件，以 App 可执行文件启动 launcher，无需 ShowAI 源码或单独安装 Node.js。安装器检查文件与启用状态，但宿主能力刷新和会话加载仍需分别确认。已有其他来源的 ShowAI 插件时，先在宿主中停用原插件，再安装 App 版本。此入口生成的连接绑定安装时的内容库。继续旧项目时，先确认项目实际所在的库；只有需要重新绑定目标库或移动了 App，才在 App 选定目标库后「更新并启用」，再刷新或重启宿主。外部宿主连接时启动 stdio MCP，App 窗口关闭后仍可使用，App 文件必须保留。
+桌面 App 可在「设置 → 插件」给 Codex 或 Claude Code 安装插件。先安装目标宿主及其可用的插件管理 CLI；macOS 也会检测常见 Codex App 位置的内置 CLI。App 复制自带插件，以 App 可执行文件启动 launcher，无需 ShowAI 源码或单独安装 Node.js。安装器检查文件与启用状态，但宿主能力刷新和会话加载仍需分别确认。已有其他来源的 ShowAI 插件时，先在宿主中停用原插件，再安装 App 版本。此入口生成的连接绑定安装时的内容库。继续旧项目时，先确认项目实际所在的库；只有需要重新绑定目标库或移动了 App，才在 App 选定目标库后「更新并启用」，再刷新或重启宿主。外部宿主连接时启动 stdio MCP，App 窗口关闭后仍可使用，App 文件必须保留。
 
 源码方式的插件 launcher 使用系统 Node.js，需要 Node.js 22.12+ 和已登记的 ShowAI 软件。
 

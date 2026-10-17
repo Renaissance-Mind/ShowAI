@@ -6,7 +6,7 @@ ShowAI 插件提供八个 Skill 和本机 MCP 启动入口。Agent 通过 MCP �
 
 ## 安装与连接
 
-桌面 App 用户打开 **设置 → Agent → 本地连接 → 安装 ShowAI 插件**，点击 Codex 旁的「安装插件」。同一面板也支持 Claude Code。先安装目标宿主，并确保其插件管理命令可用；macOS 还会检查常见 Codex App 安装位置中的内置 CLI。
+桌面 App 用户打开 **设置 → 插件 → 安装 ShowAI 插件**，点击 Codex 旁的「安装插件」。同一面板也支持 Claude Code。先安装目标宿主，并确保其插件管理命令可用；macOS 还会检查常见 Codex App 安装位置中的内置 CLI。
 
 App 提供插件文件和运行时，无需下载 ShowAI 源码或单独安装 Node.js。安装后会核验文件与启用状态。插件连接当前内容库；切换内容库或移动 App 后，点击「更新并启用」，再刷新或重启宿主以加载新工具。如果已有其他来源的 ShowAI 插件，请先在宿主中停用原插件，再安装 App 版本。
 

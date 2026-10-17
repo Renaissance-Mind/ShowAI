@@ -1,5 +1,6 @@
 import {
   Bot,
+  Puzzle,
   ChevronDown,
   ChevronRight,
   Copy,
@@ -47,6 +48,11 @@ const sections = [
     id: "agent",
     label: "section.agent",
     icon: Bot,
+  },
+  {
+    id: "plugins",
+    label: "section.plugins",
+    icon: Puzzle,
   },
   {
     id: "icons",
@@ -280,46 +286,46 @@ export function SettingsPanel({
           </div>
         </section>
       )}
-      {section === "agent" && (
-        <>
-          <AgentSettings />
-          <section
-            className="settings-group"
-            aria-labelledby="settings-agent-title"
-          >
-            <h2 id="settings-agent-title">{t("localConnection")}</h2>
-            {info && info.mode !== "browser" && (
-              <PluginInstallSettings home={info.home} />
-            )}
-            <div className="settings-row">
-              <div className="settings-row-text">
-                <h3>{t("launchConfig")}</h3>
-              </div>
-              <button
-                className="settings-button"
-                disabled={!info}
-                onClick={onCopyConfig}
-              >
-                <Copy size={14} aria-hidden="true" />
-                {t("copyLaunchConfig")}
-              </button>
+      {section === "agent" && <AgentSettings />}
+      {section === "plugins" && (
+        <section
+          className="settings-group"
+          aria-labelledby="settings-plugins-title"
+        >
+          <h2 id="settings-plugins-title">{t("localConnection")}</h2>
+          {info?.mode === "browser" ? (
+            <p>{t("pluginsDesktopOnly")}</p>
+          ) : info ? (
+            <PluginInstallSettings home={info.home} />
+          ) : null}
+          <div className="settings-row">
+            <div className="settings-row-text">
+              <h3>{t("launchConfig")}</h3>
             </div>
-            <details className="settings-config">
-              <summary>
-                <ChevronRight size={14} aria-hidden="true" />
-                <Terminal size={15} aria-hidden="true" />
-                {t("launchConfig")}
-              </summary>
-              <pre>
-                <code>
-                  {info
-                    ? JSON.stringify(info.cli, null, 2)
-                    : t("readingLaunchConfig")}
-                </code>
-              </pre>
-            </details>
-          </section>
-        </>
+            <button
+              className="settings-button"
+              disabled={!info}
+              onClick={onCopyConfig}
+            >
+              <Copy size={14} aria-hidden="true" />
+              {t("copyLaunchConfig")}
+            </button>
+          </div>
+          <details className="settings-config">
+            <summary>
+              <ChevronRight size={14} aria-hidden="true" />
+              <Terminal size={15} aria-hidden="true" />
+              {t("launchConfig")}
+            </summary>
+            <pre>
+              <code>
+                {info
+                  ? JSON.stringify(info.cli, null, 2)
+                  : t("readingLaunchConfig")}
+              </code>
+            </pre>
+          </details>
+        </section>
       )}
       {section === "about" && (
         <>

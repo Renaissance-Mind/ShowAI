@@ -6,7 +6,7 @@ The local **0.18.0** plugin supplies eight Skills and a stdio MCP launcher for r
 
 ## Install locally
 
-Desktop App users can open **Settings → Agent → Local connection** to install the plugin for Codex or Claude Code. Install the host first and make its plugin-management CLI available. The App supplies the plugin and runtime; no source checkout or separate Node.js is needed. Refresh/restart the host after installation. The connection uses the selected library; update it again after switching libraries or moving the App. Disable an enabled ShowAI plugin from another source before installing the App version.
+Desktop App users can open **Settings → Plugins** to install the plugin for Codex or Claude Code. Install the host first and make its plugin-management CLI available. The App supplies the plugin and runtime; no source checkout or separate Node.js is needed. Refresh/restart the host after installation. The connection uses the selected library; update it again after switching libraries or moving the App. Disable an enabled ShowAI plugin from another source before installing the App version.
 
 For source installation, use Node.js 22.12+ and Codex CLI on PATH. Build/start ShowAI, or register an installed standalone runtime, so the selected library has an agent-runtime.json. From this repository:
 
