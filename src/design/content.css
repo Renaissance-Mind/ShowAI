@@ -13,11 +13,14 @@
   --reading-highlight: #37304f;
   --reading-code: #29243a;
 }
+/* Every rule below keeps the :is(…) container prefix (0,2,x): the workbench,
+ * text component and portable reader then share one set of values regardless of
+ * stylesheet order, while blocks scoped under .sb-block.<root> (0,3,0) still win. */
 :is(.document-content, .portable-editor .tiptap, .portable-content, .sb-text) {
   font-family: var(--font-sans);
   font-size: 16px;
   font-weight: 400;
-  line-height: 1.9;
+  line-height: 1.8;
   letter-spacing: 0;
   color: var(--reading-text);
 }
@@ -33,11 +36,11 @@
   )
   :is(h1, h2, h3, h4, h5, h6) {
   color: var(--reading-heading);
-  font-weight: 550;
-  line-height: 1.5;
+  font-weight: 600;
   letter-spacing: -0.3px;
   scroll-margin-top: 80px;
 }
+/* Each level is clearly smaller than the one above, and sits closer to the text it introduces. */
 :is(
     .document-content,
     .portable-editor .tiptap,
@@ -46,8 +49,8 @@
   )
   h1 {
   font-size: 28px;
-  font-weight: 600;
-  margin: 32px 0 20px;
+  line-height: 1.35;
+  margin: 40px 0 14px;
 }
 :is(
     .document-content,
@@ -56,8 +59,9 @@
     .sb-rich-text
   )
   h2 {
-  font-size: 21px;
-  margin: 20px 0 19px;
+  font-size: 22px;
+  line-height: 1.4;
+  margin: 34px 0 12px;
 }
 :is(
     .document-content,
@@ -66,8 +70,9 @@
     .sb-rich-text
   )
   h3 {
-  font-size: 20px;
-  margin: 28px 0 17px;
+  font-size: 18px;
+  line-height: 1.45;
+  margin: 26px 0 8px;
 }
 :is(
     .document-content,
@@ -77,7 +82,18 @@
   )
   :is(h4, h5, h6) {
   font-size: 16px;
-  margin: 24px 0 12px;
+  line-height: 1.5;
+  margin: 20px 0 6px;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(h1, h2, h3, h4, h5, h6)
+  + :is(h2, h3, h4, h5, h6) {
+  margin-top: 14px;
 }
 :is(
     .document-content,
@@ -86,7 +102,7 @@
     .sb-rich-text
   )
   p {
-  margin: 0 0 17px;
+  margin: 0 0 14px;
 }
 :is(.document-content, .portable-editor .tiptap, .portable-content)
   mark:not(:where(.sb-block *, .showai-custom-block *)),
@@ -175,11 +191,12 @@
     .sb-rich-text
   )
   blockquote {
-  border-left: 3px solid var(--reading-accent);
+  border-left: 3px solid
+    color-mix(in srgb, var(--reading-accent) 45%, transparent);
   background: none;
-  color: var(--reading-accent);
-  padding: 8px 0 8px 18px;
-  margin: 22px 0;
+  color: var(--reading-text);
+  padding: 2px 0 2px 16px;
+  margin: 18px 0;
   border-radius: 0;
 }
 :is(
@@ -188,9 +205,19 @@
     .portable-content,
     .sb-rich-text
   )
+  blockquote
+  p {
+  margin: 0 0 8px;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
   :is(ul, ol) {
-  padding-left: 22px;
-  margin: 16px 0;
+  padding-left: 1.5em;
+  margin: 0 0 14px;
 }
 :is(
     .document-content,
@@ -199,7 +226,209 @@
     .sb-rich-text
   )
   li {
-  margin: 8px 0;
+  margin: 4px 0;
+  padding-left: 0.2em;
+}
+/* A list item's paragraphs and nested lists belong to the item, not to the page rhythm. */
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  li
+  > p {
+  margin: 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  li
+  > :is(ul, ol) {
+  margin: 4px 0 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  ol {
+  font-variant-numeric: tabular-nums;
+}
+/* Task lists: the editor renders <label><input></label><div>, the reader <input><div>. */
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list) {
+  list-style: none;
+  padding-left: 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding-left: 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  > li
+  > label {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  height: 1.8em;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  input[type="checkbox"] {
+  /* One drawn box for the editable editor and the read-only reader, so a
+     disabled reader checkbox does not fall back to the greyed system look. */
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  border: 1.5px solid color-mix(in srgb, var(--reading-text) 40%, transparent);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  /* The tick is drawn with borders: component bundles may not load image assets. */
+  --task-tick: #ffffff;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  input[type="checkbox"]:checked {
+  border-color: var(--reading-accent);
+  background-color: var(--reading-accent);
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  input[type="checkbox"]:checked::before {
+  content: "";
+  display: block;
+  width: 4px;
+  height: 8px;
+  margin: 1px 0 0 4px;
+  border: solid var(--task-tick);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  input[type="checkbox"]:disabled {
+  cursor: default;
+}
+:root[data-theme="dark"]
+  :is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  input[type="checkbox"]:checked {
+  /* The dark accent is light, so the tick turns dark. */
+  --task-tick: #201c2e;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--reading-accent);
+  outline-offset: 2px;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  .portable-task-list
+  > li
+  > input[type="checkbox"] {
+  /* Centre the box on the first line, as the editor's label does. */
+  margin-top: calc(0.9em - 7.5px);
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  > li
+  > div {
+  flex: 1;
+  min-width: 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  > li
+  > div
+  > p {
+  margin: 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(ul[data-type="taskList"], .portable-task-list)
+  > li[data-checked="true"]
+  > div
+  > p {
+  color: var(--muted);
+  text-decoration: line-through;
 }
 :is(
     .document-content,
@@ -222,7 +451,9 @@
   color: var(--reading-accent);
   background: var(--reading-code);
   border-radius: 4px;
+  padding: 0.1em 0.35em;
 }
+/* Code keeps its own lines and scrolls sideways, in the editor and the reader alike. */
 :is(
     .document-content,
     .portable-editor .tiptap,
@@ -232,13 +463,15 @@
   pre,
 .sb-code pre {
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--surface);
   color: var(--reading-text);
-  padding: 20px 24px;
-  margin: 24px 0;
-  font: 14px/1.65 var(--font-mono);
-  overflow: auto;
+  padding: 16px 20px;
+  margin: 18px 0;
+  font: 13.5px/1.7 var(--font-mono);
+  white-space: pre;
+  tab-size: 2;
+  overflow-x: auto;
 }
 :is(
     .document-content,
@@ -251,6 +484,19 @@
   font: inherit;
   color: inherit;
   background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 28px 0;
 }
 :is(
     .document-content,
@@ -270,6 +516,47 @@
   > :last-child {
   margin-bottom: 0;
 }
+/* Nested containers trim their own edges, so a one-paragraph callout or cell has
+ * no trailing gap: editor callouts/toggles, reader callouts/toggles, quotes,
+ * list items and table cells. */
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(
+    blockquote,
+    li,
+    th,
+    td,
+    .callout-content > div,
+    .toggle-body > div > div,
+    .portable-callout > div,
+    .portable-toggle-body
+  )
+  > :last-child {
+  margin-bottom: 0;
+}
+:is(
+    .document-content,
+    .portable-editor .tiptap,
+    .portable-content,
+    .sb-rich-text
+  )
+  :is(
+    blockquote,
+    li,
+    th,
+    td,
+    .callout-content > div,
+    .toggle-body > div > div,
+    .portable-callout > div,
+    .portable-toggle-body
+  )
+  > :first-child {
+  margin-top: 0;
+}
 .document-content .document-image,
 .portable-editor .document-image,
 .portable-image,
@@ -277,22 +564,59 @@
 .sb-image img {
   border-radius: 14px;
 }
+/* Rich-text tables: light rules, a tinted header and compact cells. Block tables
+ * (.sb-block) keep their own styles. */
+:is(.document-content, .portable-editor .tiptap, .portable-content)
+  :is(.tableWrapper, .portable-table-scroll):not(.sb-block *) {
+  overflow-x: auto;
+  margin: 18px 0;
+}
 :is(.document-content, .portable-editor .tiptap, .portable-content)
   table:not(.sb-block table),
-.sb-table table,
 .sb-rich-text table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 15px;
+  line-height: 1.6;
+}
+:is(.document-content, .portable-editor .tiptap, .portable-content)
+  :is(th, td):not(.sb-block :is(th, td)),
+.sb-rich-text :is(th, td) {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  vertical-align: top;
+  text-align: start;
+}
+:is(.document-content, .portable-editor .tiptap, .portable-content)
+  th:not(.sb-block th),
+.sb-rich-text th {
+  background: var(--surface);
+  color: var(--reading-heading);
+  font-weight: 600;
+}
+:is(.document-content, .portable-editor .tiptap, .portable-content)
+  :is(th, td):not(.sb-block :is(th, td))
+  > p,
+.sb-rich-text :is(th, td) > p {
+  margin: 0;
+}
+:is(.document-content, .portable-editor .tiptap, .portable-content)
+  :is(th, td):not(.sb-block :is(th, td))
+  > p
+  + p,
+.sb-rich-text :is(th, td) > p + p {
+  margin-top: 6px;
+}
+/* The table block keeps its established look. */
+.sb-table table {
   font-size: inherit;
   line-height: inherit;
 }
-:is(.document-content, .portable-editor .tiptap)
-  :is(th, td):not(.sb-block :is(th, td)),
-.sb-table :is(th, td),
-.sb-rich-text :is(th, td) {
+.sb-table :is(th, td) {
   padding: 12px 16px;
   border-color: var(--line);
 }
-.sb-table th,
-.sb-rich-text th {
+.sb-table th {
   background: var(--surface);
   font-weight: 600;
 }

@@ -59,9 +59,6 @@
 .portable-editor .tiptap {
   min-height: 140px;
   outline: none;
-  font-size: 14px;
-  line-height: 1.9;
-  letter-spacing: 0.005em;
   overflow-wrap: anywhere;
   caret-color: var(--accent);
 }
@@ -73,169 +70,17 @@
 .portable-editor .tiptap > :first-child {
   margin-top: 0;
 }
-.document-content p,
-.portable-editor .tiptap p {
-  margin: 9px 0;
-}
-.document-content h1,
-.document-content h2,
-.document-content h3,
-.portable-editor .tiptap h1,
-.portable-editor .tiptap h2,
-.portable-editor .tiptap h3 {
-  color: var(--text);
-  font-weight: 650;
-  line-height: 1.45;
-  letter-spacing: -0.035em;
-  scroll-margin-top: 75px;
-}
-.document-content h1,
-.portable-editor .tiptap h1 {
-  font-size: 28px;
-  margin: 35px 0 13px;
-}
-.document-content h2,
-.portable-editor .tiptap h2 {
-  font-size: 21px;
-  margin: 32px 0 12px;
-}
-.document-content h3,
-.portable-editor .tiptap h3 {
-  font-size: 17px;
-  margin: 24px 0 9px;
-}
-.document-content strong,
-.portable-editor .tiptap strong {
-  font-weight: 650;
-}
 .document-content a,
 .portable-editor .tiptap a {
-  color: var(--accent);
-  text-underline-offset: 3px;
-  text-decoration-thickness: 1px;
   cursor: pointer;
-}
-.document-content mark,
-.portable-editor .tiptap mark {
-  border-radius: 2px;
-  padding: 1px 2px;
-  color: #343a35;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
-}
-.document-content code,
-.portable-editor .tiptap code {
-  border-radius: 4px;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 0.88em;
-  padding: 2px 5px;
-  color: #9a634d;
-  background: var(--editor-hover);
 }
 .document-content pre,
 .portable-editor .tiptap pre {
   position: relative;
-  overflow: auto;
-  margin: 20px 0;
-  padding: 19px 22px;
-  border: 1px solid var(--editor-line);
-  border-radius: 7px;
-  background: var(--editor-hover);
-  white-space: pre;
-  tab-size: 2;
-  line-height: 1.7;
-}
-.document-content pre code,
-.portable-editor .tiptap pre code {
-  padding: 0;
-  color: var(--text);
-  font-size: 12px;
-  background: transparent;
-}
-.document-content blockquote,
-.portable-editor .tiptap blockquote {
-  margin: 20px 0;
-  border-left: 3px solid var(--accent);
-  padding: 1px 0 1px 20px;
-  color: var(--text);
-}
-.document-content blockquote p,
-.portable-editor .tiptap blockquote p {
-  margin: 4px 0;
-}
-.document-content hr,
-.portable-editor .tiptap hr {
-  border: 0;
-  border-top: 1px solid var(--editor-line);
-  margin: 28px 0;
-}
-.document-content ul,
-.document-content ol,
-.portable-editor .tiptap ul,
-.portable-editor .tiptap ol {
-  padding-left: 24px;
-  margin: 10px 0;
-}
-.document-content li,
-.portable-editor .tiptap li {
-  padding-left: 3px;
-}
-.document-content li::marker,
-.portable-editor .tiptap li::marker {
-  color: var(--accent);
-}
-.document-content li p,
-.portable-editor .tiptap li p {
-  margin: 2px 0;
-}
-.document-content li > ul,
-.document-content li > ol,
-.portable-editor .tiptap li > ul,
-.portable-editor .tiptap li > ol {
-  margin: 2px 0 5px;
-}
-.document-content ul[data-type="taskList"],
-.portable-editor .tiptap ul[data-type="taskList"] {
-  list-style: none;
-  padding-left: 0;
-}
-.document-content ul[data-type="taskList"] > li,
-.portable-editor .tiptap ul[data-type="taskList"] > li {
-  display: flex;
-  gap: 9px;
-  padding-left: 0;
-  align-items: flex-start;
-}
-.document-content ul[data-type="taskList"] > li > label,
-.portable-editor .tiptap ul[data-type="taskList"] > li > label {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  height: 31px;
-  user-select: none;
 }
 .document-content ul[data-type="taskList"] input,
 .portable-editor .tiptap ul[data-type="taskList"] input {
-  accent-color: var(--accent);
-  margin: 0;
-  width: 14px;
-  height: 14px;
   cursor: pointer;
-}
-.document-content ul[data-type="taskList"] > li > div,
-.portable-editor .tiptap ul[data-type="taskList"] > li > div {
-  min-width: 0;
-  flex: 1;
-}
-.document-content ul[data-type="taskList"] > li[data-checked="true"] > div > p,
-.portable-editor
-  .tiptap
-  ul[data-type="taskList"]
-  > li[data-checked="true"]
-  > div
-  > p {
-  color: var(--muted);
-  text-decoration: line-through;
 }
 .document-content p.is-empty::before {
   color: var(--muted);
@@ -268,37 +113,18 @@
   margin: 22px auto;
   border-radius: 5px;
 }
-.document-content .tableWrapper {
-  overflow-x: auto;
-  margin: 21px 0;
-}
 .document-content table:not(.document-widget table),
 .portable-editor .tiptap table:not(.document-widget table) {
-  border-collapse: collapse;
-  width: 100%;
   table-layout: fixed;
   overflow: hidden;
-  font-size: inherit;
 }
 .document-content th:not(.document-widget th),
 .document-content td:not(.document-widget td),
 .portable-editor .tiptap th:not(.document-widget th),
 .portable-editor .tiptap td:not(.document-widget td) {
   position: relative;
-  border: 1px solid var(--editor-line);
-  padding: 7px 11px;
   min-width: 70px;
-  vertical-align: top;
   text-align: left;
-}
-.document-content th:not(.document-widget th),
-.portable-editor .tiptap th:not(.document-widget th) {
-  font-weight: 600;
-  background: var(--editor-hover);
-}
-.document-content td:not(.document-widget td) > *,
-.document-content th:not(.document-widget th) > * {
-  margin: 0;
 }
 .document-content .selectedCell:after {
   position: absolute;
@@ -355,6 +181,7 @@
   background: color-mix(in srgb, #cb9493 16%, var(--editor-paper));
 }
 .callout-decoration {
+  position: relative;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -375,8 +202,13 @@
   opacity: 1;
   cursor: default;
 }
+/* The tone dot sits under the icon without adding height, so a one-line callout stays one line tall. */
 .callout-color {
-  margin: 8px 0 0;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  translate: -50% 0;
+  margin: 4px 0 0;
   width: 9px;
   height: 9px;
   border-radius: 50%;
