@@ -8,6 +8,7 @@ import {
   type HTMLAttributes,
 } from "react";
 import type { LibraryTarget } from "./LibraryNavigation";
+import { LibraryDragPreview } from "./LibraryDragPreview";
 import { translator } from "../i18n";
 import sidebarMessages from "../i18n/messages/sidebar";
 
@@ -22,6 +23,7 @@ export interface LibraryDrop {
   placement?: "before" | "after";
 }
 interface Destination {
+  element: HTMLElement;
   key: string;
   position: "before" | "after" | "inside";
   drop: LibraryDrop;
@@ -45,7 +47,7 @@ export const useLibraryDrag = () => useContext(LibraryDragContext);
 export function useLibraryDragController(options: {
   sectionFor: (projectId: string) => string;
   parentFor: (projectId: string, id: string) => string | null;
-  onDrop: (drop: LibraryDrop) => void;
+  onDrop: (drop: LibraryDrop) => unknown | Promise<unknown>;
   onStart: () => void;
 }) {
   const latest = useRef(options);
@@ -59,17 +61,12 @@ export function useLibraryDragController(options: {
     pointerId: number;
     active: boolean;
     sidebar: HTMLElement;
+    element: HTMLElement;
   } | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
-  // Pointer moves position the preview directly instead of re-rendering Studio.
-  const previewPoint = useRef({ x: 0, y: 0 });
-  const previewRef = useRef<HTMLDivElement>(null);
-  const [preview, setPreview] = useState<{
-    title: string;
-    readonly x: number;
-    readonly y: number;
-  } | null>(null);
-  const [destination, setDestination] = useState<Destination | null>(null);
+  const visual = useRef<LibraryDragPreview | null>(null);
+  const destination = useRef<Destination | null>(null);
+  const finishing = useRef(false);
 
   useEffect(() => {
     let expansion: {
@@ -90,8 +87,10 @@ export function useLibraryDragController(options: {
       frame = 0;
       gesture.current = null;
       setDragging(null);
-      setDestination(null);
-      setPreview(null);
+      destination.current = null;
+      visual.current?.dispose();
+      visual.current = null;
+      finishing.current = false;
       document.body.classList.remove("library-drag-active");
       document.body.style.cursor = "";
     };
@@ -102,17 +101,30 @@ export function useLibraryDragController(options: {
       const current = gesture.current;
       if (!current) return { destination: null };
       const item = current.source;
+      if (visual.current?.inPlaceholder(point.x, point.y)) {
+        const next = destination.current;
+        const binding = next && rows.current.get(next.key);
+        return {
+          destination: next,
+          expand:
+            next?.position === "inside" && !binding?.expanded
+              ? (binding?.toggle ??
+                sections.current.get(next.key.replace(/^section:/, "")))
+              : undefined,
+        };
+      }
       const hit = document.elementFromPoint(point.x, point.y);
       if (!hit || !current.sidebar.contains(hit)) return { destination: null };
-      const element = hit.closest<HTMLElement>(
-        ".studio-tree-row, .studio-page-list-row",
-      );
+      const element =
+        visual.current?.hit(point.x, point.y) ??
+        hit.closest<HTMLElement>(".studio-tree-row, .studio-page-list-row");
       if (!element) {
         const section = hit.closest<HTMLElement>("[data-library-drop-section]");
         const id = section?.dataset.libraryDropSection;
         return id && item.kind === "project"
           ? {
               destination: {
+                element: section!,
                 key: `section:${id}`,
                 position: "inside",
                 drop: { source: item, sectionId: id },
@@ -126,14 +138,21 @@ export function useLibraryDragController(options: {
       const target = binding.target;
       if (target.id === item.id && target.projectId === item.projectId)
         return { destination: null };
-      const rect = element.getBoundingClientRect();
-      const fraction = (point.y - rect.top) / rect.height;
+      const rect =
+        visual.current?.layoutRect(element) ?? element.getBoundingClientRect();
+      const grid =
+        element.closest<HTMLElement>(".studio-page-list")?.dataset.view;
+      const fraction =
+        grid && grid !== "list"
+          ? (point.x - rect.left) / rect.width
+          : (point.y - rect.top) / rect.height;
       if (item.kind === "project") {
         const position = fraction < 0.5 ? "before" : "after";
         return {
           destination:
             target.kind === "project"
               ? {
+                  element,
                   key: target.id,
                   position,
                   drop: {
@@ -168,6 +187,7 @@ export function useLibraryDragController(options: {
       const position = inside ? "inside" : fraction < 0.5 ? "before" : "after";
       return {
         destination: {
+          element,
           key: target.id,
           position,
           drop: {
@@ -186,12 +206,14 @@ export function useLibraryDragController(options: {
       };
     };
     const update = () => {
+      if (!gesture.current?.element.isConnected) {
+        reset();
+        return;
+      }
       const { destination: next, expand } = locate();
-      setDestination((current) =>
-        current?.key === next?.key && current?.position === next?.position
-          ? current
-          : next,
-      );
+      destination.current = next;
+      if (next) visual.current?.project(next.element, next.position);
+      else visual.current?.restorePosition();
       document.body.style.cursor = next ? "grabbing" : "not-allowed";
       if (next?.position === "inside" && expand) {
         if (expansion?.key !== next.key) {
@@ -202,10 +224,20 @@ export function useLibraryDragController(options: {
     };
     const scroll = () => {
       const current = gesture.current;
-      if (!current?.active) return;
-      const panel = current.sidebar.querySelector<HTMLElement>(
-        ".studio-sidebar-projects",
-      );
+      if (!current?.active || finishing.current) return;
+      const panel = [
+        ...current.sidebar.querySelectorAll<HTMLElement>(
+          ".studio-sidebar-projects, .studio-scroll",
+        ),
+      ].find((element) => {
+        const rect = element.getBoundingClientRect();
+        return (
+          point.x >= rect.left &&
+          point.x <= rect.right &&
+          point.y >= rect.top &&
+          point.y <= rect.bottom
+        );
+      });
       if (panel) {
         const rect = panel.getBoundingClientRect();
         if (
@@ -222,54 +254,57 @@ export function useLibraryDragController(options: {
           }
         }
       }
+      update();
       frame = requestAnimationFrame(scroll);
     };
     const move = (event: PointerEvent) => {
       const current = gesture.current;
-      if (!current || event.pointerId !== current.pointerId) return;
+      if (
+        !current ||
+        finishing.current ||
+        event.pointerId !== current.pointerId
+      )
+        return;
       point = { x: event.clientX, y: event.clientY };
       if (!current.active) {
         if (Math.hypot(point.x - current.x, point.y - current.y) < 6) return;
         current.active = true;
+        visual.current = new LibraryDragPreview(
+          current.element,
+          current.sidebar,
+          current.x,
+          current.y,
+        );
         latest.current.onStart();
         setDragging(current.source.id);
         document.body.classList.add("library-drag-active");
         frame = requestAnimationFrame(scroll);
       }
       event.preventDefault();
-      previewPoint.current = {
-        x: Math.min(point.x + 14, window.innerWidth - 180),
-        y: Math.min(point.y + 14, window.innerHeight - 36),
-      };
-      const element = previewRef.current;
-      if (element) {
-        element.style.left = `${previewPoint.current.x}px`;
-        element.style.top = `${previewPoint.current.y}px`;
-      }
-      const title = current.source.title;
-      setPreview((shown) =>
-        shown?.title === title
-          ? shown
-          : {
-              title,
-              get x() {
-                return previewPoint.current.x;
-              },
-              get y() {
-                return previewPoint.current.y;
-              },
-            },
-      );
+      visual.current?.move(point);
       update();
     };
-    const up = (event: PointerEvent) => {
-      if (event.pointerId !== gesture.current?.pointerId) return;
+    const up = async (event: PointerEvent) => {
+      if (event.pointerId !== gesture.current?.pointerId || finishing.current)
+        return;
       point = { x: event.clientX, y: event.clientY };
-      const next = gesture.current.active ? locate().destination : null;
-      reset();
-      if (next) {
-        event.preventDefault();
-        latest.current.onDrop(next.drop);
+      const current = gesture.current;
+      const next = current.active ? locate().destination : null;
+      if (!current.active) {
+        reset();
+        return;
+      }
+      event.preventDefault();
+      finishing.current = true;
+      cancelAnimationFrame(frame);
+      clearExpansion();
+      if (!next) visual.current?.restorePosition();
+      await visual.current?.settle();
+      if (gesture.current !== current) return;
+      try {
+        if (next) await latest.current.onDrop(next.drop);
+      } finally {
+        reset();
       }
     };
     const key = (event: KeyboardEvent) => {
@@ -308,18 +343,20 @@ export function useLibraryDragController(options: {
       expanded: boolean,
       toggle?: () => void,
     ): HTMLAttributes<HTMLDivElement> => {
-      rows.current.set(target.id, { target, expanded, toggle });
+      const previous = rows.current.get(target.id);
+      rows.current.set(target.id, {
+        target,
+        expanded: !toggle && previous?.toggle ? previous.expanded : expanded,
+        toggle: toggle ?? previous?.toggle,
+      });
       return {
         "aria-description": t("dragHint"),
         "data-library-draggable": true,
         "data-dragging": dragging === target.id || undefined,
-        "data-drop-title":
-          destination?.key === target.id ? preview?.title : undefined,
-        "data-drop-position":
-          destination?.key === target.id ? destination.position : undefined,
         onDragStart: (event) => event.preventDefault(),
         onPointerDown: (event) => {
           if (
+            finishing.current ||
             event.button !== 0 ||
             (event.target as HTMLElement).closest(
               ".studio-row-menu,.studio-tree-chevron",
@@ -335,6 +372,7 @@ export function useLibraryDragController(options: {
             pointerId: event.pointerId,
             active: false,
             sidebar,
+            element: event.currentTarget,
           };
         },
       } as HTMLAttributes<HTMLDivElement>;
@@ -346,11 +384,9 @@ export function useLibraryDragController(options: {
       sections.current.set(id, expand);
       return {
         "data-library-drop-section": id,
-        "data-drop-position":
-          destination?.key === `section:${id}` ? "inside" : undefined,
       } as HTMLAttributes<HTMLDivElement>;
     };
     return { row, section };
-  }, [dragging, destination, preview]);
-  return { dragging: !!dragging, preview, previewRef, bindings };
+  }, [dragging]);
+  return { dragging: !!dragging, bindings };
 }

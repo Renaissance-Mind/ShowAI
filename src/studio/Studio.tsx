@@ -1742,9 +1742,7 @@ export default function Studio() {
     parentFor: (projectId, id) =>
       contents[projectId]?.folders.find((item) => item.id === id)?.parentId ??
       null,
-    onDrop: (drop) => {
-      void dropLibraryItem(drop);
-    },
+    onDrop: (drop) => dropLibraryItem(drop),
     onStart: () => {
       setContextMenu(null);
       setProjectsMenu(null);
@@ -2402,19 +2400,6 @@ export default function Studio() {
         />
       )}
       {sidebarNavigation}
-      {libraryDrag.preview && (
-        <div
-          ref={libraryDrag.previewRef}
-          className="studio-library-drag-preview"
-          aria-hidden="true"
-          style={{
-            left: libraryDrag.preview.x,
-            top: libraryDrag.preview.y,
-          }}
-        >
-          {libraryDrag.preview.title}
-        </div>
-      )}
     </LibraryDragContext.Provider>
   );
   const topbar = (

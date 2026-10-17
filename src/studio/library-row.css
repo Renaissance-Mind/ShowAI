@@ -20,49 +20,6 @@
 .library-drag-active * {
   user-select: none !important;
 }
-.studio-library-drag-preview {
-  position: fixed;
-  z-index: 10000;
-  pointer-events: none;
-  max-width: 180px;
-  padding: 7px 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  border-radius: 6px;
-  background: var(--text, #252525);
-  color: var(--bg, #fff);
-  box-shadow: 0 3px 12px #0003;
-  font-size: 12px;
-}
-.studio-tree-row[data-dragging="true"] {
-  opacity: 0.4;
-}
-.studio-tree-row[data-drop-position="inside"],
-.studio-sidebar-label[data-drop-position="inside"],
-.studio-project-section-items[data-drop-position="inside"] {
-  background: color-mix(in srgb, var(--accent, #5b66d8) 12%, transparent);
-  outline: 1px solid var(--accent, #5b66d8);
-  border-radius: 6px;
-}
-.studio-tree-row[data-drop-position="before"]::before,
-.studio-tree-row[data-drop-position="after"]::after {
-  content: "";
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--accent, #5b66d8);
-  pointer-events: none;
-  z-index: 2;
-}
-.studio-tree-row[data-drop-position="before"]::before {
-  top: -1px;
-}
-.studio-tree-row[data-drop-position="after"]::after {
-  bottom: -1px;
-}
 .studio-tree-row > .studio-tree-main {
   padding-right: calc(var(--row-menu-size) + 2 * var(--row-menu-inset));
   transition: padding-right 180ms cubic-bezier(0.2, 0.7, 0.2, 1);
@@ -139,34 +96,42 @@
   flex-shrink: 0;
 }
 
-/* A labelled insertion preview shows the result at the actual destination. */
-.studio-tree-row[data-drop-position="before"]::before,
-.studio-tree-row[data-drop-position="after"]::after {
-  content: attr(data-drop-title);
-  height: 26px;
-  line-height: 26px;
-  padding-inline: 10px;
+/* The placeholder is a translucent copy in normal flow; siblings truly reflow. */
+.library-drag-placeholder {
+  opacity: 0.24;
+  pointer-events: none;
+  user-select: none;
+}
+.library-drag-placeholder .studio-row-menu {
+  visibility: hidden;
+}
+.library-drag-ghost,
+.studio-page-list.library-drag-ghost {
+  position: fixed;
+  inset: 0 auto auto 0;
+  z-index: 10000;
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  pointer-events: none;
+  opacity: 0.78;
   background: var(--paper, var(--bg));
-  color: var(--accent);
-  border: 1px solid var(--accent);
-  box-shadow: 0 2px 8px #0002;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border-radius: 7px;
+  box-shadow: 0 7px 20px #00000012;
+  will-change: transform;
 }
-.studio-tree-row[data-drop-position="before"]::before {
-  top: -14px;
+.library-drag-ghost > :is(.studio-tree-row, .studio-page-list-row) {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
 }
-.studio-tree-row[data-drop-position="after"]::after {
-  bottom: -14px;
+.library-drag-ghost .studio-row-menu {
+  visibility: hidden;
 }
-
-.studio-tree-row { transition: background-color 100ms ease, opacity 100ms ease; }
-.studio-tree-row[data-drop-position="inside"]::after {
-  content: attr(data-drop-title); position: absolute; top: 100%; left: 28px; right: 4px;
-  height: 28px; line-height: 28px; padding-inline: 10px; z-index: 3;
-  border: 1px dashed var(--accent); border-radius: 5px;
-  background: var(--paper, var(--bg)); color: var(--accent); pointer-events: none;
-  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+.library-drag-active .studio-page-list-row {
+  touch-action: none;
 }
-@media (prefers-reduced-motion: reduce) { .studio-tree-row { transition: none; } }
+.library-drag-active [data-library-id] {
+  will-change: transform;
+}

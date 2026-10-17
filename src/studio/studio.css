@@ -1456,19 +1456,6 @@ button.studio-tree-chevron:hover {
 .studio-page-list[data-view="large"] .studio-page-thumbnail {
   height: 210px;
 }
-.studio-page-list-row[data-dragging="true"] {
-  opacity: 0.35;
-}
-.studio-page-list-row[data-drop-position="inside"] {
-  outline: 2px solid var(--accent);
-}
-.studio-page-list-row[data-drop-position="before"] {
-  border-top: 3px solid var(--accent);
-}
-.studio-page-list-row[data-drop-position="after"] {
-  border-bottom: 3px solid var(--accent);
-}
-
 .studio-page-list[data-view]:not([data-view="list"]) .studio-page-list-row {
   align-items: flex-start;
 }
