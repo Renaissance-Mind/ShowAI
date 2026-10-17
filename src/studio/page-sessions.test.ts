@@ -130,6 +130,71 @@ describe("workspace sessions against the real loopback workbench", () => {
     });
     expect(remaining.some((item) => item.id === retained.id)).toBe(false);
   });
+  it.each([false, true])(
+    "rebases a retained typing draft on Agent additions when reopening (already synced: %s)",
+    async (alreadySynced) => {
+      const local = structuredClone(first.document);
+      const typed: JSONContent = {
+        type: "paragraph",
+        attrs: { id: crypto.randomUUID() },
+        content: [
+          { type: "text", text: "Human draft after switching runtime" },
+        ],
+      };
+      local.content.content!.push(typed);
+      await invoke("drafts:save", {
+        input: {
+          kind: "page",
+          clientId: "workspace-test-client",
+          projectId: project,
+          resourceId: first.document.id,
+          baseRevision: first.revision,
+          baseContent: first.document,
+          content: local,
+          sequence: 2,
+        },
+      });
+      const remote = structuredClone(first.document);
+      remote.content.content!.push({
+        type: "paragraph",
+        attrs: { id: crypto.randomUUID() },
+        content: [
+          { type: "text", text: "Agent addition while page was closed" },
+        ],
+      });
+      if (alreadySynced) remote.content.content!.push(typed);
+      await invoke("pages:save", {
+        projectId: project,
+        pageId: first.document.id,
+        document: remote,
+        baseHash: first.hash,
+        baseRevision: first.revision,
+      });
+      await sessions.open(project, first.document.id, "reopened");
+      const view = sessions.getSnapshot().active!;
+      expect(view.getSnapshot().status).not.toBe("conflict");
+      expect(await view.flush()).toBe(true);
+      const saved = await invoke<LoadedPage>("pages:get", {
+        projectId: project,
+        pageId: first.document.id,
+      });
+      const texts = saved.document.content.content!.flatMap(
+        (n) => n.content?.map((child) => child.text) ?? [],
+      );
+      expect(
+        texts.filter((text) => text === "Human draft after switching runtime"),
+      ).toHaveLength(1);
+      expect(texts).toContain("Agent addition while page was closed");
+      expect(view.getSnapshot().status).toBe("saved");
+      expect(
+        await invoke("drafts:list", {
+          kind: "page",
+          projectId: project,
+          resourceId: first.document.id,
+        }),
+      ).toEqual([]);
+    },
+  );
   it("saves nested unusable links as text while keeping the exact original recovery draft", async () => {
     const view = await warm();
     const content = structuredClone(view.getSnapshot().draft!.content);

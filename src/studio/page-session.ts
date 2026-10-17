@@ -674,6 +674,39 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         return true;
       }
       const recoveredSequence = restored.record.sequence ?? 0;
+      if (
+        restored.baseContent &&
+        !loaded.workspaceConflicts?.length &&
+        restored.record.baseRevision !== loaded.revision
+      ) {
+        const merged = mergePageContent(
+          restored.baseContent,
+          restored.content,
+          loaded.document,
+        );
+        if (!merged.conflicts.length) {
+          if (
+            pageContentKey(merged.document) === pageContentKey(loaded.document)
+          ) {
+            await options.invoke("drafts:remove", {
+              id: restored.record.id,
+              generation: restored.record.generation,
+            });
+            return true;
+          }
+          current.current = merged.document;
+          setDraft(merged.document);
+          revision.current = recoveredSequence + 1;
+          savedRevision.current = recoveredSequence;
+          retained.current = restored.record;
+          recoveredFrom.current = restored.record.recoverySource ?? null;
+          setStatus("changed");
+          setDraftNotice(t("draftRestored"));
+          scheduleDraft();
+          scheduleSave();
+          return true;
+        }
+      }
       revision.current = recoveredSequence;
       savedRevision.current = recoveredSequence;
       if (
