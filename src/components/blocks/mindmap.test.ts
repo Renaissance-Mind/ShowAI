@@ -38,9 +38,14 @@ describe("mind map document contract", () => {
       const saved = validateDocument(
         JSON.parse(JSON.stringify(inserted.document)),
       );
-      const widget = saved.content.content!.find(
+      const insertedNode = saved.content.content!.find(
         (item) => item.attrs?.id === inserted.nodeId,
       )!;
+      if (kind === "board") {
+        expect(insertedNode.attrs!.kind).toBe("page");
+        expect(insertedNode.content).toHaveLength(1);
+      }
+      const widget = kind === "board" ? insertedNode.content![0] : insertedNode;
       expect(widget.attrs!.kind).toBe("mindmap");
       expect(widget.attrs!.data).toEqual(metadata.defaultData);
       widget.attrs!.data.nodes[1].parentId = "missing";
@@ -229,11 +234,16 @@ describe("mind map document contract", () => {
       const saved = validateDocument(
         JSON.parse(JSON.stringify(inserted.document)),
       );
-      expect(
-        saved.content.content!.find(
-          (node) => node.attrs?.id === inserted.nodeId,
-        )!.attrs!.data,
-      ).toEqual(data);
+      const insertedNode = saved.content.content!.find(
+        (node) => node.attrs?.id === inserted.nodeId,
+      )!;
+      if (kind === "board") {
+        expect(insertedNode.attrs!.kind).toBe("page");
+        expect(insertedNode.content).toHaveLength(1);
+      }
+      const widget = kind === "board" ? insertedNode.content![0] : insertedNode;
+      expect(widget.attrs!.kind).toBe("mindmap");
+      expect(widget.attrs!.data).toEqual(data);
     }
     expect(() => validateMindmapData({ ...map(), layout: "diagonal" })).toThrow(
       /layout/,
