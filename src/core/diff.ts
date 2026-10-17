@@ -584,6 +584,31 @@ export function applyOperations(
         node.attrs = { ...node.attrs, ...operation.attrs };
         break;
       }
+      case "component.props.set": {
+        const node = locate(operation.blockId).node;
+        const data = node.attrs?.data;
+        if (
+          node.type !== "widget" ||
+          !data ||
+          typeof data !== "object" ||
+          !operation.props ||
+          typeof operation.props !== "object" ||
+          Array.isArray(operation.props)
+        )
+          throw new CoreError(
+            "INVALID_DATA",
+            "component.props.set requires a component block and a props object.",
+          );
+        const props = structuredClone(operation.props);
+        node.attrs = {
+          ...node.attrs,
+          data:
+            node.attrs!.kind === "custom"
+              ? { ...data, props: { ...data.props, ...props } }
+              : { ...data, ...props },
+        };
+        break;
+      }
       case "block.text.set": {
         const node = locate(operation.blockId).node;
         if (node.type === "richText" && typeof operation.text === "string") {

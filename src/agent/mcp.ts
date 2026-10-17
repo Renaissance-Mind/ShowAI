@@ -485,7 +485,7 @@ export function createMcpServer(options: {
     "page_apply",
     {
       description:
-        "Apply stable-block-id operations with a current baseHash. Query guide authoring for the operation shapes.",
+        'Apply stable-block-id operations with a current baseHash. Query guide authoring for the operation shapes. Change existing component data with {type:"component.props.set",blockId,props} rather than block.replace, and keep each call shallow and short.',
       inputSchema: {
         ...changeSchema,
         pageId: z.string(),

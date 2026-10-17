@@ -173,6 +173,57 @@ describe("semantic page changes", () => {
     expect(diffDocuments(before, changed)).toHaveLength(3);
   });
 
+  it("replaces component data keys without resending the node", () => {
+    const before = document();
+    before.content.content = [
+      {
+        type: "widget",
+        attrs: {
+          id: "custom",
+          kind: "custom",
+          data: {
+            componentId: "terms",
+            version: "1.0.0",
+            integrity: "sha256-x",
+            props: { title: "Terms", terms: [{ term: "A" }] },
+          },
+        },
+      },
+      {
+        type: "widget",
+        attrs: { id: "chart", kind: "chart", data: { title: "Old", rows: [] } },
+      },
+      { type: "paragraph", attrs: { id: "plain" } },
+    ];
+    const changed = applyOperations(before, [
+      {
+        type: "component.props.set",
+        blockId: "custom",
+        props: { terms: [{ term: "B" }] },
+      },
+      {
+        type: "component.props.set",
+        blockId: "chart",
+        props: { title: "New" },
+      },
+    ]);
+    expect(changed.content.content![0].attrs!.data).toEqual({
+      componentId: "terms",
+      version: "1.0.0",
+      integrity: "sha256-x",
+      props: { title: "Terms", terms: [{ term: "B" }] },
+    });
+    expect(changed.content.content![1].attrs!.data).toEqual({
+      title: "New",
+      rows: [],
+    });
+    expect(() =>
+      applyOperations(before, [
+        { type: "component.props.set", blockId: "plain", props: { a: 1 } },
+      ]),
+    ).toThrow("component block");
+  });
+
   it("distinguishes removal of a null property from an unchanged value", () => {
     const before = document();
     before.content.content![0].attrs!.backgroundColor = null;

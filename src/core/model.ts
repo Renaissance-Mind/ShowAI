@@ -159,6 +159,12 @@ export type PageOperation =
       afterId?: string | null;
     }
   | { type: "block.attrs.set"; blockId: string; attrs: Record<string, unknown> }
+  /** Replace top-level component data keys without resending the node envelope. */
+  | {
+      type: "component.props.set";
+      blockId: string;
+      props: Record<string, unknown>;
+    }
   | { type: "block.text.set"; blockId: string; text: string };
 
 export interface ApplyPageInput {
