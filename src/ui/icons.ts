@@ -82,6 +82,8 @@ export {
   Layers,
   Laptop,
   LayoutDashboard,
+  LayoutGrid,
+  Grid2X2,
   LayoutList,
   LayoutTemplate,
   Link2,

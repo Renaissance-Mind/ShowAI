@@ -14,7 +14,6 @@ export const boardTools: {
   { tool: "rectangle", label: "tool.rectangle", key: "4", aliases: ["r"] },
   { tool: "ellipse", label: "tool.ellipse", key: "5", aliases: ["e", "o"] },
   { tool: "arrow", label: "tool.arrow", key: "6", aliases: ["a"] },
-  { tool: "region", label: "tool.region", key: "7", aliases: ["f"] },
   { tool: "pan", label: "tool.pan", key: "8", aliases: ["m"] },
   { tool: "eraser", label: "tool.eraser", key: "9", aliases: ["x"] },
   { tool: "lasso", label: "tool.lasso", key: "L", aliases: ["l"] },

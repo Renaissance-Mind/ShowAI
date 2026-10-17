@@ -46,7 +46,11 @@ export interface PageSession {
   getMetadata(): PageSnapshot;
   subscribe(listener: () => void): () => void;
   subscribeMetadata(listener: () => void): () => void;
-  open(projectId: string, pageId: string): Promise<boolean>;
+  open(
+    projectId: string,
+    pageId: string,
+    initial?: LoadedPage,
+  ): Promise<boolean>;
   edit(patch: Partial<ShowDocument>): void;
   editContent(content: JSONContent): void;
   flush(settle?: boolean): Promise<boolean>;
@@ -608,15 +612,21 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     blocked.current = !!page.workspaceConflicts?.length;
   };
 
-  const open = async (projectId: string, pageId: string) => {
+  const open = async (
+    projectId: string,
+    pageId: string,
+    initial?: LoadedPage,
+  ) => {
     const ticket = ++opening.current;
     if (!(await flush())) return false;
     if (opening.current !== ticket) return false;
     const fetchedAtBase = base.current;
-    const loaded = await options.invoke<LoadedPage>("pages:get", {
-      projectId,
-      pageId,
-    });
+    const loaded =
+      initial ??
+      (await options.invoke<LoadedPage>("pages:get", {
+        projectId,
+        pageId,
+      }));
     if (opening.current !== ticket) return false;
     // The editor remains usable during disk I/O. Save keystrokes entered after
     // the first flush before replacing its draft with the newly loaded page.
@@ -628,11 +638,13 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     )
       return true;
     install(projectId, loaded);
-    const drafts = await options.invoke<EditorDraftRecord[]>("drafts:list", {
-      kind: "page",
-      projectId,
-      resourceId: pageId,
-    });
+    const drafts = initial
+      ? []
+      : await options.invoke<EditorDraftRecord[]>("drafts:list", {
+          kind: "page",
+          projectId,
+          resourceId: pageId,
+        });
     if (
       opening.current !== ticket ||
       projectRef.current !== projectId ||

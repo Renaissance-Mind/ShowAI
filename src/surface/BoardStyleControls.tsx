@@ -130,6 +130,12 @@ export function BoardStyleControls({
           <BoardColorPicker
             label={filled ? t("style.borderColor") : t("style.penColor")}
             value={color ?? "#252629"}
+            allowNone={
+              filled &&
+              drawings.every((node) =>
+                ["rectangle", "ellipse"].includes(node.attrs!.tool),
+              )
+            }
             onChange={(color) => onChange({ color })}
           />
           {color === undefined && <small>{t("style.mixed")}</small>}
@@ -140,18 +146,10 @@ export function BoardStyleControls({
           {t("style.fill")}
           <BoardColorPicker
             label={t("style.fillColor")}
-            value={fill && fill !== "none" ? fill : "#ffffff"}
+            value={fill ?? "none"}
+            allowNone
             onChange={(fillColor) => onChange({ fillColor })}
           />
-          <button
-            type="button"
-            aria-label={t("style.transparentFill")}
-            aria-pressed={fill === "none"}
-            title={t("style.transparentFill")}
-            onClick={() => onChange({ fillColor: "none" })}
-          >
-            {t("style.none")}
-          </button>
           {fill === undefined && <small>{t("style.mixed")}</small>}
         </div>
       )}
@@ -174,40 +172,42 @@ export function BoardStyleControls({
           {width === undefined && <small>{t("style.mixed")}</small>}
         </label>
       </div>
-      {(drawings.length
-        ? drawings.every((node) =>
-            ["pen", "highlighter"].includes(node.attrs!.tool),
-          )
-        : tool === "pen" || tool === "highlighter") && (
-        <div className="board-style-section board-pressure-controls">
-          <span>{t("style.pressureLabel")}</span>
-          <button
-            type="button"
-            className="board-pressure-toggle"
-            aria-label={t("style.pressure")}
-            title={t(pressure ? "style.pressureWidth" : "style.fixedWidth")}
-            aria-pressed={pressure}
-            onClick={() => onChange({ pressure: !pressure })}
-          >
-            <svg viewBox="0 0 24 20" aria-hidden="true">
-              {pressure ? (
-                <path
-                  d="M3 14 C7 2 13 7 17 9 C19 10 20 8 21 6 C20 13 16 16 12 11 C8 7 6 7 3 14 Z"
-                  fill="currentColor"
-                />
-              ) : (
-                <path
-                  d="M3 14 C8 2 16 18 21 6"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              )}
-            </svg>
-          </button>
-        </div>
-      )}
+      {typeof document !== "undefined" &&
+        document.documentElement.dataset.native === "ios" &&
+        (drawings.length
+          ? drawings.every((node) =>
+              ["pen", "highlighter"].includes(node.attrs!.tool),
+            )
+          : tool === "pen" || tool === "highlighter") && (
+          <div className="board-style-section board-pressure-controls">
+            <span>{t("style.pressureLabel")}</span>
+            <button
+              type="button"
+              className="board-pressure-toggle"
+              aria-label={t("style.pressure")}
+              title={t(pressure ? "style.pressureWidth" : "style.fixedWidth")}
+              aria-pressed={pressure}
+              onClick={() => onChange({ pressure: !pressure })}
+            >
+              <svg viewBox="0 0 24 20" aria-hidden="true">
+                {pressure ? (
+                  <path
+                    d="M3 14 C7 2 13 7 17 9 C19 10 20 8 21 6 C20 13 16 16 12 11 C8 7 6 7 3 14 Z"
+                    fill="currentColor"
+                  />
+                ) : (
+                  <path
+                    d="M3 14 C8 2 16 18 21 6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                )}
+              </svg>
+            </button>
+          </div>
+        )}
     </div>
   );
 }
