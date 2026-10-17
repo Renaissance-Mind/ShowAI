@@ -37,6 +37,6 @@ COPY --from=build /build/dist-remote-agent /app
 USER root
 RUN find /app -type d ! -perm -005 -exec chmod a+rx {} + && find /app -type f ! -perm -004 -exec chmod a+r {} +
 USER node
-RUN node /app/scripts/content-check.mjs
+RUN SHOWAI_CHECK_AGENT_PLUGIN=1 node /app/scripts/content-check.mjs
 EXPOSE 8790
 CMD ["node","/app/scripts/container.mjs"]

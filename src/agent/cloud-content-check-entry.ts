@@ -16,9 +16,10 @@ try {
       else await readFile(child);
     }
   }
-  await readableTree(
-    fileURLToPath(new URL("../assets/agent-plugin", import.meta.url)),
-  );
+  if (process.env.SHOWAI_CHECK_AGENT_PLUGIN === "1")
+    await readableTree(
+      fileURLToPath(new URL("../assets/agent-plugin", import.meta.url)),
+    );
   const service = new AgentService({ root });
   const project = await service.createProject("Content check");
   await service.createPage(project.id, { title: "Content check page" });
