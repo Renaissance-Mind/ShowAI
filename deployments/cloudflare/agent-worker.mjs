@@ -108,6 +108,8 @@ export class ShowAIAgentGateway extends DurableObject {
   pending = new Map();
   monitoring = false;
   stateTenant = "";
+  quiescing = false;
+  cloudCalls = 0;
   constructor(ctx, env) {
     super(ctx, env);
     if (ctx.container?.running) {
@@ -289,6 +291,16 @@ export class ShowAIAgentGateway extends DurableObject {
     return this.cloud(request);
   }
   async cloud(request) {
+    if (this.quiescing)
+      return json(
+        {
+          error: {
+            code: "AGENT_STARTING",
+            message: "Cloud Agent is switching to the updated runtime.",
+          },
+        },
+        503,
+      );
     const tenant = await this.ctx.storage.get("tenant");
     if (!tenant) return new Response(null, { status: 404 });
     const key = await derived(this.env.SHOWAI_AGENT_KEY, tenant);
@@ -318,6 +330,64 @@ export class ShowAIAgentGateway extends DurableObject {
         // Only the operator health route can reach this path. Preserve startup
         // diagnostics there; user requests receive the public readiness error.
         if (new URL(request.url).pathname === "/health") {
+          if (
+            request.headers.get("x-showai-upgrade-idle") === "1" &&
+            health.ok
+          ) {
+            if (this.cloudCalls)
+              return json(
+                { runtime: "busy", reason: "request-in-progress" },
+                409,
+              );
+            this.quiescing = true;
+            try {
+              const check = await container.exec(
+                [
+                  "node",
+                  "-e",
+                  `const fs=require('node:fs');let busy=false;function read(path){if(!fs.existsSync(path))return;const info=fs.statSync(path);if(info.isDirectory()){for(const name of fs.readdirSync(path))read(path+'/'+name)}else if(path.endsWith('.json')){const value=JSON.parse(fs.readFileSync(path,'utf8'));if(value.state==='running'||value.turn?.state==='running'||value.turns?.some?.(turn=>turn.state==='running'))busy=true}}for(const path of ['/state/agent-host/remote-turns','/state/agent-host/conversations','/state/agent-host/tasks'])read(path);console.log(JSON.stringify({busy}));`,
+                ],
+                { signal: AbortSignal.timeout(10000) },
+              );
+              const checked = await check.output();
+              if (
+                checked.exitCode !== 0 ||
+                JSON.parse(new TextDecoder().decode(checked.stdout)).busy
+              ) {
+                this.quiescing = false;
+                return json(
+                  { runtime: "busy", reason: "task-in-progress" },
+                  409,
+                );
+              }
+              await health.body?.cancel();
+              container.signal(15);
+              this.ctx.waitUntil(
+                container
+                  .monitor()
+                  .catch((error) =>
+                    console.error(
+                      "Idle upgrade:",
+                      String(error?.message ?? error),
+                    ),
+                  )
+                  .finally(() => {
+                    this.quiescing = false;
+                  }),
+              );
+              return json(
+                {
+                  service: "showai-agent-container",
+                  runtime: "upgrading",
+                  checkpoint: "graceful shutdown",
+                },
+                202,
+              );
+            } catch (error) {
+              this.quiescing = false;
+              throw error;
+            }
+          }
           if (request.headers.get("x-showai-runtime-diagnostics") === "1") {
             const process = await container.exec(
               [
@@ -417,14 +487,29 @@ const directory='/state/agent-host/remote-turns',jobs=fs.existsSync(directory)?f
     headers.set("x-showai-internal", key);
     const target = new URL(request.url);
     target.protocol = "http:";
-    return port.fetch(
-      new Request(target, {
-        method: request.method,
-        headers,
-        body: request.body,
-        redirect: "manual",
-      }),
-    );
+    if (this.quiescing)
+      return json(
+        {
+          error: {
+            code: "AGENT_STARTING",
+            message: "Cloud Agent is switching to the updated runtime.",
+          },
+        },
+        503,
+      );
+    this.cloudCalls++;
+    try {
+      return await port.fetch(
+        new Request(target, {
+          method: request.method,
+          headers,
+          body: request.body,
+          redirect: "manual",
+        }),
+      );
+    } finally {
+      this.cloudCalls--;
+    }
   }
   async webSocketMessage(socket, message) {
     try {
@@ -564,6 +649,9 @@ export default {
                 : {}),
               ...(request.headers.get("x-showai-recover-startup") === "1"
                 ? { "x-showai-recover-startup": "1" }
+                : {}),
+              ...(request.headers.get("x-showai-upgrade-idle") === "1"
+                ? { "x-showai-upgrade-idle": "1" }
                 : {}),
             },
             ...(relay
