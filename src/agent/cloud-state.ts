@@ -67,6 +67,7 @@ export class CloudState {
     readonly options: {
       ignore?: (path: string) => boolean;
       snapshotSqlite?: boolean;
+      onRestoreProgress?: (completed: number, total: number) => void;
     } = {},
   ) {
     if (!/^[a-f0-9]{64}$/.test(key))
@@ -102,6 +103,7 @@ export class CloudState {
     ]);
   }
   async restore() {
+    this.options.onRestoreProgress?.(0, 0);
     await mkdir(this.root, { recursive: true, mode: 0o700 });
     if ((await readdir(this.root)).length)
       throw new Error(
@@ -119,6 +121,8 @@ export class CloudState {
     )
       throw new Error("Invalid cloud state manifest.");
     const paths = new Set<string>();
+    let completed = 0;
+    this.options.onRestoreProgress?.(0, manifest.files.length);
     await batches(manifest.files, async (file) => {
       if (
         !validPath(file.path) ||
@@ -132,7 +136,10 @@ export class CloudState {
       paths.add(file.path);
       // Process leases and other ephemeral files from older checkpoints must
       // also be excluded on restore, even if a container reuses the same PID.
-      if (this.options.ignore?.(file.path)) return;
+      if (this.options.ignore?.(file.path)) {
+        this.options.onRestoreProgress?.(++completed, manifest.files.length);
+        return;
+      }
       const path = join(this.root, file.path);
       await mkdir(resolve(path, ".."), { recursive: true, mode: 0o700 });
       const handle = await open(path + ".restore", "wx", 0o600);
@@ -157,6 +164,7 @@ export class CloudState {
         await handle.close();
       }
       await rename(path + ".restore", path);
+      this.options.onRestoreProgress?.(++completed, manifest.files.length);
     });
   }
   async save(capture?: (read: () => Promise<void>) => Promise<void>) {

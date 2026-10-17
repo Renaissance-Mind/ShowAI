@@ -58,7 +58,13 @@ test("encrypted checkpoints restore a real SQLite authorization database, artifa
     "authorization.sqlite",
   );
   const restored = await directory();
-  await new CloudState(restored, objects, key).restore();
+  const progress: [number, number][] = [];
+  await new CloudState(restored, objects, key, {
+    onRestoreProgress: (completed, total) => progress.push([completed, total]),
+  }).restore();
+  expect(progress[0]).toEqual([0, 0]);
+  expect(progress.at(-1)![0]).toBe(progress.at(-1)![1]);
+  expect(progress.at(-1)![1]).toBeGreaterThan(0);
   const reopened = new DatabaseSync(
     join(restored, "auth", "authorization.sqlite"),
   );

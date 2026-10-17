@@ -32,6 +32,7 @@ if (process.argv.includes("--install-runtime")) {
     throw new Error("Cloud Agent identity is not configured.");
   let stage = "restore";
   let startupError: string | undefined;
+  let restoreProgress = { completed: 0, total: 0 };
   let health: Record<string, unknown> | undefined;
   let invoke:
     | ((request: IncomingMessage, response: ServerResponse) => Promise<void>)
@@ -51,6 +52,7 @@ if (process.argv.includes("--install-runtime")) {
                   service: "showai-agent-container",
                   runtime: startupError ? "failed" : "starting",
                   stage,
+                  ...(stage === "restore" ? { restore: restoreProgress } : {}),
                   error: startupError,
                 })
               : {
@@ -85,32 +87,62 @@ if (process.argv.includes("--install-runtime")) {
   });
   server.listen(8790, "0.0.0.0");
   const boot = async () => {
+    const stateRequest = async (
+      name: string,
+      bytes?: Uint8Array,
+    ): Promise<{ status: number; body: Uint8Array }> => {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const response = await fetch(`${origin}/__state/${tenant}/${name}`, {
+            method: bytes ? "PUT" : "GET",
+            headers: { authorization: `Bearer ${key}` },
+            ...(bytes ? { body: Buffer.from(bytes) } : {}),
+            signal: AbortSignal.timeout(60000),
+            redirect: "error",
+          });
+          if ([502, 503, 504].includes(response.status) && attempt < 2) {
+            await response.body?.cancel();
+          } else
+            return {
+              status: response.status,
+              body: new Uint8Array(await response.arrayBuffer()),
+            };
+        } catch (error) {
+          if (
+            attempt >= 2 ||
+            (!(error instanceof TypeError) &&
+              !["TimeoutError", "AbortError"].includes((error as Error).name))
+          )
+            throw error;
+        }
+        await new Promise((resolve) =>
+          setTimeout(resolve, 1000 * (attempt + 1)),
+        );
+      }
+    };
     const state = new CloudState(
       "/state",
       {
         async get(name) {
-          const response = await fetch(`${origin}/__state/${tenant}/${name}`, {
-            headers: { authorization: `Bearer ${key}` },
-            redirect: "error",
-          });
+          const response = await stateRequest(name);
           if (response.status === 404) return null;
-          if (!response.ok) throw new Error("State read failed.");
-          return new Uint8Array(await response.arrayBuffer());
+          if (response.status < 200 || response.status >= 300)
+            throw new Error(`State read failed (${response.status}).`);
+          return response.body;
         },
         async put(name, bytes) {
-          const response = await fetch(`${origin}/__state/${tenant}/${name}`, {
-            method: "PUT",
-            headers: { authorization: `Bearer ${key}` },
-            body: Buffer.from(bytes),
-            redirect: "error",
-          });
-          if (!response.ok) throw new Error("State checkpoint failed.");
+          const response = await stateRequest(name, bytes);
+          if (response.status < 200 || response.status >= 300)
+            throw new Error(`State checkpoint failed (${response.status}).`);
         },
       },
       key,
       {
         snapshotSqlite: true,
         ignore: ignoreRemoteAgentState,
+        onRestoreProgress: (completed, total) => {
+          restoreProgress = { completed, total };
+        },
       },
     );
     await state.restore();
