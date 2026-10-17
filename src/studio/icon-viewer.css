@@ -30,10 +30,6 @@
   outline: none;
   color: var(--text);
 }
-.icon-viewer-search:focus-within {
-  outline: 2px solid var(--text);
-  outline-offset: 2px;
-}
 .icon-viewer-search button {
   display: flex;
   padding: 0;

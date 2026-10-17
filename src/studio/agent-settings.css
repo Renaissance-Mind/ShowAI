@@ -246,9 +246,9 @@
   color: var(--text);
   font: inherit;
 }
-.agent-settings input:focus-visible,
+.agent-settings input[type="checkbox"]:focus-visible,
+.agent-settings input[type="radio"]:focus-visible,
 .agent-settings select:focus-visible,
-.agent-settings textarea:focus-visible,
 .agent-settings button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;

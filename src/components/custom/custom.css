@@ -58,10 +58,6 @@
     12px/1.65 ui-monospace,
     monospace;
 }
-.custom-props-editor textarea:focus {
-  outline: 2px solid var(--accent, #547c63);
-  outline-offset: 2px;
-}
 .custom-props-error {
   color: #ae3c3c;
   margin: 9px 0 0;

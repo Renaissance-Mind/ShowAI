@@ -88,11 +88,32 @@ summary:focus-visible {
   outline: 2px solid var(--text);
   outline-offset: 3px;
 }
-input:focus-visible,
-textarea:focus-visible,
+input:is(
+    [type="checkbox"],
+    [type="radio"],
+    [type="range"],
+    [type="color"],
+    [type="file"],
+    [type="button"],
+    [type="submit"],
+    [type="reset"]
+  ):focus-visible,
 select:focus-visible {
   outline: 2px solid var(--text);
   outline-offset: 2px;
+}
+input:not(
+    [type="checkbox"],
+    [type="radio"],
+    [type="range"],
+    [type="color"],
+    [type="file"],
+    [type="button"],
+    [type="submit"],
+    [type="reset"]
+  ):focus,
+textarea:focus {
+  outline: none;
 }
 input::placeholder,
 textarea::placeholder {

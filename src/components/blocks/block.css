@@ -57,11 +57,34 @@
 .sb-block select {
   accent-color: var(--sb-accent);
 }
-.sb-block input:focus-visible,
-.sb-block textarea:focus-visible,
+.sb-block
+  input:is(
+    [type="checkbox"],
+    [type="radio"],
+    [type="range"],
+    [type="color"],
+    [type="file"],
+    [type="button"],
+    [type="submit"],
+    [type="reset"]
+  ):focus-visible,
 .sb-block select:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--sb-accent) 50%, transparent);
   outline-offset: 1px;
+}
+.sb-block
+  input:not(
+    [type="checkbox"],
+    [type="radio"],
+    [type="range"],
+    [type="color"],
+    [type="file"],
+    [type="button"],
+    [type="submit"],
+    [type="reset"]
+  ):focus,
+.sb-block textarea:focus {
+  outline: none;
 }
 .sb-block input::placeholder,
 .sb-block textarea::placeholder {
