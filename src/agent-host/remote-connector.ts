@@ -57,7 +57,7 @@ export class RemoteMacConnector {
     return join(this.host.options.root, "remote-device.json");
   }
   async status() {
-    if (this.online && this.sharedHome !== this.home()) this.close();
+    if (this.online && this.sharedHome !== this.home()) await this.close();
     this.initialization ??= (async () => {
       const saved = await readOptional<ConnectorSettings>(this.path);
       this.settings = saved
@@ -166,19 +166,20 @@ export class RemoteMacConnector {
       throw new Error("Invalid device identity.");
     await writeProtected(this.path, input);
     this.settings = input;
-    this.close();
-    await this.lan.close();
+    await this.close();
     await this.start();
     return this.status();
   }
   async start() {
+    const generation = ++this.generation;
+    this.stopped = false;
     const { settings } = await this.status();
+    if (this.stopped || generation !== this.generation) return;
     await this.lan.start().catch((error) => {
       this.lan.error = error.message;
     });
+    if (this.stopped || generation !== this.generation) return;
     if (!settings.enabled) return;
-    this.stopped = false;
-    const generation = ++this.generation;
     let retryDelay = 10000;
     const connect = async () => {
       const sharedHome = this.home();
@@ -336,7 +337,7 @@ export class RemoteMacConnector {
     await connect().catch(failed);
   }
   close() {
-    void this.lan
+    const local = this.lan
       .close()
       .catch((error) => console.error("Local sharing:", error.message));
     this.stopped = true;
@@ -351,5 +352,6 @@ export class RemoteMacConnector {
       .catch((error) =>
         console.error("Remote task cancellation:", error.message),
       );
+    return local;
   }
 }

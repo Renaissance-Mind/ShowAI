@@ -307,6 +307,10 @@ test("nearby Mac accepts a local iPad project without any cloud account and neve
   expect(first.connections).toEqual([]);
   settings = first.settings;
   peer = connector.lan;
+  const cancelledStart = connector.start();
+  await connector.close();
+  await cancelledStart;
+  expect(peer.status.online).toBe(false);
   await connector.start();
   certificate = await readFile(
     join(root, "account-free-agent", "lan-peer", "identity.crt"),
@@ -397,5 +401,5 @@ test("nearby Mac accepts a local iPad project without any cloud account and neve
   ).not.toBe(200);
   await peer.approve(clientId, false);
   expect((await rpc("replica:index", {}, randomUUID(), wire)).status).toBe(401);
-  connector.close();
+  await connector.close();
 });
