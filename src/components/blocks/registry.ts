@@ -51,6 +51,50 @@ import { validateScene3dData } from "./scene3d-contract.mjs";
 const Scene3DBlock = /* @__PURE__ */ lazy(() =>
   import("./Scene3D").then((module) => ({ default: module.Scene3DBlock })),
 );
+import { validateDocDiagramData } from "./doc-diagrams-contract.mjs";
+import { validateDocReferenceData } from "./doc-reference-contract.mjs";
+import { validateDocBrowseData } from "./doc-browse-contract.mjs";
+import { validatePlanData } from "./plan-contract.mjs";
+import { validateEventTimelineData } from "./event-timeline-contract.mjs";
+import { validatePlaygroundData } from "./playground-contract.mjs";
+import { validateDatabaseData } from "./database-contract.mjs";
+const SequenceDiagramBlock = /* @__PURE__ */ lazy(() =>
+  import("./SequenceDiagram").then((module) => ({
+    default: module.SequenceDiagramBlock,
+  })),
+);
+const LayerDiagramBlock = /* @__PURE__ */ lazy(() =>
+  import("./LayerDiagram").then((module) => ({
+    default: module.LayerDiagramBlock,
+  })),
+);
+const StepGuideBlock = /* @__PURE__ */ lazy(() =>
+  import("./StepGuide").then((module) => ({ default: module.StepGuideBlock })),
+);
+const CommandReferenceBlock = /* @__PURE__ */ lazy(() =>
+  import("./CommandReference").then((module) => ({
+    default: module.CommandReferenceBlock,
+  })),
+);
+const StructureBrowserBlock = /* @__PURE__ */ lazy(() =>
+  import("./StructureBrowser").then((module) => ({
+    default: module.StructureBrowserBlock,
+  })),
+);
+const CardGridBlock = /* @__PURE__ */ lazy(() =>
+  import("./CardGrid").then((module) => ({ default: module.CardGridBlock })),
+);
+const RoadmapBlock = /* @__PURE__ */ lazy(() =>
+  import("./Roadmap").then((module) => ({ default: module.RoadmapBlock })),
+);
+const WaterfallBlock = /* @__PURE__ */ lazy(() =>
+  import("./Waterfall").then((module) => ({ default: module.WaterfallBlock })),
+);
+const EventTimelineBlock = /* @__PURE__ */ lazy(() =>
+  import("./EventTimeline").then((module) => ({
+    default: module.EventTimelineBlock,
+  })),
+);
 import { parseChartData } from "./helpers";
 import g2Metadata from "../../../resources/catalog/g2.json";
 const G2ChartBlock = /* @__PURE__ */ lazy(() =>
@@ -251,7 +295,7 @@ for (const item of diagramMetadata) {
 registerBlock({
   kind: "flowchart",
   title: "交互流程图",
-  description: "节点、分支与按需展开的说明",
+  description: "节点分支、路线讲解与阶段回放",
   icon: "⌘",
   defaultData: componentMetadata.find((item) => item.kind === "flowchart")!
     .defaultData as BlockData,
@@ -284,7 +328,7 @@ registerBlock({
 registerBlock({
   kind: "database",
   title: "数据库",
-  description: "表格、看板、筛选和排序",
+  description: "表格、看板、日历、筛选和排序",
   icon: "▦",
   defaultData: {
     title: "数据库",
@@ -301,27 +345,7 @@ registerBlock({
   },
   renderer: DatabaseBlock,
   validate: (data) => {
-    const columns = objectArray(data, "columns"),
-      rows = objectArray(data, "rows");
-    const validIds = (items: Record<string, unknown>[]) =>
-      items.every(
-        (item) =>
-          typeof item.id === "string" &&
-          item.id &&
-          !["__proto__", "constructor", "prototype"].includes(item.id),
-      ) && new Set(items.map((item) => item.id)).size === items.length;
-    if (!validIds(columns) || !validIds(rows))
-      throw new Error("属性和记录必须使用不重复的 id。");
-    if (columns.some((column) => column.id === "id"))
-      throw new Error("属性 id 不能使用保留名称 id。");
-    if (
-      rows.some((row) =>
-        Object.values(row).some(
-          (value) => !["string", "number", "boolean"].includes(typeof value),
-        ),
-      )
-    )
-      throw new Error("单元格只支持文字、数字或布尔值。");
+    validateDatabaseData(data);
   },
 });
 registerBlock({
@@ -338,7 +362,7 @@ registerBlock({
 registerBlock({
   kind: "playground",
   title: "交互计算",
-  description: "滑动参数，即时探索计算结果",
+  description: "调参数，看公式结果、构成与排名",
   icon: "⌁",
   defaultData: {
     title: "交互计算",
@@ -349,23 +373,7 @@ registerBlock({
   },
   renderer: PlaygroundBlock,
   validate: (data) => {
-    const inputs = objectArray(data, "inputs");
-    if (
-      inputs.some(
-        (input) =>
-          typeof input.id !== "string" ||
-          typeof input.label !== "string" ||
-          !["min", "max", "step", "value"].every(
-            (key) =>
-              typeof input[key] === "number" && Number.isFinite(input[key]),
-          ) ||
-          Number(input.min) >= Number(input.max) ||
-          Number(input.step) <= 0,
-      )
-    )
-      throw new Error("参数需要名称和有限数值范围，且步长必须大于 0。");
-    if (new Set(inputs.map((input) => input.id)).size !== inputs.length)
-      throw new Error("参数 id 不能重复。");
+    validatePlaygroundData(data);
   },
 });
 registerBlock({
@@ -533,5 +541,116 @@ registerBlock({
   renderer: Scene3DBlock,
   validate: (data) => {
     validateScene3dData(data);
+  },
+});
+registerBlock({
+  kind: "sequence-diagram",
+  title: "时序图",
+  description: "参与者之间逐步播放的消息往返",
+  icon: "⇄",
+  defaultData: componentMetadata.find(
+    (item) => item.kind === "sequence-diagram",
+  )!.defaultData as BlockData,
+  renderer: SequenceDiagramBlock,
+  validate: (data) => {
+    validateDocDiagramData("sequence-diagram", data);
+  },
+});
+registerBlock({
+  kind: "layer-diagram",
+  title: "分层架构图",
+  description: "自上而下的分层与可点选模块",
+  icon: "☰",
+  defaultData: componentMetadata.find((item) => item.kind === "layer-diagram")!
+    .defaultData as BlockData,
+  renderer: LayerDiagramBlock,
+  validate: (data) => {
+    validateDocDiagramData("layer-diagram", data);
+  },
+});
+registerBlock({
+  kind: "step-guide",
+  title: "操作步骤",
+  description: "编号步骤、可复制代码与计时",
+  icon: "①",
+  defaultData: componentMetadata.find((item) => item.kind === "step-guide")!
+    .defaultData as BlockData,
+  renderer: StepGuideBlock,
+  validate: (data) => {
+    validateDocReferenceData("step-guide", data);
+  },
+});
+registerBlock({
+  kind: "command-reference",
+  title: "命令参考",
+  description: "可搜索的分组命令与参数",
+  icon: "⌘",
+  defaultData: componentMetadata.find(
+    (item) => item.kind === "command-reference",
+  )!.defaultData as BlockData,
+  renderer: CommandReferenceBlock,
+  validate: (data) => {
+    validateDocReferenceData("command-reference", data);
+  },
+});
+registerBlock({
+  kind: "structure-browser",
+  title: "结构浏览器",
+  description: "可展开的目录或字段树，附说明与示例",
+  icon: "⊟",
+  defaultData: componentMetadata.find(
+    (item) => item.kind === "structure-browser",
+  )!.defaultData as BlockData,
+  renderer: StructureBrowserBlock,
+  validate: (data) => {
+    validateDocBrowseData("structure-browser", data);
+  },
+});
+registerBlock({
+  kind: "card-grid",
+  title: "卡片导航",
+  description: "带图标与说明的入口卡片，可整卡链接",
+  icon: "▤",
+  defaultData: componentMetadata.find((item) => item.kind === "card-grid")!
+    .defaultData as BlockData,
+  renderer: CardGridBlock,
+  validate: (data) => {
+    validateDocBrowseData("card-grid", data);
+  },
+});
+registerBlock({
+  kind: "roadmap",
+  title: "路线图",
+  description: "按日期阅读计划、依赖与负责人",
+  icon: "▤",
+  defaultData: componentMetadata.find((item) => item.kind === "roadmap")!
+    .defaultData as BlockData,
+  renderer: RoadmapBlock,
+  validate: (data) => {
+    validatePlanData("roadmap", data);
+  },
+});
+registerBlock({
+  kind: "waterfall",
+  title: "瀑布桥图",
+  description: "期初到期末的逐项增减与构成",
+  icon: "▥",
+  defaultData: componentMetadata.find((item) => item.kind === "waterfall")!
+    .defaultData as BlockData,
+  renderer: WaterfallBlock,
+  validate: (data) => {
+    validatePlanData("waterfall", data);
+  },
+});
+registerBlock({
+  kind: "event-timeline",
+  title: "事件时间线",
+  description: "曲线、阶段与事件同轴回放",
+  icon: "⌖",
+  defaultData: componentMetadata.find((item) => item.kind === "event-timeline")!
+    .defaultData as BlockData,
+  renderer: EventTimelineBlock,
+  validate: (data) => {
+    validateEventTimelineData(data);
   },
 });

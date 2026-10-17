@@ -970,9 +970,10 @@
       "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
-      "purpose": "带筛选、排序和看板视图的表格。单元格支持文字、数字、选择、复选框和链接。",
+      "purpose": "带筛选、排序和表格/看板/日历视图的数据库。单元格支持文字、数字、选择、复选框、链接和日期；日历可按月、按周（含时间轴）或以热力图查看。",
       "structure": [
-        "columns.id 对应 rows 中的字段键，rows[].id 稳定标识记录；groupBy 选择可分组的选择列。"
+        "columns.id 对应 rows 中的字段键，rows[].id 稳定标识记录；groupBy 选择看板分组的选择列。",
+        "日历读取 date 列（YYYY-MM-DD）；calendar 指定开始/结束日期、时间、颜色和完成标记列，view 决定初始视图。"
       ],
       "inputs": [
         {
@@ -981,7 +982,7 @@
         },
         {
           "path": "columns",
-          "meaning": "列定义：唯一 id、显示 name、type=text/number/select/checkbox/url。select 列用 options 给出候选值。"
+          "meaning": "列定义：唯一 id、显示 name、type=text/number/select/checkbox/url/date。select 列用 options 给出候选值；date 列的值是 YYYY-MM-DD 或空字符串。"
         },
         {
           "path": "rows",
@@ -990,6 +991,30 @@
         {
           "path": "groupBy",
           "meaning": "看板分组列的 id，必须对应 select 列；未指定或无效时使用第一列 select。"
+        },
+        {
+          "path": "view",
+          "meaning": "可选初始视图 table/board/calendar；calendar 需要至少一个 date 列。读者仍可切换视图。"
+        },
+        {
+          "path": "calendar.dateColumn / endDateColumn",
+          "meaning": "开始与可选结束日期列（date）；结束早于开始或缺失时按单日显示。未指定时用第一个 date 列。"
+        },
+        {
+          "path": "calendar.startTimeColumn / endTimeColumn",
+          "meaning": "可选时间列（text，H:MM 或 HH:MM）；周视图据此画时间轴，重叠记录并排显示，无效时间按全天处理。"
+        },
+        {
+          "path": "calendar.colorColumn",
+          "meaning": "着色与图例使用的 select 列；默认第一个 select 列，空字符串关闭着色。"
+        },
+        {
+          "path": "calendar.doneColumn",
+          "meaning": "checkbox 完成列；记录显示勾选状态，热力图只统计已勾选记录。"
+        },
+        {
+          "path": "calendar.mode / initialDate / weekStartsOn / weeks",
+          "meaning": "初始模式 month/week/heatmap、初始日期（默认今天）、每周起始日 0 或 1、热力图周数 1–53（默认 12）。"
         }
       ],
       "recipes": [
@@ -1002,6 +1027,22 @@
           "exampleIndex": 0
         },
         {
+          "title": "周历或月历",
+          "steps": [
+            "添加 date 列并填 YYYY-MM-DD；需要时间轴时添加两个 text 列写 HH:MM，在 calendar 中指向它们。",
+            "用 select 列表示类别并设为 colorColumn；用 checkbox 列表示完成并设为 doneColumn；view 设为 calendar，mode 设为 week 或 month，initialDate 指向要展示的那一周。"
+          ],
+          "exampleIndex": 1
+        },
+        {
+          "title": "打卡热力图",
+          "steps": [
+            "每次打卡一行：date、习惯（select）、完成（checkbox）。",
+            "calendar.mode 设为 heatmap，weeks 设为要回看的周数；读者点图例可只看某一个习惯，筛选同样生效。"
+          ],
+          "exampleIndex": 2
+        },
+        {
           "title": "替换为自己的内容",
           "steps": [
             "根据上述输入关系填入任务提供的内容，保留稳定标识与合法取值。",
@@ -1011,9 +1052,24 @@
       ],
       "interactions": [
         {
-          "action": "阅读与探索",
-          "effect": "查看当前内容；组件提供的阅读控件改变本地阅读状态。",
+          "action": "切换视图、日历模式与翻页",
+          "effect": "在表格、看板、日历（月/周/热力图）之间切换，前后翻月、翻周或翻区间，回到今天。",
           "persistence": "view"
+        },
+        {
+          "action": "点击日历中的记录或图例",
+          "effect": "打开记录详情（可编辑时可直接修改字段或删除）；图例突出某一类别，热力图只统计该类别。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击热力图格子",
+          "effect": "列出当天的记录；方向键在格子间移动。",
+          "persistence": "view"
+        },
+        {
+          "action": "在日历中新建或拖动记录（可编辑时）",
+          "effect": "在某天新建带日期的记录，或把记录拖到另一天（结束日期同步平移）。",
+          "persistence": "content"
         },
         {
           "action": "编辑内容或配置",
@@ -1023,7 +1079,10 @@
       ],
       "constraints": [
         "不要因排序改变或重新生成行 ID。",
-        "仅使用数字列的示例不会产生有意义的状态看板；分组需要选择列。"
+        "仅使用数字列的示例不会产生有意义的状态看板；分组需要选择列。",
+        "date 单元格只接受合法的 YYYY-MM-DD 或空字符串；calendar 引用的列必须存在且类型匹配。",
+        "搜索与筛选同样作用于日历和热力图；没有日期的记录不进入日历，会在下方提示数量。",
+        "容器宽度不足 560px 时月历和周历改为按天的日程列表；打印时附带完整日程列表。"
       ],
       "editing": {
         "data": [
@@ -1041,25 +1100,37 @@
           "purpose": "软件内置实现位置；MCP source 返回的是 SDK 包装起点，不是这份软件源码。"
         },
         {
+          "path": "src/components/blocks/DatabaseCalendar.tsx",
+          "purpose": "日历视图：月历、周列表/时间轴、热力图与记录详情。"
+        },
+        {
+          "path": "src/components/blocks/database-contract.mjs",
+          "purpose": "数据库校验与日期计算（记录展开、时间分道、热力图与连续天数），工作台、CLI 与离线阅读共用。"
+        },
+        {
           "path": "index.tsx",
           "purpose": "通过 source 视图获得的可编辑 SDK 包装入口；用 showai:components 组合已有能力。"
         }
       ],
       "architecture": [
         "DatabaseBlock 以稳定列/行 ID 组织数据；过滤、排序与看板视图使用本地阅读状态。",
-        "页面实例保存源数据；阅读状态与正式编辑回传分别维护。"
+        "页面实例保存源数据；阅读状态与正式编辑回传分别维护。",
+        "日历只接收已搜索、筛选后的行；日期按 UTC 日序号计算，今天取读者本地日期。日历列选择与模式是阅读状态，初始值来自 calendar。"
       ],
       "extensionPoints": [
-        "增加列类型需更新编辑控件、校验、排序与导出；分组依赖 select 列。"
+        "增加列类型需更新编辑控件、校验（database-contract.mjs）、排序与导出；分组依赖 select 列。",
+        "新增日历模式时在 CALENDAR_MODES 与 i18n 中登记，并保留窄屏日程列表和打印输出。"
       ],
       "invariants": [
         "保留原始输入与稳定 ID，明确区分源数据、派生值和阅读状态。",
-        "保持只读模式不写入源内容，沿用宿主的菜单与交互边界。"
+        "保持只读模式不写入源内容，沿用宿主的菜单与交互边界。",
+        "修改属性时同步清理 calendar 中失效的列引用；把列改为 date 时无法识别的旧值清空。"
       ],
       "verification": [
         "把最小示例放入真实 Page，核对内容、图像与关键交互。",
         "替换一组任务数据，核对边界、空数据、单位与派生结果。",
-        "核对编辑保存、只读阅读与离线导出；升级时保留旧版本和引用。"
+        "核对编辑保存、只读阅读与离线导出；升级时保留旧版本和引用。",
+        "日历：检查月/周/热力图、跨月翻页、今天标记、窄屏日程列表、深色主题与只读模式不写入。"
       ]
     }
   },
@@ -1160,12 +1231,17 @@
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
+      "boundaries": [
+        "可用于不同主题；公式只能使用公开的表达式语言，不能执行任意代码。",
+        "旧数据（inputs + operation）保持原有求和、乘积、平均行为。"
+      ]
     },
     "usage": {
-      "purpose": "用滑块探索求和、乘积或平均值。",
+      "purpose": "用有界输入驱动声明式公式，即时展示结果、目标差距、构成占比与加权排名。",
       "structure": [
-        "inputs 提供多个有界数值参数，operation 对全部参数执行求和、乘积或平均。"
+        "inputs 是读者可调的量；formulas 用 id 引用输入或其他公式得出派生值；outputs 决定显示哪些结果。",
+        "breakdown 把若干公式画成构成条和表；presets 是一键切换的输入组合；ranking 用权重给候选项排序。",
+        "没有 formulas、outputs 且不是只有 ranking 时，按 operation（默认 sum）对全部输入求和、乘积或平均，即旧版行为。"
       ],
       "inputs": [
         {
@@ -1173,29 +1249,49 @@
           "meaning": "组件标题；只修改本实例的文字。"
         },
         {
-          "path": "inputs",
-          "meaning": "每项提供唯一 id、label、min、max、step、value，可选 unit；min<max，step>0，value 在范围内。"
-        },
-        {
-          "path": "operation",
-          "meaning": "sum 对全部输入求和，product 求乘积，average 求算术平均。"
-        },
-        {
-          "path": "resultLabel",
-          "meaning": "结果显示名称。"
-        },
-        {
-          "path": "unit",
-          "meaning": "数据或结果的单位，说明中同时给出口径。"
-        },
-        {
           "path": "description",
-          "meaning": "说明文字，用于解释数据口径或阅读目标。"
+          "meaning": "说明文字，用于解释口径或阅读目标。"
+        },
+        {
+          "path": "inputs[]",
+          "meaning": "唯一 id、label；type 省略为 slider。slider 需要 min、max、step、value；stepper 需要 min、max、value，step 默认 1；toggle 取值 0/1，默认 0；choice 需要 2–8 个 options{label,value,note?}，value 等于其中一项，默认第一项。可选 unit、hint。"
+        },
+        {
+          "path": "operation / resultLabel / unit",
+          "meaning": "旧版字段：sum、product、average 对全部输入运算；结果名称与单位。新数据可不填。"
+        },
+        {
+          "path": "formulas[]",
+          "meaning": "id 以字母或 _ 开头，只含字母、数字、_；expr 支持数字、输入或公式 id、+ - * / ^、括号、比较 < <= > >= == !=（得 1 或 0），函数 min、max、round(x, 位数)、floor、ceil、abs、sqrt、clamp(x, 下限, 上限)、if(条件, 是, 否)。可选 label、unit、format。引用未知 id 或循环引用会被拒绝。"
+        },
+        {
+          "path": "outputs[]",
+          "meaning": "formula 引用公式或输入 id；第一项为大号主结果，其余为次要数字。可选 label、unit、hint、format，以及 target{value 数字或 id, label, above, below} 画出目标线并说明高于或低于多少。省略 outputs 时显示最后一个公式。"
+        },
+        {
+          "path": "format",
+          "meaning": "{prefix, suffix, decimals 0–6, divisor, signed}：例如 divisor 1000 加 suffix \"K\"；signed 为 true 时正数带 +。"
+        },
+        {
+          "path": "breakdown",
+          "meaning": "{title?, format?, items[{formula, label?, color?}]}：画成堆叠条与表，占比按各项绝对值之和计算，负值用斜纹表示。"
+        },
+        {
+          "path": "presets[]",
+          "meaning": "{label, values{输入 id: 值}}：值须在该输入的合法范围内；当前值与某个预设一致时该按钮高亮。"
+        },
+        {
+          "path": "ranking",
+          "meaning": "{title?, scale 默认 10, decimals?, criteria[{id,label,hint?,color?,weight 数字或输入/公式 id}], items[{id,label,note?,scores{criterion: 0..scale}}]}：得分 = Σ 权重×子分 / Σ 权重，换算到满分 100，实时排序。"
+        },
+        {
+          "path": "note",
+          "meaning": "结果下方的口径或假设说明。"
         }
       ],
       "recipes": [
         {
-          "title": "构造有效输入",
+          "title": "旧版：对输入直接运算",
           "steps": [
             "把可变参数定义为 inputs，并设定有意义的范围与步长。",
             "例如面积用长宽两个输入和 product；结果单位单独写为平方米。"
@@ -1203,35 +1299,54 @@
           "exampleIndex": 0
         },
         {
-          "title": "替换为自己的内容",
+          "title": "预算与分摊",
           "steps": [
-            "根据上述输入关系填入任务提供的内容，保留稳定标识与合法取值。",
-            "在真实页面核对结果和交互；修改现有页面时保留当前 hash/revision。"
-          ]
+            "人数用 stepper，档次用 choice（value 写单价），可选项用 toggle（0/1 乘到费用上）。",
+            "每个费用项一条公式，再用一条公式汇总；outputs 放每人与合计，breakdown 列出各费用项。"
+          ],
+          "exampleIndex": 1
+        },
+        {
+          "title": "假设推演与目标",
+          "steps": [
+            "常量写成没有引用的公式（例如 startArr = 14100），杠杆写成 slider。",
+            "主结果加 target；损失项写成负值放进 breakdown；presets 给出几组典型方案。"
+          ],
+          "exampleIndex": 2
+        },
+        {
+          "title": "加权排名",
+          "steps": [
+            "先把每个候选项各方面归一化到 0–scale 的子分写入 scores。",
+            "每个方面一个权重输入（stepper 0–5），criteria.weight 引用它；presets 提供常见偏好。"
+          ],
+          "exampleIndex": 3
         }
       ],
       "interactions": [
         {
-          "action": "阅读与探索",
-          "effect": "查看当前内容；组件提供的阅读控件改变本地阅读状态。",
+          "action": "调整输入、点击预设或重置",
+          "effect": "立即重算公式、结果、目标差距、构成与排名；排名变化时行平滑移动（遵守减少动态效果设置）。",
           "persistence": "view"
         },
         {
-          "action": "编辑内容或配置",
-          "effect": "通过宿主编辑入口修改数据与配置，并由 onChange 返回有效数据；页面保存成功后形成正式版本。",
+          "action": "编辑标题与参数",
+          "effect": "通过宿主编辑入口修改标题、参数名称、单位与范围；旧版数据还可改计算方式与结果名称。公式等其他字段原样保留，保存前整体校验。",
           "persistence": "content"
         }
       ],
       "constraints": [
-        "只支持求和、乘积、平均，不接受任意公式字符串。",
-        "滑块探索是本地阅读状态；调整初始值或参数规则通过编辑保存。"
+        "公式只能使用上述表达式语言，不接受任意代码；最多 60 条公式、每条 500 字符。",
+        "最多 30 个输入、6 个输出、12 个构成项、8 个预设、8 个排名方面与 30 个候选项。",
+        "滑动、预设与排名都是本地阅读状态，不写回页面；调整初始值或公式通过编辑数据保存。",
+        "内置编辑面板只覆盖标题和参数；公式、输出、构成、预设与排名在页面数据中修改。"
       ],
       "editing": {
         "data": [
-          "替换公开字段中的内容、数值、初始配置与受支持样式；遵守 schema 和字段关系。"
+          "替换输入、公式与文字时保持 id 稳定，公式只引用已存在的 id；保存前确认没有循环引用。"
         ],
         "implementation": [
-          "新增图形、输入结构或交互行为时读取开发说明，创建新版本并在真实 Page 验证。"
+          "新增输入类型、函数或展示形式时同步表达式解析、校验、schema 与文档，并在真实 Page 验证。"
         ]
       }
     },
@@ -1242,25 +1357,31 @@
           "purpose": "软件内置实现位置；MCP source 返回的是 SDK 包装起点，不是这份软件源码。"
         },
         {
+          "path": "src/components/blocks/playground-contract.mjs",
+          "purpose": "表达式解析与求值、公式拓扑排序、构成与排名计算、数字格式化和 validatePlaygroundData；工作台、CLI 与离线阅读器共用。"
+        },
+        {
           "path": "index.tsx",
           "purpose": "通过 source 视图获得的可编辑 SDK 包装入口；用 showai:components 组合已有能力。"
         }
       ],
       "architecture": [
-        "calculate 汇总输入数值；滑块值存于本地 values，保存参数规则通过编辑草稿与 onChange。",
-        "页面实例保存源数据；阅读状态与正式编辑回传分别维护。"
+        "表达式经分词与递归下降解析为 AST，按依赖拓扑排序后逐条求值；不使用 eval 或 Function。",
+        "读者的输入覆盖值存于本地 values，经 clampInput 约束后与公式一起求值；保存参数规则走编辑草稿与 onChange。",
+        "isLegacyPlayground 判断是否沿用旧版 operation 结果区；calculate 保留旧版运算。"
       ],
       "extensionPoints": [
-        "增加运算需同步 operation 枚举、calculate、单位说明和非有限结果处理。"
+        "新增函数需同步 FUNCTIONS 的参数个数、evaluateExpression 与文档。",
+        "新增输入类型需同步 INPUT_TYPES、validateInput、clampInput/inputDefault 与渲染。"
       ],
       "invariants": [
-        "保留原始输入与稳定 ID，明确区分源数据、派生值和阅读状态。",
-        "保持只读模式不写入源内容，沿用宿主的菜单与交互边界。"
+        "旧版数据（operation 且无 formulas）渲染与计算保持不变。",
+        "阅读时的交互不调用 onChange；编辑保存保留未覆盖的字段并整体校验。",
+        "表达式不能访问全局对象或执行代码；未知 id 与循环引用在校验时报错并给出字段路径。"
       ],
       "verification": [
-        "把最小示例放入真实 Page，核对内容、图像与关键交互。",
-        "替换一组任务数据，核对边界、空数据、单位与派生结果。",
-        "核对编辑保存、只读阅读与离线导出；升级时保留旧版本和引用。"
+        "运行 src/components/blocks/playground.test.ts，覆盖解析、校验、计算、格式化与渲染。",
+        "在真实 Page 检查旧版示例与新示例、深色主题、360px 窄屏、键盘操作（步进、开关、方向键选项）与离线导出。"
       ]
     }
   },
@@ -1569,9 +1690,10 @@
       "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
-      "purpose": "基于 React Flow 的可缩放流程图，支持节点详情、分支关系、多条流程和编辑节点。",
+      "purpose": "基于 React Flow 的可缩放流程图，支持节点详情、分支关系、多条流程和编辑节点；可选路线逐步讲解与阶段播放，按步骤高亮节点和连线。",
       "structure": [
-        "flows 保存可切换流程；每条流程内 nodes 和 edges 以稳定 ID 关联。"
+        "flows 保存可切换流程；每条流程内 nodes 和 edges 以稳定 ID 关联。",
+        "每条流程可选 journeys（路线：按步骤聚焦节点）和 stages（阶段：给节点与连线着色），两者只引用本流程的节点与连线 id。"
       ],
       "inputs": [
         {
@@ -1601,6 +1723,26 @@
         {
           "path": "flows[].nodes[].sourceSide / targetSide",
           "meaning": "连接从节点哪一边进出：top/bottom/left/right。"
+        },
+        {
+          "path": "flows[].journeys",
+          "meaning": "路线列表，最多 12 条；每条有 id、label、可选 summary 与 1–60 个 steps。"
+        },
+        {
+          "path": "flows[].journeys[].steps[]",
+          "meaning": "node 为本步聚焦的节点；edge 可选，为到达本步经过的连线（必须连接 node），省略时自动取与上一步节点相连的连线；title、text 为本步说明。"
+        },
+        {
+          "path": "flows[].stages",
+          "meaning": "阶段列表，最多 30 个；每个有 id、label、可选 summary。"
+        },
+        {
+          "path": "flows[].stages[].nodes / edges",
+          "meaning": "以节点或连线 id 为键的状态表：state 为 ok/warn/bad/idle/active；节点可带 note（显示在节点内），连线可带 label（替换该阶段的连线标签）。未列出的保持默认外观。"
+        },
+        {
+          "path": "flows[].initialJourney / initialStage",
+          "meaning": "打开时选中的路线或阶段 id。有 initialJourney 时先进入路线；否则有阶段就显示 initialStage（缺省为第一个阶段）。"
         }
       ],
       "recipes": [
@@ -1618,6 +1760,22 @@
             "根据上述输入关系填入任务提供的内容，保留稳定标识与合法取值。",
             "在真实页面核对结果和交互；修改现有页面时保留当前 hash/revision。"
           ]
+        },
+        {
+          "title": "写一条逐步讲解的路线",
+          "steps": [
+            "先建好节点和连线，再按讲解顺序列出 steps，每步写 node、title、text。",
+            "相邻两步之间有多条连线或需要跳转时，用 edge 指明本步经过的连线；需要默认打开时设置 initialJourney。"
+          ],
+          "exampleIndex": 1
+        },
+        {
+          "title": "按阶段回放状态变化",
+          "steps": [
+            "每个阶段只列出需要着色的节点和连线；用 note 写该阶段的关键数值或现象，用连线 label 写当时的调用特征。",
+            "按时间顺序排列 stages，并用 initialStage 指定最值得先看的阶段。"
+          ],
+          "exampleIndex": 2
         }
       ],
       "interactions": [
@@ -1630,11 +1788,28 @@
           "action": "编辑内容或配置",
           "effect": "通过宿主编辑入口修改数据与配置，并由 onChange 返回有效数据；页面保存成功后形成正式版本。",
           "persistence": "content"
+        },
+        {
+          "action": "选择路线并逐步播放",
+          "effect": "全景/路线切换、上一步、下一步、步骤圆点、播放/暂停、从头开始；点击路线中的节点跳到对应步骤。←/→ 键在播放控件上切换步骤。",
+          "persistence": "view"
+        },
+        {
+          "action": "切换或播放阶段",
+          "effect": "阶段标签、上一阶段、下一阶段、播放；节点与连线按状态着色，所选节点详情显示本阶段状态与备注。",
+          "persistence": "view"
+        },
+        {
+          "action": "展开全部步骤与阶段",
+          "effect": "以文字列出所有路线步骤和阶段状态；打印与导出时始终展开。",
+          "persistence": "view"
         }
       ],
       "constraints": [
         "每条流程最多 200 节点、400 边；最多 20 条流程；ID 唯一且连接不得悬空。",
-        "阅读中的缩放、锁定与节点查看不意味着已保存源码布局；编辑保存以宿主回执为准。"
+        "阅读中的缩放、锁定与节点查看不意味着已保存源码布局；编辑保存以宿主回执为准。",
+        "路线最多 12 条、每条 1–60 步；阶段最多 30 个；步骤与阶段引用的节点、连线必须存在于同一流程，step.edge 必须连接该步节点。",
+        "路线与阶段只是阅读状态，切换和播放不会修改或保存页面；initialJourney/initialStage 只决定打开时的初始画面。"
       ],
       "editing": {
         "data": [
@@ -1658,19 +1833,25 @@
       ],
       "architecture": [
         "Flowchart.tsx 使用 React Flow 呈现节点与边，flowchart-contract.mjs 校验模型并计算布局。",
-        "页面实例保存源数据；阅读状态与正式编辑回传分别维护。"
+        "页面实例保存源数据；阅读状态与正式编辑回传分别维护。",
+        "playbackView 把当前路线步骤或阶段换算成节点视图（状态、备注、当前、变暗、步骤编号）与连线视图；节点视图经 React context 传入卡片，避免播放时重置 React Flow 节点位置。",
+        "连线使用自定义 showai 边类型与本实例的箭头标记，颜色全部来自 CSS 变量，跟随深色主题。"
       ],
       "extensionPoints": [
-        "扩展节点或连线时保持 ID、端点与坐标规则；锁定画布与内部阅读交互分别验证。"
+        "扩展节点或连线时保持 ID、端点与坐标规则；锁定画布与内部阅读交互分别验证。",
+        "新增阶段状态时同时扩展 flowchart-contract.mjs 的 STAGE_STATES、i18n 的 state.* 与 CSS 色板。"
       ],
       "invariants": [
         "保留原始输入与稳定 ID，明确区分源数据、派生值和阅读状态。",
-        "保持只读模式不写入源内容，沿用宿主的菜单与交互边界。"
+        "保持只读模式不写入源内容，沿用宿主的菜单与交互边界。",
+        "路线、阶段、播放与步骤跳转均不调用 onChange；编辑节点仍保留 journeys 与 stages。",
+        "所有步骤和阶段都有可打印的文字版本；减少动态效果时连线不流动、故障节点不闪烁。"
       ],
       "verification": [
         "把最小示例放入真实 Page，核对内容、图像与关键交互。",
         "替换一组任务数据，核对边界、空数据、单位与派生结果。",
-        "核对编辑保存、只读阅读与离线导出；升级时保留旧版本和引用。"
+        "核对编辑保存、只读阅读与离线导出；升级时保留旧版本和引用。",
+        "用两个新增示例核对路线播放、节点跳转、阶段着色、窄屏控件换行、深色主题与打印文字列表。"
       ]
     }
   },
@@ -8786,6 +8967,1287 @@
       ],
       "verification": [
         "检查真实 Page、深色主题、窄屏、锁定与解锁视角、减少动态效果、打印和离线导出。"
+      ]
+    }
+  },
+  "sequence-diagram": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": [
+        "适合 2–6 个参与者、3–15 步的交互；更长的流程拆成几张图。",
+        "只表达时间顺序上的消息往来，不表达分支和循环；带分支的流程用 flowchart。",
+        "内容由实例提供；阅读操作只改变当前视图。"
+      ]
+    },
+    "usage": {
+      "purpose": "让读者一步一步看清一次操作在几个参与者之间怎样往返，每一步的解释写在 detail 中。",
+      "structure": [
+        "顶部：可选 title、description 与操作提示。",
+        "中部：参与者卡片与生命线，每一步一行：call 为实线箭头，reply 为虚线箭头，note 为跨越 from 与 to 生命线的方框；from 与 to 相同时画成回环或单列备注。",
+        "下方：上一步 / 下一步 / 播放 / 重来、进度与当前步骤的说明。",
+        "组件宽度小于 640px 或每个参与者分不到 96px 时，改为纵向步骤列表，每步显示「发起方 → 接收方」。",
+        "打印时隐藏控制按钮，所有步骤正常显示，并在图下列出全部步骤及说明。"
+      ],
+      "inputs": [
+        {
+          "path": "title",
+          "meaning": "可选：图标题。"
+        },
+        {
+          "path": "description",
+          "meaning": "可选：标题下的一句说明。"
+        },
+        {
+          "path": "actors",
+          "meaning": "参与者，从左到右排列、宽度等分；1–8 个，建议 2–6 个。"
+        },
+        {
+          "path": "actors[].id",
+          "meaning": "参与者唯一 id，steps 用它引用。"
+        },
+        {
+          "path": "actors[].label",
+          "meaning": "参与者名称，建议不超过 8 个字；放不下时截断，悬停可见全文。"
+        },
+        {
+          "path": "actors[].sub",
+          "meaning": "可选：副标题，例如具体实现或位置。"
+        },
+        {
+          "path": "actors[].icon",
+          "meaning": "可选：一个 emoji 图标。"
+        },
+        {
+          "path": "actors[].tone",
+          "meaning": "可选色调：accent | teal | orange | violet | rose | slate，默认 accent；当前步骤涉及的参与者用它高亮。"
+        },
+        {
+          "path": "steps",
+          "meaning": "按时间顺序排列的步骤，1–40 步。"
+        },
+        {
+          "path": "steps[].from / steps[].to",
+          "meaning": "发起方与接收方的参与者 id，必须存在。"
+        },
+        {
+          "path": "steps[].label",
+          "meaning": "箭头上的短标签，建议不超过 14 个字。"
+        },
+        {
+          "path": "steps[].kind",
+          "meaning": "可选：call（默认，实线）、reply（虚线返回）、note（备注框）。"
+        },
+        {
+          "path": "steps[].detail",
+          "meaning": "可选：当前步骤的说明；支持 **粗体**、`代码` 与 [链接](https://…)，换行分段。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "讲清一次多方往返",
+          "steps": [
+            "先列出参与者并按调用方向从左到右排好，发起方放最左。",
+            "每一步写一个短标签，把为什么这样做写进 detail。",
+            "返回结果用 reply，内部处理或状态说明用 note。"
+          ],
+          "exampleIndex": 1
+        }
+      ],
+      "interactions": [
+        {
+          "action": "上一步 / 下一步 / 重来",
+          "effect": "切换当前步骤，之后的步骤变淡，图下显示当前步骤说明。",
+          "persistence": "view"
+        },
+        {
+          "action": "播放 / 暂停",
+          "effect": "每 1.6 秒自动前进一步，到最后一步停止。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击箭头或列表项",
+          "effect": "跳到该步。",
+          "persistence": "view"
+        },
+        {
+          "action": "聚焦图后按方向键 / Home / End",
+          "effect": "前后切换步骤或跳到首尾。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "参与者 id 唯一；steps 的 from、to 必须引用已有参与者。",
+        "最多 8 个参与者、40 步。",
+        "阅读操作不调用 onChange。"
+      ],
+      "editing": {
+        "data": [
+          "修改实例数据后经宿主页面保存；调整参与者 id 时同步修改引用它的 steps。"
+        ],
+        "implementation": [
+          "新增步骤类型或分支表达时同步修改契约、schema、SDK 与测试。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/components/blocks/SequenceDiagram.tsx",
+          "purpose": "软件内置实现位置；source 视图返回 SDK 包装起点。"
+        },
+        {
+          "path": "src/components/blocks/doc-diagrams-contract.mjs",
+          "purpose": "与 layer-diagram 共用的数据校验和行内标记解析。"
+        },
+        {
+          "path": "index.tsx",
+          "purpose": "可编辑 SDK 包装入口，通过 showai:components 组合已有能力。"
+        }
+      ],
+      "architecture": [
+        "宽屏用 SVG 绘制：列宽按参与者等分，每步一行，标签按实测宽度截断；窄屏改为 HTML 有序列表。",
+        "打印用一份始终渲染、屏幕上隐藏的静态步骤列表。"
+      ],
+      "extensionPoints": ["新增步骤类型时在宽屏、列表与静态列表三处同时呈现。"],
+      "invariants": [
+        "当前步骤、播放状态只保存在组件本地，不调用 onChange。",
+        "说明文字解析为 React 元素，从不注入 HTML。"
+      ],
+      "verification": [
+        "检查真实 Page、深色主题、360px 宽度、键盘操作、打印与离线导出。"
+      ]
+    }
+  },
+  "layer-diagram": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": [
+        "适合 2–6 层、每层 1–8 个模块的分层结构；层与层之间默认是自上而下的依赖关系。",
+        "模块之间的具体连线请用 flowchart。",
+        "内容由实例提供；阅读操作只改变当前视图。"
+      ]
+    },
+    "usage": {
+      "purpose": "用一张分层图说明架构，模块的职责和位置放进 detail / path，读者点选后查看。",
+      "structure": [
+        "顶部：可选 title、caption 与操作提示。",
+        "中部：自上而下的分层，层与层之间有向下的细箭头；每层左侧是序号、名称和说明，右侧是模块标签。",
+        "下方：所选模块的说明面板（所属层 / 模块名、路径、说明）。",
+        "组件宽度不超过 640px 时，每层名称在上、模块标签在下。",
+        "打印时隐藏说明面板，改为列出每层全部模块的路径与说明。"
+      ],
+      "inputs": [
+        {
+          "path": "title",
+          "meaning": "可选：图标题。"
+        },
+        {
+          "path": "caption",
+          "meaning": "可选：图上方的一句说明，支持行内标记。"
+        },
+        {
+          "path": "layers",
+          "meaning": "分层，自上而下排列（通常从入口到存储），1–8 层。"
+        },
+        {
+          "path": "layers[].id",
+          "meaning": "层的唯一 id。"
+        },
+        {
+          "path": "layers[].name",
+          "meaning": "层名称，建议 2–6 个字。"
+        },
+        {
+          "path": "layers[].sub",
+          "meaning": "可选：层的一句说明，显示在名称下方。"
+        },
+        {
+          "path": "layers[].tone",
+          "meaning": "可选色调：accent | teal | orange | violet | rose | slate；省略时按层顺序依次取 accent、teal、violet、orange、rose、slate。"
+        },
+        {
+          "path": "layers[].modules",
+          "meaning": "该层的模块，0–12 个；为空时显示「暂无模块」。"
+        },
+        {
+          "path": "layers[].modules[].id",
+          "meaning": "模块 id，在整张图内唯一。"
+        },
+        {
+          "path": "layers[].modules[].name",
+          "meaning": "模块名称，建议不超过 10 个字。"
+        },
+        {
+          "path": "layers[].modules[].path",
+          "meaning": "可选：源码路径、目录或其他位置，以等宽字体显示。"
+        },
+        {
+          "path": "layers[].modules[].detail",
+          "meaning": "可选：模块职责；支持 **粗体**、`代码` 与 [链接](https://…)，换行分段。"
+        },
+        {
+          "path": "initial",
+          "meaning": "可选：初始选中的模块 id，必须存在；省略时说明面板显示提示。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "画一张架构分层图",
+          "steps": [
+            "从用户入口到存储自上而下列出层。",
+            "每层只列读者需要知道的模块，写一句职责并核对路径。",
+            "用 initial 选中正文重点讲的模块。"
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击模块标签或用 Tab / Enter 选择",
+          "effect": "选中模块，在下方显示说明和路径；再次点击取消。",
+          "persistence": "view"
+        },
+        {
+          "action": "左右方向键 / 上下方向键",
+          "effect": "在同一层的模块间移动 / 跨层移动；Escape 取消选择。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "层 id 唯一；模块 id 在整张图内唯一；initial 必须引用已有模块。",
+        "最多 8 层、每层 12 个模块。",
+        "阅读操作不调用 onChange。"
+      ],
+      "editing": {
+        "data": [
+          "修改实例数据后经宿主页面保存；修改模块 id 时同步检查 initial。"
+        ],
+        "implementation": [
+          "需要横向分栏或层间具体连线时同步修改契约、schema、SDK 与测试。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/components/blocks/LayerDiagram.tsx",
+          "purpose": "软件内置实现位置；source 视图返回 SDK 包装起点。"
+        },
+        {
+          "path": "src/components/blocks/doc-diagrams-contract.mjs",
+          "purpose": "与 sequence-diagram 共用的数据校验和行内标记解析。"
+        },
+        {
+          "path": "index.tsx",
+          "purpose": "可编辑 SDK 包装入口，通过 showai:components 组合已有能力。"
+        }
+      ],
+      "architecture": [
+        "纯 HTML / CSS 布局：每层是两栏网格，按容器宽度变为单栏；层间连接线是装饰性 SVG。"
+      ],
+      "extensionPoints": ["新增模块字段时在说明面板与打印列表中同时呈现。"],
+      "invariants": [
+        "选择只保存在组件本地，不调用 onChange。",
+        "说明文字解析为 React 元素，从不注入 HTML。"
+      ],
+      "verification": [
+        "检查真实 Page、深色主题、360px 宽度、键盘操作、打印与离线导出。"
+      ]
+    }
+  },
+  "step-guide": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": [
+        "用于需要按顺序执行的操作；无顺序的要点用正文列表，有分支的流程用流程图。",
+        "代码只展示和复制，不执行；勾选完成和计时只改变当前视图，不写回数据。"
+      ]
+    },
+    "usage": {
+      "purpose": "让读者按顺序完成一项操作，随时知道做到哪一步、每一步该看到什么、还要等多久。",
+      "structure": [
+        "list 布局：左侧编号竖轴，所有步骤同时可见；点击编号标记完成。",
+        "focus 布局：一次显示一张步骤卡，计时器以圆环显示在右侧，底部有上一步、下一步与步骤圆点；方向键也可切换。",
+        "每步：标题、说明、代码面板（语言标签或平台标签页 + 复制）、确认信号 cue、等待提示 wait、提示 note、完成结果 result、可选倒计时 timer。",
+        "任一步骤带 segments 时，顶部显示时间线：每行一个步骤，动手段为实色，等待段为斜纹，点击行跳到该步骤。"
+      ],
+      "inputs": [
+        {
+          "path": "title",
+          "meaning": "可选：组件标题。"
+        },
+        {
+          "path": "description",
+          "meaning": "可选：标题下的一句说明，支持行内标记。"
+        },
+        {
+          "path": "layout",
+          "meaning": "list（默认，全部可见）或 focus（一次一步）。步骤长、需要计时或边做边看时用 focus。"
+        },
+        {
+          "path": "start",
+          "meaning": "可选：第一步的编号，默认 1；接续前一组步骤时使用。"
+        },
+        {
+          "path": "initialStep",
+          "meaning": "可选：focus 布局初始显示的步骤下标，从 0 开始。"
+        },
+        {
+          "path": "steps",
+          "meaning": "按顺序执行的步骤，1–40 步；每组建议不超过 8 步。"
+        },
+        {
+          "path": "steps[].id",
+          "meaning": "可选：稳定 ID，整组内唯一；有计时器时建议填写，以便数据更新后保留计时。"
+        },
+        {
+          "path": "steps[].title",
+          "meaning": "步骤标题，写成动作。支持行内标记。"
+        },
+        {
+          "path": "steps[].short",
+          "meaning": "可选：时间线与计时托盘中的短名，省略时使用标题。"
+        },
+        {
+          "path": "steps[].badge",
+          "meaning": "可选：标题旁的小标签，例如火候、所需权限或环境。"
+        },
+        {
+          "path": "steps[].body",
+          "meaning": "说明，按换行分段。行内标记：**粗体**、`代码`、[文字](https://…)。"
+        },
+        {
+          "path": "steps[].code",
+          "meaning": "单段代码；以 # 或 // 开头的行显示为注释色。不能与 variants 同时使用。"
+        },
+        {
+          "path": "steps[].lang",
+          "meaning": "可选：代码面板左上角的语言标签，省略时显示「代码」。"
+        },
+        {
+          "path": "steps[].variants",
+          "meaning": "按平台或宿主切换的代码，1–6 个，标签在步骤内唯一；每项 label、code、可选 lang。"
+        },
+        {
+          "path": "steps[].cue",
+          "meaning": "可选：判断这一步完成的信号（看到什么就对了）。"
+        },
+        {
+          "path": "steps[].wait",
+          "meaning": "可选：等待期间可以做的事。"
+        },
+        {
+          "path": "steps[].note",
+          "meaning": "可选：补充提示，灰色显示。"
+        },
+        {
+          "path": "steps[].result",
+          "meaning": "可选：完成后应看到的结果，带勾显示。"
+        },
+        {
+          "path": "steps[].timer",
+          "meaning": "可选：倒计时 minutes（0–1440，可为小数）与 label。"
+        },
+        {
+          "path": "steps[].segments",
+          "meaning": "可选：时间线片段 start（从流程开始算的分钟）、minutes 与 kind（active 动手 / wait 等待），每步最多 8 段。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "安装或配置说明",
+          "steps": [
+            "用 list 布局，每步一个动作；按平台不同的命令放进 variants。",
+            "给关键步骤写 result，让读者能自查。"
+          ],
+          "exampleIndex": 0
+        },
+        {
+          "title": "有等待时间的流程",
+          "steps": [
+            "用 focus 布局，为需要等待的步骤填写 timer 与 wait。",
+            "按实际时间顺序填写 segments，并行的等待与动手可以重叠。"
+          ],
+          "exampleIndex": 1
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击步骤编号",
+          "effect": "标记或取消完成，竖轴与进度随之更新。",
+          "persistence": "view"
+        },
+        {
+          "action": "切换代码标签页、点击复制",
+          "effect": "显示对应平台的代码；复制失败时自动选中代码供手动复制。",
+          "persistence": "view"
+        },
+        {
+          "action": "开始、暂停、继续、重置计时",
+          "effect": "倒计时在切换步骤后继续，托盘显示其余计时；到时以颜色、文字和读屏提示。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击时间线行、步骤圆点或上一步/下一步",
+          "effect": "focus 布局切换步骤；list 布局滚动到该步骤。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "最多 40 步、每步 6 个代码变体、8 个时间段；步骤 id 与同一步内的变体标签唯一。",
+        "code 与 variants 只能二选一。",
+        "完成标记与计时不保存；刷新后重置。",
+        "宽度不足 640px 时编号缩小、步骤卡单列、时间线标签变窄。"
+      ],
+      "editing": {
+        "data": ["修改实例数据后经宿主页面保存。"],
+        "implementation": [
+          "新增表达或交互需要同步数据约定、schema、SDK 与 doc-reference-contract 的校验。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/components/blocks/StepGuide.tsx",
+          "purpose": "软件内置实现位置；source 视图返回 SDK 包装起点。"
+        },
+        {
+          "path": "src/components/blocks/doc-reference-contract.mjs",
+          "purpose": "与 command-reference 共用的校验、行内标记与时间线计算。"
+        },
+        {
+          "path": "index.tsx",
+          "purpose": "可编辑 SDK 包装入口，通过 showai:components 组合已有能力。"
+        }
+      ],
+      "architecture": [
+        "完成标记、计时器与当前步骤都是组件内状态，按 step.id（缺省时按下标）索引。",
+        "计时器保存剩余毫秒或结束时间戳，有计时运行时每 250ms 刷新一次。",
+        "CodePanel 与 Inline 同时供 command-reference 使用；所有代码变体都留在文档中，未选中的以 hidden 隐藏，打印时显示。"
+      ],
+      "extensionPoints": ["新增步骤字段时同步 StepDetails 与打印列表。"],
+      "invariants": [
+        "勾选、计时、切换步骤和复制均不调用 onChange。",
+        "打印与静态阅读列出全部步骤和全部代码变体。"
+      ],
+      "verification": [
+        "检查真实 Page、深色主题、360px 窄屏、键盘操作、减少动态效果、打印与离线导出。"
+      ]
+    }
+  },
+  "command-reference": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": [
+        "用于查找型的命令或接口参考；需要按顺序执行的操作用 step-guide。",
+        "示例只展示和复制，不执行；搜索、筛选与展开只改变当前视图。"
+      ]
+    },
+    "usage": {
+      "purpose": "让读者按名称、用途或参数快速找到命令，并在同一处看到说明、参数和可复制的示例。",
+      "structure": [
+        "顶部搜索框与分组筛选按钮；下方按分组列出命令，每条显示命令行和一句说明。",
+        "有 detail、params 或 examples 的条目可以展开；展开后显示说明段落（空行分段，「- 」开头的行成为列表）、参数表和示例代码。"
+      ],
+      "inputs": [
+        {
+          "path": "title",
+          "meaning": "可选：组件标题。"
+        },
+        {
+          "path": "description",
+          "meaning": "可选：标题下的一句说明，支持行内标记。"
+        },
+        {
+          "path": "placeholder",
+          "meaning": "可选：搜索框提示文字，省略时使用界面默认文字。"
+        },
+        {
+          "path": "program",
+          "meaning": "可选：命令前缀（单个词，如 git）；命令行首个词与之相同时淡化显示。"
+        },
+        {
+          "path": "groups",
+          "meaning": "分组 id 与 label，1–16 个，id 唯一；顺序即显示顺序。"
+        },
+        {
+          "path": "commands",
+          "meaning": "命令列表，1–300 条。"
+        },
+        {
+          "path": "commands[].group",
+          "meaning": "所属分组 id，必须存在于 groups。"
+        },
+        {
+          "path": "commands[].command",
+          "meaning": "命令行。大写词或 <x>、[x] 显示为占位符，-x / --x 显示为参数。"
+        },
+        {
+          "path": "commands[].summary",
+          "meaning": "一句用途说明，支持行内标记。"
+        },
+        {
+          "path": "commands[].detail",
+          "meaning": "可选：展开后的详细说明。"
+        },
+        {
+          "path": "commands[].params",
+          "meaning": "可选：参数表 name 与 meaning，名称在同一命令内唯一，最多 40 个。"
+        },
+        {
+          "path": "commands[].examples",
+          "meaning": "可选：1–6 个示例，code 与可选 label；多个示例以标签页切换。"
+        },
+        {
+          "path": "commands[].id",
+          "meaning": "可选：稳定 ID，全组件唯一；用于在数据更新后保持展开状态。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "整理 CLI 参考",
+          "steps": [
+            "按读者任务而不是按字母分组；每组 3–12 条。",
+            "summary 写用途，参数细节放进 params，常用写法放进 examples。"
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "输入关键词",
+          "effect": "按全部关键词筛选并高亮；Esc 清除，↓ 进入结果列表，↑/↓ 在条目间移动。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击分组按钮",
+          "effect": "只显示该分组；再次点击回到全部。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击条目",
+          "effect": "展开或收起说明、参数表与示例。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击复制",
+          "effect": "复制当前示例；失败时选中代码供手动复制。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "最多 16 个分组、300 条命令、每条 40 个参数与 6 个示例。",
+        "命令的 group 必须指向已定义的分组。",
+        "宽度不足 640px 时参数表改为上下排列。"
+      ],
+      "editing": {
+        "data": ["修改实例数据后经宿主页面保存。"],
+        "implementation": [
+          "新增表达或交互需要同步数据约定、schema、SDK 与 doc-reference-contract 的校验。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/components/blocks/CommandReference.tsx",
+          "purpose": "软件内置实现位置；source 视图返回 SDK 包装起点。"
+        },
+        {
+          "path": "src/components/blocks/doc-reference-contract.mjs",
+          "purpose": "校验、搜索匹配与高亮区间计算，与 step-guide 共用。"
+        },
+        {
+          "path": "index.tsx",
+          "purpose": "可编辑 SDK 包装入口，通过 showai:components 组合已有能力。"
+        }
+      ],
+      "architecture": [
+        "搜索词经 useDeferredValue 延迟，按空白拆成小写关键词，每个都需命中。",
+        "示例代码复用 StepGuide 导出的 CodePanel，行内标记复用 Inline。",
+        "收起的详情与总览中被折叠的命令仍在文档中，以 hidden 隐藏，打印时显示。"
+      ],
+      "extensionPoints": [
+        "命令行着色规则集中在 CommandLine；新增字段时同步搜索范围与打印。"
+      ],
+      "invariants": ["搜索、筛选、展开与复制均不调用 onChange。"],
+      "verification": [
+        "检查真实 Page、深色主题、360px 窄屏、键盘操作、打印与离线导出。"
+      ]
+    }
+  },
+  "structure-browser": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": [
+        "内容由实例提供；展开、选中与复制只改变当前视图，不修改页面数据。",
+        "建议总项数不超过 60、层级不超过 6 层；更大的结构拆成几个树，或只展示读者需要的部分。"
+      ]
+    },
+    "usage": {
+      "purpose": "让读者在层级结构中边看边查：左侧看到整体形状，选中任一项在右侧读到它是什么、类型是什么、怎么写。",
+      "structure": [
+        "nodes 是顶层节点，children 嵌套子节点；路径由各级 name 用 / 连接（去掉结尾的 /）。",
+        "kind 决定图标与种类文字：dir、file、object、array、field；省略时有 children 视为 dir，否则 file。"
+      ],
+      "inputs": [
+        {
+          "path": "title",
+          "meaning": "可选：标题，显示在树上方，也作为无障碍名称。"
+        },
+        {
+          "path": "nodes[].name",
+          "meaning": "节点名称：文件名、文件夹名（可带结尾的 /）或字段名；同一父节点下必须唯一，中间不能含 /。"
+        },
+        {
+          "path": "nodes[].kind",
+          "meaning": "可选：dir / file / object / array / field。"
+        },
+        {
+          "path": "nodes[].type",
+          "meaning": "可选：类型或格式，以等宽字体显示，例如 string、\"a\" | \"b\"、JSON。"
+        },
+        {
+          "path": "nodes[].badge",
+          "meaning": "可选：不超过 16 字的徽标，例如 必填、可选、入口。"
+        },
+        {
+          "path": "nodes[].summary",
+          "meaning": "可选：一句话说明，显示在详情顶部、父节点的子项列表和打印大纲中。"
+        },
+        {
+          "path": "nodes[].detail",
+          "meaning": "可选：更多说明；支持 **粗体**、`代码`、[链接](https://…)，空行分段，每行以 - 开头的段落成为列表。"
+        },
+        {
+          "path": "nodes[].example",
+          "meaning": "可选：示例代码，原样显示在带复制按钮的面板中；exampleLang 是左上角的语言标签。"
+        },
+        {
+          "path": "nodes[].open",
+          "meaning": "可选：初始是否展开有子节点的项。"
+        },
+        {
+          "path": "initial",
+          "meaning": "可选：初始选中项的路径，例如 data/status；该项及祖先自动展开。省略时选中第一个顶层节点。"
+        },
+        {
+          "path": "caption",
+          "meaning": "可选：树下方的一行说明，支持行内标记。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "讲解一份 JSON 结构",
+          "steps": [
+            "只保留读者需要理解的字段；对象用 object，数组用 array，叶子用 field，type 写类型或可选值。",
+            "必填 / 可选写在 badge，每项写一句 summary，复杂字段补 detail 和 example。",
+            "把最值得先看的字段路径写进 initial。"
+          ],
+          "exampleIndex": 0
+        },
+        {
+          "title": "说明一个文件夹布局",
+          "steps": [
+            "文件夹用 dir（名称可带结尾的 /），文件用 file，type 写格式。",
+            "需要读者先看到内容的文件夹设 open: true。"
+          ],
+          "exampleIndex": 2
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击树中的项",
+          "effect": "选中并在右侧显示说明；点击收起的文件夹或对象同时展开，再次点击已选中的项收起。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击折叠箭头",
+          "effect": "只展开或收起，不改变选中项。",
+          "persistence": "view"
+        },
+        {
+          "action": "键盘 ↑ ↓ Home End",
+          "effect": "在可见项之间移动选中，焦点跟随。",
+          "persistence": "view"
+        },
+        {
+          "action": "键盘 → / ←",
+          "effect": "展开或进入第一个子项 / 收起或回到父项。",
+          "persistence": "view"
+        },
+        {
+          "action": "键盘 Enter 或空格",
+          "effect": "展开或收起当前项。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击路径中的祖先或子项列表中的项",
+          "effect": "选中该项并展开其祖先。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击复制",
+          "effect": "复制示例；剪贴板不可用时选中代码并提示按 ⌘C / Ctrl+C。",
+          "persistence": "none"
+        }
+      ],
+      "constraints": [
+        "同一父节点下名称唯一；initial 必须指向存在的路径。",
+        "顶层与每层最多 60 项，全树最多 400 项、8 层。",
+        "链接只允许 http(s)、mailto、# 锚点和相对路径。",
+        "宽度不足 640px 时详情移到树下方；打印时显示完整展开的大纲。"
+      ],
+      "editing": {
+        "data": ["增删节点只需修改 nodes / children；改名后同步更新 initial。"],
+        "implementation": [
+          "新增节点种类需要同步约定、图标、种类文字与 schema。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/components/blocks/StructureBrowser.tsx",
+          "purpose": "软件内置实现位置；source 视图返回 SDK 包装起点。"
+        },
+        {
+          "path": "src/components/blocks/doc-browse-contract.mjs",
+          "purpose": "共享校验、路径索引 structureOutline 与行内标记解析。"
+        },
+        {
+          "path": "index.tsx",
+          "purpose": "可编辑 SDK 包装入口，通过 showai:components 组合已有能力。"
+        }
+      ],
+      "architecture": [
+        "structureOutline 把嵌套节点展开为以路径为键的 Map，记录深度、父路径、种类与子项；可见列表由展开集合计算。",
+        "树采用 WAI-ARIA tree 模式：role=tree / treeitem、aria-level、aria-expanded、aria-selected，选中项是唯一的 Tab 停留点。",
+        "行内标记由 parseInline 解析为片段再生成 React 元素，不使用 HTML 字符串。"
+      ],
+      "extensionPoints": [
+        "种类图标在 KindIcon 中绘制；新增视图时保留打印大纲。"
+      ],
+      "invariants": [
+        "组件不调用 onChange；展开、选中与复制只改变本地状态。",
+        "不安全的链接在校验时拒绝，渲染时也只作为文字显示。"
+      ],
+      "verification": [
+        "键盘：↓ 移到下一项，→ 展开，← 回到父项，Enter 收起；Tab 只停在选中项上。",
+        "检查真实 Page、深色主题、360px 窄屏、打印与离线导出。"
+      ]
+    }
+  },
+  "card-grid": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": [
+        "内容由实例提供；卡片只做导航与概览，不保存状态。",
+        "每组最多 24 张；更长的目录用列表或数据库。"
+      ]
+    },
+    "usage": {
+      "purpose": "用一组并列卡片给出入口或分类：读者扫一眼标题和一句话说明，就能选择下一步。",
+      "structure": [
+        "cards 按顺序排成网格（variant tile）或紧凑列表（variant row）；columns 控制列数。"
+      ],
+      "inputs": [
+        {
+          "path": "title",
+          "meaning": "可选：标题，显示在卡片上方，也作为无障碍名称。"
+        },
+        {
+          "path": "variant",
+          "meaning": "可选：tile 网格卡片（默认）或 row 紧凑列表。"
+        },
+        {
+          "path": "columns",
+          "meaning": "可选：1–4 列；省略时 tile 按卡片数取 1–3 列（4 张取 2 列），row 超过 3 张取 2 列。"
+        },
+        {
+          "path": "cards[].title",
+          "meaning": "卡片标题。"
+        },
+        {
+          "path": "cards[].body",
+          "meaning": "一句话说明，支持 **粗体** 和 `代码`；没有 href 的卡片也可以写 [链接](https://…)。"
+        },
+        {
+          "path": "cards[].icon",
+          "meaning": "可选：一个 emoji 或短符号。"
+        },
+        {
+          "path": "cards[].tag",
+          "meaning": "可选：不超过 16 字的标签。"
+        },
+        {
+          "path": "cards[].tone",
+          "meaning": "可选：brand / teal / warm / violet / rose / slate，决定图标底色、标签和悬停颜色。"
+        },
+        {
+          "path": "cards[].href",
+          "meaning": "可选：整张卡片的链接；只允许 http(s)、mailto、# 锚点和相对路径，http(s) 在新标签页打开。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "文档首页的起步路线",
+          "steps": [
+            "每种读者情况一张卡片，标题写读者的目标，body 写一句做什么。",
+            "每张卡片链接到对应章节，最推荐的一张加 tag。"
+          ],
+          "exampleIndex": 0
+        },
+        {
+          "title": "章节末尾的后续阅读",
+          "steps": [
+            "用 variant row，3–5 条即可。",
+            "卡片 body 写读者能在链接里找到什么。"
+          ],
+          "exampleIndex": 1
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击有 href 的卡片",
+          "effect": "打开链接；http(s) 在新标签页打开并标注给读屏软件。",
+          "persistence": "none"
+        },
+        {
+          "action": "悬停或键盘聚焦有链接的卡片",
+          "effect": "边框按色调高亮，显示箭头。",
+          "persistence": "none"
+        }
+      ],
+      "constraints": [
+        "最多 24 张卡片；标题 80 字、说明 400 字以内。",
+        "有 href 的卡片 body 中不能再有链接。",
+        "宽度不足 820px 时 4 列变 2 列，不足 560px 时变 1 列。"
+      ],
+      "editing": {
+        "data": ["修改实例数据后经宿主页面保存。"],
+        "implementation": ["新增色调需要同步约定、样式与 schema。"]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/components/blocks/CardGrid.tsx",
+          "purpose": "软件内置实现位置；source 视图返回 SDK 包装起点。"
+        },
+        {
+          "path": "src/components/blocks/doc-browse-contract.mjs",
+          "purpose": "共享校验、链接安全检查与默认列数。"
+        },
+        {
+          "path": "index.tsx",
+          "purpose": "可编辑 SDK 包装入口，通过 showai:components 组合已有能力。"
+        }
+      ],
+      "architecture": [
+        "卡片是 ul / li；有安全链接时整张卡片是一个 a 元素，否则是 div。",
+        "行内标记与结构浏览器共用 parseInline 与 InlineText。"
+      ],
+      "extensionPoints": ["新增排列方式时保留窄屏单列与打印链接地址。"],
+      "invariants": [
+        "组件不调用 onChange。",
+        "不安全的链接在校验时拒绝，渲染时也不会成为链接。"
+      ],
+      "verification": [
+        "检查真实 Page、深色主题、360px 窄屏、键盘 Tab 聚焦和打印。"
+      ]
+    }
+  },
+  "roadmap": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": [
+        "内容由实例提供；分组、筛选与选择只改变当前视图，不修改计划。",
+        "用于阅读计划；需要拖拽排期、编辑任务的项目甘特图请使用 task-gantt 组件包。"
+      ]
+    },
+    "usage": {
+      "purpose": "把以天或周计的计划按日期排开，读者能看出谁在做什么、先后依赖、今天在哪、离截止还有多远。",
+      "structure": [
+        "lanes 是工作流，items 是任务；item.lane 引用 lanes，item.owner 引用 owners，item.status 引用 statuses（省略时使用默认的已完成、进行中、未开始、受阻）。",
+        "depends 列出必须先完成的任务 id；组件反向推出“完成后可以开始”的任务。",
+        "start/end 省略时按任务、里程碑与截止日期自动取范围。"
+      ],
+      "inputs": [
+        {
+          "path": "start / end",
+          "meaning": "可选：时间轴范围，YYYY-MM-DD；所有任务、里程碑与截止日期须在范围内，最长 400 天。"
+        },
+        {
+          "path": "today",
+          "meaning": "可选：今天的日期；在范围内时画出今天线并给之前的日期加底纹。"
+        },
+        {
+          "path": "deadline",
+          "meaning": "可选：截止日期 date 与标签 label，画在当天结束处。"
+        },
+        {
+          "path": "groupBy",
+          "meaning": "可选：初始分组 lane 或 owner，默认 lane。"
+        },
+        {
+          "path": "owners",
+          "meaning": "可选：负责人 id、label 与可选 color（六位十六进制）；未给颜色时按顺序取默认色。"
+        },
+        {
+          "path": "lanes",
+          "meaning": "工作流 id、label 与可选 summary。"
+        },
+        {
+          "path": "statuses",
+          "meaning": "可选：状态 id、label 与 tone（done/active/todo/blocked 决定外观）。"
+        },
+        {
+          "path": "items",
+          "meaning": "任务：id、lane、title、start、end、status，可选 owner、progress（0–1，进行中时显示已完成部分）、detail、doneWhen、basis、depends、tags。"
+        },
+        {
+          "path": "milestones",
+          "meaning": "可选：里程碑 date 与 label。"
+        },
+        {
+          "path": "initialItem",
+          "meaning": "可选：初始选中的任务 id；省略时选中第一个进行中的任务。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "从开发计划填入",
+          "steps": [
+            "先定工作流与负责人，再按任务写日期、状态和完成标准。",
+            "只为真正的先后约束写 depends，避免环。",
+            "在真实 Page、窄屏和打印中检查标签与里程碑是否拥挤。"
+          ],
+          "exampleIndex": 0
+        },
+        {
+          "title": "截止前的冲刺",
+          "steps": [
+            "把一周拆成按天的任务，用 today 和 deadline 标出现在与截止。",
+            "tags 写对应的意见或需求编号，让读者从任务追到来源。"
+          ],
+          "exampleIndex": 1
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击任务条",
+          "effect": "在详情区显示说明、完成标准、依据、依赖与解锁的任务，相连任务被描边突出；再次点击或按 Escape 取消。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击详情中的依赖或解锁任务",
+          "effect": "切换到该任务。",
+          "persistence": "view"
+        },
+        {
+          "action": "切换分组",
+          "effect": "按工作流或负责人重新分组。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击负责人",
+          "effect": "突出该负责人的任务，其他任务变淡。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "日期写作 YYYY-MM-DD，end 不早于 start；任务 id 唯一，depends 必须指向已有任务且不能成环。",
+        "最多 12 个工作流、8 位负责人、6 种状态、80 个任务、12 个里程碑。",
+        "宽度不足 640px 时隐藏左侧标签列，时间轴可横向滚动；全部任务可在下方列表阅读，打印时自动展开。"
+      ],
+      "editing": {
+        "data": ["修改实例数据后经宿主页面保存。"],
+        "implementation": [
+          "新增字段或交互需要同步 plan-contract、schema、SDK 与验证。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/components/blocks/Roadmap.tsx",
+          "purpose": "软件内置实现位置；source 视图返回 SDK 包装起点。"
+        },
+        {
+          "path": "src/components/blocks/plan-contract.mjs",
+          "purpose": "roadmap 与 waterfall 共用的数据校验与日期、工作量计算。"
+        },
+        {
+          "path": "index.tsx",
+          "purpose": "可编辑 SDK 包装入口，通过 showai:components 组合已有能力。"
+        }
+      ],
+      "architecture": [
+        "日期换算为 UTC 日序号，按百分比定位任务条；标签列宽度固定，窄屏时隐藏并允许横向滚动。",
+        "工作量按负责人汇总排期天数，未完成部分按 progress 折算为待做天数。"
+      ],
+      "extensionPoints": ["新增视图时保留静态列表与打印展开。"],
+      "invariants": [
+        "分组、筛选与选择均不调用 onChange。",
+        "所有界面文字经 i18n，实例内容来自数据。"
+      ],
+      "verification": [
+        "检查真实 Page、深色主题、360px 窄屏、键盘操作（Tab、Enter、Escape）、打印和离线导出。"
+      ]
+    }
+  },
+  "waterfall": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": ["内容由实例提供；选择柱子只改变当前视图。"]
+    },
+    "usage": {
+      "purpose": "说明一个数值如何从期初走到期末：每一步增加或减少多少、各自由什么构成。",
+      "structure": [
+        "steps 按顺序排列；kind 为 total（合计，从零起）、up（增加）或 down（减少），value 是正的幅度。",
+        "第一步之后的 total 会与前面累计值核对，相差超过显示精度的一半时在图下提示。",
+        "breakdown.items 是该步的构成，占比按各项之和计算；各项之和与该步不一致时在侧栏注明差额。"
+      ],
+      "inputs": [
+        {
+          "path": "eyebrow / title / narrative",
+          "meaning": "可选：上方的小字背景、标题与一句话结论。"
+        },
+        {
+          "path": "headlines",
+          "meaning": "可选：最多 5 个关键数字 label、value（已格式化文本）、detail 与 tone（up/down/neutral）。"
+        },
+        {
+          "path": "steps",
+          "meaning": "2–16 步：id、label、kind、value，可选 breakdown {title, items[{label, value}], note}。"
+        },
+        {
+          "path": "format",
+          "meaning": "可选：数值显示方式 prefix、suffix、divisor（显示前先除以它）与 decimals（0–4）。"
+        },
+        {
+          "path": "axisFloor",
+          "meaning": "可选：纵轴起点；可以截掉合计柱的底部，但不能高于任何变动柱的下沿。"
+        },
+        {
+          "path": "axisNote",
+          "meaning": "可选：图下的单位与坐标说明；省略且纵轴不从零起时自动说明起点。"
+        },
+        {
+          "path": "upIsGood",
+          "meaning": "可选：默认 true；耗时、成本等越低越好的指标设为 false，增加显示为不利色。"
+        },
+        {
+          "path": "initialStep",
+          "meaning": "可选：初始选中的步骤 id；省略时选中第二步。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "财务期间变动",
+          "steps": [
+            "期初与期末用 total，中间按新增、扩展、降级、流失等写 up/down。",
+            "用 format 统一单位，用 axisFloor 放大变动。"
+          ],
+          "exampleIndex": 0
+        },
+        {
+          "title": "性能或成本拆解",
+          "steps": [
+            "设置 upIsGood 为 false，让变慢或变贵显示为不利色。",
+            "每项优化写 breakdown，说明具体来源。"
+          ],
+          "exampleIndex": 1
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击柱子或按 Enter",
+          "effect": "侧栏显示该步的构成、占比与说明。",
+          "persistence": "view"
+        },
+        {
+          "action": "左右方向键",
+          "effect": "在柱子之间移动并选中。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "step id 唯一，up/down 的 value 不能为负；最多 16 步、每步 12 项构成、5 个关键数字。",
+        "宽度不足 760px 时侧栏移到图下方；柱子过多时图表横向滚动；全部步骤可在表格中阅读，打印时自动展开。"
+      ],
+      "editing": {
+        "data": ["修改实例数据后经宿主页面保存。"],
+        "implementation": [
+          "新增字段或交互需要同步 plan-contract、schema、SDK 与验证。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/components/blocks/Waterfall.tsx",
+          "purpose": "软件内置实现位置；source 视图返回 SDK 包装起点。"
+        },
+        {
+          "path": "src/components/blocks/plan-contract.mjs",
+          "purpose": "waterfall 与 roadmap 共用的数据校验，以及累计值与不一致检查。"
+        },
+        {
+          "path": "index.tsx",
+          "purpose": "可编辑 SDK 包装入口，通过 showai:components 组合已有能力。"
+        }
+      ],
+      "architecture": [
+        "waterfallBridge 计算每步的上下沿与累计值；SVG 按实际像素宽度绘制，步骤标签用 HTML 叠加以便换行。"
+      ],
+      "extensionPoints": ["新增视图时保留表格阅读与打印展开。"],
+      "invariants": [
+        "选择不调用 onChange。",
+        "所有界面文字经 i18n，实例内容来自数据。"
+      ],
+      "verification": [
+        "检查真实 Page、深色主题、360px 窄屏、键盘操作（Tab、方向键、Enter）、打印和离线导出。"
+      ]
+    }
+  },
+  "event-timeline": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": ["内容由实例提供；拖动、点击与键盘浏览只改变当前视图。"]
+    },
+    "usage": {
+      "purpose": "沿一条时间轴对照指标曲线、阶段与事件，回答“什么时候发生了什么、指标怎样随之变化”。",
+      "structure": [
+        "axis 决定点的标签：number 显示 prefix+数值+unit，clock 从 HH:MM 起每点加 step 分钟，date 从 YYYY-MM-DD 起每点加 step 天。",
+        "所有位置（events[].at、phases[].from/to、initialAt）都是从 0 开始的点序号；series[].values 每点一个值，长度等于点数。",
+        "events 按 at 升序排列；kind 引用 kinds 中的 id，kinds 的 tone 决定颜色。"
+      ],
+      "inputs": [
+        {
+          "path": "axis",
+          "meaning": "type（number/clock/date）、start、step、可选 count（无 series 时必填）、label，number 轴可加 prefix 与 unit。"
+        },
+        {
+          "path": "series",
+          "meaning": "0–3 条曲线：id、label、values（可含 null 表示缺数据）、可选 unit、tone 或 color、area、dashed、axis（left/right）与 min/max。"
+        },
+        {
+          "path": "phases",
+          "meaning": "可选阶段色带：from、to、label、tone；按顺序排列，相邻阶段可共用边界点。"
+        },
+        {
+          "path": "kinds",
+          "meaning": "可选事件类型：id、label、tone（neutral/info/good/warn/bad/accent）或 color。"
+        },
+        {
+          "path": "events",
+          "meaning": "事件：at、title，可选 kind 与 detail；最多 80 个。"
+        },
+        {
+          "path": "summary",
+          "meaning": "可选顶部要点：label、value（文字）与 tone，最多 6 项。"
+        },
+        {
+          "path": "initialAt",
+          "meaning": "可选初始游标位置；省略时停在第一个事件。"
+        },
+        {
+          "path": "note",
+          "meaning": "可选图下脚注，说明数据来源或口径。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "按分钟复盘一次事件",
+          "steps": [
+            "axis 用 clock，start 填第一点的时刻；每条指标按分钟一个值。",
+            "两条单位不同的曲线一条放 left、一条放 right，必要时用 max 固定上限。",
+            "先列阶段，再按时间顺序写事件，把 initialAt 设在最想让读者先看的时刻。"
+          ],
+          "exampleIndex": 0
+        },
+        {
+          "title": "按天回看一次发布",
+          "steps": [
+            "axis 用 date，start 填第一天；每日指标对齐到点。",
+            "用 kinds 区分发布、推广、问题与修复，同一天的多个事件依次排列。",
+            "summary 写两到四个读者最先需要的数字。"
+          ],
+          "exampleIndex": 1
+        }
+      ],
+      "interactions": [
+        {
+          "action": "拖动滑块或在图上按住拖动",
+          "effect": "游标移到该点，显示各曲线数值与阶段，并展开该点或之前最近的事件。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击事件（列表或图上标记）",
+          "effect": "游标跳到该事件所在点并展开说明。",
+          "persistence": "view"
+        },
+        {
+          "action": "键盘：滑块方向键逐点移动；列表内上下键、Home、End 切换事件；‹ › 按钮跳到前后事件",
+          "effect": "与点击相同，焦点保持在当前控件。",
+          "persistence": "view"
+        },
+        {
+          "action": "点击阶段标签",
+          "effect": "游标跳到该阶段起点。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "2–500 个点，最多 3 条曲线、12 个阶段、8 种事件类型、80 个事件、6 项要点。",
+        "series 的 values 长度必须等于点数；events 按 at 升序；阶段不得重叠。",
+        "宽度不足 760px 时事件列表移到图表下方。"
+      ],
+      "editing": {
+        "data": ["修改实例数据后经宿主页面保存。"],
+        "implementation": [
+          "新增表达或交互需要同步数据约定、schema、SDK 与验证。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/components/blocks/EventTimeline.tsx",
+          "purpose": "软件内置实现位置；source 视图返回 SDK 包装起点。"
+        },
+        {
+          "path": "src/components/blocks/event-timeline-contract.mjs",
+          "purpose": "共享验证与点标签、当前事件、当前阶段的计算。"
+        },
+        {
+          "path": "index.tsx",
+          "purpose": "可编辑 SDK 包装入口，通过 showai:components 组合已有能力。"
+        }
+      ],
+      "architecture": [
+        "按容器实际宽度绘制 SVG；左右两侧各一套 y 轴刻度，由该侧曲线共享。",
+        "游标位置是唯一的视图状态；当前事件由游标推出，同一点有多个事件时点击可固定其中之一。"
+      ],
+      "extensionPoints": ["新增视图或控件时保留打印中的曲线与完整事件说明。"],
+      "invariants": [
+        "拖动、点击与键盘浏览均不调用 onChange。",
+        "颜色只来自 tone 令牌或显式 color，深色主题由令牌切换。"
+      ],
+      "verification": [
+        "检查真实 Page、深色主题、360px 窄屏、键盘操作、打印和离线导出。"
       ]
     }
   }

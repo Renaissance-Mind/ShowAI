@@ -9,6 +9,7 @@ import {
   Download,
   ExternalLink,
   Filter,
+  LayoutDashboard,
   LayoutList,
   Plus,
   Table2,
@@ -23,12 +24,19 @@ import {
   uid,
 } from "./helpers";
 import { BlockHeader, EmptyState, Field, blockLabel } from "./shared";
+import {
+  DatabaseCalendar,
+  pruneCalendarConfig,
+  resolveCalendar,
+} from "./DatabaseCalendar";
+import { normalizeDate } from "./database-contract.mjs";
 import type { MessageKey } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/database";
 import type {
   BlockProps,
   ColumnType,
+  DatabaseCalendarConfig,
   DatabaseColumn,
   DatabaseRow,
 } from "./types";
@@ -39,13 +47,17 @@ const TYPES: { value: ColumnType; label: MessageKey<typeof messages> }[] = [
   { value: "select", label: "type.select" },
   { value: "checkbox", label: "type.checkbox" },
   { value: "url", label: "type.url" },
+  { value: "date", label: "type.date" },
 ];
+type View = "table" | "board" | "calendar";
+const VIEWS: View[] = ["table", "board", "calendar"];
 const TYPE_SYMBOL: Record<ColumnType, string> = {
   text: "Aa",
   number: "#",
   select: "◉",
   checkbox: "☑",
   url: "↗",
+  date: "◫",
 };
 
 function Cell({
@@ -122,10 +134,10 @@ function Cell({
       <input
         aria-label={column.name}
         type={
-          column.type === "number"
-            ? "number"
-            : column.type === "url"
-              ? "url"
+          column.type === "number" || column.type === "url"
+            ? column.type
+            : column.type === "date"
+              ? "date"
               : "text"
         }
         className="sb-cell-input"
@@ -177,7 +189,13 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   const rows: DatabaseRow[] = Array.isArray(data.rows)
     ? data.rows.filter((row) => row && typeof row.id === "string")
     : [];
-  const [view, setView] = useState<"table" | "board">("table");
+  const [view, setView] = useState<View>(
+    VIEWS.includes(data.view as View) ? (data.view as View) : "table",
+  );
+  // Calendar column choices are reading state seeded from the saved settings, like board grouping.
+  const [calendarChoice, setCalendarChoice] = useState<DatabaseCalendarConfig>(
+    {},
+  );
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<{
     column: string;
@@ -199,6 +217,15 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
       (column) => column.id === grouping && column.type === "select",
     ) ?? selectColumns[0];
   const shownRows = filterSortRows(rows, columns, query, filter, sort);
+  const savedCalendar: DatabaseCalendarConfig =
+    data.calendar && typeof data.calendar === "object"
+      ? (data.calendar as DatabaseCalendarConfig)
+      : {};
+  const calendar = resolveCalendar(columns, {
+    ...savedCalendar,
+    ...calendarChoice,
+  });
+  const dateColumns = columns.filter((column) => column.type === "date");
   const pageSize = 30,
     totalPages = Math.max(1, Math.ceil(shownRows.length / pageSize)),
     activePage = Math.min(page, totalPages - 1);
@@ -214,18 +241,20 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
         ]),
       )
     : [""];
+  const updateFields = (
+    id: string,
+    values: Record<string, string | number | boolean>,
+  ) =>
+    onChange?.({
+      ...data,
+      rows: rows.map((row) => (row.id === id ? { ...row, ...values } : row)),
+    });
   const updateRow = (
     id: string,
     column: string,
     value: string | number | boolean,
-  ) =>
-    onChange?.({
-      ...data,
-      rows: rows.map((row) =>
-        row.id === id ? { ...row, [column]: value } : row,
-      ),
-    });
-  const addRow = (group?: string) => {
+  ) => updateFields(id, { [column]: value });
+  const addRow = (group?: string, preset: Record<string, string> = {}) => {
     const row: DatabaseRow = {
       id: uid(),
       ...Object.fromEntries(
@@ -234,12 +263,14 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           column.type === "checkbox" ? false : "",
         ]),
       ),
+      ...preset,
     };
     if (groupColumn && group !== undefined) row[groupColumn.id] = group;
     onChange?.({ ...data, rows: [...rows, row] });
     setPage(Math.floor(rows.length / pageSize));
     setQuery("");
     setFilter({ column: "", value: "" });
+    return row.id;
   };
   const removeRow = (id: string) =>
     onChange?.({ ...data, rows: rows.filter((row) => row.id !== id) });
@@ -282,7 +313,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
         ),
       ],
     }));
-    onChange?.({
+    const next: Record<string, unknown> = {
       ...data,
       title: draftTitle,
       columns: cleaned,
@@ -302,12 +333,27 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                     : Number.isFinite(Number(previous))
                       ? Number(previous)
                       : ""
-                  : text(previous);
+                  : column.type === "date"
+                    ? normalizeDate(text(previous))
+                    : text(previous);
             return [column.id, value];
           }),
         ),
       })),
-    });
+    };
+    // Calendar settings must keep pointing at columns of the right type.
+    const calendarConfig = pruneCalendarConfig(
+      data.calendar ? savedCalendar : undefined,
+      cleaned,
+    );
+    if (calendarConfig) next.calendar = calendarConfig;
+    if (
+      next.view === "calendar" &&
+      !cleaned.some((column) => column.type === "date")
+    )
+      delete next.view;
+    onChange?.(next);
+    setCalendarChoice({});
     if (!cleaned.some((column) => column.id === filter.column))
       setFilter({ column: "", value: "" });
     setEditing(false);
@@ -370,6 +416,14 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                 <Columns3 size={14} />
                 {t("board")}
               </button>
+              <button
+                type="button"
+                className={view === "calendar" ? "is-active" : ""}
+                onClick={() => setView("calendar")}
+              >
+                <LayoutDashboard size={14} />
+                {t("calendar")}
+              </button>
             </div>
             <div className="sb-database-tools">
               <ExpandableSearch
@@ -413,6 +467,59 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                     </option>
                   ))}
                 </select>
+              </div>
+            )}
+            {view === "calendar" && calendar.dateColumn && (
+              <div className="sb-board-grouping sb-calendar-settings">
+                {(
+                  [
+                    ["dateColumn", "calendar.dateProperty", dateColumns, false],
+                    [
+                      "endDateColumn",
+                      "calendar.endDateProperty",
+                      dateColumns.filter(
+                        (column) => column.id !== calendar.dateColumn?.id,
+                      ),
+                      true,
+                    ],
+                    [
+                      "colorColumn",
+                      "calendar.colorProperty",
+                      selectColumns,
+                      true,
+                    ],
+                    [
+                      "doneColumn",
+                      "calendar.doneProperty",
+                      columns.filter((column) => column.type === "checkbox"),
+                      true,
+                    ],
+                  ] as const
+                ).map(([key, label, choices, optional]) =>
+                  choices.length > (optional ? 0 : 1) ? (
+                    <label key={key}>
+                      <span>{t(label)}</span>
+                      <select
+                        value={calendar[key]?.id ?? ""}
+                        onChange={(event) =>
+                          setCalendarChoice((current) => ({
+                            ...current,
+                            [key]: event.target.value,
+                          }))
+                        }
+                      >
+                        {optional && (
+                          <option value="">{t("calendar.none")}</option>
+                        )}
+                        {choices.map((column) => (
+                          <option key={column.id} value={column.id}>
+                            {column.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null,
+                )}
               </div>
             )}
           </div>
@@ -565,7 +672,37 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           )}
         </div>
       )}
-      {view === "table" ? (
+      {view === "calendar" ? (
+        <DatabaseCalendar
+          key={JSON.stringify(savedCalendar)}
+          columns={columns}
+          rows={shownRows}
+          settings={calendar}
+          editable={editable}
+          renderCell={(row, column) => (
+            <Cell
+              row={row}
+              column={column}
+              editable={editable}
+              update={(value) => updateRow(row.id, column.id, value)}
+            />
+          )}
+          onMove={(id, start, end) =>
+            updateFields(id, {
+              [calendar.dateColumn!.id]: start,
+              ...(end && calendar.endDateColumn
+                ? { [calendar.endDateColumn.id]: end }
+                : {}),
+            })
+          }
+          onAdd={
+            calendar.dateColumn
+              ? (date) => addRow(undefined, { [calendar.dateColumn!.id]: date })
+              : undefined
+          }
+          onRemove={removeRow}
+        />
+      ) : view === "table" ? (
         <>
           <div className="sb-table-scroll">
             <table className="sb-database-table">

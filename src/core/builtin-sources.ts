@@ -107,6 +107,45 @@ import i18n_richText from "../i18n/messages/richText.ts?raw";
 import i18n_search from "../i18n/messages/search.ts?raw";
 import i18n_analysis from "../i18n/messages/analysis.ts?raw";
 import i18n_scene3d from "../i18n/messages/scene3d.ts?raw";
+import src_InlineMarkup_tsx from "../components/blocks/InlineMarkup.tsx?raw";
+import src_inline_markup_mjs from "../components/blocks/inline-markup.mjs?raw";
+import src_database_contract_mjs from "../components/blocks/database-contract.mjs?raw";
+import src_database_calendar_css from "../components/blocks/database-calendar.css?raw";
+import src_DatabaseCalendar_tsx from "../components/blocks/DatabaseCalendar.tsx?raw";
+import src_playground_contract_mjs from "../components/blocks/playground-contract.mjs?raw";
+import src_playground_css from "../components/blocks/playground.css?raw";
+import src_i18n_messages_eventTimeline_ts from "../i18n/messages/eventTimeline.ts?raw";
+import src_event_timeline_contract_mjs from "../components/blocks/event-timeline-contract.mjs?raw";
+import src_event_timeline_css from "../components/blocks/event-timeline.css?raw";
+import src_EventTimeline_tsx from "../components/blocks/EventTimeline.tsx?raw";
+import src_i18n_messages_waterfall_ts from "../i18n/messages/waterfall.ts?raw";
+import src_waterfall_css from "../components/blocks/waterfall.css?raw";
+import src_Waterfall_tsx from "../components/blocks/Waterfall.tsx?raw";
+import src_i18n_messages_roadmap_ts from "../i18n/messages/roadmap.ts?raw";
+import src_plan_contract_mjs from "../components/blocks/plan-contract.mjs?raw";
+import src_roadmap_css from "../components/blocks/roadmap.css?raw";
+import src_Roadmap_tsx from "../components/blocks/Roadmap.tsx?raw";
+import src_i18n_messages_cardGrid_ts from "../i18n/messages/cardGrid.ts?raw";
+import src_card_grid_css from "../components/blocks/card-grid.css?raw";
+import src_CardGrid_tsx from "../components/blocks/CardGrid.tsx?raw";
+import src_i18n_messages_structureBrowser_ts from "../i18n/messages/structureBrowser.ts?raw";
+import src_doc_browse_contract_mjs from "../components/blocks/doc-browse-contract.mjs?raw";
+import src_structure_browser_css from "../components/blocks/structure-browser.css?raw";
+import src_StructureBrowser_tsx from "../components/blocks/StructureBrowser.tsx?raw";
+import src_i18n_messages_commandReference_ts from "../i18n/messages/commandReference.ts?raw";
+import src_command_reference_css from "../components/blocks/command-reference.css?raw";
+import src_CommandReference_tsx from "../components/blocks/CommandReference.tsx?raw";
+import src_i18n_messages_stepGuide_ts from "../i18n/messages/stepGuide.ts?raw";
+import src_step_guide_css from "../components/blocks/step-guide.css?raw";
+import src_StepGuide_tsx from "../components/blocks/StepGuide.tsx?raw";
+import src_doc_reference_contract_mjs from "../components/blocks/doc-reference-contract.mjs?raw";
+import src_i18n_messages_layerDiagram_ts from "../i18n/messages/layerDiagram.ts?raw";
+import src_layer_diagram_css from "../components/blocks/layer-diagram.css?raw";
+import src_LayerDiagram_tsx from "../components/blocks/LayerDiagram.tsx?raw";
+import src_i18n_messages_sequenceDiagram_ts from "../i18n/messages/sequenceDiagram.ts?raw";
+import src_doc_diagrams_contract_mjs from "../components/blocks/doc-diagrams-contract.mjs?raw";
+import src_sequence_diagram_css from "../components/blocks/sequence-diagram.css?raw";
+import src_SequenceDiagram_tsx from "../components/blocks/SequenceDiagram.tsx?raw";
 
 const sources: Record<string, string> = {
   ...g2BuiltinSources,
@@ -218,6 +257,45 @@ const sources: Record<string, string> = {
   "i18n/messages/search.ts": i18n_search,
   "i18n/messages/analysis.ts": i18n_analysis,
   "i18n/messages/scene3d.ts": i18n_scene3d,
+  "InlineMarkup.tsx": src_InlineMarkup_tsx,
+  "inline-markup.mjs": src_inline_markup_mjs,
+  "database-contract.mjs": src_database_contract_mjs,
+  "database-calendar.css": src_database_calendar_css,
+  "DatabaseCalendar.tsx": src_DatabaseCalendar_tsx,
+  "playground-contract.mjs": src_playground_contract_mjs,
+  "playground.css": src_playground_css,
+  "i18n/messages/eventTimeline.ts": src_i18n_messages_eventTimeline_ts,
+  "event-timeline-contract.mjs": src_event_timeline_contract_mjs,
+  "event-timeline.css": src_event_timeline_css,
+  "EventTimeline.tsx": src_EventTimeline_tsx,
+  "i18n/messages/waterfall.ts": src_i18n_messages_waterfall_ts,
+  "waterfall.css": src_waterfall_css,
+  "Waterfall.tsx": src_Waterfall_tsx,
+  "i18n/messages/roadmap.ts": src_i18n_messages_roadmap_ts,
+  "plan-contract.mjs": src_plan_contract_mjs,
+  "roadmap.css": src_roadmap_css,
+  "Roadmap.tsx": src_Roadmap_tsx,
+  "i18n/messages/cardGrid.ts": src_i18n_messages_cardGrid_ts,
+  "card-grid.css": src_card_grid_css,
+  "CardGrid.tsx": src_CardGrid_tsx,
+  "i18n/messages/structureBrowser.ts": src_i18n_messages_structureBrowser_ts,
+  "doc-browse-contract.mjs": src_doc_browse_contract_mjs,
+  "structure-browser.css": src_structure_browser_css,
+  "StructureBrowser.tsx": src_StructureBrowser_tsx,
+  "i18n/messages/commandReference.ts": src_i18n_messages_commandReference_ts,
+  "command-reference.css": src_command_reference_css,
+  "CommandReference.tsx": src_CommandReference_tsx,
+  "i18n/messages/stepGuide.ts": src_i18n_messages_stepGuide_ts,
+  "step-guide.css": src_step_guide_css,
+  "StepGuide.tsx": src_StepGuide_tsx,
+  "doc-reference-contract.mjs": src_doc_reference_contract_mjs,
+  "i18n/messages/layerDiagram.ts": src_i18n_messages_layerDiagram_ts,
+  "layer-diagram.css": src_layer_diagram_css,
+  "LayerDiagram.tsx": src_LayerDiagram_tsx,
+  "i18n/messages/sequenceDiagram.ts": src_i18n_messages_sequenceDiagram_ts,
+  "doc-diagrams-contract.mjs": src_doc_diagrams_contract_mjs,
+  "sequence-diagram.css": src_sequence_diagram_css,
+  "SequenceDiagram.tsx": src_SequenceDiagram_tsx,
 };
 // Package the shared icon module inside the trusted SDK's virtual filesystem.
 // User component packages retain the existing package-local import boundary.
@@ -277,6 +355,15 @@ export const builtinExports: Record<string, string> = {
   "status-tree": "StatusTree",
   "experiment-tracker": "ExperimentTracker",
   "scene-3d": "Scene3D",
+  "event-timeline": "EventTimeline",
+  waterfall: "Waterfall",
+  roadmap: "Roadmap",
+  "card-grid": "CardGrid",
+  "structure-browser": "StructureBrowser",
+  "command-reference": "CommandReference",
+  "step-guide": "StepGuide",
+  "layer-diagram": "LayerDiagram",
+  "sequence-diagram": "SequenceDiagram",
   chart: "Chart",
   mindmap: "Mindmap",
   flowchart: "Flowchart",

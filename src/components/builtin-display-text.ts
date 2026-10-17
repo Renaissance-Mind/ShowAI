@@ -42,7 +42,7 @@ export const builtinEnglish: BuiltinDisplayText = {
   database: {
     name: "Database",
     description:
-      "A table with filters, sorting and a board view. Cells hold text, numbers, selects, checkboxes and links.",
+      "Table with filters and sorting, plus board and calendar (month, week, heatmap) views.",
   },
   metrics: {
     name: "Key metrics",
@@ -50,7 +50,8 @@ export const builtinEnglish: BuiltinDisplayText = {
   },
   playground: {
     name: "Interactive calculator",
-    description: "Explore sums, products or averages with sliders.",
+    description:
+      "Sliders, steppers, toggles and choices drive declarative formulas with results, targets, breakdowns and weighted rankings.",
   },
   gallery: {
     name: "Image gallery",
@@ -67,6 +68,51 @@ export const builtinEnglish: BuiltinDisplayText = {
     description:
       "Branches balance naturally around a central topic, or use a one-sided layout. Supports keyboard editing, collapsing and undo.",
   },
+  "sequence-diagram": {
+    name: "Sequence diagram",
+    description:
+      "Step-through lifelines with calls, replies and notes, each step explained below.",
+  },
+  "layer-diagram": {
+    name: "Layer diagram",
+    description:
+      "Top-down architecture layers with selectable modules, their paths and details.",
+  },
+  "step-guide": {
+    name: "Step guide",
+    description:
+      "Numbered steps with copyable per-platform code, hints, results, timers and an optional one-step-at-a-time view.",
+  },
+  "command-reference": {
+    name: "Command reference",
+    description:
+      "Grouped, searchable commands with highlighted matches, parameter tables and copyable examples.",
+  },
+  "structure-browser": {
+    name: "Structure browser",
+    description:
+      "Expandable file or field tree with a detail panel showing path, type, description and a copyable example.",
+  },
+  "card-grid": {
+    name: "Card grid",
+    description:
+      "Navigation cards with icon, title, short text, tag and an optional whole-card link, as a grid or compact rows.",
+  },
+  roadmap: {
+    name: "Roadmap",
+    description:
+      "Read a day- or week-scale plan by date: workstream lanes, owner colors, statuses, dependencies, milestones, today and deadline lines, with owner focus and per-task details.",
+  },
+  waterfall: {
+    name: "Waterfall",
+    description:
+      "Bridge an opening value to a closing value through increases and decreases; click a bar for its breakdown and shares, with a warning when steps do not add up.",
+  },
+  "event-timeline": {
+    name: "Event timeline",
+    description:
+      "Metric lines, phase bands and events on one time axis; scrub or pick an event and the chart and list stay in sync.",
+  },
   "scene-3d": {
     name: "3D scene",
     description:
@@ -75,7 +121,7 @@ export const builtinEnglish: BuiltinDisplayText = {
   flowchart: {
     name: "Interactive flowchart",
     description:
-      "A zoomable flowchart built on React Flow, with node details, branches, multiple flows and node editing.",
+      "A zoomable React Flow chart with node details, multiple flows and node editing, plus optional step-through journeys and stage playback.",
   },
   video: {
     name: "Video",

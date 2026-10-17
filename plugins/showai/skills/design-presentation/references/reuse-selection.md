@@ -15,11 +15,13 @@
 先确定表达形式，再查完整的当前组件索引：模板组件来自 template_context 返回的固定引用（局部名由模板 design 指南给出，实际 componentId/version/integrity 以返回为准）；内置与项目组件来自 `catalog_list({kind:"component",projectId})`。常用对应：
 
 - 对象与材料：image、gallery、video、pdf；局部热点是否可用查具体组件。
-- 概念与关系：flowchart、mindmap；项目目录有专题图形组件时按其 guide 使用。
+- 概念与关系：flowchart（journeys 逐步走一条路线，stages 按阶段改变节点状态）、mindmap、layer-diagram 分层架构、sequence-diagram 参与者之间按顺序的往返；项目目录有专题图形组件时按其 guide 使用。
+- 操作与参考：step-guide 编号步骤、分平台代码与计时；command-reference 可搜索的命令与参数；structure-browser 目录或字段结构与说明；card-grid 入口与选项卡片。
+- 时间与计划：roadmap 按日期阅读泳道、负责人、依赖和里程碑（只读）；event-timeline 事件、阶段与指标曲线同轴回放；database 的 calendar 视图展示带日期的记录与打卡热力。
 - 机制与状态变化：mechanism-steps 保持对象身份并逐步显示状态与作用关系。
-- 对照与证据：evidence-explorer 连接总览、条件、来源和共同维度比较；table、database、comparison-matrix、chart 与适配数据类型的 G2 图表；references 和 bookmark。
+- 对照与证据：evidence-explorer 连接总览、条件、来源和共同维度比较；waterfall 从期初到期末的逐项增减；table、database、comparison-matrix、chart 与适配数据类型的 G2 图表；references 和 bookmark。
 - 补充说明：text、toggle；关键条件进入主线。
-- 参数探索：playground 只支持它公开的有限计算，专题模型按各自假设使用。
+- 参数探索：playground 用声明式公式、预设、分项构成和加权排名，只做它公开的有限运算；专题模型按各自假设使用。
 - 空间与三维：scene-3d 用基本形体、坐标箭头、标注和参数绑定解释姿态、结构与转动；平面图能讲清时优先平面图。
 
 顺序：调整实例数据和布局 → 组合已有能力 → 扩展已有组件 → 为确认的缺口创建新组件。通用、专题、内容专用分别判断，不能仅因外观相似复用写死事实的作品组件。
