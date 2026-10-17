@@ -138,3 +138,35 @@
   color: var(--muted);
   flex-shrink: 0;
 }
+
+/* A labelled insertion preview shows the result at the actual destination. */
+.studio-tree-row[data-drop-position="before"]::before,
+.studio-tree-row[data-drop-position="after"]::after {
+  content: attr(data-drop-title);
+  height: 26px;
+  line-height: 26px;
+  padding-inline: 10px;
+  background: var(--paper, var(--bg));
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  box-shadow: 0 2px 8px #0002;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.studio-tree-row[data-drop-position="before"]::before {
+  top: -14px;
+}
+.studio-tree-row[data-drop-position="after"]::after {
+  bottom: -14px;
+}
+
+.studio-tree-row { transition: background-color 100ms ease, opacity 100ms ease; }
+.studio-tree-row[data-drop-position="inside"]::after {
+  content: attr(data-drop-title); position: absolute; top: 100%; left: 28px; right: 4px;
+  height: 28px; line-height: 28px; padding-inline: 10px; z-index: 3;
+  border: 1px dashed var(--accent); border-radius: 5px;
+  background: var(--paper, var(--bg)); color: var(--accent); pointer-events: none;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+@media (prefers-reduced-motion: reduce) { .studio-tree-row { transition: none; } }

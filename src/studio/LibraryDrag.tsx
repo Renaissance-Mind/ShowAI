@@ -104,7 +104,9 @@ export function useLibraryDragController(options: {
       const item = current.source;
       const hit = document.elementFromPoint(point.x, point.y);
       if (!hit || !current.sidebar.contains(hit)) return { destination: null };
-      const element = hit.closest<HTMLElement>(".studio-tree-row");
+      const element = hit.closest<HTMLElement>(
+        ".studio-tree-row, .studio-page-list-row",
+      );
       if (!element) {
         const section = hit.closest<HTMLElement>("[data-library-drop-section]");
         const id = section?.dataset.libraryDropSection;
@@ -311,6 +313,8 @@ export function useLibraryDragController(options: {
         "aria-description": t("dragHint"),
         "data-library-draggable": true,
         "data-dragging": dragging === target.id || undefined,
+        "data-drop-title":
+          destination?.key === target.id ? preview?.title : undefined,
         "data-drop-position":
           destination?.key === target.id ? destination.position : undefined,
         onDragStart: (event) => event.preventDefault(),
@@ -322,8 +326,7 @@ export function useLibraryDragController(options: {
             )
           )
             return;
-          const sidebar =
-            event.currentTarget.closest<HTMLElement>(".studio-sidebar");
+          const sidebar = event.currentTarget.closest<HTMLElement>(".studio");
           if (!sidebar) return;
           gesture.current = {
             source: target,
@@ -348,6 +351,6 @@ export function useLibraryDragController(options: {
       } as HTMLAttributes<HTMLDivElement>;
     };
     return { row, section };
-  }, [dragging, destination]);
+  }, [dragging, destination, preview]);
   return { dragging: !!dragging, preview, previewRef, bindings };
 }

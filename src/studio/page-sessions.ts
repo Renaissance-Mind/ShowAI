@@ -202,7 +202,12 @@ export class PageSessions {
       session.dispose();
     }
   }
-  async open(projectId: string, pageId: string, tabId = "primary") {
+  async open(
+    projectId: string,
+    pageId: string,
+    tabId = "primary",
+    initial?: LoadedPage,
+  ) {
     if (!this.home) {
       const info = await this.options.invoke<{ home: string }>("app:info");
       this.setHome(info.home);
@@ -251,7 +256,7 @@ export class PageSessions {
           this.publish();
         this.trimDocuments();
       });
-      if (!(await created.open(projectId, pageId))) return false;
+      if (!(await created.open(projectId, pageId, initial))) return false;
     }
     if (ticket !== this.ticket) return false;
     this.retainView(session, tabId);

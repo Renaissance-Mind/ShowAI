@@ -77,6 +77,17 @@ describe("workspace sessions against the real loopback workbench", () => {
     sessions.setHome(home);
     calls.length = 0;
   });
+  it("opens a just-created page without rereading or looking up recovery drafts", async () => {
+    const before = calls.length;
+    expect(
+      await sessions.open(project, first.document.id, "created", first),
+    ).toBe(true);
+    expect(calls.slice(before)).not.toContain("pages:get");
+    expect(calls.slice(before)).not.toContain("drafts:list");
+    expect(sessions.getSnapshot().active?.getSnapshot().draft?.id).toBe(
+      first.document.id,
+    );
+  });
   afterEach(async () => {
     await sessions.shutdown();
     await server.close();

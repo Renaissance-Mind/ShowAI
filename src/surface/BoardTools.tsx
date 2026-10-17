@@ -6,7 +6,6 @@ import {
   Square,
   Circle,
   ArrowUpRight,
-  PanelsTopLeft,
   ChevronDown,
   Hand,
   Eraser,
@@ -26,7 +25,6 @@ const icons = [
   Square,
   Circle,
   ArrowUpRight,
-  PanelsTopLeft,
   Hand,
   Eraser,
   Lasso,
@@ -42,12 +40,10 @@ export function BoardTools({
 }) {
   const t = useTranslator(messages);
   const [expanded, setExpanded] = useState(true);
-  const mobile =
-    typeof document !== "undefined" &&
-    document.documentElement.dataset.native === "ios";
-  const entries = boardTools
-    .map((entry, index) => ({ ...entry, Icon: icons[index] }))
-    .filter((entry) => !mobile || entry.tool !== "region");
+  const entries = boardTools.map((entry, index) => ({
+    ...entry,
+    Icon: icons[index],
+  }));
   return (
     <div
       className="board-tool-stack"

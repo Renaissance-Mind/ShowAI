@@ -140,7 +140,14 @@ export function bindingAtPoint(
   });
   const hit = pickShape(candidates);
   return hit
-    ? { targetId: hit.id, anchor: connectionAnchor(hit.frame, point) }
+    ? {
+        targetId: hit.id,
+        // A Page is an annotation surface: preserve the point inside its content.
+        anchor:
+          hit.node.type === "surface" && hit.node.attrs?.kind === "page"
+            ? normalizedAnchor(hit.frame, point)
+            : connectionAnchor(hit.frame, point),
+      }
     : null;
 }
 

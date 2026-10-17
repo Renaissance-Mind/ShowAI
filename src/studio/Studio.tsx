@@ -57,6 +57,9 @@ import {
   MoreHorizontal,
   Sparkles,
   ListOrdered,
+  LayoutList,
+  LayoutGrid,
+  Grid2X2,
   Plus,
   History,
   Upload,
@@ -103,6 +106,7 @@ import {
   type LibraryContextMenuItem,
 } from "./LibraryNavigation";
 import Dialog from "./Dialog";
+import PageThumbnail from "./PageThumbnail";
 import PageIcon from "../components/PageIcon";
 import PageIconDialog from "./PageIconDialog";
 import ExpandableSearch from "../components/ExpandableSearch";
@@ -374,7 +378,8 @@ export default function Studio() {
   useEffect(() => {
     const host = window as Window & { showaiPendingInvite?: string };
     const receive = (event?: Event) => {
-      const link = event instanceof CustomEvent ? event.detail : host.showaiPendingInvite;
+      const link =
+        event instanceof CustomEvent ? event.detail : host.showaiPendingInvite;
       if (typeof link !== "string" || !link || receivingInvite.current) return;
       receivingInvite.current = true;
       void (async () => {
@@ -385,7 +390,11 @@ export default function Studio() {
         setSettingsSection("sync");
         setSyncNavigationKey((value) => value + 1);
         await navigate("settings");
-      })().catch(report).finally(() => { receivingInvite.current = false; });
+      })()
+        .catch(report)
+        .finally(() => {
+          receivingInvite.current = false;
+        });
     };
     window.addEventListener("showai:invitation", receive);
     receive();
@@ -426,6 +435,52 @@ export default function Studio() {
   const activeSurface = useRef<{ pageId: string; surfaceId: string } | null>(
     null,
   );
+  const [directoryView, setDirectoryView] = useState<
+    "list" | "small" | "medium" | "large"
+  >(() => {
+    const saved = localStorage.getItem("showai:directory-view");
+    return saved === "small" || saved === "medium" || saved === "large"
+      ? saved
+      : "list";
+  });
+  const [viewMenu, setViewMenu] = useState<HTMLElement | null>(null);
+  const viewOptions = ["list", "small", "medium", "large"] as const;
+  const viewIcon = (mode: typeof directoryView) =>
+    mode === "list" ? (
+      <LayoutList size={16} />
+    ) : mode === "small" ? (
+      <LayoutGrid size={16} />
+    ) : (
+      <Grid2X2 size={mode === "large" ? 20 : 16} />
+    );
+  const chooseDirectoryView = (mode: typeof directoryView) => {
+    setDirectoryView(mode);
+    localStorage.setItem("showai:directory-view", mode);
+  };
+  const directoryViewControl = (): LibraryContextMenuItem => ({
+    label: t("directoryView"),
+    icon: <LayoutGrid size={15} />,
+    control: (
+      <div
+        className="directory-view-switch"
+        role="group"
+        aria-label={t("directoryView")}
+      >
+        {viewOptions.map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            title={t(`view.${mode}`)}
+            aria-label={t(`view.${mode}`)}
+            aria-pressed={directoryView === mode}
+            onClick={() => chooseDirectoryView(mode)}
+          >
+            {viewIcon(mode)}
+          </button>
+        ))}
+      </div>
+    ),
+  });
   const [contextMenu, setContextMenu] = useState<{
     target: LibraryTarget;
     anchor: HTMLElement;
@@ -1106,8 +1161,16 @@ export default function Studio() {
         templateScope: template?.scope,
         templateIntegrity: template?.integrity,
       });
-      await openProject(projectId, parentId);
-      await page.open(projectId, created.document.id);
+      await page.open(
+        projectId,
+        created.document.id,
+        workspace.activeId,
+        created,
+      );
+      selectedRef.current = projectId;
+      setSelectedProject(projectId);
+      setSelectedFolder(parentId);
+      setExpandedProjects((current) => ({ ...current, [projectId]: true }));
       setDialog(null);
       setView("page");
       await refresh();
@@ -1373,7 +1436,9 @@ export default function Studio() {
         ? [{ value: "manual" as const }]
         : []),
     ];
-    return options.map((option, index) => ({
+    return [
+      directoryViewControl(),
+      ...options.map((option, index) => ({
       label: t(`sort.${option.value}`),
       checked: option.value === sortBy,
       icon:
@@ -1384,7 +1449,8 @@ export default function Studio() {
         ),
       separatorBefore: index === 0,
       onSelect: action(() => changeDirectorySort(target, option.value)),
-    }));
+      })),
+    ];
   }
   async function moveProject(projectId: string, groupId: string | null) {
     await desktop.invoke("projects:group", { projectId, groupId });
@@ -1393,7 +1459,9 @@ export default function Studio() {
   function projectOrderMenuItems(target: LibraryTarget) {
     if (target.kind !== "project") return [];
     const sectionFor = (item: ProjectSummary) =>
-      item.pinned ? "pinned" : (organization.projectGroups[item.id] ?? "projects");
+      item.pinned
+        ? "pinned"
+        : (organization.projectGroups[item.id] ?? "projects");
     const project = projects.find((item) => item.id === target.id);
     if (!project) return [];
     const sectionId = sectionFor(project);
@@ -1417,11 +1485,101 @@ export default function Studio() {
     }));
   }
   const movingLibrary = useRef(false);
+  const libraryUndo = useRef<{ undo: LibraryDrop; redo: LibraryDrop }[]>([]);
+  const libraryRedo = useRef<{ undo: LibraryDrop; redo: LibraryDrop }[]>([]);
+  const historyBusy = useRef(false);
+  function inverseLibraryDrop(drop: LibraryDrop): LibraryDrop {
+    const source = drop.source;
+    const siblings =
+      source.kind === "project"
+        ? orderSidebarProjects(projects, organization.projectOrder)
+            .filter(
+              (item) =>
+                (item.pinned
+                  ? "pinned"
+                  : (organization.projectGroups[item.id] ?? "projects")) ===
+                (source.pinned
+                  ? "pinned"
+                  : (organization.projectGroups[source.id] ?? "projects")),
+            )
+            .map((item) => item.id)
+        : sortDirectoryItems(
+            directoryEntries(
+              contents[source.projectId]?.folders ?? [],
+              contents[source.projectId]?.pages ?? [],
+            ).filter((item) => item.parentId === source.parentId),
+            folderPreferences(source.projectId, source.parentId),
+            organization.entryOrder?.[source.projectId],
+          ).map((item) => item.id);
+    const index = siblings.indexOf(source.id);
+    const next = siblings[index + 1],
+      previous = siblings[index - 1];
+    return {
+      source:
+        source.kind === "project"
+          ? source
+          : {
+              ...source,
+              projectId: drop.projectId ?? source.projectId,
+              parentId: drop.parentId ?? null,
+            },
+      projectId: source.projectId,
+      parentId: source.parentId,
+      sectionId:
+        source.kind === "project"
+          ? source.pinned
+            ? "pinned"
+            : (organization.projectGroups[source.id] ?? "projects")
+          : undefined,
+      relativeId: next ?? previous,
+      placement: next ? "before" : "after",
+    };
+  }
+  async function replayLibraryMove(redo: boolean) {
+    if (historyBusy.current || movingLibrary.current) return;
+    const from = redo ? libraryRedo.current : libraryUndo.current;
+    const to = redo ? libraryUndo.current : libraryRedo.current;
+    const entry = from.at(-1);
+    if (!entry) return;
+    historyBusy.current = true;
+    try {
+      if (await dropLibraryItem(redo ? entry.redo : entry.undo, false)) {
+        from.pop();
+        to.push(entry);
+      }
+    } finally {
+      historyBusy.current = false;
+    }
+  }
+  const replayLibraryRef = useRef(replayLibraryMove);
+  replayLibraryRef.current = replayLibraryMove;
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z")
+        return;
+      const target = event.target as HTMLElement;
+      if (target.closest("input,textarea,[contenteditable=true],.page-surface"))
+        return;
+      if (
+        !target.closest(".studio-sidebar,.studio-library,.studio-topbar") &&
+        view !== "project" &&
+        view !== "projects"
+      )
+        return;
+      const stack = event.shiftKey ? libraryRedo.current : libraryUndo.current;
+      if (!stack.length) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void replayLibraryRef.current(event.shiftKey).catch(report);
+    };
+    window.addEventListener("keydown", key, true);
+    return () => window.removeEventListener("keydown", key, true);
+  }, [view]);
   function reorderLibraryItem(drop: LibraryDrop) {
     const source = drop.source;
     const current = contents[source.projectId];
     const home = info?.home;
-    if (!current || !home) return;
+    if (!current || !home) return Promise.resolve(false);
     const siblings = sortDirectoryItems(
       directoryEntries(current.folders, current.pages).filter(
         (item) => item.parentId === source.parentId,
@@ -1444,7 +1602,7 @@ export default function Studio() {
         placement: drop.placement,
       },
     ]);
-    reorderQueue.current = reorderQueue.current.then(async () => {
+    const result = reorderQueue.current.then(async () => {
       let failed = false;
       try {
         const saved = await desktop.invoke<SidebarOrganization>(
@@ -1478,17 +1636,28 @@ export default function Studio() {
         if (failed && sidebarHome.current === home)
           void refresh().catch(report);
       }
+      return !failed;
     });
+    reorderQueue.current = result.then(() => {});
+    return result;
   }
-  async function dropLibraryItem(drop: LibraryDrop) {
-    if (movingLibrary.current) return;
+  async function dropLibraryItem(drop: LibraryDrop, recordHistory = true) {
+    if (movingLibrary.current) return false;
+    const inverse = recordHistory ? inverseLibraryDrop(drop) : null;
+    const remember = () => {
+      if (!inverse) return;
+      libraryUndo.current.push({ undo: inverse, redo: drop });
+      if (libraryUndo.current.length > 100) libraryUndo.current.shift();
+      libraryRedo.current = [];
+    };
     if (
       drop.source.kind !== "project" &&
       drop.source.projectId === drop.projectId &&
       drop.source.parentId === drop.parentId
     ) {
-      reorderLibraryItem(drop);
-      return;
+      const success = await reorderLibraryItem(drop);
+      if (success) remember();
+      return success;
     }
     movingLibrary.current = true;
     const source = drop.source;
@@ -1552,6 +1721,8 @@ export default function Studio() {
       await refresh();
       if (reopen) await openPage(source.id, drop.projectId!);
       setNotice(t("moved"));
+      remember();
+      return true;
     } catch (error) {
       if (reopen && cleared)
         await openPage(
@@ -2520,6 +2691,17 @@ export default function Studio() {
             </ExpandableSearch>
           )}
         <div className="studio-section-actions studio-topbar-view-actions">
+          {view === "project" && (
+            <button
+              className="studio-icon"
+              aria-label={t("directoryView")}
+              title={t("directoryView")}
+              aria-haspopup="menu"
+              onClick={(event) => setViewMenu(event.currentTarget)}
+            >
+              {viewIcon(directoryView)}
+            </button>
+          )}
           {view === "projects" && (
             <button
               className="studio-icon"
@@ -2688,8 +2870,15 @@ export default function Studio() {
       >
         <AutoHideSidebar
           enabled={view === "page" && !!page.draft}
-          mobileBoardKey={view === "page" && page.draft?.content.attrs?.kind === "board" ? page.draft.id : undefined}
-          onMobileBack={() => { if (selectedProject) void openProject(selectedProject, selectedFolder).catch(report); }}
+          mobileBoardKey={
+            view === "page" && page.draft?.content.attrs?.kind === "board"
+              ? page.draft.id
+              : undefined
+          }
+          onMobileBack={() => {
+            if (selectedProject)
+              void openProject(selectedProject, selectedFolder).catch(report);
+          }}
           interactionHeld={
             !!dialog ||
             libraryDrag.dragging ||
@@ -2858,7 +3047,9 @@ export default function Studio() {
                     </button>
                   </>
                 ) : (
-                  <button onClick={action(page.retry)}>{t("retrySave")}</button>
+                    <button onClick={action(page.retry)}>
+                      {t("retrySave")}
+                    </button>
                 )}
               </div>
             )}
@@ -2882,6 +3073,20 @@ export default function Studio() {
             <div
               ref={catalogScrollRef}
               className={`studio-scroll${view === "page" && page.draft ? " has-page-surface" : ""}`}
+                onContextMenu={(event) => {
+                  if (event.defaultPrevented || view !== "project" || !project)
+                    return;
+                  if ((event.target as HTMLElement).closest("button,input,a"))
+                    return;
+                  event.preventDefault();
+                  showMenu(
+                    currentFolder
+                      ? folderTarget(currentFolder, project.id)
+                      : projectTarget(project),
+                    event.currentTarget,
+                    { x: event.clientX, y: event.clientY },
+                  );
+                }}
             >
               <PageWorkspace
                 sessions={page.sessions}
@@ -2975,10 +3180,15 @@ export default function Studio() {
                   {view === "project" && (
                     <>
                       {visibleEntries.length ? (
-                        <div className="studio-page-list">
+                          <div
+                            className="studio-page-list"
+                            data-view={directoryView}
+                          >
                           {visibleEntries.map(({ target, updatedAt }) => (
                             <div
                               key={target.id}
+                                {...libraryDrag.bindings.row(target, false)}
+                                data-library-id={target.id}
                               className="studio-page-list-row"
                               onContextMenu={(event) => {
                                 event.preventDefault();
@@ -3006,6 +3216,14 @@ export default function Studio() {
                                 if (anchor) showMenu(target, anchor);
                               }}
                             >
+                                {directoryView !== "list" &&
+                                  target.kind === "page" && (
+                                    <PageThumbnail
+                                      projectId={target.projectId}
+                                      pageId={target.id}
+                                      updatedAt={updatedAt}
+                                    />
+                                  )}
                               <button
                                 className="studio-page-list-open"
                                 onClick={(event) =>
@@ -3016,6 +3234,13 @@ export default function Studio() {
                                     openTargetClick(target, event);
                                 }}
                               >
+                                  {directoryView !== "list" && (
+                                    <span className="studio-thumbnail-space">
+                                      {target.kind === "folder" && (
+                                        <Folder size={64} strokeWidth={1} />
+                                      )}
+                                    </span>
+                                  )}
                                 <span className="studio-page-list-icon">
                                   {target.kind === "folder" ? (
                                     <PageIcon
@@ -3137,7 +3362,9 @@ export default function Studio() {
                       showProjectNames={componentProject === "all"}
                       query={catalogQueries.components}
                       category={componentCategory}
-                      onOpen={(item) => void viewComponent(item).catch(report)}
+                        onOpen={(item) =>
+                          void viewComponent(item).catch(report)
+                        }
                     />
                   )}
                 </div>
@@ -3221,6 +3448,19 @@ export default function Studio() {
                 }),
               },
             ]}
+          />
+        )}
+        {viewMenu && (
+          <LibraryContextMenu
+            anchor={viewMenu}
+            label={t("directoryView")}
+            onClose={() => setViewMenu(null)}
+            items={viewOptions.map((mode) => ({
+              label: t(`view.${mode}`),
+              icon: viewIcon(mode),
+              checked: directoryView === mode,
+              onSelect: () => chooseDirectoryView(mode),
+            }))}
           />
         )}
         {contextMenu && (

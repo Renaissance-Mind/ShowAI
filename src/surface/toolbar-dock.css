@@ -47,7 +47,7 @@
   display: none;
 }
 .board-dockable-toolbar[data-dock="bottom"] .board-tool-shortcuts {
-  bottom: calc(100% + 60px);
+  bottom: calc(100% + 5px);
 }
 .board-toolbar-properties .board-style-section > button {
   min-height: 24px;
@@ -380,4 +380,34 @@
   top: 0;
   left: auto;
   right: calc(100% + 12px);
+}
+
+.board-toolbar-inline-properties {
+  display: flex;
+  align-items: center;
+  border-inline-start: 1px solid var(--line, var(--border));
+  margin-left: 4px;
+  min-width: 0;
+}
+.board-toolbar-inline-properties .board-style-controls {
+  gap: 6px;
+}
+.board-dockable-toolbar:is([data-dock="left"], [data-dock="right"])
+  .board-toolbar-inline-properties {
+  flex-direction: column;
+  border-inline-start: 0;
+  border-top: 1px solid var(--line, var(--border));
+  margin: 4px 0 0;
+}
+.board-toolbar-primary {
+  overflow: visible;
+}
+@media (max-width: 800px) {
+  .board-toolbar-inline-properties .board-style-section {
+    font-size: 10px;
+    gap: 3px;
+  }
+  .board-toolbar-inline-properties .board-stroke-slider {
+    width: 64px;
+  }
 }

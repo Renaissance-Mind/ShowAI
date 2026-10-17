@@ -65,5 +65,4 @@ export function toolbarCenter(
   };
 }
 
-export const toolbarPropertiesReserve = (edge: DockEdge) =>
-  edge === "left" || edge === "right" ? 264 : 108;
+export const toolbarPropertiesReserve = (_edge: DockEdge) => 0;

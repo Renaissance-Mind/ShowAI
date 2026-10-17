@@ -378,7 +378,15 @@ export function DrawingInput({
   // Points live in the gesture; a version counter repaints without copying
   // the whole stroke on every pointer sample.
   const [, setVersion] = useState(0);
-  const repaint = () => setVersion((value) => value + 1);
+  const paintFrame = useRef(0);
+  const repaint = () => {
+    if (!paintFrame.current)
+      paintFrame.current = requestAnimationFrame(() => {
+        paintFrame.current = 0;
+        setVersion((value) => value + 1);
+      });
+  };
+  useEffect(() => () => cancelAnimationFrame(paintFrame.current), []);
   const [guides, setGuides] = useState<SnapGuide[]>([]);
   const pending = useRef<{
     id: number;
@@ -441,7 +449,9 @@ export function DrawingInput({
     pending.current = null;
     flushSync(() => {
       onDraw(result.node, result.frame);
-      repaint();
+      cancelAnimationFrame(paintFrame.current);
+      paintFrame.current = 0;
+      setVersion((value) => value + 1);
       setGuides([]);
     });
     if (surface.current?.hasPointerCapture(current.id))
@@ -581,7 +591,7 @@ export function DrawingInput({
           points: [start],
           origin: start,
           cursor: start,
-          snap: makeSnapIndex(),
+          snap: freehand ? { boxes: [], x: [], y: [] } : makeSnapIndex(),
           moved: false,
           modifiers: modifiersOf(event),
         };
@@ -689,8 +699,29 @@ function DrawingPreview({ node }: { node: JSONContent }) {
   } = node.attrs!;
   const a = points[0],
     b = points.at(-1);
-  const path =
-    tool === "arrow" ? arrowPath(a, b, strokeWidth) : smoothPath(points);
+  // Freehand points append in place. Build only new curve segments each frame
+  // instead of walking an increasingly long stroke on every repaint.
+  const cache = useRef<{ points: Point[]; next: number; path: string } | null>(
+    null,
+  );
+  let path: string;
+  if (tool === "pen" || tool === "highlighter") {
+    if (
+      !cache.current ||
+      cache.current.points !== points ||
+      cache.current.next > points.length - 1
+    )
+      cache.current = { points, next: 1, path: `M ${a.x} ${a.y}` };
+    const current = cache.current;
+    while (current.next < points.length - 1) {
+      const p = points[current.next],
+        q = points[current.next + 1];
+      current.path += ` Q ${p.x} ${p.y} ${(p.x + q.x) / 2} ${(p.y + q.y) / 2}`;
+      current.next++;
+    }
+    path = `${current.path} L ${b.x} ${b.y}`;
+  } else
+    path = tool === "arrow" ? arrowPath(a, b, strokeWidth) : smoothPath(points);
   return (
     <g
       stroke={color}
