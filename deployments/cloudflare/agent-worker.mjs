@@ -291,6 +291,9 @@ export class ShowAIAgentGateway extends DurableObject {
     return this.cloud(request);
   }
   async cloud(request) {
+    // A deployment can replace the monitor continuation after the process exits.
+    // The container state remains authoritative; do not retain an idle-upgrade gate.
+    if (this.quiescing && !this.ctx.container.running) this.quiescing = false;
     if (this.quiescing)
       return json(
         {
