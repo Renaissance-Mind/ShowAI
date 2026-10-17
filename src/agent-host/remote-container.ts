@@ -30,6 +30,9 @@ if (process.argv.includes("--install-runtime")) {
     key = process.env.SHOWAI_AGENT_KEY!;
   if (!origin || !/^[a-f0-9]{64}$/.test(tenant) || !/^[a-f0-9]{64}$/.test(key))
     throw new Error("Cloud Agent identity is not configured.");
+  const stateOrigin = process.env.SHOWAI_AGENT_STATE_URL ?? origin;
+  if (stateOrigin !== origin && stateOrigin !== "http://showai-state.internal")
+    throw new Error("Cloud state endpoint is not authorized.");
   let stage = "restore";
   let startupError: string | undefined;
   let restoreProgress = { completed: 0, total: 0 };
@@ -51,6 +54,8 @@ if (process.argv.includes("--install-runtime")) {
               ? (health ?? {
                   service: "showai-agent-container",
                   taskAdmission: "checkpointed-before-start",
+                  stateTransport:
+                    stateOrigin === origin ? "https" : "worker-binding",
                   runtime: startupError ? "failed" : "starting",
                   stage,
                   ...(stage === "restore" ? { restore: restoreProgress } : {}),
@@ -94,13 +99,16 @@ if (process.argv.includes("--install-runtime")) {
     ): Promise<{ status: number; body: Uint8Array }> => {
       for (let attempt = 0; ; attempt++) {
         try {
-          const response = await fetch(`${origin}/__state/${tenant}/${name}`, {
-            method: bytes ? "PUT" : "GET",
-            headers: { authorization: `Bearer ${key}` },
-            ...(bytes ? { body: Buffer.from(bytes) } : {}),
-            signal: AbortSignal.timeout(60000),
-            redirect: "error",
-          });
+          const response = await fetch(
+            `${stateOrigin}/__state/${tenant}/${name}`,
+            {
+              method: bytes ? "PUT" : "GET",
+              headers: { authorization: `Bearer ${key}` },
+              ...(bytes ? { body: Buffer.from(bytes) } : {}),
+              signal: AbortSignal.timeout(60000),
+              redirect: "error",
+            },
+          );
           if ([502, 503, 504].includes(response.status) && attempt < 2) {
             await response.body?.cancel();
           } else
@@ -259,6 +267,7 @@ if (process.argv.includes("--install-runtime")) {
     health = {
       service: "showai-agent-container",
       taskAdmission: "checkpointed-before-start",
+      stateTransport: stateOrigin === origin ? "https" : "worker-binding",
       runtime: (await engine.host.installer.status()).state,
       browserRendering,
       sandbox,

@@ -1,4 +1,4 @@
-import { DurableObject } from "cloudflare:workers";
+import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 import {
   invocation,
   remoteTaskActions,
@@ -76,7 +76,13 @@ async function state(request, env, tenant, name) {
   if (request.method === "GET") {
     const object = await env.STATE.get(key);
     return object
-      ? new Response(object.body)
+      ? new Response(object.body, {
+          headers: {
+            "content-type": "application/octet-stream",
+            "content-length": String(object.size),
+            "cache-control": "no-store",
+          },
+        })
       : new Response(null, { status: 404 });
   }
   if (request.method === "PUT") {
@@ -88,17 +94,38 @@ async function state(request, env, tenant, name) {
   }
   return new Response(null, { status: 405 });
 }
+export class ShowAIStateBroker extends WorkerEntrypoint {
+  async fetch(request) {
+    const match = new URL(request.url).pathname.match(
+      /^\/__state\/([a-f0-9]{64})\/(head|[a-f0-9]{64})$/,
+    );
+    if (!match || match[1] !== this.ctx.props.tenant)
+      return new Response(null, { status: 404 });
+    return state(request, this.env, match[1], match[2]);
+  }
+}
 export class ShowAIAgentGateway extends DurableObject {
   pending = new Map();
   monitoring = false;
+  stateTenant = "";
   constructor(ctx, env) {
     super(ctx, env);
     if (ctx.container?.running) {
-      void ctx.blockConcurrencyWhile(() =>
-        ctx.container.setInactivityTimeout(15 * 60 * 1000),
-      );
+      void ctx.blockConcurrencyWhile(async () => {
+        await ctx.container.setInactivityTimeout(15 * 60 * 1000);
+        const tenant = await ctx.storage.get("tenant");
+        if (tenant) await this.bindStateStore(tenant);
+      });
       this.observeContainer();
     }
+  }
+  async bindStateStore(tenant) {
+    if (this.stateTenant === tenant && this.ctx.container.running) return;
+    await this.ctx.container.interceptOutboundHttp(
+      "showai-state.internal",
+      this.ctx.exports.ShowAIStateBroker({ props: { tenant } }),
+    );
+    this.stateTenant = tenant;
   }
   observeContainer() {
     if (this.monitoring) return;
@@ -114,6 +141,7 @@ export class ShowAIAgentGateway extends DurableObject {
         )
         .finally(() => {
           this.monitoring = false;
+          this.stateTenant = "";
         }),
     );
   }
@@ -265,6 +293,7 @@ export class ShowAIAgentGateway extends DurableObject {
     if (!tenant) return new Response(null, { status: 404 });
     const key = await derived(this.env.SHOWAI_AGENT_KEY, tenant);
     const container = this.ctx.container;
+    await this.bindStateStore(tenant);
     if (!container.running)
       container.start({
         enableInternet: true,
@@ -272,6 +301,7 @@ export class ShowAIAgentGateway extends DurableObject {
           SHOWAI_AGENT_URL: this.env.SHOWAI_AGENT_URL,
           SHOWAI_AGENT_TENANT: tenant,
           SHOWAI_AGENT_KEY: key,
+          SHOWAI_AGENT_STATE_URL: "http://showai-state.internal",
         },
       });
     this.observeContainer();
@@ -455,7 +485,7 @@ const directory='/state/agent-host/remote-turns',jobs=fs.existsSync(directory)?f
   }
 }
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     try {
       const url = new URL(request.url);
       if (
@@ -495,6 +525,32 @@ export default {
         const tenant =
           requestedTenant ??
           (await derived(env.SHOWAI_AGENT_KEY, "deployment-health"));
+        if (request.headers.get("x-showai-state-probe") === "1") {
+          const broker = ctx.exports.ShowAIStateBroker({ props: { tenant } }),
+            target = `http://showai-state.internal/__state/${tenant}/head`,
+            authorization = `Bearer ${await derived(env.SHOWAI_AGENT_KEY, tenant)}`;
+          const valid = await broker.fetch(
+              new Request(target, { headers: { authorization } }),
+            ),
+            bytes = (await valid.arrayBuffer()).byteLength;
+          const missing = await broker.fetch(new Request(target));
+          await missing.body?.cancel();
+          const foreign = (tenant[0] === "0" ? "1" : "0") + tenant.slice(1),
+            foreignAuthorization = `Bearer ${await derived(env.SHOWAI_AGENT_KEY, foreign)}`,
+            denied = await broker.fetch(
+              new Request(
+                `http://showai-state.internal/__state/${foreign}/head`,
+                { headers: { authorization: foreignAuthorization } },
+              ),
+            );
+          await denied.body?.cancel();
+          return json({
+            authorizedStatus: valid.status,
+            bytes,
+            missingAuthStatus: missing.status,
+            foreignTenantStatus: denied.status,
+          });
+        }
         const relay = url.pathname.endsWith("relay-ticket");
         const target = new URL(relay ? "/devices/ticket" : "/health", url);
         return env.AGENTS.get(env.AGENTS.idFromName(tenant)).fetch(

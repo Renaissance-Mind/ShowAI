@@ -4,7 +4,8 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHmac } from "node:crypto";
+import { CloudState } from "../agent/cloud-state";
 import { startSyncServer } from "../server/node";
 import { AgentService } from "../agent/service";
 import { syncManager, stopSyncManagers } from "../sync/manager";
@@ -241,4 +242,64 @@ test("disabling sharing removes the Mac without opening any inbound listener", a
   expect((await request("/destinations")).value).not.toContainEqual(
     expect.objectContaining({ id: deviceId }),
   );
+});
+test("the internal state binding authenticates real R2 checkpoints and rejects another tenant even with valid foreign credentials", async () => {
+  const master = "f".repeat(64),
+    tenant = "a".repeat(64),
+    foreign = "0" + tenant.slice(1),
+    key = createHmac("sha256", master).update(tenant).digest("hex"),
+    foreignKey = createHmac("sha256", master).update(foreign).digest("hex");
+  const root = await mkdtemp(join(directory, "state-broker-"));
+  await writeFile(
+    join(root, "retained.txt"),
+    "Encrypted state binding acceptance",
+  );
+  const path = gateway + "/__state/" + tenant + "/",
+    headers = { authorization: "Bearer " + key };
+  const state = new CloudState(
+    root,
+    {
+      async get(name) {
+        const r = await fetch(path + name, { headers });
+        if (r.status === 404) return null;
+        if (!r.ok) throw new Error("State read failed");
+        return new Uint8Array(await r.arrayBuffer());
+      },
+      async put(name, bytes) {
+        const r = await fetch(path + name, {
+          method: "PUT",
+          headers,
+          body: Buffer.from(bytes),
+        });
+        expect(r.status).toBe(204);
+      },
+    },
+    key,
+  );
+  await state.save();
+  expect(
+    (
+      await fetch(gateway + "/__state/" + foreign + "/head", {
+        method: "PUT",
+        headers: { authorization: "Bearer " + foreignKey },
+        body: "separate namespace fixture",
+      })
+    ).status,
+  ).toBe(204);
+  const response = await fetch(gateway + "/_operations/health", {
+    method: "POST",
+    headers: {
+      authorization: "Bearer " + master,
+      "x-showai-tenant": tenant,
+      "x-showai-state-probe": "1",
+    },
+  });
+  expect(response.status).toBe(200);
+  const result = await response.json();
+  expect(result).toMatchObject({
+    authorizedStatus: 200,
+    missingAuthStatus: 404,
+    foreignTenantStatus: 404,
+  });
+  expect(result.bytes).toBeGreaterThan(28);
 });
