@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorCode, errorMessage } from "./bridge";
 import Dialog from "./Dialog";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/lanPairing";
@@ -38,6 +38,7 @@ export function NearbyMacs({
   } | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pairAgain, setPairAgain] = useState("");
   const useMac = async (id: string) => {
     setBusy(true);
     setError("");
@@ -45,6 +46,7 @@ export function NearbyMacs({
       await onPaired(id);
     } catch (reason) {
       setError(errorMessage(reason));
+      if (errorCode(reason) === "PROJECT_NOT_SHARED") setPairAgain(id);
     } finally {
       setBusy(false);
     }
@@ -152,10 +154,18 @@ export function NearbyMacs({
             className="settings-button"
             disabled={busy || pair?.state === "pending"}
             onClick={() =>
-              device.online ? void useMac(device.id) : void begin(device.id)
+              device.online && pairAgain !== device.id
+                ? void useMac(device.id)
+                : void begin(device.id)
             }
           >
-            {busy ? t("connecting") : device.online ? t("useMac") : t("pair")}
+            {busy
+              ? t("connecting")
+              : pairAgain === device.id
+                ? t("pairAgain")
+                : device.online
+                  ? t("useMac")
+                  : t("pair")}
           </button>
         </div>
       ))}

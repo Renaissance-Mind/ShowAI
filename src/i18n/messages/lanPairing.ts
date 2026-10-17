@@ -14,6 +14,7 @@ export default defineMessages("lanPairing", {
     nearbyMac: "附近的 Mac",
     useMac: "使用此 Mac",
     connecting: "正在连接…",
+    pairAgain: "重新配对",
     pair: "发起配对",
     macSavesToServerIPadRetainsChangesOffline:
       "Mac 负责服务器保存，断联期间修改留在 iPad",
@@ -39,6 +40,7 @@ export default defineMessages("lanPairing", {
     nearbyMac: "Nearby Mac",
     useMac: "Use Mac",
     connecting: "Connecting…",
+    pairAgain: "Pair again",
     pair: "Pair",
     macSavesToServerIPadRetainsChangesOffline:
       "Mac saves to server; iPad retains changes offline",
