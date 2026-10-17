@@ -200,7 +200,7 @@ try {
     await api.invoke('pages:remove',{projectId:project.id,pageId:importedExplicitRoot.document.id});
     saved=await api.invoke('pages:rename',{projectId:project.id,pageId:saved.document.id,title:'Renamed',baseHash:saved.hash,baseRevision:saved.revision});
     saved=await api.invoke('pages:pin',{projectId:project.id,pageId:saved.document.id,pinned:true,baseHash:saved.hash,baseRevision:saved.revision});
-    const templatePage=await api.invoke('pages:create',{projectId:project.id,parentId:childFolder.id,templateId:'research',title:'Folder template'});
+    const templatePage=await api.invoke('pages:create',{projectId:project.id,parentId:childFolder.id,templateId:'system-presentation',title:'Folder template'});
     const organized=await api.invoke('pages:list',{projectId:project.id});
     await api.invoke('folders:remove',{projectId:project.id,folderId:folder.id});
     const hiddenPages=await api.invoke('pages:list',{projectId:project.id});
