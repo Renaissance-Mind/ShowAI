@@ -3,7 +3,7 @@ import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import { desktop } from "./bridge";
 import { PageSessions } from "./page-sessions";
-import type { PageSnapshot, SaveStatus } from "./page-session";
+import type { LoadedPage, PageSnapshot, SaveStatus } from "./page-session";
 export type { LoadedPage, SaveStatus } from "./page-session";
 
 const empty: PageSnapshot = {
@@ -167,8 +167,12 @@ export function usePage(home?: string) {
     return sessions.getSnapshot().active?.flush() ?? true;
   }, [sessions]);
   const open = useCallback(
-    async (projectId: string, pageId: string, tabId?: string) =>
-      (await flush()) && sessions.open(projectId, pageId, tabId),
+    async (
+      projectId: string,
+      pageId: string,
+      tabId?: string,
+      initial?: LoadedPage,
+    ) => (await flush()) && sessions.open(projectId, pageId, tabId, initial),
     [sessions, flush],
   );
   const leave = useCallback(

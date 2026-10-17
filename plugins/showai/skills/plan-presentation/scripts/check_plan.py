@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check saved presentation-plan coverage; this is not a quality score."""
+"""Check saved presentation-plan coverage (logic nodes and design scenes); this is not a quality score."""
 import hashlib
 import argparse
 import json
@@ -53,7 +53,7 @@ def check(plan, document=None):
 
     walk(plan.get("nodes", []))
     if not nodes:
-        errors.append("no understanding nodes")
+        errors.append("no logic nodes")
     raw_scenes = plan.get("scenes", [])
     if not isinstance(raw_scenes, list):
         errors.append("scenes must be an array")
@@ -69,7 +69,7 @@ def check(plan, document=None):
         scenes[key] = scene
         links = scene.get("nodes", [])
         if not isinstance(links, list) or not links:
-            errors.append(f"{key}: link the understanding nodes explained here")
+            errors.append(f"{key}: link the logic nodes explained here")
             continue
         for link in links:
             if not isinstance(link, str):

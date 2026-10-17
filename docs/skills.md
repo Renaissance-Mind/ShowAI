@@ -4,16 +4,16 @@
 
 The ShowAI plugin provides eight Skills. The runtime owns storage, native containers, catalog, compilation and rendering; the plugin supplies methods, references and connection configuration. Agent document operations use MCP. CLI supports startup, diagnostics and scripts.
 
-| Skill                                                                        | Task                                                | Result                                                         |
-| ---------------------------------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------- |
-| [use-showai](../plugins/showai/skills/use-showai/SKILL.md)                   | Connect, find, read and discover capabilities       | Connection, content identities and available resources         |
-| [plan-presentation](../plugins/showai/skills/plan-presentation/SKILL.md)     | Organize difficult material                         | Reader goals, evidence scope and understanding path            |
-| [design-presentation](../plugins/showai/skills/design-presentation/SKILL.md) | Design expression and interaction                   | Objects, relationships, layout, states and static alternatives |
-| [show-document](../plugins/showai/skills/show-document/SKILL.md)             | Create, revise, present, export or apply a template | Saved editable Page and delivery                               |
-| [review-presentation](../plugins/showai/skills/review-presentation/SKILL.md) | Assess clarity and revise                           | Located issues, repairs and verified scope                     |
-| [create-template](../plugins/showai/skills/create-template/SKILL.md)         | Create/extract reusable organization                | Template folder, instructions and applied example              |
-| [create-component](../plugins/showai/skills/create-component/SKILL.md)       | Add a missing expression capability                 | Versioned React component, contract and real instance          |
-| [collaborate-canvas](../plugins/showai/skills/collaborate-canvas/SKILL.md) | Concurrent editing, paired devices and spatial references | Saved content with clear synchronization and edit boundaries |
+| Skill                                                                        | Task                                                      | Result                                                         |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------- |
+| [use-showai](../plugins/showai/skills/use-showai/SKILL.md)                   | Connect, find, read and discover capabilities             | Connection, content identities and available resources         |
+| [plan-presentation](../plugins/showai/skills/plan-presentation/SKILL.md)     | Organize difficult material                               | Reader goals, evidence scope and understanding path            |
+| [design-presentation](../plugins/showai/skills/design-presentation/SKILL.md) | Design expression and interaction                         | Objects, relationships, layout, states and static alternatives |
+| [show-document](../plugins/showai/skills/show-document/SKILL.md)             | Create, revise, present, export or apply a template       | Saved editable Page and delivery                               |
+| [review-presentation](../plugins/showai/skills/review-presentation/SKILL.md) | Assess clarity and revise                                 | Located issues, repairs and verified scope                     |
+| [create-template](../plugins/showai/skills/create-template/SKILL.md)         | Create/extract reusable organization                      | Template folder, instructions and applied example              |
+| [create-component](../plugins/showai/skills/create-component/SKILL.md)       | Add a missing expression capability                       | Versioned React component, contract and real instance          |
+| [collaborate-canvas](../plugins/showai/skills/collaborate-canvas/SKILL.md)   | Concurrent editing, paired devices and spatial references | Saved content with clear synchronization and edit boundaries   |
 
 ## Start from the request
 
@@ -29,9 +29,9 @@ Read the current Page before editing; keep its hash, revision and stable IDs. Sa
 
 ## Templates and components
 
-The system presentation baseline is mandatory. Six task families cover concepts/mechanisms, comparisons/decisions, evidence reports, procedures/troubleshooting, progress reports and exploration maps. Template folders declare intent, evidence, understanding, design, authoring and review stages, and may include components and a Page skeleton. Existing legacy templates remain readable. See [Template folders](template-bundles.md).
+The system presentation baseline is mandatory. It defines four stages, each with one record: intent (reader brief), material (source notes), logic (multi-level presentation plan) and design (scene-by-scene design draft); authoring implements the draft and review checks the saved Page against it. Template folders declare the same four stages and may include a component library. The runtime ships the `paper-explainer` method template; legacy six-stage templates remain readable. See [Template folders](template-bundles.md).
 
-Read only the needed stage and selected exact-template context. For mechanisms, make the participating objects, state changes, steps and feedback observable. A template provides guidance and structure; the agent fills it with real evidence. Preserve the original when extracting a template and test the result with different material.
+Read only the needed stage and selected exact-template context. Prefer visual expression, keep text as the necessary complement, and design both the whole page and each part. A template provides the method; the agent fills it with real evidence. Preserve the original when extracting a template and test the result with different material.
 
 Components own their schema and versioned usage/development documentation. Query metadata, guide and [parameters](component-parameters.md) first; read implementation sources when developing a component. Reuse and combine existing capabilities before adding a new package. New source requires a new immutable revision.
 

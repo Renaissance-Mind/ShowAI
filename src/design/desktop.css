@@ -251,10 +251,6 @@
   background: var(--paper);
   box-shadow: 0 2px 6px #00000008;
 }
-.studio-search:focus-within {
-  outline: 2px solid var(--text);
-  outline-offset: 2px;
-}
 .studio-search input {
   width: 180px;
   font-size: 14px;
@@ -481,7 +477,7 @@
   font-size: 14px;
   line-height: 1.5;
 }
-.studio-form :is(input, textarea, select):focus-visible {
+.studio-form select:focus-visible {
   border-color: var(--text);
 }
 .studio-form .studio-code-editor {

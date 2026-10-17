@@ -81,6 +81,8 @@ export class LanPeerServer {
   private syncWork = new Set<Promise<unknown>>();
   private syncTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private closing?: Promise<void>;
+  private starting?: Promise<void>;
+  private generation = 0;
   private incoming = new Map<
     string,
     Promise<{ projectId: string; role: string; serverLinked: boolean }>
@@ -148,8 +150,18 @@ export class LanPeerServer {
       if (peer.id === peerId) socket.close(4001, "Pairing changed");
   }
   async start() {
+    const generation = this.generation;
     await this.closing;
-    if (this.server) return;
+    if (generation !== this.generation || this.server) return;
+    const work = this.starting ?? this.open();
+    this.starting = work;
+    try {
+      await work;
+    } finally {
+      if (this.starting === work) this.starting = undefined;
+    }
+  }
+  private async open() {
     const settings = this.settings();
     if (!settings || !(settings.nearbyEnabled ?? settings.enabled)) return;
     const sharedHome = this.home();
@@ -863,8 +875,12 @@ export class LanPeerServer {
     return this.host.action(action, { ...args, projectId });
   }
   async close() {
+    this.generation++;
     if (this.closing) return this.closing;
     const task = (async () => {
+      await this.starting?.catch((error) => {
+        this.error = error.message;
+      });
       this.publisher?.kill();
       this.publisher = undefined;
       await this.watcher?.close();

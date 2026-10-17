@@ -213,15 +213,15 @@ export function DockableBoardToolbar({
             </button>
           )}
           {children}
+          {properties && (
+            <div className="board-toolbar-inline-properties" data-surface-ui>
+              {properties}
+            </div>
+          )}
         </div>
         {actions && (
           <div className="board-toolbar-actions" data-surface-ui>
             {actions}
-          </div>
-        )}
-        {properties && (
-          <div className="board-toolbar-properties" data-surface-ui>
-            {properties}
           </div>
         )}
       </div>

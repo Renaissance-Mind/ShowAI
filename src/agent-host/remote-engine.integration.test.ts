@@ -121,6 +121,18 @@ test("account identity and current project membership are checked before opening
     ),
   ).rejects.toThrow();
 });
+test("a new cloud project can show execution settings and empty conversations before its first task", async () => {
+  const status = (await engine.invoke(request("agent:status"), actor)) as {
+    settings: { mode: string };
+  };
+  expect(status.settings.mode).toBe("api");
+  expect(await engine.invoke(request("agent:conversations"), actor)).toEqual(
+    [],
+  );
+  expect(
+    (await syncManager(engine.options.library).configuration()).projects,
+  ).toEqual([]);
+});
 test("pulls a real server project and refuses a stale page before model execution", async () => {
   await engine.host.saveSource({
     id: randomUUID(),

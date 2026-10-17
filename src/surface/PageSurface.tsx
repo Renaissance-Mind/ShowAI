@@ -63,7 +63,6 @@ import {
   SendToBack,
   ChevronUp,
   ChevronDown,
-  Group,
   Ungroup,
   LockKeyhole,
   LockKeyholeOpen,
@@ -230,7 +229,6 @@ export default function PageSurface({
   onCopyObjects,
   onPasteObjects,
   onReorder,
-  onGroup,
   onUngroup,
   onLock,
   ref,
@@ -435,23 +433,6 @@ export default function PageSurface({
         frames[id] = { ...frame, x: frame.x + offset.x, y: frame.y + offset.y };
     }
     if (Object.keys(frames).length) onTransform?.(frames);
-  };
-  const group = (ids: string[]) => {
-    const boxes = Object.values(board.measured(ids));
-    if (!boxes.length || !onGroup) return;
-    const left = Math.min(...boxes.map((b) => b.x)),
-      top = Math.min(...boxes.map((b) => b.y));
-    const bounds = {
-      x: left,
-      y: top,
-      width: Math.max(...boxes.map((b) => b.x + b.width)) - left,
-      height: Math.max(...boxes.map((b) => b.y + b.height)) - top,
-    };
-    const id = onGroup(ids, bounds, regionOffset());
-    if (id) {
-      board.selectIds([id]);
-      focusRoot();
-    }
   };
   const ungroup = (id: string) => {
     const ids = onUngroup?.(id, regionOffset(id));
@@ -991,22 +972,17 @@ export default function PageSurface({
             }),
           )
         : []),
-      region
-        ? {
+      ...(region
+        ? [
+            {
             label: t("region.ungroup"),
             icon: <Ungroup size={14} />,
             shortcut: "⇧⌘G",
             separatorBefore: true,
             onSelect: () => ungroup(id),
-          }
-        : {
-            label: t("region.group"),
-            icon: <Group size={14} />,
-            shortcut: "⌘G",
-            separatorBefore: true,
-            disabled: !onGroup,
-            onSelect: () => group(ids),
           },
+          ]
+        : []),
       {
         label: lockedNow ? t("lock.unlock") : t("lock.lock"),
         icon: lockedNow ? (
@@ -1517,6 +1493,10 @@ export default function PageSurface({
           updateMarquee();
           trackEdges(event.clientX, event.clientY);
         }}
+        onDragStartCapture={(event) => {
+          // Native image/text drag cancels pointer capture during fast moves.
+          if (pointing.current || marquee.current) event.preventDefault();
+        }}
         onPointerUpCapture={(event) => {
           const pointer = pointing.current;
           if (pointer?.pointer === event.pointerId) {
@@ -1583,7 +1563,14 @@ export default function PageSurface({
         onLostPointerCapture={(event) => {
           if (event.target !== event.currentTarget) return;
           cancelMarquee(true);
-          if (pointing.current) cancelPointing();
+          const pointer = pointing.current;
+          if (pointer && !pointer.touch && pointer.moved) {
+            pointing.current = null;
+            stopAutoPan();
+            board.update(pointer.input);
+            board.finish();
+            controls.current.objectGesture(false);
+          } else if (pointer) cancelPointing();
         }}
         onPointerLeave={() => {
           clearHover();
@@ -1715,12 +1702,13 @@ export default function PageSurface({
             return run(() => board.selectAll());
           if (command && event.key.toLowerCase() === "d" && ids.length)
             return run(() => duplicateSelection(ids));
-          if (command && event.code === "KeyG" && ids.length)
-            return run(() =>
-              event.shiftKey
-                ? selectedRegion && ungroup(selectedRegion)
-                : group(ids),
-            );
+          if (
+            command &&
+            event.shiftKey &&
+            event.code === "KeyG" &&
+            selectedRegion
+          )
+            return run(() => ungroup(selectedRegion));
           if (command && event.shiftKey && event.code === "KeyL" && ids.length)
             return run(() => toggleLock(ids));
           if (
@@ -2116,22 +2104,7 @@ export default function PageSurface({
                     >
                       <Ungroup size={15} />
                     </button>
-                  ) : (
-                    board.ids.size > 1 &&
-                    onGroup && (
-                      <button
-                        type="button"
-                        aria-label={t("region.group")}
-                        title={t("tool.withShortcut", {
-                          label: t("region.group"),
-                          key: "⌘G",
-                        })}
-                        onClick={() => group(selectedIds)}
-                      >
-                        <Group size={15} />
-                      </button>
-                    )
-                  )}
+                  ) : null}
                   <button
                     type="button"
                     aria-label={allLocked ? t("lock.unlock") : t("lock.lock")}

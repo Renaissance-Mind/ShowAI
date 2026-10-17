@@ -22,7 +22,14 @@
 .sync-settings select {
   max-width: 280px;
 }
-.sync-settings :is(button, input, select, summary):focus-visible {
+.sync-settings
+  :is(
+    button,
+    input[type="checkbox"],
+    input[type="radio"],
+    select,
+    summary
+  ):focus-visible {
   outline: 2px solid var(--brand-accent, var(--accent));
   outline-offset: 2px;
 }
@@ -729,7 +736,14 @@
   min-height: 38px;
   font-size: 13px;
 }
-.sync-dialog :is(button, input, select, summary):focus-visible {
+.sync-dialog
+  :is(
+    button,
+    input[type="checkbox"],
+    input[type="radio"],
+    select,
+    summary
+  ):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
@@ -1350,10 +1364,6 @@
 }
 .sync-projects-dialog input.sync-project-search:focus-visible {
   outline: none;
-}
-.sync-project-search-field:has(input:focus-visible) {
-  outline: 1px solid var(--muted);
-  outline-offset: 2px;
 }
 .sync-project-table {
   width: 100%;

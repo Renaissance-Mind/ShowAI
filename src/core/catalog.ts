@@ -45,7 +45,6 @@ import { build, type Plugin } from "esbuild";
 import Ajv from "ajv";
 import standaloneCode from "ajv/dist/standalone/index.js";
 import legacyTemplates from "../../resources/catalog/templates.json";
-import presentationTemplates from "../../resources/catalog/presentation-templates.json";
 import { builtinTemplateBundles } from "./builtin-template-bundles";
 import {
   parseTemplateBundle,
@@ -720,11 +719,7 @@ const folderTemplates = builtinTemplateBundles.map((source) => {
     },
   };
 });
-const templates = [
-  ...legacyTemplates,
-  ...presentationTemplates,
-  ...folderTemplates,
-];
+const templates = [...legacyTemplates, ...folderTemplates];
 
 function builtinTemplate(
   id: string,

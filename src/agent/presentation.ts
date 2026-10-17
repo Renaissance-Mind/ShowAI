@@ -2,7 +2,6 @@ import { CapacityError } from "../portable/capacity.mjs";
 import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname, extname } from "node:path";
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { AgentService } from "./service";
 import { builtinTemplateBundles } from "../core/builtin-template-bundles";
@@ -29,7 +28,6 @@ import {
   serializeArtifact,
   validateDocument,
 } from "../portable/validation.mjs";
-import { upgradeResource } from "../surface/containers.mjs";
 import { selectDocumentBlocks } from "../portable/selection.mjs";
 import type { ComponentSource } from "../components/custom/types";
 import { assertProps } from "../components/custom/schema";
@@ -71,45 +69,6 @@ export const presentationSchema = {
 };
 export type PresentationInput = z.infer<z.ZodObject<typeof presentationSchema>>;
 
-const text = (id: string, content: string) => ({
-  type: "widget",
-  attrs: { id, kind: "text", data: { content, format: "markdown" } },
-});
-const publicTemplates = [
-  {
-    id: "explainer",
-    name: "交互讲解",
-    description: "从一个问题出发，用例子、图解和来源解释内容。",
-    sections: [
-      ["question", "## 问题\n写下读者要理解的问题。"],
-      ["example", "## 从例子开始\n填入任务提供的例子。"],
-      ["visual", "## 看清关系\n在这里插入合适的图解组件。"],
-      ["sources", "## 依据\n补充可核实的来源。"],
-    ],
-  },
-  {
-    id: "comparison",
-    name: "方案对比",
-    description: "按同一组维度比较候选方案，并记录选择依据。",
-    sections: [
-      ["goal", "## 选择目标\n说明需要解决的任务。"],
-      ["dimensions", "## 比较维度\n列出影响选择的条件。"],
-      ["options", "## 候选方案\n用任务提供的材料填写各方案。"],
-      ["decision", "## 判断与依据\n记录取舍及待核实事项。"],
-    ],
-  },
-  {
-    id: "research-note",
-    name: "研究笔记",
-    description: "保留问题、局部证据、解释及后续验证，便于人和 Agent 续改。",
-    sections: [
-      ["question", "## 研究问题\n写下本次关注的问题。"],
-      ["evidence", "## 证据\n记录来源、观察及适用范围。"],
-      ["interpretation", "## 理解\n连接证据与解释。"],
-      ["next", "## 下一步\n记录尚待验证的问题。"],
-    ],
-  },
-];
 const folderTemplateIds = new Set(
   builtinTemplateBundles.map(
     (source) => parseTemplateBundle(source).metadata.id,
@@ -118,18 +77,8 @@ const folderTemplateIds = new Set(
 const publicCatalogHome = () => join(tmpdir(), "showai-public-catalog");
 
 export function publicTemplate(id: string): ShowDocument {
-  const found = publicTemplates.find((item) => item.id === id);
-  if (!found)
-    throw new Error(`Unknown public template: ${id}. Use public_catalog_list.`);
-  return upgradeResource(
-    validateDocument({
-      id: randomUUID(),
-      title: found.name,
-      content: {
-        type: "doc",
-        content: found.sections.map(([key, content]) => text(key, content)),
-      },
-    }),
+  throw new Error(
+    `Unknown public template: ${id}. Public templates are the builtin folder templates listed by public_catalog_list.`,
   );
 }
 export async function publicCatalog(
@@ -152,27 +101,6 @@ export async function publicCatalog(
             query: input.query,
           })
         ).items;
-  const query = input.query?.toLocaleLowerCase();
-  const templates =
-    input.kind === "component"
-      ? []
-      : publicTemplates
-          .filter(
-            (item) =>
-              !query ||
-              `${item.id} ${item.name} ${item.description}`
-                .toLocaleLowerCase()
-                .includes(query),
-          )
-          .map(({ id, name, description }) => ({
-            kind: "template",
-            id,
-            name,
-            description,
-            scenarios: [description],
-            scope: "public",
-            version: "1.0.0",
-          }));
   const folders =
     input.kind === "component"
       ? []
@@ -183,7 +111,7 @@ export async function publicCatalog(
             query: input.query,
           })
         ).items.filter((item) => folderTemplateIds.has(item.id));
-  const items = [...components, ...templates, ...folders];
+  const items = [...components, ...folders];
   return {
     ...catalogPage(items, {
       limit: input.limit,
@@ -212,9 +140,7 @@ export async function describePublicResource(
   if (
     input.view === "parameters" &&
     (input.kind === "template" ||
-      (input.kind !== "component" &&
-        (folderTemplateIds.has(id) ||
-          publicTemplates.some((x) => x.id === id))))
+      (input.kind !== "component" && folderTemplateIds.has(id)))
   )
     throw new Error("Parameter references belong to components.");
   if (folderTemplateIds.has(id) && input.kind !== "component") {
@@ -276,32 +202,7 @@ export async function describePublicResource(
       },
     };
   }
-  if (input.stage)
-    throw new Error(
-      "Stage guides are available on folder templates. Read the system baseline with guide presentation for legacy public templates.",
-    );
-  if (
-    input.kind === "template" ||
-    (input.kind !== "component" &&
-      publicTemplates.some((item) => item.id === id))
-  ) {
-    const template = publicTemplates.find((item) => item.id === id);
-    if (!template) throw new Error(`Unknown public template: ${id}`);
-    return {
-      kind: "template",
-      id,
-      name: template.name,
-      description: template.description,
-      version: "1.0.0",
-      scope: "public",
-      editable: true,
-      guide:
-        "Customize the returned document. Render it without a private project, or save it using page_create in an authorized project.",
-      ...(input.view === "source" || input.view === "examples"
-        ? { document: publicTemplate(id) }
-        : {}),
-    };
-  }
+  if (input.kind === "template" || input.stage) publicTemplate(id);
   return new AgentService({
     root: join(tmpdir(), "showai-public-catalog"),
   }).catalogDescribe(id, {

@@ -67,7 +67,7 @@ await writeFile(
   entrypoint,
   entrySource.replace(
     /<!-- showai-system-baseline:start -->[\s\S]*?<!-- showai-system-baseline:end -->/,
-    `<!-- showai-system-baseline:start -->\n${baseline}\n\n系统基线内容哈希：\`${baselineHash}\`。本轮已读到同一内容时，可用 knownSystemHash 避免重复返回；没有读过时不要仅凭哈希声明已知。\n<!-- showai-system-baseline:end -->`,
+    `<!-- showai-system-baseline:start -->\n\n${baseline}\n\n系统基线内容哈希：\`${baselineHash}\`。本轮已读到同一内容时，可用 knownSystemHash 避免重复返回；没有读过时不要仅凭哈希声明已知。\n<!-- showai-system-baseline:end -->`,
   ),
 );
 // Host packaging differs; skills, system rules and the MCP runtime remain shared.

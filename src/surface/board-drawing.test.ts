@@ -92,3 +92,13 @@ describe("Board drawing transactions", () => {
     expect(() => validateDocument(result)).toThrow(/Drawing fill/);
   });
 });
+
+it.each(["rectangle", "ellipse"] as const)("roundtrips %s with no border or fill", (tool) => {
+  const doc = createResource(blankDocument(), "board");
+  const drawing = finishBoardDrawing(tool, { ...style, color: "none", fillColor: "none" }, gesture);
+  const saved = addNode(doc, drawing.node, drawing.frame, doc.content.attrs!.id);
+  const restored = parseArtifact(serializeArtifact(validateDocument(saved))).document;
+  expect(restored.content.content![0].attrs).toMatchObject({ tool, color: "none", fillColor: "none" });
+  restored.content.content![0].attrs!.tool = "pen";
+  expect(() => validateDocument(restored)).toThrow(/Drawing color/);
+});

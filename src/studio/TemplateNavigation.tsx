@@ -1,4 +1,4 @@
-import { FileText, FlaskConical, LayoutTemplate, Columns3 } from "../ui/icons";
+import { FileText, FlaskConical, LayoutTemplate } from "../ui/icons";
 import type { TemplateMetadata } from "../components/custom/types";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/templates";
@@ -7,17 +7,9 @@ import "./template-navigation.css";
 // Labels are templates-namespace keys (`type.<id>`), translated at render.
 const types = [
   { id: "all", icon: LayoutTemplate },
-  { id: "concept-explainer", icon: LayoutTemplate },
-  { id: "decision-comparison", icon: Columns3 },
-  { id: "evidence-report", icon: FlaskConical },
-  { id: "procedure-guide", icon: FileText },
-  { id: "progress-report", icon: FileText },
-  { id: "exploration-map", icon: LayoutTemplate },
   { id: "system-presentation", icon: FileText },
+  { id: "paper-explainer", icon: FlaskConical },
   { id: "blank", icon: FileText },
-  { id: "research", icon: FlaskConical },
-  { id: "comparison", icon: Columns3 },
-  { id: "brief", icon: FileText },
   { id: "custom", icon: LayoutTemplate },
 ] as const;
 

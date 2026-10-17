@@ -6,6 +6,8 @@ import {
   shapeIntersects,
   shapeIntersectsPolygon,
 } from "./drawing-geometry.mjs";
+import { overlappingPageAnnotations } from "./page-annotations";
+import { flushSync } from "react-dom";
 import { canCommitBoardGesture, boardSelectionScope } from "./board-commands";
 import type { SurfaceGeometryStore } from "./geometry-store";
 import {
@@ -812,6 +814,14 @@ export function useBoardInteraction({
         );
         if (chosen.has(nodeId) && !frame.locked) frames[nodeId] = frame;
       }
+      if (kind === "move") {
+        for (const key of overlappingPageAnnotations(
+          source,
+          Object.keys(frames),
+          measured,
+        ))
+          frames[key] = source.layout![key];
+      }
       if (!frames[id]) return false;
       const bounds = pointsBounds(
         Object.keys(frames).flatMap((key) => {
@@ -868,8 +878,7 @@ export function useBoardInteraction({
           Object.entries(measured)
             .filter(
               ([key]) =>
-                !chosen.has(key) &&
-                index.get(key)?.node.attrs?.tool !== "arrow",
+                !frames[key] && index.get(key)?.node.attrs?.tool !== "arrow",
             )
             .map(([key, frame]) => ({ id: key, frame })),
         ),
@@ -901,8 +910,10 @@ export function useBoardInteraction({
           JSON.stringify(drag.next[id]) !== JSON.stringify(drag.frames[id]),
       );
       const frames = drag.next;
-      restore();
-      if (valid && changed) current.current.onTransform?.(frames);
+      flushSync(() => {
+        restore();
+        if (valid && changed) current.current.onTransform?.(frames);
+      });
     },
     cancel: restore,
     marquee(rect, additive, base, wrap = false) {

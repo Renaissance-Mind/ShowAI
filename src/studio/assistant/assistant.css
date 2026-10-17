@@ -309,10 +309,6 @@
   color: var(--text);
   font: inherit;
 }
-.assistant-input textarea:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
-}
 .assistant-send {
   position: absolute;
   right: 6px;

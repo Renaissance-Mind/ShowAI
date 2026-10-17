@@ -44,8 +44,8 @@ npm run plugin:dsh
 | Skill                                                      | 用途                             |
 | ---------------------------------------------------------- | -------------------------------- |
 | [use-showai](skills/use-showai/SKILL.md)                   | 连接身份、发现、查找、阅读与分工 |
-| [plan-presentation](skills/plan-presentation/SKILL.md)     | 读者目标、证据与理解路径         |
-| [design-presentation](skills/design-presentation/SKILL.md) | 图形对象、布局、状态与交互       |
+| [plan-presentation](skills/plan-presentation/SKILL.md)     | 读者意图、材料与呈现逻辑         |
+| [design-presentation](skills/design-presentation/SKILL.md) | 逐幕设计稿、布局与交互           |
 | [show-document](skills/show-document/SKILL.md)             | 制作、续改、保存、展示与导出     |
 | [review-presentation](skills/review-presentation/SKILL.md) | 检查理解、修订与复核             |
 | [create-component](skills/create-component/SKILL.md)       | 可复用 React 表达能力            |

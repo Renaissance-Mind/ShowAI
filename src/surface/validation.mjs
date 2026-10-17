@@ -200,8 +200,16 @@ function validateResource(document) {
         )
       )
         throw new Error("Unknown drawing tool.");
-      if (!/^#[0-9a-fA-F]{6}$/.test(node.attrs.color))
-        throw new Error("Drawing color must be a six-digit hex value.");
+      if (
+        !(
+          node.attrs.color === "none" &&
+          ["rectangle", "ellipse"].includes(node.attrs.tool)
+        ) &&
+        !/^#[0-9a-fA-F]{6}$/.test(node.attrs.color)
+      )
+        throw new Error(
+          "Drawing color must be a six-digit hex value, or none for a rectangle or ellipse.",
+        );
       if (
         node.attrs.fillColor !== undefined &&
         node.attrs.fillColor !== "none" &&

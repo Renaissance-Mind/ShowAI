@@ -2,7 +2,12 @@ import { afterEach, expect, test } from "vitest";
 import { mkdtemp, rm, writeFile, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseTemplateBundle } from "../portable/template-bundle.mjs";
+import {
+  parseTemplateBundle,
+  stageGuidePath,
+  TEMPLATE_STAGES,
+  TEMPLATE_WORKFLOW_CAPABILITIES,
+} from "../portable/template-bundle.mjs";
 import {
   readTemplateDirectory,
   writeTemplateDirectory,
@@ -12,6 +17,7 @@ import { AgentService } from "../agent/service";
 import {
   getTemplate,
   getComponentByRef,
+  listTemplates,
   readComponentSource,
   resolveDocumentComponents,
   promotePackage,
@@ -29,15 +35,31 @@ afterEach(async () => {
   for (const path of paths.splice(0))
     await rm(path, { recursive: true, force: true });
 });
-test("portable folder contract rejects traversal, unknown fields and cross-platform collisions", () => {
+test("the workflow has four stages and the capability advertises protocol v2", () => {
+  expect([...TEMPLATE_STAGES]).toEqual([
+    "intent",
+    "material",
+    "logic",
+    "design",
+  ]);
+  expect(TEMPLATE_WORKFLOW_CAPABILITIES.protocol).toBe(
+    "showai-template-workflow-v2",
+  );
+  expect(TEMPLATE_WORKFLOW_CAPABILITIES.schemaVersion).toBe(3);
+});
+test("portable folder contract rejects traversal, unknown fields, page skeletons and cross-platform collisions", () => {
   const source = templateFixture();
-  expect(parseTemplateBundle(source).components).toHaveLength(1);
+  const parsed = parseTemplateBundle(source);
+  expect(parsed.components).toHaveLength(1);
+  expect(parsed.legacy).toBe(false);
+  expect(Object.keys(parsed.guides)).toEqual([...TEMPLATE_STAGES]);
   for (const name of [
     "../escape.md",
     "guides/CON.md",
     "guides/trailing.",
     "components",
     "guides",
+    "page.json",
   ]) {
     const bad = structuredClone(source);
     bad.files[name] = "bad";
@@ -48,21 +70,40 @@ test("portable folder contract rejects traversal, unknown fields and cross-platf
   expect(() => parseTemplateBundle(collision)).toThrow(/case-insensitive/);
   const unknown = structuredClone(source);
   unknown.files["README.md"] = unknown.files["README.md"].replace(
-    '"schemaVersion": 1',
-    '"schemaVersion": 1, "automaticPermissions": true',
+    '"schemaVersion": 3',
+    '"schemaVersion": 3, "automaticPermissions": true',
   );
   expect(() => parseTemplateBundle(unknown)).toThrow(/Unknown/);
+  const legacyStage = structuredClone(source);
+  legacyStage.files["README.md"] = legacyStage.files["README.md"].replace(
+    '"material": "guides/material.md"',
+    '"evidence": "guides/material.md"',
+  );
+  expect(() => parseTemplateBundle(legacyStage)).toThrow(/stage guide/);
 });
 test("a stage folder discloses its main README; null inherits the system stage", () => {
   const source = templateFixture("folder", false);
   source.files["README.md"] = source.files["README.md"]
     .replace('"design": "guides/design.md"', '"design": "guides/design"')
-    .replace('"evidence": "guides/evidence.md"', '"evidence": null');
+    .replace('"material": "guides/material.md"', '"material": null');
   source.files["guides/design/README.md"] = "# Design\nMain.";
   source.files["guides/design/detail.md"] = "# Detail\nOptional.";
   const parsed = parseTemplateBundle(source);
   expect(parsed.guides.design?.path).toBe("guides/design/README.md");
-  expect(parsed.guides.evidence).toBeUndefined();
+  expect(parsed.guides.material).toBeUndefined();
+  expect(stageGuidePath(parsed.metadata, "material")).toBeNull();
+});
+test("legacy six-stage bundles map evidence/understanding onto material/logic and keep their page skeleton", () => {
+  const legacy = templateFixture("legacy-six", false, true);
+  const parsed = parseTemplateBundle(legacy);
+  expect(parsed.legacy).toBe(true);
+  expect(parsed.metadata.schemaVersion).toBe(1);
+  expect(parsed.guides.material?.path).toBe("guides/evidence.md");
+  expect(parsed.guides.logic?.path).toBe("guides/understanding.md");
+  expect(stageGuidePath(parsed.metadata, "logic")).toBe(
+    "guides/understanding.md",
+  );
+  expect(Object.keys(parsed.guides)).toEqual([...TEMPLATE_STAGES]);
 });
 test("real directory export/import preserves portable files and rejects symlinks", async () => {
   const directory = await temporary(),
@@ -90,6 +131,7 @@ test("template components compile with isolated names, persist exact refs and su
     integrity: summary.integrity,
   });
   expect(saved.workflow?.components).toHaveLength(1);
+  expect(saved.workflow?.stages).toEqual([...TEMPLATE_STAGES]);
   const binding = saved.workflow!.components[0];
   expect(binding.ref.id).toMatch(/^tpl-guided-example-step-picker-/);
   const compiled = await getComponentByRef(home, binding.ref, project.id);
@@ -103,6 +145,8 @@ test("template components compile with isolated names, persist exact refs and su
     },
   ]);
   expect(context.system?.required).toBe(true);
+  expect(context.stages).toEqual([...TEMPLATE_STAGES]);
+  expect(context.templates?.[0]).not.toHaveProperty("legacyStages");
   expect(context.components?.[0].ref.integrity).toBe(compiled.integrity);
   const page = await service.applyTemplate(project.id, saved.id);
   expect(page.document.templateContext?.templates[0].integrity).toBe(
@@ -157,46 +201,102 @@ test("template components compile with isolated names, persist exact refs and su
     await resolveDocumentComponents(home, updated.document, project.id),
   ).toHaveLength(1);
 });
-test("system-only/default context, exact legacy revisions and changed-context cache are distinct", async () => {
+test("builtin catalog ships only the system baseline, the paper explainer and blank", async () => {
   const home = await temporary(),
     service = new AgentService({ root: home });
-  const project = await service.createProject("Contexts");
+  const project = await service.createProject("Builtins");
+  const ids = (await listTemplates(home, project.id)).map((item) => item.id);
+  expect(ids.sort()).toEqual([
+    "blank",
+    "paper-explainer",
+    "system-presentation",
+  ]);
+  for (const id of ["system-presentation", "paper-explainer"]) {
+    const current = await getTemplate(home, id, project.id, {
+      scope: "builtin",
+    });
+    const parsed = parseTemplateBundle(current.bundle);
+    expect(parsed.metadata.schemaVersion).toBe(3);
+    expect(parsed.metadata.version).toBe("2.0.0");
+    expect(Object.keys(parsed.guides)).toEqual([...TEMPLATE_STAGES]);
+    expect(current.document.content.content ?? []).toHaveLength(0);
+  }
   const base = await service.templateContext(project.id);
   expect(base.context.templates).toEqual([]);
   expect(base.system?.required).toBe(true);
-  const report = await service.templateContext(project.id, [
-    { id: "evidence-report", scope: "builtin" },
+  expect(base.system?.readme).toContain("理解意图");
+  const paper = await service.templateContext(project.id, [
+    { id: "paper-explainer", scope: "builtin" },
   ]);
-  expect(report.context.templates[0].version).toBe("2.1.0");
+  expect(paper.context.templates[0].version).toBe("2.0.0");
+  const summary = paper.templates?.[0];
+  expect(summary && "stages" in summary).toBe(true);
+  expect(
+    summary && "stages" in summary
+      ? summary.stages.map((stage) => stage.stage)
+      : [],
+  ).toEqual([...TEMPLATE_STAGES]);
   const cached = await service.templateContext(
     project.id,
-    report.context.templates,
-    report.context.hash,
+    paper.context.templates,
+    paper.context.hash,
   );
   expect(cached.unchanged).toBe(true);
   expect(cached.system).toBeUndefined();
-  const legacy = await getTemplate(home, "evidence-report", project.id, {
-    scope: "builtin",
-    version: "1.2.1",
-  });
-  expect(legacy.integrity).toBe(
-    "sha256-c21034e9c09752e07d2492b56e2dd73a6a1421f1ed505679019cfd2b8dda3b5a",
-  );
   const design = await service.templateGuide(
     project.id,
     "design",
-    report.context.templates,
+    paper.context.templates,
   );
+  expect(design.documents).toHaveLength(2);
   expect(
     design.documents?.every(
       (document) =>
-        !("markdown" in document) ||
-        !(document.markdown ?? "").includes("# 研究与证据报告：评审"),
+        !("path" in document) || String(document.path).includes("design"),
     ),
   ).toBe(true);
   await expect(
-    service.templateGuide(project.id, "design", [{ id: "evidence-report" }]),
+    service.templateGuide(project.id, "design", [{ id: "paper-explainer" }]),
   ).rejects.toThrow(/pinned/);
+  await expect(
+    service.templateGuide(
+      project.id,
+      "authoring" as never,
+      paper.context.templates,
+    ),
+  ).rejects.toThrow(/Unknown presentation stage/);
+});
+test("legacy saved templates stay readable through the four current stages", async () => {
+  const home = await temporary(),
+    service = new AgentService({ root: home });
+  const project = await service.createProject("Legacy");
+  const saved = await service.saveTemplate(project.id, undefined, {
+    bundle: templateFixture("legacy-six", false, true),
+  });
+  const context = await service.templateContext(project.id, [
+    {
+      id: saved.id,
+      scope: "project",
+      version: saved.version,
+      integrity: saved.integrity,
+    },
+  ]);
+  const legacySummary = context.templates?.[0];
+  expect(legacySummary).toMatchObject({ legacyStages: true });
+  expect(
+    legacySummary && "stages" in legacySummary
+      ? legacySummary.stages.find((stage) => stage.stage === "logic")?.path
+      : undefined,
+  ).toBe("guides/understanding.md");
+  const logic = await service.templateGuide(
+    project.id,
+    "logic",
+    context.context.templates,
+  );
+  const document = logic.documents?.[1];
+  expect(document && "path" in document ? document.path : undefined).toBe(
+    "guides/understanding.md",
+  );
 });
 test("bundled README identity cannot be overridden and the mandatory system cannot be replaced", async () => {
   const home = await temporary(),
@@ -220,39 +320,7 @@ test("folder templates can be forked and promoted without losing guides or compo
     service = new AgentService({ root: home });
   const a = await service.createProject("Owner"),
     b = await service.createProject("Consumer");
-  const source = templateFixture("shared-folder"),
-    parsed = parseTemplateBundle(source);
-  parsed.metadata.page = "page.json";
-  source.files["README.md"] =
-    "---\n" +
-    JSON.stringify(parsed.metadata, null, 2) +
-    "\n---\n" +
-    parsed.body;
-  source.files["page.json"] = JSON.stringify({
-    content: {
-      type: "surface",
-      attrs: { id: "root", kind: "page", name: "Sequence" },
-      content: [
-        {
-          type: "widget",
-          attrs: {
-            id: "sequence",
-            kind: "custom",
-            data: {
-              componentId: "step-picker",
-              version: "1.0.0",
-              props: {
-                title: "Inheritance",
-                labels: ["Candidate", "Accepted"],
-              },
-            },
-          },
-        },
-      ],
-    },
-    layout: {},
-    surfaceViews: {},
-  });
+  const source = templateFixture("shared-folder");
   const summary = await service.saveTemplate(a.id, undefined, {
     bundle: source,
   });
@@ -297,9 +365,10 @@ test("folder templates can be forked and promoted without losing guides or compo
     version: original.version,
     integrity: original.integrity,
   });
-  expect(
-    await resolveDocumentComponents(home, applied.document, b.id),
-  ).toHaveLength(1);
+  expect(applied.document.content.content ?? []).toEqual([
+    expect.objectContaining({ type: "paragraph" }),
+  ]);
+  expect(JSON.stringify(applied.document.content)).not.toContain("widget");
   await expect(
     service.templateContext(b.id, [
       {
@@ -312,26 +381,49 @@ test("folder templates can be forked and promoted without losing guides or compo
   ).rejects.toThrow(/not found/);
 });
 
-test("method-only templates reject page structures and apply as empty Pages", async () => {
-  const source = templateFixture("method-only", false);
+test("legacy schemaVersion 1 page skeletons still instantiate while schemaVersion 3 rejects them", async () => {
+  const source = templateFixture("legacy-page", true, true);
   const { metadata, body } = parseTemplateBundle(source);
-  metadata.schemaVersion = 2;
-  delete metadata.page;
+  metadata.page = "page.json";
   source.files["README.md"] =
-    "---\n" + JSON.stringify(metadata) + "\n---\n" + body;
-  expect(parseTemplateBundle(source).document).toBeUndefined();
-  const invalid = structuredClone(source);
-  invalid.files["page.json"] = "{}";
-  expect(() => parseTemplateBundle(invalid)).toThrow(/page.json/);
+    "---\n" + JSON.stringify(metadata, null, 2) + "\n---\n" + body;
+  source.files["page.json"] = JSON.stringify({
+    content: {
+      type: "surface",
+      attrs: { id: "root", kind: "page", name: "Sequence" },
+      content: [
+        {
+          type: "widget",
+          attrs: {
+            id: "sequence",
+            kind: "custom",
+            data: {
+              componentId: "step-picker",
+              version: "1.0.0",
+              props: {
+                title: "Inheritance",
+                labels: ["Candidate", "Accepted"],
+              },
+            },
+          },
+        },
+      ],
+    },
+    layout: {},
+    surfaceViews: {},
+  });
+  expect(parseTemplateBundle(source).document).toBeDefined();
+  const invalid = templateFixture("current-page", false);
+  const current = parseTemplateBundle(invalid);
   invalid.files["README.md"] =
     "---\n" +
-    JSON.stringify({ ...metadata, page: "page.json" }) +
+    JSON.stringify({ ...current.metadata, page: "page.json" }) +
     "\n---\n" +
-    body;
-  expect(() => parseTemplateBundle(invalid)).toThrow(/page is not supported/);
+    current.body;
+  expect(() => parseTemplateBundle(invalid)).toThrow(/legacy schemaVersion 1/);
   const home = await temporary(),
     service = new AgentService({ root: home });
-  const project = await service.createProject("Methods");
+  const project = await service.createProject("Legacy pages");
   const saved = await service.saveTemplate(project.id, undefined, {
     bundle: source,
   });
@@ -340,28 +432,7 @@ test("method-only templates reject page structures and apply as empty Pages", as
     version: saved.version,
     integrity: saved.integrity,
   });
-  expect(applied.document.content.content ?? []).toEqual([
-    expect.objectContaining({ type: "paragraph" }),
-  ]);
-  expect(JSON.stringify(applied.document.content)).not.toContain("widget");
-  for (const id of [
-    "concept-explainer",
-    "decision-comparison",
-    "evidence-report",
-    "procedure-guide",
-    "progress-report",
-    "exploration-map",
-  ]) {
-    const current = await getTemplate(home, id, project.id, {
-      scope: "builtin",
-    });
-    expect(parseTemplateBundle(current.bundle).metadata.schemaVersion).toBe(2);
-    expect(current.document.content.content ?? []).toHaveLength(0);
-    const previous = await getTemplate(home, id, project.id, {
-      scope: "builtin",
-      version: "2.0.0",
-    });
-    expect(parseTemplateBundle(previous.bundle).metadata.schemaVersion).toBe(1);
-    expect(previous.document.content.content?.length).toBeGreaterThan(0);
-  }
+  expect(
+    await resolveDocumentComponents(home, applied.document, project.id),
+  ).toHaveLength(1);
 });

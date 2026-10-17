@@ -187,3 +187,14 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai/README.zh-CN.md
 
 !/plugins/showai/skills/collaborate-canvas/SKILL.md
+
+# Public template files referenced by builtin-template-bundles.ts
+!/resources/templates/system-presentation/guides/02-material.md
+!/resources/templates/system-presentation/guides/03-logic.md
+!/resources/templates/paper-explainer/README.md
+!/resources/templates/paper-explainer/guides/01-intent.md
+!/resources/templates/paper-explainer/guides/02-material.md
+!/resources/templates/paper-explainer/guides/03-logic.md
+!/resources/templates/paper-explainer/guides/04-design.md
+!/plugins/showai/skills/design-presentation/references/design-draft.md
+!/plugins/showai/skills/plan-presentation/references/presentation-logic.md

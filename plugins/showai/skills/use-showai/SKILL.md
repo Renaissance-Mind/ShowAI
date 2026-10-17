@@ -29,7 +29,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 ## 模板阶段与会话
 
-呈现任务使用 show-document 中的必读系统基线；没有本机 skill 的网页客户端先读 guide({topic:"presentation"})。检查 templateWorkflow.protocol，template_context 选择本轮模板并返回固定引用、README 和组件索引；template_guide 只读当前阶段。启动时 --templates 只固定该项目绑定 MCP 会话的默认选择，不修改全局模板或库配置。续改读取 Page.templateContext；目录或引用已知时复用，knownHash 只用于本轮确实持有的内容。模板组件索引按 componentPage 分页，实现源码只在开发或明确导出时读取。组件 guide 返回 authoringReference 时，可按其精确引用读取制作索引及相关指南、输入和工具；这些制作资源属于正常组件使用。
+呈现任务使用 show-document 中的必读系统基线；没有本机 skill 的网页客户端先读 guide({topic:"presentation"})。检查 templateWorkflow.protocol 为 showai-template-workflow-v2，template_context 选择本轮模板并返回固定引用、README 和组件索引；template_guide 只读当前阶段，四阶段为 intent（理解意图）、material（收集与处理材料）、logic（呈现逻辑）、design（呈现设计稿），制作与评审按设计稿执行。启动时 --templates 只固定该项目绑定 MCP 会话的默认选择，不修改全局模板或库配置。续改读取 Page.templateContext；目录或引用已知时复用，knownHash 只用于本轮确实持有的内容。模板组件索引按 componentPage 分页，实现源码只在开发或明确导出时读取。组件 guide 返回 authoringReference 时，可按其精确引用读取制作索引及相关指南、输入和工具；这些制作资源属于正常组件使用。
 
 ## 根据任务继续
 

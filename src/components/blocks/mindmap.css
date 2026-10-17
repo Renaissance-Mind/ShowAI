@@ -85,8 +85,7 @@
   );
 }
 .sm-node.is-selected,
-.sm-node:focus-visible,
-.sm-node-input:focus {
+.sm-node:focus-visible {
   outline: 3px solid
     color-mix(in srgb, var(--sm-branch, var(--sb-accent)) 30%, transparent);
   outline-offset: 3px;

@@ -43,7 +43,8 @@ export interface ChartData extends BlockData {
   series: ChartSeries[];
   unit?: string;
 }
-export type ColumnType = "text" | "number" | "select" | "checkbox" | "url";
+export type ColumnType =
+  "text" | "number" | "select" | "checkbox" | "url" | "date";
 export interface DatabaseColumn {
   id: string;
   name: string;
@@ -59,4 +60,19 @@ export interface DatabaseData extends BlockData {
   columns: DatabaseColumn[];
   rows: DatabaseRow[];
   groupBy?: string;
+  view?: "table" | "board" | "calendar";
+  calendar?: DatabaseCalendarConfig;
+}
+/** Calendar view settings; every column id is optional and resolved against columns. */
+export interface DatabaseCalendarConfig {
+  dateColumn?: string;
+  endDateColumn?: string;
+  startTimeColumn?: string;
+  endTimeColumn?: string;
+  colorColumn?: string;
+  doneColumn?: string;
+  mode?: "month" | "week" | "heatmap";
+  initialDate?: string;
+  weekStartsOn?: 0 | 1;
+  weeks?: number;
 }

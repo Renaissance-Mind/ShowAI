@@ -192,7 +192,7 @@ Composition is compiled into the parent's runtime and works in desktop, offline 
 
 ## Templates and composition
 
-New reusable workflows use [template folders](template-bundles.md), with strict README metadata, six stage guides and optional components/page skeleton. Scripts can use `template import`, `template export`, `template context` and `template guide`. The legacy definition/composition operations below remain supported.
+New reusable workflows use [template folders](template-bundles.md), with strict README metadata, four stage guides (intent, material, logic, design) and an optional component library. Scripts can use `template import`, `template export`, `template context` and `template guide`. The legacy definition/composition operations below remain supported.
 
 A template can be saved from an existing page or from explicit metadata and composition:
 

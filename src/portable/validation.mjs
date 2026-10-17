@@ -13,6 +13,13 @@ import { validateG2Data } from "../components/blocks/g2/contract.mjs";
 import { validatePresentationData } from "../components/blocks/presentation-contract.mjs";
 import { validateAnalysisData } from "../components/blocks/analysis-contract.mjs";
 import { validateScene3dData } from "../components/blocks/scene3d-contract.mjs";
+import { validateDocDiagramData } from "../components/blocks/doc-diagrams-contract.mjs";
+import { validateDocReferenceData } from "../components/blocks/doc-reference-contract.mjs";
+import { validateDocBrowseData } from "../components/blocks/doc-browse-contract.mjs";
+import { validatePlanData } from "../components/blocks/plan-contract.mjs";
+import { validateEventTimelineData } from "../components/blocks/event-timeline-contract.mjs";
+import { validatePlaygroundData } from "../components/blocks/playground-contract.mjs";
+import { validateDatabaseData } from "../components/blocks/database-contract.mjs";
 import { validateResearchData } from "../components/blocks/research-contract.mjs";
 // Shared by the browser importer and the dependency-free artifact command.
 import { validateRemoteComponents } from "./remote.mjs";
@@ -300,6 +307,34 @@ function validateWidgetData(kind, data, path) {
     validateScene3dData(data);
     return;
   }
+  if (kind === "sequence-diagram" || kind === "layer-diagram") {
+    validateDocDiagramData(kind, data);
+    return;
+  }
+  if (kind === "step-guide" || kind === "command-reference") {
+    validateDocReferenceData(kind, data);
+    return;
+  }
+  if (kind === "structure-browser" || kind === "card-grid") {
+    validateDocBrowseData(kind, data);
+    return;
+  }
+  if (kind === "roadmap" || kind === "waterfall") {
+    validatePlanData(kind, data);
+    return;
+  }
+  if (kind === "event-timeline") {
+    validateEventTimelineData(data);
+    return;
+  }
+  if (kind === "playground") {
+    validatePlaygroundData(data);
+    return;
+  }
+  if (kind === "database") {
+    validateDatabaseData(data);
+    return;
+  }
   if (
     ["text", "image", "table", "callout", "toggle", "divider", "code"].includes(
       kind,
@@ -382,32 +417,6 @@ function validateWidgetData(kind, data, path) {
     }
     label(data.unit, "unit");
   }
-  if (kind === "database") {
-    const columns = rows(list("columns", 50), true);
-    for (const column of columns) {
-      if (column.id === "id")
-        throw new Error(
-          `${path}.column id cannot use the reserved row identity key id.`,
-        );
-      string(column.name, `${path}.column.name`, 1000);
-      if (
-        !["text", "number", "select", "checkbox", "url"].includes(column.type)
-      )
-        throw new Error(`${path} contains an unsupported column type.`);
-      if (
-        column.options !== undefined &&
-        (!Array.isArray(column.options) ||
-          column.options.length > 200 ||
-          !column.options.every((value) => typeof value === "string"))
-      )
-        throw new Error(`${path}.options must be an array of text.`);
-    }
-    for (const row of rows(list("rows", 5000), true))
-      for (const value of Object.values(row))
-        if (!["string", "number", "boolean"].includes(typeof value))
-          throw new Error(`${path}.rows must have scalar cells.`);
-    label(data.groupBy, "groupBy");
-  }
   if (kind === "metrics")
     for (const item of rows(list("items", 100))) {
       string(item.label, `${path}.item.label`, 1000);
@@ -421,31 +430,6 @@ function validateWidgetData(kind, data, path) {
       )
         throw new Error(`${path}.item.trend must be a finite number.`);
     }
-  if (kind === "playground") {
-    if (
-      data.operation !== undefined &&
-      !["sum", "product", "average"].includes(data.operation)
-    )
-      throw new Error(`${path}.operation is unsupported.`);
-    for (const input of rows(list("inputs", 30), true)) {
-      string(input.label, `${path}.input.label`, 1000);
-      if (
-        ![input.min, input.max, input.step, input.value].every(
-          (value) => typeof value === "number" && Number.isFinite(value),
-        ) ||
-        input.min >= input.max ||
-        input.step <= 0 ||
-        input.value < input.min ||
-        input.value > input.max
-      )
-        throw new Error(
-          `${path}.input requires a valid range, positive step, and initial value within the range.`,
-        );
-      label(input.unit, "input.unit");
-    }
-    label(data.resultLabel, "resultLabel");
-    label(data.unit, "unit");
-  }
   if (kind === "gallery") {
     if (data.columns !== undefined && ![1, 2, 3].includes(data.columns))
       throw new Error(`${path}.columns must be 1, 2, or 3.`);

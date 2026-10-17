@@ -45,7 +45,7 @@ const guides: Record<
       "board_read freezes the bundled reader's rendered content and complete source in one 30-minute snapshot. Rendered nested Page scrolling and Board cameras can be supplied in state. This is a saved-source rendering unless draftDocument is explicitly supplied; it does not implicitly capture the live editor. origin, sourceHash, componentRefs, state, warnings and currentSourceChanged identify that distinction. Reading never writes content. SNAPSHOT_EXPIRED requires a new capture.",
       "For Board detail supply snapshotId with mode tile and tileIds, mode region with tileId plus pointPx or rectPx, or mode element with nodeId and detail source/image/both. Pixel selectors use the original tile's resolution; scale changes only the requested detail image resolution. tileId restricts an element to that image; imageScope tile clips its detail crop. Source retains exact drawing points, Page text, component props and bindings. Large element images paginate with cursor; use smaller regions if a requested detail exceeds 2560 pixels per side.",
       "The Board pageIndex enumerates nested native Pages including clipped/offscreen content, with pageCoverage.nextOffset. Read a Page's complete original subtree through page_read({pageId,snapshotId,blockIds:[nodeId],rendered:false,response:source}); pageId remains the containing resource, nodeId identifies the nested Page. Omit blockIds to read the entire resource. mode source returns the captured Board subtree with parentPath/layout/surfaceViews/externalRefs. Partial sources are not full replacement documents. Before editing reread the current complete Page without snapshotId and keep its current hash/revision.",
-      "Read guide presentation for the mandatory baseline. Read one current-stage guide at a time. Select task templates with template_context; template_guide adds their exact-version instructions and component references.",
+      "Read guide presentation for the mandatory baseline. The four stages are intent (reader brief), material (source notes), logic (multi-level presentation plan) and design (scene-by-scene design draft); authoring implements the draft and review checks the saved Page against it. Read one current-stage guide at a time. Select task templates with template_context; template_guide adds their exact-version instructions and component references.",
     ],
     commands: [
       "showai boards read PAGE --project PROJECT --json",
@@ -53,7 +53,7 @@ const guides: Record<
       "showai boards read PAGE --project PROJECT --snapshot SNAPSHOT --mode element --node NODE --state detail-options.json --json",
       "showai pages read PAGE --project PROJECT --snapshot SNAPSHOT --blocks PAGE_NODE --rendered false --json",
       "showai guide presentation --json",
-      "showai template context --project PROJECT --templates evidence-report --json",
+      "showai template context --project PROJECT --templates paper-explainer --json",
     ],
   },
   integration: {
@@ -397,7 +397,7 @@ const guides: Record<
       "Trigger when the user asks to save or extract a template. Finishing a page does not automatically create a template.",
       "Read the current page and compare prior hash before extraction. Separate stable narrative/layout from instance facts, data and optional sections.",
       "Replace instance content with filling guidance or honest empty states; describe input requirements in contentGuide, contexts in scenarios, component roles in related and realistic use in examples.",
-      "New templates store six-stage guides and optional components. Understanding determines content logic and reading order; design determines layout, containers and interactions for the current material. Applying starts an empty Page. Legacy schemaVersion 1 page files and document/composition remain readable for historical references.",
+      "New templates store four stage guides (intent, material, logic, design) and optional components. The logic guide determines content logic and reading order; the design guide determines layout, visual expression and interaction for the current material. Applying starts an empty Page. Legacy schemaVersion 1–2 bundles and document/composition remain readable for historical references.",
       "Save in the project, apply to a new page and verify with different source material. Preserve the source page. Promote or publish only when requested.",
     ],
     commands: [
@@ -428,13 +428,13 @@ const guides: Record<
     purpose:
       "Use or compose reusable content structures while keeping template revisions immutable.",
     rules: [
-      "New templates use a folder bundle: strict JSON-frontmatter README (schemaVersion 2), six stage guides and optional components. import/export manage directories; MCP template_save accepts the same portable files/assets object.",
+      "New templates use a folder bundle: strict JSON-frontmatter README (schemaVersion 3), four stage guides (intent, material, logic, design) and optional components. import/export manage directories; MCP template_save accepts the same portable files/assets object.",
       "The system baseline is mandatory and selected task templates are explicit pinned references. template_context returns READMEs and component references; template_guide discloses one stage. Null stage declarations inherit system instructions; guide directories expose their main README and optional subfiles.",
       "Use a template's scenarios to choose it, guide to learn its content structure and related resources, and examples to see realistic sequences.",
-      "Match reader task, required evidence, environment and content density before visual style. The presentation families concept-explainer, decision-comparison, evidence-report, procedure-guide, progress-report and exploration-map provide six-stage authoring methods; query the connected catalog for their exact revisions.",
+      "Match reader task, required evidence, environment and content density before visual style. The runtime ships the mandatory system-presentation baseline and the paper-explainer method template; query the connected catalog for project and global templates and their exact revisions.",
       "contentGuide describes required inputs, optional sections, depth/layout variants, interaction/static behavior and acceptance tasks. These are Agent-facing filling instructions, not automatic variable binding. Preserve missing evidence as a limitation instead of inventing content.",
-      "Applying a schemaVersion 2 template creates an empty Page. Determine content logic and reading order during understanding, then layout, containers and interactions during design. Legacy templates retain their saved document/composition for historical compatibility.",
-      "Save new templates as schemaVersion 2 folder bundles containing README metadata, guides and optional components. Publish a new version for revisions. Legacy page snapshots and document/composition inputs remain compatible.",
+      "Applying a folder template creates an empty Page. Determine content logic and reading order during logic, then layout, visual expression and interaction during design. Legacy six-stage bundles read evidence/understanding as material/logic; legacy templates retain their saved document/composition for historical compatibility.",
+      "Save new templates as schemaVersion 3 folder bundles containing README metadata, four guides and optional components. Publish a new version for revisions. Legacy page snapshots and document/composition inputs remain compatible.",
       "A composition part is either {type:'content', content:DOC_NODE} or {type:'template', ref:EXACT_REF, title?:TEXT}. The core pins referenced integrity. Query --view dependencies to inspect the resulting graph.",
     ],
     commands: [

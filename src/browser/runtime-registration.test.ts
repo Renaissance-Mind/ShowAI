@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { startBrowserServer } from "./server";
@@ -24,10 +24,12 @@ test("verification hosts preserve an existing Agent registration", async () => {
     },
   });
   await writeFile(registration, original);
+  const webRoot = join(home, "web");
+  await mkdir(webRoot);
   const server = await startBrowserServer({
     home,
     port: 0,
-    webRoot: resolve("dist"),
+    webRoot,
     cliEntry: resolve("dist-agent/cli.mjs"),
     settingsPath: join(home, "settings.json"),
     registerAgentRuntime: false,
@@ -48,10 +50,12 @@ test("ordinary browser hosts still register their actual CLI", async () => {
     ),
   );
   const cliEntry = resolve("dist-agent/cli.mjs");
+  const webRoot = join(home, "web");
+  await mkdir(webRoot);
   const server = await startBrowserServer({
     home,
     port: 0,
-    webRoot: resolve("dist"),
+    webRoot,
     cliEntry,
     settingsPath: join(home, "settings.json"),
   });

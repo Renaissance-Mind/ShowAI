@@ -6,11 +6,11 @@ import source3 from "../../plugins/showai/skills/create-component/SKILL.md?raw";
 import source4 from "../../plugins/showai/skills/create-template/references/template-abstraction.md?raw";
 import source5 from "../../plugins/showai/skills/create-template/references/template-creation.md?raw";
 import source6 from "../../plugins/showai/skills/create-template/SKILL.md?raw";
-import source7 from "../../plugins/showai/skills/design-presentation/references/expression-and-storyboard.md?raw";
+import source7 from "../../plugins/showai/skills/design-presentation/references/design-draft.md?raw";
 import source8 from "../../plugins/showai/skills/design-presentation/references/reuse-selection.md?raw";
 import source9 from "../../plugins/showai/skills/design-presentation/SKILL.md?raw";
 import source10 from "../../plugins/showai/skills/plan-presentation/references/presentation-contract.md?raw";
-import source11 from "../../plugins/showai/skills/plan-presentation/references/understanding-plan.md?raw";
+import source11 from "../../plugins/showai/skills/plan-presentation/references/presentation-logic.md?raw";
 import source12 from "../../plugins/showai/skills/plan-presentation/scripts/check_plan.py?raw";
 import source13 from "../../plugins/showai/skills/plan-presentation/SKILL.md?raw";
 import source14 from "../../plugins/showai/skills/review-presentation/references/review-criteria.md?raw";
@@ -33,11 +33,11 @@ export const mcpSkillSources: Record<string, string> = {
   "create-template/references/template-abstraction.md": source4,
   "create-template/references/template-creation.md": source5,
   "create-template/SKILL.md": source6,
-  "design-presentation/references/expression-and-storyboard.md": source7,
+  "design-presentation/references/design-draft.md": source7,
   "design-presentation/references/reuse-selection.md": source8,
   "design-presentation/SKILL.md": source9,
   "plan-presentation/references/presentation-contract.md": source10,
-  "plan-presentation/references/understanding-plan.md": source11,
+  "plan-presentation/references/presentation-logic.md": source11,
   "plan-presentation/scripts/check_plan.py": source12,
   "plan-presentation/SKILL.md": source13,
   "review-presentation/references/review-criteria.md": source14,

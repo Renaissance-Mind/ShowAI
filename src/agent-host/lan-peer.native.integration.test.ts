@@ -3,6 +3,7 @@ import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { AgentService } from "../agent/service";
+import { startSyncServer } from "../server/node";
 import { stopSyncManagers } from "../sync/manager";
 import { AgentHost } from "./host";
 import { LanPeerServer } from "./lan-peer";
@@ -11,6 +12,21 @@ test.skipIf(!process.env.SHOWAI_NATIVE_LAN_TEST_ROOT)(
   async () => {
     const task = process.env.SHOWAI_NATIVE_LAN_TEST_ROOT!;
     const root = await mkdtemp(join(task, "tmp/native-peer-"));
+    const server = await startSyncServer({
+      home: join(root, "server"),
+      port: 0,
+      registrationKey: "native-hybrid-test",
+    });
+    const account = await fetch(server.url + "/api/auth/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "native-hybrid-owner",
+        password: "native-hybrid-private-passphrase",
+        registrationKey: "native-hybrid-test",
+        device: "native-hybrid-test",
+      }),
+    }).then((r) => r.json());
     const service = new AgentService({ root: join(root, "library") });
     const project = await service.createProject("Native LAN acceptance");
     const page = await service.createPage(project.id, {
@@ -40,6 +56,8 @@ test.skipIf(!process.env.SHOWAI_NATIVE_LAN_TEST_ROOT)(
     await writeFile(
       join(task, "tmp/native-peer-fixture.json"),
       JSON.stringify({
+        serverURL: server.url,
+        token: account.token,
         deviceId: settings.deviceId,
         projectId: project.id,
         pageId: page.document.id,
@@ -122,6 +140,7 @@ test.skipIf(!process.env.SHOWAI_NATIVE_LAN_TEST_ROOT)(
     await peer.close();
     host.close();
     await stopSyncManagers();
+    await server.close();
     await rm(root, {
       recursive: true,
       force: true,

@@ -579,7 +579,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     throw error;
   }
   async function close() {
-    remoteConnector.close();
+    await remoteConnector.close();
     agentHost.close();
     await syncManager(store.root).stop();
     if (closed) return;

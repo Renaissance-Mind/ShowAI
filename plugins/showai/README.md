@@ -44,8 +44,8 @@ Then, once, in DeepSeek Harness: **Plugins → Add plugin**, paste the bundle pa
 | Skill                                                      | Purpose                                             |
 | ---------------------------------------------------------- | --------------------------------------------------- |
 | [use-showai](skills/use-showai/SKILL.md)                   | Connection identity, discovery, reading and routing |
-| [plan-presentation](skills/plan-presentation/SKILL.md)     | Reader goals, evidence and understanding path       |
-| [design-presentation](skills/design-presentation/SKILL.md) | Visual objects, layout, states and interaction      |
+| [plan-presentation](skills/plan-presentation/SKILL.md)     | Reader intent, material and presentation logic      |
+| [design-presentation](skills/design-presentation/SKILL.md) | Scene-by-scene design draft, layout and interaction |
 | [show-document](skills/show-document/SKILL.md)             | Create, continue, save, present and export Pages    |
 | [review-presentation](skills/review-presentation/SKILL.md) | Assess understanding, revise and verify             |
 | [create-component](skills/create-component/SKILL.md)       | Reusable React expression capabilities              |

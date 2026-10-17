@@ -23,7 +23,7 @@ These guides follow the current `main` source: **application 0.9.0, local plugin
 | ------------------------------------------------ | ------------------------------------------------------- |
 | [Components and templates](catalog-lifecycle.md) | Scopes, immutable versions, composition and publication |
 | [Skills and workflows](skills.md)                | Eight Skills and task routing                           |
-| [Template folders](template-bundles.md)          | Metadata, six stages and component libraries            |
+| [Template folders](template-bundles.md)          | Metadata, four stages and component libraries           |
 | [Component parameters](component-parameters.md)  | Generated references, omission and relation checks      |
 | [G2 data charts](g2-components.md)               | 43 charts, datasets and field mapping                   |
 | [Mind maps](mindmap.md)                          | Layouts, shortcuts, data and export                     |
