@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { desktop } from "./bridge";
+import { desktop, errorMessage } from "./bridge";
 import type { AgentDestination } from "../agent-host/remote-protocol";
 import type { ConnectorSettings } from "../agent-host/remote-connector";
 import { translator } from "../i18n";
@@ -28,39 +28,60 @@ export function AgentExecutionPicker({
   const [pairing, setPairing] = useState(false);
   const [pairId, setPairId] = useState<string>();
   const [error, setError] = useState("");
+  const [selecting, setSelecting] = useState(false);
   const loadGeneration = useRef(0),
     selectionGeneration = useRef(0);
-  const load = () => {
+  const load = async (refresh = true) => {
     const generation = ++loadGeneration.current;
-    return desktop
-      .invoke<NonNullable<typeof context>>("agent:execution", { projectId })
-      .then((next) => {
+    try {
+      // Saved selection and authenticated LAN state do not depend on the cloud.
+      // Render them before refreshing the remote device inventory.
+      for (const cached of refresh ? [true, false] : [true]) {
+        const next = await desktop.invoke<NonNullable<typeof context>>(
+          "agent:execution",
+          { projectId, cached, refresh: !cached },
+        );
         if (generation === loadGeneration.current) {
           setContext(next);
           setError(next.error ?? "");
-        }
-      })
-      .catch((reason) => {
-        if (generation === loadGeneration.current) setError(reason.message);
-      });
+        } else return;
+      }
+    } catch (reason) {
+      if (generation === loadGeneration.current) setError(errorMessage(reason));
+    }
   };
   useEffect(() => {
-    if (remoteExecution()) void load();
+    if (!remoteExecution()) return;
+    void load();
+    const selected = () => void load(false);
+    window.addEventListener("showai-agent-execution-change", selected);
+    return () => {
+      loadGeneration.current++;
+      selectionGeneration.current++;
+      window.removeEventListener("showai-agent-execution-change", selected);
+    };
   }, [projectId]);
   if (!remoteExecution()) return null;
-  const change = async (value: Record<string, string>) => {
+  const change = async (value: Record<string, string>, propagate = false) => {
     const generation = ++selectionGeneration.current;
     loadGeneration.current++;
+    setSelecting(true);
     setError("");
     try {
-      await desktop.invoke("agent:selectExecution", { projectId, ...value });
+      const selected = await desktop.invoke<NonNullable<typeof context>>(
+        "agent:selectExecution",
+        { projectId, ...value },
+      );
       if (generation !== selectionGeneration.current) return;
-      await load();
-      if (generation !== selectionGeneration.current) return;
+      setContext(selected);
       onChange?.(true);
       window.dispatchEvent(new Event("showai-agent-execution-change"));
     } catch (reason) {
-      setError((reason as Error).message);
+      if (generation === selectionGeneration.current)
+        setError(errorMessage(reason));
+      if (propagate) throw reason;
+    } finally {
+      if (generation === selectionGeneration.current) setSelecting(false);
     }
   };
   return (
@@ -68,7 +89,7 @@ export function AgentExecutionPicker({
       <label>
         {t("serverAccount")}
         <select
-          disabled={disabled}
+          disabled={disabled || selecting}
           value={context?.connectionId ?? ""}
           onChange={(e) => void change({ connectionId: e.target.value })}
         >
@@ -83,7 +104,7 @@ export function AgentExecutionPicker({
       <label>
         {t("runAgentOn")}
         <select
-          disabled={disabled || !context?.connectionId}
+          disabled={disabled || selecting || !context?.connectionId}
           value={context?.destinationId ?? "cloud"}
           onChange={(e) => {
             const id = e.target.value;
@@ -114,7 +135,7 @@ export function AgentExecutionPicker({
       <button
         type="button"
         className="settings-button"
-        disabled={disabled}
+        disabled={disabled || selecting}
         onClick={() => void load().then(() => onChange?.(false))}
       >
         {t("refreshDevices")}
@@ -122,7 +143,7 @@ export function AgentExecutionPicker({
       <button
         type="button"
         className="settings-button"
-        disabled={disabled}
+        disabled={disabled || selecting}
         onClick={() => {
           setPairId(undefined);
           setPairing(true);
@@ -134,9 +155,9 @@ export function AgentExecutionPicker({
         <NearbyMacs
           initialId={pairId}
           onClose={() => setPairing(false)}
-          onPaired={(id) => {
+          onPaired={async (id) => {
+            await change({ destinationId: id }, true);
             setPairing(false);
-            void change({ destinationId: id });
           }}
         />
       )}

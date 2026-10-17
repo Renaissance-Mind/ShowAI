@@ -26,7 +26,7 @@ export function NearbyMacs({
   initialId,
 }: {
   onClose(): void;
-  onPaired(id: string): void;
+  onPaired(id: string): Promise<void>;
   initialId?: string;
 }) {
   const [state, setState] = useState<Nearby>({ nearby: [], peers: [] });
@@ -38,6 +38,17 @@ export function NearbyMacs({
   } | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const useMac = async (id: string) => {
+    setBusy(true);
+    setError("");
+    try {
+      await onPaired(id);
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
   const load = () =>
     desktop
       .invoke<Nearby>("agent:nearby")
@@ -47,13 +58,12 @@ export function NearbyMacs({
     setBusy(true);
     setError("");
     try {
-      setPair({
-        ...(await desktop.invoke<Omit<NonNullable<typeof pair>, "id">>(
-          "agent:pair",
-          { id },
-        )),
-        id,
-      });
+      const result = await desktop.invoke<Omit<NonNullable<typeof pair>, "id">>(
+        "agent:pair",
+        { id },
+      );
+      setPair({ ...result, id });
+      if (result.state === "approved") await useMac(id);
     } catch (reason) {
       setError(errorMessage(reason));
     } finally {
@@ -77,10 +87,10 @@ export function NearbyMacs({
       pending = true;
       void desktop
         .invoke<Omit<NonNullable<typeof pair>, "id">>("agent:pairStatus")
-        .then((value) => {
+        .then(async (value) => {
           if (stopped) return;
           setPair({ ...value, id: pair.id });
-          if (value.state === "approved") onPaired(pair.id);
+          if (value.state === "approved") await useMac(pair.id);
         })
         .catch((reason) => {
           if (!stopped) setError(errorMessage(reason));
@@ -142,10 +152,10 @@ export function NearbyMacs({
             className="settings-button"
             disabled={busy || pair?.state === "pending"}
             onClick={() =>
-              device.online ? onPaired(device.id) : void begin(device.id)
+              device.online ? void useMac(device.id) : void begin(device.id)
             }
           >
-            {device.online ? t("useMac") : t("pair")}
+            {busy ? t("connecting") : device.online ? t("useMac") : t("pair")}
           </button>
         </div>
       ))}
