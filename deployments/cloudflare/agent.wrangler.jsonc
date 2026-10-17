@@ -21,8 +21,7 @@
   "containers": [
     {
       "class_name": "ShowAIAgentGateway",
-      "image": "./agent-runtime-repair.Dockerfile",
-      "image_build_context": "../..",
+      "image": "registry.cloudflare.com/8f1753ad2d5e392716033248d7c5639e/showai-agent-showaiagentgateway@sha256:50fdacfdbd7b868726c8423e3745f01555cc14d2cf350a311c60cafa53396119",
       "instance_type": "standard-1",
       "max_instances": 10,
     },
