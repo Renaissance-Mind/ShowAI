@@ -474,6 +474,24 @@ const directory='/state/agent-host/remote-turns',jobs=fs.existsSync(directory)?f
       await new Promise((r) => setTimeout(r, 250));
     }
     if (!ready) {
+      // This flag is forwarded only by the master-key-protected operator route.
+      // Recovery replaces an unresponsive ephemeral runtime; encrypted committed
+      // state and durable task receipts remain in R2 for the next boot.
+      if (
+        request.headers.get("x-showai-recover-startup") === "1" &&
+        !this.cloudCalls
+      ) {
+        await container.destroy();
+        this.quiescing = false;
+        return json(
+          {
+            service: "showai-agent-container",
+            runtime: "restarting",
+            previous: "unresponsive",
+          },
+          202,
+        );
+      }
       const response = json(
         {
           error: {
