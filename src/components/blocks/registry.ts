@@ -196,7 +196,6 @@ function objectArray(data: BlockData, key: string): Record<string, unknown>[] {
 for (const item of primitiveMetadata) {
   registerBlock({
     kind: item.kind,
-    replacedBy: item.replacedBy,
     title: item.name,
     description: item.description,
     icon: (

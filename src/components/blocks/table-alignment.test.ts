@@ -58,7 +58,7 @@ describe("basic table alignment", () => {
     });
     const html = renderToStaticMarkup(
       createElement(TableBlock, {
-        data: saved.content.content![0].attrs!.data,
+        data: { document: saved.content },
         readOnly: true,
       }),
     );

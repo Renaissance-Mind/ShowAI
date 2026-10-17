@@ -1,0 +1,149 @@
+import { useState } from "react";
+import type { Editor } from "@tiptap/core";
+import { useTranslator } from "../../i18n/react";
+import messages from "../../i18n/messages/primitives";
+
+/** Component-specific fields join the existing block menu and its lifecycle. */
+export function ContentNodeActions({
+  editor,
+  position,
+}: {
+  editor: Editor;
+  position: number;
+}) {
+  const t = useTranslator(messages);
+  const [copyStatus, setCopyStatus] = useState("");
+  const node = editor.state.doc.nodeAt(position);
+  if (!node || !editor.isEditable) return null;
+  const type = node.type.name;
+  const update = (key: string, value: unknown) => {
+    editor.view.dispatch(
+      editor.state.tr.setNodeAttribute(position, key, value),
+    );
+  };
+  const field = (key: string, label: string) => (
+    <label key={key}>
+      {label}
+      <input
+        value={node.attrs[key] ?? ""}
+        onChange={(event) => update(key, event.target.value)}
+      />
+    </label>
+  );
+  const styled = [
+    "image",
+    "table",
+    "codeBlock",
+    "callout",
+    "toggle",
+    "horizontalRule",
+  ].includes(type);
+  const style = node.attrs.componentStyle ?? {};
+  const updateStyle = (key: string, value: unknown) => {
+    const next = { ...style };
+    if (value === undefined) delete next[key];
+    else next[key] = value;
+    update("componentStyle", next);
+  };
+  return (
+    <div className="content-node-fields">
+      {type === "image" && (
+        <>
+          {field("src", t("imageSrc"))}
+          {field("alt", t("imageAlt"))}
+          {field("caption", t("imageCaption"))}
+          {(["width", "height"] as const).map((key) => (
+            <label key={key}>
+              {t(key)}
+              <input
+                inputMode="decimal"
+                value={node.attrs[key] ?? ""}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (
+                    !value ||
+                    (/^\d+(?:px|%)?$/.test(value) &&
+                      parseInt(value) > 0 &&
+                      parseInt(value) <= 10000)
+                  )
+                    update(
+                      key,
+                      value
+                        ? /^\d+$/.test(value)
+                          ? Number(value)
+                          : value
+                        : null,
+                    );
+                }}
+              />
+            </label>
+          ))}
+          <label>
+            {t("fit")}
+            <select
+              value={node.attrs.fit ?? "contain"}
+              onChange={(event) => update("fit", event.target.value)}
+            >
+              <option value="contain">{t("contain")}</option>
+              <option value="cover">{t("cover")}</option>
+            </select>
+          </label>
+        </>
+      )}
+      {["table", "callout", "toggle"].includes(type) &&
+        field("title", t("title"))}
+      {type === "codeBlock" && (
+        <>
+          {field("language", t("language"))}
+          <button
+            onClick={() => {
+              navigator.clipboard
+                .writeText(node.textContent)
+                .then(() => setCopyStatus(t("copied")))
+                .catch((error: Error) => setCopyStatus(error.message));
+            }}
+          >
+            {t("copy")}
+          </button>
+          {copyStatus && <span role="status">{copyStatus}</span>}
+        </>
+      )}
+      {styled && (
+        <details>
+          <summary>{t("appearance")}</summary>
+          {(["color", "backgroundColor"] as const).map((key) => (
+            <label key={key}>
+              {t(key)}
+              <input
+                value={style[key] ?? ""}
+                onChange={(event) =>
+                  updateStyle(key, event.target.value || undefined)
+                }
+              />
+            </label>
+          ))}
+          {(["fontSize", "padding", "radius"] as const).map((key) => (
+            <label key={key}>
+              {t(key)}
+              <input
+                type="number"
+                min={key === "fontSize" ? 8 : 0}
+                max="200"
+                value={style[key] ?? ""}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (
+                    !value ||
+                    (Number(value) >= (key === "fontSize" ? 8 : 0) &&
+                      Number(value) <= 200)
+                  )
+                    updateStyle(key, value ? Number(value) : undefined);
+                }}
+              />
+            </label>
+          ))}
+        </details>
+      )}
+    </div>
+  );
+}

@@ -341,14 +341,22 @@ function validateResource(document) {
     finite(frame.y, -1000000, 1000000, `layout.${id}.y`);
     finite(
       frame.width,
-      node.type === "drawing" || node.attrs?.data?.nativeInk ? 1 : 120,
-      node.attrs?.ink || node.attrs?.data?.nativeInk ? 1000000 : 10000,
+      node.type === "drawing" ||
+        (node.attrs?.nativeInk ?? node.attrs?.data?.nativeInk)
+        ? 1
+        : 120,
+      node.attrs?.ink || (node.attrs?.nativeInk ?? node.attrs?.data?.nativeInk)
+        ? 1000000
+        : 10000,
       `layout.${id}.width`,
     );
     if (frame.height !== undefined)
       finite(
         frame.height,
-        node.type === "drawing" || node.attrs?.data?.nativeInk ? 1 : 40,
+        node.type === "drawing" ||
+          (node.attrs?.nativeInk ?? node.attrs?.data?.nativeInk)
+          ? 1
+          : 40,
         1000000,
         `layout.${id}.height`,
       );

@@ -71,7 +71,11 @@ export function inkNodes(board: JSONContent): JSONContent[] {
   const result: JSONContent[] = [];
   const visit = (node: JSONContent) => {
     if (node.type === "surface") return;
-    if (node.attrs?.ink || node.attrs?.data?.nativeInk) result.push(node);
+    if (
+      node.attrs?.ink ||
+      (node.attrs?.nativeInk ?? node.attrs?.data?.nativeInk)
+    )
+      result.push(node);
     else node.content?.forEach(visit);
   };
   board.content?.forEach(visit);

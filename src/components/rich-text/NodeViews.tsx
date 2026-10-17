@@ -1,3 +1,5 @@
+import { ImageContent } from "./ImageContent";
+import { richTextStyle } from "./model.mjs";
 import { mathHtml } from "../blocks/markdown-math.mjs";
 import {
   useEffect,
@@ -86,6 +88,7 @@ export function CalloutView({ node, updateAttributes, editor }: NodeViewProps) {
   });
   return (
     <NodeViewWrapper
+      style={richTextStyle(node.attrs.componentStyle)}
       className={`document-callout tone-${node.attrs.tone}`}
       data-block-id={node.attrs.id ?? undefined}
     >
@@ -118,7 +121,10 @@ export function CalloutView({ node, updateAttributes, editor }: NodeViewProps) {
           />
         )}
       </div>
-      <NodeViewContent className="callout-content" />
+      <div>
+        {node.attrs.title && <strong>{node.attrs.title}</strong>}
+        <NodeViewContent className="callout-content" />
+      </div>
     </NodeViewWrapper>
   );
 }
@@ -133,6 +139,7 @@ export function ToggleView({ node, updateAttributes, editor }: NodeViewProps) {
   useEffect(() => setOpen(Boolean(node.attrs.open)), [node.attrs.open]);
   return (
     <NodeViewWrapper
+      style={richTextStyle(node.attrs.componentStyle)}
       className={`document-toggle${open ? " is-open" : ""}`}
       data-block-id={node.attrs.id ?? undefined}
     >
@@ -199,6 +206,18 @@ export function MathView({
           }}
         />
       )}
+    </NodeViewWrapper>
+  );
+}
+
+export function ImageView({ node }: NodeViewProps) {
+  return (
+    <NodeViewWrapper
+      data-block-id={node.attrs.id}
+      data-drag-handle
+      contentEditable={false}
+    >
+      <ImageContent attrs={node.attrs} />
     </NodeViewWrapper>
   );
 }

@@ -13,9 +13,9 @@ export const builtinEnglish: BuiltinDisplayText = {
       "A single image with a caption. Adjust its size, crop and corner radius. Offline pages embed the image.",
   },
   table: {
-    name: "Basic table",
+    name: "Table",
     description:
-      "A lightweight two-dimensional table of text, numbers and booleans, with editable headers and cells and per-column or whole-table alignment.",
+      "One table implementation with rich text cells, merging, row and column editing, column widths and alignment. Imports arrays while retaining numbers and booleans.",
   },
   callout: {
     name: "Callout",

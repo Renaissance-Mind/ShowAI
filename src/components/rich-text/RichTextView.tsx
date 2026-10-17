@@ -1,8 +1,11 @@
+import "../blocks/katex.css";
+import { ImageContent } from "./ImageContent";
+import { normalizeContentTree } from "./model.mjs";
 import { richTextStyle } from "./model.mjs";
 import { createElement, type CSSProperties, type ReactNode } from "react";
 import type { JSONContent } from "@tiptap/core";
 import { mathHtml } from "../blocks/markdown-math.mjs";
-import { safeImageUrl, safeUrl } from "../blocks/helpers";
+import { safeUrl } from "../blocks/helpers";
 import { translator } from "../../i18n";
 import messages from "../../i18n/messages/richText";
 
@@ -10,6 +13,7 @@ const t = translator(messages);
 function nodeStyle(node: JSONContent): CSSProperties {
   const attrs = node.attrs ?? {};
   return {
+    ...richTextStyle(attrs.componentStyle),
     ...(attrs.textAlign ? { textAlign: attrs.textAlign } : {}),
     ...(attrs.backgroundColor
       ? { backgroundColor: attrs.backgroundColor }
@@ -217,31 +221,26 @@ export function RichTextNode({
         </pre>
       );
     case "horizontalRule":
-      return <hr {...props} />;
-    case "image":
       return (
-        <img
+        <hr
           {...props}
-          className="portable-image"
-          src={safeImageUrl(attrs.src) || undefined}
-          alt={attrs.alt ?? ""}
-          title={attrs.title}
           style={{
             ...props.style,
-            width: attrs.width || undefined,
-            height: attrs.height || undefined,
-            ...(attrs.align === "left"
-              ? { marginLeft: 0, marginRight: "auto" }
-              : attrs.align === "right"
-                ? { marginLeft: "auto", marginRight: 0 }
-                : {}),
+            borderTopColor: attrs.componentStyle?.color,
           }}
         />
+      );
+    case "image":
+      return (
+        <div id={attrs.id} data-block-id={attrs.id}>
+          <ImageContent attrs={attrs} />
+        </div>
       );
     case "table":
       return (
         <div className="portable-table-scroll">
           <table {...props}>
+            {attrs.title && <caption>{attrs.title}</caption>}
             {tableColumns(node)}
             <tbody>{children}</tbody>
           </table>
@@ -278,7 +277,10 @@ export function RichTextNode({
           <span className="portable-callout-icon" aria-hidden="true">
             {attrs.icon ?? "💡"}
           </span>
-          <div>{children}</div>
+          <div>
+            {attrs.title && <strong>{attrs.title}</strong>}
+            {children}
+          </div>
         </aside>
       );
     case "toggle":
@@ -291,6 +293,17 @@ export function RichTextNode({
         </details>
       );
     case "widget":
+      if (
+        ["image", "code", "table", "callout", "toggle", "divider"].includes(
+          attrs.kind,
+        )
+      )
+        return (
+          <RichTextNode
+            node={normalizeContentTree(node)}
+            renderWidget={renderWidget}
+          />
+        );
       return (
         <div
           {...props}

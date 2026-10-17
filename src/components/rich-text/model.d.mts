@@ -20,3 +20,15 @@ export function createRichTextNode(
 export function richTextStyle(
   data?: Record<string, unknown>,
 ): import("react").CSSProperties;
+
+export const primitiveNodeTypes: Readonly<Record<string, string>>;
+export function primitiveContentNode(
+  kind: string,
+  data: Record<string, unknown>,
+  id?: string,
+): JSONContent;
+export function normalizeContentTree(node: JSONContent): JSONContent;
+export function patchPrimitiveContentNode(
+  node: JSONContent,
+  props: Record<string, unknown>,
+): JSONContent;

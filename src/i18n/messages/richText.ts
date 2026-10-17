@@ -45,7 +45,7 @@ export default defineMessages("richText", {
     "block.imageKeywords": "图片 照片",
     "block.code": "代码块",
     "block.codeKeywords": "代码",
-    "block.table": "简单表格",
+    "block.table": "表格",
     "block.tableKeywords": "表格",
 
     "format.textStyle": "文字样式",
@@ -196,7 +196,7 @@ export default defineMessages("richText", {
     "block.imageKeywords": "picture",
     "block.code": "Code block",
     "block.codeKeywords": "program",
-    "block.table": "Simple table",
+    "block.table": "Table",
     "block.tableKeywords": "grid",
 
     "format.textStyle": "Text style",

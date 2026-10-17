@@ -156,8 +156,15 @@
     },
     "usage": {
       "purpose": "单张图像与图注，可调整尺寸、裁切和圆角。离线页面使用内嵌图像。",
-      "structure": ["src 对应一张图像，alt 提供替代文字，caption 提供图注。"],
+      "structure": [
+        "文档、画布与 SDK 共用结构化内容节点和编辑器。旧字段输入在读取时转换；保存编辑结果使用 document 内容树。",
+        "同一内容的 ID、资源、格式与子节点在兼容转换中保留。"
+      ],
       "inputs": [
+        {
+          "path": "document",
+          "meaning": "正式编辑格式：{type:\"doc\",content:[...]}。图片为 image，代码为 codeBlock，表格为 table，提示为 callout，折叠为 toggle，分隔线为 horizontalRule；表格单元格支持富文本、合并、列宽与对齐。旧字段可继续用于导入和局部更新。"
+        },
         {
           "path": "src",
           "meaning": "http/https 图像地址，或 PNG/JPEG/GIF/WebP/AVIF 的 base64 data URI；离线交付嵌入图像。"
@@ -285,8 +292,15 @@
     },
     "usage": {
       "purpose": "轻量的二维表格，支持文字、数字和布尔值，可编辑表头和单元格，并按列或整体设置对齐。",
-      "structure": ["columns 决定列顺序，rows 按同样顺序逐行保存单元格。"],
+      "structure": [
+        "文档、画布与 SDK 共用结构化内容节点和编辑器。旧字段输入在读取时转换；保存编辑结果使用 document 内容树。",
+        "同一内容的 ID、资源、格式与子节点在兼容转换中保留。"
+      ],
       "inputs": [
+        {
+          "path": "document",
+          "meaning": "正式编辑格式：{type:\"doc\",content:[...]}。图片为 image，代码为 codeBlock，表格为 table，提示为 callout，折叠为 toggle，分隔线为 horizontalRule；表格单元格支持富文本、合并、列宽与对齐。旧字段可继续用于导入和局部更新。"
+        },
         {
           "path": "title",
           "meaning": "组件标题；只修改本实例的文字。"
@@ -358,8 +372,9 @@
         }
       ],
       "constraints": [
-        "表格提供基础单元格编辑与对齐；需要列类型、筛选、排序或看板时选数据库组件。",
-        "字号达到18px时按列数保留可读宽度，窄视口横向滚动；滚动区域可聚焦并用方向键阅读。无需为这一宽度保护另建包装组件。"
+        "需要字段类型、筛选、排序或多种视图时使用数据库组件。",
+        "旧表格的数字和布尔值保留在单元格 scalarValue 中；修改文字后以实际编辑内容为准。",
+        "选中、悬停和右键菜单共用文档表格操作；支持行列编辑、合并拆分、列宽和对齐。"
       ],
       "editing": {
         "data": [
@@ -408,10 +423,14 @@
     "usage": {
       "purpose": "带标题和 Markdown 正文的提示、引用或说明。",
       "structure": [
-        "读取现有字段与示例后局部修改，保留页面原有身份。",
-        "新建内容通过 Markdown 的引用、分隔线或代码语法表达。"
+        "文档、画布与 SDK 共用结构化内容节点和编辑器。旧字段输入在读取时转换；保存编辑结果使用 document 内容树。",
+        "同一内容的 ID、资源、格式与子节点在兼容转换中保留。"
       ],
       "inputs": [
+        {
+          "path": "document",
+          "meaning": "正式编辑格式：{type:\"doc\",content:[...]}。图片为 image，代码为 codeBlock，表格为 table，提示为 callout，折叠为 toggle，分隔线为 horizontalRule；表格单元格支持富文本、合并、列宽与对齐。旧字段可继续用于导入和局部更新。"
+        },
         {
           "path": "title",
           "meaning": "组件标题；只修改本实例的文字。"
@@ -523,9 +542,14 @@
     "usage": {
       "purpose": "按需展开补充信息，正文支持 Markdown。",
       "structure": [
-        "summary 是始终可见的标题，content 保存展开后的 Markdown。"
+        "文档、画布与 SDK 共用结构化内容节点和编辑器。旧字段输入在读取时转换；保存编辑结果使用 document 内容树。",
+        "同一内容的 ID、资源、格式与子节点在兼容转换中保留。"
       ],
       "inputs": [
+        {
+          "path": "document",
+          "meaning": "正式编辑格式：{type:\"doc\",content:[...]}。图片为 image，代码为 codeBlock，表格为 table，提示为 callout，折叠为 toggle，分隔线为 horizontalRule；表格单元格支持富文本、合并、列宽与对齐。旧字段可继续用于导入和局部更新。"
+        },
         {
           "path": "summary",
           "meaning": "始终可见的标题。"
@@ -642,10 +666,14 @@
     "usage": {
       "purpose": "在页面内容之间建立轻量的视觉分隔。",
       "structure": [
-        "读取现有字段与示例后局部修改，保留页面原有身份。",
-        "新建内容通过 Markdown 的引用、分隔线或代码语法表达。"
+        "文档、画布与 SDK 共用结构化内容节点和编辑器。旧字段输入在读取时转换；保存编辑结果使用 document 内容树。",
+        "同一内容的 ID、资源、格式与子节点在兼容转换中保留。"
       ],
       "inputs": [
+        {
+          "path": "document",
+          "meaning": "正式编辑格式：{type:\"doc\",content:[...]}。图片为 image，代码为 codeBlock，表格为 table，提示为 callout，折叠为 toggle，分隔线为 horizontalRule；表格单元格支持富文本、合并、列宽与对齐。旧字段可继续用于导入和局部更新。"
+        },
         {
           "path": "color",
           "meaning": "文字颜色；使用可读的 CSS 颜色。"
@@ -749,10 +777,14 @@
     "usage": {
       "purpose": "保留缩进与换行的代码片段，可声明语言并自定义外观。",
       "structure": [
-        "读取现有字段与示例后局部修改，保留页面原有身份。",
-        "新建内容通过 Markdown 的引用、分隔线或代码语法表达。"
+        "文档、画布与 SDK 共用结构化内容节点和编辑器。旧字段输入在读取时转换；保存编辑结果使用 document 内容树。",
+        "同一内容的 ID、资源、格式与子节点在兼容转换中保留。"
       ],
       "inputs": [
+        {
+          "path": "document",
+          "meaning": "正式编辑格式：{type:\"doc\",content:[...]}。图片为 image，代码为 codeBlock，表格为 table，提示为 callout，折叠为 toggle，分隔线为 horizontalRule；表格单元格支持富文本、合并、列宽与对齐。旧字段可继续用于导入和局部更新。"
+        },
         {
           "path": "content",
           "meaning": "具体值和边界见 schema；保留示例所用数据结构。"

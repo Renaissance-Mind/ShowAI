@@ -176,7 +176,7 @@ describe("portable artifact boundaries", () => {
       ],
       [{ type: "callout" }],
       [{ type: "paragraph", attrs: { title: {} } }],
-      [{ type: "heading", attrs: { level: 6 } }],
+      [{ type: "heading", attrs: { level: 7 } }],
     ];
     for (const content of malformed)
       expect(() => validateDocument(documentWith(content))).toThrow();

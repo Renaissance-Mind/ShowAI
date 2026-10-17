@@ -1,6 +1,10 @@
 import { validateRichTextData } from "../rich-text/model.mjs";
 import { validateNativeInk } from "../../surface/native-ink.mjs";
 export function validatePrimitiveData(kind, data) {
+  if (kind !== "text" && data.document) {
+    validateRichTextData({ content: data.document, format: "richtext" });
+    return;
+  }
   for (const key of ["color", "backgroundColor"])
     if (data[key] !== undefined && typeof data[key] !== "string")
       throw new Error(`${key} 必须是文字。`);

@@ -124,7 +124,8 @@ const ContentNode = memo(
       actions.geometry,
     );
     const id = node.attrs!.id;
-    const nativeInk = node.type === "widget" && !!node.attrs?.data?.nativeInk;
+    const inkData = node.attrs?.nativeInk ?? node.attrs?.data?.nativeInk;
+    const nativeInk = !!inkData;
     // Keep stored native widgets intact while sharing the drawing's chrome.
     const drawingNode: JSONContent | undefined =
       node.type === "drawing"
@@ -138,15 +139,15 @@ const ContentNode = memo(
                 tool: "pen",
                 color: "#252629",
                 strokeWidth: 2.5,
-                extent: node.attrs!.data.nativeInk.extent,
+                extent: inkData.extent,
                 points: [
                   { x: 0, y: 0 },
                   {
-                    x: node.attrs!.data.nativeInk.extent[0],
-                    y: node.attrs!.data.nativeInk.extent[1],
+                    x: inkData.extent[0],
+                    y: inkData.extent[1],
                   },
                 ],
-                ink: node.attrs!.data.nativeInk,
+                ink: inkData,
               },
             }
           : undefined;

@@ -7,14 +7,20 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Image from "@tiptap/extension-image";
-import { TableKit } from "@tiptap/extension-table";
+import { TableKit, TableView } from "@tiptap/extension-table";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import { ReadingHighlight } from "./reading-highlight";
 import TextAlign from "@tiptap/extension-text-align";
 import { TableAlignmentAttributes } from "./table-alignment";
 import { DropCursorCleanup } from "./drop-cursor-cleanup";
-import { CalloutView, ToggleView, WidgetView, MathView } from "./NodeViews";
+import {
+  CalloutView,
+  ToggleView,
+  WidgetView,
+  MathView,
+  ImageView,
+} from "./NodeViews";
 
 export const blockIdNodeTypes = [
   "paragraph",
@@ -168,7 +174,11 @@ export const CalloutNode = Node.create({
   content: "block+",
   defining: true,
   draggable: true,
-  addAttributes: () => ({ icon: { default: "💡" }, tone: { default: "sage" } }),
+  addAttributes: () => ({
+    icon: { default: "💡" },
+    tone: { default: "sage" },
+    title: { default: "" },
+  }),
   parseHTML: () => [{ tag: "aside[data-callout]" }],
   renderHTML: ({ HTMLAttributes }) => [
     "aside",
@@ -205,6 +215,7 @@ export const RichTextNode = Node.create({
   defining: true,
   addAttributes: () => ({
     id: { default: null },
+    kind: { default: null },
     name: { default: "富文本" }, // i18n-exempt: default node name saved into documents
     data: {
       default: {},
@@ -289,6 +300,7 @@ export function createExtensions(
   } = {},
 ) {
   return [
+    ContentAttributes,
     RichTextNode,
     TextStyle,
     mathNode(true),
@@ -313,11 +325,13 @@ export function createExtensions(
             : (options.placeholder ?? t("placeholderDefault")),
       includeChildren: false,
     }),
-    Image.configure({
+    Image.extend({
+      addNodeView: () => ReactNodeViewRenderer(ImageView),
+    }).configure({
       allowBase64: true,
       HTMLAttributes: { class: "document-image" },
     }),
-    TableKit.configure({ table: { resizable: true } }),
+    TableKit.configure({ table: { resizable: true, View: ContentTableView } }),
     TableAlignmentAttributes,
     TaskList,
     TaskItem.configure({ nested: true }),
@@ -327,4 +341,110 @@ export function createExtensions(
     ToggleNode,
     WidgetNode,
   ];
+}
+
+/** Persist the same metadata through every ProseMirror edit and clipboard round trip. */
+const ContentAttributes = Extension.create({
+  name: "showaiContentAttributes",
+  addGlobalAttributes() {
+    const attribute = (name: string) => ({
+      default: null,
+      parseHTML: (element: HTMLElement) => {
+        const value = element.getAttribute(
+          `data-content-${name.toLowerCase()}`,
+        );
+        if (value === null) return null;
+        try {
+          return name === "title" ? value : JSON.parse(value);
+        } catch {
+          return null;
+        }
+      },
+      renderHTML: (attrs: Record<string, unknown>) =>
+        attrs[name] == null
+          ? {}
+          : {
+              [`data-content-${name.toLowerCase()}`]:
+                name === "title"
+                  ? String(attrs[name])
+                  : JSON.stringify(attrs[name]),
+              ...(name === "componentStyle"
+                ? {
+                    style: Object.entries({
+                      ...richTextStyle(attrs[name] as Record<string, unknown>),
+                      borderTopColor: (attrs[name] as Record<string, unknown>)
+                        ?.color,
+                    })
+                      .filter(([, value]) => value !== undefined)
+                      .map(
+                        ([key, value]) =>
+                          `${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}:${typeof value === "number" ? `${value}px` : value}`,
+                      )
+                      .join(";"),
+                  }
+                : {}),
+            },
+    });
+    return [
+      {
+        types: [
+          "image",
+          "codeBlock",
+          "table",
+          "callout",
+          "toggle",
+          "horizontalRule",
+        ],
+        attributes: { componentStyle: attribute("componentStyle") },
+      },
+      {
+        types: ["image"],
+        attributes: Object.fromEntries(
+          ["caption", "fit", "nativeInk", "width", "height", "align"].map(
+            (key) => [key, attribute(key)],
+          ),
+        ),
+      },
+      { types: ["table"], attributes: { title: attribute("title") } },
+      {
+        types: ["tableCell", "tableHeader"],
+        attributes: { scalarValue: attribute("scalarValue") },
+      },
+    ];
+  },
+});
+
+/** Retain Tiptap resizing and cell editing while displaying shared table metadata. */
+class ContentTableView extends TableView {
+  constructor(...args: ConstructorParameters<typeof TableView>) {
+    super(...args);
+    this.syncMetadata();
+  }
+  syncMetadata() {
+    const style = richTextStyle(this.node.attrs.componentStyle);
+    this.dom.style.cssText = "";
+    Object.assign(
+      this.dom.style,
+      Object.fromEntries(
+        Object.entries(style)
+          .filter(([, value]) => value !== undefined)
+          .map(([key, value]) => [
+            key,
+            typeof value === "number" ? `${value}px` : value,
+          ]),
+      ),
+    );
+    if (this.node.attrs.id) this.table.dataset.blockId = this.node.attrs.id;
+    const title = this.node.attrs.title;
+    if (title) {
+      const caption = this.table.caption ?? this.table.createCaption();
+      caption.textContent = title;
+    } else this.table.caption?.remove();
+    this.dom.tabIndex = 0;
+  }
+  update(node: Parameters<TableView["update"]>[0]) {
+    if (!super.update(node)) return false;
+    this.syncMetadata();
+    return true;
+  }
 }

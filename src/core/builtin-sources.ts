@@ -1,3 +1,5 @@
+import richTextImageContent from "../components/rich-text/ImageContent.tsx?raw";
+import richTextContentActions from "../components/rich-text/ContentNodeActions.tsx?raw";
 import richTextTableAlignment from "../components/rich-text/table-alignment.ts?raw";
 import richTextTableSelection from "../components/rich-text/table-selection.ts?raw";
 import richTextExternalContent from "../components/rich-text/external-content.ts?raw";
@@ -111,6 +113,8 @@ import i18n_scene3d from "../i18n/messages/scene3d.ts?raw";
 const sources: Record<string, string> = {
   ...g2BuiltinSources,
   ...diagramBuiltinSources,
+  "rich-text/ImageContent.tsx": richTextImageContent,
+  "rich-text/ContentNodeActions.tsx": richTextContentActions,
   "rich-text/table-alignment.ts": richTextTableAlignment,
   "rich-text/table-selection.ts": richTextTableSelection,
   "rich-text/external-content.ts": richTextExternalContent,
@@ -226,7 +230,12 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
     name,
     source
       .replaceAll('"../../surface/native-ink.mjs"', '"./native-ink.mjs"')
-      .replaceAll('"../../surface/NativeInkPreview"', '"./NativeInkPreview"')
+      .replaceAll(
+        '"../../surface/NativeInkPreview"',
+        name.startsWith("rich-text/")
+          ? '"../NativeInkPreview"'
+          : '"./NativeInkPreview"',
+      )
       .replaceAll('"../portable/capacity.mjs"', '"./capacity.mjs"')
       .replaceAll(
         '"../../portable/capacity.mjs"',

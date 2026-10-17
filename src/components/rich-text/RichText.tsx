@@ -38,10 +38,7 @@ export function RichText({
   const t = useTranslator(messages);
   validateRichTextData(data);
   const content = useMemo(
-    () =>
-      typeof data.content === "string"
-        ? richTextDocument(data)
-        : (data.content as JSONContent),
+    () => richTextDocument(data),
     [data.content, data.format],
   );
   const { renderWidget } = useContext(RichTextEnvironment);

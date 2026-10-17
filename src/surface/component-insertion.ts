@@ -1,4 +1,8 @@
-import { createRichTextNode } from "../components/rich-text/model.mjs";
+import {
+  primitiveContentNode,
+  primitiveNodeTypes,
+  createRichTextNode,
+} from "../components/rich-text/model.mjs";
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import type { NodeLayout } from "./types";
@@ -65,6 +69,12 @@ export function insertComponent(
   let node: JSONContent, frame: NodeLayout;
   if (kind === "text") {
     node = createRichTextNode(data);
+    frame = { x: 0, y: 0, width: 640 };
+  } else if (primitiveNodeTypes[kind]) {
+    node = data.document
+      ? createRichTextNode({ content: data.document, format: "richtext" })
+      : primitiveContentNode(kind, data, crypto.randomUUID());
+    if (data.document) node.attrs = { ...node.attrs, kind };
     frame = { x: 0, y: 0, width: 640 };
   } else if (definition?.insertion) {
     const incoming = remapSurfaceIds(nativeComponentDocument(kind, data));

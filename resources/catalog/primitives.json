@@ -177,7 +177,7 @@
   },
   {
     "kind": "image",
-    "name": "图像框",
+    "name": "图片",
     "description": "单张图像与图注，可调整尺寸、裁切和圆角。离线页面使用内嵌图像。",
     "scenarios": [
       "展示示意图、设计稿或照片，并提供替代文字和图注。",
@@ -187,7 +187,7 @@
       "保留图像比例或按给定尺寸裁切。",
       "同一份数据可复用于页面、模块和组合组件。"
     ],
-    "version": "1.0.0",
+    "version": "2.0.0",
     "defaultData": {
       "src": "",
       "alt": "",
@@ -241,10 +241,27 @@
           "type": "number",
           "minimum": 0,
           "maximum": 200
+        },
+        "document": {
+          "type": "object",
+          "description": "统一结构化内容树；编辑后的正式格式，旧字段仍作为兼容导入输入。"
         }
       },
-      "required": ["src"],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": ["document"],
+          "properties": {
+            "document": {}
+          }
+        },
+        {
+          "required": ["src"],
+          "properties": {
+            "src": {}
+          }
+        }
+      ]
     },
     "examples": [
       {
@@ -264,18 +281,18 @@
   },
   {
     "kind": "table",
-    "name": "基础表格",
-    "description": "轻量的二维表格，支持文字、数字和布尔值，可编辑表头和单元格，并按列或整体设置对齐。",
+    "name": "表格",
+    "description": "统一的表格组件，支持富文本单元格、合并拆分、行列编辑、列宽和对齐；兼容二维数组导入并保留数字与布尔值。",
     "scenarios": [
       "展示小规模对照、术语解释或计算结果。",
       "在组合组件中嵌入简单结构化内容。"
     ],
     "effects": [
-      "以统一表头和行间距呈现二维数据。",
-      "编辑页面时可修改单元格与增减行；阅读时保持完整表格。",
-      "悬停首行可设置列对齐；表格右上角与右键菜单可统一设置所有列。"
+      "文档与画布使用同一套表格内容和编辑操作。",
+      "保留单元格格式、合并关系、列宽及对齐。",
+      "通过已有的选中、悬停及右键菜单编辑表格。"
     ],
-    "version": "1.1.2",
+    "version": "2.0.0",
     "defaultData": {
       "title": "",
       "columns": ["名称", "说明"],
@@ -337,10 +354,28 @@
           "items": {
             "enum": ["left", "center", "right", null]
           }
+        },
+        "document": {
+          "type": "object",
+          "description": "统一结构化内容树；编辑后的正式格式，旧字段仍作为兼容导入输入。"
         }
       },
-      "required": ["columns", "rows"],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": ["document"],
+          "properties": {
+            "document": {}
+          }
+        },
+        {
+          "required": ["columns", "rows"],
+          "properties": {
+            "columns": {},
+            "rows": {}
+          }
+        }
+      ]
     },
     "examples": [
       {
@@ -382,7 +417,7 @@
       "带标题和 Markdown 正文的提示、引用或说明。",
       "使用组件数据和源码扩展自己的呈现方式。"
     ],
-    "version": "1.0.0",
+    "version": "2.0.0",
     "defaultData": {
       "title": "提示",
       "content": "补充一条说明。"
@@ -442,10 +477,27 @@
           "type": "number",
           "minimum": 0,
           "maximum": 200
+        },
+        "document": {
+          "type": "object",
+          "description": "统一结构化内容树；编辑后的正式格式，旧字段仍作为兼容导入输入。"
         }
       },
-      "required": ["content"],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": ["document"],
+          "properties": {
+            "document": {}
+          }
+        },
+        {
+          "required": ["content"],
+          "properties": {
+            "content": {}
+          }
+        }
+      ]
     },
     "examples": [
       {
@@ -455,8 +507,7 @@
           "content": "先看 **主要结论**，再检查每项证据。"
         }
       }
-    ],
-    "replacedBy": "text"
+    ]
   },
   {
     "kind": "toggle",
@@ -470,7 +521,7 @@
       "按需展开补充信息，正文支持 Markdown。",
       "使用组件数据和源码扩展自己的呈现方式。"
     ],
-    "version": "1.0.0",
+    "version": "2.0.0",
     "defaultData": {
       "summary": "展开内容",
       "content": "这里是补充说明。",
@@ -534,10 +585,28 @@
           "type": "number",
           "minimum": 0,
           "maximum": 200
+        },
+        "document": {
+          "type": "object",
+          "description": "统一结构化内容树；编辑后的正式格式，旧字段仍作为兼容导入输入。"
         }
       },
-      "required": ["summary", "content"],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": ["document"],
+          "properties": {
+            "document": {}
+          }
+        },
+        {
+          "required": ["summary", "content"],
+          "properties": {
+            "summary": {},
+            "content": {}
+          }
+        }
+      ]
     },
     "examples": [
       {
@@ -562,7 +631,7 @@
       "在页面内容之间建立轻量的视觉分隔。",
       "使用组件数据和源码扩展自己的呈现方式。"
     ],
-    "version": "1.0.0",
+    "version": "2.0.0",
     "defaultData": {
       "color": "#dce1d7"
     },
@@ -592,9 +661,12 @@
           "type": "number",
           "minimum": 0,
           "maximum": 200
+        },
+        "document": {
+          "type": "object",
+          "description": "统一结构化内容树；编辑后的正式格式，旧字段仍作为兼容导入输入。"
         }
       },
-      "required": [],
       "additionalProperties": false
     },
     "examples": [
@@ -604,8 +676,7 @@
           "color": "#dddddd"
         }
       }
-    ],
-    "replacedBy": "text"
+    ]
   },
   {
     "kind": "code",
@@ -619,7 +690,7 @@
       "保留缩进与换行的代码片段，可声明语言并自定义外观。",
       "使用组件数据和源码扩展自己的呈现方式。"
     ],
-    "version": "1.0.0",
+    "version": "2.0.0",
     "defaultData": {
       "content": "",
       "language": ""
@@ -656,10 +727,27 @@
           "type": "number",
           "minimum": 0,
           "maximum": 200
+        },
+        "document": {
+          "type": "object",
+          "description": "统一结构化内容树；编辑后的正式格式，旧字段仍作为兼容导入输入。"
         }
       },
-      "required": ["content"],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": ["document"],
+          "properties": {
+            "document": {}
+          }
+        },
+        {
+          "required": ["content"],
+          "properties": {
+            "content": {}
+          }
+        }
+      ]
     },
     "examples": [
       {
@@ -669,7 +757,6 @@
           "language": "javascript"
         }
       }
-    ],
-    "replacedBy": "text"
+    ]
   }
 ]

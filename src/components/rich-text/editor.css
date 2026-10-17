@@ -272,18 +272,18 @@
   overflow-x: auto;
   margin: 21px 0;
 }
-.document-content table:not(.sb-block table):not(.sb-primitive table),
-.portable-editor .tiptap table:not(.sb-block table):not(.sb-primitive table) {
+.document-content table:not(.document-widget table),
+.portable-editor .tiptap table:not(.document-widget table) {
   border-collapse: collapse;
   width: 100%;
   table-layout: fixed;
   overflow: hidden;
   font-size: inherit;
 }
-.document-content th:not(.sb-block th):not(.sb-primitive th),
-.document-content td:not(.sb-block td):not(.sb-primitive td),
-.portable-editor .tiptap th:not(.sb-block th):not(.sb-primitive th),
-.portable-editor .tiptap td:not(.sb-block td):not(.sb-primitive td) {
+.document-content th:not(.document-widget th),
+.document-content td:not(.document-widget td),
+.portable-editor .tiptap th:not(.document-widget th),
+.portable-editor .tiptap td:not(.document-widget td) {
   position: relative;
   border: 1px solid var(--editor-line);
   padding: 7px 11px;
@@ -291,13 +291,13 @@
   vertical-align: top;
   text-align: left;
 }
-.document-content th:not(.sb-block th):not(.sb-primitive th),
-.portable-editor .tiptap th:not(.sb-block th):not(.sb-primitive th) {
+.document-content th:not(.document-widget th),
+.portable-editor .tiptap th:not(.document-widget th) {
   font-weight: 600;
   background: var(--editor-hover);
 }
-.document-content td:not(.sb-block td):not(.sb-primitive td) > *,
-.document-content th:not(.sb-block th):not(.sb-primitive th) > * {
+.document-content td:not(.document-widget td) > *,
+.document-content th:not(.document-widget th) > * {
   margin: 0;
 }
 .document-content .selectedCell:after {
@@ -1133,4 +1133,44 @@
 .rich-text-component .sb-rich-text {
   font-size: inherit;
   color: inherit;
+}
+
+.content-node-fields:empty {
+  display: none;
+}
+.content-node-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+.content-node-fields input,
+.content-node-fields select {
+  width: 100%;
+  min-width: 0;
+  color: inherit;
+  background: var(--paper, #fff);
+  border: 1px solid var(--line, #ddd);
+  border-radius: 4px;
+  padding: 5px;
+}
+.document-content .sb-image {
+  margin: 0;
+}
+
+.document-content table caption {
+  text-align: start;
+  font-weight: 600;
+  padding: 0 0 10px;
+}
+
+.block-menu:has(.content-node-fields:not(:empty)) {
+  max-height: min(560px, calc(100vh - 32px));
+  overflow-y: auto;
+}
+.content-node-fields summary {
+  cursor: pointer;
+  padding: 5px 8px;
+  font-size: 12px;
 }

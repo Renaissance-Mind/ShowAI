@@ -38,7 +38,8 @@ export function BoardGestureInput({
     last: Point;
   } | null>(null);
   const isInk = (node: JSONContent) =>
-    node.type === "drawing" || !!node.attrs?.data?.nativeInk;
+    node.type === "drawing" ||
+    !!(node.attrs?.nativeInk ?? node.attrs?.data?.nativeInk);
   const restore = (value: NonNullable<typeof gesture.current>) => {
     for (const element of value.hidden) delete element.dataset.erasing;
   };

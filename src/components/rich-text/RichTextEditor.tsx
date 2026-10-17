@@ -1,3 +1,5 @@
+import { ContentNodeActions } from "./ContentNodeActions";
+import { primitiveNodeTypes, primitiveContentNode } from "./model.mjs";
 import { CAPACITY, formatBytes } from "../../portable/capacity.mjs";
 import { translator } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
@@ -281,6 +283,32 @@ export default function RichTextEditor({
     ],
     [additionalExtensions, trailingNode],
   );
+  useLayoutEffect(() => {
+    if (!blockMenu) return;
+    const root = wrapperRef.current;
+    const menu = root?.querySelector<HTMLElement>(".block-menu");
+    const handle = root?.querySelector<HTMLElement>(".block-handle");
+    if (!menu || !handle) return;
+    const place = () => {
+      const anchor = handle.getBoundingClientRect();
+      const rect = menu.getBoundingClientRect();
+      Object.assign(menu.style, {
+        position: "fixed",
+        left: `${Math.max(12, Math.min(anchor.right, window.innerWidth - rect.width - 12))}px`,
+        top: `${Math.max(12, Math.min(anchor.top, window.innerHeight - rect.height - 12))}px`,
+      });
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(menu);
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [blockMenu, hover?.pos]);
   const editor = useWorkspaceEditor({
     retentionKey,
     extensions,
@@ -895,7 +923,9 @@ export default function RichTextEditor({
       },
       ...catalog.items
         .filter(
-          (item) => !("kind" in item && item.insertion) || !!onInsertNative,
+          (item) =>
+            !("kind" in item && primitiveNodeTypes[item.kind]) &&
+            (!("kind" in item && item.insertion) || !!onInsertNative),
         )
         .map((item) => ({
           id:
@@ -955,8 +985,12 @@ export default function RichTextEditor({
             .focus()
             .deleteRange({ from: state.from, to: state.to })
             .insertContent({
-              type: "widget",
-              attrs: { kind: value.kind, data: value.data },
+              ...(primitiveNodeTypes[value.kind]
+                ? primitiveContentNode(value.kind, value.data)
+                : {
+                    type: "widget",
+                    attrs: { kind: value.kind, data: value.data },
+                  }),
             })
             .run();
         }
@@ -1480,6 +1514,7 @@ export default function RichTextEditor({
                         <div className="menu-rule" />
                       </>
                     )}
+                  <ContentNodeActions editor={editor} position={hover.pos} />
                   {onDetachBlock && (
                     <button
                       onClick={() => {

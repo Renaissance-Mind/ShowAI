@@ -280,7 +280,10 @@ describe("compiled React packages", () => {
       "text",
       "image",
       "table",
+      "callout",
       "toggle",
+      "divider",
+      "code",
       "chart",
       "database",
       "metrics",
@@ -310,7 +313,7 @@ describe("compiled React packages", () => {
     ).toBe(true);
     expect(builtins.find((item) => item.kind === "text")!.name).toBe("富文本");
     for (const kind of ["callout", "divider", "code"]) {
-      expect(describeBuiltinComponent(kind).replacedBy).toBe("text");
+      expect(describeBuiltinComponent(kind).replacedBy).toBeUndefined();
       expect(readBuiltinComponentSource(kind).source).toContain(
         'from "showai:components"',
       );

@@ -1,3 +1,4 @@
+import { normalizeContentTree } from "../components/rich-text/model.mjs";
 import { isResource } from "../surface/containers.mjs";
 import { validatePageIcon } from "../lib/page-icon.mjs";
 import { artifactVersion, assignSurfaceIds } from "../surface/document.mjs";
@@ -98,6 +99,11 @@ const nodeAttributes = new Set([
   "frameless",
   "latex",
   "display",
+  "componentStyle",
+  "caption",
+  "fit",
+  "nativeInk",
+  "scalarValue",
 ]);
 const markAttributes = new Set([
   "href",
@@ -182,7 +188,7 @@ function validateAttrs(attrs, path, permitted, surfaceIcon = false) {
     if (value === null || value === undefined) continue;
     if (key === "href" && !isSafeUrl(value))
       throw new Error(`${path}.href must be a safe web, email, or anchor URL.`);
-    if (key === "src" && !isSafeUrl(value, true))
+    if (key === "src" && value !== "" && !isSafeUrl(value, true))
       throw new Error(
         `${path}.src must be a web URL or embedded raster image.`,
       );
@@ -191,8 +197,8 @@ function validateAttrs(attrs, path, permitted, surfaceIcon = false) {
       !["left", "center", "right", "justify"].includes(value)
     )
       throw new Error(`${path}.${key} is not supported.`);
-    if (key === "level" && ![1, 2, 3].includes(value))
-      throw new Error(`${path}.level must be 1 through 3.`);
+    if (key === "level" && ![1, 2, 3, 4, 5, 6].includes(value))
+      throw new Error(`${path}.level must be 1 through 6.`);
     if (key === "type" && !["1", "a", "A", "i", "I"].includes(value))
       throw new Error(`${path}.type must be an ordered-list marker style.`);
     if (["open", "checked"].includes(key) && typeof value !== "boolean")
@@ -302,8 +308,8 @@ function validateWidgetData(kind, data, path) {
     )
   ) {
     validatePrimitiveData(kind, data);
-    if (kind === "text" && typeof data.content === "object")
-      validateNode(data.content, `${path}.content`, {
+    if ((kind === "text" && typeof data.content === "object") || data.document)
+      validateNode(data.document ?? data.content, `${path}.content`, {
         count: 0,
         surface: false,
         resource: false,
@@ -486,7 +492,7 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
   if (!counter.resource && node.type === "surface" && depth !== 0)
     throw new Error("A whiteboard root cannot be nested.");
   if (
-    ["region", "richText"].includes(node.type) &&
+    node.type === "region" &&
     (!["surface", "region"].includes(parentType) || !counter.surface)
   )
     throw new Error(`${node.type} requires a whiteboard or region parent.`);
@@ -564,8 +570,33 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
         `${path}.attrs.canvas.width must be between 240 and 1600.`,
       );
   }
-  if (node.type === "image" && !isSafeUrl(node.attrs?.src, true))
+  if (
+    node.type === "image" &&
+    node.attrs?.src !== "" &&
+    !isSafeUrl(node.attrs?.src, true)
+  )
     throw new Error(`${path} requires a safe image src.`);
+  if (node.type === "image")
+    validatePrimitiveData(
+      "image",
+      Object.fromEntries(
+        Object.entries({ ...node.attrs.componentStyle, ...node.attrs }).filter(
+          ([key, value]) => value != null && !["width", "height"].includes(key),
+        ),
+      ),
+    );
+  if (node.attrs?.nativeInk != null && node.type !== "image")
+    throw new Error(`${path}.nativeInk requires an image node.`);
+  if (
+    node.attrs?.scalarValue != null &&
+    (!["tableCell", "tableHeader"].includes(node.type) ||
+      !["string", "number", "boolean"].includes(typeof node.attrs.scalarValue))
+  )
+    throw new Error(`${path}.scalarValue requires a typed table cell value.`);
+  if (node.attrs?.componentStyle) {
+    object(node.attrs.componentStyle, `${path}.componentStyle`);
+    validatePrimitiveData("divider", node.attrs.componentStyle);
+  }
   if (node.type === "richText")
     validatePrimitiveData("text", {
       ...node.attrs?.data,
@@ -631,6 +662,7 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
   }
   const children = node.content ?? [];
   const blockTypes = [
+    "richText",
     "paragraph",
     "heading",
     "mathBlock",
@@ -774,6 +806,13 @@ export function validateDocument(value) {
     document.surfaceViews !== undefined
   )
     throw new Error("Layout and views require a surface root.");
+  validateNode(document.content, "document.content", {
+    count: 0,
+    surface,
+    resource,
+  });
+  document.content = normalizeContentTree(document.content);
+  if (surface) assignSurfaceIds(document);
   validateNode(document.content, "document.content", {
     count: 0,
     surface,

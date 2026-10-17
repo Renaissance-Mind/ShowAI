@@ -206,7 +206,7 @@ export function richTextDocument(data) {
             .map((text) => ({ type: "paragraph", content: textNode(text) })),
         }
       : markdownToRichText(data.content);
-  return structuredClone(
+  return normalizeContentTree(
     data.content ?? { type: "doc", content: [{ type: "paragraph" }] },
   );
 }
@@ -311,6 +311,7 @@ export function validateRichTextData(data) {
     }
     if (
       node.type === "image" &&
+      node.attrs?.src !== "" &&
       !/^(https?:\/\/|data:image\/(?:png|jpe?g|gif|webp|avif);base64,)/i.test(
         node.attrs?.src ?? "",
       )
@@ -339,6 +340,7 @@ export function createRichTextNode(data, id = crypto.randomUUID()) {
   };
 }
 export function richTextStyle(data = {}) {
+  data ??= {};
   return {
     color: data.color || undefined,
     backgroundColor: data.backgroundColor || undefined,
@@ -347,4 +349,202 @@ export function richTextStyle(data = {}) {
     borderRadius: typeof data.radius === "number" ? data.radius : undefined,
     padding: typeof data.padding === "number" ? data.padding : undefined,
   };
+}
+
+/** Canonical content nodes shared by document editing, the catalog and SDK. */
+export const primitiveNodeTypes = Object.freeze({
+  __proto__: null,
+  image: "image",
+  code: "codeBlock",
+  table: "table",
+  callout: "callout",
+  toggle: "toggle",
+  divider: "horizontalRule",
+});
+export function primitiveContentNode(kind, data, id) {
+  const type = primitiveNodeTypes[kind];
+  if (!type) throw new Error(`Not a basic content component: ${kind}`);
+  const style = Object.fromEntries(
+    ["color", "backgroundColor", "fontSize", "align", "padding", "radius"]
+      .filter((key) => data[key] !== undefined)
+      .map((key) => [key, data[key]]),
+  );
+  const attrs = {
+    ...(id ? { id } : {}),
+    ...(Object.keys(style).length ? { componentStyle: style } : {}),
+  };
+  const node = { type, attrs };
+  if (kind === "image") {
+    attrs.width = data.width ?? "100%";
+    for (const key of [
+      "src",
+      "alt",
+      "caption",
+      "title",
+      "width",
+      "height",
+      "fit",
+      "nativeInk",
+    ])
+      if (data[key] !== undefined) attrs[key] = structuredClone(data[key]);
+  } else if (kind === "code") {
+    attrs.language = data.language ?? null;
+    node.content = textNode(data.content ?? "");
+  } else if (kind === "table") {
+    attrs.title = data.title ?? "";
+    node.content = [data.columns, ...data.rows].map((row, index) => ({
+      type: "tableRow",
+      content: row.map((value, column) => ({
+        type: index ? "tableCell" : "tableHeader",
+        attrs: {
+          colspan: 1,
+          rowspan: 1,
+          colwidth:
+            typeof data.fontSize === "number" && data.fontSize >= 18
+              ? [data.fontSize * 10 + 16]
+              : null,
+          textAlign: data.columnAlignments?.[column] ?? data.align ?? "left",
+          scalarValue: value,
+        },
+        content: [{ type: "paragraph", content: textNode(String(value)) }],
+      })),
+    }));
+  } else if (kind === "callout" || kind === "toggle") {
+    attrs.title =
+      kind === "toggle"
+        ? (data.summary ?? data.title ?? "")
+        : (data.title ?? "");
+    if (kind === "toggle") attrs.open = data.open === true;
+    else {
+      attrs.icon = data.icon ?? "💡";
+      attrs.tone = data.tone ?? "sage";
+    }
+    node.content = richTextDocument({ content: data.content }).content;
+    if (!node.content.length) node.content = [{ type: "paragraph" }];
+  }
+  return node;
+}
+/** Pure, idempotent compatibility conversion. Original files and history are untouched. */
+export function normalizeContentTree(input) {
+  const visit = (inputNode) => {
+    let node = inputNode;
+    if (node.type === "widget" && primitiveNodeTypes[node.attrs?.kind]) {
+      const { kind, data, ...identity } = node.attrs;
+      node = data.document
+        ? {
+            type: "richText",
+            attrs: { kind },
+            content: normalizeContentTree(data.document).content,
+          }
+        : primitiveContentNode(kind, data, identity.id);
+      node.attrs = { ...identity, ...node.attrs };
+    }
+    if (Array.isArray(node.content)) node.content = node.content.map(visit);
+    if (
+      ["tableCell", "tableHeader"].includes(node.type) &&
+      node.attrs?.scalarValue != null
+    ) {
+      const plain = (value) =>
+        value.type === "text"
+          ? value.text
+          : (value.content ?? []).map(plain).join("");
+      if (plain(node) !== String(node.attrs.scalarValue))
+        node.attrs.scalarValue = plain(node);
+    }
+    return node;
+  };
+  return visit(structuredClone(input));
+}
+
+/** Keep existing component.props.set callers working against the canonical content node. */
+export function patchPrimitiveContentNode(node, props) {
+  if (node.type === "richText" && primitiveNodeTypes[node.attrs?.kind]) {
+    if (props.document)
+      return { ...node, content: normalizeContentTree(props.document).content };
+    const next = structuredClone(node);
+    const index = next.content.findIndex(
+      (child) => child.type === primitiveNodeTypes[node.attrs.kind],
+    );
+    if (index < 0) throw new Error("The component content has been removed.");
+    next.content[index] = patchPrimitiveContentNode(next.content[index], props);
+    return next;
+  }
+  const kind = Object.keys(primitiveNodeTypes).find(
+    (key) => primitiveNodeTypes[key] === node.type,
+  );
+  if (!kind) throw new Error("Expected a basic content node.");
+  if (props.document)
+    return {
+      type: "richText",
+      attrs: { id: node.attrs?.id, kind },
+      content: normalizeContentTree(props.document).content,
+    };
+  const next = structuredClone(node);
+  next.attrs ??= {};
+  const styleKeys = [
+    "color",
+    "backgroundColor",
+    "fontSize",
+    "align",
+    "padding",
+    "radius",
+  ];
+  for (const key of styleKeys)
+    if (props[key] !== undefined)
+      next.attrs.componentStyle = {
+        ...next.attrs.componentStyle,
+        [key]: props[key],
+      };
+  const plain = (value) =>
+    value.type === "text"
+      ? value.text
+      : (value.content ?? []).map(plain).join("");
+  if (kind === "table") {
+    if (props.title !== undefined) next.attrs.title = props.title;
+    if (props.columns !== undefined || props.rows !== undefined) {
+      const columns = props.columns ?? next.content[0].content.map(plain);
+      const rows =
+        props.rows ??
+        next.content
+          .slice(1)
+          .map((row) =>
+            row.content.map((cell) => cell.attrs?.scalarValue ?? plain(cell)),
+          );
+      const converted = primitiveContentNode("table", { columns, rows });
+      next.content = converted.content.map((row, r) => ({
+        ...row,
+        attrs: next.content[r]?.attrs,
+        content: row.content.map((cell, c) => {
+          const previous = next.content[r]?.content[c];
+          return previous && plain(previous) === plain(cell)
+            ? previous
+            : { ...cell, attrs: { ...previous?.attrs, ...cell.attrs } };
+        }),
+      }));
+    }
+    if (props.align !== undefined || props.columnAlignments !== undefined)
+      next.content.forEach((row) =>
+        row.content.forEach((cell, column) => {
+          cell.attrs = {
+            ...cell.attrs,
+            textAlign:
+              props.columnAlignments?.[column] ??
+              props.align ??
+              next.attrs.componentStyle?.align ??
+              "left",
+          };
+        }),
+      );
+  } else {
+    for (const [key, value] of Object.entries(props)) {
+      if (styleKeys.includes(key)) continue;
+      if (key === "content")
+        next.content =
+          kind === "code"
+            ? textNode(value)
+            : richTextDocument({ content: value }).content;
+      else next.attrs[key === "summary" ? "title" : key] = value;
+    }
+  }
+  return normalizeContentTree(next);
 }

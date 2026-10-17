@@ -101,9 +101,10 @@ export const surfaceToScreen = (point, origin, camera) => ({
 export function objectCapabilities(node) {
   const drawing = node.type === "drawing";
   const nativeInk =
-    node.type === "widget" &&
-    node.attrs?.kind === "image" &&
-    !!node.attrs?.data?.nativeInk;
+    !!node.attrs?.nativeInk ||
+    (node.type === "widget" &&
+      node.attrs?.kind === "image" &&
+      !!node.attrs?.data?.nativeInk);
   return {
     rotate:
       (drawing || nativeInk || node.type === "image") &&
