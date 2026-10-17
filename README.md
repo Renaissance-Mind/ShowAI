@@ -32,10 +32,6 @@ https://github.com/user-attachments/assets/ecdccdec-1def-45a9-811f-121a7d07b906
 - **Cross-device**: Pair an iPad with a Mac to share one body of content, and run agent tasks on this device, in the cloud or on the paired Mac.
 - **Local-first, share when you want**: Fully usable with no account. Connect a self-hosted server for collaboration, or export an offline, interactive HTML file.
 
-> **Versions:** These docs follow application **0.9.0**, plugin **0.16.1** and artifact format **v3** on `main`. Software, plugins and hosted services update independently. Check [Releases](https://github.com/Renaissance-Mind/ShowAI/releases) for available downloads and [the documentation index](docs/README.md) for paired English/Chinese guides.
-
-The workbench supports English and Simplified Chinese. Change it in **Settings → Appearance → Language**; exported reader controls use the export language.
-
 ## 🧩 Design
 
 ![ShowAI design: dynamically added components, content and templates, co-creation in agent context and the ShowAI App, then use and delivery](docs/showai-design-logic.svg)

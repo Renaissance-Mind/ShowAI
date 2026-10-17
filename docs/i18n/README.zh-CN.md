@@ -32,10 +32,6 @@ https://github.com/user-attachments/assets/375d6ff3-fe3e-47c2-b6a4-d69df1b86b20
 - **Cross-device**：iPad 与 Mac 配对后共用同一份内容，Agent 任务可以在本机、云端或配对的 Mac 上执行。
 - **Local-first, share when you want**：不开账号也能完整使用，需要时接自建服务器多人协作，或导出一个离线可交互的 HTML。
 
-> **版本：** 本文档对应 main 分支的应用 **0.9.0**、插件 **0.16.1** 和页面格式 **v3**。软件、插件与托管服务独立更新；可下载文件以 [Releases](https://github.com/Renaissance-Mind/ShowAI/releases) 为准。全部公开使用与技术指南提供中英文版本，见[文档目录](index.zh-CN.md)。
-
-工作台支持英文和简体中文，在「设置 → 外观 → 语言」切换；导出阅读器使用导出时的界面语言。
-
 ## 🧩 设计逻辑
 
 ![ShowAI 设计逻辑：从可由 Agent 动态添加的组件、内容（模板），到 Agent 上下文与 ShowAI App 中的共创，以及使用与交付](showai-design-logic.zh-CN.svg)
