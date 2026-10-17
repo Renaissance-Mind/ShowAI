@@ -50,6 +50,7 @@ if (process.argv.includes("--install-runtime")) {
             request.url === "/health"
               ? (health ?? {
                   service: "showai-agent-container",
+                  taskAdmission: "checkpointed-before-start",
                   runtime: startupError ? "failed" : "starting",
                   stage,
                   ...(stage === "restore" ? { restore: restoreProgress } : {}),
@@ -257,6 +258,7 @@ if (process.argv.includes("--install-runtime")) {
     }, 10000);
     health = {
       service: "showai-agent-container",
+      taskAdmission: "checkpointed-before-start",
       runtime: (await engine.host.installer.status()).state,
       browserRendering,
       sandbox,
