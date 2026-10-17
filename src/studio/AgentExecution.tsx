@@ -2,10 +2,11 @@ import { useEffect, useState, useRef } from "react";
 import { desktop } from "./bridge";
 import type { AgentDestination } from "../agent-host/remote-protocol";
 import type { ConnectorSettings } from "../agent-host/remote-connector";
-import { getLocale } from "../i18n";
+import { translator } from "../i18n";
+import messages from "../i18n/messages/agentExecution";
 
 import { NearbyMacs } from "./LanPairing";
-const chinese = () => getLocale() === "zh-CN";
+const t = translator(messages);
 export const remoteExecution = () =>
   document.documentElement.dataset.native === "ios";
 export function AgentExecutionPicker({
@@ -65,13 +66,13 @@ export function AgentExecutionPicker({
   return (
     <div className="agent-execution-picker">
       <label>
-        {chinese() ? "服务器账号" : "Server account"}
+        {t("serverAccount")}
         <select
           disabled={disabled}
           value={context?.connectionId ?? ""}
           onChange={(e) => void change({ connectionId: e.target.value })}
         >
-          <option value="">{chinese() ? "选择账号" : "Choose account"}</option>
+          <option value="">{t("chooseAccount")}</option>
           {context?.connections.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -80,7 +81,7 @@ export function AgentExecutionPicker({
         </select>
       </label>
       <label>
-        {chinese() ? "运行位置" : "Run Agent on"}
+        {t("runAgentOn")}
         <select
           disabled={disabled || !context?.connectionId}
           value={context?.destinationId ?? "cloud"}
@@ -104,12 +105,8 @@ export function AgentExecutionPicker({
               {d.online
                 ? ""
                 : d.kind === "cloud"
-                  ? chinese()
-                    ? " · 暂不可用"
-                    : " · Unavailable"
-                  : chinese()
-                    ? " · 离线"
-                    : " · Offline"}
+                  ? t("unavailable")
+                  : t("offline")}
             </option>
           ))}
         </select>
@@ -120,7 +117,7 @@ export function AgentExecutionPicker({
         disabled={disabled}
         onClick={() => void load().then(() => onChange?.(false))}
       >
-        {chinese() ? "刷新设备" : "Refresh devices"}
+        {t("refreshDevices")}
       </button>
       <button
         type="button"
@@ -131,7 +128,7 @@ export function AgentExecutionPicker({
           setPairing(true);
         }}
       >
-        {chinese() ? "配对附近的 Mac" : "Pair a nearby Mac"}
+        {t("pairANearbyMac")}
       </button>
       {pairing && (
         <NearbyMacs
@@ -199,20 +196,16 @@ export function RemoteDeviceSettings() {
   if (!state)
     return (
       <section className="settings-group agent-device-settings">
-        <h2>
-          {chinese() ? "让 iPad 使用这台电脑" : "Use this computer from iPad"}
-        </h2>
+        <h2>{t("useThisComputerFromIPad")}</h2>
         {error ? (
           <p role="alert" className="agent-error">
             {error}
           </p>
         ) : (
-          <p role="status">
-            {chinese() ? "正在读取设备连接…" : "Reading device connection…"}
-          </p>
+          <p role="status">{t("readingDeviceConnection")}</p>
         )}
         <button className="settings-button" onClick={() => void refresh()}>
-          {chinese() ? "刷新" : "Refresh"}
+          {t("refresh")}
         </button>
       </section>
     );
@@ -232,13 +225,11 @@ export function RemoteDeviceSettings() {
   };
   return (
     <section className="settings-group agent-device-settings">
-      <h2>
-        {chinese() ? "让 iPad 使用这台电脑" : "Use this computer from iPad"}
-      </h2>
+      <h2>{t("useThisComputerFromIPad")}</h2>
       <p className="settings-help">
-        {chinese()
-          ? "设备通过 WSS 连接 ShowAI Cloud。iPad 使用同一服务器账号后，可将任务交给这台电脑。保持 ShowAI 运行并让电脑保持唤醒。"
-          : "Connect this computer to ShowAI Cloud over WSS. Devices signed into the same server account can run tasks here. Keep ShowAI running and the computer awake."}
+        {t(
+          "connectThisComputerToShowAICloudOverWSSDevicesSignedIntoTheSameServerAccountCanRunTasksHereKeepShowAIRunningAndTheComputerAwake",
+        )}
       </p>
       <label className="settings-row">
         <input
@@ -246,24 +237,24 @@ export function RemoteDeviceSettings() {
           checked={state.settings.enabled}
           onChange={(e) => change({ enabled: e.target.checked })}
         />
-        {chinese() ? "允许远程执行" : "Allow remote execution"}
+        {t("allowRemoteExecution")}
       </label>
       <label className="settings-row">
-        {chinese() ? "设备名称" : "Device name"}
+        {t("deviceName")}
         <input
           value={state.settings.name}
           onChange={(e) => change({ name: e.target.value })}
         />
       </label>
       <label className="settings-row">
-        {chinese() ? "服务器账号" : "Server account"}
+        {t("serverAccount")}
         <select
           value={state.settings.connectionId}
           onChange={(e) =>
             change({ connectionId: e.target.value, projectIds: [] })
           }
         >
-          <option value="">{chinese() ? "选择账号" : "Choose account"}</option>
+          <option value="">{t("chooseAccount")}</option>
           {state.connections.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -272,16 +263,14 @@ export function RemoteDeviceSettings() {
         </select>
       </label>
       <fieldset>
-        <legend>{chinese() ? "允许访问的项目" : "Allowed projects"}</legend>
+        <legend>{t("allowedProjects")}</legend>
         {!state.projects.some(
           (p) => p.connectionId === state.settings.connectionId,
         ) && (
           <p className="settings-help">
-            {chinese()
-              ? state.settings.connectionId
-                ? "请先在这台电脑同步需要的项目。"
-                : "选择账号后显示已同步的项目。"
-              : "Choose an account with projects synchronized on this computer."}
+            {state.settings.connectionId
+              ? t("syncTheRequiredProjectsOnThisComputerFirst")
+              : t("chooseAnAccountToShowSynchronizedProjects")}
           </p>
         )}
         {state.projects
@@ -320,7 +309,7 @@ export function RemoteDeviceSettings() {
                 .catch((reason) => setError(reason.message))
             }
           >
-            {chinese() ? "允许此设备" : "Allow device"}
+            {t("allowDevice")}
           </button>
           <button
             className="settings-button"
@@ -334,7 +323,7 @@ export function RemoteDeviceSettings() {
                 .catch((reason) => setError(reason.message))
             }
           >
-            {chinese() ? "拒绝" : "Reject"}
+            {t("reject")}
           </button>
         </div>
       ))}
@@ -358,24 +347,14 @@ export function RemoteDeviceSettings() {
                 .catch((reason) => setError(reason.message))
             }
           >
-            {chinese() ? "撤销设备授权" : "Revoke device"}
+            {t("revokeDevice")}
           </button>
         </div>
       ))}
       <div className="settings-row">
         <span role="status">
-          {state.lan?.online
-            ? chinese()
-              ? "局域网可发现 · "
-              : "Discoverable on LAN · "
-            : ""}
-          {state.online
-            ? chinese()
-              ? "已连接"
-              : "Connected"
-            : chinese()
-              ? "未连接"
-              : "Disconnected"}
+          {state.lan?.online ? t("discoverableOnLAN") : ""}
+          {state.online ? t("connected") : t("disconnected")}
         </span>
         <button
           type="button"
@@ -383,14 +362,14 @@ export function RemoteDeviceSettings() {
           disabled={busy}
           onClick={() => void save()}
         >
-          {chinese() ? "保存" : "Save"}
+          {t("save")}
         </button>
         <button
           type="button"
           className="settings-button"
           onClick={() => void refresh()}
         >
-          {chinese() ? "刷新" : "Refresh"}
+          {t("refresh")}
         </button>
       </div>
       {(error || state.error) && (

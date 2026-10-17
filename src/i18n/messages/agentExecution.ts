@@ -1,0 +1,58 @@
+import { defineMessages } from "../index";
+export default defineMessages("agentExecution", {
+  "zh-CN": {
+    serverAccount: "服务器账号",
+    chooseAccount: "选择账号",
+    runAgentOn: "运行位置",
+    unavailable: " · 暂不可用",
+    offline: " · 离线",
+    refreshDevices: "刷新设备",
+    pairANearbyMac: "配对附近的 Mac",
+    useThisComputerFromIPad: "让 iPad 使用这台电脑",
+    readingDeviceConnection: "正在读取设备连接…",
+    refresh: "刷新",
+    connectThisComputerToShowAICloudOverWSSDevicesSignedIntoTheSameServerAccountCanRunTasksHereKeepShowAIRunningAndTheComputerAwake:
+      "设备通过 WSS 连接 ShowAI Cloud。iPad 使用同一服务器账号后，可将任务交给这台电脑。保持 ShowAI 运行并让电脑保持唤醒。",
+    allowRemoteExecution: "允许远程执行",
+    deviceName: "设备名称",
+    allowedProjects: "允许访问的项目",
+    syncTheRequiredProjectsOnThisComputerFirst:
+      "请先在这台电脑同步需要的项目。",
+    chooseAnAccountToShowSynchronizedProjects: "选择账号后显示已同步的项目。",
+    allowDevice: "允许此设备",
+    reject: "拒绝",
+    revokeDevice: "撤销设备授权",
+    discoverableOnLAN: "局域网可发现 · ",
+    connected: "已连接",
+    disconnected: "未连接",
+    save: "保存",
+  },
+  en: {
+    serverAccount: "Server account",
+    chooseAccount: "Choose account",
+    runAgentOn: "Run Agent on",
+    unavailable: " · Unavailable",
+    offline: " · Offline",
+    refreshDevices: "Refresh devices",
+    pairANearbyMac: "Pair a nearby Mac",
+    useThisComputerFromIPad: "Use this computer from iPad",
+    readingDeviceConnection: "Reading device connection…",
+    refresh: "Refresh",
+    connectThisComputerToShowAICloudOverWSSDevicesSignedIntoTheSameServerAccountCanRunTasksHereKeepShowAIRunningAndTheComputerAwake:
+      "Connect this computer to ShowAI Cloud over WSS. Devices signed into the same server account can run tasks here. Keep ShowAI running and the computer awake.",
+    allowRemoteExecution: "Allow remote execution",
+    deviceName: "Device name",
+    allowedProjects: "Allowed projects",
+    syncTheRequiredProjectsOnThisComputerFirst:
+      "Sync the required projects on this computer first.",
+    chooseAnAccountToShowSynchronizedProjects:
+      "Choose an account to show synchronized projects.",
+    allowDevice: "Allow device",
+    reject: "Reject",
+    revokeDevice: "Revoke device",
+    discoverableOnLAN: "Discoverable on LAN · ",
+    connected: "Connected",
+    disconnected: "Disconnected",
+    save: "Save",
+  },
+});

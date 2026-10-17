@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { desktop, errorMessage } from "./bridge";
 import Dialog from "./Dialog";
-import { getLocale } from "../i18n";
+import { translator } from "../i18n";
+import messages from "../i18n/messages/lanPairing";
 import { remoteExecution } from "./AgentExecution";
-const zh = () => getLocale() === "zh-CN";
+const t = translator(messages);
 interface Device {
   id: string;
   name: string;
@@ -95,7 +96,7 @@ export function NearbyMacs({
   }, [pair?.id, pair?.state]);
   return (
     <Dialog
-      title={zh() ? "连接附近的 Mac" : "Connect a nearby Mac"}
+      title={t("connectANearbyMac")}
       onClose={() => {
         void desktop
           .invoke("agent:cancelPair")
@@ -105,29 +106,23 @@ export function NearbyMacs({
       className="lan-pairing-dialog"
     >
       <p>
-        {zh()
-          ? "两台设备连接同一个局域网。在 Mac 的设置 → Agent 中开启远程执行并选择项目，然后在这里发起连接。"
-          : "Join the same local network. Enable remote execution and select projects in the Mac’s Settings → Agent, then connect here."}
+        {t(
+          "joinTheSameLocalNetworkEnableRemoteExecutionAndSelectProjectsInTheMacSSettingsAgentThenConnectHere",
+        )}
       </p>
       {pair && (
         <div className="lan-pair-code" role="status">
           <strong>{pair.code}</strong>
           <p>
             {pair.state === "pending"
-              ? zh()
-                ? "核对 Mac 显示的数字，并在 Mac 上确认。两分钟内有效。"
-                : "Match this code on the Mac and approve within two minutes."
-              : zh()
-                ? "请求已结束，可重新发起配对。"
-                : "Request ended. You can pair again."}
+              ? t("matchThisCodeOnTheMacAndApproveWithinTwoMinutes")
+              : t("requestEndedYouCanPairAgain")}
           </p>
         </div>
       )}
       {!state.nearby.length && (
         <p className="settings-help">
-          {zh()
-            ? "正在查找…请允许 ShowAI 使用本地网络。"
-            : "Searching… Allow ShowAI to access your local network."}
+          {t("searchingAllowShowAIToAccessYourLocalNetwork")}
         </p>
       )}
       {state.nearby.map((device) => (
@@ -136,16 +131,10 @@ export function NearbyMacs({
             <b>{device.name}</b>
             <small>
               {device.online
-                ? zh()
-                  ? "已连接 · 局域网"
-                  : "Connected · LAN"
+                ? t("connectedLAN")
                 : device.paired
-                  ? zh()
-                    ? "已记住，可重新配对"
-                    : "Remembered · pair again"
-                  : zh()
-                    ? "附近的 Mac"
-                    : "Nearby Mac"}
+                  ? t("rememberedPairAgain")
+                  : t("nearbyMac")}
             </small>
           </div>
           <button
@@ -156,13 +145,7 @@ export function NearbyMacs({
               device.online ? onPaired(device.id) : void begin(device.id)
             }
           >
-            {device.online
-              ? zh()
-                ? "使用此 Mac"
-                : "Use Mac"
-              : zh()
-                ? "发起配对"
-                : "Pair"}
+            {device.online ? t("useMac") : t("pair")}
           </button>
         </div>
       ))}
@@ -171,10 +154,7 @@ export function NearbyMacs({
         .map((peer) => (
           <div className="lan-device" key={peer.id}>
             <small>
-              {peer.name} ·{" "}
-              {zh()
-                ? "Mac 负责服务器保存，断联期间修改留在 iPad"
-                : "Mac saves to server; iPad retains changes offline"}
+              {peer.name} · {t("macSavesToServerIPadRetainsChangesOffline")}
             </small>
             <button
               type="button"
@@ -186,7 +166,7 @@ export function NearbyMacs({
                   .catch((reason) => setError(errorMessage(reason)))
               }
             >
-              {zh() ? "断开并恢复服务器同步" : "Disconnect and use server sync"}
+              {t("disconnectAndUseServerSync")}
             </button>
           </div>
         ))}
@@ -251,23 +231,19 @@ export function MacPairingPrompt() {
   };
   return (
     <Dialog
-      title={zh() ? "允许 iPad 连接这台 Mac？" : "Allow this iPad to connect?"}
+      title={t("allowThisIPadToConnect")}
       onClose={() => void decide(false)}
       className="lan-pairing-dialog"
     >
       <p>
         <b>{request.name}</b>{" "}
-        {zh()
-          ? "请求使用你已开放的项目，在此 Mac 上运行 Agent 并保存页面。"
-          : "requests access to your shared projects, Agent execution, and page saving on this Mac."}
+        {t(
+          "requestsAccessToYourSharedProjectsAgentExecutionAndPageSavingOnThisMac",
+        )}
       </p>
       <div className="lan-pair-code">
         <strong>{request.code}</strong>
-        <p>
-          {zh()
-            ? "请确认 iPad 上显示相同数字。"
-            : "Confirm the iPad displays the same code."}
-        </p>
+        <p>{t("confirmTheIPadDisplaysTheSameCode")}</p>
       </div>
       <div className="lan-pair-actions">
         <button
@@ -276,7 +252,7 @@ export function MacPairingPrompt() {
           disabled={busy}
           onClick={() => void decide(false)}
         >
-          {zh() ? "拒绝" : "Reject"}
+          {t("reject")}
         </button>
         <button
           type="button"
@@ -284,7 +260,7 @@ export function MacPairingPrompt() {
           disabled={busy}
           onClick={() => void decide(true)}
         >
-          {zh() ? "数字一致，允许连接" : "Code matches, allow"}
+          {t("codeMatchesAllow")}
         </button>
       </div>
       {error && (
