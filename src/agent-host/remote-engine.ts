@@ -35,6 +35,7 @@ export class RemoteAgentEngine {
       host?: AgentHost;
       connectionId?: string;
       projectIds?: string[];
+      deferTaskStart?: boolean;
     },
   ) {
     this.host =
@@ -53,7 +54,12 @@ export class RemoteAgentEngine {
           await this.publish(projectId);
         },
       });
-    this.turns = new RemoteTurns(options.root, options.library, this.host);
+    this.turns = new RemoteTurns(
+      options.root,
+      options.library,
+      this.host,
+      options.deferTaskStart,
+    );
   }
   private async publish(projectId: string) {
     const manager = syncManager(this.options.library);

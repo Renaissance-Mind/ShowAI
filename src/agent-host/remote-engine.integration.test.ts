@@ -169,6 +169,58 @@ test("cancellation during project preparation survives reopening and never start
   expect((await resumed.host.installer.status()).state).toBe("absent");
   resumed.host.close();
 });
+test("durable admission can be checkpointed before preparation and cancelled without downloading or starting a model", async () => {
+  const library = join(directory, "deferred-replica");
+  const deferred = new RemoteAgentEngine({
+    ...engine.options,
+    root: join(directory, "deferred-agent"),
+    library,
+    deferTaskStart: true,
+    cli: () => ({
+      command: process.execPath,
+      args: [resolve("dist-agent/cli.mjs")],
+      env: { SHOWAI_HOME: library },
+    }),
+  });
+  try {
+    await deferred.host.saveSource({
+      id: randomUUID(),
+      name: "Unconnected admission source",
+      provider: "openai",
+      baseUrl: "https://api.openai.com/v1",
+      model: "gpt-4.1",
+      protocol: "responses",
+      credential: "api-key",
+    });
+    const accepted = (await deferred.invoke(
+      request("agent:send", {
+        prompt: "Admission boundary only",
+        target: { kind: "page", pageId },
+        expectedHash: "stale",
+      }),
+      actor,
+    )) as { id: string; turns: { id: string }[] };
+    const turn = accepted.turns.at(-1)!;
+    expect((await syncManager(library).configuration()).projects).toHaveLength(
+      0,
+    );
+    expect((await deferred.host.installer.status()).state).toBe("absent");
+    await deferred.turns.cancel(projectId, turn.id);
+    deferred.turns.startAdmitted(turn.id);
+    await deferred.turns.settled();
+    expect(
+      (await deferred.turns.conversation(projectId, accepted.id)).turns.at(-1)
+        ?.state,
+    ).toBe("cancelled");
+    expect((await syncManager(library).configuration()).projects).toHaveLength(
+      0,
+    );
+    expect((await deferred.host.installer.status()).state).toBe("absent");
+  } finally {
+    deferred.host.close();
+    await deferred.turns.settled();
+  }
+});
 test("mutation receipts survive engine recreation and reject request ID reuse", async () => {
   const id = randomUUID(),
     call = request(

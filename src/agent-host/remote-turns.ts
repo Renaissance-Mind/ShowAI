@@ -21,11 +21,13 @@ interface RemoteTurn {
 export class RemoteTurns {
   private jobs = new Map<string, RemoteTurn>();
   private queues = new Map<string, Promise<unknown>>();
+  private admissions = new Map<string, RemoteTurn>();
   private loaded?: Promise<void>;
   constructor(
     readonly root: string,
     readonly library: string,
     readonly host: AgentHost,
+    readonly deferTaskStart = false,
   ) {}
   get running() {
     return [...this.jobs.values()].some((job) => job.turn.state === "running");
@@ -153,10 +155,35 @@ export class RemoteTurns {
     };
     this.jobs.set(id, job);
     await this.save(job);
-    const previous = this.queues.get(remoteProjectId) ?? Promise.resolve();
+    if (this.deferTaskStart) this.admissions.set(id, job);
+    else this.enqueue(job);
+    return { ...conversation, turns: [...conversation.turns, turn] };
+  }
+  startAdmitted(id: string) {
+    const job = this.admissions.get(id);
+    this.admissions.delete(id);
+    if (job?.turn.state === "running") this.enqueue(job);
+  }
+  async failAdmission(id: string, message: string) {
+    const job = this.admissions.get(id);
+    this.admissions.delete(id);
+    if (!job || job.turn.state !== "running") return;
+    job.phase = "finished";
+    job.turn.state = "failed";
+    job.turn.error = message;
+    job.turn.finishedAt = new Date().toISOString();
+    job.turn.events.push({
+      sequence: job.turn.events.length + 1,
+      type: "error",
+      text: message,
+    });
+    await this.save(job);
+  }
+  private enqueue(job: RemoteTurn) {
+    const previous = this.queues.get(job.remoteProjectId) ?? Promise.resolve();
     const next = previous.then(() => this.run(job));
     this.queues.set(
-      remoteProjectId,
+      job.remoteProjectId,
       next.then(
         () => undefined,
         () => undefined,
@@ -165,7 +192,6 @@ export class RemoteTurns {
     void next.catch((error) =>
       console.error("Remote Agent task persistence:", error.message),
     );
-    return { ...conversation, turns: [...conversation.turns, turn] };
   }
   private async run(job: RemoteTurn) {
     try {

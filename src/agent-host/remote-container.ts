@@ -13,7 +13,7 @@ import { checkCloudBrowser } from "../agent/cloud-browser-check";
 import { withLibraryLock } from "../core/library-lock";
 import { execute } from "./process";
 import { ignoreRemoteAgentState } from "./remote-state";
-import type { RemoteActor } from "./remote-protocol";
+import { remoteReadActions, type RemoteActor } from "./remote-protocol";
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const runtimeRoot = process.env.SHOWAI_AGENT_RUNTIME ?? "/runtime";
@@ -164,6 +164,7 @@ if (process.argv.includes("--install-runtime")) {
       library: "/state/library",
       runtimeRoot,
       afterAuthorization: checkpoint,
+      deferTaskStart: true,
       cli: () => ({
         command: process.execPath,
         args: [join(directory, "cli.mjs")],
@@ -213,13 +214,28 @@ if (process.argv.includes("--install-runtime")) {
         String(request.headers["x-showai-actor"] ?? "null"),
       ) as RemoteActor;
       if (!actor) throw new Error("Account context is required.");
-      const value = await engine.invoke(JSON.parse(body), actor);
-      await checkpoint();
+      const call = JSON.parse(body),
+        value = await engine.invoke(call, actor);
+      const admittedId =
+        call.action === "agent:send"
+          ? (value as { turns: { id: string }[] }).turns.at(-1)?.id
+          : undefined;
+      try {
+        if (!remoteReadActions.has(call.action)) await checkpoint();
+      } catch (error) {
+        if (admittedId)
+          await engine.turns.failAdmission(
+            admittedId,
+            "Task admission could not be checkpointed. Review the conversation before retrying.",
+          );
+        throw error;
+      }
       response.writeHead(200, {
         "content-type": "application/json",
         "cache-control": "no-store",
       });
       response.end(JSON.stringify({ ok: true, data: value }));
+      if (admittedId) engine.turns.startAdmitted(admittedId);
     };
     // Persist running turns and keep the Container active independently of iPad polling.
     const timer = setInterval(() => {
