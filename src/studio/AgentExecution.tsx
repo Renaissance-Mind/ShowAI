@@ -109,16 +109,18 @@ export function AgentExecutionPicker({
                   online: false,
                 },
               ]
-            ).map((d) => (
-              <option key={d.id} value={d.id} disabled={!d.online}>
-                {d.name}
-                {!d.online
-                  ? d.kind === "cloud"
-                    ? t("unavailable")
-                    : t("offline")
-                  : ""}
-              </option>
-            ))}
+            )
+              .filter((d) => d.kind !== "cloud" || !!context?.connectionId)
+              .map((d) => (
+                <option key={d.id} value={d.id} disabled={!d.online}>
+                  {d.name}
+                  {!d.online
+                    ? d.kind === "cloud"
+                      ? t("unavailable")
+                      : t("offline")
+                    : ""}
+                </option>
+              ))}
           </select>
         </div>
       </label>

@@ -122,6 +122,7 @@ export default function AgentSettings() {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
+  const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<ModelSource | null>(null),
     [key, setKey] = useState("");
   const [models, setModels] = useState<{ id: string; name: string }[]>([]);
@@ -238,6 +239,7 @@ export default function AgentSettings() {
     });
     setKey("");
     setModels([]);
+    setAdding(false);
   };
   const saveSource = async () => {
     if (!editing) return;
@@ -301,7 +303,8 @@ export default function AgentSettings() {
         )}
       </div>
     );
-  const deviceExecution = remoteExecution() && status.executionKind === "device";
+  const deviceExecution =
+    remoteExecution() && status.executionKind === "device";
   const cloudExecution = remoteExecution() && status.executionKind === "cloud";
   if (remoteExecution() && status.executionKind === "mac")
     return (
@@ -319,70 +322,75 @@ export default function AgentSettings() {
     <div className="agent-settings">
       <AgentExecutionPicker onChange={executionChanged} disabled={busy} />
       <RemoteDeviceSettings />
-      <section className="settings-group" aria-labelledby="agent-mode-title">
-        <h2 id="agent-mode-title">{t("mode")}</h2>
-        <div
-          className="agent-modes"
-          role="radiogroup"
-          aria-label={t("modeLabel")}
-        >
-          {(
-            [
-              {
-                id: "local",
-                title: "mode.local.title",
-                text: "mode.local.text",
-              },
-              {
-                id: "api",
-                title: "mode.api.title",
-                text: "mode.api.text",
-              },
-            ] as const
-          ).map((mode) => (
-            <button
-              key={mode.id}
-              role="radio"
-              aria-checked={status.settings.mode === mode.id}
-              disabled={
-                busy ||
-                (remoteExecution() &&
-                  (cloudExecution || deviceExecution) &&
-                  mode.id === "local")
-              }
-              onClick={(event) => {
-                choiceFocusRef.current = event.currentTarget;
-                void action(() => change({ mode: mode.id }))();
-              }}
-              onKeyDown={(event) => {
-                if (
-                  ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(
-                    event.key,
-                  )
-                ) {
-                  event.preventDefault();
-                  const next = mode.id === "local" ? "api" : "local";
-                  const buttons =
-                    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
-                      "button[role=radio]",
-                    );
-                  const choice = buttons?.[next === "local" ? 0 : 1];
-                  choiceFocusRef.current = choice ?? null;
-                  void action(() => change({ mode: next }))();
-                  choice?.focus();
+      {!remoteExecution() && (
+        <section className="settings-group" aria-labelledby="agent-mode-title">
+          <h2 id="agent-mode-title">{t("mode")}</h2>
+          <div
+            className="agent-modes"
+            role="radiogroup"
+            aria-label={t("modeLabel")}
+          >
+            {(
+              [
+                {
+                  id: "local",
+                  title: "mode.local.title",
+                  text: "mode.local.text",
+                },
+                {
+                  id: "api",
+                  title: "mode.api.title",
+                  text: "mode.api.text",
+                },
+              ] as const
+            ).map((mode) => (
+              <button
+                key={mode.id}
+                role="radio"
+                aria-checked={status.settings.mode === mode.id}
+                disabled={
+                  busy ||
+                  (remoteExecution() &&
+                    (cloudExecution || deviceExecution) &&
+                    mode.id === "local")
                 }
-              }}
-            >
-              <span>
-                <Bot size={17} />
-                {t(mode.title)}
-                {status.settings.mode === mode.id && <Check size={15} />}
-              </span>
-              <small>{t(mode.text)}</small>
-            </button>
-          ))}
-        </div>
-      </section>
+                onClick={(event) => {
+                  choiceFocusRef.current = event.currentTarget;
+                  void action(() => change({ mode: mode.id }))();
+                }}
+                onKeyDown={(event) => {
+                  if (
+                    [
+                      "ArrowLeft",
+                      "ArrowRight",
+                      "ArrowUp",
+                      "ArrowDown",
+                    ].includes(event.key)
+                  ) {
+                    event.preventDefault();
+                    const next = mode.id === "local" ? "api" : "local";
+                    const buttons =
+                      event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                        "button[role=radio]",
+                      );
+                    const choice = buttons?.[next === "local" ? 0 : 1];
+                    choiceFocusRef.current = choice ?? null;
+                    void action(() => change({ mode: next }))();
+                    choice?.focus();
+                  }
+                }}
+              >
+                <span>
+                  <Bot size={17} />
+                  {t(mode.title)}
+                  {status.settings.mode === mode.id && <Check size={15} />}
+                </span>
+                <small>{t(mode.text)}</small>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
       {status.settings.mode === "local" ? (
         <section className="settings-group" aria-labelledby="local-agent-title">
           <h2 id="local-agent-title">{t("availableAgents")}</h2>
@@ -404,62 +412,64 @@ export default function AgentSettings() {
             role="group"
             aria-label={t("chooseLocalAgent")}
           >
-            {status.agents.map((agent) => (
-              <article
-                className="agent-card"
-                key={agent.id}
-                data-selected={status.settings.localAgent === agent.id}
-                data-unavailable={!agent.path}
-              >
-                <label>
-                  <AgentBrandIcon brand={agent.id} />
-                  <span className="agent-card-name">
-                    <strong>{agent.name}</strong>
-                    <small>{agent.version || t("notInstalled")}</small>
-                  </span>
-                  {status.settings.localAgent === agent.id && (
-                    <span className="agent-current">{t("current")}</span>
-                  )}
-                  <input
-                    type="radio"
-                    name="local-agent"
-                    aria-label={agent.name}
-                    aria-describedby={`agent-detail-${agent.id}`}
-                    checked={status.settings.localAgent === agent.id}
-                    disabled={!agent.path || busy}
-                    onChange={(event) => {
-                      if (document.activeElement === event.currentTarget)
-                        choiceFocusRef.current = event.currentTarget;
-                      void action(() => change({ localAgent: agent.id }))();
-                    }}
-                  />
-                </label>
-                <p id={`agent-detail-${agent.id}`}>{agent.detail}</p>
-                <div className="agent-card-footer">
-                  <span
-                    className={`agent-availability ${agent.callable === true ? "verified" : ""}`}
-                  >
-                    {agent.callable === true
-                      ? t("availability.passed")
-                      : agent.callable === false
-                        ? t("availability.failed")
-                        : agent.auth === "ready"
-                          ? t("availability.ready")
-                          : agent.path
-                            ? t("availability.untested")
-                            : t("availability.missing")}
-                  </span>
-                  <button
-                    className="settings-button"
-                    aria-label={t("testAgent", { name: agent.name })}
-                    disabled={!agent.path || busy || hasRunning}
-                    onClick={action(() => test(agent.id))}
-                  >
-                    {t("testConnection")}
-                  </button>
-                </div>
-              </article>
-            ))}
+            {status.agents
+              .filter((agent) => !!agent.path)
+              .map((agent) => (
+                <article
+                  className="agent-card"
+                  key={agent.id}
+                  data-selected={status.settings.localAgent === agent.id}
+                  data-unavailable={!agent.path}
+                >
+                  <label>
+                    <AgentBrandIcon brand={agent.id} />
+                    <span className="agent-card-name">
+                      <strong>{agent.name}</strong>
+                      <small>{agent.version || t("notInstalled")}</small>
+                    </span>
+                    {status.settings.localAgent === agent.id && (
+                      <span className="agent-current">{t("current")}</span>
+                    )}
+                    <input
+                      type="radio"
+                      name="local-agent"
+                      aria-label={agent.name}
+                      aria-describedby={`agent-detail-${agent.id}`}
+                      checked={status.settings.localAgent === agent.id}
+                      disabled={!agent.path || busy}
+                      onChange={(event) => {
+                        if (document.activeElement === event.currentTarget)
+                          choiceFocusRef.current = event.currentTarget;
+                        void action(() => change({ localAgent: agent.id }))();
+                      }}
+                    />
+                  </label>
+                  <p id={`agent-detail-${agent.id}`}>{agent.detail}</p>
+                  <div className="agent-card-footer">
+                    <span
+                      className={`agent-availability ${agent.callable === true ? "verified" : ""}`}
+                    >
+                      {agent.callable === true
+                        ? t("availability.passed")
+                        : agent.callable === false
+                          ? t("availability.failed")
+                          : agent.auth === "ready"
+                            ? t("availability.ready")
+                            : agent.path
+                              ? t("availability.untested")
+                              : t("availability.missing")}
+                    </span>
+                    <button
+                      className="settings-button"
+                      aria-label={t("testAgent", { name: agent.name })}
+                      disabled={!agent.path || busy || hasRunning}
+                      onClick={action(() => test(agent.id))}
+                    >
+                      {t("testConnection")}
+                    </button>
+                  </div>
+                </article>
+              ))}
           </div>
         </section>
       ) : (
@@ -468,11 +478,15 @@ export default function AgentSettings() {
             className="settings-group"
             aria-labelledby="agent-sources-title"
           >
-            <h2 id="agent-sources-title">{t("modelSources")}</h2>
+            <h2 id="agent-sources-title">
+              {t(deviceExecution ? "modelName" : "modelSources")}
+            </h2>
             <div className="settings-row">
-              <div className="settings-row-text">
-                <h3>{t("currentSource")}</h3>
-              </div>
+              {!deviceExecution && (
+                <div className="settings-row-text">
+                  <h3>{t("currentSource")}</h3>
+                </div>
+              )}
               <div className="settings-select">
                 <select
                   aria-label={t("currentSourceLabel")}
@@ -485,35 +499,78 @@ export default function AgentSettings() {
                   }
                 >
                   <option value="">{t("chooseSource")}</option>
-                  {status.settings.sources.map((source) => (
-                    <option key={source.id} value={source.id}>
-                      {source.name}
-                    </option>
-                  ))}
+                  {status.settings.sources
+                    .filter(
+                      (source) =>
+                        !deviceExecution ||
+                        source.apiKeyPresent ||
+                        source.planEnabled,
+                    )
+                    .map((source) => (
+                      <option key={source.id} value={source.id}>
+                        {deviceExecution && source.model
+                          ? `${source.name} · ${source.model}`
+                          : source.name}
+                      </option>
+                    ))}
                 </select>
                 <ChevronDown size={14} />
               </div>
-            </div>
-            {selected && (
-              <div className="agent-source-summary">
-                <AgentBrandIcon brand={selected.provider} />
-                <div className="agent-source-identity">
-                  <strong>{selected.name}</strong>
-                  <small>
-                    {selected.model || t("noModel")}
-                    {selected.account ? ` · ${selected.account}` : ""}
-                  </small>
-                  <small>
-                    {selected.hosted ? `${selected.hosted.serverName} · ` : ""}
-                    {selected.credential === "chatgpt"
-                      ? selected.planEnabled
-                        ? t("chatgptAuthorized")
-                        : t("chatgptPending")
-                      : selected.apiKeyPresent
-                        ? t("apiKeySaved")
-                        : t("apiKeyMissing")}
-                  </small>
+              {deviceExecution && (
+                <div className="agent-form-actions">
+                  {selected && (
+                    <button
+                      className="settings-button"
+                      disabled={busy}
+                      onClick={() => {
+                        setEditing({ ...selected });
+                        setKey("");
+                        setModels([]);
+                        setAdding(false);
+                      }}
+                    >
+                      {t("configure")}
+                    </button>
+                  )}
+                  {!editing && (
+                    <button
+                      className="settings-button"
+                      disabled={busy}
+                      onClick={() => setAdding(!adding)}
+                    >
+                      <Plus size={14} />
+                      {t("addSource")}
+                    </button>
+                  )}
                 </div>
+              )}
+            </div>
+            {!deviceExecution && selected && (
+              <div className="agent-source-summary">
+                {!deviceExecution && (
+                  <AgentBrandIcon brand={selected.provider} />
+                )}
+                {!deviceExecution && (
+                  <div className="agent-source-identity">
+                    <strong>{selected.name}</strong>
+                    <small>
+                      {selected.model || t("noModel")}
+                      {selected.account ? ` · ${selected.account}` : ""}
+                    </small>
+                    <small>
+                      {selected.hosted
+                        ? `${selected.hosted.serverName} · `
+                        : ""}
+                      {selected.credential === "chatgpt"
+                        ? selected.planEnabled
+                          ? t("chatgptAuthorized")
+                          : t("chatgptPending")
+                        : selected.apiKeyPresent
+                          ? t("apiKeySaved")
+                          : t("apiKeyMissing")}
+                    </small>
+                  </div>
+                )}
                 <button
                   className="settings-button"
                   disabled={busy}
@@ -527,44 +584,49 @@ export default function AgentSettings() {
                 </button>
               </div>
             )}
-            <div className="agent-presets" aria-label={t("addModelSource")}>
-              {sourcePresets
-                .filter(
-                  (preset) =>
-                    deviceExecution ? preset.provider === "deepseek" : !cloudExecution || preset.credential !== "chatgpt",
-                )
-                .map((preset) => (
-                  <button
-                    className="agent-preset"
-                    key={preset.provider}
-                    disabled={busy}
-                    onClick={() => add(preset.provider)}
-                  >
-                    <AgentBrandIcon brand={preset.provider} />
-                    <span>
-                      <strong>
-                        {presetName(preset.provider, preset.name)}
-                      </strong>
-                      <small>
-                        {preset.credential === "chatgpt"
-                          ? t("presetHint.account")
-                          : preset.provider === "custom"
-                            ? t("presetHint.custom")
-                            : t("presetHint.apiKey")}
-                      </small>
-                    </span>
-                    <Plus size={14} aria-hidden="true" />
-                  </button>
-                ))}
-            </div>
+            {(!deviceExecution || adding) && (
+              <div className="agent-presets" aria-label={t("addModelSource")}>
+                {sourcePresets
+                  .filter((preset) =>
+                    deviceExecution
+                      ? preset.provider === "deepseek"
+                      : !cloudExecution || preset.credential !== "chatgpt",
+                  )
+                  .map((preset) => (
+                    <button
+                      className="agent-preset"
+                      key={preset.provider}
+                      disabled={busy}
+                      onClick={() => add(preset.provider)}
+                    >
+                      <AgentBrandIcon brand={preset.provider} />
+                      <span>
+                        <strong>
+                          {presetName(preset.provider, preset.name)}
+                        </strong>
+                        <small>
+                          {preset.credential === "chatgpt"
+                            ? t("presetHint.account")
+                            : preset.provider === "custom"
+                              ? t("presetHint.custom")
+                              : t("presetHint.apiKey")}
+                        </small>
+                      </span>
+                      <Plus size={14} aria-hidden="true" />
+                    </button>
+                  ))}
+              </div>
+            )}
             {cloudExecution && (
               <p className="settings-help">{t("cloudChatgptHelp")}</p>
             )}
-            {!deviceExecution && <ServerResources
-              selected={selected}
-              disabled={busy || !!hasRunning}
-              update={update}
-            />}
+            {!deviceExecution && (
+              <ServerResources
+                selected={selected}
+                disabled={busy || !!hasRunning}
+                update={update}
+              />
+            )}
             {editing && (
               <form
                 className="agent-source-form"
@@ -620,22 +682,24 @@ export default function AgentSettings() {
                         placeholder="https://example.com/v1"
                       />
                     </label>
-                    <label>
-                      {t("protocol")}
-                      <select
-                        value={editing.protocol}
-                        onChange={(event) =>
-                          setEditing({
-                            ...editing,
-                            protocol: event.target
-                              .value as ModelSource["protocol"],
-                          })
-                        }
-                      >
-                        <option value="responses">Responses API</option>
-                        <option value="chat">Chat Completions</option>
-                      </select>
-                    </label>
+                    {!deviceExecution && (
+                      <label>
+                        {t("protocol")}
+                        <select
+                          value={editing.protocol}
+                          onChange={(event) =>
+                            setEditing({
+                              ...editing,
+                              protocol: event.target
+                                .value as ModelSource["protocol"],
+                            })
+                          }
+                        >
+                          <option value="responses">Responses API</option>
+                          <option value="chat">Chat Completions</option>
+                        </select>
+                      </label>
+                    )}
                     <label>
                       {t("apiKey")}
                       <input
@@ -716,7 +780,7 @@ export default function AgentSettings() {
                 )}
               </form>
             )}
-            {selected && (
+            {selected && (!deviceExecution || editing) && (
               <div className="agent-form-actions">
                 {selected.credential === "chatgpt" &&
                   !selected.hosted &&
@@ -784,7 +848,9 @@ export default function AgentSettings() {
                 </button>
                 <button
                   className="settings-button agent-remove"
-                  disabled={busy || hasRunning || (deviceExecution && !!selected.hosted)}
+                  disabled={
+                    busy || hasRunning || (deviceExecution && !!selected.hosted)
+                  }
                   onClick={action(async () => {
                     update(
                       await desktop.invoke("agent:removeSource", {
@@ -817,95 +883,99 @@ export default function AgentSettings() {
               </p>
             )}
           </section>
-          <section
-            className="settings-group"
-            aria-labelledby="agent-runtime-title"
-          >
-            <h2 id="agent-runtime-title">{t("runtime")}</h2>
-            <div className="settings-row">
-              <div className="settings-row-text">
-                <h3>
-                  {t("runtimeName")}{" "}
-                  {status.runtime.version && (
-                    <span className="agent-version">
-                      {status.runtime.version}
-                    </span>
+          {!remoteExecution() && (
+            <section
+              className="settings-group"
+              aria-labelledby="agent-runtime-title"
+            >
+              <h2 id="agent-runtime-title">{t("runtime")}</h2>
+              <div className="settings-row">
+                <div className="settings-row-text">
+                  <h3>
+                    {t("runtimeName")}{" "}
+                    {status.runtime.version && (
+                      <span className="agent-version">
+                        {status.runtime.version}
+                      </span>
+                    )}
+                  </h3>
+                  <p>{status.runtime.progress}</p>
+                </div>
+                <button
+                  className="settings-button"
+                  disabled={
+                    busy || status.runtime.state === "installing" || hasRunning
+                  }
+                  onClick={action(async () => {
+                    update(await desktop.invoke("agent:install"));
+                  })}
+                >
+                  {status.runtime.state === "installing" ? (
+                    <Loader2 size={13} className="studio-spin" />
+                  ) : (
+                    <Download size={13} />
                   )}
-                </h3>
-                <p>{status.runtime.progress}</p>
+                  {status.runtime.state === "ready"
+                    ? t("runtime.update")
+                    : status.runtime.state === "installing"
+                      ? t("runtime.installing")
+                      : t("runtime.install")}
+                </button>
               </div>
-              <button
-                className="settings-button"
-                disabled={
-                  busy || status.runtime.state === "installing" || hasRunning
-                }
-                onClick={action(async () => {
-                  update(await desktop.invoke("agent:install"));
-                })}
-              >
-                {status.runtime.state === "installing" ? (
-                  <Loader2 size={13} className="studio-spin" />
-                ) : (
-                  <Download size={13} />
-                )}
-                {status.runtime.state === "ready"
-                  ? t("runtime.update")
-                  : status.runtime.state === "installing"
-                    ? t("runtime.installing")
-                    : t("runtime.install")}
-              </button>
-            </div>
-            <p className="settings-help">{t("runtimeHelp")}</p>
-            {status.runtime.error && (
-              <p className="agent-error" role="alert">
-                {status.runtime.error}
-              </p>
-            )}
-          </section>
+              <p className="settings-help">{t("runtimeHelp")}</p>
+              {status.runtime.error && (
+                <p className="agent-error" role="alert">
+                  {status.runtime.error}
+                </p>
+              )}
+            </section>
+          )}
         </>
       )}
-      <section className="settings-group" aria-labelledby="agent-task-title">
-        <h2 id="agent-task-title">{t("runInShowAI")}</h2>
-        <p className="settings-help">{t("inPageHelp")}</p>
-        {taskId && activeTask && (
-          <TaskResult
-            task={activeTask}
-            onFile={(path) =>
-              void action(() =>
-                downloadAgentFile(desktop.invoke, activeTask.id, path),
-              )()
-            }
-            onPermission={(id, option) =>
-              void action(async () =>
-                update(
-                  await desktop.invoke("agent:permission", { id, option }),
-                ),
-              )()
-            }
-            onCancel={() =>
-              void action(async () =>
-                update(
-                  await desktop.invoke("agent:cancel", {
-                    id: activeTask.id,
-                  }),
-                ),
-              )()
-            }
-          />
-        )}
-      </section>
-      <details className="agent-storage">
-        <summary>{t("storage")}</summary>
-        <p>
-          {t("taskWorkspace")}
-          <code>{status.workspaceRoot}</code>
-        </p>
-        <p>
-          {t("credentialRoot")}
-          <code>{status.credentialRoot}</code>
-        </p>
-        <p>{t("storageHelp")}</p>
-      </details>
+      {taskId && activeTask && (
+        <section className="settings-group" aria-label={activeTask.label}>
+          {taskId && activeTask && (
+            <TaskResult
+              task={activeTask}
+              onFile={(path) =>
+                void action(() =>
+                  downloadAgentFile(desktop.invoke, activeTask.id, path),
+                )()
+              }
+              onPermission={(id, option) =>
+                void action(async () =>
+                  update(
+                    await desktop.invoke("agent:permission", { id, option }),
+                  ),
+                )()
+              }
+              onCancel={() =>
+                void action(async () =>
+                  update(
+                    await desktop.invoke("agent:cancel", {
+                      id: activeTask.id,
+                    }),
+                  ),
+                )()
+              }
+            />
+          )}
+        </section>
+      )}
+      {!remoteExecution() && (
+        <details className="agent-storage">
+          <summary>{t("storage")}</summary>
+          <p>
+            {t("taskWorkspace")}
+            <code>{status.workspaceRoot}</code>
+          </p>
+          <p>
+            {t("credentialRoot")}
+            <code>{status.credentialRoot}</code>
+          </p>
+          <p>{t("storageHelp")}</p>
+        </details>
+      )}
       {error && (
         <p className="agent-error agent-feedback" role="alert">
           {error}
