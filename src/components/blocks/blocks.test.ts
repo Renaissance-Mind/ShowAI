@@ -22,11 +22,19 @@ import { validateDocument } from "../../portable/validation.mjs";
 import type { DatabaseColumn, DatabaseRow } from "./types";
 
 describe("interactive block data", () => {
-  it("offers one rich-text entry while retaining legacy text renderers", () => {
+  it("lists the primitive content components beside the rich-text entry", () => {
     expect(getBlockDefinition("text")!.title).toBe("富文本");
-    for (const kind of ["callout", "divider", "code"]) {
-      expect(blockDefinitions.some((block) => block.kind === kind)).toBe(false);
-      expect(getBlockDefinition(kind)!.replacedBy).toBe("text");
+    const markers = {
+      callout: "portable-callout",
+      divider: "<hr",
+      code: "<pre",
+      image: "rich-text-component",
+      table: "rich-text-component",
+      toggle: "rich-text-component",
+    };
+    for (const [kind, marker] of Object.entries(markers)) {
+      expect(blockDefinitions.some((block) => block.kind === kind)).toBe(true);
+      expect(getBlockDefinition(kind)!.replacedBy).toBeUndefined();
       expect(
         renderToStaticMarkup(
           createElement(Widget, {
@@ -35,10 +43,7 @@ describe("interactive block data", () => {
             readOnly: true,
           }),
         ),
-      ).toContain("sb-primitive");
-    }
-    for (const kind of ["image", "table", "toggle"]) {
-      expect(blockDefinitions.some((block) => block.kind === kind)).toBe(true);
+      ).toContain(marker);
     }
   });
 
