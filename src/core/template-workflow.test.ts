@@ -282,6 +282,9 @@ test("legacy saved templates stay readable through the four current stages", asy
       integrity: saved.integrity,
     },
   ]);
+  // Records saved before the four-stage runtime hash their six declared
+  // stages; the runtime keeps that list so stored integrity still verifies.
+  expect(saved.workflow?.stages).toEqual([...LEGACY_TEMPLATE_STAGES]);
   const legacySummary = context.templates?.[0];
   expect(legacySummary).toMatchObject({ legacyStages: true });
   expect(
