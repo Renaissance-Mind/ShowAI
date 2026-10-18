@@ -117,7 +117,10 @@ export async function stageDshBundle({
     command: runtime.command,
     args: [join(target, "mcp/launch.mjs")],
     env: { ...runtime.env, SHOWAI_HOME: home },
-    cwd: target,
+    // Staging replaces the bundle directory as a whole, so a live MCP child
+    // must not keep its working directory there: its cwd would vanish and every
+    // later call would fail with uv_cwd ENOENT. The library home is stable.
+    cwd: home,
   };
   const staging = `${target}.staging-${process.pid}-${Date.now()}`;
   await mkdir(dirname(target), { recursive: true });

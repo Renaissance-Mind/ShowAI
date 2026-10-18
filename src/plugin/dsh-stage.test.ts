@@ -60,7 +60,9 @@ test("stages the bundle with Skills, the launcher and a literal MCP row", async 
       NOTE: 'quote " and: colon',
       SHOWAI_HOME: join(root, "library"),
     },
-    cwd: target,
+    // The MCP child keeps a stable working directory: staging replaces the
+    // bundle directory, which would invalidate a cwd inside it.
+    cwd: join(root, "library"),
   });
   expect(patch).toContain(
     `- ${JSON.stringify(join(target, "mcp/launch.mjs"))}`,
