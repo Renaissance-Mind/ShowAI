@@ -355,16 +355,18 @@
   font-size: 11px;
   overflow-wrap: anywhere;
 }
-.history-merge-dialog,
-.history-external-dialog {
+.history-conflict-body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
   padding-bottom: 18px;
 }
-.history-merge-dialog > .history-change-list,
-.history-merge-dialog > details,
-.history-merge-dialog > .history-change,
-.history-external-dialog > .history-tabs,
-.history-external-dialog > .history-conflict-values,
-.history-external-dialog > .history-resolution {
+.history-conflict-body > .history-change-list,
+.history-conflict-body > details,
+.history-conflict-body > .history-change,
+.history-conflict-body > .history-tabs,
+.history-conflict-body > .history-conflict-values,
+.history-conflict-body > .history-resolution {
   margin: 0 22px;
 }
 .history-merge-summary {
@@ -394,8 +396,15 @@
     Menlo,
     monospace;
 }
-.history-external-dialog > .history-resolution {
+.history-external-dialog .history-conflict-body > .history-resolution {
   width: calc(100% - 44px);
+}
+.history-merge-dialog > .history-footer,
+.history-external-dialog > .history-footer {
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  padding: 18px 22px;
 }
 .history-footer {
   display: flex;
