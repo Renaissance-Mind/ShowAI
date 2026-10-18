@@ -25,6 +25,23 @@ async function clientPlugin() {
   return clientFactory((id) => (id === "react" ? React : require(id)));
 }
 
+/**
+ * Slot kinds as the Harness chat bundles declare them, with the registry's own
+ * validation (`dsh-web-frontend` SlotCore): keyed entries need `key`, list
+ * entries need `id`, and either must be unique within its slot.
+ */
+const SLOT_KINDS = { "tool.call.toolview": "keyed", "conversation.chat.turnTail": "list" };
+
+/** Validate one registration exactly as the host registry does. */
+function assertHostRegistration(spec, registrations) {
+  const kind = SLOT_KINDS[spec.name];
+  assert.notEqual(kind, undefined, `unknown slot ${spec.name}`);
+  const field = kind === "keyed" ? "key" : "id";
+  if (spec[field] === undefined) throw new Error(`${kind} slot "${spec.name}" requires options.${field}`);
+  const clash = registrations.find((entry) => entry.spec.name === spec.name && entry.spec[field] === spec[field]);
+  if (clash !== undefined) throw new Error(`${kind} slot "${spec.name}" already has ${field} "${spec[field]}"`);
+}
+
 /** Apply the plugin into a slot/context seam and return what it registered. */
 async function loadClient({ uiConversation } = {}) {
   const plugin = await clientPlugin();
@@ -44,6 +61,7 @@ async function loadClient({ uiConversation } = {}) {
         register();
       },
       register(spec, component) {
+        assertHostRegistration(spec, registrations);
         registrations.push({ spec, component });
         return () => {};
       },
@@ -199,12 +217,20 @@ test("the Turn tail keeps a presented page outside the folded process", async ()
     published,
   );
 
+  assert.equal(context.state.pages[0].fullPath, "/tmp/page.inline.html");
   const turn = { data: new Map([["showai-page", { pages: context.state.pages }]]) };
-  const markup = renderToStaticMarkup(React.createElement(tail, { turn, seq: 9, t: (key) => key }));
+  const markup = renderToStaticMarkup(
+    React.createElement(tail, { turn, seq: 9, openFile: () => {}, t: (key) => key }),
+  );
+  assert.match(markup, /action\.openFile/);
+  assert.match(markup, /action\.hide/);
   assert.match(markup, /showai-page-tail/);
   assert.match(markup, /showai-page-preview\/call_weather\.html/);
   assert.match(markup, /北京天气/);
   assert.doesNotMatch(markup, /showai-page-preview\/call_bash/);
+
+  // A page presented after the closing reply belongs to a later tail.
+  assert.equal(renderToStaticMarkup(React.createElement(tail, { turn, seq: 4, t: (key) => key })), "");
 
   const empty = renderToStaticMarkup(
     React.createElement(tail, { turn: { data: new Map() }, seq: 9, t: (key) => key }),

@@ -28,6 +28,7 @@ window.__ModuleLoader__.load({
     const TOOLS = ["mcp__showai__page_present", "mcp__showai__render_document"];
     /** Frame heights: the inline seat, and the expanded seat. */
     const COLLAPSED_HEIGHT = 420;
+    const TAIL_HEIGHT = 460;
     const EXPANDED_HEIGHT = "76vh";
 
     const zh = {
@@ -46,6 +47,8 @@ window.__ModuleLoader__.load({
       "action.open": "在新标签页打开",
       "action.openFile": "打开完整 HTML",
       "action.output": "工具输出",
+      "action.hide": "隐藏页面",
+      "action.show": "显示页面",
     };
     const en = {
       "row.title": "ShowAI page",
@@ -63,6 +66,8 @@ window.__ModuleLoader__.load({
       "action.open": "Open in a new tab",
       "action.openFile": "Open the full HTML",
       "action.output": "Tool output",
+      "action.hide": "Hide page",
+      "action.show": "Show page",
     };
 
     /** Styles use theme tokens only, so light and dark follow the host. */
@@ -420,7 +425,10 @@ window.__ModuleLoader__.load({
         const delivery = data?.delivery;
         if (delivery === null || typeof delivery !== "object") continue;
         if (typeof delivery.inline !== "string" && typeof delivery.html !== "string") continue;
-        return { title: typeof data.title === "string" ? data.title : undefined };
+        return {
+          title: typeof data.title === "string" ? data.title : undefined,
+          fullPath: typeof delivery.html === "string" ? delivery.html : delivery.inline,
+        };
       }
       return undefined;
     }
@@ -454,7 +462,7 @@ window.__ModuleLoader__.load({
         const presentation = presentationOf(message);
         if (presentation === undefined) return context.state;
         const pages = context.state.pages.filter((page) => page.callId !== callId);
-        pages.push({ callId, title: presentation.title, seq: match.event.seq });
+        pages.push({ callId, title: presentation.title, fullPath: presentation.fullPath, seq: match.event.seq });
         return { ...context.state, pages };
       },
       // Publish the Turn's pages as Location data; without this the Turn tail
@@ -489,36 +497,39 @@ window.__ModuleLoader__.load({
       const tr = typeof props.t === "function" ? props.t : (key) => key;
       const state = turn?.data?.get?.("showai-page");
       const pages = (Array.isArray(state?.pages) ? state.pages : []).filter((page) => page.seq < seq);
-      return pages.length === 0 ? null : h(ShowAIPageTailList, { pages, openFile, tr });
+      return pages.length === 0
+        ? null
+        : h(
+            "div",
+            { className: "showai-page-tail" },
+            pages.map((page) => h(ShowAIPageTailCard, { key: page.callId, page, openFile, tr })),
+          );
     }
 
     /**
-     * Stack the Turn's presented pages, each with its own open/collapse state.
-     * @param props - presented pages, file opener, and localized copy.
-     * @returns the stacked tail cards.
+     * One presented page in the Turn tail, with its own fold, height and reload state.
+     * @param props - the presented page, file opener, and localized copy.
+     * @returns the tail card.
      */
-    function ShowAIPageTailList({ pages, openFile, tr }) {
+    function ShowAIPageTailCard({ page, openFile, tr }) {
       const [open, setOpen] = React.useState(true);
       const [expanded, setExpanded] = React.useState(false);
       const [reload, setReload] = React.useState(0);
-      const height = expanded ? EXPANDED_HEIGHT : "460px";
+      const url = `${ROUTE}/${encodeURIComponent(previewFile(page.callId))}`;
+      const title = page.title ?? tr("row.title");
       return h(
         "div",
-        { className: "showai-page-tail" },
-        pages.map((page) => {
-          const url = `${ROUTE}/${encodeURIComponent(previewFile(page.callId))}`;
-          return h(
-            "div",
-            { className: "showai-page-tailCard", key: page.callId },
-            h(
-              "div",
-              { className: "showai-page-tailHead" },
-              h("span", { className: "showai-page-dot" }),
-              h("span", { className: "showai-page-tailTitle" }, page.title ?? tr("row.title")),
-              h(
-                "span",
-                { className: "showai-page-actions", style: { opacity: "1" } },
-                h(
+        { className: "showai-page-tailCard", "data-showai-tail": page.callId },
+        h(
+          "div",
+          { className: "showai-page-tailHead" },
+          h("span", { className: "showai-page-dot", "aria-hidden": true }),
+          h("span", { className: "showai-page-tailTitle", title }, title),
+          h(
+            "span",
+            { className: "showai-page-actions", style: { opacity: "1" } },
+            open
+              ? h(
                   "button",
                   {
                     type: "button",
@@ -526,8 +537,10 @@ window.__ModuleLoader__.load({
                     onClick: () => setReload((value) => value + 1),
                   },
                   tr("action.reload"),
-                ),
-                h(
+                )
+              : null,
+            open
+              ? h(
                   "button",
                   {
                     type: "button",
@@ -535,45 +548,45 @@ window.__ModuleLoader__.load({
                     onClick: () => setExpanded((value) => !value),
                   },
                   expanded ? tr("action.collapse") : tr("action.expand"),
-                ),
-                h(
-                  "a",
-                  {
-                    className: "showai-page-button",
-                    href: url,
-                    target: "_blank",
-                    rel: "noopener noreferrer",
-                  },
-                  tr("action.open"),
-                ),
-                typeof openFile === "function"
-                  ? h(
-                      "button",
-                      {
-                        type: "button",
-                        className: "showai-page-button",
-                        onClick: () => setOpen((value) => !value),
-                      },
-                      open ? tr("action.collapse") : tr("action.expand"),
-                    )
-                  : null,
-              ),
-            ),
-            open
-              ? h("iframe", {
-                  key: `${page.callId}:${reload}`,
-                  className: "showai-page-tailFrame",
-                  style: { height },
-                  src: `${url}?v=${reload}`,
-                  title: page.title ?? tr("row.title"),
-                  sandbox:
-                    "allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads",
-                  referrerPolicy: "no-referrer",
-                  loading: "lazy",
-                })
+                )
               : null,
-          );
-        }),
+            h(
+              "a",
+              { className: "showai-page-button", href: url, target: "_blank", rel: "noopener noreferrer" },
+              tr("action.open"),
+            ),
+            typeof page.fullPath === "string" && typeof openFile === "function"
+              ? h(
+                  "button",
+                  { type: "button", className: "showai-page-button", onClick: () => openFile(page.fullPath) },
+                  tr("action.openFile"),
+                )
+              : null,
+            h(
+              "button",
+              {
+                type: "button",
+                className: "showai-page-button",
+                "aria-expanded": open,
+                onClick: () => setOpen((value) => !value),
+              },
+              open ? tr("action.hide") : tr("action.show"),
+            ),
+          ),
+        ),
+        open
+          ? h("iframe", {
+              key: `${page.callId}:${reload}`,
+              className: "showai-page-tailFrame",
+              style: { height: expanded ? EXPANDED_HEIGHT : `${TAIL_HEIGHT}px` },
+              src: `${url}?v=${reload}`,
+              title,
+              sandbox:
+                "allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads",
+              referrerPolicy: "no-referrer",
+              loading: "lazy",
+            })
+          : null,
       );
     }
 
@@ -609,8 +622,14 @@ window.__ModuleLoader__.load({
           }, "showai-page: turn records");
           // The closing Turn's tail sits outside the collapsible process, so a
           // presented page stays visible after the Turn folds.
+          // `conversation.chat.turnTail` is a list slot: the host rejects an entry
+          // without an `id`, and that rejection happens inside the deferred inject,
+          // so a missing id silently leaves the tail empty.
           ctx.slots.inject("conversation.chat.turnTail", () =>
-            ctx.slots.register({ name: "conversation.chat.turnTail", locale: NS }, ShowAIPageTail),
+            ctx.slots.register(
+              { name: "conversation.chat.turnTail", id: "@showai/dsh-showai/page-tail", locale: NS },
+              ShowAIPageTail,
+            ),
           );
         }
         for (const key of TOOLS) {
