@@ -1,3 +1,5 @@
+import { instantiateTemplate } from "./template-instance";
+export { instantiateTemplate } from "./template-instance";
 import {
   CAPACITY,
   assertBytes,
@@ -1275,20 +1277,6 @@ function changedTemplateBundle(
   bundle.files["README.md"] =
     "---\n" + JSON.stringify(metadata, null, 2) + "\n---\n" + body + "\n";
   return bundle;
-}
-export function instantiateTemplate(document: ShowDocument): ShowDocument {
-  const copy = remapSurfaceIds(documentCopy(document), randomUUID),
-    date = new Date().toISOString();
-  return {
-    ...copy,
-    id: randomUUID(),
-    createdAt: date,
-    updatedAt: date,
-    favorite: false,
-    archived: false,
-    parentId: null,
-    comments: [],
-  };
 }
 
 function record(value: unknown, label: string): Record<string, unknown> {
