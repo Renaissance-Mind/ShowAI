@@ -35,7 +35,7 @@ export default function App() {
     <Suspense
       fallback={
         <div role="status" className="showai-loading">
-          {t("opening")}
+          <span className="showai-text-shimmer">{t("opening")}</span>
         </div>
       }
     >

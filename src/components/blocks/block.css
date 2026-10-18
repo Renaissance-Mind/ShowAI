@@ -981,7 +981,11 @@
   font-weight: 500;
   overflow-wrap: anywhere;
 }
-.sb-metric-value > span {
+/* Fixed-width digits keep the figure steady while it counts up. */
+.sb-metric-figure {
+  font-variant-numeric: tabular-nums;
+}
+.sb-metric-value > span:not(.sb-metric-figure) {
   font-size: 12px;
   font-weight: 400;
   color: var(--sb-muted);
@@ -1340,6 +1344,7 @@
   flex-direction: column;
 }
 .sb-lightbox figure > img {
+  animation: showai-pop-in var(--duration-slow) var(--ease-out);
   max-width: 100%;
   max-height: calc(100dvh - 150px);
   object-fit: contain;

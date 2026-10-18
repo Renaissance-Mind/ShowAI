@@ -821,6 +821,50 @@ button.studio-tree-chevron:hover {
   background: var(--accent-soft);
   color: var(--accent);
 }
+/* useSlidingIndicator: one highlight slides between tabs. */
+[data-indicator] {
+  position: relative;
+  isolation: isolate;
+}
+[data-indicator]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  width: var(--indicator-width, 0);
+  height: var(--indicator-height, 0);
+  translate: var(--indicator-x, 0) var(--indicator-y, 0);
+  pointer-events: none;
+}
+[data-indicator="ready"]::before {
+  transition:
+    translate var(--duration-base) var(--ease-out),
+    width var(--duration-base) var(--ease-out);
+}
+.studio-filter-tabs[data-indicator]::before {
+  background: var(--accent-soft);
+  border-radius: 7px;
+}
+.studio-filter-tabs[data-indicator] > button[aria-pressed] {
+  background: transparent;
+  border-bottom-color: transparent;
+  font-weight: 500;
+}
+.studio-filter-tabs[data-indicator] > button[aria-pressed="true"] {
+  color: var(--accent);
+}
+.studio-detail-tabs.catalog-tabs[data-indicator]::before {
+  top: auto;
+  bottom: 0;
+  height: 3px;
+  translate: var(--indicator-x, 0) 0;
+  background: var(--brand-accent);
+}
+.studio-detail-tabs.catalog-tabs[data-indicator]
+  > button[role="tab"][aria-selected] {
+  border-bottom-color: transparent;
+}
 .studio-component-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
@@ -881,9 +925,10 @@ button.studio-tree-chevron:hover {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  animation: studio-enter 0.12s ease;
+  animation: showai-fade-in var(--duration-base) var(--ease-out);
 }
 .studio-modal {
+  animation: showai-pop-in var(--duration-base) var(--ease-out);
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -1131,7 +1176,7 @@ button.studio-tree-chevron:hover {
   display: flex;
   align-items: center;
   gap: 9px;
-  animation: studio-enter 0.15s ease;
+  animation: showai-rise-in var(--duration-slow) var(--ease-out);
 }
 .studio-problem {
   display: flex;
@@ -1194,6 +1239,8 @@ button.studio-tree-chevron:hover {
 .studio-context-menu {
   position: fixed;
   z-index: 300;
+  transform-origin: top left;
+  animation: showai-pop-in var(--duration-fast) var(--ease-out);
   width: max-content;
   min-width: min(220px, calc(100vw - 16px));
   max-width: calc(100vw - 16px);
@@ -1204,6 +1251,8 @@ button.studio-tree-chevron:hover {
   position: absolute;
   top: 32px;
   right: 0;
+  transform-origin: top right;
+  animation: showai-pop-in var(--duration-fast) var(--ease-out);
   width: 216px;
   z-index: 50;
 }
@@ -1238,6 +1287,8 @@ button.studio-tree-chevron:hover {
   padding: 50px;
   text-align: center;
   color: var(--muted);
+  /* Fast loads finish before the indicator appears. */
+  animation: showai-fade-in var(--duration-base) var(--ease-out) 200ms both;
 }
 .studio-spin {
   animation: studio-spin 1s linear infinite;

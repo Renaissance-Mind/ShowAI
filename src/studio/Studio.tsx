@@ -177,6 +177,7 @@ import commonMessages from "../i18n/messages/common";
 import studioMessages from "../i18n/messages/studio";
 import assistantMessages from "../i18n/messages/assistant";
 import AssistantWorkbench from "./assistant/AssistantWorkbench";
+import { useSlidingIndicator } from "./useSlidingIndicator";
 import {
   componentDisplayDescription,
   componentDisplayName,
@@ -506,6 +507,7 @@ export default function Studio() {
   componentProjectRef.current = componentProject;
   const [componentFilter, setComponentFilter] =
     useState<ComponentFilter>("all");
+  const componentSourceTabs = useSlidingIndicator<HTMLElement>(componentFilter);
   const [componentCategory, setComponentCategory] =
     useState<ComponentCategory | null>(null);
   const [catalogQueries, setCatalogQueries] = useState({
@@ -2496,7 +2498,9 @@ export default function Studio() {
       )}
       {view === "components" && (
         <nav
+          ref={componentSourceTabs}
           className="studio-filter-tabs component-source-tabs"
+          data-indicator=""
           aria-label={t("componentSource")}
         >
           {(

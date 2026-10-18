@@ -198,7 +198,7 @@ function TurnView({
         {turn.state === "running" && (
           <p className="assistant-status" role="status">
             <Loader2 size={13} className="studio-spin" aria-hidden="true" />
-            <span>
+            <span className="showai-text-shimmer">
               {turn.events.length ? t("panel.running") : t("panel.connecting")}
             </span>
             <button type="button" onClick={onCancel}>

@@ -270,13 +270,15 @@
   background: var(--paper);
   transition:
     border-color 150ms ease,
-    transform 150ms ease;
+    box-shadow var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
 }
 .studio-project-card:hover,
 .studio-template-card:hover,
 .studio-component-card:hover {
   border-color: var(--subtle);
   background: var(--paper);
+  box-shadow: var(--shadow);
   transform: translateY(-2px);
 }
 .studio-card-open {
@@ -777,4 +779,13 @@
   background: #c13515;
   border-color: #c13515;
   color: #ffffff;
+}
+.showai-loading {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  background: var(--paper);
+  animation: showai-fade-in var(--duration-slow) var(--ease-out) 300ms both;
 }

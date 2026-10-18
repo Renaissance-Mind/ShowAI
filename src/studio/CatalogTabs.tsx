@@ -1,4 +1,5 @@
 import { useId, useRef } from "react";
+import { useSlidingIndicator } from "./useSlidingIndicator";
 
 export default function CatalogTabs<T extends string>({
   label,
@@ -15,9 +16,12 @@ export default function CatalogTabs<T extends string>({
 }) {
   const id = useId();
   const buttons = useRef(new Map<T, HTMLButtonElement>());
+  const indicator = useSlidingIndicator<HTMLElement>(active);
   return (
     <nav
+      ref={indicator}
       className="studio-detail-tabs catalog-tabs"
+      data-indicator=""
       role="tablist"
       aria-label={label}
       onKeyDown={(event) => {

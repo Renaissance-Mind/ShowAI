@@ -69,6 +69,59 @@
   --shadow-dialog: 0 16px 64px #00000066;
   color-scheme: dark;
 }
+/* Motion: things enter on a strong ease-out, move on ease-in-out, and stay
+ * short enough that repeated use never feels slow. Patterns adapted from
+ * motion-primitives and Magic UI (both MIT); see resources/licenses/motion-ui.txt. */
+:root,
+[data-showai-inline-root] {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --duration-fast: 140ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+}
+@keyframes showai-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+/* Overlays grow from slightly below full size, never from zero. */
+@keyframes showai-pop-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+@keyframes showai-rise-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+@keyframes showai-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+/* A highlight sweeping across text marks work in progress. */
+.showai-text-shimmer {
+  color: transparent;
+  background: linear-gradient(
+      90deg,
+      var(--muted) 0%,
+      var(--muted) 35%,
+      var(--text) 50%,
+      var(--muted) 65%,
+      var(--muted) 100%
+    )
+    0 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: showai-shimmer 2s linear infinite;
+}
 button,
 input,
 textarea,

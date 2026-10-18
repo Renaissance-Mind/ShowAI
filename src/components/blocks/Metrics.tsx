@@ -1,5 +1,5 @@
 import { BlockSettings } from "./action-host";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -14,6 +14,83 @@ import type { BlockProps } from "./types";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/metrics";
 import common from "../../i18n/messages/common";
+
+// A leading/trailing label around one number, e.g. "$1,234.5M" or "98%".
+const countable = /^(\D*?)(-?\d{1,3}(?:,\d{3})+|-?\d+)(\.\d+)?(\D*)$/;
+
+/** Counts a figure up the first time it is seen. Reduced motion and rendered
+ * exports keep the final value; `aria-busy` lets thumbnail capture and screen
+ * readers wait for it. Pattern after Magic UI's NumberTicker (MIT). */
+function CountUp({ value }: { value: string }) {
+  const element = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const target = element.current;
+    const match = countable.exec(value);
+    if (
+      !target ||
+      !match ||
+      typeof IntersectionObserver === "undefined" ||
+      matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      // Catalog thumbnails capture a still frame, as their stage already
+      // turns off CSS motion.
+      target.closest(".component-capture-stage")
+    )
+      return;
+    const [, prefix, integer, fraction = "", suffix] = match;
+    const end = Number(integer.replaceAll(",", "") + fraction);
+    // Years read as labels, not quantities to count towards.
+    const year = !fraction && /^(19|20)\d\d$/.test(integer);
+    if (!end || year) return;
+    const digits = Math.max(0, fraction.length - 1);
+    const format = (current: number) =>
+      prefix +
+      current.toLocaleString("en-US", {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
+        useGrouping: integer.includes(","),
+      }) +
+      suffix;
+    let frame = 0;
+    const count = () => {
+      observer.disconnect();
+      target.setAttribute("aria-busy", "true");
+      target.textContent = format(0);
+      const start = performance.now();
+      const step = (now: number) => {
+        const progress = Math.min(1, (now - start) / 1000);
+        target.textContent =
+          progress < 1 ? format(end * (1 - (1 - progress) ** 4)) : value;
+        if (progress < 1) frame = requestAnimationFrame(step);
+        else target.removeAttribute("aria-busy");
+      };
+      frame = requestAnimationFrame(step);
+    };
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) count();
+    });
+    const box = target.getBoundingClientRect();
+    // Start before the first paint when already on screen, so the final value
+    // never flashes; otherwise wait until the figure scrolls into view.
+    if (
+      document.visibilityState === "visible" &&
+      box.bottom > 0 &&
+      box.top < innerHeight
+    )
+      count();
+    else observer.observe(target);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+      target.removeAttribute("aria-busy");
+      target.textContent = value;
+    };
+  }, [value]);
+  return (
+    <span ref={element} className="sb-metric-figure">
+      {value}
+    </span>
+  );
+}
 
 interface Metric {
   label: string;
@@ -177,7 +254,7 @@ export function MetricsBlock({ data, onChange, readOnly }: BlockProps) {
             <div className="sb-metric" key={index}>
               <span className="sb-metric-label">{text(item.label)}</span>
               <div className="sb-metric-value">
-                {text(item.value, "—")}
+                <CountUp value={text(item.value, "—")} />
                 <span>{text(item.unit)}</span>
               </div>
               <div className="sb-metric-foot">
