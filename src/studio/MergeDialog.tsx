@@ -7,7 +7,6 @@ import {
   Loader2,
 } from "../ui/icons";
 import Dialog from "./Dialog";
-import { ChangeList } from "./RecoveryDialogs";
 import ConflictPagePreview from "./ConflictPagePreview";
 import { desktop, errorMessage } from "./bridge";
 import { mergePageContent } from "../core/page-merge-model";
@@ -16,7 +15,7 @@ import type { PageMergeConflict, PageMergePreview } from "../core/page-merge";
 import type { ShowDocument } from "../types";
 import { useTranslator } from "../i18n/react";
 import recoveryMessages from "../i18n/messages/recovery";
-import { conflictNodeLabel, conflictText } from "./conflict-content";
+import { conflictNodeLabel, conflictDisplayValue } from "./conflict-content";
 import "./merge-dialog.css";
 
 const ConflictDiff = lazy(() => import("./ConflictDiff"));
@@ -117,12 +116,6 @@ export default function MergeDialog({
   const conflict = conflicts[activeIndex];
   const remaining = result?.conflicts.length ?? 0;
   const completed = conflicts.length - remaining;
-  const rawText = (value: unknown) =>
-    value === undefined
-      ? t("missingInVersion")
-      : typeof value === "string"
-        ? value
-        : JSON.stringify(value, null, 2);
   const label = (item: PageMergeConflict) => {
     if (item.path === "/structure" || item.path === "/root")
       return t("wholePageStructure");
@@ -189,11 +182,20 @@ export default function MergeDialog({
       onClose();
     });
   }
-  const leftText = conflictText(conflict?.ours);
-  const rightText = conflictText(conflict?.theirs);
-  const readable =
-    leftText !== null && rightText !== null && leftText !== rightText;
-  const usingRaw = !readable;
+  const leftText =
+    conflict && conflictDisplayValue(conflict.ours, conflict.path, document);
+  const rightText =
+    conflict &&
+    preview &&
+    conflictDisplayValue(
+      conflict.theirs,
+      conflict.path,
+      preview.currentDocument,
+    );
+  const baseText =
+    conflict &&
+    preview &&
+    conflictDisplayValue(conflict.base, conflict.path, preview.baseDocument);
   return (
     <Dialog
       title={t("resolveChanges")}
@@ -375,36 +377,25 @@ export default function MergeDialog({
                     }
                   >
                     <ConflictDiff
-                      key={`${conflict.path}:${usingRaw}`}
-                      left={usingRaw ? rawText(conflict.ours) : leftText!}
-                      right={usingRaw ? rawText(conflict.theirs) : rightText!}
+                      key={conflict.path}
+                      left={leftText!}
+                      right={rightText!}
                       leftLabel={t("side.ours")}
                       rightLabel={t("side.theirs")}
                     />
                   </Suspense>
                   <div className="conflict-comparison-tools">
                     <span>
-                      {t(usingRaw ? "structuredComparison" : "textComparison")}
+                      {t(
+                        leftText === rightText
+                          ? "sameTextDifferentAppearance"
+                          : "textComparison",
+                      )}
                     </span>
                   </div>
                   <section className="conflict-base" key={conflict.path}>
                     <h4>{t("commonVersion")}</h4>
-                    <pre>
-                      {conflictText(conflict.base) ?? rawText(conflict.base)}
-                    </pre>
-                  </section>
-                  <section className="conflict-technical">
-                    <h4>{t("technicalDetails")}</h4>
-                    <code>{conflict.path}</code>
-                    {conflict.reason && <p>{conflict.reason}</p>}
-                    <div className="history-conflict-values">
-                      {(["base", "ours", "theirs"] as const).map((side) => (
-                        <div key={side}>
-                          <small>{t(`side.${side}`)}</small>
-                          <pre>{rawText(conflict[side])}</pre>
-                        </div>
-                      ))}
-                    </div>
+                    <p className="conflict-base-content">{baseText}</p>
                   </section>
                 </>
               ) : (
@@ -423,17 +414,8 @@ export default function MergeDialog({
                     {remaining ? t("previewPendingHelp") : t("mergeReadyHelp")}
                   </p>
                   <div className="conflict-page-preview">
-                    <ConflictPagePreview
-                      value={result.document}
-                      expandContent
-                    />
+                    <ConflictPagePreview value={result.document} />
                   </div>
-                  <section className="conflict-base">
-                    <h4>
-                      {t("otherChanges", { count: preview.changes.length })}
-                    </h4>
-                    <ChangeList changes={preview.changes} expandContent />
-                  </section>
                 </>
               )}
             </section>

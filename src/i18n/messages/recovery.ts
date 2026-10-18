@@ -3,6 +3,12 @@ import { defineMessages } from "../index";
 // Conflict, merge and external-change recovery dialogs, plus library search results.
 export default defineMessages("recovery", {
   "zh-CN": {
+    sameTextDifferentAppearance: "正文相同，格式或页面设置有所不同。",
+    unnamedContent: "内容 {number}",
+    pageRootLocation: "页面顶层",
+    settingEnabled: "开启",
+    settingDisabled: "关闭",
+    emptyContent: "空内容",
     commonVersion: "修改前的共同版本",
     rawData: "原始数据",
     blockContent: "区块内容",
@@ -147,6 +153,13 @@ export default defineMessages("recovery", {
     viewRawData: "查看原始页面数据",
   },
   en: {
+    sameTextDifferentAppearance:
+      "The text is the same; formatting or page settings differ.",
+    unnamedContent: "Content {number}",
+    pageRootLocation: "Page root",
+    settingEnabled: "On",
+    settingDisabled: "Off",
+    emptyContent: "Empty content",
     commonVersion: "Common version before changes",
     rawData: "Raw data",
     blockContent: "Block content",
