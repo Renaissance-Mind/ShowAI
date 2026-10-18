@@ -88,6 +88,11 @@ window.__ModuleLoader__.load({
 .showai-page-note{color:var(--dsw-alias-label-tertiary);margin:0;padding:10px 12px;font-size:12px;line-height:18px}
 .showai-page-output{white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;color:var(--dsw-alias-label-secondary);margin:0;padding:10px 12px;font:var(--dsw-font-markdown-code-block-small);overflow:auto}
 .showai-page-visuallyHidden{clip:rect(0 0 0 0);white-space:nowrap;width:1px;height:1px;position:absolute;overflow:hidden}
+.showai-page-tail{display:flex;flex-direction:column;gap:8px;margin:8px 0 4px}
+.showai-page-tailCard{border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-base);flex-direction:column;display:flex;overflow:hidden}
+.showai-page-tailHead{border-bottom:1px solid var(--dsw-alias-border-l1);align-items:center;gap:6px;min-width:0;padding:6px 10px;display:flex}
+.showai-page-tailTitle{color:var(--dsw-alias-label-secondary);text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:auto;font-size:13px;line-height:24px;overflow:hidden}
+.showai-page-tailFrame{display:block;width:100%;border:0;background:#fff}
 @media (prefers-reduced-motion:reduce){.showai-page-card[data-state=running] .showai-page-row:after{animation:none;display:none}}
 `;
     const tagId = "@showai/dsh-showai/preview.css";
@@ -389,10 +394,175 @@ window.__ModuleLoader__.load({
       );
     }
 
+    /**
+     * Wire tools whose settled result carries a ShowAI presentation delivery.
+     * Kept in sync with the Host half so a Turn record and the cache agree.
+     */
+    const PRESENTATION_TOOL = /^mcp__[A-Za-z0-9_-]+__(?:page_present|render_document)$/;
+
+    /**
+     * Read the delivery record out of one settled Tool result message.
+     * @param message - the recorded result message.
+     * @returns the presented title, or undefined for an unrelated or failed result.
+     */
+    function presentationOf(message) {
+      if (message === null || typeof message !== "object" || message.isError === true) return undefined;
+      if (!Array.isArray(message.content)) return undefined;
+      for (const block of message.content) {
+        if (block?.type !== "text" || typeof block.text !== "string") continue;
+        let body;
+        try {
+          body = JSON.parse(block.text);
+        } catch {
+          continue;
+        }
+        const data = body?.ok === true ? body.data : undefined;
+        const delivery = data?.delivery;
+        if (delivery === null || typeof delivery !== "object") continue;
+        if (typeof delivery.inline !== "string" && typeof delivery.html !== "string") continue;
+        return { title: typeof data.title === "string" ? data.title : undefined };
+      }
+      return undefined;
+    }
+
+    /**
+     * Turn-local register of ShowAI presentations. It publishes no view Node: the
+     * Turn-tail slot reads it back after the Turn closes, so a presented page stays
+     * visible even though the completed Turn's process folds.
+     */
+    const showaiPageDefinition = {
+      kind: "showai-page",
+      match: (event) => {
+        if (event.type === "turn/start") return { id: String(event.data.turn), role: "start" };
+        if (event.type === "tool/call" || event.type === "tool/result") {
+          return { id: String(event.data.turn), role: "update" };
+        }
+        return null;
+      },
+      start: () => ({ calls: new Map(), pages: [] }),
+      update: (context, match) => {
+        if (match.event.type === "tool/call") {
+          const calls = new Map(context.state.calls);
+          calls.set(String(match.event.data.callId), String(match.event.data.name ?? ""));
+          return { ...context.state, calls };
+        }
+        if (match.event.type !== "tool/result") return context.state;
+        const message = match.event.data.message;
+        const callId = message === null || typeof message !== "object" ? "" : String(message.source?.callId ?? "");
+        if (callId === "") return context.state;
+        if (!PRESENTATION_TOOL.test(context.state.calls.get(callId) ?? "")) return context.state;
+        const presentation = presentationOf(message);
+        if (presentation === undefined) return context.state;
+        const pages = context.state.pages.filter((page) => page.callId !== callId);
+        pages.push({ callId, title: presentation.title, seq: match.event.seq });
+        return { ...context.state, pages };
+      },
+    };
+
+    /**
+     * Render one presented page in the closing Turn's tail: a header the reader can
+     * act on, then the framed page. This seat is outside the collapsible process.
+     * @param props - closing Turn, its seq, the file opener, and locale copy.
+     * @returns the tail card, or null for a Turn that presented no page.
+     */
+    function ShowAIPageTail(props) {
+      const { turn, seq, openFile } = props;
+      const tr = typeof props.t === "function" ? props.t : (key) => key;
+      const state = turn?.data?.get?.("showai-page");
+      const pages = (Array.isArray(state?.pages) ? state.pages : []).filter((page) => page.seq < seq);
+      return pages.length === 0 ? null : h(ShowAIPageTailList, { pages, openFile, tr });
+    }
+
+    /**
+     * Stack the Turn's presented pages, each with its own open/collapse state.
+     * @param props - presented pages, file opener, and localized copy.
+     * @returns the stacked tail cards.
+     */
+    function ShowAIPageTailList({ pages, openFile, tr }) {
+      const [open, setOpen] = React.useState(true);
+      const [expanded, setExpanded] = React.useState(false);
+      const [reload, setReload] = React.useState(0);
+      const height = expanded ? EXPANDED_HEIGHT : "460px";
+      return h(
+        "div",
+        { className: "showai-page-tail" },
+        pages.map((page) => {
+          const url = `${ROUTE}/${encodeURIComponent(previewFile(page.callId))}`;
+          return h(
+            "div",
+            { className: "showai-page-tailCard", key: page.callId },
+            h(
+              "div",
+              { className: "showai-page-tailHead" },
+              h("span", { className: "showai-page-dot" }),
+              h("span", { className: "showai-page-tailTitle" }, page.title ?? tr("row.title")),
+              h(
+                "span",
+                { className: "showai-page-actions", style: { opacity: "1" } },
+                h(
+                  "button",
+                  {
+                    type: "button",
+                    className: "showai-page-button",
+                    onClick: () => setReload((value) => value + 1),
+                  },
+                  tr("action.reload"),
+                ),
+                h(
+                  "button",
+                  {
+                    type: "button",
+                    className: "showai-page-button",
+                    onClick: () => setExpanded((value) => !value),
+                  },
+                  expanded ? tr("action.collapse") : tr("action.expand"),
+                ),
+                h(
+                  "a",
+                  {
+                    className: "showai-page-button",
+                    href: url,
+                    target: "_blank",
+                    rel: "noopener noreferrer",
+                  },
+                  tr("action.open"),
+                ),
+                typeof openFile === "function"
+                  ? h(
+                      "button",
+                      {
+                        type: "button",
+                        className: "showai-page-button",
+                        onClick: () => setOpen((value) => !value),
+                      },
+                      open ? tr("action.collapse") : tr("action.expand"),
+                    )
+                  : null,
+              ),
+            ),
+            open
+              ? h("iframe", {
+                  key: `${page.callId}:${reload}`,
+                  className: "showai-page-tailFrame",
+                  style: { height },
+                  src: `${url}?v=${reload}`,
+                  title: page.title ?? tr("row.title"),
+                  sandbox:
+                    "allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads",
+                  referrerPolicy: "no-referrer",
+                  loading: "lazy",
+                })
+              : null,
+          );
+        }),
+      );
+    }
+
     return {
       inject: ["slots", "locale"],
       /**
-       * Register the dictionaries and the two keyed Tool views.
+       * Register the dictionaries, the two keyed Tool views, and the Turn-tail
+       * preview that survives the completed Turn's fold.
        * @param ctx - the client plugin context.
        */
       apply(ctx) {
@@ -409,6 +579,20 @@ window.__ModuleLoader__.load({
           };
         }, "showai-page: styles");
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), "showai-page: dictionaries");
+        // Conversation seats only exist in a chat composition: a headless or
+        // card-only host keeps the Tool views without the Turn-tail record.
+        const conversation = typeof ctx.get === "function" ? ctx.get("uiConversation") : ctx.uiConversation;
+        if (conversation?.events !== undefined) {
+          ctx.effect(() => {
+            const dispose = conversation.events.register(showaiPageDefinition);
+            return typeof dispose === "function" ? dispose : () => {};
+          }, "showai-page: turn records");
+          // The closing Turn's tail sits outside the collapsible process, so a
+          // presented page stays visible after the Turn folds.
+          ctx.slots.inject("conversation.chat.turnTail", () =>
+            ctx.slots.register({ name: "conversation.chat.turnTail", locale: NS }, ShowAIPageTail),
+          );
+        }
         for (const key of TOOLS) {
           ctx.slots.inject("tool.call.toolview", () =>
             ctx.slots.register({ name: "tool.call.toolview", key, locale: NS }, ShowAIPageCard),
