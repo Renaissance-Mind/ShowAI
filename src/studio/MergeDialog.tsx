@@ -75,6 +75,11 @@ export default function MergeDialog({
       .then(
         (value) => {
           if (!active) return;
+          setChoices(
+            Object.fromEntries(
+              value.conflicts.map((item) => [item.path, "ours"]),
+            ),
+          );
           setPreview(value);
           setActivePath(value.conflicts[0]?.path ?? "");
           setTab(value.conflicts.length ? "conflicts" : "result");
@@ -100,6 +105,18 @@ export default function MergeDialog({
         : null,
     [preview, document, choices],
   );
+  useEffect(() => {
+    const missing =
+      result?.conflicts.filter((item) => !Object.hasOwn(choices, item.path)) ??
+      [];
+    if (missing.length)
+      setChoices((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          missing.map((item) => [item.path, "ours" as const]),
+        ),
+      }));
+  }, [result, choices]);
   const conflicts = useMemo(() => {
     const items = new Map(
       preview?.conflicts.map((conflict) => [conflict.path, conflict]),
@@ -329,45 +346,6 @@ export default function MergeDialog({
                       </button>
                     </div>
                   </div>
-                  <p className="conflict-help">
-                    {t(
-                      conflict.path === "/structure"
-                        ? "wholePageChoiceHelp"
-                        : "chooseVersionHelp",
-                    )}
-                  </p>
-                  <div className="conflict-version-actions">
-                    {(["ours", "theirs"] as const).map((side) => (
-                      <div
-                        key={side}
-                        className={`conflict-version ${side} ${(choices["/structure"] ?? choices[conflict.path]) === side ? "chosen" : ""}`}
-                      >
-                        <span>
-                          <i />
-                          <strong>{t(`side.${side}`)}</strong>
-                        </span>
-                        <button
-                          disabled={busy}
-                          aria-pressed={
-                            (choices["/structure"] ??
-                              choices[conflict.path]) === side
-                          }
-                          onClick={() => choose(side)}
-                        >
-                          {(choices["/structure"] ?? choices[conflict.path]) ===
-                            side && <Check size={14} />}
-                          {t(
-                            (choices["/structure"] ??
-                              choices[conflict.path]) === side
-                              ? "versionSelected"
-                              : conflict.path === "/structure"
-                                ? "useWholePage"
-                                : "useThisVersion",
-                          )}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
                   <Suspense
                     fallback={
                       <div className="conflict-loading">
@@ -382,17 +360,11 @@ export default function MergeDialog({
                       right={rightText!}
                       leftLabel={t("side.ours")}
                       rightLabel={t("side.theirs")}
+                      selected={choices["/structure"] ?? choices[conflict.path]}
+                      disabled={busy}
+                      onSelect={choose}
                     />
                   </Suspense>
-                  <div className="conflict-comparison-tools">
-                    <span>
-                      {t(
-                        leftText === rightText
-                          ? "sameTextDifferentAppearance"
-                          : "textComparison",
-                      )}
-                    </span>
-                  </div>
                   <section className="conflict-base" key={conflict.path}>
                     <h4>{t("commonVersion")}</h4>
                     <p className="conflict-base-content">{baseText}</p>

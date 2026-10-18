@@ -242,106 +242,73 @@
   color: var(--muted);
   line-height: 1.8;
 }
-.conflict-version-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  border: 1px solid var(--line);
-  border-radius: 9px 9px 0 0;
-  overflow: hidden;
-}
-.conflict-version {
-  padding: 13px 16px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--surface);
-  font-size: 12px;
-}
-.conflict-version + .conflict-version {
-  border-left: 1px solid var(--line);
-}
-.conflict-version > span {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.conflict-version strong {
-  font-weight: 550;
-}
-.conflict-version i {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--conflict-ours);
-}
-.conflict-version.theirs i {
-  background: var(--conflict-theirs);
-}
-.conflict-version button {
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  background: var(--paper);
-  color: var(--text);
-  font-size: 11px;
-  padding: 6px 9px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.conflict-version.chosen {
-  background: var(--conflict-ours-soft);
-}
-.conflict-version.theirs.chosen {
-  background: var(--conflict-theirs-soft);
-}
-.conflict-version.chosen button {
-  color: var(--conflict-ours);
-  border-color: var(--conflict-ours);
-}
-.conflict-version.theirs.chosen button {
-  color: var(--conflict-theirs);
-  border-color: var(--conflict-theirs);
-}
 .conflict-diff {
-  border: 1px solid var(--line);
-  border-top: 0;
-  border-radius: 0 0 9px 9px;
-  overflow: hidden;
+  margin: 24px 0;
   min-width: 0;
 }
 .conflict-diff .cm-mergeView {
-  max-height: 360px;
+  max-height: 420px;
   overflow: auto;
-  min-height: 150px;
 }
-.conflict-diff .cm-mergeViewEditor + .cm-mergeViewEditor {
-  border-left: 1px solid var(--line);
+.conflict-diff .cm-mergeViewEditors {
+  gap: 12px;
+  padding: 2px;
+}
+.conflict-diff .cm-mergeViewEditor {
+  overflow: clip;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  cursor: pointer;
+  background: var(--paper);
+}
+.conflict-diff .cm-mergeViewEditor:hover {
+  border-color: var(--muted);
+}
+.conflict-diff .cm-mergeViewEditor[aria-checked="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.conflict-diff .cm-mergeViewEditor:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -4px;
+}
+.conflict-diff .cm-mergeViewEditor[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.6;
+}
+.conflict-version-heading {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 15px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 12px;
+}
+.conflict-version-heading strong {
+  font-weight: 550;
+}
+[aria-checked="true"] > .conflict-version-heading {
+  background: var(--accent-soft);
+}
+.conflict-version-indicator {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+}
+[aria-checked="true"] .conflict-version-indicator {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: inset 0 0 0 4px var(--paper);
 }
 .conflict-diff .cm-editor {
   min-height: 150px;
-}
-.conflict-diff > .cm-editor {
-  max-height: 360px;
-}
-.conflict-diff > .cm-editor .cm-scroller {
-  overflow: auto;
-}
-.conflict-comparison-tools {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 0 20px;
-  color: var(--muted);
-  font-size: 10px;
-}
-.conflict-comparison-tools button {
-  font-size: 11px;
 }
 .conflict-base {
   border-top: 1px solid var(--line);
@@ -439,10 +406,6 @@
   .conflict-detail {
     padding: 22px 18px;
   }
-  .conflict-version {
-    padding: 12px;
-    flex-wrap: wrap;
-  }
   .conflict-save > span {
     display: none;
   }
@@ -519,8 +482,11 @@
   .conflict-detail-heading h3 {
     font-size: 17px;
   }
-  .conflict-version {
-    padding: 10px;
+  .conflict-version-heading {
+    padding: 12px 10px;
+    font-size: 11px;
+  }
+  .conflict-diff .cm-mergeViewEditors {
     gap: 8px;
   }
   .conflict-help {
@@ -542,8 +508,7 @@
     padding: 8px 10px;
     font-size: 11px;
   }
-  .conflict-diff .cm-mergeView,
-  .conflict-diff > .cm-editor {
+  .conflict-diff .cm-mergeView {
     max-height: 280px;
   }
   .conflict-page-preview {

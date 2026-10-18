@@ -1,42 +1,45 @@
-import { useEffect, useRef, useState } from "react";
-import { MergeView, unifiedMergeView } from "@codemirror/merge";
+import { useEffect, useRef } from "react";
+import { MergeView } from "@codemirror/merge";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { useTranslator } from "../i18n/react";
-import recoveryMessages from "../i18n/messages/recovery";
 
-/** A read-only diff: choosing a version always keeps its complete structured value. */
+type Side = "ours" | "theirs";
+
 export default function ConflictDiff({
   left,
   right,
   leftLabel,
   rightLabel,
+  selected,
+  disabled,
+  onSelect,
 }: {
   left: string;
   right: string;
   leftLabel: string;
   rightLabel: string;
+  selected: Side | undefined;
+  disabled: boolean;
+  onSelect: (side: Side) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
-  const t = useTranslator(recoveryMessages);
-  const [narrow, setNarrow] = useState(
-    () => window.matchMedia("(max-width: 700px)").matches,
-  );
+  const controls = useRef({ selected, disabled, onSelect });
+  controls.current = { selected, disabled, onSelect };
+  const panes = useRef<HTMLElement[]>([]);
+  const updateSelection = () => {
+    for (const pane of panes.current) {
+      const checked = pane.dataset.side === controls.current.selected;
+      pane.setAttribute("aria-checked", String(checked));
+      pane.setAttribute("aria-disabled", String(controls.current.disabled));
+      pane.tabIndex = checked && !controls.current.disabled ? 0 : -1;
+    }
+  };
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 700px)");
-    const update = () => setNarrow(media.matches);
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-  useEffect(() => {
-    const extensions = (label: string) => [
+    const extensions = [
       EditorState.readOnly.of(true),
       EditorView.editable.of(false),
       EditorView.lineWrapping,
-      EditorView.contentAttributes.of({ "aria-label": label, tabindex: "0" }),
-      EditorState.phrases.of({
-        "$ unchanged lines": t("unchangedLines", { count: "$" }),
-      }),
+      EditorView.contentAttributes.of({ tabindex: "-1" }),
       EditorView.theme({
         "&": {
           backgroundColor: "transparent",
@@ -46,54 +49,78 @@ export default function ConflictDiff({
         ".cm-scroller": { fontFamily: "var(--font-sans)", lineHeight: "1.8" },
         ".cm-content": { padding: "16px 0" },
         ".cm-line": { padding: "0 18px" },
-        "&.cm-focused": {
-          outline: "2px solid var(--accent)",
-          outlineOffset: "-2px",
-        },
-        "&.cm-merge-a .cm-changedLine, .cm-deletedChunk, .cm-deletedLine": {
+        "&.cm-merge-a .cm-changedLine": {
           backgroundColor: "var(--conflict-ours-soft)",
         },
-        "&.cm-merge-b .cm-changedLine, .cm-insertedLine": {
+        "&.cm-merge-b .cm-changedLine": {
           backgroundColor: "var(--conflict-theirs-soft)",
         },
-        "&.cm-merge-a .cm-changedText, .cm-deletedText": {
+        "&.cm-merge-a .cm-changedText": {
           backgroundColor: "var(--conflict-ours-mark)",
           textDecoration: "none",
         },
-        "&.cm-merge-b .cm-changedText, .cm-insertedText": {
+        "&.cm-merge-b .cm-changedText": {
           backgroundColor: "var(--conflict-theirs-mark)",
           textDecoration: "none",
         },
-        ".cm-collapsedLines": {
-          background: "var(--surface)",
-          color: "var(--muted)",
-          border: "0",
-          padding: "8px",
-        },
       }),
     ];
-    const view = narrow
-      ? new EditorView({
-          parent: host.current!,
-          doc: right,
-          extensions: [
-            ...extensions(`${leftLabel} / ${rightLabel}`),
-            unifiedMergeView({
-              original: left,
-              mergeControls: false,
-              gutter: false,
-              diffConfig: { scanLimit: 1000, timeout: 100 },
-            }),
-          ],
-        })
-      : new MergeView({
-          parent: host.current!,
-          a: { doc: left, extensions: extensions(leftLabel) },
-          b: { doc: right, extensions: extensions(rightLabel) },
-          gutter: false,
-          diffConfig: { scanLimit: 1000, timeout: 100 },
-        });
-    return () => view.destroy();
-  }, [left, right, leftLabel, rightLabel, t, narrow]);
-  return <div className="conflict-diff" ref={host} />;
+    const view = new MergeView({
+      parent: host.current!,
+      a: { doc: left, extensions },
+      b: { doc: right, extensions },
+      gutter: false,
+      diffConfig: { scanLimit: 1000, timeout: 100 },
+    });
+    panes.current = [view.a.dom.parentElement!, view.b.dom.parentElement!];
+    panes.current.forEach((pane, index) => {
+      const side: Side = index === 0 ? "ours" : "theirs";
+      const label = index === 0 ? leftLabel : rightLabel;
+      pane.dataset.side = side;
+      pane.setAttribute("role", "radio");
+      pane.setAttribute("aria-label", label);
+      const header = document.createElement("div");
+      header.className = "conflict-version-heading";
+      const indicator = document.createElement("span");
+      indicator.className = "conflict-version-indicator";
+      indicator.setAttribute("aria-hidden", "true");
+      const title = document.createElement("strong");
+      title.textContent = label;
+      header.append(title, indicator);
+      pane.prepend(header);
+      pane.addEventListener(
+        "click",
+        () => {
+          if (!controls.current.disabled) controls.current.onSelect(side);
+        },
+        true,
+      );
+      pane.addEventListener("keydown", (event) => {
+        if (controls.current.disabled) return;
+        const arrows = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+        if (arrows.includes(event.key)) {
+          event.preventDefault();
+          controls.current.onSelect(side === "ours" ? "theirs" : "ours");
+          panes.current[1 - index].focus({ preventScroll: true });
+        } else if (event.key === " " || event.key === "Enter") {
+          event.preventDefault();
+          controls.current.onSelect(side);
+        }
+      });
+    });
+    updateSelection();
+    return () => {
+      panes.current = [];
+      view.destroy();
+    };
+  }, [left, right, leftLabel, rightLabel]);
+  useEffect(updateSelection, [selected, disabled]);
+  return (
+    <div
+      className="conflict-diff"
+      role="radiogroup"
+      aria-label={`${leftLabel} / ${rightLabel}`}
+      ref={host}
+    />
+  );
 }
