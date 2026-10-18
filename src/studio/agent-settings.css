@@ -569,3 +569,108 @@
 .agent-remote-advanced > .settings-help {
   margin-top: 14px;
 }
+
+/* Settings headings share one typographic level; the chat picker stays compact. */
+.studio-settings .agent-settings > .agent-execution-picker {
+  padding: 0;
+  margin-bottom: 30px;
+  gap: 14px;
+}
+.studio-settings .agent-settings .agent-runtime-choice > span,
+.studio-settings .agent-settings .settings-group > h2 {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--text);
+  letter-spacing: 0;
+  border: 0;
+  padding: 0;
+  margin: 0 0 12px;
+}
+.device-model-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
+  gap: 14px;
+}
+.device-model-card,
+.device-model-add {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.device-model-card[data-active="true"] {
+  background: var(--accent-soft);
+}
+.device-model-select {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  width: 100%;
+  min-height: 136px;
+  gap: 6px;
+  padding: 18px 18px 12px;
+  text-align: left;
+  color: var(--text);
+}
+.device-model-brand {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  margin-bottom: 8px;
+}
+.device-model-brand svg {
+  width: 26px;
+  height: 26px;
+}
+.device-model-check {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: var(--accent);
+}
+.device-model-card[data-active="true"] .device-model-check {
+  background: var(--paper);
+}
+.device-model-select strong {
+  grid-column: 1 / -1;
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.device-model-name {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.device-model-configure {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 18px;
+  text-align: left;
+  font-size: 12px;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+}
+.device-model-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 180px;
+  padding: 20px;
+  border-style: dashed;
+  color: var(--muted);
+  font-size: 13px;
+}
+.device-model-add:hover,
+.device-model-configure:hover {
+  color: var(--text);
+  background: var(--hover);
+}
