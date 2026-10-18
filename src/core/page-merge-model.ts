@@ -1,6 +1,11 @@
 import type { JSONContent } from "@tiptap/core";
 import { canonicalJson } from "./canonical";
-import { mergeText, mergeValues, rebaseHistoryText } from "./catalog-merge";
+import {
+  mergeText,
+  mergeValues,
+  rebaseHistoryText,
+  type MergeChoices,
+} from "./catalog-merge";
 import { validateDocument } from "../portable/validation.mjs";
 import type { ShowDocument } from "./model";
 import type { MergeConflict } from "../components/custom/types";
@@ -156,14 +161,22 @@ export function mergePageContent(
   ours: ShowDocument,
   theirs: ShowDocument,
   mode: "merge" | "history" = "merge",
+  choices: MergeChoices = {},
 ): PageMergeResult {
   if (base.id !== ours.id || ours.id !== theirs.id)
     throw new Error("Page merge inputs must identify the same page.");
+  if (Object.hasOwn(choices, "/structure"))
+    return {
+      document: structuredClone(
+        choices["/structure"] === "ours" ? ours : theirs,
+      ),
+      conflicts: [],
+    };
   const b = flatten(base),
     o = flatten(ours),
     t = flatten(theirs);
-  const metadata = mergeValues(b.fields, o.fields, t.fields, "/page");
-  const root = mergeValues(b.root, o.root, t.root, "/root");
+  const metadata = mergeValues(b.fields, o.fields, t.fields, "/page", choices);
+  const root = mergeValues(b.root, o.root, t.root, "/root", choices);
   const conflicts: PageMergeConflict[] = [
     ...metadata.conflicts,
     ...root.conflicts,
@@ -211,7 +224,13 @@ export function mergePageContent(
         delete remote!.node.content;
       }
     }
-    const merged = mergeValues(previous, local, remote, `/nodes/${id}`);
+    const merged = mergeValues(
+      previous,
+      local,
+      remote,
+      `/nodes/${id}`,
+      choices,
+    );
     conflicts.push(...merged.conflicts);
     if (merged.value !== undefined) {
       const entry = merged.value as Omit<FlatNode, "children">;
@@ -245,8 +264,16 @@ export function mergePageContent(
       t.nodes[id]?.children ?? [],
       members,
     );
-    entry.children = merged.order;
-    if (merged.conflict)
+    const orderChoice = choices[`/nodes/${id}/order`];
+    entry.children = orderChoice
+      ? [
+          ...new Set([
+            ...((orderChoice === "ours" ? o : t).nodes[id]?.children ?? []),
+            ...merged.order,
+          ]),
+        ].filter((child) => members.has(child))
+      : merged.order;
+    if (merged.conflict && !orderChoice)
       conflicts.push({
         path: `/nodes/${id}/order`,
         kind: "structure",
@@ -274,8 +301,16 @@ export function mergePageContent(
         saved: [],
         readingOrder: [],
       };
-      fields.surfaceViews[id].readingOrder = reading.order;
-      if (reading.conflict)
+      const readingChoice = choices[`/surfaceViews/${id}/readingOrder`];
+      fields.surfaceViews[id].readingOrder = readingChoice
+        ? [
+            ...new Set([
+              ...((readingChoice === "ours" ? o : t).readingOrders[id] ?? []),
+              ...reading.order,
+            ]),
+          ].filter((child) => members.has(child))
+        : reading.order;
+      if (reading.conflict && !readingChoice)
         conflicts.push({
           path: `/surfaceViews/${id}/readingOrder`,
           kind: "structure",

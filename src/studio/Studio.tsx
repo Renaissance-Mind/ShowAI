@@ -1,3 +1,4 @@
+import MergeDialog from "./MergeDialog";
 import type { ProjectSyncRequest } from "./SyncSettings";
 import accountFlowMessages from "../i18n/messages/accountFlow";
 import { coalescedTask } from "../lib/coalesced-task";
@@ -160,7 +161,6 @@ import { TemplateDialog, ComponentDialog } from "./CatalogDialogs";
 import "./studio.css";
 import {
   LibrarySearchResults,
-  MergeDialog,
   ExternalConflictDialog,
   WorkspaceConflictsDialog,
 } from "./RecoveryDialogs";
