@@ -386,7 +386,7 @@ test("anonymous clients discover and customize public resources without a projec
         id: "paper-explainer",
         kind: "template",
         view: "guide",
-        version: "2.1.0",
+        version: "2.1.1",
       },
     }),
   );

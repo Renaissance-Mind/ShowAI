@@ -50,7 +50,7 @@ afterAll(async () => {
 });
 test("two real stdio sessions retain different pinned templates and stage disclosures", async () => {
   const [a, b] = await Promise.all([
-    connect("paper-explainer@2.1.0"),
+    connect("paper-explainer@2.1.1"),
     connect(),
   ]);
   const first = await call(a, "template_context"),
@@ -117,7 +117,7 @@ test("source and receipt profiles reduce text without losing saved content or re
   const page = await call(client, "template_apply", {
     templateId: "paper-explainer",
     scope: "builtin",
-    version: "2.1.0",
+    version: "2.1.1",
     title: "Report",
   });
   const full = await call(client, "page_read", {
