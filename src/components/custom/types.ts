@@ -70,7 +70,11 @@ export interface TemplateMetadata {
   legacy?: boolean;
   workflow?: {
     format: 1;
-    stages: import("../../portable/template-bundle.mjs").TemplateStage[];
+    /** Declared by the bundle: four current stages, or six for legacy schemaVersion 1–2. */
+    stages: (
+      | import("../../portable/template-bundle.mjs").TemplateStage
+      | import("../../portable/template-bundle.mjs").LegacyTemplateStage
+    )[];
     components: { id: string; ref: PackageRevisionRef }[];
   };
 }

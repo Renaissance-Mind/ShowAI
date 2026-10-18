@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  LEGACY_TEMPLATE_STAGES,
   parseTemplateBundle,
   stageGuidePath,
   TEMPLATE_STAGES,
