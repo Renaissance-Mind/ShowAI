@@ -403,12 +403,16 @@ export function createMcpServer(options: {
     "page_create",
     {
       description:
-        "Create a page in the bound project. Optional artifact components are imported into this project; remote components are fetched and verified.",
+        'Create a page in the bound project. Prefer blocks:[{kind,data}] (catalog components in reading order, e.g. {kind:"text",data:{format:"markdown",content:"..."}}) over a full nested document; keep it to a few blocks and add the rest with page_apply component.insert. Optional artifact components are imported into this project; remote components are fetched and verified.',
       inputSchema: {
         ...changeSchema,
         title: z.string().optional(),
         kind: z.enum(["page", "board"]).optional(),
         parentId: z.string().min(1).nullable().optional(),
+        blocks: z
+          .array(z.object({ kind: z.string().min(1), data: jsonObject }))
+          .max(100)
+          .optional(),
         document: jsonObject.optional(),
         components: z.array(jsonObject).max(100).optional(),
         remoteComponents: z.array(jsonObject).max(100).optional(),
@@ -419,6 +423,7 @@ export function createMcpServer(options: {
       title,
       kind,
       parentId,
+      blocks,
       document,
       components,
       remoteComponents,
@@ -430,6 +435,7 @@ export function createMcpServer(options: {
             title,
             kind,
             parentId,
+            blocks,
             ...(document ? { document: validateDocument(document) } : {}),
             components: components as unknown as
               CompiledComponent[] | undefined,
@@ -485,7 +491,7 @@ export function createMcpServer(options: {
     "page_apply",
     {
       description:
-        'Apply stable-block-id operations with a current baseHash. Query guide authoring for the operation shapes. Change existing component data with {type:"component.props.set",blockId,props} rather than block.replace, and keep each call shallow and short.',
+        'Apply stable-block-id operations with a current baseHash. Query guide authoring for the operation shapes. Add components with {type:"component.insert",kind,data,parentId?,afterId?} rather than block.insert of a nested node, change existing component data with {type:"component.props.set",blockId,props} rather than block.replace, and keep each call shallow and short.',
       inputSchema: {
         ...changeSchema,
         pageId: z.string(),

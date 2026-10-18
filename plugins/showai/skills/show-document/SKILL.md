@@ -55,7 +55,7 @@ description: 通过 ShowAI MCP 制作、续改、展示和导出可交互报告�
 
 ## 制作
 
-制作只做一件事：把设计稿落实为 Page。应用模板用 template_apply（空白 Page，绑定本轮固定引用）；空白路径用 page_create。按设计稿的幕顺序填入真实内容：导语、图形或组件、图注与要点。每幕完成后记录实现它的 blockIds。
+制作只做一件事：把设计稿落实为 Page。应用模板用 template_apply（空白 Page，绑定本轮固定引用）；空白路径用 page_create，只传标题和少量 `blocks:[{kind,data}]`，不手写整棵 document。按设计稿的幕顺序填入真实内容：导语、图形或组件、图注与要点；新增内容用 page_apply 的 `component.insert`（kind、data，可选 parentId/afterId），一次插入一到几个组件，文字用 `{kind:"text",data:{format:"markdown",content}}`。每幕完成后记录实现它的 blockIds。
 
 选择组件后读其精确 guide，再按当前材料用 parameters 的 parameterPath 查字段含义、约束与例子；只在需要原始结构时读 schema。模板组件采用 template_context 返回的 componentId/version/integrity，不把局部名字当内置 kind。guide 返回 authoringReference 时沿用精确引用读取制作索引，流程见 [组件设计](../create-component/references/component-authoring.md)。现有数据调整或组合够用时复用；设计稿中确认的缺口进入 [create-component](../create-component/SKILL.md)。编辑 Board 的绘画、对象属性、布局或连接时读 [Board 对象编辑](references/board-authoring.md)。需要具体操作时才读 guide authoring/containers/document 等技术说明。
 

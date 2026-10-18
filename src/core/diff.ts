@@ -360,6 +360,7 @@ export function applyOperations(
           operation.parentId ?? null,
           operation.kind,
           operation.data,
+          operation.afterId,
         ).document;
         break;
       case "surface.upgrade":

@@ -124,6 +124,7 @@ export type PageOperation =
       kind: string;
       data: Record<string, unknown>;
       parentId?: string | null;
+      afterId?: string | null;
     }
   | { type: "surface.upgrade" }
   | {

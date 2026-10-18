@@ -48,12 +48,16 @@ export function nativeComponentDocument(
       : {}),
   });
 }
-/** Every catalog item enters the same insertion path; containers remain native nodes. */
+/**
+ * Every catalog item enters the same insertion path; containers remain native nodes.
+ * An omitted afterId appends, null inserts first, and an id inserts after that sibling.
+ */
 export function insertComponent(
   source: ShowDocument,
   parentId: string | null,
   kind: string,
   data: Record<string, unknown>,
+  afterId?: string | null,
 ) {
   if (!data || typeof data !== "object" || Array.isArray(data))
     throw new Error("Component data must be an object.");
@@ -136,7 +140,19 @@ export function insertComponent(
         }),
       ),
     );
-  parent.content = [...siblings, node];
+  let index = siblings.length;
+  if (afterId === null) index = 0;
+  else if (afterId !== undefined) {
+    const sibling = siblings.findIndex((child) => child.attrs?.id === afterId);
+    if (sibling < 0)
+      throw new Error(`Insertion anchor ${afterId} does not belong to this parent.`);
+    index = sibling + 1;
+  }
+  parent.content = [
+    ...siblings.slice(0, index),
+    node,
+    ...siblings.slice(index),
+  ];
   document.layout[node.attrs!.id] = frame;
   return {
     document: reconcileSurface(document),

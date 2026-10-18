@@ -3,7 +3,7 @@ import { ReadBaselines } from "../core/read-baselines";
 import { readBoard, type BoardReadInput } from "./board-reading";
 import { EditorDrafts } from "../core/editor-drafts";
 import { placeTemplate } from "../surface/document.mjs";
-import { upgradeResource } from "../surface/containers.mjs";
+import { createResource, upgradeResource } from "../surface/containers.mjs";
 import { FileStore } from "../core/store";
 import { applyOperations, canonicalJson } from "../core/diff";
 import { createHash } from "node:crypto";
@@ -175,6 +175,47 @@ function rebindImportedComponents(
 }
 
 /** CLI and MCP share operations; project-bound connections cannot mutate shared libraries. */
+/**
+ * Build a new Page from catalog components without a nested document tree:
+ * each block goes through the same component.insert path as page_apply.
+ * The store assigns the real id, title and timestamps on creation.
+ */
+function blocksDocument(
+  blocks: { kind: string; data: Record<string, unknown> }[],
+  title = "未命名页面",
+  kind: "page" | "board" = "page",
+): ShowDocument {
+  const now = new Date().toISOString();
+  const blank = createResource(
+    {
+      id: "pending",
+      title,
+      icon: "",
+      cover: "none",
+      parentId: null,
+      favorite: false,
+      archived: false,
+      createdAt: now,
+      updatedAt: now,
+      content: { type: "doc", content: [{ type: "paragraph" }] },
+      comments: [],
+    },
+    kind,
+  );
+  // The blocks replace the empty starter text a new Page carries.
+  for (const starter of blank.content.content ?? [])
+    delete blank.layout?.[starter.attrs?.id];
+  blank.content.content = [];
+  return applyOperations(
+    blank,
+    blocks.map((block) => ({
+      type: "component.insert" as const,
+      kind: block.kind,
+      data: block.data,
+    })),
+  );
+}
+
 export class AgentService {
   readonly store: FileStore;
   readonly projectId?: string;
@@ -1319,11 +1360,18 @@ export class AgentService {
       kind?: "page" | "board";
       parentId?: string | null;
       document?: ShowDocument;
+      /** Shallow alternative to document: catalog components in reading order. */
+      blocks?: { kind: string; data: Record<string, unknown> }[];
       components?: CompiledComponent[];
       remoteComponents?: PublishedComponentLocator[];
     },
   ) {
     const project = this.requireProject(projectId);
+    if (input.blocks?.length && input.document)
+      throw new CoreError(
+        "INVALID_DATA",
+        "Pass either document or blocks when creating a page, not both.",
+      );
     await this.store.listPages(project);
     const components = [
       ...(input.components ?? []),
@@ -1333,10 +1381,13 @@ export class AgentService {
     ];
     if (components.length)
       await importCompiledComponents(this.store.root, components, project);
-    const document = input.document
+    const source = input.blocks?.length
+      ? blocksDocument(input.blocks, input.title, input.kind)
+      : input.document;
+    const document = source
       ? await lockDocumentComponents(
           this.store.root,
-          rebindImportedComponents(input.document, components),
+          rebindImportedComponents(source, components),
           project,
         )
       : undefined;

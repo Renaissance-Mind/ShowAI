@@ -626,3 +626,94 @@ test("presentation templates apply as independent native Pages, persist edits an
     ).toBe(saved.hash);
   }
 }, 180000);
+
+test("pages are authored through shallow blocks and component.insert", async () => {
+  const c = await connect(createLibraryMcpServer({ root }));
+  const p = await call(c, "project_create", { name: "Shallow authoring" }),
+    projectId = p.id;
+  // The same content a model once sent as a seven-level nested document.
+  const page = await call(c, "page_create", {
+    projectId,
+    title: "北京天气 · 出行速览",
+    blocks: [
+      {
+        kind: "text",
+        data: { format: "markdown", content: "适合出门的时段是 **上午 9 点到下午 3 点**。" },
+      },
+      {
+        kind: "metrics",
+        data: {
+          title: "一眼看懂",
+          items: [{ label: "现在", value: 15, unit: "°C", detail: "云量 100%" }],
+        },
+      },
+      {
+        kind: "chart",
+        data: {
+          title: "今天的温度走向",
+          type: "line",
+          labels: ["09", "12", "15"],
+          series: [{ name: "气温", values: [15, 17, 18] }],
+        },
+      },
+      { kind: "table", data: { columns: ["时段", "建议"], rows: [["上午", "出门"]] } },
+    ],
+  });
+  const created = page.document;
+  expect(created.title).toBe("北京天气 · 出行速览");
+  const children = created.content.content;
+  expect(children.map((node: any) => node.attrs.kind ?? node.type)).toEqual([
+    "richText",
+    "metrics",
+    "chart",
+    "table",
+  ]);
+  expect(JSON.stringify(children[0])).toContain("上午 9 点到下午 3 点");
+  const ids = new Set<string>([created.content.attrs.id]);
+  const visit = (node: any) => {
+    if (node.attrs?.id) ids.add(node.attrs.id);
+    for (const child of node.content ?? []) visit(child);
+  };
+  visit(created.content);
+  // No layout or view entry outlives the starter text the blocks replaced.
+  for (const id of Object.keys(created.layout)) expect(ids.has(id)).toBe(true);
+  for (const [id, views] of Object.entries<any>(created.surfaceViews)) {
+    expect(ids.has(id)).toBe(true);
+    for (const target of views.readingOrder ?? []) expect(ids.has(target)).toBe(true);
+  }
+
+  const first = children[0].attrs.id;
+  const applied = await call(c, "page_apply", {
+    projectId,
+    pageId: created.id,
+    baseHash: page.hash,
+    baseRevision: page.revision,
+    response: "source",
+    operations: [
+      {
+        type: "component.insert",
+        kind: "text",
+        data: { format: "markdown", content: "## 导语" },
+        afterId: null,
+      },
+      {
+        type: "component.insert",
+        kind: "callout",
+        data: { title: "提示", content: "傍晚起霾。" },
+        afterId: first,
+      },
+    ],
+  });
+  const order = applied.document.content.content.map(
+    (node: any) => node.attrs.kind ?? node.type,
+  );
+  expect(order).toEqual(["richText", "richText", "callout", "metrics", "chart", "table"]);
+  expect(applied.document.content.content[1].attrs.id).toBe(first);
+
+  const both = await c.callTool({
+    name: "page_create",
+    arguments: { projectId, blocks: [{ kind: "text", data: { content: "x" } }], document: created },
+  });
+  expect(both.isError).toBe(true);
+  expect(JSON.stringify(both.content)).toContain("not both");
+});
