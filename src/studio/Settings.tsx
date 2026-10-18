@@ -27,6 +27,7 @@ import IconViewer from "./IconViewer";
 import SyncSettings, { type ProjectSyncRequest } from "./SyncSettings";
 import AgentSettings from "./AgentSettings";
 import PluginInstallSettings from "./PluginInstallSettings";
+import { workbenchCapabilities } from "./capabilities";
 
 const sections = [
   {
@@ -68,28 +69,43 @@ const sections = [
 
 export type SettingsSection = (typeof sections)[number]["id"];
 
+export function availableSettingsSection(
+  section: SettingsSection,
+  platform?: string,
+): SettingsSection {
+  const capabilities = workbenchCapabilities(platform);
+  return (section === "general" && !capabilities.manageLibrary) ||
+    (section === "plugins" && !capabilities.localPlugins)
+    ? "sync"
+    : section;
+}
+
 export function SettingsNavigation({
   section,
   onSelect,
+  platform,
 }: {
   section: SettingsSection;
   onSelect: (section: SettingsSection) => void;
+  platform?: string;
 }) {
   const t = useTranslator(messages);
   return (
     <div className="settings-category-sidebar">
       <div className="settings-nav-label">{t("title")}</div>
       <nav className="settings-nav" aria-label={t("categories")}>
-        {sections.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            aria-current={section === id ? "page" : undefined}
-            onClick={() => onSelect(id)}
-          >
-            <Icon size={17} strokeWidth={1.7} aria-hidden="true" />
-            {t(label)}
-          </button>
-        ))}
+        {sections
+          .filter(({ id }) => availableSettingsSection(id, platform) === id)
+          .map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              aria-current={section === id ? "page" : undefined}
+              onClick={() => onSelect(id)}
+            >
+              <Icon size={17} strokeWidth={1.7} aria-hidden="true" />
+              {t(label)}
+            </button>
+          ))}
       </nav>
     </div>
   );
@@ -149,6 +165,7 @@ export function SettingsPanel({
 }) {
   const t = useTranslator(messages);
   const language = useLanguagePreference();
+  section = availableSettingsSection(section, info?.platform);
   const current = sections.find((item) => item.id === section)!;
   return (
     <div className="studio-settings" key={section}>

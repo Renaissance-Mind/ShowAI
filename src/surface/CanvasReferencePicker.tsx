@@ -8,6 +8,7 @@ import {
 } from "./agent-reference";
 import { useTranslator } from "../i18n/react";
 import strings from "../i18n/messages/assistant";
+import { registerReferencePicker } from "./reference-availability";
 
 export function CanvasReferencePicker({
   pageId,
@@ -32,7 +33,11 @@ export function CanvasReferencePicker({
     end: { x: number; y: number };
   } | null>(null);
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      setRequest(null);
+      setDrag(null);
+      return;
+    }
     const start = (event: Event) => {
       const value = (event as CustomEvent).detail;
       if (event.defaultPrevented || value?.pageId !== pageId) return;
@@ -56,10 +61,12 @@ export function CanvasReferencePicker({
     window.addEventListener(referenceRequest, start);
     window.addEventListener(referenceDisplay, display);
     window.addEventListener("keydown", escape);
+    const unregister = registerReferencePicker(pageId);
     return () => {
       window.removeEventListener(referenceRequest, start);
       window.removeEventListener(referenceDisplay, display);
       window.removeEventListener("keydown", escape);
+      unregister();
     };
   }, [enabled, pageId, surfaceId]);
   const local = (x: number, y: number) => {
@@ -94,7 +101,7 @@ export function CanvasReferencePicker({
           </svg>,
           world.current,
         )}
-      {request && (
+      {enabled && request && (
         <div
           className="agent-reference-picker"
           data-surface-ui

@@ -98,6 +98,7 @@ import { parseArtifact } from "../lib/artifact";
 import { parseMarkdown } from "../lib/markdown";
 import { newDocument } from "../lib/document";
 import { desktop, errorMessage } from "./bridge";
+import { workbenchCapabilities } from "./capabilities";
 import { usePage, type LoadedPage } from "./usePage";
 import {
   LibraryRow,
@@ -289,6 +290,7 @@ export default function Studio() {
   const catalogLoaded = useRef(false);
   const windowFullscreen = useWindowFullscreen();
   const [info, setInfo] = useState<DesktopInfo | null>(null);
+  const capabilities = workbenchCapabilities(info?.platform);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [savedOrganization, setOrganization] = useState<SidebarOrganization>({
     groups: [],
@@ -375,7 +377,8 @@ export default function Studio() {
       : "projects",
   );
   const [settingsSection, setSettingsSection] = useState<SettingsSection>(() =>
-    new URLSearchParams(location.search).has("invite") ? "sync" : "general",
+    new URLSearchParams(location.search).has("invite") || !capabilities.manageLibrary
+      ? "sync" : "general",
   );
   useEffect(() => {
     const host = window as Window & { showaiPendingInvite?: string };
@@ -1085,6 +1088,8 @@ export default function Studio() {
   ) {
     if (!workspaceReady || routingRef.current || workspace.switching)
       return false;
+    if ((!capabilities.tabs && disposition !== "window") ||
+        (!capabilities.windows && disposition === "window")) disposition = "current";
     if (disposition === "window") {
       return desktop.openWindow(
         {
@@ -2165,6 +2170,7 @@ export default function Studio() {
     },
   });
   useEffect(() => {
+    if (!capabilities.tabs) return;
     const command = (command: TabCommand) => {
       if (dialogRef.current || !workspaceReady || routingRef.current) return;
       const index = workspace.tabs.findIndex(
@@ -2198,7 +2204,7 @@ export default function Studio() {
       unsubscribe();
       window.removeEventListener("keydown", key, true);
     };
-  }, [workspace, workspaceReady, report]);
+  }, [workspace, workspaceReady, report, capabilities.tabs]);
   const action = (operation: () => Promise<unknown>) => () => {
     void operation().catch(report);
   };
@@ -2223,7 +2229,8 @@ export default function Studio() {
     event: ReactMouseEvent<HTMLButtonElement>,
   ) {
     const target = searchTarget(result);
-    const disposition = clickDisposition(event, info?.platform === "darwin");
+    const disposition = capabilities.tabs
+      ? clickDisposition(event, info?.platform === "darwin") : "current";
     if (target && disposition !== "current") {
       event.preventDefault();
       if (!(await openTarget(target, disposition)))
@@ -2345,6 +2352,7 @@ export default function Studio() {
         <SettingsNavigation
           section={settingsSection}
           onSelect={setSettingsSection}
+          platform={info?.platform}
         />
       ) : view === "templates" ? (
         <TemplateNavigation
@@ -2614,7 +2622,7 @@ export default function Studio() {
             />
           </label>
         )}
-        {info?.libraryVersion === 2 && (
+        {capabilities.externalChanges && info?.libraryVersion === 2 && (
           <>
             <button
               className="studio-icon"
@@ -2715,7 +2723,7 @@ export default function Studio() {
           )}
           {view === "project" && project && (
             <>
-              <button
+              {capabilities.revealFiles && <button
                 className="studio-icon"
                 aria-label={t("revealProjectFolder")}
                 title={t("revealProjectFolder")}
@@ -2726,7 +2734,7 @@ export default function Studio() {
                 )}
               >
                 <FolderOpen size={16} />
-              </button>
+              </button>}
               <button
                 className="studio-icon"
                 onClick={action(importPage)}
@@ -2735,7 +2743,7 @@ export default function Studio() {
               >
                 <Upload size={15} />
               </button>
-              <button
+              {capabilities.exportSite && <button
                 className="studio-icon"
                 disabled={!pages.length || busy}
                 aria-haspopup="menu"
@@ -2749,7 +2757,7 @@ export default function Studio() {
                 title={t("exportSite")}
               >
                 <ArrowUpRight size={15} />
-              </button>
+              </button>}
               <button
                 className="studio-icon"
                 aria-label={t("folderActions")}
@@ -2808,7 +2816,7 @@ export default function Studio() {
                   : null
               }
             />
-            <button
+            {capabilities.revealFiles && <button
               className="studio-icon"
               aria-label={t("revealPageFile")}
               title={t("revealPageFile")}
@@ -2820,7 +2828,7 @@ export default function Studio() {
               )}
             >
               <FolderOpen size={16} />
-            </button>
+            </button>}
             <button
               className="studio-icon"
               aria-label={tc("export")}
@@ -3380,7 +3388,7 @@ export default function Studio() {
             {notice}
           </div>
         )}
-        {exportMenu && (
+        {capabilities.exportSite && exportMenu && (
           <LibraryContextMenu
             anchor={exportMenu}
             label={t("siteExportMode")}
@@ -3482,6 +3490,7 @@ export default function Studio() {
               contextMenu.creationOnly
                 ? creationMenuItems(contextMenu.target)
                 : [
+                    ...(capabilities.tabs ? [
                     {
                       label: t("openInNewTab"),
                       icon: <PanelsTopLeft size={15} />,
@@ -3495,6 +3504,8 @@ export default function Studio() {
                         openTarget(contextMenu.target, "tab"),
                       ),
                     },
+                    ] : []),
+                    ...(capabilities.windows ? [
                     {
                       label: t("openInNewWindow"),
                       icon: <AppWindow size={15} />,
@@ -3505,6 +3516,7 @@ export default function Studio() {
                         openTarget(contextMenu.target, "window"),
                       ),
                     },
+                    ] : []),
                     {
                       label: tc("rename"),
                       separatorBefore: true,
@@ -3668,6 +3680,7 @@ export default function Studio() {
                             icon: <Download size={15} />,
                             onSelect: () => void exportPage("json"),
                           },
+                          ...(capabilities.advancedPageExport ? [
                           {
                             label: t("exportWithPublished"),
                             icon: <Globe size={15} />,
@@ -3695,6 +3708,7 @@ export default function Studio() {
                                 "cdn",
                               ),
                           },
+                          ] : []),
                         ]
                       : []),
                     {
@@ -3813,7 +3827,7 @@ export default function Studio() {
             }}
           />
         )}
-        {dialog?.type === "workspaceConflicts" && (
+        {capabilities.externalChanges && dialog?.type === "workspaceConflicts" && (
           <WorkspaceConflictsDialog
             onClose={closeDialog}
             onSelect={(id) => setDialog({ type: "externalConflict", id })}
@@ -3997,7 +4011,7 @@ export default function Studio() {
             }
             builtin={dialog.builtin}
             custom={dialog.custom}
-            loadSource={() =>
+            loadSource={capabilities.componentSource ? () =>
               desktop.invoke<ComponentSource>(
                 "components:source",
                 dialog.builtin
@@ -4009,7 +4023,7 @@ export default function Studio() {
                       integrity: dialog.custom!.integrity,
                       projectId: dialog.projectId,
                     },
-              )
+              ) : undefined
             }
             canInsert={
               !!page.draft &&

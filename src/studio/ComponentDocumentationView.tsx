@@ -84,7 +84,7 @@ export default function ComponentDocumentationView({
       ),
     },
   ];
-  if (documentation.version === 2 && documentation.authoring)
+  if (documentation.version === 2 && documentation.authoring && loadSource)
     sections.push({
       id: "authoring",
       title: t("authoring.title"),

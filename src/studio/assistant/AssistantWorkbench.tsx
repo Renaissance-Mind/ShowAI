@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
@@ -44,6 +45,10 @@ import {
 import { downloadAgentFile } from "./message-links";
 import "./assistant.css";
 import { useAssistantDrafts } from "./useAssistantDrafts";
+import {
+  referenceAvailable,
+  subscribeReferenceAvailability,
+} from "../../surface/reference-availability";
 import { AgentMarkdown } from "./AgentMarkdown";
 import {
   referenceRequest,
@@ -411,6 +416,11 @@ export default function AssistantWorkbench({
 }) {
   const t = useTranslator(strings);
   const [summaries, setSummaries] = useState<AgentConversationSummary[]>([]);
+  const canPickReference = useSyncExternalStore(
+    subscribeReferenceAvailability,
+    () => referenceAvailable(pageId),
+    () => false,
+  );
   const [conversation, setConversation] = useState<AgentConversation | null>(
     null,
   );
@@ -477,7 +487,7 @@ export default function AssistantWorkbench({
     };
   }, [pageId, reference]);
   const pickReference = () => {
-    if (!pageId) return;
+    if (!pageId || !referenceAvailable(pageId)) return;
     const request = new CustomEvent(referenceRequest, {
       cancelable: true,
       detail: { id: crypto.randomUUID(), pageId },
@@ -1052,16 +1062,18 @@ export default function AssistantWorkbench({
               )}
             </div>
             <div className="assistant-input">
-              <button
-                type="button"
-                className="assistant-icon assistant-reference-button"
-                aria-label={t("reference.pick")}
-                title={t("reference.pick")}
-                disabled={!pageId}
-                onClick={pickReference}
-              >
-                <LocateFixed size={17} />
-              </button>
+              {canPickReference && (
+                <button
+                  type="button"
+                  className="assistant-icon assistant-reference-button"
+                  aria-label={t("reference.pick")}
+                  title={t("reference.pick")}
+                  disabled={!pageId}
+                  onClick={pickReference}
+                >
+                  <LocateFixed size={17} />
+                </button>
+              )}
               <textarea
                 rows={3}
                 value={draft}
