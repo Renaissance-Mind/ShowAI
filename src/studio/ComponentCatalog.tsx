@@ -26,6 +26,7 @@ import ComponentThumbnail, {
   componentPreviewReference,
 } from "./ComponentThumbnail";
 import "./component-catalog.css";
+import { workbenchCapabilities } from "./capabilities";
 const categoryIcons = {
   text: Type,
   image: Image,
@@ -130,11 +131,11 @@ export function ComponentCatalog({
                   onOpen(item);
                 }}
               >
-                <ComponentThumbnail
+                {workbenchCapabilities().componentThumbnails && <ComponentThumbnail
                   item={item}
                   browser={browser}
                   theme={theme}
-                />
+                />}
                 <div className="component-card-copy">
                   <div className="component-card-identity">
                     <span className="studio-component-symbol">

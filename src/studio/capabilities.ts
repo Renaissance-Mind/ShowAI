@@ -14,5 +14,6 @@ export function workbenchCapabilities(platform?: string) {
     localPlugins: !ios,
     externalChanges: !ios,
     componentSource: !ios,
+    componentThumbnails: !ios,
   };
 }
