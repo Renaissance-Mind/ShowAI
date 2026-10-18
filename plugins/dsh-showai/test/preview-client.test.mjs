@@ -33,6 +33,7 @@ async function loadClient({ uiConversation } = {}) {
     effect(factory) {
       factory();
     },
+    ...(uiConversation === undefined ? {} : { uiConversation }),
     get(name) {
       if (name === "uiConversation") return uiConversation;
       return undefined;

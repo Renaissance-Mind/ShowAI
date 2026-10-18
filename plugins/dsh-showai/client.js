@@ -578,7 +578,7 @@ window.__ModuleLoader__.load({
     }
 
     return {
-      inject: ["slots", "locale"],
+      inject: ["slots", "locale", "uiConversation"],
       /**
        * Register the dictionaries, the two keyed Tool views, and the Turn-tail
        * preview that survives the completed Turn's fold.
@@ -598,9 +598,10 @@ window.__ModuleLoader__.load({
           };
         }, "showai-page: styles");
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), "showai-page: dictionaries");
-        // Conversation seats only exist in a chat composition: a headless or
-        // card-only host keeps the Tool views without the Turn-tail record.
-        const conversation = typeof ctx.get === "function" ? ctx.get("uiConversation") : ctx.uiConversation;
+        // uiConversation is injected, so the registry is ready by the time this
+        // runs; the lazy lookup only guards a host that exposes it later.
+        const conversation =
+          ctx.uiConversation ?? (typeof ctx.get === "function" ? ctx.get("uiConversation") : undefined);
         if (conversation?.events !== undefined) {
           ctx.effect(() => {
             const dispose = conversation.events.register(showaiPageDefinition);
