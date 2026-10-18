@@ -89,6 +89,8 @@ for (const name of [
   "@tiptap/react",
   "@tiptap/pm",
   "@tiptap/starter-kit",
+  "@tiptap/extension-code-block-lowlight",
+  "lowlight",
   "@tiptap/extension-placeholder",
   "@tiptap/extension-image",
   "@tiptap/extension-table",

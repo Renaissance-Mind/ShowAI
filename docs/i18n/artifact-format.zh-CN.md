@@ -64,10 +64,12 @@ v3 用可递归嵌套的原生 Page 与 Board 保存内容。Page 按阅读顺�
 | listItem / taskItem                        | 首项为段落，可含后续区块；taskItem 有 checked        |
 | taskList                                   | taskItem 列表                                        |
 | blockquote / callout / toggle              | 嵌套区块；callout 有 icon/tone，toggle 有 title/open |
-| codeBlock                                  | 纯文本，可设 language                                |
+| codeBlock                                  | 纯文本，可设 language；编辑与阅读时按语言显示语法高亮     |
 | horizontalRule / image                     | 无子内容；image 有 src/alt/title 和可选尺寸          |
 | table / tableRow / tableCell / tableHeader | 表格行与单元格；支持 colspan/rowspan/colwidth/align  |
 | widget                                     | 无子节点，使用 attrs.kind 与 attrs.data              |
+
+代码块使用 Lowlight 的常用语言语法，覆盖 JavaScript、TypeScript、Python、JSON、SQL、Bash、HTML/XML、CSS 等。支持 `js`、`py`、`html` 等别名，忽略大小写；未设置、未知语言和 `plaintext` 按纯文本显示。语法高亮只影响显示，保存的代码仍是未格式化的原文，导出页面也遵循这一规则。
 
 文本 marks 包括 bold、italic、underline、strike、code、highlight、link 与支持的 textStyle。链接允许 HTTP(S)、mailto、tel 或锚点；highlight 可指定 color 和 lower/full 模式。拒绝 JavaScript URL 与任意 HTML。
 

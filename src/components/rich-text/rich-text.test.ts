@@ -229,6 +229,7 @@ describe("shared rich-text component", () => {
       content: { type: "doc", content: [{ type: "paragraph", content: [] }] },
     });
     expect(compiled.inline!.script).toContain("rich-text-component");
-    expect(compiled.inline!.script.length).toBeLessThan(2000000);
+    // The shared common-language highlighter adds ~173 KB minified to the SDK.
+    expect(compiled.inline!.script.length).toBeLessThan(2200000);
   }, 60000);
 });
