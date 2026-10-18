@@ -9,7 +9,7 @@ export interface RemoteActor {
 export interface AgentDestination {
   id: string;
   name: string;
-  kind: "cloud" | "mac";
+  kind: "cloud" | "mac" | "device";
   online: boolean;
   projectIds?: string[];
 }

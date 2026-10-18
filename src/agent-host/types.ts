@@ -121,7 +121,7 @@ export interface AgentConversationSummary {
   running: boolean;
 }
 export interface AgentHostStatus {
-  executionKind?: "cloud" | "mac";
+  executionKind?: "cloud" | "mac" | "device";
   settings: AgentSettings;
   agents: LocalAgent[];
   runtime: RuntimeStatus;

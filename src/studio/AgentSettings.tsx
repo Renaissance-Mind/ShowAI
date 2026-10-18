@@ -301,6 +301,7 @@ export default function AgentSettings() {
         )}
       </div>
     );
+  const deviceExecution = remoteExecution() && status.executionKind === "device";
   const cloudExecution = remoteExecution() && status.executionKind === "cloud";
   if (remoteExecution() && status.executionKind === "mac")
     return (
@@ -346,7 +347,7 @@ export default function AgentSettings() {
               disabled={
                 busy ||
                 (remoteExecution() &&
-                  status.executionKind === "cloud" &&
+                  (cloudExecution || deviceExecution) &&
                   mode.id === "local")
               }
               onClick={(event) => {
@@ -530,7 +531,7 @@ export default function AgentSettings() {
               {sourcePresets
                 .filter(
                   (preset) =>
-                    !cloudExecution || preset.credential !== "chatgpt",
+                    deviceExecution ? preset.provider === "deepseek" : !cloudExecution || preset.credential !== "chatgpt",
                 )
                 .map((preset) => (
                   <button
@@ -559,11 +560,11 @@ export default function AgentSettings() {
             {cloudExecution && (
               <p className="settings-help">{t("cloudChatgptHelp")}</p>
             )}
-            <ServerResources
+            {!deviceExecution && <ServerResources
               selected={selected}
               disabled={busy || !!hasRunning}
               update={update}
-            />
+            />}
             {editing && (
               <form
                 className="agent-source-form"
@@ -783,7 +784,7 @@ export default function AgentSettings() {
                 </button>
                 <button
                   className="settings-button agent-remove"
-                  disabled={busy || hasRunning}
+                  disabled={busy || hasRunning || (deviceExecution && !!selected.hosted)}
                   onClick={action(async () => {
                     update(
                       await desktop.invoke("agent:removeSource", {
