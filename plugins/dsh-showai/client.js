@@ -439,7 +439,7 @@ window.__ModuleLoader__.load({
         }
         return null;
       },
-      start: () => ({ calls: new Map(), pages: [] }),
+      start: (_context, match) => ({ turn: match.event.data.turn, calls: new Map(), pages: [] }),
       update: (context, match) => {
         if (match.event.type === "tool/call") {
           const calls = new Map(context.state.calls);
@@ -456,6 +456,25 @@ window.__ModuleLoader__.load({
         const pages = context.state.pages.filter((page) => page.callId !== callId);
         pages.push({ callId, title: presentation.title, seq: match.event.seq });
         return { ...context.state, pages };
+      },
+      // Publish the Turn's pages as Location data; without this the Turn tail
+      // cannot read them back. Identity is kept when nothing changed.
+      buildLocationData: (context, scope, previous) => {
+        if (scope !== "turn" || context.state === undefined) return null;
+        if (
+          previous?.kind === "turn" &&
+          previous.turn === context.state.turn &&
+          previous.key === "showai-page" &&
+          previous.value.pages === context.state.pages
+        ) {
+          return previous;
+        }
+        return {
+          kind: "turn",
+          turn: context.state.turn,
+          key: "showai-page",
+          value: { pages: context.state.pages },
+        };
       },
     };
 

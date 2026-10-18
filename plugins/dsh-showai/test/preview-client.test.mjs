@@ -141,7 +141,9 @@ test("the Turn tail keeps a presented page outside the folded process", async ()
   const definition = definitions[0];
   assert.equal(definition.kind, "showai-page");
 
-  let context = { state: definition.start() };
+  let context = {
+    state: definition.start(undefined, { event: { type: "turn/start", seq: 1, data: { turn: 7 } } }),
+  };
   const feed = (event) => {
     context = { state: definition.update(context, { event }) };
   };
@@ -185,7 +187,18 @@ test("the Turn tail keeps a presented page outside the folded process", async ()
   });
   assert.equal(context.state.pages.length, 1);
 
-  const turn = { data: new Map([["showai-page", context.state]]) };
+  const published = definition.buildLocationData({ kind: definition.kind, state: context.state }, "turn");
+  assert.equal(published.kind, "turn");
+  assert.equal(published.turn, 7);
+  assert.equal(published.key, "showai-page");
+  assert.equal(published.value.pages.length, 1);
+  assert.equal(definition.buildLocationData({ kind: definition.kind, state: context.state }, "step"), null);
+  assert.equal(
+    definition.buildLocationData({ kind: definition.kind, state: context.state }, "turn", published),
+    published,
+  );
+
+  const turn = { data: new Map([["showai-page", { pages: context.state.pages }]]) };
   const markup = renderToStaticMarkup(React.createElement(tail, { turn, seq: 9, t: (key) => key }));
   assert.match(markup, /showai-page-tail/);
   assert.match(markup, /showai-page-preview\/call_weather\.html/);
