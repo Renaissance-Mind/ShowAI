@@ -82,7 +82,6 @@ export default function ConflictDiff({
               original: left,
               mergeControls: false,
               gutter: false,
-              collapseUnchanged: { margin: 3, minSize: 8 },
               diffConfig: { scanLimit: 1000, timeout: 100 },
             }),
           ],
@@ -92,7 +91,6 @@ export default function ConflictDiff({
           a: { doc: left, extensions: extensions(leftLabel) },
           b: { doc: right, extensions: extensions(rightLabel) },
           gutter: false,
-          collapseUnchanged: { margin: 3, minSize: 8 },
           diffConfig: { scanLimit: 1000, timeout: 100 },
         });
     return () => view.destroy();

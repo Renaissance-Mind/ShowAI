@@ -32,8 +32,10 @@ function readable(node: JSONContent): string {
 }
 export default function ConflictPagePreview({
   value,
+  expandContent = false,
 }: {
   value: ShowDocument | string | null;
+  expandContent?: boolean;
 }) {
   const t = useTranslator(recoveryMessages);
   const tc = useTranslator(commonMessages);
@@ -64,12 +66,21 @@ export default function ConflictPagePreview({
       ) : (
         <p>{invalid ? t("invalidFile") : t("pageMissing")}</p>
       )}
-      <details>
-        <summary>{t("viewRawData")}</summary>
-        <pre style={{ maxHeight: 320, overflow: "auto" }}>
-          {typeof value === "string" ? value : JSON.stringify(value, null, 2)}
-        </pre>
-      </details>
+      {expandContent ? (
+        <section className="conflict-raw-data">
+          <h4>{t("rawData")}</h4>
+          <pre style={{ maxHeight: 320, overflow: "auto" }}>
+            {typeof value === "string" ? value : JSON.stringify(value, null, 2)}
+          </pre>
+        </section>
+      ) : (
+        <details>
+          <summary>{t("viewRawData")}</summary>
+          <pre style={{ maxHeight: 320, overflow: "auto" }}>
+            {typeof value === "string" ? value : JSON.stringify(value, null, 2)}
+          </pre>
+        </details>
+      )}
     </section>
   );
 }

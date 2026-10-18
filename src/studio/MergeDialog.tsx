@@ -57,7 +57,6 @@ export default function MergeDialog({
   const [choices, setChoices] = useState<MergeChoices>({});
   const [activePath, setActivePath] = useState("");
   const [tab, setTab] = useState<"conflicts" | "result">("conflicts");
-  const [raw, setRaw] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
@@ -153,7 +152,6 @@ export default function MergeDialog({
   const select = (path: string) => {
     setActivePath(path);
     setTab("conflicts");
-    setRaw(false);
     detail.current?.scrollTo(0, 0);
   };
   function choose(side: "ours" | "theirs") {
@@ -195,7 +193,7 @@ export default function MergeDialog({
   const rightText = conflictText(conflict?.theirs);
   const readable =
     leftText !== null && rightText !== null && leftText !== rightText;
-  const usingRaw = raw || !readable;
+  const usingRaw = !readable;
   return (
     <Dialog
       title={t("resolveChanges")}
@@ -388,24 +386,15 @@ export default function MergeDialog({
                     <span>
                       {t(usingRaw ? "structuredComparison" : "textComparison")}
                     </span>
-                    {readable && (
-                      <button
-                        className="studio-text-button"
-                        aria-pressed={raw}
-                        onClick={() => setRaw(!raw)}
-                      >
-                        {t(raw ? "showReadableContent" : "viewRawData")}
-                      </button>
-                    )}
                   </div>
-                  <details className="conflict-base" key={conflict.path}>
-                    <summary>{t("showBase")}</summary>
+                  <section className="conflict-base" key={conflict.path}>
+                    <h4>{t("commonVersion")}</h4>
                     <pre>
                       {conflictText(conflict.base) ?? rawText(conflict.base)}
                     </pre>
-                  </details>
-                  <details className="conflict-technical">
-                    <summary>{t("technicalDetails")}</summary>
+                  </section>
+                  <section className="conflict-technical">
+                    <h4>{t("technicalDetails")}</h4>
                     <code>{conflict.path}</code>
                     {conflict.reason && <p>{conflict.reason}</p>}
                     <div className="history-conflict-values">
@@ -416,7 +405,7 @@ export default function MergeDialog({
                         </div>
                       ))}
                     </div>
-                  </details>
+                  </section>
                 </>
               ) : (
                 <>
@@ -434,14 +423,17 @@ export default function MergeDialog({
                     {remaining ? t("previewPendingHelp") : t("mergeReadyHelp")}
                   </p>
                   <div className="conflict-page-preview">
-                    <ConflictPagePreview value={result.document} />
+                    <ConflictPagePreview
+                      value={result.document}
+                      expandContent
+                    />
                   </div>
-                  <details className="conflict-base">
-                    <summary>
+                  <section className="conflict-base">
+                    <h4>
                       {t("otherChanges", { count: preview.changes.length })}
-                    </summary>
-                    <ChangeList changes={preview.changes} />
-                  </details>
+                    </h4>
+                    <ChangeList changes={preview.changes} expandContent />
+                  </section>
                 </>
               )}
             </section>

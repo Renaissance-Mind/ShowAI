@@ -3,6 +3,9 @@ import { defineMessages } from "../index";
 // Conflict, merge and external-change recovery dialogs, plus library search results.
 export default defineMessages("recovery", {
   "zh-CN": {
+    commonVersion: "修改前的共同版本",
+    rawData: "原始数据",
+    blockContent: "区块内容",
     refreshComparison: "重新获取最新版本",
     resolveChanges: "合并页面修改",
     draftPreserved: "草稿已保留",
@@ -37,7 +40,7 @@ export default defineMessages("recovery", {
     previewPending: "预览尚未完成",
     previewPendingHelp: "部分冲突还未选择版本，以下为当前合并预览。",
     mergeReadyHelp: "已保留你的选择和互不冲突的修改，检查后即可保存。",
-    otherChanges: "查看合并中的其他变化（{count} 项）",
+    otherChanges: "合并中的其他变化（{count} 项）",
     discardDraft: "放弃草稿",
     continueInPage: "在页面中编辑",
     allChangesResolved: "全部冲突已处理",
@@ -144,6 +147,9 @@ export default defineMessages("recovery", {
     viewRawData: "查看原始页面数据",
   },
   en: {
+    commonVersion: "Common version before changes",
+    rawData: "Raw data",
+    blockContent: "Block content",
     refreshComparison: "Refresh comparison",
     resolveChanges: "Merge page changes",
     draftPreserved: "Draft retained",

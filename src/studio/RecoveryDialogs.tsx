@@ -100,7 +100,13 @@ function time(value: string) {
     second: "2-digit",
   }).format(new Date(value));
 }
-function Value({ value }: { value: unknown }) {
+function Value({
+  value,
+  expandContent = false,
+}: {
+  value: unknown;
+  expandContent?: boolean;
+}) {
   const t = useTranslator(recoveryMessages);
   if (typeof value === "string" && /^data:image\//.test(value))
     return (
@@ -114,6 +120,7 @@ function Value({ value }: { value: unknown }) {
     return <span className="history-empty-value">{t("notSet")}</span>;
   const text =
     typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  if (expandContent) return <pre>{text}</pre>;
   return (
     <>
       <pre>{text.length > 8000 ? text.slice(0, 8000) + "\n…" : text}</pre>
@@ -144,7 +151,13 @@ const fieldNames: Record<string, MessageKey<typeof recoveryMessages>> = {
   content: "field.content",
   type: "field.type",
 };
-export function ChangeList({ changes }: { changes: PageChange[] }) {
+export function ChangeList({
+  changes,
+  expandContent = false,
+}: {
+  changes: PageChange[];
+  expandContent?: boolean;
+}) {
   const t = useTranslator(recoveryMessages);
   return (
     <div className="history-change-list">
@@ -170,11 +183,17 @@ export function ChangeList({ changes }: { changes: PageChange[] }) {
                   <div className="history-value-pair">
                     <div className="before">
                       <small>{t("before")}</small>
-                      <Value value={field.before} />
+                      <Value
+                        value={field.before}
+                        expandContent={expandContent}
+                      />
                     </div>
                     <div className="after">
                       <small>{t("after")}</small>
-                      <Value value={field.after} />
+                      <Value
+                        value={field.after}
+                        expandContent={expandContent}
+                      />
                     </div>
                   </div>
                 </div>
@@ -196,6 +215,11 @@ export function ChangeList({ changes }: { changes: PageChange[] }) {
                       })
                     : t("movedToRootStart")}
               </p>
+            ) : expandContent ? (
+              <section>
+                <h4>{t("blockContent")}</h4>
+                <Value value={change.node} expandContent />
+              </section>
             ) : (
               <details>
                 <summary>{t("viewBlockContent")}</summary>

@@ -349,10 +349,13 @@
   padding: 16px 0;
   font-size: 12px;
 }
-.conflict-base > summary,
-.conflict-technical > summary {
+.conflict-base > h4,
+.conflict-technical > h4,
+.conflict-raw-data > h4 {
   color: var(--muted);
-  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0 0 12px;
 }
 .conflict-base > pre,
 .conflict-technical pre {
@@ -412,8 +415,7 @@
   color: var(--muted);
   font-size: 11px;
 }
-.conflict-workspace button:focus-visible,
-.conflict-workspace summary:focus-visible {
+.conflict-workspace button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
