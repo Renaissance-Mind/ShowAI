@@ -5,6 +5,7 @@ import { Extension, mergeAttributes, Node, Mark } from "@tiptap/core";
 import { ReactNodeViewRenderer } from "@tiptap/react";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import StarterKit from "@tiptap/starter-kit";
+import { HighlightedCodeBlock } from "./code-block";
 import Placeholder from "@tiptap/extension-placeholder";
 import Image from "@tiptap/extension-image";
 import { TableKit, TableView } from "@tiptap/extension-table";
@@ -313,8 +314,9 @@ export function createExtensions(
         openOnClick: options.readOnly ?? false,
         HTMLAttributes: { rel: "noopener noreferrer", target: "_blank" },
       },
-      codeBlock: { HTMLAttributes: { class: "code-block" } },
+      codeBlock: false,
     }),
+    HighlightedCodeBlock,
     Placeholder.configure({
       placeholder: ({ node }) =>
         node.type.name === "heading"

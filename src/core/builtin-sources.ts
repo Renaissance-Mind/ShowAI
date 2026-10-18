@@ -13,6 +13,10 @@ import richTextEditor from "../components/rich-text/RichTextEditor.tsx?raw";
 import richTextFormatControls from "../components/rich-text/FormatControls.tsx?raw";
 import richTextFormatCss from "../components/rich-text/format-controls.css?raw";
 import richTextView from "../components/rich-text/RichTextView.tsx?raw";
+import highlightedCode from "../components/rich-text/HighlightedCode.tsx?raw";
+import codeHighlighting from "../components/rich-text/code-highlighting.ts?raw";
+import codeHighlightingCss from "../components/rich-text/code-highlighting.css?raw";
+import codeBlock from "../components/rich-text/code-block.ts?raw";
 import richTextTableControls from "../components/rich-text/TableControls.tsx?raw";
 import richTextTableActions from "../components/rich-text/TableSelectionActions.tsx?raw";
 import richTextCss from "../components/rich-text/editor.css?raw";
@@ -167,6 +171,10 @@ const sources: Record<string, string> = {
   "rich-text/FormatControls.tsx": richTextFormatControls,
   "rich-text/format-controls.css": richTextFormatCss,
   "rich-text/RichTextView.tsx": richTextView,
+  "rich-text/HighlightedCode.tsx": highlightedCode,
+  "rich-text/code-highlighting.ts": codeHighlighting,
+  "rich-text/code-highlighting.css": codeHighlightingCss,
+  "rich-text/code-block.ts": codeBlock,
   "rich-text/TableControls.tsx": richTextTableControls,
   "rich-text/TableSelectionActions.tsx": richTextTableActions,
   "rich-text/editor.css": richTextCss,

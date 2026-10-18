@@ -70,7 +70,7 @@ Content follows the editor's JSON tree. Every block uses `{type, attrs?, content
 | `taskList`                  | `taskItem` children                                                                                       |
 | `taskItem`                  | Begins with a paragraph; `attrs.checked` is boolean                                                       |
 | `blockquote`                | One or more blocks                                                                                        |
-| `codeBlock`                 | Plain text nodes, optional `attrs.language`                                                               |
+| `codeBlock`                 | Plain text nodes; optional `attrs.language` selects syntax highlighting in both editing and reading        |
 | `horizontalRule`            | No content                                                                                                |
 | `image`                     | No content; `attrs.src`, `alt`, `title`; optional numeric width/height                                    |
 | `table`                     | One or more `tableRow` nodes                                                                              |
@@ -79,6 +79,8 @@ Content follows the editor's JSON tree. Every block uses `{type, attrs?, content
 | `callout`                   | One or more blocks; `attrs.icon`, `attrs.tone` (`sage`, `sand`, `blue`, `rose`)                           |
 | `toggle`                    | One or more blocks; `attrs.title`, `attrs.open`                                                           |
 | `widget`                    | No content; `attrs.kind` and `attrs.data`                                                                 |
+
+Code blocks use Lowlight's common language grammars, including JavaScript, TypeScript, Python, JSON, SQL, Bash, HTML/XML and CSS. Language aliases such as `js`, `py` and `html` are supported, ignoring case. Missing, unknown and `plaintext` languages render as plain text. Highlighting is display-only: stored code remains unformatted text, including in exported pages.
 
 Text marks are `bold`, `italic`, `underline`, `strike`, `code`, `highlight`, and `link`. A link has `attrs.href` with an HTTP(S), `mailto:`, `tel:`, or anchor URL; a highlight can use `attrs.color` and `attrs.mode` (`lower` or `full`). `textStyle` carries supported text styling such as color. JavaScript URLs and arbitrary HTML are rejected.
 

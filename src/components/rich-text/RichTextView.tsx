@@ -1,5 +1,6 @@
 import "../blocks/katex.css";
 import { ImageContent } from "./ImageContent";
+import { HighlightedCode } from "./HighlightedCode";
 import { normalizeContentTree } from "./model.mjs";
 import { richTextStyle } from "./model.mjs";
 import { createElement, type CSSProperties, type ReactNode } from "react";
@@ -210,13 +211,18 @@ export function RichTextNode({
       );
     case "codeBlock":
       return (
-        <pre {...props}>
+        <pre {...props} className="code-block">
           <code
             className={
               attrs.language ? `language-${attrs.language}` : undefined
             }
           >
-            {children}
+            <HighlightedCode
+              code={(node.content ?? [])
+                .map((child) => child.text ?? "")
+                .join("")}
+              language={attrs.language}
+            />
           </code>
         </pre>
       );

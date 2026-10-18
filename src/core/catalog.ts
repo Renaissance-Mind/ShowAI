@@ -1625,6 +1625,8 @@ async function compilePackage(
     "@tiptap/react",
     "@tiptap/pm",
     "@tiptap/starter-kit",
+    "@tiptap/extension-code-block-lowlight",
+    "lowlight",
     "@tiptap/extension-placeholder",
     "@tiptap/extension-image",
     "@tiptap/extension-table",
@@ -1838,6 +1840,7 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
           (sdkImport &&
             [
               "react-dom",
+              "lowlight",
               "marked",
               "katex",
               "pdfjs-dist",

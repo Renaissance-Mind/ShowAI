@@ -2,6 +2,11 @@ import { useState } from "react";
 import type { Editor } from "@tiptap/core";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/primitives";
+import {
+  codeLanguages,
+  normalizeCodeLanguage,
+  supportsCodeLanguage,
+} from "./code-highlighting";
 
 /** Component-specific fields join the existing block menu and its lifecycle. */
 export function ContentNodeActions({
@@ -94,7 +99,32 @@ export function ContentNodeActions({
         field("title", t("title"))}
       {type === "codeBlock" && (
         <>
-          {field("language", t("language"))}
+          <label>
+            {t("language")}
+            <select
+              value={normalizeCodeLanguage(node.attrs.language)}
+              onChange={(event) => update("language", event.target.value)}
+            >
+              <option value="plaintext">{t("plainText")}</option>
+              {!codeLanguages.includes(
+                normalizeCodeLanguage(node.attrs.language),
+              ) && (
+                <option value={normalizeCodeLanguage(node.attrs.language)}>
+                  {node.attrs.language}
+                  {supportsCodeLanguage(node.attrs.language)
+                    ? ""
+                    : ` (${t("plainText")})`}
+                </option>
+              )}
+              {codeLanguages
+                .filter((language) => language !== "plaintext")
+                .map((language) => (
+                  <option key={language} value={language}>
+                    {language}
+                  </option>
+                ))}
+            </select>
+          </label>
           <button
             onClick={() => {
               navigator.clipboard
