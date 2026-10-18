@@ -7,13 +7,12 @@ import {
   type MouseEvent,
 } from "react";
 import type { LibraryMenuPoint } from "./LibraryNavigation";
-import { ArrowRight, Loader2, FileText } from "../ui/icons";
+import { ArrowRight, FileText } from "../ui/icons";
 import Dialog from "./Dialog";
 import ConflictPagePreview from "./ConflictPagePreview";
 import { desktop, errorMessage } from "./bridge";
 import type { PageChange } from "../core/model";
 import type { SearchResult } from "../core/library-index";
-import type { PageMergePreview } from "../core/page-merge";
 import type { ShowDocument } from "../types";
 import "./recovery.css";
 import { getLocale, type MessageKey } from "../i18n";
@@ -101,7 +100,13 @@ function time(value: string) {
     second: "2-digit",
   }).format(new Date(value));
 }
-function Value({ value }: { value: unknown }) {
+function Value({
+  value,
+  expandContent = false,
+}: {
+  value: unknown;
+  expandContent?: boolean;
+}) {
   const t = useTranslator(recoveryMessages);
   if (typeof value === "string" && /^data:image\//.test(value))
     return (
@@ -115,6 +120,7 @@ function Value({ value }: { value: unknown }) {
     return <span className="history-empty-value">{t("notSet")}</span>;
   const text =
     typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  if (expandContent) return <pre>{text}</pre>;
   return (
     <>
       <pre>{text.length > 8000 ? text.slice(0, 8000) + "\n…" : text}</pre>
@@ -145,7 +151,13 @@ const fieldNames: Record<string, MessageKey<typeof recoveryMessages>> = {
   content: "field.content",
   type: "field.type",
 };
-export function ChangeList({ changes }: { changes: PageChange[] }) {
+export function ChangeList({
+  changes,
+  expandContent = false,
+}: {
+  changes: PageChange[];
+  expandContent?: boolean;
+}) {
   const t = useTranslator(recoveryMessages);
   return (
     <div className="history-change-list">
@@ -171,11 +183,17 @@ export function ChangeList({ changes }: { changes: PageChange[] }) {
                   <div className="history-value-pair">
                     <div className="before">
                       <small>{t("before")}</small>
-                      <Value value={field.before} />
+                      <Value
+                        value={field.before}
+                        expandContent={expandContent}
+                      />
                     </div>
                     <div className="after">
                       <small>{t("after")}</small>
-                      <Value value={field.after} />
+                      <Value
+                        value={field.after}
+                        expandContent={expandContent}
+                      />
                     </div>
                   </div>
                 </div>
@@ -197,6 +215,11 @@ export function ChangeList({ changes }: { changes: PageChange[] }) {
                       })
                     : t("movedToRootStart")}
               </p>
+            ) : expandContent ? (
+              <section>
+                <h4>{t("blockContent")}</h4>
+                <Value value={change.node} expandContent />
+              </section>
             ) : (
               <details>
                 <summary>{t("viewBlockContent")}</summary>
@@ -392,201 +415,6 @@ export function LibrarySearchResults({
   );
 }
 
-export function MergeDialog({
-  projectId,
-  pageId,
-  baseRevision,
-  document,
-  onClose,
-  onMerged,
-  saveFailure = false,
-  onEdit,
-  onDiscard,
-}: {
-  projectId: string;
-  pageId: string;
-  baseRevision: string;
-  document: ShowDocument;
-  onClose: () => void;
-  onMerged: () => Promise<void>;
-  saveFailure?: boolean;
-  onEdit?: (
-    document: ShowDocument,
-    currentRevision: string,
-    currentHash: string,
-  ) => void;
-  onDiscard?: () => Promise<void>;
-}) {
-  const t = useTranslator(recoveryMessages);
-  const [reviewed, setReviewed] = useState(false);
-  const [preview, setPreview] = useState<
-      | (PageMergePreview & { currentRevision: string; currentHash: string })
-      | null
-    >(null),
-    [resolved, setResolved] = useState(""),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  useEffect(() => {
-    let active = true;
-    void desktop
-      .invoke<
-        PageMergePreview & { currentRevision: string; currentHash: string }
-      >("page:mergePreview", { projectId, pageId, baseRevision, document })
-      .then(
-        (value) => {
-          if (active) {
-            setPreview(value);
-            setResolved(JSON.stringify(value.document, null, 2));
-          }
-        },
-        (reason) => {
-          if (active) setError(errorMessage(reason));
-        },
-      );
-    return () => {
-      active = false;
-    };
-  }, [projectId, pageId, baseRevision, document]);
-  async function save() {
-    if (!preview) return;
-    setBusy(true);
-    setError("");
-    try {
-      await desktop.invoke("page:mergeSave", {
-        projectId,
-        pageId,
-        baseRevision,
-        currentRevision: preview.currentRevision,
-        document: JSON.parse(resolved),
-      });
-      await onMerged();
-      onClose();
-    } catch (reason) {
-      setError(errorMessage(reason));
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <Dialog
-      title={saveFailure ? t("saveFailedResolve") : t("compareAndMergeDraft")}
-      dismissible={!saveFailure}
-      onClose={onClose}
-      wide
-      className="history-merge-dialog"
-    >
-      {error && (
-        <p className="history-error" role="alert">
-          {error}
-        </p>
-      )}
-      {preview ? (
-        <>
-          <p className="history-merge-summary">
-            {preview.conflicts.length
-              ? t("conflictsToResolve", { count: preview.conflicts.length })
-              : t("autoMergeable")}
-          </p>
-          <ChangeList changes={preview.changes} />
-          {preview.conflicts.map((conflict, index) => (
-            <section className="history-change" key={index}>
-              <header>
-                <strong>{t("conflictNumber", { number: index + 1 })}</strong>
-                <code>{conflict.path}</code>
-              </header>
-              <div className="history-conflict-values">
-                {(["base", "ours", "theirs"] as const).map((side) => (
-                  <div key={side}>
-                    <small>{t(`side.${side}`)}</small>
-                    <Value value={conflict[side]} />
-                  </div>
-                ))}
-              </div>
-            </section>
-          ))}
-          <details open={!saveFailure && preview.conflicts.length > 0}>
-            <summary>{t("reviewMergedData")}</summary>
-            <textarea
-              className="history-resolution"
-              aria-label={t("mergedData")}
-              value={resolved}
-              onChange={(event) => setResolved(event.target.value)}
-              spellCheck={false}
-            />
-          </details>
-          {!!preview.conflicts.length && (
-            <label className="history-review-confirm">
-              <input
-                type="checkbox"
-                checked={reviewed}
-                onChange={(event) => setReviewed(event.target.checked)}
-              />
-              {t("confirmResolved")}
-            </label>
-          )}
-          <footer className="history-footer">
-            {saveFailure && onEdit && (
-              <button
-                className="studio-button primary"
-                disabled={busy}
-                onClick={() => {
-                  onEdit(
-                    JSON.parse(resolved),
-                    preview.currentRevision,
-                    preview.currentHash,
-                  );
-                  onClose();
-                }}
-              >
-                {t("editAndResave")}
-              </button>
-            )}
-            {saveFailure && onDiscard && (
-              <button
-                className="studio-button"
-                disabled={busy}
-                onClick={() =>
-                  void onDiscard()
-                    .then(onClose)
-                    .catch((reason) => setError(errorMessage(reason)))
-                }
-              >
-                {t("discardAndLoad")}
-              </button>
-            )}
-            <button
-              className="studio-button primary"
-              disabled={busy || (!!preview.conflicts.length && !reviewed)}
-              onClick={() => void save()}
-            >
-              {t("saveMerged")}
-            </button>
-            {!saveFailure && (
-              <button className="studio-button" onClick={onClose}>
-                {t("keepDraftAndReturn")}
-              </button>
-            )}
-          </footer>
-        </>
-      ) : error && saveFailure && onDiscard ? (
-        <button
-          className="studio-button"
-          disabled={busy}
-          onClick={() =>
-            void onDiscard()
-              .then(onClose)
-              .catch((reason) => setError(errorMessage(reason)))
-          }
-        >
-          {t("discardAndLoad")}
-        </button>
-      ) : (
-        <Loader2 className="studio-spin" />
-      )}
-    </Dialog>
-  );
-}
-
 export function ExternalConflictDialog({
   id,
   onClose,
@@ -704,114 +532,118 @@ export function ExternalConflictDialog({
       wide
       className="history-external-dialog"
     >
-      <p className="history-merge-summary">{t("externalKeptIntro")}</p>
-      {error && (
-        <p className="history-error" role="alert">
-          {error}
-        </p>
-      )}
-      {detail && (
-        <>
-          <nav className="history-tabs">
-            <button
-              aria-pressed={tab === "compare"}
-              onClick={() => setTab("compare")}
-            >
-              {t("viewVersions")}
-            </button>
-            <button
-              aria-pressed={tab === "merge"}
-              onClick={() => setTab("merge")}
-              disabled={packageConflict}
-            >
-              {t("editMergeResult")}
-            </button>
-          </nav>
-          {tab === "compare" && saveFailure && draftDocument ? (
-            <div className="history-conflict-values">
-              <div>
-                <h3>{t("myUnsavedChanges")}</h3>
-                <ConflictPagePreview value={draftDocument} />
-              </div>
-              <div>
-                <h3>{t("currentFileVersion")}</h3>
-                <ConflictPagePreview value={detail.external} />
-              </div>
-            </div>
-          ) : tab === "compare" ? (
-            <div className="history-conflict-values">
-              {draftDocument && (
-                <div>
-                  <h3>{t("unsavedAppDraft")}</h3>
-                  <Value value={draftDocument} />
-                </div>
-              )}
-              <div>
-                <h3>{t("originalBase")}</h3>
-                <Value value={detail.baseline} />
-              </div>
-              <div>
-                <h3>{t("savedVersion")}</h3>
-                <Value value={detail.current} />
-              </div>
-              <div>
-                <h3>{t("externalVersion")}</h3>
-                <Value value={detail.external} />
-              </div>
-            </div>
-          ) : (
-            <textarea
-              aria-label={t("externalMergeResult")}
-              className="history-resolution"
-              value={resolved}
-              onChange={(event) => setResolved(event.target.value)}
-              spellCheck={false}
-            />
-          )}
-          <footer className="history-footer">
-            {saveFailure && draftDocument && onEdit && (
+      <div className="history-conflict-body">
+        <p className="history-merge-summary">{t("externalKeptIntro")}</p>
+        {error && (
+          <p className="history-error" role="alert">
+            {error}
+          </p>
+        )}
+        {detail && (
+          <>
+            <nav className="history-tabs">
               <button
-                className="studio-button primary"
-                disabled={busy || packageConflict}
-                onClick={() => {
-                  onEdit(JSON.parse(resolved));
-                  onClose();
-                }}
+                aria-pressed={tab === "compare"}
+                onClick={() => setTab("compare")}
               >
-                {t("editAndResave")}
+                {t("viewVersions")}
               </button>
+              <button
+                aria-pressed={tab === "merge"}
+                onClick={() => setTab("merge")}
+                disabled={packageConflict}
+              >
+                {t("editMergeResult")}
+              </button>
+            </nav>
+            {tab === "compare" && saveFailure && draftDocument ? (
+              <div className="history-conflict-values">
+                <div>
+                  <h3>{t("myUnsavedChanges")}</h3>
+                  <ConflictPagePreview value={draftDocument} />
+                </div>
+                <div>
+                  <h3>{t("currentFileVersion")}</h3>
+                  <ConflictPagePreview value={detail.external} />
+                </div>
+              </div>
+            ) : tab === "compare" ? (
+              <div className="history-conflict-values">
+                {draftDocument && (
+                  <div>
+                    <h3>{t("unsavedAppDraft")}</h3>
+                    <Value value={draftDocument} />
+                  </div>
+                )}
+                <div>
+                  <h3>{t("originalBase")}</h3>
+                  <Value value={detail.baseline} />
+                </div>
+                <div>
+                  <h3>{t("savedVersion")}</h3>
+                  <Value value={detail.current} />
+                </div>
+                <div>
+                  <h3>{t("externalVersion")}</h3>
+                  <Value value={detail.external} />
+                </div>
+              </div>
+            ) : (
+              <textarea
+                aria-label={t("externalMergeResult")}
+                className="history-resolution"
+                value={resolved}
+                onChange={(event) => setResolved(event.target.value)}
+                spellCheck={false}
+              />
             )}
+          </>
+        )}
+      </div>
+      {detail && (
+        <footer className="history-footer">
+          {saveFailure && draftDocument && onEdit && (
             <button
               className="studio-button primary"
-              disabled={busy}
-              onClick={() =>
-                packageConflict
-                  ? void recoverPackage()
-                  : void choose(tab === "merge" ? "merge" : "import")
-              }
+              disabled={busy || packageConflict}
+              onClick={() => {
+                onEdit(JSON.parse(resolved));
+                onClose();
+              }}
             >
-              {packageConflict
-                ? t("keepAsEditDraft")
-                : tab === "merge"
-                  ? t("saveMergeResult")
-                  : saveFailure
-                    ? t("discardMineUseFile")
-                    : t("importExternal")}
+              {t("editAndResave")}
             </button>
-            <button
-              className="studio-button"
-              disabled={busy}
-              onClick={() => void choose("discard")}
-            >
-              {t("useSavedVersion")}
+          )}
+          <button
+            className="studio-button primary"
+            disabled={busy}
+            onClick={() =>
+              packageConflict
+                ? void recoverPackage()
+                : void choose(tab === "merge" ? "merge" : "import")
+            }
+          >
+            {packageConflict
+              ? t("keepAsEditDraft")
+              : tab === "merge"
+                ? t("saveMergeResult")
+                : saveFailure
+                  ? t("discardMineUseFile")
+                  : t("importExternal")}
+          </button>
+          <button
+            className="studio-button"
+            disabled={busy}
+            onClick={() => void choose("discard")}
+          >
+            {t("useSavedVersion")}
+          </button>
+          {!saveFailure && (
+            <button className="studio-text-button" onClick={onClose}>
+              {t("later")}
             </button>
-            {!saveFailure && (
-              <button className="studio-text-button" onClick={onClose}>
-                {t("later")}
-              </button>
-            )}
-          </footer>
-        </>
+          )}
+        </footer>
       )}
     </Dialog>
   );

@@ -731,6 +731,8 @@ export class LibraryOperations {
     const draft = validateDocument(input.document);
     return {
       ...previewPageMerge(baseline, draft, current.document),
+      baseDocument: baseline,
+      currentDocument: current.document,
       baseRevision: input.baseRevision,
       currentRevision: current.revision,
       currentHash: current.hash,

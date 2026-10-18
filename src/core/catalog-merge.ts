@@ -184,12 +184,15 @@ export function rebaseHistoryText(
   return cells.map((cell) => cell.value).join("");
 }
 
+export type MergeChoices = Readonly<Record<string, "ours" | "theirs">>;
+
 /** Missing keys, deletions, and array changes remain distinct from null. */
 export function mergeValues(
   base: unknown,
   ours: unknown,
   theirs: unknown,
   path = "",
+  choices: MergeChoices = {},
 ): { value: unknown; conflicts: MergeConflict[] } {
   if (equal(ours, theirs) || equal(theirs, base))
     return { value: structuredClone(ours), conflicts: [] };
@@ -209,6 +212,7 @@ export function mergeValues(
         ours[key],
         theirs[key],
         `${path}/${key.replaceAll("~", "~0").replaceAll("/", "~1")}`,
+        choices,
       );
       if (merged.value !== undefined) value[key] = merged.value;
       conflicts.push(...merged.conflicts);
@@ -226,6 +230,14 @@ export function mergeValues(
     const merged = mergeText(base, ours, theirs);
     if (merged !== undefined) return { value: merged, conflicts: [] };
   }
+  const choice = Object.hasOwn(choices, path || "/")
+    ? choices[path || "/"]
+    : undefined;
+  if (choice)
+    return {
+      value: structuredClone(choice === "ours" ? ours : theirs),
+      conflicts: [],
+    };
   return {
     value: structuredClone(ours),
     conflicts: [
