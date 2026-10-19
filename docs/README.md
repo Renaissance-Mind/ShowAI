@@ -2,20 +2,20 @@
 
 **Language:** English | [简体中文](i18n/index.zh-CN.md)
 
-ShowAI turns shared work with agents into readable, interactive and editable Pages. Start with the quick start or choose the connection you use below.
+ShowAI is the evolving interface between humans and agents: your agent's answers become interfaces — interactive, archived, and evolving as you use them. New to ShowAI? Start with the quick start.
 
-These guides follow the current `main` source: **application 0.9.0, local plugin 0.16.1, artifact format v3** (updated 2026-10-16). Application/runtime, local plugin and deployed services update independently. Check `runtime info --json`, plugin installation receipts and the actual service for installed capabilities. Release downloads may lag the source; see [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases).
+Guides describe the current source. The released app, the plugin and hosted services update separately; downloads are on [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases).
 
 ## Start here
 
-| Guide                                     | Contents                                          |
-| ----------------------------------------- | ------------------------------------------------- |
-| [Quick start](quick-start.md)             | Launch, create, save and share                    |
-| [ChatGPT on the web](chatgpt.md)          | Account, MCP, consent and updates                 |
-| [Use with Codex](codex.md)                | Local plugin, runtime and saved-page workflow     |
-| [Local browser edition](local-browser.md) | Launchers, file operations and packaging          |
-| [Page and Board](page-surface.md)         | Nested containers, drawing, reading and shortcuts |
-| [Built-in agent](agent-host.md)           | Local/API, Cloud and paired Mac execution         |
+| Guide                                          | Contents                                            |
+| ---------------------------------------------- | --------------------------------------------------- |
+| [Quick start](quick-start.md)                  | Install, connect an agent, first interface, share   |
+| [Use in Claude Code and Codex](codex.md)       | Install the plugin from the app, projects and pages |
+| [Built-in agent](agent-host.md)                | Local/API, Cloud and paired Mac execution           |
+| [Page and Board](page-surface.md)              | Nested containers, drawing, reading and shortcuts   |
+| [Local browser edition](local-browser.md)      | Run from source on macOS, Linux and Windows         |
+| [ChatGPT on the web (invite only)](chatgpt.md) | Account, hosted MCP, consent and updates            |
 
 ## Components and templates
 
@@ -49,7 +49,7 @@ These guides follow the current `main` source: **application 0.9.0, local plugin
 | [Artifact format v3](artifact-format.md)  | Nodes, geometry, components, export and limits         |
 | [Brand assets](branding.md)               | Logo source, variants and generation                   |
 
-[Plugin installation](../plugins/showai/README.md) covers Codex and Claude Code. [Contributing](../CONTRIBUTING.md) explains isolated development and relevant tests; participation follows the [Code of Conduct](../CODE_OF_CONDUCT.md).
+[Plugin documentation](../plugins/showai/README.md) covers the Skills and installing from source. [Contributing](../CONTRIBUTING.md) explains isolated development and relevant tests; participation follows the [Code of Conduct](../CODE_OF_CONDUCT.md).
 
 ## Runtime-provided reference
 

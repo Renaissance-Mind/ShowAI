@@ -2,11 +2,13 @@
 
 **语言：** [English](README.md) | 简体中文 · [文档目录](../../docs/i18n/index.zh-CN.md)
 
-本机插件提供八个 Skill 与 stdio MCP launcher，用于读取、创建、续改和展示 ShowAI 内容。应用/运行时独立安装，仓库应用源码版本为 **0.9.0**，兼容性以实际运行时能力为准。
+ShowAI 让 Agent 用界面回答——可以交互、可以归档、在使用中不断进化。它由两部分组成：本插件为 Agent 提供 ShowAI 的工具（stdio MCP launcher）和八个 Skill；ShowAI App 保存页面，并提供插件连接的运行时。兼容性以运行时报告的实际能力为准。
 
-## 本机安装
+## 安装
 
-桌面 App 用户打开「设置 → 插件」，即可给 Codex 或 Claude Code 安装插件。先安装宿主并确保其插件管理 CLI 可用。App 提供插件和运行时，无需下载源码或单独安装 Node.js；安装后刷新或重启宿主。连接使用所选内容库，切换库或移动 App 后再次更新插件。已有其他来源的 ShowAI 插件时，先在宿主中停用原插件，再安装 App 版本。
+**推荐从 ShowAI App 安装。** 从 [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases/latest) 下载并打开 App，在欢迎页或「设置 → 插件」中为 Claude Code 或 Codex 安装插件。先安装 Agent，并确保其命令行工具可用。App 提供插件和运行时，无需源码，也无需单独安装 Node.js。安装后 Claude Code 重启会话，Codex 刷新插件或重启，然后新开对话。连接使用 App 当前的内容库；切换内容库或移动 App 后点「更新并启用」。已有其他来源的 ShowAI 插件时，先在 Agent 中停用原插件，再安装 App 版本。详见[在 Claude Code 与 Codex 中使用](../../docs/i18n/codex.zh-CN.md)。
+
+### 从源码安装
 
 源码安装需要 Node.js 22.12+ 和 PATH 中的 Codex CLI。先构建/启动 ShowAI，或登记已安装的独立运行时，使目标内容库存在 agent-runtime.json。在源码仓库执行：
 

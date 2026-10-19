@@ -2,15 +2,17 @@
 
 **Language:** English | [简体中文](i18n/chatgpt.zh-CN.md) · [Documentation](README.md)
 
+> **Invite only.** ChatGPT on the web connects through a ShowAI Cloud account, and registration currently needs a registration key from the operator or an invitation to a shared project. Without one, use ShowAI in [Claude Code or Codex](codex.md) or with the [built-in agent](agent-host.md) — see the [quick start](quick-start.md).
+
 Connect ShowAI's hosted MCP server to create, save, edit and present interactive pages in a chat on [chatgpt.com](https://chatgpt.com). After account setup, everyday web use does not require a local ShowAI process or a separate Skill installation. Your account/workspace must permit custom MCP servers.
 
 ## 1. Prepare a ShowAI account
 
 The account/sync base URL is `https://showai.renaissancemind.ai/cloud`.
 
-Registration is controlled. Ask the operator for a registration key, or a project administrator for an invitation. In the desktop/local browser workbench, choose **Settings → Servers and sync → Server accounts → Add server account**, enter that base URL, and register with an account name, password of at least 12 characters and the key.
+Registration is controlled. Ask the operator for a registration key, or a project administrator for an invitation. In the desktop/local browser workbench, choose **Settings → Account & sync → Server accounts → Add server account**, enter that base URL, and register with an account name, password of at least 12 characters and the key.
 
-For an invitation, paste its link into **Project sync → Join shared project** and register through the invitation card; this route needs no registration key. Existing accounts can skip registration. Projects stored only on your computer must synchronize to this account before the remote MCP server can see them.
+For an invitation, paste its link into **Project sync → Join a shared project** and register through the invitation card; this route needs no registration key. Existing accounts can skip registration. Projects stored only on your computer must synchronize to this account before the remote MCP server can see them.
 
 ## 2. Add the MCP connection
 

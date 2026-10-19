@@ -2,20 +2,20 @@
 
 **语言：** [English](../README.md) | 简体中文
 
-ShowAI 用可阅读、可交互、可编辑的页面承载人与 Agent 的共同创作。首次使用从快速上手开始，也可以按下方选择正在使用的连接。
+ShowAI 是可进化的人机交互界面：Agent 的回答不再只是一段文字，而是一个可以交互、可以归档、在使用中不断进化的界面。初次使用从快速上手开始。
 
-本组指南对应当前 main 源码：**应用 0.9.0、本机插件 0.16.1、页面格式 v3**（更新于 2026-10-16）。应用/运行时、本机插件和部署服务独立更新；以 runtime info --json、插件安装回执和实际服务核对已安装能力。发行包可能晚于源码，下载以 [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases) 为准。
+指南对应当前源码。已发布的 App、插件和托管服务分别更新；下载见 [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases)。
 
 ## 开始使用
 
-| 文档                                   | 内容                           |
-| -------------------------------------- | ------------------------------ |
-| [快速上手](quick-start.zh-CN.md)       | 启动、创建、保存与分享         |
-| [网页版 ChatGPT](chatgpt.zh-CN.md)     | 账号、MCP 连接、授权与更新     |
-| [在 Codex 中使用](codex.zh-CN.md)      | 本机插件、运行时与页面工作流   |
-| [本地浏览器版](local-browser.zh-CN.md) | 启动器、本机文件操作与发行构建 |
-| [Page 与 Board](page-surface.zh-CN.md) | 嵌套容器、绘画、阅读与快捷键   |
-| [内置 Agent](agent-host.zh-CN.md)      | 本机/API、云端与配对 Mac 执行  |
+| 文档                                             | 内容                                  |
+| ------------------------------------------------ | ------------------------------------- |
+| [快速上手](quick-start.zh-CN.md)                 | 安装、连接 Agent、第一个界面与分享    |
+| [在 Claude Code 与 Codex 中使用](codex.zh-CN.md) | 从 App 安装插件、项目与页面工作流     |
+| [内置 Agent](agent-host.zh-CN.md)                | 本机/API、云端与配对 Mac 执行         |
+| [Page 与 Board](page-surface.zh-CN.md)           | 嵌套容器、绘画、阅读与快捷键          |
+| [本地浏览器版](local-browser.zh-CN.md)           | 在 macOS、Linux 与 Windows 从源码运行 |
+| [网页版 ChatGPT（邀请制）](chatgpt.zh-CN.md)     | 账号、托管 MCP、授权与更新            |
 
 ## 组件与模板
 
@@ -49,7 +49,7 @@ ShowAI 用可阅读、可交互、可编辑的页面承载人与 Agent 的共同
 | [页面数据格式 v3](artifact-format.zh-CN.md) | 节点、几何、组件、导出与限制  |
 | [品牌资源](branding.zh-CN.md)               | 标识来源、变体与生成          |
 
-[插件安装](../../plugins/showai/README.zh-CN.md) 包含 Codex 与 Claude Code。[贡献指南](CONTRIBUTING.zh-CN.md) 说明隔离开发与相关检查，参与项目须遵循[行为准则](CODE_OF_CONDUCT.zh-CN.md)。
+[插件说明](../../plugins/showai/README.zh-CN.md)介绍各个 Skill 与从源码安装。[贡献指南](CONTRIBUTING.zh-CN.md) 说明隔离开发与相关检查，参与项目须遵循[行为准则](CODE_OF_CONDUCT.zh-CN.md)。
 
 ## 运行时提供的参考
 

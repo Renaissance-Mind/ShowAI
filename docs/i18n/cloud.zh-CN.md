@@ -2,7 +2,7 @@
 
 **语言：** [English](../cloud.md) | 简体中文 · [文档目录](index.zh-CN.md)
 
-官方账号/同步基址是 **https://showai.renaissancemind.ai/cloud**。在「设置 → 服务器与同步 → 服务器账号 → 添加服务器账号」填写，不包含 /api。无注册密钥时可索取项目邀请，在「项目同步 → 加入共享项目」粘贴，通过邀请注册无需密钥。ChatGPT 使用独立的 [MCP 地址](chatgpt.zh-CN.md)。
+官方账号/同步基址是 **https://showai.renaissancemind.ai/cloud**。在「设置 → 账号与同步 → 服务器账号 → 添加服务器账号」填写，不包含 /api。无注册密钥时可索取项目邀请，在「项目同步 → 加入共享项目」粘贴，通过邀请注册无需密钥。ChatGPT 使用独立的 [MCP 地址](chatgpt.zh-CN.md)。
 
 ## 账号、登录与服务绑定
 
