@@ -13,6 +13,7 @@ import {
   surfaceKind,
 } from "../surface/containers.mjs";
 import { readFile, writeFile, stat } from "node:fs/promises";
+import { localMediaGrants } from "./local-media";
 import { join, sep, resolve } from "node:path";
 import { randomUUID, createHash } from "node:crypto";
 import { changeContext, withChangeContext } from "../core/history-context";
@@ -193,6 +194,8 @@ export const workbenchActions = new Set([
   "fs:reveal",
   "settings:chooseHome",
   "clipboard:write",
+  "media:open",
+  "media:reveal",
   "app:openPageWindow",
   "app:openWindow",
 ]);
@@ -1407,6 +1410,14 @@ export function createWorkbench(
       case "settings:chooseHome":
       case "clipboard:write":
         return host.invoke(action, args);
+      case "media:open":
+        return localMediaGrants.grant(args.path);
+      case "media:reveal": {
+        const grant = localMediaGrants.resolve(required(args, "token"));
+        if (!grant)
+          throw new CoreError("NOT_FOUND", "Open the file again to reveal it.");
+        return host.invoke(action, { path: grant.path });
+      }
       case "app:openPageWindow":
       case "app:openWindow": {
         const id = projectId(args);

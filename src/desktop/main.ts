@@ -11,6 +11,7 @@ import {
   Menu,
   nativeImage,
   nativeTheme,
+  protocol,
   shell,
 } from "electron";
 import type { IpcMainEvent, IpcMainInvokeEvent, NativeImage } from "electron";
@@ -20,6 +21,9 @@ import { atomicRename } from "../core/atomic-rename";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
+import { Readable } from "node:stream";
+import { localMediaResponse } from "../workbench/local-media";
+import { LOCAL_MEDIA_SCHEME } from "../components/custom/local-media-link";
 import { tabShortcut } from "../workbench/tab-shortcuts";
 import { windowQuery, type WindowTarget } from "../workbench/window-target";
 import { AgentService, errorResult } from "../agent/service";
@@ -397,6 +401,10 @@ async function nativeAction(
       broadcast("home");
       return info();
     }
+    case "media:reveal":
+      // The action layer only passes paths it granted for the player.
+      shell.showItemInFolder(String(args.path));
+      return null;
     case "clipboard:write": {
       if (typeof args.text !== "string" || args.text.length > 2 * 1024 * 1024)
         throw new CoreError(
@@ -706,6 +714,13 @@ else {
         }
       }
     });
+  // Granted local files (videos, audio, images) for the workbench player; streamed with ranges.
+  protocol.registerSchemesAsPrivileged([
+    {
+      scheme: LOCAL_MEDIA_SCHEME,
+      privileges: { standard: true, secure: true, stream: true },
+    },
+  ]);
   app.on("open-url", (event, url) => {
     event.preventDefault();
     if (!app.isReady()) pendingDeepLink = url;
@@ -794,6 +809,20 @@ else {
           console.error("Remote Agent connector:", error.message),
         );
       if (app.isPackaged) app.setAsDefaultProtocolClient("showai");
+      protocol.handle(LOCAL_MEDIA_SCHEME, async (request) => {
+        const token = new URL(request.url).pathname.slice(1);
+        const result = await localMediaResponse(
+          token,
+          request.headers.get("range"),
+          request.method === "HEAD",
+        );
+        return new Response(
+          result.body
+            ? (Readable.toWeb(result.body) as ReadableStream<Uint8Array>)
+            : null,
+          { status: result.status, headers: result.headers },
+        );
+      });
       buildApplicationMenu();
       ipcMain.handle("showai:set-locale", async (event, locale: unknown) => {
         trustedSender(event);

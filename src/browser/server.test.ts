@@ -628,6 +628,41 @@ test("real component compilation, templates, source import and HTML/site export 
   );
 }, 30000);
 
+test("local media plays only through grants minted by the authenticated workbench", async () => {
+  const clip = join(home, "clip.mp4");
+  await writeFile(clip, "0123456789");
+  const grant = await invoke<{ token: string; kind: string; path: string }>(
+    "media:open",
+    { path: `file://${clip}` },
+  );
+  expect(grant.kind).toBe("video");
+  const media = server.url + "api/media/" + grant.token;
+  const whole = await fetch(media);
+  expect(whole.status).toBe(200);
+  expect(whole.headers.get("content-type")).toBe("video/mp4");
+  expect(await whole.text()).toBe("0123456789");
+  const part = await fetch(media, { headers: { Range: "bytes=3-4" } });
+  expect(part.status).toBe(206);
+  expect(part.headers.get("content-range")).toBe("bytes 3-4/10");
+  expect(await part.text()).toBe("34");
+  // Unknown tokens, foreign origins and other methods never reach the file.
+  expect((await fetch(server.url + "api/media/" + crypto.randomUUID())).status).toBe(404);
+  expect(
+    (await fetch(media, { headers: { Origin: "https://example.com" } })).status,
+  ).toBe(403);
+  expect((await fetch(media, { method: "POST" })).status).toBe(401);
+  await expect(invoke("media:open", { path: "clip.mp4" })).rejects.toMatchObject({
+    code: "INVALID_PATH",
+  });
+  await expect(invoke("media:reveal", { token: crypto.randomUUID() })).rejects.toMatchObject({
+    code: "NOT_FOUND",
+  });
+  // The workbench page allows same-origin media for the player.
+  expect((await fetch(server.url)).headers.get("content-security-policy")).toContain(
+    "media-src 'self'",
+  );
+});
+
 test("loopback API rejects missing tokens, foreign origins, rebinding, invalid paths and static traversal", async () => {
   const input = JSON.stringify({ action: "projects:list", args: {} });
   const headers = {

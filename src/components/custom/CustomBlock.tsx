@@ -29,6 +29,7 @@ import type { CompiledComponent } from "./types";
 import { InlineComponent } from "./InlineComponent";
 import { findComponent, indexComponents } from "./component-index";
 import { installComponentLinks, openComponentLink } from "./external-links";
+import { openComponentMedia } from "./LocalMediaViewer";
 import { installComponentActivity } from "./activity";
 import { useLocale, useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/customComponents";
@@ -305,6 +306,10 @@ function SandboxComponent({
       if (event.data.type === "showai:ready") sendProps();
       if (event.data.type === "showai:open-url") {
         openComponentLink(event.data.url);
+        return;
+      }
+      if (event.data.type === "showai:open-media") {
+        openComponentMedia(event.data.url);
         return;
       }
       if (
