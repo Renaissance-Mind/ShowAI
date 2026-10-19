@@ -27,7 +27,6 @@ export default function AutoHideSidebar({
   navigation,
   history,
   topbar,
-  focusWindow,
   switchingTab,
   mobileBoardKey,
   onMobileBack,
@@ -38,7 +37,6 @@ export default function AutoHideSidebar({
   navigation: ReactNode;
   history: ReactNode;
   topbar: ReactNode;
-  focusWindow: boolean;
   switchingTab: boolean;
   mobileBoardKey?: string;
   onMobileBack?: () => void;
@@ -97,7 +95,7 @@ export default function AutoHideSidebar({
     ? nativeLayout.width
     : clampWidth(preferredWidth ?? (viewportWidth <= 1100 ? 208 : 240));
   const sidebar = useRef<HTMLElement>(null);
-  const automatic = enabled && !locked && !focusWindow && !nativeTouch;
+  const automatic = enabled && !locked && !nativeTouch;
   const mode = nativeTouch
     ? nativeLayout.docked
       ? "docked"
@@ -387,55 +385,52 @@ export default function AutoHideSidebar({
   return (
     <>
       <header className="studio-window-topbar">
-        {!focusWindow && (
-          <div
-            className="studio-topbar-brand"
-            style={
-              {
-                width: nativeTouch && viewportWidth <= 650 ? 56 : width,
-              } as CSSProperties
-            }
-            onPointerEnter={reveal}
-            onPointerLeave={leave}
-          >
-            <span className="studio-app-brand">
-              <img src={appIcon} alt="" draggable={false} />
-              <strong>ShowAI</strong>
-            </span>
-            <div className="studio-topbar-actions">
-              {history}
-              <button
-                type="button"
-                className="studio-sidebar-lock"
-                aria-label={lockLabel}
-                title={lockLabel}
-                aria-pressed={nativeTouch ? nativeOpen : locked}
-                aria-controls="studio-project-navigation"
-                aria-expanded={nativeTouch ? nativeOpen : !hidden}
-                onPointerDown={
-                  nativeTouch
-                    ? (event) => {
-                        event.preventDefault();
-                        setNativeOpen((value) => !value);
-                      }
-                    : undefined
+        <div
+          className="studio-topbar-brand"
+          style={
+            {
+              width: nativeTouch && viewportWidth <= 650 ? 56 : width,
+            } as CSSProperties
+          }
+          onPointerEnter={reveal}
+          onPointerLeave={leave}
+        >
+          <span className="studio-app-brand">
+            <img src={appIcon} alt="" draggable={false} />
+            <strong>ShowAI</strong>
+          </span>
+          <div className="studio-topbar-actions">
+            {history}
+            <button
+              type="button"
+              className="studio-sidebar-lock"
+              aria-label={lockLabel}
+              title={lockLabel}
+              aria-pressed={nativeTouch ? nativeOpen : locked}
+              aria-controls="studio-project-navigation"
+              aria-expanded={nativeTouch ? nativeOpen : !hidden}
+              onPointerDown={
+                nativeTouch
+                  ? (event) => {
+                      event.preventDefault();
+                      setNativeOpen((value) => !value);
+                    }
+                  : undefined
+              }
+              onClick={(event) => {
+                if (nativeTouch) {
+                  if (event.detail === 0) setNativeOpen((value) => !value);
+                  return;
                 }
-                onClick={(event) => {
-                  if (nativeTouch) {
-                    if (event.detail === 0) setNativeOpen((value) => !value);
-                    return;
-                  }
-                  const next = !locked;
-                  localStorage.setItem("showai:sidebar-locked", String(next));
-                  setLocked(next);
-                }}
-              >
-                <PanelLeft size={19} strokeWidth={1.7} aria-hidden="true" />
-              </button>
-            </div>
+                const next = !locked;
+                localStorage.setItem("showai:sidebar-locked", String(next));
+                setLocked(next);
+              }}
+            >
+              <PanelLeft size={19} strokeWidth={1.7} aria-hidden="true" />
+            </button>
           </div>
-        )}
-        {focusWindow && history}
+        </div>
         {topbar}
       </header>
       <div
@@ -443,129 +438,127 @@ export default function AutoHideSidebar({
         inert={switchingTab}
         aria-busy={switchingTab}
       >
-        {!focusWindow && (
-          <div
-            className="studio-sidebar-shell"
-            data-sidebar-mode={mode}
-            data-sidebar-resizing={resizing || undefined}
-            style={{ "--navigation-width": `${width}px` } as CSSProperties}
+        <div
+          className="studio-sidebar-shell"
+          data-sidebar-mode={mode}
+          data-sidebar-resizing={resizing || undefined}
+          style={{ "--navigation-width": `${width}px` } as CSSProperties}
+        >
+          <aside
+            ref={sidebar}
+            id="studio-project-navigation"
+            className="studio-sidebar"
+            aria-label={t("projectNavigation")}
+            inert={hidden}
+            onPointerEnter={reveal}
+            onPointerLeave={leave}
+            onFocusCapture={(event) => {
+              if (event.target.matches(":focus-visible"))
+                setKeyboardFocus(true);
+            }}
+            onBlurCapture={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget))
+                setKeyboardFocus(false);
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== "Escape" || !automatic || interactionHeld)
+                return;
+              event.preventDefault();
+              event.stopPropagation();
+              if (document.activeElement instanceof HTMLElement)
+                document.activeElement.blur();
+              setKeyboardFocus(false);
+              setHovered(false);
+              setPosition("hidden");
+            }}
           >
-            <aside
-              ref={sidebar}
-              id="studio-project-navigation"
-              className="studio-sidebar"
-              aria-label={t("projectNavigation")}
-              inert={hidden}
-              onPointerEnter={reveal}
-              onPointerLeave={leave}
-              onFocusCapture={(event) => {
-                if (event.target.matches(":focus-visible"))
-                  setKeyboardFocus(true);
+            {navigation}
+            <div
+              ref={resizeHandle}
+              className="studio-sidebar-resizer"
+              role="separator"
+              tabIndex={0}
+              aria-label={t("resizeSidebar")}
+              aria-orientation="vertical"
+              aria-controls="studio-project-navigation"
+              aria-valuemin={minimumWidth}
+              aria-valuemax={widthLimit}
+              aria-valuenow={width}
+              aria-valuetext={t("widthPixels", { width })}
+              onPointerDown={(event) => {
+                if (event.button !== 0 || resize.current) return;
+                event.preventDefault();
+                event.currentTarget.setPointerCapture(event.pointerId);
+                resize.current = {
+                  pointerId: event.pointerId,
+                  startX: event.clientX,
+                  startWidth: width,
+                  originalPreference: preferredWidth,
+                  currentWidth: width,
+                };
+                setResizing(true);
               }}
-              onBlurCapture={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget))
-                  setKeyboardFocus(false);
+              onPointerMove={(event) => {
+                const current = resize.current;
+                if (!current || current.pointerId !== event.pointerId) return;
+                current.currentWidth = clampWidth(
+                  current.startWidth + event.clientX - current.startX,
+                );
+                setPreferredWidth(current.currentWidth);
+              }}
+              onPointerUp={endResize}
+              onPointerCancel={(event) => endResize(event, true)}
+              onLostPointerCapture={(event) => endResize(event, true)}
+              onDoubleClick={() => {
+                localStorage.removeItem(widthPreference);
+                setPreferredWidth(null);
               }}
               onKeyDown={(event) => {
-                if (event.key !== "Escape" || !automatic || interactionHeld)
-                  return;
+                const next =
+                  event.key === "ArrowLeft"
+                    ? width - (event.shiftKey ? 32 : 8)
+                    : event.key === "ArrowRight"
+                      ? width + (event.shiftKey ? 32 : 8)
+                      : event.key === "Home"
+                        ? minimumWidth
+                        : event.key === "End"
+                          ? widthLimit
+                          : null;
+                if (next === null) return;
                 event.preventDefault();
                 event.stopPropagation();
-                if (document.activeElement instanceof HTMLElement)
-                  document.activeElement.blur();
-                setKeyboardFocus(false);
-                setHovered(false);
-                setPosition("hidden");
+                saveWidth(next);
+              }}
+            />
+          </aside>
+          {automatic && (
+            <button
+              type="button"
+              className="studio-sidebar-edge"
+              aria-label={t("showNavigation")}
+              aria-controls="studio-project-navigation"
+              aria-expanded={!hidden}
+              tabIndex={hidden ? 0 : -1}
+              onPointerEnter={reveal}
+              onPointerLeave={leave}
+              onFocus={() => {
+                setKeyboardFocus(true);
+                setPosition("overlay");
+                focusNavigation();
+              }}
+              onBlur={(event) => {
+                if (!sidebar.current?.contains(event.relatedTarget))
+                  setKeyboardFocus(false);
+              }}
+              onClick={() => {
+                setPosition("overlay");
+                focusNavigation();
               }}
             >
-              {navigation}
-              <div
-                ref={resizeHandle}
-                className="studio-sidebar-resizer"
-                role="separator"
-                tabIndex={0}
-                aria-label={t("resizeSidebar")}
-                aria-orientation="vertical"
-                aria-controls="studio-project-navigation"
-                aria-valuemin={minimumWidth}
-                aria-valuemax={widthLimit}
-                aria-valuenow={width}
-                aria-valuetext={t("widthPixels", { width })}
-                onPointerDown={(event) => {
-                  if (event.button !== 0 || resize.current) return;
-                  event.preventDefault();
-                  event.currentTarget.setPointerCapture(event.pointerId);
-                  resize.current = {
-                    pointerId: event.pointerId,
-                    startX: event.clientX,
-                    startWidth: width,
-                    originalPreference: preferredWidth,
-                    currentWidth: width,
-                  };
-                  setResizing(true);
-                }}
-                onPointerMove={(event) => {
-                  const current = resize.current;
-                  if (!current || current.pointerId !== event.pointerId) return;
-                  current.currentWidth = clampWidth(
-                    current.startWidth + event.clientX - current.startX,
-                  );
-                  setPreferredWidth(current.currentWidth);
-                }}
-                onPointerUp={endResize}
-                onPointerCancel={(event) => endResize(event, true)}
-                onLostPointerCapture={(event) => endResize(event, true)}
-                onDoubleClick={() => {
-                  localStorage.removeItem(widthPreference);
-                  setPreferredWidth(null);
-                }}
-                onKeyDown={(event) => {
-                  const next =
-                    event.key === "ArrowLeft"
-                      ? width - (event.shiftKey ? 32 : 8)
-                      : event.key === "ArrowRight"
-                        ? width + (event.shiftKey ? 32 : 8)
-                        : event.key === "Home"
-                          ? minimumWidth
-                          : event.key === "End"
-                            ? widthLimit
-                            : null;
-                  if (next === null) return;
-                  event.preventDefault();
-                  event.stopPropagation();
-                  saveWidth(next);
-                }}
-              />
-            </aside>
-            {automatic && (
-              <button
-                type="button"
-                className="studio-sidebar-edge"
-                aria-label={t("showNavigation")}
-                aria-controls="studio-project-navigation"
-                aria-expanded={!hidden}
-                tabIndex={hidden ? 0 : -1}
-                onPointerEnter={reveal}
-                onPointerLeave={leave}
-                onFocus={() => {
-                  setKeyboardFocus(true);
-                  setPosition("overlay");
-                  focusNavigation();
-                }}
-                onBlur={(event) => {
-                  if (!sidebar.current?.contains(event.relatedTarget))
-                    setKeyboardFocus(false);
-                }}
-                onClick={() => {
-                  setPosition("overlay");
-                  focusNavigation();
-                }}
-              >
-                <span aria-hidden="true" />
-              </button>
-            )}
-          </div>
-        )}
+              <span aria-hidden="true" />
+            </button>
+          )}
+        </div>
         {children}
       </div>
     </>
