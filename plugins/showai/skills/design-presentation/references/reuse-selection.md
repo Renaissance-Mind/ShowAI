@@ -19,7 +19,7 @@
 - 操作与参考：step-guide 编号步骤、分平台代码、读者逐步勾选与计时；command-reference 可搜索的命令与参数；structure-browser 目录或字段结构与说明；card-grid 入口与选项卡片。
 - 时间与计划：roadmap 按日期阅读泳道、负责人、依赖和里程碑（只读）；event-timeline 事件、阶段与指标曲线同轴回放；database 的 calendar 视图展示带日期的记录、打卡热力与连续天数；roadmap 只负责阅读，需要持续编辑的排期用 database 等可编辑数据。
 - 机制与状态变化：step-walkthrough 用一个具体例子逐步展示：每步一句要点，左栏是实际输入与操作，右栏是各组成部分此刻的具体条目及其新增、更新、失效；输出步骤可隐藏某一部分作对比。读者需要看到每一步各部分的具体内容时用它；只需按阶段给节点着色时用 flowchart stages；读者要照着执行的操作步骤用 step-guide。
-- 对照与证据：evidence-explorer 连接总览、条件、来源和共同维度比较；waterfall 从期初到期末的逐项增减；table、database、comparison-matrix、chart 与适配数据类型的 G2 图表；references 和 bookmark。
+- 对照与证据：waterfall 从期初到期末的逐项增减；table、database、comparison-matrix、chart 与适配数据类型的 G2 图表；references 和 bookmark。
 - 补充说明：text、toggle；关键条件进入主线。
 - 参数探索：playground 用声明式公式、预设、目标差距、分项构成和加权排名，只做它公开的有限运算；专题模型按各自假设使用。
 - 空间与三维：scene-3d 用基本形体、坐标箭头、标注和参数绑定解释姿态、结构与转动；平面图能讲清时优先平面图。

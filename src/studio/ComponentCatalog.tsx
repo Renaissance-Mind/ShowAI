@@ -6,6 +6,7 @@ import {
   ChartNoAxesCombined,
   Code2,
   Image,
+  Loader2,
   Table2,
   Type,
   Workflow,
@@ -87,6 +88,7 @@ export function ComponentCatalog({
   browser = false,
   showProjectNames = false,
   query = "",
+  loading = false,
 }: {
   groups: ComponentGroup[];
   category: ComponentCategory | null;
@@ -94,12 +96,24 @@ export function ComponentCatalog({
   browser?: boolean;
   showProjectNames?: boolean;
   query?: string;
+  loading?: boolean;
 }) {
   const t = useTranslator(messages);
   const theme = useAppearanceTheme(),
     [selected, setSelected] = useState<string | null>(null);
   const visible = groups.filter((group) => !category || group.id === category),
     items = visible.flatMap((group) => group.items);
+  if (loading)
+    return (
+      <div
+        className="studio-loading"
+        role="status"
+        aria-label={t("loadingComponents")}
+        aria-busy="true"
+      >
+        <Loader2 size={24} className="studio-spin" aria-hidden="true" />
+      </div>
+    );
   return (
     <div className="component-catalog">
       <section

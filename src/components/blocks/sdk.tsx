@@ -32,7 +32,6 @@ export {
   CodeBlock as Code,
 } from "./Primitives";
 
-export { EvidenceExplorerBlock as EvidenceExplorer } from "./Presentation";
 export { StepWalkthroughBlock as StepWalkthrough } from "./StepWalkthrough";
 export { ComparisonMatrixBlock as ComparisonMatrix } from "./ComparisonMatrix";
 export { StatusTreeBlock as StatusTree } from "./StatusTree";

@@ -298,7 +298,6 @@ describe("compiled React packages", () => {
       "pdf",
       "references",
       "step-walkthrough",
-      "evidence-explorer",
       "comparison-matrix",
       "status-tree",
       "experiment-tracker",

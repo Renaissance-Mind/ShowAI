@@ -289,6 +289,7 @@ export default function Studio() {
   const [routing, setRouting] = useState(false);
   const routingRef = useRef(false);
   const catalogLoaded = useRef(false);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const windowFullscreen = useWindowFullscreen();
   const [info, setInfo] = useState<DesktopInfo | null>(null);
   const capabilities = workbenchCapabilities(info?.platform);
@@ -734,8 +735,8 @@ export default function Studio() {
     [refreshNavigation],
   );
   const loadCatalog = useMemo(
-    () =>
-      coalescedTask(async () => {
+    () => {
+      const load = coalescedTask(async () => {
         const id = selectedRef.current;
         const requestedScope = catalogScopeRef.current;
         const scope = {
@@ -808,7 +809,16 @@ export default function Studio() {
             (item): item is CatalogCustomComponent => !("kind" in item),
           ),
         });
-      }),
+      });
+      return async () => {
+        setCatalogLoading(true);
+        try {
+          await load();
+        } finally {
+          setCatalogLoading(false);
+        }
+      };
+    },
     [],
   );
 
@@ -3366,6 +3376,7 @@ export default function Studio() {
                   {view === "components" && (
                     <ComponentCatalog
                       groups={componentGroups}
+                      loading={catalogLoading}
                       browser={
                         !!info && "mode" in info && info.mode === "browser"
                       }

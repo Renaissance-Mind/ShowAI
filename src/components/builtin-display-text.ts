@@ -148,11 +148,6 @@ export const builtinEnglish: BuiltinDisplayText = {
     description:
       "Walk through a concrete example step by step: what happens in each step on one side, the actual contents of each part with new, updated and retired entries on the other.",
   },
-  "evidence-explorer": {
-    name: "Evidence explorer",
-    description:
-      "Survey evidence by topic and time, with linked item details and comparisons across shared dimensions, keeping conditions and sources.",
-  },
   "g2-bar": {
     name: "Column chart",
     description: "Compare values across categories.",
