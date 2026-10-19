@@ -207,11 +207,7 @@ test("builtin catalog ships only the system baseline, the paper explainer and bl
     service = new AgentService({ root: home });
   const project = await service.createProject("Builtins");
   const ids = (await listTemplates(home, project.id)).map((item) => item.id);
-  expect(ids.sort()).toEqual([
-    "blank",
-    "paper-explainer",
-    "system-presentation",
-  ]);
+  expect(ids.sort()).toEqual(["paper-explainer", "system-presentation"]);
   for (const id of ["system-presentation", "paper-explainer"]) {
     const current = await getTemplate(home, id, project.id, {
       scope: "builtin",

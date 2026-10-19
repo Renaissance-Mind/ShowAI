@@ -127,17 +127,15 @@ it("React Flow can be composed through the SDK and exported without external scr
 });
 
 describe("filesystem template catalog", () => {
-  it("provides blank plus the folder templates without invented findings", async () => {
+  it("lists the folder templates and keeps blank as a Studio-only page source", async () => {
     const home = await temporary();
-    expect(
-      (await listTemplates(home, project(home))).map((item) => item.id),
-    ).toEqual(
-      expect.arrayContaining([
-        "blank",
-        "system-presentation",
-        "paper-explainer",
-      ]),
+    const listed = (await listTemplates(home, project(home))).map(
+      (item) => item.id,
     );
+    expect(listed).toEqual(
+      expect.arrayContaining(["system-presentation", "paper-explainer"]),
+    );
+    expect(listed).not.toContain("blank");
     const blank = await getTemplate(home, "blank", project(home));
     expect(blank.scope).toBe("builtin");
     expect(

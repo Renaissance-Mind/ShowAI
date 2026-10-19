@@ -727,6 +727,8 @@ const folderTemplates = builtinTemplateBundles.map((source) => {
   };
 });
 const templates = [...legacyTemplates, ...folderTemplates];
+/** Studio creates new pages from these; agents never see them in catalogs. */
+const STUDIO_ONLY_TEMPLATES = new Set(["blank"]);
 
 function builtinTemplate(
   id: string,
@@ -809,6 +811,7 @@ export async function listTemplates(
   }
   if (!options.scope || options.scope === "all" || options.scope === "builtin")
     for (const spec of templates) {
+      if (STUDIO_ONLY_TEMPLATES.has(spec.id)) continue;
       const {
         document: _document,
         composition: _composition,

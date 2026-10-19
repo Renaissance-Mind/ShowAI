@@ -873,6 +873,9 @@ test("CLI templates create independent pages and save reusable project templates
   ]);
   expect(
     catalog.items.some((item: { id: string }) => item.id === "blank"),
+  ).toBe(false);
+  expect(
+    catalog.items.some((item: { id: string }) => item.id === "paper-explainer"),
   ).toBe(true);
   const first = await run([
     "template",

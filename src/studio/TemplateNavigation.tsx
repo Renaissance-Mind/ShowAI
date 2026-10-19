@@ -9,7 +9,6 @@ const types = [
   { id: "all", icon: LayoutTemplate },
   { id: "system-presentation", icon: FileText },
   { id: "paper-explainer", icon: FlaskConical },
-  { id: "blank", icon: FileText },
   { id: "custom", icon: LayoutTemplate },
 ] as const;
 
