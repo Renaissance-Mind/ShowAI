@@ -25,6 +25,8 @@ ShowAI works inside the agent you already use: the plugin lets your agent build 
 2. ShowAI checks for Claude Code and Codex. Click **Install plugin** next to the agent you use and wait for **Installed and enabled**.
 3. Reload the agent: restart the Claude Code session, or refresh plugins or restart Codex. A conversation that was already open keeps its old tool list, so start a new one.
 
+To confirm the connection, **Settings → Plugins** shows a test prompt, *Use ShowAI to list my projects*. Send it in the new conversation; when the agent reaches ShowAI, the status next to that agent changes from **Waiting for the first call** to **First call received**.
+
 The app supplies both the plugin and the runtime it talks to, so you need neither the source code nor a separate Node.js installation. The plugin connects to the app's current content library; click **Update and enable** after switching libraries or moving the app.
 
 ## 3. Ask for your first interface

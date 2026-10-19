@@ -22,7 +22,7 @@ ShowAI 通过 Agent 自己的插件命令安装，因此需要 Agent 的命令�
 
 > 用 ShowAI 帮我做一个房贷计算器：房价、首付比例、利率和贷款年限可以调整，显示月供和总利息。
 
-Agent 应当调用 ShowAI 工具、保存页面并展示出来。如果它只用文字回答，见 [Agent 找不到 ShowAI 时](quick-start.zh-CN.md#agent-找不到-showai-时)。
+Agent 应当调用 ShowAI 工具、保存页面并展示出来。「设置 → 插件」也会显示每个 Agent 是否已经调用过 ShowAI（「等待第一次调用」/「已收到第一次调用」），并提供一条更短、可以复制的测试提示词。如果它只用文字回答，见 [Agent 找不到 ShowAI 时](quick-start.zh-CN.md#agent-找不到-showai-时)。
 
 ## 选择内容库与项目
 
