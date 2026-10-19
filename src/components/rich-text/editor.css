@@ -1006,3 +1006,9 @@
   padding: 5px 8px;
   font-size: 12px;
 }
+
+.document-content .is-component-range-selected {
+  background: Highlight;
+  background: color-mix(in srgb, Highlight 22%, transparent);
+  outline: 2px solid color-mix(in srgb, Highlight 65%, transparent);
+}

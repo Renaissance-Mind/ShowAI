@@ -1,3 +1,5 @@
+import { installComponentSelectionBridge } from "./selection-bridge";
+import { useSelectionFrame } from "./useSelectionFrame";
 import { CAPACITY, assertContent } from "../../portable/capacity.mjs";
 import { installIconTooltips } from "../../ui/icon-tooltip.mjs";
 import { componentSandboxPolicy } from "./sandbox-policy.mjs";
@@ -169,6 +171,7 @@ function SandboxComponent({
   const locale = useLocale();
   const initialTheme = useRef(theme);
   const [channel] = useState(() => crypto.randomUUID());
+  useSelectionFrame(iframe, channel);
   const [height, setHeight] = useState(180);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(false);
@@ -258,7 +261,7 @@ function SandboxComponent({
         // Built-in blocks compiled into the package start in the workbench language.
         `<style>body{color:var(--text)}</style><script>document.documentElement.lang=document.documentElement.dataset.showaiLocale=${safeJson(locale)};(${installComponentActivity.toString()})(${safeJson(channel)});(${installSandboxTheme.toString()})(${safeJson(channel)},${safeJson(initialTheme.current)},${safeJson(appearanceTokens())});</script><script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current })}</script>`,
       ) +
-      `<script>(${installIconTooltips.toString()})(document);(${installComponentLinks.toString()})(${safeJson(channel)});</script>`
+      `<script>(${installComponentSelectionBridge.toString()})(${safeJson(channel)});(${installIconTooltips.toString()})(document);(${installComponentLinks.toString()})(${safeJson(channel)});</script>`
     );
   }, [component.html, channel, locale]);
 

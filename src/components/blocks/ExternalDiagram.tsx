@@ -1,3 +1,5 @@
+import { installComponentSelectionBridge } from "../custom/selection-bridge";
+import { useSelectionFrame } from "../custom/useSelectionFrame";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, Upload } from "../../ui/icons";
 import { BlockHeader, Field } from "./shared";
@@ -46,6 +48,9 @@ function ExternalDiagramBlock({
   onChange,
   readOnly,
 }: BlockProps & { family: DiagramFamily }) {
+  const iframe = useRef<HTMLIFrameElement>(null);
+  const [selectionChannel] = useState(() => crypto.randomUUID());
+  useSelectionFrame(iframe, selectionChannel);
   const t = useTranslator(messages);
   const name = t(names[family]);
   const templates = useMemo(() => listDiagramTemplates(family), [family]);
@@ -61,8 +66,10 @@ function ExternalDiagramBlock({
     [family, source, presentation],
   );
   const html = useMemo(
-    () => diagramDocument(family, shownSource, presentation),
-    [family, shownSource, presentation],
+    () =>
+      diagramDocument(family, shownSource, presentation) +
+      `<script>(${installComponentSelectionBridge.toString()})(${JSON.stringify(selectionChannel)});</script>`,
+    [family, shownSource, presentation, selectionChannel],
   );
   const outsideTitle =
     presentation.title === "outside"
@@ -235,6 +242,7 @@ function ExternalDiagramBlock({
         unlockDescription={t("unlockDescription")}
       />
       <iframe
+        ref={iframe}
         title={text(data.title, name)}
         className="sb-diagram-frame"
         sandbox="allow-scripts allow-downloads"

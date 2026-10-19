@@ -1,3 +1,4 @@
+import { TextSelectionScope } from "./TextSelectionScope";
 import { SurfaceGeometryStore } from "./geometry-store";
 import { readingCapture } from "./reading-capture";
 import { EditorViewScope } from "../editor/view-scope";
@@ -437,7 +438,7 @@ export function ContainerRuntime({
               }}
             />
           )}
-          <div
+          <TextSelectionScope
             className="container-workspace"
             data-resource-id={document.id}
             onKeyDown={(event) => {
@@ -889,7 +890,7 @@ export function ContainerRuntime({
                 </aside>
               </InspectorOutlet>
             )}
-          </div>
+          </TextSelectionScope>
         </Context.Provider>
       </RegisterComponentContext.Provider>
     </AdditionalComponentsProvider>

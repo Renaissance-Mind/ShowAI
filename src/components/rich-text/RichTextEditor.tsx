@@ -1,3 +1,5 @@
+import { ComponentRangeSelection } from "./component-range-selection";
+import { registerSelectionEditor } from "../../surface/text-selection";
 import { ContentNodeActions } from "./ContentNodeActions";
 import { primitiveNodeTypes, primitiveContentNode } from "./model.mjs";
 import { CAPACITY, formatBytes } from "../../portable/capacity.mjs";
@@ -385,6 +387,15 @@ export default function RichTextEditor({
       }),
   });
 
+  useEffect(
+    () =>
+      editor
+        ? registerSelectionEditor(editor, (anchor, head) =>
+            ComponentRangeSelection.create(editor.state.doc, anchor, head),
+          )
+        : undefined,
+    [editor],
+  );
   useEffect(() => {
     if (editor) onEditorReady?.(editor);
   }, [editor, onEditorReady]);
