@@ -28,6 +28,9 @@ ShowAI 在你已经在用的 Agent 里工作：装上插件后，Agent 就能把
 
 1. **下载 ShowAI** — 下载[最新版本](https://github.com/Renaissance-Mind/ShowAI/releases/latest)，打开 DMG，把 ShowAI 拖进「应用程序」。当前版本尚未经过 Apple 公证；macOS 阻止首次打开时，见[首次打开](quick-start.zh-CN.md#1-安装-showai)。
 2. **连接你的 Agent** — 打开 ShowAI，在欢迎页（或「设置 → 插件」）为 Claude Code 或 Codex 安装插件，然后重启 Agent。
+
+   > **注意：** 目前可下载的 v0.9.0 还不包含在 App 中安装插件的功能，这项功能将随下一个版本发布。在此之前，请按[从源码构建](#从源码构建)构建 App 并安装插件。
+
 3. **让 Agent 做第一个界面** — 在新对话中粘贴示例提示词：
 
    > 用 ShowAI 帮我做一个房贷计算器：房价、首付比例、利率和贷款年限可以调整，显示月供和总利息。

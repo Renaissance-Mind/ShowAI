@@ -28,6 +28,9 @@ You need a Mac with Apple silicon (macOS 13 or later), and Claude Code or Codex 
 
 1. **Download ShowAI** — get the [latest release](https://github.com/Renaissance-Mind/ShowAI/releases/latest), open the DMG and drag ShowAI into Applications. Current builds are not yet notarized by Apple; if macOS blocks the first launch, see [first launch](docs/quick-start.md#1-install-showai).
 2. **Connect your agent** — open ShowAI and install the plugin for Claude Code or Codex from the welcome screen (or **Settings → Plugins**), then restart the agent.
+
+   > **Note:** the downloadable v0.9.0 predates in-app plugin installation; it arrives with the next release. Until then, use [Build from source](#build-from-source), which builds the app and installs the plugin.
+
 3. **Ask for an interface** — paste the sample prompt into a new conversation:
 
    > Use ShowAI to build a mortgage calculator: price, down payment, rate and term are adjustable; show the monthly payment and total interest.
