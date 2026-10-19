@@ -4,7 +4,7 @@ const rowSelector =
 const duration = () =>
   matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 180;
 
-/** Transient layout only: React's rows stay in their own parents until the drop saves. */
+/** Transient layout only: React takes over the rows when the drop lands. */
 export class LibraryDragPreview {
   private ghost: HTMLElement;
   private placeholder: HTMLElement;

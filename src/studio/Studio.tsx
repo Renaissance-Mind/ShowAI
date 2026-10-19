@@ -13,6 +13,7 @@ import {
   withSavedProjectTime,
 } from "./navigation-refresh";
 import { readNavigationCache, writeNavigationCache } from "./navigation-cache";
+import { applyLibraryMove, type LibraryContents } from "./library-move";
 import { ComponentLibraryContext } from "../components/ComponentLibrary";
 import { insertComponent } from "../surface/component-insertion";
 import { findSurfaceNode } from "../surface/document.mjs";
@@ -364,9 +365,18 @@ export default function Studio() {
       clearInterval(timer);
     };
   }, [selectedProject, info?.home]);
-  const [contents, setContents] = useState<
-    Record<string, { pages: PageSummary[]; folders: FolderMetadata[] }>
-  >({});
+  const [savedContents, setContents] = useState<LibraryContents>({});
+  const [pendingLibraryMove, setPendingLibraryMove] = useState<{
+    home: string;
+    drop: LibraryDrop;
+  } | null>(null);
+  const contents = useMemo(
+    () =>
+      pendingLibraryMove && pendingLibraryMove.home === info?.home
+        ? applyLibraryMove(savedContents, pendingLibraryMove.drop)
+        : savedContents,
+    [savedContents, pendingLibraryMove, info?.home],
+  );
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<
     Record<string, boolean>
@@ -1691,28 +1701,90 @@ export default function Studio() {
       if (success) remember();
       return success;
     }
+    const home = info?.home;
+    if (!home) return false;
     movingLibrary.current = true;
+    setNotice("");
     const source = drop.source;
-    const reopen =
+    const activePage =
       source.kind === "page" &&
       page.projectId === source.projectId &&
       page.draft?.id === source.id;
+    const crossProject =
+      source.kind !== "project" && source.projectId !== drop.projectId;
+    const reopen = activePage && crossProject;
+    const token = ++sidebarRevision.current;
+    reorderCount.current++;
+    const change: DesktopChange = {
+      type: "files",
+      home,
+      sidebar: true,
+      projectIds: [
+        ...new Set([source.projectId, drop.projectId ?? source.projectId]),
+      ],
+      ...(source.kind === "page" ? { pageIds: [source.id] } : {}),
+    };
+    if (source.kind !== "project") {
+      setPendingLibraryMove({ home, drop });
+      setExpandedProjects((current) => ({
+        ...current,
+        [drop.projectId!]: true,
+      }));
+      if (drop.parentId)
+        setExpandedFolders((current) => ({
+          ...current,
+          [drop.parentId!]: true,
+        }));
+      const preferences = folderPreferences(
+        drop.projectId!,
+        drop.parentId ?? null,
+      );
+      if (drop.relativeId || preferences.sortBy === "manual") {
+        const destination = contents[drop.projectId!];
+        const siblings = sortDirectoryItems(
+          directoryEntries(
+            destination?.folders ?? [],
+            destination?.pages ?? [],
+          ).filter((item) => item.parentId === (drop.parentId ?? null)),
+          preferences,
+          organization.entryOrder?.[drop.projectId!],
+        ).map((item) => item.id);
+        setPendingReorders((pending) => [
+          ...pending,
+          {
+            token,
+            home,
+            projectId: drop.projectId!,
+            parentId: drop.parentId,
+            id: source.id,
+            siblings,
+            relativeId: drop.relativeId,
+            placement: drop.placement,
+          },
+        ]);
+      }
+    }
     let moved = false;
     let cleared = false;
     try {
       await reorderQueue.current;
       if (source.kind !== "project" && !(await page.flush())) {
         setView("page");
-        return;
+        return false;
       }
+      if (crossProject && !(await page.sessions.flushAll())) return false;
       if (source.kind === "project") {
-        await desktop.invoke("sidebar:moveProject", {
-          expectedHome: info?.home,
-          projectId: source.id,
-          sectionId: drop.sectionId,
-          relativeId: drop.relativeId,
-          placement: drop.placement,
-        });
+        const saved = await desktop.invoke<SidebarOrganization>(
+          "sidebar:moveProject",
+          {
+            expectedHome: home,
+            projectId: source.id,
+            sectionId: drop.sectionId,
+            relativeId: drop.relativeId,
+            placement: drop.placement,
+          },
+        );
+        if (sidebarHome.current === home) setOrganization(saved);
         if (drop.sectionId)
           setCollapsedSections((current) => ({
             ...current,
@@ -1722,38 +1794,40 @@ export default function Studio() {
         const record =
           source.kind === "page"
             ? await desktop.invoke<LoadedPage>("pages:get", {
+                expectedHome: home,
                 projectId: source.projectId,
                 pageId: source.id,
               })
             : null;
-        if (reopen && !(await page.clear())) return;
+        if (reopen && !(await page.clear())) return false;
         cleared = reopen;
-        await desktop.invoke("sidebar:moveEntry", {
-          kind: source.kind,
-          projectId: source.projectId,
-          id: source.id,
-          destinationProjectId: drop.projectId,
-          parentId: drop.parentId,
-          relativeId: drop.relativeId,
-          placement: drop.placement,
-          baseHash: record?.hash,
-          baseRevision: record?.revision,
-        });
+        const saved = await desktop.invoke<SidebarOrganization>(
+          "sidebar:moveEntry",
+          {
+            expectedHome: home,
+            kind: source.kind,
+            projectId: source.projectId,
+            id: source.id,
+            destinationProjectId: drop.projectId,
+            parentId: drop.parentId,
+            relativeId: drop.relativeId,
+            placement: drop.placement,
+            baseHash: record?.hash,
+            baseRevision: record?.revision,
+          },
+        );
         moved = true;
-        setExpandedProjects((current) => ({
-          ...current,
-          [drop.projectId!]: true,
-        }));
-        if (drop.parentId)
-          setExpandedFolders((current) => ({
-            ...current,
-            [drop.parentId!]: true,
-          }));
+        if (sidebarHome.current === home) setOrganization(saved);
+        if (crossProject) page.sessions.forgetPage(source.projectId, source.id);
+        else if (source.kind === "page") page.sessions.invalidate(change);
+        if (activePage && !crossProject)
+          setSelectedFolder(drop.parentId ?? null);
       }
-      await refresh();
-      if (reopen) await openPage(source.id, drop.projectId!);
-      setNotice(t("moved"));
+      moved = true;
       remember();
+      if (reopen) await openPage(source.id, drop.projectId!);
+      // Confirm only the affected projects; unrelated libraries can be large.
+      await refresh(change);
       return true;
     } catch (error) {
       if (reopen && cleared)
@@ -1762,8 +1836,18 @@ export default function Studio() {
           moved ? drop.projectId! : source.projectId,
         ).catch(report);
       report(error);
+      return moved;
     } finally {
+      if (moved && source.kind !== "project" && sidebarHome.current === home)
+        setContents((current) => applyLibraryMove(current, drop));
+      setPendingLibraryMove(null);
+      setPendingReorders((pending) =>
+        pending.filter((move) => move.token !== token),
+      );
+      sidebarRevision.current++;
+      reorderCount.current--;
       movingLibrary.current = false;
+      if (moved && sidebarHome.current === home) setNotice(t("moved"));
     }
   }
   const libraryDrag = useLibraryDragController({
@@ -2605,6 +2689,7 @@ export default function Studio() {
               <input
                 className="studio-page-title-input"
                 aria-label={t("pageTitle")}
+                disabled={!page.draft}
                 readOnly={syncReadOnly ?? page.record?.readOnly}
                 placeholder={tc("untitled")}
                 value={page.draft?.title ?? ""}

@@ -301,11 +301,10 @@ export function useLibraryDragController(options: {
       if (!next) visual.current?.restorePosition();
       await visual.current?.settle();
       if (gesture.current !== current) return;
-      try {
-        if (next) await latest.current.onDrop(next.drop);
-      } finally {
-        reset();
-      }
+      // Release the preview before React moves its rows. Persistence must not
+      // leave a settled ghost blocking clicks for the duration of disk I/O.
+      reset();
+      if (next) await latest.current.onDrop(next.drop);
     };
     const key = (event: KeyboardEvent) => {
       if (event.key === "Escape" && gesture.current?.active) {
