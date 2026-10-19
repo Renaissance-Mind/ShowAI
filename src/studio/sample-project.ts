@@ -3,7 +3,7 @@ import type { SampleState } from "../core/onboarding";
 import type { AgentConnectionRecord } from "../agent/mcp-connections";
 import { getLocale, translator, type Locale } from "../i18n";
 import messages from "../i18n/messages/onboarding";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorCode, errorMessage } from "./bridge";
 
 export const SAMPLE_KEYS = ["kyoto", "attention", "foldable"] as const;
 export type SampleKey = (typeof SAMPLE_KEYS)[number];
@@ -57,8 +57,14 @@ export function useSampleProject(
     if (!home) return;
     let stopped = false;
     void (async () => {
-      const current = await desktop.invoke<Onboarding>("agent:onboarding");
-      if (stopped) return;
+      const current = await desktop
+        .invoke<Onboarding>("agent:onboarding")
+        .catch((reason) => {
+          // Hosts without the App's library runtime, such as the website workbench, have no first-run state.
+          if (errorCode(reason) === "UNAVAILABLE") return null;
+          throw reason;
+        });
+      if (stopped || !current) return;
       setSamples(current.samples);
       if (current.samples?.state !== "pending") return;
       setPreparing(true);
