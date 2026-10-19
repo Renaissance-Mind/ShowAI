@@ -46,9 +46,6 @@ import viewportLockCss from "../components/blocks/viewport-lock.css?raw";
 import tableHover from "../components/blocks/table-hover.ts?raw";
 import tableAlignment from "../components/blocks/TableAlignment.tsx?raw";
 import primitives from "../components/blocks/Primitives.tsx?raw";
-import presentation from "../components/blocks/Presentation.tsx?raw";
-import presentationCss from "../components/blocks/presentation.css?raw";
-import presentationContract from "../components/blocks/presentation-contract.mjs?raw";
 import comparisonMatrix from "../components/blocks/ComparisonMatrix.tsx?raw";
 import statusTree from "../components/blocks/StatusTree.tsx?raw";
 import experimentTracker from "../components/blocks/ExperimentTracker.tsx?raw";
@@ -105,7 +102,6 @@ import i18n_mindmap from "../i18n/messages/mindmap.ts?raw";
 import i18n_nativeInk from "../i18n/messages/nativeInk.ts?raw";
 import i18n_pdf from "../i18n/messages/pdf.ts?raw";
 import i18n_playground from "../i18n/messages/playground.ts?raw";
-import i18n_presentation from "../i18n/messages/presentation.ts?raw";
 import i18n_primitives from "../i18n/messages/primitives.ts?raw";
 import i18n_references from "../i18n/messages/references.ts?raw";
 import i18n_resourceEditor from "../i18n/messages/resourceEditor.ts?raw";
@@ -206,9 +202,6 @@ const sources: Record<string, string> = {
   "Primitives.tsx": primitives,
   "TableAlignment.tsx": tableAlignment,
   "table-hover.ts": tableHover,
-  "Presentation.tsx": presentation,
-  "presentation.css": presentationCss,
-  "presentation-contract.mjs": presentationContract,
   "ComparisonMatrix.tsx": comparisonMatrix,
   "StatusTree.tsx": statusTree,
   "ExperimentTracker.tsx": experimentTracker,
@@ -265,7 +258,6 @@ const sources: Record<string, string> = {
   "i18n/messages/nativeInk.ts": i18n_nativeInk,
   "i18n/messages/pdf.ts": i18n_pdf,
   "i18n/messages/playground.ts": i18n_playground,
-  "i18n/messages/presentation.ts": i18n_presentation,
   "i18n/messages/primitives.ts": i18n_primitives,
   "i18n/messages/references.ts": i18n_references,
   "i18n/messages/resourceEditor.ts": i18n_resourceEditor,
@@ -375,7 +367,6 @@ export const builtinExports: Record<string, string> = {
   divider: "Divider",
   code: "Code",
   "step-walkthrough": "StepWalkthrough",
-  "evidence-explorer": "EvidenceExplorer",
   "comparison-matrix": "ComparisonMatrix",
   "status-tree": "StatusTree",
   "experiment-tracker": "ExperimentTracker",

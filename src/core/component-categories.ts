@@ -30,7 +30,6 @@ const builtinCategories: Record<string, ComponentCategory> = {
   metrics: "data",
   playground: "data",
   "step-walkthrough": "flow",
-  "evidence-explorer": "table",
   "comparison-matrix": "table",
   "status-tree": "flow",
   "experiment-tracker": "data",

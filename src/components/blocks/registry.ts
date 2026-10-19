@@ -16,10 +16,8 @@ import { VideoBlock, AudioBlock } from "./Media";
 import { PdfBlock } from "./Pdf";
 import { ReferencesBlock } from "./References";
 import { validateResearchData } from "./research-contract.mjs";
-import { EvidenceExplorerBlock } from "./Presentation";
 import { StepWalkthroughBlock } from "./StepWalkthrough";
 import { validateWalkthroughData } from "./walkthrough-contract.mjs";
-import { validatePresentationData } from "./presentation-contract.mjs";
 import { ChartBlock } from "./Chart";
 import { DatabaseBlock } from "./Database";
 import { GalleryBlock } from "./Gallery";
@@ -484,17 +482,6 @@ registerBlock({
   validate: (data) => {
     validateWalkthroughData(data);
   },
-});
-registerBlock({
-  kind: "evidence-explorer",
-  title: "证据探索",
-  description: "主题、时间、来源与共同维度比较",
-  icon: "⇄",
-  defaultData: componentMetadata.find(
-    (item) => item.kind === "evidence-explorer",
-  )!.defaultData as BlockData,
-  renderer: EvidenceExplorerBlock,
-  validate: (data) => validatePresentationData("evidence-explorer", data),
 });
 registerBlock({
   kind: "comparison-matrix",

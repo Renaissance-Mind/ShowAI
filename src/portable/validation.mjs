@@ -10,7 +10,6 @@ import {
   diagramTemplates,
 } from "../components/blocks/diagrams/contract.mjs";
 import { validateG2Data } from "../components/blocks/g2/contract.mjs";
-import { validatePresentationData } from "../components/blocks/presentation-contract.mjs";
 import { validateWalkthroughData } from "../components/blocks/walkthrough-contract.mjs";
 import { validateAnalysisData } from "../components/blocks/analysis-contract.mjs";
 import { validateScene3dData } from "../components/blocks/scene3d-contract.mjs";
@@ -270,10 +269,6 @@ function validateAttrs(attrs, path, permitted, surfaceIcon = false) {
 function validateWidgetData(kind, data, path) {
   if (Object.hasOwn(diagramTemplates, kind)) {
     validateDiagramData(kind, data);
-    return;
-  }
-  if (kind === "evidence-explorer") {
-    validatePresentationData(kind, data);
     return;
   }
   if (kind === "step-walkthrough") {
