@@ -26,7 +26,7 @@ ShowAI 在你已经在用的 Agent 里工作：装上插件后，Agent 就能把
 
 需要：Apple Silicon Mac（macOS 13 或更高版本），以及已登录的 Claude Code 或 Codex（也可以在 App 中填写模型 API Key）。使用 Windows 或 Linux 时，运行[浏览器版](#从源码构建)。
 
-1. **下载 ShowAI** — 下载[最新版本](https://github.com/Renaissance-Mind/ShowAI/releases/latest)，打开 DMG，把 ShowAI 拖进「应用程序」。
+1. **下载 ShowAI** — 下载[最新版本](https://github.com/Renaissance-Mind/ShowAI/releases/latest)，打开 DMG，把 ShowAI 拖进「应用程序」。当前版本尚未经过 Apple 公证；macOS 阻止首次打开时，见[首次打开](quick-start.zh-CN.md#1-安装-showai)。
 2. **连接你的 Agent** — 打开 ShowAI，在欢迎页（或「设置 → 插件」）为 Claude Code 或 Codex 安装插件，然后重启 Agent。
 3. **让 Agent 做第一个界面** — 在新对话中粘贴示例提示词：
 

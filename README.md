@@ -26,7 +26,7 @@ ShowAI works inside the agent you already use: the plugin lets your agent build 
 
 You need a Mac with Apple silicon (macOS 13 or later), and Claude Code or Codex signed in. No agent yet? Use the built-in agent with a model API key. On Windows or Linux, run the [browser edition](#build-from-source).
 
-1. **Download ShowAI** — get the [latest release](https://github.com/Renaissance-Mind/ShowAI/releases/latest), open the DMG and drag ShowAI into Applications.
+1. **Download ShowAI** — get the [latest release](https://github.com/Renaissance-Mind/ShowAI/releases/latest), open the DMG and drag ShowAI into Applications. Current builds are not yet notarized by Apple; if macOS blocks the first launch, see [first launch](docs/quick-start.md#1-install-showai).
 2. **Connect your agent** — open ShowAI and install the plugin for Claude Code or Codex from the welcome screen (or **Settings → Plugins**), then restart the agent.
 3. **Ask for an interface** — paste the sample prompt into a new conversation:
 

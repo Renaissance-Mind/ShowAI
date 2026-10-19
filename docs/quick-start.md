@@ -17,7 +17,7 @@ ShowAI works inside the agent you already use: the plugin lets your agent build 
 
 1. Download the DMG from the [latest release](https://github.com/Renaissance-Mind/ShowAI/releases/latest).
 2. Open it and drag **ShowAI** into **Applications**, then open ShowAI.
-3. If macOS blocks the first launch, the release has not been notarized by Apple yet. Open **System Settings → Privacy & Security** and choose **Open Anyway** ([Apple's instructions](https://support.apple.com/en-us/102445)). The release notes state whether this applies.
+3. Current builds are not yet notarized by Apple, so macOS may block the first launch. If it does, open **System Settings → Privacy & Security** and choose **Open Anyway** ([Apple's instructions](https://support.apple.com/en-us/102445)). Each release's notes say whether this is still needed.
 
 ## 2. Connect your agent
 
@@ -45,7 +45,7 @@ Two more to try:
 
 | What you see                                        | What to do                                                                                                                                                       |
 | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The plugin panel says the agent was not found       | Install Claude Code or Codex, make sure its command-line tool runs in a terminal, then click **Check again**.                                                    |
+| The plugin panel says the agent was not found       | Install Claude Code or Codex, make sure its command-line tool runs in a terminal (`claude --version` or `codex --version`), then click **Check again**.          |
 | **Installed, disabled**                             | Click **Update and enable**.                                                                                                                                     |
 | ShowAI is enabled from another source               | Disable that plugin in the agent, then click **Check again** and install the app version.                                                                        |
 | The agent answers in text and never mentions ShowAI | The conversation started before the plugin loaded. Restart the agent and open a new conversation; asking explicitly with "Use ShowAI to …" helps.                |
