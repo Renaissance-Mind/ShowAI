@@ -1,29 +1,9 @@
 import { defineMessages } from "../index";
 
-// Mechanism steps and evidence explorer reading controls.
+// Evidence explorer reading controls.
 export default defineMessages("presentation", {
   "zh-CN": {
-    "status.changed": "本步改变",
-    "status.retained": "承接保留",
-    "status.fixed": "保持固定",
     sources: "依据：",
-    links: "作用关系",
-    condition: "成立条件：",
-    "mechanism.empty":
-      "尚未填写机制。为同一组对象添加连续状态、变化原因与成立条件。",
-    "mechanism.steps": "机制步骤",
-    "mechanism.progress": "第 {current} 步 / 共 {total} 步",
-    "mechanism.before": "进入本步前",
-    "mechanism.after": "完成本步后",
-    "mechanism.startingObjects": "从这些对象开始",
-    "mechanism.next": "下一步：{title}",
-    "mechanism.nextHint": "接下来：{title}",
-    "mechanism.complete": "已到最后一步",
-    previousStep: "上一步",
-    nextStep: "下一步",
-    backToStart: "回到起点",
-    readStepByStep: "逐步阅读",
-    expandAllSteps: "展开全部步骤",
     notProvided: "资料未提供",
     boundary: "解释边界：",
     undated: "未标日期",
@@ -58,27 +38,7 @@ export default defineMessages("presentation", {
     readAll: "连续阅读全部条目与来源（{count}）",
   },
   en: {
-    "status.changed": "Changes here",
-    "status.retained": "Carried over",
-    "status.fixed": "Stays fixed",
     sources: "Sources: ",
-    links: "Interactions",
-    condition: "Holds when: ",
-    "mechanism.empty":
-      "No mechanism yet. Add successive states for the same set of objects, what causes each change, and when it holds.",
-    "mechanism.steps": "Mechanism steps",
-    "mechanism.progress": "Step {current} of {total}",
-    "mechanism.before": "Before this step",
-    "mechanism.after": "After this step",
-    "mechanism.startingObjects": "Start with these objects",
-    "mechanism.next": "Next: {title}",
-    "mechanism.nextHint": "Coming next: {title}",
-    "mechanism.complete": "Final step reached",
-    previousStep: "Previous step",
-    nextStep: "Next step",
-    backToStart: "Back to start",
-    readStepByStep: "Read step by step",
-    expandAllSteps: "Show all steps",
     notProvided: "Not provided",
     boundary: "Limits of interpretation: ",
     undated: "Undated",

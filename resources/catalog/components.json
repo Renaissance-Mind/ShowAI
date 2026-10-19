@@ -3908,18 +3908,35 @@
     ]
   },
   {
-    "kind": "mechanism-steps",
-    "name": "机制分镜",
-    "description": "通过前后状态对照，逐步讲清每一步改变什么、保留什么，以及结果如何传到下一步。",
-    "version": "1.1.0",
+    "kind": "step-walkthrough",
+    "name": "分步演示",
+    "description": "用一个具体例子逐步演示机制：每一步给出一句要点，左栏是实际发生的输入与操作，右栏是各组成部分此刻的具体条目（新增、已更新、已失效、未变）；最后可展示输出原文并隐藏某一部分作对比。",
+    "version": "1.0.0",
     "scenarios": [
-      "机制、算法、实验或流程的逐步状态变化。",
-      "比较每轮变化、继承位置和外部固定条件。"
+      "用一个具体例子讲清算法、协议或系统机制每一步实际改变了什么，例如缓存淘汰、数据库事务或记忆系统的写入与检索。",
+      "说明某个组成部分为什么必要：在输出步骤中隐藏它，对比读者会少知道什么。"
     ],
     "defaultData": {
-      "title": "机制如何发生",
-      "parts": [],
-      "frames": []
+      "title": "分步演示",
+      "parts": [
+        {
+          "id": "state",
+          "label": "状态"
+        }
+      ],
+      "steps": [
+        {
+          "id": "s1",
+          "label": "第一步",
+          "takeaway": "这一步的要点。",
+          "actions": [
+            {
+              "actor": "操作",
+              "text": "描述这一步实际做了什么。"
+            }
+          ]
+        }
+      ]
     },
     "propsSchema": {
       "type": "object",
@@ -3928,11 +3945,30 @@
           "type": "string",
           "minLength": 1
         },
-        "introduction": {
-          "type": "string"
+        "question": {
+          "type": "string",
+          "minLength": 1,
+          "description": "这组演示要回答的具体问题。"
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "description": "整组说明，例如哪些内容是示意。"
+        },
+        "stateHeading": {
+          "type": "string",
+          "minLength": 1,
+          "description": "右栏状态标题，默认“此时的状态”。"
+        },
+        "initialStep": {
+          "type": "string",
+          "minLength": 1,
+          "description": "初始显示的步骤 id。"
         },
         "parts": {
           "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
           "items": {
             "type": "object",
             "properties": {
@@ -3943,15 +3979,27 @@
               "label": {
                 "type": "string",
                 "minLength": 1
+              },
+              "plain": {
+                "type": "string",
+                "minLength": 1
+              },
+              "how": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tone": {
+                "enum": ["accent", "teal", "orange", "violet", "rose", "slate"]
               }
             },
             "required": ["id", "label"],
             "additionalProperties": false
-          },
-          "maxItems": 8
+          }
         },
-        "frames": {
+        "steps": {
           "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
           "items": {
             "type": "object",
             "properties": {
@@ -3959,20 +4007,51 @@
                 "type": "string",
                 "minLength": 1
               },
-              "title": {
+              "label": {
                 "type": "string",
                 "minLength": 1
               },
-              "explanation": {
+              "takeaway": {
                 "type": "string",
                 "minLength": 1
               },
-              "condition": {
+              "actionsHeading": {
                 "type": "string",
                 "minLength": 1
               },
-              "states": {
+              "actions": {
                 "type": "array",
+                "minItems": 1,
+                "maxItems": 12,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "actor": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "text": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "kind": {
+                      "enum": ["input", "action", "result", "note"]
+                    },
+                    "illustrative": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["actor", "text"],
+                  "additionalProperties": false
+                }
+              },
+              "entries": {
+                "type": "array",
+                "maxItems": 24,
                 "items": {
                   "type": "object",
                   "properties": {
@@ -3980,54 +4059,142 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "value": {
+                    "partId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "title": {
                       "type": "string",
                       "minLength": 1
                     },
                     "status": {
-                      "enum": ["changed", "retained", "fixed"]
+                      "enum": ["new", "changed", "retired", "kept"]
                     },
-                    "tokens": {
+                    "statusLabel": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "note": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "fields": {
                       "type": "array",
+                      "minItems": 1,
+                      "maxItems": 8,
                       "items": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 80
-                      },
-                      "maxItems": 12,
-                      "description": "可选的对象或候选标签，作为可读的状态标记展示。"
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "value": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "mono": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": ["label", "value"],
+                        "additionalProperties": false
+                      }
                     }
                   },
-                  "required": ["id", "value", "status"],
+                  "required": ["id", "partId", "title", "status", "fields"],
                   "additionalProperties": false
-                },
-                "maxItems": 8
+                }
               },
-              "links": {
+              "partNotes": {
                 "type": "array",
+                "maxItems": 6,
                 "items": {
                   "type": "object",
                   "properties": {
-                    "from": {
+                    "partId": {
                       "type": "string",
                       "minLength": 1
                     },
-                    "to": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "label": {
+                    "text": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["from", "to", "label"],
+                  "required": ["partId", "text"],
                   "additionalProperties": false
+                }
+              },
+              "output": {
+                "type": "object",
+                "properties": {
+                  "heading": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "hidePartId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "hideLabel": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "hideNote": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "blocks": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 8,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "partId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "callouts": {
+                          "type": "array",
+                          "maxItems": 6,
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      "required": ["id", "label", "text"],
+                      "additionalProperties": false
+                    }
+                  }
                 },
-                "maxItems": 24
+                "required": ["heading", "blocks"],
+                "additionalProperties": false
+              },
+              "details": {
+                "type": "array",
+                "maxItems": 10,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
               },
               "sources": {
                 "type": "array",
+                "maxItems": 8,
                 "items": {
                   "type": "object",
                   "properties": {
@@ -4037,179 +4204,591 @@
                     },
                     "url": {
                       "type": "string",
+                      "minLength": 1,
                       "pattern": "^https?://"
                     }
                   },
                   "required": ["label", "url"],
                   "additionalProperties": false
-                },
-                "maxItems": 80
-              },
-              "inputSummary": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 240,
-                "description": "进入本步前的简要状态说明。"
-              },
-              "outputSummary": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 240,
-                "description": "完成本步后的简要结果说明。"
-              },
-              "actionLabel": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 240,
-                "description": "前后状态之间的处理动作。"
-              },
-              "nextHint": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 240,
-                "description": "本步结束后需要继续关注的内容。"
-              },
-              "headline": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 240,
-                "description": "可选的本步讲解标题；title 保持适合导航的短标题。"
+                }
               }
             },
-            "required": ["id", "title", "explanation", "states", "links"],
+            "required": ["id", "label", "takeaway", "actions"],
             "additionalProperties": false
-          },
-          "maxItems": 16
-        },
-        "initialStates": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "minLength": 1
-              },
-              "value": {
-                "type": "string",
-                "minLength": 1
-              },
-              "status": {
-                "enum": ["changed", "retained", "fixed"]
-              },
-              "tokens": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 80
-                },
-                "maxItems": 12,
-                "description": "可选的对象或候选标签，作为可读的状态标记展示。"
-              }
-            },
-            "required": ["id", "value", "status"],
-            "additionalProperties": false
-          },
-          "maxItems": 8,
-          "description": "可选的第一步输入状态；每个 parts.id 恰好出现一次。省略时先介绍对象，不假设初始值。"
+          }
         }
       },
-      "required": ["title", "parts", "frames"],
+      "required": ["title", "parts", "steps"],
       "additionalProperties": false
     },
     "examples": [
       {
-        "name": "数学关系示例",
-        "request": "机制分镜",
+        "name": "LRU 缓存淘汰",
+        "request": "用一个具体例子逐步说明 LRU 缓存怎样淘汰数据，最后展示一次未命中的读取。",
         "data": {
-          "title": "约分为什么保持比例",
-          "introduction": "分子和分母同时除以同一个非零数。",
+          "title": "LRU 缓存如何淘汰数据",
+          "question": "容量为 2 的 LRU 缓存依次写入 A、B，读取 A，再写入 C 之后，为什么读取 B 会落空？",
           "parts": [
             {
-              "id": "n",
-              "label": "分子"
+              "id": "cache",
+              "label": "缓存",
+              "plain": "当前保存的键值对",
+              "how": "容量 2",
+              "tone": "accent"
             },
             {
-              "id": "d",
-              "label": "分母"
+              "id": "order",
+              "label": "使用顺序",
+              "plain": "从最近使用到最久未使用",
+              "tone": "teal"
             }
           ],
-          "frames": [
+          "steps": [
             {
-              "id": "before",
-              "title": "原始比例",
-              "explanation": "2/4 表示四份中的两份。",
-              "states": [
+              "id": "put",
+              "label": "写入 A、B",
+              "takeaway": "缓存未满时，新写入的键直接保存，并排在使用顺序的最前面。",
+              "actions": [
                 {
-                  "id": "n",
-                  "value": "2",
-                  "status": "fixed"
+                  "actor": "调用方",
+                  "kind": "input",
+                  "text": "依次写入两个键",
+                  "code": "cache.put(\"A\", 1)\ncache.put(\"B\", 2)"
+                }
+              ],
+              "entries": [
+                {
+                  "id": "a",
+                  "partId": "cache",
+                  "title": "A",
+                  "status": "new",
+                  "fields": [
+                    {
+                      "label": "值",
+                      "value": "1",
+                      "mono": true
+                    }
+                  ]
                 },
                 {
-                  "id": "d",
-                  "value": "4",
-                  "status": "fixed"
-                }
-              ],
-              "links": [
+                  "id": "b",
+                  "partId": "cache",
+                  "title": "B",
+                  "status": "new",
+                  "fields": [
+                    {
+                      "label": "值",
+                      "value": "2",
+                      "mono": true
+                    }
+                  ]
+                },
                 {
-                  "from": "n",
-                  "to": "d",
-                  "label": "组成 2/4"
+                  "id": "seq",
+                  "partId": "order",
+                  "title": "顺序",
+                  "status": "new",
+                  "fields": [
+                    {
+                      "label": "最近 → 最久",
+                      "value": "B, A",
+                      "mono": true
+                    }
+                  ]
                 }
-              ],
-              "inputSummary": "观察原始分子和分母。",
-              "outputSummary": "原始比例为 2 / 4。",
-              "actionLabel": "记录原始比例"
+              ]
             },
             {
-              "id": "after",
-              "title": "同时除以 2",
-              "explanation": "2÷2=1，4÷2=2；1/2 与 2/4 相等。",
-              "condition": "分子分母必须除以同一个非零数。",
-              "states": [
+              "id": "get",
+              "label": "读取 A",
+              "takeaway": "读取也算一次使用：A 移到最前，B 成为最久未使用的键。",
+              "actions": [
                 {
-                  "id": "n",
-                  "value": "1",
-                  "status": "changed"
+                  "actor": "调用方",
+                  "kind": "input",
+                  "text": "读取 A",
+                  "code": "cache.get(\"A\")"
                 },
                 {
-                  "id": "d",
-                  "value": "2",
-                  "status": "changed"
+                  "actor": "缓存返回",
+                  "kind": "result",
+                  "text": "命中，返回 1"
                 }
               ],
-              "links": [
+              "entries": [
                 {
-                  "from": "n",
-                  "to": "d",
-                  "label": "组成 1/2"
+                  "id": "a",
+                  "partId": "cache",
+                  "title": "A",
+                  "status": "kept",
+                  "fields": [
+                    {
+                      "label": "值",
+                      "value": "1",
+                      "mono": true
+                    }
+                  ]
+                },
+                {
+                  "id": "b",
+                  "partId": "cache",
+                  "title": "B",
+                  "status": "kept",
+                  "fields": [
+                    {
+                      "label": "值",
+                      "value": "2",
+                      "mono": true
+                    }
+                  ]
+                },
+                {
+                  "id": "seq",
+                  "partId": "order",
+                  "title": "顺序",
+                  "status": "changed",
+                  "fields": [
+                    {
+                      "label": "最近 → 最久",
+                      "value": "A, B",
+                      "mono": true
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "evict",
+              "label": "写入 C",
+              "takeaway": "缓存已满，写入 C 之前先淘汰最久未使用的 B。",
+              "actions": [
+                {
+                  "actor": "调用方",
+                  "kind": "input",
+                  "text": "写入第三个键",
+                  "code": "cache.put(\"C\", 3)"
                 }
               ],
-              "inputSummary": "分子和分母来自同一个比例。",
-              "outputSummary": "同时除以 2，得到 1 / 2。",
-              "actionLabel": "同时除以 2"
+              "entries": [
+                {
+                  "id": "a",
+                  "partId": "cache",
+                  "title": "A",
+                  "status": "kept",
+                  "fields": [
+                    {
+                      "label": "值",
+                      "value": "1",
+                      "mono": true
+                    }
+                  ]
+                },
+                {
+                  "id": "b",
+                  "partId": "cache",
+                  "title": "B",
+                  "status": "retired",
+                  "statusLabel": "已淘汰",
+                  "fields": [
+                    {
+                      "label": "值",
+                      "value": "2",
+                      "mono": true
+                    }
+                  ],
+                  "note": "容量已满，淘汰使用顺序末尾的键。"
+                },
+                {
+                  "id": "c",
+                  "partId": "cache",
+                  "title": "C",
+                  "status": "new",
+                  "fields": [
+                    {
+                      "label": "值",
+                      "value": "3",
+                      "mono": true
+                    }
+                  ]
+                },
+                {
+                  "id": "seq",
+                  "partId": "order",
+                  "title": "顺序",
+                  "status": "changed",
+                  "fields": [
+                    {
+                      "label": "最近 → 最久",
+                      "value": "C, A",
+                      "mono": true
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "miss",
+              "label": "读取 B",
+              "takeaway": "B 已在上一步被淘汰，因此读取落空。",
+              "actions": [
+                {
+                  "actor": "调用方",
+                  "kind": "input",
+                  "text": "读取 B",
+                  "code": "cache.get(\"B\")"
+                }
+              ],
+              "output": {
+                "heading": "返回结果",
+                "blocks": [
+                  {
+                    "id": "r",
+                    "partId": "cache",
+                    "label": "cache.get(\"B\")",
+                    "text": "-1",
+                    "callouts": [
+                      "未命中：B 在第 3 步被淘汰。",
+                      "若第 2 步没有读取 A，被淘汰的将是 A。"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "编码记忆的写入、覆盖与检索",
+        "request": "逐步演示 Agent 记忆系统在两次修改代码后保存了什么，并在提问时可隐藏版本链作对比。",
+        "data": {
+          "title": "案例 B：两次修改同一处代码后，记忆库中保留的内容",
+          "question": "Agent 先后采用两种方法修复同一个超时问题。此后被问及“最终保留的是哪种实现”时，它能从记忆中取回哪些信息？",
+          "note": "用户的第一句请求、工具返回和最后的提问来自官方 Coding 示例；第二次会话、代码改动以及各条记录的文字，是按照官方源码中的字段与格式补写的示意，并非实际运行输出。",
+          "stateHeading": "此时记忆库中的内容",
+          "parts": [
+            {
+              "id": "fact",
+              "label": "事实层",
+              "plain": "本次完成了哪些工作",
+              "how": "模型抽取 · 每次会话恰好 1 条",
+              "tone": "accent"
+            },
+            {
+              "id": "exp",
+              "label": "经验层",
+              "plain": "可在后续任务中复用的方法",
+              "how": "同一次模型抽取 · 通过价值评估才保存",
+              "tone": "teal"
+            },
+            {
+              "id": "chain",
+              "label": "版本链",
+              "plain": "每一版代码的具体改动",
+              "how": "不调用模型 · 直接记录 diff · Coding 场景特有",
+              "tone": "orange"
             }
           ],
-          "initialStates": [
+          "initialStep": "s1",
+          "steps": [
             {
-              "id": "n",
-              "value": "2",
-              "status": "fixed"
+              "id": "s1",
+              "label": "第一次会话：写入",
+              "takeaway": "会话结束后，记忆库同时记录了本次完成的工作（事实）和代码的具体改动（版本链第 1 版）。本次仅调大了一个参数，不具备复用价值，因此没有生成经验。",
+              "actions": [
+                {
+                  "actor": "用户",
+                  "kind": "input",
+                  "text": "Fix the timeout in the search client."
+                },
+                {
+                  "actor": "Agent 调用工具",
+                  "kind": "action",
+                  "text": "apply_patch 修改 src/search.py",
+                  "code": "- resp = client.get(url, timeout=5)\n+ resp = client.get(url, timeout=30)",
+                  "illustrative": true
+                },
+                {
+                  "actor": "工具返回",
+                  "kind": "result",
+                  "text": "Patch applied successfully"
+                },
+                {
+                  "actor": "调用记忆 SDK",
+                  "kind": "note",
+                  "text": "将本次对话写入记忆库",
+                  "code": "client.add(messages, scene=\"coding\",\n           workspace_id=\"github.com/example/service\",\n           branch=\"fix/search-timeout\")"
+                }
+              ],
+              "entries": [
+                {
+                  "id": "f1",
+                  "partId": "fact",
+                  "title": "事实 #1",
+                  "status": "new",
+                  "fields": [
+                    {
+                      "label": "statement",
+                      "value": "用户要求修复 search client 超时；在 src/search.py 的 search() 中将请求超时从 5s 调整为 30s，补丁已应用。"
+                    },
+                    {
+                      "label": "files · branch",
+                      "value": "src/search.py · fix/search-timeout",
+                      "mono": true
+                    },
+                    {
+                      "label": "status",
+                      "value": "active",
+                      "mono": true
+                    }
+                  ]
+                },
+                {
+                  "id": "c1",
+                  "partId": "chain",
+                  "title": "src/search.py · search()  已修改 1 次",
+                  "status": "new",
+                  "fields": [
+                    {
+                      "label": "第 1 版原话",
+                      "value": "Fix the timeout in the search client."
+                    },
+                    {
+                      "label": "第 1 版改动",
+                      "value": "~ resp = client.get(url, timeout=5) → resp = client.get(url, timeout=30)",
+                      "mono": true
+                    }
+                  ]
+                }
+              ],
+              "partNotes": [
+                {
+                  "partId": "exp",
+                  "text": "无新增：本次修改仅调大超时参数，未通过“值得复用”的评估。"
+                }
+              ],
+              "details": [
+                "写入内容须包含 assistant 的 tool_calls 或 role=tool 消息；不含工具调用记录时会回退到 Chat 记忆。显式指定 scene=\"coding\" 时跳过场景判断。",
+                "事实与经验在同一次模型调用中抽取；事实层有意只记录文件、函数与分支等定位信息，不保存代码。",
+                "版本链不调用模型：直接从本地 Git diff（需配置 MEMORY_CODING_CHAIN_REPO_ROOT）或工具调用中带有 path / old / new 的替换操作中记录。无法解析的编辑会被跳过，不影响事实与经验的写入。"
+              ],
+              "sources": [
+                {
+                  "label": "Working 与 Coding 场景文档",
+                  "url": "https://github.com/Tencent-Hunyuan/Hy-Memory/blob/main/docs/scene_coding_usage.md"
+                }
+              ]
             },
             {
-              "id": "d",
-              "value": "4",
-              "status": "fixed"
+              "id": "s2",
+              "label": "第二次会话：覆盖",
+              "takeaway": "次日发现延长超时未能解决根本问题，改为短超时加重试。旧事实没有被删除，而是标记为“已被取代”；第 1 版代码虽已从仓库中消失，版本链仍保留着它。",
+              "actions": [
+                {
+                  "actor": "用户",
+                  "kind": "input",
+                  "text": "Still timing out under load. Revert the 30s timeout and retry with exponential backoff instead.",
+                  "illustrative": true
+                },
+                {
+                  "actor": "Agent 调用工具",
+                  "kind": "action",
+                  "text": "apply_patch 修改 src/search.py",
+                  "code": "- resp = client.get(url, timeout=30)\n+ resp = get_with_retry(url, timeout=5, retries=3, backoff=0.5)",
+                  "illustrative": true
+                },
+                {
+                  "actor": "工具返回",
+                  "kind": "result",
+                  "text": "Patch applied successfully"
+                },
+                {
+                  "actor": "调用记忆 SDK",
+                  "kind": "note",
+                  "text": "再次写入，仓库与分支相同",
+                  "code": "client.add(messages, scene=\"coding\", workspace_id=…, branch=\"fix/search-timeout\")"
+                }
+              ],
+              "entries": [
+                {
+                  "id": "f1",
+                  "partId": "fact",
+                  "title": "事实 #1",
+                  "status": "retired",
+                  "statusLabel": "已被取代",
+                  "fields": [
+                    {
+                      "label": "statement",
+                      "value": "用户要求修复 search client 超时；在 src/search.py 的 search() 中将请求超时从 5s 调整为 30s，补丁已应用。"
+                    },
+                    {
+                      "label": "status",
+                      "value": "superseded → 事实 #2",
+                      "mono": true
+                    }
+                  ],
+                  "note": "被判定为同一任务的后续推进，因此标记为已被取代而非删除，可沿任务进展链回溯。"
+                },
+                {
+                  "id": "f2",
+                  "partId": "fact",
+                  "title": "事实 #2",
+                  "status": "new",
+                  "fields": [
+                    {
+                      "label": "statement",
+                      "value": "用户继续修复同一超时问题：30s 超时在高负载下仍会超时，改为 5s 超时并最多进行 3 次指数退避重试。"
+                    },
+                    {
+                      "label": "进展总结",
+                      "value": "先将超时从 5s 调整为 30s；高负载下仍超时，撤回该修改并改为短超时加重试。"
+                    },
+                    {
+                      "label": "status",
+                      "value": "active",
+                      "mono": true
+                    }
+                  ]
+                },
+                {
+                  "id": "e1",
+                  "partId": "exp",
+                  "title": "经验 #1",
+                  "status": "new",
+                  "fields": [
+                    {
+                      "label": "task",
+                      "value": "外部搜索服务在高负载下偶发超时"
+                    },
+                    {
+                      "label": "solution",
+                      "value": "采用短超时加指数退避重试，而不是一味延长超时"
+                    },
+                    {
+                      "label": "适用条件",
+                      "value": "仅适用于幂等的只读请求；写请求须先保证幂等再重试"
+                    },
+                    {
+                      "label": "confidence",
+                      "value": "0.8",
+                      "mono": true
+                    }
+                  ]
+                },
+                {
+                  "id": "c1",
+                  "partId": "chain",
+                  "title": "src/search.py · search()  已修改 2 次",
+                  "status": "changed",
+                  "fields": [
+                    {
+                      "label": "第 1 版",
+                      "value": "“Fix the timeout in the search client.”\n~ resp = client.get(url, timeout=5) → resp = client.get(url, timeout=30)",
+                      "mono": true
+                    },
+                    {
+                      "label": "第 2 版",
+                      "value": "“Still timing out under load. Revert…”\n~ resp = client.get(url, timeout=30) → resp = get_with_retry(url, timeout=5, retries=3, backoff=0.5)",
+                      "mono": true
+                    }
+                  ],
+                  "note": "第 2 版删除的正是第 1 版新增的那一行，因此检索时会标注“撤销了第 1 版”。"
+                }
+              ],
+              "details": [
+                "事实层只有两种操作：INSERT（每次必有）和 SUPERSEDE。只有当主体相同、目标相同，且新会话是在继续或完成旧工作时，才会执行 SUPERSEDE；无法确定时仅执行 INSERT。",
+                "经验层另有 ADD / UPDATE / DELETE / SKIP 四种操作；适用条件对应字段 boundary_envs，复用前会先判断当前情境是否符合。",
+                "版本链按“分支 + 文件 + 函数块”划分，并以 user_id 与 workspace_id 隔离。版本号仅表示记录的先后次序，不依赖模型判断哪一版覆盖了哪一版。"
+              ],
+              "sources": [
+                {
+                  "label": "fact_reconciler.py",
+                  "url": "https://github.com/Tencent-Hunyuan/Hy-Memory/blob/main/hy_memory/coding/fact_reconciler.py"
+                },
+                {
+                  "label": "chain_store.py",
+                  "url": "https://github.com/Tencent-Hunyuan/Hy-Memory/blob/main/hy_memory/coding/chain_store.py"
+                }
+              ]
+            },
+            {
+              "id": "s3",
+              "label": "提问：检索",
+              "takeaway": "被问及“最终保留了哪种实现”时，Agent 不仅得到答案（短超时加重试），还能看到已被撤回的第 1 版代码与当时的用户原话。可勾选右上角的选项，对比缺少版本链时的检索结果。",
+              "actions": [
+                {
+                  "actor": "用户",
+                  "kind": "input",
+                  "text": "Which timeout implementation was finally kept?"
+                },
+                {
+                  "actor": "调用记忆 SDK",
+                  "kind": "note",
+                  "text": "按场景检索，不调用模型",
+                  "code": "client.search(\"Which timeout implementation was finally kept?\",\n              scene=\"coding\", workspace_id=…,\n              branch=\"fix/search-timeout\", limit=5)"
+                }
+              ],
+              "output": {
+                "heading": "Agent 收到的检索结果",
+                "blocks": [
+                  {
+                    "id": "facts",
+                    "partId": "fact",
+                    "label": "facts[0]",
+                    "text": "用户继续修复同一超时问题：30s 超时在高负载下仍会超时，改为 5s 超时并最多进行 3 次指数退避重试。",
+                    "callouts": [
+                      "直接回答了问题：最终保留的是短超时加重试。",
+                      "已被取代的事实 #1 已从向量库中移除，不会再被检索到。",
+                      "该事实也出现在下方 chain_block 的开头（chain_used = [0]），拼接上下文时需由调用方去重。"
+                    ]
+                  },
+                  {
+                    "id": "exps",
+                    "partId": "exp",
+                    "label": "experiences[0]",
+                    "text": "task: 外部搜索服务在高负载下偶发超时\nsolution: 采用短超时加指数退避重试，而不是一味延长超时\nboundary_envs: 仅适用于幂等的只读请求",
+                    "callouts": [
+                      "附带适用条件：遇到写请求时，Agent 能够判断该方法不可直接套用。"
+                    ]
+                  },
+                  {
+                    "id": "chain",
+                    "partId": "chain",
+                    "label": "chain_block",
+                    "text": "【工作上下文】 分支 fix/search-timeout · src/search.py\n- 用户继续修复同一超时问题：…改为 5s 超时并最多进行 3 次指数退避重试。\n    └ search  (这条分支上改过 2 次)\n       第1版 · \"Fix the timeout in the search client.\"\n              ~ resp = client.get(url, timeout=5) → resp = client.get(url, timeout=30)\n       第2版(+20小时) · \"Still timing out under load. Revert the 30s timeout…\"   ← 撤销了第1版   ← 当前代码\n              ~ resp = client.get(url, timeout=30) → resp = get_with_retry(url, timeout=5, retries=3, backoff=0.5)\n\n⚠ 以上改动都在分支 `fix/search-timeout` 上。先 `git checkout fix/search-timeout` 再动手。",
+                    "callouts": [
+                      "已被撤回的第 1 版代码只能从这里读取。",
+                      "每一版的用户原话与改动均为原样记录，未经模型改写；“撤销了第1版”由 diff 行比对得出。",
+                      "该文本的格式与措辞来自官方源码中生成 chain_block 的模板。"
+                    ]
+                  }
+                ],
+                "hidePartId": "chain",
+                "hideLabel": "隐藏版本链以作对比",
+                "hideNote": "仅有事实与经验时，Agent 知道最终采用的是短超时加重试，也知道此前尝试过 30s 超时；但第 1 版具体修改了哪一行、用户当时如何描述，已无法查证——该版本既不在工作区，也不在 HEAD 中。这正是 Coding 记忆在 Working 记忆之外增加版本链的原因。"
+              },
+              "details": [
+                "显式指定 scene 时直接进入对应的检索路径，不调用场景判断或查询改写模型。",
+                "limit 分别限制 facts 与 experiences 的条数。",
+                "版本链仅起“附加”作用：不参与排序，只将已检索到的事实所涉及代码的全部版本附在其后；无法关联时 chain_block 为空字符串。实际输出还会附上最后一版的完整代码，此处省略。"
+              ],
+              "sources": [
+                {
+                  "label": "Working 与 Coding 场景文档",
+                  "url": "https://github.com/Tencent-Hunyuan/Hy-Memory/blob/main/docs/scene_coding_usage.md"
+                },
+                {
+                  "label": "chain_store.py · _render",
+                  "url": "https://github.com/Tencent-Hunyuan/Hy-Memory/blob/main/hy_memory/coding/chain_store.py"
+                }
+              ]
             }
           ]
         }
       }
     ],
     "effects": [
-      "机制、算法、实验或流程的逐步状态变化。",
-      "比较每轮变化、继承位置和外部固定条件。"
+      "每一步上方给出一句要点；左栏列出实际输入与操作，代码中以 + / - 开头的行按 diff 着色；右栏按组成部分列出具体条目，新增、已更新、已失效与未变分别用绿框、黄框、灰底删除线与淡显表示。",
+      "输出步骤原样展示结果并逐块注释，可隐藏某一部分作对比；方向键切换步骤，窄屏改为单栏，打印时依次展开全部步骤。"
     ]
   },
   {

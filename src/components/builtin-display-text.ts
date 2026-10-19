@@ -143,10 +143,10 @@ export const builtinEnglish: BuiltinDisplayText = {
     description:
       "Numbered references with authors, year, title, source, DOI, link and notes, cited by anchors in the text.",
   },
-  "mechanism-steps": {
-    name: "Mechanism steps",
+  "step-walkthrough": {
+    name: "Step walkthrough",
     description:
-      "Keep objects in place and compare step by step what changes, what stays and how the change propagates.",
+      "Walk through a concrete example step by step: what happens in each step on one side, the actual contents of each part with new, updated and retired entries on the other.",
   },
   "evidence-explorer": {
     name: "Evidence explorer",

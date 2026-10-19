@@ -148,6 +148,10 @@ import src_doc_reference_contract_mjs from "../components/blocks/doc-reference-c
 import src_i18n_messages_layerDiagram_ts from "../i18n/messages/layerDiagram.ts?raw";
 import src_layer_diagram_css from "../components/blocks/layer-diagram.css?raw";
 import src_LayerDiagram_tsx from "../components/blocks/LayerDiagram.tsx?raw";
+import src_step_walkthrough_css from "../components/blocks/step-walkthrough.css?raw";
+import src_StepWalkthrough_tsx from "../components/blocks/StepWalkthrough.tsx?raw";
+import src_walkthrough_contract from "../components/blocks/walkthrough-contract.mjs?raw";
+import i18n_stepWalkthrough from "../i18n/messages/stepWalkthrough.ts?raw";
 import src_i18n_messages_sequenceDiagram_ts from "../i18n/messages/sequenceDiagram.ts?raw";
 import src_doc_diagrams_contract_mjs from "../components/blocks/doc-diagrams-contract.mjs?raw";
 import src_sequence_diagram_css from "../components/blocks/sequence-diagram.css?raw";
@@ -304,6 +308,10 @@ const sources: Record<string, string> = {
   "i18n/messages/layerDiagram.ts": src_i18n_messages_layerDiagram_ts,
   "layer-diagram.css": src_layer_diagram_css,
   "LayerDiagram.tsx": src_LayerDiagram_tsx,
+  "step-walkthrough.css": src_step_walkthrough_css,
+  "StepWalkthrough.tsx": src_StepWalkthrough_tsx,
+  "walkthrough-contract.mjs": src_walkthrough_contract,
+  "i18n/messages/stepWalkthrough.ts": i18n_stepWalkthrough,
   "i18n/messages/sequenceDiagram.ts": src_i18n_messages_sequenceDiagram_ts,
   "doc-diagrams-contract.mjs": src_doc_diagrams_contract_mjs,
   "sequence-diagram.css": src_sequence_diagram_css,
@@ -366,7 +374,7 @@ export const builtinExports: Record<string, string> = {
   toggle: "Toggle",
   divider: "Divider",
   code: "Code",
-  "mechanism-steps": "MechanismSteps",
+  "step-walkthrough": "StepWalkthrough",
   "evidence-explorer": "EvidenceExplorer",
   "comparison-matrix": "ComparisonMatrix",
   "status-tree": "StatusTree",

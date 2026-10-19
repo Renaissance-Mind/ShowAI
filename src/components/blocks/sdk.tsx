@@ -32,10 +32,8 @@ export {
   CodeBlock as Code,
 } from "./Primitives";
 
-export {
-  MechanismStepsBlock as MechanismSteps,
-  EvidenceExplorerBlock as EvidenceExplorer,
-} from "./Presentation";
+export { EvidenceExplorerBlock as EvidenceExplorer } from "./Presentation";
+export { StepWalkthroughBlock as StepWalkthrough } from "./StepWalkthrough";
 export { ComparisonMatrixBlock as ComparisonMatrix } from "./ComparisonMatrix";
 export { StatusTreeBlock as StatusTree } from "./StatusTree";
 export { ExperimentTrackerBlock as ExperimentTracker } from "./ExperimentTracker";

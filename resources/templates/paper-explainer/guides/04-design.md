@@ -38,10 +38,10 @@
 | ------------------ | -------------------------------- | ----------------------------- |
 | 首屏四格或分层要点 | paper-glance、paper-brief        | metrics + 正文要点            |
 | 术语胶囊           | term-strip                       | table                         |
-| 并排序列或路径     | sequence-layout                  | mechanism-steps 两帧对比      |
-| 阶段 × 对象矩阵    | stage-lanes                      | mechanism-steps 逐帧          |
+| 并排序列或路径     | sequence-layout                  | step-walkthrough 两步对比     |
+| 阶段 × 对象矩阵    | stage-lanes                      | step-walkthrough 逐步         |
 | 难题对策配对       | problem-fix-map                  | comparison-matrix、双列 table |
-| 连续帧机制         | —                                | mechanism-steps               |
+| 逐步机制演示       | —                                | step-walkthrough              |
 | 可拖参数与曲线     | formula-curves                   | playground                    |
 | 同口径结果表       | benchmark-compare、metric-matrix | table + 正文写差值            |
 | 排序条形           | rank-bars                        | chart                         |

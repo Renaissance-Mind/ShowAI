@@ -8378,98 +8378,224 @@
       ]
     }
   },
-  "mechanism-steps": {
+  "step-walkthrough": {
     "version": 1,
     "reuse": {
       "kind": "general",
-      "boundaries": ["内容与证据由实例提供；阅读操作只改变当前视图。"]
+      "boundaries": [
+        "适合 2–10 步、每步可写出具体输入与具体状态的机制讲解；每步给出该时刻各部分的完整内容，组件不推算两步之间的差异。",
+        "只需展示结构关系而没有逐步状态变化时，用 flowchart 或 layer-diagram；多方往返调用用 sequence-diagram。",
+        "内容由实例提供；阅读操作只改变当前视图。"
+      ]
     },
     "usage": {
-      "purpose": "用当前步骤的前后状态对照，解释变化原因、承接内容与下一步。",
+      "purpose": "用一个具体例子讲清机制：每一步左侧是实际发生的输入与操作，右侧是各组成部分此刻的具体条目，读者无需从抽象标签推测发生了什么。",
       "structure": [
-        "顶部进度导航选择步骤，中心展示进入本步前、处理动作和完成本步后。",
-        "输入状态来自上一帧；第一帧可以提供 initialStates。省略初始状态时展示对象名称，不编造初始值。",
-        "本步改变、承接保留、保持固定按 states.status 汇总；固定对象的值保持可读，关系从 links 展示。"
+        "顶部：标题、question（本例回答的问题）、按 parts 着色的组成部分图例。",
+        "步骤条：按顺序编号，可点击或用左右方向键切换；已读步骤编号变色。",
+        "要点：当前步骤的 takeaway。",
+        "左栏：actions 按顺序显示，kind 决定样式（input 强调、result 浅底、note 虚线）；code 中以 + / - 开头的行按 diff 着色；illustrative 标“示意”。",
+        "右栏（状态步骤）：按 parts 顺序列出条目卡；new 绿框、changed 黄框、retired 灰底删除线、kept 淡显，statusLabel 可改写徽标文字；无条目时显示 partNotes 或“无内容”。",
+        "右栏（输出步骤，有 output 时）：blocks 以等宽原文展示并附 callouts；声明 hidePartId 时提供隐藏开关，被隐藏的块改为虚线并显示 hideNote。",
+        "底部：上一步/下一步、可展开的前提条件与出处、整组 note。",
+        "组件宽度不超过 720px 时改为单栏；打印时依次展开全部步骤。"
       ],
       "inputs": [
         {
+          "path": "title",
+          "meaning": "标题。"
+        },
+        {
+          "path": "question",
+          "meaning": "可选：这组演示要回答的具体问题。"
+        },
+        {
+          "path": "note",
+          "meaning": "可选：整组说明，例如哪些内容是示意。"
+        },
+        {
+          "path": "stateHeading",
+          "meaning": "可选：右栏状态标题，默认“此时的状态”。"
+        },
+        {
           "path": "parts",
-          "meaning": "稳定对象的 id 与名称；所有状态及关系通过 id 对齐。最多 8 个。"
+          "meaning": "组成部分，1–6 个，决定图例与右栏顺序。"
         },
         {
-          "path": "frames",
-          "meaning": "最多 16 个步骤。每步 states 必须恰好覆盖所有 parts.id，保留 explanation、links、condition 和 sources。"
+          "path": "parts[].id",
+          "meaning": "组成部分 id，唯一。"
         },
         {
-          "path": "initialStates",
-          "meaning": "可选第一步输入状态，结构与 frames[].states 相同。未提供时不推断对象的初始值。"
+          "path": "parts[].label",
+          "meaning": "名称。"
         },
         {
-          "path": "frames[].inputSummary",
-          "meaning": "进入本步前的短说明，最多 240 字符；省略时使用上一帧的输出说明或标题。"
+          "path": "parts[].plain",
+          "meaning": "可选：一句话说明它保存什么。"
         },
         {
-          "path": "frames[].outputSummary",
-          "meaning": "完成本步后的短说明，最多 240 字符；省略时使用本步标题。"
+          "path": "parts[].how",
+          "meaning": "可选：它如何产生或更新，显示为小标签。"
         },
         {
-          "path": "frames[].actionLabel",
-          "meaning": "前后对照之间的处理动作，最多 240 字符；省略时使用本步标题。"
+          "path": "parts[].tone",
+          "meaning": "可选色调：accent、teal、orange、violet、rose、slate；省略时按顺序分配。"
         },
         {
-          "path": "frames[].nextHint",
-          "meaning": "下一步提示，最多 240 字符；省略时使用下一步标题，末步显示完成提示。"
+          "path": "initialStep",
+          "meaning": "可选：初始步骤 id，默认第一步。"
         },
         {
-          "path": "frames[].states[].tokens",
-          "meaning": "可选的候选或对象标签，最多 12 项，每项最多 80 字符；value 仍然提供完整状态描述。"
+          "path": "steps",
+          "meaning": "步骤，1–10 个。"
         },
         {
-          "path": "frames[].headline",
-          "meaning": "可选的本步讲解标题，最多 240 字符；title 用作简短的步骤导航。"
+          "path": "steps[].id",
+          "meaning": "步骤 id，唯一。"
+        },
+        {
+          "path": "steps[].label",
+          "meaning": "步骤条上的短名称。"
+        },
+        {
+          "path": "steps[].takeaway",
+          "meaning": "这一步要读者理解的一句话，支持行内标记。"
+        },
+        {
+          "path": "steps[].actionsHeading",
+          "meaning": "可选：左栏标题，默认“本步的输入与操作”。"
+        },
+        {
+          "path": "steps[].actions",
+          "meaning": "本步实际发生的输入与操作，1–12 条。"
+        },
+        {
+          "path": "steps[].actions[].actor",
+          "meaning": "执行者或来源，如“用户”“调用方”。"
+        },
+        {
+          "path": "steps[].actions[].text",
+          "meaning": "操作说明，支持行内标记。"
+        },
+        {
+          "path": "steps[].actions[].code",
+          "meaning": "可选：代码、命令或 diff。"
+        },
+        {
+          "path": "steps[].actions[].kind",
+          "meaning": "可选：input、action、result、note，只影响样式，默认 action。"
+        },
+        {
+          "path": "steps[].actions[].illustrative",
+          "meaning": "可选：为 true 时标注“示意”。"
+        },
+        {
+          "path": "steps[].entries",
+          "meaning": "可选：此刻各部分的完整条目快照，最多 24 条；同一条目跨步骤沿用 id。"
+        },
+        {
+          "path": "steps[].entries[].partId",
+          "meaning": "所属组成部分。"
+        },
+        {
+          "path": "steps[].entries[].status",
+          "meaning": "new 本步新增、changed 本步更新、retired 已失效（保留但不再生效）、kept 未变。"
+        },
+        {
+          "path": "steps[].entries[].statusLabel",
+          "meaning": "可选：替换徽标文字，如“已淘汰”“已被取代”。"
+        },
+        {
+          "path": "steps[].entries[].fields",
+          "meaning": "条目的具体字段，1–8 个；mono 为 true 时等宽显示。"
+        },
+        {
+          "path": "steps[].entries[].note",
+          "meaning": "可选：条目下方的解释。"
+        },
+        {
+          "path": "steps[].partNotes",
+          "meaning": "可选：对某部分的说明，常用于解释为什么没有变化。"
+        },
+        {
+          "path": "steps[].output",
+          "meaning": "可选：输出步骤的结果；提供时右栏显示它而不是条目快照。"
+        },
+        {
+          "path": "steps[].output.blocks",
+          "meaning": "输出原文块，1–8 个，可关联 partId 并附 callouts。"
+        },
+        {
+          "path": "steps[].output.hidePartId",
+          "meaning": "可选：允许读者隐藏的部分，必须对应至少一个块。"
+        },
+        {
+          "path": "steps[].output.hideLabel",
+          "meaning": "可选：隐藏开关文字。"
+        },
+        {
+          "path": "steps[].output.hideNote",
+          "meaning": "可选：隐藏后显示的说明，写清少了这一部分会缺什么。"
+        },
+        {
+          "path": "steps[].details",
+          "meaning": "可选：前提条件与实现细节，默认收起。"
+        },
+        {
+          "path": "steps[].sources",
+          "meaning": "可选：出处，http(s) 链接。"
         }
       ],
       "recipes": [
         {
-          "title": "从理解任务填入真实材料",
+          "title": "用一个具体例子讲清机制",
           "steps": [
-            "先确定跨步骤保持身份一致的 parts，再逐帧填写完整 states、explanation 和 links。",
-            "如需要第一步前后对比，提供覆盖所有对象的 initialStates。",
-            "用 inputSummary、outputSummary、actionLabel 简洁说明状态怎样转换；tokens 只承载明确给出的对象标签。",
-            "核对上一帧到当前帧的连续性、关键变化、成立条件与来源，使用下一步、回到起点和展开全部检查完整机制。"
+            "选一个读者能跟上的最小例子，列出 2–4 个组成部分，每个写一句 plain。",
+            "每一步写清实际输入与操作（真实代码或参数），右栏给出此刻各部分的完整条目，用 status 标出本步变化。",
+            "没有变化的部分用 partNotes 说明原因；非原始材料标 illustrative，并在 note 中说明示意范围。",
+            "最后一步用 output 展示结果原文，callouts 指出每块回答了什么；需要论证某部分必要时设置 hidePartId。"
           ],
           "exampleIndex": 0
         }
       ],
       "interactions": [
         {
-          "action": "选择步骤、上一步或下一步",
-          "effect": "以相同对象身份对照上一帧与当前帧，并展示处理动作、状态分组、条件和来源；方向键及 Home/End 可切换导航步骤。",
+          "action": "点击步骤、上一步/下一步，或在步骤条上按左右方向键",
+          "effect": "切换当前步骤，隐藏开关复位。",
           "persistence": "view"
         },
         {
-          "action": "回到起点或展开全部步骤",
-          "effect": "恢复初始步骤，或连续阅读所有步骤的前后对照；打印自动展开全部。",
+          "action": "勾选隐藏开关",
+          "effect": "对应部分的输出块改为虚线说明。",
+          "persistence": "view"
+        },
+        {
+          "action": "展开前提条件与出处",
+          "effect": "显示当前步骤的 details 与 sources。",
           "persistence": "view"
         }
       ],
       "constraints": [
-        "每个 frame.states 必须恰好覆盖所有 parts.id；状态不得靠颜色单独表达。",
-        "图示由作者定义，不能把概念关系冒充实测因果。",
-        "changed 表示本步改变，retained 表示承接保留，fixed 表示本步固定；不能把 fixed 自动解释为尚未执行。"
+        "parts、steps、步骤内 entries 与 output.blocks 的 id 唯一；partId、hidePartId、initialStep 必须引用已有对象。",
+        "最多 6 个部分、10 步；每步最多 12 条操作、24 个条目。",
+        "阅读操作不调用 onChange。"
       ],
       "editing": {
-        "data": ["修改实例数据后经宿主页面保存。"],
+        "data": ["修改实例数据后经宿主页面保存；修改 id 时同步检查引用。"],
         "implementation": [
-          "新增表达或交互需要同步数据约定、schema、SDK 与验证。"
+          "新增状态或操作样式时同步修改契约、schema、SDK、文案与测试。"
         ]
       }
     },
     "development": {
       "entryPoints": [
         {
-          "path": "src/components/blocks/Presentation.tsx",
+          "path": "src/components/blocks/StepWalkthrough.tsx",
           "purpose": "软件内置实现位置；source 视图返回 SDK 包装起点。"
+        },
+        {
+          "path": "src/components/blocks/walkthrough-contract.mjs",
+          "purpose": "数据校验，供工作台、CLI 与离线阅读器共用。"
         },
         {
           "path": "index.tsx",
@@ -8477,15 +8603,15 @@
         }
       ],
       "architecture": [
-        "presentation-contract.mjs 核验对象引用与维度；presentation.css 使用容器查询和打印展开。"
+        "当前步骤与隐藏开关保存在组件本地；同一个 StepView 同时用于屏幕显示与打印展开。"
       ],
-      "extensionPoints": ["添加新视图时保留来源、解释边界与恢复路径。"],
+      "extensionPoints": ["新增条目状态时同步 ENTRY_STATUSES、文案与样式。"],
       "invariants": [
-        "阅读筛选、步骤、选择和比较均不调用 onChange。",
-        "打印展开所有步骤或所有证据，筛选不改变源数据。"
+        "阅读操作不调用 onChange。",
+        "说明文字经行内标记解析为 React 元素，从不注入 HTML。"
       ],
       "verification": [
-        "检查真实 Page、离线导出、390px 重排、键盘操作和 props 更新。"
+        "检查真实 Page、深色主题、390px 宽度、键盘操作、打印与离线导出。"
       ]
     }
   },

@@ -16,7 +16,9 @@ import { VideoBlock, AudioBlock } from "./Media";
 import { PdfBlock } from "./Pdf";
 import { ReferencesBlock } from "./References";
 import { validateResearchData } from "./research-contract.mjs";
-import { MechanismStepsBlock, EvidenceExplorerBlock } from "./Presentation";
+import { EvidenceExplorerBlock } from "./Presentation";
+import { StepWalkthroughBlock } from "./StepWalkthrough";
+import { validateWalkthroughData } from "./walkthrough-contract.mjs";
 import { validatePresentationData } from "./presentation-contract.mjs";
 import { ChartBlock } from "./Chart";
 import { DatabaseBlock } from "./Database";
@@ -471,15 +473,17 @@ for (const item of g2Metadata) {
 
 // Keep literal registrations: the portable reader removes unused kinds and metadata together.
 registerBlock({
-  kind: "mechanism-steps",
-  title: "机制分镜",
-  description: "稳定对象的逐步变化与继承",
+  kind: "step-walkthrough",
+  title: "分步演示",
+  description: "逐步展示实际操作与各部分的具体内容变化",
   icon: "⇄",
   defaultData: componentMetadata.find(
-    (item) => item.kind === "mechanism-steps",
+    (item) => item.kind === "step-walkthrough",
   )!.defaultData as BlockData,
-  renderer: MechanismStepsBlock,
-  validate: (data) => validatePresentationData("mechanism-steps", data),
+  renderer: StepWalkthroughBlock,
+  validate: (data) => {
+    validateWalkthroughData(data);
+  },
 });
 registerBlock({
   kind: "evidence-explorer",

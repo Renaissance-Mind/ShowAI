@@ -22,7 +22,7 @@ afterEach(async () => {
 
 test.each([
   "text",
-  "mechanism-steps",
+  "step-walkthrough",
   "evidence-explorer",
   "comparison-matrix",
   "status-tree",

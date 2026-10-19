@@ -29,7 +29,7 @@ const builtinCategories: Record<string, ComponentCategory> = {
   chart: "data",
   metrics: "data",
   playground: "data",
-  "mechanism-steps": "flow",
+  "step-walkthrough": "flow",
   "evidence-explorer": "table",
   "comparison-matrix": "table",
   "status-tree": "flow",
