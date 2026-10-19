@@ -5,7 +5,8 @@ import richTextTableSelection from "../components/rich-text/table-selection.ts?r
 import richTextExternalContent from "../components/rich-text/external-content.ts?raw";
 import richTextWidgetSelection from "../components/rich-text/widget-selection.ts?raw";
 import richTextAssistantSelection from "../components/rich-text/assistant-selection.ts?raw";
-import richTextRangeSelection from "../components/rich-text/component-range-selection.ts?raw";
+import richTextRangeEdit from "../components/rich-text/text-range-edit.ts?raw";
+import textSelectionModel from "../surface/text-selection-model.ts?raw";
 import selectionBridge from "../components/custom/selection-bridge.ts?raw";
 import selectionFrame from "../components/custom/useSelectionFrame.ts?raw";
 import textSelection from "../surface/text-selection.ts?raw";
@@ -167,7 +168,8 @@ const sources: Record<string, string> = {
   "rich-text/external-content.ts": richTextExternalContent,
   "rich-text/widget-selection.ts": richTextWidgetSelection,
   "rich-text/assistant-selection.ts": richTextAssistantSelection,
-  "rich-text/component-range-selection.ts": richTextRangeSelection,
+  "rich-text/text-range-edit.ts": richTextRangeEdit,
+  "surface/text-selection-model.ts": textSelectionModel,
   "custom/selection-bridge.ts": selectionBridge,
   "custom/useSelectionFrame.ts": selectionFrame,
   "surface/text-selection.ts": textSelection,
@@ -338,13 +340,18 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
           : '"./capacity.mjs"',
       )
       .replaceAll('"../rich-text/', '"./rich-text/')
-      .replaceAll(
-        '"../custom/selection-bridge"',
-        '"./custom/selection-bridge"',
-      )
+      .replaceAll('"../custom/selection-bridge"', '"./custom/selection-bridge"')
       .replaceAll(
         '"../custom/useSelectionFrame"',
         '"./custom/useSelectionFrame"',
+      )
+      .replaceAll(
+        '"../../surface/text-selection-model"',
+        '"../surface/text-selection-model"',
+      )
+      .replaceAll(
+        '"../components/rich-text/text-range-edit"',
+        '"../rich-text/text-range-edit"',
       )
       .replaceAll(
         '"../../surface/text-selection"',

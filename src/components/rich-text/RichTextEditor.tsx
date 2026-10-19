@@ -1,4 +1,4 @@
-import { ComponentRangeSelection } from "./component-range-selection";
+import { textRangeEditMeta } from "./text-range-edit";
 import { registerSelectionEditor } from "../../surface/text-selection";
 import { ContentNodeActions } from "./ContentNodeActions";
 import { primitiveNodeTypes, primitiveContentNode } from "./model.mjs";
@@ -91,7 +91,7 @@ export interface RichTextEditorProps {
   content: JSONContent;
   onChange: (
     content: JSONContent,
-    options?: { separateHistory?: boolean },
+    options?: { separateHistory?: boolean; historyGroup?: string },
   ) => void;
   readOnly?: boolean;
   minimal?: boolean;
@@ -384,16 +384,12 @@ export default function RichTextEditor({
     onUpdate: ({ editor: current, transaction }) =>
       latestOnChange.current(editorNodeJSON(current.state.doc), {
         separateHistory: Boolean(transaction.getMeta(documentTableActionMeta)),
+        historyGroup: transaction.getMeta(textRangeEditMeta),
       }),
   });
 
   useEffect(
-    () =>
-      editor
-        ? registerSelectionEditor(editor, (anchor, head) =>
-            ComponentRangeSelection.create(editor.state.doc, anchor, head),
-          )
-        : undefined,
+    () => (editor ? registerSelectionEditor(editor) : undefined),
     [editor],
   );
   useEffect(() => {

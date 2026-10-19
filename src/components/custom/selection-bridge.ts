@@ -1,50 +1,80 @@
-/** Runs inside an opaque sandbox. Only pointer coordinates cross the boundary;
- * component code, DOM, and editing data stay in the sandbox. */
-export function installComponentSelectionBridge(channel: string) {
-  const excluded =
-    'button,input,textarea,select,summary,[role="button"],[role="slider"],[data-surface-ui],.react-flow,[data-surface-gesture="own"]';
-  const sendText = () => {
-    const clone = document.body.cloneNode(true) as HTMLElement;
-    clone
-      .querySelectorAll(excluded + ",script,style,[hidden]")
-      .forEach((node) => node.remove());
-    clone
-      .querySelectorAll(
-        "p,div,section,article,li,tr,h1,h2,h3,h4,pre,blockquote",
-      )
-      .forEach((node) => node.append("\n"));
-    clone.querySelectorAll("br").forEach((node) => node.replaceWith("\n"));
+import { createTextModel } from "../../surface/text-selection-model";
+
+/** Both sides use the same character offsets; sandbox DOM never leaves its frame. */
+export function installComponentSelectionBridge(
+  channel: string,
+  buildModel: typeof createTextModel,
+) {
+  const name = "showai-frame-text-" + channel;
+  const style = document.createElement("style");
+  style.textContent = `::highlight(${name}){background:Highlight;color:HighlightText}`;
+  document.head.append(style);
+  const api = window as unknown as {
+    Highlight?: new (...ranges: Range[]) => unknown;
+    CSS: { highlights?: Map<string, unknown> };
+  };
+  let lastOffset = 0;
+  const offsetAt = (x: number, y: number) => {
+    const range = document.caretRangeFromPoint(x, y);
+    if (!range) return null;
+    return buildModel(document.body).offsetAt(
+      range.startContainer,
+      range.startOffset,
+    );
+  };
+  const sendText = () =>
     parent.postMessage(
       {
         channel,
         type: "showai:text-selection-content",
-        text: (clone.textContent ?? "").slice(0, 256_000),
+        text: buildModel(document.body).text.slice(0, 256_000),
       },
       "*",
     );
-  };
-  window.addEventListener("message", (event) => {
-    if (
-      event.source === parent &&
-      event.data?.channel === channel &&
-      event.data.type === "showai:text-selection-content-request"
-    )
-      sendText();
-  });
-  const send = (phase: string, event: PointerEvent) =>
+  const send = (phase: string, x: number, y: number, buttons: number) => {
+    const offset = offsetAt(x, y);
+    if (offset !== null) lastOffset = offset;
     parent.postMessage(
       {
         channel,
         type: "showai:text-selection-pointer",
         phase,
-        x: event.clientX,
-        y: event.clientY,
+        x,
+        y,
         width: innerWidth,
         height: innerHeight,
-        buttons: event.buttons,
+        buttons,
+        offset: lastOffset,
       },
       "*",
     );
+  };
+  window.addEventListener("message", (event) => {
+    if (event.source !== parent || event.data?.channel !== channel) return;
+    if (event.data.type === "showai:text-selection-content-request") sendText();
+    else if (event.data.type === "showai:text-selection-range") {
+      const { from, to } = event.data;
+      if (!Number.isFinite(from) || !Number.isFinite(to)) return;
+      if (to > from) {
+        const model = buildModel(document.body);
+        if (api.Highlight && api.CSS.highlights)
+          api.CSS.highlights.set(
+            name,
+            new api.Highlight(
+              ...model.ranges(
+                Math.max(0, from),
+                Math.min(model.text.length, to),
+              ),
+            ),
+          );
+        document.getSelection()?.removeAllRanges();
+      } else api.CSS.highlights?.delete(name);
+    } else if (
+      event.data.type === "showai:text-selection-hit" &&
+      [event.data.x, event.data.y].every(Number.isFinite)
+    )
+      send("move", event.data.x, event.data.y, 1);
+  });
   document.addEventListener(
     "pointerdown",
     (event) => {
@@ -55,17 +85,19 @@ export function installComponentSelectionBridge(channel: string) {
         event.metaKey ||
         event.ctrlKey ||
         !(event.target instanceof Element) ||
-        event.target.closest(excluded)
+        event.target.closest(
+          'button,input,textarea,select,summary,[role="button"],[role="slider"],[data-surface-ui],.react-flow,[data-surface-gesture="own"]',
+        )
       )
         return;
-      const caret = document.caretRangeFromPoint(event.clientX, event.clientY);
+      const range = document.caretRangeFromPoint(event.clientX, event.clientY);
       if (
-        caret?.startContainer.nodeType !== Node.TEXT_NODE ||
-        !event.target.contains(caret.startContainer)
+        range?.startContainer.nodeType !== Node.TEXT_NODE ||
+        !event.target.contains(range.startContainer)
       )
         return;
       sendText();
-      send("down", event);
+      send("down", event.clientX, event.clientY, event.buttons);
     },
     true,
   );
@@ -73,14 +105,21 @@ export function installComponentSelectionBridge(channel: string) {
     "pointermove",
     (event) => {
       if (event.pointerType === "mouse" && event.buttons & 1)
-        send("move", event);
+        send("move", event.clientX, event.clientY, event.buttons);
     },
     true,
   );
-  document.addEventListener("pointerup", (event) => send("up", event), true);
   document.addEventListener(
-    "pointercancel",
-    (event) => send("cancel", event),
+    "pointerup",
+    (event) => send("up", event.clientX, event.clientY, event.buttons),
     true,
   );
+  document.addEventListener(
+    "pointercancel",
+    (event) => send("cancel", event.clientX, event.clientY, event.buttons),
+    true,
+  );
+}
+export function componentSelectionScript(channel: string) {
+  return `(${installComponentSelectionBridge.toString()})(${JSON.stringify(channel)},${createTextModel.toString()});`;
 }

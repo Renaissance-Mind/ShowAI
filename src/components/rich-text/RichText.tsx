@@ -25,7 +25,7 @@ export type RichTextHost = Pick<
   continuousPage?: boolean;
   onContentChange?: (
     content: JSONContent,
-    options?: { separateHistory?: boolean },
+    options?: { separateHistory?: boolean; historyGroup?: string },
   ) => void;
 };
 /** One text component for direct typing, catalog insertion, AI input and the SDK. */

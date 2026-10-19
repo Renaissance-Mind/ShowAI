@@ -5,6 +5,7 @@ import { defineMessages } from "../index";
 // documents (region, drawing, rich text) stay in code.
 export default defineMessages("surface", {
   "zh-CN": {
+    "selection.textInput": "跨组件文本选区",
     board: "白板",
     "board.descriptionLocked":
       "视图已锁定。可以点击内容，滚动用于外层页面阅读；右上角解锁后可缩放和移动。",
@@ -231,6 +232,7 @@ export default defineMessages("surface", {
     "error.embedNeedsSource": "复制嵌入内容需要来源文档的布局与视图。",
   },
   en: {
+    "selection.textInput": "Text selected across components",
     board: "Board",
     "board.descriptionLocked":
       "The view is locked. You can click content, and scrolling moves the surrounding page. Unlock it in the top-right corner to zoom and pan.",

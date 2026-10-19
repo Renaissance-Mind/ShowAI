@@ -1,4 +1,3 @@
-import { ComponentRange } from "./component-range-selection";
 import { richTextStyle } from "./model.mjs";
 import { translator } from "../../i18n";
 import messages from "../../i18n/messages/richText";
@@ -342,7 +341,6 @@ export function createExtensions(
     CalloutNode,
     ToggleNode,
     WidgetNode,
-    ComponentRange,
   ];
 }
 
