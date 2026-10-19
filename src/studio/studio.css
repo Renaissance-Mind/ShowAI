@@ -1511,7 +1511,7 @@ button.studio-tree-chevron:hover {
   align-items: flex-start;
 }
 .studio-page-list[data-view]:not([data-view="list"]) .studio-page-list-icon {
-  width: 22px;
+  display: none;
 }
 .studio-page-thumbnail {
   position: absolute;
