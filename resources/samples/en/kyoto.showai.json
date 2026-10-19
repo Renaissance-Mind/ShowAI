@@ -3,7 +3,7 @@
   "version": 3,
   "document": {
     "id": "f3641d0c-a605-44ca-a523-79fe532eac65",
-    "title": "Five Days in Kyoto: Take It Slow",
+    "title": "Kyoto in five days",
     "icon": "⛩️",
     "cover": "none",
     "parentId": null,
@@ -16,7 +16,7 @@
       "attrs": {
         "id": "kyoto-page",
         "kind": "page",
-        "name": "Five Days in Kyoto: Take It Slow"
+        "name": "Kyoto in five days"
       },
       "content": [
         {

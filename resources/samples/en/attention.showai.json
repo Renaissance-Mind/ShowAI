@@ -3,7 +3,7 @@
   "version": 3,
   "document": {
     "id": "1d0f36da-d0e5-4f26-97bc-158217916fa8",
-    "title": "Attention mechanism, understand it step by step",
+    "title": "Attention, step by step",
     "icon": "🔦",
     "cover": "none",
     "parentId": null,
@@ -16,7 +16,7 @@
       "attrs": {
         "id": "surface-attention-zh",
         "kind": "page",
-        "name": "Attention mechanism, understand it step by step"
+        "name": "Attention, step by step"
       },
       "content": [
         {

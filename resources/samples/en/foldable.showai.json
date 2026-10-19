@@ -3,7 +3,7 @@
   "version": 3,
   "document": {
     "id": "cb8ed801-1670-45c1-bf19-d97dafddcea2",
-    "title": "Which foldable screen should I buy?",
+    "title": "Which foldable to buy?",
     "icon": "📱",
     "cover": "none",
     "parentId": null,
@@ -16,7 +16,7 @@
       "attrs": {
         "id": "foldable-root",
         "kind": "page",
-        "name": "Which foldable screen should I buy?"
+        "name": "Which foldable to buy?"
       },
       "content": [
         {

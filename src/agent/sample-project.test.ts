@@ -89,9 +89,9 @@ describe("sample project", () => {
           .map((page) => page.id),
       ).toEqual(keys.map((key) => seeded.pages[key]));
       expect(pages.map((page) => page.title).sort()).toEqual([
-        "Attention mechanism, understand it step by step",
-        "Five Days in Kyoto: Take It Slow",
-        "Which foldable screen should I buy?",
+        "Attention, step by step",
+        "Kyoto in five days",
+        "Which foldable to buy?",
       ]);
     }));
 
