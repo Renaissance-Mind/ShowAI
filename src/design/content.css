@@ -747,10 +747,15 @@
   }
 }
 
-/* Page rich-text groups have the same edge spacing as a Markdown component. */
-.document-content .page-document-flow > :first-child {
+/* Flow groups share one reading rhythm. Trim only the document's outer edges:
+ * a preceding/following sibling at any ancestor makes this an internal boundary. */
+.document-content
+  .page-document-flow
+  > :first-child:not(.document-content :not(:first-child) *) {
   margin-top: 0;
 }
-.document-content .page-document-flow > :last-child {
+.document-content
+  .page-document-flow
+  > :last-child:not(.document-content :not(:last-child) *) {
   margin-bottom: 0;
 }
