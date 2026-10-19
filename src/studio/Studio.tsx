@@ -111,6 +111,12 @@ import {
 } from "./LibraryNavigation";
 import Dialog from "./Dialog";
 import PageThumbnail from "./PageThumbnail";
+import {
+  BatchPagesDialog,
+  DirectorySelectionBar,
+  useDirectoryPageSelection,
+  type PageDestination,
+} from "./DirectoryPageSelection";
 import PageIcon from "../components/PageIcon";
 import PageIconDialog from "./PageIconDialog";
 import ExpandableSearch from "../components/ExpandableSearch";
@@ -206,6 +212,11 @@ type DialogState =
   | { type: "project"; project?: ProjectSummary; groupId?: string }
   | { type: "group"; group?: ProjectGroup; projectId?: string }
   | { type: "moveProject"; projectId: string }
+  | {
+      type: "batchPages";
+      operation: "move" | "delete";
+      targets: LibraryTarget[];
+    }
   | {
       type: "newPage";
       projectId: string;
@@ -2076,6 +2087,111 @@ export default function Studio() {
     selectedProject ? folderPreferences(selectedProject, selectedFolder) : {},
     organization.entryOrder?.[selectedProject ?? ""],
   );
+  const selectablePages = visibleEntries.filter(
+    (item) => item.target.kind === "page",
+  );
+  const pageSelection = useDirectoryPageSelection(
+    JSON.stringify([info?.home, view, selectedProject, selectedFolder, query]),
+    selectablePages.map((item) => item.id),
+  );
+  const selectedPageTargets = selectablePages
+    .filter((item) => pageSelection.ids.includes(item.id))
+    .map((item) => item.target);
+  function beginBatchPages(operation: "move" | "delete") {
+    if (!selectedPageTargets.length) return;
+    setContextMenu(null);
+    setDialog({ type: "batchPages", operation, targets: selectedPageTargets });
+  }
+  async function applyBatchPages(destination?: PageDestination) {
+    if (dialog?.type !== "batchPages" || movingLibrary.current) return;
+    const { operation, targets } = dialog;
+    const home = info?.home;
+    let completed = 0;
+    movingLibrary.current = true;
+    try {
+      await reorderQueue.current;
+      if (!(await page.flush()) || !(await page.sessions.flushAll())) {
+        setDialog(null);
+        setView("page");
+        return;
+      }
+      if (
+        targets.some(
+          (target) =>
+            target.projectId === page.projectId && target.id === page.draft?.id,
+        )
+      ) {
+        if (!(await page.clear())) return;
+      }
+      for (const target of targets) {
+        const record = await desktop.invoke<LoadedPage>("pages:get", {
+          expectedHome: home,
+          projectId: target.projectId,
+          pageId: target.id,
+        });
+        if (operation === "delete") {
+          await desktop.invoke("pages:remove", {
+            expectedHome: home,
+            projectId: target.projectId,
+            pageId: target.id,
+            baseHash: record.hash,
+            baseRevision: record.revision,
+          });
+        } else {
+          if (!destination)
+            throw new Error("A destination is required to move pages.");
+          await desktop.invoke("sidebar:moveEntry", {
+            expectedHome: home,
+            kind: "page",
+            projectId: target.projectId,
+            id: target.id,
+            destinationProjectId: destination.projectId,
+            parentId: destination.parentId,
+            placement: "after",
+            baseHash: record.hash,
+            baseRevision: record.revision,
+          });
+        }
+        completed++;
+        page.sessions.forgetPage(target.projectId, target.id);
+        pageSelection.remove(target.id);
+      }
+      if (destination) {
+        setExpandedProjects((current) => ({
+          ...current,
+          [destination.projectId]: true,
+        }));
+        if (destination.parentId)
+          setExpandedFolders((current) => ({
+            ...current,
+            [destination.parentId!]: true,
+          }));
+      }
+      pageSelection.clear();
+      setDialog(null);
+      setNotice(
+        t(operation === "move" ? "pagesMoved" : "pagesDeleted", {
+          count: completed,
+        }),
+      );
+    } catch (reason) {
+      setDialog((current) =>
+        current?.type === "batchPages"
+          ? { ...current, targets: targets.slice(completed) }
+          : current,
+      );
+      throw new Error(
+        t("batchPageFailed", {
+          completed,
+          remaining: targets.length - completed,
+          error: errorMessage(reason),
+        }),
+      );
+    } finally {
+      movingLibrary.current = false;
+      await refresh().catch(report);
+    }
+  }
   const breadcrumbFolders: FolderMetadata[] = [];
   let breadcrumbFolder = currentFolder;
   while (
@@ -2714,6 +2830,18 @@ export default function Studio() {
           )}
           {view === "project" && (
             <button
+              className="studio-button"
+              disabled={!selectablePages.length}
+              aria-pressed={pageSelection.active}
+              onClick={() =>
+                pageSelection.active ? pageSelection.clear() : pageSelection.start()
+              }
+            >
+              <Check size={15} />{t("selectPages")}
+            </button>
+          )}
+          {view === "project" && (
+            <button
               className="studio-icon"
               aria-label={t("directoryView")}
               title={t("directoryView")}
@@ -3199,17 +3327,44 @@ export default function Studio() {
                   )}
                   {view === "project" && (
                     <>
+                      {pageSelection.active && (
+                        <DirectorySelectionBar
+                          selection={pageSelection}
+                          total={selectablePages.length}
+                          onMove={() => beginBatchPages("move")}
+                          onDelete={() => beginBatchPages("delete")}
+                        />
+                      )}
                       {visibleEntries.length ? (
                           <div
                             className="studio-page-list"
                             data-view={directoryView}
+                            data-selecting={pageSelection.active || undefined}
+                            onKeyDown={(event) => {
+                              if (
+                                dialog ||
+                                (event.target as HTMLElement).closest(
+                                  "input,textarea,[contenteditable=true]",
+                                )
+                              ) return;
+                              if (event.key === "Escape" && pageSelection.active) {
+                                event.preventDefault();
+                                pageSelection.clear();
+                              } else if (
+                                (event.metaKey || event.ctrlKey) &&
+                                event.key.toLowerCase() === "a"
+                              ) {
+                                event.preventDefault();
+                                pageSelection.selectAll();
+                              }
+                            }}
                           >
                           {visibleEntries.map(({ target, updatedAt }) => (
                             <div
                               key={target.id}
-                                {...libraryDrag.bindings.row(target, false)}
+                                {...(!pageSelection.active ? libraryDrag.bindings.row(target, false) : {})}
                                 data-library-id={target.id}
-                              className="studio-page-list-row"
+                              className={`studio-page-list-row${pageSelection.ids.includes(target.id) ? " selected" : ""}`}
                               onContextMenu={(event) => {
                                 event.preventDefault();
                                 const anchor =
@@ -3236,6 +3391,20 @@ export default function Studio() {
                                 if (anchor) showMenu(target, anchor);
                               }}
                             >
+                              {target.kind === "page" && (
+                                <button
+                                  type="button"
+                                  role="checkbox"
+                                  aria-checked={pageSelection.ids.includes(target.id)}
+                                  aria-label={t("selectPage", { title: target.title })}
+                                  className="studio-page-checkbox"
+                                  onPointerDown={(event) => event.stopPropagation()}
+                                  onClick={(event) => pageSelection.toggle(target.id, event.shiftKey)}
+                                >
+                                  {pageSelection.ids.includes(target.id) && <Check size={14} />}
+                                </button>
+                              )}
+                              {target.kind === "folder" && <span className="studio-page-checkbox-spacer" aria-hidden="true" />}
                                 {directoryView !== "list" &&
                                   target.kind === "page" && (
                                     <PageThumbnail
@@ -3246,9 +3415,11 @@ export default function Studio() {
                                   )}
                               <button
                                 className="studio-page-list-open"
-                                onClick={(event) =>
-                                  openTargetClick(target, event)
-                                }
+                                onClick={(event) => {
+                                  if (pageSelection.active && target.kind === "page")
+                                    pageSelection.toggle(target.id, event.shiftKey);
+                                  else openTargetClick(target, event);
+                                }}
                                 onAuxClick={(event) => {
                                   if (event.button === 1)
                                     openTargetClick(target, event);
@@ -3919,6 +4090,15 @@ export default function Studio() {
             onSave={async (name) => {
               if (await updateTarget(dialog.target, { name })) setDialog(null);
             }}
+          />
+        )}
+        {dialog?.type === "batchPages" && (
+          <BatchPagesDialog
+            operation={dialog.operation}
+            targets={dialog.targets}
+            projects={projects}
+            onClose={closeDialog}
+            onApply={applyBatchPages}
           />
         )}
         {dialog?.type === "delete" && (

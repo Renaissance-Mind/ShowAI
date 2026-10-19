@@ -100,6 +100,54 @@ describe("workspace sessions against the real loopback workbench", () => {
     await sessions.open(project, first.document.id, "a");
     return a;
   }
+  it("retires a moved page's retained editors and reloads its destination on reopen", async () => {
+    const originalSession = await warm();
+    await sessions.open(project, second.document.id, "b");
+    const otherSession = sessions.getSnapshot().active;
+    expect(await sessions.flushAll()).toBe(true);
+    const destination = await invoke<{ id: string }>("folders:create", {
+      projectId: project,
+      name: "Destination",
+    });
+    const record = await invoke<LoadedPage>("pages:get", {
+      projectId: project,
+      pageId: first.document.id,
+    });
+    await invoke("sidebar:moveEntry", {
+      kind: "page",
+      projectId: project,
+      destinationProjectId: project,
+      id: first.document.id,
+      parentId: destination.id,
+      baseHash: record.hash,
+      baseRevision: record.revision,
+    });
+    sessions.forgetPage(project, first.document.id);
+    expect(
+      sessions
+        .getSnapshot()
+        .views.some((view) => view.session === originalSession),
+    ).toBe(false);
+    expect(sessions.getSnapshot().active).toBe(otherSession);
+    expect(await sessions.open(project, first.document.id, "a")).toBe(true);
+    expect(sessions.getSnapshot().active).not.toBe(originalSession);
+    expect(sessions.getSnapshot().active?.getSnapshot().draft?.parentId).toBe(
+      destination.id,
+    );
+  });
+  it("keeps unsaved editors when asked to forget a page", async () => {
+    await sessions.open(project, first.document.id, "a");
+    const active = sessions.getSnapshot().active!;
+    active.edit({ title: "Unsaved title" });
+    expect(() => sessions.forgetPage(project, first.document.id)).toThrow(
+      "Save the page",
+    );
+    expect(sessions.getSnapshot().active).toBe(active);
+    expect(await sessions.flushAll()).toBe(true);
+    sessions.forgetPage(project, first.document.id);
+    expect(sessions.getSnapshot().active).toBeNull();
+    expect(sessions.getSnapshot().views).toHaveLength(0);
+  });
   it("does not restore an unchanged retained draft over a newer formal page", async () => {
     const retained = await invoke<{ id: string }>("drafts:save", {
       input: {

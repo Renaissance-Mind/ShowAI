@@ -272,6 +272,24 @@ export class PageSessions {
     this.publish({ active: null, activeView: null });
     return true;
   }
+  /** Retire clean editors after a library operation changes their location or archives them. */
+  forgetPage(projectId: string, pageId: string) {
+    const key = this.pageKey(projectId, pageId);
+    const session = this.pages.get(key);
+    if (!session) return;
+    if (session.isDirty() || session.isBusy())
+      throw new Error("Save the page before removing its editor session.");
+    this.pages.delete(key);
+    this.stale.delete(session);
+    this.changedComponents.delete(session);
+    for (const [viewKey, view] of this.viewStates)
+      if (view.session === session) this.viewStates.delete(viewKey);
+    session.dispose();
+    this.publish({
+      views: this.snapshot.views.filter((view) => view.session !== session),
+      ...(this.snapshot.active === session ? { active: null, activeView: null } : {}),
+    });
+  }
   async flushAll() {
     const results = await Promise.all(
       [...new Set(this.pages.values())].map((session) => session.flush()),
