@@ -346,12 +346,14 @@ test("new windows target real projects, folders and pages, and reject unavailabl
     expect(url.searchParams.get("page")).toBe(
       "pageId" in args ? args.pageId : null,
     );
+    expect(url.searchParams.has("focus")).toBe(false);
   }
   const legacy = await invoke<{ url: string }>("app:openPageWindow", {
     projectId: project.id,
     pageId: page.document.id,
   });
   expect(new URL(legacy.url).searchParams.get("page")).toBe(page.document.id);
+  expect(new URL(legacy.url).searchParams.has("focus")).toBe(false);
   for (const args of [
     { projectId: project.id, folderId: "missing-folder" },
     { projectId: project.id, pageId: "missing-page" },

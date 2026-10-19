@@ -214,7 +214,6 @@ describe("opening library targets", () => {
     expect(windowQuery({ projectId: "project-a", pageId: "page-a" })).toEqual({
       project: "project-a",
       page: "page-a",
-      focus: "1",
     });
     expect(windowQuery({ invite: "invitation" })).toEqual({
       invite: "invitation",

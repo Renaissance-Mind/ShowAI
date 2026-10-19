@@ -527,9 +527,6 @@ export default function Studio() {
     [catalog, componentFilter, catalogQueries.components],
   );
   const catalogScrollRef = useRef<HTMLDivElement>(null);
-  const [focusWindow] = useState(
-    () => new URLSearchParams(location.search).get("focus") === "1",
-  );
   const page = usePage(info?.home);
   const activePageId = page.draft?.id;
   const handleActiveSurfaceChange = useCallback(
@@ -837,6 +834,8 @@ export default function Studio() {
       const projectId = params.get("project"),
         pageId = params.get("page"),
         folderId = params.get("folder");
+      // Restore saved navigation before expanding the explicit launch target.
+      await verification;
       if (projectId) {
         selectedRef.current = projectId;
         setSelectedProject(projectId);
@@ -859,7 +858,6 @@ export default function Studio() {
           setView("project");
         }
       }
-      await verification;
       setWorkspaceReady(true);
     })().catch(report);
   }, [refresh, loadCatalog, page, report]);
@@ -2872,7 +2870,7 @@ export default function Studio() {
   return (
     <ComponentLibraryContext.Provider value={pickerLibrary}>
       <div
-        className={`studio ${view === "templates" || view === "components" ? "catalog-view" : ""} ${view === "templates" ? "templates-view" : ""} ${focusWindow ? "focus-window" : ""} ${view === "components" ? "components-view" : ""}`}
+        className={`studio ${view === "templates" || view === "components" ? "catalog-view" : ""} ${view === "templates" ? "templates-view" : ""} ${view === "components" ? "components-view" : ""}`}
         data-navigation-state={navigationUpdating ? "updating" : "current"}
         data-window-fullscreen={windowFullscreen}
         data-native-titlebar={
@@ -2899,7 +2897,6 @@ export default function Studio() {
             !!groupMenu ||
             !!contextMenu?.anchor.closest(".studio-sidebar")
           }
-          focusWindow={focusWindow}
           switchingTab={workspace.switching || routing}
           navigation={sidebarContent}
           history={

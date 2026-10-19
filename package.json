@@ -42,7 +42,7 @@
     "package:mac": "npm run build && electron-builder --mac --arm64 --config electron-builder.yml",
     "package:win": "npm run build && electron-builder --win --x64 --config electron-builder.yml",
     "pretest": "npm run build:portable",
-    "test:desktop": "npm run build && node src/desktop/smoke.mjs && node src/desktop/ui-smoke.mjs && node src/desktop/library-ui-smoke.mjs && node src/desktop/catalog-ui-smoke.mjs",
+    "test:desktop": "npm run build && node src/desktop/smoke.mjs && node src/desktop/ui-smoke.mjs && node src/desktop/window-ui-smoke.mjs && node src/desktop/library-ui-smoke.mjs && node src/desktop/catalog-ui-smoke.mjs",
     "plugin:install": "node scripts/install-codex-plugin.mjs",
     "plugin:update": "node scripts/install-codex-plugin.mjs --update",
     "plugin:dsh": "node scripts/install-dsh-plugin.mjs",

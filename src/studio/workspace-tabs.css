@@ -108,7 +108,3 @@
     opacity: 1;
   }
 }
-.focus-window[data-native-titlebar="mac"]:not([data-window-fullscreen="true"])
-  .studio-tab-history {
-  padding-left: 88px;
-}
