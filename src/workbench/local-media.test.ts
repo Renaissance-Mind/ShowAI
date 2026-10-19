@@ -26,6 +26,9 @@ describe("local media grants", () => {
     expect(localMediaPath(pathToFileURL(video).href)).toBe(video);
     expect(localMediaPath("file:~/clip.mp4")).toBe(join(homedir(), "clip.mp4"));
     expect(localMediaPath("~/clip.mp4")).toBe(join(homedir(), "clip.mp4"));
+    // Components encode each path segment, so spaces, CJK, # and ? survive.
+    const segments = "~/RM 宣传/成片/a#1?.mp4".split("/").map(encodeURIComponent).join("/");
+    expect(localMediaPath(`file:${segments}`)).toBe(join(homedir(), "RM 宣传/成片/a#1?.mp4"));
     for (const bad of ["clip.mp4", "file:clip.mp4", "", 3, "file:///a%ZZ"])
       expect(() => localMediaPath(bad)).toThrow();
   });
