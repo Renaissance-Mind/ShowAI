@@ -659,8 +659,8 @@ describe("component composition and editable primitives", () => {
       expect(compiled.html).toContain("Content-Security-Policy");
       expect(compiled.inline?.script).toBeTruthy();
       if (item.kind === "text")
-        // The rich-text SDK includes the editing engine and offline math support.
-        expect(compiled.inline!.script.length).toBeLessThan(2000000);
+        // Includes editing, syntax highlighting, offline math and range selection.
+        expect(Buffer.byteLength(compiled.inline!.script)).toBeLessThan(2_250_000);
       expect(compiled.defaultData).toEqual(item.defaultData);
     },
     process.platform === "win32" ? 600000 : 360000,

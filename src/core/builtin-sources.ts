@@ -5,6 +5,10 @@ import richTextTableSelection from "../components/rich-text/table-selection.ts?r
 import richTextExternalContent from "../components/rich-text/external-content.ts?raw";
 import richTextWidgetSelection from "../components/rich-text/widget-selection.ts?raw";
 import richTextAssistantSelection from "../components/rich-text/assistant-selection.ts?raw";
+import richTextRangeSelection from "../components/rich-text/component-range-selection.ts?raw";
+import selectionBridge from "../components/custom/selection-bridge.ts?raw";
+import selectionFrame from "../components/custom/useSelectionFrame.ts?raw";
+import textSelection from "../surface/text-selection.ts?raw";
 import richTextDropCursor from "../components/rich-text/drop-cursor-cleanup.ts?raw";
 import richTextInsertion from "../components/rich-text/component-insertion.ts?raw";
 import richTextNodeViews from "../components/rich-text/NodeViews.tsx?raw";
@@ -163,6 +167,10 @@ const sources: Record<string, string> = {
   "rich-text/external-content.ts": richTextExternalContent,
   "rich-text/widget-selection.ts": richTextWidgetSelection,
   "rich-text/assistant-selection.ts": richTextAssistantSelection,
+  "rich-text/component-range-selection.ts": richTextRangeSelection,
+  "custom/selection-bridge.ts": selectionBridge,
+  "custom/useSelectionFrame.ts": selectionFrame,
+  "surface/text-selection.ts": textSelection,
   "rich-text/drop-cursor-cleanup.ts": richTextDropCursor,
   "rich-text/component-insertion.ts": richTextInsertion,
   "rich-text/NodeViews.tsx": richTextNodeViews,
@@ -309,7 +317,7 @@ const sources: Record<string, string> = {
   "sequence-diagram.css": src_sequence_diagram_css,
   "SequenceDiagram.tsx": src_SequenceDiagram_tsx,
 };
-// Package the shared icon module inside the trusted SDK's virtual filesystem.
+// Package shared modules and rewrite their imports inside the trusted SDK's virtual filesystem.
 // User component packages retain the existing package-local import boundary.
 export const builtinSources: Record<string, string> = Object.fromEntries(
   Object.entries(sources).map(([name, source]) => [
@@ -330,6 +338,20 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
           : '"./capacity.mjs"',
       )
       .replaceAll('"../rich-text/', '"./rich-text/')
+      .replaceAll(
+        '"../custom/selection-bridge"',
+        '"./custom/selection-bridge"',
+      )
+      .replaceAll(
+        '"../custom/useSelectionFrame"',
+        '"./custom/useSelectionFrame"',
+      )
+      .replaceAll(
+        '"../../surface/text-selection"',
+        name.includes("/")
+          ? '"../surface/text-selection"'
+          : '"./surface/text-selection"',
+      )
       .replaceAll(
         '"../../editor/',
         name.startsWith("rich-text/") ? '"../editor/' : '"./editor/',
