@@ -1,4 +1,4 @@
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import PageIcon from "../components/PageIcon";
 import { FileText } from "../ui/icons";
 import type { PageSummary, ProjectSummary } from "../core/model";
@@ -79,9 +79,12 @@ export default function RecentPages({
   onOpen,
   onMenu,
   onCreateProject,
+  welcome,
 }: {
   pages: RecentPage[];
   query: string;
+  /** First-run content shown instead of the list until the library has pages of its own. */
+  welcome?: ReactNode;
   onOpen: (page: RecentPage, event: MouseEvent<HTMLButtonElement>) => void;
   onMenu: (
     page: RecentPage,
@@ -101,6 +104,7 @@ export default function RecentPages({
   const visible = pages.filter((page) =>
     `${page.title} ${page.projectName}`.toLocaleLowerCase().includes(term),
   );
+  if (welcome && !term) return <>{welcome}</>;
   if (!visible.length)
     return (
       <div className="studio-empty">

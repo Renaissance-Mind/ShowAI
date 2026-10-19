@@ -3,17 +3,22 @@ import type {
   DshPendingSteps,
   PluginHost,
   PluginInstallation,
-  PluginInstallReceipt,
 } from "../plugin/desktop-install";
+import type { AgentConnectionRecord } from "../agent/mcp-connections";
+import { getLocale } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/pluginInstall";
+import onboardingMessages from "../i18n/messages/onboarding";
+import { ExternalLink } from "../ui/icons";
 import { desktop, errorMessage } from "./bridge";
-
-const hostNames: Record<PluginHost, string> = {
-  codex: "Codex",
-  claude: "Claude Code",
-  deepseek: "DeepSeek Harness",
-};
+import {
+  pluginActionBlocked,
+  pluginActionLabel,
+  pluginHostNames,
+  usePluginHosts,
+} from "./usePluginHosts";
+import { AGENT_TROUBLESHOOTING, connectionHost } from "./AgentReadiness";
+import type { Onboarding } from "./sample-project";
 
 /** Harness installs bundles itself, so the App lists the steps left in Harness. */
 function DshSteps({ steps }: { steps: DshPendingSteps }) {
@@ -54,42 +59,124 @@ function DshSteps({ steps }: { steps: DshPendingSteps }) {
   );
 }
 
+function formatTime(value: string) {
+  return new Date(value).toLocaleString(getLocale(), {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+}
+
+/**
+ * After installation, the first MCP call from each host proves the plugin is
+ * loaded and pinned to this library. The stdio MCP records it in the library.
+ */
+function VerifyConnection({ hosts }: { hosts: PluginInstallation[] }) {
+  const t = useTranslator(onboardingMessages);
+  const [records, setRecords] = useState<AgentConnectionRecord[]>([]);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState("");
+  const latest = (host: PluginHost) =>
+    records
+      .filter((record) => connectionHost(record.client) === host)
+      .sort((a, b) =>
+        (b.lastCallAt ?? b.lastConnectedAt).localeCompare(
+          a.lastCallAt ?? a.lastConnectedAt,
+        ),
+      )[0];
+  const waiting = hosts.some((host) => !latest(host.host)?.firstCallAt);
+  useEffect(() => {
+    let stopped = false;
+    const read = () =>
+      desktop
+        .invoke<Onboarding>("agent:onboarding")
+        .then((value) => {
+          if (!stopped) {
+            setRecords(value.connections);
+            setError("");
+          }
+        })
+        .catch((reason) => {
+          if (!stopped) setError(errorMessage(reason));
+        });
+    void read();
+    // Keep checking while a host has not called yet; the person is switching apps.
+    const timer = waiting ? setInterval(() => void read(), 3000) : undefined;
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [waiting]);
+  return (
+    <div className="settings-row plugin-verify">
+      <div className="settings-row-text">
+        <h3>{t("verify.title")}</h3>
+        <p>{t("verify.detail")}</p>
+        <div className="plugin-install-path">
+          <code>{t("verify.prompt")}</code>
+          <button
+            className="settings-button"
+            onClick={() =>
+              void desktop
+                .invoke("clipboard:write", { text: t("verify.prompt") })
+                .then(() => setCopied(true))
+                .catch((reason) => setError(errorMessage(reason)))
+            }
+          >
+            {copied ? t("verify.copied") : t("verify.copy")}
+          </button>
+        </div>
+        <ul className="plugin-verify-hosts">
+          {hosts.map((host) => {
+            const record = latest(host.host);
+            return (
+              <li
+                key={host.host}
+                data-state={
+                  record?.firstCallAt
+                    ? "called"
+                    : record
+                      ? "connected"
+                      : "waiting"
+                }
+              >
+                <strong>{pluginHostNames[host.host]}</strong>
+                <span role="status">
+                  {record?.firstCallAt
+                    ? t("verify.called", {
+                        time: formatTime(record.lastCallAt ?? record.firstCallAt),
+                      })
+                    : record
+                      ? t("verify.connected", {
+                          time: formatTime(record.lastConnectedAt),
+                        })
+                      : t("verify.waiting")}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+        <a href={AGENT_TROUBLESHOOTING} target="_blank" rel="noreferrer">
+          <ExternalLink size={12} aria-hidden="true" />
+          {t("verify.help")}
+        </a>
+        {error && (
+          <p role="alert" className="plugin-install-error">
+            {error}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function PluginInstallSettings({ home }: { home: string }) {
   const t = useTranslator(messages);
-  const [hosts, setHosts] = useState<PluginInstallation[]>([]);
-  const [busy, setBusy] = useState<PluginHost | "scan" | null>(null);
-  const [error, setError] = useState("");
-  const [receipt, setReceipt] = useState<PluginInstallReceipt | null>(null);
-  async function refresh() {
-    setBusy("scan");
-    setError("");
-    try {
-      setHosts(await desktop.invoke<PluginInstallation[]>("plugins:status"));
-    } catch (error) {
-      setError(errorMessage(error));
-    } finally {
-      setBusy(null);
-    }
-  }
-  useEffect(() => {
-    setReceipt(null);
-    void refresh();
-  }, [home]);
-  async function install(host: PluginHost) {
-    setBusy(host);
-    setError("");
-    setReceipt(null);
-    try {
-      setReceipt(
-        await desktop.invoke<PluginInstallReceipt>("plugins:install", { host }),
-      );
-      setHosts(await desktop.invoke<PluginInstallation[]>("plugins:status"));
-    } catch (error) {
-      setError(errorMessage(error));
-    } finally {
-      setBusy(null);
-    }
-  }
+  const { hosts, busy, error, receipt, refresh, install } =
+    usePluginHosts(home);
+  const installed = hosts.filter((host) => host.installed && host.enabled);
   return (
     <div className="plugin-install-settings" aria-busy={!!busy}>
       <div className="settings-row">
@@ -108,7 +195,7 @@ export default function PluginInstallSettings({ home }: { home: string }) {
       {hosts.map((host) => (
         <div className="settings-row" key={host.host}>
           <div className="settings-row-text">
-            <h3>{hostNames[host.host]}</h3>
+            <h3>{pluginHostNames[host.host]}</h3>
             <p>
               {!host.executable
                 ? host.host === "deepseek"
@@ -141,23 +228,10 @@ export default function PluginInstallSettings({ home }: { home: string }) {
           </div>
           <button
             className="settings-button"
-            disabled={
-              !!busy ||
-              !host.executable ||
-              !!host.error ||
-              !!host.otherSources.length
-            }
+            disabled={!!busy || pluginActionBlocked(host)}
             onClick={() => void install(host.host)}
           >
-            {busy === host.host
-              ? t("installing")
-              : host.host === "deepseek"
-                ? host.installedPath
-                  ? t("dshUpdate")
-                  : t("dshPrepare")
-                : host.installed
-                  ? t("update")
-                  : t("install")}
+            {busy === host.host ? t("installing") : t(pluginActionLabel(host))}
           </button>
         </div>
       ))}
@@ -184,6 +258,7 @@ export default function PluginInstallSettings({ home }: { home: string }) {
           </details>
         </div>
       )}
+      {installed.length > 0 && <VerifyConnection hosts={installed} />}
       <p className="plugin-install-note">
         {t("library")} <span>{home}</span>
       </p>

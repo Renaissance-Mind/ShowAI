@@ -278,7 +278,9 @@ export default function RichTextEditor({
   const extensions = useMemo(
     () => [
       ...createExtensions({
-        placeholder: () => translate("placeholder"),
+        // An empty page (no trailing node: the continuous page editor) points to the Agent.
+        placeholder: ({ empty }) =>
+          translate(empty && !trailingNode ? "placeholderPage" : "placeholder"),
         trailingNode,
       }),
       ...(additionalExtensions ?? []),

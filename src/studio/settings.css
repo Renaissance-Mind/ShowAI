@@ -616,3 +616,28 @@
   overflow-wrap: anywhere;
   font-size: 11px;
 }
+.plugin-verify-hosts {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  font-size: 12px;
+}
+.plugin-verify-hosts li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 3px 0;
+}
+.plugin-verify-hosts li span {
+  color: var(--muted);
+}
+.plugin-verify-hosts li[data-state="called"] span {
+  color: var(--accent);
+}
+.plugin-verify a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--accent);
+}

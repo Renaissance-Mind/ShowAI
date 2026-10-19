@@ -15,6 +15,12 @@ import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { FileStore, assertId } from "../core/store";
 import { AgentService } from "../agent/service";
+import { readOnboarding } from "../core/onboarding";
+import { readAgentConnections } from "../agent/mcp-connections";
+import {
+  seedSampleProject,
+  type SampleProjectInput,
+} from "../agent/sample-project";
 import {
   writeProtected,
   readOptional,
@@ -1230,6 +1236,8 @@ export class AgentHost {
       args: [...cli.args, "mcp", "--project", projectId],
       env: {
         ...cli.env,
+        // Keeps built-in runs out of the host plugin connection records.
+        SHOWAI_MCP_CLIENT: "builtin",
         ...(task && "conversationId" in task
           ? {
               SHOWAI_AGENT_PAGE_WRITES: this.conversations.writesPath(
@@ -1684,6 +1692,18 @@ export class AgentHost {
         );
       case "agent:scan":
         return this.scan();
+      case "agent:onboarding": {
+        const root = this.options.library().root;
+        return {
+          samples: (await readOnboarding(root))?.samples ?? null,
+          connections: await readAgentConnections(root),
+        };
+      }
+      case "agent:seedSamples":
+        return seedSampleProject(
+          this.options.library().root,
+          args as unknown as SampleProjectInput,
+        );
       case "agent:settings":
         return this.save(args.settings);
       case "agent:source":
@@ -1792,6 +1812,8 @@ export class AgentHost {
   }
 }
 export const agentActions = new Set([
+  "agent:onboarding",
+  "agent:seedSamples",
   "agent:serverResources",
   "agent:addServerResource",
   "agent:publishSource",

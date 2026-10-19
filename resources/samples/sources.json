@@ -1,0 +1,100 @@
+{
+  "format": "showai-samples",
+  "version": 1,
+  "source": {
+    "zh-CN": {
+      "seed": "ShowAI_Homepage/site/public/seed.json",
+      "catalog": "ShowAI_Homepage/site/public/catalog.json",
+      "release": "2026-10-09"
+    },
+    "en": {
+      "seed": "ShowAI_Homepage/site/public/seed.en.json",
+      "catalog": "ShowAI_Homepage/site/public/catalog.en.json",
+      "release": "2026-10-09"
+    }
+  },
+  "locales": {
+    "zh-CN": [
+      {
+        "name": "kyoto",
+        "file": "zh-CN/kyoto.showai.json",
+        "pageId": "f3641d0c-a605-44ca-a523-79fe532eac65",
+        "title": "京都五日：慢慢走",
+        "sourceRevision": "17c042ef1608c2cfbd94e34845744bee757d15de",
+        "components": [
+          "trip-route-map:1.0.0:sha256-d62362afe6463d9955930c123d5b81c2a1b2bee18148c2cfd3b1d2ab32c6f6bb",
+          "trip-budget:1.0.0:sha256-c277b6aeecbd8ab21d08a42c7019d4990d045c74d3253d65b0d44a797f36afc2"
+        ],
+        "bytes": 886775,
+        "sha256": "e3c5e31bfff10def5be5b81a78df165e13643477c1ab3d76ae675d90c5887aa5"
+      },
+      {
+        "name": "attention",
+        "file": "zh-CN/attention.showai.json",
+        "pageId": "1d0f36da-d0e5-4f26-97bc-158217916fa8",
+        "title": "注意力机制，一步步看懂",
+        "sourceRevision": "e8c769f8de53952557b02354a49bdd1b56f73fd3",
+        "components": [
+          "attention-explorer:1.0.0:sha256-9131f29b7fc24d9a314db05da1de80a8b320a98e3b048f127e0f28eca9fdfaf6",
+          "attention-steps:1.0.0:sha256-cc9e992ca65f1fdf3597d68006858082c9bb0bb720e2b7e667f7ee09448c98d0"
+        ],
+        "bytes": 729227,
+        "sha256": "193270a91e6f28ac704f67cbbdb8fa02923391f93800407c4e9486a1edf08cd9"
+      },
+      {
+        "name": "foldable",
+        "file": "zh-CN/foldable.showai.json",
+        "pageId": "cb8ed801-1670-45c1-bf19-d97dafddcea2",
+        "title": "该买哪台折叠屏？",
+        "sourceRevision": "7211fc67ac629c31f43318eef9380acacc76f580",
+        "components": [
+          "fold-picker:1.0.0:sha256-3f9af9a4da6dd93e00659db3e7011e81933b201760f22040c09e4753b4957efd",
+          "spec-scatter:1.0.0:sha256-26743012c1550f106b49e2a51bee6149cc7e09af776525ce05d078ccfded05ef"
+        ],
+        "bytes": 831505,
+        "sha256": "1d6e9e5b50d4a0aa5e7dff1e3d7776547eceda300502941dde5d1ae674c71f45"
+      }
+    ],
+    "en": [
+      {
+        "name": "kyoto",
+        "file": "en/kyoto.showai.json",
+        "pageId": "f3641d0c-a605-44ca-a523-79fe532eac65",
+        "title": "Five Days in Kyoto: Take It Slow",
+        "sourceRevision": "65819ec7c95b34890664cb0310c88de3189ab0d7",
+        "components": [
+          "trip-route-map:1.0.0:sha256-791b4a4b39e3f6547bd76596ea8115497411bc76418be7b906da43f7feb4662b",
+          "trip-budget:1.0.0:sha256-033a92cc74b2e407b5094843c976531b4fa1ac9c349180ddc41f5446084d8595"
+        ],
+        "bytes": 891488,
+        "sha256": "ddf37d8314ac95f09555ff018e55cccf712762edb419ebd0f011fe0dabd19f08"
+      },
+      {
+        "name": "attention",
+        "file": "en/attention.showai.json",
+        "pageId": "1d0f36da-d0e5-4f26-97bc-158217916fa8",
+        "title": "Attention mechanism, understand it step by step",
+        "sourceRevision": "600cc2678e5b02ebfb80bd7ca960625f3fdf0880",
+        "components": [
+          "attention-explorer:1.0.0:sha256-75fc0959310ac144244c9e2c25422a8062c4cea0ccbc8674e2184dd62a19c87a",
+          "attention-steps:1.0.0:sha256-2e402f99dcc9911602cdc8c351a354db9007421bc20bf27fc02c63deaecb111d"
+        ],
+        "bytes": 730673,
+        "sha256": "c79c9ae0d649a62fb14091666e97f03738f9eb797e0b4542df24c8031e90007d"
+      },
+      {
+        "name": "foldable",
+        "file": "en/foldable.showai.json",
+        "pageId": "cb8ed801-1670-45c1-bf19-d97dafddcea2",
+        "title": "Which foldable screen should I buy?",
+        "sourceRevision": "c48767cafd44187ecb97a2a15b9107d44cf14cf5",
+        "components": [
+          "fold-picker:1.0.0:sha256-dd12e58600a15b7634816ee2846f4b3c337d39279552121fff7dbe61ca7e63db",
+          "spec-scatter:1.0.0:sha256-a08dc4971a523f03bc9403b5e156c27a92aeac2be6569db60a0a849b40d309a2"
+        ],
+        "bytes": 834573,
+        "sha256": "39a70b55a5c420facd7718684f80fafdf079895a28807fb05f3bab2a6b09ebc5"
+      }
+    ]
+  }
+}

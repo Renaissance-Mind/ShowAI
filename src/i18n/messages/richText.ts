@@ -9,6 +9,7 @@ export default defineMessages("richText", {
     openingDocument: "正在打开文档",
     documentContent: "文档内容",
     placeholder: "输入 / 添加内容",
+    placeholderPage: "输入 / 添加内容，或在右侧让 Agent 写这一页",
     placeholderDefault: "写下想法，或输入 / 添加内容…",
     placeholderHeading: "标题",
     readOnlyNote: "交互阅读模式",
@@ -159,6 +160,8 @@ export default defineMessages("richText", {
     openingDocument: "Opening document",
     documentContent: "Document content",
     placeholder: "Type / to add content",
+    placeholderPage:
+      "Type / to add content, or ask the agent on the right to write this page",
     placeholderDefault: "Write something, or type / to add content…",
     placeholderHeading: "Heading",
     readOnlyNote: "Interactive reading mode",
