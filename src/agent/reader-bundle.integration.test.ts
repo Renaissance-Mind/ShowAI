@@ -54,6 +54,7 @@ test("text documents exclude unused renderers, preserve source and remain readab
   const full = await readFile(resolve("dist-portable/portable.html"), "utf8");
   const html = await buildPageHtml(doc);
   expect(Buffer.byteLength(html)).toBeLessThan(Buffer.byteLength(full) / 3);
+  expect(html).not.toContain("Visual Basic .NET");
   expect(readerKinds([doc])).toEqual([]);
   pages.set("/text", html);
   const page = await browser.newPage();
@@ -64,6 +65,30 @@ test("text documents exclude unused renderers, preserve source and remain readab
   const source = await page.locator("#showai-data").textContent();
   expect(JSON.parse(source!).document.id).toBe(doc.id);
   expect(requests.every((url) => url.startsWith(address))).toBe(true);
+  await page.close();
+});
+
+test("code blocks load their syntax grammars in a specialized offline reader", async () => {
+  const doc = createResource(blankDocument());
+  doc.content.content = [
+    {
+      type: "codeBlock",
+      attrs: { id: "snippet", language: "js" },
+      content: [{ type: "text", text: 'const message = "hello";' }],
+    },
+  ];
+  doc.surfaceViews[doc.content.attrs!.id].readingOrder = ["snippet"];
+  const html = await buildPageHtml(doc);
+  expect(html).toContain("Visual Basic .NET");
+  pages.set("/code", html);
+  const page = await browser.newPage();
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(address + "/code");
+  await page
+    .locator(".code-block .hljs-string", { hasText: '"hello"' })
+    .waitFor();
+  expect(errors).toEqual([]);
   await page.close();
 });
 

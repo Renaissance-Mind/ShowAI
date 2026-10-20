@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   codeHighlighter,
   codeLanguages,
@@ -18,6 +18,7 @@ import { EditorState, TextSelection } from "@tiptap/pm/state";
 import { DecorationSet } from "@tiptap/pm/view";
 import StarterKit from "@tiptap/starter-kit";
 import { HighlightedCodeBlock } from "./code-block";
+import { loadCodeHighlighter } from "./HighlightedCode";
 
 function render(code: string, language?: string | null) {
   return renderToStaticMarkup(
@@ -31,7 +32,18 @@ function render(code: string, language?: string | null) {
   );
 }
 
+// Runs before the grammars load: readers show the code itself, then color it.
+it("renders code as plain text until the highlighter loads", async () => {
+  const code = 'const html = "<b>bold</b>";';
+  const before = render(code, "javascript");
+  expect(before).not.toContain("hljs-");
+  expect(before).toContain("const html = &quot;&lt;b&gt;bold&lt;/b&gt;&quot;;");
+  await loadCodeHighlighter();
+  expect(render(code, "javascript")).toContain("hljs-string");
+});
+
 describe("code syntax highlighting", () => {
+  beforeAll(() => loadCodeHighlighter());
   it("refreshes unselected blocks on language and text changes and maps offsets through surrounding edits", () => {
     const editor = new Editor({
       element: null,

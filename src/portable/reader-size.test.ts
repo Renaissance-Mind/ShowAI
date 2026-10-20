@@ -37,13 +37,50 @@ const formula = page([
   paragraph("Energy:"),
   { type: "mathBlock", attrs: { latex: "E = mc^2" } },
 ]);
+const code = page([
+  paragraph("Example:"),
+  {
+    type: "codeBlock",
+    attrs: { language: "js" },
+    content: [{ type: "text", text: 'const message = "hello";' }],
+  },
+]);
+// A grammar name only the syntax highlighter's registry carries.
+const GRAMMARS = "Visual Basic .NET";
 
 describe("reader omissions", () => {
   test("formulas, delimiters and Markdown-like text keep KaTeX", () => {
-    expect(readerOmissions([plain])).toEqual(["math"]);
-    expect(readerOmissions([formula])).toEqual([]);
-    expect(readerOmissions([page([paragraph("cost $5")])])).toEqual([]);
-    expect(readerOmissions([page([paragraph("\\(x\\)")])])).toEqual([]);
+    expect(readerOmissions([plain])).toEqual(["code", "math"]);
+    expect(readerOmissions([formula])).toEqual(["code"]);
+    expect(readerOmissions([page([paragraph("cost $5")])])).toEqual(["code"]);
+    expect(readerOmissions([page([paragraph("\\(x\\)")])])).toEqual(["code"]);
+  });
+  test("code blocks, code components and Markdown fences keep syntax grammars", () => {
+    expect(readerOmissions([code])).toEqual(["math"]);
+    expect(readerOmissions([page([paragraph("```js\nx\n```")])])).toEqual([
+      "math",
+    ]);
+    expect(readerOmissions([page([paragraph("~~~\nx\n~~~")])])).toEqual([
+      "math",
+    ]);
+    const component = {
+      id: "code-component",
+      title: "Code component",
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "widget",
+            attrs: {
+              id: "snippet",
+              kind: "code",
+              data: { content: "x = 1", language: "python" },
+            },
+          },
+        ],
+      },
+    } as unknown as ShowDocument;
+    expect(readerOmissions([component])).toEqual(["math"]);
   });
 });
 
@@ -61,13 +98,21 @@ describe.skipIf(!existsSync(archive))("conversation preview budget", () => {
   test("a plain page carries its local reader with room to spare", async () => {
     const { reader, bytes } = await inlineBytes(plain);
     expect(reader).not.toContain("KaTeX_");
-    expect(reader).toContain('name="showai-reader-omits" content="math"');
+    expect(reader).not.toContain(GRAMMARS);
+    expect(reader).toContain('name="showai-reader-omits" content="code math"');
     expect(bytes).toBeLessThan(CAPACITY.chatBytes * 0.6);
   });
   test("a page with formulas still fits its local reader", async () => {
     const { reader, bytes } = await inlineBytes(formula);
     expect(reader).toContain("KaTeX_");
-    expect(reader).not.toContain("showai-reader-omits");
+    expect(reader).not.toContain(GRAMMARS);
+    expect(reader).toContain('name="showai-reader-omits" content="code"');
     expect(bytes).toBeLessThan(CAPACITY.chatBytes * 0.9);
+  });
+  test("a page with code carries its syntax grammars", async () => {
+    const { reader, bytes } = await inlineBytes(code);
+    expect(reader).toContain(GRAMMARS);
+    expect(reader).toContain('name="showai-reader-omits" content="math"');
+    expect(bytes).toBeLessThan(CAPACITY.chatBytes * 0.6);
   });
 });

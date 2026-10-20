@@ -1,8 +1,20 @@
-import { useMemo, type ReactNode } from "react";
-import { highlightCode } from "./code-highlighting";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import type { highlightCode } from "./code-highlighting";
 import "./code-highlighting.css";
 
+type Highlighter = typeof import("./code-highlighting");
 type Token = ReturnType<typeof highlightCode>["children"][number];
+
+// The grammar registry outweighs the rest of rich text. Load it only when a
+// code block renders, so split builds fetch it on demand and page readers
+// without code blocks can leave it out entirely.
+let highlighter: Highlighter | undefined;
+let loading: Promise<Highlighter> | undefined;
+export function loadCodeHighlighter() {
+  return (loading ??= import("./code-highlighting").then(
+    (module) => (highlighter = module),
+  ));
+}
 
 function renderTokens(nodes: readonly Token[]): ReactNode {
   return nodes.map((node, index) => {
@@ -28,8 +40,16 @@ export function HighlightedCode({
   code: string;
   language?: string | null;
 }) {
+  const [loaded, setLoaded] = useState(highlighter);
+  useEffect(() => {
+    if (!loaded) void loadCodeHighlighter().then(setLoaded);
+  }, [loaded]);
+  // Until the grammars arrive the same text shows unstyled.
   return useMemo(
-    () => renderTokens(highlightCode(code, language).children),
-    [code, language],
+    () =>
+      loaded
+        ? renderTokens(loaded.highlightCode(code, language).children)
+        : code,
+    [loaded, code, language],
   );
 }

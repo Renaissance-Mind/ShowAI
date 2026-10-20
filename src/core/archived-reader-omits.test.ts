@@ -28,6 +28,13 @@ const plain = page([
   { type: "paragraph", content: [{ type: "text", text: "Plain" }] },
 ]);
 const formula = page([{ type: "mathBlock", attrs: { latex: "x^2" } }]);
+const code = page([
+  {
+    type: "codeBlock",
+    attrs: { language: "js" },
+    content: [{ type: "text", text: "let x = 1;" }],
+  },
+]);
 const pagePath = "projects/p1/pages/omits.json";
 
 describe.skipIf(!existsSync(viewer))("archived readers and omitted capabilities", () => {
@@ -57,10 +64,18 @@ describe.skipIf(!existsSync(viewer))("archived readers and omitted capabilities"
     await expect(
       completePageReaders(await staged(formula, formula), read),
     ).resolves.toBeUndefined();
+    await expect(
+      completePageReaders(await staged(code, code), read),
+    ).resolves.toBeUndefined();
   });
   it("rejects a reader without formulas for a page that gained one", async () => {
     await expect(
       completePageReaders(await staged(plain, formula), read),
+    ).rejects.toThrow("kind or capability");
+  });
+  it("rejects a reader without syntax grammars for a page that gained code", async () => {
+    await expect(
+      completePageReaders(await staged(plain, code), read),
     ).rejects.toThrow("kind or capability");
   });
 });

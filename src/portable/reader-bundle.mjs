@@ -130,17 +130,22 @@ export function readerKinds(documents) {
   return [...kinds].filter((k) => typeof k === "string").sort();
 }
 const MATH_TEXT = /\$|\\\(|\\\[/;
+// Markdown gives code a language only through fences.
+const CODE_TEXT = /```|~~~/;
 /**
  * Optional reader capabilities a page does not need. KaTeX (code and fonts) is
  * a third of a page reader, so it stays out unless the page has formulas or
- * Markdown-like text that may still become one.
+ * Markdown-like text that may still become one. Syntax grammars likewise stay
+ * out unless the page has code blocks or Markdown code fences.
  */
 export function readerOmissions(documents) {
   let math = false;
+  let code = false;
   const visit = (value) => {
-    if (math || value === null || value === undefined) return;
+    if ((math && code) || value === null || value === undefined) return;
     if (typeof value === "string") {
       if (MATH_TEXT.test(value)) math = true;
+      if (CODE_TEXT.test(value)) code = true;
       return;
     }
     if (Array.isArray(value)) {
@@ -148,15 +153,18 @@ export function readerOmissions(documents) {
       return;
     }
     if (typeof value === "object") {
-      if (value.type === "mathInline" || value.type === "mathBlock") {
+      if (value.type === "mathInline" || value.type === "mathBlock")
         math = true;
-        return;
-      }
+      if (
+        value.type === "codeBlock" ||
+        (value.type === "widget" && value.attrs?.kind === "code")
+      )
+        code = true;
       Object.values(value).forEach(visit);
     }
   };
   for (const document of documents) visit(document.content);
-  return math ? [] : ["math"];
+  return [...(code ? [] : ["code"]), ...(math ? [] : ["math"])];
 }
 const removeRanges = (source, ranges) => {
   for (const { start, end } of [...ranges].sort((a, b) => b.start - a.start))
@@ -214,6 +222,7 @@ export async function bundleReader(archivePath, documents) {
 async function compileReader(archivePath, archive, kinds, omits = []) {
   const selected = new Set(kinds);
   const omitMath = omits.includes("math");
+  const omitCode = omits.includes("code");
   const catalogKinds = (name) =>
     JSON.parse(archive.files[`resources/catalog/${name}.json`]).map(
       (item) => item.kind,
@@ -323,6 +332,16 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
       builder.onLoad({ filter: /.*/, namespace: "reader" }, (args) => {
         if (omitMath && args.path === "src/components/blocks/katex.css")
           return { contents: "", loader: "css" };
+        // Never reached without code blocks; the stub keeps code as plain text if it is.
+        if (
+          omitCode &&
+          args.path === "src/components/rich-text/code-highlighting.ts"
+        )
+          return {
+            contents:
+              'export const highlightCode = (code) => ({ type: "root", children: [{ type: "text", value: code }] });',
+            loader: "js",
+          };
         // Readers never edit: rich text renders through its static view, so
         // the lazily loaded ProseMirror editor would only add weight.
         if (args.path === "src/components/rich-text/RichTextEditor.tsx")
