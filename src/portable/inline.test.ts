@@ -23,6 +23,17 @@ describe("inline page delivery", () => {
     expect(fragment).toContain('{"format":"showai"}');
     expect(fragment).not.toContain('src="');
   });
+  it("takes reader CSS only from style elements, not from style text inside scripts", () => {
+    const highlighter = built.replace(
+      "const parse",
+      'const grammar={begin:/<style(?=\\s|>)/,end:"</style>",note:"not css"};const parse',
+    );
+    const fragment = toInlineFragment(highlighter, "showai-test");
+    const css = fragment.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "";
+    expect(css).toContain(":scope{color:red}");
+    expect(css).not.toContain("end:");
+    expect(fragment).toContain('note:"not css"');
+  });
   it("rejects referenced legacy component packages without a conversation runtime", () => {
     const artifact = {
       format: "showai",

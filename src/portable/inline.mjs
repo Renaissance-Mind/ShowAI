@@ -48,9 +48,13 @@ export function toInlineFragment(html, id = `showai-${randomUUID()}`) {
   // The host page owns <html>; carry the exporter's language on our root.
   const lang = html.match(/<html\b[^>]*\slang=["']([\w-]+)["']/i)?.[1];
   const langAttribute = lang ? ` lang="${lang}"` : "";
-  const styles = [...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map(
-    (match) => match[1],
-  );
+  // Script bodies may contain "<style" text (e.g. a syntax highlighter's HTML grammar); only real
+  // <style> elements carry reader CSS. A script body cannot contain "</script>", so drop scripts first.
+  const styles = [
+    ...html
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
+      .matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi),
+  ].map((match) => match[1]);
   const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
   const artifactSource = scripts.find(
     (match) =>
