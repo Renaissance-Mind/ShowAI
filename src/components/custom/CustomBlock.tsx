@@ -343,7 +343,14 @@ function SandboxComponent({
         return;
       }
       if (event.data.type === "showai:open-url") {
-        openComponentLink(event.data.url);
+        // The page around the block may open its own links in place, such as the built-in docs.
+        const link = new CustomEvent("showai:component-link", {
+          bubbles: true,
+          cancelable: true,
+          detail: { url: event.data.url },
+        });
+        if (iframe.current?.dispatchEvent(link) !== false)
+          openComponentLink(event.data.url);
         return;
       }
       if (event.data.type === "showai:open-media") {

@@ -151,6 +151,8 @@ export function SettingsPanel({
   onCopyHome,
   onCopyConfig,
   onMigrate,
+  docsVisible,
+  onDocsVisibleChange,
 }: {
   syncRequest?: ProjectSyncRequest;
   onOpenProject?: (projectId: string) => Promise<void>;
@@ -162,6 +164,9 @@ export function SettingsPanel({
   onCopyHome: () => void;
   onCopyConfig: () => void;
   onMigrate: () => void;
+  /** Absent where the host publishes its own documentation. */
+  docsVisible?: boolean;
+  onDocsVisibleChange?: (visible: boolean) => void;
 }) {
   const t = useTranslator(messages);
   const language = useLanguagePreference();
@@ -221,6 +226,28 @@ export function SettingsPanel({
               </button>
             </div>
           )}
+        </section>
+      )}
+      {section === "general" && onDocsVisibleChange && (
+        <section
+          className="settings-group"
+          aria-labelledby="settings-sidebar-title"
+        >
+          <h2 id="settings-sidebar-title">{t("sidebar")}</h2>
+          <div className="settings-row">
+            <div className="settings-row-text">
+              <label htmlFor="settings-builtin-docs">{t("builtinDocs")}</label>
+              <p>{t("builtinDocsDetail")}</p>
+            </div>
+            <input
+              id="settings-builtin-docs"
+              type="checkbox"
+              role="switch"
+              className="settings-switch"
+              checked={!!docsVisible}
+              onChange={(event) => onDocsVisibleChange(event.target.checked)}
+            />
+          </div>
         </section>
       )}
       {section === "general" && info?.libraryVersion === 2 && (

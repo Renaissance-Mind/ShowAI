@@ -119,6 +119,24 @@ describe("workspace tabs", () => {
     ).toEqual(state);
   });
 
+  it("restores built-in documentation pages, which belong to no project", () => {
+    const doc = (pageId: string | null): WorkspaceEntry => ({
+      location: { view: "docs", projectId: null, folderId: null, pageId },
+      title: "快速上手",
+      icon: "🚀",
+      scrollTop: 0,
+    });
+    const state = visitWorkspace(createWorkspace(), doc("welcome"));
+    expect(
+      parseWorkspaceTabs(JSON.stringify({ version: 1, ...state })),
+    ).toEqual(state);
+    expect(
+      parseWorkspaceTabs(
+        JSON.stringify({ version: 1, ...createWorkspace(doc(null)) }),
+      ),
+    ).toBeUndefined();
+  });
+
   it("rejects corrupted sessions, invalid page owners and missing selected tabs", () => {
     expect(parseWorkspaceTabs("broken")).toBeUndefined();
     for (const mutate of [

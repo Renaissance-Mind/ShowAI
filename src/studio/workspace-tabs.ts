@@ -3,8 +3,15 @@ import sidebarMessages from "../i18n/messages/sidebar";
 
 const t = translator(sidebarMessages);
 
+/** `docs` is a built-in documentation page: no project, `pageId` names the page. */
 export type WorkspaceView =
-  "projects" | "project" | "page" | "templates" | "components" | "settings";
+  | "projects"
+  | "project"
+  | "page"
+  | "templates"
+  | "components"
+  | "settings"
+  | "docs";
 
 export interface WorkspaceLocation {
   view: WorkspaceView;
@@ -124,6 +131,7 @@ export function parseWorkspaceTabs(
     "templates",
     "components",
     "settings",
+    "docs",
   ];
   const optionalId = (id: unknown) =>
     id === null || (typeof id === "string" && /^[\w-]{1,128}$/.test(id));
@@ -159,6 +167,7 @@ export function parseWorkspaceTabs(
         !optionalId(loc.folderId) ||
         !optionalId(loc.pageId) ||
         (loc.view === "page" && (!loc.projectId || !loc.pageId)) ||
+        (loc.view === "docs" && !loc.pageId) ||
         (loc.view === "project" && !loc.projectId) ||
         typeof entry.title !== "string" ||
         (entry.icon !== undefined && typeof entry.icon !== "string") ||

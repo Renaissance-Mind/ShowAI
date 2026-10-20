@@ -29,6 +29,7 @@ export default function ProjectSidebar({
   addDisabled = false,
   onMenu,
   onGroupMenu,
+  docs,
 }: {
   projects: ProjectSummary[];
   organization: SidebarOrganization;
@@ -41,6 +42,8 @@ export default function ProjectSidebar({
   addDisabled?: boolean;
   onMenu: (anchor: HTMLElement) => void;
   onGroupMenu: (group: ProjectGroup, anchor: HTMLElement) => void;
+  /** The built-in documentation, pinned under the add button. */
+  docs?: ReactNode;
 }) {
   const t = useTranslator(sidebarMessages);
   const tc = useTranslator(commonMessages);
@@ -164,6 +167,7 @@ export default function ProjectSidebar({
         <Plus size={17} aria-hidden="true" />
         <span>{onAddContent ? tc("add") : t("newProject")}</span>
       </button>
+      {docs}
       {!!pinned.length && section("pinned", t("section.pinned"), pinned)}
       {section("projects", t("section.projects"), ungrouped)}
       {organization.groups.map((group) =>

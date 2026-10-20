@@ -51,6 +51,8 @@
     "release:notes": "node scripts/release-entry.mjs notes",
     "release:check": "node scripts/release-entry.mjs check",
     "test:release-entry": "node --test scripts/release-entry.test.mjs",
+    "docs:sync": "node scripts/sync-docs.mjs",
+    "test:sync-docs": "node --test scripts/sync-docs.test.mjs",
     "runtime:register": "node dist-runtime/scripts/cli.mjs runtime register --json",
     "build:browser": "tsc -b && npm run build:portable && npm run build:cdn && vite build && npm run build:agent && npm run package:runtime",
     "browser": "node dist-runtime/scripts/cli.mjs serve",

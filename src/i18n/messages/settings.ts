@@ -20,6 +20,10 @@ export default defineMessages("settings", {
     copyLibraryPath: "复制内容库路径",
     upgradeLibrary: "升级内容库",
     upgradeLibraryDetail: "导入现有内容并启用当前内容存储，原始文件保留。",
+    sidebar: "侧栏",
+    builtinDocs: "显示 ShowAI 文档",
+    builtinDocsDetail:
+      "在「添加」下方固定 ShowAI 文档文件夹，包含开始使用和使用说明。文档随 App 一起更新，与官网一致。",
     interface: "界面",
     theme: "主题",
     themePreview: "主题预览",
@@ -60,6 +64,10 @@ export default defineMessages("settings", {
     upgradeLibrary: "Upgrade library",
     upgradeLibraryDetail:
       "Import existing content and switch to the current storage format. Original files are kept.",
+    sidebar: "Sidebar",
+    builtinDocs: "Show ShowAI Documentation",
+    builtinDocsDetail:
+      "Pin the ShowAI Documentation folder under Add, with Get started and the user guide. It updates with the App and matches the website.",
     interface: "Interface",
     theme: "Theme",
     themePreview: "Theme preview",

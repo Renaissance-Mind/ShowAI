@@ -148,6 +148,19 @@ import {
 import TemplateThumbnail from "./TemplateThumbnail";
 import RecentPages, { recentPages } from "./RecentPages";
 import Welcome from "./Welcome";
+import {
+  BuiltinDocPage,
+  DocsNavigation,
+  useBuiltinDocFolders,
+  useBuiltinDocTitle,
+} from "./BuiltinDocs";
+import {
+  builtinDocs,
+  DOCS_HOME,
+  DOCS_VISIBLE_KEY,
+  readDocsVisible,
+  WELCOME_DOC,
+} from "./builtin-docs";
 import { useSampleProject } from "./sample-project";
 import AutoHideSidebar from "./AutoHideSidebar";
 import WorkspaceTabs, { WorkspaceHistory } from "./WorkspaceTabs";
@@ -182,7 +195,7 @@ import {
   type SettingsSection,
 } from "./Settings";
 import { getLocale } from "../i18n";
-import { useTranslator } from "../i18n/react";
+import { useLocale, useTranslator } from "../i18n/react";
 import commonMessages from "../i18n/messages/common";
 import studioMessages from "../i18n/messages/studio";
 import assistantMessages from "../i18n/messages/assistant";
@@ -315,6 +328,20 @@ export default function Studio() {
   const windowFullscreen = useWindowFullscreen();
   const [info, setInfo] = useState<DesktopInfo | null>(null);
   const capabilities = workbenchCapabilities(info?.platform);
+  // Built-in documentation; the website workbench publishes its own instead.
+  const [docPage, setDocPage] = useState<{ id: string; hash: string } | null>(
+    null,
+  );
+  const [docsVisible, setDocsVisible] = useState(readDocsVisible);
+  const docsAvailable = !!info && info.builtinDocs !== false;
+  const showDocs = docsAvailable && docsVisible;
+  const changeDocsVisible = useCallback((visible: boolean) => {
+    setDocsVisible(visible);
+    if (visible) localStorage.removeItem(DOCS_VISIBLE_KEY);
+    else localStorage.setItem(DOCS_VISIBLE_KEY, "hidden");
+  }, []);
+  const docTitle = useBuiltinDocTitle();
+  const locale = useLocale();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [savedOrganization, setOrganization] = useState<SidebarOrganization>({
     groups: [],
@@ -998,8 +1025,10 @@ export default function Studio() {
     document.title =
       view === "page" && page.draft
         ? `${page.draft.title || tc("untitled")} — ShowAI`
-        : "ShowAI";
-  }, [view, page.draft?.title, tc]);
+        : view === "docs" && docPage
+          ? `${docTitle(docPage.id).title} — ShowAI`
+          : "ShowAI";
+  }, [view, page.draft?.title, tc, docPage?.id]);
   useEffect(() => {
     const handle = (event: KeyboardEvent) => {
       if (event.key === "Escape") setContextMenu(null);
@@ -1212,6 +1241,55 @@ export default function Studio() {
       target,
       clickDisposition(event, info?.platform === "darwin"),
     ).catch(report);
+  }
+  /** Built-in documentation opens like a page: in this tab, or a new one on a modified click. */
+  async function openDoc(
+    id: string,
+    hash = "",
+    disposition: OpenDisposition = "current",
+  ) {
+    if (!workspaceReady || routingRef.current || workspace.switching)
+      return false;
+    const meta = docTitle(id);
+    if (
+      capabilities.tabs &&
+      (disposition === "tab" || disposition === "foreground-tab")
+    )
+      return workspace.open(
+        {
+          location: {
+            view: "docs",
+            projectId: null,
+            folderId: null,
+            pageId: id,
+          },
+          title: meta.title,
+          icon: meta.icon,
+          scrollTop: 0,
+        },
+        disposition === "foreground-tab",
+      );
+    workspace.rememberScroll();
+    routingRef.current = true;
+    setRouting(true);
+    try {
+      if (!(await page.leave())) {
+        setView("page");
+        return false;
+      }
+      setContextMenu(null);
+      setQuery("");
+      selectedRef.current = null;
+      setSelectedProject(null);
+      setSelectedFolder(null);
+      setEditorControls(null);
+      setDocPage({ id, hash });
+      setView("docs");
+      return true;
+    } finally {
+      routingRef.current = false;
+      setRouting(false);
+    }
   }
   async function beginNewPage(projectId: string, parentId: string | null) {
     const choices = await desktop.invoke<TemplateMetadata[]>("templates:list", {
@@ -2352,6 +2430,10 @@ export default function Studio() {
       await refresh().catch(report);
     }
   }
+  const docFolders = useBuiltinDocFolders(
+    view === "docs" ? (docPage?.id ?? null) : null,
+  );
+  const docMeta = view === "docs" && docPage ? docTitle(docPage.id) : null;
   const breadcrumbFolders: FolderMetadata[] = [];
   let breadcrumbFolder = currentFolder;
   while (
@@ -2374,24 +2456,33 @@ export default function Studio() {
             ? t("heading.components")
             : view === "settings"
               ? t("heading.settings")
-              : page.draft?.title || tc("untitled");
+              : view === "docs"
+                ? (docMeta?.title ?? "")
+                : page.draft?.title || tc("untitled");
   const workspaceEntry = useMemo<WorkspaceEntry>(
     () => ({
       location: {
         view,
         projectId: selectedProject,
         folderId: selectedFolder,
-        pageId: view === "page" ? (page.draft?.id ?? null) : null,
+        pageId:
+          view === "page"
+            ? (page.draft?.id ?? null)
+            : view === "docs"
+              ? (docPage?.id ?? null)
+              : null,
       },
       title: heading,
       icon:
         view === "page"
           ? page.draft?.icon
-          : view === "project"
-            ? selectedFolder
-              ? currentFolder?.icon
-              : project?.icon
-            : undefined,
+          : view === "docs"
+            ? docMeta?.icon
+            : view === "project"
+              ? selectedFolder
+                ? currentFolder?.icon
+                : project?.icon
+              : undefined,
       scrollTop: 0,
     }),
     [
@@ -2403,6 +2494,8 @@ export default function Studio() {
       project?.icon,
       currentFolder?.icon,
       heading,
+      docPage?.id,
+      docMeta?.icon,
     ],
   );
   const workspace = useWorkspaceTabs({
@@ -2444,6 +2537,8 @@ export default function Studio() {
       setSearchLibrary(false);
       setRevealNode(null);
       if (target.view !== "page") setEditorControls(null);
+      if (target.view === "docs" && target.pageId)
+        setDocPage({ id: target.pageId, hash: "" });
       setView(target.view);
       if (target.projectId && !loaded)
         void loadProjectContents(target.projectId).catch(report);
@@ -2455,6 +2550,26 @@ export default function Studio() {
       return true;
     },
   });
+  // A new App opens on the first-run page of its documentation, once per window,
+  // while the library has no pages of its own; restored sessions and page links win.
+  const launchedWelcome = useRef(false);
+  useEffect(() => {
+    if (!workspaceReady || !info || launchedWelcome.current) return;
+    const launch = workspace.launchState();
+    if (!launch) return;
+    launchedWelcome.current = true;
+    const params = new URLSearchParams(location.search);
+    if (
+      launch !== "new" ||
+      !welcoming ||
+      !showDocs ||
+      view !== "projects" ||
+      params.has("project") ||
+      params.has("invite")
+    )
+      return;
+    void openDoc(WELCOME_DOC).catch(report);
+  }, [workspaceReady, info, welcoming, showDocs, view, routing]);
   useEffect(() => {
     if (!capabilities.tabs) return;
     const command = (command: TabCommand) => {
@@ -2612,6 +2727,40 @@ export default function Studio() {
     }
     return toggle;
   };
+  const welcomeView = (
+    <Welcome
+      info={info}
+      samples={sampleProjectId ? sampleProject.samples : null}
+      preparing={sampleProject.preparing}
+      onOpenSample={(projectId, pageId, event) => {
+        const item = contents[projectId]?.pages.find(
+          (entry) => entry.id === pageId,
+        );
+        openTargetClick(
+          item
+            ? pageTarget(item, projectId)
+            : {
+                kind: "page",
+                projectId,
+                id: pageId,
+                title: tc("untitled"),
+                pinned: false,
+                parentId: null,
+              },
+          event,
+        );
+      }}
+      onOpenAgentSettings={() => {
+        setSettingsSection("agent");
+        void navigate("settings").catch(report);
+      }}
+      onOpenPluginSettings={() => {
+        setSettingsSection("plugins");
+        void navigate("settings").catch(report);
+      }}
+      onCreateProject={() => setDialog({ type: "project" })}
+    />
+  );
   const sidebarNavigation = (
     <SidebarNavigation
       onSelect={(section) =>
@@ -2676,6 +2825,21 @@ export default function Studio() {
             setProjectsMenu((current) => (current === anchor ? null : anchor))
           }
           onGroupMenu={(group, anchor) => setGroupMenu({ group, anchor })}
+          docs={
+            showDocs ? (
+              <DocsNavigation
+                activeId={view === "docs" ? (docPage?.id ?? null) : null}
+                onOpen={(id, event) => {
+                  event.preventDefault();
+                  void openDoc(
+                    id,
+                    "",
+                    clickDisposition(event, info?.platform === "darwin"),
+                  ).catch(report);
+                }}
+              />
+            ) : undefined
+          }
           renderProject={(item) => (
             <div key={item.id}>
               <LibraryRow
@@ -2758,6 +2922,23 @@ export default function Studio() {
               </button>
             </span>
           ))}
+          {view === "docs" && docMeta && (
+            <>
+              <button onClick={action(() => openDoc(DOCS_HOME))}>
+                <PageIcon value={builtinDocs(locale).icon} size={17} />
+                <span>{builtinDocs(locale).name}</span>
+              </button>
+              {docFolders.map((name) => (
+                <span className="studio-breadcrumb-folder" key={name}>
+                  <ChevronRight size={13} />
+                  <span>{name}</span>
+                </span>
+              ))}
+              <ChevronRight size={13} />
+              <PageIcon value={docMeta.icon} size={18} />
+              <span className="studio-breadcrumb-current">{docMeta.title}</span>
+            </>
+          )}
           {view === "page" && (
             <>
               <ChevronRight size={13} />
@@ -3386,7 +3567,7 @@ export default function Studio() {
             )}
             <div
               ref={catalogScrollRef}
-              className={`studio-scroll${view === "page" && page.draft ? " has-page-surface" : ""}`}
+              className={`studio-scroll${(view === "page" && page.draft) || (view === "docs" && docPage && docPage.id !== WELCOME_DOC) ? " has-page-surface" : ""}`}
                 onContextMenu={(event) => {
                   if (event.defaultPrevented || view !== "project" || !project)
                     return;
@@ -3433,6 +3614,10 @@ export default function Studio() {
                   dark={dark}
                   onDarkChange={setDark}
                   onMigrate={() => setDialog({ type: "migration" })}
+                  docsVisible={docsVisible}
+                  onDocsVisibleChange={
+                    docsAvailable ? changeDocsVisible : undefined
+                  }
                   onChooseHome={action(async () => {
                     if (!(await page.prepareClose())) return;
                     const next = await desktop.invoke<DesktopInfo | null>(
@@ -3467,6 +3652,20 @@ export default function Studio() {
                     setNotice(t("launchConfigCopied"));
                   })}
                 />
+              ) : view === "docs" && docPage ? (
+                docPage.id === WELCOME_DOC ? (
+                  <div className="studio-library">{welcomeView}</div>
+                ) : (
+                  <BuiltinDocPage
+                    id={docPage.id}
+                    hash={docPage.hash}
+                    onOpenDoc={(id, hash, newTab) =>
+                      void openDoc(id, hash, newTab ? "tab" : "current").catch(
+                        report,
+                      )
+                    }
+                  />
+                )
               ) : view === "page" && page.draft ? null : (
                 <div
                   className={`studio-library${view === "components" ? " studio-component-library" : ""}`}
@@ -3492,43 +3691,8 @@ export default function Studio() {
                       welcome={
                         !workspaceReady ? (
                           <div className="studio-welcome" aria-busy="true" />
-                        ) : welcoming ? (
-                          <Welcome
-                            info={info}
-                            samples={
-                              sampleProjectId ? sampleProject.samples : null
-                            }
-                            preparing={sampleProject.preparing}
-                            onOpenSample={(projectId, pageId, event) => {
-                              const item = contents[projectId]?.pages.find(
-                                (entry) => entry.id === pageId,
-                              );
-                              openTargetClick(
-                                item
-                                  ? pageTarget(item, projectId)
-                                  : {
-                                      kind: "page",
-                                      projectId,
-                                      id: pageId,
-                                      title: tc("untitled"),
-                                      pinned: false,
-                                      parentId: null,
-                                    },
-                                event,
-                              );
-                            }}
-                            onOpenAgentSettings={() => {
-                              setSettingsSection("agent");
-                              void navigate("settings").catch(report);
-                            }}
-                            onOpenPluginSettings={() => {
-                              setSettingsSection("plugins");
-                              void navigate("settings").catch(report);
-                            }}
-                            onCreateProject={() =>
-                              setDialog({ type: "project" })
-                            }
-                          />
+                        ) : welcoming && !showDocs ? (
+                          welcomeView
                         ) : undefined
                       }
                     />

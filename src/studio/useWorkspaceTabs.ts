@@ -35,6 +35,8 @@ export function useWorkspaceTabs({
   const closing = useRef(false);
   const library = useRef<string | undefined>(undefined);
   const restored = useRef(false);
+  // How this window began: with a new workspace, or by restoring its saved tabs.
+  const launch = useRef<"new" | "restored" | null>(null);
   const latest = useRef({ entry, restore, getScroll, onError, beforeClose });
   latest.current = { entry, restore, getScroll, onError, beforeClose };
 
@@ -96,9 +98,11 @@ export function useWorkspaceTabs({
         firstLibrary && (params.has("project") || params.has("invite"));
       if (saved && !explicit && !restored.current) {
         restored.current = true;
+        if (firstLibrary) launch.current = "restored";
         void activate(saved).catch(latest.current.onError);
       } else {
         restored.current = true;
+        if (firstLibrary) launch.current = "new";
         publish(createWorkspace(latest.current.entry));
       }
       return;
@@ -178,6 +182,7 @@ export function useWorkspaceTabs({
     close,
     step,
     rememberScroll,
+    launchState: () => launch.current,
     canBack: active.cursor > 0,
     canForward: active.cursor < active.entries.length - 1,
   };

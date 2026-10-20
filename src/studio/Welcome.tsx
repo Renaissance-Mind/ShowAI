@@ -29,7 +29,11 @@ import "./onboarding.css";
 
 const PROMPTS = ["mortgage", "foldable", "attention"] as const;
 
-/** First-run content of the Recent view while the library has no pages of its own. */
+/**
+ * The first-run page: "Get started" in the built-in documentation, opened when a new App
+ * starts, or the Recent view's content while the documentation is hidden and the library
+ * has no pages of its own.
+ */
 export default function Welcome({
   info,
   samples,

@@ -18,6 +18,8 @@ export interface DesktopInfo {
   mode?: "desktop" | "browser";
   libraryVersion?: 1 | 2;
   cli: { command: string; args: string[]; env: Record<string, string> };
+  /** False where the host publishes the documentation itself (the public website). */
+  builtinDocs?: boolean;
 }
 
 export interface DesktopChange {

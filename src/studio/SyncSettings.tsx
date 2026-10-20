@@ -1153,7 +1153,7 @@ export default function SyncSettings({
                           id={`sync-visible-${project.id}`}
                           type="checkbox"
                           role="switch"
-                          className="sync-switch"
+                          className="settings-switch"
                           disabled={busy}
                           checked={!hidden.has(project.id)}
                           onChange={(event) => {
