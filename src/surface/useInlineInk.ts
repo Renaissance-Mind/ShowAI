@@ -182,6 +182,13 @@ export function useInlineInk({
       });
     };
     invalidate.current = schedule;
+    const refreshDocument = () => {
+      lastKey = "";
+      lastDocument = undefined;
+      lastPoses = undefined;
+      schedule();
+    };
+    surface.addEventListener("showai:ink-refresh", refreshDocument);
     const send = async () => {
       if (!alive || failed) return;
       dirty = false;
@@ -415,6 +422,7 @@ export function useInlineInk({
     schedule();
     return () => {
       alive = false;
+      surface.removeEventListener("showai:ink-refresh", refreshDocument);
       if (invalidate.current === schedule) invalidate.current = null;
       cancelAnimationFrame(frame);
       mutations.disconnect();
