@@ -189,9 +189,69 @@ export function DockableBoardToolbar({
     outer.current.style.left = `${next.x}px`;
     outer.current.style.top = `${next.y}px`;
   };
+  const advance = (event: PointerEvent<HTMLDivElement>) => {
+    const current = drag.current;
+    if (current?.id !== event.pointerId) return;
+    if (
+      !current.active &&
+      Math.hypot(
+        event.clientX - current.start.x,
+        event.clientY - current.start.y,
+      ) < 6
+    )
+      return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (!current.active) {
+      current.active = true;
+      position.current = toolbarCenter(
+        dock,
+        geometryRef.current.bounds,
+        geometryRef.current.size,
+      );
+      setDragging(true);
+    }
+    current.pointer = pointer(event);
+    const bounds = geometryRef.current.bounds,
+      scale = bounds.width / root.current!.getBoundingClientRect().width;
+    const snapped = toolbarSnapTarget(
+      current.pointer,
+      bounds,
+      current.snapped,
+      44 * scale,
+    );
+    current.snapped = snapped?.edge ?? null;
+    const next =
+      snapped?.edge ??
+      (horizontal(current.edge)
+        ? current.pointer.y < bounds.height / 2
+          ? "top"
+          : "bottom"
+        : current.pointer.x < bounds.width / 2
+          ? "left"
+          : "right");
+    if (next !== current.edge) {
+      current.edge = next;
+      // Orientation changes resize the strip. Measure that layout before
+      // the next sample/up so the grabbed control stays under the finger.
+      flushSync(() => setEdge(next));
+      const element = primary.current!;
+      const measured = {
+        bounds: geometryRef.current.bounds,
+        size: {
+          width: element.offsetWidth,
+          height: element.offsetHeight,
+        },
+      };
+      geometryRef.current = measured;
+      setGeometry(measured);
+    }
+    schedule();
+  };
   const finish = (event: PointerEvent<HTMLDivElement>, cancel = false) => {
     const current = drag.current;
     if (current?.id !== event.pointerId) return;
+    if (!cancel) advance(event);
     const pressed = !cancel && !current.active ? current.pressed : null;
     event.preventDefault();
     if (current.active) {
@@ -209,7 +269,7 @@ export function DockableBoardToolbar({
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
     if (pressed?.isConnected) {
-      pressed.focus({ preventScroll: true });
+      if (event.pointerType === "mouse") pressed.focus({ preventScroll: true });
       pressed.click();
     }
   };
@@ -283,62 +343,7 @@ export function DockableBoardToolbar({
             pressed,
           };
         }}
-        onPointerMove={(event) => {
-          const current = drag.current;
-          if (current?.id !== event.pointerId) return;
-          if (
-            !current.active &&
-            Math.hypot(
-              event.clientX - current.start.x,
-              event.clientY - current.start.y,
-            ) < 6
-          )
-            return;
-          event.preventDefault();
-          event.stopPropagation();
-          if (!current.active) {
-            current.active = true;
-            position.current = center;
-            setDragging(true);
-            event.currentTarget.setPointerCapture(event.pointerId);
-          }
-          current.pointer = pointer(event);
-          const bounds = geometryRef.current.bounds,
-            scale = bounds.width / root.current!.getBoundingClientRect().width;
-          const snapped = toolbarSnapTarget(
-            current.pointer,
-            bounds,
-            current.snapped,
-            44 * scale,
-          );
-          current.snapped = snapped?.edge ?? null;
-          const next =
-            snapped?.edge ??
-            (horizontal(current.edge)
-              ? current.pointer.y < bounds.height / 2
-                ? "top"
-                : "bottom"
-              : current.pointer.x < bounds.width / 2
-                ? "left"
-                : "right");
-          if (next !== current.edge) {
-            current.edge = next;
-            // Orientation changes resize the strip. Measure that layout before
-            // the next sample/up so the grabbed control stays under the finger.
-            flushSync(() => setEdge(next));
-            const element = primary.current!;
-            const measured = {
-              bounds: geometryRef.current.bounds,
-              size: {
-                width: element.offsetWidth,
-                height: element.offsetHeight,
-              },
-            };
-            geometryRef.current = measured;
-            setGeometry(measured);
-          }
-          schedule();
-        }}
+        onPointerMove={advance}
         onPointerUp={(event) => finish(event)}
         onPointerCancel={(event) => finish(event, true)}
         onLostPointerCapture={(event) => {
