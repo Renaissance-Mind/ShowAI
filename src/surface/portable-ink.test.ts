@@ -208,6 +208,13 @@ describe("portable ink kernel and collaboration", () => {
     delete removed.layout!.stroke;
     expect(applyInkUpdate(removed, delta).content.content).toHaveLength(0);
   });
+  it("retains remotely modified strokes when a stale eraser attempts deletion", () => {
+    const base=document(), remote=structuredClone(base);
+    remote.content.content![0].attrs!.color="#abcdef";
+    expect(()=>applyInkUpdate(remote,{pageId:"page",boardId:"board",nodes:[],layout:{},removedIds:["stroke"],baseNodes:[node()],baseLayout:base.layout!})).toThrow(/Concurrent ink deletion/);
+    expect(remote.content.content).toHaveLength(1);
+    expect(applyInkUpdate(base,{pageId:"page",boardId:"board",nodes:[],layout:{},removedIds:["stroke"],baseNodes:[node()],baseLayout:base.layout!}).content.content).toHaveLength(0);
+  });
   it("exposes conflicting changes to the same property instead of silently losing them", () => {
     const base = document(),
       remote = structuredClone(base),

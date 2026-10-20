@@ -103,6 +103,13 @@ export function applyInkUpdate(
     const current = new Map(previous.map((n) => [n.attrs!.id, n]));
     const nodes: JSONContent[] = [],
       layout: Record<string, NodeLayout> = {};
+    for (const id of value.removedIds ?? []) {
+      const before=base.get(id), present=current.get(id);
+      if (!before || !present) continue;
+      if (mergeValues(before, undefined, present, `/ink/${id}`).conflicts.length ||
+          mergeValues(value.baseLayout?.[id], undefined, document.layout?.[id], `/layout/${id}`).conflicts.length)
+        throw new InkEditConflict(`Concurrent ink deletion requires resolution: ${id}`);
+    }
     for (const next of value.nodes) {
       const id = next.attrs!.id,
         before = base.get(id),
