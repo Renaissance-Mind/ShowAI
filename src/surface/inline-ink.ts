@@ -7,13 +7,15 @@ export interface InkUpdate {
   boardId: string;
   nodes: JSONContent[];
   layout: Record<string, NodeLayout>;
+  /** Incremental native saves retain untouched nodes and their identity. */
+  removedIds?: string[];
 }
 export interface InkFrame {
   token: string;
   pageId: string;
   boardId: string;
   document?: ShowDocument;
-  tool: "pen" | "highlighter";
+  tool: "pen" | "highlighter" | "eraser";
   color: string;
   width: number;
   pressure?: boolean;
@@ -36,6 +38,7 @@ export interface InkCommand {
   navigating?: boolean;
   tool?: string;
   error?: string;
+  clearSelection?: boolean;
   shapeGesture?: {
     id: string;
     phase: "began" | "changed" | "ended" | "cancelled";
@@ -89,7 +92,12 @@ export function applyInkUpdate(
   if (document.id !== value.pageId) return document;
   const board = findSurfaceNode(document, value.boardId)?.node;
   if (!board || board.attrs?.kind !== "board") return document;
-  const ids = new Set(inkNodes(board).map((node) => node.attrs!.id));
+  const previous = inkNodes(board);
+  const ids = new Set(
+    value.removedIds
+      ? [...value.removedIds, ...value.nodes.map((node) => node.attrs!.id)]
+      : previous.map((node) => node.attrs!.id),
+  );
   const clean = (node: JSONContent): JSONContent =>
     node.type === "surface"
       ? node

@@ -110,3 +110,42 @@ it("a concave lasso selects the enclosed area without turning it into a rectangu
   expect(polygonContains(polygon, { x: 80, y: 15 })).toBe(true);
   expect(polygonContains(polygon, { x: 80, y: 80 })).toBe(false);
 });
+
+it("applies incremental native ink without rebuilding untouched strokes or losing concurrent ink", () => {
+  let document = createResource(blankDocument(), "board");
+  const boardId = document.content.attrs!.id;
+  const stroke = (id: string) => ({
+    type: "image",
+    attrs: {
+      id,
+      nativeInk: { format: "showai-pencilkit-v1" },
+      src: "data:image/png;base64,AA==",
+    },
+  });
+  const kept = stroke("kept"),
+    erased = stroke("erased"),
+    concurrent = stroke("concurrent");
+  for (const node of [kept, erased, concurrent])
+    document = addNode(
+      document,
+      node,
+      { x: 10, y: 20, width: 30, height: 40 },
+      boardId,
+    ) as typeof document;
+  const next = applyInkUpdate(document, {
+    pageId: document.id,
+    boardId,
+    nodes: [stroke("new")],
+    removedIds: ["erased"],
+    layout: { new: { x: 60, y: 20, width: 30, height: 40 } },
+  });
+  expect(inkNodes(next.content).map((node) => node.attrs!.id)).toEqual([
+    "kept",
+    "concurrent",
+    "new",
+  ]);
+  expect(inkNodes(next.content)[0]).toBe(inkNodes(document.content)[0]);
+  expect(inkNodes(next.content)[1]).toBe(inkNodes(document.content)[2]);
+  expect(next.layout?.kept).toBe(document.layout.kept);
+  expect(next.layout?.erased).toBeUndefined();
+});

@@ -66,6 +66,7 @@ export function useInlineInk({
   onCamera,
   onTool,
   onShapeGesture,
+  onClearSelection,
 }: {
   root: RefObject<HTMLDivElement | null>;
   world: RefObject<HTMLDivElement | null>;
@@ -83,6 +84,7 @@ export function useInlineInk({
     final: boolean,
   ) => void;
   onTool: (tool: string) => void;
+  onClearSelection: () => void;
   onShapeGesture: (value: NonNullable<InkCommand["shapeGesture"]>) => void;
 }) {
   const current = useRef({
@@ -94,13 +96,14 @@ export function useInlineInk({
     onCamera,
     onTool,
     onShapeGesture,
+    onClearSelection,
     tool,
   });
   const cameraRevision = useRef(0),
     previousInk = useRef("pen");
   const invalidate = useRef<(() => void) | null>(null);
   const navigating = useRef(false);
-  const inking = tool === "pen" || tool === "highlighter";
+  const inking = tool === "pen" || tool === "highlighter" || tool === "eraser";
   if (tool === "pen" || tool === "highlighter") previousInk.current = tool;
   current.current = {
     source,
@@ -111,6 +114,7 @@ export function useInlineInk({
     onCamera,
     onTool,
     onShapeGesture,
+    onClearSelection,
     tool,
   };
   useEffect(() => {
@@ -118,6 +122,7 @@ export function useInlineInk({
     if (!bridge || !enabled || !source) return;
     return bridge.onCommand((value) => {
       if (value.pageId !== source.id || value.boardId !== boardId) return;
+      if (value.clearSelection) current.current.onClearSelection();
       if (value.shapeGesture)
         current.current.onShapeGesture(value.shapeGesture);
       if (value.camera) {
@@ -240,7 +245,7 @@ export function useInlineInk({
         token,
         pageId: documentValue.id,
         boardId,
-        tool: current.current.tool as "pen" | "highlighter",
+        tool: current.current.tool as "pen" | "highlighter" | "eraser",
         color: current.current.color,
         width: current.current.width,
         pressure: current.current.pressure,

@@ -321,6 +321,7 @@ export default function PageSurface({
     ruler,
     enabled: enabled && !locked && !!onDraw && !printing,
     onCamera: (value, final) => controls.current.navigateTo(value, final),
+    onClearSelection: () => board.select(null),
     onShapeGesture: (value) => {
       const point = {
         clientX: value.x,
@@ -1009,12 +1010,12 @@ export default function PageSurface({
       ...(region
         ? [
             {
-            label: t("region.ungroup"),
-            icon: <Ungroup size={14} />,
-            shortcut: "⇧⌘G",
-            separatorBefore: true,
-            onSelect: () => ungroup(id),
-          },
+              label: t("region.ungroup"),
+              icon: <Ungroup size={14} />,
+              shortcut: "⇧⌘G",
+              separatorBefore: true,
+              onSelect: () => ungroup(id),
+            },
           ]
         : []),
       {
@@ -1221,6 +1222,16 @@ export default function PageSurface({
           // Secondary contacts belong to the viewport's two-finger gesture.
           if (event.pointerType === "touch" && !event.isPrimary) return;
           const hit = board.hitTest(event.clientX, event.clientY);
+          // Touch navigation handles the pointer before the bubbling handler.
+          // Clear an empty hit here as well, while preserving toolbar actions.
+          if (
+            !hit &&
+            event.button === 0 &&
+            !event.shiftKey &&
+            !spaceHeld.current &&
+            !target.closest("[data-surface-ui], [data-surface-content]")
+          )
+            board.select(null);
           const shapeId = isBoardShape(hit?.node)
             ? hit!.id
             : target.closest<HTMLElement>('[data-board-shape="true"]')?.dataset
@@ -2193,8 +2204,16 @@ export default function PageSurface({
                         {tidyAvailable &&
                           (
                             [
-                              ["right", t("align.tidyRight"), <Workflow size={14} />],
-                              ["down", t("align.tidyDown"), <Network size={14} />],
+                              [
+                                "right",
+                                t("align.tidyRight"),
+                                <Workflow size={14} />,
+                              ],
+                              [
+                                "down",
+                                t("align.tidyDown"),
+                                <Network size={14} />,
+                              ],
                             ] as const
                           ).map(([direction, label, icon]) => (
                             <button

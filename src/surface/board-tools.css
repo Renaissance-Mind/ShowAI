@@ -162,7 +162,8 @@
   z-index: 5;
   bottom: calc(100% + 12px);
   right: 0;
-  width: 156px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
   padding: 10px;
   border-radius: 12px;
   background: var(--paper, var(--bg));
@@ -171,13 +172,14 @@
 }
 .board-color-presets {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, 28px);
   gap: 8px;
 }
 .surface-toolbar .board-color-presets button {
   width: 28px;
   height: 28px;
   min-width: 28px;
+  min-height: 28px;
   padding: 0;
   border-radius: 50%;
   border: 1px solid #8885;
@@ -251,4 +253,16 @@
   .board-toolbar-inline-properties
   .board-style-controls {
   height: auto;
+}
+
+@media (pointer: coarse) {
+  .board-color-presets {
+    grid-template-columns: repeat(4, 36px);
+  }
+  .surface-toolbar .board-color-presets button {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+  }
 }

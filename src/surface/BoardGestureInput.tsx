@@ -23,7 +23,26 @@ export function BoardGestureInput({
 }) {
   const t = useTranslator(messages),
     [preview, setPreview] = useState<Point[]>([]);
-  const [cursor, setCursor] = useState<Point | null>(null);
+  const cursor = useRef<SVGCircleElement>(null);
+  const pendingCursor = useRef<Point | null>(null);
+  const cursorFrame = useRef(0);
+  const moveCursor = (point: Point | null) => {
+    pendingCursor.current = point;
+    if (cursorFrame.current) return;
+    cursorFrame.current = requestAnimationFrame(() => {
+      cursorFrame.current = 0;
+      const element = cursor.current,
+        point = pendingCursor.current;
+      if (!element) return;
+      const display = point ? "" : "none";
+      if (element.style.display !== display) element.style.display = display;
+      if (point) {
+        const p = local(point);
+        element.setAttribute("cx", String(p.x));
+        element.setAttribute("cy", String(p.y));
+      }
+    });
+  };
   const svg = useRef<SVGSVGElement>(null);
   const local = (p: Point) => {
     const m = svg.current?.getScreenCTM();
@@ -31,6 +50,7 @@ export function BoardGestureInput({
   };
   const gesture = useRef<{
     id: number;
+    hitTest: BoardInteraction["hitTest"];
     points: Point[];
     erased: Set<string>;
     hidden: Set<HTMLElement>;
@@ -54,17 +74,20 @@ export function BoardGestureInput({
   useEffect(() => {
     const root = svg.current?.closest(".page-surface");
     root?.addEventListener("showai-board-pinch", cancel);
+    root?.addEventListener("showai:viewport-change", cancel);
     window.addEventListener("blur", cancel);
     return () => {
+      cancelAnimationFrame(cursorFrame.current);
       root?.removeEventListener("showai-board-pinch", cancel);
+      root?.removeEventListener("showai:viewport-change", cancel);
       window.removeEventListener("blur", cancel);
       const value = gesture.current;
       if (value) restore(value);
     };
   }, []);
   const erase = (p: Point) => {
-    const hit = board.hitTest(p.x, p.y, false, size / 2);
     const value = gesture.current;
+    const hit = value?.hitTest(p.x, p.y, false);
     if (
       value &&
       hit &&
@@ -140,6 +163,7 @@ export function BoardGestureInput({
         const p = { x: e.clientX, y: e.clientY };
         gesture.current = {
           id: e.pointerId,
+          hitTest: board.createHitTest(size / 2),
           points: [p],
           erased: new Set(),
           hidden: new Set(),
@@ -150,7 +174,7 @@ export function BoardGestureInput({
         else setPreview([p]);
       }}
       onPointerMove={(e) => {
-        if (tool === "eraser") setCursor({ x: e.clientX, y: e.clientY });
+        if (tool === "eraser") moveCursor({ x: e.clientX, y: e.clientY });
         if (gesture.current?.id === e.pointerId) {
           e.preventDefault();
           add({ x: e.clientX, y: e.clientY });
@@ -165,7 +189,7 @@ export function BoardGestureInput({
       onPointerCancel={cancel}
       onLostPointerCapture={cancel}
       onPointerLeave={() => {
-        if (!gesture.current) setCursor(null);
+        if (!gesture.current) moveCursor(null);
       }}
       onKeyDown={(e) => {
         if (e.key === "Escape") {
@@ -176,11 +200,11 @@ export function BoardGestureInput({
         }
       }}
     >
-      {tool === "eraser" && cursor && (
+      {tool === "eraser" && (
         <circle
+          ref={cursor}
           className="board-eraser-cursor"
-          cx={local(cursor).x}
-          cy={local(cursor).y}
+          style={{ display: "none" }}
           r={size / 2}
         />
       )}

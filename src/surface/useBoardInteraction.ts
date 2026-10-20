@@ -3,6 +3,7 @@ import {
   geometryFrame,
   frameFromGeometry,
   pickShape,
+  type PickCandidate,
   shapeIntersects,
   shapeIntersectsPolygon,
 } from "./drawing-geometry.mjs";
@@ -55,6 +56,8 @@ export interface BoardInteraction {
   drawingSnapIndex: () => SnapIndex;
   selectionHit: (x: number, y: number) => string | null;
   edgeHit: (x: number, y: number) => ReturnType<BoardInteraction["hitTest"]>;
+  /** Geometry snapshot for one eraser gesture; each sample reuses the measurements. */
+  createHitTest: (radius?: number) => BoardInteraction["hitTest"];
   hitTest: (
     x: number,
     y: number,
@@ -634,15 +637,19 @@ export function useBoardInteraction({
       }
       return createSnapIndex(objects);
     },
-    hitTest(x, y, inside = true, radius = 8) {
+    createHitTest(radius = 8) {
       const root = world.current,
         source = current.current.document;
-      if (!root || !source) return null;
+      if (!root || !source) return () => null;
       const boxes = new Map<
         HTMLElement,
         { left: number; top: number; scale: number }
       >();
-      const candidates = [];
+      const candidates: (Omit<PickCandidate, "point"> & {
+        element: HTMLElement;
+        box: { left: number; top: number; scale: number };
+        labelRect?: DOMRect;
+      })[] = [];
       const viewport = root.closest(".page-surface")!.getBoundingClientRect();
       for (const element of root.querySelectorAll<HTMLElement>(
         ".surface-object[data-surface-id]",
@@ -674,10 +681,13 @@ export function useBoardInteraction({
           node: entry.node,
           element,
           frame: measureFrame(frame, element),
-          point: {
-            x: (x - box.left) / box.scale,
-            y: (y - box.top) / box.scale,
-          },
+          box,
+          labelRect:
+            entry.node.type === "drawing" && entry.node.attrs?.tool === "arrow"
+              ? element
+                  .querySelector(".board-drawing-label")
+                  ?.getBoundingClientRect()
+              : undefined,
           tolerance: Math.max(
             radius / box.scale,
             entry.node.type === "drawing"
@@ -697,34 +707,50 @@ export function useBoardInteraction({
           },
         });
       }
-      const shape = pickShape(candidates, inside);
-      // An arrow's label sits on its line but beyond the stroke; it still
-      // selects the arrow unless a later-painted object covers it.
-      let label: (typeof candidates)[number] | undefined;
-      for (const item of candidates) {
-        if (item.node.type !== "drawing" || item.node.attrs?.tool !== "arrow")
-          continue;
-        const rect = item.element
-          .querySelector(".board-drawing-label")
-          ?.getBoundingClientRect();
+      return (x: number, y: number, inside = true) => {
+        const visible = candidates
+          .filter(
+            (item) =>
+              item.element.isConnected &&
+              item.element.dataset.erasing !== "true",
+          )
+          .map((item) => ({
+            ...item,
+            point: {
+              x: (x - item.box.left) / item.box.scale,
+              y: (y - item.box.top) / item.box.scale,
+            },
+          }));
+        const shape = pickShape(visible, inside);
+        // An arrow's label sits on its line but beyond the stroke; it still
+        // selects the arrow unless a later-painted object covers it.
+        let label: (typeof visible)[number] | undefined;
+        for (const item of visible) {
+          if (item.node.type !== "drawing" || item.node.attrs?.tool !== "arrow")
+            continue;
+          const rect = item.labelRect;
+          if (
+            rect &&
+            x >= rect.left &&
+            x <= rect.right &&
+            y >= rect.top &&
+            y <= rect.bottom
+          )
+            label = item;
+        }
         if (
-          rect &&
-          x >= rect.left &&
-          x <= rect.right &&
-          y >= rect.top &&
-          y <= rect.bottom
+          !label ||
+          (shape &&
+            shape.element !== label.element &&
+            label.element.compareDocumentPosition(shape.element) &
+              Node.DOCUMENT_POSITION_FOLLOWING)
         )
-          label = item;
-      }
-      if (
-        !label ||
-        (shape &&
-          shape.element !== label.element &&
-          label.element.compareDocumentPosition(shape.element) &
-            Node.DOCUMENT_POSITION_FOLLOWING)
-      )
-        return shape;
-      return label;
+          return shape;
+        return label;
+      };
+    },
+    hitTest(x, y, inside = true, radius = 8) {
+      return this.createHitTest(radius)(x, y, inside);
     },
     select,
     selectIds(ids) {

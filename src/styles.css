@@ -50,7 +50,12 @@ button {
     background 0.15s,
     color 0.15s;
 }
-button:hover {
+@media (hover: hover) {
+  button:hover {
+    background: var(--hover);
+  }
+}
+button:active:not(:disabled) {
   background: var(--hover);
 }
 button:disabled {
