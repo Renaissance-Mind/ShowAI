@@ -70,6 +70,30 @@ export function inkModelPoses(document, boardId, previous = {}) {
   board?.content?.forEach((node) => visit(node, true));
   return { poses, nested, complete };
 }
+/** Transfer only changed ink payloads; the small hierarchy names every current stroke.
+ * Previous is the last native-acknowledged model, never a merely queued frame. */
+export function inkScenePatch(document, boardId, previous) {
+  const collect = (doc) => {
+    const found = new Map();
+    const find = node => node.attrs?.id === boardId ? node : node.content?.map(find).find(Boolean);
+    const walk = node => {
+      if (node.type === "surface") return null;
+      const id=node.attrs?.id;
+      if (isInkNode(node)) {found.set(id,node);return {type:"ink-ref",attrs:{id}};}
+      const content=node.content?.map(walk).filter(Boolean) ?? [];
+      return content.length ? {type:node.type,attrs:{id},content} : null;
+    };
+    const board=doc && find(doc.content);
+    if (doc && !board) throw new Error("Ink Board no longer exists");
+    const content=board?.content?.map(walk).filter(Boolean) ?? [];
+    return {found,content};
+  };
+  const current=collect(document), old=collect(previous);
+  return {
+    document:{id:document.id,content:{type:"surface",attrs:{id:boardId,kind:"board"},content:current.content},layout:Object.fromEntries([...current.found.keys()].map(id=>[id,document.layout?.[id]]).filter(([,frame])=>frame))},
+    nodes:[...current.found].filter(([id,node])=>old.found.get(id)!==node && JSON.stringify(old.found.get(id))!==JSON.stringify(node)).map(([,node])=>node),
+  };
+}
 export function portableInkColor(color, dark = false) {
   const c = /^#[0-9a-f]{6}$/i.test(color) ? parseInt(color.slice(1), 16) : 0;
   return dark && Math.max(c >>> 16, (c >>> 8) & 255, c & 255) < 64

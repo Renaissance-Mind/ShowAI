@@ -73,3 +73,5 @@ export function portableInkBounds(
   strokeWidth?: number,
   pressure?: boolean,
 ): { x: number; y: number; width: number; height: number };
+
+export function inkScenePatch(document: any, boardId: string, previous?: any): {document: any;nodes: any[]};

@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import type { ShowDocument } from "../types";
 import {
+  inkScenePatch,
+  portableNodeSamples,
+  isEditableDrawing,
   inkModelPoses,
   createPortableInk,
   validatePortableInk,
@@ -64,6 +67,28 @@ function document(): ShowDocument {
   });
 }
 describe("portable ink kernel and collaboration", () => {
+  it("sends a versionable ink hierarchy without retransmitting unchanged samples", () => {
+    const base=document(), next=structuredClone(base);
+    next.content.content!.push(node("remote"));
+    next.layout!.remote={x:200,y:0,width:100,height:100};
+    const first=inkScenePatch(base,"board"), patch=inkScenePatch(next,"board",base);
+    expect(first.nodes).toHaveLength(1);
+    expect(patch.nodes.map(n=>n.attrs.id)).toEqual(["remote"]);
+    expect(JSON.stringify(patch.document)).not.toContain("samples");
+    expect(patch.document.content.content.map((n:{attrs:{id:string}})=>n.attrs.id)).toEqual(["stroke","remote"]);
+    next.content.content=[];next.layout={};
+    expect(inkScenePatch(next,"board",base).document.content.content).toEqual([]);
+  });
+  it("edits pressure and width through the same sample rules on every adapter", () => {
+    const stroke=node(), original=structuredClone(stroke.attrs.ink.samples);
+    expect(isEditableDrawing(stroke)).toBe(true);
+    const varied=portableNodeSamples(stroke);
+    expect(varied[0][3]).toBeLessThan(varied[1][3]);
+    const uniform=portableNodeSamples({...stroke,attrs:{...stroke.attrs,pressure:false,strokeWidth:12}});
+    expect(uniform.map(p=>p[3])).toEqual([12,12]);
+    expect(stroke.attrs.ink.samples).toEqual(original);
+    expect(isEditableDrawing({type:"drawing",attrs:{ink:{format:"showai-pencilkit-v1"}}})).toBe(false);
+  });
   it("derives fractional root poses from the authoritative model without layout rounding", () => {
     const d = document();
     d.layout!.stroke = {
