@@ -50,7 +50,13 @@ async function geometry(frame: Frame) {
 beforeAll(async () => {
   let document = createResource(blankDocument());
   document.title = "Inline height regression";
+  document.icon = "📄";
   document.content.content = [
+    {
+      type: "heading",
+      attrs: { id: "body-heading", level: 2 },
+      content: [{ type: "text", text: "Introduction heading" }],
+    },
     ...paragraphs("Introduction", 8),
     {
       type: "toggle",
@@ -132,7 +138,18 @@ test("inline Pages expose their content height and keep explicitly bounded child
   const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
   await page.goto(`${address}/inline`);
   const frame = page.frames().find((item) => item.parentFrame())!;
-  await frame.getByText("Inline height regression", { exact: true }).waitFor();
+  await frame.locator(rootPage).waitFor();
+  expect(await frame.locator(".portable-page-heading").isVisible()).toBe(false);
+  expect(
+    await frame
+      .locator(`${rootPage} > .container-page-column > .container-page-heading`)
+      .isVisible(),
+  ).toBe(false);
+  expect(
+    await frame
+      .getByRole("heading", { name: "Introduction heading" })
+      .isVisible(),
+  ).toBe(true);
   const initial = await geometry(frame);
   expect(initial.height).toBeGreaterThan(initial.viewportHeight * 2);
   expect(initial.outerHeight).toBeGreaterThanOrEqual(initial.height);
@@ -223,6 +240,12 @@ test("standalone readers keep their viewport and Page scrolling", async () => {
   const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
   await page.goto(`${address}/standalone`);
   await page.locator(rootPage).waitFor();
+  expect(
+    await page
+      .getByRole("heading", { name: "Inline height regression" })
+      .isVisible(),
+  ).toBe(true);
+  expect(await page.locator(".portable-page-icon").isVisible()).toBe(true);
   const geometry = await page.locator(rootPage).evaluate((element) => ({
     height: element.clientHeight,
     scrollHeight: element.scrollHeight,

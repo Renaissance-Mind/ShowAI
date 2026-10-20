@@ -14,7 +14,8 @@ export function scopeReaderCss(css) {
 // root Page grow naturally. Keep spatial Boards and embedded fixed frames
 // bounded. Applying this at export time also adapts archived readers.
 export const INLINE_READER_OVERRIDES = `.portable-document { max-width: none; padding: 24px 0 12px; }
-.portable-title { padding-right: 96px; font-size: 28px; margin-bottom: 24px; }
+.portable-page-heading,
+.container-page-heading:has(> .portable-page-heading:only-child) { display: none; }
 .portable-options { display: none; }
 .portable-app { min-height: 0; }
 .portable-app:has(> .container-workspace > .container-main > .container-page.is-root),
