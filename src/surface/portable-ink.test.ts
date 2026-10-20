@@ -67,6 +67,14 @@ function document(): ShowDocument {
   });
 }
 describe("portable ink kernel and collaboration", () => {
+  it("keeps one authoritative trajectory rather than duplicating every sample in node attributes", () => {
+    const points=Array.from({length:256},(_,i)=>({x:i,y:Math.sin(i/8)*20,pressure:i/255}));
+    const result=finishBoardDrawing("pen",{color:"#234567",fillColor:"none",strokeWidth:8},{origin:points[0],points,release:points.at(-1)!,moved:true,scale:1});
+    expect(result.node.attrs!.points).toHaveLength(2);
+    expect(result.node.attrs!.ink.samples.length).toBeGreaterThanOrEqual(256);
+    expect(result.node.attrs!.ink.samples[128][6]).toBe(points[128].pressure);
+    expect(portableInkGeometry(result.node.attrs!.ink).path).toContain("L");
+  });
   it("sends a versionable ink hierarchy without retransmitting unchanged samples", () => {
     const base=document(), next=structuredClone(base);
     next.content.content!.push(node("remote"));
