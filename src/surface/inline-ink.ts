@@ -50,7 +50,7 @@ export interface InlineInkBridge {
   bind(
     pageId: string,
     projectId: string,
-    listener: (value: InkUpdate) => Promise<boolean>,
+    listener: (value: InkUpdate, applied?: () => void) => Promise<boolean>,
   ): () => void;
   frame(value: InkFrame): Promise<void>;
   viewport?(

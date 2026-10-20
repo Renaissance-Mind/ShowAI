@@ -1,5 +1,10 @@
 import { expect, it } from "vitest";
-import { readToolbarDock, snapToolbar, toolbarCenter } from "./toolbar-dock";
+import {
+  readToolbarDock,
+  snapToolbar,
+  toolbarCenter,
+  toolbarSnapTarget,
+} from "./toolbar-dock";
 
 it("docks on all four edges and remembers the position along that edge", () => {
   const bounds = { width: 1000, height: 700 };
@@ -65,4 +70,42 @@ it("anchors only the fixed primary strip and reserves space for properties below
     108,
   );
   expect(row.y).toBe(658);
+});
+
+it("follows freely in the middle, snaps live near every edge, and releases outside the band", () => {
+  const bounds = { width: 1000, height: 700 };
+  expect(toolbarSnapTarget({ x: 500, y: 350 }, bounds)).toBeNull();
+  for (const [edge, inside, held, outside] of [
+    ["top", { x: 500, y: 35 }, { x: 500, y: 55 }, { x: 500, y: 80 }],
+    ["bottom", { x: 500, y: 665 }, { x: 500, y: 645 }, { x: 500, y: 620 }],
+    ["left", { x: 35, y: 350 }, { x: 55, y: 350 }, { x: 80, y: 350 }],
+    ["right", { x: 965, y: 350 }, { x: 945, y: 350 }, { x: 920, y: 350 }],
+  ] as const) {
+    expect(toolbarSnapTarget(inside, bounds)?.edge).toBe(edge);
+    expect(toolbarSnapTarget(held, bounds, edge)?.edge).toBe(edge);
+    expect(toolbarSnapTarget(outside, bounds, edge)).toBeNull();
+  }
+});
+
+it("restores floating placement and keeps it inside a resized viewport", () => {
+  const dock = readToolbarDock("bottom:0.4:0.4:0.45");
+  expect(dock.floating).toEqual({ x: 0.4, y: 0.45 });
+  expect(
+    toolbarCenter(
+      dock,
+      { width: 1000, height: 800 },
+      { width: 400, height: 54 },
+    ),
+  ).toEqual({ x: 400, y: 360 });
+  expect(
+    toolbarCenter(
+      dock,
+      { width: 390, height: 700 },
+      { width: 360, height: 54 },
+    ),
+  ).toEqual({ x: 192, y: 315 });
+  expect(readToolbarDock("bottom:0.5:NaN:0.2")).toEqual({
+    edge: "bottom",
+    position: 0.5,
+  });
 });

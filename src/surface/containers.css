@@ -555,9 +555,11 @@
 .board-object-outline {
   position: absolute;
   pointer-events: none;
+  outline: calc(1.5px * var(--board-inv, 1)) solid #467de3;
 }
 .surface-object[data-erasing="true"] .board-drawing-selection,
-.surface-object[data-erasing="true"] > :is(.board-resize-handle, .surface-object-rotate, .board-lock-badge) {
+.surface-object[data-erasing="true"]
+  > :is(.board-resize-handle, .surface-object-rotate, .board-lock-badge) {
   display: none;
 }
 .board-drawing-selection {
@@ -568,8 +570,9 @@
   overflow: visible;
   pointer-events: none;
 }
-.surface-object.is-drawing > .board-resize-handle,
-.board-group-outline[data-drawing-selection="true"] > .board-resize-handle {
+.surface-object.is-drawing > .board-resize-handle::after,
+.board-group-outline[data-drawing-selection="true"]
+  > .board-resize-handle::after {
   border-radius: 50%;
 }
 .surface-object.is-drawing.is-hovered:not(.is-selected) .board-drawing {

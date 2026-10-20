@@ -2,16 +2,28 @@ export type DockEdge = "top" | "bottom" | "left" | "right";
 export interface ToolbarDock {
   edge: DockEdge;
   position: number;
+  floating?: { x: number; y: number };
 }
 const edges: DockEdge[] = ["bottom", "top", "left", "right"];
 const clamp = (value: number, low: number, high: number) =>
   Math.max(low, Math.min(high, value));
 
 export function readToolbarDock(saved: string | null): ToolbarDock {
-  const [edge, raw] = (saved ?? "").split(":");
+  const [edge, raw, x, y] = (saved ?? "").split(":");
   const position = Number(raw);
   return edges.includes(edge as DockEdge) && raw && Number.isFinite(position)
-    ? { edge: edge as DockEdge, position: clamp(position, 0, 1) }
+    ? {
+        edge: edge as DockEdge,
+        position: clamp(position, 0, 1),
+        ...(x && y && [Number(x), Number(y)].every(Number.isFinite)
+          ? {
+              floating: {
+                x: clamp(Number(x), 0, 1),
+                y: clamp(Number(y), 0, 1),
+              },
+            }
+          : {}),
+      }
     : { edge: "bottom", position: 0.5 };
 }
 
@@ -48,6 +60,12 @@ export function toolbarCenter(
   reserve = 0,
 ) {
   bounds = { ...bounds, height: Math.max(1, bounds.height - reserve) };
+  if (dock.floating)
+    return constrainToolbarPoint(
+      { x: dock.floating.x * bounds.width, y: dock.floating.y * bounds.height },
+      bounds,
+      size,
+    );
   const horizontal = dock.edge === "top" || dock.edge === "bottom";
   const xInset = Math.min(bounds.width / 2, size.width / 2 + 12),
     yInset = Math.min(bounds.height / 2, size.height / 2 + 12);
@@ -63,6 +81,50 @@ export function toolbarCenter(
         : bounds.height - yInset
       : clamp(bounds.height * dock.position, yInset, bounds.height - yInset),
   };
+}
+
+export function constrainToolbarPoint(
+  point: { x: number; y: number },
+  bounds: { width: number; height: number },
+  size: { width: number; height: number },
+) {
+  const x = Math.min(bounds.width / 2, size.width / 2 + 12),
+    y = Math.min(bounds.height / 2, size.height / 2 + 12);
+  return {
+    x: clamp(point.x, x, bounds.width - x),
+    y: clamp(point.y, y, bounds.height - y),
+  };
+}
+
+/** Enter only near an edge; a slightly wider release band prevents jitter. */
+export function toolbarSnapTarget(
+  point: { x: number; y: number },
+  bounds: { width: number; height: number },
+  previous: DockEdge | null = null,
+  threshold = 44,
+): ToolbarDock | null {
+  const distances = {
+    top: point.y,
+    bottom: bounds.height - point.y,
+    left: point.x,
+    right: bounds.width - point.x,
+  };
+  const target = snapToolbar(point, bounds);
+  const edge =
+    previous && distances[previous] <= threshold * 1.4 ? previous : target.edge;
+  return distances[edge] <= threshold * (edge === previous ? 1.4 : 1)
+    ? {
+        ...target,
+        edge,
+        position: clamp(
+          edge === "top" || edge === "bottom"
+            ? point.x / Math.max(1, bounds.width)
+            : point.y / Math.max(1, bounds.height),
+          0,
+          1,
+        ),
+      }
+    : null;
 }
 
 export const toolbarPropertiesReserve = (_edge: DockEdge) => 0;

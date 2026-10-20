@@ -1222,10 +1222,13 @@ export default function PageSurface({
           // Secondary contacts belong to the viewport's two-finger gesture.
           if (event.pointerType === "touch" && !event.isPrimary) return;
           const hit = board.hitTest(event.clientX, event.clientY);
+          const selectionId = board.selectionHit(event.clientX, event.clientY);
+          const selectionTouch = event.pointerType === "touch" && !!selectionId;
           // Touch navigation handles the pointer before the bubbling handler.
           // Clear an empty hit here as well, while preserving toolbar actions.
           if (
             !hit &&
+            !selectionId &&
             event.button === 0 &&
             !event.shiftKey &&
             !spaceHeld.current &&
@@ -1253,7 +1256,12 @@ export default function PageSurface({
             setObjectMenu(null);
             return;
           }
-          if (shapeId && event.pointerType === "pen") {
+          if (
+            shapeId &&
+            event.pointerType === "pen" &&
+            drawTool &&
+            !target.closest("[data-resize-direction],.surface-object-rotate")
+          ) {
             // A lasso may cross a shape; a direct Pencil tap does not select it.
             if (!drawingTool && drawTool !== "eraser" && drawTool !== "lasso") {
               event.preventDefault();
@@ -1270,6 +1278,7 @@ export default function PageSurface({
           if (
             fingerNavigatesBoard(event.pointerType) &&
             !fingerShape &&
+            !selectionTouch &&
             !target.closest(
               "[data-surface-ui],button,input,textarea,select,iframe,[contenteditable=true]",
             )
@@ -1292,15 +1301,6 @@ export default function PageSurface({
             addText(controls.current.point(event.clientX, event.clientY));
             return;
           }
-          const selectedHit =
-            drawTool === "lasso"
-              ? board.hitTest(event.clientX, event.clientY)
-              : null;
-          const selectionId =
-            board.selectionHit(event.clientX, event.clientY) ??
-            (selectedHit && board.ids.has(selectedHit.id)
-              ? selectedHit.id
-              : null);
           const handle =
             target.closest<HTMLElement>(
               ".board-resize-handle,.surface-object-rotate",
@@ -1348,11 +1348,15 @@ export default function PageSurface({
             // Drawing tools never grab the selection; the lasso moves its own.
             (drawTool &&
               !fingerShape &&
+              !selectionTouch &&
               !quickSelect &&
               !handle &&
               !(drawTool === "lasso" && selectionId)) ||
             event.button !== 0 ||
-            (event.pointerType === "touch" && !handle && !fingerShape) ||
+            (event.pointerType === "touch" &&
+              !handle &&
+              !fingerShape &&
+              !selectionTouch) ||
             (spaceHeld.current && !fingerShape) ||
             (panMode.current && !fingerShape) ||
             (!handle && target.closest("[data-surface-handle]")) ||
@@ -1405,7 +1409,7 @@ export default function PageSurface({
           }
           if (moveId && (!forceBrush || handle)) {
             event.preventDefault();
-            if (!fingerShape) event.stopPropagation();
+            if (!fingerShape && !selectionTouch) event.stopPropagation();
             controls.current.cancel();
             cancelMarquee();
             clearHover();
@@ -1763,7 +1767,11 @@ export default function PageSurface({
             !marquee.current
           ) {
             const entry = boardToolForKey(event.key);
-            if (entry && (!mobile || entry.tool !== "region")) {
+            if (
+              entry &&
+              (!mobile ||
+                !["region", "lasso", "pan"].includes(entry.tool ?? ""))
+            ) {
               event.preventDefault();
               event.stopPropagation();
               clearHover();
@@ -2283,28 +2291,46 @@ export default function PageSurface({
             </>
           }
           properties={
-            onTransform && !locked && !objectMenu ? (
-              <BoardStyleControls
-                tool={selectedNodes.length ? null : drawTool}
-                style={{
-                  color: drawColor,
-                  fillColor: drawFillColor,
-                  strokeWidth: drawStrokeWidth,
-                  pressure: drawPressure,
-                }}
-                nodes={selectedNodes}
-                onChange={(patch) =>
-                  onStyleChange?.(
-                    selectedNodes
-                      .filter(
-                        (node) => node.type === "drawing" && !node.attrs?.ink,
-                      )
-                      .map((node) => node.attrs!.id),
-                    patch,
-                  )
-                }
-              />
-            ) : null
+            <>
+              {onTransform && !locked && !objectMenu ? (
+                <BoardStyleControls
+                  tool={selectedNodes.length ? null : drawTool}
+                  style={{
+                    color: drawColor,
+                    fillColor: drawFillColor,
+                    strokeWidth: drawStrokeWidth,
+                    pressure: drawPressure,
+                  }}
+                  nodes={selectedNodes}
+                  onChange={(patch) =>
+                    onStyleChange?.(
+                      selectedNodes
+                        .filter(
+                          (node) => node.type === "drawing" && !node.attrs?.ink,
+                        )
+                        .map((node) => node.attrs!.id),
+                      patch,
+                    )
+                  }
+                />
+              ) : null}
+              {mobile &&
+                onDraw &&
+                !locked &&
+                (drawTool === "pen" || drawTool === "highlighter") && (
+                  <div className="board-writing-options" data-surface-ui>
+                    <button
+                      type="button"
+                      aria-label={t("tool.ruler")}
+                      title={t("tool.ruler")}
+                      aria-pressed={ruler}
+                      onClick={() => setRuler((value) => !value)}
+                    >
+                      <Ruler size={15} />
+                    </button>
+                  </div>
+                )}
+            </>
           }
         >
           {!mobile && (
@@ -2489,7 +2515,7 @@ export default function PageSurface({
           <fieldset className="surface-extra-actions" disabled={locked}>
             {extraActions}
           </fieldset>
-          {onDraw && !locked && (
+          {!mobile && onDraw && !locked && (
             <div className="board-writing-options" data-surface-ui>
               <button
                 type="button"

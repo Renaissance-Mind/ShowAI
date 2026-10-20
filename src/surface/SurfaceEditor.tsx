@@ -207,12 +207,17 @@ function SurfaceEditor({
   useEffect(() => {
     const bridge = window.showai?.inlineInk;
     if (!bridge || !inlineInkProjectId || readOnly) return;
-    return bridge.bind(document.id, inlineInkProjectId, async (value) => {
-      if (latestReadOnly.current || current.current.id !== value.pageId)
-        return false;
-      commit(applyInkUpdate(current.current, value));
-      return (await inkSave.current?.()) ?? true;
-    });
+    return bridge.bind(
+      document.id,
+      inlineInkProjectId,
+      async (value, applied) => {
+        if (latestReadOnly.current || current.current.id !== value.pageId)
+          return false;
+        commit(applyInkUpdate(current.current, value));
+        applied?.();
+        return (await inkSave.current?.()) ?? true;
+      },
+    );
   }, [document.id, inlineInkProjectId, readOnly, commit]);
   const travel = useCallback(
     async (redo = false) => {

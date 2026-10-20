@@ -631,6 +631,7 @@
   position: absolute;
   pointer-events: none;
   z-index: 13;
+  outline: calc(1.5px * var(--board-inv, 1)) solid #467de3;
 }
 .board-style-controls {
   display: flex;
@@ -889,16 +890,34 @@ body:has([data-showai-development]) .surface-toolbar {
 }
 .board-resize-handle {
   position: absolute;
-  width: calc(9px * var(--board-inv, 1));
-  height: calc(9px * var(--board-inv, 1));
+  width: calc(28px * var(--board-inv, 1));
+  height: calc(28px * var(--board-inv, 1));
   padding: 0;
-  border: calc(1px * var(--board-inv, 1)) solid #467de3;
-  border-radius: calc(2px * var(--board-inv, 1));
-  background: white;
+  border: 0;
+  background: transparent;
   z-index: 15;
   pointer-events: auto;
   touch-action: none;
   transform: translate(-50%, -50%);
+}
+.board-resize-handle::after {
+  content: "";
+  position: absolute;
+  width: calc(10px * var(--board-inv, 1));
+  height: calc(10px * var(--board-inv, 1));
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border: calc(1px * var(--board-inv, 1)) solid #467de3;
+  border-radius: calc(2px * var(--board-inv, 1));
+  background: white;
+  pointer-events: none;
+}
+@media (pointer: coarse) {
+  .board-resize-handle {
+    width: calc(40px * var(--board-inv, 1));
+    height: calc(40px * var(--board-inv, 1));
+  }
 }
 .board-resize-handle.handle-nw {
   left: 0;
@@ -1092,4 +1111,9 @@ body:has([data-showai-development]) .board-minimap {
   .page-surface.has-board-grid > .surface-scroll > .surface-grid {
     display: none;
   }
+}
+
+html[data-native="ios"] .board-resize-handle {
+  width: calc(40px * var(--board-inv, 1));
+  height: calc(40px * var(--board-inv, 1));
 }

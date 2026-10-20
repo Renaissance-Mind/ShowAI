@@ -187,7 +187,7 @@ export function useBoardInteraction({
       );
     });
     outline.dataset.drawingSelection = String(drawings);
-    // Drawing selections use edge handles without surrounding their contours.
+    // One frame owns a group selection and its corner handles.
     const fixed = [...ids].some(
       (id) =>
         world.current?.querySelector<HTMLElement>(
@@ -198,7 +198,7 @@ export function useBoardInteraction({
     for (const direction of locked
       ? []
       : drawings
-        ? ["n", "e", "s", "w"]
+        ? ["nw", "ne", "se", "sw"]
         : fixed
           ? ["nw", "n", "ne", "e", "se", "s", "sw", "w"]
           : ["e", "w"]) {
@@ -568,18 +568,6 @@ export function useBoardInteraction({
     },
     selectionHit(x, y) {
       if (!currentIds.current.size) return null;
-      if (
-        [...currentIds.current].every((id) => {
-          const node = selectionIndex.get(id)?.node;
-          return (
-            node?.type === "drawing" ||
-            !!(node?.attrs?.nativeInk ?? node?.attrs?.data?.nativeInk)
-          );
-        })
-      ) {
-        const hit = this.hitTest(x, y);
-        return hit && currentIds.current.has(hit.id) ? hit.id : null;
-      }
       const boxes = [...currentIds.current].flatMap((id) => {
         const el = world.current?.querySelector<HTMLElement>(
           `[data-surface-id="${CSS.escape(id)}"]`,
@@ -593,17 +581,7 @@ export function useBoardInteraction({
         right = Math.max(...boxes.map((b) => b.right)),
         top = Math.min(...boxes.map((b) => b.top)),
         bottom = Math.max(...boxes.map((b) => b.bottom));
-      return x >= left - 8 &&
-        x <= right + 8 &&
-        y >= top - 8 &&
-        y <= bottom + 8 &&
-        (currentIds.current.size > 1 ||
-          Math.min(
-            Math.abs(x - left),
-            Math.abs(x - right),
-            Math.abs(y - top),
-            Math.abs(y - bottom),
-          ) <= 8)
+      return x >= left - 8 && x <= right + 8 && y >= top - 8 && y <= bottom + 8
         ? [...currentIds.current][0]
         : null;
     },

@@ -92,42 +92,9 @@
 ) {
   display: none;
 }
-.surface-toolbar .board-toolbar-grip {
-  cursor: grab;
-  touch-action: none;
-  padding-inline: 2px;
-  min-width: 20px;
-}
 .board-dockable-toolbar[data-dragging] {
   opacity: 0.85;
   user-select: none;
-}
-.board-dockable-toolbar[data-dragging] .board-toolbar-grip {
-  cursor: grabbing;
-}
-.board-toolbar-dock-preview {
-  position: absolute;
-  z-index: 19;
-  pointer-events: none;
-  background: var(--accent, #467de3);
-  opacity: 0.4;
-  border-radius: 4px;
-}
-.board-toolbar-dock-preview[data-edge="top"] {
-  inset: 4px 16px auto;
-  height: 3px;
-}
-.board-toolbar-dock-preview[data-edge="bottom"] {
-  inset: auto 16px 4px;
-  height: 3px;
-}
-.board-toolbar-dock-preview[data-edge="left"] {
-  inset: 16px auto 16px 4px;
-  width: 3px;
-}
-.board-toolbar-dock-preview[data-edge="right"] {
-  inset: 16px 4px 16px auto;
-  width: 3px;
 }
 .board-dockable-toolbar:is([data-dock="left"], [data-dock="right"])
   .board-toolbar-primary {
@@ -203,11 +170,6 @@
   gap: 4px;
   margin: 0;
   padding: 0;
-}
-@media print {
-  .board-toolbar-dock-preview {
-    display: none;
-  }
 }
 .surface-toolbar.board-dockable-toolbar:is(
     [data-dock="left"],
@@ -320,11 +282,6 @@
   left: auto;
   right: calc(100% + 12px);
 }
-@media print {
-  .board-toolbar-dock-preview {
-    display: none;
-  }
-}
 .board-dockable-toolbar:is([data-dock="left"], [data-dock="right"])
   .board-style-section {
   flex-direction: column;
@@ -410,4 +367,112 @@
   .board-toolbar-inline-properties .board-stroke-slider {
     width: 64px;
   }
+}
+
+/* iPad: a fixed primary strip and one equally long parallel settings strip. */
+.board-dockable-toolbar[data-mobile] .board-tool-shortcuts {
+  display: none;
+}
+.board-toolbar-primary {
+  touch-action: none;
+  cursor: grab;
+}
+.board-dockable-toolbar[data-dragging] .board-toolbar-primary {
+  cursor: grabbing;
+}
+.board-dockable-toolbar[data-mobile] .board-toolbar-primary .board-tool-stack {
+  --board-tool-width: clamp(
+    36px,
+    calc(
+      (var(--board-toolbar-width) - 44px) / var(--board-tool-count, 8) - 2px
+    ),
+    44px
+  );
+}
+.board-dockable-toolbar[data-mobile] .board-toolbar-secondary {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: var(--board-primary-width);
+  height: var(--board-primary-height);
+  box-sizing: border-box;
+  padding: 5px;
+  border: 1px solid var(--line, var(--border));
+  border-radius: 12px;
+  background: var(--paper, var(--bg));
+  box-shadow: 0 4px 20px #0000000a;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.board-dockable-toolbar[data-mobile]
+  .board-toolbar-secondary:not(
+    :has(button, summary, input, select, [role="status"])
+  ) {
+  display: none;
+}
+.board-dockable-toolbar[data-mobile]
+  :is(
+    .board-toolbar-settings,
+    .board-toolbar-secondary .board-toolbar-actions
+  ) {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  position: static;
+  width: auto;
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  overflow: visible;
+  gap: 4px;
+}
+.board-dockable-toolbar[data-mobile]
+  .board-toolbar-secondary
+  .board-toolbar-actions:not(
+    :has(
+      button,
+      summary,
+      [role="status"],
+      > .board-component-actions:not(:empty)
+    )
+  ) {
+  display: none;
+}
+.board-dockable-toolbar[data-mobile] .board-toolbar-secondary button {
+  flex-shrink: 0;
+}
+.board-dockable-toolbar[data-mobile][data-dock="top"] .board-toolbar-secondary {
+  top: calc(100% + 8px);
+  bottom: auto;
+}
+.board-dockable-toolbar[data-mobile]:is([data-dock="left"], [data-dock="right"])
+  .board-toolbar-secondary {
+  top: 0;
+  bottom: auto;
+  flex-direction: column;
+}
+.board-dockable-toolbar[data-mobile][data-dock="left"]
+  .board-toolbar-secondary {
+  left: calc(100% + 8px);
+}
+.board-dockable-toolbar[data-mobile][data-dock="right"]
+  .board-toolbar-secondary {
+  left: auto;
+  right: calc(100% + 8px);
+}
+.board-dockable-toolbar[data-mobile]:is([data-dock="left"], [data-dock="right"])
+  :is(
+    .board-toolbar-settings,
+    .board-toolbar-secondary .board-toolbar-actions
+  ) {
+  flex-direction: column;
 }

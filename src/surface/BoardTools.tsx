@@ -40,10 +40,15 @@ export function BoardTools({
 }) {
   const t = useTranslator(messages);
   const [expanded, setExpanded] = useState(true);
-  const entries = boardTools.map((entry, index) => ({
-    ...entry,
-    Icon: icons[index],
-  }));
+  const mobile =
+    typeof document !== "undefined" &&
+    document.documentElement.dataset.native === "ios";
+  const entries = boardTools
+    .map((entry, index) => ({
+      ...entry,
+      Icon: icons[index],
+    }))
+    .filter((entry) => !mobile || !["lasso", "pan"].includes(entry.tool ?? ""));
   return (
     <div
       className="board-tool-stack"

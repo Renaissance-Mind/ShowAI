@@ -369,14 +369,14 @@ export function SurfaceObject({
   const resizeDirections =
     drawingTool === "arrow"
       ? []
-      : drawing && drawingTool !== "rectangle"
-        ? ["n", "e", "s", "w"]
+      : drawing
+        ? ["nw", "ne", "se", "sw"]
         : fixedHeight
           ? ["nw", "n", "ne", "e", "se", "s", "sw", "w"]
           : ["e", "w"];
   const drawingHandle = (direction: string) => {
     if (!ink || !drawingNode) return undefined;
-    let x =
+    const x =
       ink.x +
       ink.width *
         (direction.includes("w") ? 0 : direction.includes("e") ? 1 : 0.5);
@@ -384,18 +384,6 @@ export function SurfaceObject({
       ink.y +
       ink.height *
         (direction.includes("n") ? 0 : direction.includes("s") ? 1 : 0.5);
-    if (
-      !drawingNode.attrs!.ink &&
-      (drawingTool === "pen" || drawingTool === "highlighter")
-    ) {
-      const axis = direction === "n" || direction === "s" ? "y" : "x";
-      const sign = direction === "n" || direction === "w" ? -1 : 1;
-      const point = drawingNode.attrs!.points.reduce(
-        (edge: { x: number; y: number }, point: { x: number; y: number }) =>
-          point[axis] * sign > edge[axis] * sign ? point : edge,
-      );
-      ({ x, y } = point);
-    }
     return {
       left: `${(x / drawingNode.attrs!.extent[0]) * 100}%`,
       top: `${(y / drawingNode.attrs!.extent[1]) * 100}%`,
