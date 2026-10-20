@@ -3,6 +3,7 @@ import {
   geometryFrame,
   frameFromGeometry,
   pickShape,
+  pickSelection,
   type PickCandidate,
   shapeIntersects,
   shapeIntersectsPolygon,
@@ -57,7 +58,14 @@ export interface BoardInteraction {
   selectionHit: (x: number, y: number) => string | null;
   edgeHit: (x: number, y: number) => ReturnType<BoardInteraction["hitTest"]>;
   /** Geometry snapshot for one eraser gesture; each sample reuses the measurements. */
-  createHitTest: (radius?: number) => BoardInteraction["hitTest"];
+  createHitTest: (
+    radius?: number,
+    target?: "paint" | "selection",
+  ) => BoardInteraction["hitTest"];
+  selectionTarget: (
+    x: number,
+    y: number,
+  ) => ReturnType<BoardInteraction["hitTest"]>;
   hitTest: (
     x: number,
     y: number,
@@ -615,7 +623,7 @@ export function useBoardInteraction({
       }
       return createSnapIndex(objects);
     },
-    createHitTest(radius = 8) {
+    createHitTest(radius = 8, target = "paint") {
       const root = world.current,
         source = current.current.document;
       if (!root || !source) return () => null;
@@ -699,7 +707,10 @@ export function useBoardInteraction({
               y: (y - item.box.top) / item.box.scale,
             },
           }));
-        const shape = pickShape(visible, inside);
+        const shape =
+          target === "selection"
+            ? pickSelection(visible)
+            : pickShape(visible, inside);
         // An arrow's label sits on its line but beyond the stroke; it still
         // selects the arrow unless a later-painted object covers it.
         let label: (typeof visible)[number] | undefined;
@@ -726,6 +737,9 @@ export function useBoardInteraction({
           return shape;
         return label;
       };
+    },
+    selectionTarget(x, y) {
+      return this.createHitTest(8, "selection")(x, y);
     },
     hitTest(x, y, inside = true, radius = 8) {
       return this.createHitTest(radius)(x, y, inside);

@@ -441,6 +441,15 @@ export function shapeIntersects(node, frame, rect, wrap = false) {
 
 /** Candidates are in paint order. Empty interiors never occlude closer geometry. */
 export function pickShape(candidates, hitInside = true) {
+  return pickCandidate(candidates, hitInside, false);
+}
+
+/** Selection owns the whole drawing frame; painting and erasing keep path hits. */
+export function pickSelection(candidates) {
+  return pickCandidate(candidates, true, true);
+}
+
+function pickCandidate(candidates, hitInside, drawingBounds) {
   let edge = null,
     hollow = null;
   for (let i = candidates.length - 1; i >= 0; i--) {
@@ -460,8 +469,9 @@ export function pickShape(candidates, hitInside = true) {
         edge = { item, distance: hit.distance * item.scale };
     } else if (
       hitInside &&
-      hit.inside &&
-      (!item.viewport ||
+      (hit.inside || (drawingBounds && item.node.type === "drawing")) &&
+      ((drawingBounds && item.node.type === "drawing") ||
+        !item.viewport ||
         ![
           ...[
             [0, 0],

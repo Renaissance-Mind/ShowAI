@@ -28,6 +28,9 @@ export function pickShape<T extends PickCandidate>(
   candidates: T[],
   hitInside?: boolean,
 ): T | null;
+export function pickSelection<T extends PickCandidate>(
+  candidates: T[],
+): T | null;
 export function creationPoints(
   tool: string,
   origin: Point,

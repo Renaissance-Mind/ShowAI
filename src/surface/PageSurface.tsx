@@ -1160,7 +1160,7 @@ export default function PageSurface({
             return;
           }
           const target = event.target as Element;
-          const hit = board.hitTest(event.clientX, event.clientY);
+          const hit = board.selectionTarget(event.clientX, event.clientY);
           if (navigation.current) navigation.current.open = false;
           // Any object under the pointer gets the object menu, not only its frame.
           if (
@@ -1221,7 +1221,10 @@ export default function PageSurface({
             return;
           // Secondary contacts belong to the viewport's two-finger gesture.
           if (event.pointerType === "touch" && !event.isPrimary) return;
-          const hit = board.hitTest(event.clientX, event.clientY);
+          const hit =
+            !drawTool || event.pointerType === "touch"
+              ? board.selectionTarget(event.clientX, event.clientY)
+              : board.hitTest(event.clientX, event.clientY);
           const selectionId = board.selectionHit(event.clientX, event.clientY);
           const selectionTouch = event.pointerType === "touch" && !!selectionId;
           // Touch navigation handles the pointer before the bubbling handler.
@@ -1235,10 +1238,12 @@ export default function PageSurface({
             !target.closest("[data-surface-ui], [data-surface-content]")
           )
             board.select(null);
-          const shapeId = isBoardShape(hit?.node)
-            ? hit!.id
-            : target.closest<HTMLElement>('[data-board-shape="true"]')?.dataset
-                .surfaceId;
+          const shapeId =
+            isBoardShape(hit?.node) ||
+            (!drawTool && hit?.node.type === "drawing")
+              ? hit!.id
+              : target.closest<HTMLElement>('[data-board-shape="true"]')
+                  ?.dataset.surfaceId;
           const fingerShape = !!shapeId && event.pointerType === "touch";
           if (
             shapeId &&
@@ -1600,7 +1605,7 @@ export default function PageSurface({
               if (pointer.enterEdit)
                 enterEditing(pointer.enterEdit, event.clientX, event.clientY);
               else if (pointer.groupClick) {
-                const hit = board.hitTest(event.clientX, event.clientY);
+                const hit = board.selectionTarget(event.clientX, event.clientY);
                 board.select(hit && board.ids.has(hit.id) ? hit.id : null);
               } else if (pointer.wasSelected && !pointer.preserveSelection)
                 board.select(pointer.id, pointer.additive);

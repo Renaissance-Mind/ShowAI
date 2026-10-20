@@ -5,6 +5,7 @@ import {
   geometryFrame,
   frameFromGeometry,
   pickShape,
+  pickSelection,
   shapeHit,
   shapeIntersects,
   snapCreation,
@@ -297,5 +298,47 @@ describe("painted drawing geometry", () => {
     );
     expect((Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI).toBeCloseTo(15);
     expect(Math.hypot(b.x - a.x, b.y - a.y)).toBeCloseTo(Math.hypot(100, 30));
+  });
+});
+
+describe("drawing selection frames", () => {
+  it("selects a hollow drawing's center even when its frame covers the viewport", () => {
+    const item = {
+      ...candidate("cover", 1000, { x: 500, y: 500 }),
+      viewport: { x: 300, y: 300, width: 400, height: 400 },
+    };
+    expect(pickShape([item])).toBeNull();
+    expect(pickSelection([item])?.id).toBe("cover");
+    expect(pickShape([item], false)).toBeNull();
+  });
+  it("selects empty parts of drawing frames without broadening eraser or stroke hits", () => {
+    for (const tool of ["ellipse", "arrow", "pen", "highlighter"]) {
+      const item = {
+        ...candidate(
+          tool,
+          100,
+          tool === "ellipse" ? { x: 50, y: 50 } : { x: 80, y: 20 },
+        ),
+        node: shape(tool, tool),
+      };
+      expect(pickSelection([item])?.id).toBe(tool);
+      expect(pickShape([item], false)).toBeNull();
+    }
+  });
+  it("keeps content inside overlapping hollow frames reachable", () => {
+    const point = { x: 50, y: 50 };
+    const page = {
+      ...candidate("page", 100, point),
+      node: { type: "surface", attrs: { id: "page", kind: "page" } },
+    };
+    expect(pickSelection([page, candidate("cover", 300, point)])?.id).toBe(
+      "page",
+    );
+    expect(
+      pickSelection([
+        candidate("small", 100, point),
+        candidate("large", 300, point),
+      ])?.id,
+    ).toBe("small");
   });
 });
