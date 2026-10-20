@@ -109,3 +109,23 @@ it("restores floating placement and keeps it inside a resized viewport", () => {
     position: 0.5,
   });
 });
+
+it("uses the wider iPad edge band while still allowing a drag to detach", () => {
+  const bounds = { width: 1024, height: 768 };
+  expect(toolbarSnapTarget({ x: 70, y: 300 }, bounds, null, 72)?.edge).toBe(
+    "left",
+  );
+  expect(toolbarSnapTarget({ x: 954, y: 300 }, bounds, null, 72)?.edge).toBe(
+    "right",
+  );
+  expect(toolbarSnapTarget({ x: 500, y: 70 }, bounds, null, 72)?.edge).toBe(
+    "top",
+  );
+  expect(toolbarSnapTarget({ x: 500, y: 698 }, bounds, null, 72)?.edge).toBe(
+    "bottom",
+  );
+  expect(toolbarSnapTarget({ x: 95, y: 300 }, bounds, "left", 72)?.edge).toBe(
+    "left",
+  );
+  expect(toolbarSnapTarget({ x: 115, y: 300 }, bounds, "left", 72)).toBeNull();
+});

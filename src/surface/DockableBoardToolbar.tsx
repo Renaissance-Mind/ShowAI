@@ -218,7 +218,7 @@ export function DockableBoardToolbar({
       current.pointer,
       bounds,
       current.snapped,
-      44 * scale,
+      (mobile ? 72 : 44) * scale,
     );
     current.snapped = snapped?.edge ?? null;
     const next =

@@ -2291,46 +2291,50 @@ export default function PageSurface({
             </>
           }
           properties={
-            <>
-              {onTransform && !locked && !objectMenu ? (
-                <BoardStyleControls
-                  tool={selectedNodes.length ? null : drawTool}
-                  style={{
-                    color: drawColor,
-                    fillColor: drawFillColor,
-                    strokeWidth: drawStrokeWidth,
-                    pressure: drawPressure,
-                  }}
-                  nodes={selectedNodes}
-                  onChange={(patch) =>
-                    onStyleChange?.(
-                      selectedNodes
-                        .filter(
-                          (node) => node.type === "drawing" && !node.attrs?.ink,
-                        )
-                        .map((node) => node.attrs!.id),
-                      patch,
-                    )
-                  }
-                />
-              ) : null}
-              {mobile &&
-                onDraw &&
-                !locked &&
-                (drawTool === "pen" || drawTool === "highlighter") && (
-                  <div className="board-writing-options" data-surface-ui>
-                    <button
-                      type="button"
-                      aria-label={t("tool.ruler")}
-                      title={t("tool.ruler")}
-                      aria-pressed={ruler}
-                      onClick={() => setRuler((value) => !value)}
-                    >
-                      <Ruler size={15} />
-                    </button>
-                  </div>
-                )}
-            </>
+            mobile && board.ids.size > 1 ? null : (
+              <>
+                {onTransform && !locked && !objectMenu ? (
+                  <BoardStyleControls
+                    tool={selectedNodes.length ? null : drawTool}
+                    style={{
+                      color: drawColor,
+                      fillColor: drawFillColor,
+                      strokeWidth: drawStrokeWidth,
+                      pressure: drawPressure,
+                    }}
+                    nodes={selectedNodes}
+                    onChange={(patch) =>
+                      onStyleChange?.(
+                        selectedNodes
+                          .filter(
+                            (node) =>
+                              node.type === "drawing" && !node.attrs?.ink,
+                          )
+                          .map((node) => node.attrs!.id),
+                        patch,
+                      )
+                    }
+                  />
+                ) : null}
+                {mobile &&
+                  !selectedNodes.length &&
+                  onDraw &&
+                  !locked &&
+                  (drawTool === "pen" || drawTool === "highlighter") && (
+                    <div className="board-writing-options" data-surface-ui>
+                      <button
+                        type="button"
+                        aria-label={t("tool.ruler")}
+                        title={t("tool.ruler")}
+                        aria-pressed={ruler}
+                        onClick={() => setRuler((value) => !value)}
+                      >
+                        <Ruler size={15} />
+                      </button>
+                    </div>
+                  )}
+              </>
+            )
           }
         >
           {!mobile && (

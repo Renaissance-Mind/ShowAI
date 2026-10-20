@@ -3,6 +3,7 @@ import type { RefObject } from "react";
 import type { ShowDocument } from "../types";
 import { findSurfaceNode } from "./document.mjs";
 import { inkNodes } from "./inline-ink";
+import { inkUIRegions } from "./ink-ui-regions";
 import type { InkCommand } from "./inline-ink";
 import type { Camera } from "./model";
 
@@ -226,21 +227,11 @@ export function useInlineInk({
         poseDocument = documentValue;
         poseSize = size;
       }
-      const holes = [
-        ...document.querySelectorAll<HTMLElement>(
+      const holes = inkUIRegions(
+        document.querySelectorAll<HTMLElement>(
           "[data-surface-ui],.surface-toolbar,.studio-context-menu,.studio-modal-shade,.container-inspector,.studio-sidebar-shell:not([data-sidebar-mode=hidden]) .studio-sidebar,.studio-mobile-sidebar-edge,.studio-mobile-sidebar-scrim,.studio-mobile-navigation-tools",
         ),
-      ]
-        .filter(
-          (element) =>
-            element.getClientRects().length &&
-            getComputedStyle(element).pointerEvents !== "none" &&
-            getComputedStyle(element).visibility !== "hidden",
-        )
-        .map((element) => {
-          const r = element.getBoundingClientRect();
-          return { x: r.x, y: r.y, width: r.width, height: r.height };
-        });
+      );
       const packet = {
         token,
         pageId: documentValue.id,
@@ -397,6 +388,7 @@ export function useInlineInk({
     document.addEventListener("transitionrun", animationStart, true);
     document.addEventListener("transitionend", animationEnd, true);
     document.addEventListener("transitioncancel", animationEnd, true);
+    document.addEventListener("scroll", schedule, true);
     window.addEventListener("resize", schedule);
     schedule();
     return () => {
@@ -410,6 +402,7 @@ export function useInlineInk({
       document.removeEventListener("transitionrun", animationStart, true);
       document.removeEventListener("transitionend", animationEnd, true);
       document.removeEventListener("transitioncancel", animationEnd, true);
+      document.removeEventListener("scroll", schedule, true);
       window.removeEventListener("resize", schedule);
       void bridge.hide(source.id, boardId, token).finally(() => {
         if (surface.dataset.nativeInkToken === token) {

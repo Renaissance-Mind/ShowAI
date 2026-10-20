@@ -394,7 +394,7 @@
 }
 .board-dockable-toolbar[data-mobile] .board-toolbar-secondary {
   position: absolute;
-  bottom: calc(100% + 8px);
+  bottom: 100%;
   left: 0;
   display: flex;
   align-items: center;
@@ -404,9 +404,10 @@
   box-sizing: border-box;
   padding: 5px;
   border: 1px solid var(--line, var(--border));
-  border-radius: 12px;
+  border-radius: 12px 12px 0 0;
+  border-bottom: 0;
   background: var(--paper, var(--bg));
-  box-shadow: 0 4px 20px #0000000a;
+  box-shadow: none;
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
@@ -454,7 +455,7 @@
   flex-shrink: 0;
 }
 .board-dockable-toolbar[data-mobile][data-dock="top"] .board-toolbar-secondary {
-  top: calc(100% + 8px);
+  top: 100%;
   bottom: auto;
 }
 .board-dockable-toolbar[data-mobile]:is([data-dock="left"], [data-dock="right"])
@@ -465,12 +466,12 @@
 }
 .board-dockable-toolbar[data-mobile][data-dock="left"]
   .board-toolbar-secondary {
-  left: calc(100% + 8px);
+  left: 100%;
 }
 .board-dockable-toolbar[data-mobile][data-dock="right"]
   .board-toolbar-secondary {
   left: auto;
-  right: calc(100% + 8px);
+  right: 100%;
 }
 .board-dockable-toolbar[data-mobile]:is([data-dock="left"], [data-dock="right"])
   :is(
@@ -484,4 +485,51 @@
 .board-toolbar-primary
   :is(.board-tool-stack, .board-tool-buttons, button, summary) {
   touch-action: none;
+}
+
+/* One joined panel; the primary strip's shared border is the divider. */
+.board-dockable-toolbar[data-mobile] .board-toolbar-primary {
+  box-shadow: none;
+}
+.board-dockable-toolbar[data-mobile]:has(
+    > .board-toolbar-secondary
+      :is(button, summary, input, select, [role="status"])
+  )
+  .board-toolbar-primary {
+  border-radius: 0 0 12px 12px;
+}
+.board-dockable-toolbar[data-mobile][data-dock="top"]:has(
+    > .board-toolbar-secondary
+      :is(button, summary, input, select, [role="status"])
+  )
+  .board-toolbar-primary {
+  border-radius: 12px 12px 0 0;
+}
+.board-dockable-toolbar[data-mobile][data-dock="top"] .board-toolbar-secondary {
+  border-width: 0 1px 1px;
+  border-radius: 0 0 12px 12px;
+}
+.board-dockable-toolbar[data-mobile][data-dock="left"]:has(
+    > .board-toolbar-secondary
+      :is(button, summary, input, select, [role="status"])
+  )
+  .board-toolbar-primary {
+  border-radius: 12px 0 0 12px;
+}
+.board-dockable-toolbar[data-mobile][data-dock="left"]
+  .board-toolbar-secondary {
+  border-width: 1px 1px 1px 0;
+  border-radius: 0 12px 12px 0;
+}
+.board-dockable-toolbar[data-mobile][data-dock="right"]:has(
+    > .board-toolbar-secondary
+      :is(button, summary, input, select, [role="status"])
+  )
+  .board-toolbar-primary {
+  border-radius: 0 12px 12px 0;
+}
+.board-dockable-toolbar[data-mobile][data-dock="right"]
+  .board-toolbar-secondary {
+  border-width: 1px 0 1px 1px;
+  border-radius: 12px 0 0 12px;
 }
