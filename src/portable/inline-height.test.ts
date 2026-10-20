@@ -139,7 +139,10 @@ test("inline Pages expose their content height and keep explicitly bounded child
   await page.goto(`${address}/inline`);
   const frame = page.frames().find((item) => item.parentFrame())!;
   await frame.locator(rootPage).waitFor();
-  expect(await frame.locator(".portable-page-heading").isVisible()).toBe(false);
+  expect(
+    await frame.getByText("Inline height regression", { exact: true }).count(),
+  ).toBe(0);
+  expect(await frame.locator(".portable-page-heading").count()).toBe(0);
   expect(
     await frame
       .locator(`${rootPage} > .container-page-column > .container-page-heading`)
