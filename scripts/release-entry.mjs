@@ -140,12 +140,20 @@ export async function checkOnlineEntries(version) {
     for (const wanted of [ENTRY_COPY.en.tagline, "docs/quick-start.md"])
       if (!newest.body?.includes(wanted)) errors.push(`${newest.tag_name} notes: missing “${wanted}”`);
   }
-  // The site answers every path with its app shell, so check the published content rather than status codes.
+  // The site answers every path with its app shell; the launch page's shared copy ships in its main script.
   const published = [];
-  for (const path of ["/", "/seed.json", "/seed.en.json"]) {
-    const page = await fetch(`${SITE}${path}`);
-    if (!page.ok) errors.push(`${SITE}${path}: HTTP ${page.status}`);
-    else published.push(await page.text());
+  const shell = await fetch(`${SITE}/`);
+  if (!shell.ok) errors.push(`${SITE}/: HTTP ${shell.status}`);
+  else {
+    const html = await shell.text();
+    published.push(html);
+    const script = html.match(/<script[^>]+src="([^"]+\.js)"/)?.[1];
+    if (!script) errors.push(`${SITE}/: no main script`);
+    else {
+      const main = await fetch(new URL(script, `${SITE}/`));
+      if (!main.ok) errors.push(`${SITE}${script}: HTTP ${main.status}`);
+      else published.push(await main.text());
+    }
   }
   for (const tagline of [ENTRY_COPY.en.tagline, ENTRY_COPY.zh.tagline])
     if (!published.some((text) => text.includes(tagline))) errors.push(`${SITE}: published homepage does not use “${tagline}” yet`);
