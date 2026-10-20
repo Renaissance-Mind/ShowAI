@@ -963,12 +963,15 @@ function ContainerView({
       ? tool
       : tool === "text" ? "pen" : "shape";
   const style = styles[styleKey];
-  const chooseTool = async (next: BoardTool | null) => {
-    await window.showai?.inlineInk?.flush();
+  const chooseTool = (next: BoardTool | null) => {
+    // Finish the outgoing contact now; its checkpoint continues independently
+    // of the selected tool. Native hide retains the original durability barrier.
+    const saving = window.showai?.inlineInk?.flush();
     runtime.activate(id);
     runtime.select(null);
     runtime.inspect(null);
     setTool(next);
+    return saving;
   };
   const enabled = root || runtime.active === id;
   const viewScope = useContext(EditorViewScope);
