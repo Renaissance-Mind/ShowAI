@@ -126,6 +126,7 @@ function SurfaceEditor({
     ) {
       if (contentKey(before) === contentKey(document)) {
         current.current = document;
+        window.showai?.inlineInk?.setDocument?.(document.id, document);
         refresh((value) => value + 1);
         return;
       }
@@ -147,6 +148,7 @@ function SurfaceEditor({
       }
     }
     current.current = document;
+    window.showai?.inlineInk?.setDocument?.(document.id, document);
     refresh((value) => value + 1);
   }, [document]);
   const settleGeometry = useCallback(() => {
@@ -167,6 +169,7 @@ function SurfaceEditor({
           { clone: false },
         ) as ContainerDocument;
         current.current = settled;
+        window.showai?.inlineInk?.setDocument?.(settled.id, settled);
         latestChange.current(settled);
       });
     });
@@ -196,6 +199,7 @@ function SurfaceEditor({
       stack.group = group;
       stack.at = now;
       current.current = next;
+      window.showai?.inlineInk?.setDocument?.(next.id, next);
       latestChange.current(next);
       refresh((value) => value + 1);
       settleGeometry();
@@ -207,7 +211,7 @@ function SurfaceEditor({
   useEffect(() => {
     const bridge = window.showai?.inlineInk;
     if (!bridge || !inlineInkProjectId || readOnly) return;
-    return bridge.bind(
+    const unbind = bridge.bind(
       document.id,
       inlineInkProjectId,
       async (value, applied) => {
@@ -248,6 +252,8 @@ function SurfaceEditor({
         return (await inkSave.current?.()) ?? true;
       },
     );
+    bridge.setDocument?.(document.id, current.current);
+    return unbind;
   }, [document.id, inlineInkProjectId, readOnly, commit]);
   const travel = useCallback(
     async (redo = false) => {
@@ -268,6 +274,7 @@ function SurfaceEditor({
         surfaceViews: next.surfaceViews,
       };
       current.current = restored;
+      window.showai?.inlineInk?.setDocument?.(restored.id, restored);
       latestChange.current(restored);
       refresh((value) => value + 1);
       settleGeometry();

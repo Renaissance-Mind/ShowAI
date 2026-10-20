@@ -55,6 +55,7 @@ export interface InkCommand {
   };
 }
 export interface InlineInkBridge {
+  setDocument?(pageId: string, document: ShowDocument): void;
   bind(
     pageId: string,
     projectId: string,

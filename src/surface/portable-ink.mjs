@@ -1,5 +1,47 @@
 /** Portable brush v1. This module has no DOM, platform or storage dependencies. */
 export const PORTABLE_INK_FORMAT = "showai-ink-v1";
+export function inkFramePose(frame, extent) {
+  const a = ((frame.rotation ?? 0) * Math.PI) / 180,
+    c = Math.cos(a),
+    s = Math.sin(a),
+    w = frame.width,
+    h = frame.height;
+  return [
+    (c * w) / extent[0],
+    (s * w) / extent[0],
+    (-s * h) / extent[1],
+    (c * h) / extent[1],
+    frame.x + w / 2 - (c * w) / 2 + (s * h) / 2,
+    frame.y + h / 2 - (s * w) / 2 - (c * h) / 2,
+  ];
+}
+export function inkModelPoses(document, boardId, previous = {}) {
+  const find = (node) =>
+    node.attrs?.id === boardId ? node : node.content?.map(find).find(Boolean);
+  const board = find(document.content),
+    poses = { ...previous };
+  let nested = false,
+    complete = true;
+  const visit = (node, direct) => {
+    if (node.type === "surface") return;
+    if (isInkNode(node)) {
+      const id = node.attrs.id,
+        extent =
+          node.attrs.extent ??
+          node.attrs.nativeInk?.extent ??
+          node.attrs.data?.nativeInk?.extent,
+        frame = document.layout?.[id];
+      if (direct && frame?.height && extent)
+        poses[id] = inkFramePose(frame, extent);
+      else {
+        nested = true;
+        if (!poses[id]) complete = false;
+      }
+    } else node.content?.forEach((child) => visit(child, false));
+  };
+  board?.content?.forEach((node) => visit(node, true));
+  return { poses, nested, complete };
+}
 export function portableInkColor(color, dark = false) {
   const c = /^#[0-9a-f]{6}$/i.test(color) ? parseInt(color.slice(1), 16) : 0;
   return dark && Math.max(c >>> 16, (c >>> 8) & 255, c & 255) < 64

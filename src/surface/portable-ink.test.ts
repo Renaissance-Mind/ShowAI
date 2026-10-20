@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { ShowDocument } from "../types";
 import {
+  inkModelPoses,
   createPortableInk,
   validatePortableInk,
   portableInkGeometry,
@@ -63,6 +64,23 @@ function document(): ShowDocument {
   });
 }
 describe("portable ink kernel and collaboration", () => {
+  it("derives fractional root poses from the authoritative model without layout rounding", () => {
+    const d = document();
+    d.layout!.stroke = {
+      x: 1.123456789,
+      y: 2.345678901,
+      width: 143.432167,
+      height: 87.432165,
+    };
+    d.content.content![0].attrs!.extent = [143.432167, 87.432165];
+    const result = inkModelPoses(d, "board");
+    expect(result.complete).toBe(true);
+    expect(result.nested).toBe(false);
+    expect(result.poses.stroke[0]).toBe(1);
+    expect(result.poses.stroke[3]).toBe(1);
+    expect(result.poses.stroke[4]).toBeCloseTo(d.layout!.stroke.x, 10);
+    expect(result.poses.stroke[5]).toBeCloseTo(d.layout!.stroke.y, 10);
+  });
   it("stores a real drawing with editable geometry and no PNG/archive requirement", () => {
     const d = document();
     expect(() =>

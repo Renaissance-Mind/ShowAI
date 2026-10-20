@@ -14,6 +14,21 @@ export interface PortableInk {
   createdAt?: number;
 }
 export const PORTABLE_INK_FORMAT: "showai-ink-v1";
+export function inkFramePose(
+  frame: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation?: number;
+  },
+  extent: number[],
+): number[];
+export function inkModelPoses(
+  document: any,
+  boardId: string,
+  previous?: Record<string, number[]>,
+): { poses: Record<string, number[]>; nested: boolean; complete: boolean };
 export function portableInkColor(color: string, dark?: boolean): string;
 export function isPortableInk(ink: unknown): ink is PortableInk;
 export function isInkNode(node: {
