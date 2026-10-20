@@ -64,6 +64,8 @@ npm test
 
 修改 plugins/showai 的 Skill、参考说明或 manifest 后执行 npm run plugin:update -- --json。核对成功、enabled、version、installedPath、verifiedFiles 与 treeSha256。安装、宿主刷新与新会话看到工具分别验证。修改 CLI 协议时同步相关说明。
 
+README、快速上手、横幅图、App 欢迎页与主页共用同一组标语、一句话介绍和示例提示词，定义在 `scripts/release-entry.mjs`。修改后运行 `npm run release:check`（发版前运行 `npm run release:check -- --online`，同时检查已发布的 Release 与主页），并用 `npm run release:notes -- --headline "…" --changes changes.json` 生成发行说明草稿。
+
 公开文档同步维护：根中英文 README、docs/TOPIC.md 与 i18n/TOPIC.zh-CN.md，以及两个文档目录。保留语言切换和有效相对链接。命令以当前实现为准，区分源码、已安装软件/插件、部署服务与发行包。内部计划、凭据、本机状态、测试日志和验收材料留在公开文档之外。
 
 ## 提交与反馈

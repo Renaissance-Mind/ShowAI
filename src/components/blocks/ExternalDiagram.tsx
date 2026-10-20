@@ -1,4 +1,4 @@
-import { installComponentSelectionBridge } from "../custom/selection-bridge";
+import { componentSelectionScript } from "../custom/selection-bridge";
 import { useSelectionFrame } from "../custom/useSelectionFrame";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, Upload } from "../../ui/icons";
@@ -68,7 +68,7 @@ function ExternalDiagramBlock({
   const html = useMemo(
     () =>
       diagramDocument(family, shownSource, presentation) +
-      `<script>(${installComponentSelectionBridge.toString()})(${JSON.stringify(selectionChannel)});</script>`,
+      `<script>${componentSelectionScript(selectionChannel)}</script>`,
     [family, shownSource, presentation, selectionChannel],
   );
   const outsideTitle =

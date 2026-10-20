@@ -2,11 +2,13 @@
 
 **Language:** English | [简体中文](README.zh-CN.md) · [Documentation](../../docs/README.md)
 
-The local plugin supplies eight Skills and a stdio MCP launcher for reading, creating, revising and presenting ShowAI content. The application/runtime is installed separately. The repository's application source version is **0.9.0**; runtime capabilities determine compatibility.
+ShowAI lets your agent answer with interfaces — interactive, archived, and evolving as you use them. It has two parts: this plugin gives the agent ShowAI's tools (a stdio MCP launcher) and eight Skills, and the ShowAI app keeps the pages and provides the runtime the plugin talks to. Compatibility is determined by the runtime's reported capabilities.
 
-## Install locally
+## Install
 
-Desktop App users can open **Settings → Plugins** to install the plugin for Codex or Claude Code. Install the host first and make its plugin-management CLI available. The App supplies the plugin and runtime; no source checkout or separate Node.js is needed. Refresh/restart the host after installation. The connection uses the selected library; update it again after switching libraries or moving the App. Disable an enabled ShowAI plugin from another source before installing the App version.
+**Recommended: install from the ShowAI app.** Download the app from [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases/latest), open it, and use the plugin panel on the welcome screen or under **Settings → Plugins** to install the plugin for Claude Code or Codex. Install the agent first and make its command-line tool available. The app supplies the plugin and runtime; no source checkout or separate Node.js is needed. Restart the Claude Code session, or refresh plugins or restart Codex, then start a new conversation. The connection uses the app's current library; click **Update and enable** after switching libraries or moving the app. Disable a ShowAI plugin enabled from another source before installing the app version. See [Use ShowAI in Claude Code and Codex](../../docs/codex.md).
+
+### From a source checkout
 
 For source installation, use Node.js 22.12+ and Codex CLI on PATH. Build/start ShowAI, or register an installed standalone runtime, so the selected library has an agent-runtime.json. From this repository:
 

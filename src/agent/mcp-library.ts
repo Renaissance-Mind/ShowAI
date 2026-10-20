@@ -15,6 +15,7 @@ import { AgentService } from "./service";
 import { mcpFailure, mcpSuccess } from "./presentation-tools";
 import { withChangeContext, changeContext } from "../core/history-context";
 import { openLibrary } from "../core/open-library";
+import { recordConnections } from "./mcp-connections";
 
 /** Explicit project identities, no mutable connection-wide "current project". */
 export function createLibraryMcpServer(options: {
@@ -155,11 +156,12 @@ export async function startLibraryMcp(
   options: Parameters<typeof createLibraryMcpServer>[0],
 ) {
   await openLibrary(options.root);
-  await createLibraryMcpServer(options).connect(
-    new StdioServerTransport(process.stdin, process.stdout, {
-      maxBufferSize: CAPACITY.authoringRequestBytes,
-    }),
-  );
+  const transport = new StdioServerTransport(process.stdin, process.stdout, {
+    maxBufferSize: CAPACITY.authoringRequestBytes,
+  });
+  // Lets Settings → Plugins confirm that the host reached this library.
+  recordConnections(transport, options.root);
+  await createLibraryMcpServer(options).connect(transport);
   process.stderr.write(
     "ShowAI MCP connected to the configured library. Select projectId explicitly.\n",
   );

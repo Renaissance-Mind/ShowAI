@@ -104,3 +104,110 @@
     transition: none;
   }
 }
+/* Workbench player for local files a component links to; matches the gallery lightbox. */
+.showai-local-media {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 50px 65px;
+  background: #101611f2;
+  backdrop-filter: blur(12px);
+  color: #f1f5ee;
+  font: 13px/1.5 "Avenir Next", "PingFang SC", system-ui, sans-serif;
+}
+.showai-local-media figure {
+  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.showai-local-media video,
+.showai-local-media img {
+  max-width: 100%;
+  max-height: calc(100dvh - 190px);
+  object-fit: contain;
+  display: block;
+  background: #000;
+  border-radius: 6px;
+}
+.showai-local-media audio {
+  width: min(560px, 80vw);
+}
+.showai-local-media figcaption {
+  font-size: 12px;
+  line-height: 1.8;
+  text-align: center;
+  padding: 15px 0 0;
+  overflow-wrap: anywhere;
+}
+.showai-local-media figcaption > span {
+  display: block;
+  color: #a8b2a7;
+  font-size: 10px;
+  padding-top: 5px;
+}
+.showai-local-media-close {
+  position: absolute;
+  top: 20px;
+  right: 22px;
+  width: 39px;
+  height: 39px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ffffff15;
+  border-radius: 50%;
+  background: #ffffff0b;
+  color: #f1f5ee;
+  cursor: pointer;
+}
+.showai-local-media-close:hover {
+  background: #ffffff20;
+}
+.showai-local-media-note {
+  margin: 0 0 12px;
+  font-size: 14px;
+  text-align: center;
+}
+.showai-local-media-path {
+  user-select: all;
+  font-family: ui-monospace, Menlo, monospace;
+}
+.showai-local-media figcaption > .showai-local-media-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding-top: 10px;
+}
+.showai-local-media-actions > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid #ffffff26;
+  border-radius: 999px;
+  background: #ffffff0f;
+  color: #f1f5ee;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.showai-local-media-actions > button:hover {
+  background: #ffffff20;
+}
+.showai-local-media-close:focus-visible,
+.showai-local-media-actions > button:focus-visible {
+  outline: 2px solid #b8ceba;
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .showai-local-media {
+    backdrop-filter: none;
+  }
+}

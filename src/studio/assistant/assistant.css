@@ -795,3 +795,39 @@
   border-radius: 50%;
   background: var(--accent);
 }
+/* Empty conversation: Agent status, starting prompts and the selection hint. */
+.assistant-start {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0;
+}
+.assistant-start .assistant-empty {
+  margin: 4px 8px;
+}
+.assistant-starters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.assistant-starters > span {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.assistant-starters .assistant-chip {
+  height: auto;
+  min-height: 24px;
+  padding: 4px 9px;
+  color: var(--text);
+}
+.assistant-starters .assistant-chip span {
+  white-space: normal;
+  text-align: left;
+  line-height: 1.35;
+}
+.assistant-turn .onboarding-steps,
+.assistant-form .onboarding-steps {
+  margin-top: 6px;
+}

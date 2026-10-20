@@ -91,6 +91,7 @@ Check the installer JSON/receipt for success, enabled state, version, installed 
 - Handle errors at real boundaries (I/O, processes, user input) and surface the cause; do not swallow failures.
 - Markdown files are ignored by default. To add a new public `.md` file, add its exact path to the allowlist in `.gitignore`.
 - Maintain English and Simplified Chinese together: `README.md` ↔ `docs/i18n/README.zh-CN.md`, `docs/TOPIC.md` ↔ `docs/i18n/TOPIC.zh-CN.md`, and both documentation indexes. Keep language switches and relative links valid.
+- README, the quick start, the banners, the app's welcome copy and the homepage share one tagline, one-liner and sample prompt, defined in `scripts/release-entry.mjs`. Run `npm run release:check` after changing them (`npm run release:check -- --online` before a release also checks the published release and homepage), and draft release notes with `npm run release:notes -- --headline "…" --changes changes.json`.
 - Verify documented commands against the owning implementation. Distinguish source versions, installed runtime/plugin versions, deployed service state and published release artifacts.
 - Keep internal plans, credentials, machine-specific state, test logs and acceptance evidence outside public documentation.
 

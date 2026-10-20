@@ -343,7 +343,9 @@ function SurfaceEditor({
               };
               value = fromPageEditor(value, source);
             }
-            const group = options?.separateHistory ? "" : `text:${parentId}`;
+            const group =
+              options?.historyGroup ??
+              (options?.separateHistory ? "" : `text:${parentId}`);
             if (kind === "children")
               commit(
                 replaceChildren(source, parentId, ids, value.content ?? []),
@@ -401,7 +403,7 @@ function SurfaceEditor({
           !(event.metaKey || event.ctrlKey) ||
           event.altKey ||
           (event.target as Element).closest(
-            'input,textarea,select,[role="dialog"],[data-editor-keyboard-scope]',
+            'input,textarea:not([data-text-selection-input]),select,[role="dialog"],[data-editor-keyboard-scope]',
           )
         )
           return;

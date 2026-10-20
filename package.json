@@ -1,6 +1,6 @@
 {
   "name": "showai",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -48,6 +48,9 @@
     "plugin:dsh": "node scripts/install-dsh-plugin.mjs",
     "package:runtime": "node scripts/package-runtime.mjs",
     "package:plugin": "node scripts/package-plugin.mjs",
+    "release:notes": "node scripts/release-entry.mjs notes",
+    "release:check": "node scripts/release-entry.mjs check",
+    "test:release-entry": "node --test scripts/release-entry.test.mjs",
     "runtime:register": "node dist-runtime/scripts/cli.mjs runtime register --json",
     "build:browser": "tsc -b && npm run build:portable && npm run build:cdn && vite build && npm run build:agent && npm run package:runtime",
     "browser": "node dist-runtime/scripts/cli.mjs serve",

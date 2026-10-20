@@ -39,6 +39,7 @@ import {
 } from "../workbench/actions";
 import type { DesktopChange, DesktopInfo } from "../desktop/bridge";
 import { openLocalPath } from "./system";
+import { localMediaResponse } from "../workbench/local-media";
 import { windowQuery } from "../workbench/window-target";
 
 export interface BrowserServerOptions {
@@ -300,6 +301,10 @@ export async function startBrowserServer(options: BrowserServerOptions) {
             notify("home");
             return info();
           }
+          case "media:reveal":
+            // The action layer only passes paths it granted for the player.
+            await openLocalPath(String(args.path), true);
+            return null;
           case "app:openPageWindow":
           case "app:openWindow": {
             return {
@@ -400,6 +405,21 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         return;
       }
       const url = new URL(request.url ?? "/", origin);
+      // A media element cannot send the bearer header; the unguessable grant
+      // minted through an authenticated media:open call is the credential.
+      const media = /^\/api\/media\/([0-9a-f-]{36})$/.exec(url.pathname);
+      if (media && (request.method === "GET" || request.method === "HEAD")) {
+        const result = await localMediaResponse(
+          media[1],
+          request.headers.range,
+          request.method === "HEAD",
+        );
+        response.writeHead(result.status, result.headers);
+        if (result.body)
+          result.body.on("error", () => response.destroy()).pipe(response);
+        else response.end();
+        return;
+      }
       if (url.pathname.startsWith("/api/")) {
         const supplied =
           url.pathname === "/api/events"
@@ -521,7 +541,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         );
         response.setHeader(
           "Content-Security-Policy",
-          `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; connect-src 'self'; frame-src 'self' about: data: blob:; frame-ancestors ${preview ? "'self'" : "'none'"}; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'`,
+          `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; media-src 'self' data: https: http:; font-src 'self' data:; connect-src 'self'; frame-src 'self' about: data: blob:; frame-ancestors ${preview ? "'self'" : "'none'"}; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'`,
         );
         response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         response.end(request.method === "HEAD" ? undefined : html);

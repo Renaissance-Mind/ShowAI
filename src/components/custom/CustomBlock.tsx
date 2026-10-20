@@ -1,4 +1,4 @@
-import { installComponentSelectionBridge } from "./selection-bridge";
+import { componentSelectionScript } from "./selection-bridge";
 import { useSelectionFrame } from "./useSelectionFrame";
 import { CAPACITY, assertContent } from "../../portable/capacity.mjs";
 import { installIconTooltips } from "../../ui/icon-tooltip.mjs";
@@ -29,6 +29,7 @@ import type { CompiledComponent } from "./types";
 import { InlineComponent } from "./InlineComponent";
 import { findComponent, indexComponents } from "./component-index";
 import { installComponentLinks, openComponentLink } from "./external-links";
+import { openComponentMedia } from "./LocalMediaViewer";
 import { installComponentActivity } from "./activity";
 import { useLocale, useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/customComponents";
@@ -261,7 +262,7 @@ function SandboxComponent({
         // Built-in blocks compiled into the package start in the workbench language.
         `<style>body{color:var(--text)}</style><script>document.documentElement.lang=document.documentElement.dataset.showaiLocale=${safeJson(locale)};(${installComponentActivity.toString()})(${safeJson(channel)});(${installSandboxTheme.toString()})(${safeJson(channel)},${safeJson(initialTheme.current)},${safeJson(appearanceTokens())});</script><script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current })}</script>`,
       ) +
-      `<script>(${installComponentSelectionBridge.toString()})(${safeJson(channel)});(${installIconTooltips.toString()})(document);(${installComponentLinks.toString()})(${safeJson(channel)});</script>`
+      `<script>${componentSelectionScript(channel)}(${installIconTooltips.toString()})(document);(${installComponentLinks.toString()})(${safeJson(channel)});</script>`
     );
   }, [component.html, channel, locale]);
 
@@ -305,6 +306,10 @@ function SandboxComponent({
       if (event.data.type === "showai:ready") sendProps();
       if (event.data.type === "showai:open-url") {
         openComponentLink(event.data.url);
+        return;
+      }
+      if (event.data.type === "showai:open-media") {
+        openComponentMedia(event.data.url);
         return;
       }
       if (

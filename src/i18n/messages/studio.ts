@@ -113,7 +113,7 @@ export default defineMessages("studio", {
     noMatchingContent: "没有匹配的内容",
     folderEmpty: "文件夹为空",
     projectEmpty: "项目为空",
-    emptyHint: "点击左上角的 + 添加文件夹、页面或白板",
+    emptyHint: "点击左上角的 + 添加页面或白板，或打开 Agent 让它写第一页",
     viewTemplate: "查看模板 {name} {version} {scope}",
     noMatchingTemplates: "没有匹配的模板",
     noTemplates: "暂无这类模板",
@@ -310,7 +310,8 @@ export default defineMessages("studio", {
     noMatchingContent: "No matching content",
     folderEmpty: "This folder is empty",
     projectEmpty: "This project is empty",
-    emptyHint: "Click + at the top left to add a folder, page or board",
+    emptyHint:
+      "Click + at the top left to add a page or board, or open the agent and let it write the first page",
     viewTemplate: "View template {name} {version} {scope}",
     noMatchingTemplates: "No matching templates",
     noTemplates: "No templates of this kind",

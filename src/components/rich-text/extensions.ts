@@ -1,4 +1,3 @@
-import { ComponentRange } from "./component-range-selection";
 import { richTextStyle } from "./model.mjs";
 import { translator } from "../../i18n";
 import messages from "../../i18n/messages/richText";
@@ -296,7 +295,7 @@ export function createExtensions(
   options: {
     readOnly?: boolean;
     /** Called while rendering so the placeholder follows the current language. */
-    placeholder?: string | (() => string);
+    placeholder?: string | ((context: { empty: boolean }) => string);
     trailingNode?: boolean;
   } = {},
 ) {
@@ -319,11 +318,11 @@ export function createExtensions(
     }),
     HighlightedCodeBlock,
     Placeholder.configure({
-      placeholder: ({ node }) =>
+      placeholder: ({ node, editor }) =>
         node.type.name === "heading"
           ? t("placeholderHeading")
           : typeof options.placeholder === "function"
-            ? options.placeholder()
+            ? options.placeholder({ empty: editor.isEmpty })
             : (options.placeholder ?? t("placeholderDefault")),
       includeChildren: false,
     }),
@@ -342,7 +341,6 @@ export function createExtensions(
     CalloutNode,
     ToggleNode,
     WidgetNode,
-    ComponentRange,
   ];
 }
 

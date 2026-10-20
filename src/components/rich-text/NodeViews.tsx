@@ -1,3 +1,5 @@
+import { isTextPointerTarget } from "../../surface/text-selection";
+import { clearWidgetSelection } from "./widget-selection";
 import { ImageContent } from "./ImageContent";
 import { richTextStyle } from "./model.mjs";
 import { mathHtml } from "../blocks/markdown-math.mjs";
@@ -45,6 +47,17 @@ export function WidgetView({
           event.ctrlKey
         )
           return;
+        if (
+          isTextPointerTarget(
+            event.target as Element,
+            event.clientX,
+            event.clientY,
+          )
+        ) {
+          const transaction = clearWidgetSelection(editor.state);
+          if (transaction) editor.view.dispatch(transaction);
+          return;
+        }
         const position = getPos();
         if (!selected && typeof position === "number")
           editor.commands.setNodeSelection(position);
@@ -58,6 +71,17 @@ export function WidgetView({
           event.ctrlKey
         )
           return;
+        if (
+          isTextPointerTarget(
+            event.target as Element,
+            event.clientX,
+            event.clientY,
+          ) ||
+          (event.target as Element).closest('[data-text-selection="true"]')
+        ) {
+          event.stopPropagation();
+          return;
+        }
         const position = getPos();
         if (typeof position !== "number") return;
         editor.commands.setNodeSelection(position);

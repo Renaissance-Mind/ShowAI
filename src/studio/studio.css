@@ -1511,7 +1511,7 @@ button.studio-tree-chevron:hover {
   align-items: flex-start;
 }
 .studio-page-list[data-view]:not([data-view="list"]) .studio-page-list-icon {
-  width: 22px;
+  display: none;
 }
 .studio-page-thumbnail {
   position: absolute;
@@ -1620,4 +1620,17 @@ button.studio-tree-chevron:hover {
 }
 .studio-page-list[data-view]:not([data-view="list"]) .studio-page-checkbox-spacer {
   display: none;
+}
+/* Page toolbar button with a visible text label (the Agent panel toggle). */
+.studio-icon.studio-icon-labeled {
+  width: auto;
+  gap: 5px;
+  padding: 0 8px 0 7px;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.studio-icon.studio-icon-labeled[aria-pressed="true"] {
+  color: var(--accent);
+  background: var(--accent-soft);
 }

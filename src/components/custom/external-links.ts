@@ -20,6 +20,12 @@ export function installComponentLinks(channel: string): void {
       ) as HTMLAnchorElement | undefined;
     if (!anchor || anchor.hasAttribute("download")) return;
     const url = anchor.getAttribute("href") ?? "";
+    // Local files open in the workbench player; the frame itself cannot load them.
+    if (/^file:/i.test(url)) {
+      event.preventDefault();
+      parent.postMessage({ channel, type: "showai:open-media", url }, "*");
+      return;
+    }
     if (!/^https?:\/\//i.test(url)) return;
     event.preventDefault();
     parent.postMessage({ channel, type: "showai:open-url", url }, "*");

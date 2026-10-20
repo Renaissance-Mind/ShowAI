@@ -146,6 +146,8 @@ import {
 } from "./template-catalog-model";
 import TemplateThumbnail from "./TemplateThumbnail";
 import RecentPages, { recentPages } from "./RecentPages";
+import Welcome from "./Welcome";
+import { useSampleProject } from "./sample-project";
 import AutoHideSidebar from "./AutoHideSidebar";
 import WorkspaceTabs, { WorkspaceHistory } from "./WorkspaceTabs";
 import { useWorkspaceTabs } from "./useWorkspaceTabs";
@@ -754,6 +756,12 @@ export default function Studio() {
       return refreshNavigation();
     },
     [refreshNavigation],
+  );
+  // A library the App just created gets its sample project once.
+  const sampleProject = useSampleProject(
+    info && capabilities.manageLibrary ? info.home : null,
+    refresh,
+    report,
   );
   const loadCatalog = useMemo(
     () => {
@@ -2114,6 +2122,22 @@ export default function Studio() {
     () => recentPages(projects, contents),
     [projects, contents],
   );
+  // A sample project the person removed is never offered again.
+  const seededSamples =
+    sampleProject.samples?.state === "seeded" ? sampleProject.samples : null;
+  const sampleProjectId =
+    seededSamples &&
+    projects.some(
+      (item) => item.id === seededSamples.projectId && !item.archived,
+    )
+      ? seededSamples.projectId
+      : null;
+  // The welcome stays until the library has pages outside the sample project;
+  // it waits for the first page list so existing libraries never flash it.
+  const welcoming =
+    workspaceReady &&
+    !!info &&
+    !recent.some((item) => item.projectId !== sampleProjectId);
   const catalogTemplates = (
     showTemplateVersions ? templates : latestTemplateVersions(templates)
   )
@@ -3064,13 +3088,13 @@ export default function Studio() {
               <ArrowUpRight size={14} />
             </button>
             <button
-              className={`studio-icon${assistantOpen ? " is-active" : ""}`}
-              aria-label={ta("panel.toggle")}
+              className={`studio-icon studio-icon-labeled${assistantOpen ? " is-active" : ""}`}
               aria-pressed={assistantOpen}
               title={ta("panel.toggle")}
               onClick={() => changeAssistantOpen(!assistantOpen)}
             >
-              <Sparkles size={15} />
+              <Sparkles size={15} aria-hidden="true" />
+              <span>{ta("panel.button")}</span>
             </button>
             <button
               className="studio-icon"
@@ -3408,6 +3432,48 @@ export default function Studio() {
                         )
                       }
                       onCreateProject={() => setDialog({ type: "project" })}
+                      welcome={
+                        !workspaceReady ? (
+                          <div className="studio-welcome" aria-busy="true" />
+                        ) : welcoming ? (
+                          <Welcome
+                            info={info}
+                            samples={
+                              sampleProjectId ? sampleProject.samples : null
+                            }
+                            preparing={sampleProject.preparing}
+                            onOpenSample={(projectId, pageId, event) => {
+                              const item = contents[projectId]?.pages.find(
+                                (entry) => entry.id === pageId,
+                              );
+                              openTargetClick(
+                                item
+                                  ? pageTarget(item, projectId)
+                                  : {
+                                      kind: "page",
+                                      projectId,
+                                      id: pageId,
+                                      title: tc("untitled"),
+                                      pinned: false,
+                                      parentId: null,
+                                    },
+                                event,
+                              );
+                            }}
+                            onOpenAgentSettings={() => {
+                              setSettingsSection("agent");
+                              void navigate("settings").catch(report);
+                            }}
+                            onOpenPluginSettings={() => {
+                              setSettingsSection("plugins");
+                              void navigate("settings").catch(report);
+                            }}
+                            onCreateProject={() =>
+                              setDialog({ type: "project" })
+                            }
+                          />
+                        ) : undefined
+                      }
                     />
                   )}
                   {view === "project" && (

@@ -20,7 +20,6 @@ import {
 import type {
   AgentConversation,
   AgentConversationSummary,
-  AgentHostStatus,
   AgentTarget,
   AgentTurn,
 } from "../../agent-host/types";
@@ -51,19 +50,23 @@ import {
 } from "../../surface/reference-availability";
 import { AgentMarkdown } from "./AgentMarkdown";
 import {
+  AgentNextSteps,
+  AgentStatusRow,
+  agentErrorKind,
+  localAgentNames,
+  useAgentStatus,
+} from "../AgentReadiness";
+import onboardingStrings from "../../i18n/messages/onboarding";
+import {
   referenceRequest,
   referencePicked,
   referenceDisplay,
   type CanvasReference,
 } from "../../surface/agent-reference";
 
-const agentNames: Record<string, string> = {
-  codex: "Codex",
-  claude: "Claude Code",
-  kimi: "Kimi",
-  gemini: "Gemini CLI",
-  opencode: "OpenCode",
-};
+const agentNames = localAgentNames;
+/** Starting points for an empty page; a chip fills the input for review. */
+const pageStarters = ["fromTitle", "calculator", "compare"] as const;
 const widthPreference = "showai:assistant-width";
 const quickActions = [
   "polish",
@@ -99,6 +102,7 @@ function TurnView({
   onUndo,
   onPermission,
   onFile,
+  setup,
 }: {
   turn: AgentTurn;
   latest: boolean;
@@ -107,6 +111,7 @@ function TurnView({
   onUndo: () => void;
   onPermission: (id: string, option: string | null) => void;
   onFile: (path: string) => void;
+  setup: SetupActions;
 }) {
   const t = useTranslator(strings);
   const groups: {
@@ -208,9 +213,12 @@ function TurnView({
           </p>
         )}
         {turn.error && turn.state !== "running" && (
-          <p className="assistant-error" role="alert">
-            {turn.error}
-          </p>
+          <>
+            <p className="assistant-error" role="alert">
+              {turn.error}
+            </p>
+            {latest && <SetupSteps message={turn.error} setup={setup} />}
+          </>
         )}
         {turn.state !== "running" && pageChanged && turn.pageId && (
           <div className="assistant-result">
@@ -243,6 +251,30 @@ function TurnView({
       </div>
     </article>
   );
+}
+
+interface SetupActions {
+  checking: boolean;
+  onOpenSettings: () => void;
+  onRecheck: () => void;
+}
+/** Next steps under an Agent setup error (missing agent, sign-in, API key, SDK). */
+function SetupSteps({
+  message,
+  setup,
+}: {
+  message: string;
+  setup: SetupActions;
+}) {
+  const kind = agentErrorKind(message);
+  return kind ? (
+    <AgentNextSteps
+      kind={kind}
+      checking={setup.checking}
+      onOpenSettings={setup.onOpenSettings}
+      onRecheck={setup.onRecheck}
+    />
+  ) : null;
 }
 
 /** Floating request box opened from selection, block, board and page menus. */
@@ -441,7 +473,7 @@ export default function AssistantWorkbench({
   const sending = useRef(new Set<string>());
   const busy = sendingKeys.includes(composerKey);
   const [error, setError] = useState("");
-  const [status, setStatus] = useState<AgentHostStatus | null>(null);
+  const to = useTranslator(onboardingStrings);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [executionRevision, setExecutionRevision] = useState(0);
   const executionGeneration = useRef(0);
@@ -464,6 +496,7 @@ export default function AssistantWorkbench({
     return Number.isFinite(value) && value >= 300 ? Math.min(value, 640) : 380;
   });
   const list = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLTextAreaElement>(null);
   const project = useRef(projectId);
   project.current = projectId;
   useEffect(() => {
@@ -584,21 +617,18 @@ export default function AssistantWorkbench({
       stopped = true;
     };
   }, [projectId, open, loadSummaries, select, executionRevision]);
-  useEffect(() => {
-    if (!open && !composer) return;
-    let stopped = false;
-    void desktop
-      .invoke<AgentHostStatus>("agent:status", { projectId })
-      .then((value) => {
-        if (!stopped) setStatus(value);
-      })
-      .catch(() => {
-        if (!stopped) setStatus(null);
-      });
-    return () => {
-      stopped = true;
-    };
-  }, [open, !!composer, projectId, executionRevision]);
+  // Re-read when the panel reappears, e.g. after changing Agent settings.
+  const agent = useAgentStatus(
+    (open && enabled) || !!composer,
+    projectId,
+    executionRevision,
+  );
+  const status = agent.status;
+  const setup = {
+    checking: agent.checking,
+    onOpenSettings,
+    onRecheck: () => void agent.recheck(),
+  };
 
   const running = conversation?.turns.find((turn) => turn.state === "running");
   useEffect(() => {
@@ -972,7 +1002,38 @@ export default function AssistantWorkbench({
             {!projectId ? (
               <p className="assistant-empty">{t("panel.noProject")}</p>
             ) : fresh || !turns.length ? (
-              <p className="assistant-empty">{t("panel.empty")}</p>
+              <div className="assistant-start">
+                <AgentStatusRow
+                  status={status}
+                  error={agent.error}
+                  checking={agent.checking}
+                  onOpenSettings={onOpenSettings}
+                  onRecheck={setup.onRecheck}
+                />
+                {pageId && (
+                  <div
+                    className="assistant-starters"
+                    role="group"
+                    aria-label={to("chips.label")}
+                  >
+                    <span>{to("chips.label")}</span>
+                    {pageStarters.map((key) => (
+                      <button
+                        type="button"
+                        key={key}
+                        className="assistant-chip"
+                        onClick={() => {
+                          setDraft(to(`chips.${key}`));
+                          input.current?.focus();
+                        }}
+                      >
+                        <span>{to(`chips.${key}`)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <p className="assistant-empty">{t("panel.empty")}</p>
+              </div>
             ) : (
               turns.map((turn, index) => (
                 <TurnView
@@ -1006,6 +1067,7 @@ export default function AssistantWorkbench({
                       }),
                     ),
                   )}
+                  setup={setup}
                   onPermission={(id, option) =>
                     act(() =>
                       desktop.invoke("agent:permission", {
@@ -1075,6 +1137,7 @@ export default function AssistantWorkbench({
                 </button>
               )}
               <textarea
+                ref={input}
                 rows={3}
                 value={draft}
                 disabled={!projectId || !pageId}
@@ -1123,9 +1186,12 @@ export default function AssistantWorkbench({
               </button>
             </footer>
             {(error || messageDraft.persistenceError) && !composer && (
-              <p className="assistant-error" role="alert">
-                {error || messageDraft.persistenceError}
-              </p>
+              <>
+                <p className="assistant-error" role="alert">
+                  {error || messageDraft.persistenceError}
+                </p>
+                {error && <SetupSteps message={error} setup={setup} />}
+              </>
             )}
           </form>
         </aside>

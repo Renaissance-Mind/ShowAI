@@ -16,7 +16,9 @@ Archify、Diagram Design 和 Fireworks 技术图带有固定上游提交的完�
 
 `readData(props)` 的参数就是组件收到的 `data`，即页面引用 `data.props` 中的实例数据。读取结果把返回值作为 computed.data 与原始 props 分开提供，因此只需返回派生值，用稳定 ID 对应源数据，不必复制原始字段；返回值只能包含有限的 JSON 值。用 page_read 的 structured 视图读取 computed.data 时不要传 rendered:false；含 readData 的组件会自动渲染。
 
-先复用 `showai:components` 的基础元素与已提供控件，包括 Flowchart、Video、Audio、PDF 和 References。RichText 是统一富文本组件，App 正文、组件插入与 AI 写入复用同一模型、渲染和组件自带菜单；数据首选 format=richtext 与 doc 内容树，旧 Markdown/Text 导出名和字符串输入保留兼容。文字设置、选中、悬停与表格操作在富文本组件内部定义，宿主提供项目资源与内容保存。组件自带行内与行间 LaTeX 渲染；不要为公式另写渲染器。文件组件在自定义组件沙箱中使用对应 MIME 的 base64 data URI，在线地址只能用于工作台中的原生内置组件；沙箱保持禁止外部请求。自定义子组件通过 `showai:component/ID` 导入，并在 manifest.dependencies 声明目录返回的完整版本和指纹。允许 React、ShowAI SDK 与包内模块；任意 npm 包和远端脚本不是组件导入接口。需要新的外部库时，将依赖接入 ShowAI 软件运行时并完成离线验收，再向组件暴露明确能力。
+先复用 `showai:components` 的基础元素与已提供控件，包括 Flowchart、Video、Audio、PDF 和 References。RichText 是统一富文本组件，App 正文、组件插入与 AI 写入复用同一模型、渲染和组件自带菜单；数据首选 format=richtext 与 doc 内容树，旧 Markdown/Text 导出名和字符串输入保留兼容。文字设置、选中、悬停与表格操作在富文本组件内部定义，宿主提供项目资源与内容保存。组件自带行内与行间 LaTeX 渲染；不要为公式另写渲染器。文件组件在自定义组件沙箱中使用对应 MIME 的 base64 data URI，在线地址只能用于工作台中的原生内置组件；沙箱保持禁止外部请求。本机的大文件见下方「本机文件」。自定义子组件通过 `showai:component/ID` 导入，并在 manifest.dependencies 声明目录返回的完整版本和指纹。允许 React、ShowAI SDK 与包内模块；任意 npm 包和远端脚本不是组件导入接口。需要新的外部库时，将依赖接入 ShowAI 软件运行时并完成离线验收，再向组件暴露明确能力。
+
+**本机文件。** 视频原片等本机大文件不必内嵌，也不受上面的资源预算限制：在组件里放一个普通链接，`href` 写 `file:///绝对路径`，或写 `file:~/相对个人目录的路径`（如 `href="file:~/Movies/clip.mp4"`）。路径各段用 `encodeURIComponent` 编码后再用 `/` 连接并拼到 `file:` 后面，这样空格、中文、`#`、`?` 都能保留。这个能力只属于自定义组件里的链接；内置 Video/Audio 组件的 src 和正文里的链接不接受 `file:`。读者在 ShowAI 桌面版或本机浏览器版（编辑和只读阅读都可以）点击这个链接后，工作台弹出播放器直接打开原文件：支持视频（mp4、m4v、mov、webm）、音频（mp3、m4a、aac、wav、ogg、flac）和图片（png、jpg、gif、webp）；其他类型显示位置，并提供「在文件夹中显示」。组件本身拿不到文件内容，沙箱策略不变。只有 `<a href>` 链接的点击会被宿主接收：不要用 `window.open`、`location` 或按钮脚本代替；不要阻止链接点击的冒泡或默认行为（链接上及其外层处理链接点击时都不要调用 `stopPropagation`、`preventDefault`）；卡片自身的点击处理可先用 `event.target.closest("a")` 判断并跳过链接，与链接无关的点击不受影响。导出的 HTML 不能播放本机文件，点击只显示并可复制文件位置（位置里含本机用户名等信息，分享前留意）；对话内预览中点击没有效果。需要随页面分发的视频改用内置 Video 组件（data URI 嵌入，受页面资源预算，并会使对话预览超限）或在线地址。
 
 ## 菜单与交互入口
 

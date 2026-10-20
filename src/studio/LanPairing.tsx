@@ -252,7 +252,14 @@ export function MacPairingPrompt() {
             );
         })
         .catch((reason) => {
-          if (!stopped) console.error("Pairing status:", reason);
+          if (stopped) return;
+          // Hosts without nearby pairing, such as the website workbench, answer UNAVAILABLE.
+          if (errorCode(reason) === "UNAVAILABLE") {
+            stopped = true;
+            clearInterval(timer);
+            return;
+          }
+          console.error("Pairing status:", reason);
         })
         .finally(() => {
           pending = false;

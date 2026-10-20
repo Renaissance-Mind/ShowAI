@@ -1,3 +1,4 @@
+import { isTextPointerTarget } from "./text-selection";
 import {
   drawingBounds,
   geometryFrame,
@@ -411,6 +412,16 @@ export function SurfaceObject({
       tabIndex={-1}
       onPointerDown={(event) => {
         if (event.defaultPrevented) return;
+        if (
+          isTextPointerTarget(
+            event.target as Element,
+            event.clientX,
+            event.clientY,
+          )
+        ) {
+          actions.select(null);
+          return;
+        }
         if (event.pointerType === "pen" && isBoardShape(drawingNode)) return;
         if (
           (event.target as Element).closest("[data-surface-id]") ===

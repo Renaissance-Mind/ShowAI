@@ -1,34 +1,32 @@
-# 在 Codex 中使用 ShowAI
+# 在 Claude Code 与 Codex 中使用 ShowAI
 
 **语言：** [English](../codex.md) | 简体中文 · [文档目录](index.zh-CN.md)
 
-ShowAI 插件提供八个 Skill 和本机 MCP 启动入口。Agent 通过 MCP 创建、读取、修改和展示内容；正式页面保存到所选 ShowAI 项目。ShowAI 软件提供存储、阅读器与组件编译能力，**需要与插件分别安装**。
+连接 ShowAI 后，Claude Code 与 Codex 可以用界面而不是一段文字来回答，把它保存为 ShowAI 项目中的页面，之后还能在你的修改上继续。插件为 Agent 提供 ShowAI 的工具和八个 Skill；ShowAI App 负责保存页面，并提供插件连接的运行时。**先安装 App，插件随 App 提供。**
 
-## 安装与连接
+## 从 App 安装插件
 
-桌面 App 用户打开 **设置 → 插件 → 安装 ShowAI 插件**，点击 Codex 旁的「安装插件」。同一面板也支持 Claude Code。先安装目标宿主，并确保其插件管理命令可用；macOS 还会检查常见 Codex App 安装位置中的内置 CLI。
+需要 ShowAI 桌面 App（见[快速上手](quick-start.zh-CN.md#1-安装-showai)），以及已安装并登录的 Claude Code 或 Codex。
 
-App 提供插件文件和运行时，无需下载 ShowAI 源码或单独安装 Node.js。安装后会核验文件与启用状态。插件连接当前内容库；切换内容库或移动 App 后，点击「更新并启用」，再刷新或重启宿主以加载新工具。如果已有其他来源的 ShowAI 插件，请先在宿主中停用原插件，再安装 App 版本。
+1. 在 ShowAI 中打开插件面板：首次启动时的欢迎页，或随时打开「设置 → 插件」。
+2. 在 Claude Code 或 Codex 旁点「安装插件」，等待显示「已安装并启用」。
+3. Claude Code 重启会话；Codex 刷新插件或重启 Codex。然后新开一个对话。
 
-从源码安装时，本机需要 **Node.js 22.12+**、Codex 和支持 `showai-mcp-v1` 的 ShowAI 运行时。ShowAI 启动或 `runtime register` 会在目标内容库中登记 `agent-runtime.json`。
+ShowAI 通过 Agent 自己的插件命令安装，因此需要 Agent 的命令行工具可用；macOS 还会检查常见 Codex App 安装位置中的内置 CLI。App 提供插件文件和可执行的运行时，无需 ShowAI 源码，也无需单独安装 Node.js。安装后，ShowAI 会核验安装文件与启用状态。
 
-在源码仓库中首次安装：
+插件连接 App 当前的内容库。切换内容库或移动 App 后，点「更新并启用」。如果已经启用了其他来源的 ShowAI 插件，先在 Agent 中停用它，再点「重新检测」。
 
-```sh
-npm run plugin:install
-```
+## 确认连接
 
-拉取新代码后刷新已安装的插件：
+安装插件、重新加载 Agent、对话取得新工具是三个分开的环节；已经打开的对话仍使用旧的工具列表。在新对话中请求一个界面：
 
-```sh
-npm run plugin:update
-```
+> 用 ShowAI 帮我做一个房贷计算器：房价、首付比例、利率和贷款年限可以调整，显示月供和总利息。
 
-安装器使用官方 Codex 插件命令，并核验版本、启用状态和文件指纹；加 `-- --json` 可输出机器可读的结果。
+Agent 应当调用 ShowAI 工具、保存页面并展示出来。「设置 → 插件」也会显示每个 Agent 是否已经调用过 ShowAI（「等待第一次调用」/「已收到第一次调用」），并提供一条更短、可以复制的测试提示词。如果它只用文字回答，见 [Agent 找不到 ShowAI 时](quick-start.zh-CN.md#agent-找不到-showai-时)。
 
-安装完成后，通过宿主支持的方式刷新能力，再新建 Codex 会话，**确认 ShowAI MCP 工具可见**，先调用 `guide()`，再调用 `showai_capabilities` 和 `project_context`。已打开的会话不会自动加载新安装的插件。
+## 选择内容库与项目
 
-### 选择内容库与项目
+从 App 安装的插件使用 App 的内容库。自行配置启动方式的 Agent 可以在 MCP 进程启动前设置：
 
 | 配置                      | 用途                                           |
 | ------------------------- | ---------------------------------------------- |
@@ -37,32 +35,48 @@ npm run plugin:update
 | `SHOWAI_TEMPLATES`        | 可选启动模板，需同时指定 SHOWAI_PROJECT_ID     |
 | `SHOWAI_PRESENTATION_DIR` | 宿主可读取的展示目录                           |
 
-配置必须在启动时明确，**运行期间不切换内容库**。旧运行时或连接失败会明确报错，不自动改用其他库或独立 HTML。
+**运行期间不切换内容库**。本机启动入口只查找所选内容库中登记的运行时；版本不兼容或连接失败会明确报错，不自动改用其他库或独立 HTML。只有远程连接时，使用已授权的 HTTP MCP 地址与项目，不读取本机配置。完整接入说明见 [Agent 接入](agent-integration.zh-CN.md)。
 
-只有远程连接时，使用已授权的 HTTP MCP 地址与项目，不读取本机配置。完整接入说明见 [Agent 接入](agent-integration.zh-CN.md)。
+## Agent 怎样处理页面
 
-## 文档工作流
+连接 ShowAI 的 Agent 都按同样的步骤工作；了解这些步骤，便于检查 Agent 做了什么。
 
-### 1. 找到内容
+1. **找到内容。** `projects_list` 或绑定的 `project_context` → `pages_list` / `library_search` → `page_read`。只读查找不会创建项目。新内容保存到你指定的项目；没有指定时，本机连接可用 `project_resolve` 根据 Agent 的工作目录定位项目。
+2. **读取相应指南。** `show-document` 按理解意图、收集材料、呈现逻辑、设计稿四个阶段完成一份页面。准备数据前，Agent 先读取组件指南和精确的参数说明。
+3. **谨慎保存。** **读取完整 Page**，保留稳定的节点 ID，携带当前 hash/revision 调用 `page_apply` 或 `page_save`。**冲突必须比较两份内容后有意识地合并**，不能刷新版本后直接覆盖。
+4. **展示已保存的页面。** `page_present` 返回完整 HTML/source 和 inline 预览。支持 MCP Apps 的 Agent 直接显示阅读器；Codex 文件式可视化使用实际返回的 `delivery.inline` 路径；其他情况下 Agent 交给你 HTML 文件。
 
-已有内容：`projects_list` 或绑定的 `project_context` → `pages_list` / `library_search` → `page_read`。
+导出是快照，源页面后续修改不会更新旧的导出文件。预览过大时，Agent 展示选定的内容块，同时保留完整页面交付。**用户明确只要独立文件时**才用 `render_document`，它不保存到项目。
 
-新正式内容：用户指定的项目优先；本机 library 连接可用 `project_resolve` 根据可信宿主工作目录定位项目。远程和项目绑定连接使用已有授权项目。
+基于 ShowAI 开发 Agent 时，先调用 `guide()`，再调用 `showai_capabilities` 和 `project_context`，确认实际连接。
 
-### 2. 修改并保存
+## 从源码安装
 
-**读取完整 Page** → 携带 hash/revision 调用 `page_apply` 或 `page_save` → 核对回执。
+开发 ShowAI 或从源码运行时使用这种方式。需要 **Node.js 22.12+** 和支持 `showai-mcp-v1` 的运行时。先启动一次构建好的 App，或运行 `npm run runtime:register`，让目标内容库登记 `agent-runtime.json`。
 
-**冲突必须比较与处理**，不刷新版本后直接覆盖。
+Codex（需要 PATH 中有 Codex CLI）：
 
-### 3. 展示结果
+```sh
+npm run plugin:install -- --json
+```
 
-保存后 `page_present` 返回完整 HTML/source 和 inline 预览。MCP Apps 由宿主显示；Codex 文件式可视化使用实际 `delivery.inline` 路径。
+拉取新代码后刷新已安装的插件：
 
-HTML 导出位置与源 Page 归属不同，源页面后续修改不会自动更新旧导出文件。
+```sh
+npm run plugin:update -- --json
+```
 
-**用户明确只要独立文件时**才用 `render_document`。普通文档任务不因连接或显示失败改为不入库交付。
+安装器使用官方 Codex 插件命令，并核验版本、启用状态和文件指纹。
 
-## CLI 的职责
+Claude Code，在仓库根目录执行：
 
-CLI 用于运行时登记、服务启动、诊断、运维与脚本，具体命令见 [脚本参考](agent-usage.zh-CN.md)。它不是 Agent 每次操作文档时的第二套决策路径。例如宿主运行 `showai mcp --home /ABSOLUTE_LIBRARY` 启动连接后，Agent 通过 MCP 调用页面工具。
+```sh
+claude plugin marketplace add ./
+claude plugin install showai@renaissance-mind
+```
+
+各个 Skill 与 DeepSeek Harness 的接入见[插件说明](../../plugins/showai/README.zh-CN.md)。
+
+## 诊断
+
+使用设置中显示的运行时启动配置，或所选内容库的 `agent-runtime.json`。CLI 用于运行时登记、服务启动、诊断、运维与脚本，具体命令见[脚本参考](agent-usage.zh-CN.md)；Agent 的文档操作通过 MCP 完成。报告问题时，分别写明插件、App 和托管 MCP 的版本。

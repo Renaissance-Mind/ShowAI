@@ -47,6 +47,7 @@ import { pageWriteCapture, type PageWrite } from "../core/page-write-capture";
 import { savePageWrites } from "../agent-host/page-undo";
 import { WorkspaceService } from "./workspace-service";
 import { registerOrganizationTools } from "./mcp-organization";
+import { recordConnections } from "./mcp-connections";
 
 const scopeSchema = z.enum([
   "builtin",
@@ -1089,14 +1090,16 @@ export async function startMcp(options: {
 }): Promise<void> {
   const service = new AgentService(options);
   await service.listPages(service.requireProject(options.projectId));
+  const transport = new StdioServerTransport(process.stdin, process.stdout, {
+    maxBufferSize: CAPACITY.authoringRequestBytes,
+  });
+  // Host plugins pinned to a project are recorded too; the built-in Agent is not a host.
+  if (process.env.SHOWAI_MCP_CLIENT !== "builtin")
+    recordConnections(transport, service.store.root);
   await createMcpServer({
     ...options,
     pageWriteDirectory: process.env.SHOWAI_AGENT_PAGE_WRITES,
-  }).connect(
-    new StdioServerTransport(process.stdin, process.stdout, {
-      maxBufferSize: CAPACITY.authoringRequestBytes,
-    }),
-  );
+  }).connect(transport);
   process.stderr.write(
     `ShowAI MCP connected to project ${options.projectId}.\n`,
   );

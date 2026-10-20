@@ -4,6 +4,7 @@ import { versionedLibrary } from "./library-runtime";
 import { ContentLibrary as GitLibrary } from "./content-library";
 import { CoreError } from "./model";
 import { safeLibraryPath, readLibraryBytes } from "./library-files";
+import { markNewLibrary } from "./onboarding";
 const entries = (path: string) =>
   readdir(path).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return [];
@@ -34,6 +35,7 @@ export async function openLibrary(home: string) {
     await readLibraryBytes(root, join(root, "local", "library-bootstrap.json"))
   ) {
     await new GitLibrary(root).initialize();
+    await markNewLibrary(root);
     return { mode: "versioned" as const, initialized: true };
   }
   if (!(await empty(root)))
@@ -49,5 +51,7 @@ export async function openLibrary(home: string) {
       throw error;
     return { mode: "legacy" as const, initialized: false };
   }
+  // The App offers sample content only to libraries it created itself.
+  await markNewLibrary(root);
   return { mode: "versioned" as const, initialized: true };
 }
