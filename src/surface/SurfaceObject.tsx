@@ -411,7 +411,9 @@ export function SurfaceObject({
       aria-label={name}
       tabIndex={-1}
       onPointerDown={(event) => {
-        if (event.defaultPrevented) return;
+        // A secondary click keeps a multi-selection for its context menu,
+        // which selects an unselected object itself.
+        if (event.defaultPrevented || event.button !== 0) return;
         if (
           isTextPointerTarget(
             event.target as Element,
