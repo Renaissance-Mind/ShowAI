@@ -36,11 +36,12 @@ interface WorkspaceSnapshot {
   revision: number;
 }
 
-/** Views are bounded separately from documents; hidden pages keep their own save queue. */
+/** Open tabs retain their live views; only navigation history is evictable. */
 export class PageSessions {
   home?: string;
   private pages = new Map<string, PageSession>();
   private viewStates = new Map<string, PageViewSession>();
+  private tabViews = new Map<string, string>();
   private listeners = new Set<() => void>();
   private savedListeners = new Set<
     (projectId: string, record: LoadedPage) => void
@@ -114,6 +115,7 @@ export class PageSessions {
     for (const session of new Set(this.pages.values())) session.dispose();
     this.pages.clear();
     this.viewStates.clear();
+    this.tabViews.clear();
     this.stale.clear();
     this.changedComponents.clear();
     clearTimeout(this.refreshTimer);
@@ -151,6 +153,7 @@ export class PageSessions {
         };
     this.viewStates.delete(key);
     this.viewStates.set(key, view);
+    this.tabViews.set(tabId, key);
     // Recency belongs to the cache map, not DOM order. Moving a retained iframe
     // within its parent recreates its browsing context even when React keeps the node.
     const views = this.snapshot.views.some((item) => item.key === key)
@@ -165,7 +168,8 @@ export class PageSessions {
     ) {
       const oldest = [...this.viewStates.keys()].find(
         (candidate) =>
-          candidate !== key && views.some((view) => view.key === candidate),
+          ![...this.tabViews.values()].includes(candidate) &&
+          views.some((view) => view.key === candidate),
       );
       const index = views.findIndex((item) => item.key === oldest);
       if (index < 0) break;
@@ -283,11 +287,17 @@ export class PageSessions {
     this.stale.delete(session);
     this.changedComponents.delete(session);
     for (const [viewKey, view] of this.viewStates)
-      if (view.session === session) this.viewStates.delete(viewKey);
+      if (view.session === session) {
+        this.viewStates.delete(viewKey);
+        if (this.tabViews.get(view.tabId) === viewKey)
+          this.tabViews.delete(view.tabId);
+      }
     session.dispose();
     this.publish({
       views: this.snapshot.views.filter((view) => view.session !== session),
-      ...(this.snapshot.active === session ? { active: null, activeView: null } : {}),
+      ...(this.snapshot.active === session
+        ? { active: null, activeView: null }
+        : {}),
     });
   }
   async flushAll() {
@@ -357,6 +367,7 @@ export class PageSessions {
     });
     for (const [key, view] of this.viewStates)
       if (view.tabId === tabId) this.viewStates.delete(key);
+    this.tabViews.delete(tabId);
     return true;
   }
   isDirty() {
@@ -373,6 +384,7 @@ export class PageSessions {
     for (const session of new Set(this.pages.values())) session.dispose();
     this.pages.clear();
     this.viewStates.clear();
+    this.tabViews.clear();
     this.listeners.clear();
   }
 }

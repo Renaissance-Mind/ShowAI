@@ -31,6 +31,7 @@ export interface WorkspaceTab {
   id: string;
   entries: WorkspaceEntry[];
   cursor: number;
+  assistantOpen?: boolean;
 }
 
 export interface WorkspaceTabsState {
@@ -51,6 +52,19 @@ export function createWorkspace(entry = recentEntry()): WorkspaceTabsState {
 
 export function currentEntry(tab: WorkspaceTab) {
   return tab.entries[tab.cursor];
+}
+
+export function setWorkspaceAssistantOpen(
+  state: WorkspaceTabsState,
+  tabId: string,
+  open: boolean,
+): WorkspaceTabsState {
+  return {
+    ...state,
+    tabs: state.tabs.map((tab) =>
+      tab.id === tabId ? { ...tab, assistantOpen: open } : tab,
+    ),
+  };
 }
 
 export function sameLocation(a: WorkspaceLocation, b: WorkspaceLocation) {
@@ -153,6 +167,8 @@ export function parseWorkspaceTabs(
       !tab.entries.length ||
       tab.entries.length > 50 ||
       !Number.isInteger(tab.cursor) ||
+      (tab.assistantOpen !== undefined &&
+        typeof tab.assistantOpen !== "boolean") ||
       tab.cursor < 0 ||
       tab.cursor >= tab.entries.length
     )

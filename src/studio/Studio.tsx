@@ -487,13 +487,6 @@ export default function Studio() {
   const [problem, setProblem] = useState("");
   const [busy, setBusy] = useState(false);
   const [revealNode, setRevealNode] = useState<string | null>(null);
-  const [assistantOpen, setAssistantOpen] = useState(
-    () => localStorage.getItem("showai:assistant-open") === "true",
-  );
-  const changeAssistantOpen = useCallback((open: boolean) => {
-    setAssistantOpen(open);
-    localStorage.setItem("showai:assistant-open", String(open));
-  }, []);
   const [editorControls, setEditorControls] = useState<EditorControls | null>(
     null,
   );
@@ -917,7 +910,7 @@ export default function Studio() {
         setExpandedProjects((current) => ({ ...current, [projectId]: true }));
         const loaded = await loadProjectContents(projectId);
         if (pageId) {
-          if (await page.open(projectId, pageId)) {
+          if (await page.open(projectId, pageId, workspace.activeId)) {
             setView("page");
             void loadCatalog().catch(report);
             // A reference link opens here; show what it points at.
@@ -2550,6 +2543,9 @@ export default function Studio() {
       return true;
     },
   });
+  const assistantOpen = workspace.assistantOpen;
+  const changeAssistantOpen = (open: boolean) =>
+    workspace.setAssistantOpen(open, workspace.activeId);
   // A new App opens on the first-run page of its documentation, once per window,
   // while the library has no pages of its own; restored sessions and page links win.
   const launchedWelcome = useRef(false);

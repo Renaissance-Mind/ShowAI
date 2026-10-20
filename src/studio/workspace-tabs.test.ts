@@ -6,6 +6,7 @@ import {
   currentEntry,
   parseWorkspaceTabs,
   recentEntry,
+  setWorkspaceAssistantOpen,
   visitWorkspace,
   type WorkspaceEntry,
 } from "./workspace-tabs";
@@ -20,6 +21,31 @@ const page = (id: string, projectId = "project-a"): WorkspaceEntry => ({
 });
 
 describe("workspace tabs", () => {
+  it("keeps the Agent panel open state per tab and restores it with the window session", () => {
+    const initial = createWorkspace(page("page-a"));
+    const opened = setWorkspaceAssistantOpen(initial, initial.activeId, true);
+    const other = addWorkspaceTab(opened, page("page-a"));
+    expect(other.tabs[0].assistantOpen).toBe(true);
+    expect(other.tabs[1].assistantOpen).toBeUndefined();
+    const closed = setWorkspaceAssistantOpen(other, other.activeId, false);
+    expect(closed.tabs[0].assistantOpen).toBe(true);
+    expect(closed.tabs[1].assistantOpen).toBe(false);
+    // An in-flight turn can finish after the user switches tabs.
+    const completed = setWorkspaceAssistantOpen(closed, initial.activeId, true);
+    expect(completed.tabs[1].assistantOpen).toBe(false);
+    expect(
+      parseWorkspaceTabs(JSON.stringify({ version: 1, ...completed })),
+    ).toEqual(completed);
+    expect(
+      parseWorkspaceTabs(
+        JSON.stringify({
+          version: 1,
+          ...completed,
+          tabs: [{ ...completed.tabs[0], assistantOpen: "true" }],
+        }),
+      ),
+    ).toBeUndefined();
+  });
   it("opens a target in the background while preserving the current tab and its forward history", () => {
     const visited = visitWorkspace(
       visitWorkspace(createWorkspace(), page("page-a")),

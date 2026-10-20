@@ -299,7 +299,7 @@ describe("workspace sessions against the real loopback workbench", () => {
     );
     expect(view.getSnapshot().status).toBe("saved");
   });
-  it("switches cached views without rereading pages and bounds resident views", async () => {
+  it("keeps every open tab resident, including duplicate pages beyond the history budget", async () => {
     await warm();
     calls.length = 0;
     await sessions.open(project, second.document.id, "b");
@@ -334,15 +334,39 @@ describe("workspace sessions against the real loopback workbench", () => {
     await sessions.open(project, second.document.id, "e");
     await sessions.open(project, second.document.id, "f");
     await sessions.open(project, second.document.id, "g");
-    expect(sessions.getSnapshot().views).toHaveLength(4);
+    expect(sessions.getSnapshot().views).toHaveLength(6);
     expect(
       sessions.getSnapshot().views.some((view) => view.tabId === "a"),
-    ).toBe(false);
+    ).toBe(true);
     await sessions.open(project, first.document.id, "a");
     expect(
       sessions.getSnapshot().views.find((view) => view.tabId === "a")!.surface
         .history!.past,
     ).toHaveLength(1);
+  });
+  it("evicts navigation history before a tab's current page, even over the byte budget", async () => {
+    await sessions.shutdown();
+    sessions = new PageSessions({
+      clientId: "bounded-history",
+      invoke,
+      maximumViews: 1,
+      maximumViewBytes: 1,
+    });
+    sessions.setHome(home);
+    await sessions.open(project, first.document.id, "a");
+    const firstView = sessions.getSnapshot().views[0];
+    await sessions.open(project, second.document.id, "b");
+    expect(sessions.getSnapshot().views).toHaveLength(2);
+    expect(sessions.getSnapshot().views[0]).toBe(firstView);
+    await sessions.open(project, second.document.id, "a");
+    expect(sessions.getSnapshot().views.map((view) => view.tabId)).toEqual([
+      "b",
+      "a",
+    ]);
+    expect(await sessions.closeTab("b")).toBe(true);
+    expect(sessions.getSnapshot().views.map((view) => view.tabId)).toEqual([
+      "a",
+    ]);
   });
   it("retains locally and switches while the actual database writer is busy", async () => {
     const a = await warm();

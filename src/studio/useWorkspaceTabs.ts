@@ -6,6 +6,7 @@ import {
   currentEntry,
   parseWorkspaceTabs,
   sameLocation,
+  setWorkspaceAssistantOpen,
   visitWorkspace,
   type WorkspaceEntry,
   type WorkspaceTabsState,
@@ -182,6 +183,9 @@ export function useWorkspaceTabs({
     close,
     step,
     rememberScroll,
+    assistantOpen: active.assistantOpen ?? false,
+    setAssistantOpen: (open: boolean, tabId = current.current.activeId) =>
+      publish(setWorkspaceAssistantOpen(current.current, tabId, open)),
     launchState: () => launch.current,
     canBack: active.cursor > 0,
     canForward: active.cursor < active.entries.length - 1,
