@@ -102,7 +102,11 @@ export function shapeIntersectsPolygon(node, frame, polygon, tolerance = 0) {
 export function drawingBounds(node) {
   if (node.type !== "drawing") return null;
   if (isPortableInk(node.attrs.ink))
-    return portableInkBounds(node.attrs.ink, node.attrs.strokeWidth);
+    return portableInkBounds(
+      node.attrs.ink,
+      node.attrs.strokeWidth,
+      node.attrs.pressure,
+    );
   if (node.attrs.ink)
     return {
       x: 0,
@@ -328,6 +332,7 @@ export function shapeHit(node, frame, point) {
         y: (p.y * node.attrs.extent[1]) / height,
       },
       node.attrs.strokeWidth,
+      node.attrs.pressure,
     );
     return {
       ...result,

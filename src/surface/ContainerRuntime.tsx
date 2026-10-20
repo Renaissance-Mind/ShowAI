@@ -1,3 +1,4 @@
+import {isEditableDrawing} from "./portable-ink.mjs";
 import { TextSelectionScope } from "./TextSelectionScope";
 import { SurfaceGeometryStore } from "./geometry-store";
 import { readingCapture } from "./reading-capture";
@@ -1368,9 +1369,7 @@ function ContainerView({
           drawPressure={style.pressure !== false}
           onStyleChange={(ids, patch) => {
             const drawings = ids.filter(
-              (nodeId) =>
-                findSurfaceNode(runtime.current.current, nodeId)?.node.type ===
-                "drawing",
+              (nodeId) => isEditableDrawing(findSurfaceNode(runtime.current.current,nodeId)?.node),
             );
             // A current selection takes precedence over the active drawing tool.
             if (!drawings.length) {

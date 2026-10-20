@@ -1,3 +1,4 @@
+import { isEditableDrawing } from "./portable-ink.mjs";
 import type { JSONContent } from "@tiptap/core";
 import { useState } from "react";
 import type { BoardTool, DrawingStyle } from "./types";
@@ -127,9 +128,7 @@ export function BoardStyleControls({
   onChange: (patch: Partial<DrawingStyle>) => void;
 }) {
   const t = useTranslator(messages);
-  const drawings = nodes.filter(
-    (node) => node.type === "drawing" && !node.attrs?.ink,
-  );
+  const drawings = nodes.filter(isEditableDrawing);
   if (!drawings.length && nodes.some((node) => node.attrs?.ink))
     return <span className="board-style-controls">{t("style.inkNotice")}</span>;
   if (!drawings.length && (!tool || ["region", "pan", "lasso"].includes(tool)))

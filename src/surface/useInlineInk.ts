@@ -307,13 +307,14 @@ export function useInlineInk({
       try {
         if (surface.dataset.nativeInkToken !== token)
           surface.dataset.nativeInkToken = token;
-        await bridge.frame({
+        const accepted = await bridge.frame({
           ...packet,
           ...(lastPoses !== poses ? { poses } : {}),
           ...(lastDocument !== documentValue
             ? { document: documentValue }
             : {}),
         });
+        if (accepted === false) return;
         lastKey = key;
         lastDocument = documentValue;
         lastPoses = poses;

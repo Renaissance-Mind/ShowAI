@@ -1,5 +1,33 @@
 /** Portable brush v1. This module has no DOM, platform or storage dependencies. */
 export const PORTABLE_INK_FORMAT = "showai-ink-v1";
+export const isEditableDrawing = (node) =>
+  node?.type === "drawing" &&
+  (!node.attrs?.ink || isPortableInk(node.attrs.ink));
+export function portableInkSamples(
+  ink,
+  width = ink.width,
+  pressure = ink.brush !== "monoline",
+) {
+  return ink.samples.map((p) => {
+    const q = [...p],
+      nib = pressure
+        ? ink.brush === "monoline"
+          ? ink.width * (0.2 + 0.8 * Math.min(1, p[6]))
+          : p[3]
+        : ink.width;
+    q[3] = (nib * width) / ink.width;
+    q[4] = (nib * (p[3] > 0 ? p[4] / p[3] : 1) * width) / ink.width;
+    return q;
+  });
+}
+export function portableNodeSamples(node) {
+  return portableInkSamples(
+    node.attrs.ink,
+    node.attrs.strokeWidth,
+    node.attrs.pressure ?? node.attrs.ink.brush !== "monoline",
+  );
+}
+
 export function inkFramePose(frame, extent) {
   const a = ((frame.rotation ?? 0) * Math.PI) / 180,
     c = Math.cos(a),
@@ -71,7 +99,7 @@ export function createPortableInk(
     samples: points.map((p, i) => {
       const size =
         width *
-        (pressure && p.pressure !== undefined
+        (p.pressure !== undefined
           ? 0.2 + 0.8 * Math.max(0, Math.min(1, p.pressure))
           : 1);
       return [
@@ -215,13 +243,17 @@ const map = (m, p) => ({
   x: m[0] * p.x + m[2] * p.y + m[4],
   y: m[1] * p.x + m[3] * p.y + m[5],
 });
-export function portableInkBounds(ink, strokeWidth = ink.width) {
+export function portableInkBounds(
+  ink,
+  strokeWidth = ink.width,
+  pressure = ink.brush !== "monoline",
+) {
   let left = Infinity,
     top = Infinity,
     right = -Infinity,
     bottom = -Infinity;
-  for (const sample of ink.samples)
-    for (const point of ellipse(sample, strokeWidth / ink.width)) {
+  for (const sample of portableInkSamples(ink, strokeWidth, pressure))
+    for (const point of ellipse(sample, 1)) {
       const p = map(ink.transform, point);
       left = Math.min(left, p.x);
       top = Math.min(top, p.y);
@@ -262,17 +294,23 @@ function support(p, width, nx, ny) {
   return { x: ex * c - ey * s, y: ex * s + ey * c };
 }
 /** One filled contour prevents translucent marker segments darkening at joins. */
-export function portableInkGeometry(ink, strokeWidth = ink.width) {
+export function portableInkGeometry(
+  ink,
+  strokeWidth = ink.width,
+  pressure = ink.brush !== "monoline",
+) {
   let widths = caches.get(ink);
   if (!widths) caches.set(ink, (widths = new Map()));
-  if (widths.has(strokeWidth)) return widths.get(strokeWidth);
-  const width = strokeWidth / ink.width,
-    polygons = [];
-  for (let i = 0; i < ink.samples.length; i++) {
-    const p = ink.samples[i];
+  const key = strokeWidth + ":" + pressure;
+  if (widths.has(key)) return widths.get(key);
+  const width = 1,
+    polygons = [],
+    samples = portableInkSamples(ink, strokeWidth, pressure);
+  for (let i = 0; i < samples.length; i++) {
+    const p = samples[i];
     polygons.push(ellipse(p, width));
     if (!i) continue;
-    const q = ink.samples[i - 1],
+    const q = samples[i - 1],
       dx = p[0] - q[0],
       dy = p[1] - q[1],
       l = Math.hypot(dx, dy);
@@ -301,7 +339,7 @@ export function portableInkGeometry(ink, strokeWidth = ink.width) {
   };
   // Do not accumulate every width visited by a slider.
   widths.clear();
-  widths.set(strokeWidth, result);
+  widths.set(key, result);
   return result;
 }
 function contains(poly, p) {
@@ -377,7 +415,12 @@ function maskContains(contours, p) {
     }
   return winding !== 0;
 }
-export function portableInkHit(ink, point, strokeWidth = ink.width) {
+export function portableInkHit(
+  ink,
+  point,
+  strokeWidth = ink.width,
+  pressure = ink.brush !== "monoline",
+) {
   if (ink.mask !== undefined && !maskContains(maskContours(ink), point))
     return {
       inside: false,
@@ -387,7 +430,7 @@ export function portableInkHit(ink, point, strokeWidth = ink.width) {
     };
   let distance = Infinity,
     inside = false;
-  for (const poly of portableInkGeometry(ink, strokeWidth).polygons) {
+  for (const poly of portableInkGeometry(ink, strokeWidth, pressure).polygons) {
     inside ||= contains(poly, point);
     for (let i = 0; i < poly.length; i++) {
       const a = poly[i],

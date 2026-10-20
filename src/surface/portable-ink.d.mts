@@ -14,6 +14,17 @@ export interface PortableInk {
   createdAt?: number;
 }
 export const PORTABLE_INK_FORMAT: "showai-ink-v1";
+export function isEditableDrawing(
+  node: { type?: string; attrs?: Record<string, any> } | undefined,
+): boolean;
+export function portableInkSamples(
+  ink: PortableInk,
+  width?: number,
+  pressure?: boolean,
+): number[][];
+export function portableNodeSamples(node: {
+  attrs: Record<string, any>;
+}): number[][];
 export function inkFramePose(
   frame: {
     x: number;
@@ -49,13 +60,16 @@ export function validatePortableInk(ink: unknown): PortableInk;
 export function portableInkGeometry(
   ink: PortableInk,
   strokeWidth?: number,
+  pressure?: boolean,
 ): { path: string; mask?: string; polygons: { x: number; y: number }[][] };
 export function portableInkHit(
   ink: PortableInk,
   point: { x: number; y: number },
   strokeWidth?: number,
+  pressure?: boolean,
 ): { inside: boolean; distance: number; solid: boolean; area: number };
 export function portableInkBounds(
   ink: PortableInk,
   strokeWidth?: number,
+  pressure?: boolean,
 ): { x: number; y: number; width: number; height: number };

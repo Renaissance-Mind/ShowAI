@@ -10,13 +10,15 @@ export function PortableInkPaths({
   ink,
   color,
   width,
+  pressure,
 }: {
   ink: PortableInk;
   color: string;
   width?: number;
+  pressure?: boolean;
 }) {
   const id = useId(),
-    geometry = portableInkGeometry(ink, width);
+    geometry = portableInkGeometry(ink, width, pressure);
   return (
     <>
       {geometry.mask && (

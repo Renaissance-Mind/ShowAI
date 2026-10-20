@@ -112,7 +112,12 @@ export function Drawing({
   const path =
     tool === "arrow" ? arrowPath(first, last, strokeWidth) : smoothPath(points);
   const shape = isPortableInk(node.attrs!.ink) ? (
-    <PortableInkPaths ink={node.attrs!.ink} color={color} width={strokeWidth} />
+    <PortableInkPaths
+      ink={node.attrs!.ink}
+      color={color}
+      width={strokeWidth}
+      pressure={node.attrs!.pressure}
+    />
   ) : node.attrs!.ink ? (
     <>
       <image

@@ -1,3 +1,4 @@
+import { isEditableDrawing } from "./portable-ink.mjs";
 import { LibraryContextMenu } from "../studio/LibraryNavigation";
 import type { LibraryContextMenuItem } from "../studio/LibraryNavigation";
 import type { SurfaceGeometryStore } from "./geometry-store";
@@ -2311,10 +2312,7 @@ export default function PageSurface({
                     onChange={(patch) =>
                       onStyleChange?.(
                         selectedNodes
-                          .filter(
-                            (node) =>
-                              node.type === "drawing" && !node.attrs?.ink,
-                          )
+                          .filter(isEditableDrawing)
                           .map((node) => node.attrs!.id),
                         patch,
                       )
