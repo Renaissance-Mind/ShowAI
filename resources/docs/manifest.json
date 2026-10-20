@@ -24,8 +24,7 @@
   "architecture": "428dd837-61c9-5984-b3a5-0f577b6db22a",
   "file-format": "d25297b7-5bfa-5283-ae6a-da5f8e524904",
   "component-dev": "1b6dc3fc-a168-5ede-8cd2-fb3e22566de4",
-  "cli": "c207d0b8-8aa9-5290-95a5-2a6c4484456c",
-  "performance": "703d3975-9f8d-5242-bca5-61f0223bfb8a"
+  "cli": "c207d0b8-8aa9-5290-95a5-2a6c4484456c"
  },
  "locales": {
   "zh-CN": {
@@ -141,26 +140,11 @@
       {
        "type": "page",
        "id": "c207d0b8-8aa9-5290-95a5-2a6c4484456c"
-      },
-      {
-       "type": "page",
-       "id": "703d3975-9f8d-5242-bca5-61f0223bfb8a"
       }
      ]
     }
    ],
    "pages": {
-    "703d3975-9f8d-5242-bca5-61f0223bfb8a": {
-     "title": "性能",
-     "icon": "⚡",
-     "file": "zh-CN/pages/703d3975-9f8d-5242-bca5-61f0223bfb8a.json",
-     "sha256": "772518ad923069857fe3ce1e9da2fc3d97f1dfde1f79c667fd6cf54fa735eb9a",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
     "c207d0b8-8aa9-5290-95a5-2a6c4484456c": {
      "title": "CLI 与 MCP 参考",
      "icon": "⌨️",
@@ -214,7 +198,7 @@
      "title": "服务器运维",
      "icon": "🛠️",
      "file": "zh-CN/pages/c907d80d-f305-5558-bcbf-29ffd17d0f5d.json",
-     "sha256": "93dbdcf9bfc3f774f40f7826249b6417f89f1712763af1576f58c0e885c8b81f",
+     "sha256": "026dcef63444065ad9141c8e28dd745dd2128b67f23c72dbbc13802b8237b65e",
      "components": [
       "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
       "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
@@ -419,7 +403,7 @@
      "title": "ShowAI 文档",
      "icon": "📚",
      "file": "zh-CN/pages/2e9af66b-0a83-58f6-b3f5-a480f0f6abab.json",
-     "sha256": "45303313cae066aa1950aae66a4ae3de3cd1b7e1cb9d15c98f645d425ce0925c",
+     "sha256": "4bb23ab67fde87fb6b079890e415d231a98e370ba1bdbde6636d7fc653517d5d",
      "components": [
       "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
       "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json",
@@ -542,26 +526,11 @@
       {
        "type": "page",
        "id": "c207d0b8-8aa9-5290-95a5-2a6c4484456c"
-      },
-      {
-       "type": "page",
-       "id": "703d3975-9f8d-5242-bca5-61f0223bfb8a"
       }
      ]
     }
    ],
    "pages": {
-    "703d3975-9f8d-5242-bca5-61f0223bfb8a": {
-     "title": "Performance",
-     "icon": "⚡",
-     "file": "en/pages/703d3975-9f8d-5242-bca5-61f0223bfb8a.json",
-     "sha256": "a85042e457b14579f44ed556f834e0e1bfd35d6fbdc5bbd88769982e3eff6afe",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
     "c207d0b8-8aa9-5290-95a5-2a6c4484456c": {
      "title": "CLI & MCP Reference",
      "icon": "⌨️",
@@ -615,7 +584,7 @@
      "title": "Server Operations",
      "icon": "🛠️",
      "file": "en/pages/c907d80d-f305-5558-bcbf-29ffd17d0f5d.json",
-     "sha256": "68b741e4a55349606f2ba6e9732e001e7a9bcdc7514f836674ec055916472321",
+     "sha256": "5fd2ad799b9b191a2b9e351353a6060a027484ce3a82a8b3ac6144a9c31b9a10",
      "components": [
       "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
       "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
@@ -820,7 +789,7 @@
      "title": "ShowAI Documentation",
      "icon": "📚",
      "file": "en/pages/2e9af66b-0a83-58f6-b3f5-a480f0f6abab.json",
-     "sha256": "68686d7f18b41de4a61f2da1aac09aeb8d8a1331fd720e811b98253f467a81f4",
+     "sha256": "7939cba3a6de16867d9be3110399078f9a1551f40074c55e343ed68e75bcae93",
      "components": [
       "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
       "en/components/doc-cards@1.0.0-25e52118b12f.json",
