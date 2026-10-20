@@ -231,8 +231,6 @@ export function DockableBoardToolbar({
             "--board-properties-reserve": "0px",
             "--board-toolbar-height": `${geometry.bounds.height}px`,
             "--board-toolbar-width": `${geometry.bounds.width}px`,
-            "--board-primary-width": `${geometry.size.width}px`,
-            "--board-primary-height": `${geometry.size.height}px`,
           } as CSSProperties
         }
         onPointerDownCapture={(event) => {

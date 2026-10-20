@@ -396,8 +396,8 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  width: var(--board-primary-width);
-  height: var(--board-primary-height);
+  width: 100%;
+  height: 100%;
   box-sizing: border-box;
   padding: 5px;
   border: 1px solid var(--line, var(--border));
