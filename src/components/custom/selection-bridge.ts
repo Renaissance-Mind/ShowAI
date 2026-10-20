@@ -90,6 +90,8 @@ export function installComponentSelectionBridge(
         )
       )
         return;
+      // Content that opts out of selection, such as a pannable diagram viewport, keeps its drag.
+      if (getComputedStyle(event.target).userSelect === "none") return;
       const range = document.caretRangeFromPoint(event.clientX, event.clientY);
       if (
         range?.startContainer.nodeType !== Node.TEXT_NODE ||
