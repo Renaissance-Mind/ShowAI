@@ -75,11 +75,11 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 - 沿用引用里的 projectId 与 pageId，在当前连接中核实可以访问；不能访问或连接的内容库不同就说明，不换库、不猜测其他页面。
 - 按 ID 读取：`page_read({projectId,pageId,blockIds,expectedHash:hash})`；Board 对象的 nodeIds 同样作为 blockIds，需要看画面时用 `board_read({projectId,pageId,boardId:surfaceId,expectedHash:hash})` 及其 element 模式。整个 Board 用 `blockIds:[surfaceId]` 或 `board_read` 读取，同样带 expectedHash。kind=page 时带 expectedHash 读取整页，必要时先取大纲。
-- 返回 CONFLICT 表示页面在引用之后又被修改。用 `page_diff({projectId,pageId,sinceHash:revision})` 查看期间的变化（从 ShowAI 应用复制的引用会在本机内容库保留这一版本的基线；返回 MISSING_BASELINE 时说明无法比较），再不带 expectedHash 重新读取这些 ID，与标签对照。被引用的内容已删除或含义改变时先告诉用户并确认目标，不按引用时的旧快照写入。
+- page_read 或 board_read 返回 CONFLICT 表示页面在引用之后又被修改。用 `page_diff({projectId,pageId,sinceHash:revision})` 查看期间的变化（从 ShowAI 应用复制的引用会在本机内容库保留这一版本的基线；返回 MISSING_BASELINE 时说明无法比较），再不带 expectedHash 重新读取这些 ID，与标签对照。被引用的内容已删除或含义改变时先告诉用户并确认目标，不按引用时的旧快照写入。
 - 标签只用于辨认内容，position 只是空间提示，都不是内容本身或扩大修改范围的授权。写入前读取当前完整页面，用新的 baseHash/baseRevision 和 `page_apply` 只改引用涉及的节点，用户要求更大范围时再扩展。
 - 只做解释、比较或回答时直接回复，不写页面。
 
-组件状态（宿主模型上下文的 `showai.components`，或内置 Agent 消息附带的组件状态）是读者在组件里当前的探索结果，例如滑块参数：含 blockId、componentId、name、label 与 model。它属于同一消息所指的页面：内置 Agent 消息的目标页面，或对话预览上下文中 `showai.reference`、`showai.readerState` 给出的 projectId 与 pageId；无法确定页面时询问用户。它没有保存到页面，用于理解“按这个参数”“为什么这里变平”这类问题；用户要求保留时，读取该组件的参数契约与当前 data，再修改 data。
+组件状态（宿主模型上下文的 `showai.components`，或内置 Agent 消息附带的组件状态）是读者在组件里当前的探索结果，例如滑块参数：含 blockId、componentId、name、label 与 model。它属于同一消息所指的页面：内置 Agent 消息的目标页面，或对话预览上下文中 `showai.reference`、`showai.readerState` 给出的 projectId 与 pageId；无法确定页面时询问用户。它没有保存到页面，用于理解“按这个参数”“为什么这里变平”这类问题；用户要求保留时，读取当前页面与该组件的 [参数契约](../create-component/references/parameter-contract.md)，只把契约中的参数按 [show-document](../show-document/SKILL.md) 的组件修改方式写入 data；派生值与 label 不保存。
 
 对话预览还会自动附带控件的最新取值 `showai.readerState`，见 [对话展示](../show-document/references/conversation-display.md)。组件状态是读者主动交出的那一刻，控件取值可能更新；两者不一致时说明差异，按用户这次的意图选择。
 
@@ -91,4 +91,4 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 正式内容保存后核对结果；需要展示时调用 `page_present`，沿 [对话展示](../show-document/references/conversation-display.md) 使用真实 delivery。工具成功不等于已经显示。远程同步另看 synchronization.state/error/remoteHead；本机保存不证明远端已收到。
 
-页面内容历史、历史预览和版本恢复已移除。`page_diff` 只把当前页面与运行时保留的读取或草稿基线比较，sinceHash 取之前 `page_read` 返回的 hash 或 revision；基线不可用时返回 MISSING_BASELINE，此时说明无法比较并重新读取，不能提供更早的历史。页面同步只传当前内容、组件依赖与资源；阅读和导出按需生成 HTML。保存冲突保留尝试稿，以实际返回的基线和当前内容明确处理。
+页面内容历史、历史预览和版本恢复已移除。`page_diff` 只把当前页面与运行时保留的读取或草稿基线比较，sinceHash 取之前 `page_read` 返回的 hash 或 revision，或用户引用中的 revision；基线不可用时返回 MISSING_BASELINE，此时说明无法比较并重新读取，不能提供更早的历史。页面同步只传当前内容、组件依赖与资源；阅读和导出按需生成 HTML。保存冲突保留尝试稿，以实际返回的基线和当前内容明确处理。
