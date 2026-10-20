@@ -9,6 +9,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -272,5 +273,10 @@ function main(argv) {
   );
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href)
+// Node resolves the entry's symlinks (macOS /var → /private/var), so compare real paths;
+// a mismatch would skip main() and let --check pass without checking.
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href
+)
   main(process.argv.slice(2));
