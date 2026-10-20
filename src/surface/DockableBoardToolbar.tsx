@@ -233,6 +233,10 @@ export function DockableBoardToolbar({
             "--board-toolbar-width": `${geometry.bounds.width}px`,
           } as CSSProperties
         }
+        onContextMenu={(event) => {
+          if (primary.current?.contains(event.target as Node))
+            event.preventDefault();
+        }}
         onPointerDownCapture={(event) => {
           suppressClick.current = false;
           if (

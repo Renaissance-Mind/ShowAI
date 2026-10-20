@@ -375,6 +375,9 @@
 }
 .board-toolbar-primary {
   touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
   cursor: grab;
 }
 .board-dockable-toolbar[data-dragging] .board-toolbar-primary {
@@ -475,4 +478,10 @@
     .board-toolbar-secondary .board-toolbar-actions
   ) {
   flex-direction: column;
+}
+/* Tool buttons sit inside a scroll container. Give that container and its
+   controls the drag gesture too, so WebKit cannot cancel it to start scrolling. */
+.board-toolbar-primary
+  :is(.board-tool-stack, .board-tool-buttons, button, summary) {
+  touch-action: none;
 }
