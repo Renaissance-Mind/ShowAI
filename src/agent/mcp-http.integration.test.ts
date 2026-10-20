@@ -465,7 +465,7 @@ test("anonymous clients discover and customize public resources without a projec
   expect(denied.isError).toBe(true);
   expect(denied._meta).toHaveProperty("mcp/www_authenticate");
   const resource = await anonymous.readResource({
-    uri: "ui://showai/reader-v2.html",
+    uri: "ui://showai/reader-v3.html",
   });
   expect(resource.contents[0].mimeType).toBe("text/html;profile=mcp-app");
   const malformed = await anonymous.callTool({

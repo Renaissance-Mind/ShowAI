@@ -103,7 +103,7 @@
 .rich-text-selection-toolbar.editor-bubble {
   --editor-soft: var(--accent-soft, #eeedf9);
   gap: 2px;
-  max-width: min(640px, calc(100vw - 24px));
+  max-width: min(680px, calc(100vw - 24px));
   padding: 6px;
   flex-wrap: wrap;
   overflow: visible;
@@ -143,6 +143,10 @@
   color: var(--accent, #6c805f);
   font: 500 12px/1.2 var(--font-ui, system-ui, sans-serif);
   cursor: pointer;
+}
+/* Copy reference sits beside Ask AI as a compact icon; its tooltip names the count. */
+.rich-text-selection-toolbar .editor-bubble-reference {
+  color: var(--accent, #6c805f);
 }
 .rich-text-selection-toolbar .editor-bubble-assistant:hover {
   background: color-mix(
@@ -276,6 +280,9 @@
   .rich-text-selection-toolbar .editor-bubble-assistant {
     order: 1;
     margin-left: auto;
+  }
+  .rich-text-selection-toolbar .editor-bubble-reference {
+    order: 1;
   }
   .rich-text-selection-toolbar .rich-format-color-panel {
     grid-template-columns: 1fr;

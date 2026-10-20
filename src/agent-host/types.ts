@@ -79,6 +79,16 @@ export interface AgentTarget {
   blockIds?: string[];
   text?: string;
   reference?: import("../surface/agent-reference").CanvasReference;
+  /** Exploration state components handed to this message; never saved to the page. */
+  components?: AgentComponentContext[];
+}
+/** The model-visible part of a component's onContext snapshot. */
+export interface AgentComponentContext {
+  blockId: string;
+  componentId?: string;
+  name: string;
+  label?: string;
+  model: unknown;
 }
 /** One user request and the Agent run that answered it. */
 export interface AgentTurn extends AgentTask {

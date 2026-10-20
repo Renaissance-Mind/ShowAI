@@ -604,13 +604,15 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
       const params = new URL(url).searchParams;
       const projectId = params.get("project"),
         pageId = params.get("page"),
-        folderId = params.get("folder");
+        folderId = params.get("folder"),
+        blocks = params.get("blocks");
       void createWindow(
         projectId
           ? {
               projectId,
               pageId: pageId ?? undefined,
               folderId: folderId ?? undefined,
+              blocks: blocks ?? undefined,
             }
           : undefined,
       ).catch((error) =>
@@ -672,12 +674,22 @@ async function openDeepLink(source: string): Promise<void> {
   )
     throw new CoreError(
       "INVALID_PATH",
-      "Expected showai://project/PROJECT/page/PAGE.",
+      "Expected showai://project/PROJECT/page/PAGE[?blocks=ID,ID].",
     );
   const project = assertId(parts[0]),
     page = assertId(parts[2]);
+  // A copied ShowAI reference names the blocks to highlight.
+  const blocks = (url.searchParams.get("blocks") ?? "")
+    .split(",")
+    .filter(Boolean)
+    .slice(0, 100)
+    .map(assertId);
   await store.readPage(project, page);
-  await createWindow({ projectId: project, pageId: page });
+  await createWindow({
+    projectId: project,
+    pageId: page,
+    ...(blocks.length ? { blocks: blocks.join(",") } : {}),
+  });
 }
 
 if (!app.requestSingleInstanceLock()) app.quit();

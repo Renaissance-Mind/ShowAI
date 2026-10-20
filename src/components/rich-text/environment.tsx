@@ -19,7 +19,11 @@ export const RichTextEnvironment = createContext<{
   registerComponent: (component: CompiledComponent) => void;
   renderWidget: (props: BlockProps & { kind: string }) => ReactNode;
   /** Present only inside an editable workbench page with an Agent available. */
-  assistant?: { open: (request: AssistantRequest) => void } | null;
+  assistant?: {
+    open: (request: AssistantRequest) => void;
+    /** Copies a reference to the request's blocks for an external Agent. */
+    reference: (request: AssistantRequest) => void;
+  } | null;
 }>({
   useCatalog: () => ({
     items: [],

@@ -9,6 +9,21 @@ export default defineMessages("assistant", {
     "reference.region": "参考区域",
     "reference.remove": "移除位置参考",
     "reference.noCanvas": "请先打开白板，再标记参考位置。",
+    "pageReference.copied":
+      "已保存 · 引用版本 {version} · 已复制，可粘贴到 Claude Code 或 Codex",
+    "pageReference.pageChanged": "页面已切换，请重新引用。",
+    "pageReference.untitled": "未命名页面",
+    "pageReference.headingSelection":
+      "ShowAI 引用 · 选区（{count} 个块）·《{title}》· 版本 {version}",
+    "pageReference.headingBoard":
+      "ShowAI 引用 · Board 中 {count} 个对象 ·《{title}》· 版本 {version}",
+    "pageReference.headingBoardAll":
+      "ShowAI 引用 · 整个 Board ·《{title}》· 版本 {version}",
+    "pageReference.headingPage": "ShowAI 引用 · 整页 ·《{title}》· 版本 {version}",
+    "pageReference.copyPage": "复制页面引用",
+    "componentState.remove": "移除组件状态，不随消息发送",
+    "componentState.removeNamed": "移除组件状态：{name}",
+    "componentState.sent": "随消息发送的组件当前状态（未保存到页面）",
     "panel.title": "AI 对话",
     "panel.toggle": "AI 对话",
     "panel.button": "Agent",
@@ -76,6 +91,29 @@ export default defineMessages("assistant", {
     "reference.region": "Reference area",
     "reference.remove": "Remove location reference",
     "reference.noCanvas": "Open a Board before marking a reference location.",
+    "pageReference.copied":
+      "Saved · referencing version {version} · copied to paste into Claude Code or Codex",
+    "pageReference.pageChanged": "The page changed. Reference it again.",
+    "pageReference.untitled": "Untitled page",
+    "pageReference.headingSelection": {
+      one: "ShowAI reference · selection ({count} block) · “{title}” · version {version}",
+      other:
+        "ShowAI reference · selection ({count} blocks) · “{title}” · version {version}",
+    },
+    "pageReference.headingBoard": {
+      one: "ShowAI reference · {count} Board object · “{title}” · version {version}",
+      other:
+        "ShowAI reference · {count} Board objects · “{title}” · version {version}",
+    },
+    "pageReference.headingBoardAll":
+      "ShowAI reference · whole Board · “{title}” · version {version}",
+    "pageReference.headingPage":
+      "ShowAI reference · whole page · “{title}” · version {version}",
+    "pageReference.copyPage": "Copy page reference",
+    "componentState.remove": "Remove this component state from the message",
+    "componentState.removeNamed": "Remove component state: {name}",
+    "componentState.sent":
+      "Current component state sent with the message (not saved to the page)",
     "panel.title": "AI chat",
     "panel.toggle": "AI chat",
     "panel.button": "Agent",

@@ -34,6 +34,8 @@ import { installComponentActivity } from "./activity";
 import { useLocale, useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/customComponents";
 import common from "../../i18n/messages/common";
+import { AssistantContext } from "../assistant-context";
+import { componentContextIssue } from "./component-context.mjs";
 import "./custom.css";
 
 const ComponentsContext = createContext<ReadonlyMap<string, CompiledComponent>>(
@@ -186,12 +188,21 @@ function SandboxComponent({
     props: Record<string, unknown>;
     timeout: number;
   } | null>(null);
-  const latest = useRef({ data, parsed, onChange, readOnly });
+  // Present in the workbench page; readers and exports have no conversation.
+  const assistant = useContext(AssistantContext);
+  const latest = useRef({ data, parsed, onChange, readOnly, assistant });
   const initial = useRef({
     props: parsed.props,
     readOnly: !!readOnly || !onChange,
   });
-  latest.current = { data, parsed, onChange, readOnly };
+  latest.current = { data, parsed, onChange, readOnly, assistant };
+  /** The page block this instance renders, for state handed to the conversation. */
+  const blockId = () => {
+    const owner = iframe.current?.closest<HTMLElement>(
+      "[data-block-id],[data-surface-id]",
+    );
+    return owner?.dataset.blockId ?? owner?.dataset.surfaceId;
+  };
   const editable = !!onChange && !readOnly;
   const cancelValidation = () => {
     if (pendingValidation.current)
@@ -274,6 +285,7 @@ function SandboxComponent({
         type: "showai:props",
         props: current.parsed.props,
         readOnly: !!current.readOnly || !current.onChange,
+        context: !!current.assistant,
       },
       "*",
     );
@@ -303,7 +315,32 @@ function SandboxComponent({
         event.data.channel !== channel
       )
         return;
-      if (event.data.type === "showai:ready") sendProps();
+      if (event.data.type === "showai:ready") {
+        sendProps();
+        // State still waiting in the conversation input returns to its component.
+        const id = blockId();
+        const pending = id
+          ? latest.current.assistant?.pendingComponentContext(id)
+          : undefined;
+        if (pending)
+          iframe.current?.contentWindow?.postMessage(
+            { channel, type: "showai:context-restore", snapshot: pending },
+            "*",
+          );
+      }
+      if (event.data.type === "showai:context") {
+        const snapshot = event.data.snapshot;
+        const id = blockId();
+        // The runtime checks this too; the host never trusts the frame.
+        if (!id || componentContextIssue(snapshot)) return;
+        latest.current.assistant?.componentContext({
+          ...snapshot,
+          blockId: id,
+          componentId: latest.current.parsed.componentId,
+          name: component.name,
+        });
+        return;
+      }
       if (event.data.type === "showai:open-url") {
         openComponentLink(event.data.url);
         return;
@@ -435,7 +472,13 @@ function SandboxComponent({
     };
   }, [channel]);
   // Callback identity is host plumbing; only data and edit permission cross the sandbox.
-  useEffect(sendProps, [parsed.props, readOnly, editable, channel]);
+  useEffect(sendProps, [
+    parsed.props,
+    readOnly,
+    editable,
+    channel,
+    !!assistant,
+  ]);
   useEffect(() => {
     const sendTheme = () =>
       iframe.current?.contentWindow?.postMessage(

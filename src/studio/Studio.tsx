@@ -32,6 +32,7 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpRight,
+  AtSign,
   AppWindow,
   Blocks,
   Settings2,
@@ -186,6 +187,13 @@ import commonMessages from "../i18n/messages/common";
 import studioMessages from "../i18n/messages/studio";
 import assistantMessages from "../i18n/messages/assistant";
 import AssistantWorkbench from "./assistant/AssistantWorkbench";
+import { referenceHeading } from "./assistant/targets";
+import type { AgentTarget } from "../agent-host/types";
+import {
+  formatReference,
+  referenceVersion,
+  type PageReference,
+} from "../core/page-reference";
 import { useSlidingIndicator } from "./useSlidingIndicator";
 import {
   componentDisplayDescription,
@@ -872,7 +880,8 @@ export default function Studio() {
       const params = new URLSearchParams(location.search);
       const projectId = params.get("project"),
         pageId = params.get("page"),
-        folderId = params.get("folder");
+        folderId = params.get("folder"),
+        blocks = (params.get("blocks") ?? "").split(",").filter(Boolean);
       // Restore saved navigation before expanding the explicit launch target.
       await verification;
       if (projectId) {
@@ -884,6 +893,8 @@ export default function Studio() {
           if (await page.open(projectId, pageId)) {
             setView("page");
             void loadCatalog().catch(report);
+            // A reference link opens here; show what it points at.
+            if (blocks.length) void locateAssistantTarget(pageId, blocks);
           }
           const parentId =
             loaded.pages.find((item) => item.id === pageId)?.parentId ?? null;
@@ -1058,13 +1069,49 @@ export default function Studio() {
     }
   }
   /** Open the page an Agent turn worked on and highlight the blocks it named. */
+  /** Save the page as shown, then copy a reference pinned to that version. */
+  async function copyPageReference(projectId: string, target: AgentTarget) {
+    const pageId = target.pageId;
+    if (!pageId) return;
+    const workspaceState = page.sessions.getSnapshot();
+    const session = workspaceState.views
+      .map((view) => view.session)
+      .find((item) => {
+        const state = item.getSnapshot();
+        return state.projectId === projectId && state.draft?.id === pageId;
+      });
+    // An open page saves first; the active one also finishes native ink input.
+    const saved = !session
+      ? true
+      : session === workspaceState.active
+        ? await page.flush()
+        : await session.flush();
+    if (!saved) throw new Error(ta("panel.saveFirst"));
+    const record = session?.getSnapshot().record;
+    if (session && record?.document.id !== pageId)
+      throw new Error(ta("pageReference.pageChanged"));
+    const reference = await desktop.invoke<PageReference>("pages:reference", {
+      projectId,
+      pageId,
+      target,
+      ...(record ? { expectedHash: record.hash } : {}),
+    });
+    await desktop.invoke("clipboard:write", {
+      text: formatReference(reference, referenceHeading(ta, reference)),
+    });
+    setNotice(
+      ta("pageReference.copied", { version: referenceVersion(reference) }),
+    );
+  }
   async function locateAssistantTarget(pageId: string, ids: string[]) {
     const projectId = page.projectId ?? selectedProject;
     if (page.draft?.id !== pageId && !(await openPage(pageId, projectId)))
       return;
     if (ids[0]) setRevealNode(ids[0]);
     // Editors own their DOM attributes, so the highlight is a separate overlay.
-    window.setTimeout(() => {
+    // A page that is still opening gets a moment to render its content.
+    const started = Date.now();
+    const flash = () => {
       const scope = document.querySelector(".studio-main");
       const found = ids
         .map((id) =>
@@ -1073,6 +1120,10 @@ export default function Studio() {
           ),
         )
         .filter((element): element is Element => !!element);
+      if (!found.length && Date.now() - started < 3000) {
+        window.setTimeout(flash, 160);
+        return;
+      }
       found[0]?.scrollIntoView({ block: "center" });
       for (const element of found) {
         const rect = element.getBoundingClientRect();
@@ -1087,7 +1138,8 @@ export default function Studio() {
         document.body.append(box);
         window.setTimeout(() => box.remove(), 1600);
       }
-    }, 240);
+    };
+    window.setTimeout(flash, 240);
   }
   async function openPage(id: string, projectId = selectedProject) {
     if (routingRef.current) return false;
@@ -3178,6 +3230,11 @@ export default function Studio() {
             pageTitle={page.draft?.title}
             flush={page.flush}
             onLocate={locateAssistantTarget}
+            onReference={(target) => {
+              const projectId = page.projectId;
+              if (projectId)
+                void copyPageReference(projectId, target).catch(report);
+            }}
             onOpenSettings={() => {
               setSettingsSection("agent");
               void navigate("settings").catch(report);
@@ -3851,6 +3908,21 @@ export default function Studio() {
                       ),
                     },
                     ] : []),
+                    ...(contextMenu.target.kind === "page"
+                      ? [
+                          {
+                            // Like copying a link, for Agents outside ShowAI.
+                            label: ta("pageReference.copyPage"),
+                            icon: <AtSign size={15} />,
+                            onSelect: action(() =>
+                              copyPageReference(contextMenu.target.projectId, {
+                                kind: "page",
+                                pageId: contextMenu.target.id,
+                              }),
+                            ),
+                          },
+                        ]
+                      : []),
                     {
                       label: tc("rename"),
                       separatorBefore: true,

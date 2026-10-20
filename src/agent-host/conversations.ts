@@ -11,6 +11,10 @@ import type {
 } from "./types";
 import type { ShowDocument } from "../types";
 import { referenceInstructions } from "../surface/agent-reference";
+import {
+  componentContextIssue,
+  componentContextLimits,
+} from "../components/custom/component-context.mjs";
 import { translator } from "../i18n";
 import agentHostMessages from "../i18n/messages/agentHost";
 
@@ -36,6 +40,30 @@ export const targetSchema = z.object({
       height: z.number().finite().min(0).max(2000000).optional(),
     })
     .optional(),
+  components: z
+    .array(
+      z
+        .object({
+          blockId,
+          componentId: z.string().min(1).max(200).optional(),
+          name: z.string().min(1).max(200),
+          label: z
+            .string()
+            .min(1)
+            .max(componentContextLimits.labelChars)
+            .optional(),
+          model: z.unknown(),
+        })
+        .superRefine((item, context) => {
+          const issue = componentContextIssue({
+            model: item.model,
+            ...(item.label ? { label: item.label } : {}),
+          });
+          if (issue) context.addIssue({ code: "custom", message: issue });
+        }),
+    )
+    .max(componentContextLimits.perMessage)
+    .optional(),
 });
 
 export function parseTarget(value: unknown): AgentTarget {
@@ -49,7 +77,32 @@ export function parseTarget(value: unknown): AgentTarget {
     ...(blockIds.length ? { blockIds } : {}),
     ...(target.text?.trim() ? { text: target.text.slice(0, 4000) } : {}),
     ...(target.reference ? { reference: target.reference } : {}),
+    ...(target.components?.length
+      ? {
+          components: target.components.map((item) => ({
+            blockId: item.blockId,
+            ...(item.componentId ? { componentId: item.componentId } : {}),
+            name: item.name,
+            ...(item.label ? { label: item.label } : {}),
+            model: item.model,
+          })),
+        }
+      : {}),
   };
+}
+
+/** Component state the person handed over; it describes the live view only. */
+export function componentInstructions(components?: AgentTarget["components"]) {
+  if (!components?.length) return "";
+  return (
+    "\nThe person handed over the current exploration state of these components. It is local to their view, not saved to the page; use it to understand the request and do not write it into component data unless asked:\n" +
+    components
+      .map(
+        (item) =>
+          `- block ${item.blockId} (${JSON.stringify(item.name)}${item.componentId ? `, ${item.componentId}` : ""})${item.label ? ` ${JSON.stringify(item.label)}` : ""}: ${JSON.stringify(item.model)}`,
+      )
+      .join("\n")
+  );
 }
 
 /** Tell the Agent exactly which objects the user pointed at and how far it may write. */
@@ -74,7 +127,13 @@ export function targetInstructions(target: AgentTarget, pageTitle?: string) {
     target.kind === "page"
       ? ""
       : " Read them with page_read using blockIds before editing. Change only those objects (and their children) with page_apply unless the user asks for wider changes; if a wider change is needed, explain it in the reply first. For explanations or questions, reply in text without writing the page.";
-  return scope + limits + quote + referenceInstructions(target.reference);
+  return (
+    scope +
+    limits +
+    quote +
+    referenceInstructions(target.reference) +
+    componentInstructions(target.components)
+  );
 }
 
 /** Backends without native session resume receive the previous turns as context. */

@@ -74,6 +74,8 @@ export default defineMessages("surface", {
     "menu.addComponent": "添加组件…",
     "menu.duplicate": "复制对象",
     "menu.assistant": "让 AI 处理所选对象",
+    "menu.reference": "复制引用（{count}）",
+    "menu.referenceBoard": "复制整个 Board 的引用",
     "board.assistant": "让 AI 处理所选对象",
     "menu.duplicateMany": "复制 {count} 个对象",
     "menu.settings": "对象设置",
@@ -309,6 +311,8 @@ export default defineMessages("surface", {
     "menu.addComponent": "Add component…",
     "menu.duplicate": "Duplicate object",
     "menu.assistant": "Ask AI about the selection",
+    "menu.reference": "Copy reference ({count})",
+    "menu.referenceBoard": "Copy a reference to this Board",
     "board.assistant": "Ask AI about the selection",
     "menu.duplicateMany": {
       one: "Duplicate {count} object",

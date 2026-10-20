@@ -13,6 +13,24 @@ const frames = new WeakMap<
 >();
 type Point = { x: number; y: number };
 type Caret = { node: Node; offset: number };
+/** Installed scopes read their painted selection through this, not the DOM selection. */
+const paintedSelections = new WeakMap<
+  HTMLElement,
+  () => { ranges: Range[]; text: string } | null
+>();
+/** The read-only text selection painted in the scope around `target`, if any.
+ * Its document selection lives in a hidden input, so callers read it here. */
+export function paintedTextSelection(target: Element) {
+  for (
+    let element: HTMLElement | null = target.closest<HTMLElement>("*");
+    element;
+    element = element.parentElement
+  ) {
+    const read = paintedSelections.get(element);
+    if (read) return read();
+  }
+  return null;
+}
 const textBoundarySelector =
   ".document-widget,.portable-widget,.page-document-module,.rich-text-component,[data-surface-id],pre,table,.document-callout,.document-toggle";
 export function registerSelectionEditor(editor: Editor) {
@@ -686,7 +704,16 @@ export function installPageTextSelection(
   proxy.addEventListener("compositionend", compositionEnd);
   root.addEventListener("showai:text-selection-pointer", bridge);
   win.addEventListener("blur", blur);
+  paintedSelections.set(root, () =>
+    selected && selected.to > selected.from
+      ? {
+          ranges: selected.model.ranges(selected.from, selected.to),
+          text: selected.model.text.slice(selected.from, selected.to),
+        }
+      : null,
+  );
   return () => {
+    paintedSelections.delete(root);
     stop();
     clear();
     style.remove();

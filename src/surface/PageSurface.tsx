@@ -77,6 +77,7 @@ import {
   MapIcon,
   CheckSquare,
   Sparkles,
+  AtSign,
 } from "../ui/icons";
 import {
   useSurfaceViewport,
@@ -878,16 +879,20 @@ export default function PageSurface({
       "⌥⇧V",
     ],
   ];
+  // Ask AI and Copy reference name the same Board and objects.
+  const boardTarget = (
+    ids: string[],
+    anchor: { left: number; top: number; bottom: number },
+  ) => ({
+    kind: "board" as const,
+    blockIds: ids.slice(0, 100),
+    surfaceId: containerId ?? boardDocument?.content.attrs?.id,
+    anchor,
+  });
   const askAssistant = (
     ids: string[],
     anchor: { left: number; top: number; bottom: number },
-  ) =>
-    assistant?.open({
-      kind: "board",
-      blockIds: ids.slice(0, 100),
-      surfaceId: boardDocument?.content.attrs?.id,
-      anchor,
-    });
+  ) => assistant?.open(boardTarget(ids, anchor));
   const objectMenuItems = (ids: string[], id: string, container: boolean) => {
     const many = ids.length > 1;
     const lockedNow = ids.every((item) => layoutOf(item)?.locked);
@@ -897,18 +902,19 @@ export default function PageSurface({
       findSurfaceNode(boardDocument, id)?.node.type === "region" &&
       layoutOf(id)?.mode === "free";
     const point = objectMenu?.point ?? { x: 0, y: 0 };
+    const anchor = { left: point.x, top: point.y, bottom: point.y };
     const items: LibraryContextMenuItem[] = [
       ...(assistant
         ? [
             {
               label: t("menu.assistant"),
               icon: <Sparkles size={14} />,
-              onSelect: () =>
-                askAssistant(ids, {
-                  left: point.x,
-                  top: point.y,
-                  bottom: point.y,
-                }),
+              onSelect: () => askAssistant(ids, anchor),
+            },
+            {
+              label: t("menu.reference", { count: ids.length }),
+              icon: <AtSign size={14} />,
+              onSelect: () => assistant.reference(boardTarget(ids, anchor)),
             },
           ]
         : []),
@@ -1875,6 +1881,25 @@ export default function PageSurface({
                       disabled: !nodes.length,
                       onSelect: () => board.selectAll(),
                     },
+                    ...(assistant
+                      ? [
+                          {
+                            label: board.ids.size
+                              ? t("menu.reference", { count: board.ids.size })
+                              : t("menu.referenceBoard"),
+                            icon: <AtSign size={14} />,
+                            separatorBefore: true,
+                            onSelect: () =>
+                              assistant.reference(
+                                boardTarget([...board.ids], {
+                                  left: objectMenu.point.x,
+                                  top: objectMenu.point.y,
+                                  bottom: objectMenu.point.y,
+                                }),
+                              ),
+                          },
+                        ]
+                      : []),
                   ]
                 : objectMenuItems(
                     objectMenu.ids,

@@ -289,8 +289,16 @@
 }
 .assistant-form-target {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 2px;
+  gap: 4px 2px;
+  min-width: 0;
+}
+/* Component states can carry long labels; they shorten instead of pushing chips out. */
+.assistant-form-target .assistant-chip {
+  min-width: 0;
+}
+.assistant-chip-text {
   min-width: 0;
 }
 .assistant-form-target .assistant-icon {

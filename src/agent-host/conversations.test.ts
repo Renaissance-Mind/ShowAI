@@ -100,6 +100,51 @@ test("targets keep stable ids, drop duplicates and bound quoted text", () => {
   );
 });
 
+test("handed-over component state reaches the prompt without its private part", () => {
+  const target = parseTarget({
+    kind: "page",
+    pageId: "page-1",
+    components: [
+      {
+        blockId: "explorer",
+        componentId: "damped",
+        name: "Explorer",
+        label: "γ=0.3",
+        model: { gamma: 0.3 },
+        private: { zoom: 2 },
+      },
+    ],
+  });
+  expect(target.components).toEqual([
+    {
+      blockId: "explorer",
+      componentId: "damped",
+      name: "Explorer",
+      label: "γ=0.3",
+      model: { gamma: 0.3 },
+    },
+  ]);
+  const instructions = targetInstructions(target);
+  expect(instructions).toContain('block explorer ("Explorer", damped)');
+  expect(instructions).toContain('{"gamma":0.3}');
+  expect(instructions).toContain("not saved to the page");
+  expect(instructions).not.toContain("zoom");
+  const item = { blockId: "b", name: "C", model: "x".repeat(9000) };
+  expect(() => parseTarget({ kind: "page", components: [item] })).toThrow(
+    /model exceeds/,
+  );
+  expect(() =>
+    parseTarget({
+      kind: "page",
+      components: Array.from({ length: 7 }, (_, index) => ({
+        blockId: `b${index}`,
+        name: "C",
+        model: 1,
+      })),
+    }),
+  ).toThrow();
+});
+
 test("recap summarises finished turns for agents without session resume", () => {
   const turn = (
     id: string,

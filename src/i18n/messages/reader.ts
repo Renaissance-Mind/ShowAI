@@ -19,6 +19,20 @@ export default defineMessages("reader", {
     emptyPage: "页面内容为空。",
     unreadablePage: "无法读取这份页面。",
     openFailed: "无法打开页面",
+    referenceSelection: "引用选区到对话（{count}）",
+    referenceBlock: "引用此块到对话",
+    referencePage: "引用整页到对话",
+    referenceClear: "取消对话引用",
+    referenceAdded: "已加入对话输入框 · 引用版本 {version}",
+    referenceCleared: "已取消对话引用",
+    referenceUnavailable: "当前对话不接收页面引用。",
+    referenceHeadingSelection:
+      "ShowAI 引用 · 选区（{count} 个块）·《{title}》· 版本 {version}",
+    referenceHeadingBoard:
+      "ShowAI 引用 · Board 中 {count} 个对象 ·《{title}》· 版本 {version}",
+    referenceHeadingBoardAll:
+      "ShowAI 引用 · 整个 Board ·《{title}》· 版本 {version}",
+    referenceHeadingPage: "ShowAI 引用 · 整页 ·《{title}》· 版本 {version}",
   },
   en: {
     draftNote: "Interactive preview · Changes are kept only in this preview",
@@ -41,5 +55,26 @@ export default defineMessages("reader", {
     emptyPage: "The page is empty.",
     unreadablePage: "Couldn't read this page.",
     openFailed: "Couldn't open page",
+    referenceSelection: "Reference selection in chat ({count})",
+    referenceBlock: "Reference this block in chat",
+    referencePage: "Reference the page in chat",
+    referenceClear: "Remove the chat reference",
+    referenceAdded: "Added to the chat input · version {version}",
+    referenceCleared: "Chat reference removed",
+    referenceUnavailable: "This conversation doesn't accept page references.",
+    referenceHeadingSelection: {
+      one: "ShowAI reference · selection ({count} block) · “{title}” · version {version}",
+      other:
+        "ShowAI reference · selection ({count} blocks) · “{title}” · version {version}",
+    },
+    referenceHeadingBoard: {
+      one: "ShowAI reference · {count} Board object · “{title}” · version {version}",
+      other:
+        "ShowAI reference · {count} Board objects · “{title}” · version {version}",
+    },
+    referenceHeadingBoardAll:
+      "ShowAI reference · whole Board · “{title}” · version {version}",
+    referenceHeadingPage:
+      "ShowAI reference · whole page · “{title}” · version {version}",
   },
 });

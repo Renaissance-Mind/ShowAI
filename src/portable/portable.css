@@ -116,6 +116,29 @@ html {
 .portable-options-menu svg {
   color: var(--text-secondary);
 }
+/* The conversation reference menu opens at the pointer with the same items. */
+.portable-context-menu {
+  position: fixed;
+  right: auto;
+  z-index: 40;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 16px));
+}
+.portable-reference-status {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  z-index: 40;
+  max-width: calc(100vw - 32px);
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 8px 32px #17221512;
+  color: var(--text-secondary);
+  font-size: 13px;
+  transform: translateX(-50%);
+}
 .portable-document {
   max-width: 960px;
   margin: 0 auto;
@@ -297,7 +320,9 @@ html {
   }
 }
 @media print {
-  .portable-options {
+  .portable-options,
+  .portable-context-menu,
+  .portable-reference-status {
     display: none !important;
   }
   .portable-document {

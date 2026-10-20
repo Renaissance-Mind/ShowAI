@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { desktop } from "../bridge";
-import type { AssistantTarget } from "../../components/assistant-context";
+import type {
+  AssistantTarget,
+  ComponentContextItem,
+} from "../../components/assistant-context";
 import type { CanvasReference } from "../../surface/agent-reference";
 
 interface ComposerDraft {
   text: string;
   target: AssistantTarget | null;
   reference: CanvasReference | null;
+  /** Component states handed over on pageId, sent with the next message. */
+  components: ComponentContextItem[];
   pageId: string | null;
   updatedAt: number;
 }
@@ -14,6 +19,7 @@ const empty: ComposerDraft = {
   text: "",
   target: null,
   reference: null,
+  components: [],
   pageId: null,
   updatedAt: 0,
 };
@@ -72,7 +78,8 @@ export function useAssistantDrafts(key: string) {
       persist();
     };
   }, []);
-  const current = drafts[key] ?? empty;
+  // Drafts saved before a field existed take its empty value.
+  const current = { ...empty, ...drafts[key] };
   const update = (patch: Partial<ComposerDraft>, capturedKey = key) =>
     setDrafts((before) => ({
       ...before,

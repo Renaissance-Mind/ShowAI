@@ -12,13 +12,14 @@ export class ReadBaselines {
   private directory() {
     return join(this.home, "local", "read-baselines");
   }
-  async remember(projectId: string, record: PageRecord) {
+  /** `slot` keeps a baseline beside the session's own read, e.g. a page
+   * revision a person referenced for an Agent to diff against later. */
+  async remember(projectId: string, record: PageRecord, slot?: string) {
     const actor = changeContext().actor;
     const id = createHash("sha256")
       .update(
         JSON.stringify([
-          actor.harness,
-          actor.sessionId,
+          ...(slot ? [slot] : [actor.harness, actor.sessionId]),
           projectId,
           record.document.id,
         ]),

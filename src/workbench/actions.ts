@@ -17,6 +17,9 @@ import { localMediaGrants } from "./local-media";
 import { join, sep, resolve } from "node:path";
 import { randomUUID, createHash } from "node:crypto";
 import { changeContext, withChangeContext } from "../core/history-context";
+import { pageReference } from "../core/page-reference";
+import { ReadBaselines } from "../core/read-baselines";
+import { parseTarget } from "../agent-host/conversations";
 import { mutateLibrary, versionedLibrary } from "../core/library-runtime";
 import { canonicalJson } from "../core/diff";
 import type { ChangeActor } from "../core/history-model";
@@ -164,6 +167,7 @@ export const workbenchActions = new Set([
   "folders:remove",
   "pages:list",
   "pages:get",
+  "pages:reference",
   "pages:create",
   "pages:insertTemplate",
   "pages:save",
@@ -877,6 +881,25 @@ export function createWorkbench(
         return activePages(projectId(args));
       case "pages:get":
         return pageRecord(projectId(args), pageId(args), args);
+      case "pages:reference": {
+        // The editor saved first; pin the version the person is looking at.
+        const id = projectId(args);
+        const record = await store.readPage(id, pageId(args));
+        const expected = text(args, "expectedHash", true);
+        if (expected && expected !== record.hash)
+          throw new CoreError("CONFLICT", t("referenceChanged"), {
+            currentHash: record.hash,
+            currentRevision: record.revision,
+          });
+        const reference = pageReference(id, record, parseTarget(args.target));
+        // page_diff can then compare the current page with this exact version.
+        await new ReadBaselines(store.root).remember(
+          id,
+          record,
+          `reference:${record.revision ?? record.hash}`,
+        );
+        return reference;
+      }
       case "pages:insertTemplate": {
         const id = projectId(args);
         return enrichPage(

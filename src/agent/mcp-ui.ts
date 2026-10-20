@@ -1,8 +1,9 @@
 // Hosts cache UI templates by URI; bump the version when the reader's behavior changes.
-export const readerResourceUri = "ui://showai/reader-v2.html";
+export const readerResourceUri = "ui://showai/reader-v3.html";
 
 /** One sandboxed reader for MCP Apps hosts; all page dependencies travel with the result.
- * Reader control values are reported as model context only. They never write the Page.
+ * Reader control values, references the reader makes and component states handed
+ * over are reported together as model context only. They never write the Page.
  */
 export const mcpReaderHtml = `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -27,7 +28,7 @@ a{color:inherit}
 (() => {
  const root=document.getElementById('reader'),status=document.getElementById('status');
  const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
- let current='',sequence=1,settled=false,hostTheme='',page={};
+ let current='',sequence=1,settled=false,hostTheme='',page={},lastResult=null,contextSupported=false;
  const pending=new Map();
  function send(method,params){const id=sequence++;parent.postMessage({jsonrpc:'2.0',id,method,params},'*');return new Promise((resolve,reject)=>{pending.set(id,{resolve,reject});setTimeout(()=>{if(pending.delete(id))reject(new Error('Host request timed out'));},10000);});}
  function notify(method,params){parent.postMessage({jsonrpc:'2.0',method,params},'*');}
@@ -41,20 +42,23 @@ a{color:inherit}
  function failure(result){const output=result?.structuredContent;if(!result?.isError&&output?.ok!==false)return '';if(output?.error?.message)return String(output.error.message);const text=(result.content||[]).find(item=>item?.type==='text')?.text;if(!text)return '工具调用失败。';try{return String(JSON.parse(text)?.error?.message||text);}catch{return text;}}
  function theme(value){if(value!=='dark'&&value!=='light')return;hostTheme=value;document.documentElement.style.colorScheme=value;for(const node of document.querySelectorAll('[data-showai-inline-root]'))node.dataset.theme=value;}
  // The portable reader reads its initial theme from these options before it mounts.
- function readOptions(){document.getElementById('showai-read-options')?.remove();if(!hostTheme)return;const options=document.createElement('script');options.type='application/json';options.id='showai-read-options';options.textContent=JSON.stringify({theme:hostTheme});document.head.append(options);}
+ // The conversation identity enables "reference in chat" only when the host accepts model context.
+ function readOptions(){document.getElementById('showai-read-options')?.remove();const value={};if(hostTheme)value.theme=hostTheme;if(conversational())value.conversation=page;if(!Object.keys(value).length)return;const options=document.createElement('script');options.type='application/json';options.id='showai-read-options';options.textContent=JSON.stringify(value);document.head.append(options);}
+ function conversational(){return contextSupported&&!!(page.projectId&&page.pageId&&page.hash);}
  function waiting(args){if(settled||current)return;const title=args?.title||args?.document?.title;showStatus(title?'正在生成《'+String(title).slice(0,120)+'》…':'正在生成 ShowAI 页面…','busy');}
 
  function render(result){
   if(!result)return;
+  lastResult=result;
   const error=failure(result);
   if(error){settled=true;if(!current)showStatus('ShowAI 页面未能生成：'+error,'error');return;}
   const data=payload(result);if(!data)return;
   settled=true;
   const info=result.structuredContent?.data;
-  if(info)page={title:info.title,pageId:info.pageId,projectId:info.projectId};
+  if(info)page={title:info.title,pageId:info.pageId,projectId:info.projectId,hash:info.hash,revision:info.revision};
   if(!data.inline){showStatus(data.inlineError||'完整页面已生成。');appendDelivery(data.delivery?.html);return;}
   if(data.inline===current)return;
-  current=data.inline;states.clear();root.replaceChildren();readOptions();
+  current=data.inline;states.clear();handed.clear();referenced=null;if(lastContext)publishState();root.replaceChildren();root.toggleAttribute('data-showai-conversation',conversational());readOptions();
   const parsed=new DOMParser().parseFromString(data.inline,'text/html');
   for(const child of [...parsed.head.childNodes,...parsed.body.childNodes])root.append(document.importNode(child,true));
   for(const old of root.querySelectorAll('script')){if(old.src){showStatus('页面包含未打包的脚本。','error');return;}const fresh=document.createElement('script');for(const attr of old.attributes)fresh.setAttribute(attr.name,attr.value);fresh.textContent=old.textContent;old.replaceWith(fresh);}
@@ -113,7 +117,7 @@ a{color:inherit}
   while(states.size>40)states.delete(states.keys().next().value);
   clearTimeout(stateTimer);stateTimer=setTimeout(publishState,700);
  }
- function publishState(){
+ function controlLines(){
   const blocks=new Map();
   for(const item of states.values()){
    const value=item.control.isConnected?valueOf(item.control):item.value;
@@ -121,15 +125,31 @@ a{color:inherit}
    if(!blocks.has(item.blockId))blocks.set(item.blockId,{blockId:item.blockId||undefined,kind:item.kind||undefined,controls:[]});
    blocks.get(item.blockId).controls.push({label:item.label,value});
   }
-  if(!blocks.size)return;
+  if(!blocks.size)return null;
   const lines=['The reader is exploring this ShowAI page in the conversation preview. These are the latest control values; they are local to the preview and have not been saved to the Page.'];
   if(page.title||page.pageId)lines.push('Page: '+[page.title,page.pageId&&'pageId '+page.pageId,page.projectId&&'projectId '+page.projectId].filter(Boolean).join(' · '));
   for(const block of blocks.values())lines.push('- '+(block.blockId?'block '+block.blockId+(block.kind?' ('+block.kind+')':''):'page')+': '+block.controls.map(control=>control.label+' = '+control.value).join('; '));
-  const text=lines.join('\\n').slice(0,4000);
-  if(text===lastContext)return;
-  lastContext=text;
-  send('ui/update-model-context',{content:[{type:'text',text}],structuredContent:{showai:{readerState:{...page,savedToPage:false,blocks:[...blocks.values()]}}}}).catch(error=>console.warn('ShowAI reader state:',error.message));
+  return {text:lines.join('\\n').slice(0,4000),state:{...page,savedToPage:false,blocks:[...blocks.values()]}};
  }
+ // Each update replaces the previous one, so the reference, handed-over component
+ // states and control values always travel together, newest components kept first.
+ const handed=new Map();let referenced=null;
+ function publishContext(){
+  const controls=controlLines(),components=[...handed.values()];
+  const compose=()=>{const parts=[],showai={};
+   if(referenced){parts.push(referenced.text);showai.reference=referenced.reference;}
+   if(components.length){parts.push(['The reader handed over the current exploration state of these components in the conversation preview. It is local to the preview and has not been saved to the Page:',...components.map(item=>'- block '+item.blockId+' ('+JSON.stringify(item.name)+(item.componentId?', '+item.componentId:'')+')'+(item.label?' '+JSON.stringify(item.label):'')+': '+JSON.stringify(item.model))].join('\\n'));showai.components=components;}
+   if(controls){parts.push(controls.text);showai.readerState=controls.state;}
+   return {text:parts.join('\\n\\n'),showai};};
+  let context=compose();
+  while(context.text.length>24000&&components.length>1){components.shift();context=compose();}
+  if(context.text===lastContext)return Promise.resolve();
+  lastContext=context.text;
+  return send('ui/update-model-context',{content:context.text?[{type:'text',text:context.text}]:[],structuredContent:{showai:context.showai}});
+ }
+ function publishState(){publishContext().catch(error=>console.warn('ShowAI reader state:',error.message));}
+ root.addEventListener('showai:conversation-reference',event=>{if(!conversational()||!event.detail)return;const detail=event.detail;referenced=detail.reference?{reference:detail.reference,text:String(detail.text||'')}:null;detail.result=publishContext();});
+ root.addEventListener('showai:conversation-context',event=>{const detail=event.detail;if(!conversational()||!detail?.blockId||!detail.snapshot)return;handed.delete(detail.blockId);handed.set(detail.blockId,{blockId:detail.blockId,componentId:detail.componentId||undefined,name:String(detail.name||''),label:detail.snapshot.label,model:detail.snapshot.model});while(handed.size>6)handed.delete(handed.keys().next().value);clearTimeout(stateTimer);stateTimer=setTimeout(publishState,300);});
  for(const type of ['input','click'])root.addEventListener(type,track,true);
 
  // External links go through the host so its sandbox and confirmation rules apply.
@@ -144,7 +164,7 @@ a{color:inherit}
  function fromOpenAI(globals){if(!globals)return;theme(globals.theme);if(globals.toolOutput||globals.toolResponseMetadata)render({structuredContent:globals.toolOutput,_meta:globals.toolResponseMetadata,isError:globals.toolOutput?.ok===false});else waiting(globals.toolInput);}
  window.addEventListener('openai:set_globals',event=>fromOpenAI(event.detail?.globals));
  fromOpenAI(window.openai);
- send('ui/initialize',{appInfo:{name:'ShowAI',version:'1.0.0'},appCapabilities:{},protocolVersion:'2026-01-26'}).then(result=>{theme(result?.hostContext?.theme);notify('ui/notifications/initialized');}).catch(error=>{if(!current&&!settled)showStatus('等待宿主提供页面。');console.warn(error.message);});
+ send('ui/initialize',{appInfo:{name:'ShowAI',version:'1.0.0'},appCapabilities:{},protocolVersion:'2026-01-26'}).then(result=>{theme(result?.hostContext?.theme);contextSupported=!!result?.hostCapabilities?.updateModelContext;notify('ui/notifications/initialized');if(contextSupported&&current&&lastResult){current='';render(lastResult);}}).catch(error=>{if(!current&&!settled)showStatus('等待宿主提供页面。');console.warn(error.message);});
  // Measure the whole body so status changes and shrinking content both resize the frame.
  new ResizeObserver(()=>notify('ui/notifications/size-changed',{height:Math.ceil(Math.max(document.body.getBoundingClientRect().height,document.body.scrollHeight))})).observe(document.body);
 })();

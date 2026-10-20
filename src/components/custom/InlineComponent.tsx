@@ -8,6 +8,10 @@ import { useEffect, useRef, useState } from "react";
 import type { CompiledComponent } from "./types";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/customComponents";
+import {
+  componentContextIssue,
+  type ComponentContextSnapshot,
+} from "./component-context.mjs";
 
 interface MountedComponent {
   update(data: Record<string, unknown>): void;
@@ -19,9 +23,16 @@ interface InlineModule {
     options: {
       data: Record<string, unknown>;
       onError: (message: string) => void;
+      onContext?: (snapshot: ComponentContextSnapshot) => boolean;
+      context?: ComponentContextSnapshot;
     },
   ): MountedComponent;
 }
+
+/** The conversation reader listens for this; detail.result settles its delivery. */
+export const conversationContextEvent = "showai:conversation-context";
+// Handed-over states return to their block if the reader mounts it again.
+const handedOver = new Map<string, ComponentContextSnapshot>();
 
 /** Only the portable reader enables this inside an existing conversation sandbox.
  * Shadow DOM isolates styling; the host iframe is the JavaScript security boundary.
@@ -83,10 +94,41 @@ export function InlineComponent({
       jsx: JsxRuntime,
       jsxDev: JsxDevRuntime,
     };
+    // Only a conversation host that accepts model context offers onContext.
+    const owner = container.current.closest<HTMLElement>(
+      "[data-block-id],[data-surface-id]",
+    );
+    const blockId = owner?.dataset.blockId ?? owner?.dataset.surfaceId;
+    const conversation =
+      !!blockId && !!host.closest("[data-showai-conversation]");
+    const onContext = (snapshot: ComponentContextSnapshot) => {
+      const issue = componentContextIssue(snapshot);
+      if (issue) throw new Error(`onContext: ${issue}`);
+      if (navigator.userActivation && !navigator.userActivation.isActive)
+        return false;
+      const copy = JSON.parse(JSON.stringify(snapshot));
+      handedOver.set(blockId!, copy);
+      container.current?.dispatchEvent(
+        new CustomEvent(conversationContextEvent, {
+          bubbles: true,
+          composed: true,
+          detail: {
+            blockId,
+            componentId: component.id,
+            name: component.name,
+            snapshot: copy,
+          },
+        }),
+      );
+      return true;
+    };
     globals[callbackKey] = (module: InlineModule) => {
       mounted.current = module.mount(root, {
         data: currentData.current,
         onError: setError,
+        ...(conversation
+          ? { onContext, context: handedOver.get(blockId!) }
+          : {}),
       });
     };
     const script = document.createElement("script");

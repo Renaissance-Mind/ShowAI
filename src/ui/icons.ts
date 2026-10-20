@@ -21,6 +21,7 @@ export {
   ArrowRight,
   ArrowUp,
   ArrowUpRight,
+  AtSign,
   BarChart3,
   Blocks,
   Bold,

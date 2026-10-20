@@ -215,6 +215,17 @@ describe("opening library targets", () => {
       project: "project-a",
       page: "page-a",
     });
+    // Reference links highlight their blocks once the page opens.
+    expect(
+      windowQuery({
+        projectId: "project-a",
+        pageId: "page-a",
+        blocks: "b1,b2",
+      }),
+    ).toEqual({ project: "project-a", page: "page-a", blocks: "b1,b2" });
+    expect(windowQuery({ projectId: "project-a", blocks: "b1" })).toEqual({
+      project: "project-a",
+    });
     expect(windowQuery({ invite: "invitation" })).toEqual({
       invite: "invitation",
     });

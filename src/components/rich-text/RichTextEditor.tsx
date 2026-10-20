@@ -50,6 +50,7 @@ import {
   AlignRight,
   ArrowDown,
   ArrowUp,
+  AtSign,
   Check,
   CheckSquare,
   ChevronDown,
@@ -1141,6 +1142,15 @@ export default function RichTextEditor({
   const textStyle = editor.isActive("heading")
     ? t("block.heading", { level: editor.getAttributes("heading").level })
     : t("block.text");
+  // The reference action names how many blocks the selection touches.
+  const bubbleBlockCount =
+    bubble && assistant
+      ? selectionBlockIds(
+          editor.state.doc,
+          editor.state.selection.from,
+          editor.state.selection.to,
+        ).length
+      : 0;
   const formatButtons = (!minimal || bubble) && (
     <FormatControls editor={editor} onLink={() => openDialog("link")} />
   );
@@ -1593,6 +1603,30 @@ export default function RichTextEditor({
                       {t("assistant.askBlock")}
                     </button>
                   )}
+                  {assistant && (
+                    <button
+                      onClick={(event) => {
+                        const id = editor.state.doc.nodeAt(hover.pos)?.attrs.id;
+                        const rect = event.currentTarget
+                          .closest(".block-handle")!
+                          .getBoundingClientRect();
+                        setBlockMenu(false);
+                        if (typeof id === "string" && !isSyntheticId(id))
+                          assistant.reference({
+                            kind: "blocks",
+                            blockIds: [id],
+                            anchor: {
+                              left: rect.right,
+                              top: rect.top,
+                              bottom: rect.bottom,
+                            },
+                          });
+                      }}
+                    >
+                      <AtSign size={15} />
+                      {t("assistant.referenceBlock")}
+                    </button>
+                  )}
                   <div className="menu-rule" />
                   <button
                     className="danger"
@@ -1718,6 +1752,30 @@ export default function RichTextEditor({
               >
                 <Sparkles size={15} />
                 <span>AI</span>
+              </button>
+              <button
+                type="button"
+                className="editor-tool editor-bubble-reference"
+                aria-label={t("assistant.referenceSelection", {
+                  count: bubbleBlockCount,
+                })}
+                title={t("assistant.referenceSelection", {
+                  count: bubbleBlockCount,
+                })}
+                onClick={() => {
+                  const { from, to } = editor.state.selection;
+                  const anchor = bubble;
+                  selectionMenuInteracting.current = false;
+                  setBubble(null);
+                  assistant.reference({
+                    kind: "text",
+                    blockIds: selectionBlockIds(editor.state.doc, from, to),
+                    text: editor.state.doc.textBetween(from, to, "\n"),
+                    anchor,
+                  });
+                }}
+              >
+                <AtSign size={16} />
               </button>
             </>
           )}

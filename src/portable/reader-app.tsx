@@ -16,6 +16,10 @@ import { loadRemoteComponents } from "./remote.mjs";
 import type { CompiledComponent } from "../components/custom/types";
 import { SurfaceReader } from "./SurfaceReader";
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
+import {
+  conversationPage,
+  useConversationReference,
+} from "./ConversationReference";
 import { resolveLocale, setLocale, translator } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/reader";
@@ -108,6 +112,13 @@ function ArtifactReader({
   });
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const appRef = useRef<HTMLDivElement>(null);
+  // Only a conversation host that accepts model context names the saved page.
+  const conversation = useMemo(
+    () => conversationPage(host.readOptions()),
+    [host],
+  );
+  const references = useConversationReference(appRef, document, conversation);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const [remote, setRemote] = useState<CompiledComponent[]>([]);
   const [remoteError, setRemoteError] = useState("");
@@ -169,6 +180,7 @@ function ArtifactReader({
 
   return (
     <div
+      ref={appRef}
       className={`portable-app${artifact.selection ? " portable-partial" : ""}`}
     >
       {draftPreview && (
@@ -226,6 +238,8 @@ function ArtifactReader({
           </div>
         )}
       </div>
+      {references.contextMenu}
+      {references.status}
       <CustomComponentsProvider
         components={[...(artifact.components ?? []), ...remote]}
         inlineHost={inlineHost}

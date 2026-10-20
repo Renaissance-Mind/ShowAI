@@ -16,6 +16,7 @@ import {
   type AssistantAnchor,
   type AssistantBridge,
   type AssistantTarget,
+  type ComponentContextItem,
 } from "../../components/assistant-context";
 import type {
   AgentConversation,
@@ -31,6 +32,7 @@ import { useTranslator } from "../../i18n/react";
 import strings from "../../i18n/messages/assistant";
 import {
   ArrowUp,
+  Blocks,
   Loader2,
   LocateFixed,
   Plus,
@@ -63,6 +65,8 @@ import {
   referenceDisplay,
   type CanvasReference,
 } from "../../surface/agent-reference";
+import { agentTarget } from "./targets";
+import { componentContextLimits } from "../../components/custom/component-context.mjs";
 
 const agentNames = localAgentNames;
 /** Starting points for an empty page; a chip fills the input for review. */
@@ -93,6 +97,9 @@ function targetLabel(
   if (target.kind === "board") return t("target.board", { count });
   return t("target.blocks", { count });
 }
+
+const componentChip = (item: Pick<ComponentContextItem, "name" | "label">) =>
+  item.label ? `${item.name} · ${item.label}` : item.name;
 
 function TurnView({
   turn,
@@ -152,6 +159,20 @@ function TurnView({
           <blockquote className="assistant-quote">
             {turn.target.text}
           </blockquote>
+        )}
+        {!!turn.target.components?.length && (
+          <div className="assistant-form-target">
+            {turn.target.components.map((item) => (
+              <span
+                key={item.blockId}
+                className="assistant-chip is-static"
+                title={t("componentState.sent")}
+              >
+                <Blocks size={12} aria-hidden="true" />
+                {componentChip(item)}
+              </span>
+            ))}
+          </div>
         )}
       </div>
       <div className="assistant-reply">
@@ -432,6 +453,7 @@ export default function AssistantWorkbench({
   pageTitle,
   flush,
   onLocate,
+  onReference,
   onOpenSettings,
   children,
 }: {
@@ -443,6 +465,8 @@ export default function AssistantWorkbench({
   pageTitle?: string;
   flush: () => Promise<boolean>;
   onLocate: (pageId: string, ids: string[]) => void;
+  /** Saves and copies a reference to the target for an Agent outside ShowAI. */
+  onReference: (target: AgentTarget) => void;
   onOpenSettings: () => void;
   children: ReactNode;
 }) {
@@ -462,9 +486,18 @@ export default function AssistantWorkbench({
   const composerKey = `${projectId ?? ""}/${fresh ? "new" : (selectedId ?? "new")}`;
   const messageDraft = useAssistantDrafts(composerKey);
   const draft = messageDraft.text,
-    panelTarget = messageDraft.pageId === pageId ? messageDraft.target : null,
-    reference = messageDraft.pageId === pageId ? messageDraft.reference : null;
+    samePage = messageDraft.pageId === pageId,
+    panelTarget = samePage ? messageDraft.target : null,
+    reference = samePage ? messageDraft.reference : null,
+    components = samePage ? messageDraft.components : [];
   const setDraft = (text: string) => messageDraft.update({ text });
+  const setComponents = (items: ComponentContextItem[]) =>
+    messageDraft.update({
+      components: items,
+      pageId,
+      // Targets picked on another page do not carry over to this one.
+      ...(samePage ? {} : { target: null, reference: null }),
+    });
   const setPanelTarget = (target: AssistantTarget | null) =>
     messageDraft.update({ target, pageId });
   const setReference = (value: CanvasReference | null) =>
@@ -734,6 +767,10 @@ export default function AssistantWorkbench({
     const sentText = draft,
       sentAt = messageDraft.updatedAt;
     const sentReference = clearDraft ? reference : target?.reference;
+    // Component states wait in the panel input; quick requests stay focused on their target.
+    const sentComponents = clearDraft
+      ? components.map(({ private: _private, ...item }) => item)
+      : [];
     sending.current.add(composerKey);
     setSendingKeys([...sending.current]);
     setError("");
@@ -741,20 +778,12 @@ export default function AssistantWorkbench({
       selection = selectionGeneration.current;
     try {
       if (!(await flush())) throw new Error(t("panel.saveFirst"));
-      const hostTarget: AgentTarget = {
-        kind: target?.kind ?? "page",
-        ...(pageId ? { pageId } : {}),
-        ...(target && "blockIds" in target && target.blockIds.length
-          ? { blockIds: target.blockIds }
-          : {}),
-        ...(target?.kind === "board" && target.surfaceId
-          ? { surfaceId: target.surfaceId }
-          : {}),
-        ...(target?.kind === "text" && target.text
-          ? { text: target.text }
-          : {}),
-        ...(sentReference ? { reference: sentReference } : {}),
-      };
+      const hostTarget = agentTarget(
+        pageId,
+        target,
+        sentReference,
+        sentComponents,
+      );
       const next = await desktop.invoke<AgentConversation>("agent:send", {
         projectId,
         ...(conversation && !fresh ? { conversationId: conversation.id } : {}),
@@ -786,6 +815,21 @@ export default function AssistantWorkbench({
   const act = (work: () => Promise<unknown>) => () =>
     void work().catch((reason) => setError(errorMessage(reason)));
 
+  // The bridge stays stable for page content; its actions read the latest draft.
+  const live = useRef({
+    pageId,
+    components,
+    setComponents,
+    onReference,
+    onOpenChange,
+  });
+  live.current = {
+    pageId,
+    components,
+    setComponents,
+    onReference,
+    onOpenChange,
+  };
   const bridge = useMemo<AssistantBridge | null>(
     () =>
       enabled && projectId
@@ -793,6 +837,44 @@ export default function AssistantWorkbench({
             open: (target) => {
               setError("");
               setComposer(target);
+            },
+            reference: (target) =>
+              live.current.onReference(
+                agentTarget(live.current.pageId, target),
+              ),
+            componentContext: (item) => {
+              const current = live.current;
+              if (!current.pageId) return;
+              const fresh = !current.components.some(
+                (entry) => entry.blockId === item.blockId,
+              );
+              current.setComponents(
+                [
+                  ...current.components.filter(
+                    (entry) => entry.blockId !== item.blockId,
+                  ),
+                  item,
+                ].slice(-componentContextLimits.perMessage),
+              );
+              // The first hand-over opens the input; later updates stay quiet.
+              if (fresh) {
+                current.onOpenChange(true);
+                requestAnimationFrame(() => input.current?.focus());
+              }
+            },
+            pendingComponentContext: (blockId) => {
+              const item = live.current.components.find(
+                (entry) => entry.blockId === blockId,
+              );
+              return item
+                ? {
+                    model: item.model,
+                    ...(item.private !== undefined
+                      ? { private: item.private }
+                      : {}),
+                    ...(item.label ? { label: item.label } : {}),
+                  }
+                : undefined;
             },
           }
         : null,
@@ -1093,6 +1175,30 @@ export default function AssistantWorkbench({
             }}
           >
             <div className="assistant-form-target">
+              {components.map((item) => (
+                <button
+                  type="button"
+                  key={item.blockId}
+                  className="assistant-chip"
+                  onClick={() =>
+                    setComponents(
+                      components.filter(
+                        (entry) => entry.blockId !== item.blockId,
+                      ),
+                    )
+                  }
+                  title={t("componentState.remove")}
+                  aria-label={t("componentState.removeNamed", {
+                    name: componentChip(item),
+                  })}
+                >
+                  <Blocks size={12} aria-hidden="true" />
+                  <span className="assistant-chip-text">
+                    {componentChip(item)}
+                  </span>
+                  <X size={12} aria-hidden="true" />
+                </button>
+              ))}
               {reference && (
                 <button
                   type="button"

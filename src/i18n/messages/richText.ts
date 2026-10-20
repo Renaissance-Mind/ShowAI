@@ -106,6 +106,9 @@ export default defineMessages("richText", {
     "block.duplicate": "复制内容块",
     "assistant.ask": "让 AI 处理",
     "assistant.askBlock": "让 AI 处理此块",
+    "assistant.referenceSelection":
+      "复制引用（{count} 个块），可粘贴到 Claude Code 或 Codex",
+    "assistant.referenceBlock": "复制此块的引用",
     "block.delete": "删除",
 
     "dialog.addLink": "添加链接",
@@ -259,6 +262,12 @@ export default defineMessages("richText", {
     "block.duplicate": "Duplicate block",
     "assistant.ask": "Ask AI",
     "assistant.askBlock": "Ask AI about this block",
+    "assistant.referenceSelection": {
+      one: "Copy a reference ({count} block) to paste into Claude Code or Codex",
+      other:
+        "Copy a reference ({count} blocks) to paste into Claude Code or Codex",
+    },
+    "assistant.referenceBlock": "Copy a reference to this block",
     "block.delete": "Delete",
 
     "dialog.addLink": "Add link",
