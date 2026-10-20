@@ -21,8 +21,6 @@ ShowAI works inside the agent you already use: the plugin lets your agent build 
 
 ## 2. Connect your agent
 
-> **Note:** the downloadable v0.9.0 predates the welcome screen and **Settings → Plugins**; both arrive with the next release. Until then, [run from source](#run-from-source) and install the plugin from the checkout.
-
 1. In ShowAI, open the plugin panel: the welcome screen shows it on first launch, and it is always available under **Settings → Plugins**.
 2. ShowAI checks for Claude Code and Codex. Click **Install plugin** next to the agent you use and wait for **Installed and enabled**.
 3. Reload the agent: restart the Claude Code session, or refresh plugins or restart Codex. A conversation that was already open keeps its old tool list, so start a new one.
