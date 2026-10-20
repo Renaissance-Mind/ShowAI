@@ -9,7 +9,7 @@ This directory is a skill-only plugin for Kimi Work. It teaches the agent how to
 ## Setup
 
 1. Install and start ShowAI (desktop app, or `npm run build:browser` and `npm run browser` from the repository).
-2. In Kimi Work, add a local MCP server for ShowAI. Use the start command shown in ShowAI under 设置 → 连接 Agent, or run the CLI directly with an absolute content library path:
+2. In Kimi Work, add a local MCP server for ShowAI. Use the start command from ShowAI → **Settings → Plugins → Copy launch configuration**, or run the CLI directly with an absolute content library path:
 
    ```sh
    node /ABSOLUTE/PATH/TO/ShowAI/dist-runtime/scripts/cli.mjs mcp --home /ABSOLUTE/LIBRARY
@@ -25,7 +25,7 @@ See [Agent integration](../../docs/agent-integration.md) for MCP entry points an
 本目录为实验性的 Kimi Work 纯 Skill 插件，指导 Agent 通过 ShowAI MCP 创建、续改、读取并使用 Kimi Work widget 展示页面；不带运行时或 MCP launcher。
 
 1. 安装并启动 ShowAI；源码可使用 npm run build:browser 和 npm run browser。
-2. 在 Kimi Work 添加本机 MCP，使用 ShowAI 设置中的实际启动配置，或 node /ABSOLUTE/PATH/TO/ShowAI/dist-runtime/scripts/cli.mjs mcp --home /ABSOLUTE/LIBRARY。
+2. 在 Kimi Work 添加本机 MCP，使用 ShowAI「设置 → 插件」中「复制启动配置」得到的启动命令，或 node /ABSOLUTE/PATH/TO/ShowAI/dist-runtime/scripts/cli.mjs mcp --home /ABSOLUTE/LIBRARY。
 3. 将 plugins-kimi/showai 目录作为本机插件添加。
 4. 按宿主支持的方式刷新并新建对话，确认 ShowAI MCP 工具可见后再创作。
 

@@ -36,18 +36,15 @@ Agent 会把界面保存到 ShowAI 并在对话中展示（不能内嵌显示的
 
 ## 🤖 支持的 Agent
 
-| Agent       | 接入方式                                                                | 状态 |
-| ----------- | ----------------------------------------------------------------------- | ---- |
-| Claude Code | ShowAI「设置 → 插件」→ 安装插件                                         | 正式 |
-| Codex       | ShowAI「设置 → 插件」→ 安装插件                                         | 正式 |
-| 内置 Agent  | 在 ShowAI 中使用本机 Codex 或 Claude Code 的登录、模型 API Key 或 Cloud | 正式 |
-
-更多 Agent：
-
-- **DeepSeek Harness**（预览）—「设置 → 插件 → 准备插件」，再在 DeepSeek Harness 中添加。见[插件说明](../../plugins/showai/README.zh-CN.md)。
-- **Kimi**（预览）— 插件位于 [`plugins-kimi`](../../plugins-kimi/showai/README.md)。
-- **网页版 ChatGPT**（邀请制）— 通过托管 MCP 与 ShowAI Cloud 账号接入，注册需要注册码或项目邀请。见 [ChatGPT 指南](chatgpt.zh-CN.md)。
-- **其他 MCP 客户端**，如 Gemini CLI、OpenCode（实验）— 手动配置 stdio MCP。见 [Agent 接入](agent-integration.zh-CN.md)。
+| Agent                                      | 状态   | 接入方式                                                                                                                       |
+| ------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| Claude Code                                | 正式   | ShowAI「设置 → 插件」→ 安装插件                                                                                                |
+| Codex                                      | 正式   | ShowAI「设置 → 插件」→ 安装插件                                                                                                |
+| 内置 Agent                                 | 正式   | 在 ShowAI 中使用本机 Codex 或 Claude Code 的登录、模型 API Key 或 Cloud                                                        |
+| DeepSeek Harness                           | 预览   | ShowAI「设置 → 插件」→ 准备插件，再在 DeepSeek Harness 中添加（[步骤](../../plugins/showai/README.zh-CN.md#deepseek-harness)） |
+| Kimi Work                                  | 预览   | 在 Kimi Work 中添加 ShowAI 的 MCP 服务和 [Kimi 插件](../../plugins-kimi/showai/README.md)                                      |
+| 网页版 ChatGPT                             | 邀请制 | 通过托管 MCP 与 ShowAI Cloud 账号接入，注册需要注册码或项目邀请（[指南](chatgpt.zh-CN.md)）                                    |
+| 其他 MCP 客户端（Gemini CLI、OpenCode 等） | 实验   | 手动配置 stdio MCP（[Agent 接入](agent-integration.zh-CN.md)）                                                                 |
 
 ## 💡 看看做出来的样子
 

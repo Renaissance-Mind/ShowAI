@@ -36,18 +36,15 @@ The agent saves the interface in ShowAI and shows it in the conversation (or as 
 
 ## 🤖 Supported agents
 
-| Agent          | How to connect                                                                         | Status    |
-| -------------- | -------------------------------------------------------------------------------------- | --------- |
-| Claude Code    | ShowAI → **Settings → Plugins** → Install plugin                                       | Supported |
-| Codex          | ShowAI → **Settings → Plugins** → Install plugin                                       | Supported |
-| Built-in agent | Inside ShowAI, using your local Codex or Claude Code sign-in, a model API key or Cloud | Supported |
-
-More agents:
-
-- **DeepSeek Harness** (preview) — **Settings → Plugins → Prepare plugin**, then add it in DeepSeek Harness. See [plugin documentation](plugins/showai/README.md).
-- **Kimi** (preview) — plugin in [`plugins-kimi`](plugins-kimi/showai/README.md).
-- **ChatGPT on the web** (invite only) — hosted MCP with a ShowAI Cloud account; registration needs a registration key or a project invitation. See the [ChatGPT guide](docs/chatgpt.md).
-- **Other MCP clients** such as Gemini CLI or OpenCode (experimental) — configure the stdio MCP entry manually. See [Agent integration](docs/agent-integration.md).
+| Agent                                     | Status       | How to connect                                                                                                                         |
+| ----------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code                               | Supported    | ShowAI → **Settings → Plugins** → Install plugin                                                                                       |
+| Codex                                     | Supported    | ShowAI → **Settings → Plugins** → Install plugin                                                                                       |
+| Built-in agent                            | Supported    | Inside ShowAI, using your local Codex or Claude Code sign-in, a model API key or Cloud                                                 |
+| DeepSeek Harness                          | Preview      | ShowAI → **Settings → Plugins** → Prepare plugin, then add it in DeepSeek Harness ([steps](plugins/showai/README.md#deepseek-harness)) |
+| Kimi Work                                 | Preview      | Add ShowAI's MCP server and the [Kimi plugin](plugins-kimi/showai/README.md) in Kimi Work                                              |
+| ChatGPT on the web                        | Invite only  | Hosted MCP with a ShowAI Cloud account; registration needs a key or a project invitation ([guide](docs/chatgpt.md))                    |
+| Other MCP clients (Gemini CLI, OpenCode…) | Experimental | Configure the stdio MCP entry by hand ([Agent integration](docs/agent-integration.md))                                                 |
 
 ## 💡 See what it makes
 
