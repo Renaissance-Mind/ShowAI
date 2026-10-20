@@ -370,8 +370,12 @@ export function useSurfaceViewport(
     const paintNow = () => {
       const c = camera.current;
       const transform = `translate3d(${c.x}px, ${c.y}px, 0) scale(${c.scale})`;
-      const changed = world.style.transform !== transform;
+      const previousTransform = world.style.transform;
       world.style.transform = transform;
+      // CSSOM normalizes values such as the translate3d z coordinate from 0
+      // to 0px. Compare serialized values on both sides so a layout refresh
+      // does not announce a camera move and hide the live native ink.
+      const changed = world.style.transform !== previousTransform;
       // Selection chrome and the dot grid read these to stay screen-sized.
       if (root.style.getPropertyValue("--board-zoom") !== String(c.scale))
         root.style.setProperty("--board-zoom", String(c.scale));
