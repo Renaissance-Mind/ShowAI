@@ -207,7 +207,9 @@ export default function PluginInstallSettings({ home }: { home: string }) {
                     ? t("otherSource")
                     : host.installed
                       ? host.enabled
-                        ? t("installed")
+                        ? host.current === false
+                          ? t("outdated")
+                          : t("installed")
                         : t("disabled")
                       : host.host === "deepseek" && host.installedPath
                         ? t("dshStaged")

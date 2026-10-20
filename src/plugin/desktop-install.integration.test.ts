@@ -58,13 +58,19 @@ describe.skipIf(!output || !config)(
       async (host) => {
         const first = await installer.install(host);
         expect(first.verifiedFiles).toBeGreaterThan(20);
+        const state = async () =>
+          (await installer.status()).find((item) => item.host === host)!;
+        expect(await state()).toMatchObject({ enabled: true, current: true });
         const repeated = await installer.install(host);
         expect(repeated.treeSha256).toBe(first.treeSha256);
         home = join(root, `library-${host}`);
         cli = { ...cli, env: { ...cli.env, SHOWAI_HOME: home } };
         await registerRuntime(home, cli);
+        // Another library makes the installed copy outdated until it is updated.
+        expect(await state()).toMatchObject({ enabled: true, current: false });
         const changed = await installer.install(host);
         expect(changed.version).not.toBe(first.version);
+        expect(await state()).toMatchObject({ enabled: true, current: true });
         const manifest = JSON.parse(
           await readFile(
             join(

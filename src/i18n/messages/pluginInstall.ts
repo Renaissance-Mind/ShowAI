@@ -13,6 +13,8 @@ export default defineMessages("pluginInstall", {
     otherSource:
       "已启用其他来源的 ShowAI 插件。若要改用 App 版本，请先在宿主中停用原插件，再重新检测。",
     installed: "已安装并启用",
+    outdated: "已安装并启用，有可用更新",
+    reinstall: "重新安装",
     disabled: "已安装，尚未启用",
     ready: "可安装",
     install: "安装插件",
@@ -57,6 +59,8 @@ export default defineMessages("pluginInstall", {
     otherSource:
       "ShowAI is enabled from another source. To use the App version, disable the original plugin in the host, then check again.",
     installed: "Installed and enabled",
+    outdated: "Installed and enabled · update available",
+    reinstall: "Reinstall",
     disabled: "Installed, disabled",
     ready: "Ready to install",
     install: "Install plugin",

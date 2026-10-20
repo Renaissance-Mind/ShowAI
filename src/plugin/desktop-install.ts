@@ -43,6 +43,8 @@ export interface PluginInstallation {
   installed: boolean;
   enabled: boolean;
   version?: string;
+  /** Codex and Claude Code: the installed copy is the one this App would install now (same plugin files, runtime and library). */
+  current?: boolean;
   installedPath?: string;
   otherSources: string[];
   error?: string;
@@ -217,9 +219,29 @@ export class DesktopPluginInstaller {
     };
   }
 
+  /**
+   * The version installHost() gives the plugin: the bundled manifest version plus a hash of the
+   * bundled files and this runtime launch, which includes the library. A different library, a moved
+   * App or a newer bundle changes it.
+   */
+  private async expectedVersion() {
+    const manifest = JSON.parse(
+      await readFile(join(this.options.pluginRoot(), "plugin.json"), "utf8"),
+    );
+    if (manifest.name !== "showai" || typeof manifest.version !== "string")
+      throw new Error("Invalid bundled ShowAI plugin.");
+    const original = await pluginFingerprint(this.options.pluginRoot());
+    const version = `${manifest.version}+desktop.${createHash("sha256")
+      .update(JSON.stringify([original.treeSha256, this.options.runtime()]))
+      .digest("hex")
+      .slice(0, 12)}`;
+    return { manifest, original, version };
+  }
+
   private async inspect(
     host: PluginHost,
     executable: string,
+    expected?: Promise<string>,
   ): Promise<PluginInstallation> {
     if (host === "deepseek") return this.inspectDsh(executable);
     const data = JSON.parse(await this.command(executable, ["list", "--json"]));
@@ -239,6 +261,8 @@ export class DesktopPluginInstaller {
       installed: !!own && (host !== "codex" || own.installed === true),
       enabled: own?.enabled === true,
       version: own?.version,
+      current:
+        !!own?.version && !!expected && own.version === (await expected),
       installedPath: own?.installedPath ?? own?.installPath,
       otherSources: items
         .filter((item) => {
@@ -256,6 +280,7 @@ export class DesktopPluginInstaller {
 
   async status() {
     await mkdir(this.options.root, { recursive: true });
+    let expected: Promise<string> | undefined;
     return Promise.all(
       (["codex", "claude", "deepseek"] as const).map(
         async (host): Promise<PluginInstallation> => {
@@ -270,7 +295,15 @@ export class DesktopPluginInstaller {
           if (!executable) return base;
           // Each host is an independent I/O boundary; one failure must not hide the other.
           try {
-            return await this.inspect(host, executable);
+            return await this.inspect(
+              host,
+              executable,
+              host === "deepseek"
+                ? undefined
+                : (expected ??= this.expectedVersion().then(
+                    (item) => item.version,
+                  )),
+            );
           } catch (error) {
             return {
               ...base,
@@ -366,16 +399,7 @@ export class DesktopPluginInstaller {
         );
     }
     const runtime = this.options.runtime();
-    const manifest = JSON.parse(
-      await readFile(join(this.options.pluginRoot(), "plugin.json"), "utf8"),
-    );
-    if (manifest.name !== "showai" || typeof manifest.version !== "string")
-      throw new Error("Invalid bundled ShowAI plugin.");
-    const original = await pluginFingerprint(this.options.pluginRoot());
-    const version = `${manifest.version}+desktop.${createHash("sha256")
-      .update(JSON.stringify([original.treeSha256, runtime]))
-      .digest("hex")
-      .slice(0, 12)}`;
+    const { manifest, original, version } = await this.expectedVersion();
     // Only this App-owned staging directory is replaced; host caches are managed by official CLIs.
     await rm(source, { recursive: true, force: true });
     await cp(this.options.pluginRoot(), source, {

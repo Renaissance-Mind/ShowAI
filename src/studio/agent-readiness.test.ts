@@ -7,7 +7,11 @@ import {
   agentReadiness,
   connectionHost,
 } from "./AgentReadiness";
-import { pluginActionLabel, pluginHostState } from "./usePluginHosts";
+import {
+  pluginActionLabel,
+  pluginHostState,
+  pluginUpToDate,
+} from "./usePluginHosts";
 
 const agent = (id: LocalAgent["id"], found: boolean, auth: LocalAgent["auth"]) =>
   ({
@@ -142,9 +146,19 @@ describe("host plugin connection", () => {
     expect(pluginHostState(host, "missing")).toBe("connect.signedOut");
     expect(pluginHostState(host)).toBe("connect.found");
     expect(pluginActionLabel(host)).toBe("install");
-    const installed = { ...host, installed: true, enabled: true };
-    expect(pluginHostState(installed, "ready")).toBe("connect.enabled");
-    expect(pluginActionLabel(installed)).toBe("update");
+    // Already running the plugin this App would install: offer only a repair.
+    const current = { ...host, installed: true, enabled: true, current: true };
+    expect(pluginHostState(current, "ready")).toBe("connect.enabled");
+    expect(pluginActionLabel(current)).toBe("reinstall");
+    expect(pluginUpToDate(current)).toBe(true);
+    // Installed from an older App, another library or a moved App: an update is due.
+    const outdated = { ...current, current: false };
+    expect(pluginHostState(outdated)).toBe("connect.outdated");
+    expect(pluginActionLabel(outdated)).toBe("update");
+    expect(pluginUpToDate(outdated)).toBe(false);
+    const disabled = { ...current, enabled: false };
+    expect(pluginHostState(disabled)).toBe("connect.disabled");
+    expect(pluginActionLabel(disabled)).toBe("update");
     expect(
       pluginHostState({ ...host, otherSources: ["showai@other"] }),
     ).toBe("connect.otherSource");

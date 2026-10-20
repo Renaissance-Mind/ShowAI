@@ -19,8 +19,15 @@ export function pluginActionLabel(host: PluginInstallation) {
       ? ("dshUpdate" as const)
       : ("dshPrepare" as const)
     : host.installed
-      ? ("update" as const)
+      ? host.enabled && host.current
+        ? ("reinstall" as const)
+        : ("update" as const)
       : ("install" as const);
+}
+
+/** Codex or Claude Code already runs the plugin this App would install; nothing to do. */
+export function pluginUpToDate(host: PluginInstallation) {
+  return host.installed && host.enabled && host.current === true;
 }
 
 /**
@@ -35,9 +42,11 @@ export function pluginHostState(
   if (host.error) return "connect.failed" as const;
   if (host.otherSources.length) return "connect.otherSource" as const;
   if (host.installed)
-    return host.enabled
-      ? ("connect.enabled" as const)
-      : ("connect.disabled" as const);
+    return !host.enabled
+      ? ("connect.disabled" as const)
+      : host.current === false
+        ? ("connect.outdated" as const)
+        : ("connect.enabled" as const);
   if (host.host === "deepseek" && host.installedPath)
     return "connect.dshStaged" as const;
   return auth === "ready"

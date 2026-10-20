@@ -11,6 +11,7 @@ import { workbenchCapabilities } from "./capabilities";
 import {
   pluginActionBlocked,
   pluginActionLabel,
+  pluginUpToDate,
   pluginHostNames,
   pluginHostState,
   usePluginHosts,
@@ -143,6 +144,7 @@ export default function Welcome({
                   </span>
                 </span>
                 {host.executable &&
+                  !pluginUpToDate(host) &&
                   (pluginActionBlocked(host) ? (
                     // Another plugin source or a host error is explained in Settings → Plugins.
                     <button
