@@ -18,6 +18,8 @@ const untitled = () => common("untitled");
 export interface LoadedPage extends PageRecord {
   components: CompiledComponent[];
   reuseComponents?: boolean;
+  reuseDocument?: boolean;
+  documentMetadata?: Partial<Pick<ShowDocument, "createdAt" | "updatedAt">>;
   readOnly?: boolean;
   incomingCrossDevice?: boolean;
 }
@@ -436,6 +438,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
                   pageId: source.id,
                   document: source,
                   baseHash: base.current,
+                  reuseDocument: true,
                   baseRevision: baseRevision.current,
                   knownComponents: recordRef.current?.components.map(
                     ({ id, version, integrity, scope }) => ({
@@ -453,6 +456,9 @@ export function createPageSession(options: PageSessionOptions): PageSession {
                 });
           const saved = {
             ...response,
+            document: response.reuseDocument
+              ? { ...source, ...response.documentMetadata }
+              : response.document,
             components: response.reuseComponents
               ? (recordRef.current?.components ?? [])
               : response.components,
@@ -470,7 +476,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
             const keys = (value: ShowDocument) =>
               JSON.stringify([value.content, value.layout, value.surfaceViews]);
             const installed =
-              keys(source) === keys(saved.document)
+              saved.reuseDocument || keys(source) === keys(saved.document)
                 ? {
                     ...saved.document,
                     content: editingSource.content,
