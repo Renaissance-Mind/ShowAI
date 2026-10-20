@@ -310,9 +310,9 @@ export function useInlineInk({
         const accepted = await bridge.frame({
           ...packet,
           ...(lastPoses !== poses ? { poses } : {}),
-          ...(lastDocument !== documentValue
-            ? { document: documentValue }
-            : {}),
+          // The bridge uses this model identity to verify nested DOM poses.
+          // It removes unchanged document payloads before native transport.
+          document: documentValue,
         });
         if (accepted === false) return;
         lastKey = key;
