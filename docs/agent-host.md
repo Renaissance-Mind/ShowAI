@@ -4,6 +4,8 @@
 
 Use **Ask AI** from selected text/cells, a block menu or selected Board objects. The Page toolbar opens project conversations. **Settings → Agent** configures execution location, local agents and model sources. Every execution path uses project-bound MCP and the Page's current hash/revision.
 
+The same selection, block, Board object and page menus offer **Copy reference** for an Agent running elsewhere, such as Claude Code or Codex in a terminal. ShowAI saves the page first, then copies a heading, a `showai://` link that opens the page and highlights the blocks, and one JSON line (`"type":"showai.reference"`) pinned to the saved hash/revision with block or Board object IDs and up to 20 text labels; the notice names the version. Agents read the IDs with ShowAI MCP and compare versions before writing, as the [use-showai Skill](../plugins/showai/skills/use-showai/SKILL.md) describes. Components that support it can **hand their current state** to the conversation: it appears as a removable chip in the Agent input, is sent only with your next message and is never saved to the Page.
+
 ## Choose where work runs
 
 | Location    | Setup                                                            | Requirements                                                            |

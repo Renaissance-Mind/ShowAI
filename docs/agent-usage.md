@@ -184,6 +184,8 @@ export default function Figure({ data, onChange, readOnly }) {
 }
 ```
 
+Readers can hand a component's current exploration state to the conversation when the host provides `onContext`; the [artifact format](artifact-format.md#authoring-and-reading-behavior) describes the snapshot, limits and host behavior.
+
 Components that handle scrolling or zoom can import `GestureBoundary` from `showai:components` and set `axes={["x"]}`, `["y"]`, `["zoom"]` or a combination. Claim only the input axes needed by that interaction.
 
 The SDK also exports `Callout`, `Toggle`, `Divider`, `Code`, `Chart`, `Database`, `Metrics`, `Playground`, `Gallery`, and `Bookmark`. Package-local React modules can nest normally. To reuse an existing custom component, declare its exact component ref in `manifest.dependencies`, then import its default export from `showai:component/ID`. The child must have verified editable source available in the selected project or shared catalog. Pass `readOnly` and connect child `onChange` callbacks to the parent's data; each child validates its own schema. The parent schema should define the complete data it stores, including nested child data.

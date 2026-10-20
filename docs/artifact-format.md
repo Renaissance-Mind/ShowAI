@@ -213,6 +213,8 @@ The page node stores a reference and props:
 
 The React entry exports a default component receiving `{ data, onChange?, readOnly }`. Use `onChange(nextData)` for authoring updates. In reading mode, persistent updates are disabled; local React state can still support temporary exploration. Installed package versions are **immutable**, so a source edit requires a new version.
 
+Hosts with a conversation also pass `onContext` and `context`. A reader action such as a "hand to chat" button calls `onContext({ model, private?, label? })` to give the conversation the current exploration state: `model` (JSON, at most 8 KiB) is visible to the Agent with the next message, `private` returns only to the same component instance, and `label` (at most 80 characters) names the chip; the whole snapshot is at most 16 KiB. The call returns `true` when handed over and `false` without a recent user gesture, and throws for invalid snapshots. The workbench shows it as a removable chip in the built-in Agent input, and MCP Apps hosts receive it through `ui/update-model-context`; neither saves the Page, sends a message or starts an Agent turn. While the hand-over is pending, a remounted instance receives it again as `context`. Exported HTML, previews and hosts without a conversation omit `onContext`, so render the control only when it exists. Exploration state is not part of the props schema.
+
 The compiler supports React and package-local imports. Desktop and ordinary HTML render each component in an iframe with `sandbox="allow-scripts"`; the component cannot use the desktop bridge, filesystem or external network. The catalog keeps original package files for editing, while each exported artifact includes a deduplicated `components` array:
 
 ```text

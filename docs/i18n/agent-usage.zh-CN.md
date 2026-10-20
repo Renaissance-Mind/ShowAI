@@ -77,6 +77,8 @@ showai catalog merge resolve --project PROJECT --input resolved-merge.json --jso
 
 父组件从 `showai:components` 导入内置组件；自定义子组件先在 `manifest.dependencies` 声明精确引用，再从 `showai:component/ID` 导入。传递 readOnly 并把子组件 onChange 接回父数据。编译后的父组件携带依赖，可离线运行；不能使用任意 npm 导入。
 
+宿主提供 `onContext` 时，读者可以把组件当前的探索状态交给对话；快照、上限与宿主行为见 [页面格式](artifact-format.zh-CN.md)。
+
 ## 模板
 
 新模板使用文件夹、严格 README 元信息、四阶段指南（intent、material、logic、design）和可选组件库：

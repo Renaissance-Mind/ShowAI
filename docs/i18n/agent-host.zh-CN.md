@@ -4,6 +4,8 @@
 
 在页面中通过选中文字、内容块菜单或白板对象菜单选择「让 AI 处理」，也可从顶栏打开项目对话。设置中的 Agent 页面配置执行位置、本机 Agent 与模型来源。所有执行路径使用项目绑定 MCP 与当前 hash/revision。
 
+同样的选中、内容块、白板对象与页面菜单提供「复制引用」，交给在其他地方运行的 Agent，例如终端里的 Claude Code 或 Codex。ShowAI 先保存页面，再复制一行标题、一条打开页面并高亮内容的 `showai://` 链接，以及一行固定在保存后 hash/revision 的 JSON（`"type":"showai.reference"`），含内容块或白板对象 ID 与至多 20 条文字标签；提示中会写出引用的版本。Agent 用 ShowAI MCP 按 ID 读取，写入前比较版本，见 [use-showai 技能](../../plugins/showai/skills/use-showai/SKILL.md)。支持的组件还可以「交给对话」：当前状态以可删标签出现在 Agent 输入框，只随下一条消息发送，不会保存到页面。
+
 ## iPad 与远程执行
 
 iPad 在 AI 面板和「设置 → Agent」中选择运行位置，项目的同步账号自动沿用。云端执行可以直接配置用户自己的 LLM API，也可以从服务器模型资源中选择已有来源。使用 ChatGPT 套餐时，先在 Mac 的 Agent 设置完成官方授权，将来源发布到自己的 ShowAI 服务器，再在 iPad 的服务器模型来源中添加；OpenAI 的 OSS 授权使用本机回调。发布后由服务器统一保管加密凭据并刷新授权，同一账号的云端 Agent 可以直接选用。

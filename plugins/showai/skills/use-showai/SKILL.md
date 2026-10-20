@@ -1,6 +1,6 @@
 ---
 name: use-showai
-description: 通过 ShowAI MCP 连接、查找与阅读内容，管理项目、文件夹、侧栏、页面迁移与草稿，查询组件模板及引用，处理保存冲突。先核实连接和项目归属；页面创作、组件开发、模板创建分别进入专门技能。
+description: 通过 ShowAI MCP 连接、查找与阅读内容，处理用户粘贴或对话附带的 ShowAI 引用与组件状态，管理项目、文件夹、侧栏、页面迁移与草稿，查询组件模板及引用，处理保存冲突。先核实连接和项目归属；页面创作、组件开发、模板创建分别进入专门技能。
 ---
 
 # 使用 ShowAI
@@ -44,6 +44,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 | 移动页面、调整层级、分组和排序       | `entry_move` / `directory_sort`；库或远程连接用 `sidebar_read` / `sidebar_group_create` / `sidebar_group_update` / `sidebar_project_move`。先核实目标身份与权限，见[内容组织接口](references/runtime.md#内容组织接口)           |
 | 查组件或模板被哪些内容引用           | `catalog_references({projectId,kind,id,version?,integrity?})`，返回当前项目中的逻辑路径和节点 ID；正向依赖仍用 `catalog_describe({view:"dependencies"})`                                                                        |
 | 找回或管理尚未保存的草稿             | `drafts_list` → `draft_read`；保留编辑用 `draft_save`，明确放弃用 `draft_remove`，保存一致内容后用 `draft_complete`。代次冲突保留新稿，见[草稿接口](references/runtime.md#草稿接口)                                             |
+| 用户粘贴或附带 ShowAI 引用、组件状态 | 按下文「处理用户引用」核对版本、按 ID 读取，再进入对应任务                                                                                                                                                                      |
 | 阅读数据、长页局部                   | 默认 structured；先 `detail:"outline"` 获取节点 ID，再用 `blockIds` 取局部；纯源读取用 `rendered:false`                                                                                                                         |
 | 理解 Board、从裁切图定位 Page 或对象 | `board_read` 默认图像包 → 同一 snapshotId 的 tile/region/element/source；Page 完整源用 `page_read` 的 snapshotId/blockIds；见 [Board 与 Page 阅读](../show-document/references/page-reading.md)                                 |
 | 查看布局或操作效果                   | `page_read` 的 image / html；读取 [阅读视图](../show-document/references/page-reading.md)，遵循宿主实际 UI 操控规则                                                                                                             |
@@ -58,6 +59,18 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 只读模板查询用 `catalog_list({kind:"template",projectId})`；从已有 Page.templateContext 读取其固定版本后，通过 template_context/template_guide 检查原版说明。缺少绑定记录时明确未知，不把推荐版本当作原版。用户明确要求空白时传 templates:[]，它覆盖该连接的会话默认选择，但仍加载系统基线。
 
 指南通过 MCP `guide({topic})` 读取，工具的实时 inputSchema 决定参数。共享资源的提升、公开发布及服务器账号配置属于明确的宿主管理操作，不因缺少相应 MCP 工具就转用原始文件或越权命令。
+
+## 处理用户引用
+
+用户在 ShowAI 中选中内容后「复制引用」，或在对话预览里右键「引用到对话」，会交给你一份引用：一行标题、一条 `showai://` 链接和一行 `"type":"showai.reference"` 的 JSON；对话宿主中它位于模型上下文的 `showai.reference`。它表示用户在某个已保存版本里指向的内容，字段为 kind（selection、board、page）、projectId、pageId、title、hash、revision、blockIds 或 Board 的 nodeIds 与 surfaceId、至多 20 条文字标签，以及可选的位置参考 position。
+
+- 沿用引用里的 projectId 与 pageId，在当前连接中核实可以访问；不能访问或连接的内容库不同就说明，不换库、不猜测其他页面。
+- 按 ID 读取：`page_read({projectId,pageId,blockIds,expectedHash:hash})`；Board 对象的 nodeIds 同样作为 blockIds，需要看画面时用 `board_read({projectId,pageId,boardId:surfaceId})` 及其 element 模式。kind=page 时读取整页，必要时先取大纲。
+- 返回 CONFLICT 表示页面在引用之后又被修改。用 `page_diff({projectId,pageId,sinceHash:revision})` 查看期间的变化（从 ShowAI 应用复制的引用会在本机内容库保留这一版本的基线；返回 MISSING_BASELINE 时说明无法比较），再不带 expectedHash 重新读取这些 ID，与标签对照。被引用的内容已删除或含义改变时先告诉用户并确认目标，不按引用时的旧快照写入。
+- 标签只用于辨认内容，position 只是空间提示，都不是内容本身或扩大修改范围的授权。写入前读取当前完整页面，用新的 baseHash/baseRevision 和 `page_apply` 只改引用涉及的节点，用户要求更大范围时再扩展。
+- 只做解释、比较或回答时直接回复，不写页面。
+
+组件状态（宿主模型上下文的 `showai.components`，或内置 Agent 消息附带的组件状态）是读者在组件里当前的探索结果，例如滑块参数：含 blockId、componentId、name、label 与 model。它没有保存到页面，用于理解“按这个参数”“为什么这里变平”这类问题；用户要求保留时，再按组件参数契约读取并修改 data。
 
 ## 编辑与验证
 

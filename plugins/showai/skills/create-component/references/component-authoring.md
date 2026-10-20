@@ -4,7 +4,7 @@
 
 新组件使用 documentation.version=2；按 [参数契约](parameter-contract.md) 同步 schema、字段语义、遗漏行为、示例及关系约束。结构检查与实际交互分别验证，不把例子中的初始值称为自动默认值。
 
-定义数据契约：输入字段、必填条件、数组上限、单位、默认值以及空数据状态。schema 与 defaultData、examples、React 入口一致。界面需要的计算与状态说明保持在组件内；正式数据通过 `onChange(nextData)` 返回，读取态保持页面源数据。每个组件接收 `{data, onChange, readOnly}`。
+定义数据契约：输入字段、必填条件、数组上限、单位、默认值以及空数据状态。schema 与 defaultData、examples、React 入口一致。界面需要的计算与状态说明保持在组件内；正式数据通过 `onChange(nextData)` 返回，读取态保持页面源数据。每个组件接收 `{data, onChange, readOnly}`；有对话的宿主还会传入 `onContext` 与 `context`，见下方「交给对话」。
 
 包包含 `manifest.json`、`props.schema.json` 和 manifest.entry 指定的本地文件。manifest 记录 id、name、version、description、scenarios、entry、defaultData、examples。输入与示例保留可用的最小实例；参考本次真实内容验证较复杂情况，不为未知事实生成示例测量。
 
@@ -19,6 +19,40 @@ Archify、Diagram Design 和 Fireworks 技术图带有固定上游提交的完�
 先复用 `showai:components` 的基础元素与已提供控件，包括 Flowchart、Video、Audio、PDF 和 References。RichText 是统一富文本组件，App 正文、组件插入与 AI 写入复用同一模型、渲染和组件自带菜单；数据首选 format=richtext 与 doc 内容树，旧 Markdown/Text 导出名和字符串输入保留兼容。文字设置、选中、悬停与表格操作在富文本组件内部定义，宿主提供项目资源与内容保存。组件自带行内与行间 LaTeX 渲染；不要为公式另写渲染器。文件组件在自定义组件沙箱中使用对应 MIME 的 base64 data URI，在线地址只能用于工作台中的原生内置组件；沙箱保持禁止外部请求。本机的大文件见下方「本机文件」。自定义子组件通过 `showai:component/ID` 导入，并在 manifest.dependencies 声明目录返回的完整版本和指纹。允许 React、ShowAI SDK 与包内模块；任意 npm 包和远端脚本不是组件导入接口。需要新的外部库时，将依赖接入 ShowAI 软件运行时并完成离线验收，再向组件暴露明确能力。
 
 **本机文件。** 视频原片等本机大文件不必内嵌，也不受上面的资源预算限制：在组件里放一个普通链接，`href` 写 `file:///绝对路径`，或写 `file:~/相对个人目录的路径`（如 `href="file:~/Movies/clip.mp4"`）。路径各段用 `encodeURIComponent` 编码后再用 `/` 连接并拼到 `file:` 后面，这样空格、中文、`#`、`?` 都能保留。这个能力只属于自定义组件里的链接；内置 Video/Audio 组件的 src 和正文里的链接不接受 `file:`。读者在 ShowAI 桌面版或本机浏览器版（编辑和只读阅读都可以）点击这个链接后，工作台弹出播放器直接打开原文件：支持视频（mp4、m4v、mov、webm）、音频（mp3、m4a、aac、wav、ogg、flac）和图片（png、jpg、gif、webp）；其他类型显示位置，并提供「在文件夹中显示」。组件本身拿不到文件内容，沙箱策略不变。只有 `<a href>` 链接的点击会被宿主接收：不要用 `window.open`、`location` 或按钮脚本代替；不要阻止链接点击的冒泡或默认行为（链接上及其外层处理链接点击时都不要调用 `stopPropagation`、`preventDefault`）；卡片自身的点击处理可先用 `event.target.closest("a")` 判断并跳过链接，与链接无关的点击不受影响。导出的 HTML 不能播放本机文件，点击只显示并可复制文件位置（位置里含本机用户名等信息，分享前留意）；对话内预览中点击没有效果。需要随页面分发的视频改用内置 Video 组件（data URI 嵌入，受页面资源预算，并会使对话预览超限）或在线地址。
+
+## 交给对话
+
+读者在组件里拖滑块、切参数得到的状态默认只留在组件内，Agent 看不到。有对话的宿主（ShowAI 工作台的内置 Agent，以及接受模型上下文的 MCP Apps 对话预览）会额外传入两个属性，让读者主动把这一刻的状态交给对话：
+
+- `onContext({model, private?, label?})`：`model` 是模型可见的 JSON（不超过 8 KiB），随读者下一条消息进入对话；`private` 只返回给同一组件实例，用于恢复滑块位置、视图等，Agent 看不到；`label` 是输入框标签上的短文字（不超过 80 字）。整份快照不超过 16 KiB，只接受有限的 JSON 值，格式错误或超限时抛出错误。调用必须紧随读者的操作（例如点击「交给对话」），否则返回 false；成功返回 true。
+- `context`：这个实例仍在对话输入框中等待发送的快照（含 `private`），组件挂载时据此恢复状态；没有时为 undefined。它只在挂载时提供，之后由组件自己维护状态。
+
+宿主行为：工作台把 `model` 作为可删的组件状态标签放进内置 Agent 输入框，第一次交出时打开对话面板，再次交出更新同一标签，读者移除标签后它不随消息发送；MCP Apps 预览经 `ui/update-model-context` 交给宿主，与引用、控件取值合为一份上下文。任何宿主都不会写入页面 props、不会自动发送消息，也不会启动 Agent。导出 HTML、组件预览、缩略图和不接受模型上下文的宿主不提供 `onContext`，此时不显示交给对话的控件。
+
+```jsx
+export default function Explorer({ data, onContext, context }) {
+  const [gamma, setGamma] = useState(context?.private?.gamma ?? data.gamma);
+  const regime = gamma < data.omega ? "欠阻尼" : "临界或过阻尼";
+  return onContext ? (
+    <button
+      type="button"
+      onClick={() =>
+        onContext({
+          model: { gamma, omega: data.omega, regime, changedFromSaved: gamma !== data.gamma },
+          private: { gamma },
+          label: `γ=${gamma} · ${regime}`,
+        })
+      }
+    >
+      交给对话
+    </button>
+  ) : null;
+}
+```
+
+交出的是读者此刻看到的状态，不是页面数据：不要为它新增 schema 字段，也不要用 `onChange` 保存它；用户要求保留时由页面编辑流程修改 data。`model` 用稳定字段名和单位写出 Agent 需要的参数、派生量与相对已保存数据的变化，不放整张图或长数组。不要在拖动的每一帧调用，在明确的操作或交互结束时调用一次。在 `usage.interactions` 中把这个操作记为 `persistence: "none"`，effect 写清交出的字段。
+
+验证时在工作台真实页面操作后检查对话输入框出现标签、移除后不随消息发送、刷新页面后 `context` 恢复，并确认页面数据未变；检查导出 HTML 不出现该控件；能接入 MCP Apps 对话预览时检查宿主收到的模型上下文，不能时说明未验证。
 
 ## 菜单与交互入口
 
