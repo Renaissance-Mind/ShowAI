@@ -285,7 +285,8 @@ function SandboxComponent({
         type: "showai:props",
         props: current.parsed.props,
         readOnly: !!current.readOnly || !current.onChange,
-        context: !!current.assistant,
+        // Previews and dialogs are not page blocks, so they cannot hand over state.
+        context: !!current.assistant && !!blockId(),
       },
       "*",
     );
