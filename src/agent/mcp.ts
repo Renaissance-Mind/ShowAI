@@ -284,7 +284,7 @@ export function createMcpServer(options: {
     "project_context",
     {
       description:
-        "Initialize page/component work: inspect the bound project and receive the complete compact component index, revision and workflow guidance. It cannot select another project.",
+        "Initialize page/component work: inspect the bound project and receive the complete compact component index (names, descriptions, scenarios and one-line props signatures), its revision and workflow guidance. It cannot select another project.",
       inputSchema: {
         knownCatalogRevision: z
           .string()
@@ -571,7 +571,7 @@ export function createMcpServer(options: {
     "catalog_list",
     {
       description:
-        "Return all component/template names, descriptions and scenarios, with identities for detail lookup. Components default to built-ins plus the selected project's components; explicitly set scope to query global/published/all. Omit query/limit/cursor for the full result; explicit limit/cursor opts into pagination. Schemas, examples and source require catalog_describe.",
+        "Return all component/template names, descriptions and scenarios, plus a one-line props signature per component, with identities for detail lookup. Components default to built-ins plus the selected project's components; explicitly set scope to query global/published/all. Omit query/limit/cursor for the full result; explicit limit/cursor opts into pagination. Full schemas, examples and source require catalog_describe.",
       inputSchema: {
         kind: z.enum(["component", "template"]).optional(),
         scope: scopeSchema.optional(),

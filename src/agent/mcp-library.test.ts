@@ -230,6 +230,7 @@ test("catalog discovery returns all compact entries, with optional pagination be
           "id",
           "name",
           "description",
+          "signature",
           "scenarios",
           "scope",
           "reuse",

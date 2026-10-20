@@ -55,7 +55,7 @@ Ordinary research, comparison and report tasks default to **one resource Page**.
 
 ## Discover resources, then request one view
 
-Read the full accessible catalog of names, descriptions and scenarios before inspecting individual resources:
+Read the full accessible catalog of names, descriptions, scenarios and one-line component signatures before inspecting individual resources:
 
 ```sh
 showai catalog list --kind component --project PROJECT --json
@@ -67,7 +67,7 @@ showai catalog describe chart --kind component --view examples --project PROJECT
 
 ### Catalog results
 
-A list returns `{ items, total, limit, nextCursor, next }`. By default it returns all matching names, descriptions and scenarios, plus IDs, scopes and available revision identities for detail lookup. Omit query, limit and cursor for the complete accessible catalog. Component discovery with no scope returns all built-ins plus the selected project’s components (built-ins only when no project is selected). Use an explicit global, published or all scope to include shared components; template discovery retains its all-scope default. Preserve the returned scope/version/integrity when describing an entry so same-ID components remain unambiguous. Public catalog listing returns all public entries by default. Explicit limits from 1 to 50 opt into pagination; pass the returned cursor with the same limit, query and scope to continue. If the catalog changes, restart without a cursor. Catalog content enters Agent context when the tool is called, not automatically at session startup.
+A list returns `{ items, total, limit, nextCursor, next }`. By default it returns all matching names, descriptions and scenarios, plus IDs, scopes and available revision identities for detail lookup. Each component entry also carries a one-line `signature` derived from its props schema: the data fields with their types, required fields first; nested structures collapse to `{…}` and trailing fields to `…` when the line would exceed 320 characters. Use it to judge fit and prepare data; field meanings, omission behavior and relation rules remain in the guide and parameters views. Omit query, limit and cursor for the complete accessible catalog. Component discovery with no scope returns all built-ins plus the selected project’s components (built-ins only when no project is selected). Use an explicit global, published or all scope to include shared components; template discovery retains its all-scope default. Preserve the returned scope/version/integrity when describing an entry so same-ID components remain unambiguous. Public catalog listing returns all public entries by default. Explicit limits from 1 to 50 opt into pagination; pass the returned cursor with the same limit, query and scope to continue. If the catalog changes, restart without a cursor. Catalog content enters Agent context when the tool is called, not automatically at session startup.
 
 ### Scope and exact versions
 
@@ -75,7 +75,7 @@ Lookup uses the selected project, then global and published libraries, with buil
 
 | View                | What is returned                                                                                   |
 | ------------------- | -------------------------------------------------------------------------------------------------- |
-| `summary` (default) | Identity and scope; component purpose/scenarios/effects, or template scenarios                     |
+| `summary` (default) | Identity and scope; component signature, purpose/scenarios/effects, or template scenarios          |
 | `guide`             | Usage guidance, component node shape, or template content guide and related resources              |
 | `schema`            | Component props schema, or the template-definition input shape                                     |
 | `examples`          | Relevant examples and, for components, default data                                                |

@@ -38,7 +38,7 @@ description: 通过 ShowAI MCP 制作、续改、展示和导出可交互报告�
 
 复杂新作品先查模板目录 `catalog_list({kind:"template",projectId})`，按读者任务与材料判断适配性；匹配则选用，用户要求空白或没有匹配时只用系统基线。用户指定模板优先；未指定时可沿用会话绑定。明确要求空白时在 template_context 和 template_guide 传 templates:[]。续改从源 Page 的 templateContext 恢复精确引用；没有记录时按现有页面与系统基线判断，不猜测它原先使用的模板。
 
-调用 template_context({projectId,templates?,knownSystemHash?}) 取得系统基线、所选模板 README、固定引用和组件索引；保留 context.templates，组件较多时按 componentPage 分页。进入某阶段时才读 template_guide({projectId,stage,templates:context.templates})，一次一个阶段。四阶段为 intent、material、logic、design。knownSystemHash 对应系统基线正文，knownHash 对应已持有的 context 或某阶段指南响应；都只用于本轮确实读到的同一内容。
+调用 template_context({projectId,templates?,knownSystemHash?}) 取得系统基线、所选模板 README、固定引用和带 signature 的组件索引；保留 context.templates，组件较多时按 componentPage 分页。进入某阶段时才读 template_guide({projectId,stage,templates:context.templates})，一次一个阶段。四阶段为 intent、material、logic、design。knownSystemHash 对应系统基线正文，knownHash 对应已持有的 context 或某阶段指南响应；都只用于本轮确实读到的同一内容。
 
 ## 四个阶段
 
@@ -57,7 +57,7 @@ description: 通过 ShowAI MCP 制作、续改、展示和导出可交互报告�
 
 制作只做一件事：把设计稿落实为 Page。应用模板用 template_apply（空白 Page，绑定本轮固定引用）；空白路径用 page_create，只传标题和少量（一到几个）`blocks:[{kind,data}]`，不手写整棵 document。按设计稿的幕顺序填入真实内容：导语、图形或组件、图注与要点；新增内容用 page_apply 的 `component.insert`，一次插入一到几个组件，例如 `operations:[{type:"component.insert",kind:"text",data:{format:"markdown",content:"..."},afterId:"上一块ID"}]`。`blocks` 与 `component.insert` 的 kind/data 相同：data 就是该组件的参数，文字统一用 `{kind:"text",data:{format:"markdown",content}}`；afterId 省略时追加到末尾，为 null 时放在最前。page_create 返回含块 ID 的完整 document 与 hash/revision；page_apply 的 receipt 只含 hash/revision，按顺序追加时省略 afterId 即可，需要新块 ID 作锚点时用 response:"source"。每幕完成后记录实现它的 blockIds。
 
-选择组件后读其精确 guide，再按当前材料用 parameters 的 parameterPath 查字段含义、约束与例子；只在需要原始结构时读 schema。模板组件采用 template_context 返回的 componentId/version/integrity，不把局部名字当内置 kind。guide 返回 authoringReference 时沿用精确引用读取制作索引，流程见 [组件设计](../create-component/references/component-authoring.md)。现有数据调整或组合够用时复用；设计稿中确认的缺口进入 [create-component](../create-component/SKILL.md)。编辑 Board 的绘画、对象属性、布局或连接时读 [Board 对象编辑](references/board-authoring.md)。需要具体操作时才读 guide authoring/containers/document 等技术说明。
+索引条目的 signature 一行给出组件参数的字段与类型，内置组件对应 data，自定义组件对应 data.props；用它判断适配、准备数据和核对顶层必填项，嵌套字段的必填与含义以 parameters 为准。选择组件后读其精确 guide，再按当前材料用 parameters 的 parameterPath 查字段含义、约束与例子；只在需要原始结构时读 schema。模板组件采用 template_context 返回的 componentId/version/integrity，不把局部名字当内置 kind。guide 返回 authoringReference 时沿用精确引用读取制作索引，流程见 [组件设计](../create-component/references/component-authoring.md)。现有数据调整或组合够用时复用；设计稿中确认的缺口进入 [create-component](../create-component/SKILL.md)。编辑 Board 的绘画、对象属性、布局或连接时读 [Board 对象编辑](references/board-authoring.md)。需要具体操作时才读 guide authoring/containers/document 等技术说明。
 
 修改前 page_read({projectId,pageId,rendered:false,response:"source"}) 读取完整源与 hash/revision；局部编辑保留必要基线，不用局部 source 覆盖整页。优先 page_apply 的稳定节点操作，response:"receipt" 只收保存回执。修改已有组件数据用 `component.props.set`（blockId 加变化的顶层 props；每个列出的顶层键整体替换，不做深度合并，嵌套值要读出后改好整段回写）。改已有段落或标题的文字用 `block.text.set`（该段落/标题 ID 和纯文本）；Board 上矩形、椭圆或箭头的文字是绘画属性，用 `block.attrs.set` 改 `label`/`labelSize`，见 [Board 对象编辑](references/board-authoring.md)；需要新格式时删除旧文本块，再用 `component.insert` 插入 Markdown 文本块。单次参数保持浅而短，大改动拆成几次顺序 apply，每次沿用返回的 hash/revision。需要新模板绑定时以 page.set.fields.templateContext 保存 template_context 返回的 format/system/templates，去掉 hash。CONFLICT 必须比较基线、当前内容和尝试稿，保留无关修改；处理流程见 [use-showai](../use-showai/SKILL.md)。
 

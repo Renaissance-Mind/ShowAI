@@ -137,6 +137,8 @@ export interface ComponentMetadata extends ComponentManifest {
   scope: CatalogScope;
   integrity: string;
   updatedAt: string;
+  /** One-line type summary of the props schema, derived when the package is projected. */
+  signature?: string;
   parents?: PackageRevisionRef[];
   mergeBase?: PackageRevisionRef;
 }

@@ -47,11 +47,11 @@ showai catalog describe chart --kind component --project PROJECT --view examples
 showai catalog describe COMPONENT --project PROJECT --view parameters --parameter-path PATH --parameter-offset 0 --parameter-limit 20 --json
 ```
 
-默认组件发现返回内置项与当前项目组件。明确查询 global/published/all 作用域可包含共享项。模板保留全部作用域的默认行为。省略 query、limit、cursor 可取得完整可访问目录；明确 limit（1–50）启用分页，并按返回的游标继续。目录变化后重新开始。
+默认组件发现返回内置项与当前项目组件。明确查询 global/published/all 作用域可包含共享项。模板保留全部作用域的默认行为。省略 query、limit、cursor 可取得完整可访问目录；明确 limit（1–50）启用分页，并按返回的游标继续。目录变化后重新开始。每个组件条目还带一行由 props schema 生成的 `signature`：data 的字段与类型，必填在前；超过 320 个字符时嵌套结构折叠为 `{…}`、末尾字段折叠为 `…`。用它判断适配和准备数据；字段含义、省略行为和关系规则仍在 guide 与 parameters 视图。
 
 | view                  | 返回内容                                         |
 | --------------------- | ------------------------------------------------ |
-| `summary`             | 身份、作用域、用途与场景                         |
+| `summary`             | 身份、作用域、signature、用途与场景              |
 | `guide`               | 使用约定、节点形状或模板说明                     |
 | `parameters`          | 精确组件版本的参数含义、约束、省略行为与真实示例 |
 | `schema` / `examples` | 数据结构 / 示例及默认初始化数据                  |

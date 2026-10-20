@@ -19,7 +19,7 @@ Within a scope, an ID/version identifies one immutable package. Identical reimpo
 
 ## Discover and compose
 
-Read current catalog metadata, then a selected revision's usage guide, parameters, schema/examples and, when developing, source. The default component list includes built-ins and the selected project's revisions; request global/published/all scopes for other entries. Explicit pagination returns cursors that must be restarted when the catalog changes.
+Read current catalog metadata, where each component entry carries a one-line signature of its data fields and types, then a selected revision's usage guide, parameters, schema/examples and, when developing, source. The default component list includes built-ins and the selected project's revisions; request global/published/all scopes for other entries. Explicit pagination returns cursors that must be restarted when the catalog changes.
 
 Markdown (`text`) combines headings, paragraphs, lists, quotations, code and dividers. Image/table components provide dedicated editing. `showai:components` exports these and the other built-in React implementations for custom parents.
 

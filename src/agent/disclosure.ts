@@ -1,8 +1,10 @@
 import { createHash } from "node:crypto";
 import type {
   CatalogScope,
+  JsonSchema,
   PackageRevisionRef,
 } from "../components/custom/types";
+import { componentSignature } from "../portable/component-signature.mjs";
 
 export const CATALOG_VIEWS = [
   "summary",
@@ -64,6 +66,8 @@ export interface CatalogSummary {
   version?: string;
   integrity?: string;
   description?: string;
+  /** One-line props type summary derived from the schema; components only. */
+  signature?: string;
   scenarios: string[];
   parameterDocumentation?: {
     version: number | null;
@@ -137,6 +141,16 @@ export function summarizeCatalog(
   const version = typeof item.version === "string" ? item.version : undefined;
   const integrity =
     typeof item.integrity === "string" ? item.integrity : undefined;
+  const schema =
+    kind === "component"
+      ? ((item.propsSchema ?? item.schema) as JsonSchema | undefined)
+      : undefined;
+  const signature =
+    kind === "component" && typeof item.signature === "string"
+      ? item.signature
+      : schema !== undefined
+        ? componentSignature(id, schema)
+        : undefined;
   const scenarios = Array.isArray(item.scenarios)
     ? item.scenarios.filter(
         (value): value is string => typeof value === "string",
@@ -149,6 +163,7 @@ export function summarizeCatalog(
     id,
     name: String(item.name ?? id),
     description: typeof item.description === "string" ? item.description : "",
+    ...(signature ? { signature } : {}),
     scope,
     ...(kind === "template" && item.workflow
       ? {
@@ -243,6 +258,7 @@ export function catalogEntry(item: CatalogSummary) {
     version,
     integrity,
     description,
+    signature,
     scenarios,
     reuse,
     documentationStatus,
@@ -253,6 +269,7 @@ export function catalogEntry(item: CatalogSummary) {
     id,
     name,
     description: description ?? "",
+    ...(signature ? { signature } : {}),
     scenarios,
     scope,
     ...(reuse ? { reuse, documentationStatus } : {}),

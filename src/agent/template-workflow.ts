@@ -9,6 +9,7 @@ import {
   templateFilePath,
   type TemplateStage,
 } from "../portable/template-bundle.mjs";
+import { componentSignature } from "../portable/component-signature.mjs";
 import type {
   CatalogScope,
   PackageRevisionRef,
@@ -139,14 +140,16 @@ export async function templateContext(
       ? parseTemplateBundle(template.bundle)
       : undefined;
     for (const binding of template.workflow?.components ?? []) {
-      const component = source!.components.find(
+      const bundled = source!.components.find(
         (item) => item.id === binding.id,
-      )!.source.manifest;
+      )!.source;
+      const component = bundled.manifest;
       components.push({
         localId: binding.id,
         template: ref(template, projectId),
         ref: { ...binding.ref, scope: template.scope },
         name: component.name,
+        signature: componentSignature(component.id, bundled.schema),
         description: component.description.slice(0, 240),
         ...(component.description.length > 240
           ? { descriptionTruncated: true }

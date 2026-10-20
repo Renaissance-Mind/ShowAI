@@ -89,6 +89,7 @@ import { changeContext } from "./history-context";
 import { mergeValues } from "./catalog-merge";
 import { readCustomBlockData } from "../components/custom/contract";
 import { parameterRuleIssues } from "../portable/component-parameters.mjs";
+import { componentSignature } from "../portable/component-signature.mjs";
 import {
   assertJsonValue,
   assertProps,
@@ -2145,16 +2146,21 @@ async function componentMetadata(
       });
     }
     projection = await task;
-    if (projection.entries[cacheKey])
+    // Entries projected before signatures existed are rebuilt from the package.
+    if (typeof projection.entries[cacheKey]?.signature === "string")
       return structuredClone(projection.entries[cacheKey]);
   }
   const {
     html: _html,
     inline: _inline,
-    schema: _schema,
+    schema,
     sourceIntegrity: _source,
-    ...metadata
+    ...rest
   } = await readCompiled(home, path, scope);
+  const metadata: ComponentMetadata = {
+    ...rest,
+    signature: componentSignature(rest.id, schema),
+  };
   if (projection && cacheKey) {
     projection.entries[cacheKey] = structuredClone(metadata);
     // Bound retained historic metadata too; it is always derivable from immutable packages.

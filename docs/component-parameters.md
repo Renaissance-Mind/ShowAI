@@ -28,7 +28,7 @@ The same portable relation function is used for default/example validation, actu
 
 ## Progressive querying
 
-Check showai_capabilities.componentParameters.protocol for showai-component-parameters-v1. Read catalog metadata first, then the exact component guide. Version 2 guides link to the parameter reference rather than returning a duplicate full schema.
+Check showai_capabilities.componentParameters.protocol for showai-component-parameters-v1. Read catalog metadata first; each component entry's one-line `signature` shows the data fields and types. Then read the exact component guide. Version 2 guides link to the parameter reference rather than returning a duplicate full schema.
 
 ```json
 {

@@ -30,7 +30,7 @@ usage.rules 支持数组值/ID 唯一、作用域引用、零起始索引与数�
 
 ## 按需查询
 
-先检查 `showai_capabilities.componentParameters.protocol` 为 `showai-component-parameters-v1`，再读目录元数据和精确组件 guide。v2 guide 指向参数参考，避免重复返回完整 schema。
+先检查 `showai_capabilities.componentParameters.protocol` 为 `showai-component-parameters-v1`，再读目录元数据，其中组件条目的一行 `signature` 给出字段与类型，然后读精确组件 guide。v2 guide 指向参数参考，避免重复返回完整 schema。
 
 ```json
 {

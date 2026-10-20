@@ -237,7 +237,7 @@ export function registerPresentationTools(
     "public_catalog_list",
     {
       description:
-        "Return all public component/template names, descriptions and scenarios by default, without login or synchronization. Omit query/limit/cursor for the full catalog; explicit limit/cursor opts into pagination. Read details with public_catalog_describe.",
+        "Return all public component/template names, descriptions and scenarios, plus a one-line props signature per component, without login or synchronization. Omit query/limit/cursor for the full catalog; explicit limit/cursor opts into pagination. Read details with public_catalog_describe.",
       inputSchema: {
         kind: z.enum(["component", "template"]).optional(),
         query: z.string().optional(),
