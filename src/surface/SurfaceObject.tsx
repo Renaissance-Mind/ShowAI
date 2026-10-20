@@ -435,12 +435,12 @@ export function SurfaceObject({
         }
       }}
     >
-      {drawing &&
+      {(drawing || (container && positioned && !!board)) &&
         !actions.readOnly &&
         (board?.ids.has(id) ?? actions.selected === id) && (
           <div
-            className="board-object-outline"
-            style={outline}
+            className={`board-object-outline${container ? " board-selection-drag-area" : ""}`}
+            style={drawing ? outline : { inset: 0 }}
             aria-hidden="true"
           />
         )}

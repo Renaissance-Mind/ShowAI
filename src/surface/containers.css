@@ -596,3 +596,12 @@
   > .page-surface:focus-visible {
   outline: none;
 }
+
+/* A selected Page moves as a whole, including over its nested editor/iframe. */
+.board-selection-drag-area {
+  outline: none;
+  pointer-events: auto;
+  z-index: 2;
+  touch-action: none;
+  cursor: move;
+}
