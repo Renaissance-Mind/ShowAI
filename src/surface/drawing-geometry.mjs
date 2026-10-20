@@ -9,6 +9,11 @@ import {
   rotatePoint,
 } from "./geometry.mjs";
 import { polygonContains } from "./lasso.mjs";
+import {
+  isPortableInk,
+  portableInkHit,
+  portableInkBounds,
+} from "./portable-ink.mjs";
 
 /** A lasso selects enclosed paint and any contour touched by its trace. */
 export function shapeIntersectsPolygon(node, frame, polygon, tolerance = 0) {
@@ -96,6 +101,8 @@ export function shapeIntersectsPolygon(node, frame, polygon, tolerance = 0) {
 /** Geometry is the painted centerline, independent of SVG viewport padding. */
 export function drawingBounds(node) {
   if (node.type !== "drawing") return null;
+  if (isPortableInk(node.attrs.ink))
+    return portableInkBounds(node.attrs.ink, node.attrs.strokeWidth);
   if (node.attrs.ink)
     return {
       x: 0,
@@ -194,7 +201,10 @@ function drawingOutline(node, frame, p = { x: Infinity, y: Infinity }) {
     b = local.at(-1);
   let vertices = local,
     inside = false;
-  if (tool === "rectangle" || node.attrs.ink) {
+  if (
+    tool === "rectangle" ||
+    (node.attrs.ink && !isPortableInk(node.attrs.ink))
+  ) {
     vertices = [
       { x: box.x, y: box.y },
       { x: box.x + box.width, y: box.y },
@@ -310,6 +320,25 @@ export function shapeHit(node, frame, point) {
     );
   p.x -= frame.x;
   p.y -= frame.y;
+  if (isPortableInk(node.attrs.ink)) {
+    const result = portableInkHit(
+      node.attrs.ink,
+      {
+        x: (p.x * node.attrs.extent[0]) / frame.width,
+        y: (p.y * node.attrs.extent[1]) / height,
+      },
+      node.attrs.strokeWidth,
+    );
+    return {
+      ...result,
+      distance:
+        result.distance *
+        Math.min(
+          frame.width / node.attrs.extent[0],
+          height / node.attrs.extent[1],
+        ),
+    };
+  }
   const { vertices, inside, box } = drawingOutline(node, frame, p);
   const a = vertices[0];
   let distance =
@@ -343,7 +372,7 @@ export function shapeIntersects(node, frame, rect, wrap = false) {
   if (contains) return true;
   if (wrap || node.type === "surface" || node.type === "region") return false;
   if (!intersectsFrame(geometryFrame(node, frame), rect)) return false;
-  if (node.attrs?.ink) return true;
+  if (node.attrs?.ink && !isPortableInk(node.attrs.ink)) return true;
   if (node.type !== "drawing") return true;
   if (
     node.attrs.fillColor &&

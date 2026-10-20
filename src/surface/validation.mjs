@@ -1,5 +1,6 @@
 import { objectCapabilities, bindingParent } from "./geometry.mjs";
 import { validateNativeInk } from "./native-ink.mjs";
+import { isPortableInk } from "./portable-ink.mjs";
 import { labelCapable, MAX_LABEL_LENGTH } from "./drawing-label.mjs";
 import { isResource, fillResource, surfaceKind } from "./containers.mjs";
 import { fillSurfaceLayout, visitNodes } from "./document.mjs";
@@ -190,7 +191,10 @@ function validateResource(document) {
     if (node.type === "drawing") {
       if (node.attrs.ink !== undefined) {
         validateNativeInk(node.attrs.ink);
-        if (node.attrs.tool !== "pen")
+        if (
+          node.attrs.tool !== "pen" &&
+          !(isPortableInk(node.attrs.ink) && node.attrs.tool === "highlighter")
+        )
           throw new Error("Native ink uses the pen drawing tool.");
       }
       if (owner?.attrs.kind !== "board")
@@ -242,7 +246,8 @@ function validateResource(document) {
           finite(point.pressure, 0, 1, "point.pressure");
       }
       if (
-        (node.attrs.label !== undefined || node.attrs.labelSize !== undefined) &&
+        (node.attrs.label !== undefined ||
+          node.attrs.labelSize !== undefined) &&
         !labelCapable(node)
       )
         throw new Error(

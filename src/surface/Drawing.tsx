@@ -14,6 +14,8 @@ import {
   labelPadding,
 } from "./drawing-label.mjs";
 import { pressureOutline } from "./pressure-stroke";
+import { isPortableInk, isInkNode } from "./portable-ink.mjs";
+import { PortableInkPaths } from "./PortableInkPaths";
 import { fingerNavigatesBoard } from "./board-input.mjs";
 import { flushSync } from "react-dom";
 import { ObjectContext } from "./SurfaceObject";
@@ -109,7 +111,9 @@ export function Drawing({
     last = preview?.key === "end" ? preview.point : points.at(-1)!;
   const path =
     tool === "arrow" ? arrowPath(first, last, strokeWidth) : smoothPath(points);
-  const shape = node.attrs!.ink ? (
+  const shape = isPortableInk(node.attrs!.ink) ? (
+    <PortableInkPaths ink={node.attrs!.ink} color={color} width={strokeWidth} />
+  ) : node.attrs!.ink ? (
     <>
       <image
         className={node.attrs!.ink.darkPreview ? "board-ink-light" : undefined}
@@ -161,8 +165,8 @@ export function Drawing({
     <>
       <svg
         className="board-drawing"
-        data-native-ink={node.attrs!.ink ? "" : undefined}
-        data-native-ink-id={node.attrs!.ink ? node.attrs!.id : undefined}
+        data-native-ink={isInkNode(node) ? "" : undefined}
+        data-native-ink-id={isInkNode(node) ? node.attrs!.id : undefined}
         viewBox={`0 0 ${extent[0]} ${extent[1]}`}
         preserveAspectRatio="none"
         role="img"
@@ -171,7 +175,13 @@ export function Drawing({
         <g
           fill={tool === "rectangle" || tool === "ellipse" ? fillColor : "none"}
           stroke={color}
-          opacity={tool === "highlighter" ? 0.35 : 1}
+          opacity={
+            isPortableInk(node.attrs!.ink)
+              ? 1
+              : tool === "highlighter"
+                ? 0.35
+                : 1
+          }
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -800,8 +810,8 @@ function DrawingLabel({
   };
   if (tool === "arrow") {
     Object.assign(style, {
-      left: `${(((first.x + last.x) / 2) / extent[0]) * 100}%`,
-      top: `${(((first.y + last.y) / 2) / extent[1]) * 100}%`,
+      left: `${((first.x + last.x) / 2 / extent[0]) * 100}%`,
+      top: `${((first.y + last.y) / 2 / extent[1]) * 100}%`,
     });
   } else {
     const box = labelBox(tool, extent[0], extent[1], strokeWidth);

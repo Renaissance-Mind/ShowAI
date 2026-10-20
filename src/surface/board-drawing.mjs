@@ -1,5 +1,6 @@
 import { creationPoints, snapCreation } from "./drawing-geometry.mjs";
 import { pointsBounds } from "./geometry.mjs";
+import { createPortableInk } from "./portable-ink.mjs";
 
 /** Release coordinates are authoritative even if no move/paint frame was delivered. */
 export function finishBoardDrawing(tool, style, gesture, modifiers = {}) {
@@ -83,8 +84,25 @@ export function finishBoardDrawing(tool, style, gesture, modifiers = {}) {
         points: points.map((point) => ({
           x: point.x - frame.x,
           y: point.y - frame.y,
-          ...(freehand && point.pressure !== undefined ? { pressure: point.pressure } : {}),
+          ...(freehand && point.pressure !== undefined
+            ? { pressure: point.pressure }
+            : {}),
         })),
+        ...(freehand
+          ? {
+              ink: createPortableInk(
+                points.map((p) => ({
+                  ...p,
+                  x: p.x - frame.x,
+                  y: p.y - frame.y,
+                })),
+                style.strokeWidth,
+                [frame.width, frame.height],
+                tool === "highlighter" ? "marker" : "pen",
+                style.pressure,
+              ),
+            }
+          : {}),
       },
     },
     frame,

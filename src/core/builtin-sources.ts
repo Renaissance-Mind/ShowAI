@@ -41,6 +41,7 @@ import themeTokens from "../design/tokens.css?raw";
 import themeContent from "../design/content.css?raw";
 import contract from "../components/blocks/primitive-contract.mjs?raw";
 import nativeInkContract from "../surface/native-ink.mjs?raw";
+import portableInkContract from "../surface/portable-ink.mjs?raw";
 import nativeInkPreview from "../surface/NativeInkPreview.tsx?raw";
 import nativeInkCss from "../surface/native-ink.css?raw";
 import capacity from "../portable/capacity.mjs?raw";
@@ -203,6 +204,7 @@ const sources: Record<string, string> = {
   "expandable-search.css": expandableSearchCss,
   "primitive-contract.mjs": contract,
   "native-ink.mjs": nativeInkContract,
+  "portable-ink.mjs": portableInkContract,
   "NativeInkPreview.tsx": nativeInkPreview,
   "native-ink.css": nativeInkCss,
   "capacity.mjs": capacity,

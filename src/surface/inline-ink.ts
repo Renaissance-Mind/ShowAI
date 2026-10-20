@@ -2,6 +2,8 @@ import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import type { NodeLayout } from "./types";
 import { findSurfaceNode } from "./document.mjs";
+import { isInkNode } from "./portable-ink.mjs";
+import { mergeValues } from "../core/catalog-merge";
 export interface InkUpdate {
   pageId: string;
   boardId: string;
@@ -9,6 +11,9 @@ export interface InkUpdate {
   layout: Record<string, NodeLayout>;
   /** Incremental native saves retain untouched nodes and their identity. */
   removedIds?: string[];
+  /** The source actually seen by the author, before this delta was produced. */
+  baseNodes?: JSONContent[];
+  baseLayout?: Record<string, NodeLayout>;
 }
 export interface InkFrame {
   token: string;
@@ -74,11 +79,7 @@ export function inkNodes(board: JSONContent): JSONContent[] {
   const result: JSONContent[] = [];
   const visit = (node: JSONContent) => {
     if (node.type === "surface") return;
-    if (
-      node.attrs?.ink ||
-      (node.attrs?.nativeInk ?? node.attrs?.data?.nativeInk)
-    )
-      result.push(node);
+    if (isInkNode(node)) result.push(node);
     else node.content?.forEach(visit);
   };
   board.content?.forEach(visit);
@@ -93,6 +94,37 @@ export function applyInkUpdate(
   const board = findSurfaceNode(document, value.boardId)?.node;
   if (!board || board.attrs?.kind !== "board") return document;
   const previous = inkNodes(board);
+  if (value.baseNodes) {
+    const base = new Map(value.baseNodes.map((n) => [n.attrs!.id, n]));
+    const current = new Map(previous.map((n) => [n.attrs!.id, n]));
+    const nodes: JSONContent[] = [],
+      layout: Record<string, NodeLayout> = {};
+    for (const next of value.nodes) {
+      const id = next.attrs!.id,
+        before = base.get(id),
+        present = current.get(id);
+      // A concurrent delete cannot be resurrected by a delayed native snapshot.
+      if (before && !present) continue;
+      const result = mergeValues(before, next, present, `/ink/${id}`);
+      if (result.conflicts.length)
+        throw new Error(`Concurrent ink edit requires resolution: ${id}`);
+      if (result.value) nodes.push(result.value as JSONContent);
+      if (value.layout[id]) {
+        const result = mergeValues(
+          value.baseLayout?.[id],
+          value.layout[id],
+          document.layout?.[id],
+          `/layout/${id}`,
+        );
+        if (result.conflicts.length)
+          throw new Error(
+            `Concurrent ink transform requires resolution: ${id}`,
+          );
+        if (result.value) layout[id] = result.value as NodeLayout;
+      }
+    }
+    value = { ...value, nodes, layout };
+  }
   const ids = new Set(
     value.removedIds
       ? [...value.removedIds, ...value.nodes.map((node) => node.attrs!.id)]

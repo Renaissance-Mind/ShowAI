@@ -1,4 +1,5 @@
 import { CAPACITY, assertBytes, base64Bytes } from "../portable/capacity.mjs";
+import { isPortableInk, validatePortableInk } from "./portable-ink.mjs";
 
 export const NATIVE_INK_FORMAT = "showai-pencilkit-v1";
 export const NATIVE_INK_MIME = "application/vnd.showai.pencilkit";
@@ -14,6 +15,7 @@ function embedded(value, mime, label) {
 
 /** Native archives remain opaque; iPad verifies them with the PencilKit decoder. */
 export function validateNativeInk(ink) {
+  if (isPortableInk(ink)) return validatePortableInk(ink);
   if (!ink || typeof ink !== "object" || Array.isArray(ink))
     throw new Error("Native ink must be an object.");
   if (
