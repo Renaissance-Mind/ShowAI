@@ -162,6 +162,10 @@ describe("CDN reader", () => {
     const frame = tab.frameLocator('iframe[title="Host"]');
     await frame.getByRole("slider", { name: "转动" }).waitFor();
     await frame.locator("canvas.s3-canvas").waitFor();
+    expect(await frame.locator(".portable-page-heading").count()).toBe(0);
+    expect(await frame.locator(".container-page-heading").isVisible()).toBe(
+      false,
+    );
     // The custom component runs through its inline runtime on the shared React.
     const custom = frame.getByRole("slider").last();
     await custom.waitFor();
@@ -295,9 +299,10 @@ describe("CDN reader", () => {
     const began = performance.now();
     await tab.goto(host.host("/slow-primary", fragment));
     const frame = tab.frameLocator('iframe[title="Host"]');
-    await frame
-      .getByText("Backup reader", { exact: true })
-      .waitFor({ timeout: 10000 });
+    await frame.locator(".container-page.is-root").waitFor({ timeout: 10000 });
+    expect(
+      await frame.getByText("Backup reader", { exact: true }).count(),
+    ).toBe(0);
     expect(performance.now() - began).toBeLessThan(10000);
     expect(await frame.locator("[data-showai-placeholder]").count()).toBe(0);
     expect(await frame.locator("[data-showai-inline-root] > div").count()).toBe(
