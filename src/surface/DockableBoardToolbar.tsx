@@ -9,6 +9,7 @@ import {
   type RefObject,
   type PointerEvent,
 } from "react";
+import { flushSync } from "react-dom";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";
 import {
@@ -312,7 +313,19 @@ export function DockableBoardToolbar({
                 : "right");
           if (next !== current.edge) {
             current.edge = next;
-            setEdge(next);
+            // Orientation changes resize the strip. Measure that layout before
+            // the next sample/up so the grabbed control stays under the finger.
+            flushSync(() => setEdge(next));
+            const element = primary.current!;
+            const measured = {
+              bounds: geometryRef.current.bounds,
+              size: {
+                width: element.offsetWidth,
+                height: element.offsetHeight,
+              },
+            };
+            geometryRef.current = measured;
+            setGeometry(measured);
           }
           schedule();
         }}
