@@ -4,6 +4,9 @@ import type { NodeLayout } from "./types";
 import { findSurfaceNode } from "./document.mjs";
 import { isInkNode } from "./portable-ink.mjs";
 import { mergeValues } from "../core/catalog-merge";
+export class InkEditConflict extends Error {
+  readonly code = "INK_EDIT_CONFLICT";
+}
 export interface InkUpdate {
   pageId: string;
   boardId: string;
@@ -107,7 +110,9 @@ export function applyInkUpdate(
       if (before && !present) continue;
       const result = mergeValues(before, next, present, `/ink/${id}`);
       if (result.conflicts.length)
-        throw new Error(`Concurrent ink edit requires resolution: ${id}`);
+        throw new InkEditConflict(
+          `Concurrent ink edit requires resolution: ${id}`,
+        );
       if (result.value) nodes.push(result.value as JSONContent);
       if (value.layout[id]) {
         const result = mergeValues(
@@ -117,7 +122,7 @@ export function applyInkUpdate(
           `/layout/${id}`,
         );
         if (result.conflicts.length)
-          throw new Error(
+          throw new InkEditConflict(
             `Concurrent ink transform requires resolution: ${id}`,
           );
         if (result.value) layout[id] = result.value as NodeLayout;
@@ -125,29 +130,39 @@ export function applyInkUpdate(
     }
     value = { ...value, nodes, layout };
   }
-  const ids = new Set(
-    value.removedIds
-      ? [...value.removedIds, ...value.nodes.map((node) => node.attrs!.id)]
-      : previous.map((node) => node.attrs!.id),
+  const replacements = new Map(
+    value.nodes.map((node) => [node.attrs!.id, node]),
   );
-  const clean = (node: JSONContent): JSONContent =>
-    node.type === "surface"
-      ? node
-      : node.content
-        ? {
-            ...node,
-            content: node.content
-              .filter((child) => !ids.has(child.attrs?.id))
-              .map(clean),
-          }
-        : node;
+  const ids = new Set(
+    value.removedIds ??
+      previous
+        .map((node) => node.attrs!.id)
+        .filter((id) => !replacements.has(id)),
+  );
+  const placed = new Set<string>();
+  const clean = (node: JSONContent): JSONContent => {
+    if (node.type === "surface") return node;
+    const replacement = replacements.get(node.attrs?.id);
+    if (replacement) {
+      placed.add(node.attrs!.id);
+      return replacement;
+    }
+    return node.content
+      ? {
+          ...node,
+          content: node.content
+            .filter((child) => !ids.has(child.attrs?.id))
+            .map(clean),
+        }
+      : node;
+  };
   const updated = {
     ...board,
     content: [
       ...(board.content ?? [])
         .filter((node) => !ids.has(node.attrs?.id))
         .map(clean),
-      ...value.nodes,
+      ...value.nodes.filter((node) => !placed.has(node.attrs!.id)),
     ],
   };
   const replace = (node: JSONContent): JSONContent =>

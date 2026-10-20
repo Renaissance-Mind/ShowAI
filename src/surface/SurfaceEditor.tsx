@@ -1,4 +1,4 @@
-import { applyInkUpdate } from "./inline-ink";
+import { applyInkUpdate, InkEditConflict } from "./inline-ink";
 import { SurfaceGeometryStore } from "./geometry-store";
 import type { EditorControls } from "./EditorControls";
 import { insertComponentAtText } from "./component-insertion";
@@ -213,7 +213,37 @@ function SurfaceEditor({
       async (value, applied) => {
         if (latestReadOnly.current || current.current.id !== value.pageId)
           return false;
-        commit(applyInkUpdate(current.current, value));
+        try {
+          commit(applyInkUpdate(current.current, value));
+        } catch (error) {
+          if (!(error instanceof InkEditConflict)) throw error;
+          const record = await window.showai!.invoke<{
+            document: ShowDocument;
+            revision: string;
+          }>("pages:get", {
+            projectId: inlineInkProjectId,
+            pageId: document.id,
+          });
+          const recovery = applyInkUpdate(record.document, {
+            ...value,
+            baseNodes: undefined,
+            baseLayout: undefined,
+          });
+          await window.showai!.invoke("drafts:save", {
+            input: {
+              kind: "page",
+              projectId: inlineInkProjectId,
+              resourceId: document.id,
+              clientId: `ink-conflict-${value.boardId}`,
+              baseRevision: record.revision,
+              baseContent: record.document,
+              content: recovery,
+              sequence: Date.now(),
+              title: recovery.title,
+            },
+          });
+          throw error;
+        }
         applied?.();
         return (await inkSave.current?.()) ?? true;
       },

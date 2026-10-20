@@ -221,7 +221,29 @@ export function useInlineInk({
           const element = elements.get(node.attrs!.id),
             m = element && inkMatrix(element);
           if (!m) return;
-          next[node.attrs!.id] = values(inverse.multiply(m));
+          const frame = documentValue.layout?.[node.attrs!.id];
+          const object = element.closest<HTMLElement>(".surface-object");
+          if (frame?.height && object?.parentElement === content) {
+            // The document is authoritative. CSS rounds fractional SVG sizes
+            // to layout pixels; feeding that rounding back rescales saved ink.
+            const extent =
+              node.attrs!.extent ??
+              node.attrs!.nativeInk?.extent ??
+              node.attrs!.data?.nativeInk?.extent;
+            const a = ((frame.rotation ?? 0) * Math.PI) / 180,
+              c = Math.cos(a),
+              s = Math.sin(a),
+              w = frame.width,
+              h = frame.height;
+            next[node.attrs!.id] = [
+              (c * w) / extent[0],
+              (s * w) / extent[0],
+              (-s * h) / extent[1],
+              (c * h) / extent[1],
+              frame.x + w / 2 - (c * w) / 2 + (s * h) / 2,
+              frame.y + h / 2 - (s * w) / 2 - (c * h) / 2,
+            ];
+          } else next[node.attrs!.id] = values(inverse.multiply(m));
         }
         poses = next;
         poseDocument = documentValue;
