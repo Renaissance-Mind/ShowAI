@@ -74,7 +74,7 @@ The system baseline is always included in task contexts and embedded in the foun
 | ID                    | Purpose                                                                                                                  |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `system-presentation` | Mandatory baseline: the four stages and the visual principles                                                            |
-| `paper-explainer`     | Interactive explanation of a paper: answer first, problem → mechanism → evidence → conditions → credibility → self-check |
+| `paper-explainer`     | Interactive explanation of a paper: starts from background and motivation and builds up step by step, problem → mechanism → evaluation setup → evidence → credibility → self-check |
 | `blank`               | Studio-only source for the "new page" button; not listed in agent catalogs                                               |
 
 `paper-explainer` was distilled from two verified explainer pages (VideoJev, Terminal-RSI). Its design guide names the component capabilities by reader task; when a project or global copy of the template carries the matching component library, `template_context` returns exact references, otherwise the guide lists builtin alternatives.

@@ -4,7 +4,7 @@
   "schemaVersion": 3,
   "id": "system-presentation",
   "name": "系统呈现规则",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "所有呈现任务必读的基础规则：理解意图、收集与处理材料、呈现逻辑、呈现设计稿四个阶段，以及视觉表达原则。",
   "scenarios": [
     "ShowAI 中任何讲解、报告、比较、教程或网站的规划、设计、制作、评审与交付。"
