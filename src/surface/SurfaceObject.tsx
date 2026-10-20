@@ -50,6 +50,11 @@ export interface ObjectActions {
   expand?: (id: string) => void;
   remove?: (id: string) => void;
   move?: (id: string, frame: NodeLayout) => void;
+  /** The shape or arrow whose label is open for editing. */
+  labelEditing?: string | null;
+  editLabel?: (id: string | null) => void;
+  /** Commit a label; minHeight grows a shape whose text no longer fits. */
+  setLabel?: (id: string, label: string, minHeight?: number) => void;
   readOnly: boolean;
   revealAll: boolean;
   revealed: Set<string>;

@@ -230,6 +230,16 @@
 .surface-object.is-container .container-page-column {
   padding: 20px 24px 56px;
 }
+.surface-object.is-container
+  > .surface-object-content
+  > .container-page[data-frameless="true"] {
+  min-height: 0;
+}
+.surface-object.is-container
+  .container-page[data-frameless="true"]
+  > .container-page-column {
+  padding: 4px 8px;
+}
 .surface-object.is-drawing > .surface-object-content {
   padding: 0;
   width: 100%;
@@ -258,6 +268,57 @@
   width: 100%;
   height: 100%;
   overflow: visible;
+}
+.surface-object.is-drawing > .surface-object-content {
+  position: relative;
+}
+.board-drawing-label {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text, var(--ink));
+  font-family: inherit;
+  font-weight: 500;
+  text-align: center;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  user-select: none;
+}
+.board-drawing-label > span {
+  max-width: 100%;
+}
+.board-drawing-label[data-tool="arrow"] {
+  width: max-content;
+  max-width: 240px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--paper, var(--bg));
+  transform: translate(-50%, -50%);
+}
+.board-drawing-label[data-editing] {
+  pointer-events: auto;
+}
+.board-drawing-label[data-tool="arrow"][data-editing] {
+  min-width: 96px;
+}
+.board-drawing-label textarea {
+  display: block;
+  width: 100%;
+  min-height: 1lh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  text-align: inherit;
+  caret-color: #467de3;
 }
 .board-drawing-input {
   position: absolute;

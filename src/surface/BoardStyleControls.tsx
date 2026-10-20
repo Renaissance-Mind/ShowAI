@@ -5,6 +5,12 @@ import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";
 import { useToolbarDock } from "./DockableBoardToolbar";
 import { BoardColorPicker } from "./BoardColorPicker";
+import { Type } from "../ui/icons";
+import {
+  DEFAULT_LABEL_SIZE,
+  LABEL_SIZES,
+  labelCapable,
+} from "./drawing-label.mjs";
 
 function StrokeWidthSlider({
   width,
@@ -63,6 +69,49 @@ function StrokeWidthSlider({
         }
       />
     </span>
+  );
+}
+
+/**
+ * Text size for selected shapes and arrows that carry a label. It belongs to
+ * the selection's text settings, ahead of object-specific actions.
+ */
+export function LabelSizeSelect({
+  nodes,
+  onChange,
+}: {
+  nodes: JSONContent[];
+  onChange: (labelSize: number) => void;
+}) {
+  const t = useTranslator(messages);
+  const labelled = nodes.filter(
+    (node) => labelCapable(node) && !!node.attrs?.label,
+  );
+  if (!labelled.length) return null;
+  const sizes = new Set(
+    labelled.map((node) => node.attrs?.labelSize ?? DEFAULT_LABEL_SIZE),
+  );
+  const size = sizes.size === 1 ? [...sizes][0] : undefined;
+  return (
+    <label className="board-label-size" title={t("style.labelSize")}>
+      <Type size={14} aria-hidden="true" />
+      <select
+        aria-label={t("style.labelSize")}
+        value={size ?? ""}
+        onChange={(event) => onChange(Number(event.currentTarget.value))}
+      >
+        {size === undefined && (
+          <option value="" disabled>
+            {t("style.mixed")}
+          </option>
+        )}
+        {LABEL_SIZES.map((value) => (
+          <option key={value} value={value}>
+            {t(`style.labelSize${value}` as "style.labelSize16")}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

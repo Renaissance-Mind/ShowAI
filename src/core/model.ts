@@ -1,6 +1,10 @@
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import type { NodeLayout, SavedView } from "../surface/types";
+import type {
+  DiagramDirection,
+  DiagramInsertInput,
+} from "../surface/diagram.mjs";
 
 export type { ShowArtifact, ShowDocument } from "../types";
 export type { JSONContent } from "@tiptap/core";
@@ -166,7 +170,11 @@ export type PageOperation =
       blockId: string;
       props: Record<string, unknown>;
     }
-  | { type: "block.text.set"; blockId: string; text: string };
+  | { type: "block.text.set"; blockId: string; text: string }
+  /** Native shapes and bound arrows from nodes and edges, laid out when unpositioned. */
+  | ({ type: "diagram.insert" } & DiagramInsertInput)
+  /** Lay out existing connected objects along their arrows, as the editor's arrange command does. */
+  | { type: "diagram.arrange"; nodeIds: string[]; direction?: DiagramDirection };
 
 export interface ApplyPageInput {
   baseRevision?: string;

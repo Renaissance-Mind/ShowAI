@@ -29,21 +29,21 @@ The content breadcrumb tracks expansion. Moving, wrapping and deleting container
 | Escape                            | Cancel current action, then leave the current level         |
 | Wrap in Page/Board                | Add a container around the original node                    |
 
-Click a Board object to select; drag it to move. Click selected text again or press Enter to edit; Escape ends editing while keeping selection. Component clicks reach the selected component. Shift locks drag direction; Alt-drag duplicates; Alt-resize uses the center; Cmd/Ctrl disables snapping. Shift constrains drawing proportions and Alt draws from center.
+Click a Board object to select; drag it to move. Click selected text again or press Enter to edit; Escape ends editing while keeping selection. Double-click a rectangle, ellipse or arrow, or select it and press Enter, to edit its label; Escape, Cmd/Ctrl+Enter or clicking elsewhere finishes, and a shape grows taller when its text no longer fits. Component clicks reach the selected component. Shift locks drag direction; Alt-drag duplicates; Alt-resize uses the center; Cmd/Ctrl disables snapping. Shift constrains drawing proportions and Alt draws from center.
 
-The toolbar docks at any canvas edge and saves its position locally. Object actions include duplicate, layer order, alignment/distribution, grouping, locking and deletion. Edge-dragging and wheel input during a drag pan the canvas. Double-click blank space or use the text tool to type. Drawing keeps the current tool active. Regions collect fully enclosed objects; their empty interior allows interaction with underlying content. Full-page Boards offer a minimap with click/drag navigation.
+The toolbar docks at any canvas edge and saves its position locally. Object actions include duplicate, layer order, alignment/distribution, locking and deletion; shape style controls include label size. With two or more objects connected by arrows selected, the alignment menu can also arrange them along the arrows, left to right or top to bottom. Edge-dragging and wheel input during a drag pan the canvas. Double-click blank space or use the text tool to type. Drawing keeps the current tool active. Existing regions can be ungrouped; their empty interior allows interaction with underlying content. Full-page Boards offer a minimap with click/drag navigation.
 
 | Shortcut                                         | Action                                                                                    |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| V / P / H / R / E (or O) / A / F / M / X / L / T | Select, pen, highlighter, rectangle, ellipse, arrow, region, pan, ink eraser, lasso, text |
-| 1–9                                              | First nine tools above                                                                    |
+| V / P / H / R / E (or O) / A / M / X / L / T     | Select, pen, highlighter, rectangle, ellipse, arrow, pan, ink eraser, lasso, text         |
+| 1–6, 8, 9                                        | Select through arrow, then pan and ink eraser                                             |
 | Shift+1 / Shift+2 / Shift+0                      | Fit all / fit selection / 100%                                                            |
 | + / -                                            | Zoom; Cmd/Ctrl combinations remain application zoom                                       |
 | Cmd/Ctrl+C / X / V / D                           | Copy / cut / paste / duplicate                                                            |
 | ] / [ and Shift+] / Shift+[                      | Raise/lower and front/back                                                                |
 | Alt+A / H / D / W / V / S                        | Align left/center/right/top/middle/bottom                                                 |
 | Alt+Shift+H / V                                  | Distribute horizontally/vertically                                                        |
-| Cmd/Ctrl+G / Shift+Cmd/Ctrl+G                    | Group / ungroup                                                                           |
+| Shift+Cmd/Ctrl+G                                 | Ungroup a region                                                                          |
 | Shift+Cmd/Ctrl+L                                 | Lock / unlock                                                                             |
 | Arrows; Shift for ×10                            | Nudge; continuous keypress is one undo step                                               |
 
@@ -131,15 +131,15 @@ Every non-text node has a unique stable ID. `surface.attrs.kind` is `page` or `b
 
 `surfaceViews` holds saved views, initial view and reading order by container ID. View targets belong to that container. Page reading order follows its tree; Board reading order supports linear export. Camera, scroll, selection and expansion are local user state and do not change the content hash.
 
-Drawing nodes store tool, six-digit hex color, stroke width, local points and extent. Layout stores displayed position/size; scaling a parent does not rewrite points. `rotation` ranges from −360 to 360 degrees around the center and applies to images/non-arrow drawings. Auto-sized objects may store a measured `contentSize`; the reader remeasures without saving.
+Drawing nodes store tool, six-digit hex color, stroke width, local points and extent. Rectangles, ellipses and arrows may add a plain-text `label` (up to 2000 characters) and `labelSize` (8–160 Board units, default 16); the label is centred inside the shape or at the arrow's midpoint and uses the shape's color. Layout stores displayed position/size; scaling a parent does not rewrite points. `rotation` ranges from −360 to 360 degrees around the center and applies to images/non-arrow drawings. Auto-sized objects may store a measured `contentSize`; the reader remeasures without saving.
 
-Arrow `attrs.bindings.start/end` each contain `{targetId,anchor:{x,y}}`, with normalized anchors on an unrotated sibling frame. The parent must be a Board/free region; the target cannot be another arrow. Endpoints follow movement, size and rotation. Removing/reparenting a target frees that endpoint. Changing free regions to flow/grid clears direct child arrow bindings and rotation; nested spatial geometry remains intact. Undo restores relationships.
+Arrow `attrs.bindings.start/end` each contain `{targetId,anchor:{x,y}}`, with normalized anchors on an unrotated sibling frame. When an operation omits an anchor, it becomes the edge midpoint facing the other end; an arrow bound at both ends needs no points or frame. The parent must be a Board/free region; the target cannot be another arrow. Endpoints follow movement, size and rotation. Removing/reparenting a target frees that endpoint. Changing free regions to flow/grid clears direct child arrow bindings and rotation; nested spatial geometry remains intact. Undo restores relationships.
 
 Moving an arrow alone with `surface.layout.set` clears bindings; moving it with its targets in one operation retains their bindings. Equal-value updates do not clear them. Full writes use explicit bindings. Template copies remap targets; partial exports free endpoints aimed outside the selection. A drag/resize/rotation is one undo step, including measurement updates.
 
 ## Agents, templates and exports
 
-`guide containers` provides the full operation contract. New resources support `pages create --kind page|board`. `component.insert` handles ordinary components and native containers. `surface.create`, `surface.wrap`, block operations and view operations preserve identities; saves require current hash/revision.
+`guide containers` provides the full operation contract. New resources support `pages create --kind page|board`. `component.insert` handles ordinary components and native containers. `surface.create`, `surface.wrap`, block operations and view operations preserve identities; saves require current hash/revision. `diagram.insert` (see `guide whiteboard`) creates labelled rectangles/ellipses and arrows bound at both ends from a list of nodes and edges, laying out unpositioned nodes along the edges; `diagram.arrange` re-lays out existing connected objects the same way as the editor's arrange-along-arrows command. When `block.insert` adds a drawing, omitted color, stroke width, points and extent are derived from the frame or label.
 
 Templates retain trees, frames and views and remap identities together on application. Partial export includes selected descendants and necessary ancestors. Standalone HTML preserves reading, Board navigation and expansion. `--presentation reading` projects the selected root Board into reading order. Printing preserves embedded Board geometry; export an inner Page separately for complete linear reading.
 

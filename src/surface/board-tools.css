@@ -111,6 +111,28 @@
   border-inline-start: 1px solid var(--line, var(--border));
   padding-inline-start: 8px;
 }
+.board-label-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-inline: 4px;
+  color: var(--muted, inherit);
+}
+.board-label-size select {
+  height: 26px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text, inherit);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.board-label-size select:hover,
+.board-label-size select:focus-visible {
+  background: var(--hover, color-mix(in srgb, currentColor 8%, transparent));
+}
 .board-width-controls,
 .board-width-controls > label,
 .board-pressure-controls {

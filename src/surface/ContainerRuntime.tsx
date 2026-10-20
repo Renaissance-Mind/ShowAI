@@ -27,6 +27,8 @@ import { flushSync, createPortal } from "react-dom";
 import { ComponentSlashMenu } from "../components/ComponentSlashMenu";
 import { RegisterComponentContext } from "../components/useComponentCatalog";
 import { insertComponent } from "./component-insertion";
+import { labelCapable, labelFitHeight } from "./drawing-label.mjs";
+import { tidyFrames } from "./diagram.mjs";
 import {
   createContext,
   useContext,
@@ -1045,9 +1047,10 @@ function ContainerView({
           runtime.select(null);
         },
   };
+  // A borderless Page blends into its Board: no frame and no title line.
   const heading =
     header ??
-    (!root ? (
+    (!root && !node.attrs?.frameless ? (
       <h2>
         <PageIcon value={node.attrs?.icon} size={24} /> {nodeName(node)}
       </h2>
@@ -1380,11 +1383,78 @@ function ContainerView({
                 const applicable = { ...patch };
                 if (!["rectangle", "ellipse"].includes(node.attrs!.tool))
                   delete applicable.fillColor;
+                if (!labelCapable(node)) delete applicable.labelSize;
                 node.attrs = { ...node.attrs, ...applicable };
               }) as ContainerDocument;
+            // A larger label grows its shape in the same step when it no longer fits.
+            if (patch.labelSize !== undefined) {
+              const grown: Record<string, NodeLayout> = {};
+              for (const nodeId of drawings) {
+                const node = findSurfaceNode(next, nodeId)?.node,
+                  frame = next.layout?.[nodeId];
+                if (
+                  !node?.attrs?.label ||
+                  !frame ||
+                  node.attrs.tool === "arrow" ||
+                  !labelCapable(node)
+                )
+                  continue;
+                const needed = labelFitHeight(
+                  node.attrs.tool,
+                  node.attrs.label,
+                  patch.labelSize,
+                  frame.width,
+                  node.attrs.strokeWidth,
+                );
+                if (needed > (frame.height ?? 0))
+                  grown[nodeId] = { ...frame, height: needed };
+              }
+              if (Object.keys(grown).length)
+                next = transformObjects(next, grown) as ContainerDocument;
+            }
             // Dragging a slider or color picker is one undo step.
             runtime.commit(next, `style:${[...drawings].sort().join(",")}`);
           }}
+          onLabel={
+            readOnly
+              ? undefined
+              : (nodeId, label, minHeight) => {
+                  let next = runtime.geometry.materialize(
+                    runtime.current.current,
+                  );
+                  const frame = next.layout?.[nodeId];
+                  if (minHeight && frame && minHeight > (frame.height ?? 0))
+                    next = transformObjects(next, {
+                      [nodeId]: { ...frame, height: minHeight },
+                    });
+                  next = editNode(next, nodeId, (node) => {
+                    if (label) node.attrs = { ...node.attrs, label };
+                    else delete node.attrs!.label;
+                  }) as ContainerDocument;
+                  runtime.commit(next);
+                }
+          }
+          onTidy={
+            readOnly
+              ? undefined
+              : (ids, direction) => {
+                  const source = runtime.geometry.materialize(
+                    runtime.current.current,
+                  );
+                  const tidy = tidyFrames(source, ids, direction);
+                  if (!tidy) return;
+                  let next = transformObjects(source, tidy.frames);
+                  for (const [arrowId, anchors] of Object.entries(tidy.anchors))
+                    next = editNode(next, arrowId, (node) => {
+                      const bindings = node.attrs!.bindings;
+                      node.attrs!.bindings = {
+                        start: { ...bindings.start, anchor: anchors.start },
+                        end: { ...bindings.end, anchor: anchors.end },
+                      };
+                    }) as ContainerDocument;
+                  runtime.commit(reconcileConnections(next));
+                }
+          }
           onAddComponent={
             readOnly
               ? undefined

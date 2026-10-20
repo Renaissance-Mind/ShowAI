@@ -94,6 +94,10 @@ export function toMarkdown(node: JSONContent, depth = 0): string {
           )
           .join("") + "\n"
       );
+    case "drawing":
+      return typeof node.attrs?.label === "string"
+        ? node.attrs.label + "\n\n"
+        : "";
     case "image":
       return `![${node.attrs?.alt ?? ""}](${node.attrs?.src ?? ""})\n\n`;
     case "mathInline":

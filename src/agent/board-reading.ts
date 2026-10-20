@@ -122,6 +122,8 @@ type Options = z.output<typeof boardReadSchema>;
 interface IndexedElement extends CapturedElement {
   kind: string;
   title: string;
+  /** Text shown inside a shape or on an arrow. */
+  label?: string;
   parentPath: string[];
 }
 interface Snapshot {
@@ -441,6 +443,9 @@ async function createSnapshot(
         kind:
           node.type === "surface" ? node.attrs!.kind : (node.type ?? "unknown"),
         title: nodeTitle(node),
+        ...(node.type === "drawing" && typeof node.attrs?.label === "string"
+          ? { label: node.attrs.label.slice(0, 500) }
+          : {}),
         parentPath: paths[el.nodeId] ?? [],
       };
     });
@@ -587,6 +592,7 @@ function indexFor(
             nodeId: el.nodeId,
             kind: el.kind,
             title: el.title,
+            ...(el.label ? { label: el.label } : {}),
             boundsInBoard: el.bounds,
             visibleBoundsInTile: {
               x: (visible.x - bounds.x) * scale,
@@ -895,6 +901,7 @@ export async function readBoard(
       nodeId: el.nodeId,
       kind: el.kind,
       title: el.title,
+      ...(el.label ? { label: el.label } : {}),
       bounds: el.bounds,
       parentPath: el.parentPath,
       sourceRef: { nodeId: el.nodeId, snapshotId: snapshot.snapshotId },

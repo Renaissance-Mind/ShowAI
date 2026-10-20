@@ -6,6 +6,13 @@ import {
   snapCreation,
 } from "./drawing-geometry.mjs";
 import { finishBoardDrawing } from "./board-drawing.mjs";
+import {
+  DEFAULT_LABEL_SIZE,
+  LABEL_LINE_HEIGHT,
+  labelBox,
+  labelCapable,
+  labelPadding,
+} from "./drawing-label.mjs";
 import { pressureOutline } from "./pressure-stroke";
 import { fingerNavigatesBoard } from "./board-input.mjs";
 import { flushSync } from "react-dom";
@@ -14,8 +21,10 @@ import {
   useContext,
   useId,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
+  type CSSProperties,
   type PointerEvent,
 } from "react";
 import type { JSONContent } from "@tiptap/core";
@@ -216,6 +225,28 @@ export function Drawing({
           </g>
         </svg>
       )}
+      {labelCapable(node) &&
+        (node.attrs!.label ||
+          (!actions.readOnly &&
+            !!actions.setLabel &&
+            actions.labelEditing === node.attrs!.id)) && (
+          <DrawingLabel
+            node={node}
+            first={first}
+            last={last}
+            frameHeight={frame ? (frame.height ?? extent[1]) : extent[1]}
+            editing={
+              !actions.readOnly &&
+              !!actions.setLabel &&
+              actions.labelEditing === node.attrs!.id
+            }
+            onDone={(label, minHeight) => {
+              actions.editLabel?.(null);
+              if (label !== (node.attrs!.label ?? "") || minHeight)
+                actions.setLabel?.(node.attrs!.id, label, minHeight);
+            }}
+          />
+        )}
       {tool === "arrow" &&
         frame &&
         !actions.readOnly &&
@@ -689,6 +720,133 @@ type Modifiers = {
   ctrlKey: boolean;
   metaKey: boolean;
 };
+/**
+ * Plain-text label centered inside a shape, or on an arrow's midpoint. Sizes
+ * are Board units: the label lives inside the scaled world like the shape.
+ */
+function DrawingLabel({
+  node,
+  first,
+  last,
+  frameHeight,
+  editing,
+  onDone,
+}: {
+  node: JSONContent;
+  first: Point;
+  last: Point;
+  frameHeight: number;
+  editing: boolean;
+  onDone: (label: string, minHeight?: number) => void;
+}) {
+  const t = useTranslator(messages);
+  const {
+    tool,
+    color,
+    strokeWidth,
+    extent,
+    label = "",
+    labelSize = DEFAULT_LABEL_SIZE,
+  } = node.attrs! as {
+    tool: DrawingTool;
+    color: string;
+    strokeWidth: number;
+    extent: [number, number];
+    label?: string;
+    labelSize?: number;
+  };
+  const [draft, setDraft] = useState(label);
+  const input = useRef<HTMLTextAreaElement>(null);
+  const finished = useRef(false);
+  useEffect(() => {
+    if (!editing) return;
+    finished.current = false;
+    setDraft(label);
+    const field = input.current;
+    if (!field) return;
+    field.focus({ preventScroll: true });
+    field.select();
+  }, [editing]);
+  useLayoutEffect(() => {
+    const field = input.current;
+    if (!field) return;
+    field.style.height = "auto";
+    field.style.height = `${field.scrollHeight}px`;
+  }, [draft, editing]);
+  const finish = (refocus = false) => {
+    if (finished.current) return;
+    finished.current = true;
+    const field = input.current;
+    // Keyboard endings keep the shape focused, so undo and nudging still reach the Board.
+    const host = refocus
+      ? field?.closest<HTMLElement>("[data-surface-id]")
+      : null;
+    let minHeight: number | undefined;
+    if (field && tool !== "arrow") {
+      const pad = labelPadding(tool, strokeWidth);
+      const needed =
+        tool === "ellipse"
+          ? (field.scrollHeight + pad) / Math.SQRT1_2
+          : field.scrollHeight + pad * 2;
+      if (needed > frameHeight + 0.5) minHeight = Math.ceil(needed);
+    }
+    onDone(draft.trim() ? draft : "", minHeight);
+    host?.focus({ preventScroll: true });
+  };
+  const style: CSSProperties = {
+    color: color === "none" ? undefined : color,
+    fontSize: labelSize,
+    lineHeight: LABEL_LINE_HEIGHT,
+  };
+  if (tool === "arrow") {
+    Object.assign(style, {
+      left: `${(((first.x + last.x) / 2) / extent[0]) * 100}%`,
+      top: `${(((first.y + last.y) / 2) / extent[1]) * 100}%`,
+    });
+  } else {
+    const box = labelBox(tool, extent[0], extent[1], strokeWidth);
+    Object.assign(style, {
+      left: `${(box.x / extent[0]) * 100}%`,
+      top: `${(box.y / extent[1]) * 100}%`,
+      width: `${(box.width / extent[0]) * 100}%`,
+      height: `${(box.height / extent[1]) * 100}%`,
+    });
+  }
+  return (
+    <div
+      className="board-drawing-label"
+      data-tool={tool}
+      data-editing={editing || undefined}
+      style={style}
+    >
+      {editing ? (
+        <textarea
+          ref={input}
+          rows={1}
+          value={draft}
+          aria-label={t("drawing.label")}
+          data-surface-ui
+          spellCheck={false}
+          onChange={(event) => setDraft(event.currentTarget.value)}
+          onPointerDown={(event) => event.stopPropagation()}
+          onBlur={() => finish()}
+          onKeyDown={(event) => {
+            if (
+              event.key === "Escape" ||
+              (event.key === "Enter" && (event.metaKey || event.ctrlKey))
+            ) {
+              event.preventDefault();
+              event.stopPropagation();
+              finish(true);
+            }
+          }}
+        />
+      ) : (
+        <span>{label}</span>
+      )}
+    </div>
+  );
+}
 function DrawingPreview({ node }: { node: JSONContent }) {
   const {
     points,

@@ -697,7 +697,34 @@ export function useBoardInteraction({
           },
         });
       }
-      return pickShape(candidates, inside);
+      const shape = pickShape(candidates, inside);
+      // An arrow's label sits on its line but beyond the stroke; it still
+      // selects the arrow unless a later-painted object covers it.
+      let label: (typeof candidates)[number] | undefined;
+      for (const item of candidates) {
+        if (item.node.type !== "drawing" || item.node.attrs?.tool !== "arrow")
+          continue;
+        const rect = item.element
+          .querySelector(".board-drawing-label")
+          ?.getBoundingClientRect();
+        if (
+          rect &&
+          x >= rect.left &&
+          x <= rect.right &&
+          y >= rect.top &&
+          y <= rect.bottom
+        )
+          label = item;
+      }
+      if (
+        !label ||
+        (shape &&
+          shape.element !== label.element &&
+          label.element.compareDocumentPosition(shape.element) &
+            Node.DOCUMENT_POSITION_FOLLOWING)
+      )
+        return shape;
+      return label;
     },
     select,
     selectIds(ids) {

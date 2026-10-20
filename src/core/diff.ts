@@ -6,6 +6,8 @@ import {
   indexSurfaceTree,
 } from "../surface/connections.mjs";
 import { insertComponent } from "../surface/component-insertion";
+import { completeDrawings } from "../surface/drawing-completion.mjs";
+import { insertDiagram, tidyFrames } from "../surface/diagram.mjs";
 import {
   isResource,
   upgradeResource,
@@ -289,6 +291,10 @@ export function applyOperations(
     );
   let draft = structuredClone(document);
   const transformedIds = new Set<string>();
+  // Frames the caller set explicitly; others are automatic placeholders that
+  // drawing completion may size from the drawing itself.
+  const framed = new Set(Object.keys(document.layout ?? {}));
+  let removedPlaceholder = false;
   const locate = (
     id: string,
   ): { parent: JSONContent; index: number; node: JSONContent } => {
@@ -350,11 +356,40 @@ export function applyOperations(
     children.splice(index, 0, node);
     parent.content = children;
   };
+  // A new nested Page holds one empty paragraph so people can type into it.
+  // Content added through an operation replaces that placeholder.
+  const placeholderOf = (parentId?: string | null) => {
+    if (!parentId || parentId === draft.content.attrs?.id) return undefined;
+    const parent = locate(parentId).node;
+    const only = parent.content?.length === 1 ? parent.content[0] : undefined;
+    return parent.type === "surface" &&
+      parent.attrs?.kind === "page" &&
+      only?.type === "richText" &&
+      (only.content ?? []).every(
+        (child) => child.type === "paragraph" && !child.content?.length,
+      )
+      ? { parentId: parent.attrs!.id as string, id: only.attrs!.id as string }
+      : undefined;
+  };
+  const dropPlaceholder = (
+    placeholder: ReturnType<typeof placeholderOf>,
+  ) => {
+    if (!placeholder) return;
+    const parent = locate(placeholder.parentId).node;
+    if ((parent.content?.length ?? 0) < 2) return;
+    parent.content = parent.content!.filter(
+      (child) => child.attrs?.id !== placeholder.id,
+    );
+    removedPlaceholder = true;
+  };
   for (const operation of operations) {
     if (!operation || typeof operation !== "object")
       throw new CoreError("INVALID_DATA", "Invalid page operation.");
     switch (operation.type) {
-      case "component.insert":
+      case "component.insert": {
+        const placeholder = isResource(draft)
+          ? placeholderOf(operation.parentId)
+          : undefined;
         draft = insertComponent(
           draft,
           operation.parentId ?? null,
@@ -362,7 +397,70 @@ export function applyOperations(
           operation.data,
           operation.afterId,
         ).document;
+        dropPlaceholder(placeholder);
         break;
+      }
+      case "diagram.insert": {
+        if (!isResource(draft))
+          throw new CoreError(
+            "INVALID_DATA",
+            "Upgrade this page before inserting a diagram.",
+          );
+        fillSurfaceLayout(draft);
+        try {
+          const inserted = insertDiagram(draft, operation);
+          inserted.shapeIds.forEach((id) => framed.add(id));
+        } catch (error) {
+          throw new CoreError(
+            "INVALID_DATA",
+            error instanceof Error ? error.message : "Invalid diagram.",
+          );
+        }
+        break;
+      }
+      case "diagram.arrange": {
+        if (
+          !isResource(draft) ||
+          !Array.isArray(operation.nodeIds) ||
+          operation.nodeIds.length > 400 ||
+          operation.nodeIds.some((id) => typeof id !== "string")
+        )
+          throw new CoreError(
+            "INVALID_DATA",
+            "diagram.arrange needs nodeIds of objects on a Board.",
+          );
+        operation.nodeIds.forEach(locate);
+        fillSurfaceLayout(draft);
+        let tidy: ReturnType<typeof tidyFrames>;
+        try {
+          tidy = tidyFrames(draft, operation.nodeIds, operation.direction);
+        } catch (error) {
+          throw new CoreError(
+            "INVALID_DATA",
+            error instanceof Error ? error.message : "Invalid direction.",
+          );
+        }
+        if (!tidy)
+          throw new CoreError(
+            "INVALID_DATA",
+            "diagram.arrange needs two or more unlocked, framed objects in one container with an arrow between two of them.",
+          );
+        Object.assign(draft.layout!, tidy.frames);
+        Object.keys(tidy.frames).forEach((id) => framed.add(id));
+        // Arrows re-attach to the sides that face each other in the new arrangement.
+        for (const [arrowId, anchors] of Object.entries(tidy.anchors)) {
+          const arrow = locate(arrowId).node;
+          const bindings = arrow.attrs!.bindings;
+          arrow.attrs = {
+            ...arrow.attrs,
+            bindings: {
+              start: { ...bindings.start, anchor: anchors.start },
+              end: { ...bindings.end, anchor: anchors.end },
+            },
+          };
+        }
+        break;
+      }
       case "surface.upgrade":
         draft = upgradeResource(draft);
         break;
@@ -412,6 +510,7 @@ export function applyOperations(
             "Only regions can define mode, columns and gap.",
           );
         fillSurfaceLayout(draft);
+        framed.add(operation.nodeId);
         const beforeFrame = draft.layout![operation.nodeId];
         draft.layout![operation.nodeId] = {
           ...(beforeFrame ?? { x: 0, y: 0, width: 360 }),
@@ -526,13 +625,18 @@ export function applyOperations(
         Object.assign(draft, operation.fields);
         break;
       }
-      case "block.insert":
+      case "block.insert": {
+        const placeholder = isResource(draft)
+          ? placeholderOf(operation.parentId)
+          : undefined;
         insert(
           structuredClone(operation.node),
           operation.parentId,
           operation.afterId,
         );
+        dropPlaceholder(placeholder);
         break;
+      }
       case "block.remove": {
         const target = locate(operation.blockId);
         target.parent.content!.splice(target.index, 1);
@@ -582,7 +686,11 @@ export function applyOperations(
             "Block attributes cannot change a stable id.",
           );
         const node = locate(operation.blockId).node;
-        node.attrs = { ...node.attrs, ...operation.attrs };
+        const attrs = { ...node.attrs, ...operation.attrs };
+        // Like a JSON merge patch, null removes an attribute.
+        for (const [key, value] of Object.entries(operation.attrs))
+          if (value === null) delete attrs[key];
+        node.attrs = attrs;
         break;
       }
       case "component.props.set": {
@@ -645,20 +753,43 @@ export function applyOperations(
         );
     }
   }
+  if (isSurface(draft)) {
+    const before = indexSurfaceTree(document.content);
+    fillSurfaceLayout(draft);
+    try {
+      completeDrawings(draft, {
+        framed,
+        fresh: new Set(
+          [...indexSurfaceTree(draft.content).keys()].filter(
+            (id) => !before.has(id),
+          ),
+        ),
+      });
+    } catch (error) {
+      throw new CoreError(
+        "INVALID_DATA",
+        error instanceof Error ? error.message : "Invalid drawing.",
+      );
+    }
+  }
   // Validate caller-supplied references before intentional structural cleanup.
-  const structural = operations.some(
-    (operation) =>
-      (operation.type === "surface.layout.set" &&
-        Object.hasOwn(operation.layout, "mode")) ||
-      [
-        "block.remove",
-        "block.replace",
-        "block.move",
-        "block.insert",
-        "surface.create",
-        "surface.wrap",
-      ].includes(operation.type),
-  );
+  const structural =
+    removedPlaceholder ||
+    operations.some(
+      (operation) =>
+        (operation.type === "surface.layout.set" &&
+          Object.hasOwn(operation.layout, "mode")) ||
+        [
+          "block.remove",
+          "block.replace",
+          "block.move",
+          "block.insert",
+          "surface.create",
+          "surface.wrap",
+          "diagram.insert",
+          "diagram.arrange",
+        ].includes(operation.type),
+    );
   if (isSurface(draft) && structural) draft = reconcileSurface(draft);
   const index = indexSurfaceTree(draft.content);
   const arrows = [...transformedIds]

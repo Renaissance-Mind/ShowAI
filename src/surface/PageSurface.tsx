@@ -14,7 +14,7 @@ import { boardToolForKey } from "./board-tools";
 import type { JSONContent } from "@tiptap/core";
 import type { BoardTool, BoardDrawingTool, DrawingStyle } from "./types";
 import { findSurfaceNode } from "./document.mjs";
-import { BoardStyleControls } from "./BoardStyleControls";
+import { BoardStyleControls, LabelSizeSelect } from "./BoardStyleControls";
 import { DockableBoardToolbar } from "./DockableBoardToolbar";
 import { BoardMinimap } from "./BoardMinimap";
 import { readingCapture } from "./reading-capture";
@@ -28,6 +28,7 @@ import {
 import { MAX_ZOOM, MIN_ZOOM } from "./model";
 import { flushSync } from "react-dom";
 import { fingerNavigatesBoard, isBoardShape } from "./board-input.mjs";
+import { labelCapable } from "./drawing-label.mjs";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";
 import { AssistantContext } from "../components/assistant-context";
@@ -74,6 +75,8 @@ import {
   AlignEndHorizontal,
   AlignHorizontalDistributeCenter,
   AlignVerticalDistributeCenter,
+  Workflow,
+  Network,
   MapIcon,
   CheckSquare,
   Sparkles,
@@ -137,6 +140,10 @@ interface Props {
   drawStrokeWidth?: number;
   drawPressure?: boolean;
   onStyleChange?: (ids: string[], patch: Partial<DrawingStyle>) => void;
+  /** Commit a shape or arrow label; minHeight grows a shape to fit its text. */
+  onLabel?: (id: string, label: string, minHeight?: number) => void;
+  /** Arrange connected objects along their arrows. */
+  onTidy?: (ids: string[], direction: "right" | "down") => void;
   onAddComponent?: (
     kind: string,
     point: { x: number; y: number },
@@ -257,6 +264,8 @@ export default function PageSurface({
   drawStrokeWidth = 2.5,
   drawPressure = true,
   onStyleChange,
+  onLabel,
+  onTidy,
   onAddComponent,
   onOpenComponents,
   onDraw,
@@ -269,6 +278,7 @@ export default function PageSurface({
     typeof document !== "undefined" &&
     document.documentElement.dataset.native === "ios";
   const [localSelection, setLocalSelection] = useState<string | null>(null);
+  const [labelEditing, setLabelEditing] = useState<string | null>(null);
   const capture = useRef(readingCapture()).current;
   const [componentActionsHost, setComponentActionsHost] =
     useState<HTMLDivElement | null>(null);
@@ -859,6 +869,24 @@ export default function PageSurface({
     (selectedIds.length === 1
       ? focusAfterMount(selectedIds, true)
       : focusAfterMount(selectedIds));
+  // Arranging along arrows needs an arrow between two selected objects.
+  const tidyAvailable =
+    !!onTidy &&
+    !!boardDocument &&
+    selectedIds.length > 1 &&
+    (() => {
+      const ids = new Set(selectedIds);
+      const owner =
+        (containerId && findSurfaceNode(boardDocument, containerId)?.node) ||
+        boardDocument.content;
+      return (owner.content ?? []).some(
+        (child) =>
+          child.type === "drawing" &&
+          child.attrs?.tool === "arrow" &&
+          ids.has(child.attrs.bindings?.start?.targetId) &&
+          ids.has(child.attrs.bindings?.end?.targetId),
+      );
+    })();
   const alignItems: [AlignMode, string, ReactNode, string][] = [
     ["left", t("align.left"), <AlignStartVertical size={14} />, "⌥A"],
     ["center", t("align.center"), <AlignCenterVertical size={14} />, "⌥H"],
@@ -1031,6 +1059,35 @@ export default function PageSurface({
     ];
     return items;
   };
+  /** A shape or arrow on this Board whose label can be edited now. */
+  const labelTarget = (id: string) => {
+    if (!editable || !onLabel || !boardDocument) return false;
+    const entry = findSurfaceNode(boardDocument, id);
+    return (
+      !!entry &&
+      labelCapable(entry.node) &&
+      (entry.parent?.attrs?.id ?? boardDocument.content.attrs?.id) ===
+        (containerId ?? boardDocument.content.attrs?.id) &&
+      !layoutOf(id)?.locked
+    );
+  };
+  const startLabelEditing = (
+    target: Element,
+    event: { clientX: number; clientY: number; preventDefault(): void },
+  ) => {
+    if (
+      drawTool ||
+      target.closest(".page-surface") !== rootRef.current ||
+      target.closest("[data-surface-ui]")
+    )
+      return false;
+    const hit = board.hitTest(event.clientX, event.clientY);
+    if (!hit || !labelTarget(hit.id)) return false;
+    event.preventDefault();
+    board.select(hit.id);
+    setLabelEditing(hit.id);
+    return true;
+  };
   const objectContext = useMemo<ObjectActions>(
     () => ({
       componentActionsHost,
@@ -1048,6 +1105,9 @@ export default function PageSurface({
       move: locked ? undefined : onMove,
       connect: locked ? undefined : onConnect,
       highlightTarget,
+      labelEditing,
+      editLabel: setLabelEditing,
+      setLabel: locked ? undefined : onLabel,
       readOnly: !onMove,
       revealAll: revealAll || printing || !!capture,
       revealed,
@@ -1066,6 +1126,8 @@ export default function PageSurface({
       onRemove,
       onMove,
       onConnect,
+      labelEditing,
+      onLabel,
       revealAll,
       printing,
       revealed,
@@ -1130,8 +1192,9 @@ export default function PageSurface({
           }
         }}
         onDoubleClick={(event) => {
-          // Double-clicking empty Board space writes text there.
           const target = event.target as Element;
+          if (startLabelEditing(target, event)) return;
+          // Double-clicking empty Board space writes text there.
           if (
             !editable ||
             !onAddComponent ||
@@ -1746,6 +1809,13 @@ export default function PageSurface({
             )[event.code];
             if (mode) return run(() => align(mode));
           }
+          if (
+            event.key === "Enter" &&
+            !command &&
+            ids.length === 1 &&
+            labelTarget(ids[0])
+          )
+            return run(() => setLabelEditing(ids[0]));
           if (event.key === "Enter" && !command && ids.length === 1) {
             const element = worldRef.current?.querySelector<HTMLElement>(
               `[data-surface-id="${CSS.escape(ids[0])}"]`,
@@ -2030,6 +2100,12 @@ export default function PageSurface({
               )}
               {onTransform && !objectMenu && board.ids.size > 0 && (
                 <>
+                  <LabelSizeSelect
+                    nodes={selectedNodes}
+                    onChange={(labelSize) =>
+                      onStyleChange?.(selectedIds, { labelSize })
+                    }
+                  />
                   {assistant && (
                     <button
                       type="button"
@@ -2114,6 +2190,23 @@ export default function PageSurface({
                             {icon}
                           </button>
                         ))}
+                        {tidyAvailable &&
+                          (
+                            [
+                              ["right", t("align.tidyRight"), <Workflow size={14} />],
+                              ["down", t("align.tidyDown"), <Network size={14} />],
+                            ] as const
+                          ).map(([direction, label, icon]) => (
+                            <button
+                              type="button"
+                              key={direction}
+                              aria-label={label}
+                              title={label}
+                              onClick={() => onTidy?.(selectedIds, direction)}
+                            >
+                              {icon}
+                            </button>
+                          ))}
                       </div>
                     </details>
                   )}

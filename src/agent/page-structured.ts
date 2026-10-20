@@ -41,7 +41,9 @@ export function structuredContent(document: ShowDocument) {
         ? String(attrs.name ?? attrs.title ?? "")
         : node.type === "widget"
           ? String(attrs.data?.props?.title ?? attrs.data?.title ?? kind)
-          : text(node);
+          : node.type === "drawing"
+            ? String(attrs.label ?? attrs.name ?? "")
+            : text(node);
     if (attrs.id)
       outline.push({
         id: attrs.id,
@@ -77,6 +79,19 @@ export function structuredContent(document: ShowDocument) {
         "```",
         "",
       );
+      return;
+    }
+    if (node.type === "drawing") {
+      if (typeof attrs.label === "string") {
+        const link =
+          attrs.tool === "arrow"
+            ? `${attrs.bindings?.start?.targetId ?? "?"} → ${attrs.bindings?.end?.targetId ?? "?"}: `
+            : "";
+        lines.push(
+          `- ${link}${attrs.label.replaceAll("\n", " / ")} [${attrs.id ?? ""}]`,
+          "",
+        );
+      }
       return;
     }
     if (node.type === "heading") {

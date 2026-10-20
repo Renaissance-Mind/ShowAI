@@ -10,6 +10,8 @@ export interface DrawingStyle {
   fillColor: string;
   strokeWidth: number;
   pressure?: boolean;
+  /** Label font size for rectangles, ellipses and arrows, in Board units. */
+  labelSize?: number;
 }
 export type LayoutMode = "flow" | "grid" | "free";
 export interface NodeLayout {

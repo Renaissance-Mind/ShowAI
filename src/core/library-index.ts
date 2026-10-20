@@ -465,7 +465,11 @@ export class LibraryIndex {
             `${path}#${id}`,
             "page",
             String(title),
-            [ownText, ...readableText(node.attrs?.data)]
+            [
+              ownText,
+              node.type === "drawing" ? node.attrs?.label : undefined,
+              ...readableText(node.attrs?.data),
+            ]
               .filter(Boolean)
               .join("\n"),
             id,

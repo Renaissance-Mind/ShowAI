@@ -1,5 +1,6 @@
 import { objectCapabilities, bindingParent } from "./geometry.mjs";
 import { validateNativeInk } from "./native-ink.mjs";
+import { labelCapable, MAX_LABEL_LENGTH } from "./drawing-label.mjs";
 import { isResource, fillResource, surfaceKind } from "./containers.mjs";
 import { fillSurfaceLayout, visitNodes } from "./document.mjs";
 const reserved = new Set(["__proto__", "constructor", "prototype"]);
@@ -240,6 +241,24 @@ function validateResource(document) {
         if (point.pressure !== undefined)
           finite(point.pressure, 0, 1, "point.pressure");
       }
+      if (
+        (node.attrs.label !== undefined || node.attrs.labelSize !== undefined) &&
+        !labelCapable(node)
+      )
+        throw new Error(
+          "Only rectangle, ellipse and arrow drawings can have a label.",
+        );
+      if (
+        node.attrs.label !== undefined &&
+        (typeof node.attrs.label !== "string" ||
+          !node.attrs.label.trim() ||
+          node.attrs.label.length > MAX_LABEL_LENGTH)
+      )
+        throw new Error(
+          `drawing.label must be non-empty text of at most ${MAX_LABEL_LENGTH} characters.`,
+        );
+      if (node.attrs.labelSize !== undefined)
+        finite(node.attrs.labelSize, 8, 160, "drawing.labelSize");
     }
     for (const child of node.content ?? []) walk(child, node, owner);
   };
