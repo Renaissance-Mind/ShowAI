@@ -2321,7 +2321,10 @@ export default function PageSurface({
                   onDraw &&
                   !locked &&
                   (drawTool === "pen" || drawTool === "highlighter") && (
-                    <div className="board-writing-options" data-surface-ui>
+                    <div
+                      className="board-writing-options board-ruler-controls"
+                      data-surface-ui
+                    >
                       <button
                         type="button"
                         aria-label={t("tool.ruler")}

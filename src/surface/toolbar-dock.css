@@ -405,7 +405,7 @@
   padding: 5px;
   border: 1px solid var(--line, var(--border));
   border-radius: 12px 12px 0 0;
-  border-bottom: 0;
+  border-width: 1px 1px 0;
   background: var(--paper, var(--bg));
   box-shadow: none;
   overflow: auto;
@@ -532,4 +532,31 @@
   .board-toolbar-secondary {
   border-width: 1px 0 1px 1px;
   border-radius: 12px 0 0 12px;
+}
+
+/* Flatten the existing action groups into evenly spaced settings slots. */
+.board-dockable-toolbar[data-mobile] .board-toolbar-secondary {
+  justify-content: space-evenly;
+}
+.board-dockable-toolbar[data-mobile]
+  .board-toolbar-secondary
+  :is(.board-toolbar-settings, .board-style-controls, .board-toolbar-actions) {
+  display: contents;
+}
+.board-dockable-toolbar[data-mobile]
+  .board-toolbar-secondary
+  :is(.board-toolbar-settings, .board-toolbar-actions):empty {
+  display: none;
+}
+.board-dockable-toolbar[data-mobile] .board-ruler-controls {
+  border-inline-start: 1px solid var(--line, var(--border));
+  padding-inline-start: 8px;
+}
+.board-dockable-toolbar[data-mobile]:is([data-dock="left"], [data-dock="right"])
+  .board-ruler-controls {
+  border-inline-start: 0;
+  border-top: 1px solid var(--line, var(--border));
+  padding-inline-start: 0;
+  padding-top: 6px;
+  width: 36px;
 }

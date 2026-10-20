@@ -128,3 +128,67 @@ export function toolbarSnapTarget(
 }
 
 export const toolbarPropertiesReserve = (_edge: DockEdge) => 0;
+
+export interface ToolbarRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+/** The primary strip and its joined secondary strip, in surface coordinates. */
+export function toolbarPanelRect(
+  center: { x: number; y: number },
+  size: { width: number; height: number },
+  edge: DockEdge,
+  secondary: boolean,
+): ToolbarRect {
+  const rect = {
+    x: center.x - size.width / 2,
+    y: center.y - size.height / 2,
+    ...size,
+  };
+  if (!secondary) return rect;
+  if (edge === "top" || edge === "bottom") {
+    if (edge === "bottom") rect.y -= size.height;
+    rect.height += size.height;
+  } else {
+    if (edge === "right") rect.x -= size.width;
+    rect.width += size.width;
+  }
+  return rect;
+}
+export function toolbarEdgeGap(
+  rect: ToolbarRect,
+  bounds: { width: number; height: number },
+  edge: DockEdge,
+) {
+  return {
+    left: rect.x,
+    right: bounds.width - rect.x - rect.width,
+    top: rect.y,
+    bottom: bounds.height - rect.y - rect.height,
+  }[edge];
+}
+/** Snap when any part of the panel reaches an edge band, independent of the grab point. */
+export function toolbarRectSnapTarget(
+  rect: ToolbarRect,
+  bounds: { width: number; height: number },
+  threshold = 96,
+): ToolbarDock | null {
+  const edge = edges.reduce((best, next) =>
+    toolbarEdgeGap(rect, bounds, next) < toolbarEdgeGap(rect, bounds, best)
+      ? next
+      : best,
+  );
+  if (toolbarEdgeGap(rect, bounds, edge) > threshold) return null;
+  return {
+    edge,
+    position: clamp(
+      edge === "top" || edge === "bottom"
+        ? (rect.x + rect.width / 2) / Math.max(1, bounds.width)
+        : (rect.y + rect.height / 2) / Math.max(1, bounds.height),
+      0,
+      1,
+    ),
+  };
+}

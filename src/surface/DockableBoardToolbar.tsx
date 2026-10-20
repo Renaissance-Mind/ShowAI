@@ -15,6 +15,9 @@ import messages from "../i18n/messages/surface";
 import {
   readToolbarDock,
   toolbarSnapTarget,
+  toolbarPanelRect,
+  toolbarRectSnapTarget,
+  toolbarEdgeGap,
   toolbarCenter,
   constrainToolbarPoint,
   type DockEdge,
@@ -48,7 +51,10 @@ export function DockableBoardToolbar({
   const preference = `showai:board-toolbar:${mobile ? "mobile" : "desktop"}`;
   const [dock, setDock] = useState(() => {
     try {
-      return readToolbarDock(localStorage.getItem(preference));
+      const saved = readToolbarDock(localStorage.getItem(preference));
+      return mobile && saved.floating
+        ? { edge: saved.edge, position: saved.position }
+        : saved;
     } catch {
       return readToolbarDock(null);
     }
@@ -71,6 +77,7 @@ export function DockableBoardToolbar({
     across: number;
     edge: DockEdge;
     snapped: DockEdge | null;
+    snapOrigin: { pointer: Point; gap: number } | null;
     active: boolean;
     origin: ToolbarDock;
     pressed: HTMLElement | null;
@@ -121,13 +128,20 @@ export function DockableBoardToolbar({
     [mobile],
   );
   const restore = (origin: ToolbarDock) => {
-    setDock(origin);
-    setEdge(origin.edge);
-    const point = toolbarCenter(
-      origin,
-      geometryRef.current.bounds,
-      geometryRef.current.size,
-    );
+    flushSync(() => {
+      setDock(origin);
+      setEdge(origin.edge);
+    });
+    const element = primary.current;
+    const measured = {
+      bounds: geometryRef.current.bounds,
+      size: element
+        ? { width: element.offsetWidth, height: element.offsetHeight }
+        : geometryRef.current.size,
+    };
+    geometryRef.current = measured;
+    setGeometry(measured);
+    const point = toolbarCenter(origin, measured.bounds, measured.size);
     if (outer.current) {
       outer.current.style.left = `${point.x}px`;
       outer.current.style.top = `${point.y}px`;
@@ -153,7 +167,11 @@ export function DockableBoardToolbar({
       y: ((event.clientY - rect.top) * bounds.height) / rect.height,
     };
   };
-  const locate = () => {
+  const secondaryVisible = () =>
+    !!outer.current
+      ?.querySelector<HTMLElement>(":scope > .board-toolbar-secondary")
+      ?.getClientRects().length;
+  const freePosition = () => {
     const current = drag.current!,
       { bounds, size } = geometryRef.current;
     const raw = horizontal(current.edge)
@@ -165,7 +183,12 @@ export function DockableBoardToolbar({
           x: current.pointer.x + (0.5 - current.across) * size.width,
           y: current.pointer.y + (0.5 - current.along) * size.height,
         };
-    const point = constrainToolbarPoint(raw, bounds, size);
+    return constrainToolbarPoint(raw, bounds, size);
+  };
+  const locate = () => {
+    const current = drag.current!,
+      { bounds, size } = geometryRef.current;
+    const point = freePosition();
     const target: ToolbarDock = {
       edge: current.edge,
       position: horizontal(current.edge)
@@ -214,12 +237,47 @@ export function DockableBoardToolbar({
     current.pointer = pointer(event);
     const bounds = geometryRef.current.bounds,
       scale = bounds.width / root.current!.getBoundingClientRect().width;
-    const snapped = toolbarSnapTarget(
-      current.pointer,
-      bounds,
-      current.snapped,
-      (mobile ? 72 : 44) * scale,
-    );
+    let snapped: ToolbarDock | null;
+    if (mobile) {
+      const band = 96 * scale;
+      const rect = toolbarPanelRect(
+        freePosition(),
+        geometryRef.current.size,
+        current.edge,
+        secondaryVisible(),
+      );
+      const origin = current.snapOrigin,
+        attached = current.snapped;
+      const pull =
+        !origin || !attached
+          ? Infinity
+          : attached === "left"
+            ? current.pointer.x - origin.pointer.x
+            : attached === "right"
+              ? origin.pointer.x - current.pointer.x
+              : attached === "top"
+                ? current.pointer.y - origin.pointer.y
+                : origin.pointer.y - current.pointer.y;
+      // Keep the entry geometry while attached: rotating a long strip into a
+      // side dock must not detach it on the very next pointer sample.
+      if (origin && attached && origin.gap + pull <= band * 1.4)
+        snapped = { edge: attached, position: 0.5 };
+      else {
+        snapped = toolbarRectSnapTarget(rect, bounds, band);
+        current.snapOrigin = snapped
+          ? {
+              pointer: { ...current.pointer },
+              gap: toolbarEdgeGap(rect, bounds, snapped.edge),
+            }
+          : null;
+      }
+    } else
+      snapped = toolbarSnapTarget(
+        current.pointer,
+        bounds,
+        current.snapped,
+        44 * scale,
+      );
     current.snapped = snapped?.edge ?? null;
     const next =
       snapped?.edge ??
@@ -255,7 +313,7 @@ export function DockableBoardToolbar({
     const pressed = !cancel && !current.active ? current.pressed : null;
     event.preventDefault();
     if (current.active) {
-      if (!cancel) {
+      if (!cancel && (!mobile || current.snapped)) {
         current.pointer = pointer(event);
         save(locate().target);
       } else restore(current.origin);
@@ -338,6 +396,25 @@ export function DockableBoardToolbar({
             across,
             edge,
             snapped: dock.floating ? null : edge,
+            snapOrigin: dock.floating
+              ? null
+              : {
+                  pointer: pointer(event),
+                  gap: toolbarEdgeGap(
+                    toolbarPanelRect(
+                      toolbarCenter(
+                        dock,
+                        geometryRef.current.bounds,
+                        geometryRef.current.size,
+                      ),
+                      geometryRef.current.size,
+                      edge,
+                      secondaryVisible(),
+                    ),
+                    geometryRef.current.bounds,
+                    edge,
+                  ),
+                },
             active: false,
             origin: dock,
             pressed,

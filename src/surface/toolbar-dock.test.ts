@@ -4,6 +4,8 @@ import {
   snapToolbar,
   toolbarCenter,
   toolbarSnapTarget,
+  toolbarPanelRect,
+  toolbarRectSnapTarget,
 } from "./toolbar-dock";
 
 it("docks on all four edges and remembers the position along that edge", () => {
@@ -128,4 +130,59 @@ it("uses the wider iPad edge band while still allowing a drag to detach", () => 
     "left",
   );
   expect(toolbarSnapTarget({ x: 115, y: 300 }, bounds, "left", 72)).toBeNull();
+});
+
+it("snaps a long toolbar when its body reaches an edge, even with the grab point far away", () => {
+  const bounds = { width: 1024, height: 1000 };
+  expect(
+    toolbarRectSnapTarget({ x: 80, y: 400, width: 400, height: 54 }, bounds)
+      ?.edge,
+  ).toBe("left");
+  expect(
+    toolbarRectSnapTarget({ x: 544, y: 400, width: 400, height: 54 }, bounds)
+      ?.edge,
+  ).toBe("right");
+  expect(
+    toolbarRectSnapTarget({ x: 400, y: 80, width: 54, height: 400 }, bounds)
+      ?.edge,
+  ).toBe("top");
+  expect(
+    toolbarRectSnapTarget({ x: 400, y: 520, width: 54, height: 400 }, bounds)
+      ?.edge,
+  ).toBe("bottom");
+  expect(
+    toolbarRectSnapTarget({ x: 300, y: 400, width: 400, height: 100 }, bounds),
+  ).toBeNull();
+});
+
+it("includes the joined secondary strip in the docking footprint", () => {
+  const bounds = { width: 1024, height: 1000 },
+    center = { x: 850, y: 500 },
+    size = { width: 54, height: 300 };
+  expect(
+    toolbarRectSnapTarget(
+      toolbarPanelRect(center, size, "left", false),
+      bounds,
+    ),
+  ).toBeNull();
+  expect(
+    toolbarRectSnapTarget(toolbarPanelRect(center, size, "left", true), bounds)
+      ?.edge,
+  ).toBe("right");
+  expect(
+    toolbarPanelRect(
+      { x: 500, y: 500 },
+      { width: 400, height: 54 },
+      "bottom",
+      true,
+    ),
+  ).toEqual({ x: 300, y: 419, width: 400, height: 108 });
+  expect(
+    toolbarPanelRect(
+      { x: 500, y: 500 },
+      { width: 54, height: 300 },
+      "right",
+      true,
+    ),
+  ).toEqual({ x: 419, y: 350, width: 108, height: 300 });
 });
