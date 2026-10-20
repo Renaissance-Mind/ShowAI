@@ -253,6 +253,13 @@ export function DockableBoardToolbar({
             across = horizontal(edge)
               ? (event.clientY - rect.top) / rect.height
               : (event.clientX - rect.left) / rect.width;
+          // Capture on the pressed control immediately: a fast first move may
+          // already leave the narrow strip. Keeping the control as owner also
+          // preserves an ordinary click when the contact never becomes a drag.
+          const pressed =
+            (event.target as Element).closest<HTMLElement>("button,summary") ??
+            event.currentTarget;
+          pressed.setPointerCapture(event.pointerId);
           drag.current = {
             id: event.pointerId,
             start: { x: event.clientX, y: event.clientY },
@@ -311,7 +318,9 @@ export function DockableBoardToolbar({
         }}
         onPointerUp={(event) => finish(event)}
         onPointerCancel={(event) => finish(event, true)}
-        onLostPointerCapture={(event) => finish(event, true)}
+        onLostPointerCapture={(event) => {
+          if (event.target === event.currentTarget) finish(event, true);
+        }}
         onClickCapture={(event) => {
           if (suppressClick.current) {
             event.preventDefault();
