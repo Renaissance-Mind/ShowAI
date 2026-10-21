@@ -94,6 +94,8 @@ export class InkOperationReplica {
   abort(token: string): void;
   append(operations: InkOperation[]): InkReplicaPrepared;
   checkpoint(): InkOperationCheckpoint;
+  projectionIndex(): {id:string;born:[number,string,number];placement?:InkEditPatch["placement"]}[];
+  sparseCheckpoint(ids: string[]): {checkpoint: InkOperationCheckpoint; clock: Record<string,number>; level:number};
   materialize(ids?: string[]): InkMaterialization;
 }
 export function inkCheckpointRecords(checkpoint: InkOperationCheckpoint): InkReplicaRecord[];

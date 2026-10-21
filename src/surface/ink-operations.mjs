@@ -179,8 +179,11 @@ export class InkOperationReplica {
     this.known = new Map(Object.entries(state.known));
     this.strokes = new Map(state.strokes.map(stroke => [stroke.id, stroke]));
     this.frontier = new Set(state.frontier); this.version = 0; this.nextToken = 0; this.prepared = null;
-    this.clock = Object.create(null);
-    for (const item of this.known.values()) for (const [actor, sequence] of Object.entries(item.clock)) this.clock[actor] = Math.max(this.clock[actor] ?? 0, sequence);
+    this.clock = Object.create(null); this.level = 0; this.levelCounts = new Map();
+    for (const item of this.known.values()) {
+      this.level = Math.max(this.level, item.level); this.levelCounts.set(item.level, (this.levelCounts.get(item.level) ?? 0) + 1);
+      for (const [actor, sequence] of Object.entries(item.clock)) this.clock[actor] = Math.max(this.clock[actor] ?? 0, sequence);
+    }
   }
   /** Prepare is copy-on-write for touched strokes/registers only. Existing sample
    * payloads and causal maps remain owned and are not cloned or revalidated. */
@@ -433,7 +436,17 @@ export class InkOperationReplica {
   commit(token) {
     if (!this.prepared || this.prepared.token !== token) invalid("unknown prepared replica transaction");
     const { known, strokes, frontier, clock } = this.prepared;
-    for (const [key, value] of known) this.known.set(key, value);
+    for (const [key, value] of known) {
+      const previous = this.known.get(key);
+      if (previous?.level !== value.level) {
+        if (previous) { const count = this.levelCounts.get(previous.level) - 1; if (count) this.levelCounts.set(previous.level, count); else this.levelCounts.delete(previous.level); }
+        this.levelCounts.set(value.level, (this.levelCounts.get(value.level) ?? 0) + 1);
+      }
+      this.known.set(key, value); this.level = Math.max(this.level, value.level);
+    }
+    // Import can replace an approximate compact anchor level with its real
+    // lower level. Only that cold correction needs to revisit numeric levels.
+    if (!this.levelCounts.has(this.level)) { this.level = 0; for (const level of this.levelCounts.keys()) this.level = Math.max(this.level, level); }
     for (const [key, value] of strokes) this.strokes.set(key, value);
     this.frontier = frontier; this.clock = clock; this.prepared = null; this.version++;
     return { frontier: [...frontier].sort(compare), version: this.version };
@@ -447,6 +460,33 @@ export class InkOperationReplica {
     return clone({ format: INK_CHECKPOINT_FORMAT, pageId: this.pageId, boardId: this.boardId,
       frontier: [...this.frontier].sort(compare), known: Object.fromEntries([...this.known].sort(([a], [b]) => compare(a, b))),
       strokes: [...this.strokes.values()].sort(strokeOrder) });
+  }
+  /** Cold-load ordering index. Deliberately excludes nodes, geometry and
+   * historic contexts; live projection uses sparseCheckpoint instead. */
+  projectionIndex() {
+    return [...this.strokes.values()].sort(strokeOrder).map(stroke => clone({ id: stroke.id, born: stroke.creationOrder,
+      ...(stroke.registers.placement ? { placement: stroke.registers.placement[0].value } : {}) }));
+  }
+  /** A projection read visits requested stroke records and their descriptors
+   * only. Its global metadata is maintained during commit, never reconstructed
+   * by scanning every historic event or unrelated sample payload. */
+  sparseCheckpoint(ids) {
+    if (!Array.isArray(ids) || ids.some(strokeId => !id(strokeId))) invalid("sparse projection stroke identities");
+    const strokes = [], required = new Set(this.frontier);
+    for (const strokeId of new Set(ids)) {
+      const stroke = this.strokes.get(strokeId);
+      if (!stroke) invalid(`sparse projection stroke is unavailable: ${strokeId}`);
+      strokes.push(stroke); required.add(stroke.creationId);
+      for (const heads of Object.values(stroke.registers)) for (const head of heads) required.add(head.operationId);
+    }
+    const known = Object.create(null);
+    for (const operationId of required) {
+      const descriptor = this.known.get(operationId);
+      if (!descriptor) invalid(`sparse projection causal descriptor is unavailable: ${operationId}`);
+      known[operationId] = descriptor;
+    }
+    return clone({ checkpoint: { format: INK_CHECKPOINT_FORMAT, pageId: this.pageId, boardId: this.boardId,
+      frontier: [...this.frontier].sort(compare), known, strokes: strokes.sort(strokeOrder) }, clock: this.clock, level: this.level });
   }
   /** Explicit reads may materialize the whole Board; append does not. */
   materialize(ids) {

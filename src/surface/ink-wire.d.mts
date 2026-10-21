@@ -1,5 +1,5 @@
 import type { ShowDocument } from "../types";
-import type { InkOperationIdentity, InkOperationChange, InkOperationCheckpoint, InkOperation } from "./ink-operations.mjs";
+import type { InkOperationIdentity, InkOperationChange, InkOperationCheckpoint, InkOperation, InkOperationReplica, InkEditPatch, InkMaterialization } from "./ink-operations.mjs";
 export const INK_WIRE_FORMAT: "showai-ink-state-v1";
 export class InkWireError extends Error { readonly code: "INK_CAUSAL_CONFLICT" }
 export interface InkWireConflict { boardId?: string; strokeId?: string; field: string; reason: string; retained: boolean }
@@ -35,3 +35,10 @@ export function inkWireResolutionPlan(document: ShowDocument, choices: InkWireCh
 export function inkWireEditPlans(baseline: ShowDocument, next: ShowDocument): {boardId: string; parents: string[]; changes: InkOperationChange[]}[];
 export function inkWireImportCheckpoints(baseline: ShowDocument, next: ShowDocument): {boardId: string; checkpoint: InkOperationCheckpoint}[];
 export function inkWireAuthorReceipt(authorBaseline: ShowDocument, rawDraft: ShowDocument, actualOperations: InkOperation[], actualJournalCheckpoint: InkOperationCheckpoint): ShowDocument;
+
+export interface InkWireDelta {
+ pageId:string;boardId:string;ids:string[];state:InkWireState;
+ visible:{id:string;node:ShowDocument["content"];layout:NonNullable<ShowDocument["layout"]>[string];placement:NonNullable<InkEditPatch["placement"]>;born:[number,string,number]}[];
+ deleted:string[];conflicts:InkMaterialization["conflicts"];
+}
+export function inkWireDeltaFromReplica(replica:InkOperationReplica,ids:string[],options?:{placements?:Record<string,NonNullable<InkEditPatch["placement"]>>}):InkWireDelta;

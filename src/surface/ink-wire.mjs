@@ -528,18 +528,17 @@ function checkpointFromWireState(pageId, boardId, state, lookup) {
   return validateInkCheckpoint({ format: "showai-ink-checkpoint-v1", pageId, boardId, frontier, known, strokes });
 }
 
-/** Native coalesced saves export the retained replica's original dots, not the
- * identity of whichever stroke happened to trigger the final checkpoint. */
-export function inkWireDocumentFromCheckpoint(document, boardId, checkpoint) {
-  validateInkCheckpoint(checkpoint);
-  if (checkpoint.pageId !== document.id || checkpoint.boardId !== boardId) fail("checkpoint projection scope differs");
-  const next = clone(document), record = boards(next).get(boardId); if (!record) fail("Board is missing");
-  const state = empty(), materialized = materializeInkOperations([], checkpoint), byId = new Map(materialized.strokes.map(stroke => [stroke.id, stroke])), visible = [];
-  for (const item of Object.values(checkpoint.known)) { state.clock = joinClock(state.clock, item.clock); state.level = Math.max(state.level, item.level); }
+/** Format current touched records identically for full and sparse publishers. */
+function wireProjection(checkpoint, materialized, placementFor, metadata) {
+  const state = empty(), byId = new Map(materialized.strokes.map(stroke => [stroke.id, stroke])), visible = [], deleted = [];
+  if (metadata) { state.clock = clone(metadata.clock); state.level = metadata.level; }
+  else for (const item of Object.values(checkpoint.known)) { state.clock = joinClock(state.clock, item.clock); state.level = Math.max(state.level, item.level); }
   for (const source of checkpoint.strokes) {
     const stroke = { born: source.creationOrder, fields: {} }, current = byId.get(source.id), registers = { ...source.registers };
     if (!registers.placement && current && !current.deleted) {
-      const placement = record.records.get(source.id)?.placement ?? { parentId: boardId, after: record.board.content?.filter(node => !isInkNode(node)).at(-1)?.attrs?.id ?? null, before: null };
+      const placement = placementFor(source.id);
+      if (!placement) fail(`missing canonical placement for sparse stroke: ${source.id}`);
+      validateInkOperationField("placement", placement);
       registers.placement = [{ operationId: source.creationId, value: placement }];
     }
     const variants = {};
@@ -561,15 +560,39 @@ export function inkWireDocumentFromCheckpoint(document, boardId, checkpoint) {
     if (isDeleted(stroke) && !hasConflict) compactDeleted(stroke);
     else if (Object.keys(variants).length) stroke.variants = variants;
     state.strokes[source.id] = stroke;
+    if (isDeleted(stroke)) deleted.push(source.id);
     if (current && !current.deleted) visible.push({ id: source.id, node: current.node, layout: current.layout, placement: current.placement ?? registers.placement[0].value, born: source.creationOrder });
   }
   // Checkpoint record/key order is an index detail; born order is the original
   // logical paint order, including adjacent ink inside a transparent group.
   visible.sort((a, b) => birthOrder(a.born, b.born));
+  return { state: prune(state), visible, deleted, conflicts: materialized.conflicts };
+}
+
+/** Native coalesced saves export the retained replica's original dots, not the
+ * identity of whichever stroke happened to trigger the final checkpoint. */
+export function inkWireDocumentFromCheckpoint(document, boardId, checkpoint) {
+  validateInkCheckpoint(checkpoint);
+  if (checkpoint.pageId !== document.id || checkpoint.boardId !== boardId) fail("checkpoint projection scope differs");
+  const next = clone(document), record = boards(next).get(boardId); if (!record) fail("Board is missing");
+  const projection = wireProjection(checkpoint, materializeInkOperations([], checkpoint), strokeId =>
+    record.records.get(strokeId)?.placement ?? { parentId: boardId, after: record.board.content?.filter(node => !isInkNode(node)).at(-1)?.attrs?.id ?? null, before: null });
   const removedIds = new Set(record.records.keys());
   const strip = node => { if (node.content) node.content = node.content.filter(child => !removedIds.has(child.attrs?.id)).map(strip); return node; };
   next.content = strip(next.content); next.layout = Object.fromEntries(Object.entries(next.layout ?? {}).filter(([id]) => !removedIds.has(id)));
-  return finishInkPageMerge(next, { plans: [{ id: boardId, state: prune(state), visible }], conflicts: [] }).document;
+  return finishInkPageMerge(next, { plans: [{ id: boardId, state: projection.state, visible: projection.visible }], conflicts: [] }).document;
+}
+
+/** A retained-replica delta replaces only the requested wire stroke entries.
+ * Merge scoped metadata maps into the prior Board state; pruning and complete
+ * exports belong to an idle/full-document boundary. Parent existence, anchor
+ * cycles and generic sibling order are checked by the tree splicer, using the
+ * explicit placements returned here. Missing legacy placement must be supplied
+ * from the actual canonical tree; this helper cannot infer absent parents. */
+export function inkWireDeltaFromReplica(replica, ids, { placements = {} } = {}) {
+  const sparse = replica.sparseCheckpoint(ids), requested = [...new Set(ids)];
+  const projection = wireProjection(sparse.checkpoint, replica.materialize(requested), strokeId => placements[strokeId], sparse);
+  return { pageId: replica.pageId, boardId: replica.boardId, ids: requested, ...projection };
 }
 
 /** Convert an ordinary canonical editor draft into author intent against the
