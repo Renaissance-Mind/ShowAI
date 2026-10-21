@@ -1,5 +1,6 @@
 /** Include ancestor CSS transforms; WebKit SVG screen matrices omit some
  * ancestor scales. Camera inversion happens once at content/layout changes. */
+import {measureNativeSync} from "./native-perf";
 import type {ShowDocument} from "../types";
 import {inkFramePose} from "./portable-ink.mjs";
 export function clientMatrix(element: Element, width: number, height: number) {
@@ -21,6 +22,9 @@ export interface NativeObjectProjection {
   clips:{ownerId?:string;matrix:number[];rect:number[]}[];
 }
 export function measureNativeBoard(surface:HTMLElement,world:HTMLElement,source?:ShowDocument):NativeObjectProjection[]{
+  return measureNativeSync("board.measureNativeBoard",()=>measureNativeBoardObjects(surface,world,source));
+}
+function measureNativeBoardObjects(surface:HTMLElement,world:HTMLElement,source?:ShowDocument):NativeObjectProjection[]{
   const inverse=clientMatrix(world,world.offsetWidth,world.offsetHeight).inverse();
   const projections:NativeObjectProjection[]=[];
   const nodes=new Map<string,Record<string,any>>();

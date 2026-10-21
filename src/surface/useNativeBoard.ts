@@ -1,3 +1,4 @@
+import {measureNativeSync} from "./native-perf";
 import {useEffect,useRef,useState,type RefObject} from "react";
 import type {ShowDocument} from "../types";
 import type {JSONContent} from "@tiptap/core";
@@ -62,16 +63,17 @@ export function useNativeBoard(options:NativeBoardOptions){
     const schedule=()=>{dirty=true;if(alive&&!pending&&!frame)frame=requestAnimationFrame(()=>{frame=0;void send()})};
     const send=async()=>{
       dirty=false;const v=current.current,source=v.document;
-      if(!alive||!source||!surface.getClientRects().length||document.visibilityState==="hidden")return;
-      const size=surface.clientWidth+":"+surface.clientHeight;
+      if(!alive||!source)return;
+      if(measureNativeSync("board.visibility",()=>!surface.getClientRects().length||document.visibilityState==="hidden"))return;
+      const size=measureNativeSync("board.surfaceSize",()=>surface.clientWidth+":"+surface.clientHeight);
       if(poseDocument!==source||poseSize!==size){poses=measureNativeBoard(surface,world,source);poseDocument=source;poseSize=size}
-      const holes=inkUIRegions(document.querySelectorAll<HTMLElement>("[data-surface-ui],.surface-toolbar,.studio-context-menu,.studio-modal-shade,.container-inspector,.studio-sidebar-shell:not([data-sidebar-mode=hidden]) .studio-sidebar,.studio-mobile-sidebar-edge,.studio-mobile-sidebar-scrim,.studio-mobile-navigation-tools"));
-      const style=getComputedStyle(surface);
-      const packet={token,pageId:source.id,boardId:v.boardId,nativeScene:true,tool:v.tool??"select",color:v.color,fillColor:v.fillColor??"none",width:v.width,pressure:v.pressure,ruler:v.ruler,
+      const holes=measureNativeSync("board.inkUIRegions",()=>inkUIRegions(document.querySelectorAll<HTMLElement>("[data-surface-ui],.surface-toolbar,.studio-context-menu,.studio-modal-shade,.container-inspector,.studio-sidebar-shell:not([data-sidebar-mode=hidden]) .studio-sidebar,.studio-mobile-sidebar-edge,.studio-mobile-sidebar-scrim,.studio-mobile-navigation-tools")));
+      const style=measureNativeSync("board.surfaceStyle",()=>getComputedStyle(surface));
+      const packet=measureNativeSync("board.packet",()=>({token,pageId:source.id,boardId:v.boardId,nativeScene:true,tool:v.tool??"select",color:v.color,fillColor:v.fillColor??"none",width:v.width,pressure:v.pressure,ruler:v.ruler,
         dark:document.documentElement.dataset.theme==="dark",widthPx:surface.clientWidth,heightPx:surface.clientHeight,
-        viewport:matrixValues(clientMatrix(surface,surface.offsetWidth,surface.offsetHeight)),camera:{...v.camera.current},cameraVersion:cameraVersion.current,
-        selection:v.selection?.()??[],holes,grid:surface.classList.contains("has-board-grid"),background:style.backgroundColor};
-      const key=JSON.stringify(packet);
+        viewport:measureNativeSync("board.viewportMatrix",()=>matrixValues(clientMatrix(surface,surface.offsetWidth,surface.offsetHeight))),camera:{...v.camera.current},cameraVersion:cameraVersion.current,
+        selection:v.selection?.()??[],holes,grid:surface.classList.contains("has-board-grid"),background:measureNativeSync("board.backgroundColor",()=>style.backgroundColor)}));
+      const key=measureNativeSync("board.packetKey",()=>JSON.stringify(packet));
       if(key===lastKey&&source===lastDocument&&poses===lastPoses)return;
       pending=true;
       try{
