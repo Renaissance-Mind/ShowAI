@@ -761,9 +761,14 @@ export function isDocumentTimestamp(value) {
 }
 
 export function validateDocument(value) {
+  return validateDocumentValue(value, true);
+}
+
+function validateDocumentValue(value, independent) {
   validateJson(value, "document");
   assertContent(value);
-  const document = structuredClone(object(value, "document"));
+  const source = object(value, "document");
+  const document = independent ? structuredClone(source) : source;
   let templateContext;
   if (document.templateContext !== undefined) {
     const context = object(
@@ -1027,6 +1032,13 @@ function parseArtifactDocument(input, documentParser) {
 
 export function parseArtifact(input) {
   return parseArtifactDocument(input, validateDocument);
+}
+
+/** Internal parser adapter for a JSON.parse result exclusively owned by the
+ * calling backend. All JSON, model, ink, capacity and wrapper validation still
+ * runs; only the redundant defensive copy of that private graph is omitted. */
+export function parseArtifactConsumingDocument(input) {
+  return parseArtifactDocument(input, value => validateDocumentValue(value, false));
 }
 
 /** Trusted backend adapter only. The source registry must first return its

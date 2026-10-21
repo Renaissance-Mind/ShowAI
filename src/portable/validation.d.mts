@@ -10,6 +10,8 @@ export function isDocumentTimestamp(value: unknown): boolean;
 /** Internal trusted adapter: held body must come from the actual source registry. */
 export function parseArtifactWithValidatedDocument(input: unknown, heldDocument: ShowDocument): ShowArtifact;
 export function parseArtifact(input: unknown): ShowArtifact;
+/** Internal backend parser; consumes its exclusively held JSON.parse graph. */
+export function parseArtifactConsumingDocument(input: unknown): ShowArtifact;
 export function serializeArtifact(
   document: ShowDocument,
   components?: CompiledComponent[],
