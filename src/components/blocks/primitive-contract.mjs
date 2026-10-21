@@ -1,5 +1,8 @@
 import { validateRichTextData } from "../rich-text/model.mjs";
 import { validateNativeInk } from "../../surface/native-ink.mjs";
+
+/** Most steps one stepper holds; the editor's hiding rules cover this many. */
+export const MAX_STEPS = 12;
 export function validatePrimitiveData(kind, data) {
   if (kind !== "text" && data.document) {
     validateRichTextData({ content: data.document, format: "richtext" });
@@ -51,6 +54,21 @@ export function validatePrimitiveData(kind, data) {
   }
   if (["callout", "toggle"].includes(kind))
     validateRichTextData({ content: data.content });
+  if (kind === "stepper") {
+    if (
+      !Array.isArray(data.steps) ||
+      !data.steps.length ||
+      data.steps.length > MAX_STEPS
+    )
+      throw new Error(`逐步切换需要 1 到 ${MAX_STEPS} 个步骤。`);
+    for (const step of data.steps) {
+      if (!step || typeof step !== "object")
+        throw new Error("每个步骤必须是对象。");
+      if (step.title !== undefined && typeof step.title !== "string")
+        throw new Error("步骤标题必须是文字。");
+      validateRichTextData({ content: step.content ?? "" });
+    }
+  }
   if (kind === "code" && typeof data.content !== "string")
     throw new Error("组件需要文字内容。");
   if (kind === "table") {

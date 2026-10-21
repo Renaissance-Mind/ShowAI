@@ -283,6 +283,7 @@ describe("compiled React packages", () => {
       "table",
       "callout",
       "toggle",
+      "stepper",
       "divider",
       "code",
       "chart",

@@ -26,6 +26,11 @@ export const builtinEnglish: BuiltinDisplayText = {
     description:
       "Supplementary content that expands on demand. The body supports rich text and Markdown import.",
   },
+  stepper: {
+    name: "Stepper",
+    description:
+      "Ordered steps shown one at a time with a numbered step bar. Each step holds any content, including other components.",
+  },
   divider: {
     name: "Divider",
     description: "A light visual separator between page content.",

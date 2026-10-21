@@ -48,6 +48,7 @@ describe("portable artifact boundaries", () => {
           "richText",
           "listItem",
           "taskItem",
+          "step",
           "table",
           "tableRow",
           "tableCell",

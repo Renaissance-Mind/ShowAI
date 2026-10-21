@@ -17,6 +17,8 @@ import {
   type NodeViewProps,
 } from "@tiptap/react";
 import { ChevronRight } from "../../ui/icons";
+import { TextSelection } from "@tiptap/pm/state";
+import { MAX_STEPS, StepperBar, stepTitle } from "./Stepper";
 import { RichTextEnvironment } from "./environment";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/richText";
@@ -194,6 +196,160 @@ export function ToggleView({ node, updateAttributes, editor }: NodeViewProps) {
       <div className="toggle-body" hidden={!open}>
         <NodeViewContent />
       </div>
+    </NodeViewWrapper>
+  );
+}
+
+export function StepperView({ node, editor, getPos }: NodeViewProps) {
+  const t = useTranslator(messages);
+  const editable = useEditorState({
+    editor,
+    selector: ({ editor: current }) => current.isEditable,
+  });
+  const [active, setActive] = useState(0);
+  const count = node.childCount;
+  const current = Math.min(active, count - 1);
+  const titles = Array.from({ length: count }, (_, index) =>
+    stepTitle(node.child(index).attrs.title, index),
+  );
+  const start = () => {
+    const pos = getPos();
+    if (typeof pos !== "number") throw new Error("The stepper is detached.");
+    return pos + 1;
+  };
+  const stepPos = (index: number) => {
+    let pos = start();
+    for (let k = 0; k < index; k += 1) pos += node.child(k).nodeSize;
+    return pos;
+  };
+  // A caret moved into another step (arrow keys, search, undo) opens that step.
+  useEffect(() => {
+    const follow = () => {
+      const pos = getPos();
+      // Read the stepper from the current document: this runs before React
+      // re-renders the view with the updated node.
+      const stepper =
+        typeof pos === "number" ? editor.state.doc.nodeAt(pos) : null;
+      if (!stepper || stepper.type.name !== "stepper") return;
+      const { from } = editor.state.selection;
+      if (from <= pos! || from >= pos! + stepper.nodeSize) return;
+      let edge = pos! + 1;
+      for (let k = 0; k < stepper.childCount; k += 1) {
+        edge += stepper.child(k).nodeSize;
+        if (from < edge) return setActive(k);
+      }
+    };
+    editor.on("selectionUpdate", follow);
+    return () => {
+      editor.off("selectionUpdate", follow);
+    };
+  }, [editor, getPos]);
+  const edit = (change: (tr: typeof editor.state.tr) => number) => {
+    const { tr } = editor.state;
+    const next = change(tr);
+    editor.view.dispatch(tr);
+    setActive(next);
+    return next;
+  };
+  const rename = (title: string) =>
+    edit((tr) => {
+      tr.setNodeMarkup(stepPos(current), undefined, {
+        ...node.child(current).attrs,
+        title,
+      });
+      return current;
+    });
+  // A new step takes the caret so typing continues inside it.
+  const add = () => {
+    edit((tr) => {
+      const { schema } = editor.state;
+      const at = stepPos(current) + node.child(current).nodeSize;
+      tr.insert(
+        at,
+        schema.nodes.step.create(
+          { title: "" },
+          schema.nodes.paragraph.create(),
+        ),
+      );
+      tr.setSelection(TextSelection.create(tr.doc, at + 2));
+      return current + 1;
+    });
+    editor.view.focus();
+  };
+  const remove = () =>
+    edit((tr) => {
+      const from = stepPos(current);
+      tr.delete(from, from + node.child(current).nodeSize);
+      return Math.max(0, current - 1);
+    });
+  const move = (delta: -1 | 1) =>
+    edit((tr) => {
+      const target = current + delta;
+      const step = node.child(current);
+      const from = stepPos(current);
+      // Moving later lands after the following step; earlier, before the previous one.
+      const at =
+        delta < 0
+          ? stepPos(target)
+          : stepPos(target) + node.child(target).nodeSize;
+      tr.delete(from, from + step.nodeSize);
+      tr.insert(tr.mapping.map(at), step);
+      return target;
+    });
+  return (
+    <NodeViewWrapper
+      style={richTextStyle(node.attrs.componentStyle)}
+      className="document-stepper"
+      data-block-id={node.attrs.id ?? undefined}
+    >
+      <StepperBar titles={titles} active={current} onSelect={setActive} />
+      {editable && (
+        <div className="stepper-edit" contentEditable={false}>
+          <input
+            aria-label={t("stepper.titleLabel")}
+            placeholder={t("stepper.titlePlaceholder")}
+            value={node.child(current).attrs.title ?? ""}
+            onChange={(event) => rename(event.target.value)}
+          />
+          <button
+            type="button"
+            title={t("stepper.moveEarlier")}
+            aria-label={t("stepper.moveEarlier")}
+            disabled={current === 0}
+            onClick={() => move(-1)}
+          >
+            ↤
+          </button>
+          <button
+            type="button"
+            title={t("stepper.moveLater")}
+            aria-label={t("stepper.moveLater")}
+            disabled={current === count - 1}
+            onClick={() => move(1)}
+          >
+            ↦
+          </button>
+          <button
+            type="button"
+            title={t("stepper.add")}
+            aria-label={t("stepper.add")}
+            disabled={count >= MAX_STEPS}
+            onClick={add}
+          >
+            +
+          </button>
+          <button
+            type="button"
+            title={t("stepper.remove")}
+            aria-label={t("stepper.remove")}
+            disabled={count <= 1}
+            onClick={remove}
+          >
+            ×
+          </button>
+        </div>
+      )}
+      <NodeViewContent className="stepper-steps" data-active={current} />
     </NodeViewWrapper>
   );
 }

@@ -2,7 +2,10 @@ import { isResource } from "../surface/containers.mjs";
 import { validatePageIcon } from "../lib/page-icon.mjs";
 import { artifactVersion, assignSurfaceIds } from "../surface/document.mjs";
 import { validateSurface } from "../surface/validation.mjs";
-import { validatePrimitiveData } from "../components/blocks/primitive-contract.mjs";
+import {
+  MAX_STEPS,
+  validatePrimitiveData,
+} from "../components/blocks/primitive-contract.mjs";
 import { validateMindmapData } from "../components/blocks/mindmap-contract.mjs";
 import { validateFlowchartData } from "../components/blocks/flowchart-contract.mjs";
 import {
@@ -64,6 +67,8 @@ const nodeTypes = new Set([
   "tableHeader",
   "callout",
   "toggle",
+  "stepper",
+  "step",
   "widget",
 ]);
 const markTypes = new Set([
@@ -336,9 +341,16 @@ function validateWidgetData(kind, data, path) {
     return;
   }
   if (
-    ["text", "image", "table", "callout", "toggle", "divider", "code"].includes(
-      kind,
-    )
+    [
+      "text",
+      "image",
+      "table",
+      "callout",
+      "toggle",
+      "stepper",
+      "divider",
+      "code",
+    ].includes(kind)
   ) {
     validatePrimitiveData(kind, data);
     if ((kind === "text" && typeof data.content === "object") || data.document)
@@ -656,6 +668,7 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
     "table",
     "callout",
     "toggle",
+    "stepper",
     "widget",
   ];
   const allowed = {
@@ -679,6 +692,8 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
     blockquote: blockTypes,
     callout: blockTypes,
     toggle: blockTypes,
+    stepper: ["step"],
+    step: blockTypes,
     bulletList: ["listItem"],
     orderedList: ["listItem"],
     listItem: blockTypes,
@@ -691,11 +706,15 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
   }[node.type];
   if (allowed && children.some((child) => !allowed.includes(child.type)))
     throw new Error(`${path} contains an invalid child block.`);
+  if (node.type === "stepper" && children.length > MAX_STEPS)
+    throw new Error(`${path} must contain at most ${MAX_STEPS} steps.`);
   if (
     [
       "blockquote",
       "callout",
       "toggle",
+      "stepper",
+      "step",
       "bulletList",
       "orderedList",
       "listItem",

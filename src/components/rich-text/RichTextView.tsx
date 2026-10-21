@@ -7,6 +7,7 @@ import { createElement, type CSSProperties, type ReactNode } from "react";
 import type { JSONContent } from "@tiptap/core";
 import { mathHtml } from "../blocks/markdown-math.mjs";
 import { safeUrl } from "../blocks/helpers";
+import { StepperReader, stepTitle } from "./Stepper";
 import { translator } from "../../i18n";
 import messages from "../../i18n/messages/richText";
 
@@ -298,6 +299,25 @@ export function RichTextNode({
           <div className="portable-toggle-body">{children}</div>
         </details>
       );
+    case "stepper":
+      return (
+        <StepperReader
+          id={attrs.id}
+          style={nodeStyle(node)}
+          titles={(node.content ?? []).map((step, index) =>
+            stepTitle(step.attrs?.title, index),
+          )}
+          steps={(node.content ?? []).map((step, index) => (
+            <RichTextNode
+              key={step.attrs?.id ?? index}
+              node={{ ...step, type: "region" }}
+              renderWidget={renderWidget}
+            />
+          ))}
+        />
+      );
+    case "step":
+      return <section {...props}>{children}</section>;
     case "widget":
       if (
         ["image", "code", "table", "callout", "toggle", "divider"].includes(

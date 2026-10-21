@@ -254,6 +254,8 @@ const nodes = new Set([
   "tableCell",
   "callout",
   "toggle",
+  "stepper",
+  "step",
   "widget",
   "region",
   "richText",
@@ -382,6 +384,7 @@ export const primitiveNodeTypes = Object.freeze({
   table: "table",
   callout: "callout",
   toggle: "toggle",
+  stepper: "stepper",
   divider: "horizontalRule",
 });
 export function primitiveContentNode(kind, data, id) {
@@ -443,6 +446,15 @@ export function primitiveContentNode(kind, data, id) {
     }
     node.content = richTextDocument({ content: data.content }).content;
     if (!node.content.length) node.content = [{ type: "paragraph" }];
+  } else if (kind === "stepper") {
+    node.content = data.steps.map((step) => {
+      const content = richTextDocument({ content: step.content }).content;
+      return {
+        type: "step",
+        attrs: { title: step.title ?? "" },
+        content: content.length ? content : [{ type: "paragraph" }],
+      };
+    });
   }
   return node;
 }

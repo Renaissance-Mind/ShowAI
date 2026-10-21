@@ -4,6 +4,7 @@ import {
   TableBlock,
   CalloutBlock,
   ToggleBlock,
+  StepperBlock,
   DividerBlock,
   CodeBlock,
   validatePrimitiveData,
@@ -249,6 +250,7 @@ for (const item of primitiveMetadata) {
         table: "▦",
         callout: "!",
         toggle: "⌄",
+        stepper: "⇥",
         divider: "—",
         code: "{}",
       } as Record<string, string>
@@ -260,11 +262,19 @@ for (const item of primitiveMetadata) {
       table: TableBlock,
       callout: CalloutBlock,
       toggle: ToggleBlock,
+      stepper: StepperBlock,
       divider: DividerBlock,
       code: CodeBlock,
     }[
       item.kind as
-        "text" | "image" | "table" | "callout" | "toggle" | "divider" | "code"
+        | "text"
+        | "image"
+        | "table"
+        | "callout"
+        | "toggle"
+        | "stepper"
+        | "divider"
+        | "code"
     ],
     validate: (data) => validatePrimitiveData(item.kind, data),
   });

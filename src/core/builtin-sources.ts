@@ -19,6 +19,8 @@ import retainedEditorContent from "../components/rich-text/RetainedEditorContent
 import richTextFormatControls from "../components/rich-text/FormatControls.tsx?raw";
 import richTextFormatCss from "../components/rich-text/format-controls.css?raw";
 import richTextView from "../components/rich-text/RichTextView.tsx?raw";
+import richTextStepper from "../components/rich-text/Stepper.tsx?raw";
+import richTextStepperCss from "../components/rich-text/stepper.css?raw";
 import highlightedCode from "../components/rich-text/HighlightedCode.tsx?raw";
 import codeHighlighting from "../components/rich-text/code-highlighting.ts?raw";
 import codeHighlightingCss from "../components/rich-text/code-highlighting.css?raw";
@@ -184,6 +186,8 @@ const sources: Record<string, string> = {
   "rich-text/FormatControls.tsx": richTextFormatControls,
   "rich-text/format-controls.css": richTextFormatCss,
   "rich-text/RichTextView.tsx": richTextView,
+  "rich-text/Stepper.tsx": richTextStepper,
+  "rich-text/stepper.css": richTextStepperCss,
   "rich-text/HighlightedCode.tsx": highlightedCode,
   "rich-text/code-highlighting.ts": codeHighlighting,
   "rich-text/code-highlighting.css": codeHighlightingCss,
@@ -397,6 +401,7 @@ export const builtinExports: Record<string, string> = {
   table: "Table",
   callout: "Callout",
   toggle: "Toggle",
+  stepper: "Stepper",
   divider: "Divider",
   code: "Code",
   "step-walkthrough": "StepWalkthrough",

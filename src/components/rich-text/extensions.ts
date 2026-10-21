@@ -18,6 +18,7 @@ import { DropCursorCleanup } from "./drop-cursor-cleanup";
 import {
   CalloutView,
   ToggleView,
+  StepperView,
   WidgetView,
   MathView,
   ImageView,
@@ -42,6 +43,8 @@ export const blockIdNodeTypes = [
   "tableHeader",
   "callout",
   "toggle",
+  "stepper",
+  "step",
   "widget",
   "mathInline",
   "mathBlock",
@@ -208,6 +211,40 @@ export const ToggleNode = Node.create({
   addNodeView: () => ReactNodeViewRenderer(ToggleView),
 });
 
+/** Ordered steps shown one at a time; which step is open is reading state, never saved. */
+export const StepperNode = Node.create({
+  name: "stepper",
+  group: "block",
+  content: "step+",
+  defining: true,
+  draggable: true,
+  isolating: true,
+  parseHTML: () => [{ tag: "section[data-stepper]" }],
+  renderHTML: ({ HTMLAttributes }) => [
+    "section",
+    mergeAttributes(HTMLAttributes, { "data-stepper": "" }),
+    0,
+  ],
+  addNodeView: () => ReactNodeViewRenderer(StepperView),
+});
+
+/** One step: a short title and any blocks, including other components. */
+export const StepNode = Node.create({
+  name: "step",
+  content: "block+",
+  defining: true,
+  isolating: true,
+  addAttributes: () => ({
+    title: { default: "" },
+  }),
+  parseHTML: () => [{ tag: "section[data-step]" }],
+  renderHTML: ({ HTMLAttributes }) => [
+    "section",
+    mergeAttributes(HTMLAttributes, { "data-step": "" }),
+    0,
+  ],
+});
+
 export const RichTextNode = Node.create({
   name: "richText",
   priority: 50,
@@ -340,6 +377,8 @@ export function createExtensions(
     TextAlign.configure({ types: ["heading", "paragraph"] }),
     CalloutNode,
     ToggleNode,
+    StepperNode,
+    StepNode,
     WidgetNode,
   ];
 }
@@ -394,6 +433,7 @@ const ContentAttributes = Extension.create({
           "table",
           "callout",
           "toggle",
+          "stepper",
           "horizontalRule",
         ],
         attributes: { componentStyle: attribute("componentStyle") },

@@ -12,3 +12,4 @@ export function alignTableData(
   column: number | null,
   alignment: "left" | "center" | "right",
 ): Record<string, unknown>;
+export declare const MAX_STEPS: number;

@@ -67,6 +67,7 @@ import {
   Link2,
   List,
   ListOrdered,
+  ArrowRight,
   MessageSquareQuote,
   Minus,
   PanelTop,
@@ -886,6 +887,38 @@ export default function RichTextEditor({
               type: "toggle",
               attrs: { title: "展开了解更多", open: true }, // i18n-exempt: default title saved into the new toggle
               content: [{ type: "paragraph" }],
+            })
+            .run();
+        },
+      },
+      {
+        id: "stepper",
+        title: t("block.stepper"),
+        keywords: `stepper steps ${t("block.stepperKeywords")}`,
+        icon: <ArrowRight size={20} />,
+        group: t("group.basic"),
+        run: (e: Editor) => {
+          // Untitled steps read as "Step n" in the current language.
+          const step = { type: "step", content: [{ type: "paragraph" }] };
+          const { from } = e.state.selection;
+          e.chain()
+            .focus()
+            .insertContent({ type: "stepper", content: [step, step] })
+            // Same transaction: continue typing in the new stepper's first step.
+            .command(({ tr }) => {
+              let stepper = -1;
+              tr.doc.nodesBetween(
+                Math.max(0, from - 1),
+                tr.doc.content.size,
+                (node, pos) => {
+                  if (stepper < 0 && node.type.name === "stepper")
+                    stepper = pos;
+                  return stepper < 0;
+                },
+              );
+              if (stepper >= 0)
+                tr.setSelection(TextSelection.create(tr.doc, stepper + 3));
+              return true;
             })
             .run();
         },
