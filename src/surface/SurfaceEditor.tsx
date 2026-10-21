@@ -1,3 +1,4 @@
+import { rebaseHistorySnapshots } from "./history-rebase";
 import { applyInkUpdate, InkEditConflict } from "./inline-ink";
 import type {NativeAuthorMutation} from "./inline-ink";
 import { SurfaceGeometryStore } from "./geometry-store";
@@ -149,20 +150,7 @@ function SurfaceEditor({
         inkActions.current.clear();
         lastAuthorMutation.current=undefined;
       } else {
-        const rebase = (snapshot: ContainerDocument) => {
-          const next=mergePageContent(before, document, snapshot, "history").document as ContainerDocument;
-          const action=inkActions.current.get(snapshot);
-          if(action){inkActions.current.delete(snapshot);inkActions.current.set(next,action)}
-          return next;
-        };
-        history.current.past = history.current.past
-          .map(rebase)
-          .filter((snapshot) => contentKey(snapshot) !== contentKey(document));
-        history.current.future = history.current.future
-          .map(rebase)
-          .filter((snapshot) => contentKey(snapshot) !== contentKey(document));
-        history.current.group = "";
-        history.current.at = 0;
+        rebaseHistorySnapshots(history.current,inkActions.current,before,document);
       }
     }
     current.current = document;
@@ -218,6 +206,7 @@ function SurfaceEditor({
         for(const discarded of stack.future)inkActions.current.delete(discarded);
         stack.future = [];stack.group=group;stack.at=now;
       }
+      else rebaseHistorySnapshots(stack,inkActions.current,before,next);
       let author:NativeAuthorMutation|undefined;
       if(authoring&&recordHistory&&!nativeAction&&window.showai?.inlineInk?.nativeScene){
         const owner=stack.past.at(-1);
