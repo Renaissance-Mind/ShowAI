@@ -22,7 +22,7 @@ import { changeContext, withChangeContext } from "../core/history-context";
 import { pageReference } from "../core/page-reference";
 import { ReadBaselines } from "../core/read-baselines";
 import { parseTarget } from "../agent-host/conversations";
-import { mutateLibrary, versionedLibrary } from "../core/library-runtime";
+import { mutateLibrary, versionedLibrary, withLibrarySnapshot } from "../core/library-runtime";
 import { canonicalJson } from "../core/diff";
 import type { ChangeActor } from "../core/history-model";
 import { EditorDrafts, type EditorDraftInput } from "../core/editor-drafts";
@@ -350,22 +350,24 @@ export function createWorkbench(
     page: string,
     conditional?: Record<string, unknown>,
   ) {
-    const record = await store.readPage(id, page);
-    if (
-      conditional?.ifHash === record.hash &&
-      conditional.ifRevision === record.revision &&
-      !record.workspaceConflicts?.length
-    ) {
-      const connection = (
-        await syncManager(store.root).configuration()
-      ).projects.find((item) => item.projectId === id);
-      return {
-        unchanged: true as const,
-        readOnly:
-          connection?.role === "viewer" || connection?.status === "revoked",
-      };
-    }
-    return enrichPage(id, record, conditional?.knownComponents);
+    return withLibrarySnapshot(store.root, async () => {
+      const record = await store.readPage(id, page);
+      if (
+        conditional?.ifHash === record.hash &&
+        conditional.ifRevision === record.revision &&
+        !record.workspaceConflicts?.length
+      ) {
+        const connection = (
+          await syncManager(store.root).configuration()
+        ).projects.find((item) => item.projectId === id);
+        return {
+          unchanged: true as const,
+          readOnly:
+            connection?.role === "viewer" || connection?.status === "revoked",
+        };
+      }
+      return enrichPage(id, record, conditional?.knownComponents);
+    });
   }
 
   async function enrichPage(id: string, record: PageRecord, known?: unknown) {
