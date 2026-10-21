@@ -1,3 +1,4 @@
+import {measureNativeSync} from "./native-perf";
 import { rebaseHistorySnapshots } from "./history-rebase";
 import { applyInkUpdate, InkEditConflict } from "./inline-ink";
 import type {NativeAuthorMutation} from "./inline-ink";
@@ -139,7 +140,7 @@ function SurfaceEditor({
       before.surfaceViews !== document.surfaceViews ||
       before.icon !== document.icon
     ) {
-      if (contentKey(before) === contentKey(document)) {
+      if (measureNativeSync("surface.propEcho.key",()=>contentKey(before) === contentKey(document))) {
         current.current = document;
         window.showai?.inlineInk?.setDocument?.(document.id, document);
         refresh((value) => value + 1);
@@ -152,7 +153,7 @@ function SurfaceEditor({
         inkActions.current.clear();
         lastAuthorMutation.current=undefined;
       } else {
-        rebaseHistorySnapshots(history.current,inkActions.current,before,document);
+        measureNativeSync("surface.propEcho.rebase",()=>rebaseHistorySnapshots(history.current,inkActions.current,before,document));
       }
     }
     current.current = document;
@@ -170,12 +171,12 @@ function SurfaceEditor({
       settlement.second = requestAnimationFrame(() => {
         if (settlement.generation !== generation) return;
         const before = current.current,
-          measured = geometry.materialize(before);
-        if (contentKey(before) === contentKey(measured)) return;
-        const settled = reconcileSurface(
+          measured = measureNativeSync("surface.settle.materialize",()=>geometry.materialize(before));
+        if (measureNativeSync("surface.settle.key",()=>contentKey(before) === contentKey(measured))) return;
+        const settled = measureNativeSync("surface.settle.reconcile",()=>reconcileSurface(
           { ...measured, surfaceViews: { ...measured.surfaceViews } },
           { clone: false },
-        ) as ContainerDocument;
+        )) as ContainerDocument;
         current.current = settled;
         window.showai?.inlineInk?.setDocument?.(settled.id, settled);
         latestChange.current(settled);
@@ -185,7 +186,7 @@ function SurfaceEditor({
   const commit = useCallback(
     (value: ShowDocument, group = "", nativeAction?:NativeInkHistoryAction, recordHistory=true, authoring=true) => {
       if (latestReadOnly.current) return;
-      const next = (
+      const next = measureNativeSync("surface.commit.reconcile",()=>
         isReconciledSurface(value) ? value : reconcileSurface(value)
       ) as ContainerDocument;
       const before = current.current;
@@ -197,7 +198,7 @@ function SurfaceEditor({
           next.icon === before.icon)
       )
         return;
-      if(!recordHistory && nativeDocumentContentKey(next)===nativeDocumentContentKey(before)){
+      if(!recordHistory && measureNativeSync("surface.commit.key",()=>nativeDocumentContentKey(next)===nativeDocumentContentKey(before))){
         current.current=next;
         window.showai?.inlineInk?.setDocument?.(next.id,next);
         return;
@@ -213,7 +214,7 @@ function SurfaceEditor({
         for(const discarded of stack.future)inkActions.current.delete(discarded);
         stack.future = [];stack.group=group;stack.at=now;
       }
-      else rebaseHistorySnapshots(stack,inkActions.current,before,next);
+      else measureNativeSync("surface.commit.rebase",()=>rebaseHistorySnapshots(stack,inkActions.current,before,next));
       let author:NativeAuthorMutation|undefined;
       if(authoring&&recordHistory&&!nativeAction&&window.showai?.inlineInk?.nativeScene){
         const owner=stack.past.at(-1);
@@ -225,11 +226,13 @@ function SurfaceEditor({
           lastAuthorMutation.current=mutationId;
         }
       }
-      current.current = next;
-      window.showai?.inlineInk?.setDocument?.(next.id, next,author);
-      latestChange.current(next);
-      refresh((value) => value + 1);
-      settleGeometry();
+      measureNativeSync("surface.commit.publish",()=>{
+        current.current = next;
+        window.showai?.inlineInk?.setDocument?.(next.id, next,author);
+        latestChange.current(next);
+        refresh((value) => value + 1);
+        settleGeometry();
+      });
     },
     [settleGeometry],
   );
@@ -252,7 +255,7 @@ function SurfaceEditor({
             let merged:ReturnType<typeof mergeNativeDocumentReceipt>;
             while(true){
               if(!bound||latestReadOnly.current||current.current.id!==value.pageId)return false;
-              if(nativeDocumentBodiesEqual(value.baseDocument,current.current)){
+              if(measureNativeSync("surface.receipt.compare",()=>nativeDocumentBodiesEqual(value.baseDocument!,current.current))){
                 merged={document:value.document,conflicts:[]};break;
               }
               if(bridge.hasProjectionReceipt?.(value.document)&&bridge.mergeProjection){
@@ -264,7 +267,7 @@ function SurfaceEditor({
                 if(current.current!==projected.current||!nativeDocumentBodiesEqual(projected.basis,current.current))continue;
                 merged=projected.result;break;
               }
-              merged=mergeNativeDocumentReceipt(value.baseDocument,current.current,value.document);break;
+              merged=measureNativeSync("surface.receipt.merge",()=>mergeNativeDocumentReceipt(value.baseDocument!,current.current,value.document!));break;
             }
             if(!canCommitPageMerge(merged))throw new InkEditConflict("Concurrent Board edits require resolution");
             authorBaseline.current=value.document;
@@ -286,7 +289,7 @@ function SurfaceEditor({
               const plan=nativeContentHistoryStages(current.current,value.baseDocument,value.document,value.nativeContentActions,{baseline:value.baseDocument,current:current.current,incoming:value.document,result:merged});
               if(plan.stages.length){
                 if(contentKey(current.current)!==contentKey(plan.sourceOnly))
-                  rebaseHistorySnapshots(history.current,inkActions.current,current.current,plan.sourceOnly as ContainerDocument);
+                  measureNativeSync("surface.receipt.historyRebase",()=>rebaseHistorySnapshots(history.current,inkActions.current,current.current,plan.sourceOnly as ContainerDocument));
                 current.current=plan.sourceOnly as ContainerDocument;
                 for(const stage of plan.stages)commit(stage.document,`native-content:${stage.groupId}`,undefined,true,false);
               }else commit(merged.document,"",undefined,false,false);

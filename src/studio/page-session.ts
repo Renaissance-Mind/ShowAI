@@ -1,3 +1,4 @@
+import {measureNativeSync} from "../surface/native-perf";
 import { coalescedTask } from "../lib/coalesced-task";
 import type { JSONContent } from "@tiptap/core";
 import type { PageRecord } from "../core/model";
@@ -360,7 +361,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         current.current &&
         projectRef.current
       ) {
-        const repaired = repairEditorLinks(current.current);
+        const repaired = measureNativeSync("session.save.repair",()=>repairEditorLinks(current.current!));
         if (repaired.repairs.length) {
           // Retain the exact incoming version before making its links saveable.
           try {
@@ -394,7 +395,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
           repairedLinks = true;
         }
         const editingSource = current.current;
-        const source = structuredClone(editingSource);
+        const source = measureNativeSync("session.save.clone",()=>structuredClone(editingSource));
         if (typeof window !== "undefined")
           window.showai?.inlineInk?.copyDocumentMetadata?.(editingSource, source);
         const sequence = revision.current;
@@ -456,39 +457,42 @@ export function createPageSession(options: PageSessionOptions): PageSession {
                     message: "编辑页面", // i18n-exempt: saved history record
                   },
                 });
-          const saved = {
-            ...response,
-            document: response.reuseDocument
-              ? { ...source, ...response.documentMetadata }
-              : response.document,
-            components: response.reuseComponents
-              ? (recordRef.current?.components ?? [])
-              : response.components,
-          };
-          recordRef.current = saved;
-          base.current = saved.hash;
-          baseRevision.current = saved.revision;
-          draftBase.current = saved.revision;
-          setMergeBase(saved.revision);
-          operations.current.delete(sequence);
-          savedRevision.current = sequence;
-          setRecord(saved);
-          if (projectRef.current) options.onSaved?.(projectRef.current, saved);
-          if (revision.current === sequence) {
-            const keys = (value: ShowDocument) =>
-              JSON.stringify([value.content, value.layout, value.surfaceViews]);
-            const installed =
-              saved.reuseDocument || keys(source) === keys(saved.document)
-                ? {
-                    ...saved.document,
-                    content: editingSource.content,
-                    layout: editingSource.layout,
-                    surfaceViews: editingSource.surfaceViews,
-                  }
-                : saved.document;
-            current.current = installed;
-            setDraft(installed);
-          }
+          const saved = measureNativeSync("session.save.ackInstall",()=>{
+            const saved = {
+              ...response,
+              document: response.reuseDocument
+                ? { ...source, ...response.documentMetadata }
+                : response.document,
+              components: response.reuseComponents
+                ? (recordRef.current?.components ?? [])
+                : response.components,
+            };
+            recordRef.current = saved;
+            base.current = saved.hash;
+            baseRevision.current = saved.revision;
+            draftBase.current = saved.revision;
+            setMergeBase(saved.revision);
+            operations.current.delete(sequence);
+            savedRevision.current = sequence;
+            setRecord(saved);
+            if (projectRef.current) options.onSaved?.(projectRef.current, saved);
+            if (revision.current === sequence) {
+              const keys = (value: ShowDocument) =>
+                JSON.stringify([value.content, value.layout, value.surfaceViews]);
+              const installed =
+                measureNativeSync("session.save.ackKey",()=>saved.reuseDocument || keys(source) === keys(saved.document))
+                  ? {
+                      ...saved.document,
+                      content: editingSource.content,
+                      layout: editingSource.layout,
+                      surfaceViews: editingSource.surfaceViews,
+                    }
+                  : saved.document;
+              current.current = installed;
+              setDraft(installed);
+            }
+            return saved;
+          });
           if (saved.workspaceConflicts?.length) {
             setConflictId(saved.workspaceConflicts[0].id);
             blocked.current = true;
