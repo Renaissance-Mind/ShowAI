@@ -34,6 +34,8 @@ import { isBoardShape } from "./board-input.mjs";
 
 export interface ObjectActions {
   componentActionsHost?: HTMLElement | null;
+  /** This exact Board has an accepted native scene owning paint and selection. */
+  nativeScene?: boolean;
   scale: number;
   geometry?: SurfaceGeometryStore;
   selected: string | null;
@@ -352,7 +354,7 @@ export function SurfaceObject({
     actions.revealAll ||
     actions.revealed.has(id) ||
     (board?.ids.has(id) ?? actions.selected === id);
-  const ink = drawingNode && drawingBounds(drawingNode);
+  const ink = !actions.nativeScene && drawingNode && drawingBounds(drawingNode);
   const outline =
     ink && drawingNode
       ? {

@@ -101,7 +101,7 @@ export function useInlineInk({
   onActivate?: NativeBoardOptions["onActivate"];
   fillColor?: string;
 }) {
-  useNativeBoard({root,world,camera:viewCamera,document:source,boardId,tool,color,width,pressure,ruler,enabled,
+  const nativeScene=useNativeBoard({root,world,camera:viewCamera,document:source,boardId,tool,color,width,pressure,ruler,enabled,
     onCamera,onTool,onClearSelection,selection,onSelection,onLayout,onDrawing,onActivate,fillColor});
   const legacyEnabled=enabled&&(typeof window==="undefined"||window.showai?.inlineInk?.nativeScene!==true);
   const current = useRef({
@@ -459,4 +459,5 @@ export function useInlineInk({
       });
     };
   }, [legacyEnabled, source?.id, boardId, inking, root, world, viewCamera]);
+  return nativeScene;
 }

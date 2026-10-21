@@ -125,7 +125,7 @@ const ContentNode = memo(
     const { node, frame } = useConnectionGeometry(
       sourceNode,
       document,
-      actions.geometry,
+      actions.nativeScene?undefined:actions.geometry,
     );
     const id = node.attrs!.id;
     const inkData = node.attrs?.nativeInk ?? node.attrs?.data?.nativeInk;

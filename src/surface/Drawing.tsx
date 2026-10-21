@@ -36,13 +36,26 @@ import "./native-ink.css";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";
 type Point = { x: number; y: number; pressure?: number };
-export function Drawing({
-  node,
-  frame,
-}: {
-  node: JSONContent;
-  frame?: NodeLayout;
-}) {
+interface DrawingProps {node:JSONContent;frame?:NodeLayout}
+/** Native paint keeps the canonical source and exact DOM measurement basis;
+ * the browser never prepares a second hidden brush/shape representation. */
+export function Drawing(props:DrawingProps) {
+  const actions=useContext(ObjectContext);
+  return actions.nativeScene ? <DrawingMeasurement {...props}/> : <DrawingPresentation {...props}/>;
+}
+function DrawingMeasurement({node,frame}:DrawingProps) {
+  const actions=useContext(ObjectContext),attrs=node.attrs!,extent=attrs.extent as [number,number];
+  const points=attrs.points as Point[];
+  return <>
+    <svg className="board-drawing" data-native-measurement="true"
+      data-native-ink={isInkNode(node)?"":undefined} data-native-ink-id={isInkNode(node)?attrs.id:undefined}
+      viewBox={`0 0 ${extent[0]} ${extent[1]}`} preserveAspectRatio="none" role="img" aria-label={attrs.name||attrs.tool}/>
+    {labelCapable(node)&&attrs.label&&<DrawingLabel node={node} first={points[0]} last={points.at(-1)!}
+      frameHeight={frame?.height??extent[1]} editing={false}
+      onDone={(label,minHeight)=>actions.setLabel?.(attrs.id,label,minHeight)}/>}
+  </>;
+}
+function DrawingPresentation({node,frame}:DrawingProps) {
   const t = useTranslator(messages);
   const actions = useContext(ObjectContext);
   const contourId = useId();

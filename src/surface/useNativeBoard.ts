@@ -1,4 +1,4 @@
-import {useEffect,useRef,type RefObject} from "react";
+import {useEffect,useRef,useState,type RefObject} from "react";
 import type {ShowDocument} from "../types";
 import type {JSONContent} from "@tiptap/core";
 import type {Camera} from "./model";
@@ -22,6 +22,7 @@ export interface NativeBoardOptions {
  * changes; native contact/camera frames never ask React to repaint the Board. */
 export function useNativeBoard(options:NativeBoardOptions){
   const current=useRef(options);current.current=options;
+  const [owner,setOwner]=useState<{pageId:string;boardId:string;token:string}|null>(null);
   const invalidation=useRef<(()=>void)|null>(null), cameraVersion=useRef(0), previousInk=useRef("pen");
   if(options.tool==="pen"||options.tool==="highlighter")previousInk.current=options.tool;
   const active=options.enabled&&typeof window!=="undefined"&&window.showai?.inlineInk?.nativeScene===true;
@@ -79,6 +80,7 @@ export function useNativeBoard(options:NativeBoardOptions){
         if(!alive||accepted===false)return;
         lastKey=key;lastDocument=source;lastPoses=poses;
         surface.dataset.nativeBoardActive="true";
+        setOwner(previous=>previous?.token===token?previous:{pageId:source.id,boardId:v.boardId,token});
       }catch(error){surface.dispatchEvent(new CustomEvent("showai:ink-error",{bubbles:true,detail:String(error)}));throw error}
       finally{pending=false;if(dirty)schedule()}
     };
@@ -94,9 +96,12 @@ export function useNativeBoard(options:NativeBoardOptions){
     surface.addEventListener("showai:viewport-change",viewport);surface.addEventListener("showai:ink-refresh",refresh);
     window.addEventListener("resize",schedule);document.addEventListener("scroll",schedule,true);document.addEventListener("visibilitychange",schedule);
     schedule();
-    return()=>{alive=false;if(invalidation.current===schedule)invalidation.current=null;cancelAnimationFrame(frame);observer.disconnect();resize.disconnect();
+    return()=>{alive=false;setOwner(previous=>previous?.token===token?null:previous);if(invalidation.current===schedule)invalidation.current=null;cancelAnimationFrame(frame);observer.disconnect();resize.disconnect();
       surface.removeEventListener("showai:viewport-change",viewport);surface.removeEventListener("showai:ink-refresh",refresh);window.removeEventListener("resize",schedule);document.removeEventListener("scroll",schedule,true);document.removeEventListener("visibilitychange",schedule);
       void bridge.hide(o.document!.id,o.boardId,token).finally(()=>{if(surface.dataset.nativeInkToken===token){delete surface.dataset.nativeBoardActive;delete surface.dataset.nativeInkToken}});
     };
   },[active,options.document?.id,options.boardId,options.root,options.world]);
+  // Ownership follows an accepted native scene, scoped to this exact Board.
+  // An inactive/printing/locked surface immediately keeps its DOM renderer.
+  return active&&!!owner&&owner.pageId===options.document?.id&&owner.boardId===options.boardId;
 }

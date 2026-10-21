@@ -309,7 +309,7 @@ export default function PageSurface({
       { reading: !onMove, anchorScreen: !embedded, panMode },
     );
   const [ruler, setRuler] = useState(false);
-  useInlineInk({
+  const nativeScene=useInlineInk({
     root: rootRef,
     world: worldRef,
     camera,
@@ -1103,6 +1103,7 @@ export default function PageSurface({
   const objectContext = useMemo<ObjectActions>(
     () => ({
       componentActionsHost,
+      nativeScene,
       // Read live so zoom frames do not re-render every object.
       get scale() {
         return camera.current.scale;
@@ -1128,6 +1129,7 @@ export default function PageSurface({
     // the part objects read.
     [
       componentActionsHost,
+      nativeScene,
       geometry,
       selected,
       [...board.ids].join(":"),
