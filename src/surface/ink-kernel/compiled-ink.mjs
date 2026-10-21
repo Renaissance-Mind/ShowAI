@@ -2,8 +2,8 @@ import { inkKernelWasmBase64, inkKernelProvenance } from './ink-kernel-wasm.mjs'
 export { inkKernelProvenance };
 const brushes = { pen: 0, marker: 1, pencil: 2, monoline: 3 };
 const operations = { M: [0, 2], L: [1, 2], Q: [2, 4], C: [3, 6], Z: [4, 0] };
-const bytes = Uint8Array.from(atob(inkKernelWasmBase64), value => value.charCodeAt(0));
-const compiled = new WebAssembly.Module(bytes);
+let compiled;
+const module = () => compiled ??= new WebAssembly.Module(Uint8Array.from(atob(inkKernelWasmBase64), value => value.charCodeAt(0)));
 const number = value => String(Math.round(value * 10000) / 10000);
 
 /** One instance owns scratch memory. Returned arrays are detached retained
@@ -11,7 +11,7 @@ const number = value => String(Math.round(value * 10000) / 10000);
 export class CompiledInkKernel {
   constructor() {
     let exports;
-    this.instance = new WebAssembly.Instance(compiled, { env: {
+    this.instance = new WebAssembly.Instance(module(), { env: {
       sin: Math.sin, cos: Math.cos, hypot: Math.hypot,
       memcpy(destination, source, length) { new Uint8Array(exports.memory.buffer).copyWithin(destination, source, source + length); return destination; },
     } });
