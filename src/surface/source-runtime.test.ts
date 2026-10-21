@@ -1,4 +1,4 @@
-import {CAPACITY} from "../portable/capacity.mjs";
+import {CAPACITY,measureContent} from "../portable/capacity.mjs";
 import {createHash} from "node:crypto";
 import {installInkDigestProvider} from "./ink-operations.mjs";
 import {stampInkDocument} from "./ink-wire.mjs";
@@ -134,7 +134,11 @@ it("reuses the actual normalized snapshot, retained ink conflicts and lease with
   const normalized=delta(owner.execute({kind:"normalize",ref:merged.next,leaseId:"saved-view"}));
   expect(normalized.base).toBe(merged.next);expect(normalized.next).toBe(merged.next);expect(normalized.edits).toEqual([]);expect(normalized.conflicts).toBe(merged.conflicts);expect(normalized.inkCandidates).toBe(merged.inkCandidates);expect(hashes).toBe(0);
   expect(resolve(owner,normalized.next)).toEqual(expected);
-  const next=seed(base,"new");expect(Number(next.next.snapshotId.split("-")[1])).toBe(Number(merged.next.snapshotId.split("-")[1])+1);
+  const metadata=delta(owner.execute({kind:"draft",base:merged.next,transactionId:"candidate-storage-time",edits:[{op:"set",path:["updatedAt"],value:"2026-10-22T01:00:00.000Z"}],leaseId:"candidate-draft"}));
+  expect(metadata.next.kind).toBe("draft");expect(metadata.inkCandidates).toBe(merged.inkCandidates);expect(hashes).toBe(0);
+  const saved=owner.registerActualSavedSnapshot({scope:merged.next.scope,base:metadata.next,document:{...cloneSourceValue(resolve(owner,metadata.next)),updatedAt:"2026-10-22T02:00:00.000Z"},leaseId:"candidate-saved"});
+  expect(saved.inkCandidates).toBe(merged.inkCandidates);expect(hashes).toBe(0);
+  const next=seed(base,"new");expect(Number(next.next.snapshotId.split("-")[1])).toBe(Number(saved.next.snapshotId.split("-")[1])+1);
  }finally{installInkDigestProvider(null)}
 });
 it("checks normalized proof, scope and epoch, keeps its lease under pressure, and still rejects invalid drafts",()=>{
@@ -178,3 +182,15 @@ it("retains an oversized timestamp draft without promoting its optional validati
  const body=resolve(owner,draft.next);expect(body.updatedAt).toBe(timestamp);expect(draft.next.kind).toBe("draft");expect(owner.normalizedDocumentMatching({ref:draft.next,document:body})).toBeNull();
  expect(()=>owner.execute({kind:"normalize",ref:draft.next})).toThrow(/Page structure/);
 });
+
+it("inherits timestamp capacity at the exact real boundary but rejects escaped-byte growth without losing the draft",()=>{
+ const document=source() as ShowDocument&{padding:string;futureRoot:unknown};document.updatedAt="2026-10-21 ";document.futureRoot={resources:["data:image/png;base64,AAEC","data:image/png;base64,AAEC"]};document.padding="";
+ document.padding="x".repeat(CAPACITY.pageStructureBytes-measureContent(document).structureBytes);
+ const owner=new SourceRuntimeOwner(),seed=delta(owner.execute({kind:"seed",scope:actualScope(document),document,proof:"normalized",leaseId:"capacity-base"}));
+ const changed=delta(owner.execute({kind:"draft",base:seed.next,transactionId:"same-real-bytes",edits:[{op:"set",path:["updatedAt"],value:"2026-10-22 "}],leaseId:"same-date"}));
+ const same=resolve(owner,changed.next);expect(measureContent(same)).toMatchObject({structureBytes:CAPACITY.pageStructureBytes,resourceCount:1,resourceBytes:3});expect(owner.normalizedDocumentMatching({ref:changed.next,document:same})).toBe(same);expect(changed.next.kind).toBe("draft");
+ const escaped="2026-10-21\n";expect(escaped.length).toBe(document.updatedAt.length);expect(Number.isFinite(Date.parse(escaped))).toBe(true);
+ const growth=delta(owner.execute({kind:"draft",base:seed.next,transactionId:"escaped-byte-growth",edits:[{op:"set",path:["updatedAt"],value:escaped}],leaseId:"growth-date"}));
+ const retained=resolve(owner,growth.next);expect(retained.updatedAt).toBe(escaped);expect(owner.normalizedDocumentMatching({ref:growth.next,document:retained})).toBeNull();expect(()=>owner.execute({kind:"normalize",ref:growth.next})).toThrow(/Page structure/);
+ expect(()=>owner.registerActualSavedSnapshot({scope:seed.next.scope,base:seed.next,document:{...document,updatedAt:escaped},leaseId:"invalid-saved"})).toThrow(/Page structure/);
+},30000);

@@ -1,5 +1,5 @@
 import type {ShowDocument} from "../types";
-import {assertContent,CapacityError} from "../portable/capacity.mjs";
+import {assertContent,CapacityError,nonResourceReplacementDoesNotGrow} from "../portable/capacity.mjs";
 import {reconcileSurface,artifactVersion} from "./document.mjs";
 import {parseArtifact,parseArtifactConsumingDocument,isDocumentTimestamp} from "../portable/validation.mjs";
 import {mergePageContent,canCommitPageMerge,type PageMergeConflict} from "../core/page-merge-model";
@@ -48,6 +48,7 @@ const scopeKey=(scope:SourceScope)=>JSON.stringify([scope.homeId,scope.projectId
 function scope(value:SourceScope){if(!value||[value.homeId,value.projectId,value.pageId].some(part=>typeof part!=="string"||!part))fail("Source scope requires its actual home, project and page");return value}
 export const sameSourceRef=(one:SourceSnapshotRef|null|undefined,two:SourceSnapshotRef|null|undefined)=>!!one&&!!two&&one.ownerId===two.ownerId&&one.epoch===two.epoch&&one.snapshotId===two.snapshotId&&one.kind===two.kind&&scopeKey(one.scope)===scopeKey(two.scope);
 const owned=new WeakSet<object>();
+const canonicalCapacityBodies=new WeakSet<ShowDocument>();
 const metrics=new WeakMap<object,{bytes:number;children:object[]}>();
 /** Only objects recursively owned by this module may skip future freeze walks.
  * An externally shallow-frozen parent is never evidence about its children. */
@@ -120,13 +121,26 @@ export function diffOwnedSource(before:unknown,next:unknown):NativeSourceEdit[]{
  * must describe exactly the document returned by ordinary artifact parsing. */
 export function normalizeSourceDocument(document:ShowDocument):ShowDocument{
  const normalized=reconcileSurface(document);
- return parseArtifact({format:"showai",version:artifactVersion(normalized),document:normalized}).document;
+ const canonical=parseArtifact({format:"showai",version:artifactVersion(normalized),document:normalized}).document;
+ canonicalCapacityBodies.add(canonical);return canonical;
 }
 function normalizeParsedSourceDocument(document:ShowDocument):ShowDocument{
  // Retain the original result root for history's pre-normalization semantics;
  // reconcile's no-clone route owns its maps and copies changed model nodes.
  const normalized=reconcileSurface({...document},{clone:false});
- return parseArtifactConsumingDocument({format:"showai",version:artifactVersion(normalized),document:normalized}).document;
+ const canonical=parseArtifactConsumingDocument({format:"showai",version:artifactVersion(normalized),document:normalized}).document;
+ canonicalCapacityBodies.add(canonical);return canonical;
+}
+/** The actual immutable base already satisfies all three official limits.
+ * Replacing one existing non-resource scalar without increasing encoded or
+ * structural bytes preserves that capacity proof, including shared resources. */
+function timestampCapacityDoesNotGrow(before:ShowDocument,after:ShowDocument):boolean{
+ if(!Object.hasOwn(before,"updatedAt")||!isDocumentTimestamp(before.updatedAt)||!isDocumentTimestamp(after.updatedAt))return false;
+ return nonResourceReplacementDoesNotGrow(before.updatedAt,after.updatedAt);
+}
+function onlySharedTimestampChanged(before:ShowDocument,after:ShowDocument):boolean{
+ const keys=Object.keys(before);
+ return keys.length===Object.keys(after).length&&keys.every(key=>Object.hasOwn(after,key)&&(key==="updatedAt"||(before as unknown as Record<string,unknown>)[key]===(after as unknown as Record<string,unknown>)[key]));
 }
 interface Snapshot {ref:SourceSnapshotRef;document:ShowDocument;candidates:SourceSnapshotDelta["inkCandidates"];conflicts:PageMergeConflict[]}
 /** Same synchronous service runs in Native JSC, a browser worker or Node.
@@ -191,20 +205,25 @@ export class SourceRuntimeOwner {
   scope(targetScope);if(document.id!==targetScope.pageId)fail("Source body belongs to another page");
   const shared=measured(observer,"register.share",()=>base&&!preparedEdits?shareNativeSource(base.document,document):document);
   const body=measured(observer,"register.freeze",()=>freezeOwnedSource(shared));
-  if(kind==="normalized")this.validatedBodies.add(body);
-  else if(!this.validatedBodies.has(body)&&base&&preparedEdits&&this.validatedBodies.has(base.document)&&preparedEdits.every(edit=>edit.op==="set"&&edit.path.length===1&&edit.path[0]==="updatedAt")&&isDocumentTimestamp(body.updatedAt)){
-   // Exact COW edits preserve all other validated JSON and model fields. The
-   // timestamp's official rule plus a complete capacity check cover the only
-   // changed field, including unusually large valid timestamp strings.
-   try{assertContent(body);this.validatedBodies.add(body)}
-   catch(error){
-    // Model-invalid JSON is still a recoverable draft. A capacity failure only
-    // declines this optional proof; the real save barrier remains authoritative.
-    if(!(error instanceof CapacityError))throw error;
+  let timestampProof=false;
+  const timestampOnly=!!base&&this.validatedBodies.has(base.document)&&isDocumentTimestamp(body.updatedAt)&&(preparedEdits?preparedEdits.every(edit=>edit.op==="set"&&edit.path.length===1&&edit.path[0]==="updatedAt"):onlySharedTimestampChanged(base.document,body));
+  if(!this.validatedBodies.has(body)){
+   if(canonicalCapacityBodies.has(document))this.validatedBodies.add(body);
+   else if(timestampOnly){
+    try{if(!timestampCapacityDoesNotGrow(base!.document,body))assertContent(body);this.validatedBodies.add(body);timestampProof=true}
+    catch(error){
+     // An invalid JSON draft stays recoverable but receives no capacity proof.
+     // Trusted actual saves cannot claim success for an oversized stored body.
+     if(kind==="normalized"||!(error instanceof CapacityError))throw error;
+    }
+   }else if(kind==="normalized"){
+    // Backend model validation precedes actualSaved. Confirm final bytes too:
+    // storage metadata may have changed after its earlier normalization.
+    assertContent(body);this.validatedBodies.add(body);
    }
-  }
+  }else timestampProof=timestampOnly;
   const ref=freezeOwnedSource({format:"showai-source-snapshot-v1" as const,ownerId:this.ownerId,epoch:this.epoch,snapshotId:`snapshot-${++this.nextId}`,scope:{...targetScope},kind});
-  const candidates=measured(observer,"register.candidates",()=>kind==="normalized"?inkWireResolutionCandidates(body):[]);
+  const candidates=measured(observer,"register.candidates",()=>timestampProof&&base?base.candidates:kind==="normalized"?inkWireResolutionCandidates(body):[]);
   this.snapshots.set(ref.snapshotId,{ref,document:body,candidates,conflicts});measured(observer,"register.account",()=>this.account(body,1));
   try{measured(observer,"register.retain",()=>{if(leaseId)this.retain(leaseId,[ref]);else this.prune(new Set([ref.snapshotId]));});}
   catch(error){this.forget(ref.snapshotId);throw error}

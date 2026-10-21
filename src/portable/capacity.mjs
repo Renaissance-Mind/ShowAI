@@ -133,12 +133,24 @@ export function measureContent(value) {
     prettyJsonBytes: jsonBytes + prettyPadding,
   };
 }
+/** Local byte comparison only. A caller must separately prove that one
+ * existing field changed and that its real base body satisfies all limits.
+ * New/different resources require a whole-body deduplicated measurement. */
+export function nonResourceReplacementDoesNotGrow(before, after) {
+  const oldSize = measureContent(before), newSize = measureContent(after);
+  return !oldSize.resourceCount && !newSize.resourceCount &&
+    newSize.structureBytes <= oldSize.structureBytes && newSize.jsonBytes <= oldSize.jsonBytes;
+}
 export function assertContent(
   value,
   kind = "Page structure",
   maximum = CAPACITY.pageStructureBytes,
 ) {
-  const sizes = measureContent(value);
+  return assertContentSizes(measureContent(value), kind, maximum);
+}
+/** Apply the same limits to an internally measured report or a proven upper
+ * bound. Reports themselves are measurements, never document-validation proof. */
+export function assertContentSizes(sizes, kind = "Page structure", maximum = CAPACITY.pageStructureBytes) {
   assertBytes(kind, sizes.structureBytes, maximum);
   assertBytes(
     "Page resources (decoded, unique URLs)",
