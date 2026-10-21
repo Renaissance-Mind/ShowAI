@@ -230,6 +230,7 @@ export class PageSessions {
       const home = this.home;
       session = createPageSession({
         ...this.options,
+        sourceHomeId:home,
         onSaved: (projectId, record) => {
           for (const listener of this.savedListeners)
             listener(projectId, record);

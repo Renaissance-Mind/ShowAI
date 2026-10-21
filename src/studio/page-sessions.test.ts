@@ -303,6 +303,24 @@ describe("workspace sessions against the real loopback workbench", () => {
     );
     expect(view.getSnapshot().status).toBe("saved");
   });
+  it("keeps both real versions when worker merging encounters incompatible title edits",async()=>{
+    const view=await warm();
+    view.edit({title:"Local title waiting for save"});
+    await invoke("pages:save",{
+      projectId:project,pageId:first.document.id,
+      document:{...first.document,title:"Remote title already saved"},
+      baseHash:first.hash,baseRevision:first.revision,
+    });
+    await view.refresh();
+    expect(view.getSnapshot().status).toBe("conflict");
+    expect(view.getSnapshot().draft!.title).toBe("Local title waiting for save");
+    expect(await view.flush()).toBe(false);
+    const saved=await invoke<LoadedPage>("pages:get",{projectId:project,pageId:first.document.id});
+    expect(saved.document.title).toBe("Remote title already saved");
+    await view.retainDraft();
+    const retained=await invoke<{id:string}[]>("drafts:list",{kind:"page",projectId:project,resourceId:first.document.id});
+    expect(retained.length).toBeGreaterThan(0);
+  });
   it("keeps every open tab resident, including duplicate pages beyond the history budget", async () => {
     await warm();
     calls.length = 0;
@@ -380,15 +398,31 @@ describe("workspace sessions against the real loopback workbench", () => {
       {x:0,y:0,width:100,height:60},page.content.attrs!.id);
     page=addNode(page,{type:"drawing",attrs:{id:"unchanged-shape",tool:"rectangle",color:"#111111",strokeWidth:2,extent:[100,60],points:[{x:0,y:0},{x:100,y:60}]}},
       {x:200,y:0,width:100,height:60},page.content.attrs!.id);
-    const ui=reconcileSurface(page),unchanged=findSurfaceNode(ui,"unchanged-shape")!.node;
+    const ui=reconcileSurface(page),external=findSurfaceNode(ui,"unchanged-shape")!.node;
     view.edit({content:ui.content,layout:ui.layout,surfaceViews:ui.surfaceViews});
+    const captured=view.getSnapshot().draft!,unchanged=findSurfaceNode(captured,"unchanged-shape")!.node;
+    expect(unchanged).not.toBe(external);
     expect(await view.flush()).toBe(true);
     const installed=view.getSnapshot().draft!;
     expect(installed.content.attrs!.inkState).toBeDefined();
     expect(findSurfaceNode(installed,"unchanged-shape")!.node).toBe(unchanged);
-    expect(installed.layout!["unchanged-shape"]).toBe(ui.layout!["unchanged-shape"]);
+    expect(installed.layout!["unchanged-shape"]).toBe(captured.layout!["unchanged-shape"]);
     const saved=await invoke<LoadedPage>("pages:get",{projectId:project,pageId:first.document.id});
     expect(installed).toEqual(saved.document);
+  });
+  it("captures external mutable drafts and exposes a readonly canonical source",async()=>{
+    const view=await warm();
+    const input={nested:{label:"captured",values:[1,2,3]}};
+    view.edit({...view.getSnapshot().draft!,futurePayload:input} as import("../types").ShowDocument);
+    const canonical=view.getSnapshot().draft!;
+    expect(Object.isFrozen(canonical)).toBe(true);
+    expect(Object.isFrozen((canonical as unknown as {futurePayload:typeof input}).futurePayload.nested)).toBe(true);
+    input.nested.label="mutated after command";input.nested.values.push(4);
+    expect((canonical as unknown as {futurePayload:typeof input}).futurePayload.nested).toEqual({label:"captured",values:[1,2,3]});
+    expect(()=>{canonical.title="invalid direct canonical write"}).toThrow(TypeError);
+    expect(await view.flush()).toBe(true);
+    const reopened=await invoke<LoadedPage>("pages:get",{projectId:project,pageId:canonical.id});
+    expect((reopened.document as unknown as {futurePayload:typeof input}).futurePayload.nested).toEqual({label:"captured",values:[1,2,3]});
   });
   it("keeps N+1 UI source when an actual pending save acknowledges N", async () => {
     const view=await warm(),entered=deferred(),release=deferred();

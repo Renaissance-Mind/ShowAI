@@ -1,4 +1,6 @@
 import {shareNativeSource} from "../surface/native-source-delta.mjs";
+import {OwnedSourceSession,createSourceTransport,sourceSessionFor} from "../surface/source-client";
+import {isOwnedSource,type SourceSnapshotDelta} from "../surface/source-runtime";
 import {measureNativeSync} from "../surface/native-perf";
 import { coalescedTask } from "../lib/coalesced-task";
 import type { JSONContent } from "@tiptap/core";
@@ -11,7 +13,6 @@ import { translator } from "../i18n";
 import commonMessages from "../i18n/messages/common";
 import pageSessionMessages from "../i18n/messages/pageSession";
 import { repairEditorLinks } from "../surface/editor-links.mjs";
-import { mergePageContent } from "../core/page-merge-model";
 
 const t = translator(pageSessionMessages);
 const common = translator(commonMessages);
@@ -24,6 +25,8 @@ export interface LoadedPage extends PageRecord {
   documentMetadata?: Partial<Pick<ShowDocument, "createdAt" | "updatedAt">>;
   readOnly?: boolean;
   incomingCrossDevice?: boolean;
+  sourceSnapshot?: SourceSnapshotDelta;
+  sourceSnapshotDeliveryId?: string;
 }
 export type PageRefresh = LoadedPage | { unchanged: true; readOnly?: boolean };
 export type SaveStatus =
@@ -81,6 +84,8 @@ export interface PageSession {
 }
 export interface PageSessionOptions {
   clientId: string;
+  /** Actual home captured by the page-session owner; Native verifies its own scope. */
+  sourceHomeId?: string;
   invoke<T>(action: string, args?: Record<string, unknown>): Promise<T>;
   saveDelayMs?: number;
   draftDelayMs?: number;
@@ -264,6 +269,70 @@ export function createPageSession(options: PageSessionOptions): PageSession {
   const opening = ref(0);
   const clientId = ref<string | undefined>(options.clientId);
   const retained = ref<EditorDraftRecord | null>(null);
+  let sourceOwner:OwnedSourceSession|undefined;
+  const retireSourceOwner=(owner:OwnedSourceSession|undefined)=>{
+    if(!owner)return;
+    const writes=[...(pending.current?[pending.current]:[]),...draftWrites.current.values()];
+    void Promise.allSettled(writes).then(()=>owner.dispose()).catch(reason=>{
+      console.error("Source owner retirement failed",errorCode(reason));
+    });
+  };
+  const ownerFor=(ownerProject:string,pageId:string)=>{
+    if(!sourceOwner||sourceOwner.projectId!==ownerProject||sourceOwner.pageId!==pageId||sourceOwner.disposed){
+      const previous=sourceOwner;
+      sourceOwner=new OwnedSourceSession(ownerProject,pageId,createSourceTransport(options.invoke,options.sourceHomeId,{headlessHomeId:`page-session:${options.clientId}`}));
+      retireSourceOwner(previous);
+    }
+    return sourceOwner;
+  };
+  const ownCurrent=(document:ShowDocument,ownerProject=projectRef.current)=>{
+    if(!ownerProject)throw new Error("A page source requires its actual project owner");
+    return ownerFor(ownerProject,document.id).replace(document);
+  };
+  const ownRecord=(page:LoadedPage,ownerProject=projectRef.current):LoadedPage=>{
+    if(!ownerProject)throw new Error("A page record requires its actual project owner");
+    const owner=ownerFor(ownerProject,page.document.id);
+    return {...page,document:owner.captureExternal(page.document,"record")};
+  };
+  // Merge on the source owner's worker. A local edit arriving during the
+  // await is merged again from its actual newer root before anything publishes.
+  const mergeCurrentWith = async (
+    baseline: ShowDocument,
+    incoming: ShowDocument,
+    valid: () => boolean,
+    installMerged: (document: ShowDocument) => void,
+    recovered?: ShowDocument,
+  ): Promise<"merged" | "conflict" | "stale"> => {
+    const owner=sourceOwner;
+    if(!owner||!current.current||!valid())return "stale";
+    const lease=`session-merge:${crypto.randomUUID()}`;
+    const baseDocument=sourceSessionFor(baseline)===owner?baseline:owner.captureExternal(baseline,`${lease}:base`);
+    const incomingDocument=owner.captureExternal(incoming,`${lease}:incoming`);
+    const recoveredDocument=recovered?owner.captureExternal(recovered,`${lease}:recovered`):undefined;
+    try{
+      while(!disposed&&sourceOwner===owner&&valid()){
+        const observed:ShowDocument=current.current!;
+        await owner.retainHistory([baseDocument,observed,incomingDocument,...(recoveredDocument?[recoveredDocument]:[])],lease);
+        let merged:Awaited<ReturnType<OwnedSourceSession["merge"]>>;
+        try{merged=await owner.merge(baseDocument,recoveredDocument??observed,incomingDocument);}
+        catch(reason){if(errorCode(reason)==="SOURCE_MERGE_CONFLICT")return "conflict";throw reason;}
+        try{
+          if(disposed||sourceOwner!==owner||!valid())return "stale";
+          if(current.current!==observed){if(recoveredDocument)return "stale";continue;}
+          if(merged.delta.conflicts.length)return "conflict";
+          const document=owner.publishKnown(merged.document,observed);
+          if(!document)continue;
+          current.current=document;
+          installMerged(document);
+          return "merged";
+        }finally{await merged.release().catch(reason=>console.error("Source merge output cleanup failed",errorCode(reason)));}
+      }
+      return "stale";
+    }finally{
+      // Cleanup must not turn an installed, valid merge into a save failure.
+      await Promise.all([lease,`${lease}:base`,`${lease}:incoming`,`${lease}:recovered`].map(name=>owner.releaseLease(name).catch(reason=>console.error("Source merge lease cleanup failed",errorCode(reason)))));
+    }
+  };
   const recoveredFrom = ref<Pick<
     EditorDraftRecord,
     "id" | "generation"
@@ -304,6 +373,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     ]);
     const pending = draftWrites.current.get(key);
     if (pending) return pending;
+    const sourceModel=sourceSessionFor(source),sourceLease=`draft:${crypto.randomUUID()}`;
     const task = (async () => {
       const baseline = JSON.stringify([owner, source.id, draftBase.current]);
       const baseContent =
@@ -311,6 +381,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         recordRef.current?.revision === draftBase.current
           ? recordRef.current?.document
           : undefined;
+      if(sourceModel)await sourceModel.retainHistory([source,...(baseContent?[baseContent]:[])],sourceLease);
       const saved = await options.invoke<EditorDraftRecord>("drafts:save", {
         input: {
           kind: "page",
@@ -335,7 +406,9 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         durableSequence = Math.max(durableSequence, sequence);
       }
       return saved;
-    })();
+    })().finally(async()=>{
+      if(sourceModel)await sourceModel.releaseLease(sourceLease).catch(reason=>console.error("Source draft lease cleanup failed",errorCode(reason)));
+    });
     draftWrites.current.set(key, task);
     publish();
     try {
@@ -348,6 +421,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
   };
 
   const flush = async (settle = true): Promise<boolean> => {
+    if(disposed)return false;
     if (pending.current) {
       const succeeded = await pending.current;
       return succeeded && settle ? flush(true) : succeeded;
@@ -390,13 +464,13 @@ export function createPageSession(options: PageSessionOptions): PageSession {
             setSaveFailureAttempt((value) => value + 1);
             return false;
           }
-          current.current = repaired.document;
+          current.current = ownCurrent(repaired.document);
           revision.current++;
-          setDraft(repaired.document);
+          setDraft(current.current);
           repairedLinks = true;
         }
-        const editingSource = current.current;
-        const source = measureNativeSync("session.save.clone",()=>structuredClone(editingSource));
+        const editingSource = current.current,capturedOwner=sourceOwner;
+        const source = measureNativeSync("session.save.clone",()=>isOwnedSource(editingSource)?editingSource:ownCurrent(editingSource));
         if (typeof window !== "undefined")
           window.showai?.inlineInk?.copyDocumentMetadata?.(editingSource, source);
         const sequence = revision.current;
@@ -406,7 +480,9 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         };
         operations.current.set(sequence, operation);
         setStatus("saving");
+        const saveLease=`save:${operation.id}`;
         try {
+          if(capturedOwner)await capturedOwner.retainHistory([source,...(recordRef.current?[recordRef.current.document]:[])],saveLease);
           const existingDraft = retained.current;
           const savedDraft =
             existingDraft?.sequence === sequence &&
@@ -458,12 +534,17 @@ export function createPageSession(options: PageSessionOptions): PageSession {
                     message: "编辑页面", // i18n-exempt: saved history record
                   },
                 });
+          let savedDocument:ShowDocument;
+          if(response.sourceSnapshot&&capturedOwner){
+            savedDocument=await capturedOwner.acceptSaved(response.sourceSnapshot,source,response.sourceSnapshotDeliveryId);
+          }else{
+            const returned=response.reuseDocument?{...source,...response.documentMetadata}:response.document;
+            savedDocument=ownRecord({...response,document:returned}).document;
+          }
           const saved = measureNativeSync("session.save.ackInstall",()=>{
             const saved = {
               ...response,
-              document: response.reuseDocument
-                ? { ...source, ...response.documentMetadata }
-                : response.document,
+              document:savedDocument,
               components: response.reuseComponents
                 ? (recordRef.current?.components ?? [])
                 : response.components,
@@ -478,22 +559,19 @@ export function createPageSession(options: PageSessionOptions): PageSession {
             setRecord(saved);
             if (projectRef.current) options.onSaved?.(projectRef.current, saved);
             if (revision.current === sequence) {
-              const keys = (value: ShowDocument) =>
-                JSON.stringify([value.content, value.layout, value.surfaceViews]);
-              const installed =
-                measureNativeSync("session.save.ackKey",()=>saved.reuseDocument || keys(source) === keys(saved.document))
-                  ? {
-                      ...saved.document,
-                      content: editingSource.content,
-                      layout: editingSource.layout,
-                      surfaceViews: editingSource.surfaceViews,
-                    }
-                  : saved.document;
-              const shared=shareNativeSource(current.current!,installed);
-              if(typeof window!=="undefined" && (saved.reuseDocument || shared===editingSource))
-                window.showai?.inlineInk?.copyDocumentMetadata?.(source,shared);
-              current.current = shared;
-              setDraft(shared);
+              let installed:ShowDocument;
+              if(response.sourceSnapshot&&capturedOwner){
+                // Publishing is conditional on the exact frozen UI base. A
+                // saved N body remains a record when N+1 already owns the view.
+                installed=capturedOwner.publishKnown(savedDocument,source)??current.current!;
+              }else{
+                const shared=shareNativeSource(current.current!,savedDocument);
+                installed=ownCurrent(shared);
+              }
+              if(typeof window!=="undefined"&&saved.reuseDocument)
+                window.showai?.inlineInk?.copyDocumentMetadata?.(source,installed);
+              current.current = installed;
+              setDraft(installed);
             }
             return saved;
           });
@@ -545,23 +623,20 @@ export function createPageSession(options: PageSessionOptions): PageSession {
                 !remote.workspaceConflicts?.length &&
                 current.current.id === source.id
               ) {
-                const merged = mergePageContent(
-                  recordRef.current.document,
-                  current.current,
-                  remote.document,
-                );
-                if (!merged.conflicts.length) {
-                  recordRef.current = remote;
-                  base.current = remote.hash;
-                  baseRevision.current = remote.revision;
-                  draftBase.current = remote.revision;
-                  setMergeBase(remote.revision);
-                  current.current = merged.document;
-                  revision.current++;
-                  setDraft(merged.document);
-                  setRecord(remote);
-                  continue;
-                }
+                const baseline=recordRef.current.document;
+                const outcome=await mergeCurrentWith(baseline,remote.document,
+                  ()=>recordRef.current?.document===baseline&&current.current?.id===source.id,
+                  document=>{
+                    recordRef.current=ownRecord(remote);
+                    base.current=remote.hash;
+                    baseRevision.current=remote.revision;
+                    draftBase.current=remote.revision;
+                    setMergeBase(remote.revision);
+                    revision.current++;
+                    setDraft(document);
+                    setRecord(recordRef.current);
+                  });
+                if(outcome==="merged")continue;
               }
             } catch (refreshError) {
               reason = refreshError;
@@ -576,6 +651,8 @@ export function createPageSession(options: PageSessionOptions): PageSession {
           setStatus(errorCode(reason) === "CONFLICT" ? "conflict" : "error");
           setError(errorMessage(reason));
           return false;
+        }finally{
+          if(capturedOwner)await capturedOwner.releaseLease(saveLease).catch(reason=>console.error("Source save lease cleanup failed",errorCode(reason)));
         }
       }
       return true;
@@ -604,7 +681,8 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     resolution.current = null;
     setReviewingConflict(false);
     projectRef.current = projectId;
-    current.current = page.document;
+    current.current = ownCurrent(page.document,projectId);
+    page=ownRecord({...page,document:current.current},projectId);
     base.current = page.hash;
     baseRevision.current = page.revision;
     draftBase.current = page.revision;
@@ -616,7 +694,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     savedRevision.current = 0;
     durableSequence = 0;
     blocked.current = false;
-    setDraft(page.document);
+    setDraft(current.current);
     setRecord(page);
     recordRef.current = page;
     retained.current = null;
@@ -633,6 +711,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     pageId: string,
     initial?: LoadedPage,
   ) => {
+    if(disposed)return false;
     const ticket = ++opening.current;
     if (!(await flush())) return false;
     if (opening.current !== ticket) return false;
@@ -695,31 +774,24 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         !loaded.workspaceConflicts?.length &&
         restored.record.baseRevision !== loaded.revision
       ) {
-        const merged = mergePageContent(
-          restored.baseContent,
-          restored.content,
-          loaded.document,
-        );
-        if (!merged.conflicts.length) {
-          if (
-            pageContentKey(merged.document) === pageContentKey(loaded.document)
-          ) {
-            await options.invoke("drafts:remove", {
-              id: restored.record.id,
-              generation: restored.record.generation,
-            });
-            return true;
-          }
-          current.current = merged.document;
-          setDraft(merged.document);
-          revision.current = recoveredSequence + 1;
-          savedRevision.current = recoveredSequence;
-          retained.current = restored.record;
-          recoveredFrom.current = restored.record.recoverySource ?? null;
-          setStatus("changed");
-          setDraftNotice(t("draftRestored"));
-          scheduleDraft();
-          scheduleSave();
+        let unchanged=false;
+        const outcome=await mergeCurrentWith(restored.baseContent,loaded.document,
+          ()=>opening.current===ticket&&revision.current===0,
+          document=>{
+            unchanged=pageContentKey(document)===pageContentKey(loaded.document);
+            setDraft(document);
+            if(unchanged)return;
+            revision.current=recoveredSequence+1;
+            savedRevision.current=recoveredSequence;
+            retained.current=restored.record;
+            recoveredFrom.current=restored.record.recoverySource??null;
+            setStatus("changed");
+            setDraftNotice(t("draftRestored"));
+            scheduleDraft();scheduleSave();
+          },restored.content);
+        if(outcome==="stale")return true;
+        if(outcome==="merged"){
+          if(unchanged)await options.invoke("drafts:remove",{id:restored.record.id,generation:restored.record.generation});
           return true;
         }
       }
@@ -728,8 +800,8 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       if (
         pageContentKey(restored.content) !== pageContentKey(loaded.document)
       ) {
-        current.current = restored.content;
-        setDraft(restored.content);
+        current.current = ownCurrent(restored.content);
+        setDraft(current.current);
         revision.current = recoveredSequence + 1;
         retained.current = restored.record;
         recoveredFrom.current = restored.record.recoverySource ?? null;
@@ -780,19 +852,19 @@ export function createPageSession(options: PageSessionOptions): PageSession {
   };
 
   const edit = (patch: Partial<ShowDocument>) => {
-    if (!current.current || recordRef.current?.readOnly) return;
+    if (disposed || !current.current || recordRef.current?.readOnly) return;
     const next = {
       ...current.current,
       ...patch,
       updatedAt: new Date().toISOString(),
     };
-    current.current = next;
+    current.current = ownCurrent(next);
     const now = Date.now();
     if (now - editGroup.current.at > 2000)
       editGroup.current.id = crypto.randomUUID();
     editGroup.current.at = now;
     revision.current++;
-    setDraft(next);
+    setDraft(current.current);
     if (!blocked.current) setStatus("changed");
     scheduleDraft();
     scheduleSave();
@@ -823,8 +895,8 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       recovered.record.resourceId !== source.id
     )
       throw new Error(t("draftNotForPage"));
-    current.current = recovered.content;
-    setDraft(recovered.content);
+    current.current = ownCurrent(recovered.content);
+    setDraft(current.current);
     recoveredFrom.current = recovered.record;
     revision.current++;
     const conflict =
@@ -914,8 +986,8 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         !loaded.workspaceConflicts?.length
       ) {
         if (full && loaded.components !== recordRef.current?.components) {
-          recordRef.current = loaded;
-          setRecord(loaded);
+          recordRef.current = ownRecord(loaded);
+          setRecord(recordRef.current);
         }
         return;
       }
@@ -928,25 +1000,21 @@ export function createPageSession(options: PageSessionOptions): PageSession {
           !blocked.current &&
           recordRef.current
         ) {
-          const merged = mergePageContent(
-            recordRef.current.document,
-            current.current,
-            loaded.document,
-          );
-          if (!merged.conflicts.length) {
-            recordRef.current = loaded;
-            base.current = loaded.hash;
-            baseRevision.current = loaded.revision;
-            draftBase.current = loaded.revision;
-            setMergeBase(loaded.revision);
-            current.current = merged.document;
-            revision.current++;
-            setDraft(merged.document);
-            setRecord(loaded);
-            scheduleDraft();
-            scheduleSave();
-            return;
-          }
+          const baseline=recordRef.current.document;
+          const outcome=await mergeCurrentWith(baseline,loaded.document,
+            ()=>opening.current===ticket&&base.current===knownBase&&recordRef.current?.document===baseline&&!blocked.current,
+            document=>{
+              recordRef.current=ownRecord(loaded);
+              base.current=loaded.hash;
+              baseRevision.current=loaded.revision;
+              draftBase.current=loaded.revision;
+              setMergeBase(loaded.revision);
+              revision.current++;
+              setDraft(document);
+              setRecord(recordRef.current);
+              scheduleDraft();scheduleSave();
+            });
+          if(outcome!=="conflict")return;
         }
         if (
           loaded.incomingCrossDevice &&
@@ -1053,6 +1121,8 @@ export function createPageSession(options: PageSessionOptions): PageSession {
   };
 
   const retry = async () => {
+    try{await sourceOwner?.retryRegistration();}
+    catch(reason){blocked.current=true;setError(errorMessage(reason));setStatus("error");return false;}
     blocked.current = false;
     setError("");
     const saved = await flush();
@@ -1070,7 +1140,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     resolution.current = { baseRevision: mergeBase, currentRevision };
     base.current = currentHash;
     baseRevision.current = currentRevision;
-    current.current = structuredClone(document);
+    current.current = ownCurrent(document);
     revision.current++;
     blocked.current = true;
     setDraft(current.current);
@@ -1085,7 +1155,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     if (!current.current || current.current.id !== document.id)
       throw new Error(t("conflictNotForPage"));
     resolution.current = { externalConflictId: id };
-    current.current = structuredClone(document);
+    current.current = ownCurrent(document);
     revision.current++;
     blocked.current = true;
     setDraft(current.current);
@@ -1120,9 +1190,12 @@ export function createPageSession(options: PageSessionOptions): PageSession {
   };
 
   const clear = async () => {
+    if(disposed)return false;
     const ticket = ++opening.current;
     if (!(await flush())) return false;
     if (opening.current !== ticket) return false;
+    const oldSource=sourceOwner;sourceOwner=undefined;
+    retireSourceOwner(oldSource);
     current.current = null;
     projectRef.current = null;
     base.current = "";
@@ -1193,7 +1266,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         durableSequence < revision.current
       )
         await persist(
-          structuredClone(current.current),
+          current.current,
           revision.current,
           projectRef.current,
         );
@@ -1246,6 +1319,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       revision.current <= savedRevision.current,
     dispose() {
       disposed = true;
+      retireSourceOwner(sourceOwner);
       clearTimeout(autoSaveTimer.current);
       clearTimeout(draftTimer.current);
       listeners.clear();
