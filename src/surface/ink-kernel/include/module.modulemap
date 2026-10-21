@@ -1,5 +1,6 @@
 module ShowAIInkKernel {
     header "showai_ink.h"
     header "ink-input-kernel.h"
+    header "analytic-path.h"
     export *
 }
