@@ -869,6 +869,7 @@ export function validateDocument(value) {
     if (typeof comment.resolved !== "boolean")
       throw new Error("comment.resolved must be true or false.");
     return {
+      ...comment,
       id: comment.id,
       text: comment.text,
       createdAt: comment.createdAt,
@@ -876,6 +877,9 @@ export function validateDocument(value) {
     };
   });
   return {
+    // Full JSON has already passed validation. Preserve forward-compatible
+    // fields while the explicitly validated known fields retain authority.
+    ...document,
     id: document.id,
     title: document.title,
     icon:
