@@ -37,7 +37,11 @@ export function useNativeBoard(options:NativeBoardOptions){
       if(value.selection)o.onSelection?.(value.selection);
       if(value.layouts)o.onLayout?.(value.layouts);
       if(value.activate)o.onActivate?.(value.activate);
-      if(value.camera){cameraVersion.current=value.cameraVersion??cameraVersion.current;o.onCamera(value.camera,true)}
+      if(value.camera){
+        cameraVersion.current=value.cameraVersion??cameraVersion.current;
+        const previous=window.showaiApplyingNativeCamera;window.showaiApplyingNativeCamera=true;
+        try{o.onCamera(value.camera,true)}finally{window.showaiApplyingNativeCamera=previous}
+      }
       if(value.primitive){
         const p=value.primitive;
         if(!["rectangle","ellipse","arrow","region"].includes(p.tool))throw new Error("Unsupported native primitive");

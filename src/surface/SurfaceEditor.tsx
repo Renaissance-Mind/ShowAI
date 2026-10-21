@@ -26,6 +26,7 @@ import type { ContentRenderProps } from "./SurfaceContent";
 import { toPageEditor, fromPageEditor } from "./page-content";
 import { PageModuleContext, pageEditorNodes } from "./PageEditorNodes";
 import { mergePageContent, canCommitPageMerge } from "../core/page-merge-model";
+import InkConflictInspector from "./InkConflictInspector";
 
 interface NativeInkHistoryAction {boardId:string;operationIds:string[]}
 
@@ -286,7 +287,7 @@ function SurfaceEditor({
       let restored:ContainerDocument;
       if(action&&window.showai?.inlineInk?.nativeScene){
         const result=await window.showai.invoke<{document:ShowDocument;operationIds:string[]}>("native:board.compensate",{
-          pageId:before.id,boardId:action.boardId,operationIds:action.operationIds,
+          projectId:inlineInkProjectId,pageId:before.id,boardId:action.boardId,operationIds:action.operationIds,
         });
         const merged=mergePageContent(before,current.current,result.document);
         if(!canCommitPageMerge(merged))throw new InkEditConflict("Undo encountered concurrent Board edits");
@@ -307,7 +308,7 @@ function SurfaceEditor({
       refresh((value) => value + 1);
       settleGeometry();
     },
-    [settleGeometry],
+    [settleGeometry,inlineInkProjectId],
   );
   const undo = useCallback(() => travel(), [travel]);
   const redo = useCallback(() => travel(true), [travel]);
@@ -506,6 +507,9 @@ function SurfaceEditor({
         canUndo={!!history.current.past.length}
         canRedo={!!history.current.future.length}
       />
+      <InkConflictInspector document={current.current} projectId={inlineInkProjectId} host={inspectorHost}
+        beforeResolve={onInkSave} getDocument={()=>current.current}
+        onResolve={value=>commit(value,"ink-conflict-resolution")} readOnly={readOnly}/>
     </div>
   );
 }
