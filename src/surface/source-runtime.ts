@@ -1,7 +1,8 @@
+import {freezeOwnedJSON,isOwnedJSON,ownedJSONMetrics} from "../portable/owned-json.mjs";
 import type {ShowDocument} from "../types";
 import {assertContent,CapacityError,nonResourceReplacementDoesNotGrow} from "../portable/capacity.mjs";
 import {reconcileSurface,artifactVersion} from "./document.mjs";
-import {parseArtifact,parseArtifactConsumingDocument,isDocumentTimestamp} from "../portable/validation.mjs";
+import {parseArtifact,parseArtifactForSourceSnapshot,parseArtifactConsumingForSourceSnapshot,shareSourceSnapshotDocument,inheritSourceSnapshotTimestampCapacity,assertOwnedSourceDocumentCapacity,isDocumentTimestamp} from "../portable/validation.mjs";
 import {mergePageContent,canCommitPageMerge,type PageMergeConflict} from "../core/page-merge-model";
 import {inkWireResolutionCandidates} from "./ink-wire.mjs";
 import {nativeContentHistoryStages,type NativeContentHistoryAction} from "./native-content-history";
@@ -47,26 +48,10 @@ const fail=(message:string):never=>{throw new SourceRuntimeError("SOURCE_OWNERSH
 const scopeKey=(scope:SourceScope)=>JSON.stringify([scope.homeId,scope.projectId,scope.pageId]);
 function scope(value:SourceScope){if(!value||[value.homeId,value.projectId,value.pageId].some(part=>typeof part!=="string"||!part))fail("Source scope requires its actual home, project and page");return value}
 export const sameSourceRef=(one:SourceSnapshotRef|null|undefined,two:SourceSnapshotRef|null|undefined)=>!!one&&!!two&&one.ownerId===two.ownerId&&one.epoch===two.epoch&&one.snapshotId===two.snapshotId&&one.kind===two.kind&&scopeKey(one.scope)===scopeKey(two.scope);
-const owned=new WeakSet<object>();
 const canonicalCapacityBodies=new WeakSet<ShowDocument>();
-const metrics=new WeakMap<object,{bytes:number;children:object[]}>();
-/** Only objects recursively owned by this module may skip future freeze walks.
- * An externally shallow-frozen parent is never evidence about its children. */
-export function freezeOwnedSource<T>(value:T):T{
- if(typeof value==="number"&&!Number.isFinite(value))throw new TypeError("Invalid native source delta: non-JSON value");
- if(value&&typeof value==="object"&&!owned.has(value)){
-  for(const key of Object.keys(value))freezeOwnedSource((value as Record<string,unknown>)[key]);
-  const children:object[]=[],keys=Object.keys(value);let bytes=48+keys.length*8;
-  for(const key of keys){const child=(value as Record<string,unknown>)[key];
-   if(!Array.isArray(value))bytes+=key.length*2;
-   if(child&&typeof child==="object")children.push(child);
-   else bytes+=typeof child==="string"?child.length*2:8;
-  }
-  metrics.set(value,{bytes,children});Object.freeze(value);owned.add(value);
- }
- return value;
-}
-export const isOwnedSource=(value:unknown):boolean=>!!value&&typeof value==="object"&&owned.has(value);
+/** Same actual recursive ownership factory is used by private validation. */
+export function freezeOwnedSource<T>(value:T):T{return freezeOwnedJSON(value)}
+export const isOwnedSource=(value:unknown):boolean=>isOwnedJSON(value);
 /** Independent boundary for an arbitrary external value. Exact JSON cloning
  * rejects undefined, holes, cycles and non-finite numbers instead of dropping. */
 export function cloneSourceValue<T>(value:T):T{return applyNativeSourceDelta(null,[{op:"set",path:[],value}]) as T}
@@ -124,11 +109,16 @@ export function normalizeSourceDocument(document:ShowDocument):ShowDocument{
  const canonical=parseArtifact({format:"showai",version:artifactVersion(normalized),document:normalized}).document;
  canonicalCapacityBodies.add(canonical);return canonical;
 }
+function normalizeOwnedSourceDocument(document:ShowDocument):ShowDocument{
+ const normalized=reconcileSurface(document);
+ const canonical=parseArtifactForSourceSnapshot({format:"showai",version:artifactVersion(normalized),document:normalized}).document;
+ canonicalCapacityBodies.add(canonical);return canonical;
+}
 function normalizeParsedSourceDocument(document:ShowDocument):ShowDocument{
  // Retain the original result root for history's pre-normalization semantics;
  // reconcile's no-clone route owns its maps and copies changed model nodes.
  const normalized=reconcileSurface({...document},{clone:false});
- const canonical=parseArtifactConsumingDocument({format:"showai",version:artifactVersion(normalized),document:normalized}).document;
+ const canonical=parseArtifactConsumingForSourceSnapshot({format:"showai",version:artifactVersion(normalized),document:normalized}).document;
  canonicalCapacityBodies.add(canonical);return canonical;
 }
 /** The actual immutable base already satisfies all three official limits.
@@ -169,7 +159,7 @@ export class SourceRuntimeOwner {
   if(next<0)throw new Error("Source graph ownership count underflow");
   if(next)this.references.set(value,next);else this.references.delete(value);
   if(direction===1&&count||direction===-1&&next)return;
-  const metric=metrics.get(value);if(!metric)throw new Error("Source graph is not recursively owned");
+  const metric=ownedJSONMetrics(value);if(!metric)throw new Error("Source graph is not recursively owned");
   this.residentBytes+=direction*metric.bytes;
   for(const child of metric.children)this.account(child,direction);
  }
@@ -214,14 +204,14 @@ export class SourceRuntimeOwner {
  }
  private register(targetScope:SourceScope,document:ShowDocument,kind:SourceSnapshotRef["kind"],base:Snapshot|null,leaseId?:string,conflicts:PageMergeConflict[]=[],preparedEdits?:NativeSourceEdit[],observer?:SourceRuntimeObserver):SourceSnapshotDelta{
   scope(targetScope);if(document.id!==targetScope.pageId)fail("Source body belongs to another page");
-  const shared=measured(observer,"register.share",()=>base&&!preparedEdits?shareNativeSource(base.document,document):document);
+  const shared=measured(observer,"register.share",()=>base&&!preparedEdits?shareSourceSnapshotDocument(base.document,document):document);
   const body=measured(observer,"register.freeze",()=>freezeOwnedSource(shared));
   let timestampProof=false;
   const timestampOnly=!!base&&this.validatedBodies.has(base.document)&&isDocumentTimestamp(body.updatedAt)&&(preparedEdits?preparedEdits.every(edit=>edit.op==="set"&&edit.path.length===1&&edit.path[0]==="updatedAt"):onlySharedTimestampChanged(base.document,body));
   if(!this.validatedBodies.has(body)){
    if(canonicalCapacityBodies.has(document))this.validatedBodies.add(body);
    else if(timestampOnly){
-    try{if(!timestampCapacityDoesNotGrow(base!.document,body))assertContent(body);this.validatedBodies.add(body);timestampProof=true}
+    try{if(!timestampCapacityDoesNotGrow(base!.document,body)||!inheritSourceSnapshotTimestampCapacity(base!.document,body))assertOwnedSourceDocumentCapacity(body);this.validatedBodies.add(body);timestampProof=true}
     catch(error){
      // An invalid JSON draft stays recoverable but receives no capacity proof.
      // Trusted actual saves cannot claim success for an oversized stored body.
@@ -230,7 +220,7 @@ export class SourceRuntimeOwner {
    }else if(kind==="normalized"){
     // Backend model validation precedes actualSaved. Confirm final bytes too:
     // storage metadata may have changed after its earlier normalization.
-    assertContent(body);this.validatedBodies.add(body);
+    assertOwnedSourceDocumentCapacity(body);this.validatedBodies.add(body);
    }
   }else timestampProof=timestampOnly;
   const ref=freezeOwnedSource({format:"showai-source-snapshot-v1" as const,ownerId:this.ownerId,epoch:this.epoch,snapshotId:`snapshot-${++this.nextId}`,scope:{...targetScope},kind});
@@ -270,7 +260,7 @@ export class SourceRuntimeOwner {
   const equivalent=measured(observer,"origin.compare",()=>!diffNativeSource(packet.document,merged).length);
   let canonical:ShowDocument|undefined;
   if(!equivalent||!isDocumentTimestamp(packet.document.updatedAt)){
-   canonical=entry.canonical??measured(observer,"origin.normalize",()=>freezeOwnedSource(normalizeSourceDocument(packet.document)));
+   canonical=entry.canonical??measured(observer,"origin.normalize",()=>freezeOwnedSource(normalizeOwnedSourceDocument(packet.document)));
    if(!entry.canonical){entry.canonical=canonical;if(this.publications.get(scopeKey(current.ref.scope)+"\u0000"+publicationId)===entry)this.account(canonical,1)}
   }
   return{record:freezeOwnedSource({identity,packet}),canonical};
@@ -293,7 +283,7 @@ export class SourceRuntimeOwner {
   if(!canCommitPageMerge(merged))throw new SourceRuntimeError("SOURCE_MERGE_CONFLICT","Native publication requires explicit conflict resolution");
   const actions=packet.nativeContentActions as NativeContentHistoryAction[]|undefined;
   if(actions?.length&&!leaseId)fail("Native history publication requires an explicit response lease");
-  const normalized=actualCanonicalResult??measured(observer,"normalize",()=>parsedDocument?normalizeParsedSourceDocument(parsedDocument()):normalizeSourceDocument(merged.document));
+  const normalized=actualCanonicalResult??measured(observer,"normalize",()=>parsedDocument?normalizeParsedSourceDocument(parsedDocument()):normalizeOwnedSourceDocument(merged.document));
   const result=this.register(current.ref.scope,normalized,"normalized",current,leaseId,merged.conflicts,undefined,observer);
   measured(observer,"history",()=>{if(actions?.length){
    const plan=nativeContentHistoryStages(current.document,packet.baseDocument,packet.document,actions,{baseline:packet.baseDocument,current:current.document,incoming:packet.document,result:merged});
@@ -348,7 +338,7 @@ export class SourceRuntimeOwner {
    let base:ShowDocument;
    if(origin&&this.validatedBodies.has(current.document)&&!diffNativeSource(origin.packet.document,packet.baseDocument).length)base=current.document;
    else{
-    base=entry.canonicalBase??measured(observer,"unchanged.normalizeBase",()=>freezeOwnedSource(normalizeSourceDocument(packet.baseDocument)));
+    base=entry.canonicalBase??measured(observer,"unchanged.normalizeBase",()=>freezeOwnedSource(normalizeOwnedSourceDocument(packet.baseDocument)));
     if(!entry.canonicalBase){entry.canonicalBase=base;if(this.publications.get(scopeKey(current.ref.scope)+"\u0000"+request.publicationId)===entry)this.account(base,1)}
    }
    unchanged=measured(observer,"unchanged.compareBase",()=>nativeDocumentBodiesEqual(base,current.document));
@@ -357,7 +347,7 @@ export class SourceRuntimeOwner {
   // A raw/draft ref is not itself capacity proof. Equality above proves all
   // model fields except storage time; validate that actual scalar/body too.
   if(!this.validatedBodies.has(current.document))measured(observer,"unchanged.currentCapacity",()=>assertContent(current.document));
-  const canonical=entry.canonical??measured(observer,"unchanged.normalizeIncoming",()=>freezeOwnedSource(normalizeSourceDocument(packet.document)));
+  const canonical=entry.canonical??measured(observer,"unchanged.normalizeIncoming",()=>freezeOwnedSource(normalizeOwnedSourceDocument(packet.document)));
   if(!entry.canonical){entry.canonical=canonical;if(this.publications.get(scopeKey(current.ref.scope)+"\u0000"+request.publicationId)===entry)this.account(canonical,1)}
   const prepared=this.prepareNativeOrigin(current,request.publicationId,entry,canonical,request.sourceVersion,observer);
   // The only pre-normalized argument is the fresh private formal factory
@@ -386,7 +376,7 @@ export class SourceRuntimeOwner {
   * borrow saved/publication proofs for a different source body. */
  normalizeActualProjection(request:{base:SourceSnapshotRef;document:ShowDocument;leaseId?:string}):SourceSnapshotDelta{
   const base=this.get(request.base);
-  return this.register(base.ref.scope,normalizeSourceDocument(cloneSourceValue(request.document)),"normalized",base,request.leaseId);
+  return this.register(base.ref.scope,normalizeOwnedSourceDocument(cloneSourceValue(request.document)),"normalized",base,request.leaseId);
  }
  /** Trusted host adapter only: actual backend normalization/CAS has already
   * completed. Never reachable through the client request discriminant. */
@@ -399,7 +389,7 @@ export class SourceRuntimeOwner {
   switch(request.kind){
    case "seed":{
     const copy=cloneSourceValue(request.document),proof=request.proof??"draft";
-    return this.register(request.scope,proof==="normalized"?normalizeSourceDocument(copy):copy,proof,null,request.leaseId);
+    return this.register(request.scope,proof==="normalized"?normalizeOwnedSourceDocument(copy):copy,proof,null,request.leaseId);
    }
    case "draft":{
     const base=this.get(request.base);if(!request.transactionId)fail("Source draft requires an actual transaction identity");
@@ -415,14 +405,14 @@ export class SourceRuntimeOwner {
      if(request.leaseId)this.retain(request.leaseId,[current.ref]);
      return{format:"showai-owned-source-v1",base:current.ref,next:current.ref,edits:[],conflicts:current.conflicts,inkCandidates:current.candidates};
     }
-    return this.register(current.ref.scope,normalizeSourceDocument(current.document),"normalized",current,request.leaseId);
+    return this.register(current.ref.scope,normalizeOwnedSourceDocument(current.document),"normalized",current,request.leaseId);
    }
    case "merge":{
     const base=this.get(request.base),current=this.get(request.current),incoming=this.get(request.incoming);
     if(scopeKey(base.ref.scope)!==scopeKey(current.ref.scope)||scopeKey(base.ref.scope)!==scopeKey(incoming.ref.scope))fail("Source merge crosses its home/project/page");
     const merged=mergePageContent(base.document,current.document,incoming.document,request.mode);
     if(!canCommitPageMerge(merged))throw new SourceRuntimeError("SOURCE_MERGE_CONFLICT","Source edits require explicit conflict resolution");
-    return this.register(current.ref.scope,normalizeSourceDocument(merged.document),"normalized",current,request.leaseId,merged.conflicts);
+    return this.register(current.ref.scope,normalizeOwnedSourceDocument(merged.document),"normalized",current,request.leaseId,merged.conflicts);
    }
    case "publication":{
     const current=this.get(request.current),packet=request.packet;

@@ -1,3 +1,5 @@
+import {freezeOwnedJSON,isOwnedJSON} from "./owned-json.mjs";
+import {shareNativeSource} from "../surface/native-source-delta.mjs";
 import { validateInkArchiveGroup } from "../surface/ink-archive-group.mjs";
 import { isResource } from "../surface/containers.mjs";
 import { validatePageIcon } from "../lib/page-icon.mjs";
@@ -42,6 +44,8 @@ import {
   assertCompiledComponent,
   utf8Bytes,
   measureContent,
+  contentMeasurementDepth,
+  nonResourceReplacementDoesNotGrow,
 } from "./capacity.mjs";
 // Compatibility export for artifact importers; never a page or resource limit.
 export const MAX_ARTIFACT_BYTES = CAPACITY.artifactBytes;
@@ -823,13 +827,13 @@ function canonicalCapacity(before, after, sizes, opaque) {
   const prettyOverhead = count => overhead(count) + (count ? 4 * count + 1 : 0);
   const upper = {...sizes, structureBytes: sizes.structureBytes + payload + separators, jsonBytes: sizes.jsonBytes + payload + separators,
     prettyJsonBytes: sizes.prettyJsonBytes + addition.prettyJsonBytes - prettyOverhead(addedCount) + prettyOverhead(afterCount) - prettyOverhead(beforeCount)};
-  let result;
-  if (scan) result = assertContent(after);
+  let result,maximumDepth=Math.max(contentMeasurementDepth(sizes) ?? 64,contentMeasurementDepth(addition) ?? 64);
+  if (scan) {result = assertContent(after);maximumDepth=contentMeasurementDepth(result);}
   else {
     try { result = assertContentSizes(upper); }
-    catch (error) { if (!(error instanceof CapacityError)) throw error; result = assertContent(after); }
+    catch (error) { if (!(error instanceof CapacityError)) throw error; result = assertContent(after);maximumDepth=contentMeasurementDepth(result); }
   }
-  documentCapacity.set(after, {before: sizes, upper: result});
+  documentCapacity.set(after, {before: sizes, upper: result, maximumDepth});
 }
 
 export function validateDocument(value) {
@@ -1062,8 +1066,110 @@ function validateSelection(selection, document) {
   };
 }
 
-function parseArtifactDocument(input, documentParser) {
-  const inputBytes = typeof input === "string" ? utf8Bytes(input) : measureContent(input).jsonBytes;
+const ownedDocumentCapacity = new WeakMap();
+/** Read-only internal diagnostic; never grants a receipt to a caller object. */
+export const hasSourceSnapshotCapacity = (body) =>
+  isOwnedJSON(body) && ownedDocumentCapacity.has(body);
+function rememberOwnedCapacity(document, sizes, maximumDepth) {
+  if (!isOwnedJSON(document))
+    throw new Error(
+      "Capacity receipt requires an actual recursively owned body.",
+    );
+  ownedDocumentCapacity.set(
+    document,
+    Object.freeze({ sizes: Object.freeze({ ...sizes }), maximumDepth }),
+  );
+}
+function captureOwnedArtifact(artifact) {
+  const proof = documentCapacity.get(artifact.document);
+  if (!proof)
+    throw new Error("Canonical document capacity receipt is missing.");
+  const document = freezeOwnedJSON(artifact.document);
+  rememberOwnedCapacity(document, proof.upper, proof.maximumDepth);
+  return { ...artifact, document };
+}
+/** Internal source factory. Public parseArtifact keeps its mutable independent
+ * capture semantics; only this synchronous validation+ownership step mints proof. */
+export function parseArtifactForSourceSnapshot(input) {
+  return captureOwnedArtifact(parseArtifactDocument(input, validateDocument));
+}
+export function parseArtifactConsumingForSourceSnapshot(input) {
+  return captureOwnedArtifact(
+    parseArtifactDocument(input, (value) =>
+      validateDocumentValue(value, false),
+    ),
+  );
+}
+/** Source owner only: exact COW sharing preserves the complete canonical target,
+ * then actual recursive ownership seals the mixed graph before it escapes. */
+export function shareSourceSnapshotDocument(base, canonical) {
+  const receipt = ownedDocumentCapacity.get(canonical);
+  if (receipt && (!isOwnedJSON(base) || !isOwnedJSON(canonical)))
+    throw new Error("Source capacity sharing requires actual owned graphs.");
+  const result = shareNativeSource(base, canonical);
+  if (!receipt) return result;
+  const held = freezeOwnedJSON(result);
+  rememberOwnedCapacity(held, receipt.sizes, receipt.maximumDepth);
+  return held;
+}
+/** Existing actual timestamp-only COW rule, with a quantified conservative
+ * receipt. A caller's field list or shallow freeze cannot mint this proof. */
+export function inheritSourceSnapshotTimestampCapacity(base, body) {
+  const receipt = ownedDocumentCapacity.get(base);
+  if (
+    !receipt ||
+    !isOwnedJSON(base) ||
+    !isOwnedJSON(body) ||
+    !Object.hasOwn(base, "updatedAt") ||
+    !isDocumentTimestamp(base.updatedAt) ||
+    !isDocumentTimestamp(body.updatedAt)
+  )
+    return false;
+  const keys = Object.keys(base);
+  if (
+    keys.length !== Object.keys(body).length ||
+    !keys.every(
+      (key) =>
+        Object.hasOwn(body, key) &&
+        (key === "updatedAt" || base[key] === body[key]),
+    ) ||
+    !nonResourceReplacementDoesNotGrow(base.updatedAt, body.updatedAt)
+  )
+    return false;
+  rememberOwnedCapacity(body, receipt.sizes, receipt.maximumDepth);
+  return true;
+}
+/** Trusted actual-save adapter only. Model validation preceded that backend
+ * result; this always performs the official final-byte gate, never a skip flag. */
+export function assertOwnedSourceDocumentCapacity(body) {
+  if (!isOwnedJSON(body))
+    throw new Error("Actual saved capacity requires an owned body.");
+  const sizes = assertContent(body);
+  rememberOwnedCapacity(body, sizes, contentMeasurementDepth(sizes));
+  return sizes;
+}
+function artifactCapacityBytes(artifact, heldDocument) {
+  const receipt =
+    heldDocument && artifact.document === heldDocument
+      ? ownedDocumentCapacity.get(heldDocument)
+      : null;
+  if (
+    receipt &&
+    isOwnedJSON(heldDocument) &&
+    receipt.maximumDepth !== null &&
+    receipt.maximumDepth + 1 <= 64
+  ) {
+    const upper =
+      measureContent({ ...artifact, document: null }).jsonBytes -
+      4 +
+      receipt.sizes.jsonBytes;
+    if (upper <= CAPACITY.artifactBytes) return upper;
+  }
+  return measureContent(artifact).jsonBytes;
+}
+
+function parseArtifactDocument(input, documentParser, heldDocument) {
+  const inputBytes = typeof input === "string" ? utf8Bytes(input) : artifactCapacityBytes(input,heldDocument);
   assertBytes("Artifact JSON", inputBytes, CAPACITY.artifactBytes);
   const artifact = object(
     typeof input === "string" ? JSON.parse(input) : input,
@@ -1104,7 +1210,9 @@ function parseArtifactDocument(input, documentParser) {
   const documentGrowth = document === artifact.document && !proof ? 0 : proof ? Math.max(0, proof.upper.jsonBytes - proof.before.jsonBytes) : null;
   const selectionGrowth = result.selection ? Math.max(0, measureContent(result.selection).jsonBytes - measureContent(artifact.selection).jsonBytes) : 0;
   const remoteGrowth = result.remoteComponents ? Math.max(0, measureContent(result.remoteComponents).jsonBytes - measureContent(artifact.remoteComponents).jsonBytes) : 0;
-  if (documentGrowth === null || inputBytes + documentGrowth + selectionGrowth + remoteGrowth > CAPACITY.artifactBytes)
+  if(heldDocument&&document===heldDocument&&ownedDocumentCapacity.has(document))
+    assertBytes("Artifact JSON",artifactCapacityBytes(result,heldDocument),CAPACITY.artifactBytes);
+  else if (documentGrowth === null || inputBytes + documentGrowth + selectionGrowth + remoteGrowth > CAPACITY.artifactBytes)
     assertBytes("Artifact JSON", measureContent(result).jsonBytes, CAPACITY.artifactBytes);
   return result;
 }
@@ -1128,7 +1236,7 @@ export function parseArtifactWithValidatedDocument(input, heldDocument) {
     if (document !== heldDocument)
       throw new Error("Artifact document is not the actual registered body.");
     return heldDocument;
-  });
+  },heldDocument);
 }
 
 export function serializeArtifact(

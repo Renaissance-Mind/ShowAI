@@ -28,3 +28,13 @@ export function injectArtifactIntoHtml(
   presentation?: "spatial" | "reading",
   selection?: ShowArtifact["selection"],
 ): string;
+/** Internal closed source factories; canonical document is recursively owned before escape. */
+export function parseArtifactForSourceSnapshot(input:unknown):ShowArtifact;
+export function parseArtifactConsumingForSourceSnapshot(input:unknown):ShowArtifact;
+export function shareSourceSnapshotDocument<T extends ShowDocument>(base:T,canonical:T):T;
+export function inheritSourceSnapshotTimestampCapacity(base:ShowDocument,body:ShowDocument):boolean;
+/** Actual saved backend result only; always measures complete final body. */
+export function assertOwnedSourceDocumentCapacity(body:ShowDocument):import("./capacity.mjs").ContentSize;
+
+/** Read-only presence check, never a caller-provided proof. */
+export function hasSourceSnapshotCapacity(body:unknown):boolean;

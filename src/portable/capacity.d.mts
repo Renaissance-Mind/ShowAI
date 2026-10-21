@@ -37,6 +37,8 @@ export interface ContentSize {
   prettyJsonBytes: number;
 }
 export function measureContent(value: unknown): ContentSize;
+/** Internal traversal evidence; null for reports not produced by measureContent. */
+export function contentMeasurementDepth(report:ContentSize):number|null;
 /** Byte comparison, not a document validation proof. */
 export function nonResourceReplacementDoesNotGrow(before: unknown, after: unknown): boolean;
 export function assertContent(

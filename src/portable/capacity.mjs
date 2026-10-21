@@ -80,19 +80,24 @@ export function base64Bytes(encoded) {
     throw new Error("Non-canonical base64 resource.");
   return (encoded.length / 4) * 3 - padding;
 }
+// Extra traversal evidence stays private: ordinary measurement report shape is
+// unchanged, and a caller-created numeric report cannot assert a measured depth.
+const measurementDepth=new WeakMap();
+export const contentMeasurementDepth=report=>measurementDepth.get(report) ?? null;
 /** Mirrors storage's whole-string data-URL extraction; URLs inside code remain structure. */
 export function measureContent(value) {
   let structureBytes = 0,
     resourceBytes = 0,
     jsonBytes = 0,
     prettyPadding = 0;
-  const resources = new Set();
+  const resources = new Set();let maximumDepth=0;
   const addStructure = (bytes) => {
     structureBytes += bytes;
     jsonBytes += bytes;
   };
   const visit = (entry, depth = 0) => {
     if (depth > 64) throw new Error("Capacity input is nested too deeply.");
+    maximumDepth=Math.max(maximumDepth,depth);
     if (typeof entry === "string") {
       const match = /^data:([\w.+\/-]+);base64,([A-Za-z0-9+/]*={0,2})$/.exec(
         entry,
@@ -125,13 +130,14 @@ export function measureContent(value) {
     } else addStructure(utf8Bytes(JSON.stringify(entry)));
   };
   visit(value);
-  return {
+  const result={
     structureBytes,
     resourceBytes,
     resourceCount: resources.size,
     jsonBytes,
     prettyJsonBytes: jsonBytes + prettyPadding,
   };
+  measurementDepth.set(result,maximumDepth);return result;
 }
 /** Local byte comparison only. A caller must separately prove that one
  * existing field changed and that its real base body satisfies all limits.
