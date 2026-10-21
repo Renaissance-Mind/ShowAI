@@ -40,6 +40,7 @@ export function installInkDigestProvider(provider) {
     ["", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"],
     ["abc", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"],
     ["\0", "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d"],
+    // i18n-exempt: UTF-8 known-answer vector, not UI text.
     ["中文🤔", "431406ad071587234a33f8c00aa72eb2e54e28dad036f7f4061ffbff82f966ee"],
     ["\ud800", "83d544ccc223c057d2bf80d3f2a32982c32c3c0db8e2674820da5064783fb097"],
     ["\udc00", "83d544ccc223c057d2bf80d3f2a32982c32c3c0db8e2674820da5064783fb097"],

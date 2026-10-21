@@ -418,6 +418,25 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
             contents: "export function useInlineInk() {}",
             loader: "ts",
           };
+        // Frame tidying is an edit command; its graph layout would only add weight.
+        if (args.path === "src/surface/diagram.mjs")
+          return {
+            contents:
+              'export function tidyFrames() { throw new Error("Readers never edit."); }',
+            loader: "js",
+          };
+        // Outline settings open only for editable pages.
+        if (args.path === "src/surface/OutlineSettings.tsx")
+          return {
+            contents: "export function OutlineSettings() { return null; }",
+            loader: "tsx",
+          };
+        // Parameter documentation serves Agents and the catalog, never the reader.
+        if (
+          args.path === "resources/catalog/component-documentation.json" ||
+          args.path === "resources/catalog/diagram-documentation.json"
+        )
+          return { contents: "{}", loader: "json" };
         // The icon picker opens only in editable pages.
         if (args.path === "src/studio/PageIconDialog.tsx")
           return {

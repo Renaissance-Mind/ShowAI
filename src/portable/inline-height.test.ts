@@ -20,7 +20,8 @@ const paragraphs = (prefix: string, count: number) =>
     ],
   }));
 
-const rootPage = ".container-main > .container-page.is-root";
+// Native outlines wrap the root page in .page-outline-shell.
+const rootPage = ".container-main .container-page.is-root";
 const pages = new Map<string, string>();
 let browser: Browser;
 let server: Server;
