@@ -6,7 +6,7 @@
 
 ## 模型
 
-- 共享数据是项目里的一个独立资源，保存一份 JSON 值，有自己的 hash 和 revision。读写用 `dataset_list`、`dataset_read`、`dataset_create`、`dataset_apply`、`dataset_delete`。
+- 共享数据是项目里的一个独立资源，保存一份 JSON 值，有自己的 hash 和 revision；写入只需传读到的 `baseHash`。读写用 `dataset_list`、`dataset_read`、`dataset_create`、`dataset_apply`、`dataset_delete`。`dataset_read` 同时返回本项目中使用它的页面与块（`references`）。
 - 组件块通过 `data.$binding` 绑定共享数据。页面只保存绑定设置和这个块自己的值；共享数据变化不会改变页面的 hash，页面的保存冲突也不涉及共享数据。
 - 组件照常收到 `{data, onChange, readOnly}`，不需要任何新接口。宿主从共享数据生成组件参数，把 `onChange` 交回的整份参数按记录 id 拆成对共享数据的修改。组件要满足两点：列表条目有稳定 `id`，收到新的 `data` 时以它为准，见 [组件设计](../../create-component/references/component-authoring.md)。
 
@@ -14,13 +14,13 @@
 
 **props**：共享数据（或其中 `path` 指向的对象）就是组件的顶层参数，`local` 列出的参数留在各块自己保存（如标题、视图设置）。把已有组件的数据变成共享数据：
 
-```json
+```text
 dataset_create({projectId, name:"全景 OKR", fromBlock:{pageId, blockId, baseHash, baseRevision, local:["title"]}})
 ```
 
-它在同一次保存里创建共享数据并把该块改为绑定；自定义组件的参数 schema 会随之约束此后对共享数据的每次写入。另一个块要显示同一份数据时，用 `page_apply` 的 `{type:"component.binding.set", blockId, binding:{dataset:ID, props:{local:[...]}}}`。
+它在同一次保存里创建共享数据并把该块改为绑定；当时那个组件版本的参数 schema 会随之约束此后对共享数据的每次写入。组件升级后参数结构有变化时，用 `dataset_apply` 的 `schema` 换成新版本的约束（`null` 取消约束）。已有数据的列表缺 id 时，先在源组件里补上 id 再共享。另一个块要显示同一份数据时，用 `page_apply` 的 `{type:"component.binding.set", blockId, binding:{dataset:ID, props:{local:[...]}}}`。
 
-**collections**：把共享数据里沿某条路径找到的记录，作为某个数组参数（如表格的 `rows`）的条目，排在块自己的条目之后。下面的字段名（`objectives`、`due`、`done`、`areas`、表格的列 id）只是示例，要换成实际的组件参数和表格列；写回的值必须符合来源字段的类型与格式（例如日期是 `YYYY-MM-DD` 文本）：
+**collections**：把共享数据里沿某条路径找到的记录，作为某个数组参数（如表格的 `rows`）的条目，排在块自己的条目之后，按来源中的顺序排列（表格排序和日历按各自规则显示）。下面是 `component.binding.set` 的 `binding` 参数。下面的字段名（`objectives`、`due`、`done`、`areas`、表格的列 id）只是示例，要换成实际的组件参数和表格列；写回的值必须符合来源字段的类型与格式（例如日期是 `YYYY-MM-DD` 文本）：
 
 ```json
 {
@@ -62,20 +62,20 @@ dataset_create({projectId, name:"全景 OKR", fromBlock:{pageId, blockId, baseHa
 - `page_read` 的结构化、markdown 和大纲结果都带 `bindings`（`response:"source"` 也保留，`"receipt"` 省略）：每个绑定块的共享数据 id、hash、解析后的参数 `props`、映射条目数 `mapped`、每个映射条目对应的来源路径 `sources` 和提示 `issues`。图像、html 视图按共享数据显示。
 - 每次 `page_read` 或 `dataset_read` 都会记住本会话读到的版本；之后带 baseHash 的写入以它为起点，与期间别处的修改合并。写入和读取不在同一个 Agent 会话（不同的对话或连接）时，给 `page_apply` 传 `datasetBases:{共享数据id: 读到的hash}`。
 - 选择写法：修改页面上看到的一行（包括只属于这个块的字段，如开始准备），对绑定块用 `component.props.set`，按读取到的形式传参数（例如包含映射行的完整 `rows`）：映射字段写入共享数据，其他字段写入块，二者在同一次保存中完成。直接改来源记录（尤其是多条、嵌套或不在页面上显示的字段）用 `dataset_apply({projectId, datasetId, baseHash, operations})`：`{op:"set",path,value}`、`{op:"remove",path}`、`{op:"insert",path:列表,value,after?}`、`{op:"move",path:条目,after}`。路径按 id 选记录，例如 `objectives[id=o1].keyResults[id=k1].tasks[id=t1].due`，或 `["objectives",{"id":"o1"},…]`；映射条目的完整路径取自 `bindings[].sources`。
-- 两种写法遇到同一字段的新修改都返回 CONFLICT 并且什么都不写，见下文。
+- 两种写法遇到同一字段的新修改都返回 CONFLICT 并且什么都不写，见下文。`page_apply` 返回的 CONFLICT 带 `details.datasetId` 与 `details.conflicts` 时是共享数据冲突：重新 `page_read` 后逐项决定，不走 `page_diff` 和整页合并；没有这些字段时是页面本身的保存冲突。
 - `page_save` 不能把共享参数写进绑定块；要改这些参数用上面两种方式。
 - 解除绑定：`{type:"component.binding.remove", blockId, keep:"snapshot"}` 把当前显示的参数存为块的副本。
-- 删除：`dataset_delete({projectId, datasetId, baseHash})` 只能删除没有块使用的共享数据（包括已移到其他项目、仍指向它的页面），否则返回 `details.references`。删除不能在应用中撤销，先向用户确认；仍有页面使用时，列出这些页面，由用户决定是否先在这些块上解除绑定。
+- 删除：先用 `dataset_read` 的 `references` 查看本项目里使用它的页面，向用户确认（删除不能在应用中撤销）。`dataset_delete({projectId, datasetId, baseHash})` 只删除没有块使用的共享数据，已移到其他项目、仍指向它的页面也算在内；仍有使用时返回 `details.references` 而不删除，由用户决定是否先在这些块上解除绑定。
 
 ## 并发与冲突
 
 每次写入都带着它开始时的值。不同记录、同一记录的不同字段可以同时修改，自动合并；两处把同一字段改成不同的值才是冲突：写入返回 CONFLICT、什么都不写，`details.conflicts` 给出每个字段的 `path`、`base`、`mine`、`theirs`。重新读取，逐项决定后用新的 baseHash 写入；不要用旧读取的整份值覆盖。没有 id 的列表只能整体替换，几处同时改它会冲突，所以多人编辑的列表条目要有稳定 id。顺序调整按最后一次为准，不丢内容。
 
-工作台里的冲突留在出现冲突的那个窗口：组件上方列出「此处的修改」和「另一处的修改」，由使用者选择保留哪一个。这些未决的值保存在该窗口的本地草稿里，Agent 用 `dataset_read` 只能看到已保存的值，看不到也清除不了这个提示。用户问起时解释含义，读取已保存的值告诉用户；用户希望保留另一个值时，可以在确认后用 `dataset_apply` 写入，但仍需用户在该窗口选择一次来关闭提示。
+用户说应用里出现冲突提示时，先用 `page_read` 看该块是否在 `bindings` 中：是共享数据就按本节处理；不是则属于页面保存冲突，按 use-showai 的编辑与验证处理。工作台里的共享数据冲突留在出现冲突的那个窗口：组件上方列出「此处的修改」和「另一处的修改」，由使用者选择保留哪一个。这些未决的值保存在该窗口的本地草稿里（不在 `drafts_list` 的草稿中），Agent 用 `dataset_read` 只能看到已保存的值，看不到另一个值，也清除不了这个提示，需要请用户说出想保留的内容。用户问起时解释含义，读取已保存的值告诉用户；用户希望保留另一个值时，可以在确认后用 `dataset_apply` 写入，但仍需用户在该窗口选择一次来关闭提示。
 
 ## 把复制改成共享
 
-1. 核对组件：源组件的记录（各层列表条目）都有稳定且唯一的 `id`，组件按收到的 `data` 渲染。不满足时先说明，或按 [组件设计](../../create-component/references/component-authoring.md) 更新组件。
+1. 核对组件：用 `catalog_describe` 的 parameters 查看各层列表是否有唯一 `id`，用 development/source 确认组件按收到的 `data` 渲染。不满足时先说明，或按 [组件设计](../../create-component/references/component-authoring.md) 更新组件。
 2. 认出副本：复制进来的行通常带同步脚本使用的 id 前缀或来源说明，能对应到来源记录 id。无法确定时按标题与日期匹配，把匹配结果列给用户确认，不要猜。
 3. 比较副本和来源：副本的日期、完成或标题与来源不同时，说明是在目标页面改过。把差异列给用户，确定每一处保留哪一边。
 4. 在源页面用 `dataset_create` 的 `fromBlock` 把源组件改为共享数据（或在工作台的块菜单选「共享数据…」），再用 `dataset_apply` 写入用户决定保留的目标页面的值。
@@ -85,4 +85,4 @@ dataset_create({projectId, name:"全景 OKR", fromBlock:{pageId, blockId, baseHa
 
 ## 其他
 
-共享数据和组件参数一样最大 8 MiB。导出、图像与 board_read 使用保存时刻的数据快照；导出文件不再含绑定。页面移到其他项目后仍读原项目的共享数据（`binding.project`）。存为模板时，绑定块保存为当前数据的副本。项目同步按记录和字段合并两台设备的修改；无法合并的字段保留两份并生成说明页。
+共享数据和组件参数一样最大 8 MiB。导出、图像与 board_read 使用导出或渲染那一刻的最新数据快照；导出文件不再含绑定。页面移到其他项目后仍读原项目的共享数据（`binding.project`）。存为模板时，绑定块保存为当前数据的副本。项目同步按记录和字段合并两台设备的修改；无法合并的字段保留两份并生成说明页。

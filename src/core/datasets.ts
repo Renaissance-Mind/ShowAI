@@ -463,7 +463,7 @@ export class DatasetStore {
             `${result.conflicts.length} change(s) conflict with newer edits of the same fields. Nothing was written. Read the dataset, decide each field, then write with the new baseHash.`,
             { currentHash: current.hash, currentRevision: current.revision },
           );
-          error.details = { conflicts: result.conflicts };
+          error.details = { datasetId, conflicts: result.conflicts };
           throw error;
         }
         return { record: current, conflicts: result.conflicts, changed: false };

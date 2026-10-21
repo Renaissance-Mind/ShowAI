@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "showai",
-  "version": "0.20.1",
+  "version": "0.20.2",
   "description": "Four-stage presentation workflow (intent, material, logic, design), template method folders with optional component libraries, and unified MCP presentation for local and web agents.",
   "keywords": [
     "research",
