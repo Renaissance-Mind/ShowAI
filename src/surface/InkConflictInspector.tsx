@@ -21,9 +21,9 @@ export default function InkConflictInspector({ document, projectId, host, before
   onResolve: (document: ShowDocument) => void;
   readOnly?: boolean;
 }) {
-  const t = useTranslator(messages), groups = useMemo(() => host ? measureNativeSync("surface.conflictInspector",()=>inkWireResolutionCandidates(document)) : [], [document,host]);
+  const t = useTranslator(messages), groups = useMemo(() => measureNativeSync("surface.conflictInspector",()=>inkWireResolutionCandidates(document)), [document]);
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
-  if (!groups.length || !host) return null;
+  if (!groups.length) return null;
   const resolve = async (group: typeof groups[number], hash: string) => {
     if (busy || !projectId || readOnly) return;
     setBusy(true); setError("");
@@ -35,7 +35,7 @@ export default function InkConflictInspector({ document, projectId, host, before
     } catch (failure) { setError(errorMessage(failure)); }
     finally { setBusy(false); }
   };
-  return createPortal(<details className="ink-conflict-inspector" data-surface-ui>
+  const inspector=<details className={host ? "ink-conflict-inspector" : "surface-inspector ink-conflict-inspector"} data-surface-ui open>
     <summary>{t("title", { count: groups.length })}</summary>
     <p>{t("choose")}</p>
     {groups.map(group => <fieldset key={`${group.boardId}/${group.strokeId}/${group.field}`} disabled={busy || readOnly || !projectId}>
@@ -49,5 +49,6 @@ export default function InkConflictInspector({ document, projectId, host, before
       })}
     </fieldset>)}
     {error && <p role="alert">{error}</p>}
-  </details>, host);
+  </details>;
+  return host ? createPortal(inspector,host) : inspector;
 }

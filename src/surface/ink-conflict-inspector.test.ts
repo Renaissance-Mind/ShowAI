@@ -36,10 +36,25 @@ it('malformed state is rejected even when no divergent heads would otherwise be 
  const document=source();document.content.attrs!.inkState.strokes.stroke.fields.color=[];counted();
  expect(()=>inkWireConflicts(document)).toThrow('head');
 });
-it('a missing host does no hidden candidate construction while leaving normal validation authoritative',()=>{
- const document=source();document.content.attrs!.inkState.strokes.stroke.fields.color=[];
- const inputs=counted();expect(renderToStaticMarkup(createElement(InkConflictInspector,{document,getDocument:()=>document,onResolve:()=>{}}))).toBe('');expect(inputs).toEqual([]);
- expect(()=>inkWireConflicts(document)).toThrow('head');
+it('the normal missing-host path has no DOM or geometry hashes when there are no conflicts',()=>{
+ const document=source(),inputs=counted();
+ expect(renderToStaticMarkup(createElement(InkConflictInspector,{document,getDocument:()=>document,onResolve:()=>{}}))).toBe('');expect(inputs).toEqual([]);
+});
+it('the normal missing-host path still rejects malformed wire state',()=>{
+ const document=source();document.content.attrs!.inkState.strokes.stroke.fields.color=[];counted();
+ expect(()=>renderToStaticMarkup(createElement(InkConflictInspector,{document,getDocument:()=>document,onResolve:()=>{}}))).toThrow('head');
+});
+it('shows every actual retained color choice inline without an inspector host',()=>{
+ const base=source(),left=structuredClone(base),right=structuredClone(base);left.content.content![0].attrs!.color='#ff0000';right.content.content![0].attrs!.color='#0000ff';
+ const document=mergePageContent(base,stampInkDocument(left,base,{actor:'left',sequence:1}),stampInkDocument(right,base,{actor:'right',sequence:1})).document;
+ const inputs=counted(),html=renderToStaticMarkup(createElement(InkConflictInspector,{document,projectId:'actual-project',getDocument:()=>document,onResolve:()=>{}}));
+ expect(html).toContain('surface-inspector ink-conflict-inspector');expect(html).toContain('<summary>');expect(html).toContain('open=""');
+ expect(html).toContain('#0000ff');expect(html).toContain('#ff0000');expect(html).toContain('left');expect(html).toContain('right');
+ expect(html.match(/<button/g)).toHaveLength(2);expect(html).not.toContain('disabled=""');expect(inputs).toContain(canonicalInkJSON(ink(document)));
+ const reading=renderToStaticMarkup(createElement(InkConflictInspector,{document,projectId:'actual-project',readOnly:true,getDocument:()=>document,onResolve:()=>{}}));
+ expect(reading).toContain('<fieldset disabled=""');expect(reading.match(/<button/g)).toHaveLength(2);
+ const noProject=renderToStaticMarkup(createElement(InkConflictInspector,{document,getDocument:()=>document,onResolve:()=>{}}));
+ expect(noProject).toContain('<fieldset disabled=""');
 });
 it('a placement-only conflict remains structural and does not rehash geometry',()=>{
  const document=source();document.content.attrs!.inkState.strokes.stroke.unplaced=true;
