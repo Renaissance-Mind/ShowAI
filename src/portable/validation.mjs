@@ -35,6 +35,8 @@ import {
   CAPACITY,
   assertBytes,
   assertContent,
+  assertContentSizes,
+  CapacityError,
   assertCompiledComponent,
   utf8Bytes,
   measureContent,
@@ -476,6 +478,9 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
     throw new Error(`Document exceeds ${MAX_NODES} nodes.`);
   if (depth > MAX_DEPTH) throw new Error("Document is nested too deeply.");
   const node = object(value, path);
+  // Component validators are intentionally opaque here. Never infer an output
+  // capacity bound across component/data-binding normalization.
+  if (node.type === "widget") counter.capacityMayGrow = true;
   if (
     !counter.resource &&
     node.type === "surface" &&
@@ -760,15 +765,63 @@ export function isDocumentTimestamp(value) {
   return typeof value === "string" && Number.isFinite(Date.parse(value));
 }
 
+// Canonicalization copies these maps, adds IDs/frames and updates view arrays.
+// Preserve their real preimages before consuming validation may fill them.
+function capacityPreimage(document) {
+  const plain = value => value && typeof value === "object" && !Array.isArray(value);
+  const view = value => plain(value) ? {...value, ...(Object.hasOwn(value, "readingOrder") && Array.isArray(value.readingOrder) ? {readingOrder: [...value.readingOrder]} : {})} : value;
+  return {...document,
+    ...(Object.hasOwn(document, "layout") && plain(document.layout) ? {layout: {...document.layout}} : {}),
+    ...(Object.hasOwn(document, "views") && plain(document.views) ? {views: view(document.views)} : {}),
+    ...(Object.hasOwn(document, "surfaceViews") && plain(document.surfaceViews) ? {surfaceViews: Object.fromEntries(Object.entries(document.surfaceViews).map(([id, value]) => [id, view(value)]))} : {}),
+  };
+}
+// A subset retaining the same leaves can only remove syntax/resources. This
+// never subtracts individual data URLs from their global deduplicated total.
+function shrinkingProjection(before, after) {
+  if (before === after) return true;
+  if (!before || !after || typeof before !== "object" || typeof after !== "object" || Array.isArray(before) !== Array.isArray(after)) return false;
+  if (Array.isArray(after)) return after.length <= before.length && after.every((value, index) => shrinkingProjection(before[index], value));
+  return Object.keys(after).every(key => Object.hasOwn(before, key) && shrinkingProjection(before[key], after[key]));
+}
+const documentCapacity = new WeakMap();
+function canonicalCapacity(before, after, sizes, opaque) {
+  const added = {};
+  let scan = opaque;
+  for (const [key, value] of Object.entries(after)) {
+    if (!Object.hasOwn(before, key)) Object.defineProperty(added, key, {value, enumerable: true});
+    else if (!shrinkingProjection(before[key], value)) scan = true;
+  }
+  const addition = measureContent(added);
+  // New resources can coincide with URLs elsewhere, so only the full official
+  // measure can decide that case. Structural fills also take this fallback.
+  if (addition.resourceCount) scan = true;
+  const overhead = count => 2 + Math.max(0, count - 1);
+  const addedCount = Object.keys(added).length, beforeCount = Object.keys(before).length, afterCount = Object.keys(after).length;
+  const payload = addition.structureBytes - overhead(addedCount);
+  const separators = overhead(afterCount) - overhead(beforeCount);
+  const prettyOverhead = count => overhead(count) + (count ? 4 * count + 1 : 0);
+  const upper = {...sizes, structureBytes: sizes.structureBytes + payload + separators, jsonBytes: sizes.jsonBytes + payload + separators,
+    prettyJsonBytes: sizes.prettyJsonBytes + addition.prettyJsonBytes - prettyOverhead(addedCount) + prettyOverhead(afterCount) - prettyOverhead(beforeCount)};
+  let result;
+  if (scan) result = assertContent(after);
+  else {
+    try { result = assertContentSizes(upper); }
+    catch (error) { if (!(error instanceof CapacityError)) throw error; result = assertContent(after); }
+  }
+  documentCapacity.set(after, {before: sizes, upper: result});
+}
+
 export function validateDocument(value) {
   return validateDocumentValue(value, true);
 }
 
 function validateDocumentValue(value, independent) {
   validateJson(value, "document");
-  assertContent(value);
+  const sizes = assertContent(value);
   const source = object(value, "document");
   const document = independent ? structuredClone(source) : source;
+  const capacityBefore = capacityPreimage(document);
   let templateContext;
   if (document.templateContext !== undefined) {
     const context = object(
@@ -830,11 +883,8 @@ function validateDocumentValue(value, independent) {
     document.surfaceViews !== undefined
   )
     throw new Error("Layout and views require a surface root.");
-  validateNode(document.content, "document.content", {
-    count: 0,
-    surface,
-    resource,
-  });
+  const validation = {count: 0, surface, resource, capacityMayGrow: false};
+  validateNode(document.content, "document.content", validation);
   if (surface) validateSurface(document);
   const canvasIds = new Set(
     (document.content.content ?? [])
@@ -886,7 +936,7 @@ function validateDocumentValue(value, independent) {
       resolved: comment.resolved,
     };
   });
-  return {
+  const canonical = {
     // Full JSON has already passed validation. Preserve forward-compatible
     // fields while the explicitly validated known fields retain authority.
     ...document,
@@ -915,6 +965,8 @@ function validateDocumentValue(value, independent) {
     comments,
     ...(templateContext ? { templateContext } : {}),
   };
+  canonicalCapacity(capacityBefore, canonical, sizes, validation.capacityMayGrow);
+  return canonical;
 }
 
 function validateComponents(input) {
@@ -986,13 +1038,8 @@ function validateSelection(selection, document) {
 }
 
 function parseArtifactDocument(input, documentParser) {
-  assertBytes(
-    "Artifact JSON",
-    typeof input === "string"
-      ? utf8Bytes(input)
-      : measureContent(input).jsonBytes,
-    CAPACITY.artifactBytes,
-  );
+  const inputBytes = typeof input === "string" ? utf8Bytes(input) : measureContent(input).jsonBytes;
+  assertBytes("Artifact JSON", inputBytes, CAPACITY.artifactBytes);
   const artifact = object(
     typeof input === "string" ? JSON.parse(input) : input,
     "artifact",
@@ -1009,7 +1056,7 @@ function parseArtifactDocument(input, documentParser) {
   const document = documentParser(artifact.document);
   if (artifact.version !== artifactVersion(document))
     throw new Error("Artifact version does not match its page model.");
-  return {
+  const result = {
     format: "showai",
     version: artifact.version,
     document,
@@ -1028,6 +1075,13 @@ function parseArtifactDocument(input, documentParser) {
           remoteComponents: validateRemoteComponents(artifact.remoteComponents),
         }),
   };
+  const proof = documentCapacity.get(document);
+  const documentGrowth = document === artifact.document && !proof ? 0 : proof ? Math.max(0, proof.upper.jsonBytes - proof.before.jsonBytes) : null;
+  const selectionGrowth = result.selection ? Math.max(0, measureContent(result.selection).jsonBytes - measureContent(artifact.selection).jsonBytes) : 0;
+  const remoteGrowth = result.remoteComponents ? Math.max(0, measureContent(result.remoteComponents).jsonBytes - measureContent(artifact.remoteComponents).jsonBytes) : 0;
+  if (documentGrowth === null || inputBytes + documentGrowth + selectionGrowth + remoteGrowth > CAPACITY.artifactBytes)
+    assertBytes("Artifact JSON", measureContent(result).jsonBytes, CAPACITY.artifactBytes);
+  return result;
 }
 
 export function parseArtifact(input) {

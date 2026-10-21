@@ -4,6 +4,7 @@ import {
   assertContent,
   base64Bytes,
   measureContent,
+  nonResourceReplacementDoesNotGrow,
   readCapacityText,
   utf8Bytes,
 } from "./capacity.mjs";
@@ -108,4 +109,11 @@ test("HTTP body guards count actual stream bytes without relying on Content-Leng
     actualBytes: 6,
     limitBytes: 5,
   });
+});
+
+test("scalar capacity monotonicity uses real escaped UTF-8 bytes and never infers resource replacement",()=>{
+ const before="2026-10-21T00:00:00.000Z",sameSize="2026-10-22T01:00:00.000Z";
+ expect(nonResourceReplacementDoesNotGrow(before,sameSize)).toBe(true);expect(nonResourceReplacementDoesNotGrow(before,"2026-10-22")).toBe(true);expect(nonResourceReplacementDoesNotGrow("2026-10-22",sameSize)).toBe(false);
+ expect(nonResourceReplacementDoesNotGrow("2026-10-22 ","2026-10-22\n")).toBe(false);expect(nonResourceReplacementDoesNotGrow("中",'\n')).toBe(true);
+ const resource="data:image/png;base64,AAEC";expect(nonResourceReplacementDoesNotGrow(resource,resource)).toBe(false);expect(nonResourceReplacementDoesNotGrow(resource,"2026-10-22")).toBe(false);
 });

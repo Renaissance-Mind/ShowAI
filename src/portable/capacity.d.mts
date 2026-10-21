@@ -36,11 +36,14 @@ export interface ContentSize {
   prettyJsonBytes: number;
 }
 export function measureContent(value: unknown): ContentSize;
+/** Byte comparison, not a document validation proof. */
+export function nonResourceReplacementDoesNotGrow(before: unknown, after: unknown): boolean;
 export function assertContent(
   value: unknown,
   kind?: string,
   maximum?: number,
 ): ContentSize;
+export function assertContentSizes(sizes: ContentSize, kind?: string, maximum?: number): ContentSize;
 export function assertCompiledComponent(component: {
   html: string;
   inline?: { script: string; styles: string };
