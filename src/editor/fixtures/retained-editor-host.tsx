@@ -33,10 +33,31 @@ const ProbeNode = Node.create({
   addNodeView: () => ReactNodeViewRenderer(Probe),
 });
 const extensions = [StarterKit, ProbeNode];
-function Content({ scope }: { scope: string }) {
+function Content({
+  scope,
+  host,
+  onPublication,
+  onInteraction,
+}: {
+  scope: string;
+  host: string;
+  onPublication: (host: string) => void;
+  onInteraction: (interaction: string) => void;
+}) {
   const editor = useWorkspaceEditor({
     retentionKey: "same-page",
     extensions,
+    onUpdate: () => onPublication(host),
+    editorProps: {
+      handleKeyDown: (_view, event) => {
+        if (event.key === "F8") onInteraction(`key:${host}`);
+        return false;
+      },
+      handleClick: () => {
+        onInteraction(`click:${host}`);
+        return false;
+      },
+    },
     content: {
       type: "doc",
       content: [
@@ -65,13 +86,15 @@ function Content({ scope }: { scope: string }) {
       >
         Inspect Editor {scope}
       </button>
-      <output>{report}</output>
+      <output data-editor-report>{report}</output>
     </>
   );
 }
 function Scope({ name }: { name: string }) {
   const [host, setHost] = useState("embedded"),
     [visible, setVisible] = useState(true),
+    [publicationHost, setPublicationHost] = useState(""),
+    [interaction, setInteraction] = useState(""),
     [editors] = useState(() => new WorkspaceEditors());
   return (
     <section data-scope={name}>
@@ -84,12 +107,19 @@ function Scope({ name }: { name: string }) {
         <button onClick={() => setVisible(!visible)}>
           Toggle Activity {name}
         </button>
+        <output data-publication-host>{publicationHost}</output>
+        <output data-interaction-host>{interaction}</output>
         <Activity mode={visible ? "visible" : "hidden"}>
           <section key={host} data-host={host}>
             <h1>
               {name} {host}
             </h1>
-            <Content scope={name} />
+            <Content
+              scope={name}
+              host={host}
+              onPublication={setPublicationHost}
+              onInteraction={setInteraction}
+            />
           </section>
         </Activity>
       </WorkspaceEditorContext.Provider>
