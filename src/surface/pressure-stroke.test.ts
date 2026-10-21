@@ -15,11 +15,17 @@ it("preserves pressure in saved strokes and renders fixed and pressure widths di
   const document = createResource(blankDocument(),"board");
   const saved = addNode(document,value.node,value.frame,document.content.attrs!.id);
   const restored = parseArtifact(serializeArtifact(saved)).document.content.content![0];
-  expect(restored.attrs!.points.map((p:{pressure:number})=>p.pressure)).toEqual([0.2,0.9,0.4]);
+  // Freehand nodes keep one authoritative trajectory: pressure lives in the
+  // portable ink samples (index 6), while attrs.points holds only the endpoints.
+  expect(restored.attrs!.ink.samples.map((sample:number[])=>sample[6])).toEqual([0.2,0.9,0.4]);
+  expect(restored.attrs!.points.map((p:{pressure:number})=>p.pressure)).toEqual([0.2,0.4]);
   const dynamic = renderToStaticMarkup(createElement(Drawing,{node:restored}));
   const fixed = renderToStaticMarkup(createElement(Drawing,{node:{...restored,attrs:{...restored.attrs,pressure:false}}}));
-  expect(dynamic).toContain('stroke="none"');
-  expect(fixed).not.toContain('stroke="none"');
+  // Portable ink fills its outline either way; pressure changes the outline itself.
+  const outline = (markup: string) => markup.match(/ d="([^"]+)"/)?.[1];
+  expect(outline(dynamic)).toBeTruthy();
+  expect(outline(fixed)).toBeTruthy();
+  expect(outline(dynamic)).not.toBe(outline(fixed));
 });
 
 it.each([["pen",12],["highlighter",20],["eraser",64]] as const)("limits %s controls while exposing its actual stroke mode",(tool,max)=>{
